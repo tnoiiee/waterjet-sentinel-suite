@@ -96,8 +96,34 @@ invalid values (TMP-007).
     Gate decision.
 11. **Profile and identification.** The active device profile (`SIMULATOR`, `TEST_HARDWARE`,
     `PRODUCTION`) is configuration state that is validated at start and displayed in the UI
-    chrome ([ADR-0006](ADR-0006-ui-delivery-model.md) item 8). Changing it is an audited
+    chrome ([ADR-0006](ADR-0006-ui-delivery-model.md)). Changing it is an audited
     administrative action requiring permission, and it is never changed implicitly.
+12. **Published Configuration Snapshot — the runtime hot path.** The legacy application delayed
+    itself by querying parameters repeatedly. The runtime must therefore hold operational
+    parameters in memory:
+    - The runtime **loads the Published configuration at startup and validates it**.
+    - The runtime holds an **immutable in-memory Published Configuration Snapshot**. Immutable
+      means a published revision in use is never edited in place; a new revision is a new
+      snapshot.
+    - Queue, alarm, acquisition, motion, and Cleaning Job logic read the **in-memory snapshot**,
+      never the database, per cycle.
+    - Configuration is reloaded **only** after an explicitly Published revision or an approved
+      startup or recovery action.
+    - A validated new revision is **swapped in atomically**, under the approved runtime state
+      gate — a revision must not be applied while a Cleaning Job is active.
+    - A **Draft is never consumed by the runtime.**
+    - The UI does not query SQL for operational parameters every second, and device polling
+      does not query SQL for static parameters every cycle.
+    - If the new revision fails validation inside the runtime, the runtime keeps operating on
+      the previous snapshot and raises an explicit fault.
+13. **Presentation thresholds are read from the Published configuration.** Where a display
+    threshold is configurable — including the Dirty/Cleaner classification threshold recorded
+    in [`../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) section 5.1 — the UI must read the **effective
+    value from the Published configuration** and must not hard-code visual text around an
+    assumed value. Site-specific values remain local and are never committed.
+14. **Acquisition configuration compiles into a Poll Plan at publication**, not per poll cycle
+    ([ADR-0010](ADR-0010-device-adapter-boundary.md) item 12). Publication therefore has an
+    acquisition-side effect that must be bounded and measurable.
 
 ## Alternatives considered
 
@@ -109,6 +135,9 @@ invalid values (TMP-007).
 | Runtime watches configuration files and reloads automatically | An edit could take effect mid-job with no validation gate, no audit, and no publication record | Rejected |
 | Runtime reads a Draft directly | Breaks the requirement that a Draft is not runtime state, and makes an unvalidated intermediate edit executable | Rejected |
 | Applying a new revision immediately even during an active job | Could change coordinates, timeouts, or thresholds mid-job, undermining deterministic sequencing and job reproducibility | Rejected |
+| Reading operational parameters from SQL each cycle | Reintroduces database latency into the control path — the legacy failure mode | Rejected — immutable in-memory Published Configuration Snapshot |
+| Mutating the snapshot in place when a revision is published | Makes the configuration in force ambiguous and breaks job reproducibility | Rejected — a new revision is a new immutable snapshot, swapped atomically |
+| Hard-coding a display threshold in the UI | The displayed classification would contradict the published configuration and the dispatcher | Rejected — the effective threshold is read from the Published configuration |
 | Editing a published revision in place | Destroys the audit trail and makes historical job analysis untrustworthy | Rejected |
 | Storing secrets in the SQL Server database used for configuration | Moves the secret rather than protecting it, and adds a credential needed to reach the credential | Rejected |
 | Applying an invalid configuration with a warning | Directly contradicts the approved rule that the runtime must not silently correct invalid values | Rejected |
@@ -125,6 +154,12 @@ invalid values (TMP-007).
   accidentally change behaviour during a job. This is deliberate friction.
 - The Draft/Published split means two representations of the same engineering data must stay
   consistent in the UI; that is a UI design cost, not an architectural ambiguity.
+- Because the runtime never reads parameters per cycle, database slowness cannot slow
+  acquisition, queue evaluation, or the live UI. The trade is that configuration relevance
+  depends on the runtime's state gate, and the runtime must stamp and expose which revision is
+  in force.
+- Poll Plan compilation moves cost to publication time, so a publication is a measurable
+  event rather than a silent database write.
 
 ## Risks
 
@@ -143,7 +178,10 @@ invalid values (TMP-007).
   store, no publication workflow, no validation pipeline, no secret store, and no profile
   switch.
 - `[OPEN]`: local configuration path and format; secret-store mechanism; configuration backup
-  and restore; whether revision application can be performed without a runtime restart.
+  and restore; whether revision application can be performed without a runtime restart; the
+  snapshot's internal representation; and the exact Poll Plan compilation rules.
+- `[NOT VERIFIED]`: nothing about the snapshot has been executed; there is no runtime, no
+  publication workflow, and no validation pipeline.
 - No configuration file, no example file, and no credential is created by this Stage.
 
 ## Follow-up gates
@@ -154,6 +192,8 @@ invalid values (TMP-007).
 | Secret-store mechanism | Implementation Stage Gate, before any secret is stored |
 | Configuration validation rule catalogue | Implementation Stage Gate (rules), with production values captured locally, never committed |
 | Revision application procedure and state gate | Implementation Stage Gate |
+| Snapshot representation and atomic swap mechanism | Implementation Stage Gate |
+| Poll Plan compilation rules at publication | Implementation Stage Gate, with device evidence |
 | Local configuration backup and restore | Deployment Stage Gate |
 | Example-file authoring (public-safe only) | A later Stage Gate that explicitly permits creating example configuration files |
 
@@ -180,7 +220,9 @@ invalid values (TMP-007).
 - [`../PUBLIC_REPOSITORY_BOUNDARY.md`](../PUBLIC_REPOSITORY_BOUNDARY.md) — prohibited content
 - [`../../SECURITY.md`](../../SECURITY.md) — secrets and credentials policy
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — configuration and secrets model (section 17)
-- [`../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) — configuration identity and publication rules
+- [`../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) — configuration identity and publication rules;
+  Dirty/Cleaner display classification (section 5.1)
 - [`ADR-0009-database-access-and-migrations.md`](ADR-0009-database-access-and-migrations.md)
 - [`ADR-0012-simulator-first-development.md`](ADR-0012-simulator-first-development.md)
+- [`ADR-0010-device-adapter-boundary.md`](ADR-0010-device-adapter-boundary.md) — Poll Plan
 - [`ADR-0013-offline-deployment.md`](ADR-0013-offline-deployment.md)

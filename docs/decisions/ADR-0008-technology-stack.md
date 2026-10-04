@@ -1,20 +1,29 @@
 # ADR-0008 — Technology Stack
 
 - **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`.
-- **Date:** 2026-10-04
+  Review. Not binding until the Owner records `ACCEPTED`. **The final UI framework is
+  `[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+- **Date:** 2026-10-04 (corrected 2026-10-05 by the Owner-requested Stage 0.2 documentation
+  review punchlist)
 - **Supersedes:** Nothing. This record addresses the stack questions left `[OPEN]` by
   [`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 11 and listed in
   [`../CURRENT_STATE.md`](../CURRENT_STATE.md) section 8.1.
-- **Scope:** Platform support track, backend and local API framework, UI technology, service
-  hosting model, dependency injection, configuration framework, structured logging strategy,
-  validation approach, unit- and integration-test approach, and offline packaging direction.
+- **Scope:** Platform support track, backend and local API framework, UI technology and
+  framework candidates, service hosting model, dependency injection, configuration framework,
+  structured logging strategy, validation approach, unit- and integration-test approach, and
+  offline packaging direction.
 - **Authority:** Approved Stage 0.2 Scope Gate — *Technology and Solution Architecture
-  Decision*, sections 8.1, 8.2, and 8.6.
+  Decision*, sections 8.1, 8.2, and 8.6, as refined by the Owner-requested Stage 0.2
+  documentation review punchlist.
 
 ---
 
 ## Context
+
+The legacy application evidence recorded in [ADR-0006](ADR-0006-ui-delivery-model.md) and
+[`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 23 shows what happens when acquisition,
+database access, rendering, and graph updates share one architecture without isolation. The
+stack chosen here must make that failure mode structurally difficult, not merely unlikely.
 
 The target platform is Windows 11 Pro on a single standalone workstation per Boiler Unit. The
 system must run offline, own long-lived device sessions, host a local API, run a Windows
@@ -48,10 +57,13 @@ support dates, and keep a decision `OPEN` when current evidence cannot support i
    the loopback-only Local Application API defined in
    [ADR-0007](ADR-0007-runtime-process-model.md). Minimal API style is the baseline: the API
    is a small, explicit, contract-first surface, not a general web application.
-3. **UI technology: local web UI implemented in C# with a Blazor-based component model**,
-   rendered inside the application-owned kiosk shell window, as decided in
-   [ADR-0006](ADR-0006-ui-delivery-model.md). The shell host framework remains `[OPEN]`
-   there.
+3. **UI delivery: a local web UI rendered inside the application-owned kiosk shell window**,
+   as locked in [ADR-0006](ADR-0006-ui-delivery-model.md) items 1 to 4. The **final UI
+   framework is `[OPEN]`**. The candidates, compared inside the same architecture, are
+   **Candidate A — React + TypeScript + Vite** and **Candidate B — Blazor Hybrid**. The shell
+   host framework is also `[OPEN]`. The framework decision is deferred to the proposed
+   Stage 0.2.1 spike; no UI code may be created before that decision
+   ([`../MASTER_PLAN.md`](../MASTER_PLAN.md) section 3.2).
 4. **Windows Service hosting model:** the generic host model with the platform's Windows
    Service integration, one service instance, automatic start, service recovery configured at
    installation, and explicit startup-state gating before any command is issued
@@ -114,6 +126,17 @@ support dates, and keep a decision `OPEN` when current evidence cannot support i
     - Application builds are produced offline from a local package source (a local folder feed
       or equivalent) and pinned versions; no build step may require reaching a public package
       registry.
+    - **Both UI framework candidates can be built and deployed offline.** If Candidate A is
+      selected, a prepared local npm mirror or vendored package cache, a committed dependency
+      manifest and lock file, and a pinned Node.js toolchain become part of the offline build
+      definition. React does **not** require Internet access to build or to run.
+    - Candidate A adds a **second package and build ecosystem** (Node.js/npm in addition to
+      NuGet). This increases offline dependency-management, mirroring, and supply-chain audit
+      effort. It does not make offline development or deployment impossible, and it is not a
+      reason to reject the candidate.
+    - Candidate B keeps a single build ecosystem. That reduction is a real advantage, but it
+      does not by itself prove UI performance, graph quality, camera integration, or
+      long-running kiosk stability.
     - Application packages are produced as offline installable media. The package format
       (MSI, MSIX, or custom) is `[OPEN]` and belongs to the deployment Stage Gate.
     - Prerequisites that are vendor media (SQL Server Standard, and the web view runtime if it
@@ -122,10 +145,26 @@ support dates, and keep a decision `OPEN` when current evidence cannot support i
       Internet download.
     - No installer, package definition, or deployment script is created in this Stage.
 
+### UI framework comparison position
+
+The full dimension-by-dimension comparison is in
+[ADR-0006](ADR-0006-ui-delivery-model.md). The stack-level position is:
+
+| Item | Position |
+| --- | --- |
+| Locked by this Stage | Local web UI rendered in an application-owned kiosk shell window; loopback ASP.NET Core Local Application API; separate .NET Equipment Runtime Windows Service |
+| Comparison candidates | Candidate A — React + TypeScript + Vite; Candidate B — Blazor Hybrid. Both hosted in the same application-owned shell with the same API contract, the same synthetic data, and the same acceptance measures |
+| Current evidence-based preference | Candidate A, based on the Owner's legacy operating experience with React/Vite and push updates, dense-visualisation fit, charting and camera ecosystem, and UI test tooling. **A preference is not an acceptance** |
+| Explicitly not a basis for selection | Internet access assumptions; ease of closing a window; C# language unity alone; ecosystem size alone |
+| Selection route | Proposed Stage 0.2.1 — UI and Runtime Technology Spike, `PROPOSED` and `[NOT AUTHORIZED]` |
+| Effect on the rest of the stack | None: .NET, ASP.NET Core, the service host, dependency injection, configuration, logging, validation, and the adapter boundaries are unchanged by the framework decision |
+
 ## Alternatives considered
 
 | Decision | Alternative | Reason not selected |
 | --- | --- | --- |
+| **UI framework** | **Select Blazor Hybrid now because it uses C# and one toolchain** | Language unity and a smaller offline ecosystem are genuine advantages, but they do not demonstrate the one-second 104-cell workload, trend quality, camera integration, or long-running kiosk stability. Those require measurement |
+| **UI framework** | **Exclude React because it is assumed to need Internet access** | Incorrect: React can be built and deployed offline from local assets and a local package mirror. Excluding a candidate on a false premise would be a reasoning error |
 | Platform | Native Windows C++ or C# with a non-.NET runtime | Higher development and maintenance cost for the same offline Windows deployment, with weaker tooling for a small team; no requirement in the baseline forces a non-.NET platform |
 | Platform | Cross-platform runtime with an abstraction layer | The deployment target is one Windows workstation per Boiler Unit; abstracting the platform adds cost with no deployment benefit |
 | Support track | Rolling Current (standard-term) release track | Shorter support windows do not suit an offline, year-scale installation where the maintenance visit is a cost event. LTS reduces the number of version transitions the site must absorb |
@@ -144,9 +183,17 @@ support dates, and keep a decision `OPEN` when current evidence cannot support i
 
 ## Consequences
 
-- The stack is deliberately narrow: one platform, one language, one service host, one UI
-  technology family. This reduces the offline-restore and version-drift surface that a small
-  team must support on a site with no Internet access.
+- The stack is deliberately narrow on the server side: one platform, one language, one service
+  host. This reduces the offline-restore and version-drift surface that a small team must
+  support on a site with no Internet access.
+- The UI framework remains undecided, so the stack now has **two possible shapes**: a .NET-only
+  shape (Candidate B) or a .NET backend plus a TypeScript frontend shape (Candidate A). The
+  architecture, the API contract, the presentation model, and the deployment boundary are
+  identical in both, so the decision can be deferred without blocking design work.
+- If Candidate A is selected, this repository inherits a second package ecosystem with its own
+  pinning, mirroring, licence-inventory, and vulnerability-review obligations. That is a
+  deliberate, accepted cost recorded in [ADR-0013](ADR-0013-offline-deployment.md), not an
+  accident.
 - Because the exact .NET version and the logging and test-framework selections stay `[OPEN]`,
   the implementation Stage Gate inherits a small, explicit list of pinning actions with
   licence and offline-availability checks. This is deliberate: inventing them now would
@@ -168,6 +215,8 @@ support dates, and keep a decision `OPEN` when current evidence cannot support i
 | Offline package feed diverges from the pinned versions | Non-reproducible builds | Pinned versions plus a maintained local feed; build definition owned by a later gate | `[PROPOSED]` |
 | Validation implemented in the UI and skipped by the runtime | Invalid configuration or unauthorised command reaches equipment | Validation pipeline is domain-owned, and publication and command validation happen in the runtime service | `[PROPOSED]` |
 | Logging volume during a fault saturates local disk | Loss of diagnostics during the incident that matters | Rotation, retention, and volume caps; diagnostics retention is already a separate category in the approved retention model | `[PROPOSED]` |
+| A second package ecosystem drifts, or cannot be restored offline | Non-reproducible offline builds and unreviewed dependency risk | If Candidate A is selected: pinned versions, committed manifest and lock file, a prepared local mirror or vendored cache, and a licence and vulnerability inventory | `[OPEN]` |
+| UI framework chosen informally after this Stage without the spike | The legacy UI performance failure returns, and the choice is not evidenced | Framework remains `[OPEN]`; the proposed Stage 0.2.1 spike is the only authorised selection route; no UI code before a decision | `[PROPOSED]` |
 
 ## Verification status
 
@@ -176,20 +225,26 @@ support dates, and keep a decision `OPEN` when current evidence cannot support i
 - `[NOT VERIFIED]`: exact .NET version, its support window, and Windows 11 Pro compatibility
   for the pinned version.
 - `[NOT VERIFIED]`: offline restorability of every proposed dependency, and the licence
-  position of every library.
-- `[OPEN]`: .NET version pin; logging provider; validation library (optional); unit-test
-  framework; integration-test tooling; UI automation tooling; package format.
+  position of every library — including the npm dependency tree if Candidate A is selected.
+- `[NOT VERIFIED]`: the performance suitability of either UI framework candidate. No
+  measurement exists for the 104-cell one-second workload, trend rendering, camera
+  integration, or long-running memory stability.
+- `[OPEN]`: **final UI framework (Candidate A or Candidate B)**; shell host framework; .NET
+  version pin; logging provider; validation library (optional); unit-test framework;
+  integration-test tooling; UI automation tooling; push transport; chart library; package
+  format.
 - No standard, certification, or compliance claim is made or implied by this stack.
 
 ## Follow-up gates
 
 | Item | Gate that must close it |
 | --- | --- |
+| **Final UI framework selection (Candidate A versus Candidate B)** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED) |
 | .NET LTS version pin with a cited support reference | Implementation Stage Gate (before the first project file is created) |
 | Logging provider selection and licence review | Implementation Stage Gate |
 | Unit-test framework selection and pinning | Implementation Stage Gate (with the first test project) |
-| Integration and UI automation tooling | Test Stage Gate |
-| Offline package format and local feed definition | Deployment Stage Gate |
+| Integration and UI automation tooling | Test Stage Gate, and the Stage 0.2.1 spike for UI tooling ergonomics |
+| Offline package format and local feed definition, including a second ecosystem if Candidate A is selected | Deployment Stage Gate |
 | Dependency licence review for every third-party component | Implementation Stage Gate, repeated whenever a dependency is added |
 
 ## Relationship to protected decisions
@@ -207,9 +262,16 @@ support dates, and keep a decision `OPEN` when current evidence cannot support i
 
 ## References
 
-- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — decision index and required decision output
+- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — decision index and required decision output;
+  legacy evidence (section 23), UI framework candidates (section 24), legacy UI workload
+  (section 25), sensor presentation model (section 26), quality pipeline (section 27),
+  live-state delivery (section 28), Modbus acquisition (section 29), configuration snapshot
+  (section 30), Historian decoupling (section 31), trend direction (section 32), proposed
+  spike (section 33)
 - [`../TEST_STRATEGY.md`](../TEST_STRATEGY.md) — planned verification levels
-- [`../REQUIREMENTS.md`](../REQUIREMENTS.md) — ARC and TST requirement groups
+- [`../MASTER_PLAN.md`](../MASTER_PLAN.md) — proposed Stage 0.2.1
+- [`../REQUIREMENTS.md`](../REQUIREMENTS.md) — ARC, UIW, SPC, DQS, LSD, MDA, CPS, and TST
+  requirement groups
 - [`ADR-0006-ui-delivery-model.md`](ADR-0006-ui-delivery-model.md)
 - [`ADR-0007-runtime-process-model.md`](ADR-0007-runtime-process-model.md)
 - [`ADR-0009-database-access-and-migrations.md`](ADR-0009-database-access-and-migrations.md)

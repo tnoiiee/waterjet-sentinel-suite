@@ -5,8 +5,11 @@ release, shelving, and display wording. The acknowledgement model in section 3 i
 `[OWNER CONFIRMED]`. Alarm definitions and threshold values are commissioning values and
 are `[NOT VERIFIED]`.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 This document defines how the system represents, displays, and releases alarms. It does
 not define production alarm thresholds, which are confidential deployment values.
@@ -189,6 +192,28 @@ suppression, and grouping rules are `[OPEN]`.
   held. `[PROPOSED]`
 - A cleared alarm whose cleared-state acknowledgement is pending must remain visually
   distinguishable from an alarm acknowledged after clearing. `[OWNER CONFIRMED]`
+
+## 9.1 Alarm path, colour, and write-path boundaries (Stage 0.2)
+
+1. **Colour separation.** Dirty red is a process-condition colour for Sensor classification
+   (see [`ARCHITECTURE.md`](ARCHITECTURE.md) section 26.3). It must never be used as an alarm
+   severity colour. Alarm severity remains recognisable through icon, border, text, the alarm
+   banner, and the dedicated alarm workspace.
+2. **Alarm evaluation is not blocked by the database.** Alarm evaluation and the live alarm
+   surface must not wait on a Historian or SQL write. Alarm evaluation may read the in-memory
+   Published Configuration Snapshot and must not query SQL every cycle
+   (see [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 30 and 31).
+3. **The alarm write path is a specific, bounded path**, not a raw per-signal insert. Alarm
+   state transitions are persisted with the event, audit, and job records, whereas continuous
+   sample history belongs to the Historian path with its own bounded queue and batch writes.
+4. **Alarm priority is independent of Historian health.** A degraded or unavailable Historian
+   must not suppress, delay, mask, or silently clear an alarm, and must not change the
+   acknowledgement model in section 3.
+5. **[`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) governs database
+   access and migration execution.** The audit-required refusal policy (ARC-025) never extends
+   to a stop, de-energize, or release action, and must not be driven by Historian backlog.
+6. **Blocking release, acknowledgement, and shelving semantics are unchanged.** This
+   subsection adds boundaries only; it does not alter section 3 through section 6.
 
 ## 10. Open items
 

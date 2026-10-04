@@ -55,6 +55,7 @@ REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `ME
 | --- | --- | --- | --- | --- |
 | 0.1 | Repository Documentation Foundation | `[APPROVED]` | **MERGED** — merged to `main` through PR #1 (merge commit `d49eeee0d937465d61abd6e754b9a2bea5ef1d6a`) | Repository governance and documentation foundation |
 | 0.2 | Technology and Solution Architecture Decision | `[APPROVED]` | **SUBMITTED FOR OWNER REVIEW** — Owner manual review **PENDING**; **NOT MERGED** | Documentation-only technology and solution architecture decisions: UI delivery model, runtime process model, technology stack, database access and migrations, device adapter boundary, configuration and secrets, simulator-first development, offline deployment, and a documented repository structure direction — recorded as ADR candidates |
+| **0.2.1** | **UI and Runtime Technology Spike** | **`[PROPOSED]`** — **`[NOT AUTHORIZED]`** | Not started | Measured comparison of Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) inside the application-owned kiosk shell, using synthetic data only, plus validation of the live-state delivery, live-trend, and offline-restore architecture. Deliverable is a comparison report, a recommendation, and a decision-record draft — **no production code** |
 | 0.3 | Architecture and Interface Specification | `[PROPOSED]` | Not started | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic — still documentation and specification only |
 | 0.4 | Offline Domain and Queue Engine Implementation | `[PROPOSED]` | Not started | First source code: pure domain logic with a simulator and automated tests; no device access |
 | 0.5 | Read-Only Monitoring Integration | `[PROPOSED]` | Not started | Modbus TCP read path against a simulator only; no production writes |
@@ -63,6 +64,11 @@ REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `ME
 | 0.8 | Operator Interface and Kiosk Operation | `[PROPOSED]` | Not started | Control Room Kiosk experience, responsiveness, close guard, and operator workflows |
 | 0.9 | Bench Verification | `[NOT AUTHORIZED]` | Not started | Hardware benchmark evidence for the items listed in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md). Requires separate, explicit Owner authorisation and physical supervision. |
 | 1.0 | Deployment Acceptance | `[NOT AUTHORIZED]` | Not started | Owner acceptance of a release candidate on a Boiler Unit |
+
+Stage 0.2.1 is inserted by the Owner-requested Stage 0.2 documentation review punchlist as the
+only authorised route to a UI framework decision. It remains `[PROPOSED]` and
+`[NOT AUTHORIZED]`; it is **not** started by Stage 0.2, and no prototype or spike code may be
+written until it has its own approved Scope Gate.
 
 Stages 0.3 through 0.8 are a **candidate** decomposition. The Owner may merge, split,
 reorder, or replace them. They are recorded here so that work is not invented ad hoc, not
@@ -86,7 +92,25 @@ precedence for Stage 0.2, so the ledger above records the approved title. Conseq
    `[NOT AUTHORIZED]`. It is **not** the same thing as Stage 0.2 and is not started.
 3. The remaining open requirement and configuration items are listed in
    [`CURRENT_STATE.md`](CURRENT_STATE.md) section 8 and in
-   [`ARCHITECTURE.md`](ARCHITECTURE.md) section 22, each with the gate that must close it.
+   [`ARCHITECTURE.md`](ARCHITECTURE.md) section 34, each with the gate that must close it.
+
+### 3.2 Proposed Stage 0.2.1 — UI and Runtime Technology Spike
+
+| Item | Value |
+| --- | --- |
+| Stage | 0.2.1 — UI and Runtime Technology Spike |
+| Gate | `[PROPOSED]` and **`[NOT AUTHORIZED]`** |
+| Implementation | Not started |
+| Purpose | Close the `[OPEN]` UI framework decision and validate the live-state delivery, live-trend, and offline-restore architecture with measured evidence |
+| Candidates | Candidate A — React + TypeScript + Vite in the application-owned kiosk shell; Candidate B — Blazor Hybrid in the application-owned kiosk shell |
+| Method | Identical synthetic data, identical runtime/API contract, identical Sensor presentation semantics, identical trend workload, identical camera placeholder or synthetic stream, identical reconnect scenario, identical acceptance measures |
+| Measurements | CPU average and peak; memory usage; memory growth over extended operation; UI update latency; interaction latency; render stability; trend performance; push payload size; reconnect time; kiosk integration; offline build and restore complexity; package footprint; package licensing; testing ergonomics; development effort; maintainability |
+| Constraints | Synthetic data only. No WAGO, Galil, Production SQL Server, or Production configuration access. No physical device. Spike results are application-level performance evidence only |
+| Deliverable | A comparison report with measurements, a recommendation, and a decision-record draft. No production code, and no promotion of spike code into the product. **Any real UI implementation requires a separate later implementation Stage Gate** |
+
+Full workload, measurement, and constraint detail is in
+[`ARCHITECTURE.md`](ARCHITECTURE.md) section 33. The spike is **not** authorised by Stage 0.2,
+and Stage 0.2 does not start it.
 
 ## 4. Gate evidence rules
 

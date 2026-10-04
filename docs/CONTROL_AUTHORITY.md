@@ -182,6 +182,30 @@ Every change of authority state must be recorded:
 - DCS Permissive Override activation and release, with user, timestamp, and reason.
 - Break-glass login, always as a high-severity audit event.
 
+## 8.1 Authority enforcement point (Stage 0.2)
+
+1. **Every command is validated once, in the Runtime, before any actuation.** The approved
+   order is: authorization, lifecycle, interlock, ownership, then command-state validation. A
+   command that fails any check is refused and recorded; it is never partially applied.
+2. **The Operations UI is a command requester, not an actuator.** The UI cannot write to
+   hardware and cannot open a device session. Its controls issue requests that the Equipment
+   Runtime-mediated command path accepts or refuses.
+3. **The Equipment Runtime service is the sole owner of physical device sessions.** No other
+   process — UI, Local Application API host, reporting, or tooling — may own, open, or share a
+   device session for WAGO, Galil, or any future device.
+4. **Adapters contain no UI logic and no authority logic.** They translate between the
+   application-facing contract and a vendor protocol. Authority, sequencing, and interlock
+   decisions are made above the adapter and are not delegated to it.
+5. **A stale command is refused.** A command whose validity window has expired, or whose
+   command state is unknown, or whose target position is unknown, is not executed and is not
+   inferred as successful.
+6. **UI close, crash, restart, or relaunch does not create authority.** It neither grants nor
+   revokes a permission, and it does not interrupt or complete an active Cleaning Job.
+7. **Nothing added here permits concurrent Cleaning Jobs**, a second active Cleaning Job, a
+   parallel Water Jet Cleaning, or a shared Isolation Valve. Sections 4, 5, and 6 continue to
+   govern, including the DCS Permissive Override exclusions, which cannot bypass safety or
+   equipment gates.
+
 ## 9. Open authority items
 
 | Item | Why it matters | Status |

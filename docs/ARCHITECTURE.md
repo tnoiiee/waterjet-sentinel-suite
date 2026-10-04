@@ -297,16 +297,16 @@ is recorded here and argued in the referenced ADR records.
 
 | Stage 0.1 open item | Stage 0.2 disposition | Where |
 | --- | --- | --- |
-| Application language, runtime, and UI framework on Windows 11 Pro | Selected as `[PROPOSED]`: .NET with C#, LTS support track, local web UI in C# (Blazor component model) inside an application-owned kiosk shell window. Exact version `[OPEN]` until the implementation gate pins it with a cited support reference. Browser-based, desktop, and hybrid delivery were all evaluated against the project's requirements; none was rejected on convenience grounds | [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md), [`ADR-0008`](decisions/ADR-0008-technology-stack.md) |
+| Application language, runtime, and UI framework on Windows 11 Pro | **Partly closed.** Selected as `[PROPOSED]`: .NET with C#, LTS support track, for the runtime service and the Local Application API. UI **delivery** is closed as a local web UI inside an application-owned kiosk shell window. The **UI framework is `[OPEN]`**: Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) are compared inside the same architecture, with a current evidence-based preference for Candidate A that is not an acceptance. Exact .NET version `[OPEN]`. Browser-based, desktop, and hybrid delivery were all evaluated on requirements; none was rejected on convenience grounds. Corrected by the Owner-requested punchlist | [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md), [`ADR-0008`](decisions/ADR-0008-technology-stack.md) |
 | Process architecture, restart behaviour, and the scope of Equipment Runtime separation | Selected as `[PROPOSED]`: kiosk shell process plus one runtime service process that owns all device sessions, all control dispatch, and all database access | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), section 14 |
 | Modbus TCP client library selection and licence acceptability | Adapter **boundary** decided; **library selection `[OPEN]`** pending licence, offline-availability, maintenance, and observability review | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md) |
 | Galil communication mechanism and library selection | **`[OPEN]`** — vendor-provided interface, vendor library, and direct command transport must be evaluated before motion code is written | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md) |
 | Local configuration store format and its validation mechanism | Model decided as `[PROPOSED]` (Draft versus Published revisions, validation blocks publication, local site directory outside the working tree); format and secret-store mechanism `[OPEN]` | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), section 17 |
-| Data access approach for SQL Server 2025 Standard | Selected as `[PROPOSED]`: mapper as the primary technology, with a measured escape hatch for the high-rate Historian write path; provider version and compatibility `[OPEN]` | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md), section 17 |
+| Data access approach for SQL Server 2025 Standard | Selected as `[PROPOSED]` in architecture language: **transactional relational access** for configuration, alarm, event, audit, job, user, and queue-snapshot data, plus a **batch-oriented write path** for Historian samples, with a measured escape hatch permitted only after evidence identifies a bottleneck. The ORM, mapper, micro-ORM, provider, and bulk-write mechanism are all `[OPEN]`; no technology is selected by the word "mapper" | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md), section 17 |
 | Logging, diagnostics, and crash-report storage | Strategy decided as `[PROPOSED]` (structured local rolling files, separate from audit records, outside the working tree); provider selection `[OPEN]` | [`ADR-0008`](decisions/ADR-0008-technology-stack.md) |
 | Exact local equipment network topology and address plan | Remains `[OPEN]` / `[NOT VERIFIED]` — confidential local deployment information | [`REQUIREMENTS.md`](REQUIREMENTS.md) PHY-008 |
 
-Remaining `[OPEN]` architecture items after Stage 0.2 are itemised in section 22.
+Remaining `[OPEN]` architecture items after Stage 0.2 are itemised in section 34.
 
 Recording a selection as `[PROPOSED]` is deliberate. Only the Owner may accept it, and
 choosing by assumption would violate [`AGENTS.md`](../AGENTS.md) section 3.
@@ -353,6 +353,15 @@ Architecture statements in this document and in the Stage 0.2 ADR records use fo
 | Simulator-first development | `[PROPOSED]` | [`ADR-0012`](decisions/ADR-0012-simulator-first-development.md) | Simulator default and the physical-adapter gate are approved decisions |
 | Offline deployment | `[PROPOSED]` with `[OPEN]` items | [`ADR-0013`](decisions/ADR-0013-offline-deployment.md) | No Internet dependency and no auto-resume are `[APPROVED]` |
 | Repository structure direction | `[PROPOSED]` — documented, not created | Section 20 | No directory is created by Stage 0.2 |
+| UI framework candidates | `[PROPOSED]` candidates — **final selection `[OPEN]`** | [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md), [`ADR-0008`](decisions/ADR-0008-technology-stack.md) | Kiosk shell and local web UI delivery remain locked; neither candidate is accepted or rejected |
+| Live-state delivery | `[PROPOSED]` — transport `[OPEN]` | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), section 28 | Runtime authority is required |
+| Sensor presentation model | `[PROPOSED]` | Section 26 | Process classification, quality, queue, interaction, execution, and alarm dimensions |
+| Quality-aware pipeline | `[PROPOSED]` — site invalid-value mapping `[OPEN]` | Section 27 | Bad or stale quality must never be presented as dirty or cleaner |
+| Modbus acquisition architecture | `[PROPOSED]` | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md), section 29 | Per-device session and serialized queue; UI never polls |
+| Configuration hot path | `[PROPOSED]` | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), section 30 | SQL is not the per-cycle operational parameter source |
+| Historian decoupling | `[PROPOSED]` — overflow policy `[OPEN]` | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md), section 31 | Bounded, batched, reported |
+| Live trend direction | `[PROPOSED]` — library `[OPEN]` | Section 32 | Bounded window and downsampling |
+| Proposed Stage 0.2.1 technology spike | **`PROPOSED` / `[NOT AUTHORIZED]`** | Section 33, [`MASTER_PLAN.md`](MASTER_PLAN.md) section 3.2 | Not started; requires its own Scope Gate |
 
 **ADR acceptance in Stage 0.2 means acceptance as a documentation decision.** It is not
 implementation proof, not hardware evidence, and not deployment acceptance.
@@ -387,6 +396,10 @@ The boundaries marked below are already approved and are not `[OPEN]`.
 | Publish Engineering configuration | Runtime service, on an authorised publication request | Atomic, validated, audited |
 | Manage application users and permissions | Runtime service | Administration pages submit requests through the API |
 | Connect to the database | Runtime service | Single connection owner; single migration authority |
+| Maintain the authoritative in-memory operational state | Runtime service | Single source of live truth; the UI never becomes a second authority |
+| Hold the Published Configuration Snapshot | Runtime service | Immutable in memory; swapped only under the state gate |
+| Publish snapshot and delta presentation state | Runtime service | Loopback push; transport `[OPEN]` |
+| Hold presentation state | Kiosk shell | Derived from the runtime's messages only; never authoritative, never persisted as truth |
 | Render the UI | Kiosk shell | No authority over equipment |
 
 ### 14.3 Mandatory boundaries (approved — not `[OPEN]`)
@@ -398,6 +411,10 @@ The boundaries marked below are already approved and are not `[OPEN]`.
 5. Hardware commands must pass through authorization, lifecycle, interlock, ownership, and
    command-state validation.
 6. No architecture choice may permit concurrent Cleaning Jobs.
+7. The UI must not read Modbus data directly.
+8. The UI must not query SQL for live operational state.
+9. The UI must not own Queue or Cleaning Job state.
+10. The UI must not infer device state independently from the Equipment Runtime.
 
 ### 14.4 Lifecycle rules
 
@@ -440,6 +457,10 @@ status below may be read as verified behaviour.
 | 15 | Incomplete Cleaning Job after a process restart | Runtime service, operator | Outcome requires explicit operator resolution; the last successful cleaning timestamp is not updated; the job is not resumed; the recovery procedure itself is `[OPEN]` | `[PROPOSED]` / `[OPEN]` |
 | 16 | Unknown motion position | Runtime service, motion adapter | Motion mode and profile changes blocked and job start blocked; motion requires position re-establishment | `[APPROVED]` |
 | 17 | Configuration publication failure | Runtime service | Publication is atomic; a failure leaves the previous published revision in force; the runtime never operates on a partially applied revision; the failure is reported and audited | `[PROPOSED]` |
+| 18 | Presentation push channel stalls, drops, or falls behind | Runtime service, kiosk shell | The UI surfaces staleness using the sequence and timestamp rather than displaying a stale view as current; a reconnect requests a fresh snapshot; the runtime is unaffected and keeps supervising | `[PROPOSED]` |
+| 19 | One Modbus device becomes slow or times out | Runtime service, WAGO adapter | That device's data goes to bad quality and its own poll group degrades; unrelated devices keep polling; no cross-device blocking | `[PROPOSED]` |
+| 20 | A published configuration revision arrives while a Cleaning Job is active | Runtime service, configuration publisher | Publication is recorded; application is deferred to the approved state gate; the runtime continues on the previous snapshot | `[PROPOSED]` |
+| 21 | Historian backlog grows while the database is slow | Runtime service, historian writer | Bounded channel, visible health metrics, explicit backpressure or overflow policy; acquisition, queue, alarm evaluation, live UI, and Main Pump stop are unaffected | `[OPEN]` policy |
 
 ## 16. Device adapter strategy and command lifecycle
 
@@ -471,6 +492,9 @@ Rules:
    (section 5).
 8. Retries are bounded, transport-level, and re-validated; reconnection never re-issues a
    stale command and never re-energizes an output.
+8.1. Modbus acquisition uses one connection and one serialized command queue per device, bounded
+   concurrent pollers, batched reads of contiguous addresses, and a Poll Plan compiled at
+   publication or startup — see section 29.
 9. Modbus and Galil library selections remain `[OPEN]` pending licence, offline-availability,
    maintenance, and observability review. No library is installed in this Stage.
 
@@ -503,9 +527,15 @@ not a flow proof. No command may remain in an indeterminate state indefinitely.
 
 - Only the runtime service connects to SQL Server. The UI has no database credentials and no
   database code path.
-- Persistence is behind the persistence boundary: mapper as the primary technology, with a
-  measured escape hatch for the high-rate Historian write path
+- Persistence is behind the persistence boundary: **transactional relational access** for
+  configuration, alarm, event, audit, job, user, and queue-snapshot data, plus a
+  **batch-oriented write path** for Historian samples. The ORM, mapper, micro-ORM, provider,
+  and bulk-write mechanism remain `[OPEN]`; a measured escape hatch is permitted only after
+  evidence identifies a bottleneck
   ([`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md)).
+- **SQL Server is not the per-cycle operational parameter source.** The runtime holds an
+  immutable in-memory Published Configuration Snapshot; queue, alarm, acquisition, motion, and
+  Cleaning logic read that snapshot, never the database per cycle (section 30).
 - The Historian write path is decoupled from control and prioritises accountability records
   above detail, detail above normal samples, and samples above aggregates.
 - Configuration publication, alarm state transitions, job outcomes, and audit records are
@@ -638,15 +668,15 @@ Rules that the structure expresses:
 
 | # | Question | Answer | Status |
 | --- | --- | --- | --- |
-| 1 | What type of UI delivery is preferred? | An application-owned full-screen kiosk shell window hosting a local web UI. Browser kiosk and native desktop were evaluated; native desktop is the documented fallback | `[PROPOSED]` |
+| 1 | What type of UI delivery is preferred? | An application-owned full-screen kiosk shell window hosting a local web UI, with the embedded WebView loading static local assets. Browser kiosk and native desktop were evaluated; native desktop is the documented fallback. The **framework is `[OPEN]`** | `[PROPOSED]` delivery; framework `[OPEN]` |
 | 2 | What process owns the UI? | The kiosk shell process (interactive session); presentation only, no device session, no authoritative state | `[PROPOSED]` |
 | 3 | What process owns device sessions? | The runtime Windows Service, exclusively | `[PROPOSED]` mapping; boundary `[APPROVED]` |
 | 4 | Is a Local API used, and what is its boundary? | Yes — the Local Application API: loopback-only, authenticated, contract-first, hosted in-process by the runtime service, replaceable transport | `[PROPOSED]` |
 | 5 | What .NET support-track target is preferred? | Long-Term Support (LTS) track; the exact version is pinned at the implementation gate with a cited support reference | `[PROPOSED]` policy; version `[OPEN]` |
-| 6 | What UI technology is preferred? | Local web UI in C# with a Blazor-based component model, rendered in-process in the kiosk shell; shell host framework `[OPEN]` | `[PROPOSED]` |
+| 6 | What UI technology is preferred? | **`[OPEN]`.** Delivery is a local web UI rendered in the kiosk shell's embedded WebView. Candidates: **A — React + TypeScript + Vite** and **B — Blazor Hybrid**, compared inside the same architecture. Current evidence-based preference for Candidate A; **not an acceptance**. Selection deferred to the proposed Stage 0.2.1 spike. Shell host framework also `[OPEN]` | `[OPEN]` |
 | 7 | What backend framework is preferred? | ASP.NET Core minimal API hosted by the runtime service | `[PROPOSED]` |
 | 8 | What Windows Service model is preferred? | One runtime Windows Service, generic host, automatic start, bounded recovery, explicit startup gating, single-instance enforcement | `[PROPOSED]` |
-| 9 | What database-access strategy is preferred? | Mapper as the primary technology, narrow measured escape hatch for the high-rate Historian path, single connection owner, transactional accountability writes | `[PROPOSED]` |
+| 9 | What database-access strategy is preferred? | Transactional relational access for configuration, alarm, event, audit, job, user, and queue-snapshot data; a batch-oriented write path for Historian samples; single connection owner; transactional accountability writes; measured escape hatch only after evidence identifies a bottleneck. ORM, mapper, micro-ORM, provider, and bulk-write mechanism all `[OPEN]` | `[PROPOSED]` |
 | 10 | What migration strategy is preferred? | Versioned reviewed migrations, explicit offline execution only, never auto-applied at start, mandatory verified pre-change backup, forward-only preference | `[PROPOSED]` |
 | 11 | What structured logging strategy is preferred? | One logging abstraction, structured local rolling files outside the working tree, no remote sink, logs kept separate from audit records; provider `[OPEN]` | `[PROPOSED]` |
 | 12 | How are configuration Draft and Published states separated? | Draft is never consumed; publication is one validated, atomic, audited transaction; the runtime consumes only published revisions and applies them under a state gate | `[PROPOSED]` |
@@ -654,12 +684,445 @@ Rules that the structure expresses:
 | 14 | How is Simulator mode selected? | Through an explicit, validated, displayed, audited device profile whose default is `SIMULATOR` | `[PROPOSED]` |
 | 15 | How are physical adapters disabled by default? | They are not constructed at all unless the profile explicitly selects physical operation **and** a recorded local authorization and an approved Scope Gate exist; failure is explicit, never simulated | `[PROPOSED]` |
 | 16 | How does UI restart avoid owning hardware state? | The UI holds no device session and no authoritative state; the runtime continues; the shell re-reads state and replays nothing; hold-to-run stops with the session | `[PROPOSED]` |
-| 17 | What happens architecturally when SQL Server is unavailable? | Live supervision and visibility continue; process history fails explicitly; stop actions are never gated on the database; audit-required initiating actions are refused (`[PROPOSED]` set); backlog and alarm policy `[OPEN]` | `[PROPOSED]` / `[OPEN]` |
+| 17 | What happens architecturally when SQL Server is unavailable? | Live supervision and visibility continue; operational parameters already reside in the in-memory Published Configuration Snapshot, so control does not read the database per cycle; process history fails explicitly and gaps are reported; stop actions are never gated on the database; audit-required initiating actions are refused (`[PROPOSED]` set); backlog policy separated from audit policy but still `[OPEN]` | `[PROPOSED]` / `[OPEN]` |
 | 18 | What is the offline installation direction? | Offline media, prerequisites detected and never downloaded, planned maintenance window, verified pre-change backup, versioned packages, rollback by restore and reinstall | `[PROPOSED]` |
 | 19 | What repository structure should a later implementation Stage create? | The structure in section 20: `apps/`, `packages/`, `adapters/`, `tests/`, `tools/`, `deployment/`, `config/examples/` | `[PROPOSED]` — documented, not created |
-| 20 | What decisions remain `[OPEN]` and why? | Section 22, with the reason and the gate that must close each item | `[OPEN]` |
+| 20 | What decisions remain `[OPEN]` and why? | Section 34, with the reason and the gate that must close each item | `[OPEN]` |
 
-## 22. Remaining open architecture items
+## 22. Reading guide — Stage 0.2 review-correction sections
+
+Sections 23 to 33 were added by the Owner-requested Stage 0.2 documentation review
+(punchlist). They record the legacy-application evidence, the UI framework comparison, the UI
+workload and its prohibited behaviours, the Sensor presentation model, the quality-aware data
+pipeline, live-state delivery, Modbus acquisition, the SQL Server and configuration hot path,
+Historian decoupling, the live-trend direction, and the proposed Stage 0.2.1 spike.
+
+Two conventions apply throughout those sections:
+
+| Marker | Meaning in sections 23 to 33 |
+| --- | --- |
+| `[APPROVED]` | A boundary or rule that follows from the approved Stage 0.2 Scope Gate or from an existing Owner-confirmed decision |
+| `[PROPOSED]` | A selection or refinement drafted in this Stage and submitted for Owner acceptance; **not binding and not implementation authorisation** |
+| `[OPEN]` | Not decided. The section states what evidence or gate must close it |
+| `[NOT VERIFIED]` | Requires hardware, workstation, or Production evidence. Nothing in Stage 0.2 verified it |
+
+Nothing in sections 23 to 33 authorises code, dependencies, device access, Production
+configuration, or a later Stage. Section 34 lists the remaining open items.
+
+## 23. Legacy application evidence — architecture input
+
+The Owner provided direct operating experience from the previous implementation. It is
+recorded here as an **architecture input**, and it is explicitly **not** a controlled
+benchmark. No measurement was taken under controlled conditions, no baseline was captured, and
+no repeating test was run.
+
+| Item | Legacy observation |
+| --- | --- |
+| Stack | C#, .NET Framework, WinForms, a WPF-hosted grid module, NModbus, SQL Server, a desktop graph library |
+| Modbus | Polling across approximately ten devices was slow |
+| UI | Operation became delayed and resource-intensive |
+| Graphing | The graph library produced lag, freezes, and crashes |
+| Grid | The WPF sensor grid consumed significant CPU when refreshed continuously |
+| Database | Repeated parameter queries delayed the program |
+| Interaction | UI interaction was limited while polling, database access, rendering, and graph updates occurred in the same application architecture |
+| Later comparison | Better responsiveness was observed with React, Vite, a backend reading Modbus data in batches, WebSocket-style push delivery, and partial frontend updates |
+
+### 23.1 Required interpretation
+
+1. **Push delivery does not make Modbus itself faster.** WebSocket-style delivery changes how
+   data reaches the UI, not how quickly a coupler answers a request.
+2. **The likely advantage came from** batch acquisition, concurrent per-device polling,
+   in-memory operational state, push delivery, reduced SQL reads, and partial UI rendering.
+3. **The previous problems must not be attributed only to C#, WinForms, WPF, NModbus, or
+   SQL Server.** The legacy application concentrated acquisition, database access, rendering,
+   and graph updates in one architecture in which they could block one another. That
+   concentration, not the language or any single library, is the defensible reading of the
+   evidence.
+4. **Therefore the binding consequence is architectural, not a framework choice:** I/O, SQL
+   access, Historian writes, graph updates, and UI rendering must not block one another, and
+   the UI must not be the performance bottleneck.
+
+### 23.2 What this evidence does and does not justify
+
+| Justified | Not justified |
+| --- | --- |
+| Batch acquisition, per-device isolation, and a compiled Poll Plan (section 29) | Any claim that a specific Modbus library is inherently slow |
+| In-memory authoritative state and an in-memory Published Configuration Snapshot (sections 28, 30) | Any claim that a specific database or access technology is inherently slow |
+| Push delivery of changed presentation state and partial UI updates (section 28) | Any claim that one UI framework is measurably faster than another (that requires the Stage 0.2.1 spike) |
+| Bounded trend windows and downsampling (section 32) | Any claim that a specific chart library is unusable |
+| The requirement that one slow component must not stall unrelated work | Any measured performance number for the new architecture |
+
+Consequences follow in sections 24 to 33. The evidence changes no protected decision.
+
+## 24. UI framework candidates
+
+The **delivery model is locked**: a local web UI rendered inside an application-owned kiosk
+shell window, with the shell owning the close guard and controlled navigation, and the
+Equipment Runtime in a separate Windows Service behind a loopback API
+([`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md)). The **final UI framework is
+`[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+
+| Item | Status |
+| --- | --- |
+| Application-owned kiosk shell | `[PROPOSED]` — locked as the delivery model |
+| Local web UI (embedded WebView, static local assets) | `[PROPOSED]` — locked as the delivery model |
+| Candidate A: React + TypeScript + Vite | `[PROPOSED]` candidate — **not accepted** |
+| Candidate B: Blazor Hybrid | `[PROPOSED]` candidate — **not rejected** |
+| Final UI framework selection | **`[OPEN]`** |
+| Selection route | Proposed Stage 0.2.1 spike (section 33) — `PROPOSED`, `[NOT AUTHORIZED]` |
+
+Both candidates are compared **inside the same architecture** — the same application-owned
+shell, the same embedded WebView, the same loopback ASP.NET Core Local Application API, and
+the same separate .NET Equipment Runtime Windows Service. Neither candidate is compared against
+a general-purpose external browser, and React is also hosted as static local assets inside the
+application-owned WebView.
+
+**Current evidence-based preference: React + TypeScript + Vite.** The reasons are direct
+positive Owner operating experience with React/Vite and push-based updates, strong fit for
+dense visualisation, a strong chart and browser UI ecosystem, natural camera and web-content
+integration, a strong UI and component testing ecosystem, and clear frontend/backend process
+separation. **A preference is not final acceptance**, and it does not authorise implementation.
+
+**Blazor Hybrid remains fully open.** Its real advantages — one language and toolchain, fewer
+build ecosystems, direct in-process interop, fewer offline artefacts — are recorded, but they
+do not by themselves prove UI performance, graph quality, camera integration, or long-running
+kiosk stability.
+
+| Correction | Statement |
+| --- | --- |
+| Offline access | **React can be built and deployed offline.** It requires no Internet access at build or run time when a local package mirror or vendored cache is prepared |
+| Second ecosystem | React introduces a second package and build ecosystem — Node.js/npm in addition to NuGet. This increases offline dependency-management and supply-chain effort but does not make offline development or deployment impossible |
+| Single ecosystem | Blazor reduces the number of build ecosystems, but that advantage does not by itself prove UI performance, graph quality, camera integration, or long-running kiosk stability |
+| Exclusion grounds | Neither candidate may be excluded for assumed Internet access, ease of closing a window, language preference, or ecosystem size alone |
+
+The dimension-by-dimension comparison (104 live Sensor cells, one-second update target,
+partial updates, visual states, trends, camera, grids, alarms, layout, shell integration, crash
+and reconnect, memory stability, component and visual regression testing, accessibility,
+offline build and restore, licensing, footprint, development effort, maintainability,
+single-developer support, contract generation, and shell-to-UI interop) is recorded in
+[`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md). Every performance-related row
+in that comparison is a measurement to be taken, not a result.
+
+## 25. Legacy UI workload and prohibited UI behaviours
+
+### 25.1 Required UI workload
+
+The selected UI technology must support, at minimum:
+
+- **104 live Sensor cells** and **208 Thermocouple channels**, with a **one-second operational
+  update target**.
+- Wall layouts matching the approved physical baseline: **Left 24, Rear 28, Right 24,
+  Front 28**.
+- Wall-level **Dirty and Cleaner counts** (section 26).
+- **Sensor detail drill-down.**
+- **Active Cleaning Job visibility.**
+- **GlobalQueue preview.**
+- **Pump and pressure status.**
+- A **live operational trend** (section 32).
+- An **alarm banner and an alarm workspace**.
+- **Camera panel integration.**
+- **Permission-aware controls.**
+- **Full-screen kiosk** operation.
+- **Responsive workstation layouts** (IDN-006).
+- **Stable operation over long periods**, including memory stability.
+
+The UI must support **efficient changed-state updates**: only the parts of the page whose
+presentation state actually changed should be recomputed and repainted.
+
+### 25.2 Prohibited UI architecture behaviours
+
+| # | Prohibited | Why |
+| --- | --- | --- |
+| 1 | One UI request per signal | Request volume and UI work would scale with signal count — the legacy failure mode |
+| 2 | One UI-thread dispatch per signal | Same, at the rendering layer; bursts of dispatches stall interaction |
+| 3 | Rebuilding all Sensor cell objects every second | Discards the diffing opportunity and allocates continuously |
+| 4 | Recreating chart series on every update | Causes the lag and freeze behaviour observed in the legacy graph library |
+| 5 | Unbounded chart data growth | Memory grows without limit; interaction degrades over a shift |
+| 6 | UI querying SQL for operational state | Adds a second data path and defeats runtime authority |
+| 7 | UI reading Modbus directly | Violates the device-session ownership boundary |
+| 8 | UI owning Queue or Cleaning state | Two authorities for one process state |
+| 9 | UI inferring device state independently from the runtime | The UI would display a plant state the runtime never confirmed |
+
+These prohibitions are architecture requirements, not styling preferences. They hold for
+whichever framework candidate is selected.
+
+## 26. Sensor presentation model
+
+A Sensor cell is a single presentation unit with **independent** state dimensions. The model is
+framework-neutral: it defines what the UI must be able to express, not how to draw it.
+
+| # | Dimension | Values |
+| --- | --- | --- |
+| 1 | Process classification | `DIRTY`, `CLEANER` |
+| 2 | Dirty Score intensity | 0 through 100 |
+| 3 | Data quality | `GOOD`, `UNCERTAIN`, `BAD`, `STALE`, `DISABLED` |
+| 4 | Queue state | TempQueue, TimeQueue, GlobalQueue position, Held, Blocked, Excluded |
+| 5 | Interaction state | Selected, Not selected |
+| 6 | Execution state | Active Cleaning Job target, Not active |
+| 7 | Alarm state | Active alarm, Cleared acknowledgement required, Shelved, No alarm |
+
+### 26.1 Visual-semantics direction
+
+| Element | May represent |
+| --- | --- |
+| Cell background | Dirty/Cleaner process classification |
+| Shade intensity | Dirty Score strength |
+| Corner marker or pattern | Data quality |
+| Badge | Queue state |
+| Cyan outline | Selection |
+| High-contrast double outline | Active Cleaning Job target |
+| Alarm icon and bright border | Alarm state |
+
+### 26.2 Classification rule
+
+The current Owner-confirmed display rule is:
+
+| Condition | Classification |
+| --- | --- |
+| Dirty Score > 50 | `DIRTY` |
+| Dirty Score <= 50 | `CLEANER` |
+
+The UI must read the **effective threshold from the Published configuration** if the threshold
+becomes configurable, and must not hard-code visual text around an assumed value
+([`decisions/ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md) item 13).
+
+Wall summary counts must carry **explicit labels**: Dirty, Cleaner, and Bad or unavailable data
+where applicable. Displaying only unlabelled numbers is prohibited.
+
+### 26.3 Critical colour rule
+
+**Dirty red is a process-condition colour. Dirty red is not an alarm severity colour.** Alarm
+state must remain independently recognisable through icon, border, text, the alarm banner, and
+the dedicated alarm surfaces, so that a red cell cannot be mistaken for an alarm and an alarm
+cannot be mistaken for a dirty cell.
+
+Exact colour tokens, typography, dimensions, and animation are **not locked in this Stage**.
+They remain a future UX/UI decision and must be verified against the accessibility requirement
+and the visual-regression plan.
+
+## 27. Quality-aware data pipeline
+
+The legacy application displayed values such as negative sentinel values in the same visual
+channel as Dirty data. The new architecture must prevent a raw sentinel value from becoming a
+normal process classification without validation.
+
+### 27.1 Pipeline
+
+```text
+raw signal
+  -> communication and signal quality validation
+  -> engineering conversion
+  -> derived DiffTemp
+  -> Dirty Score
+  -> queue eligibility
+  -> UI presentation
+```
+
+### 27.2 Principles
+
+1. **Invalid, Bad, Stale, or unavailable data must not be presented as an ordinary Dirty or
+   Cleaner state.** It has a distinct presentation (dimension 3 of section 26).
+2. **Preserve the raw value and its quality** where appropriate for diagnostics.
+3. **Presentation uses validated operational values.**
+4. **Queue logic consumes quality-aware validated state**, never raw or substituted values.
+5. Unknown, unavailable, stale, or bad quality must never be inferred as safe or as benign
+   ([`REQUIREMENTS.md`](REQUIREMENTS.md) COMH-005, HSB-006).
+6. **Exact site-specific invalid-value mapping remains `[OPEN]`** until the Tag and data
+   quality contract is approved. Production sentinel values must never be invented or
+   committed.
+
+## 28. Operational state delivery
+
+### 28.1 Flow
+
+```text
+Equipment Runtime
+  -> authoritative in-memory operational state
+  -> application-facing snapshot or delta contract
+  -> loopback push channel
+  -> UI presentation state
+  -> partial component updates
+```
+
+The UI **must not** repeatedly query SQL for live operational state, and **must not** poll each
+signal individually. The runtime remains the single authority
+([`decisions/ADR-0007`](decisions/ADR-0007-runtime-process-model.md)).
+
+### 28.2 Published content
+
+The runtime must be able to publish:
+
+- a full **bootstrap snapshot** on initial connection;
+- a **monotonic sequence or revision**;
+- a **timestamp**;
+- **changed Sensor presentation states**;
+- the **Active Cleaning Job**;
+- **Main Pump state**;
+- **queue summary**;
+- **alarm summary**;
+- **communication health**;
+- the **published configuration revision**.
+
+### 28.3 Transport
+
+The exact transport remains **`[OPEN]`** for the Stage 0.2.1 spike. Candidates may include an
+ASP.NET Core push mechanism such as WebSocket-based delivery. **No final push library is
+selected in this Documentation Stage**, and the presentation contract must not be coupled to
+the transport.
+
+### 28.4 Reconnect principles
+
+1. A reconnecting UI **requests or receives a new authoritative snapshot**.
+2. The UI **does not instruct devices to recover**.
+3. The UI **does not replay commands**.
+4. The UI **does not infer Cleaning Job continuation from stale local state**.
+5. **The runtime remains authoritative** at all times.
+
+## 29. Modbus acquisition architecture
+
+The legacy acquisition path polled approximately ten devices in a way that slowed the whole
+application. The following direction is required.
+
+| # | Requirement |
+| --- | --- |
+| 1 | **One runtime-owned connection and one serialized command queue per Modbus device** |
+| 2 | **Different device pollers may operate concurrently under bounded scheduling** |
+| 3 | **Requests to one device remain serialized** unless future device evidence permits otherwise |
+| 4 | **One slow or timed-out device must not block polling of unrelated devices** |
+| 5 | **Contiguous coil or register addresses are compiled into bounded batch reads** where supported |
+| 6 | **Published Tag configuration compiles into a Poll Plan**, compiled at publication or runtime startup — **not from scratch every poll cycle** |
+| 7 | **Poll groups may use separate intervals: Fast, Medium, Slow.** Critical one-second data belongs to the Fast group |
+| 8 | Exact grouping and register spans remain **Production configuration** and are never committed |
+| 9 | Device limits, maximum quantities, address gaps, function codes, and byte/word order must be respected |
+| 10 | **The UI never performs Modbus polling** |
+
+**Library neutrality.** No Modbus library is selected or installed in this Stage. A library used
+by the legacy application may be evaluated later, but **prior slow behaviour must not be treated
+as proof that every architecture built on that library is slow**. The evidence points at
+unbatched per-tag requests, unisolated devices, and shared work — not at a library's inherent
+speed (section 23.1).
+
+## 30. SQL Server and the configuration hot path
+
+**SQL Server is not the per-cycle operational parameter source.**
+
+| # | Requirement |
+| --- | --- |
+| 1 | The runtime loads the **Published configuration** at startup and validates it |
+| 2 | The runtime holds an **immutable in-memory Published Configuration Snapshot** |
+| 3 | Queue, alarm, acquisition, motion, and Cleaning logic read the **in-memory snapshot** |
+| 4 | Configuration is reloaded **only** after an explicitly Published revision or an approved startup or recovery action |
+| 5 | A validated revision is **swapped in atomically** under the approved runtime state gate — never during an active Cleaning Job |
+| 6 | A **Draft is never consumed by the runtime** |
+| 7 | The UI **does not query SQL for operational parameters every second** |
+| 8 | Device polling **does not query SQL for static parameters every cycle** |
+
+SQL remains appropriate for: versioned configuration persistence; alarm history; event history;
+audit history; Cleaning Job history; the Historian; reports; and on-demand historical queries.
+No schema or SQL is created by this Stage. See
+[`decisions/ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) and
+[`decisions/ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md).
+
+## 31. Historian and database decoupling
+
+```text
+acquisition
+  -> authoritative in-memory state
+  -> queue / alarm evaluation
+  -> UI push
+  -> bounded Historian channel
+  -> batch database writer
+```
+
+A slow database write must **not** directly block: Modbus acquisition; Galil monitoring; queue
+evaluation; alarm evaluation; live UI updates; or **a valid Main Pump stop request** (PMP-007).
+
+| Required property | Statement |
+| --- | --- |
+| Bounded queue | The channel has a defined maximum |
+| Batch writes | Samples are written in batches, not one row per cycle |
+| Health metrics | Backlog, write latency, and failure counts are observable |
+| Data-gap reporting | A gap is reported explicitly; missing history is never presented as recorded |
+| No unbounded memory growth | Backlog cannot grow without limit |
+| No silent data loss | Loss must be visible and diagnosable |
+| Explicit backpressure or overflow policy | Required **before Historian implementation** |
+| Policy separation | **Historian policy is separated from Audit-required action policy.** A Historian backlog must not silently change which initiating actions are permitted |
+
+Overflow, spool, retry, priority, and database-outage policy remain **`[OPEN]`** and must be
+closed before Historian implementation. See
+[`decisions/ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) item 6.
+
+## 32. Live trend performance direction
+
+These requirements are **not library-specific**. The chart library remains `[OPEN]` pending the
+Stage 0.2.1 spike.
+
+1. The live trend uses a **bounded in-memory window**; old points leave the live buffer.
+2. Chart series are **not recreated on every update**.
+3. Point markers and animation must be **optional**, and disabled where they harm performance.
+4. Historical range queries use **appropriate aggregation or downsampling**.
+5. The UI **must not plot an unbounded raw data set**.
+6. Query resolution should be appropriate to the visible time range and pixel width.
+7. **Cleaning Job and Alarm overlays** must be supported conceptually.
+8. **Data gaps must remain visible** — a gap must not be drawn as a continuous line.
+9. **Simulation or UI rendering evidence is not hardware certification.**
+
+## 33. Proposed Stage 0.2.1 — UI and Runtime Technology Spike
+
+| Item | Value |
+| --- | --- |
+| Stage | **0.2.1 — UI and Runtime Technology Spike** |
+| Status | **`PROPOSED`** |
+| Authorization | **`[NOT AUTHORIZED]`** |
+| Purpose | Select the UI framework and validate the live-state delivery and performance architecture with measured evidence |
+| Deliverable | A comparison report with measurements, a recommendation, and a decision record draft. **No production code.** |
+
+### 33.1 Candidates
+
+- **Candidate A: React + TypeScript + Vite** in the application-owned kiosk shell.
+- **Candidate B: Blazor Hybrid** in the application-owned kiosk shell.
+
+Both candidates must use the **same synthetic data, the same runtime/API contract, the same
+Sensor presentation semantics, the same trend workload, the same camera placeholder or
+synthetic stream, the same reconnect scenario, and the same acceptance measures**. The spike is
+implemented in disposable spike code, not in the repository structure of section 20.
+
+### 33.2 Minimum synthetic workload
+
+10 simulated Modbus devices; 104 Sensor locations; 208 Thermocouple channels; one-second update;
+Dirty/Cleaner classification; Dirty Score intensity; Good/Uncertain/Bad/Stale quality; queue
+badges; a selected Sensor; an Active Cleaning Job marker; an alarm marker; wall summary counts;
+a GlobalQueue preview; a pressure trend; a camera placeholder; UI disconnect/reconnect; one
+simulated device timeout; and a database-writer slowdown simulation **without SQL Server**.
+
+### 33.3 Measurements
+
+CPU average and peak; memory usage; memory growth over extended operation; UI update latency;
+interaction latency; render stability; trend performance; push payload size; reconnect time;
+kiosk integration; offline build and restore complexity; package footprint; package licensing;
+testing ergonomics; development effort; maintainability.
+
+### 33.4 Constraints
+
+- **Synthetic data only.**
+- **No WAGO, Galil, Production SQL Server, or Production configuration access.**
+- No physical device of any kind.
+- Spike results are **application-level performance evidence only** — not hardware evidence,
+  not fail-safe evidence, and not certification.
+- The spike does **not** authorise Production Write, and it does not change the bench
+  verification requirements in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md).
+
+### 33.5 What the spike is not
+
+It is not an implementation Stage, not a simulator implementation, not a benchmark of Modbus or
+SQL Server, and not a prototype that may be promoted into the product. Its output is a decision
+and a report. **Stage 0.2.1 is not started by Stage 0.2 and requires its own approved Scope
+Gate.**
+
+## 34. Remaining open architecture items
+
+This list includes the items opened or carried forward by the Stage 0.2 documentation review
+punchlist. Nothing here may be closed by assumption.
 
 | Item | Why it remains open | Gate that must close it |
 | --- | --- | --- |
@@ -683,6 +1146,20 @@ Rules that the structure expresses:
 | Historian physical sizing, row sizes, index and partition strategy | No capacity model exists | Before retention defaults are ratified |
 | Recovery procedure for an interrupted Cleaning Job; fault-class taxonomy | Behaviour is undefined in the approved baseline | A later Stage Gate that specifies sequence recovery |
 | Configuration application without a runtime restart | Alternative not yet evaluated | Implementation Stage Gate |
+| **Final UI framework — Candidate A (React + TypeScript + Vite) versus Candidate B (Blazor Hybrid)** | Requires a measured comparison on the same synthetic workload; no measurement exists | **Stage 0.2.1 spike** (PROPOSED, NOT AUTHORIZED) |
+| Shell host framework | Implementation-level selection; no evidence available now | Implementation Stage Gate, after the framework decision |
+| Push transport and presentation-state payload encoding | The presentation contract is transport-agnostic; selecting a transport now would invent certainty | Stage 0.2.1 spike, then Implementation Stage Gate |
+| Chart/trend library | Library-neutral requirements are recorded in section 32; no library is selected | Stage 0.2.1 spike |
+| UI test tooling and visual regression tooling | Differs by framework candidate; ergonomics are a spike measurement | Stage 0.2.1 spike, then Test Stage Gate |
+| Camera integration mechanism per candidate | Camera integration is a spike workload for both candidates | Stage 0.2.1 spike |
+| Accessibility requirement level and verification method | Not yet ratified | A later UX/UI gate |
+| Sensor cell colour tokens, typography, dimensions, and animation | Deliberately not locked in this Stage (section 26.3) | A later UX/UI gate |
+| Poll Plan batching limits, poll-group intervals, and the concurrency bound | Depend on device evidence and local Production configuration | Implementation Stage Gate, then bench verification |
+| Whether a Poll Plan may be recompiled at runtime | Not yet evaluated | Implementation Stage Gate |
+| Site-specific invalid-value and sentinel mapping | Depends on the Tag and data-quality contract; production values must never be committed | Tag and data-quality contract approval |
+| Historian overflow, spool, retry, priority, and database-outage policy | Must be explicit before Historian implementation, and separated from the audit-required refusal policy | Implementation Stage Gate |
+| Exact ORM, mapper, micro-ORM, provider, and bulk-write mechanism | No technology may be selected by the generic word "mapper"; licence and offline-availability evidence is required | Implementation Stage Gate |
+| Offline package-mirror design if a JavaScript UI is selected | A second package ecosystem must be mirrored, pinned, and audited offline | Deployment Stage Gate |
 
 ---
 

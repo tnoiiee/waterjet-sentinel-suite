@@ -14,10 +14,11 @@ Repository: `waterjet-sentinel-suite`
 | Stage 0.1 Scope Gate | **APPROVED** |
 | Stage 0.1 implementation | **MERGED** — through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** |
-| Stage 0.2 implementation | **SUBMITTED FOR OWNER REVIEW** |
-| Stage 0.2 documentation review | **PENDING** |
+| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
+| Stage 0.2 documentation review | **CHANGES REQUESTED / IN PROGRESS** — the Owner-requested punchlist has been implemented on the same branch and pull request; re-review pending |
 | Owner manual review | **PENDING** |
 | Merge | **NOT MERGED** |
+| Stage 0.2.1 — UI and Runtime Technology Spike | **NOT AUTHORIZED** |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Repository contents | Documentation and repository governance only |
 | Application code | **None.** No source, no solution, no schema, no runtime. |
@@ -37,6 +38,17 @@ boundary, configuration and secrets, simulator-first development, and offline de
 ADR candidates in [`docs/decisions/`](docs/decisions/README.md). `[PROPOSED]` means drafted
 and submitted, **not approved**: the Owner has not yet accepted those records, nothing in them
 is implemented, and no capability or later stage is authorised by them.
+
+**The final UI framework is `[OPEN]`.** Two candidates are recorded and compared on equal
+terms: Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
+in the same application-owned kiosk shell behind the same loopback API. The current
+evidence-based preference for Candidate A is explicitly **not acceptance**, and Candidate B is
+explicitly **not rejected**. React can be built and deployed offline; it introduces a second
+package and build ecosystem, which increases offline dependency-management and supply-chain
+effort without making offline development or deployment impossible. Choosing the framework
+requires the proposed Stage 0.2.1 spike, which is `[NOT AUTHORIZED]`. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and
+[`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 3.2.
 
 ## What the product is
 
@@ -159,10 +171,10 @@ local deployment information and are **not** in this repository.
 
 | Document | Purpose |
 | --- | --- |
-| [`docs/decisions/ADR-0006-ui-delivery-model.md`](docs/decisions/ADR-0006-ui-delivery-model.md) | Kiosk shell and local web UI delivery model |
+| [`docs/decisions/ADR-0006-ui-delivery-model.md`](docs/decisions/ADR-0006-ui-delivery-model.md) | Kiosk shell and local web UI delivery model; React and Blazor candidates compared — final framework `[OPEN]` |
 | [`docs/decisions/ADR-0007-runtime-process-model.md`](docs/decisions/ADR-0007-runtime-process-model.md) | Process model, device-session ownership, Local Application API boundary |
-| [`docs/decisions/ADR-0008-technology-stack.md`](docs/decisions/ADR-0008-technology-stack.md) | .NET support track, API framework, UI technology, service hosting, logging, validation, tests, offline packaging |
-| [`docs/decisions/ADR-0009-database-access-and-migrations.md`](docs/decisions/ADR-0009-database-access-and-migrations.md) | Data access, transactions, Historian write path, migration execution policy, database unavailability |
+| [`docs/decisions/ADR-0008-technology-stack.md`](docs/decisions/ADR-0008-technology-stack.md) | .NET support track, API framework, service hosting, logging, validation, tests, offline packaging; UI framework `[OPEN]` |
+| [`docs/decisions/ADR-0009-database-access-and-migrations.md`](docs/decisions/ADR-0009-database-access-and-migrations.md) | Transactional relational access, batch Historian path, migration execution policy, database unavailability; ORM and mapper `[OPEN]` |
 | [`docs/decisions/ADR-0010-device-adapter-boundary.md`](docs/decisions/ADR-0010-device-adapter-boundary.md) | Adapter ports, vendor isolation, command lifecycle, disabled-by-default physical adapters |
 | [`docs/decisions/ADR-0011-configuration-and-secrets.md`](docs/decisions/ADR-0011-configuration-and-secrets.md) | Configuration layers, Draft versus Published, secrets, publication and rollback |
 | [`docs/decisions/ADR-0012-simulator-first-development.md`](docs/decisions/ADR-0012-simulator-first-development.md) | Simulator-first development, device profiles, failure injection, contract parity |

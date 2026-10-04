@@ -2,9 +2,9 @@
 
 **Document status:** The verified state below is `[APPROVED]` as a factual record.
 Stage status wording and the open-item list were corrected by the Owner-confirmed Stage 0.1
-documentation review punchlist, and updated by the approved Stage 0.2 Scope Gate —
-*Technology and Solution Architecture Decision*. Open items are `[OPEN]` and must not be
-resolved by assumption.
+documentation review punchlist, updated by the approved Stage 0.2 Scope Gate — *Technology and
+Solution Architecture Decision*, and refined by the Owner-requested Stage 0.2 documentation
+review punchlist. Open items are `[OPEN]` and must not be resolved by assumption.
 
 This document answers one question: *what is actually true right now, with evidence?*
 Nothing in this repository may contradict it. If something does, the discrepancy is reported
@@ -37,16 +37,19 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Stage 0.1 implementation | **MERGED** — merged to `main` through PR #1 |
 | Stage 0.1 Owner manual review | **Recorded as complete by the Owner** in the approved Stage 0.2 Scope Gate, which states that the previous Stage branch completed its role and was merged through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** — *Technology and Solution Architecture Decision* |
-| Stage 0.2 implementation | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review (Stage 0.2) | **PENDING** — no review has been requested or performed yet |
+| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
+| Documentation review (Stage 0.2) | **CHANGES REQUESTED / IN PROGRESS** — the Owner-requested punchlist has been implemented on the same branch and pull request; re-review pending |
 | Owner manual review (Stage 0.2) | **PENDING** |
 | Merge | **NOT MERGED** |
+| Stage 0.2.1 | **NOT AUTHORIZED** |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
 
 Approval of the Stage 0.2 Scope Gate authorised the work. It is **not** acceptance of the
-Stage 0.2 implementation. Nothing in this repository may describe the Stage 0.2 outcome as
+Stage 0.2 implementation. The Stage 0.2 documentation review has requested changes; those
+changes are implemented in a review-correction checkpoint on the same branch and pull request,
+and re-review is pending. Nothing in this repository may describe the Stage 0.2 outcome as
 Owner accepted, final, merged, reviewed, or as a completed development checkpoint accepted by
 the Owner. Stage 0.2 is a documentation and architecture-decision checkpoint only: no
 application code exists, no dependency was installed, no device was contacted, and no
@@ -96,6 +99,13 @@ No governance rule requires a documentation stage to advance a version number.
 - The architecture was decided in a working environment that contains no .NET SDK, no SQL
   Server client tooling, and no Windows runtime. No build, restore, execution, or measurement
   was possible or performed.
+- The Owner-requested Stage 0.2 documentation review punchlist was implemented as a
+  documentation-only review-correction checkpoint. It recorded the legacy-application
+  architecture evidence, returned the final UI framework selection to `[OPEN]`, added the fair
+  React-versus-Blazor comparison, and added the UI workload, Sensor presentation, quality
+  pipeline, live-state delivery, Modbus acquisition, configuration hot-path, Historian
+  decoupling, trend, and proposed Stage 0.2.1 spike content. No code, dependency, device
+  access, or Production configuration was created.
 - Stage 0.1 is a documentation and repository-governance activity only.
 - No application code has been written, and no code may be written until a later Stage Gate
   authorises it.
@@ -153,7 +163,7 @@ The Stage 0.1 open technology items were addressed by Stage 0.2. Each one is now
 `[PROPOSED]` architecture decision awaiting Owner acceptance, an `[OPEN]` item with a named
 follow-up gate, or a `[NOT VERIFIED]` item requiring hardware or workstation evidence. The
 disposition table is in [`ARCHITECTURE.md`](ARCHITECTURE.md) section 11, the remaining open
-items are listed in section 22 of the same document, and the decision records are indexed in
+items are listed in section 34 of the same document, and the decision records are indexed in
 [`decisions/README.md`](decisions/README.md).
 
 | Item | Stage 0.2 disposition |
@@ -170,6 +180,15 @@ items are listed in section 22 of the same document, and the decision records ar
 | Backup, restore, and off-box copy | Remains `[OPEN]` — carried forward into the offline deployment decision |
 | Historian write-path measurement and overflow policy | Remains `[OPEN]` — requires measurement on the target workstation |
 | Kiosk startup mechanism, package format, firewall rules, diagnostic bundle contents | Remains `[OPEN]` — deployment-gate items |
+| **Final UI framework (Candidate A React + TypeScript + Vite versus Candidate B Blazor Hybrid)** | **Returned to `[OPEN]`** by the Owner-requested punchlist. A current evidence-based preference for Candidate A is recorded and is **not an acceptance**. Selection requires the proposed Stage 0.2.1 spike |
+| Push transport and presentation-state payload encoding | `[OPEN]` — presentation contract is transport-agnostic |
+| Chart / trend library; UI test tooling; visual regression tooling | `[OPEN]` — library-neutral requirements recorded; selection needs spike evidence |
+| Site-specific invalid-value and sentinel mapping | `[OPEN]` — requires the Tag and data-quality contract; production values must never be committed |
+| ORM, mapper, micro-ORM, provider, and bulk-write mechanism | `[OPEN]` — the earlier "mapper as the primary technology" wording was replaced with testable architecture language |
+| Historian overflow, spool, retry, priority, and outage policy | `[OPEN]` — must be explicit before Historian implementation and separated from the audit-required refusal policy |
+| Poll Plan batching limits, poll-group intervals, concurrency bound, runtime recompilation | `[OPEN]` — requires device evidence and local Production configuration |
+| Sensor cell colour tokens, typography, dimensions, animation; accessibility requirement level | `[OPEN]` — deliberately deferred to a future UX/UI decision |
+| Acceptance thresholds for the Stage 0.2.1 spike | `[OPEN]` — must be set before the spike runs |
 
 ### 8.2 Sequence, queue, and equipment behaviour
 
@@ -327,11 +346,18 @@ Detailed commands and observed output are reported in the delivery report.
 | 20 | No application code or package dependency created | File-type and file-extension inventory |
 | 21 | Diff reviewed before commit | Full diff read before creating the review-correction commit |
 
-### 12.1 Stage 0.2 documentation validation record
+### 12.1 Stage 0.2 checkpoint documentation validation record
 
-Documentation-only validation, performed for the Stage 0.2 checkpoint. Every result below is
-observed output from the method shown. The exact commands are reported in the Stage 0.2
+Documentation-only validation, performed for the **first** Stage 0.2 checkpoint. Every result
+below is observed output from the method shown. The exact commands are reported in the Stage 0.2
 delivery report.
+
+**Superseded.** This record describes the first checkpoint. The Owner-requested Stage 0.2
+documentation review then returned changes, and the corrected state is recorded in section
+12.2. Two rows below are no longer an accurate description of the repository: row 1 names
+12 modified and 8 created files, and row 8 lists the stage-status wording of the first
+checkpoint. Neither is wrong as history; both were changed by the review-correction
+checkpoint.
 
 | # | Check | Method | Observed result |
 | --- | --- | --- | --- |
@@ -346,23 +372,44 @@ delivery report.
 | 9 | Full diff review | Complete staged diff read before the checkpoint commit | Every change traceable to Stage 0.2; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
 | 10 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, or installer test was executed, and none is claimed |
 
-### 12.2 Reported scope limitation — stage-status lines in files the Stage 0.2 gate did not name
+### 12.2 Stage 0.2 review-correction (punchlist) documentation validation record
 
-The approved Stage 0.2 Scope Gate named the files that may require updates and stated that no
-other file is to be created. [`AGENTS.md`](../AGENTS.md) section 2.2 also prohibits modifying a
-file that the current Stage Gate does not name.
+Documentation-only validation, performed for the Stage 0.2 review-correction checkpoint that
+implemented the Owner-requested punchlist. Every result below is observed output from the
+method shown. The exact commands are reported in the Stage 0.2 delivery report.
 
-Seven documents therefore still carry the Stage 0.1-era line
-`Stage 0.2 `[NOT AUTHORIZED]``: `CHANGELOG.md`, `SECURITY.md`, `docs/ALARM_MODEL.md`,
-`docs/CLEANING_SEQUENCE.md`, `docs/HISTORIAN_RETENTION.md`, `docs/QUEUE_MODEL.md`, and
-`docs/USER_PERMISSION_MODEL.md`. Their stage-status lines were **not modified**, because the
-gate did not name them and the working contract forbids the change.
+| # | Check | Method | Observed result |
+| --- | --- | --- | --- |
+| 1 | Changed and created file list; no out-of-scope file | `git status --porcelain` and `git diff --stat` | Only repository documentation and decision records modified. No application source, project, manifest, lock file, SQL, script, installer, archive, CI file, configuration file, or runtime directory was created |
+| 2 | No runtime or package artefact exists | File-type and file-extension inventory over all non-`.git` files | 33 Markdown files and one `.gitignore`. Only `./docs` and `./docs/decisions` directories exist |
+| 3 | No dependency installed | No package-manager or installer command was executed | No dependency installed, restored, or vendored |
+| 4 | Internal relative Markdown links resolve | Inline Python checker over every Markdown file; relative targets only, absolute URLs and in-page anchors excluded | 33 files scanned; broken count reported in the delivery report. Any non-zero count is a defect that must be fixed before commit |
+| 5 | Every ADR keeps its required section set | Heading extraction per ADR | Status, Context, Decision, Alternatives considered, Consequences, Risks, Verification status, Follow-up gates, Relationship to protected decisions |
+| 6 | The UI framework selection is not presented as accepted | Cross-document search for framework-acceptance wording | Final framework is `[OPEN]`; both candidates are `[PROPOSED]`; the React preference is explicitly not acceptance; Blazor is explicitly not rejected |
+| 7 | The React offline claim is correct and present | Targeted search | "React can be built and deployed offline" is stated, together with the second-ecosystem cost and the explicit statement that this does not make offline development or deployment impossible |
+| 8 | Protected decisions remain stated and unmodified | Targeted `grep` runs, listed in the delivery report | All required statements found and unchanged: one Boiler Unit per Workstation, 104 Sensor locations, 208 Thermocouple channels, Eight Water Jets, Four Galil DMC-B140-M controllers, Water Jet to Isolation Valve one-to-one, strictly sequential Cleaning Jobs, maximum one active Cleaning Job, parallel cleaning prohibited, GlobalQueue FIFO and source ownership, `LastSuccessfulCleaningCompletedAt` never null, Operator baseline override role, cleared-state acknowledgement, Main Pump may remain running between sequential Jobs, WAGO fail-safe `[NOT VERIFIED]`, Production Write `[NOT AUTHORIZED]`, Production configuration never in the repository |
+| 9 | Architecture consistency | Targeted `grep` runs, listed in the delivery report | The UI owns no device session and cannot write to hardware; the Equipment Runtime service is the sole owner of physical device sessions; adapters contain no UI logic and the domain is independent of vendor libraries; the simulator implements the same application-facing contract; physical adapters are disabled by default; the runtime consumes only Published configuration; the UI does not read Modbus and does not query SQL for live state; no statement permits parallel Cleaning Jobs |
+| 10 | Sensitive-data scan | IPv4 and CIDR regex, credential-shaped regex, connection-string regex, numeric configuration patterns, and register-map-like rows, across all non-`.git` files | Zero matches |
+| 11 | Stage-status consistency | Stage-status wording search across every Markdown file | Zero remaining lines describing Stage 0.2 as `[NOT AUTHORIZED]`. Every file now states the current position: Stage 0.2 Scope Gate `[APPROVED]`; Stage 0.2 architecture checkpoint SUBMITTED FOR OWNER REVIEW; documentation review CHANGES REQUESTED / IN PROGRESS; Owner manual review PENDING; NOT MERGED; Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]` |
+| 12 | Cross-reference integrity | Search for the old `section 22` reference and for the new section numbers | The open-item section is now section 34 and the earlier references were corrected. Sections 23–33 referenced by the decision records all exist |
+| 13 | Full diff review | Complete diff read before the checkpoint commit | Every change is traceable to the punchlist; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
+| 14 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, simulator, or installer test was executed, and none is claimed |
 
-This is reported rather than performed. The authoritative stage status remains
-[`CURRENT_STATE.md`](CURRENT_STATE.md), [`README.md`](../README.md), and
-[`MASTER_PLAN.md`](MASTER_PLAN.md), which are correct as of this checkpoint. A one-line
-status refresh in those seven documents requires Owner direction, either as a review-correction
-commit on this same branch or as a named file in a later gate.
+#### 12.2.1 Superseded scope limitation — stage-status lines in documents the first gate did not name
+
+The first Stage 0.2 checkpoint reported, as a scope limitation, that seven documents still
+carried the Stage 0.1-era line `Stage 0.2 `[NOT AUTHORIZED]``: `CHANGELOG.md`, `SECURITY.md`,
+`docs/ALARM_MODEL.md`, `docs/CLEANING_SEQUENCE.md`, `docs/HISTORIAN_RETENTION.md`,
+`docs/QUEUE_MODEL.md`, and `docs/USER_PERMISSION_MODEL.md`. They were not modified at that
+checkpoint, because the first gate did not name them and [`AGENTS.md`](../AGENTS.md) section 2.2
+prohibits modifying a file the current Stage Gate does not name.
+
+**That limitation is now closed.** The Owner-requested Stage 0.2 documentation review punchlist
+explicitly names those documents for a stage-status refresh, which authorises the change
+(see the authority order in [`AGENTS.md`](../AGENTS.md) section 1). Their status lines now state
+the current position. The `CHANGELOG.md` Stage 0.1 status block is retained as history and is
+annotated as superseded, because it is a historical record of that stage; the forward-looking
+stage status no longer says `[NOT AUTHORIZED]`.
 
 ## 13. Required positive confirmations
 

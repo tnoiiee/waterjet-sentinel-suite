@@ -107,7 +107,23 @@ That changes the economics of every deployment decision:
     that only the required local equipment communication is permitted outbound. Exact rule
     definitions belong to the deployment gate and to local site documentation; they are not
     recorded here.
-11. **No deployment artefact is created in this Stage.** No installer, script, package
+11. **Offline packaging must serve either UI framework candidate.**
+    - Both Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) must be
+      buildable and deployable **fully offline**. React does not require Internet access to
+      build or to run; its output is static local assets.
+    - If Candidate A is selected, the offline build definition must additionally include a
+      **prepared local npm mirror or vendored package cache**, a committed dependency manifest
+      and lock file, and a pinned Node.js toolchain. This is a second package and build
+      ecosystem alongside NuGet, and it increases offline dependency-management and
+      supply-chain audit effort.
+    - That increased effort is accepted as a **cost**, not treated as an impossibility and not
+      treated as a reason to reject the candidate. Equally, Candidate B's single ecosystem is
+      not by itself evidence of better UI performance, graph quality, camera integration, or
+      long-running kiosk stability.
+    - The offline build must be reproducible from local sources alone for whichever candidate
+      is selected, and offline restoration complexity is an explicit measurement in the
+      proposed Stage 0.2.1 spike ([`../MASTER_PLAN.md`](../MASTER_PLAN.md) section 3.2).
+12. **No deployment artefact is created in this Stage.** No installer, script, package
     definition, or CI workflow is authored.
 
 ## Alternatives considered
@@ -122,6 +138,8 @@ That changes the economics of every deployment decision:
 | Kiosk shell started only manually by an operator | A power event would leave the Control Room without an interface until an operator intervened | Rejected |
 | Trusting the operating system image to always carry the web view runtime | It may be absent, disabled, or removed by servicing; the installer must detect and act | Rejected |
 | Exposing the Local Application API on a site LAN interface for remote support | Expands the attack surface and contradicts the local-only boundary | Rejected |
+| Excluding React because an offline npm restore is difficult | An offline npm mirror is a solved packaging problem; the extra effort is real but is a cost, not a blocker | Rejected as a basis for exclusion |
+| Assuming Blazor is automatically simpler to deploy offline without measuring footprint or runtime prerequisites | A single ecosystem reduces mirroring work, but the web view runtime prerequisite and the deployed footprint still require measurement | Rejected as an assumption |
 
 ## Consequences
 
@@ -137,6 +155,9 @@ That changes the economics of every deployment decision:
 - Because nothing listens beyond loopback and nothing calls out, remote support must be
   provided by site-local means (on-site presence or site-chosen local connectivity), which is
   a plant process decision rather than an application feature.
+- If Candidate A is selected, the offline build gains a mirrored, pinned npm dependency set to
+  maintain alongside NuGet. The build machine becomes a controlled asset whose cache state
+  affects reproducibility, so the mirror must itself be versioned and auditable.
 
 ## Risks
 
@@ -148,6 +169,8 @@ That changes the economics of every deployment decision:
 | Automatic restart loops masking an unresolved fault | Repeated start attempt against unknown equipment state | Startup state blocks commands; bounded recovery; operator-visible fault | `[PROPOSED]` |
 | Diagnostic bundle containing plant-sensitive content | Prohibited data leaves the site | Manual bundle creation with a review step; contents are `[OPEN]` | `[OPEN]` |
 | Kiosk startup mechanism interacts badly with Windows servicing | Kiosk does not start after an OS update | Mechanism selection and re-verification belong to the deployment gate; shell supervision restarts it | `[OPEN]` |
+| Second package ecosystem cannot be restored offline on the build machine | Builds become non-reproducible, or require Internet access in practice | Prepared local mirror or vendored cache, committed manifest and lock file, pinned toolchain; verified in the Stage 0.2.1 spike | `[OPEN]` |
+| Offline build verified for one framework candidate but assumed for the other | A late surprise after the framework decision | Both candidates must demonstrate offline build and restore in the spike; the measurement is an explicit spike output | `[PROPOSED]` |
 
 ## Verification status
 
@@ -160,7 +183,10 @@ That changes the economics of every deployment decision:
   loss — all remain bench verification items.
 - `[OPEN]`: package format; kiosk startup mechanism; firewall rule definitions; diagnostic
   bundle contents; backup schedule, retention, and off-box copy; configuration backup; whether
-  a published configuration revision can be applied without a runtime restart.
+  a published configuration revision can be applied without a runtime restart; and the offline
+  package-mirror design for a second ecosystem if Candidate A is selected.
+- `[NOT VERIFIED]`: offline build and restore for either UI candidate. Neither has been built,
+  and no dependency set has been mirrored or pinned.
 - No release, ZIP, installer, or deployment script is created by this Stage.
 
 ## Follow-up gates
@@ -174,6 +200,8 @@ That changes the economics of every deployment decision:
 | Backup schedule, retention, and off-box copy | Deployment Stage Gate, before deployment acceptance |
 | Restore test execution | Test Stage Gate (planned) and deployment acceptance |
 | Upgrade and rollback procedure, including the verified-backup requirement | Deployment Stage Gate |
+| Offline build and dependency-restoration verification for both UI framework candidates | Stage 0.2.1 spike (PROPOSED, NOT AUTHORIZED) |
+| Offline package-mirror design for a second ecosystem, if Candidate A is selected | Deployment Stage Gate |
 | Any packaging or installation artefact | A later Stage Gate that explicitly authorises creating it |
 
 ## Relationship to protected decisions
@@ -201,3 +229,4 @@ That changes the economics of every deployment decision:
 - [`ADR-0007-runtime-process-model.md`](ADR-0007-runtime-process-model.md)
 - [`ADR-0009-database-access-and-migrations.md`](ADR-0009-database-access-and-migrations.md)
 - [`ADR-0011-configuration-and-secrets.md`](ADR-0011-configuration-and-secrets.md)
+- [`../MASTER_PLAN.md`](../MASTER_PLAN.md) — proposed Stage 0.2.1 technology spike

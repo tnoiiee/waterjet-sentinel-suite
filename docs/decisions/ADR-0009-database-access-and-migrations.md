@@ -43,17 +43,23 @@ created in this Stage.
    Application API ([ADR-0007](ADR-0007-runtime-process-model.md) item 4). One process means
    one connection pool and one transaction policy to reason about.
 
-2. **Data-access technology.**
-   - **Primary: an object-relational mapper (EF Core)** for configuration, user and permission
-     data, Cleaning Job records, alarms, events, audit records, and the schema history.
-   - **Measured escape hatch.** The Historian's high-rate sample write path may use a narrower,
-     set-based path (a mapper bulk operation or narrowly scoped hand-written SQL) **only**
-     when a measurement shows the mapper path cannot meet the approved one-second detail
-     requirement on the target workstation. Such a path must stay behind the same persistence
-     boundary, must be covered by the same tests, and must not leak into domain logic.
-   - **`[OPEN]`:** the EF Core major version, its SQL Server provider version, and verified
-     compatibility with SQL Server 2025 Standard. No package is installed and no
-     compatibility claim is made in this Stage.
+2. **Data-access technology — architecture language, not a library name.**
+   - **Transactional relational access** for configuration, alarm, event, audit, cleaning-job,
+     user and permission, and queue-snapshot data. These writes are small, correctness-critical,
+     and must be transactional with the state change they record.
+   - **Batch-oriented write path for Historian samples.** High-rate sample data is written in
+     batches on a decoupled path, not one row at a time on the control path.
+   - **Exact ORM, mapper, micro-ORM, provider, and bulk-write mechanism remain `[OPEN]`.** No
+     technology is selected by this record, and no technology may be selected merely by using
+     the generic word "mapper". A specific library may be chosen only at the implementation
+     Stage Gate, with licence and offline-availability evidence.
+   - **A measured escape hatch is allowed only after evidence identifies a bottleneck.** If
+     measurement shows that the chosen transactional access cannot meet the approved one-second
+     detail requirement on the target workstation, a narrower set-based write path may be
+     introduced for that specific path. It must stay behind the same persistence boundary,
+     must be covered by the same tests, and must not leak into domain logic.
+   - **`[OPEN]`:** provider version and verified compatibility with SQL Server 2025 Standard.
+     No package is installed and no compatibility claim is made in this Stage.
 
 3. **Migration ownership and mechanism.**
    - Schema changes are produced as **reviewed, versioned migrations** that are committed to
@@ -89,12 +95,23 @@ created in this Stage.
 6. **Historian write path.**
    - The Historian writer is **decoupled from the control path**: acquisition, queue
      evaluation, and sequencing decisions must not wait on database writes.
+   - The flow is: acquisition → authoritative in-memory state → queue and alarm evaluation →
+     UI push → bounded Historian channel → batch database writer.
+   - **A slow database write must not directly block** Modbus acquisition, Galil monitoring,
+     queue evaluation, alarm evaluation, live UI updates, or a valid Main Pump stop request
+     (PMP-007).
+   - Required properties: bounded queue; batch writes; health metrics; data-gap reporting; no
+     unbounded memory growth; no silent data loss.
    - Writes are prioritised: accountability records (audit, event, alarm, job outcome) rank
      above active-job detail, which ranks above normal thermocouple samples, which ranks above
      aggregates.
-   - The queue between the runtime and the database is **bounded**. Overflow policy is
-     `[OPEN]` and must be explicit; silently blocking the control loop or growing without
-     bound are both unacceptable. Whether overflow is spooled to local disk is `[OPEN]`.
+   - **Historian policy is separate from Audit-required action policy.** A Historian backlog,
+     degradation, or outage must not silently change which initiating actions are permitted;
+     the audit-required refusal set is governed by item 7 below, not by the Historian channel's
+     backlog state.
+   - An **explicit backpressure or overflow policy** is required **before Historian
+     implementation**. Overflow, spool, retry, priority, and database-outage policy remain
+     `[OPEN]` and must be closed before that implementation.
 7. **Behaviour when SQL Server is unavailable.**
    - The runtime continues to supervise the process using live in-memory state; **live
      process visibility in the UI must not depend on the Historian**
@@ -130,15 +147,34 @@ created in this Stage.
 10. **No capacity or performance claim.** Exact Historian physical sizing remains
     `[NOT VERIFIED]`. This record makes no benchmark, throughput, or storage-sufficiency
     claim.
+11. **SQL Server is not the per-cycle operational parameter source.** This boundary addresses
+    the legacy behaviour in which repeated parameter queries delayed the application.
+    - The runtime loads the Published configuration at startup and validates it.
+    - The runtime holds an **immutable in-memory Published Configuration Snapshot**.
+    - Queue, alarm, acquisition, motion, and Cleaning Job logic read the in-memory snapshot,
+      not the database.
+    - Configuration is reloaded only after an explicitly Published revision or an approved
+      startup or recovery action ([ADR-0011](ADR-0011-configuration-and-secrets.md)).
+    - A validated new revision is swapped in **atomically**, under the approved runtime state
+      gate.
+    - A Draft is never consumed by the runtime.
+    - The UI does not query SQL for operational parameters every second.
+    - Device polling does not query SQL for static parameters every cycle.
+12. **Where SQL remains appropriate.** Versioned configuration persistence; alarm history;
+    event history; audit history; cleaning-job history; the Historian; reports; and on-demand
+    historical queries. No schema, script, migration, or connection string is created by this
+    record or by Stage 0.2.
 
 ## Alternatives considered
 
 | Alternative | Evaluation | Outcome |
 | --- | --- | --- |
-| Mapper-only data access with no escape hatch | Simplest, uniform; but may fail the approved one-second detail requirement under 208-channel load. The requirement outranks uniformity | Rejected as an absolute rule; kept as the default |
-| Hand-written SQL and stored procedures for everything | Maximum control and explainability, but much slower to build and maintain, and duplicates mapping logic already covered by the mapper | Rejected |
+| A single prescribed data-access library, named now | The available evidence does not justify one. Naming a library here would be tool-ambiguous and would pre-empt licence and compatibility review | Rejected — architecture language recorded; library `[OPEN]` |
+| Transactional relational access with no escape hatch | Simplest and most uniform; but may fail the approved one-second detail requirement under 208-channel load. The requirement outranks uniformity | Rejected as an absolute rule; the measured escape hatch is permitted |
+| Hand-written SQL and stored procedures for everything | Maximum control and explainability, but much slower to build and maintain, and duplicates mapping logic already covered by the transactional access layer | Rejected |
 | Raw low-level ADO-style access with no mapping layer | No productivity or maintainability benefit for a small team | Rejected |
-| Micro-ORM for all persistence | Middle ground, but two access technologies and no migration story of its own | Rejected |
+| Committing to a specific high-rate write mechanism before measurement | Would record an unverifiable performance claim and pre-empt the licence and compatibility review | Rejected — decision deferred to measurement at the implementation gate |
+| Reading operational parameters from SQL each cycle | Causes the legacy failure mode: database latency becomes control-path latency | Rejected — in-memory Published Configuration Snapshot is required |
 | Auto-apply migrations at service start | Convenient, and wrong here: a service restart would silently change the schema on a live workstation, with no maintenance window, no backup, and no recorded intent | Rejected |
 | Reverse migrations as the rollback mechanism | Reverse migrations are frequently untested and can destroy data that forward migration added. Backup-and-restore is the trustworthy rollback path | Rejected as the primary mechanism; `[OPEN]` as a supplement |
 | Historian writes synchronous with the control loop | Simple ordering guarantee, but couples control determinism to database latency — the exact coupling the failure-isolation requirement forbids | Rejected |
@@ -160,12 +196,21 @@ created in this Stage.
   hatch must be justified by data.
 - Restore capability becomes a prerequisite for deployment acceptance, and it does not exist
   yet.
+- Because operational parameters live in an in-memory snapshot, the database can be slow or
+  unavailable without slowing acquisition, queue evaluation, alarm evaluation, or the live UI.
+- That improvement has a price: configuration relevance is now a runtime responsibility. A
+  revision that is published but not yet applied is **not** in force, and the runtime state
+  gate — not the publication itself — decides when it takes effect.
+- Omitting a library name keeps the decision testable but leaves a concrete selection to the
+  implementation gate, together with its licence and offline-availability review.
 
 ## Risks
 
 | Risk | Effect | Mitigation direction | Status |
 | --- | --- | --- | --- |
-| Mapper path cannot sustain the approved sample rates | Histogram gaps or control-loop pressure | Measurement at the implementation gate; the escape hatch is pre-approved by this decision | `[OPEN]` |
+| The chosen transactional access path cannot sustain the approved sample rates | Sample gaps or control-loop pressure | Measurement at the implementation gate; a measured, narrowly scoped escape hatch is permitted for the specific bottleneck | `[OPEN]` |
+| In-memory configuration snapshot diverges from the persisted published revision | Runtime behaves on stale parameters | Snapshot is created only from a validated published revision; revision identifier is stamped and displayed; reload only on publication or approved startup/recovery | `[PROPOSED]` |
+| Historian backlog policy left implicit | Either data loss or memory growth, discovered late | Explicit backpressure or overflow policy required before Historian implementation | `[OPEN]` |
 | Overflow policy for the write queue left implicit | Either data loss or memory growth is discovered in production | Policy must be explicit before the historian write path is implemented | `[OPEN]` |
 | Migration applied without a working backup | Unrecoverable schema change | Mandatory pre-migration backup and a verified restore path | `[PROPOSED]` |
 | Provider/version incompatibility with SQL Server 2025 Standard | Late rework | Verify compatibility before the first data-access code is written | `[NOT VERIFIED]` |
@@ -176,21 +221,25 @@ created in this Stage.
 
 - `[NOT VERIFIED]`: SQL Server connectivity, schema creation, migration execution, restore,
   backup, and any throughput or capacity property. No database has been contacted.
-- `[NOT VERIFIED]`: EF Core and provider compatibility with SQL Server 2025 Standard.
+- `[NOT VERIFIED]`: provider compatibility with SQL Server 2025 Standard, and the behaviour of
+  any specific ORM, mapper, micro-ORM, or bulk-write mechanism — none is selected.
 - `[NOT VERIFIED]`: Historian physical sizing, the dominant data category, and every input to
   the capacity model ([`ADR-0004`](ADR-0004-historian-strategy.md)).
-- `[OPEN]`: provider and mapper versions; migration tooling identity; isolation levels and
-  batch sizing; overflow and spool policy; backup schedule and off-box copy; restore testing.
+- `[OPEN]`: ORM, mapper, micro-ORM, provider, and bulk-write mechanism; migration tooling
+  identity; isolation levels and batch sizing; Historian overflow, spool, retry, priority, and
+  outage policy; backup schedule and off-box copy; restore testing; whether a published
+  configuration revision can be applied without a runtime restart.
 - No database object, script, migration, or connection string is created by this Stage.
 
 ## Follow-up gates
 
 | Item | Gate that must close it |
 | --- | --- |
-| Provider and mapper version pin, with compatibility evidence | Implementation Stage Gate |
+| Data-access mechanism selection (ORM, mapper, micro-ORM, or hand-written path) with licence, offline-availability, and compatibility evidence | Implementation Stage Gate |
+| Configuration snapshot application procedure and state gate | Implementation Stage Gate |
 | Migration tooling identity and execution procedure | Implementation Stage Gate |
 | Historian write-path measurement and escape-hatch decision | Implementation Stage Gate, with measurement on the target workstation |
-| Overflow, spool, and priority policy for the write queue | Implementation Stage Gate |
+| Overflow, spool, retry, priority, and database-outage policy for the write queue, including its separation from the audit-required refusal policy | Implementation Stage Gate, before Historian implementation |
 | Audit-required refusal set ratification | Owner review of Stage 0.2, then Implementation Stage Gate |
 | Backup schedule, retention, and off-box copy | Deployment Stage Gate |
 | Restore test execution | Test Stage Gate (planned) and deployment acceptance |
@@ -218,7 +267,7 @@ created in this Stage.
 - [`../HISTORIAN_RETENTION.md`](../HISTORIAN_RETENTION.md) — retention, cleanup, capacity,
   unavailability behaviour
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — data, configuration, and secrets model
-  (section 17)
+  (section 17), configuration hot path (section 30), Historian decoupling (section 31)
 - [`../REQUIREMENTS.md`](../REQUIREMENTS.md) — HIS, TMP, TSB, ALM, PMP, and ARC groups
 - [`ADR-0004-historian-strategy.md`](ADR-0004-historian-strategy.md)
 - [`ADR-0007-runtime-process-model.md`](ADR-0007-runtime-process-model.md)

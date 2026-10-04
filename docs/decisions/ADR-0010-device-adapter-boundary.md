@@ -114,6 +114,36 @@ coordinate, limit, or setpoint may be invented or committed.
     referenced, or tested in this Stage.
 11. **Production Device access remains `[NOT AUTHORIZED]`.** No adapter may be pointed at
     production equipment, and no test-hardware configuration may be created in this Stage.
+12. **Modbus acquisition architecture (corrective requirement).** The legacy application polled
+    approximately ten devices in a way that slowed the whole application. The following
+    direction is required of the acquisition path, and it is an architecture requirement, not a
+    library choice:
+    - **One runtime-owned connection and one serialized command queue per Modbus device.**
+      A session is never shared across devices.
+    - **Different device pollers may operate concurrently under bounded scheduling.** The
+      concurrency limit is configured locally; it is not unbounded.
+    - **Requests to one device remain serialized** unless future device evidence permits
+      otherwise.
+    - **One slow or timed-out device must not block polling of unrelated devices.** Isolation
+      between devices is the point of the per-device session and queue.
+    - **Contiguous coil or register addresses are compiled into bounded batch reads** where the
+      device and the function code support it, instead of one request per tag.
+    - **Published Tag configuration compiles into a Poll Plan.** Compilation happens at
+      configuration publication or runtime startup — **never from scratch every poll cycle**.
+    - **Poll groups may use separate intervals: Fast, Medium, and Slow.** Critical one-second
+      data belongs to the Fast group. Exact grouping and register spans remain Production
+      configuration and are never committed.
+    - Device limits, maximum quantities per request, address gaps, function codes, and
+      byte/word order must be respected.
+    - **The UI never performs Modbus polling** (see [ADR-0006](ADR-0006-ui-delivery-model.md)).
+    - Whether a Poll Plan may be recompiled at runtime, and the batching limits per device, are
+      `[OPEN]` and must be settled with device evidence.
+13. **Library neutrality is preserved.** No Modbus library is selected or installed in this
+    Stage. A previously used library (for example NModbus in the legacy application) may be
+    evaluated later, but **prior slow behaviour must not be treated as proof that every
+    architecture built on that library is slow**. The legacy latency is attributed to
+    architecture — unbatched per-tag requests, unisolated devices, and shared work — not to a
+    library's inherent speed.
 
 ## Alternatives considered
 
@@ -128,6 +158,11 @@ coordinate, limit, or setpoint may be invented or committed.
 | Replaying buffered commands after reconnection | Explicitly prohibited by the approved reliability principles | Rejected |
 | Simulator implemented as a separate code path with its own interfaces | Simulator would stop being a proof of the application-facing contract and drift from the real path | Rejected |
 | Selecting a Modbus or Galil library now | Licence and offline-availability evidence is unavailable in this Stage; selecting would invent certainty | Deferred — `[OPEN]` |
+| One shared Modbus session or one global polling loop for all devices | A single slow or timed-out device would delay every other device — the legacy failure mode | Rejected — per-device session and serialized command queue required |
+| One request per tag per cycle | Multiplies round trips and dominates poll time; cannot hold a one-second Fast group | Rejected — bounded batch reads of contiguous addresses |
+| Compiling the poll list from scratch every cycle | Wastes the cycle budget on compilation and couples polling cost to configuration size | Rejected — Poll Plan compiled at publication or startup |
+| Polling every device at the fastest interval | Saturates the equipment network and starves critical signals | Rejected — Fast, Medium, and Slow poll groups |
+| Attributing the legacy slowness to NModbus itself | The evidence does not support it; the same library inside a batched, isolated, concurrent architecture may perform adequately | Rejected as a conclusion |
 
 ## Consequences
 
@@ -142,6 +177,14 @@ coordinate, limit, or setpoint may be invented or committed.
   claimed to work, only to be designed.
 - Library selection remains a real, unresolved dependency with licence consequences; it is
   visible rather than assumed.
+- Acquisition cost is bounded by configuration compilation plus batched reads rather than by
+  tag count, so a larger tag list does not automatically lengthen the poll cycle.
+- Device isolation means one misbehaving coupler degrades only its own poll group; its data
+  quality goes bad while unrelated devices keep updating.
+- Poll groups require a grouping decision in local Production configuration, which is
+  deliberately not made in the public repository.
+- Because the Poll Plan is compiled at publication or startup, a configuration publication has
+  a real acquisition-side cost that must be measurable and bounded.
 
 ## Risks
 
@@ -153,6 +196,10 @@ coordinate, limit, or setpoint may be invented or committed.
 | Adapter retry logic bypassing an interlock | Equipment commanded without authorization | Retries are re-validated by the runtime service, not the adapter; adapter retries are transport-level only | `[PROPOSED]` |
 | Simulator and physical adapter drifting apart | Simulated success, physical failure | Shared contracts with contract tests; simulator cannot be built against different interfaces | `[PROPOSED]` |
 | Clock adapter not used consistently | Non-deterministic dwell and interval behaviour | Injectable clock is a testability requirement; direct system-time reads are prohibited in domain code | `[PROPOSED]` |
+| Bounded concurrency set too high for the equipment network | Saturation, timeouts, and cascading bad quality | Local configuration plus measurement during implementation; concurrency is bounded by design | `[OPEN]` |
+| Batch reads cross a gap or exceed a device limit | Request rejected, or silently wrong data | Poll Plan compilation must respect maximum quantities, gaps, and function-code limits; malformed plans are refused at publication | `[PROPOSED]` |
+| Poll Plan recompiled per cycle by accident | Acquisition cost scales with configuration, reintroducing the legacy symptom | Compilation only at publication or startup; a planned verification case covers it | `[PROPOSED]` |
+| Slow device starves others despite isolation | One bad device degrades the whole cycle | Per-device session and queue, bounded scheduling, per-device health metrics | `[PROPOSED]` |
 
 ## Verification status
 
@@ -164,7 +211,12 @@ coordinate, limit, or setpoint may be invented or committed.
 - `[NOT VERIFIED]`: WAGO watchdog behaviour and every bench-verification item in
   [`../SAFETY_BOUNDARY.md`](../SAFETY_BOUNDARY.md) section 4.
 - `[OPEN]`: Modbus library, Galil integration mechanism, retry and timeout values (local
-  configuration), and the in-house fallback decision.
+  configuration), poll-group interval values (local configuration), batching limits,
+  concurrency bound, whether a Poll Plan may be recompiled at runtime, and the in-house
+  fallback decision.
+- `[NOT VERIFIED]`: the acquisition performance of any Poll Plan design. No poller exists, no
+  device has been polled, and no cycle time has been measured. The legacy evidence justifies the
+  architecture direction; it does not measure the new one.
 - `[NOT AUTHORIZED]`: production device access and production valve and pump write control.
 
 ## Follow-up gates
@@ -177,6 +229,8 @@ coordinate, limit, or setpoint may be invented or committed.
 | Command-state evidence model per signal | Implementation Stage Gate, then bench verification |
 | Simulator contract tests proving parity with physical adapters | Test Stage Gate (planned) |
 | Retry, timeout, and reconnection policy values | Implementation Stage Gate (local configuration only) |
+| Poll Plan compilation, batching limits, poll-group intervals, and bounded concurrency | Implementation Stage Gate, with measurement against a simulator and then the bench |
+| Confirmation that a large tag list does not lengthen the poll cycle beyond the Fast-group budget | Test Stage Gate (planned performance verification) |
 | Enabling any physical adapter | A separate, future Owner-approved Scope Gate, after bench verification |
 
 ## Relationship to protected decisions
@@ -200,7 +254,7 @@ coordinate, limit, or setpoint may be invented or committed.
 ## References
 
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — adapter strategy and command lifecycle
-  (section 16)
+  (section 16), Modbus acquisition architecture (section 29)
 - [`../SAFETY_BOUNDARY.md`](../SAFETY_BOUNDARY.md) — bench verification and target safe states
 - [`../REQUIREMENTS.md`](../REQUIREMENTS.md) — COM, COMH, GAL, VLV, PMP, and ARC groups
 - [`../TEST_STRATEGY.md`](../TEST_STRATEGY.md) — planned integration levels

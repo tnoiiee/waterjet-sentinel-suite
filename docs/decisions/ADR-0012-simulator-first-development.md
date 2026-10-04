@@ -100,6 +100,20 @@ contracts produces false confidence.
 11. **Nothing is implemented in this Stage.** This record defines the model and the
     governance. No simulator code, device configuration, or test hardware configuration is
     created.
+12. **Relationship to the proposed Stage 0.2.1 technology spike.** The spike is a constrained
+    evaluation, not a simulator and not an implementation of this record:
+    - The spike runs on **synthetic data only** and must not require the simulator adapters,
+      a device driver, or any device profile beyond a synthetic feed.
+    - The spike must not access WAGO, Galil, Production SQL Server, or Production
+      configuration, and it does not authorise such access.
+    - Spike results are **UI and runtime performance evidence about the application**, not
+      simulator fidelity evidence and not hardware evidence.
+    - A spike result that looks favourable must not be reported as verification of any hardware
+      behaviour, and it must not be used to relax the bench verification requirements in
+      [`../SAFETY_BOUNDARY.md`](../SAFETY_BOUNDARY.md).
+    - Whether the spike's synthetic workload later becomes part of the simulator is `[OPEN]`
+      and belongs to the simulator Stage Gate, not to the spike.
+    See [`../MASTER_PLAN.md`](../MASTER_PLAN.md) section 3.2 for the proposed spike scope.
 
 ## Alternatives considered
 
@@ -185,3 +199,4 @@ contracts produces false confidence.
 - [`ADR-0010-device-adapter-boundary.md`](ADR-0010-device-adapter-boundary.md)
 - [`ADR-0006-ui-delivery-model.md`](ADR-0006-ui-delivery-model.md)
 - [`ADR-0013-offline-deployment.md`](ADR-0013-offline-deployment.md)
+- [`../MASTER_PLAN.md`](../MASTER_PLAN.md) — proposed Stage 0.2.1 technology spike

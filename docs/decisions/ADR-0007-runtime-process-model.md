@@ -112,6 +112,44 @@ preference is therefore the least complex process model that still satisfies iso
     behaviour degrades control determinism. Until such evidence exists, one runtime service is
     the least complex architecture that satisfies the mandatory boundaries.
 
+### Live-state delivery and performance isolation (punchlist refinement)
+
+The legacy application evidence in [`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 23 shows
+that when acquisition, database access, rendering, and graph updates share one execution
+context, they block one another and the operator notices. The following boundaries are required
+of the process model:
+
+1. **The runtime maintains the authoritative in-memory operational state.** Acquisition writes
+   into it; queue, alarm, sequencing, motion, and Cleaning Job logic read from it. It is the
+   single answer to "what is the state of the plant right now".
+2. **Operational parameters come from an in-memory Published Configuration Snapshot**, not from
+   the database per cycle ([ADR-0009](ADR-0009-database-access-and-migrations.md) item 11,
+   [ADR-0011](ADR-0011-configuration-and-secrets.md)).
+3. **The UI holds presentation state only.** It is a consumer of the runtime's state, never a
+   second authority, and never a source that the runtime reads back from.
+4. **The runtime publishes an application-facing snapshot or delta contract**, delivered to the
+   UI over a loopback push channel; the UI applies **partial component updates**. The UI does
+   not poll each signal individually and does not query SQL for live operational state.
+5. **Published content** must include, at minimum: a full bootstrap snapshot on initial
+   connection; a monotonic sequence or revision; a timestamp; changed Sensor presentation
+   states; the active Cleaning Job; Main Pump state; queue summary; alarm summary;
+   communication health; and the published configuration revision.
+6. **The exact push transport remains `[OPEN]`.** Candidates may include an ASP.NET Core push
+   mechanism such as WebSocket-based delivery. No final push library is selected in Stage 0.2.
+   The contract must not be coupled to the transport.
+7. **Reconnect principles:** the UI reconnecting requests or receives a new authoritative
+   snapshot; the UI does not instruct devices to recover; the UI does not replay commands; the
+   UI does not infer Cleaning Job continuation from stale local state; the runtime remains
+   authoritative.
+8. **I/O, database access, Historian writes, graph updates, and UI rendering must not block one
+   another.** Acquisition, queue evaluation, and alarm evaluation run independently of database
+   write latency ([ADR-0009](ADR-0009-database-access-and-migrations.md) item 6); UI rendering
+   runs in a different process from equipment supervision.
+9. **Per-device acquisition isolation** is required: one runtime-owned connection and
+   serialized command queue per Modbus device, bounded concurrent pollers, and no cross-device
+   blocking ([ADR-0010](ADR-0010-device-adapter-boundary.md) item 12).
+10. **A slow database write must not block a valid Main Pump stop request** (PMP-007).
+
 ## Alternatives considered
 
 | Alternative | Evaluation | Outcome |
@@ -123,6 +161,11 @@ preference is therefore the least complex process model that still satisfies iso
 | Console application / scheduled task instead of a Windows Service | No session independence, no service recovery, no automatic start; a workstation reboot would leave the environment unsupervised. | Rejected |
 | Containerisation or service isolation through a container runtime | Not appropriate for an offline Windows 11 Pro workstation that must reach plant hardware and provide native Windows services. | Rejected |
 | Named pipes as the baseline API transport | Strong hardening property (no listening port, OS caller identity) but weaker browser-based development and test ergonomics. Recorded as the hardening alternative; the contract is transport-agnostic so the transport can change without a contract change. | Not selected — recorded alternative |
+| UI polling the runtime once per signal every cycle | Recreates the legacy failure mode at the API boundary: request volume and UI work scale with signal count | Rejected — bootstrap snapshot plus changed-state delta push |
+| UI querying the database for live operational state | Adds a second data path, defeats the runtime's authority, and reintroduces database latency into the operator's view | Rejected |
+| Runtime reading operational parameters from SQL every cycle | Same latency coupling, now inside the control path | Rejected — in-memory Published Configuration Snapshot |
+| Selecting a push transport (for example a specific WebSocket library) in this Stage | No spike evidence exists; the contract can be defined independently of the transport | Deferred — `[OPEN]` |
+| Letting the UI infer Cleaning Job continuation from its own cached state after a reconnect | The UI holds no authority and cannot know job state; inference would display a false plant state | Rejected — the runtime remains authoritative; reconnect fetches a new snapshot |
 
 ## Consequences
 
@@ -141,6 +184,14 @@ preference is therefore the least complex process model that still satisfies iso
   reach it. Session authentication is therefore mandatory, not optional.
 - Service supervision, single-instance enforcement, and startup resynchronization must be
   implemented and tested before any control path is enabled. None exists today.
+- Authoritative in-memory state means the runtime, not the database, is the reference for live
+  behaviour. Restarting the service therefore loses no persisted truth but does lose derived
+  live state, which must be re-established before any command is issued.
+- Push delivery replaces per-signal querying, so the UI's cost scales with the **number of
+  changed cells**, not with the number of signals. That is the property that keeps a 104-cell
+  page inside the one-second target.
+- The presentation-state contract becomes a first-class interface: it must define snapshot,
+  delta, sequence, timestamp, and reconnect semantics, and it must be transport-agnostic.
 
 ## Risks
 
@@ -152,6 +203,9 @@ preference is therefore the least complex process model that still satisfies iso
 | Second runtime instance started manually | Duplicate sessions and a broken sequencing invariant | Single-instance refusal to start | `[PROPOSED]` |
 | Service recovery loops re-starting an environment that is in an unknown position | Uncontrolled motion | Startup state blocks all commands until resynchronization | `[PROPOSED]` |
 | In-process historian writer competing with the control loop | Non-deterministic control timing | Decoupled bounded writer queue and write-path priority; measurement during implementation | `[PROPOSED]` |
+| Push channel drops or falls behind, leaving the UI showing stale state | Operator acts on an outdated view | Monotonic sequence or revision plus timestamp on every message; the UI surfaces staleness rather than hiding it; reconnect requests a fresh snapshot | `[PROPOSED]` |
+| Presentation-state payload grows with signal count | Update latency rises; one-second target missed | Publish changed states only; bounded payload; payload size is an explicit spike measurement | `[PROPOSED]` |
+| Delta applied out of order or duplicated | UI shows an impossible state | Sequence or revision ordering enforced by the contract; out-of-order deltas trigger a resynchronisation | `[PROPOSED]` |
 
 ## Verification status
 
@@ -162,7 +216,10 @@ preference is therefore the least complex process model that still satisfies iso
 - `[NOT VERIFIED]`: the effect of an in-process historian writer on control-loop timing; no
   measurement exists.
 - `[OPEN]`: service identity and its database authorization; whether additional service
-  processes are ever required, and the evidence that would justify them.
+  processes are ever required, and the evidence that would justify them; the push transport;
+  the presentation-state payload encoding; and how snapshot versus delta recovery is triggered.
+- `[NOT VERIFIED]`: end-to-end update latency and payload size for the 104-cell one-second
+  workload. No runtime, API, or UI exists, so nothing has been measured.
 - `[NOT AUTHORIZED]`: production device access; production valve and pump write control.
 
 ## Follow-up gates
@@ -175,6 +232,8 @@ preference is therefore the least complex process model that still satisfies iso
 | Loopback HTTP versus named-pipe transport decision | Security review before deployment, or an implementation Stage Gate if evidence changes |
 | Splitting the API or historian writer into separate services | Only if measured evidence requires it; a new ADR would be required |
 | Restart, recovery, and resynchronization verification | Test Stage Gate — cases planned, not executed |
+| Push transport selection and presentation-state payload design | Stage 0.2.1 spike, then Implementation Stage Gate |
+| Live update latency and payload measurement for the 104-cell workload | Stage 0.2.1 spike |
 
 ## Relationship to protected decisions
 
@@ -196,8 +255,9 @@ preference is therefore the least complex process model that still satisfies iso
 
 ## References
 
-- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — process and ownership model (section 14) and
-  failure isolation matrix (section 15)
+- [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — process and ownership model (section 14),
+  failure isolation matrix (section 15), live-state delivery (section 28), and Modbus
+  acquisition isolation (section 29)
 - [`../CONTROL_AUTHORITY.md`](../CONTROL_AUTHORITY.md) — command authority and UI boundary
 - [`../SAFETY_BOUNDARY.md`](../SAFETY_BOUNDARY.md) — bench verification and target safe states
 - [`../REQUIREMENTS.md`](../REQUIREMENTS.md) — SEQ, UIG, HSB, and ARC requirement groups

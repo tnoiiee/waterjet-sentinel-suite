@@ -58,6 +58,18 @@ question for a future approved technology decision.
 
 ### Stage 0.2 candidate records — submitted for Owner acceptance
 
+**None of these records is accepted. `PROPOSED` is not binding, not implementation
+authorisation, and not evidence.** The Stage 0.2 Scope Gate is approved; the Stage 0.2
+architecture checkpoint is submitted for Owner review; documentation review is
+**CHANGES REQUESTED / IN PROGRESS**; Owner manual review is **PENDING**; the work is
+**NOT MERGED**; Stage 0.2.1 and Stage 0.3 are `[NOT AUTHORIZED]`.
+
+**The final UI framework is `[OPEN]`.** [`ADR-0006`](ADR-0006-ui-delivery-model.md) records
+Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) as comparison
+candidates. The current evidence-based preference for Candidate A is explicitly **not
+acceptance**, and Candidate B is explicitly **not rejected**. Selection requires the proposed
+Stage 0.2.1 spike, which is `[NOT AUTHORIZED]`.
+
 These records were created by the approved Stage 0.2 Scope Gate, *Technology and Solution
 Architecture Decision*. They are `PROPOSED`: the Agent may draft them, but only the Owner may
 record `ACCEPTED`. Until then they are not binding on future work.

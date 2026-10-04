@@ -4,8 +4,11 @@
 are `[APPROVED]`. Default retention values are `[PROPOSED]`. Storage design details and
 capacity conclusions are `[OPEN]` / `[NOT VERIFIED]`.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 ---
 
@@ -139,6 +142,29 @@ claimed.
   the Operator being able to see why. `[PROPOSED]`
 - Whether the Operator may delete data manually is `[OPEN]`. If permitted, it must be
   permission-controlled and audited.
+
+## 8.1 Write-path decoupling and bounded buffering (Stage 0.2)
+
+1. **The Historian write path is decoupled from acquisition.** Modbus acquisition, Galil
+   monitoring, queue evaluation, alarm evaluation, live UI state delivery, and a valid Main Pump
+   stop request (PMP-007) must not be blocked by a slow, degraded, or unavailable database.
+2. **The writer is bounded and batched.** The design requirement is a bounded in-memory queue,
+   batch inserts, health metrics, and data-gap reporting. Unbounded growth is prohibited, and
+   silent data loss is prohibited. See [`ARCHITECTURE.md`](ARCHITECTURE.md) section 31.
+3. **An explicit backpressure or overflow policy is required before implementation** and
+   remains `[OPEN]`. The Runtime must either slow, drop with an explicit recorded gap, or spool
+   under a defined retention limit — the choice is an Owner decision recorded in a later gate,
+   not an implementation-time guess.
+4. **Data-loss reporting is a first-class requirement.** Any drop, overflow, or gap must be
+   recorded and reported as a data gap in the affected signal's history rather than presented
+   as continuous data.
+5. **Historian policy is separate from audit-required action policy.** Historian backlog,
+   degradation, or outage must not determine which initiating actions are permitted
+   (ARC-025), and must not alter alarm semantics (see [`ALARM_MODEL.md`](ALARM_MODEL.md)
+   section 9.1).
+6. **Retention, cleanup, and capacity conclusions are unchanged** and remain as recorded in
+   sections 3, 4, and 7, including the capacity statements that are `[OPEN]` or
+   `[NOT VERIFIED]`.
 
 ## 9. Unavailability behaviour
 

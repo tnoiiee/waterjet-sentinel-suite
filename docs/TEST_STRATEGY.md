@@ -5,8 +5,9 @@ and has not been tested are **facts**, not proposals.
 
 **Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
 through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 > **No runtime testing has occurred.** There is no application code, no build, no database
 > schema, and no device connection in this repository. Nothing in this project has been
@@ -168,6 +169,35 @@ the corresponding cases must be revised rather than executed.
 These cases are planned design-level checks. None of them has been executed, none of them
 constitutes hardware evidence, and passing them would not constitute certification.
 
+
+### 3.8 Planned spike verification workload (proposed Stage 0.2.1)
+
+Status of every case in this group: **PLANNED — NOT EXECUTED.** They belong to the proposed
+Stage 0.2.1 spike, which is `PROPOSED` and `[NOT AUTHORIZED]`. Nothing here authorises writing
+spike code, and no spike has been run. If the Owner does not authorise Stage 0.2.1, these cases
+are not executed.
+
+| # | Planned case | Maps to |
+| --- | --- | --- |
+| 46 | Both candidates render 104 live Sensor cells with 208 channels updating at a one-second cadence without interactive stall | UIW-001, [`Architecture §33`](ARCHITECTURE.md) |
+| 47 | Only changed Sensor cells are recomputed and repainted per update | UIW-009, UIW-012 |
+| 48 | Each Sensor cell independently expresses classification, Dirty Score intensity, quality, queue state, selection, execution state, and alarm state | SPC-001 |
+| 49 | Dirty/Cleaner classification follows the published effective threshold, not a hard-coded value | SPC-002, SPC-003 |
+| 50 | Bad, stale, uncertain, and disabled quality are visually distinct from Dirty and Cleaner, and no raw sentinel value reaches the presentation layer as an ordinary state | DQS-001, DQS-002, DQS-005 |
+| 51 | Wall summary counts show labelled Dirty, Cleaner, and Bad or unavailable values | UIW-003 |
+| 52 | A live trend runs on a bounded window with no series recreation, no unbounded growth, and visible data gaps | TRD-001, TRD-002, TRD-004, TRD-006 |
+| 53 | A GlobalQueue preview, active Cleaning Job marker, alarm marker, alarm banner, and camera placeholder all update without blocking one another | UIW-004, UIW-005, UIW-006 |
+| 54 | Memory usage is stable over extended operation in both candidates | UIW-008 |
+| 55 | UI disconnect and reconnect, with a simulated one-second gap, results in a fresh authoritative snapshot and no inferred job continuation | LSD-006 |
+| 56 | One simulated device timeout degrades only that device's data while unrelated devices keep updating | MDA-003 |
+| 57 | Push payload size and UI update latency are measured and reported for both candidates | LSD-004, [`Architecture §33.3`](ARCHITECTURE.md) |
+| 58 | Database-writer slowdown simulation does not stall acquisition, queue evaluation, alarm evaluation, live UI, or a Main Pump stop request | HDC-001 |
+| 59 | Offline build and dependency restoration succeed for both candidates with no Internet access | [`ADR-0013`](decisions/ADR-0013-offline-deployment.md) |
+| 60 | CPU average and peak, kiosk integration, package footprint, and package licensing are measured and reported for both candidates | [`Architecture §33.3`](ARCHITECTURE.md) |
+
+These cases produce **application-level performance evidence about disposable spike code**.
+They are not hardware tests, not bench evidence, not fail-safe evidence, and not certification.
+
 ## 4. Testability requirements for future design
 
 To keep the above achievable, the future implementation must:
@@ -184,6 +214,12 @@ To keep the above achievable, the future implementation must:
    action or operator action can bypass.
 8. Make the DCS Permissive Override a scoped, enumerated bypass rather than a general flag,
    so that its exclusions are directly testable.
+9. Keep the presentation-state contract (snapshot, delta, sequence, timestamp, reconnect)
+   testable without a UI, so that a UI can be replaced without re-testing runtime logic.
+10. Keep the Poll Plan and its batching deterministic and inspectable, so that acquisition
+    behaviour can be asserted without a device.
+11. Keep trend buffering, downsampling, and gap representation in testable application code
+    rather than inside a chart component.
 
 ## 5. Documentation validation (performed at documentation stages)
 
@@ -229,6 +265,10 @@ The result of these checks for the current baseline is recorded in
 | Acceptance criteria for deployment acceptance | `[OPEN]` |
 | Bench test method statement authorship and witnessing | `[OPEN]` |
 | How the DCS Permissive Override is fault-injected in simulator testing | `[OPEN]` |
+| Acceptance thresholds for the proposed Stage 0.2.1 spike (what counts as acceptable CPU, latency, memory growth, and payload size) | `[OPEN]` — must be set before the spike runs |
+| Which candidate's spike artefacts, if any, may inform later implementation, and how they are discarded | `[OPEN]` |
+| Whether spike code is ever reused, and the review required if it is | `[OPEN]` |
+| Chart library, UI test tooling, and visual regression tooling | `[OPEN]` |
 
 ---
 
@@ -240,4 +280,8 @@ The result of these checks for the current baseline is recorded in
 - [`ALARM_MODEL.md`](ALARM_MODEL.md) — cleared-state acknowledgement rules
 - [`CONTROL_AUTHORITY.md`](CONTROL_AUTHORITY.md) — override scope and authority
 - [`CURRENT_STATE.md`](CURRENT_STATE.md) — validation record
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — legacy evidence (§23), UI framework candidates (§24),
+  workload (§25), presentation model (§26), quality pipeline (§27), live-state delivery (§28),
+  acquisition (§29), configuration hot path (§30), Historian decoupling (§31), trend (§32),
+  proposed spike (§33)
 - [`MASTER_PLAN.md`](MASTER_PLAN.md) — stage gates and evidence rules

@@ -5,8 +5,9 @@ work. Only an approved Stage Gate authorises delivery.
 
 **Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
 through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 This roadmap describes *intended capability sequence*. It is not a schedule, not a
 commitment, and not an authorisation. The authoritative description of how stages are
@@ -66,6 +67,11 @@ simulator-first development, and offline deployment — as ADR candidates. They 
 them `ACCEPTED`. No capability in the table above is authorised, started, or brought forward
 by those decisions, and Stage 0.3 remains `[NOT AUTHORIZED]`.
 
+Stage 0.2.1 — UI and Runtime Technology Spike — is `PROPOSED` and `[NOT AUTHORIZED]`. It is a
+constrained evaluation, not an implementation Stage, and it is recorded in
+[`MASTER_PLAN.md`](MASTER_PLAN.md) section 3.2. It is not a capability in the sequence above,
+it is not started, and it does not bring any capability forward.
+
 ## 3. Milestones that require Owner evidence
 
 Three milestones cannot be reached by implementation effort alone. They require physical
@@ -105,6 +111,8 @@ The following remain out of scope unless a future gate states otherwise:
 | Scope growth | Determinism and recoverability suffer | Stage gates; owner-only merge; priorities list applied in order |
 | Unmodelled storage growth | Historian could exhaust local storage | Produce a capacity model before committing to retention defaults; keep retention configurable per category |
 | Communication health judged by value change | A static value could mask a lost link | Evaluate health from transport evidence, never from value change alone |
+| UI framework chosen without measurement | A dense 104-cell page with one-second updates could repeat the legacy lag, freeze, and CPU problems | Framework remains `[OPEN]`; selection only through the proposed Stage 0.2.1 spike with measured acceptance criteria |
+| Acquisition path not batched and not isolated per device | One slow coupler delays unrelated devices, lengthening the whole cycle | Per-device serialized command queue, bounded concurrent pollers, compiled Poll Plan, Fast/Medium/Slow groups |
 
 ---
 
