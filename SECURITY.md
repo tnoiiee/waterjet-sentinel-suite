@@ -5,9 +5,11 @@ Owner-confirmed Stage 0.1 documentation review punchlist.
 **Applies to:** the repository `waterjet-sentinel-suite` and, once they exist, every
 deployed instance of the application.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation submitted for
-Owner review; documentation review changes requested / in progress; Owner manual review
-pending; merge NOT MERGED; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 WJSS is a monitoring and supervisory control system. It is **not** a Safety Instrumented
 System, and no statement in this document should be read as a safety certification or as

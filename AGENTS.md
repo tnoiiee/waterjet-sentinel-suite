@@ -2,8 +2,9 @@
 
 **Project:** WaterJet Sentinel Suite (WJSS)
 **Repository:** `waterjet-sentinel-suite`
-**Document status:** [APPROVED] — established by the approved Stage 0.1 Scope Gate, and
-corrected by the Owner-confirmed Stage 0.1 documentation review punchlist.
+**Document status:** [APPROVED] — established by the approved Stage 0.1 Scope Gate, corrected
+by the Owner-confirmed Stage 0.1 documentation review punchlist, and extended by the approved
+Stage 0.2 Scope Gate (authority order in section 1).
 **Applies to:** every automated agent, tool-assisted change, and human contributor working in this repository.
 
 This file is a working contract. It constrains *how* work is performed and *what* may be
@@ -22,9 +23,19 @@ source. Resolve conflicts strictly in this order:
 3. This file (`AGENTS.md`).
 4. [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 5. Approved acceptance criteria.
-6. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
-7. [`docs/ROADMAP.md`](docs/ROADMAP.md).
-8. Older proposals and unapproved recommendations.
+6. Approved Architecture Decision Records
+   ([`docs/decisions/`](docs/decisions/README.md)). Only records the Owner has marked
+   `ACCEPTED` rank here; a `PROPOSED` record does not.
+7. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+8. [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md).
+9. [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
+10. [`docs/ROADMAP.md`](docs/ROADMAP.md).
+11. Older proposals and unapproved recommendations.
+
+The order above was extended by the approved Stage 0.2 Scope Gate so that approved decision
+records outrank the conceptual architecture document, and so that the requirement register and
+the master plan rank above the roadmap. The roadmap never authorises implementation, and a
+stage appearing in the master plan or the roadmap is not authorised by that appearance alone.
 
 A recommendation that appears in a design document is **not** approved behavior unless a
 Stage Gate or the Owner has approved it. Approved behavior is always marked `[APPROVED]`

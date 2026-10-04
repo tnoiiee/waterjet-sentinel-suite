@@ -5,9 +5,10 @@ Requirements marked `[OWNER CONFIRMED]` were explicitly confirmed by the Owner d
 Stage 0.1 documentation review and are binding. Requirements marked otherwise are not
 approved behaviour.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`. Stage 0.1 implementation
-**submitted for Owner review**. Documentation review **changes requested / in progress**.
-Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 Requirement identifiers are stable. Requirements are never silently deleted; if one is
 superseded, its status changes and the superseding requirement is recorded.
@@ -27,7 +28,7 @@ superseded, its status changes and the superseding requirement is recorded.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| GOV-001 | The project must operate under an authority order: latest Owner instruction, then the approved Stage Gate, then [`AGENTS.md`](../AGENTS.md), then [`CURRENT_STATE.md`](CURRENT_STATE.md), then approved acceptance criteria, then [`ARCHITECTURE.md`](ARCHITECTURE.md), then [`ROADMAP.md`](ROADMAP.md), then older proposals. | `[APPROVED]` |
+| GOV-001 | The project must operate under the authority order in [`AGENTS.md`](../AGENTS.md) section 1: latest Owner instruction, approved Stage Gate, [`AGENTS.md`](../AGENTS.md), [`CURRENT_STATE.md`](CURRENT_STATE.md), approved acceptance criteria, approved ADRs, [`ARCHITECTURE.md`](ARCHITECTURE.md), [`REQUIREMENTS.md`](REQUIREMENTS.md), [`MASTER_PLAN.md`](MASTER_PLAN.md), [`ROADMAP.md`](ROADMAP.md), then older proposals. A `PROPOSED` ADR does not rank in that order, and the roadmap never authorises implementation. | `[APPROVED]` |
 | GOV-002 | An inconsistency between governing sources must stop the affected part of the work, be documented, and must not be resolved by silently choosing a behaviour. | `[APPROVED]` |
 | GOV-003 | Undocumented behaviour must not be treated as approved behaviour. | `[APPROVED]` |
 | GOV-004 | Claims of success must be supported by observed tool output. | `[APPROVED]` |
@@ -355,9 +356,191 @@ Full details are in [`HISTORIAN_RETENTION.md`](HISTORIAN_RETENTION.md).
 | TST-002 | Queue arbitration, dirty score computation, deduplication, refill, source ownership, sequential-execution invariants, communication-health evaluation, alarm cleared-state acknowledgement, and override restrictions are to be covered by deterministic automated tests once code exists. | `[PROPOSED]` |
 | TST-003 | Hardware fail-safe behaviour must be verified on the bench before any production write control is enabled. | `[NOT AUTHORIZED]` |
 
+## 25. Architecture and process boundaries (Stage 0.2)
+
+This group records the architecture boundaries established by the approved Stage 0.2 Scope
+Gate, *Technology and Solution Architecture Decision*. Boundaries stated as mandatory by that
+approved gate are `[APPROVED]`. Selections made during Stage 0.2 are `[PROPOSED]` and require
+Owner acceptance; they are recorded as ADR candidates in
+[`decisions/README.md`](decisions/README.md).
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| ARC-001 | The UI must not write to hardware directly. | `[APPROVED]` |
+| ARC-002 | The UI must not own device sessions. | `[APPROVED]` |
+| ARC-003 | Only the approved Equipment Runtime boundary may own physical device sessions. | `[APPROVED]` |
+| ARC-004 | Device adapters must not contain UI logic, and must not decide eligibility, sequencing, or safety. | `[APPROVED]` |
+| ARC-005 | Hardware commands must pass through authorization, lifecycle, interlock, ownership, and command-state validation before dispatch. That validation is performed in the runtime service. | `[APPROVED]` |
+| ARC-006 | No architecture choice may permit concurrent Cleaning Jobs, and the one-active-Cleaning-Job gate must be enforced in a single place that no queue, operator, or adapter action can bypass. | `[APPROVED]` |
+| ARC-007 | Domain logic must not depend directly on a vendor library; device libraries must be isolated behind application-owned interfaces. | `[APPROVED]` |
+| ARC-008 | Simulator adapters must implement the same application-facing contracts as the physical adapters, and contract parity must be verifiable. | `[APPROVED]` |
+| ARC-009 | Physical-device selection must be explicit and disabled by default. Enabling a physical adapter requires an approved future Scope Gate and a recorded local authorization; a configuration edit alone is never authorization. | `[APPROVED]` |
+| ARC-010 | No silent substitution: a physical profile whose adapter cannot be established must fail closed with an explicit fault or unknown state, and must never fall back to simulated values presented as plant data. | `[APPROVED]` |
+| ARC-011 | Commands must distinguish the requested, authorized, queued, issued, accepted, effective, feedback-confirmed, failed, timed-out, cancelled, and aborted states where applicable. How each transition is proven for a given signal remains `[NOT VERIFIED]` until bench evidence exists. | `[APPROVED]` |
+| ARC-012 | Reconnection must never re-issue a stale command, and must never re-energize an output. | `[APPROVED]` |
+| ARC-013 | Production configuration, secrets, production IP addresses, production Tag Lists, register maps, actual motion coordinates, production thresholds, and setpoints must remain outside the public repository. | `[APPROVED]` |
+| ARC-014 | Public example configuration must contain public-safe synthetic values only, must be labelled as examples, and must be incomplete by design. | `[APPROVED]` |
+| ARC-015 | Configuration publication must be conceptually separate from editing a Draft, and the runtime must consume an explicitly Published configuration, never a partially edited Draft. | `[APPROVED]` |
+| ARC-016 | Simulator mode is the default development mode; physical adapters are disabled by default; test-hardware access is separate from Production Device access. | `[APPROVED]` |
+| ARC-017 | Simulation must be deterministic where practical, and must never be presented as hardware certification. | `[APPROVED]` |
+| ARC-018 | Stage 0.2 creates no runtime artefact, installs no dependency, contacts no device, creates no database object, and produces no ZIP or release. | `[APPROVED]` |
+| ARC-019 | Preferred UI delivery: an application-owned full-screen kiosk shell window hosting a local web UI as static local assets in an embedded WebView, with the close guard enforced by the shell. **The final UI framework is `[OPEN]`** and must not be named by this requirement. | `[PROPOSED]` — [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) |
+| ARC-020 | Preferred process model: one kiosk shell process and one runtime Windows Service that owns all device sessions, command validation, job execution, queue evaluation, persistence, and database connectivity. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| ARC-021 | Preferred technology stack for the runtime, the Local Application API, and the persistence layer: .NET on the Long-Term Support track, C#, ASP.NET Core minimal API, built-in dependency injection and configuration, structured local logging, and offline packaging from a local package source. The exact .NET version is pinned at the implementation gate. **The UI framework is not decided by this requirement.** | `[PROPOSED]` — [`ADR-0008`](decisions/ADR-0008-technology-stack.md) |
+| ARC-022 | Preferred data access, stated in architecture language: transactional relational access for configuration, alarm, event, audit, job, user, and queue-snapshot data; a batch-oriented write path for Historian samples; a decoupled and prioritised Historian write path; versioned migrations that are never applied automatically at service start; and a measured escape hatch permitted only after evidence identifies a bottleneck. The ORM, mapper, micro-ORM, provider, and bulk-write mechanism remain `[OPEN]`. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| ARC-023 | The Local Application API is hosted by the runtime service, bound to the loopback interface only, authenticated with the application's own local user session, and contract-defined so the transport can change without changing the contract. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| ARC-024 | Stop and de-energize actions must never be gated on database availability. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| ARC-025 | Audit-required initiating actions must be refused when their required audit record cannot be persisted. The candidate set requires Owner ratification and never extends to a stop, de-energize, or release action. Historian backlog or degradation must not be used to decide this set. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| ARC-026 | After any start or restart, the runtime must enter an explicit startup state and must issue no command until device state, position knowledge, and permissives have been re-established. Nothing resumes automatically. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| ARC-027 | Offline installation must detect prerequisites and must never download them; installation, upgrade, and rollback are performed from local media. | `[PROPOSED]` — [`ADR-0013`](decisions/ADR-0013-offline-deployment.md) |
+| ARC-028 | The repository structure direction in [`ARCHITECTURE.md`](ARCHITECTURE.md) section 20 is documented only. No directory in it is created before an implementation Stage Gate authorises it. | `[PROPOSED]` |
+
+---
+
+## 26. UI workload, presentation, and runtime performance boundaries (Stage 0.2 punchlist)
+
+This group records the requirements established by the Owner-requested Stage 0.2 documentation
+review punchlist. Requirements marked `[APPROVED]` are architecture boundaries already binding
+from the approved Stage 0.2 Scope Gate or from an existing Owner-confirmed decision.
+Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner acceptance.
+**Libraries, frameworks, providers, and transports named anywhere in this group remain
+`[OPEN]`.**
+
+### 26.1 UI framework candidates
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| UIF-001 | **Candidate A — React + TypeScript + Vite — is a comparison candidate** for the UI framework, hosted as static local assets inside the application-owned kiosk shell. It must not be described as accepted or rejected. | `[PROPOSED]` |
+| UIF-002 | **Candidate B — Blazor Hybrid — is a comparison candidate** for the UI framework, hosted in the application-owned kiosk shell. It must not be described as accepted or rejected. | `[PROPOSED]` |
+| UIF-003 | **The final UI framework is `[OPEN]`.** No framework is selected by Stage 0.2, and no UI code may be created before the framework decision. | `[OPEN]` |
+| UIF-004 | Both candidates must be evaluated inside the same architecture: the same application-owned kiosk shell, the same embedded WebView, the same loopback ASP.NET Core Local Application API, and the same separate .NET Equipment Runtime Windows Service. Neither candidate may be compared against a general-purpose external browser. | `[APPROVED]` boundary |
+| UIF-005 | **React can be built and deployed offline.** It must never be excluded on the basis that it requires Internet access. React introduces a second package and build ecosystem (Node.js/npm in addition to NuGet), which increases offline dependency-management and supply-chain effort without making offline development or deployment impossible. | `[APPROVED]` |
+| UIF-006 | Blazor Hybrid must not be selected solely because it uses C# or reduces the number of build ecosystems. Those advantages do not by themselves prove UI performance, graph quality, camera integration, or long-running kiosk stability. | `[APPROVED]` |
+| UIF-007 | The current evidence-based preference is React + TypeScript + Vite, based on the Owner's legacy operating experience with React/Vite and push-based updates, dense-visualisation fit, charting and camera ecosystem, and UI test tooling. **This preference is not final acceptance and not an approved selection.** | `[PROPOSED]` |
+| UIF-008 | Final framework selection requires the proposed Stage 0.2.1 UI and Runtime Technology Spike, which is `PROPOSED` and `[NOT AUTHORIZED]`. | `[PROPOSED]` |
+
+### 26.2 UI workload
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| UIW-001 | The UI must support **104 live Sensor cells** and **208 Thermocouple channels** with a **one-second operational update target**. | `[APPROVED]` |
+| UIW-002 | The UI must support the approved wall layouts: Left 24, Rear 28, Right 24, Front 28. | `[APPROVED]` |
+| UIW-003 | The UI must present wall-level **Dirty and Cleaner counts**, each with an explicit label, and a distinct Bad or unavailable count where applicable. Displaying only unlabelled numbers is prohibited. | `[APPROVED]` |
+| UIW-004 | The UI must support Sensor detail drill-down, Active Cleaning Job visibility, GlobalQueue preview, and Pump and pressure status. | `[APPROVED]` |
+| UIW-005 | The UI must support a live operational trend, an alarm banner, and an alarm workspace. | `[APPROVED]` |
+| UIW-006 | The UI must support camera panel integration. | `[APPROVED]` |
+| UIW-007 | The UI must support permission-aware controls, full-screen kiosk operation, and responsive workstation layouts (IDN-006). | `[APPROVED]` |
+| UIW-008 | The UI must operate stably over long periods, including memory stability. | `[APPROVED]` |
+| UIW-009 | The UI must support **efficient changed-state updates**: only the parts of the page whose presentation state changed may be recomputed and repainted. | `[APPROVED]` |
+
+### 26.3 Prohibited UI architecture behaviours
+
+| ID | Prohibition | Status |
+| --- | --- | --- |
+| UIW-010 | One UI request per signal is prohibited. | `[APPROVED]` |
+| UIW-011 | One UI-thread dispatch per signal is prohibited. | `[APPROVED]` |
+| UIW-012 | Rebuilding all Sensor cell objects every second is prohibited. | `[APPROVED]` |
+| UIW-013 | Recreating chart series on every update is prohibited. | `[APPROVED]` |
+| UIW-014 | Unbounded chart data growth is prohibited. | `[APPROVED]` |
+| UIW-015 | The UI must not query SQL for operational state. | `[APPROVED]` |
+| UIW-016 | The UI must not read Modbus directly. | `[APPROVED]` |
+| UIW-017 | The UI must not own Queue or Cleaning state. | `[APPROVED]` |
+| UIW-018 | The UI must not infer device state independently from the Runtime. | `[APPROVED]` |
+
+### 26.4 Sensor presentation model
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| SPC-001 | A Sensor cell must represent, independently: process classification (`DIRTY`, `CLEANER`); Dirty Score intensity 0–100; data quality (`GOOD`, `UNCERTAIN`, `BAD`, `STALE`, `DISABLED`); queue state (TempQueue, TimeQueue, GlobalQueue position, Held, Blocked, Excluded); interaction state (Selected, Not selected); execution state (Active Cleaning Job target, Not active); and alarm state (Active alarm, Cleared acknowledgement required, Shelved, No alarm). | `[APPROVED]` |
+| SPC-002 | **Process classification display rule:** Dirty Score > 50 is `DIRTY`; Dirty Score <= 50 is `CLEANER`. | `[OWNER CONFIRMED]` |
+| SPC-003 | Where the classification threshold becomes configurable, the UI must read the **effective threshold from the Published configuration** and must not hard-code visual text around an assumed value. | `[APPROVED]` |
+| SPC-004 | Visual semantics direction: cell background represents Dirty/Cleaner classification; shade intensity may represent Dirty Score strength; a corner marker or pattern represents data quality; a badge represents queue state; a cyan outline may represent selection; a high-contrast double outline may represent the Active Cleaning Job target; an alarm icon and bright border represent alarm state. | `[PROPOSED]` |
+| SPC-005 | **Dirty red is a process-condition colour and must not be used as an alarm severity colour.** Alarm state must remain independently recognisable through icon, border, text, the alarm banner, and the dedicated alarm surfaces. | `[APPROVED]` |
+| SPC-006 | Exact colour tokens, typography, dimensions, and animation must not be locked in Stage 0.2. They remain a future UX/UI decision. | `[APPROVED]` |
+
+### 26.5 Quality-aware data pipeline
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| DQS-001 | The pipeline order is: raw signal → communication and signal quality validation → engineering conversion → derived DiffTemp → Dirty Score → queue eligibility → UI presentation. | `[APPROVED]` |
+| DQS-002 | Invalid, Bad, Stale, or unavailable data must not be presented as an ordinary Dirty or Cleaner state; it must have a distinct presentation. | `[APPROVED]` |
+| DQS-003 | Raw values and their quality must be preserved where appropriate for diagnostics; presentation uses validated operational values. | `[APPROVED]` |
+| DQS-004 | Queue logic must consume quality-aware validated state, never raw or substituted values. | `[APPROVED]` |
+| DQS-005 | Raw sentinel or out-of-range values must not become normal process classifications without validation. | `[APPROVED]` |
+| DQS-006 | The site-specific invalid-value and sentinel mapping remains `[OPEN]` until the Tag and data-quality contract is approved. Production sentinel values must never be invented or committed. | `[OPEN]` |
+
+### 26.6 Live-state delivery
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| LSD-001 | The Equipment Runtime must maintain the **authoritative in-memory operational state**. | `[APPROVED]` |
+| LSD-002 | The runtime must expose an application-facing **snapshot or delta contract** delivered over a **loopback push channel**; the UI applies partial component updates. | `[PROPOSED]` |
+| LSD-003 | The UI must not poll each signal individually and must not query SQL for live operational state. | `[APPROVED]` |
+| LSD-004 | Published messages must carry, at minimum: a bootstrap snapshot on initial connection; a monotonic sequence or revision; a timestamp; changed Sensor presentation states; the Active Cleaning Job; Main Pump state; queue summary; alarm summary; communication health; and the published configuration revision. | `[PROPOSED]` |
+| LSD-005 | The push transport remains `[OPEN]`. Candidates may include an ASP.NET Core push mechanism such as WebSocket-based delivery; no final push library is selected in this Stage, and the contract must not be coupled to the transport. | `[OPEN]` |
+| LSD-006 | Reconnect rules: the UI requests or receives a new authoritative snapshot; it does not instruct devices to recover; it does not replay commands; it does not infer Job continuation from stale local state; the runtime remains authoritative. | `[APPROVED]` |
+
+### 26.7 Modbus acquisition
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| MDA-001 | One runtime-owned connection and one **serialized command queue per Modbus device**. | `[APPROVED]` |
+| MDA-002 | Different device pollers may operate **concurrently under bounded scheduling**; requests to one device remain serialized unless future device evidence permits otherwise. | `[APPROVED]` |
+| MDA-003 | One slow or timed-out device must not block polling of unrelated devices. | `[APPROVED]` |
+| MDA-004 | Contiguous coil or register addresses must be compiled into **bounded batch reads** where supported. | `[APPROVED]` |
+| MDA-005 | Published Tag configuration must compile into a **Poll Plan** at publication or runtime startup — never from scratch every poll cycle. | `[APPROVED]` |
+| MDA-006 | Poll groups may use separate intervals (**Fast, Medium, Slow**); critical one-second data belongs to the Fast group. Exact grouping and register spans remain Production configuration. | `[PROPOSED]` |
+| MDA-007 | Device limits, maximum quantities, address gaps, function codes, and byte/word order must be respected. | `[APPROVED]` |
+| MDA-008 | The UI must never perform Modbus polling. | `[APPROVED]` |
+| MDA-009 | No Modbus library is selected or installed in Stage 0.2. Prior slow behaviour of a legacy library must not be treated as proof that every architecture built on that library is slow. | `[APPROVED]` |
+
+### 26.8 Configuration hot path
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| CPS-001 | **SQL Server is not the per-cycle operational parameter source.** | `[APPROVED]` |
+| CPS-002 | The runtime loads the Published configuration at startup, validates it, and holds an **immutable in-memory Published Configuration Snapshot**. | `[PROPOSED]` |
+| CPS-003 | Queue, alarm, acquisition, motion, and Cleaning logic read the in-memory snapshot, not the database. | `[PROPOSED]` |
+| CPS-004 | Configuration is reloaded only after an explicitly Published revision or an approved startup or recovery action, and a validated revision is swapped in atomically under the approved state gate — never while a Cleaning Job is active. | `[PROPOSED]` |
+| CPS-005 | A Draft is never consumed by the runtime. | `[APPROVED]` |
+| CPS-006 | The UI must not query SQL for operational parameters every second, and device polling must not query SQL for static parameters every cycle. | `[APPROVED]` |
+| CPS-007 | SQL remains appropriate for versioned configuration persistence, alarm history, event history, audit history, Cleaning Job history, the Historian, reports, and on-demand historical queries. | `[APPROVED]` |
+
+### 26.9 Historian decoupling
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| HDC-001 | A slow database write must not directly block Modbus acquisition, Galil monitoring, queue evaluation, alarm evaluation, live UI updates, or a valid Main Pump stop request (PMP-007). | `[APPROVED]` |
+| HDC-002 | The Historian path must be bounded, batched, and instrumented: bounded queue, batch writes, health metrics, data-gap reporting, no unbounded memory growth, and no silent data loss. | `[APPROVED]` |
+| HDC-003 | An explicit backpressure or overflow policy is required before Historian implementation. | `[OPEN]` |
+| HDC-004 | Historian policy must be separated from Audit-required action policy: a Historian backlog must not silently change which initiating actions are permitted. | `[APPROVED]` |
+| HDC-005 | Overflow, spool, retry, priority, and database-outage policy remain `[OPEN]` and must be closed before Historian implementation. | `[OPEN]` |
+
+### 26.10 Live trend
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| TRD-001 | The live trend must use a **bounded in-memory window**; old points leave the live buffer. | `[APPROVED]` |
+| TRD-002 | Chart series must not be recreated on every update. | `[APPROVED]` |
+| TRD-003 | Point markers and animation must be optional and disabled where they harm performance. | `[APPROVED]` |
+| TRD-004 | Historical range queries must use appropriate aggregation or downsampling; the UI must not plot an unbounded raw data set, and resolution should suit the visible time range and pixel width. | `[APPROVED]` |
+| TRD-005 | Cleaning Job and Alarm overlays must be supported conceptually. | `[APPROVED]` |
+| TRD-006 | Data gaps must remain visible and must not be drawn as a continuous line. | `[APPROVED]` |
+| TRD-007 | The chart library remains `[OPEN]`. Simulation or UI rendering evidence is not hardware certification. | `[OPEN]` |
+
+### 26.11 Proposed Stage 0.2.1 spike
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| SPI-001 | Proposed Stage 0.2.1 — UI and Runtime Technology Spike — is `PROPOSED` and `[NOT AUTHORIZED]`. It is not started by Stage 0.2 and requires its own approved Scope Gate. | `[PROPOSED]` |
+| SPI-002 | The spike must compare Candidate A and Candidate B on the same synthetic data, the same runtime/API contract, the same Sensor presentation semantics, the same trend workload, the same camera placeholder or synthetic stream, the same reconnect scenario, and the same acceptance measures. | `[PROPOSED]` |
+| SPI-003 | The spike must use **synthetic data only** and must not access WAGO, Galil, Production SQL Server, or Production configuration. | `[PROPOSED]` |
+| SPI-004 | Spike results are application-level performance evidence only — never hardware evidence, never certification, and never a relaxation of the bench verification requirements. | `[PROPOSED]` |
+
 ---
 
 ## Related documents
+
 
 - [`CURRENT_STATE.md`](CURRENT_STATE.md) — status legend, stage status, open items
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — subsystem responsibilities

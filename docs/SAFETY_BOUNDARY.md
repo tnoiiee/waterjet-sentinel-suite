@@ -3,8 +3,10 @@
 **Document status:** [APPROVED] boundary statement. Bench verification items remain
 `[NOT VERIFIED]` and production write control remains `[NOT AUTHORIZED]`.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 > **Read this first.** WJSS is **not** a Safety Instrumented System. It does not replace
 > emergency stop circuits, hardwired protection, motor protection, mechanical limits, or
@@ -164,6 +166,33 @@ values, DCS permissive definitions, and the stale-data timeout value are commiss
 values. They are `[NOT VERIFIED]` and must be captured from engineering records or field
 measurement. They must never be invented, inferred from convention, or copied from an
 example. The 30 second stale-timeout figure is an **example only**.
+
+## 9.1 Fail-closed command and device-session boundary (Stage 0.2)
+
+1. **The Operations UI must never write to hardware and must never open a device session.**
+   It cannot actuate an Isolation Valve, the Main Pump, a VFD, or a Galil axis, and it cannot
+   read Modbus or Galil directly. See [`ARCHITECTURE.md`](ARCHITECTURE.md) section 14.3 for the mandatory UI and Runtime boundary.
+2. **Device sessions owned by the UI are prohibited.** The Equipment Runtime service is the
+   sole owner of physical device sessions. This is the architectural expression of the
+   control-write prohibition in section 4 and does not weaken it.
+3. **Fail-closed rules that must hold regardless of UI state:** a stale or unverifiable command
+   is refused; unknown motion position is treated as unknown, not as a safe or assumed
+   position; a WAGO watchdog expiry is treated as a fail-safe state, not as an inference that
+   the fieldbus is healthy; loss of communication during a job follows
+   [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) section 9.
+4. **Simulation is not hardware verification.** Simulator-first development, and the proposed
+   Stage 0.2 technology spike, produce application-level evidence only. They cannot demonstrate
+   fail-safe behaviour, cannot discharge any bench verification in section 8, and cannot
+   change any `[NOT VERIFIED]` statement in section 9 or section 5.
+5. **WAGO fail-safe behaviour remains `[NOT VERIFIED]`.** Nothing in Stage 0.2 verified it,
+   and no documentation change in Stage 0.2 may be read as evidence about it.
+6. **Production Write remains `[NOT AUTHORIZED]`**, and production device access remains
+   `[NOT AUTHORIZED]`. Physical adapters are disabled by default and enabling them requires a
+   future approved gate.
+7. **Main Pump stop.** A valid Main Pump stop request must not be blocked by database or
+   Historian degradation (see [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 30 and 31), and
+   the approved limitation that the application cannot guarantee a stop in every circumstance
+   is unchanged (section 4).
 
 ## 10. Standards position
 

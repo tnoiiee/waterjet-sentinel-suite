@@ -3,8 +3,11 @@
 **Document status:** [PROPOSED] as a strategy. The statements in section 2 about what has
 and has not been tested are **facts**, not proposals.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 > **No runtime testing has occurred.** There is no application code, no build, no database
 > schema, and no device connection in this repository. Nothing in this project has been
@@ -136,6 +139,65 @@ Physical hardware, separately authorised, with a written method statement. See
 [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) section 8. This level is `[NOT AUTHORIZED]` at
 present and its outcomes are `[NOT VERIFIED]`.
 
+### 3.7 Planned architecture-boundary verification (Stage 0.2 decisions)
+
+Status of every case in this group: **PLANNED — NOT EXECUTED.** They are design-level
+verification cases derived from the `[PROPOSED]` Stage 0.2 architecture decisions. No test
+code exists, and none may be created at this stage. If the Owner does not accept a decision,
+the corresponding cases must be revised rather than executed.
+
+| # | Planned case | Maps to |
+| --- | --- | --- |
+| 29 | The UI process cannot open a device session and cannot write to hardware by any path | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-001 to ARC-003 |
+| 30 | The UI process cannot connect to the database and holds no database credential | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-020, ARC-023 |
+| 31 | Domain logic has no direct dependency on any vendor device library | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md), ARC-007 |
+| 32 | Simulator adapters satisfy the same contract tests as the physical adapters (parity) | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md), ARC-008 |
+| 33 | A second runtime service instance refuses to start | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| 34 | After a restart the runtime issues no command until state and position knowledge are re-established, and never replays a pre-restart command | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-026 |
+| 35 | A physical profile whose adapter cannot be established fails closed and does not substitute simulated values | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md), ARC-010 |
+| 36 | Physical adapters are not constructed under the default profile | [`ADR-0012`](decisions/ADR-0012-simulator-first-development.md), ARC-009, ARC-016 |
+| 37 | Publication of an invalid configuration is refused and leaves the previous published revision in force | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), ARC-015 |
+| 38 | An edited Draft is never consumed by the runtime | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), ARC-015 |
+| 39 | A published revision is not applied while a Cleaning Job is active | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md) |
+| 40 | With the database unavailable, live supervision and UI visibility continue and a stop action is not blocked | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md), ARC-024 |
+| 41 | With the database unavailable, an audit-required initiating action is refused and is not recorded as performed | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md), ARC-025 |
+| 42 | A migration is never applied automatically by a service start | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| 43 | The Local Application API is unreachable from any interface other than loopback, and rejects an unauthenticated control request | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-023 |
+| 44 | Termination of the operator interface session stops any manual hold-to-run operation and does not abort an active AutoSequence | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) item 9 |
+| 45 | No configuration file, example file, or secret is present in the public repository | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), ARC-013, ARC-014 |
+
+These cases are planned design-level checks. None of them has been executed, none of them
+constitutes hardware evidence, and passing them would not constitute certification.
+
+
+### 3.8 Planned spike verification workload (proposed Stage 0.2.1)
+
+Status of every case in this group: **PLANNED — NOT EXECUTED.** They belong to the proposed
+Stage 0.2.1 spike, which is `PROPOSED` and `[NOT AUTHORIZED]`. Nothing here authorises writing
+spike code, and no spike has been run. If the Owner does not authorise Stage 0.2.1, these cases
+are not executed.
+
+| # | Planned case | Maps to |
+| --- | --- | --- |
+| 46 | Both candidates render 104 live Sensor cells with 208 channels updating at a one-second cadence without interactive stall | UIW-001, [`Architecture §33`](ARCHITECTURE.md) |
+| 47 | Only changed Sensor cells are recomputed and repainted per update | UIW-009, UIW-012 |
+| 48 | Each Sensor cell independently expresses classification, Dirty Score intensity, quality, queue state, selection, execution state, and alarm state | SPC-001 |
+| 49 | Dirty/Cleaner classification follows the published effective threshold, not a hard-coded value | SPC-002, SPC-003 |
+| 50 | Bad, stale, uncertain, and disabled quality are visually distinct from Dirty and Cleaner, and no raw sentinel value reaches the presentation layer as an ordinary state | DQS-001, DQS-002, DQS-005 |
+| 51 | Wall summary counts show labelled Dirty, Cleaner, and Bad or unavailable values | UIW-003 |
+| 52 | A live trend runs on a bounded window with no series recreation, no unbounded growth, and visible data gaps | TRD-001, TRD-002, TRD-004, TRD-006 |
+| 53 | A GlobalQueue preview, active Cleaning Job marker, alarm marker, alarm banner, and camera placeholder all update without blocking one another | UIW-004, UIW-005, UIW-006 |
+| 54 | Memory usage is stable over extended operation in both candidates | UIW-008 |
+| 55 | UI disconnect and reconnect, with a simulated one-second gap, results in a fresh authoritative snapshot and no inferred job continuation | LSD-006 |
+| 56 | One simulated device timeout degrades only that device's data while unrelated devices keep updating | MDA-003 |
+| 57 | Push payload size and UI update latency are measured and reported for both candidates | LSD-004, [`Architecture §33.3`](ARCHITECTURE.md) |
+| 58 | Database-writer slowdown simulation does not stall acquisition, queue evaluation, alarm evaluation, live UI, or a Main Pump stop request | HDC-001 |
+| 59 | Offline build and dependency restoration succeed for both candidates with no Internet access | [`ADR-0013`](decisions/ADR-0013-offline-deployment.md) |
+| 60 | CPU average and peak, kiosk integration, package footprint, and package licensing are measured and reported for both candidates | [`Architecture §33.3`](ARCHITECTURE.md) |
+
+These cases produce **application-level performance evidence about disposable spike code**.
+They are not hardware tests, not bench evidence, not fail-safe evidence, and not certification.
+
 ## 4. Testability requirements for future design
 
 To keep the above achievable, the future implementation must:
@@ -152,6 +214,12 @@ To keep the above achievable, the future implementation must:
    action or operator action can bypass.
 8. Make the DCS Permissive Override a scoped, enumerated bypass rather than a general flag,
    so that its exclusions are directly testable.
+9. Keep the presentation-state contract (snapshot, delta, sequence, timestamp, reconnect)
+   testable without a UI, so that a UI can be replaced without re-testing runtime logic.
+10. Keep the Poll Plan and its batching deterministic and inspectable, so that acquisition
+    behaviour can be asserted without a device.
+11. Keep trend buffering, downsampling, and gap representation in testable application code
+    rather than inside a chart component.
 
 ## 5. Documentation validation (performed at documentation stages)
 
@@ -171,6 +239,9 @@ Documentation stages validate documentation. The expected checks are:
    acknowledgement.
 10. Confirm no application code, package manifest, or dependency was created.
 11. Review the full diff before committing.
+12. Confirm no runtime artefact, database object, adapter, simulator, CI workflow, installer,
+    deployment script, release package, or archive was created, and that no device or
+    production system was contacted.
 
 The result of these checks for the current baseline is recorded in
 [`CURRENT_STATE.md`](CURRENT_STATE.md).
@@ -194,6 +265,10 @@ The result of these checks for the current baseline is recorded in
 | Acceptance criteria for deployment acceptance | `[OPEN]` |
 | Bench test method statement authorship and witnessing | `[OPEN]` |
 | How the DCS Permissive Override is fault-injected in simulator testing | `[OPEN]` |
+| Acceptance thresholds for the proposed Stage 0.2.1 spike (what counts as acceptable CPU, latency, memory growth, and payload size) | `[OPEN]` — must be set before the spike runs |
+| Which candidate's spike artefacts, if any, may inform later implementation, and how they are discarded | `[OPEN]` |
+| Whether spike code is ever reused, and the review required if it is | `[OPEN]` |
+| Chart library, UI test tooling, and visual regression tooling | `[OPEN]` |
 
 ---
 
@@ -205,4 +280,8 @@ The result of these checks for the current baseline is recorded in
 - [`ALARM_MODEL.md`](ALARM_MODEL.md) — cleared-state acknowledgement rules
 - [`CONTROL_AUTHORITY.md`](CONTROL_AUTHORITY.md) — override scope and authority
 - [`CURRENT_STATE.md`](CURRENT_STATE.md) — validation record
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — legacy evidence (§23), UI framework candidates (§24),
+  workload (§25), presentation model (§26), quality pipeline (§27), live-state delivery (§28),
+  acquisition (§29), configuration hot path (§30), Historian decoupling (§31), trend (§32),
+  proposed spike (§33)
 - [`MASTER_PLAN.md`](MASTER_PLAN.md) — stage gates and evidence rules

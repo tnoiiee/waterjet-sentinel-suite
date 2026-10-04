@@ -4,8 +4,11 @@
 invariants, and its failure boundaries. All coordinate and timing values are
 `[NOT VERIFIED]` and none are invented here.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 This document specifies what a Cleaning Job is and how it is supervised. It contains no
 implementation, and it authorises no device access.
@@ -290,6 +293,33 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) section 5 and
 A blocked next job must not be silently cleared. Release requires the alarm conditions in
 [`ALARM_MODEL.md`](ALARM_MODEL.md) section 3 to be satisfied, including cleared-state
 acknowledgement.
+
+## 10.1 Ownership and single-writer boundary (Stage 0.2)
+
+The following boundaries are additions from the approved Stage 0.2 architecture decisions and do
+not change any rule in sections 1 to 10.
+
+1. **The Equipment Runtime service is the sole owner of a Cleaning Job.** Job state, sequence
+   state, step advancement, valve actuation, and motion commands are owned by the runtime.
+   The Operations UI may request and observe; it must never own, advance, or complete a job.
+2. **The Operations UI must not write to hardware and must not open a device session.** It must
+   not actuate an Isolation Valve, the Main Pump, a VFD, or a Galil axis, and must not read
+   Modbus or Galil directly. See [`ARCHITECTURE.md`](ARCHITECTURE.md) section 14.3.
+3. **UI close, crash, or restart must not affect or terminate an active Cleaning Job.** The
+   runtime continues to own and supervise the job. The UI close guard is an operational usability
+   affordance, not the mechanism that protects the job. See [`ARCHITECTURE.md`](ARCHITECTURE.md)
+   section 28.
+4. **After a UI reconnect, the job state comes from the runtime**, delivered as an
+   authoritative snapshot. The UI must not reconstruct, infer, or resume a job from stale local
+   state, and must not replay a command (LSD-006).
+5. **Commands remain subject to the approved validation order** — authorization, lifecycle,
+   interlock, ownership, and command-state validation — before any actuation, and only one
+   command path may reach a device session.
+6. **Nothing in this subsection permits more than one active Cleaning Job**, a parallel Water
+   Jet Cleaning, or a shared Isolation Valve.
+7. If motion position is unknown, or a command is stale, or a WAGO watchdog has expired, the
+   fail-closed behaviour recorded in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) and section 8 of
+   this document applies unchanged.
 
 ## 11. Not specified
 

@@ -5,8 +5,10 @@ DCS Permissive Override. Every control action that writes to an output is
 `[NOT AUTHORIZED]` until the bench verification in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md)
 is complete and recorded.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 This document answers one question for every output: **who or what may command it, and
 under what conditions.** Where an answer is not yet determined, it is marked `[OPEN]` — it
@@ -142,6 +144,14 @@ interface, not the equipment:
   never satisfies a bench verification item in
   [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) section 4.
 
+The Operations UI holds no device session, cannot write to hardware directly, and cannot
+connect to the database directly. It submits **control requests** only; the runtime service
+performs the permission, lifecycle, interlock, ownership, and command-state validation that
+turns a request into a dispatched command. This boundary is approved by the Stage 0.2 Scope
+Gate and is carried by the process model in
+[`decisions/ADR-0007`](decisions/ADR-0007-runtime-process-model.md); the UI delivery selection
+in [`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) does not change it.
+
 ## 7. Priority of command sources
 
 When more than one source could command the same output, the highest applicable priority
@@ -171,6 +181,30 @@ Every change of authority state must be recorded:
   timestamp, new timestamp, user, time, and reason.
 - DCS Permissive Override activation and release, with user, timestamp, and reason.
 - Break-glass login, always as a high-severity audit event.
+
+## 8.1 Authority enforcement point (Stage 0.2)
+
+1. **Every command is validated once, in the Runtime, before any actuation.** The approved
+   order is: authorization, lifecycle, interlock, ownership, then command-state validation. A
+   command that fails any check is refused and recorded; it is never partially applied.
+2. **The Operations UI is a command requester, not an actuator.** The UI cannot write to
+   hardware and cannot open a device session. Its controls issue requests that the Equipment
+   Runtime-mediated command path accepts or refuses.
+3. **The Equipment Runtime service is the sole owner of physical device sessions.** No other
+   process — UI, Local Application API host, reporting, or tooling — may own, open, or share a
+   device session for WAGO, Galil, or any future device.
+4. **Adapters contain no UI logic and no authority logic.** They translate between the
+   application-facing contract and a vendor protocol. Authority, sequencing, and interlock
+   decisions are made above the adapter and are not delegated to it.
+5. **A stale command is refused.** A command whose validity window has expired, or whose
+   command state is unknown, or whose target position is unknown, is not executed and is not
+   inferred as successful.
+6. **UI close, crash, restart, or relaunch does not create authority.** It neither grants nor
+   revokes a permission, and it does not interrupt or complete an active Cleaning Job.
+7. **Nothing added here permits concurrent Cleaning Jobs**, a second active Cleaning Job, a
+   parallel Water Jet Cleaning, or a shared Isolation Valve. Sections 4, 5, and 6 continue to
+   govern, including the DCS Permissive Override exclusions, which cannot bypass safety or
+   equipment gates.
 
 ## 9. Open authority items
 

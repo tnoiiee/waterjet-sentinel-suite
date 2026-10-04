@@ -10,23 +10,45 @@ Repository: `waterjet-sentinel-suite`
 
 | Item | Value |
 | --- | --- |
-| Current stage | **Stage 0.1 — Repository Documentation Foundation** |
+| Current stage | **Stage 0.2 — Technology and Solution Architecture Decision** |
 | Stage 0.1 Scope Gate | **APPROVED** |
-| Stage 0.1 implementation | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review | **CHANGES REQUESTED / IN PROGRESS** |
+| Stage 0.1 implementation | **MERGED** — through PR #1 |
+| Stage 0.2 Scope Gate | **APPROVED** |
+| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
+| Stage 0.2 documentation review | **CHANGES REQUESTED / IN PROGRESS** — the Owner-requested punchlist has been implemented on the same branch and pull request; re-review pending |
 | Owner manual review | **PENDING** |
 | Merge | **NOT MERGED** |
-| Stage 0.2 | **NOT AUTHORIZED** |
+| Stage 0.2.1 — UI and Runtime Technology Spike | **NOT AUTHORIZED** |
+| Stage 0.3 | **NOT AUTHORIZED** |
 | Repository contents | Documentation and repository governance only |
 | Application code | **None.** No source, no solution, no schema, no runtime. |
 | Application version | **NOT ESTABLISHED.** No runtime release exists. |
 | Hardware connection | **Not authorised.** Production device access is prohibited. |
+| Production Write | **Not authorised.** |
 | Merge authority | **Owner only.** Agents never merge. |
 
 This repository currently contains **documentation only**. Everything described here is a
 design baseline candidate, not a running system. See
 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) for the stage status, the verified state,
 and the status legend used throughout.
+
+Stage 0.2 recorded a `[PROPOSED]` technology and solution architecture — UI delivery model,
+runtime process model, technology stack, database access and migrations, device adapter
+boundary, configuration and secrets, simulator-first development, and offline deployment — as
+ADR candidates in [`docs/decisions/`](docs/decisions/README.md). `[PROPOSED]` means drafted
+and submitted, **not approved**: the Owner has not yet accepted those records, nothing in them
+is implemented, and no capability or later stage is authorised by them.
+
+**The final UI framework is `[OPEN]`.** Two candidates are recorded and compared on equal
+terms: Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
+in the same application-owned kiosk shell behind the same loopback API. The current
+evidence-based preference for Candidate A is explicitly **not acceptance**, and Candidate B is
+explicitly **not rejected**. React can be built and deployed offline; it introduces a second
+package and build ecosystem, which increases offline dependency-management and supply-chain
+effort without making offline development or deployment impossible. Choosing the framework
+requires the proposed Stage 0.2.1 spike, which is `[NOT AUTHORIZED]`. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and
+[`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 3.2.
 
 ## What the product is
 
@@ -144,6 +166,19 @@ local deployment information and are **not** in this repository.
 | [`docs/decisions/ADR-0003-queue-arbitration.md`](docs/decisions/ADR-0003-queue-arbitration.md) | Deterministic queue arbitration and sequencing |
 | [`docs/decisions/ADR-0004-historian-strategy.md`](docs/decisions/ADR-0004-historian-strategy.md) | Historian storage and retention strategy |
 | [`docs/decisions/ADR-0005-hardware-safety-boundary.md`](docs/decisions/ADR-0005-hardware-safety-boundary.md) | Prohibition of production control writes pending bench verification |
+
+#### Stage 0.2 candidate decision records — `PROPOSED`, Owner acceptance pending
+
+| Document | Purpose |
+| --- | --- |
+| [`docs/decisions/ADR-0006-ui-delivery-model.md`](docs/decisions/ADR-0006-ui-delivery-model.md) | Kiosk shell and local web UI delivery model; React and Blazor candidates compared — final framework `[OPEN]` |
+| [`docs/decisions/ADR-0007-runtime-process-model.md`](docs/decisions/ADR-0007-runtime-process-model.md) | Process model, device-session ownership, Local Application API boundary |
+| [`docs/decisions/ADR-0008-technology-stack.md`](docs/decisions/ADR-0008-technology-stack.md) | .NET support track, API framework, service hosting, logging, validation, tests, offline packaging; UI framework `[OPEN]` |
+| [`docs/decisions/ADR-0009-database-access-and-migrations.md`](docs/decisions/ADR-0009-database-access-and-migrations.md) | Transactional relational access, batch Historian path, migration execution policy, database unavailability; ORM and mapper `[OPEN]` |
+| [`docs/decisions/ADR-0010-device-adapter-boundary.md`](docs/decisions/ADR-0010-device-adapter-boundary.md) | Adapter ports, vendor isolation, command lifecycle, disabled-by-default physical adapters |
+| [`docs/decisions/ADR-0011-configuration-and-secrets.md`](docs/decisions/ADR-0011-configuration-and-secrets.md) | Configuration layers, Draft versus Published, secrets, publication and rollback |
+| [`docs/decisions/ADR-0012-simulator-first-development.md`](docs/decisions/ADR-0012-simulator-first-development.md) | Simulator-first development, device profiles, failure injection, contract parity |
+| [`docs/decisions/ADR-0013-offline-deployment.md`](docs/decisions/ADR-0013-offline-deployment.md) | Offline installation, startup, backup and restore, upgrade and rollback, local-only communication |
 
 ## Status legend
 

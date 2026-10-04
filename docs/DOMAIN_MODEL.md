@@ -5,8 +5,14 @@ Entities marked `[OWNER CONFIRMED]` were explicitly confirmed by the Owner durin
 Stage 0.1 documentation review and are binding. Field-level storage design is `[PROPOSED]`
 or `[OPEN]` as marked.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+
+Stage 0.2 recorded no change to any entity, relationship, enumeration, or rule in this
+document. Its architecture decisions must conform to the domain rules recorded here; where a
+technology choice and a domain rule conflict, the domain rule governs.
 
 This document defines what things are called and how they relate. It intentionally
 contains no production values.
@@ -281,6 +287,33 @@ Rules `[APPROVED]`:
 DirtyScore ordering applies **within a wall's TempQueue**. GlobalQueue initial order comes
 from the fixed source order, not from a cross-wall DirtyScore comparison. `[OWNER CONFIRMED]`
 
+### 5.1 Dirty and Cleaner display classification
+
+`DirtyScore` is a continuous 0–100 value. The operator interface additionally presents a
+two-state **process classification** derived from it, so that a cell can be read at a glance:
+
+| Condition | Display classification |
+| --- | --- |
+| Dirty Score > 50 | `DIRTY` |
+| Dirty Score <= 50 | `CLEANER` |
+
+Rules:
+
+1. The classification rule above is the current **Owner-confirmed display rule**.
+2. The UI must read the **effective threshold from the Published configuration** if the
+   threshold becomes configurable, and must not hard-code visual text around an assumed value.
+   The site value, if it differs from the current rule, is local configuration and is never
+   committed.
+3. **Dirty red is a process-condition colour, not an alarm severity colour** (see
+   [`ALARM_MODEL.md`](ALARM_MODEL.md) severities and
+   [`ARCHITECTURE.md`](ARCHITECTURE.md) section 26.3). Alarm state remains
+   independently recognisable through icon, border, text, the alarm banner, and the dedicated
+   alarm surfaces.
+4. Classification must never be derived from a raw or unvalidated value: the quality-aware
+   pipeline in [`ARCHITECTURE.md`](ARCHITECTURE.md) section 27 governs what reaches the UI.
+5. Wall summary counts presented alongside this classification must carry explicit labels
+   (Dirty, Cleaner, and Bad or unavailable where applicable), never unlabelled numbers.
+
 ## 6. TimeSinceLastClean
 
 `TimeSinceLastClean = CurrentTime - LastSuccessfulCleaningCompletedAt`
@@ -309,5 +342,6 @@ from the fixed source order, not from a cross-wall DirtyScore comparison. `[OWNE
 - [`QUEUE_MODEL.md`](QUEUE_MODEL.md) — queue specification
 - [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) — Cleaning Job specification and sequencing
 - [`ALARM_MODEL.md`](ALARM_MODEL.md) — alarm model and cleared-state acknowledgement
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — subsystem layout
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — subsystem layout; sensor presentation model
+  (section 26) and quality-aware pipeline (section 27)
 - [`USER_PERMISSION_MODEL.md`](USER_PERMISSION_MODEL.md) — roles and permissions

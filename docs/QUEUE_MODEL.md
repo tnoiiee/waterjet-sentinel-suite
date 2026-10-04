@@ -4,8 +4,11 @@
 construction and must be implemented exactly. Deviations require an approved change, not a
 local decision.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 Identifiers used in worked examples are **illustrative placeholders only**. Real sensor
 identifier formats and production mappings are not documented in this repository.
@@ -319,6 +322,30 @@ flags (`TEMP_QUEUE` / `TIME_QUEUE`), hold and reject flags, and the capture time
 snapshot is stored in Event history.
 
 Snapshot storage format, compression, and retention are `[OPEN]`.
+
+## 11.1 Parameter source and evaluation boundaries (Stage 0.2)
+
+Queue evaluation is a **per-cycle** operation at the approved one-second cadence. The following
+boundaries apply.
+
+1. **SQL Server is not the per-cycle queue parameter source.** Queue evaluation reads an
+   **immutable in-memory Published Configuration Snapshot** loaded and validated by the
+   Equipment Runtime at startup (see [`ARCHITECTURE.md`](ARCHITECTURE.md) section 30 and
+   [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md)).
+2. **A Draft is never consumed by the runtime.** Only a Published revision is loaded, and a
+   validated revision is swapped in atomically under the approved state gate — never while a
+   Cleaning Job is active.
+3. **Queue state is owned by the Runtime, not the UI.** The Operations UI observes queue state
+   through the live-state contract and issues permitted operator queue actions through the
+   approved command path. The UI must not own or recompute membership, order, dwell, or
+   disposition (see [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 14.3 and 28).
+4. **Queue evaluation must not be blocked by database writes.** A slow Historian write or an
+   alarm write must not delay a queue evaluation cycle.
+5. **Sequential execution invariants are unchanged.** Sections 1, 8, and 10 continue to govern;
+   nothing here permits more than one active Cleaning Job, parallel Water Jet Cleaning, or a
+   shared Isolation Valve.
+6. **The Poll Plan and the queue plan are compiled from the Published configuration**, not
+   rebuilt per cycle (see [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 29 and 30).
 
 ## 12. Open items
 

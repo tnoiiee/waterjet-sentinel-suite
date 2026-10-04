@@ -4,8 +4,11 @@
 audit requirements, and the break-glass account. The concrete permission catalogue is
 `[OPEN]`. The DCS Permissive Override requirements are `[OWNER CONFIRMED]`.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
+review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
+Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
 
 ---
 
@@ -162,6 +165,31 @@ Every one of the following must produce a durable record:
 | Configuration publication | User, time, what changed, previous and new values |
 | Permission or role change | User, time, target user or role, previous and new state |
 | Break-glass login | User, time, and a high-severity audit marker |
+
+## 7.1 Session, command, and UI boundaries (Stage 0.2)
+
+1. **A privileged session has an approved timeout and the timeout is enforced by the Runtime**,
+   not only by the Operations UI. UI-side hiding or UI-side timers are convenience only and are
+   never the control.
+2. **UI close, crash, or restart must not grant, extend, or silently renew authority**, and must
+   not terminate or release an active Cleaning Job.
+3. **Logout or privileged-session timeout during an active Cleaning Job** must be an
+   Owner-decided, documented behaviour before implementation, and must not create a state in
+   which a job continues without a supervision path. That behaviour remains `[OPEN]` until
+   ratified.
+4. **The UI cannot write to hardware and cannot open a device session.** A UI control that
+   appears to actuate a device issues a command request through the approved command path; the
+   Equipment Runtime performs the actuation after authorization, lifecycle, interlock,
+   ownership, and command-state validation (see [`CONTROL_AUTHORITY.md`](CONTROL_AUTHORITY.md)
+   and [`ARCHITECTURE.md`](ARCHITECTURE.md) section 14.3).
+5. **No permission can bypass a lifecycle, interlock, or ownership rule**, and none can permit
+   concurrent Cleaning Jobs.
+6. **The DCS Permissive Override remains scoped, enumerated, and non-delegable** as recorded in
+   section 5. Its exclusions, the absence of automatic expiry, and the cleared-state
+   acknowledgement requirement are unchanged.
+7. **Audit-required initiating actions** are refused when the required audit record cannot be
+   persisted (ARC-025), and the candidate set is an Owner-ratified decision, not an
+   implementation choice. Historian backlog must not be used to decide it.
 
 ## 8. Open items
 
