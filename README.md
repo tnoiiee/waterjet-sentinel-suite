@@ -10,34 +10,38 @@ Repository: `waterjet-sentinel-suite`
 
 | Item | Value |
 | --- | --- |
-| Current stage | **Stage 0.2 — Technology and Solution Architecture Decision** |
+| Current stage | **Stage 0.2.1A — React UI and Runtime Feasibility Spike** |
 | Stage 0.1 Scope Gate | **APPROVED** |
 | Stage 0.1 implementation | **MERGED** — through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** |
-| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
-| Stage 0.2 documentation review | **CHANGES REQUESTED / IN PROGRESS** — the Owner-requested punchlist has been implemented on the same branch and pull request; re-review pending |
-| Owner manual review | **PENDING** |
-| Merge | **NOT MERGED** |
-| Stage 0.2.1 — UI and Runtime Technology Spike | **NOT AUTHORIZED** |
+| Stage 0.2 architecture checkpoint | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`) |
+| Stage 0.2 ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction — accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
+| Stage 0.2.1A Scope / Coding Start | **APPROVED** |
+| Stage 0.2.1A implementation | **IN PROGRESS** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); Owner-local testing and Owner manual review **PENDING**; **NOT MERGED** |
+| React final selection | **NOT YET APPROVED** — the UI framework remains `[OPEN]` |
+| Blazor counter-spike | **DEFERRED / NOT AUTHORIZED** |
 | Stage 0.3 | **NOT AUTHORIZED** |
-| Repository contents | Documentation and repository governance only |
-| Application code | **None.** No source, no solution, no schema, no runtime. |
+| Repository contents | Documentation, repository governance, and one removable synthetic feasibility spike |
+| Application code | **None.** The Stage 0.2.1A spike is synthetic feasibility code, not Product code: no solution, no schema, no Product runtime. |
 | Application version | **NOT ESTABLISHED.** No runtime release exists. |
 | Hardware connection | **Not authorised.** Production device access is prohibited. |
 | Production Write | **Not authorised.** |
 | Merge authority | **Owner only.** Agents never merge. |
 
-This repository currently contains **documentation only**. Everything described here is a
-design baseline candidate, not a running system. See
+This repository contains documentation and, from Stage 0.2.1A, one removable **synthetic**
+React feasibility spike (`spikes/ui-runtime-react/`) that uses no device, no Production value,
+and no Product directory. Everything else described here is a design baseline, not a running
+system. See
 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) for the stage status, the verified state,
 and the status legend used throughout.
 
-Stage 0.2 recorded a `[PROPOSED]` technology and solution architecture — UI delivery model,
-runtime process model, technology stack, database access and migrations, device adapter
-boundary, configuration and secrets, simulator-first development, and offline deployment — as
-ADR candidates in [`docs/decisions/`](docs/decisions/README.md). `[PROPOSED]` means drafted
-and submitted, **not approved**: the Owner has not yet accepted those records, nothing in them
-is implemented, and no capability or later stage is authorised by them.
+Stage 0.2 recorded the technology and solution architecture — UI delivery model, runtime
+process model, technology stack, database access and migrations, device adapter boundary,
+configuration and secrets, simulator-first development, and offline deployment — in
+[`docs/decisions/`](docs/decisions/README.md). The Owner accepted Stage 0.2 and ADR-0006 to
+ADR-0013 as architecture direction. **Accepted does not mean implemented**: nothing in them is
+implemented as Product code, items still marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]`
+keep those markers, and no capability or later stage is authorised by them.
 
 **The final UI framework is `[OPEN]`.** Two candidates are recorded and compared on equal
 terms: Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
@@ -46,7 +50,10 @@ evidence-based preference for Candidate A is explicitly **not acceptance**, and 
 explicitly **not rejected**. React can be built and deployed offline; it introduces a second
 package and build ecosystem, which increases offline dependency-management and supply-chain
 effort without making offline development or deployment impossible. Choosing the framework
-requires the proposed Stage 0.2.1 spike, which is `[NOT AUTHORIZED]`. See
+requires measured evidence: the Stage 0.2.1A React feasibility spike is approved and in
+progress (see [`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md)); React
+final selection is **not yet approved**, and the Blazor counter-spike is **deferred / not
+authorized**. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and
 [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 3.2.
 
@@ -167,7 +174,7 @@ local deployment information and are **not** in this repository.
 | [`docs/decisions/ADR-0004-historian-strategy.md`](docs/decisions/ADR-0004-historian-strategy.md) | Historian storage and retention strategy |
 | [`docs/decisions/ADR-0005-hardware-safety-boundary.md`](docs/decisions/ADR-0005-hardware-safety-boundary.md) | Prohibition of production control writes pending bench verification |
 
-#### Stage 0.2 candidate decision records — `PROPOSED`, Owner acceptance pending
+#### Stage 0.2 decision records — `ACCEPTED` (architecture direction; not implemented)
 
 | Document | Purpose |
 | --- | --- |
@@ -179,6 +186,14 @@ local deployment information and are **not** in this repository.
 | [`docs/decisions/ADR-0011-configuration-and-secrets.md`](docs/decisions/ADR-0011-configuration-and-secrets.md) | Configuration layers, Draft versus Published, secrets, publication and rollback |
 | [`docs/decisions/ADR-0012-simulator-first-development.md`](docs/decisions/ADR-0012-simulator-first-development.md) | Simulator-first development, device profiles, failure injection, contract parity |
 | [`docs/decisions/ADR-0013-offline-deployment.md`](docs/decisions/ADR-0013-offline-deployment.md) | Offline installation, startup, backup and restore, upgrade and rollback, local-only communication |
+
+#### Stage 0.2.1A feasibility spike — synthetic, removable, not Product code
+
+| Document | Purpose |
+| --- | --- |
+| [`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md) | Approved spike scope, architecture, scenarios, measurement plan |
+| [`docs/spikes/stage-0.2.1a-results.md`](docs/spikes/stage-0.2.1a-results.md) | Arena validation and measurement evidence; Owner-local results pending |
+| [`spikes/ui-runtime-react/README.md`](spikes/ui-runtime-react/README.md) | Spike layout, run instructions, NOT VERIFIED list |
 
 ## Status legend
 

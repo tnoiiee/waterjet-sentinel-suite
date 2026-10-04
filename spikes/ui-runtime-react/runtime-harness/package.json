@@ -1,0 +1,15 @@
+{
+  "name": "wjss-spike-runtime-harness",
+  "private": true,
+  "version": "0.0.0-spike",
+  "description": "WJSS Stage 0.2.1A synthetic runtime harness. SYNTHETIC SPIKE INFRASTRUCTURE - not the Production Equipment Runtime.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "start": "node src/main.mjs",
+    "test": "node --test \"test/**/*.test.mjs\""
+  }
+}

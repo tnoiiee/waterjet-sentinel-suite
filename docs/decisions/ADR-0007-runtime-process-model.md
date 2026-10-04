@@ -1,7 +1,9 @@
 # ADR-0007 — Runtime Process Model
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
 - **Date:** 2026-10-04
 - **Supersedes:** Nothing. This record closes the process-architecture question left `[OPEN]`
   by [ADR-0002](ADR-0002-deployment-architecture.md) item 1 and by

@@ -1,0 +1,161 @@
+{
+  "label": "SYNTHETIC SPIKE MEASUREMENT - ARENA NODE HARNESS ONLY - NOT A BROWSER OR PRODUCTION RESULT",
+  "run": "smoke-10min",
+  "startedAt": "2026-10-04T22:48:21.566Z",
+  "durationS": 601,
+  "sseClients": 2,
+  "sampleIntervalS": 10,
+  "scenarioCycleSteps": 20,
+  "harnessProcess": {
+    "cpuPercent": {
+      "n": 60,
+      "p50": 0.82,
+      "p95": 1.18,
+      "max": 1.43,
+      "min": 0.71
+    },
+    "rssMb": {
+      "n": 60,
+      "p50": 69,
+      "p95": 76,
+      "max": 76.3,
+      "min": 63.7,
+      "firstThirdMean": 66.1,
+      "lastThirdMean": 73.5
+    },
+    "heapUsedMb": {
+      "n": 60,
+      "p50": 11.2,
+      "p95": 15.7,
+      "max": 16.1,
+      "min": 8.3
+    },
+    "eventLoopDelayP99Ms": {
+      "n": 60,
+      "p50": 10.8,
+      "p95": 10.8,
+      "max": 10.9,
+      "min": 10.7
+    }
+  },
+  "messages": {
+    "snapshotBytes": {
+      "n": 2,
+      "p50": 50422,
+      "p95": 80318,
+      "max": 80318,
+      "min": 50422
+    },
+    "deltaBytes": {
+      "n": 619,
+      "p50": 50188,
+      "p95": 50233,
+      "max": 51173,
+      "min": 1802
+    },
+    "deltaIntervalMs": {
+      "n": 618,
+      "p50": 1000,
+      "p95": 1001,
+      "max": 1045,
+      "min": 115
+    },
+    "deltaLagGeneratedToReceivedMs": {
+      "n": 619,
+      "p50": 2,
+      "p95": 3,
+      "max": 6,
+      "min": 1
+    },
+    "deltasReceivedClient0": 619,
+    "deltaRatePerS": 1.031,
+    "clientGapsDetected": [
+      1,
+      1
+    ],
+    "clientResyncs": [
+      1,
+      1
+    ],
+    "clientConnections": [
+      2,
+      2
+    ]
+  },
+  "publish": {
+    "deltasPublished": 621,
+    "publishMs": {
+      "n": 621,
+      "p50": 0.84,
+      "p95": 1.383,
+      "max": 4.948,
+      "mean": 0.927
+    },
+    "deltaBytes": {
+      "n": 621,
+      "p50": 50188,
+      "p95": 50233,
+      "max": 51173,
+      "mean": 47433
+    },
+    "deltaChangedSensors": {
+      "n": 621,
+      "p50": 104,
+      "p95": 104,
+      "max": 104,
+      "mean": 98
+    }
+  },
+  "scheduler": {
+    "maxGlobalInFlight": 4,
+    "maxPerDeviceInFlight": 1,
+    "timeouts": 90,
+    "pollLatencyMs": {
+      "FAST": {
+        "n": 2000,
+        "p50": 22.28,
+        "p95": 38.41,
+        "max": 751.03,
+        "mean": 32.78
+      },
+      "MEDIUM": {
+        "n": 242,
+        "p50": 22.52,
+        "p95": 38.17,
+        "max": 39.97,
+        "mean": 22.23
+      },
+      "SLOW": {
+        "n": 209,
+        "p50": 23.95,
+        "p95": 38.84,
+        "max": 750.22,
+        "mean": 30.28
+      }
+    }
+  },
+  "historian": {
+    "maxDepth": 10950,
+    "accepted": 125098,
+    "written": 125098,
+    "rejected": 0,
+    "nearOverflowEvents": 0
+  },
+  "jobs": {
+    "active": 1,
+    "completed": 21,
+    "aborted": 1,
+    "refusedSecondJobs": 0,
+    "acceptedSecondJobs": 0,
+    "refusals": {}
+  },
+  "pumpStopCommandMs": {
+    "n": 1,
+    "p50": 0.129,
+    "p95": 0.129,
+    "max": 0.129,
+    "mean": 0.129
+  },
+  "invariantViolations": 0,
+  "harnessExited": 0
+}

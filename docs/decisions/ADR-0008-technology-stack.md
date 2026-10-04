@@ -1,8 +1,11 @@
 # ADR-0008 — Technology Stack
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`. **The final UI framework is
-  `[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers. **The final UI framework
+  remains `[OPEN]`**; React final selection is not yet approved (Stage 0.2.1A feasibility
+  spike in progress); the Blazor counter-spike is deferred / not authorized.
 - **Date:** 2026-10-04 (corrected 2026-10-05 by the Owner-requested Stage 0.2 documentation
   review punchlist)
 - **Supersedes:** Nothing. This record addresses the stack questions left `[OPEN]` by
@@ -156,7 +159,7 @@ The full dimension-by-dimension comparison is in
 | Comparison candidates | Candidate A — React + TypeScript + Vite; Candidate B — Blazor Hybrid. Both hosted in the same application-owned shell with the same API contract, the same synthetic data, and the same acceptance measures |
 | Current evidence-based preference | Candidate A, based on the Owner's legacy operating experience with React/Vite and push updates, dense-visualisation fit, charting and camera ecosystem, and UI test tooling. **A preference is not an acceptance** |
 | Explicitly not a basis for selection | Internet access assumptions; ease of closing a window; C# language unity alone; ecosystem size alone |
-| Selection route | Proposed Stage 0.2.1 — UI and Runtime Technology Spike, `PROPOSED` and `[NOT AUTHORIZED]` |
+| Selection route | Proposed Stage 0.2.1 — UI and Runtime Technology Spike, `PROPOSED` and `[NOT AUTHORIZED]`. Update: Stage 0.2.1A synthetic React feasibility spike approved and in progress; selection not yet approved |
 | Effect on the rest of the stack | None: .NET, ASP.NET Core, the service host, dependency injection, configuration, logging, validation, and the adapter boundaries are unchanged by the framework decision |
 
 ## Alternatives considered
@@ -239,7 +242,7 @@ The full dimension-by-dimension comparison is in
 
 | Item | Gate that must close it |
 | --- | --- |
-| **Final UI framework selection (Candidate A versus Candidate B)** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED) |
+| **Final UI framework selection (Candidate A versus Candidate B)** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED). Update: Stage 0.2.1A synthetic React feasibility spike approved and in progress; Blazor counter-spike deferred / not authorized |
 | .NET LTS version pin with a cited support reference | Implementation Stage Gate (before the first project file is created) |
 | Logging provider selection and licence review | Implementation Stage Gate |
 | Unit-test framework selection and pinning | Implementation Stage Gate (with the first test project) |

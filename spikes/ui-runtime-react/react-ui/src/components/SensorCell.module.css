@@ -1,0 +1,118 @@
+/* WJSS Stage 0.2.1A — Sensor cell styles. Colours come from toCellVisual(); these rules only
+   render the independent channels (marker, badge, ring, outline, alarm border). */
+.cell {
+  position: relative;
+  width: var(--cell, 34px);
+  height: var(--cell, 34px);
+  padding: 0;
+  margin: 0;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  color: #fff;
+  font: 600 10px/1 system-ui, sans-serif;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  text-shadow: 0 0 2px #000;
+  contain: layout paint;
+}
+.cell:focus-visible {
+  outline: 2px dashed var(--selected, #00e5ff);
+  outline-offset: 2px;
+}
+.index {
+  font-size: 8px;
+  opacity: 0.8;
+}
+.score {
+  font-size: 11px;
+}
+
+/* 3. Quality markers (never Dirty/Cleaner backgrounds for BAD/STALE/DISABLED). */
+.q_NONE {
+}
+.q_UNCERTAIN_AMBER {
+}
+.uncertainMarker {
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 0;
+  height: 0;
+  border-top: 11px solid #ffb300;
+  border-right: 11px solid transparent;
+}
+.q_BAD_HATCH {
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.28) 0 3px, transparent 3px 7px) !important;
+}
+.q_STALE_CLOCK {
+  background-image: radial-gradient(circle at 50% 50%, transparent 55%, rgba(255, 255, 255, 0.35) 56% 62%, transparent 63%) !important;
+}
+.q_DISABLED_SLASH {
+  background-image: linear-gradient(135deg, transparent 46%, rgba(255, 255, 255, 0.45) 47% 53%, transparent 54%) !important;
+  color: #c9cdd2;
+}
+
+/* 4. Queue badge */
+.badge {
+  position: absolute;
+  right: -4px;
+  top: -5px;
+  min-width: 12px;
+  height: 12px;
+  padding: 0 2px;
+  border-radius: 6px;
+  background: #e8eaed;
+  color: #111;
+  font-size: 8px;
+  line-height: 12px;
+  text-shadow: none;
+  border: 1px solid #111;
+}
+
+/* 5. Selection: cyan outer ring (box-shadow, independent of border and outline). */
+.selected {
+  box-shadow: 0 0 0 3px #00e5ff;
+  z-index: 2;
+}
+
+/* 6. Active Cleaning Job target: high-contrast double outline. */
+.activeJob {
+  outline: 4px double #ffffff;
+  outline-offset: 1px;
+  z-index: 3;
+}
+.activeJob::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1px solid #000;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* 7. Alarm: bright magenta border + icon. Not the Dirty red. */
+.alarm {
+  border-color: #ff2fd2;
+  border-width: 3px;
+}
+.alarmCleared {
+  border-style: dashed;
+}
+.alarmIcon {
+  position: absolute;
+  left: -5px;
+  bottom: -5px;
+  width: 13px;
+  height: 13px;
+  border-radius: 2px;
+  background: #ff2fd2;
+  color: #000;
+  font-size: 10px;
+  line-height: 13px;
+  text-shadow: none;
+  border: 1px solid #000;
+}

@@ -1,7 +1,9 @@
 # ADR-0010 — Device Adapter Boundary
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
 - **Date:** 2026-10-04
 - **Supersedes:** Nothing. This record addresses the adapter questions left `[OPEN]` by
   [`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 11 and

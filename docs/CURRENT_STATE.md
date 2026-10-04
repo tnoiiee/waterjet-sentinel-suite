@@ -3,8 +3,9 @@
 **Document status:** The verified state below is `[APPROVED]` as a factual record.
 Stage status wording and the open-item list were corrected by the Owner-confirmed Stage 0.1
 documentation review punchlist, updated by the approved Stage 0.2 Scope Gate — *Technology and
-Solution Architecture Decision*, and refined by the Owner-requested Stage 0.2 documentation
-review punchlist. Open items are `[OPEN]` and must not be resolved by assumption.
+Solution Architecture Decision*, refined by the Owner-requested Stage 0.2 documentation review
+punchlist, and updated for Stage 0.2 Owner acceptance and the approved Stage 0.2.1A spike.
+Open items are `[OPEN]` and must not be resolved by assumption.
 
 This document answers one question: *what is actually true right now, with evidence?*
 Nothing in this repository may contradict it. If something does, the discrepancy is reported
@@ -37,23 +38,30 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Stage 0.1 implementation | **MERGED** — merged to `main` through PR #1 |
 | Stage 0.1 Owner manual review | **Recorded as complete by the Owner** in the approved Stage 0.2 Scope Gate, which states that the previous Stage branch completed its role and was merged through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** — *Technology and Solution Architecture Decision* |
-| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review (Stage 0.2) | **CHANGES REQUESTED / IN PROGRESS** — the Owner-requested punchlist has been implemented on the same branch and pull request; re-review pending |
-| Owner manual review (Stage 0.2) | **PENDING** |
-| Merge | **NOT MERGED** |
-| Stage 0.2.1 | **NOT AUTHORIZED** |
+| Stage 0.2 architecture checkpoint | **OWNER ACCEPTED / MERGED** — merged to `main` through PR #2; source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`; merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73` |
+| ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction. Accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
+| Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
+| Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
+| Stage 0.2.1A implementation | **IN PROGRESS** — development checkpoint submitted on branch `arena/01a108d8-waterjet-sentinel-suite` through a new pull request to `main` |
+| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | **PENDING** |
+| Stage 0.2.1A Owner manual review | **PENDING** |
+| Stage 0.2.1A merge | **NOT MERGED** |
+| React final selection | **NOT YET APPROVED** — UI framework `[OPEN]` |
+| Blazor counter-spike | **DEFERRED / NOT AUTHORIZED** |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
 
-Approval of the Stage 0.2 Scope Gate authorised the work. It is **not** acceptance of the
-Stage 0.2 implementation. The Stage 0.2 documentation review has requested changes; those
-changes are implemented in a review-correction checkpoint on the same branch and pull request,
-and re-review is pending. Nothing in this repository may describe the Stage 0.2 outcome as
-Owner accepted, final, merged, reviewed, or as a completed development checkpoint accepted by
-the Owner. Stage 0.2 is a documentation and architecture-decision checkpoint only: no
-application code exists, no dependency was installed, no device was contacted, and no
-Production Write was performed or authorised.
+The Owner accepted Stage 0.2 and it was merged through PR #2. Stage 0.2 was a documentation
+and architecture-decision checkpoint only. Acceptance of ADR-0006 to ADR-0013 records
+architecture direction; it is not implementation proof.
+
+Approval of the Stage 0.2.1A Scope and Coding Start Gates authorises a synthetic, removable
+React feasibility spike under `spikes/ui-runtime-react/`. It is **not** acceptance of the spike
+result and **not** a UI framework selection. Nothing in this repository may describe Stage
+0.2.1A as Owner accepted, merged, or as a React final selection. The spike uses synthetic data
+only: no device was contacted, no Production value is used, no Product directory exists, and
+no Production Write was performed or authorised.
 
 The Stage 0.1 process-deviation record in section 11.1 is retained unchanged.
 
@@ -72,15 +80,15 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.2 — Technology and Solution Architecture Decision (documentation and architecture decisions only) |
-| Repository contents | Documentation and repository governance only |
-| Application source code | **Does not exist** |
-| Project or solution files | **Do not exist** |
-| Package manifests or dependencies | **Do not exist** |
+| Current stage | Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic, removable) |
+| Repository contents | Documentation, repository governance, and the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/` |
+| Application source code | **Does not exist.** The spike is synthetic feasibility code, not Product code |
+| Project or solution files | **Do not exist** (no .NET solution or project) |
+| Package manifests or dependencies | Spike only: `spikes/ui-runtime-react/react-ui/package.json` and `package-lock.json` (Owner-approved pins); `runtime-harness/package.json` has no dependencies. No Product package manifest |
 | Database schema or SQL scripts | **Do not exist** |
 | Modbus or Galil adapter | **Does not exist** |
-| Simulator | **Does not exist** |
-| Automated tests | **Do not exist** |
+| Simulator | **No Product simulator.** The spike contains a synthetic Node runtime harness for feasibility only |
+| Automated tests | Spike tests only (Node `node:test` harness tests, Vitest jsdom tests, Playwright specs for Owner-local runs). No Product tests |
 | CI workflow | **Does not exist** |
 | Installer or release artifact | **Does not exist** |
 | Production configuration | **Does not exist in this repository** |
@@ -145,11 +153,14 @@ reopened without a new Owner decision.
    [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) is completed and recorded. `[NOT AUTHORIZED]`
 3. **No application code, schema, adapter, simulator, test, CI workflow, installer, or
    release artifact** may be created until a later Stage Gate authorises it. `[NOT AUTHORIZED]`
+   The only exception is the Stage 0.2.1A synthetic spike inside `spikes/ui-runtime-react/`,
+   within its approved scope. `[APPROVED]`
 4. **No production values** may be invented, inferred, or committed. `[NOT AUTHORIZED]`
 5. **No concurrent Cleaning Jobs.** Parallel Water Jet cleaning is prohibited. `[OWNER CONFIRMED]`
 6. **No merging.** Merge authority belongs to the Owner. `[APPROVED]`
 7. **No history rewriting or force push** without specific Owner authorisation. `[APPROVED]`
-8. **No new pull request** to replace the existing reviewed pull request. `[APPROVED]`
+8. **No reuse of PR #1 or PR #2.** Stage 0.2.1A is delivered through one new pull request to
+   `main`, as instructed by the Owner. `[APPROVED]`
 
 ## 8. Open items requiring Owner decisions
 
@@ -168,7 +179,7 @@ items are listed in section 34 of the same document, and the decision records ar
 
 | Item | Stage 0.2 disposition |
 | --- | --- |
-| Application language, runtime, UI framework, and UI delivery architecture | .NET with C# for the Equipment Runtime and Local Application API: `[PROPOSED]`; application-owned Windows kiosk shell: `[PROPOSED]`; embedded local web UI delivery model: `[PROPOSED]`; React + TypeScript + Vite: `[PROPOSED]` comparison candidate, not accepted; Blazor Hybrid: `[PROPOSED]` comparison candidate, not rejected; final UI framework: `[OPEN]`; exact .NET version: `[OPEN]`; final selection deferred to the proposed Stage 0.2.1 technology spike. Browser-based, desktop, and hybrid local-web delivery were all evaluated on requirements |
+| Application language, runtime, UI framework, and UI delivery architecture | .NET with C# for the Equipment Runtime and Local Application API: `[PROPOSED]`; application-owned Windows kiosk shell: `[PROPOSED]`; embedded local web UI delivery model: `[PROPOSED]`; React + TypeScript + Vite: `[PROPOSED]` comparison candidate, not accepted; Blazor Hybrid: `[PROPOSED]` comparison candidate, not rejected; final UI framework: `[OPEN]`; exact .NET version: `[OPEN]`; final selection deferred; the Stage 0.2.1A React feasibility spike is approved and in progress; Blazor counter-spike deferred / not authorized. Browser-based, desktop, and hybrid local-web delivery were all evaluated on requirements |
 | Process architecture, service identity, startup behaviour, and Equipment Runtime separation | Process model selected as `[PROPOSED]`; service identity `[OPEN]` |
 | Modbus TCP client library selection and licence acceptability | Boundary decided; library selection `[OPEN]` pending licence and offline-availability review |
 | Galil communication mechanism and library selection | `[OPEN]` — must be evaluated before motion code is written |
@@ -180,7 +191,7 @@ items are listed in section 34 of the same document, and the decision records ar
 | Backup, restore, and off-box copy | Remains `[OPEN]` — carried forward into the offline deployment decision |
 | Historian write-path measurement and overflow policy | Remains `[OPEN]` — requires measurement on the target workstation |
 | Kiosk startup mechanism, package format, firewall rules, diagnostic bundle contents | Remains `[OPEN]` — deployment-gate items |
-| **Final UI framework (Candidate A React + TypeScript + Vite versus Candidate B Blazor Hybrid)** | **Returned to `[OPEN]`** by the Owner-requested punchlist. A current evidence-based preference for Candidate A is recorded and is **not an acceptance**. Selection requires the proposed Stage 0.2.1 spike |
+| **Final UI framework (Candidate A React + TypeScript + Vite versus Candidate B Blazor Hybrid)** | **Returned to `[OPEN]`** by the Owner-requested punchlist. A current evidence-based preference for Candidate A is recorded and is **not an acceptance**. Stage 0.2.1A React feasibility spike approved and in progress; React final selection not yet approved |
 | Push transport and presentation-state payload encoding | `[OPEN]` — presentation contract is transport-agnostic |
 | Chart / trend library; UI test tooling; visual regression tooling | `[OPEN]` — library-neutral requirements recorded; selection needs spike evidence |
 | Site-specific invalid-value and sentinel mapping | `[OPEN]` — requires the Tag and data-quality contract; production values must never be committed |
@@ -249,7 +260,8 @@ items are listed in section 34 of the same document, and the decision records ar
 | Production register map, Tag List, and DCS signal contract | Confidential; never committed |
 | Sensor-to-Water-Jet and sensor-to-valve mapping | Deployment data; not recorded here |
 | Historian effective capacity and database sizing | No capacity model produced; no benchmark performed |
-| Runtime build, unit tests, integration tests, database tests, hardware tests | No code exists; not applicable at this stage |
+| Runtime build, unit tests, integration tests, database tests, hardware tests | No Product code exists; not applicable. Stage 0.2.1A synthetic spike tests are recorded in section 12.3 and are not Product verification |
+| Stage 0.2.1A browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI, Windows offline restore | Not measurable in Arena; Owner-local testing pending |
 
 ## 10. Sensitive data review
 
@@ -298,14 +310,34 @@ rebased, or rewritten.
 | Current Stage branch | `arena/01a1087c-waterjet-sentinel-suite` |
 | Pull request | https://github.com/tnoiiee/waterjet-sentinel-suite/pull/2 |
 | Stage 0.2 Scope Gate | **APPROVED** |
-| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review | **CHANGES REQUIRED / IN PROGRESS** |
-| Owner manual review | **PENDING** |
-| Merge | **NOT MERGED** |
-| Stage 0.2.1 | **NOT AUTHORIZED** |
+| Stage 0.2 architecture checkpoint | **OWNER ACCEPTED** |
+| Source checkpoint accepted | `5bcf1b33f924ab30590a55736676200115874fa1` |
+| Merge | **MERGED** to `main` through PR #2 — merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`, which is the approved base of Stage 0.2.1A |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
+
+*Rows above that described the Stage 0.2 review-in-progress state were replaced when the Owner
+accepted and merged Stage 0.2.*
+
+### 11.3 Stage 0.2.1A checkpoint record
+
+| Item | Value |
+| --- | --- |
+| Stage | 0.2.1A — React UI and Runtime Feasibility Spike (synthetic) |
+| Approved main base | `e779f8ad2c856e367fd65985007a3da411bd0e73` (verified remote `main` before coding) |
+| Stage branch | `arena/01a108d8-waterjet-sentinel-suite` |
+| Development checkpoint | Created on the Stage branch. Its SHA is recorded in the delivery report and in the pull request description, **not** inside the commit that creates it |
+| Pull request | A new pull request to `main` (PR #1 and PR #2 are not reused) |
+| Scope Gate / Coding Start Gate | **APPROVED** |
+| Implementation | **IN PROGRESS** — checkpoint submitted |
+| Owner-local testing | **PENDING** |
+| Owner manual review | **PENDING** |
+| Merge | **NOT MERGED** |
+| React final selection | **NOT YET APPROVED** |
+| Blazor counter-spike | **NOT AUTHORIZED** |
+| Stage 0.3 | **NOT AUTHORIZED** |
+| Production Device access | **NOT AUTHORIZED** |
 
 ### 11.1 Process deviation record
 
@@ -399,6 +431,36 @@ method shown. The exact commands are reported in the Stage 0.2 delivery report.
 | 13 | Full diff review | Complete diff read before the checkpoint commit | Every change is traceable to the punchlist; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
 | 14 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, simulator, or installer test was executed, and none is claimed |
 
+### 12.3 Stage 0.2.1A Arena validation record
+
+Synthetic spike validation in Arena (Linux x64, Node v22.22.3). Detailed evidence:
+[`spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md) and
+`spikes/ui-runtime-react/results/summary/arena-validation.md`.
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | TypeScript 6.0.3 `tsc --noEmit` | PASS, 0 errors |
+| 2 | Vite 8.3.2 production build | PASS |
+| 3 | Vitest (jsdom), 8 files | 53 / 53 PASS |
+| 4 | Runtime harness `node:test` | 14 / 14 PASS |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | 10-minute harness measurement, 2 SSE clients | Exit 0; invariant violations 0; accepted second Jobs 0 |
+| 7 | Playwright spec parse (`--list`, no browser) | PASS, 16 tests |
+| 8 | Offline `npm ci` against an unreachable registry | PASS; negative control `ENOTCACHED` |
+| 9 | Sensitive-data scan, new and changed files | PASS |
+| 10 | Markdown relative links | PASS, 0 broken |
+| 11 | Full diff review | Performed before the checkpoint commit |
+| 12 | Browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI | **NOT VERIFIED** in Arena — Owner-local testing PENDING |
+
+**Reported discrepancy (not resolved silently).** The status headers of 12 documents outside
+the Stage 0.2.1A update list still describe the Stage 0.2 submission state (`SUBMITTED FOR
+OWNER REVIEW`, Stage 0.2.1 `[NOT AUTHORIZED]`): `SECURITY.md`, `ALARM_MODEL.md`,
+`ARCHITECTURE.md`, `CLEANING_SEQUENCE.md`, `CONTROL_AUTHORITY.md`, `DOMAIN_MODEL.md`,
+`HISTORIAN_RETENTION.md`, `QUEUE_MODEL.md`, `REQUIREMENTS.md`, `SAFETY_BOUNDARY.md`,
+`TEST_STRATEGY.md`, `USER_PERMISSION_MODEL.md`. They were not changed because they are not named
+in the approved Stage 0.2.1A file list. This document takes precedence; a status-header
+correction requires Owner authorisation.
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:
@@ -421,8 +483,9 @@ The documentation explicitly contains each of the following:
 | 14 | Domain logic does not depend on vendor device libraries | [`REQUIREMENTS.md`](REQUIREMENTS.md) ARC-007, [`decisions/ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md) |
 | 15 | Simulation is not hardware verification or certification | [`decisions/ADR-0012`](decisions/ADR-0012-simulator-first-development.md), [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §3.7 |
 
-This document must not be read as claiming any test, build, database, hardware, or device
-verification. See section 9.
+Apart from the Stage 0.2.1A synthetic spike validation recorded in section 12.3 (Arena, Node
+and jsdom only), this document must not be read as claiming any test, build, database,
+hardware, or device verification. See section 9.
 
 ---
 

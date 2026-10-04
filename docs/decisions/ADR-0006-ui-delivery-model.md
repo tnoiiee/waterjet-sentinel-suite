@@ -1,8 +1,11 @@
 # ADR-0006 — UI Delivery Model
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`. **The final UI framework is
-  `[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers. **The final UI framework
+  remains `[OPEN]`**; React final selection is not yet approved (Stage 0.2.1A feasibility
+  spike in progress); the Blazor counter-spike is deferred / not authorized.
 - **Date:** 2026-10-04 (corrected 2026-10-05 by the Owner-requested Stage 0.2 documentation
   review punchlist)
 - **Supersedes:** Nothing. This record closes the UI delivery question left `[OPEN]` by
@@ -256,7 +259,7 @@ performance-related row must be settled by measurement in the proposed Stage 0.2
 
 | Item | Gate that must close it |
 | --- | --- |
-| **Final UI framework selection — React + TypeScript + Vite versus Blazor Hybrid** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED) |
+| **Final UI framework selection — React + TypeScript + Vite versus Blazor Hybrid** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED). Update: the narrower Stage 0.2.1A synthetic React feasibility spike is approved and in progress; React final selection not yet approved; Blazor counter-spike deferred / not authorized |
 | Shell host framework selection | Implementation Stage Gate before UI code is created |
 | Web view runtime availability and offline installation path | Deployment and offline packaging Stage Gate, with workstation image evidence |
 | Shell supervision and recovery policy | Implementation Stage Gate (runtime/service supervision) |

@@ -4,7 +4,8 @@ All notable changes to this repository are recorded in this file.
 
 The format follows the spirit of *Keep a Changelog*, adapted for a stage-gated project:
 entries correspond to Owner-approved Delivery Stages and to review corrections, not to
-releases of software. **This repository contains documentation only.**
+releases of software. **The repository contains documentation and, from Stage 0.2.1A, one
+removable synthetic feasibility spike — no Product code.**
 
 ---
 
@@ -23,15 +24,57 @@ releases of software. **This repository contains documentation only.**
 
 ## [Unreleased]
 
+### Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
+
+**Scope and Coding Start Gate:** `[APPROVED]`
+**Implementation:** IN PROGRESS — development checkpoint submitted for Owner review
+**Owner-local testing (installed Edge, Windows 11):** PENDING
+**Owner manual review:** PENDING
+**Merge:** NOT MERGED
+**React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
+**Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
+**Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Added
+
+- **`spikes/ui-runtime-react/`** — removable synthetic feasibility spike: Node built-ins-only
+  synthetic runtime harness (10 synthetic device sessions, serialized per device, bounded
+  cross-device concurrency, Snapshot plus Delta over SSE on `127.0.0.1` only, bounded Historian
+  slowdown simulator, invariant monitor); React 19 + TypeScript 6 + Vite 8 single Operations
+  page with an external presentation store, per-Sensor subscriptions, and a uPlot trend
+  (spike-only chart choice); contracts and golden fixtures; 28-scenario runner; measurement
+  tools; Vitest (jsdom) tests; Playwright specs for Owner-local runs with installed Microsoft
+  Edge; offline restore and Owner-local testing guides; committed environment record,
+  summaries, SBOM, licence inventory, and SHA-256 manifest. Raw results are not committed.
+- **`docs/spikes/stage-0.2.1a-plan.md`** and **`docs/spikes/stage-0.2.1a-results.md`**.
+
+#### Changed
+
+- Stage status in `README.md`, `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`,
+  `docs/ROADMAP.md`, `docs/decisions/README.md`, and ADR-0006 to ADR-0013: Stage 0.2 recorded as
+  OWNER ACCEPTED / MERGED; ADRs ACCEPTED (not implemented); Stage 0.2.1A approved and in
+  progress.
+
+#### Not changed / not verified
+
+- No Product directory (`apps/`, `packages/`, `adapters/`, `config/`), no .NET code, no SQL, no
+  device access, no Production value. SSE is a spike transport only; Production transport
+  `[OPEN]`. ASP.NET Core integration, Windows Service behaviour, WebView2 kiosk behaviour,
+  browser rendering performance, Windows offline restore, and extended stability are
+  **NOT VERIFIED**.
+
 ### Stage 0.2 — Technology and Solution Architecture Decision
 
 **Stage 0.2 Scope Gate:** `[APPROVED]`
-**Stage 0.2 architecture checkpoint:** SUBMITTED FOR OWNER REVIEW
-**Documentation review:** CHANGES REQUESTED / IN PROGRESS
-**Owner manual review:** PENDING
-**Merge:** NOT MERGED
-**Stage 0.2.1:** `[NOT AUTHORIZED]`
+**Stage 0.2 architecture checkpoint:** OWNER ACCEPTED / MERGED — PR #2 (source checkpoint
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge commit
+`e779f8ad2c856e367fd65985007a3da411bd0e73`)
+**ADR-0006 to ADR-0013:** ACCEPTED as architecture direction — not implemented
+**Stage 0.2.1:** superseded by the approved, narrower Stage 0.2.1A React feasibility spike
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+*The status lines below this point in the Stage 0.2 entry are preserved as they were written at
+submission time.*
 
 Documentation-only stage. Established the technology and solution architecture foundation for
 WJSS as a set of decision records and supporting architecture sections. **No application code,

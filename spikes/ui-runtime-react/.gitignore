@@ -1,0 +1,21 @@
+# WJSS Stage 0.2.1A spike — local, generated, and raw artefacts (never committed).
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+blob-report/
+.vite/
+.vitest/
+*.tsbuildinfo
+
+# Raw measurement results stay outside Git (Owner local storage / SharePoint).
+results/raw/*
+!results/raw/README.md
+
+# Local offline npm cache used for the offline-restore rehearsal.
+.cache/
+.offline-cache/
+
+# Local run tokens.
+**/.run-token

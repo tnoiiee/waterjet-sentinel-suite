@@ -5,9 +5,11 @@ work. Only an approved Stage Gate authorises delivery.
 
 **Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
 through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
-review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
-Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
+Decision*; Stage 0.2 **OWNER ACCEPTED / MERGED** through PR #2; ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope and Coding Start `[APPROVED]`, implementation **IN PROGRESS**,
+**NOT MERGED**; React final selection **NOT YET APPROVED**; Blazor counter-spike **DEFERRED /
+`[NOT AUTHORIZED]`**; Stage 0.3 `[NOT AUTHORIZED]`. This roadmap authorises nothing.
 
 This roadmap describes *intended capability sequence*. It is not a schedule, not a
 commitment, and not an authorisation. The authoritative description of how stages are
@@ -60,17 +62,21 @@ exist.
 | 20 | Multi-unit or fleet-level capability | Not planned. One installation controls one Boiler Unit. | `[OPEN]` |
 
 **Technology and solution architecture decisions are not a capability.** Stage 0.2 recorded
-`[PROPOSED]` architecture decisions — UI delivery model, runtime process model, technology
-stack, database access and migrations, device adapter boundary, configuration and secrets,
-simulator-first development, and offline deployment — as ADR candidates. They are indexed in
-[`decisions/README.md`](decisions/README.md) and remain `[PROPOSED]` until the Owner records
-them `ACCEPTED`. No capability in the table above is authorised, started, or brought forward
+architecture decisions — UI delivery model, runtime process model, technology stack, database
+access and migrations, device adapter boundary, configuration and secrets, simulator-first
+development, and offline deployment. They are indexed in
+[`decisions/README.md`](decisions/README.md); the Owner has recorded them `ACCEPTED` as
+architecture direction, which does not mean implemented. No capability in the table above is authorised, started, or brought forward
 by those decisions, and Stage 0.3 remains `[NOT AUTHORIZED]`.
 
 Stage 0.2.1 — UI and Runtime Technology Spike — is `PROPOSED` and `[NOT AUTHORIZED]`. It is a
 constrained evaluation, not an implementation Stage, and it is recorded in
 [`MASTER_PLAN.md`](MASTER_PLAN.md) section 3.2. It is not a capability in the sequence above,
 it is not started, and it does not bring any capability forward.
+
+**Update:** the Owner approved the narrower Stage 0.2.1A synthetic React feasibility spike,
+now in progress (see [`spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md)). It is not a
+capability in the sequence above, it selects no framework, and it brings no capability forward.
 
 ## 3. Milestones that require Owner evidence
 

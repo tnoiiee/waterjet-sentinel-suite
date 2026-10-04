@@ -1,0 +1,71 @@
+{
+  "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
+  "recordedAt": "2026-10-04T22:59:20.494Z",
+  "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
+  "checks": [
+    {
+      "check": "tsc --noEmit (TypeScript 6.0.3)",
+      "result": "PASS",
+      "detail": "0 errors"
+    },
+    {
+      "check": "vite build (production)",
+      "result": "PASS",
+      "detail": "JS 301.82 kB (gzip 100.79 kB), CSS 10.37 kB; ~0.23 s"
+    },
+    {
+      "check": "vitest (jsdom) 8 files",
+      "result": "PASS",
+      "detail": "53/53"
+    },
+    {
+      "check": "runtime-harness node:test",
+      "result": "PASS",
+      "detail": "14/14"
+    },
+    {
+      "check": "scenario runner (28 scenarios)",
+      "result": "PASS",
+      "detail": "PASS 25, PASS+OWNER 2, OWNER-LOCAL 1, FAIL 0"
+    },
+    {
+      "check": "arena harness measurement 10 min, 2 SSE clients",
+      "result": "PASS",
+      "detail": "exit 0; invariant violations 0; accepted second jobs 0"
+    },
+    {
+      "check": "playwright test --list (no browser)",
+      "result": "PASS",
+      "detail": "16 tests in 2 files, project msedge"
+    },
+    {
+      "check": "offline npm ci (unreachable registry 127.0.0.1:9, --offline)",
+      "result": "PASS",
+      "detail": "exit 0; negative control ENOTCACHED exit 1; tsc/build/vitest/harness PASS on restored tree"
+    },
+    {
+      "check": "sensitive-data scan (new and changed files)",
+      "result": "PASS",
+      "detail": "no credentials/keys/connection strings; IPv4 only 127.0.0.1, 0.0.0.0, 192.0.2.10 (RFC 5737)"
+    },
+    {
+      "check": "markdown relative links (all tracked and new .md)",
+      "result": "PASS",
+      "detail": "0 broken"
+    },
+    {
+      "check": "loopback-only bind",
+      "result": "PASS",
+      "detail": "harness socket 127.0.0.1; non-loopback refused by unit test"
+    }
+  ],
+  "notVerified": [
+    "ASP.NET Core integration",
+    "Windows Service behaviour",
+    "WebView2 kiosk behaviour",
+    "installed-Edge rendering / heap / DOM / long tasks / end-to-end latency",
+    "Windows process CPU and memory",
+    "Windows offline restore",
+    "Extended (4 h) stability"
+  ]
+}
