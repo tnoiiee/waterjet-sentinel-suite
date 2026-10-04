@@ -171,8 +171,7 @@ example. The 30 second stale-timeout figure is an **example only**.
 
 1. **The Operations UI must never write to hardware and must never open a device session.**
    It cannot actuate an Isolation Valve, the Main Pump, a VFD, or a Galil axis, and it cannot
-   read Modbus or Galil directly. See [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 4.12
-   and 25.
+   read Modbus or Galil directly. See [`ARCHITECTURE.md`](ARCHITECTURE.md) section 14.3 for the mandatory UI and Runtime boundary.
 2. **Device sessions owned by the UI are prohibited.** The Equipment Runtime service is the
    sole owner of physical device sessions. This is the architectural expression of the
    control-write prohibition in section 4 and does not weaken it.
