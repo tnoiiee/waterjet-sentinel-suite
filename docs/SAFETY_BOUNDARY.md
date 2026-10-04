@@ -3,8 +3,10 @@
 **Document status:** [APPROVED] boundary statement. Bench verification items remain
 `[NOT VERIFIED]` and production write control remains `[NOT AUTHORIZED]`.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 > **Read this first.** WJSS is **not** a Safety Instrumented System. It does not replace
 > emergency stop circuits, hardwired protection, motor protection, mechanical limits, or

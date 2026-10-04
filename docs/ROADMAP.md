@@ -3,9 +3,10 @@
 **Document status:** [PROPOSED] — a forward view. Nothing in this document is approved
 work. Only an approved Stage Gate authorises delivery.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation submitted for
-Owner review; documentation review changes requested / in progress; Owner manual review
-pending; merge NOT MERGED; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 This roadmap describes *intended capability sequence*. It is not a schedule, not a
 commitment, and not an authorisation. The authoritative description of how stages are
@@ -36,7 +37,7 @@ exist.
 
 | # | Capability | Preconditions | Status |
 | --- | --- | --- | --- |
-| 1 | Documentation and governance foundation | Approved Stage 0.1 gate | Gate `[APPROVED]`; implementation **submitted for Owner review** — documentation review changes requested / in progress |
+| 1 | Documentation and governance foundation | Approved Stage 0.1 gate | Gate `[APPROVED]`; implementation **MERGED** to `main` through PR #1 |
 | 2 | Owner-ratified requirement and configuration model | Resolution of the remaining open items in [`CURRENT_STATE.md`](CURRENT_STATE.md) | `[PROPOSED]` |
 | 3 | Offline domain logic: sensor model, DirtyScore, queue arbitration, sequencing gate | Testable specification of the queue, sequencing, and cleaning rules | `[PROPOSED]` |
 | 4 | Simulator-backed Modbus TCP acquisition (read-only) | Simulator definitions and dummy configuration only | `[PROPOSED]` |
@@ -56,6 +57,14 @@ exist.
 | 18 | Reporting and export | Retention and export lifecycle ratified | `[PROPOSED]` |
 | 19 | Diagnostics and recovery tooling | Failure taxonomy ratified | `[PROPOSED]` |
 | 20 | Multi-unit or fleet-level capability | Not planned. One installation controls one Boiler Unit. | `[OPEN]` |
+
+**Technology and solution architecture decisions are not a capability.** Stage 0.2 recorded
+`[PROPOSED]` architecture decisions — UI delivery model, runtime process model, technology
+stack, database access and migrations, device adapter boundary, configuration and secrets,
+simulator-first development, and offline deployment — as ADR candidates. They are indexed in
+[`decisions/README.md`](decisions/README.md) and remain `[PROPOSED]` until the Owner records
+them `ACCEPTED`. No capability in the table above is authorised, started, or brought forward
+by those decisions, and Stage 0.3 remains `[NOT AUTHORIZED]`.
 
 ## 3. Milestones that require Owner evidence
 

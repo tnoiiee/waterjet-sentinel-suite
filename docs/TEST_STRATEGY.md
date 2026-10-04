@@ -3,8 +3,10 @@
 **Document status:** [PROPOSED] as a strategy. The statements in section 2 about what has
 and has not been tested are **facts**, not proposals.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 > **No runtime testing has occurred.** There is no application code, no build, no database
 > schema, and no device connection in this repository. Nothing in this project has been
@@ -136,6 +138,36 @@ Physical hardware, separately authorised, with a written method statement. See
 [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) section 8. This level is `[NOT AUTHORIZED]` at
 present and its outcomes are `[NOT VERIFIED]`.
 
+### 3.7 Planned architecture-boundary verification (Stage 0.2 decisions)
+
+Status of every case in this group: **PLANNED — NOT EXECUTED.** They are design-level
+verification cases derived from the `[PROPOSED]` Stage 0.2 architecture decisions. No test
+code exists, and none may be created at this stage. If the Owner does not accept a decision,
+the corresponding cases must be revised rather than executed.
+
+| # | Planned case | Maps to |
+| --- | --- | --- |
+| 29 | The UI process cannot open a device session and cannot write to hardware by any path | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-001 to ARC-003 |
+| 30 | The UI process cannot connect to the database and holds no database credential | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-020, ARC-023 |
+| 31 | Domain logic has no direct dependency on any vendor device library | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md), ARC-007 |
+| 32 | Simulator adapters satisfy the same contract tests as the physical adapters (parity) | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md), ARC-008 |
+| 33 | A second runtime service instance refuses to start | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| 34 | After a restart the runtime issues no command until state and position knowledge are re-established, and never replays a pre-restart command | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-026 |
+| 35 | A physical profile whose adapter cannot be established fails closed and does not substitute simulated values | [`ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md), ARC-010 |
+| 36 | Physical adapters are not constructed under the default profile | [`ADR-0012`](decisions/ADR-0012-simulator-first-development.md), ARC-009, ARC-016 |
+| 37 | Publication of an invalid configuration is refused and leaves the previous published revision in force | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), ARC-015 |
+| 38 | An edited Draft is never consumed by the runtime | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), ARC-015 |
+| 39 | A published revision is not applied while a Cleaning Job is active | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md) |
+| 40 | With the database unavailable, live supervision and UI visibility continue and a stop action is not blocked | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md), ARC-024 |
+| 41 | With the database unavailable, an audit-required initiating action is refused and is not recorded as performed | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md), ARC-025 |
+| 42 | A migration is never applied automatically by a service start | [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| 43 | The Local Application API is unreachable from any interface other than loopback, and rejects an unauthenticated control request | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md), ARC-023 |
+| 44 | Termination of the operator interface session stops any manual hold-to-run operation and does not abort an active AutoSequence | [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) item 9 |
+| 45 | No configuration file, example file, or secret is present in the public repository | [`ADR-0011`](decisions/ADR-0011-configuration-and-secrets.md), ARC-013, ARC-014 |
+
+These cases are planned design-level checks. None of them has been executed, none of them
+constitutes hardware evidence, and passing them would not constitute certification.
+
 ## 4. Testability requirements for future design
 
 To keep the above achievable, the future implementation must:
@@ -171,6 +203,9 @@ Documentation stages validate documentation. The expected checks are:
    acknowledgement.
 10. Confirm no application code, package manifest, or dependency was created.
 11. Review the full diff before committing.
+12. Confirm no runtime artefact, database object, adapter, simulator, CI workflow, installer,
+    deployment script, release package, or archive was created, and that no device or
+    production system was contacted.
 
 The result of these checks for the current baseline is recorded in
 [`CURRENT_STATE.md`](CURRENT_STATE.md).

@@ -2,8 +2,9 @@
 
 **Document status:** The verified state below is `[APPROVED]` as a factual record.
 Stage status wording and the open-item list were corrected by the Owner-confirmed Stage 0.1
-documentation review punchlist. Open items are `[OPEN]` and must not be resolved by
-assumption.
+documentation review punchlist, and updated by the approved Stage 0.2 Scope Gate —
+*Technology and Solution Architecture Decision*. Open items are `[OPEN]` and must not be
+resolved by assumption.
 
 This document answers one question: *what is actually true right now, with evidence?*
 Nothing in this repository may contradict it. If something does, the discrepancy is reported
@@ -33,15 +34,25 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Item | Value |
 | --- | --- |
 | Stage 0.1 Scope Gate | **APPROVED** |
-| Stage 0.1 implementation | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review | **CHANGES REQUESTED / IN PROGRESS** |
-| Owner manual review | **PENDING** |
+| Stage 0.1 implementation | **MERGED** — merged to `main` through PR #1 |
+| Stage 0.1 Owner manual review | **Recorded as complete by the Owner** in the approved Stage 0.2 Scope Gate, which states that the previous Stage branch completed its role and was merged through PR #1 |
+| Stage 0.2 Scope Gate | **APPROVED** — *Technology and Solution Architecture Decision* |
+| Stage 0.2 implementation | **SUBMITTED FOR OWNER REVIEW** |
+| Documentation review (Stage 0.2) | **PENDING** — no review has been requested or performed yet |
+| Owner manual review (Stage 0.2) | **PENDING** |
 | Merge | **NOT MERGED** |
-| Stage 0.2 | **NOT AUTHORIZED** |
+| Stage 0.3 | **NOT AUTHORIZED** |
+| Production Device access | **NOT AUTHORIZED** |
+| Production Write | **NOT AUTHORIZED** |
 
-Approval of the Stage 0.1 Scope Gate authorised the work. It is **not** acceptance of the
-Stage 0.1 implementation. The implementation has not been described as Owner accepted, final,
-merged, or as a completed development checkpoint accepted by the Owner.
+Approval of the Stage 0.2 Scope Gate authorised the work. It is **not** acceptance of the
+Stage 0.2 implementation. Nothing in this repository may describe the Stage 0.2 outcome as
+Owner accepted, final, merged, reviewed, or as a completed development checkpoint accepted by
+the Owner. Stage 0.2 is a documentation and architecture-decision checkpoint only: no
+application code exists, no dependency was installed, no device was contacted, and no
+Production Write was performed or authorised.
+
+The Stage 0.1 process-deviation record in section 11.1 is retained unchanged.
 
 ## 3. Application version
 
@@ -58,7 +69,7 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.1 — Repository Documentation Foundation |
+| Current stage | Stage 0.2 — Technology and Solution Architecture Decision (documentation and architecture decisions only) |
 | Repository contents | Documentation and repository governance only |
 | Application source code | **Does not exist** |
 | Project or solution files | **Do not exist** |
@@ -74,6 +85,17 @@ No governance rule requires a documentation stage to advance a version number.
 
 ## 5. Verified system state
 
+- Stage 0.2 is a documentation and architecture-decision activity only. It created no runtime
+  artefact and installed no dependency.
+- Stage 0.2 selected a `[PROPOSED]` technology and solution architecture — UI delivery model,
+  runtime process model, technology stack, database access and migrations, device adapter
+  boundary, configuration and secrets model, simulator-first development model, and offline
+  deployment model — recorded as ADR candidates in
+  [`decisions/README.md`](decisions/README.md). **`[PROPOSED]` is not approval**; each record
+  requires Owner acceptance, and nothing was implemented.
+- The architecture was decided in a working environment that contains no .NET SDK, no SQL
+  Server client tooling, and no Windows runtime. No build, restore, execution, or measurement
+  was possible or performed.
 - Stage 0.1 is a documentation and repository-governance activity only.
 - No application code has been written, and no code may be written until a later Stage Gate
   authorises it.
@@ -127,17 +149,27 @@ theme rather than numbered, because the list changes as decisions are taken.
 
 ### 8.1 Product and technology
 
-| Item | Affects |
+The Stage 0.1 open technology items were addressed by Stage 0.2. Each one is now either a
+`[PROPOSED]` architecture decision awaiting Owner acceptance, an `[OPEN]` item with a named
+follow-up gate, or a `[NOT VERIFIED]` item requiring hardware or workstation evidence. The
+disposition table is in [`ARCHITECTURE.md`](ARCHITECTURE.md) section 11, the remaining open
+items are listed in section 22 of the same document, and the decision records are indexed in
+[`decisions/README.md`](decisions/README.md).
+
+| Item | Stage 0.2 disposition |
 | --- | --- |
-| Exact application language, runtime, UI framework, and UI delivery architecture (browser-based, desktop, and hybrid local-web all remain available) | [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 |
-| Process architecture, service identity, startup behaviour, and the exact scope of Equipment Runtime separation | [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 |
-| Modbus TCP client library selection and licence acceptability | [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 |
-| Galil communication mechanism and library selection | [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 |
-| Local configuration store format and its validation mechanism | [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 |
-| Data access approach for SQL Server 2025 Standard | [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 |
-| Logging, diagnostics, and crash-report storage | [`ARCHITECTURE.md`](ARCHITECTURE.md) §11 |
-| Final documentation and application versioning scheme | [`AGENTS.md`](../AGENTS.md) §4 |
-| Deployment acceptance criteria | [`ROADMAP.md`](ROADMAP.md) §3, [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §7 |
+| Application language, runtime, UI framework, and UI delivery architecture | Language, runtime, UI technology, and delivery model selected as `[PROPOSED]`; exact .NET version `[OPEN]`. Browser-based, desktop, and hybrid local-web delivery were all evaluated on requirements |
+| Process architecture, service identity, startup behaviour, and Equipment Runtime separation | Process model selected as `[PROPOSED]`; service identity `[OPEN]` |
+| Modbus TCP client library selection and licence acceptability | Boundary decided; library selection `[OPEN]` pending licence and offline-availability review |
+| Galil communication mechanism and library selection | `[OPEN]` — must be evaluated before motion code is written |
+| Local configuration store format and its validation mechanism | Model selected as `[PROPOSED]`; format and secret store `[OPEN]` |
+| Data access approach for SQL Server 2025 Standard | Approach selected as `[PROPOSED]`; provider version and compatibility `[OPEN]` |
+| Logging, diagnostics, and crash-report storage | Strategy selected as `[PROPOSED]`; provider `[OPEN]` |
+| Final documentation and application versioning scheme | Remains `[OPEN]` — unchanged by Stage 0.2 |
+| Deployment acceptance criteria | Remains `[OPEN]` — unchanged by Stage 0.2 |
+| Backup, restore, and off-box copy | Remains `[OPEN]` — carried forward into the offline deployment decision |
+| Historian write-path measurement and overflow policy | Remains `[OPEN]` — requires measurement on the target workstation |
+| Kiosk startup mechanism, package format, firewall rules, diagnostic bundle contents | Remains `[OPEN]` — deployment-gate items |
 
 ### 8.2 Sequence, queue, and equipment behaviour
 
@@ -229,10 +261,28 @@ The checks behind this table are listed with their observed results in section 1
 | Pull request | https://github.com/tnoiiee/waterjet-sentinel-suite/pull/1 |
 | Review-correction checkpoint | `899a96a5b01a8e3cfcf0aaf2468ff83ce735090e` — on the same branch and the same pull request |
 | Final targeted-correction checkpoint | A final targeted-correction commit on the same branch and the same pull request. Its SHA is recorded in the delivery report and the pull request description, not inside the commit that creates it. |
-| Stage 0.2 | **NOT AUTHORIZED** |
+| Stage 0.1 final merge state | **MERGED** to `main` through PR #1. The merge commit is `d49eeee0d937465d61abd6e754b9a2bea5ef1d6a`, which is the approved remote-main base of Stage 0.2 |
+| Stage 0.2 | **AUTHORIZED** by the approved Stage 0.2 Scope Gate |
 
 Each correction is a new commit on the existing branch. No reviewed checkpoint was amended,
 rebased, or rewritten.
+
+### 11.2 Stage 0.2 checkpoint record
+
+| Item | Value |
+| --- | --- |
+| Stage | 0.2 — Technology and Solution Architecture Decision |
+| Branch | `arena/01a1087c-waterjet-sentinel-suite` |
+| Base | `d49eeee0d937465d61abd6e754b9a2bea5ef1d6a` (approved remote `main`) |
+| Development Checkpoint | Created on the Stage 0.2 branch. Its SHA is recorded in the delivery report and in the pull request description, **not** inside the commit that creates it |
+| Checkpoint status | **SUBMITTED FOR OWNER REVIEW** |
+| Documentation review | **PENDING** |
+| Owner manual review | **PENDING** |
+| Merge state | **NOT MERGED** |
+| Pull request | A new pull request targeting `main`. PR #1 was not reused and is not reopened |
+| Stage 0.3 | **NOT AUTHORIZED** |
+| Production Device access | **NOT AUTHORIZED** |
+| Production Write | **NOT AUTHORIZED** |
 
 ### 11.1 Process deviation record
 
@@ -277,6 +327,43 @@ Detailed commands and observed output are reported in the delivery report.
 | 20 | No application code or package dependency created | File-type and file-extension inventory |
 | 21 | Diff reviewed before commit | Full diff read before creating the review-correction commit |
 
+### 12.1 Stage 0.2 documentation validation record
+
+Documentation-only validation, performed for the Stage 0.2 checkpoint. Every result below is
+observed output from the method shown. The exact commands are reported in the Stage 0.2
+delivery report.
+
+| # | Check | Method | Observed result |
+| --- | --- | --- | --- |
+| 1 | Changed and created file list; no out-of-scope file | `git status --porcelain` | 12 modified existing documents and 8 new ADR files; nothing else created or modified |
+| 2 | No runtime or package artefact exists | File-type and file-extension inventory over all non-`.git` files | 33 Markdown files and one `.gitignore`. No solution, project, manifest, lock file, source, SQL, script, installer, archive, or CI file exists |
+| 3 | No dependency installed | No package-manager or installer command was executed | No dependency installed, restored, or vendored |
+| 4 | Internal relative Markdown links resolve | Inline Python checker over every Markdown file; relative targets only, absolute URLs and in-page anchors excluded | **33 files scanned, 573 internal relative links checked, 0 broken** |
+| 5 | Protected decisions remain stated | Targeted `grep` runs, listed in the delivery report | All required statements found, including Water Jet to Isolation Valve one-to-one, maximum one active Cleaning Job, parallel cleaning prohibited, GlobalQueue FIFO and source ownership, `LastSuccessfulCleaningCompletedAt` never null, the Operator baseline override role, cleared-state acknowledgement, WAGO fail-safe `[NOT VERIFIED]`, Production Write `[NOT AUTHORIZED]`, and Stage 0.3 `[NOT AUTHORIZED]` |
+| 6 | Architecture consistency | Targeted `grep` runs, listed in the delivery report | UI owns no device session and cannot write to hardware; the runtime service owns physical device sessions; domain logic is isolated from vendor libraries; simulator adapters implement the application-facing contracts; physical adapters are disabled by default; production configuration stays outside the repository; no statement permits parallel Cleaning Jobs |
+| 7 | Sensitive-data scan | IPv4 and CIDR regex, credential-shaped regex, connection-string regex, numeric configuration patterns, and register-map-like rows, across all non-`.git` files | **Zero matches** |
+| 8 | Status check | Stage-status wording search | Stage 0.2 Scope Gate APPROVED; Stage 0.2 implementation SUBMITTED FOR OWNER REVIEW; Owner manual review PENDING; NOT MERGED; Stage 0.3 NOT AUTHORIZED; Production Device access and Production Write NOT AUTHORIZED |
+| 9 | Full diff review | Complete staged diff read before the checkpoint commit | Every change traceable to Stage 0.2; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
+| 10 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, or installer test was executed, and none is claimed |
+
+### 12.2 Reported scope limitation — stage-status lines in files the Stage 0.2 gate did not name
+
+The approved Stage 0.2 Scope Gate named the files that may require updates and stated that no
+other file is to be created. [`AGENTS.md`](../AGENTS.md) section 2.2 also prohibits modifying a
+file that the current Stage Gate does not name.
+
+Seven documents therefore still carry the Stage 0.1-era line
+`Stage 0.2 `[NOT AUTHORIZED]``: `CHANGELOG.md`, `SECURITY.md`, `docs/ALARM_MODEL.md`,
+`docs/CLEANING_SEQUENCE.md`, `docs/HISTORIAN_RETENTION.md`, `docs/QUEUE_MODEL.md`, and
+`docs/USER_PERMISSION_MODEL.md`. Their stage-status lines were **not modified**, because the
+gate did not name them and the working contract forbids the change.
+
+This is reported rather than performed. The authoritative stage status remains
+[`CURRENT_STATE.md`](CURRENT_STATE.md), [`README.md`](../README.md), and
+[`MASTER_PLAN.md`](MASTER_PLAN.md), which are correct as of this checkpoint. A one-line
+status refresh in those seven documents requires Owner direction, either as a review-correction
+commit on this same branch or as a named file in a later gate.
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:
@@ -294,6 +381,10 @@ The documentation explicitly contains each of the following:
 | 9 | Operations UI close guard | [`ARCHITECTURE.md`](ARCHITECTURE.md) §4.12, [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) §6 |
 | 10 | Production Write not authorized | [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) §4, [`REQUIREMENTS.md`](REQUIREMENTS.md) HSB-002 |
 | 11 | WAGO fail-safe not verified | [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) §5, [`REQUIREMENTS.md`](REQUIREMENTS.md) HSB-001 |
+| 12 | The UI cannot write to hardware and owns no device session | [`ARCHITECTURE.md`](ARCHITECTURE.md) §14.3, [`REQUIREMENTS.md`](REQUIREMENTS.md) ARC-001 to ARC-003 |
+| 13 | The Equipment Runtime is the only physical-device-session owner | [`decisions/ADR-0007`](decisions/ADR-0007-runtime-process-model.md), [`ARCHITECTURE.md`](ARCHITECTURE.md) §14.2 |
+| 14 | Domain logic does not depend on vendor device libraries | [`REQUIREMENTS.md`](REQUIREMENTS.md) ARC-007, [`decisions/ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md) |
+| 15 | Simulation is not hardware verification or certification | [`decisions/ADR-0012`](decisions/ADR-0012-simulator-first-development.md), [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §3.7 |
 
 This document must not be read as claiming any test, build, database, hardware, or device
 verification. See section 9.

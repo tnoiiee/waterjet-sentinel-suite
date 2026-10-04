@@ -5,8 +5,10 @@ DCS Permissive Override. Every control action that writes to an output is
 `[NOT AUTHORIZED]` until the bench verification in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md)
 is complete and recorded.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
-review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 This document answers one question for every output: **who or what may command it, and
 under what conditions.** Where an answer is not yet determined, it is marked `[OPEN]` — it
@@ -141,6 +143,14 @@ interface, not the equipment:
 - It must never be recorded, designed, or reasoned about as a protective function, and it
   never satisfies a bench verification item in
   [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) section 4.
+
+The Operations UI holds no device session, cannot write to hardware directly, and cannot
+connect to the database directly. It submits **control requests** only; the runtime service
+performs the permission, lifecycle, interlock, ownership, and command-state validation that
+turns a request into a dispatched command. This boundary is approved by the Stage 0.2 Scope
+Gate and is carried by the process model in
+[`decisions/ADR-0007`](decisions/ADR-0007-runtime-process-model.md); the UI delivery selection
+in [`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) does not change it.
 
 ## 7. Priority of command sources
 

@@ -5,9 +5,10 @@ Requirements marked `[OWNER CONFIRMED]` were explicitly confirmed by the Owner d
 Stage 0.1 documentation review and are binding. Requirements marked otherwise are not
 approved behaviour.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`. Stage 0.1 implementation
-**submitted for Owner review**. Documentation review **changes requested / in progress**.
-Stage 0.2 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
+through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
+Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
+**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
 
 Requirement identifiers are stable. Requirements are never silently deleted; if one is
 superseded, its status changes and the superseding requirement is recorded.
@@ -27,7 +28,7 @@ superseded, its status changes and the superseding requirement is recorded.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| GOV-001 | The project must operate under an authority order: latest Owner instruction, then the approved Stage Gate, then [`AGENTS.md`](../AGENTS.md), then [`CURRENT_STATE.md`](CURRENT_STATE.md), then approved acceptance criteria, then [`ARCHITECTURE.md`](ARCHITECTURE.md), then [`ROADMAP.md`](ROADMAP.md), then older proposals. | `[APPROVED]` |
+| GOV-001 | The project must operate under the authority order in [`AGENTS.md`](../AGENTS.md) section 1: latest Owner instruction, approved Stage Gate, [`AGENTS.md`](../AGENTS.md), [`CURRENT_STATE.md`](CURRENT_STATE.md), approved acceptance criteria, approved ADRs, [`ARCHITECTURE.md`](ARCHITECTURE.md), [`REQUIREMENTS.md`](REQUIREMENTS.md), [`MASTER_PLAN.md`](MASTER_PLAN.md), [`ROADMAP.md`](ROADMAP.md), then older proposals. A `PROPOSED` ADR does not rank in that order, and the roadmap never authorises implementation. | `[APPROVED]` |
 | GOV-002 | An inconsistency between governing sources must stop the affected part of the work, be documented, and must not be resolved by silently choosing a behaviour. | `[APPROVED]` |
 | GOV-003 | Undocumented behaviour must not be treated as approved behaviour. | `[APPROVED]` |
 | GOV-004 | Claims of success must be supported by observed tool output. | `[APPROVED]` |
@@ -354,6 +355,45 @@ Full details are in [`HISTORIAN_RETENTION.md`](HISTORIAN_RETENTION.md).
 | TST-001 | Documentation stages perform documentation-only validation; runtime, build, database, hardware, and device tests are not part of a documentation stage. | `[APPROVED]` |
 | TST-002 | Queue arbitration, dirty score computation, deduplication, refill, source ownership, sequential-execution invariants, communication-health evaluation, alarm cleared-state acknowledgement, and override restrictions are to be covered by deterministic automated tests once code exists. | `[PROPOSED]` |
 | TST-003 | Hardware fail-safe behaviour must be verified on the bench before any production write control is enabled. | `[NOT AUTHORIZED]` |
+
+## 25. Architecture and process boundaries (Stage 0.2)
+
+This group records the architecture boundaries established by the approved Stage 0.2 Scope
+Gate, *Technology and Solution Architecture Decision*. Boundaries stated as mandatory by that
+approved gate are `[APPROVED]`. Selections made during Stage 0.2 are `[PROPOSED]` and require
+Owner acceptance; they are recorded as ADR candidates in
+[`decisions/README.md`](decisions/README.md).
+
+| ID | Requirement | Status |
+| --- | --- | --- |
+| ARC-001 | The UI must not write to hardware directly. | `[APPROVED]` |
+| ARC-002 | The UI must not own device sessions. | `[APPROVED]` |
+| ARC-003 | Only the approved Equipment Runtime boundary may own physical device sessions. | `[APPROVED]` |
+| ARC-004 | Device adapters must not contain UI logic, and must not decide eligibility, sequencing, or safety. | `[APPROVED]` |
+| ARC-005 | Hardware commands must pass through authorization, lifecycle, interlock, ownership, and command-state validation before dispatch. That validation is performed in the runtime service. | `[APPROVED]` |
+| ARC-006 | No architecture choice may permit concurrent Cleaning Jobs, and the one-active-Cleaning-Job gate must be enforced in a single place that no queue, operator, or adapter action can bypass. | `[APPROVED]` |
+| ARC-007 | Domain logic must not depend directly on a vendor library; device libraries must be isolated behind application-owned interfaces. | `[APPROVED]` |
+| ARC-008 | Simulator adapters must implement the same application-facing contracts as the physical adapters, and contract parity must be verifiable. | `[APPROVED]` |
+| ARC-009 | Physical-device selection must be explicit and disabled by default. Enabling a physical adapter requires an approved future Scope Gate and a recorded local authorization; a configuration edit alone is never authorization. | `[APPROVED]` |
+| ARC-010 | No silent substitution: a physical profile whose adapter cannot be established must fail closed with an explicit fault or unknown state, and must never fall back to simulated values presented as plant data. | `[APPROVED]` |
+| ARC-011 | Commands must distinguish the requested, authorized, queued, issued, accepted, effective, feedback-confirmed, failed, timed-out, cancelled, and aborted states where applicable. How each transition is proven for a given signal remains `[NOT VERIFIED]` until bench evidence exists. | `[APPROVED]` |
+| ARC-012 | Reconnection must never re-issue a stale command, and must never re-energize an output. | `[APPROVED]` |
+| ARC-013 | Production configuration, secrets, production IP addresses, production Tag Lists, register maps, actual motion coordinates, production thresholds, and setpoints must remain outside the public repository. | `[APPROVED]` |
+| ARC-014 | Public example configuration must contain public-safe synthetic values only, must be labelled as examples, and must be incomplete by design. | `[APPROVED]` |
+| ARC-015 | Configuration publication must be conceptually separate from editing a Draft, and the runtime must consume an explicitly Published configuration, never a partially edited Draft. | `[APPROVED]` |
+| ARC-016 | Simulator mode is the default development mode; physical adapters are disabled by default; test-hardware access is separate from Production Device access. | `[APPROVED]` |
+| ARC-017 | Simulation must be deterministic where practical, and must never be presented as hardware certification. | `[APPROVED]` |
+| ARC-018 | Stage 0.2 creates no runtime artefact, installs no dependency, contacts no device, creates no database object, and produces no ZIP or release. | `[APPROVED]` |
+| ARC-019 | Preferred UI delivery: an application-owned full-screen kiosk shell window hosting a local web UI in C#, with the close guard enforced by the shell. | `[PROPOSED]` — [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) |
+| ARC-020 | Preferred process model: one kiosk shell process and one runtime Windows Service that owns all device sessions, command validation, job execution, queue evaluation, persistence, and database connectivity. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| ARC-021 | Preferred technology stack: .NET on the Long-Term Support track, C#, ASP.NET Core minimal API, built-in dependency injection and configuration, structured local logging, and offline packaging from a local package source. The exact .NET version is pinned at the implementation gate. | `[PROPOSED]` — [`ADR-0008`](decisions/ADR-0008-technology-stack.md) |
+| ARC-022 | Preferred data access: mapper technology as the primary path, a measured narrow escape hatch for the high-rate Historian write path, a decoupled and prioritised Historian write path, and versioned migrations that are never applied automatically at service start. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| ARC-023 | The Local Application API is hosted by the runtime service, bound to the loopback interface only, authenticated with the application's own local user session, and contract-defined so the transport can change without changing the contract. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| ARC-024 | Stop and de-energize actions must never be gated on database availability. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| ARC-025 | Audit-required initiating actions must be refused when their required audit record cannot be persisted. The candidate set requires Owner ratification and never extends to a stop, de-energize, or release action. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
+| ARC-026 | After any start or restart, the runtime must enter an explicit startup state and must issue no command until device state, position knowledge, and permissives have been re-established. Nothing resumes automatically. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
+| ARC-027 | Offline installation must detect prerequisites and must never download them; installation, upgrade, and rollback are performed from local media. | `[PROPOSED]` — [`ADR-0013`](decisions/ADR-0013-offline-deployment.md) |
+| ARC-028 | The repository structure direction in [`ARCHITECTURE.md`](ARCHITECTURE.md) section 20 is documented only. No directory in it is created before an implementation Stage Gate authorises it. | `[PROPOSED]` |
 
 ---
 
