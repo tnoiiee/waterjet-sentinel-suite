@@ -130,12 +130,36 @@ for a specific, named purpose:
 
 Non-destructive, additive work is the default: new commits on the stage branch.
 
-If a local branch ref must be reconciled with its remote, prefer
-`git merge --ff-only`. If that is refused only because untracked or unstaged content
-already matches the target commit exactly, a `--mixed` pointer update may be used after
-taking a content backup — but the working tree must be proven byte-identical to the target
-commit before and after, and the action must be reported. Never use a destructive variant
-to resolve a reconciliation problem.
+### 7.1 Baseline mismatch — Stop Gate
+
+If the local `HEAD`, the expected checkpoint, the remote branch, the index, or the working
+tree does not match the approved baseline, the Agent must:
+
+1. Stop before editing.
+2. Report the exact discrepancy.
+3. Preserve the available evidence without modifying repository state.
+4. Not move branch refs.
+5. Not reset or modify the index.
+6. Not restore, overwrite, or delete working-tree content.
+7. Not continue implementation.
+8. Wait for an Owner-approved recovery instruction.
+
+Rules that bound this gate:
+
+- A remote checkpoint may be used as **evidence**. The existence of that checkpoint does not
+  authorise the Agent to modify local refs, the index, or working-tree content.
+- Content comparison may be used for **diagnosis only**. **Content identity does not by
+  itself authorise recovery operations.**
+- Temporary files or backups under `/tmp` are **not** durable recovery evidence and must
+  never be treated as a safety net that justifies a recovery action.
+- The Owner's local repository and the verified Remote Git checkpoint remain the
+  authoritative durable sources.
+- There is no alternative automatic recovery path. The Agent must never decide
+  independently that a baseline mismatch is safe to recover, and no content backup
+  authorises branch-ref or index movement.
+
+Recovery requires explicit, Owner-authorised instructions. This gate has no exceptions and
+no self-service variant.
 
 ## 8. Owner-only merge rule
 
@@ -194,8 +218,10 @@ any of the following occurs:
 6. **Device or network access requested.** Any instruction that would require connecting
    to plant equipment or production systems.
 7. **Destructive Git requested.** See section 7.
-8. **Baseline mismatch.** The branch, history, or remote state does not match the expected
-   baseline. Report before editing.
+8. **Baseline mismatch.** The local `HEAD`, the expected checkpoint, the remote branch, the
+   index, or the working tree does not match the approved baseline. Apply the Stop Gate in
+   section 7.1: stop before editing, report the discrepancy, preserve evidence without
+   modifying repository state, and wait for an Owner-approved recovery instruction.
 9. **Evidence unavailable.** A required check cannot be executed or its output cannot be
    observed.
 10. **Merge or merge-adjacent request.** Any instruction to merge, rebase, or rewrite

@@ -22,7 +22,7 @@ review; documentation review changes requested / in progress; Stage 0.2 `[NOT AU
 
 | Role | Intended purpose | Status |
 | --- | --- | --- |
-| Operator | Day-to-day supervision: viewing, queue actions, alarm acknowledgement, sequence start and stop, DCS Permissive Override activation | `[APPROVED]` as a template |
+| Operator | Day-to-day supervision: viewing, queue actions, alarm acknowledgement, sequence start and stop, DCS Permissive Override **activation and release** | `[OWNER CONFIRMED]` as the baseline template |
 | Technician | Equipment-level tasks: valve and pump manual operation, diagnostics, return to service | `[APPROVED]` as a template |
 | Engineer | Engineering configuration: thresholds, dwells, motion profiles, mappings, DCS permissive definitions | `[APPROVED]` as a template |
 | Supervisor | Authorises operational exceptions, manual corrections, and shelving decisions | `[APPROVED]` as a template |
@@ -81,8 +81,36 @@ before timeout is `[OPEN]`.
 
 ## 5. DCS Permissive Override permissions
 
-The DCS Permissive Override requires an explicit permission `[OWNER CONFIRMED]`. Which role
-template holds it by default is `[OPEN]`.
+The DCS Permissive Override requires an explicit permission `[OWNER CONFIRMED]`.
+
+### 5.1 Baseline role assignment
+
+**The Operator role template has permission to activate and release the DCS Permissive
+Override.** `[OWNER CONFIRMED]`
+
+| Rule | Statement |
+| --- | --- |
+| Activation | The Operator role template includes permission to activate the override |
+| Release | The Operator role template includes permission to release the override |
+| Denial | A role that does not hold the required permission cannot activate or release the override |
+| Configurability | The permission model remains configurable; future authorised configuration may change role-permission assignments |
+| Baseline | The assignment remains Operator until an explicit Owner decision changes it |
+| Exclusions | Holding the permission does not weaken the exclusion list in [`REQUIREMENTS.md`](REQUIREMENTS.md) OVR-009 |
+
+The permission to activate the override must not be conflated with the permission to change
+DCS permissive definitions. Configuration of DCS permissives is an engineering activity;
+activating the override is an operational activity.
+
+### 5.2 Shared Operator account and override attribution
+
+The override is subject to the shared Operator-account limitation `[OWNER CONFIRMED]`:
+
+- Event and Audit records identify the **shared Operator account**.
+- They do **not** provide individual person-level attribution.
+- Named individual accounts, if introduced, would be a **future approved scope** item; they
+  are not part of the current baseline.
+
+### 5.3 Override property summary
 
 | Requirement | Detail |
 | --- | --- |
@@ -93,10 +121,6 @@ template holds it by default is `[OPEN]`.
 | Recording | Activation, release, user, timestamp, and reason in Event and Audit history |
 | Scope | The approved DCS permissive evaluation only. Never a general "Ignore DCS" function |
 | Exclusions | Must not bypass any item listed in [`REQUIREMENTS.md`](REQUIREMENTS.md) OVR-009 |
-
-The permission to activate the override must not be conflated with the permission to change
-DCS permissive definitions. Configuration of DCS permissives is an engineering activity;
-activating the override is an operational activity.
 
 ## 6. Permission categories to be defined
 
@@ -143,8 +167,7 @@ Every one of the following must produce a durable record:
 
 | Item | Status |
 | --- | --- |
-| Permission catalogue and role-to-permission mapping | `[OPEN]` |
-| Which role template may activate the DCS Permissive Override by default | `[OPEN]` |
+| Permission catalogue and the full role-to-permission mapping, beyond the Operator Override assignment settled below | `[OPEN]` |
 | Whether active awareness acknowledgement and cleared-state acknowledgement share a permission | `[OPEN]` |
 | Authentication method and password policy | `[OPEN]` |
 | Account lockout and failed-login handling | `[OPEN]` |
@@ -153,6 +176,11 @@ Every one of the following must produce a durable record:
 | Whether user accounts may be disabled rather than deleted | `[OPEN]` |
 | Audit record tamper protection | `[OPEN]` |
 | Whether role changes take effect for an active session immediately | `[OPEN]` |
+| Whether named individual accounts are introduced in a future approved scope | `[OPEN]` |
+
+Resolved by Owner confirmation and therefore **not** open: the baseline role assignment for
+the DCS Permissive Override. The Operator role template holds permission to activate and to
+release it, and a role without the permission cannot do either. See section 5.
 
 ---
 

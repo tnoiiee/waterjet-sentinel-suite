@@ -279,6 +279,11 @@ Full behaviour is specified in [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md).
 | OVR-008 | The override may bypass **only** the approved DCS permissive evaluation. | `[OWNER CONFIRMED]` |
 | OVR-009 | The override must not bypass: WAGO communication health; Modbus transport health; Isolation Valve feedback; valve open or close verification; Main Pump pressure validation; Galil limits; motion faults; encoder or position validation; emergency stop; Local/Remote selector; motor or drive protection; WAGO output watchdog; external hardware protection; critical application lifecycle gates; or the one-active-Cleaning-Job invariant. | `[OWNER CONFIRMED]` |
 | OVR-010 | The override must not be configurable to bypass any item in OVR-009. | `[OWNER CONFIRMED]` |
+| OVR-011 | **The Operator role template has permission to activate and release the DCS Permissive Override.** The role-permission model remains configurable, but the approved baseline assignment is Operator. | `[OWNER CONFIRMED]` |
+| OVR-012 | A role that does not hold the Override permission cannot activate or release the override. | `[OWNER CONFIRMED]` |
+| OVR-013 | Holding the Override permission does not weaken, narrow, or modify the exclusion list in OVR-009. The exclusion list is not configurable through a permission. | `[OWNER CONFIRMED]` |
+| OVR-014 | Activation and release of the override require Event and Audit records, per OVR-006 and [`USER_PERMISSION_MODEL.md`](USER_PERMISSION_MODEL.md). | `[OWNER CONFIRMED]` |
+| OVR-015 | Future authorised configuration may change role-permission assignments. The baseline assignment remains Operator until an explicit Owner decision changes it. | `[OWNER CONFIRMED]` |
 
 ## 19. Operations UI close guard
 

@@ -87,6 +87,25 @@ These cases are planned, not executed. Each maps to an Owner-confirmed requireme
 | 17 | A blocking DCS condition while idle stops the countdown, prevents dispatch, and requires cleared-state acknowledgement before the countdown resumes | COMH-006 |
 | 18 | Main Pump stop is not blocked by application-level operational permissives | PMP-007 |
 
+#### 3.2.1 Planned DCS Permissive Override permission cases
+
+Status of every case in this group: **PLANNED — NOT EXECUTED.** They are documentation-level
+and design-level verification cases only. No test code exists, and none may be created at
+this stage.
+
+| # | Planned case | Expected result | Maps to |
+| --- | --- | --- | --- |
+| 19 | Operator role template can activate the DCS Permissive Override | Activation permitted | OVR-011 |
+| 20 | Operator role template can release the DCS Permissive Override | Release permitted | OVR-011 |
+| 21 | A role without the Override permission cannot activate it | Activation refused and recorded | OVR-012 |
+| 22 | A role without the Override permission cannot release it | Release refused and recorded | OVR-012 |
+| 23 | Override activation requires explicit confirmation and a reason | Activation incomplete until both are supplied | OVR-003, OVR-004 |
+| 24 | Override activation and release create Event and Audit records | Both records present, with user, timestamp, reason, and event type | OVR-006, OVR-014 |
+| 25 | The persistent Override banner remains visible while the override is active | Banner visible for the whole active period, including after screen changes | OVR-005 |
+| 26 | The DCS Permissive Override cannot bypass any item in the exclusion list | Every exclusion in OVR-009 still blocks, including communication health, valve verification, pressure validation, motion faults, the watchdog, external protection, alarm release requirements, and the one-active-Cleaning-Job invariant | OVR-008, OVR-009, OVR-010, OVR-013 |
+| 27 | The DCS Permissive Override cannot create concurrent Cleaning Jobs | No second Cleaning Job enters an executing state while the override is active | SEQ-001, SEQ-005, SEQ-006, OVR-009 |
+| 28 | Permission configurability does not change the approved baseline assignment without an explicit configuration change | Baseline remains Operator until a configuration change is made and recorded | OVR-011, OVR-015 |
+
 ### 3.3 Simulator-backed integration tests
 
 Adds a Modbus TCP simulator and a motion simulator. Verifies acquisition decoding, quality
