@@ -2,7 +2,10 @@
 
 **Document status:** [APPROVED] for the role templates, local-user model, session rules,
 audit requirements, and the break-glass account. The concrete permission catalogue is
-`[OPEN]`.
+`[OPEN]`. The DCS Permissive Override requirements are `[OWNER CONFIRMED]`.
+
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
+review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
 
 ---
 
@@ -19,9 +22,9 @@ audit requirements, and the break-glass account. The concrete permission catalog
 
 | Role | Intended purpose | Status |
 | --- | --- | --- |
-| Operator | Day-to-day supervision: viewing, queue actions, alarm acknowledgement, sequence start and stop | `[APPROVED]` as a template |
+| Operator | Day-to-day supervision: viewing, queue actions, alarm acknowledgement, sequence start and stop, DCS Permissive Override activation | `[APPROVED]` as a template |
 | Technician | Equipment-level tasks: valve and pump manual operation, diagnostics, return to service | `[APPROVED]` as a template |
-| Engineer | Engineering configuration: thresholds, dwells, motion profiles, mappings | `[APPROVED]` as a template |
+| Engineer | Engineering configuration: thresholds, dwells, motion profiles, mappings, DCS permissive definitions | `[APPROVED]` as a template |
 | Supervisor | Authorises operational exceptions, manual corrections, and shelving decisions | `[APPROVED]` as a template |
 | Administrator | User and role management, retention configuration, system settings | `[APPROVED]` as a template |
 | Break-glass Recovery Account | Recovery only, never for normal operation | `[APPROVED]` |
@@ -43,6 +46,8 @@ Consequences to carry into design and operations:
 - Shift handover cannot be proven from audit records alone.
 - Any action requiring individual attribution must use a named account with a distinct
   role, and must not use the shared Operator account.
+- **The DCS Permissive Override is subject to this limitation.** An override record will
+  identify the shared Operator account, not the individual who activated or released it.
 
 ## 3. Privileged sessions
 
@@ -74,7 +79,26 @@ before timeout is `[OPEN]`.
 | Credentials | Must **never** be committed, documented in this repository, or transmitted through it |
 | Recovery methods | The permitted recovery methods and their limits are `[OPEN]` |
 
-## 5. Permission categories to be defined
+## 5. DCS Permissive Override permissions
+
+The DCS Permissive Override requires an explicit permission `[OWNER CONFIRMED]`. Which role
+template holds it by default is `[OPEN]`.
+
+| Requirement | Detail |
+| --- | --- |
+| Activation | Explicit action with a confirmation step |
+| Release | Manual. There is no automatic time expiry in the current approved baseline |
+| Reason | Required on activation and on release |
+| Visibility | Persistent visible banner while active |
+| Recording | Activation, release, user, timestamp, and reason in Event and Audit history |
+| Scope | The approved DCS permissive evaluation only. Never a general "Ignore DCS" function |
+| Exclusions | Must not bypass any item listed in [`REQUIREMENTS.md`](REQUIREMENTS.md) OVR-009 |
+
+The permission to activate the override must not be conflated with the permission to change
+DCS permissive definitions. Configuration of DCS permissives is an engineering activity;
+activating the override is an operational activity.
+
+## 6. Permission categories to be defined
 
 The catalogue below is the planned scope. Values are `[OPEN]` until ratified.
 
@@ -82,16 +106,22 @@ The catalogue below is the planned scope. Values are `[OPEN]` until ratified.
 | --- | --- |
 | Viewing | View process, trends, alarms, events, audit, diagnostics |
 | Queue operation | Hold, Release Hold, Reject, Release Reject, Reorder |
-| Alarm operation | Acknowledge, Shelve, Unshelve |
+| Alarm operation | Acknowledge (active awareness), Acknowledge cleared state, Shelve, Unshelve |
 | Sequence control | Start Auto Sequence, Stop Auto Sequence, Stop All |
 | Manual equipment | Manual pump start and stop, manual valve operation, manual motion jog and move |
 | Return to service | Return a valve from `OUT_OF_SERVICE` |
+| DCS override | Activate and release the DCS Permissive Override |
 | Data correction | Manual correction of `LastSuccessfulCleaningCompletedAt` |
-| Configuration | Edit configuration, publish configuration, change motion profiles, change mappings |
+| Configuration | Edit configuration, publish configuration, change motion profiles, change mappings, define DCS permissives |
 | Retention and data | Configure retention, run cleanup, export, delete |
 | Administration | Manage users, manage roles, manage break-glass recovery |
 
-## 6. Audit and event requirements
+Note that active awareness acknowledgement and cleared-state acknowledgement are listed
+separately. Whether they require the same permission is `[OPEN]`; the behavioural
+distinction between them is `[OWNER CONFIRMED]` and is described in
+[`ALARM_MODEL.md`](ALARM_MODEL.md) section 3.
+
+## 7. Audit and event requirements
 
 Every one of the following must produce a durable record:
 
@@ -99,19 +129,23 @@ Every one of the following must produce a durable record:
 | --- | --- |
 | Queue action | Timestamp, user, action, sensor, reason, original position, new position when applicable, Auto Sequence ID, queue snapshot reference |
 | Manual timestamp correction | Sensor, previous timestamp, new timestamp, user, time, reason |
-| Alarm acknowledgement | User, time, alarm instance |
+| Alarm acknowledgement (active awareness) | User, time, alarm instance |
+| Alarm cleared-state acknowledgement | User, time, alarm instance |
 | Alarm shelve and unshelve | User, time, alarm instance, reason, duration |
 | Valve exclusion and return to service | User, time, valve, affected sensors, reason, Queue snapshot |
-| Auto Sequence start and stop | User, time, reason |
+| Auto Sequence start and stop | User, time, reason. Stop records the Queue snapshot and the Held/Rejected/Reordered state |
+| DCS Permissive Override | User, timestamp, reason, and event type (activation or release) |
 | Configuration publication | User, time, what changed, previous and new values |
 | Permission or role change | User, time, target user or role, previous and new state |
 | Break-glass login | User, time, and a high-severity audit marker |
 
-## 7. Open items
+## 8. Open items
 
 | Item | Status |
 | --- | --- |
 | Permission catalogue and role-to-permission mapping | `[OPEN]` |
+| Which role template may activate the DCS Permissive Override by default | `[OPEN]` |
+| Whether active awareness acknowledgement and cleared-state acknowledgement share a permission | `[OPEN]` |
 | Authentication method and password policy | `[OPEN]` |
 | Account lockout and failed-login handling | `[OPEN]` |
 | Privileged timeout default value and pre-warning behaviour | `[OPEN]` |
@@ -124,9 +158,9 @@ Every one of the following must produce a durable record:
 
 ## Related documents
 
-- [`REQUIREMENTS.md`](REQUIREMENTS.md) — USR requirements
+- [`REQUIREMENTS.md`](REQUIREMENTS.md) — USR and OVR requirements
 - [`../SECURITY.md`](../SECURITY.md) — security policy and secret handling
-- [`CONTROL_AUTHORITY.md`](CONTROL_AUTHORITY.md) — who may command what
+- [`CONTROL_AUTHORITY.md`](CONTROL_AUTHORITY.md) — who may command what, and the override
 - [`QUEUE_MODEL.md`](QUEUE_MODEL.md) — queue action audit fields
+- [`ALARM_MODEL.md`](ALARM_MODEL.md) — acknowledgement and shelving
 - [`HISTORIAN_RETENTION.md`](HISTORIAN_RETENTION.md) — audit retention
-- [`ALARM_MODEL.md`](ALARM_MODEL.md) — acknowledgement and shelving permissions

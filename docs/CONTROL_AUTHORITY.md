@@ -1,8 +1,12 @@
 # Control Authority — WaterJet Sentinel Suite (WJSS)
 
-**Document status:** [APPROVED] for the authority model. Every control action that writes
-to an output is `[NOT AUTHORIZED]` until the bench verification in
-[`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) is complete and recorded.
+**Document status:** [APPROVED] for the authority model, including the Owner-confirmed
+DCS Permissive Override. Every control action that writes to an output is
+`[NOT AUTHORIZED]` until the bench verification in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md)
+is complete and recorded.
+
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
+review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
 
 This document answers one question for every output: **who or what may command it, and
 under what conditions.** Where an answer is not yet determined, it is marked `[OPEN]` — it
@@ -19,8 +23,14 @@ is never assumed.
 | Application authority | Any command written by the application, whether manual or supervisory |
 | External authority | Hardwired control, the Local/Remote selector, controller-side logic, or a protective device operating outside the application |
 
-Rule: **External authority always wins.** The application must never assume it retains
-control, and must never re-assert a command without re-validating state.
+Rule: **External authority always wins.** The application must never command, override,
+bypass, suppress, or replace an external protection function, and must never assume it
+retains control. It must never re-assert a command without re-validating state.
+
+Where a read-only indication of an external protection state is available, the application
+may monitor and display it and use it as a supervisory command gate. That indication does
+not transfer ownership of the protection function, is not a substitute for it, and unknown,
+unavailable, stale, or bad-quality indication must never be inferred as safe.
 
 ## 2. Authority matrix
 
@@ -28,18 +38,20 @@ control, and must never re-assert a command without re-validating state.
 | --- | --- | --- | --- |
 | Isolation Valve DO | Application (manual or supervisory) | Valve not `OUT_OF_SERVICE`; permission held; permissives satisfied; feedback state consistent | `[NOT AUTHORIZED]` |
 | Main Pump start | Application (manual or supervisory) | Permission held; no blocking alarm; pressure transmitter quality valid | `[NOT AUTHORIZED]` |
-| Main Pump stop | Application (manual or supervisory) | None — stop is always permitted | `[NOT AUTHORIZED]` |
+| Main Pump stop | Application (manual or supervisory) | No application-level operational permissive may block a valid stop request. Actual execution remains subject to command-path availability, communication availability, external authority, Local/Remote state, hardware state, current Production Write authorization, and independent protection behaviour | `[NOT AUTHORIZED]` |
 | VFD AO (speed reference) | Application | Permission held; value within configured limits; source value quality valid | `[NOT AUTHORIZED]` |
 | Galil motion (jog, move, job path) | Application | Axis position known; no motion-profile change while prohibited conditions apply; permissives satisfied | `[NOT AUTHORIZED]` |
 | Motion profile or mode change | Application (engineering permission) | Not while the pump runs, an Auto Sequence is active, a Cleaning Job is active, an axis is moving, position is unknown, or a valve is open | `[NOT AUTHORIZED]` |
-| Hardware emergency stop | **External only** | Outside application authority — never commanded, never overridden, never modelled as an application output | `[APPROVED]` restriction |
+| Hardware emergency stop | **External only** | Outside application authority — never commanded, never overridden, never suppressed, never modelled as an application output | `[APPROVED]` restriction |
 | Motor protection | **External only** | Outside application authority | `[APPROVED]` restriction |
 | Limit switches, mechanical limits | **External only** | Outside application authority | `[APPROVED]` restriction |
 
 ## 3. Preconditions common to every application command
 
 1. The acting user holds the required permission for that action.
-2. No blocking alarm prevents the action.
+2. No blocking alarm prevents the action. A block is released only when the condition is
+   CLEARED, the **cleared-state** acknowledgement is ACKNOWLEDGED, and no other blocking
+   condition remains. See [`ALARM_MODEL.md`](ALARM_MODEL.md) section 3.
 3. The sensors and equipment involved are enabled, not inhibited, and not
    `OUT_OF_SERVICE`.
 4. Signal quality for every value the decision depends on is valid. Bad quality must block
@@ -48,19 +60,89 @@ control, and must never re-assert a command without re-validating state.
 6. The action is recorded as an Event, with user, time, action, subject, and reason where
    a reason is required.
 
-## 4. Command conflict resolution
+## 4. Sequential execution authority
+
+**At most one Cleaning Job may be ACTIVE within one installation at any time.**
+`[OWNER CONFIRMED]`
+
+- Different Water Jets, different Isolation Valves, different boiler walls, and different
+  Galil controllers do not grant authority for concurrent Cleaning Jobs.
+- Parallel Water Jet cleaning is prohibited.
+- A second Cleaning Job must not enter an executing state until the current Cleaning Job
+  has reached an approved safe and released terminal condition.
+- The selected eligible head of GlobalQueue is the only normal source for the next
+  Cleaning Job.
+- Queue refill, score changes, Operator Reorder, Hold, Reject, valve exclusion, and
+  equipment availability must never produce concurrent Cleaning Jobs.
+
+"Allow unaffected Water Jets to continue" means **sequential** continuation: after the valve
+fault workflow is resolved and continuation is authorized, the AutoSequence may later select
+a sequential Cleaning Job assigned to another available Water Jet, still executing only one
+Cleaning Job at a time.
+
+## 5. DCS Permissive Override
+
+The Operator may activate the **DCS Permissive Override** `[OWNER CONFIRMED]`. It must
+always be named exactly that, and never described as a general "Ignore DCS" function.
+
+| Property | Rule |
+| --- | --- |
+| Activation | Explicit Operator action with a confirmation step |
+| Expiry | None. Remains active until manually released |
+| Reason | Recorded on activation and on release |
+| Visibility | Persistent visible banner while active |
+| Recording | Activation, release, user, timestamp, and reason in Event and Audit history |
+| Attribution | Subject to shared Operator-account limitations |
+| Permission | Requires an explicit permission |
+
+**The override may bypass only the approved DCS permissive evaluation.** It must not bypass
+any of the following, and must not be configurable to do so:
+
+- WAGO communication health
+- Modbus transport health
+- Isolation Valve feedback
+- Valve open or close verification
+- Main Pump pressure validation
+- Galil limits
+- Motion faults
+- Encoder or position validation
+- Emergency stop
+- Local/Remote selector
+- Motor or drive protection
+- WAGO output watchdog
+- External hardware protection
+- Critical application lifecycle gates
+- The one-active-Cleaning-Job invariant
+
+## 6. Command conflict resolution
 
 | Situation | Required behaviour |
 | --- | --- |
 | Operator holds an entry, then a job would dispatch it | Dispatcher skips held entries; other entries preserve relative FIFO order; the queue is not blocked. `[APPROVED]` |
 | Operator tries to reorder an active Cleaning Job | Not permitted — Reorder cannot move an active Cleaning Job. `[APPROVED]` |
 | Operator rejects an entry that is about to dispatch | Reject removes the entry and suppresses the sensor from refill during the current Auto Sequence. `[APPROVED]` |
+| Operator reorders entries | Changes dispatch position only; never changes source ownership and never creates a second active Cleaning Job. `[OWNER CONFIRMED]` |
 | Valve becomes `OUT_OF_SERVICE` while its sensor sits in GlobalQueue | Associated sensors are excluded from TempQueue, TimeQueue, GlobalQueue, and refill. `[APPROVED]` |
-| Valve returns to service | Sensors re-enter normal source queue evaluation and must not be inserted into the middle of GlobalQueue. `[APPROVED]` |
+| Valve returns to service | Sensors re-enter normal source queue evaluation and must not be inserted into the middle of GlobalQueue. Requires cleared-state acknowledgement. `[OWNER CONFIRMED]` |
+| Operator stops the AutoSequence | Dispatch stops; the active job is handled per the approved stop or recovery policy; the Queue snapshot and Held/Rejected/Reordered state are recorded in Event history; the instance closes; the old GlobalQueue is not kept as the executable queue. `[OWNER CONFIRMED]` |
 | External stop removes the plant's ability to continue | Application must not re-assert commands; re-validation is required before any new command. `[PROPOSED]` |
 | Privileged session times out during manual hold-to-run | The manual hold-to-run operation must stop. An active Auto Sequence must not be aborted. `[APPROVED]` |
+| Operator attempts to close the Operations UI while a Cleaning Job is active or the Main Pump is running | The normal close request is rejected with a clear explanation and the Operator is directed back to the active operation or Pump/Sequence state. This is an **operational usability control**, not a safety protection, and it does not change equipment authority: the Equipment Runtime lifecycle, the WAGO watchdog, safe output states, and external hardware protection remain independent of it. `[OWNER CONFIRMED]` |
 
-## 5. Priority of command sources
+## 6.1 Operations UI authority boundary
+
+The Operations UI is an operator interface, not a control authority. Blocking the normal
+close action while a Cleaning Job is active or the Main Pump is running restricts the
+interface, not the equipment:
+
+- It does not create, transfer, or remove any authority over any output.
+- It does not protect against process termination, Windows shutdown, workstation restart,
+  power loss, or hardware failure.
+- It must never be recorded, designed, or reasoned about as a protective function, and it
+  never satisfies a bench verification item in
+  [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) section 4.
+
+## 7. Priority of command sources
 
 When more than one source could command the same output, the highest applicable priority
 applies, and lower-priority sources must not fight it:
@@ -75,7 +157,7 @@ applies, and lower-priority sources must not fight it:
 Sources 2 to 5 are `[NOT AUTHORIZED]` for production writes until bench verification
 completes.
 
-## 6. Auditing of authority
+## 8. Auditing of authority
 
 Every change of authority state must be recorded:
 
@@ -87,24 +169,29 @@ Every change of authority state must be recorded:
   affected sensors, and the Queue snapshot.
 - Manual correction of `LastSuccessfulCleaningCompletedAt`, with sensor, previous
   timestamp, new timestamp, user, time, and reason.
+- DCS Permissive Override activation and release, with user, timestamp, and reason.
 - Break-glass login, always as a high-severity audit event.
 
-## 7. Open authority items
+## 9. Open authority items
 
 | Item | Why it matters | Status |
 | --- | --- | --- |
 | Who may command manual valve and pump operation | Determines permission model detail | `[OPEN]` |
-| Whether parallel Cleaning Jobs on independent Water Jets are permitted | Determines single-job assumption in [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) section 3 | `[OPEN]` |
 | Authority when the Local/Remote selector is in Local | Application visibility and interlock behaviour | `[OPEN]` |
 | Behaviour when the Historian is unavailable | Whether control continues without recording | `[OPEN]` |
 | Required reason text for each operator action | Audit completeness | `[OPEN]` |
+| Exact definition of the DCS permissive set that the override bypasses | Deployment data; must be captured, not invented | `[OPEN]` |
+
+Resolved by Owner confirmation and therefore **not** open: the Water Jet to Isolation Valve
+cardinality, and whether parallel Cleaning Jobs are permitted (they are not).
 
 ---
 
 ## Related documents
 
 - [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) — what the application may never do
-- [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) — the supervised command sequence
-- [`QUEUE_MODEL.md`](QUEUE_MODEL.md) — operator queue actions
-- [`ALARM_MODEL.md`](ALARM_MODEL.md) — blocking release
+- [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) — the supervised command sequence and sequencing
+- [`QUEUE_MODEL.md`](QUEUE_MODEL.md) — operator queue actions and stop/rebuild
+- [`ALARM_MODEL.md`](ALARM_MODEL.md) — blocking release and cleared-state acknowledgement
 - [`USER_PERMISSION_MODEL.md`](USER_PERMISSION_MODEL.md) — permissions and sessions
+- [`REQUIREMENTS.md`](REQUIREMENTS.md) — SEQ, OVR, PMP, and UIG requirements

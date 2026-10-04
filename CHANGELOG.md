@@ -3,28 +3,74 @@
 All notable changes to this repository are recorded in this file.
 
 The format follows the spirit of *Keep a Changelog*, adapted for a stage-gated project:
-each entry corresponds to an approved Delivery Stage, not to a release of software.
-This repository currently contains documentation only.
+entries correspond to Owner-approved Delivery Stages and to review corrections, not to
+releases of software. **This repository contains documentation only.**
 
-Versioning while pre-release: `0.<stage>.<checkpoint>`.
-The product version `1.0.0` is reserved for the first Owner-accepted deployment release.
+---
+
+## Versioning position
+
+- **No application version exists.** The application version is **NOT ESTABLISHED**. No
+  runtime release has been built, packaged, or delivered.
+- A previous reference to a `0.1.0` documentation label was a documentation-only working
+  label, not a product release. It is retained here only for historical traceability and is
+  explicitly **not** a product version.
+- The documentation versioning policy is **`[OPEN]`**. No scheme, such as semantic
+  versioning, is adopted, and no documentation stage automatically advances a version
+  number. A future Owner decision is required to establish one.
 
 ---
 
 ## [Unreleased]
 
-Nothing yet. Work may only begin under a newly approved Stage Gate.
+### Added
 
----
+- Stage 0.1 review-correction checkpoint (documentation-only). The Owner-confirmed Stage
+  0.1 review punchlist was applied across the affected documentation. No application code,
+  runtime scaffold, database script, hardware adapter, simulator, test, CI workflow,
+  production configuration, ZIP, or release artifact was created. Summary of what the
+  correction establishes:
+  - **Water Jet to Isolation Valve cardinality** — exactly one-to-one, dedicated, never
+    shared. A sensor's Isolation Valve is derived from the sensor's assigned Water Jet.
+  - **Strictly sequential Cleaning Jobs** — INVARIANT-SEQ-001 through INVARIANT-SEQ-006,
+    including that at most one Cleaning Job may be ACTIVE at any time and that parallel
+    Water Jet cleaning is prohibited.
+  - **GlobalQueue stop and restart policy** — an Operator stop records the Queue snapshot
+    and Held/Rejected/Reordered state and closes the instance; a new AutoSequence rebuilds
+    all source queues and seeds a fresh GlobalQueue rather than reloading the previous one.
+  - **Source ownership after deduplication** — one source owner per entry, established by
+    the preserved earliest position; merged reasons do not transfer ownership; refill uses
+    the original owner.
+  - **Alarm acknowledgement correction** — active acknowledgement is awareness only; a
+    separate cleared-state acknowledgement is required to release a block.
+  - **DCS and Modbus communication health** — transport-evidence based health evaluation
+    with a configurable stale timeout, and the approved blocking behaviour for idle and
+    active-job cases.
+  - **DCS Permissive Override** — Operator-activated, manually released, scoped to the
+    approved DCS permissive evaluation only, with an explicit exclusion list.
+  - **Operations UI close guard** — blocked while a Cleaning Job is active or the Main Pump
+    is running; an operational usability control, explicitly not safety protection.
+  - **Requirement and test traceability** — new requirement groups (WJV, SEQ, COMH, OVR,
+    UIG) and eighteen required planned test cases, all marked planned and not executed.
+  - **Status, versioning, and capacity wording corrections** — gate approval separated
+    from implementation acceptance; no application version; historian capacity conclusions
+    removed as unsupported.
 
-## [0.1.0] — 2026-10-04
+## [Historical — documentation foundation candidate]
 
-**Stage 0.1 — Repository Documentation Foundation** `[APPROVED]`
+### Stage 0.1 — Repository Documentation Foundation
 
-Documentation-only stage. Established the repository governance model, the product
-identity baseline, the queue and control models, and the delivery plan. No application
-code, runtime scaffold, database schema, hardware adapter, CI workflow, production
-configuration, release package, or archive was created.
+**Stage 0.1 Scope Gate:** `[APPROVED]`
+**Stage 0.1 implementation:** SUBMITTED FOR OWNER REVIEW
+**Documentation review:** CHANGES REQUESTED / IN PROGRESS
+**Owner manual review:** PENDING
+**Merge:** NOT MERGED
+**Stage 0.2:** `[NOT AUTHORIZED]`
+
+Documentation-only stage. Established the repository governance model, the product identity
+baseline, the queue and control models, and the delivery plan. No application code, runtime
+scaffold, database schema, hardware adapter, CI workflow, production configuration, release
+package, or archive was created.
 
 ### Added
 
@@ -38,7 +84,8 @@ configuration, release package, or archive was created.
     privileged-session expectations, and the public-repository secrecy boundary.
   - `CHANGELOG.md` — this file.
 - Core documentation
-  - `docs/CURRENT_STATE.md` — verified repository state, status legend, and open items.
+  - `docs/CURRENT_STATE.md` — stage status, verified repository state, status legend, and
+    open items.
   - `docs/MASTER_PLAN.md` — staged delivery plan, stage gates, and gate evidence rules.
   - `docs/ROADMAP.md` — forward view of planned stages and optional future capabilities.
   - `docs/REQUIREMENTS.md` — consolidated requirements with identifiers and status.
@@ -47,7 +94,7 @@ configuration, release package, or archive was created.
 - Control, safety, and queue models
   - `docs/SAFETY_BOUNDARY.md` — hardware safety boundary, target safe states, and the
     bench verification required before any production write control is permitted.
-  - `docs/CONTROL_AUTHORITY.md` — control authority matrix for every output.
+  - `docs/CONTROL_AUTHORITY.md` — control authority matrix.
   - `docs/CLEANING_SEQUENCE.md` — Cleaning Job definition, normal sequence, and
     failure and recovery boundaries.
   - `docs/ALARM_MODEL.md` — condition, acknowledgement, and shelving dimensions,
@@ -71,8 +118,7 @@ configuration, release package, or archive was created.
 
 ### Changed
 
-- `README.md` — replaced the two-line placeholder with the full repository entry point,
-  product identity statement, physical baseline summary, and document index.
+- `README.md` — replaced the two-line placeholder with the repository entry point.
 - `.gitignore` — extended the existing Visual Studio template with repository-specific
   exclusions for local production configuration, secrets, and exported data, so that
   confidential deployment material stays outside the public repository.

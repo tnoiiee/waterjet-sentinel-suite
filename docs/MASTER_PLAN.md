@@ -18,11 +18,16 @@ Work proceeds in small, explicitly approved stages. Each stage has:
 - A single reviewable deliverable set.
 - Documentation validation evidence.
 - A Development Checkpoint commit.
-- Owner review before the next stage begins.
+- Owner review before the next stage begins. A review may request changes, which are
+  applied as review-correction commits on the same branch and pull request.
 
 No stage begins automatically when the previous one ends. A completed stage produces a
 report and stops. See [`AGENTS.md`](../AGENTS.md) section 11 for the required stop
 conditions.
+
+**Gate approval and implementation acceptance are separate.** A Stage Gate being approved
+means the work is authorised. It does not mean the resulting implementation is accepted.
+Only the Owner may record acceptance.
 
 ## 2. What a stage gate is
 
@@ -34,30 +39,33 @@ A Stage Gate is the only authority that permits new artefacts. It must state, at
 4. The validation the contributor must perform and report.
 5. The delivery instruction (branch, checkpoint, and whether a pull request is expected).
 
-Behaviour described in a Scope Gate becomes `[APPROVED]` behaviour. Behaviour described
-anywhere else remains `[PROPOSED]` until a later gate approves it.
+Behaviour described in a Scope Gate becomes `[APPROVED]` behaviour. Behaviour confirmed by
+the Owner during a documentation review becomes `[OWNER CONFIRMED]` behaviour. Behaviour
+described anywhere else remains `[PROPOSED]` until a later gate approves it.
 
 ## 3. Stage ledger
 
-Status vocabulary: `[APPROVED]`, `[PROPOSED]`, `[OPEN]`, `[NOT AUTHORIZED]`,
-`[NOT VERIFIED]`.
+Status vocabulary: `[APPROVED]`, `[OWNER CONFIRMED]`, `[PROPOSED]`, `[OPEN]`,
+`[NOT AUTHORIZED]`, `[NOT VERIFIED]`, plus implementation status: `SUBMITTED FOR OWNER
+REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `MERGED`.
 
-| Stage | Title | Status | Deliverable |
-| --- | --- | --- | --- |
-| 0.1 | Repository Documentation Foundation | `[APPROVED]` — delivered | Repository governance and documentation baseline `0.1.0` |
-| 0.2 | Requirements and Configuration Model Refinement | `[PROPOSED]` | Owner-ratified requirement set, configuration field specification, and resolution of the open items in [`CURRENT_STATE.md`](CURRENT_STATE.md) |
-| 0.3 | Architecture and Interface Specification | `[PROPOSED]` | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic — still documentation and specification only |
-| 0.4 | Offline Domain and Queue Engine Implementation | `[PROPOSED]` | First source code: pure domain logic with a simulator and automated tests; no device access |
-| 0.5 | Read-Only Monitoring Integration | `[PROPOSED]` | Modbus TCP read path against a simulator only; no production writes |
-| 0.6 | Supervisory Control Path with Simulator | `[PROPOSED]` | Valve, pump, and motion command paths exercised against a simulator only |
-| 0.7 | Historian, Alarm, Event, and Audit Subsystems | `[PROPOSED]` | Storage, retention, and cleanup mechanics verified against a test database |
-| 0.8 | Operator Interface and Kiosk Operation | `[PROPOSED]` | Control Room Kiosk experience, responsiveness, and operator workflows |
-| 0.9 | Bench Verification | `[NOT AUTHORIZED]` | Hardware benchmark evidence for the items listed in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md). Requires separate, explicit Owner authorisation and physical supervision. |
-| 1.0 | Deployment Acceptance | `[NOT AUTHORIZED]` | Owner acceptance of a release candidate on a Boiler Unit |
+| Stage | Title | Gate | Implementation | Deliverable |
+| --- | --- | --- | --- | --- |
+| 0.1 | Repository Documentation Foundation | `[APPROVED]` | **SUBMITTED FOR OWNER REVIEW** — documentation review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED** | Repository governance and documentation foundation candidate |
+| 0.2 | Requirements and Configuration Model Refinement | `[PROPOSED]` — **`[NOT AUTHORIZED]`** | Not started | Owner-ratified requirement set, configuration field specification, and resolution of the remaining open items in [`CURRENT_STATE.md`](CURRENT_STATE.md) |
+| 0.3 | Architecture and Interface Specification | `[PROPOSED]` | Not started | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic — still documentation and specification only |
+| 0.4 | Offline Domain and Queue Engine Implementation | `[PROPOSED]` | Not started | First source code: pure domain logic with a simulator and automated tests; no device access |
+| 0.5 | Read-Only Monitoring Integration | `[PROPOSED]` | Not started | Modbus TCP read path against a simulator only; no production writes |
+| 0.6 | Supervisory Control Path with Simulator | `[PROPOSED]` | Not started | Valve, pump, and motion command paths exercised against a simulator only |
+| 0.7 | Historian, Alarm, Event, and Audit Subsystems | `[PROPOSED]` | Not started | Storage, retention, and cleanup mechanics verified against a test database |
+| 0.8 | Operator Interface and Kiosk Operation | `[PROPOSED]` | Not started | Control Room Kiosk experience, responsiveness, close guard, and operator workflows |
+| 0.9 | Bench Verification | `[NOT AUTHORIZED]` | Not started | Hardware benchmark evidence for the items listed in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md). Requires separate, explicit Owner authorisation and physical supervision. |
+| 1.0 | Deployment Acceptance | `[NOT AUTHORIZED]` | Not started | Owner acceptance of a release candidate on a Boiler Unit |
 
 Stages 0.2 through 0.8 are a **candidate** decomposition. The Owner may merge, split,
 reorder, or replace them. They are recorded here so that work is not invented ad hoc, not
-because they are approved.
+because they are approved. Stage 0.2 and later remain `[PROPOSED]` and are `[NOT
+AUTHORIZED]` until a later Owner Scope Gate approves them.
 
 ## 4. Gate evidence rules
 
@@ -81,14 +89,20 @@ These constraints apply to all stages unless a gate explicitly lifts one of them
    is complete and recorded.
 3. Production values — addresses, register maps, tag lists, coordinates, travel limits,
    pulses per engineering unit, speeds, accelerations, decelerations, pressure setpoints,
-   and production thresholds — must never be invented, and production instances must never
-   be committed.
+   DCS permissive definitions, and production thresholds — must never be invented, and
+   production instances must never be committed.
 4. Requirements, architecture, and documentation must remain consistent. An inconsistency
    stops the affected part of the work and is reported.
 5. Reliability, stability, deterministic behaviour, recoverability, operator usability,
    maintainability, and appropriate baseline security rank above feature breadth.
 6. Standards are used as guidance and design inspiration only. No claim of certification
    or compliance may be made at any stage.
+7. **At most one Cleaning Job may be ACTIVE at any time. Parallel Water Jet cleaning is
+   prohibited.** No stage may relax this.
+8. **No application version exists.** A documentation stage does not establish one, and
+   the documentation versioning policy remains `[OPEN]`.
+9. **The Operations UI close guard is an operational usability control, not a safety
+   protection.** No stage may describe it as hardware fail-safe.
 
 ## 6. Definition of done for a documentation stage
 
@@ -98,18 +112,22 @@ A documentation stage is done when:
 - Internal links resolve (checked mechanically where practical).
 - The status legend is applied consistently, and no unapproved behaviour is presented as
   approved.
+- Owner-confirmed review decisions are propagated to every affected document.
 - Prohibited content is absent (checked by search).
 - The diff has been reviewed before committing.
 - The checkpoint commit exists with a CHANGED / UNCHANGED / NOT VERIFIED body.
 - The stage branch is pushed, and a pull request exists if permissions allow.
 - The pull request is **not** merged by the contributor.
 
+A stage that has received review changes is not done until a review-correction checkpoint
+has been submitted and re-review has been requested.
+
 ---
 
 ## Related documents
 
 - [`AGENTS.md`](../AGENTS.md) — working contract
-- [`CURRENT_STATE.md`](CURRENT_STATE.md) — verified state and open items
+- [`CURRENT_STATE.md`](CURRENT_STATE.md) — verified state, stage status, and open items
 - [`ROADMAP.md`](ROADMAP.md) — forward view of planned capability
 - [`REQUIREMENTS.md`](REQUIREMENTS.md) — requirement register
 - [`TEST_STRATEGY.md`](TEST_STRATEGY.md) — planned verification approach

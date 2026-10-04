@@ -1,8 +1,12 @@
 # Alarm Model — WaterJet Sentinel Suite (WJSS)
 
 **Document status:** [APPROVED] for severities, the three alarm dimensions, blocking
-release, shelving, and display wording. Alarm definitions and threshold values are
-commissioning values and are `[NOT VERIFIED]`.
+release, shelving, and display wording. The acknowledgement model in section 3 is
+`[OWNER CONFIRMED]`. Alarm definitions and threshold values are commissioning values and
+are `[NOT VERIFIED]`.
+
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
+review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
 
 This document defines how the system represents, displays, and releases alarms. It does
 not define production alarm thresholds, which are confidential deployment values.
@@ -38,38 +42,72 @@ The dimensions are independent:
 - Clearing a condition does not acknowledge it.
 - Shelving does not clear, acknowledge, or delete an alarm.
 
-Combinations and required presentation:
+## 3. Acknowledgement model
 
-| Condition | Acknowledgement | Shelving | Presentation |
-| --- | --- | --- | --- |
-| `ACTIVE` | `UNACKNOWLEDGED` | `UNSHELVED` | Standard active alarm, most prominent |
-| `ACTIVE` | `ACKNOWLEDGED` | `UNSHELVED` | Active, acknowledged |
-| `ACTIVE` | `UNACKNOWLEDGED` | `SHELVED` | Shelved but active; still visible in the shelved list |
-| `ACTIVE` | `ACKNOWLEDGED` | `SHELVED` | Shelved, active, acknowledged |
-| `CLEARED` | `UNACKNOWLEDGED` | any | **"RETURNED TO NORMAL - ACK REQUIRED"** |
-| `CLEARED` | `ACKNOWLEDGED` | `UNSHELVED` | Cleared and acknowledged; leaves the active list |
-| `CLEARED` | `ACKNOWLEDGED` | `SHELVED` | Cleared while shelved; auto-unshelve applies |
+This model is `[OWNER CONFIRMED]` and must be applied consistently wherever alarm
+acknowledgement is described.
 
-"Acknowledging an alarm while it is still active does not release the block." `[APPROVED]`
+### 3.1 Active acknowledgement is awareness only
 
-## 3. Blocking release rule
+- An `ACTIVE` alarm may record Operator awareness or acknowledgement if the model supports
+  it.
+- Acknowledging an `ACTIVE` alarm **does not clear the alarm**.
+- Acknowledging an `ACTIVE` alarm **does not release any block**.
 
-A blocking condition is released only when **all three** hold `[APPROVED]`:
+### 3.2 Cleared-state acknowledgement is required
 
-1. The condition is `CLEARED`.
-2. The cleared state is `ACKNOWLEDGED`.
-3. No other blocking alarm exists.
+- When an `ACTIVE` condition transitions to `CLEARED`, **final-clearance acknowledgement
+  becomes pending**.
+- On that transition, the final-clearance acknowledgement becomes `UNACKNOWLEDGED`.
+- The Operator must acknowledge the `CLEARED` state.
+- An acknowledgement recorded earlier, while the alarm was `ACTIVE`, does **not** satisfy
+  this requirement.
+
+### 3.3 The prohibited sequence
+
+The following sequence must **not** be possible, and must not be implementable by
+configuration:
+
+```text
+ACTIVE + ACKNOWLEDGED
+  -> condition clears
+  -> CLEARED + ACKNOWLEDGED automatically
+  -> block releases without a post-clear acknowledgement     <-- PROHIBITED
+```
+
+### 3.4 Blocking release rule
+
+A blocking alarm releases its block only when **all three** hold `[OWNER CONFIRMED]`:
+
+1. Condition = `CLEARED`.
+2. **Cleared-state** acknowledgement = `ACKNOWLEDGED`.
+3. No other blocking condition remains.
 
 Consequences that must be implemented exactly:
 
 - An `ACTIVE` alarm that has been acknowledged still blocks.
-- A `CLEARED` but `UNACKNOWLEDGED` alarm still blocks and displays
-  "RETURNED TO NORMAL - ACK REQUIRED".
+- A `CLEARED` alarm whose cleared-state acknowledgement is pending still blocks and
+  displays "RETURNED TO NORMAL - ACK REQUIRED".
 - A `SHELVED` alarm that is still `ACTIVE` still blocks, because shelving suppresses
   presentation, not the condition.
 - Releasing a block is never automatic on a timer and never silent.
 
-## 4. Blocking scope
+## 4. Display and state combinations
+
+| Condition | Acknowledgement | Shelving | Presentation |
+| --- | --- | --- | --- |
+| `ACTIVE` | `UNACKNOWLEDGED` | `UNSHELVED` | Standard active alarm, most prominent |
+| `ACTIVE` | `ACKNOWLEDGED` | `UNSHELVED` | Active, acknowledged (**awareness only**) |
+| `ACTIVE` | `UNACKNOWLEDGED` | `SHELVED` | Shelved but active; still visible in the shelved list |
+| `ACTIVE` | `ACKNOWLEDGED` | `SHELVED` | Shelved, active, acknowledged (**awareness only**) |
+| `CLEARED` | cleared-ack pending | any | **"RETURNED TO NORMAL - ACK REQUIRED"** |
+| `CLEARED` | cleared-ack `ACKNOWLEDGED` | `UNSHELVED` | Cleared and acknowledged; leaves the active list |
+| `CLEARED` | cleared-ack `ACKNOWLEDGED` | `SHELVED` | Cleared while shelved; auto-unshelve applies |
+
+Acknowledging an alarm while it is still active does not release the block. "RETURNED TO
+NORMAL - ACK REQUIRED" is the required wording for a cleared but unacknowledged alarm.
+
+## 5. Blocking scope
 
 Blocking is scoped, not global by default. The intended scopes are `[PROPOSED]`:
 
@@ -82,9 +120,10 @@ Blocking is scoped, not global by default. The intended scopes are `[PROPOSED]`:
 
 Which scope each alarm definition carries is `[OPEN]` and must be ratified before
 implementation. A valve fault during a job is blocking for the job; an idle valve fault
-pauses the sequence countdown; both are `[APPROVED]` behaviours that map onto these scopes.
+pauses the sequence countdown; a blocking DCS communication condition stops the next-job
+countdown; all are `[APPROVED]` behaviours that map onto these scopes.
 
-## 5. Shelving
+## 6. Shelving
 
 Shelving must support `[APPROVED]`:
 
@@ -102,30 +141,26 @@ before deployment.
 
 A shelved alarm that reaches auto-unshelve while still `ACTIVE` must return to the
 unshelved list in its current condition and acknowledgement state. It must not be
-acknowledged by the unshelve.
-
-## 6. Acknowledgement
-
-- Acknowledgement requires permission. Which permission per severity is `[OPEN]`.
-- Acknowledgement records user, timestamp, and the alarm instance.
-- Acknowledgement of an already-acknowledged alarm is a no-op; whether it is re-recorded is
-  `[OPEN]`.
-- Bulk acknowledgement of a selection is `[OPEN]` as a capability.
+acknowledged by the unshelve, and its cleared-state acknowledgement requirement is
+unaffected.
 
 ## 7. Alarm instances and lifecycle
 
 | Element | Description |
 | --- | --- |
 | Alarm definition | The configured rule: condition source, severity, thresholds, blocking scope, shelvability |
-| Alarm instance | One occurrence: raise time, condition, acknowledgement, shelving, and history |
+| Alarm instance | One occurrence: raise time, condition, active acknowledgement, cleared-state acknowledgement, shelving, and history |
 
-Lifecycle:
+Lifecycle `[OWNER CONFIRMED]`:
 
 ```text
 RAISED (ACTIVE, UNACKNOWLEDGED, UNSHELVED)
-  -> ACKNOWLEDGED                 (still ACTIVE, still blocking)
-  -> CLEARED                      -> "RETURNED TO NORMAL - ACK REQUIRED" if unacknowledged
-  -> ACKNOWLEDGED after clearing  -> block released if no other blocking alarm exists
+  -> ACTIVE + ACKNOWLEDGED            (awareness recorded; still ACTIVE; still blocking)
+  -> condition clears
+  -> CLEARED + cleared-ack PENDING    "RETURNED TO NORMAL - ACK REQUIRED"; still blocking
+  -> Operator acknowledges the CLEARED state
+  -> CLEARED + cleared-ack ACKNOWLEDGED
+  -> block released if no other blocking condition remains
 ```
 
 Return of the condition after clearing raises a new instance. Instance identity, chattering
@@ -138,6 +173,9 @@ suppression, and grouping rules are `[OPEN]`.
 | `TC_F <= TC_R` diagnostic | Raise the diagnostic; keep calculating DirtyScore; preserve both temperatures in the Historian; do not block queue eligibility solely because of this diagnostic `[APPROVED]` |
 | Valve fault during an active Cleaning Job | Blocking alarm, job `FAILED` or `RECOVERY_REQUIRED`, next job blocked `[APPROVED]` |
 | Abnormal valve feedback while idle with the pump running | Alarm, pause countdown, Operator modal with Stop All / Continue With Valve Excluded `[APPROVED]` |
+| DCS-related communication or stale-data condition becomes blocking while no Cleaning Job is active | Alarm, stop next-job countdown, no dispatch, require recovery and **cleared-state acknowledgement** before the countdown resumes `[APPROVED]` |
+| Same condition becomes blocking while a Cleaning Job is active | Current job reaches its approved terminal condition; alarm raised or retained; next job not dispatched; countdown stopped after the current job; recovery and cleared-state acknowledgement required `[APPROVED]` |
+| Valve return to service | Requires valid closed feedback, cleared alarm, **cleared-state acknowledgement**, explicit Operator action, and runtime validation `[OWNER CONFIRMED]` |
 | Communication loss | Alarm; must not be auto-cleared on reconnection without operator awareness `[PROPOSED]` |
 | Pressure not ready within the rise timeout | Pump `FAULT` state and blocking alarm `[PROPOSED]` |
 
@@ -149,6 +187,8 @@ suppression, and grouping rules are `[OPEN]`.
 - Shelved alarms must remain discoverable from the alarm interface. `[APPROVED]`
 - A blocking condition must have a persistent, unambiguous indicator of why dispatch is
   held. `[PROPOSED]`
+- A cleared alarm whose cleared-state acknowledgement is pending must remain visually
+  distinguishable from an alarm acknowledged after clearing. `[OWNER CONFIRMED]`
 
 ## 10. Open items
 
@@ -159,6 +199,7 @@ suppression, and grouping rules are `[OPEN]`.
 | Which alarms are non-shelvable | `[OPEN]` |
 | Shelving duration limits and per-alarm maximum values | `[OPEN]` |
 | Permissions for acknowledge, shelve, and unshelve per severity | `[OPEN]` |
+| Whether the active-awareness acknowledgement and the cleared-state acknowledgement are stored as separate fields or as one field reset on clearing | `[OPEN]` — the observable behaviour of section 3 is binding either way |
 | Chattering, flood, and first-up grouping behaviour | `[OPEN]` |
 | Bulk acknowledgement | `[OPEN]` |
 | Alarm-to-Event recording granularity | `[OPEN]` |
@@ -167,8 +208,9 @@ suppression, and grouping rules are `[OPEN]`.
 
 ## Related documents
 
-- [`REQUIREMENTS.md`](REQUIREMENTS.md) — ALM requirements
-- [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) — valve fault workflows
+- [`REQUIREMENTS.md`](REQUIREMENTS.md) — ALM, COMH, and OVR requirements
+- [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) — valve fault and communication-loss workflows
 - [`QUEUE_MODEL.md`](QUEUE_MODEL.md) — effect of blocking on dispatch
 - [`USER_PERMISSION_MODEL.md`](USER_PERMISSION_MODEL.md) — permissions and audit
 - [`HISTORIAN_RETENTION.md`](HISTORIAN_RETENTION.md) — alarm history retention
+- [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) — what the alarm system is not

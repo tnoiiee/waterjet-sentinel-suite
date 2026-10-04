@@ -1,8 +1,13 @@
 # Security Policy — WaterJet Sentinel Suite (WJSS)
 
-**Document status:** [APPROVED] at the Stage 0.1 documentation baseline.
+**Document status:** [APPROVED] for the policy. Corrected for status wording by the
+Owner-confirmed Stage 0.1 documentation review punchlist.
 **Applies to:** the repository `waterjet-sentinel-suite` and, once they exist, every
 deployed instance of the application.
+
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation submitted for
+Owner review; documentation review changes requested / in progress; Owner manual review
+pending; merge NOT MERGED; Stage 0.2 `[NOT AUTHORIZED]`.
 
 WJSS is a monitoring and supervisory control system. It is **not** a Safety Instrumented
 System, and no statement in this document should be read as a safety certification or as
@@ -72,6 +77,9 @@ following approved intentions:
 - Manual hold-to-run operations stop on privileged-session timeout; an active
   Auto Sequence is **not** aborted by a session timeout. `[APPROVED]`
 - Every break-glass login raises a high-severity audit event. `[APPROVED]`
+- The DCS Permissive Override requires an explicit permission, a confirmation step, a
+  recorded reason, a persistent visible banner, and Event and Audit records on activation
+  and release. `[OWNER CONFIRMED]`
 - Audit history retention longer than any other category (see
   [`docs/HISTORIAN_RETENTION.md`](docs/HISTORIAN_RETENTION.md)). `[PROPOSED]`
 - Appropriate baseline security, prioritised below reliability, stability,
@@ -86,13 +94,19 @@ Stage Gate. `[OPEN]`
 
 - A shared Operator account is permitted. This prevents person-level attribution for
   Operator actions; audit records for Operator actions identify the account, not an
-  individual. See [`docs/USER_PERMISSION_MODEL.md`](docs/USER_PERMISSION_MODEL.md).
+  individual. This limitation also applies to DCS Permissive Override records.
+  See [`docs/USER_PERMISSION_MODEL.md`](docs/USER_PERMISSION_MODEL.md).
 - The system is not certified to any standard.
 - Hardware fail-safe behaviour of the WAGO coupler watchdog is `[NOT VERIFIED]`. Until
   bench verification is recorded, production valve and pump write control is
   `[NOT AUTHORIZED]`.
 - The application cannot and must not be relied upon as protection against an energized
-  output. A UI close guard is not an acceptable sole protection.
+  output. The Operations UI close guard is an operational usability control, not a safety
+  protection.
+- The DCS Permissive Override bypasses only the approved DCS permissive evaluation. It must
+  never be widened into a general permissive bypass, and it does not affect WAGO or Modbus
+  communication health, valve verification, pressure validation, motion faults, the WAGO
+  output watchdog, or external hardware protection.
 - Hardware emergency stop, limit switches, motor protection, Local/Remote selector, and
   independent protection remain outside the application's authority.
 
@@ -105,11 +119,12 @@ for contributors and automation alike; see [`AGENTS.md`](AGENTS.md) section 6.
 ## 7. Audit and event integrity
 
 Operator queue actions, manual timestamp corrections, alarm acknowledgement and shelving,
-permission changes, configuration publication, and break-glass logins are all required to
-produce Event or Audit records with the fields listed in
-[`docs/USER_PERMISSION_MODEL.md`](docs/USER_PERMISSION_MODEL.md) and
-[`docs/QUEUE_MODEL.md`](docs/QUEUE_MODEL.md). Tamper protection for those records is
-`[OPEN]` and must be specified before deployment.
+DCS Permissive Override activation and release, permission changes, configuration
+publication, and break-glass logins are all required to produce Event or Audit records with
+the fields listed in [`docs/USER_PERMISSION_MODEL.md`](docs/USER_PERMISSION_MODEL.md),
+[`docs/QUEUE_MODEL.md`](docs/QUEUE_MODEL.md), and
+[`docs/CONTROL_AUTHORITY.md`](docs/CONTROL_AUTHORITY.md). Tamper protection for those
+records is `[OPEN]` and must be specified before deployment.
 
 ---
 
@@ -119,4 +134,5 @@ produce Event or Audit records with the fields listed in
 - [`docs/PUBLIC_REPOSITORY_BOUNDARY.md`](docs/PUBLIC_REPOSITORY_BOUNDARY.md)
 - [`docs/USER_PERMISSION_MODEL.md`](docs/USER_PERMISSION_MODEL.md)
 - [`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md)
+- [`docs/CONTROL_AUTHORITY.md`](docs/CONTROL_AUTHORITY.md)
 - [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)

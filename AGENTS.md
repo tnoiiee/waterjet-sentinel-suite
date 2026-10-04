@@ -2,7 +2,8 @@
 
 **Project:** WaterJet Sentinel Suite (WJSS)
 **Repository:** `waterjet-sentinel-suite`
-**Document status:** [APPROVED] — established by the approved Stage 0.1 Scope Gate.
+**Document status:** [APPROVED] — established by the approved Stage 0.1 Scope Gate, and
+corrected by the Owner-confirmed Stage 0.1 documentation review punchlist.
 **Applies to:** every automated agent, tool-assisted change, and human contributor working in this repository.
 
 This file is a working contract. It constrains *how* work is performed and *what* may be
@@ -27,8 +28,8 @@ source. Resolve conflicts strictly in this order:
 
 A recommendation that appears in a design document is **not** approved behavior unless a
 Stage Gate or the Owner has approved it. Approved behavior is always marked `[APPROVED]`
-in the documentation; see the status legend in
-[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
+in the documentation; Owner decisions recorded during review are marked
+`[OWNER CONFIRMED]`. See the status legend in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md).
 
 ## 2. Scope-lock rules
 
@@ -37,11 +38,12 @@ in the documentation; see the status legend in
 3. If an additional file appears necessary, **stop, report it, and explain why** before
    creating it. Do not create it first and justify it afterwards.
 4. Do not infer that an undocumented behavior is approved. Unspecified behavior is
-   unspecified — it is recorded as `[OPEN]`, not implemented and not guessed.
+   unspecified — it is recorded as `[OPEN]`, not implemented and not guessed. The same
+   applies to ambiguity: mark it `[OPEN]`, report it, and stop the affected edit.
 5. Do not invent production values of any kind. Invented values include IP addresses,
    register maps, tag names, coordinates, travel limits, pulses per engineering unit,
-   speeds, accelerations, decelerations, pressure setpoints, alarm thresholds, and
-   timeouts.
+   speeds, accelerations, decelerations, pressure setpoints, alarm thresholds, DCS
+   permissive definitions, stale-data timeouts, and timeouts generally.
 6. Scope-locked work is delivered as a checkpoint; the Owner merges. The agent never
    merges.
 
@@ -57,20 +59,33 @@ in the documentation; see the status legend in
 5. Report negative results plainly. A search that found nothing is evidence; report the
    search that was run and what it returned.
 6. Report uncertainty as uncertainty. Use `NOT VERIFIED` rather than an assumption.
+7. If the repository state does not match the expected baseline, stop before editing and
+   report the discrepancy rather than repairing it silently.
 
 ## 4. Version and checkpoint rules
 
-1. Documentation-only stages advance the documentation baseline version recorded in
-   [`CHANGELOG.md`](CHANGELOG.md) using the `0.x.y` series while the product is pre-release.
+1. **No application version exists, and none is established by a documentation stage.**
+   The application version is NOT ESTABLISHED, and the documentation versioning policy is
+   `[OPEN]`. A documentation stage must not be given a semantic version, and no governance
+   rule may automatically advance a version number.
 2. A **Development Checkpoint** is a commit that records a reviewable, evidence-backed
    position. A checkpoint does **not** mean: production ready, commissioned, tested on
-   hardware, or certified.
-3. Every checkpoint commit body must state: the stage, what is `CHANGED`, what is
+   hardware, certified, Owner accepted, or merged.
+3. Approval of a Stage Gate must be recorded **separately** from acceptance of that stage's
+   implementation. A gate being approved does not mean its implementation is accepted.
+4. Every checkpoint commit body must state: the stage, what is `CHANGED`, what is
    `UNCHANGED`, and what is `NOT VERIFIED`.
-4. Checkpoints are append-only. An approved checkpoint is never rewritten; corrections are
-   new commits.
-5. Record the checkpoint identifier (branch and commit SHA) in
-   [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) when it is created.
+5. Checkpoints are append-only. An approved checkpoint is never rewritten; corrections are
+   new commits. A review-correction is a new commit on the same branch, not an amendment of
+   the reviewed checkpoint.
+6. Record the checkpoint identifier (branch and commit SHA) in
+   [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) when it is created. Do not attempt to
+   record the SHA of the commit that is currently being created inside that same commit.
+7. Status vocabulary for a stage implementation must be one of: `SUBMITTED FOR OWNER
+   REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `MERGED`.
+   Only the Owner may move an implementation to `OWNER ACCEPTED` or `MERGED`.
+8. The word "delivered" may be used only with an explicit qualifier, for example
+   "development checkpoint submitted for review".
 
 ## 5. Public repository restrictions
 
@@ -93,7 +108,7 @@ is never committed.
 1. Do not connect to any device: no WAGO coupler, no Galil controller, no pump, no valve,
    no PLC, no DCS, no production database, no plant network.
 2. Do not author code, scripts, adapters, or configuration that would write to production
-   outputs. Production valve and pump write control is `NOT AUTHORIZED` until the bench
+   outputs. Production valve and pump write control is `[NOT AUTHORIZED]` until the bench
    verification listed in [`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md) has been
    completed and recorded.
 3. Do not test, probe, scan, or enumerate plant networks.
@@ -115,14 +130,24 @@ for a specific, named purpose:
 
 Non-destructive, additive work is the default: new commits on the stage branch.
 
+If a local branch ref must be reconciled with its remote, prefer
+`git merge --ff-only`. If that is refused only because untracked or unstaged content
+already matches the target commit exactly, a `--mixed` pointer update may be used after
+taking a content backup — but the working tree must be proven byte-identical to the target
+commit before and after, and the action must be reported. Never use a destructive variant
+to resolve a reconciliation problem.
+
 ## 8. Owner-only merge rule
 
-1. The agent creates checkpoints, pushes the stage branch, and may open a pull request.
+1. The agent creates checkpoints, pushes the stage branch, and may open or update a pull
+   request.
 2. The agent **never** merges a pull request, never merges `main`, and never fast-forwards
    `main`.
 3. Review and merge authority belongs exclusively to the Owner.
 4. If pull-request creation is unavailable, the agent reports the exact branch name and
    commit SHA so the Owner can act.
+5. A review-correction is applied to the existing branch and the existing pull request.
+   The agent must not open a new pull request to replace a reviewed one.
 
 ## 9. Reporting format — Changed / Unchanged / Not Verified
 
@@ -136,6 +161,9 @@ Every stage report and every checkpoint description uses these three headings:
 - **NOT VERIFIED** — every value, behavior, or integration that remains unproven, with
   the reason it is unproven.
 
+A review-correction report additionally lists, for each item of the review, whether it is
+RESOLVED, PARTIALLY RESOLVED, NOT RESOLVED, or NOT APPLICABLE, with file references.
+
 ## 10. No false test claims
 
 1. Documentation-only stages perform documentation-only validation. Do not describe
@@ -145,8 +173,9 @@ Every stage report and every checkpoint description uses these three headings:
 3. Never claim compliance with or certification to any standard (IEC, ISA, ISO, or
    other). Industrial standards are used as guidance and design inspiration only.
 4. Never claim that the hardware fail-safe behaviour of the WAGO watchdog has passed
-   verification. It remains `NOT VERIFIED` until bench evidence exists and is recorded.
-5. If asked to report a result that was not observed, report the gap instead.
+   verification. It remains `[NOT VERIFIED]` until bench evidence exists and is recorded.
+5. Planned test cases must always be labelled as planned and not executed.
+6. If asked to report a result that was not observed, report the gap instead.
 
 ## 11. Required stop conditions
 
@@ -159,25 +188,37 @@ any of the following occurs:
 3. **Undocumented behaviour required.** Correct completion depends on a behaviour that no
    governing source defines.
 4. **Production value required.** Progress would require inventing addresses, coordinates,
-   limits, setpoints, thresholds, or timeouts.
+   limits, setpoints, thresholds, DCS permissive definitions, or timeouts.
 5. **Sensitive data encountered.** Anything in the public-boundary prohibited list appears
    in the working tree, in a diff, or in tool output. Do not commit it; report it.
 6. **Device or network access requested.** Any instruction that would require connecting
    to plant equipment or production systems.
 7. **Destructive Git requested.** See section 7.
-8. **Evidence unavailable.** A required check cannot be executed or its output cannot be
+8. **Baseline mismatch.** The branch, history, or remote state does not match the expected
+   baseline. Report before editing.
+9. **Evidence unavailable.** A required check cannot be executed or its output cannot be
    observed.
-9. **Merge or merge-adjacent request.** Any instruction to merge, rebase, or rewrite
-   approved history (see section 8).
-10. **Stage completion ambiguous.** It is unclear whether the current stage is complete.
+10. **Merge or merge-adjacent request.** Any instruction to merge, rebase, or rewrite
+    approved history (see section 8).
+11. **Stage completion ambiguous.** It is unclear whether the current stage is complete.
 
 ## 12. Safety position of the agent
 
 The WaterJet Sentinel Suite is a monitoring and supervisory control system. It is **not** a
 Safety Instrumented System and does not replace emergency stop circuits, hardwired
 protection, motor protection, mechanical limits, or controller-side safe-stop behaviour.
-No agent may present the system, its documentation, or its tests as safety-rated. See
-[`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md) and
+The application must never command, override, bypass, suppress, or replace an external
+protection function. No agent may present the system, its documentation, or its tests as
+safety-rated.
+
+Two further positions are binding and must not be softened in any output:
+
+1. At most one Cleaning Job may be ACTIVE at any time. Parallel Water Jet cleaning is
+   prohibited.
+2. The Operations UI close guard is an operational usability control. It is not a safety
+   protection and must never be described as hardware fail-safe.
+
+See [`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md) and
 [`docs/CONTROL_AUTHORITY.md`](docs/CONTROL_AUTHORITY.md).
 
 ---
@@ -185,7 +226,7 @@ No agent may present the system, its documentation, or its tests as safety-rated
 ## Related documents
 
 - [`README.md`](README.md) — repository entry point and document index
-- [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) — verified state and status legend
+- [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) — verified state, stage status, legend
 - [`docs/PUBLIC_REPOSITORY_BOUNDARY.md`](docs/PUBLIC_REPOSITORY_BOUNDARY.md) — what may be published
 - [`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md) — hardware safety boundary
 - [`SECURITY.md`](SECURITY.md) — security policy and secret handling

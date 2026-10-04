@@ -3,6 +3,9 @@
 **Document status:** [APPROVED] boundary statement. Bench verification items remain
 `[NOT VERIFIED]` and production write control remains `[NOT AUTHORIZED]`.
 
+**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; implementation submitted for Owner
+review; documentation review changes requested / in progress; Stage 0.2 `[NOT AUTHORIZED]`.
+
 > **Read this first.** WJSS is **not** a Safety Instrumented System. It does not replace
 > emergency stop circuits, hardwired protection, motor protection, mechanical limits, or
 > controller-side safe-stop behaviour. It is **not** certified to IEC, ISA, ISO, or any
@@ -15,15 +18,14 @@
 | The application may | The application must never |
 | --- | --- |
 | Monitor process values and signal quality | Act as a protective function |
-| Evaluate cleaning criteria and arbitrate queues | Inhibit, delay, or defeat a hardwired protective device |
+| Evaluate cleaning criteria and arbitrate queues | Inhibit, delay, suppress, or defeat a hardwired protective device |
 | Issue supervisory commands over approved paths, once authorised | Command equipment in a way that depends on the application to be safe |
 | Raise alarms and escalate to the Operator | Substitute for emergency stop, limit switches, or motor protection |
 | Log, trend, and audit | Silence or suppress a protective function |
 
 ## 2. Systems outside the application's authority
 
-The following remain outside the application's authority entirely. The application must
-not command, override, bypass, or infer the state of these systems:
+The following remain outside the application's authority entirely:
 
 - Hardware emergency stop circuits.
 - Hardwired protection interlocking.
@@ -33,8 +35,24 @@ not command, override, bypass, or infer the state of these systems:
 - The Local/Remote selector.
 - Any independent protection layer.
 
-Hardware emergency stop, limit switches, motor protection, the Local/Remote selector, and
-independent protection remain outside the application's authority. `[APPROVED]`
+**The application must never command, override, bypass, suppress, or replace an external
+protection function.** `[OWNER CONFIRMED]`
+
+### 2.1 Read-only indication of external protection state
+
+Where a read-only indication of an external protection state is available, the application:
+
+- **may** monitor and display that indication;
+- **may** use that indication as a **supervisory command gate**;
+- does **not** acquire ownership of the external protection function by doing so;
+- must **not** treat the indication as a substitute for the actual protection.
+
+**Unknown, unavailable, stale, or bad-quality indication must never be inferred as safe.**
+`[OWNER CONFIRMED]`
+
+An indication that is missing, stale, or of bad quality must block the supervisory action
+that depends on it. It must never be silently substituted with a benign value, and it must
+never be read as "protection present".
 
 ## 3. Target safe states
 
@@ -77,10 +95,12 @@ state is reached on timeout.
 
 The following must never be described, documented, or reasoned about as protection:
 
-1. **The UI close guard.** Closing a user interface, or preventing a user from closing it,
-   is not protection against an energized output remaining active. "The UI close guard is
-   not an acceptable sole protection against an energized output remaining active."
-   `[APPROVED]`
+1. **The Operations UI close guard.** Blocking the normal close action while a Cleaning Job
+   is active or the Main Pump is running is an **operational usability control** only. It
+   prevents accidental normal UI shutdown during active operation. It is **not** a safety
+   protection, and it cannot guarantee protection against process termination, Windows
+   shutdown, workstation restart, power loss, or hardware failure. It is not an acceptable
+   sole protection against an energized output remaining active. `[OWNER CONFIRMED]`
 2. **Application-side interlocks.** Application permissives are supervisory. If an
    application interlock fails to act, no protective function may be lost.
 3. **Software timeouts.** Timeouts bound the application's own waiting behaviour. They are
@@ -88,6 +108,14 @@ The following must never be described, documented, or reasoned about as protecti
 4. **Alarms.** An alarm is information for a human. An unacknowledged alarm must not be the
    only barrier between a fault and damage.
 5. **Historian records.** Recording a fault is not preventing it.
+6. **The DCS Permissive Override.** The override bypasses **only** the approved DCS
+   permissive evaluation. It must never be described as a general "Ignore DCS" function and
+   must not bypass WAGO communication health, Modbus transport health, Isolation Valve
+   feedback, valve open or close verification, Main Pump pressure validation, Galil limits,
+   motion faults, encoder or position validation, emergency stop, the Local/Remote
+   selector, motor or drive protection, the WAGO output watchdog, external hardware
+   protection, critical application lifecycle gates, or the one-active-Cleaning-Job
+   invariant. See [`REQUIREMENTS.md`](REQUIREMENTS.md) OVR-009. `[OWNER CONFIRMED]`
 
 ## 7. Safety-related behaviour that *is* required of the application
 
@@ -101,10 +129,17 @@ supervisory responses. They reduce exposure; they do not make the system safety-
   `[APPROVED]`
 - On abnormal valve feedback while the pump runs and no job is active: raise an alarm,
   pause the next-job countdown, and present the Stop All / Continue With Valve Excluded
-  modal. `[APPROVED]`
+  modal. "Continue" means **sequential** continuation on another available Water Jet; it
+  never authorises concurrent Cleaning Jobs. `[OWNER CONFIRMED]`
+- On a blocking DCS-related communication or stale-data condition: stop the next-job
+  countdown and do not dispatch the next job; where a job is already active, allow it to
+  reach its approved terminal condition first. `[APPROVED]`
 - On unknown axis position: block motion mode changes and block job start. `[APPROVED]`
 - On blocking alarm: hold the next job until the block is released by the conditions in
-  [`ALARM_MODEL.md`](ALARM_MODEL.md). `[APPROVED]`
+  [`ALARM_MODEL.md`](ALARM_MODEL.md), including **cleared-state acknowledgement**.
+  `[OWNER CONFIRMED]`
+- At most one Cleaning Job may be ACTIVE at any time. Parallel Water Jet cleaning is
+  prohibited. `[OWNER CONFIRMED]`
 
 ## 8. Bench verification protocol requirements
 
@@ -124,10 +159,11 @@ Until then, bench verification is `[NOT AUTHORIZED]`, and the verification list 
 
 Mechanical limits, soft limits, pulses per engineering unit, encoder behaviour, speed,
 acceleration, deceleration, homing, the operational envelope, pressure setpoints, pressure
-rise timeouts, valve open and close timeouts, alarm thresholds, and HardMinimumCleaningInterval
-values are commissioning values. They are `[NOT VERIFIED]` and must be captured from
-engineering records or field measurement. They must never be invented, inferred from
-convention, or copied from an example.
+rise timeouts, valve open and close timeouts, alarm thresholds, HardMinimumCleaningInterval
+values, DCS permissive definitions, and the stale-data timeout value are commissioning
+values. They are `[NOT VERIFIED]` and must be captured from engineering records or field
+measurement. They must never be invented, inferred from convention, or copied from an
+example. The 30 second stale-timeout figure is an **example only**.
 
 ## 10. Standards position
 
@@ -140,8 +176,9 @@ made for this product, its documentation, or its tests.
 ## Related documents
 
 - [`CONTROL_AUTHORITY.md`](CONTROL_AUTHORITY.md) — who may command what, and when
-- [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) — sequence and failure handling
-- [`REQUIREMENTS.md`](REQUIREMENTS.md) — HSB requirements
-- [`ALARM_MODEL.md`](ALARM_MODEL.md) — blocking and acknowledgement rules
+- [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) — sequence, sequencing invariants, failure handling
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — communication health and UI guard placement
+- [`REQUIREMENTS.md`](REQUIREMENTS.md) — HSB, OVR, UIG, and COMH requirements
+- [`ALARM_MODEL.md`](ALARM_MODEL.md) — blocking and cleared-state acknowledgement
 - [`decisions/ADR-0005-hardware-safety-boundary.md`](decisions/ADR-0005-hardware-safety-boundary.md)
 - [`../AGENTS.md`](../AGENTS.md) — stop conditions and device-access prohibition
