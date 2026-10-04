@@ -426,3 +426,43 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# ---------------------------------------------------------------------------
+# WaterJet Sentinel Suite - repository-specific exclusions
+#
+# Purpose: keep confidential local deployment material outside the public
+# repository. See docs/PUBLIC_REPOSITORY_BOUNDARY.md and SECURITY.md.
+#
+# These rules exclude LOCAL files only. They do not authorise the creation of
+# production configuration content, and they are not a substitute for the
+# prohibition on committing secrets.
+# ---------------------------------------------------------------------------
+
+# Local production configuration (stored outside the Git working tree where practical)
+config/local/
+config/production/
+config/site/
+**/appsettings.Production.json
+**/appsettings.Local.json
+
+# Secrets, credentials, and certificates
+*.pfx
+*.p12
+*.key
+*.pem
+**/secrets.json
+**/credentials.json
+**/connectionstrings.local.json
+
+# Local Tag Lists, register maps, and site data exports
+**/taglist*.csv
+**/tag-list*.csv
+**/register-map*.csv
+**/site-data/
+**/exports/
+
+# Local database artefacts and logs that could contain plant or user data
+**/*.bak
+**/audit-logs/
+**/event-logs/
+**/production-logs/
