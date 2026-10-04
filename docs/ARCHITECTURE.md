@@ -492,9 +492,7 @@ Rules:
    (section 5).
 8. Retries are bounded, transport-level, and re-validated; reconnection never re-issues a
    stale command and never re-energizes an output.
-8.1. Modbus acquisition uses one connection and one serialized command queue per device, bounded
-   concurrent pollers, batched reads of contiguous addresses, and a Poll Plan compiled at
-   publication or startup — see section 29.
+- Modbus acquisition uses one connection and one serialized command queue per device, with bounded concurrent polling across independent devices — see section 29.
 9. Modbus and Galil library selections remain `[OPEN]` pending licence, offline-availability,
    maintenance, and observability review. No library is installed in this Stage.
 

@@ -181,7 +181,7 @@ Every one of the following must produce a durable record:
    appears to actuate a device issues a command request through the approved command path; the
    Equipment Runtime performs the actuation after authorization, lifecycle, interlock,
    ownership, and command-state validation (see [`CONTROL_AUTHORITY.md`](CONTROL_AUTHORITY.md)
-   and [`ARCHITECTURE.md`](ARCHITECTURE.md) section 25).
+   and [`ARCHITECTURE.md`](ARCHITECTURE.md) section 14.3).
 5. **No permission can bypass a lifecycle, interlock, or ownership rule**, and none can permit
    concurrent Cleaning Jobs.
 6. **The DCS Permissive Override remains scoped, enumerated, and non-delegable** as recorded in

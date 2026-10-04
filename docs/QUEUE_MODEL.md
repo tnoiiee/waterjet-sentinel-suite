@@ -338,7 +338,7 @@ boundaries apply.
 3. **Queue state is owned by the Runtime, not the UI.** The Operations UI observes queue state
    through the live-state contract and issues permitted operator queue actions through the
    approved command path. The UI must not own or recompute membership, order, dwell, or
-   disposition (see [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 25 and 28).
+   disposition (see [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 14.3 and 28).
 4. **Queue evaluation must not be blocked by database writes.** A slow Historian write or an
    alarm write must not delay a queue evaluation cycle.
 5. **Sequential execution invariants are unchanged.** Sections 1, 8, and 10 continue to govern;

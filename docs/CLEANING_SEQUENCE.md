@@ -304,9 +304,9 @@ not change any rule in sections 1 to 10.
    The Operations UI may request and observe; it must never own, advance, or complete a job.
 2. **The Operations UI must not write to hardware and must not open a device session.** It must
    not actuate an Isolation Valve, the Main Pump, a VFD, or a Galil axis, and must not read
-   Modbus or Galil directly. See [`ARCHITECTURE.md`](ARCHITECTURE.md) sections 4.12 and 25.
+   Modbus or Galil directly. See [`ARCHITECTURE.md`](ARCHITECTURE.md) section 14.3.
 3. **UI close, crash, or restart must not affect or terminate an active Cleaning Job.** The
-   runtime continues to own and supervise the job. The UI close guard is an operator-safety
+   runtime continues to own and supervise the job. The UI close guard is an operational usability
    affordance, not the mechanism that protects the job. See [`ARCHITECTURE.md`](ARCHITECTURE.md)
    section 28.
 4. **After a UI reconnect, the job state comes from the runtime**, delivered as an

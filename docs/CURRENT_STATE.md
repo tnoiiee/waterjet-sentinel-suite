@@ -168,7 +168,7 @@ items are listed in section 34 of the same document, and the decision records ar
 
 | Item | Stage 0.2 disposition |
 | --- | --- |
-| Application language, runtime, UI framework, and UI delivery architecture | Language, runtime, UI technology, and delivery model selected as `[PROPOSED]`; exact .NET version `[OPEN]`. Browser-based, desktop, and hybrid local-web delivery were all evaluated on requirements |
+| Application language, runtime, UI framework, and UI delivery architecture | .NET with C# for the Equipment Runtime and Local Application API: `[PROPOSED]`; application-owned Windows kiosk shell: `[PROPOSED]`; embedded local web UI delivery model: `[PROPOSED]`; React + TypeScript + Vite: `[PROPOSED]` comparison candidate, not accepted; Blazor Hybrid: `[PROPOSED]` comparison candidate, not rejected; final UI framework: `[OPEN]`; exact .NET version: `[OPEN]`; final selection deferred to the proposed Stage 0.2.1 technology spike. Browser-based, desktop, and hybrid local-web delivery were all evaluated on requirements |
 | Process architecture, service identity, startup behaviour, and Equipment Runtime separation | Process model selected as `[PROPOSED]`; service identity `[OPEN]` |
 | Modbus TCP client library selection and licence acceptability | Boundary decided; library selection `[OPEN]` pending licence and offline-availability review |
 | Galil communication mechanism and library selection | `[OPEN]` — must be evaluated before motion code is written |
@@ -291,14 +291,18 @@ rebased, or rewritten.
 | Item | Value |
 | --- | --- |
 | Stage | 0.2 — Technology and Solution Architecture Decision |
-| Branch | `arena/01a1087c-waterjet-sentinel-suite` |
-| Base | `d49eeee0d937465d61abd6e754b9a2bea5ef1d6a` (approved remote `main`) |
-| Development Checkpoint | Created on the Stage 0.2 branch. Its SHA is recorded in the delivery report and in the pull request description, **not** inside the commit that creates it |
-| Checkpoint status | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review | **PENDING** |
+| Approved main base | `d49eeee0d937465d61abd6e754b9a2bea5ef1d6a` (verified remote `main`) |
+| Original Stage 0.2 architecture checkpoint | `b881a5fc7abac226e6c40f9cd01ec66d3ebf07c9` |
+| First Stage 0.2 review-correction checkpoint | `058a4255fd87a943d73c1def7f27f839cee222ff` |
+| Final documentation-consistency checkpoint | Created on the Stage 0.2 branch. Its SHA is recorded in the delivery report and in the pull request description, **not** inside the commit that creates it |
+| Current Stage branch | `arena/01a1087c-waterjet-sentinel-suite` |
+| Pull request | https://github.com/tnoiiee/waterjet-sentinel-suite/pull/2 |
+| Stage 0.2 Scope Gate | **APPROVED** |
+| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
+| Documentation review | **CHANGES REQUIRED / IN PROGRESS** |
 | Owner manual review | **PENDING** |
-| Merge state | **NOT MERGED** |
-| Pull request | A new pull request targeting `main`. PR #1 was not reused and is not reopened |
+| Merge | **NOT MERGED** |
+| Stage 0.2.1 | **NOT AUTHORIZED** |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
@@ -383,7 +387,7 @@ method shown. The exact commands are reported in the Stage 0.2 delivery report.
 | 1 | Changed and created file list; no out-of-scope file | `git status --porcelain` and `git diff --stat` | Only repository documentation and decision records modified. No application source, project, manifest, lock file, SQL, script, installer, archive, CI file, configuration file, or runtime directory was created |
 | 2 | No runtime or package artefact exists | File-type and file-extension inventory over all non-`.git` files | 33 Markdown files and one `.gitignore`. Only `./docs` and `./docs/decisions` directories exist |
 | 3 | No dependency installed | No package-manager or installer command was executed | No dependency installed, restored, or vendored |
-| 4 | Internal relative Markdown links resolve | Inline Python checker over every Markdown file; relative targets only, absolute URLs and in-page anchors excluded | 33 files scanned; broken count reported in the delivery report. Any non-zero count is a defect that must be fixed before commit |
+| 4 | Internal relative Markdown links resolve | Inline Python checker over every Markdown file; relative targets only, absolute URLs and in-page anchors excluded | **33 Markdown files scanned, 654 relative internal links checked, 0 broken** — previous checkpoint: 33 files, 656 links, 0 broken; delta -2 links from removed superseded scope-limitation narrative (no broken links) |
 | 5 | Every ADR keeps its required section set | Heading extraction per ADR | Status, Context, Decision, Alternatives considered, Consequences, Risks, Verification status, Follow-up gates, Relationship to protected decisions |
 | 6 | The UI framework selection is not presented as accepted | Cross-document search for framework-acceptance wording | Final framework is `[OPEN]`; both candidates are `[PROPOSED]`; the React preference is explicitly not acceptance; Blazor is explicitly not rejected |
 | 7 | The React offline claim is correct and present | Targeted search | "React can be built and deployed offline" is stated, together with the second-ecosystem cost and the explicit statement that this does not make offline development or deployment impossible |
@@ -394,22 +398,6 @@ method shown. The exact commands are reported in the Stage 0.2 delivery report.
 | 12 | Cross-reference integrity | Search for the old `section 22` reference and for the new section numbers | The open-item section is now section 34 and the earlier references were corrected. Sections 23–33 referenced by the decision records all exist |
 | 13 | Full diff review | Complete diff read before the checkpoint commit | Every change is traceable to the punchlist; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
 | 14 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, simulator, or installer test was executed, and none is claimed |
-
-#### 12.2.1 Superseded scope limitation — stage-status lines in documents the first gate did not name
-
-The first Stage 0.2 checkpoint reported, as a scope limitation, that seven documents still
-carried the Stage 0.1-era line `Stage 0.2 `[NOT AUTHORIZED]``: `CHANGELOG.md`, `SECURITY.md`,
-`docs/ALARM_MODEL.md`, `docs/CLEANING_SEQUENCE.md`, `docs/HISTORIAN_RETENTION.md`,
-`docs/QUEUE_MODEL.md`, and `docs/USER_PERMISSION_MODEL.md`. They were not modified at that
-checkpoint, because the first gate did not name them and [`AGENTS.md`](../AGENTS.md) section 2.2
-prohibits modifying a file the current Stage Gate does not name.
-
-**That limitation is now closed.** The Owner-requested Stage 0.2 documentation review punchlist
-explicitly names those documents for a stage-status refresh, which authorises the change
-(see the authority order in [`AGENTS.md`](../AGENTS.md) section 1). Their status lines now state
-the current position. The `CHANGELOG.md` Stage 0.1 status block is retained as history and is
-annotated as superseded, because it is a historical record of that stage; the forward-looking
-stage status no longer says `[NOT AUTHORIZED]`.
 
 ## 13. Required positive confirmations
 
