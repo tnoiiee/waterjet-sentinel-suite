@@ -3,11 +3,14 @@
 **Status of this index:** [APPROVED] at the Stage 0.1 documentation foundation, corrected
 by the Owner-confirmed documentation review punchlist.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]`; Stage 0.2 **OWNER ACCEPTED / MERGED** through
-PR #2; ADR-0006 to ADR-0013 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A
-React feasibility spike `[APPROVED]` and **IN PROGRESS**, **NOT MERGED**; Blazor counter-spike
-**DEFERRED / `[NOT AUTHORIZED]`**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
+framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
+`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This folder holds the decisions that shape the WaterJet Sentinel Suite. An ADR records a
 decision, its context, and its consequences so that later work does not re-litigate or

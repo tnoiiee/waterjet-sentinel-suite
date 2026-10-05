@@ -2,7 +2,7 @@
   "label": "SYNTHETIC SPIKE EVIDENCE - NOT PRODUCTION VALIDATION",
   "stage": "0.2.1A",
   "environment": "Arena (Linux, Node harness in-process, SSE over 127.0.0.1, no browser)",
-  "generatedAt": "2026-10-04T22:48:14.045Z",
+  "generatedAt": "2026-10-05T05:37:14.353Z",
   "counts": {
     "PASS": 25,
     "PASS+OWNER": 2,
@@ -13,11 +13,23 @@
       "id": "S01",
       "name": "Initial Snapshot",
       "status": "PASS",
-      "durationMs": 15,
+      "durationMs": 6,
       "evidence": {
         "firstEvent": "snapshot",
-        "snapshotBytes": 50521,
-        "sensors": 104,
+        "snapshotBytes": 78284,
+        "sensors": 106,
+        "thermocoupleChannels": 212,
+        "perWall": {
+          "LEFT": 24,
+          "REAR": 29,
+          "RIGHT": 24,
+          "FRONT": 29
+        },
+        "wallMapSlots": 108,
+        "cannonSlots": [
+          "CANNON_REAR@R5C7",
+          "CANNON_FRONT@R5C16"
+        ],
         "revision": 1
       },
       "error": null
@@ -39,10 +51,11 @@
       "id": "S03",
       "name": "30% Dirty",
       "status": "PASS",
-      "durationMs": 2516,
+      "durationMs": 2512,
       "evidence": {
-        "dirty": 31,
-        "expectedApprox": 31,
+        "dirty": 32,
+        "expectedApprox": 32,
+        "population": 106,
         "note": "one sensor may be under active cleaning"
       },
       "error": null
@@ -51,10 +64,11 @@
       "id": "S04",
       "name": "70% Dirty",
       "status": "PASS",
-      "durationMs": 2506,
+      "durationMs": 2505,
       "evidence": {
-        "dirty": 73,
-        "expectedApprox": 73
+        "dirty": 74,
+        "expectedApprox": 74,
+        "population": 106
       },
       "error": null
     },
@@ -62,7 +76,7 @@
       "id": "S05",
       "name": "Threshold oscillation around 50",
       "status": "PASS",
-      "durationMs": 7013,
+      "durationMs": 7012,
       "evidence": {
         "oscillatingSensors": 8,
         "classificationFlipsIn7s": 23
@@ -73,14 +87,14 @@
       "id": "S06",
       "name": "All quality states",
       "status": "PASS",
-      "durationMs": 1310,
+      "durationMs": 1311,
       "evidence": {
         "qualities": {
-          "SYN-LEFT-01": "UNCERTAIN",
-          "SYN-LEFT-02": "BAD",
-          "SYN-LEFT-03": "STALE",
-          "SYN-LEFT-04": "DISABLED",
-          "SYN-LEFT-05": "GOOD"
+          "G+201": "UNCERTAIN",
+          "G+202": "BAD",
+          "G+203": "STALE",
+          "G+204": "DISABLED",
+          "G+101": "GOOD"
         },
         "uncertainBasis": "LAST_VALIDATED"
       },
@@ -90,7 +104,7 @@
       "id": "S07",
       "name": "Selection during updates",
       "status": "PASS+OWNER",
-      "durationMs": 4,
+      "durationMs": 6,
       "evidence": {
         "runtimePart": "selection is not on the wire (UI-local)",
         "jsdom": "renderIsolation.test.tsx: selection survives Deltas and Snapshots",
@@ -102,12 +116,12 @@
       "id": "S08",
       "name": "Queue badge changes",
       "status": "PASS",
-      "durationMs": 4004,
+      "durationMs": 4006,
       "evidence": {
-        "sensorsWithQueueStateChange": 63,
+        "sensorsWithQueueStateChange": 64,
         "statesSeen": [
-          "NONE",
           "READY",
+          "NONE",
           "ACTIVE"
         ]
       },
@@ -119,7 +133,7 @@
       "status": "PASS",
       "durationMs": 2416,
       "evidence": {
-        "totalQueued": 30,
+        "totalQueued": 32,
         "previewLength": 8,
         "heldStatuses": [
           "HELD"
@@ -139,7 +153,7 @@
       "id": "S10",
       "name": "Single Job progression",
       "status": "PASS",
-      "durationMs": 30149,
+      "durationMs": 30173,
       "evidence": {
         "phasesSeen": [
           "P1",
@@ -161,8 +175,8 @@
       "durationMs": 403,
       "evidence": {
         "alarmState": "ACTIVE_UNACK",
-        "classificationBefore": "CLEANER",
-        "classificationAfter": "CLEANER",
+        "classificationBefore": "DIRTY",
+        "classificationAfter": "DIRTY",
         "note": "classification is independent of alarm state"
       },
       "error": null
@@ -200,7 +214,7 @@
       "id": "S14",
       "name": "Other Devices continue",
       "status": "PASS",
-      "durationMs": 2,
+      "durationMs": 3,
       "evidence": {
         "pollsDuringTimeout": {
           "SYN-TC-01": 6,
@@ -218,9 +232,9 @@
       "id": "S15",
       "name": "Device recovery",
       "status": "PASS",
-      "durationMs": 1914,
+      "durationMs": 1910,
       "evidence": {
-        "recoveredWithinMs": 1911,
+        "recoveredWithinMs": 1907,
         "commAlarmAfterRecovery": "CLEARED_UNACK"
       },
       "error": null
@@ -229,7 +243,7 @@
       "id": "S16",
       "name": "UI disconnect",
       "status": "PASS",
-      "durationMs": 304,
+      "durationMs": 305,
       "evidence": {
         "droppedClients": 1,
         "lastRevisionSeen": 81
@@ -240,7 +254,7 @@
       "id": "S17",
       "name": "UI reconnect",
       "status": "PASS",
-      "durationMs": 1700,
+      "durationMs": 1701,
       "evidence": {
         "firstEventAfterReconnect": "snapshot",
         "sentLastEventId": 81
@@ -251,7 +265,7 @@
       "id": "S18",
       "name": "Authoritative re-snapshot",
       "status": "PASS",
-      "durationMs": 2,
+      "durationMs": 4,
       "evidence": {
         "snapshotRevision": 83,
         "lastSeenBeforeDrop": 81,
@@ -264,10 +278,10 @@
       "id": "S19",
       "name": "Historian slowdown",
       "status": "PASS",
-      "durationMs": 5208,
+      "durationMs": 5210,
       "evidence": {
         "deltasIn5_2s": 6,
-        "maxIntervalMs": 1002,
+        "maxIntervalMs": 1174,
         "revisionsAdvanced": 5
       },
       "error": null
@@ -276,16 +290,16 @@
       "id": "S20",
       "name": "Near-overflow behavior",
       "status": "PASS",
-      "durationMs": 1751,
+      "durationMs": 1767,
       "evidence": {
         "nearOverflow": true,
         "depthAtFull": 50000,
         "capacity": 50000,
-        "rejected": 6302,
+        "rejected": 6322,
         "gapMarkers": 1,
-        "pumpStopRoundTripMs": 2.17,
-        "nearOverflowClearedAfterRestoreMs": 512,
-        "depthAtClear": 37574,
+        "pumpStopRoundTripMs": 4.22,
+        "nearOverflowClearedAfterRestoreMs": 515,
+        "depthAtClear": 37474,
         "pumpAfterRestart": "STARTING"
       },
       "error": null
@@ -294,12 +308,12 @@
       "id": "S21",
       "name": "Bounded Trend",
       "status": "PASS",
-      "durationMs": 9010,
+      "durationMs": 9011,
       "evidence": {
         "acceleratedTicks": 89,
         "acceleratedCapacity": 50,
         "pointsRetained": 50,
-        "mainTrendPoints": 83,
+        "mainTrendPoints": 82,
         "mainCapacity": 600,
         "note": "accelerated parameters are test-only, not the planning values"
       },
@@ -321,7 +335,7 @@
       "id": "S23",
       "name": "Synthetic close guard for Active Job",
       "status": "PASS",
-      "durationMs": 1508,
+      "durationMs": 1511,
       "evidence": {
         "evaluation": {
           "allowed": false,
@@ -338,7 +352,7 @@
       "id": "S24",
       "name": "Synthetic close guard for Pump running",
       "status": "PASS",
-      "durationMs": 4,
+      "durationMs": 5,
       "evidence": {
         "evaluation": {
           "allowed": false,
@@ -364,7 +378,7 @@
       "id": "S26",
       "name": "Synthetic config revision",
       "status": "PASS",
-      "durationMs": 805,
+      "durationMs": 806,
       "evidence": {
         "configRevision": 2,
         "dirtyAtThreshold99": 0,
@@ -390,7 +404,7 @@
       "id": "S28",
       "name": "Revision gap -> re-snapshot",
       "status": "PASS",
-      "durationMs": 3109,
+      "durationMs": 3108,
       "evidence": {
         "gapsDetected": 1,
         "resyncFirstEvent": "snapshot"

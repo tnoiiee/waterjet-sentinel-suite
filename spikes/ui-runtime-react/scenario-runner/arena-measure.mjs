@@ -79,7 +79,7 @@ for (let i = 0; i < clients; i += 1) {
 
 const CYCLE = [
   ['set-dirty-mode', { mode: 'dirty30' }],
-  ['raise-alarm', { sensorId: 'SYN-REAR-07' }],
+  ['raise-alarm', { sensorId: 'H7' }],
   ['set-dirty-mode', { mode: 'oscillate' }],
   ['clear-alarm', {}],
   ['device-timeout', { deviceId: 'SYN-TC-06', enabled: true }],

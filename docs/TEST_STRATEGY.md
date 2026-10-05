@@ -3,11 +3,14 @@
 **Document status:** [PROPOSED] as a strategy. The statements in section 2 about what has
 and has not been tested are **facts**, not proposals.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
-review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
-Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
+framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
+`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 > **No runtime testing has occurred.** There is no application code, no build, no database
 > schema, and no device connection in this repository. Nothing in this project has been
@@ -172,6 +175,9 @@ constitutes hardware evidence, and passing them would not constitute certificati
 
 ### 3.8 Planned spike verification workload (proposed Stage 0.2.1)
 
+> **SUPERSEDED route.** The Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate. Stage 0.2.1A evidence is recorded in
+> [`spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md).
+
 Status of every case in this group: **PLANNED — NOT EXECUTED.** They belong to the proposed
 Stage 0.2.1 spike, which is `PROPOSED` and `[NOT AUTHORIZED]`. Nothing here authorises writing
 spike code, and no spike has been run. If the Owner does not authorise Stage 0.2.1, these cases
@@ -179,7 +185,7 @@ are not executed.
 
 | # | Planned case | Maps to |
 | --- | --- | --- |
-| 46 | Both candidates render 104 live Sensor cells with 208 channels updating at a one-second cadence without interactive stall | UIW-001, [`Architecture §33`](ARCHITECTURE.md) |
+| 46 | The UI candidate renders 106 live Sensor cells (with the two Cannon slots as neutral equipment) with 212 channels updating at a one-second cadence without interactive stall. The dual-candidate wording of Stage 0.2.1 is superseded by the React-first Stage 0.2.1A spike; a Blazor counter-spike requires a future Owner Scope Gate | UIW-001, [`Architecture §33`](ARCHITECTURE.md) |
 | 47 | Only changed Sensor cells are recomputed and repainted per update | UIW-009, UIW-012 |
 | 48 | Each Sensor cell independently expresses classification, Dirty Score intensity, quality, queue state, selection, execution state, and alarm state | SPC-001 |
 | 49 | Dirty/Cleaner classification follows the published effective threshold, not a hard-coded value | SPC-002, SPC-003 |

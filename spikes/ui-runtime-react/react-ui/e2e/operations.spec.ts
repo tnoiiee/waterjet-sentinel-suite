@@ -12,12 +12,35 @@ test.beforeEach(async ({ page, request }) => {
   await expect(page.getByTestId('conn-state')).toHaveText('LIVE', { timeout: 15_000 });
 });
 
-test('S01/S02 initial Snapshot renders 104 cells; one-second Deltas advance the revision', async ({ page }) => {
-  await expect(page.locator('[data-sensor-id]')).toHaveCount(104);
+test('S01/S02 initial Snapshot renders 106 cells; one-second Deltas advance the revision', async ({ page }) => {
+  await expect(page.locator('[data-sensor-id]')).toHaveCount(106);
   const a = await diag(page);
   await page.waitForTimeout(3200);
   const b = await diag(page);
   expect(Number(b.deltas) - Number(a.deltas)).toBeGreaterThanOrEqual(2);
+});
+
+test('MAP U-shaped wall map: 4 walls x 6 rows, 24/29/24/29 Sensors, Cannons at I7/I16 not selectable', async ({ page }) => {
+  const walls = page.locator('[data-wall]');
+  await expect(walls).toHaveCount(4);
+  expect(await walls.evaluateAll((ws) => ws.map((w) => [w.getAttribute('data-wall'), w.getAttribute('data-wall-rows'), w.querySelectorAll('[data-sensor-id]').length]))).toEqual([
+    ['REAR', '6', 29],
+    ['LEFT', '6', 24],
+    ['RIGHT', '6', 24],
+    ['FRONT', '6', 29],
+  ]);
+  // Plan-view geometry: Rear above Left/Right, Front below; Left left of Right.
+  const box = async (w: string) => (await page.locator(`[data-wall="${w}"]`).boundingBox())!;
+  const [rear, left, right, front] = [await box('REAR'), await box('LEFT'), await box('RIGHT'), await box('FRONT')];
+  expect(rear.y + rear.height).toBeLessThanOrEqual(left.y + 1);
+  expect(left.x + left.width).toBeLessThanOrEqual(right.x);
+  expect(Math.max(left.y + left.height, right.y + right.height)).toBeLessThanOrEqual(front.y + 1);
+  await expect(page.locator('[data-sensor-id="I7"]')).toHaveCount(0);
+  await expect(page.locator('[data-sensor-id="I16"]')).toHaveCount(0);
+  const cannon = page.locator('[data-equipment-id="CANNON_REAR"]');
+  await expect(cannon).toHaveAttribute('data-logical-column', '7');
+  await cannon.click();
+  await expect(page.locator('[aria-pressed="true"]')).toHaveCount(0);
 });
 
 test('S03/S04/S05 30 % / 70 % Dirty and threshold oscillation', async ({ page, request }) => {
@@ -40,22 +63,22 @@ test('S06 all quality states; BAD/STALE/DISABLED neutral; UNCERTAIN detail note'
   await scenario(request, 'quality-showcase', { enabled: true });
   await page.waitForTimeout(1500);
   for (const [id, q] of [
-    ['SYN-LEFT-02', 'BAD'],
-    ['SYN-LEFT-03', 'STALE'],
-    ['SYN-LEFT-04', 'DISABLED'],
+    ['G+202', 'BAD'],
+    ['G+203', 'STALE'],
+    ['G+204', 'DISABLED'],
   ]) {
     const cell = page.locator(`[data-sensor-id="${id}"]`);
     await expect(cell).toHaveAttribute('data-quality', q);
     await expect(cell).toHaveAttribute('data-process', 'NEUTRAL');
   }
-  await page.locator('[data-sensor-id="SYN-LEFT-01"]').click();
+  await page.locator('[data-sensor-id="G+201"]').click();
   await expect(page.getByTestId('detail-quality')).toContainText('UNCERTAIN');
   await expect(page.getByTestId('detail-note')).toContainText(/last validated classification/i);
   await scenario(request, 'quality-showcase', { enabled: false });
 });
 
 test('S07 selection persists during updates and reconnect', async ({ page, request }) => {
-  const cell = page.locator('[data-sensor-id="SYN-REAR-10"]');
+  const cell = page.locator('[data-sensor-id="H8"]');
   await cell.click();
   await page.waitForTimeout(3000);
   await expect(cell).toHaveAttribute('aria-pressed', 'true');
@@ -76,7 +99,7 @@ test('S08/S09/S10 queue badges, GlobalQueue preview, single job progression', as
 });
 
 test('S11/S12 active alarm and cleared-ack-required, independent of Dirty colour', async ({ page, request }) => {
-  const id = 'SYN-FRONT-05';
+  const id = 'G16';
   const cell = page.locator(`[data-sensor-id="${id}"]`);
   const bgBefore = await cell.evaluate((e) => getComputedStyle(e).backgroundColor);
   const r = await scenario(request, 'raise-alarm', { sensorId: id });
@@ -93,9 +116,9 @@ test('S11/S12 active alarm and cleared-ack-required, independent of Dirty colour
 test('S13/S14/S15 device timeout, other devices continue, recovery', async ({ page, request }) => {
   await scenario(request, 'device-timeout', { deviceId: 'SYN-TC-02', enabled: true });
   await page.waitForTimeout(4500);
-  const affected = page.locator('[data-sensor-id="SYN-LEFT-14"]');
+  const affected = page.locator('[data-sensor-id="G+105"]');
   await expect(affected).toHaveAttribute('data-quality', 'BAD');
-  await expect(page.locator('[data-sensor-id="SYN-RIGHT-10"]')).toHaveAttribute('data-quality', 'GOOD');
+  await expect(page.locator('[data-sensor-id="J12"]')).toHaveAttribute('data-quality', 'GOOD');
   await scenario(request, 'device-timeout', { deviceId: 'SYN-TC-02', enabled: false });
   await expect(affected).toHaveAttribute('data-quality', 'GOOD', { timeout: 10_000 });
 });
@@ -167,7 +190,8 @@ test('S25 viewport resize keeps the page usable', async ({ page }) => {
   ]) {
     await page.setViewportSize(size);
     await page.waitForTimeout(700);
-    await expect(page.locator('[data-sensor-id]')).toHaveCount(104);
+    await expect(page.locator('[data-sensor-id]')).toHaveCount(106);
+    await expect(page.locator('[data-slot-type="CANNON"]')).toHaveCount(2);
     await expect(page.getByTestId('wall-overview')).toBeVisible();
     await expect(page.locator('.uplot')).toHaveCount(1);
   }

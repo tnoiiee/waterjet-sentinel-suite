@@ -40,46 +40,31 @@ export const DEFAULT_PARAMS = Object.freeze({
   autoJobs: true,
 });
 
-export const WALL_COUNTS = Object.freeze([
-  ['LEFT', 24],
-  ['REAR', 28],
-  ['RIGHT', 24],
-  ['FRONT', 28],
-]);
+// Sensor map, wall groups, Cannon slots, device distribution, and Thermocouple channel identifiers
+// come from the single canonical mapping source. This file never generates Sensor IDs itself.
+import { EXPECTED, JET_COUNT, TC_DEVICE_COUNT, WALL_GROUPS, getSensorMap } from '../../contracts/sensorMap.mjs';
 
-export const TC_DEVICE_COUNT = 8;
-export const TC_CHANNELS_PER_DEVICE = 26;
-export const JET_COUNT = 8;
+export { JET_COUNT, TC_DEVICE_COUNT };
+/** [wall, expectedSensorCount] in logical-column order (LEFT, REAR, RIGHT, FRONT). */
+export const WALL_COUNTS = Object.freeze(WALL_GROUPS.map((g) => Object.freeze([g.wall, EXPECTED.perWall[g.wall]])));
 export const MOTION_CONTROLLER_COUNT = 4;
+
+/** Synthetic 'oscillate' dirty-mode sample: wall column 1, logical rows 1-2 of every wall (8 Sensors). */
+export const isOscillationSample = (s) => s.wallColumn === 1 && s.logicalRow <= 2;
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
-/** 104 synthetic Sensor locations, each folded from two synthetic Thermocouple channels. */
+/**
+ * 106 synthetic Sensor locations (canonical map), each folded from two synthetic Thermocouple
+ * channels (TC_F, TC_R). Adds harness-only fields (register offsets, job target IDs).
+ */
 export function buildSensors() {
-  const sensors = [];
-  let g = 0;
-  for (const [wall, count] of WALL_COUNTS) {
-    for (let i = 1; i <= count; i += 1) {
-      const chA = 2 * g;
-      const chB = 2 * g + 1;
-      const dev = Math.floor(chA / TC_CHANNELS_PER_DEVICE) + 1;
-      const deviceId = `SYN-TC-${pad2(dev)}`;
-      const local = (c) => `${deviceId}:CH${pad2(c % TC_CHANNELS_PER_DEVICE)}`;
-      sensors.push({
-        sensorId: `SYN-${wall}-${pad2(i)}`,
-        wall,
-        index: i,
-        globalIndex: g,
-        deviceId,
-        tcChannels: [local(chA), local(chB)],
-        channelOffsets: [chA % TC_CHANNELS_PER_DEVICE, chB % TC_CHANNELS_PER_DEVICE],
-        jetId: `SYN-JET-${(g % JET_COUNT) + 1}`,
-        valveId: `SYN-VLV-${(g % JET_COUNT) + 1}`,
-      });
-      g += 1;
-    }
-  }
-  return sensors;
+  return getSensorMap().sensors.map((m) => ({
+    ...m,
+    channelOffsets: [m.tcFrontOffset, m.tcRearOffset],
+    jetId: m.assignedWaterJet,
+    valveId: m.assignedIsolationValve,
+  }));
 }
 
 export function buildDevices() {
@@ -99,13 +84,14 @@ export function buildPollPlan(sensors) {
   for (let d = 1; d <= TC_DEVICE_COUNT; d += 1) {
     const deviceId = `SYN-TC-${pad2(d)}`;
     const own = sensors.filter((s) => s.deviceId === deviceId);
+    const quantity = own.length * 2;
     plan.push({
       id: `${deviceId}/fast/tc`,
       deviceId,
       functionCategory: 'INPUT_REGISTERS',
       startAddress: 0,
-      quantity: TC_CHANNELS_PER_DEVICE,
-      decodeInstructions: Array.from({ length: TC_CHANNELS_PER_DEVICE }, (_, i) => ({
+      quantity,
+      decodeInstructions: Array.from({ length: quantity }, (_, i) => ({
         offset: i,
         type: 'INT16_SCALED',
         scale: 0.1,

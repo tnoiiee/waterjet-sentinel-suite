@@ -97,7 +97,7 @@ describe('SSE transport against the Node harness', () => {
     for (const d of deltas) expect(validateDelta(d)).toEqual([]);
     expect(deltas[0].previousRevision).toBe(snaps[0].revision);
     expect(store.stats.gapsDetected).toBe(0);
-    expect(store.sensorCount).toBe(104);
+    expect(store.sensorCount).toBe(106);
   });
 
   it('server ignores Last-Event-ID: reconnect always starts with a fresh Snapshot (no replay)', async () => {

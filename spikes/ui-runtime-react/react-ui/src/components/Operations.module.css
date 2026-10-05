@@ -215,13 +215,46 @@
   gap: 5px;
   padding: 4px;
 }
-.wall_REAR .cells,
-.wall_FRONT .cells {
-  grid-template-columns: repeat(14, var(--cell));
+/* Wall grid: 6 logical rows; column count comes from the runtime wall map
+   (LEFT/RIGHT 4, REAR/FRONT 5). Row wrappers keep the logical row structure in the DOM. */
+.cells {
+  grid-template-columns: repeat(var(--wall-cols, 5), var(--cell));
 }
-.wall_LEFT .cells,
-.wall_RIGHT .cells {
-  grid-template-columns: repeat(2, var(--cell));
+.wallRow {
+  display: contents;
+}
+.wall_REAR,
+.wall_FRONT {
+  justify-self: center;
+}
+.wallSpan {
+  opacity: 0.7;
+  margin-left: 4px;
+}
+/* Cannon equipment slot: neutral, never a process/quality colour, never selectable. */
+.cannon {
+  width: var(--cell, 34px);
+  height: var(--cell, 34px);
+  box-sizing: border-box;
+  border: 1px dashed #7d8794;
+  border-radius: 50%;
+  background: #262c33;
+  color: #aeb6bf;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font: 600 8px/1 system-ui, sans-serif;
+  cursor: default;
+  user-select: none;
+}
+.cannonGlyph {
+  font-size: 13px;
+  line-height: 1;
+}
+.cannonText {
+  font-size: 7px;
+  letter-spacing: 0.02em;
 }
 .overviewCenter {
   grid-area: center;
@@ -279,6 +312,12 @@
 }
 .swJob {
   outline: 3px double #fff;
+}
+.legend span.swCannon {
+  background: #262c33;
+  border: 1px dashed #7d8794;
+  border-radius: 50%;
+  box-sizing: border-box;
 }
 .thresholdNote {
   font-size: 11px;

@@ -3,13 +3,15 @@
 **Document status:** [PROPOSED] — a forward view. Nothing in this document is approved
 work. Only an approved Stage Gate authorises delivery.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 **OWNER ACCEPTED / MERGED** through PR #2; ADR-0006 to ADR-0013
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
-Feasibility Spike — Scope and Coding Start `[APPROVED]`, implementation **IN PROGRESS**,
-**NOT MERGED**; React final selection **NOT YET APPROVED**; Blazor counter-spike **DEFERRED /
-`[NOT AUTHORIZED]`**; Stage 0.3 `[NOT AUTHORIZED]`. This roadmap authorises nothing.
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
+framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
+`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`. This roadmap authorises
+nothing.
 
 This roadmap describes *intended capability sequence*. It is not a schedule, not a
 commitment, and not an authorisation. The authoritative description of how stages are
@@ -69,7 +71,8 @@ development, and offline deployment. They are indexed in
 architecture direction, which does not mean implemented. No capability in the table above is authorised, started, or brought forward
 by those decisions, and Stage 0.3 remains `[NOT AUTHORIZED]`.
 
-Stage 0.2.1 — UI and Runtime Technology Spike — is `PROPOSED` and `[NOT AUTHORIZED]`. It is a
+Stage 0.2.1 — UI and Runtime Technology Spike — is **SUPERSEDED** (the dual-candidate proposal is
+not performed; a Blazor counter-spike requires a future Owner Scope Gate). It was a
 constrained evaluation, not an implementation Stage, and it is recorded in
 [`MASTER_PLAN.md`](MASTER_PLAN.md) section 3.2. It is not a capability in the sequence above,
 it is not started, and it does not bring any capability forward.
@@ -117,7 +120,7 @@ The following remain out of scope unless a future gate states otherwise:
 | Scope growth | Determinism and recoverability suffer | Stage gates; owner-only merge; priorities list applied in order |
 | Unmodelled storage growth | Historian could exhaust local storage | Produce a capacity model before committing to retention defaults; keep retention configurable per category |
 | Communication health judged by value change | A static value could mask a lost link | Evaluate health from transport evidence, never from value change alone |
-| UI framework chosen without measurement | A dense 104-cell page with one-second updates could repeat the legacy lag, freeze, and CPU problems | Framework remains `[OPEN]`; selection only through the proposed Stage 0.2.1 spike with measured acceptance criteria |
+| UI framework chosen without measurement | A dense 106-cell page with one-second updates could repeat the legacy lag, freeze, and CPU problems | Framework remains `[OPEN]`; selection only through the proposed Stage 0.2.1 spike with measured acceptance criteria |
 | Acquisition path not batched and not isolated per device | One slow coupler delays unrelated devices, lengthening the whole cycle | Per-device serialized command queue, bounded concurrent pollers, compiled Poll Plan, Fast/Medium/Slow groups |
 
 ---

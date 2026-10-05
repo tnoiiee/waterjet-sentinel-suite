@@ -24,9 +24,9 @@ function SensorDetailBody({ sensorId }: { sensorId: string }) {
       <dl className={styles.kv}>
         <dt>Sensor</dt>
         <dd data-testid="detail-id">{s.sensorId}</dd>
-        <dt>Wall / index</dt>
-        <dd>
-          {s.wall} / {s.index}
+        <dt>Wall / position</dt>
+        <dd data-testid="detail-position">
+          {s.wall} · logical column {s.logicalColumn} · logical row {s.logicalRow}
         </dd>
         <dt>Classification</dt>
         <dd data-testid="detail-class">
@@ -51,7 +51,7 @@ function SensorDetailBody({ sensorId }: { sensorId: string }) {
         <dd>{s.alarmState.replace('_', ' ')}</dd>
         <dt>Device / channels</dt>
         <dd>
-          {s.deviceId} · {s.tcChannels.join(', ')}
+          {s.deviceId} · TC_F {s.tcFrontChannel} · TC_R {s.tcRearChannel}
         </dd>
       </dl>
       {v.detailNote && (

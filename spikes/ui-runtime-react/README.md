@@ -12,7 +12,7 @@ Results: [`../../docs/spikes/stage-0.2.1a-results.md`](../../docs/spikes/stage-0
 
 | Path | Contents |
 | --- | --- |
-| [`contracts/`](contracts/CONTRACTS.md) | Snapshot / Delta contract types, the single classification module, structural validator, golden fixtures |
+| [`contracts/`](contracts/CONTRACTS.md) | Snapshot / Delta contract types, the single classification module, the single Sensor mapping source (`sensorMap.mjs`: 106 Sensors, 2 Cannon slots, 212 channels), structural validator, golden fixtures |
 | `runtime-harness/` | Node synthetic runtime harness: built-ins only (`node:http`, `node:events`, `node:perf_hooks`, …), **no dependencies**, binds to `127.0.0.1` only |
 | `react-ui/` | React 19 + TypeScript 6 + Vite 8 Operations page (one page), uPlot trend, Vitest (jsdom) tests, Playwright specs for Owner-local Edge runs |
 | `scenario-runner/` | 28-scenario runner and Arena measurement driver (Node built-ins only) |
@@ -55,8 +55,14 @@ node scenario-runner/arena-measure.mjs --minutes 10              # harness measu
 ## Synthetic values
 
 Every timing, threshold, capacity, pressure, and quality parameter in this directory is a
-**SYNTHETIC SPIKE PARAMETER — NOT A PRODUCTION VALUE**. Sensor IDs are `SYN-*`. No Production
-Sensor ID, address, register map, setpoint, threshold, or timeout appears here. uPlot is approved
+**SYNTHETIC SPIKE PARAMETER — NOT A PRODUCTION VALUE**. Sensor labels follow the Owner's
+logical matrix (`G+201`..`G+218`, `G+101`..`G+118`, `G1`..`G18`, `H1`..`H18`, `I1`..`I18`
+without I7 / I16, `J1`..`J18`; Cannon slots `CANNON_REAR` at I7 and `CANNON_FRONT` at I16). These
+are a logical reference only. Device, channel, Water Jet, and Isolation Valve identifiers are
+`SYN-*`, and the scan order, device distribution, and jet assignment are synthetic. No address,
+register map, coordinate, Water Jet assignment, setpoint, threshold, or timeout from Production
+appears here. The synthetic process workload is deterministic for the same seed, scenario
+timeline, synthetic configuration, and code revision. Wall-clock sample timing is not. uPlot is approved
 for this spike only; the Production chart library remains `[OPEN]`. SSE is used for this spike
 only. The close guard is an operational usability control, not a safety protection.
 

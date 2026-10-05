@@ -8,20 +8,20 @@ describe('PresentationStore', () => {
   it('applies a chained Delta and advances the revision', () => {
     const s = new PresentationStore();
     s.applySnapshot(makeSnapshot(10));
-    const r = s.applyDelta(makeDelta(10, { sensors: [makeSensor({ sensorId: 'SYN-LEFT-01', dirtyScore: 77, classification: 'DIRTY', lastValidatedScore: 77 })] }));
+    const r = s.applyDelta(makeDelta(10, { sensors: [makeSensor({ sensorId: 'G+201', dirtyScore: 77, classification: 'DIRTY', lastValidatedScore: 77 })] }));
     expect(r).toBe('applied');
     expect(s.revision).toBe(11);
-    expect(s.getSensor('SYN-LEFT-01')?.classification).toBe('DIRTY');
+    expect(s.getSensor('G+201')?.classification).toBe('DIRTY');
   });
 
   it('detects a revision gap and applies nothing', () => {
     const s = new PresentationStore();
     s.applySnapshot(makeSnapshot(10));
-    const before = s.getSensor('SYN-LEFT-01');
-    const r = s.applyDelta(makeDelta(12, { sensors: [makeSensor({ sensorId: 'SYN-LEFT-01', dirtyScore: 99 })] }));
+    const before = s.getSensor('G+201');
+    const r = s.applyDelta(makeDelta(12, { sensors: [makeSensor({ sensorId: 'G+201', dirtyScore: 99 })] }));
     expect(r).toBe('gap');
     expect(s.revision).toBe(10);
-    expect(s.getSensor('SYN-LEFT-01')).toBe(before);
+    expect(s.getSensor('G+201')).toBe(before);
     expect(s.stats.gapsDetected).toBe(1);
   });
 
@@ -39,29 +39,29 @@ describe('PresentationStore', () => {
 
   it('Snapshot replaces all state (no merge with stale cache)', () => {
     const s = new PresentationStore();
-    s.applySnapshot(makeSnapshot(10, { activeJob: { jobId: 'SYN-JOB-0001', targetSensorId: 'SYN-LEFT-03', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P2', phaseLabel: 'x', phaseIndex: 1, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:04Z', phaseProgress: 0.5 } }));
-    s.applyDelta(makeDelta(10, { sensors: [makeSensor({ sensorId: 'SYN-LEFT-02', alarmState: 'ACTIVE_UNACK' })] }));
+    s.applySnapshot(makeSnapshot(10, { activeJob: { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P2', phaseLabel: 'x', phaseIndex: 1, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:04Z', phaseProgress: 0.5 } }));
+    s.applyDelta(makeDelta(10, { sensors: [makeSensor({ sensorId: 'G+202', alarmState: 'ACTIVE_UNACK' })] }));
     s.applySnapshot(makeSnapshot(50));
     expect(s.revision).toBe(50);
     expect(s.getSlice('activeJob')).toBeNull();
-    expect(s.getSensor('SYN-LEFT-02')?.alarmState).toBe('NONE');
-    expect(s.sensorCount).toBe(104);
+    expect(s.getSensor('G+202')?.alarmState).toBe('NONE');
+    expect(s.sensorCount).toBe(106);
   });
 
   it('notifies only the subscriptions of changed Sensors', () => {
     const s = new PresentationStore();
     s.applySnapshot(makeSnapshot(1));
     const spies = new Map<string, ReturnType<typeof vi.fn>>();
-    for (const id of ['SYN-LEFT-01', 'SYN-LEFT-02', 'SYN-REAR-10', 'SYN-FRONT-28']) {
+    for (const id of ['G+201', 'G+202', 'H8', 'J18']) {
       const fn = vi.fn();
       spies.set(id, fn);
       s.subscribeSensor(id, fn);
     }
-    s.applyDelta(makeDelta(1, { sensors: [makeSensor({ sensorId: 'SYN-REAR-10', wall: 'REAR', index: 10, dirtyScore: 60 })] }));
-    expect(spies.get('SYN-REAR-10')).toHaveBeenCalledTimes(1);
-    expect(spies.get('SYN-LEFT-01')).not.toHaveBeenCalled();
-    expect(spies.get('SYN-LEFT-02')).not.toHaveBeenCalled();
-    expect(spies.get('SYN-FRONT-28')).not.toHaveBeenCalled();
+    s.applyDelta(makeDelta(1, { sensors: [makeSensor({ sensorId: 'H8', wall: 'REAR', dirtyScore: 60 })] }));
+    expect(spies.get('H8')).toHaveBeenCalledTimes(1);
+    expect(spies.get('G+201')).not.toHaveBeenCalled();
+    expect(spies.get('G+202')).not.toHaveBeenCalled();
+    expect(spies.get('J18')).not.toHaveBeenCalled();
     expect(s.stats.lastDeltaSensorNotifications).toBe(1);
   });
 
@@ -79,7 +79,7 @@ describe('PresentationStore', () => {
 
   it('applies activeJob null as a clear, and absent as unchanged', () => {
     const s = new PresentationStore();
-    const job = { jobId: 'SYN-JOB-0001', targetSensorId: 'SYN-LEFT-03', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P1' as const, phaseLabel: 'x', phaseIndex: 0, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:00Z', phaseProgress: 0 };
+    const job = { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P1' as const, phaseLabel: 'x', phaseIndex: 0, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:00Z', phaseProgress: 0 };
     s.applySnapshot(makeSnapshot(1, { activeJob: job }));
     s.applyDelta(makeDelta(1));
     expect(s.getSlice('activeJob')).toEqual(job);

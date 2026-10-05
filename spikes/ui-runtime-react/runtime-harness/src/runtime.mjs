@@ -12,7 +12,8 @@
 import { EventEmitter } from 'node:events';
 import { performance, monitorEventLoopDelay } from 'node:perf_hooks';
 import { classifySensor } from '../../contracts/classify.mjs';
-import { DEFAULT_PARAMS, SYNTHETIC_LABEL, buildDevices, buildPollPlan, buildSensors, WALL_COUNTS } from './config.mjs';
+import { DEFAULT_PARAMS, SYNTHETIC_LABEL, buildDevices, buildPollPlan, buildSensors, isOscillationSample, WALL_COUNTS } from './config.mjs';
+import { isCannonId, wallMapSlots } from '../../contracts/sensorMap.mjs';
 import { createRng } from './rng.mjs';
 import { PollScheduler, SimDevice } from './scheduler.mjs';
 import { HistorianChannel } from './historian.mjs';
@@ -39,11 +40,17 @@ export class SyntheticRuntime extends EventEmitter {
     super();
     const p = Object.freeze({ ...DEFAULT_PARAMS, ...overrides });
     this.params = p;
+    // Independent seeded streams so the synthetic process workload does not depend on how many
+    // polls the wall-clock scheduler happened to execute:
+    //   rng       — process model (initial state, per-tick drift, job completion)
+    //   noiseRng  — per-device register noise
+    //   latencyRng — per-device simulated latency (inside SimDevice)
     this.rng = createRng(p.seed);
     this.startedAt = Date.now();
     this.sensors = buildSensors();
     this.sensorById = new Map(this.sensors.map((s) => [s.sensorId, s]));
     this.plan = buildPollPlan(this.sensors);
+    this.wallMap = wallMapSlots();
     this.dirtyMode = 'normal';
     this.tickCount = 0;
 
@@ -120,11 +127,12 @@ export class SyntheticRuntime extends EventEmitter {
     this.lastCpu = { usage: process.cpuUsage(), at: performance.now() };
 
     // Devices and scheduler.
-    const latRng = createRng(p.seed + 1);
-    const devices = buildDevices().map(
-      (d) =>
+    const deviceDefs = buildDevices();
+    this.noiseRng = new Map(deviceDefs.map((d, i) => [d.deviceId, createRng(p.seed + 100 + i)]));
+    const devices = deviceDefs.map(
+      (d, i) =>
         new SimDevice(d.deviceId, {
-          rng: latRng,
+          rng: createRng(p.seed + 1000 + i),
           latencyMinMs: p.deviceLatencyMinMs,
           latencyMaxMs: p.deviceLatencyMaxMs,
           registerSource: (entry) => this.registerSource(entry),
@@ -164,12 +172,13 @@ export class SyntheticRuntime extends EventEmitter {
   }
   registerSource(entry) {
     const regs = new Array(entry.quantity).fill(0);
+    const noise = this.noiseRng.get(entry.deviceId);
     if (entry.functionCategory === 'INPUT_REGISTERS' && entry.deviceId.startsWith('SYN-TC-')) {
       for (const s of this.sensors) {
         if (s.deviceId !== entry.deviceId) continue;
         const score = this.proc.get(s.sensorId).trueScore;
         s.channelOffsets.forEach((off) => {
-          const temp = 100 + score * 1.5 + this.rng.range(-0.3, 0.3);
+          const temp = 100 + score * 1.5 + noise.range(-0.3, 0.3);
           regs[off] = Math.round(temp * 10);
         });
       }
@@ -178,7 +187,7 @@ export class SyntheticRuntime extends EventEmitter {
       const jetting = this.activeJobs[0] && this.currentPhaseIndex(this.activeJobs[0], Date.now()) === 3;
       const offsets = [0, -3, jetting ? -12 : -6, -5];
       for (let i = 0; i < 4; i += 1) {
-        const v = level * (this.params.pumpSetpoint + offsets[i]) + this.rng.range(-1.5, 1.5) * level;
+        const v = level * (this.params.pumpSetpoint + offsets[i]) + noise.range(-1.5, 1.5) * level;
         regs[i] = Math.max(0, Math.round(v * 10));
       }
     }
@@ -193,8 +202,8 @@ export class SyntheticRuntime extends EventEmitter {
         const acq = this.acq.get(s.sensorId);
         acq.rawScore = score;
         acq.sourceTs = result.sourceTimestamp;
-        this.historian.offer({ t: result.sourceTimestamp, ch: s.tcChannels[0], v: a });
-        this.historian.offer({ t: result.sourceTimestamp, ch: s.tcChannels[1], v: b });
+        this.historian.offer({ t: result.sourceTimestamp, ch: s.tcFrontChannel, v: a });
+        this.historian.offer({ t: result.sourceTimestamp, ch: s.tcRearChannel, v: b });
       }
     } else if (entry.id === 'SYN-PIO-01/fast/pressure') {
       this.pressure.values = result.registers.map((r) => round1(r * 0.1));
@@ -233,7 +242,7 @@ export class SyntheticRuntime extends EventEmitter {
       }
     });
     if (mode === 'oscillate') {
-      for (const s of this.sensors) if (s.index <= 2) this.proc.get(s.sensorId).oscillate = true;
+      for (const s of this.sensors) if (isOscillationSample(s)) this.proc.get(s.sensorId).oscillate = true;
     }
   }
   advanceProcess() {
@@ -245,7 +254,7 @@ export class SyntheticRuntime extends EventEmitter {
         continue;
       }
       if (pr.oscillate) {
-        pr.trueScore = 50 + 2 * Math.sin(t * 1.3 + s.globalIndex);
+        pr.trueScore = 50 + 2 * Math.sin(t * 1.3 + s.scanOrder);
       } else if (pr.target !== null) {
         pr.trueScore = clamp(pr.target + this.rng.range(-0.4, 0.4), 0, 100);
       } else {
@@ -337,6 +346,7 @@ export class SyntheticRuntime extends EventEmitter {
       this.jobRefusals[reason] = (this.jobRefusals[reason] ?? 0) + 1;
       return { accepted: false, reason };
     };
+    if (isCannonId(sensorId)) return refuse('CANNON_NOT_A_SENSOR');
     const s = this.sensorById.get(sensorId);
     if (!s) return refuse('UNKNOWN_SENSOR');
     if (!this.pumpReady()) return refuse('PUMP_NOT_READY');
@@ -419,10 +429,16 @@ export class SyntheticRuntime extends EventEmitter {
     const [alarmState, alarmSeverity] = this.sensorAlarmState(s.sensorId);
     return {
       sensorId: s.sensorId,
+      slotType: 'SENSOR',
       wall: s.wall,
-      index: s.index,
+      logicalColumn: s.logicalColumn,
+      logicalRow: s.logicalRow,
+      wallColumn: s.wallColumn,
+      wallRow: s.wallRow,
+      scanOrder: s.scanOrder,
       deviceId: s.deviceId,
-      tcChannels: s.tcChannels,
+      tcFrontChannel: s.tcFrontChannel,
+      tcRearChannel: s.tcRearChannel,
       dirtyScore: quality === 'BAD' || quality === 'DISABLED' ? null : acq.rawScore,
       lastValidatedScore: acq.lastValidatedScore,
       lastValidatedAt: iso(acq.lastValidatedAt),
@@ -624,6 +640,7 @@ export class SyntheticRuntime extends EventEmitter {
       revision: this.revision,
       generatedAt: iso(Date.now()),
       config: s.config.value,
+      wallMap: this.wallMap,
       sensors: this.sensors.map((x) => this.pubSensors.get(x.sensorId).rec),
       walls: s.walls.value,
       activeJob: s.activeJob.value,
@@ -692,6 +709,8 @@ export class SyntheticRuntime extends EventEmitter {
   }
   dispatch(name, p) {
     const sensorOk = (id) => this.sensorById.has(id);
+    // Cannon slots are equipment, not Sensors: never a quality, alarm, queue, or job target.
+    const sensorRefusal = (id) => (isCannonId(id) ? 'CANNON_NOT_A_SENSOR' : 'UNKNOWN_SENSOR');
     const deviceOk = (id) => this.devices.has(id);
     switch (name) {
       case 'set-dirty-mode': {
@@ -700,18 +719,20 @@ export class SyntheticRuntime extends EventEmitter {
         return { accepted: true };
       }
       case 'force-quality': {
-        if (!sensorOk(p.sensorId)) return { accepted: false, reason: 'UNKNOWN_SENSOR' };
+        if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
         if (p.quality !== null && !['GOOD', 'UNCERTAIN', 'BAD', 'STALE', 'DISABLED'].includes(p.quality)) return { accepted: false, reason: 'INVALID_QUALITY' };
         this.acq.get(p.sensorId).forcedQuality = p.quality === 'GOOD' ? null : p.quality;
         return { accepted: true };
       }
       case 'quality-showcase': {
-        const map = { 'SYN-LEFT-01': 'UNCERTAIN', 'SYN-LEFT-02': 'BAD', 'SYN-LEFT-03': 'STALE', 'SYN-LEFT-04': 'DISABLED' };
+        // First four Sensors of the LEFT wall in canonical scan order (G+201..G+204).
+        const ids = this.sensors.filter((x) => x.wall === 'LEFT').slice(0, 4).map((x) => x.sensorId);
+        const map = Object.fromEntries(ids.map((id, i) => [id, ['UNCERTAIN', 'BAD', 'STALE', 'DISABLED'][i]]));
         for (const [id, q] of Object.entries(map)) this.acq.get(id).forcedQuality = p.enabled === false ? null : q;
         return { accepted: true, detail: map };
       }
       case 'disable-sensor': {
-        if (!sensorOk(p.sensorId)) return { accepted: false, reason: 'UNKNOWN_SENSOR' };
+        if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
         this.acq.get(p.sensorId).disabled = p.disabled !== false;
         return { accepted: true };
       }
@@ -726,7 +747,7 @@ export class SyntheticRuntime extends EventEmitter {
         return { accepted: true };
       }
       case 'raise-alarm': {
-        if (p.sensorId && !sensorOk(p.sensorId)) return { accepted: false, reason: 'UNKNOWN_SENSOR' };
+        if (p.sensorId && !sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
         const id = this.raiseAlarm({ code: 'SYN-SENSOR-ALARM', text: `Synthetic alarm ${p.sensorId ?? 'system'}`, severity: p.severity ?? 'HIGH', sensorId: p.sensorId ?? null });
         return { accepted: true, detail: { alarmId: id } };
       }
@@ -735,7 +756,7 @@ export class SyntheticRuntime extends EventEmitter {
       case 'clear-alarm':
         return { accepted: true, detail: { affected: this.clearAlarm(p.alarmId) } };
       case 'enqueue': {
-        if (!sensorOk(p.sensorId)) return { accepted: false, reason: 'UNKNOWN_SENSOR' };
+        if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
         if (!this.queueReason.has(p.sensorId) && this.activeJobs[0]?.targetSensorId !== p.sensorId) {
           this.queueOrder.push(p.sensorId);
           this.queueReason.set(p.sensorId, 'SYN_OPERATOR_REQUEST');

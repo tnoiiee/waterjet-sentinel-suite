@@ -42,9 +42,10 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction. Accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
 | Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
-| Stage 0.2.1A implementation | **IN PROGRESS** — development checkpoint submitted on branch `arena/01a108d8-waterjet-sentinel-suite` through a new pull request to `main` |
-| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | **PENDING** |
-| Stage 0.2.1A Owner manual review | **PENDING** |
+| Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain |
+| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map; the re-run is **PENDING** |
+| Stage 0.2.1A Owner manual UI re-review (corrected map) | **PENDING** |
+| Stage 0.2.1A 60-minute Owner-local run | **PAUSED** until the Owner visually accepts the corrected map |
 | Stage 0.2.1A merge | **NOT MERGED** |
 | React final selection | **NOT YET APPROVED** — UI framework `[OPEN]` |
 | Blazor counter-spike | **DEFERRED / NOT AUTHORIZED** |
@@ -62,6 +63,20 @@ result and **not** a UI framework selection. Nothing in this repository may desc
 0.2.1A as Owner accepted, merged, or as a React final selection. The spike uses synthetic data
 only: no device was contacted, no Production value is used, no Product directory exists, and
 no Production Write was performed or authorised.
+
+**Owner domain correction (Stage 0.2.1A).** The Owner corrected the physical baseline from 104
+Sensor locations / 208 Thermocouple channels (Left 24, Rear 28, Right 24, Front 28) to **106
+Sensor locations / 212 Thermocouple channels** (Left 24, Rear 29, Right 24, Front 29). The
+Sensors sit in an 18-column × 6-row logical matrix with two Cannon equipment slots, logical I7
+(Rear) and I16 (Front), which are not Sensors. See
+[`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed).
+This is a domain correction, not a runtime failure. Where 104 / 208 still appears in a
+historical record below, it is the **superseded baseline**.
+
+The synthetic process workload of the spike is deterministic for the same seed, scenario
+timeline, synthetic configuration, and code revision. Cryptographic run and scenario tokens are
+non-deterministic but do not affect process values, scenario ordering, the device latency
+sequence, classification, or revision behaviour. Identical wall-clock timing is not claimed.
 
 The Stage 0.1 process-deviation record in section 11.1 is retained unchanged.
 
@@ -327,12 +342,14 @@ accepted and merged Stage 0.2.*
 | Stage | 0.2.1A — React UI and Runtime Feasibility Spike (synthetic) |
 | Approved main base | `e779f8ad2c856e367fd65985007a3da411bd0e73` (verified remote `main` before coding) |
 | Stage branch | `arena/01a108d8-waterjet-sentinel-suite` |
-| Development checkpoint | Created on the Stage branch. Its SHA is recorded in the delivery report and in the pull request description, **not** inside the commit that creates it |
-| Pull request | A new pull request to `main` (PR #1 and PR #2 are not reused) |
+| Development checkpoint | `dd20a8bd` (104-location map, superseded by the Owner domain correction) |
+| Sensor-map correction checkpoint | A normal fast-forward commit on top of `dd20a8bd`. Its SHA is recorded in the delivery report and in the PR #3 description, **not** inside the commit that creates it |
+| Local recovery before the correction | An Owner-authorised, one-time local reference recovery set the local branch to the already-pushed `dd20a8bd` after an exact identity proof. No history was rewritten, nothing was force-pushed, and AGENTS.md is unchanged |
+| Pull request | PR #3 to `main` — **OPEN** (PR #1 and PR #2 are not reused) |
 | Scope Gate / Coding Start Gate | **APPROVED** |
-| Implementation | **IN PROGRESS** — checkpoint submitted |
-| Owner-local testing | **PENDING** |
-| Owner manual review | **PENDING** |
+| Implementation | **IN PROGRESS** |
+| Owner-local testing | `dd20a8bd` PASS (does not validate the corrected map); re-run **PENDING** |
+| Owner manual UI re-review | **PENDING** — 60-minute run **PAUSED** |
 | Merge | **NOT MERGED** |
 | React final selection | **NOT YET APPROVED** |
 | Blazor counter-spike | **NOT AUTHORIZED** |
@@ -423,7 +440,7 @@ method shown. The exact commands are reported in the Stage 0.2 delivery report.
 | 5 | Every ADR keeps its required section set | Heading extraction per ADR | Status, Context, Decision, Alternatives considered, Consequences, Risks, Verification status, Follow-up gates, Relationship to protected decisions |
 | 6 | The UI framework selection is not presented as accepted | Cross-document search for framework-acceptance wording | Final framework is `[OPEN]`; both candidates are `[PROPOSED]`; the React preference is explicitly not acceptance; Blazor is explicitly not rejected |
 | 7 | The React offline claim is correct and present | Targeted search | "React can be built and deployed offline" is stated, together with the second-ecosystem cost and the explicit statement that this does not make offline development or deployment impossible |
-| 8 | Protected decisions remain stated and unmodified | Targeted `grep` runs, listed in the delivery report | All required statements found and unchanged: one Boiler Unit per Workstation, 104 Sensor locations, 208 Thermocouple channels, Eight Water Jets, Four Galil DMC-B140-M controllers, Water Jet to Isolation Valve one-to-one, strictly sequential Cleaning Jobs, maximum one active Cleaning Job, parallel cleaning prohibited, GlobalQueue FIFO and source ownership, `LastSuccessfulCleaningCompletedAt` never null, Operator baseline override role, cleared-state acknowledgement, Main Pump may remain running between sequential Jobs, WAGO fail-safe `[NOT VERIFIED]`, Production Write `[NOT AUTHORIZED]`, Production configuration never in the repository |
+| 8 | Protected decisions remain stated and unmodified | Targeted `grep` runs, listed in the delivery report | All required statements found and unchanged: one Boiler Unit per Workstation, 104 Sensor locations, 208 Thermocouple channels *(superseded baseline — corrected by the Owner to 106 / 212 during Stage 0.2.1A, see section 2)*, Eight Water Jets, Four Galil DMC-B140-M controllers, Water Jet to Isolation Valve one-to-one, strictly sequential Cleaning Jobs, maximum one active Cleaning Job, parallel cleaning prohibited, GlobalQueue FIFO and source ownership, `LastSuccessfulCleaningCompletedAt` never null, Operator baseline override role, cleared-state acknowledgement, Main Pump may remain running between sequential Jobs, WAGO fail-safe `[NOT VERIFIED]`, Production Write `[NOT AUTHORIZED]`, Production configuration never in the repository |
 | 9 | Architecture consistency | Targeted `grep` runs, listed in the delivery report | The UI owns no device session and cannot write to hardware; the Equipment Runtime service is the sole owner of physical device sessions; adapters contain no UI logic and the domain is independent of vendor libraries; the simulator implements the same application-facing contract; physical adapters are disabled by default; the runtime consumes only Published configuration; the UI does not read Modbus and does not query SQL for live state; no statement permits parallel Cleaning Jobs |
 | 10 | Sensitive-data scan | IPv4 and CIDR regex, credential-shaped regex, connection-string regex, numeric configuration patterns, and register-map-like rows, across all non-`.git` files | Zero matches |
 | 11 | Stage-status consistency | Stage-status wording search across every Markdown file | Zero remaining lines describing Stage 0.2 as `[NOT AUTHORIZED]`. Every file now states the current position: Stage 0.2 Scope Gate `[APPROVED]`; Stage 0.2 architecture checkpoint SUBMITTED FOR OWNER REVIEW; documentation review CHANGES REQUESTED / IN PROGRESS; Owner manual review PENDING; NOT MERGED; Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]` |
@@ -432,6 +449,9 @@ method shown. The exact commands are reported in the Stage 0.2 delivery report.
 | 14 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, simulator, or installer test was executed, and none is claimed |
 
 ### 12.3 Stage 0.2.1A Arena validation record
+
+*Checkpoint `dd20a8bd`, recorded on the superseded 104-location map. See section 12.4 for the
+corrected map.*
 
 Synthetic spike validation in Arena (Linux x64, Node v22.22.3). Detailed evidence:
 [`spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md) and
@@ -452,14 +472,35 @@ Synthetic spike validation in Arena (Linux x64, Node v22.22.3). Detailed evidenc
 | 11 | Full diff review | Performed before the checkpoint commit |
 | 12 | Browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI | **NOT VERIFIED** in Arena — Owner-local testing PENDING |
 
-**Reported discrepancy (not resolved silently).** The status headers of 12 documents outside
-the Stage 0.2.1A update list still describe the Stage 0.2 submission state (`SUBMITTED FOR
-OWNER REVIEW`, Stage 0.2.1 `[NOT AUTHORIZED]`): `SECURITY.md`, `ALARM_MODEL.md`,
+**Reported discrepancy — resolved.** At checkpoint `dd20a8bd` the status headers of 12
+documents still described the Stage 0.2 submission state: `SECURITY.md`, `ALARM_MODEL.md`,
 `ARCHITECTURE.md`, `CLEANING_SEQUENCE.md`, `CONTROL_AUTHORITY.md`, `DOMAIN_MODEL.md`,
 `HISTORIAN_RETENTION.md`, `QUEUE_MODEL.md`, `REQUIREMENTS.md`, `SAFETY_BOUNDARY.md`,
-`TEST_STRATEGY.md`, `USER_PERMISSION_MODEL.md`. They were not changed because they are not named
-in the approved Stage 0.2.1A file list. This document takes precedence; a status-header
-correction requires Owner authorisation.
+`TEST_STRATEGY.md`, `USER_PERMISSION_MODEL.md`. The Owner authorised the correction with the
+Sensor-map domain correction, and all 12 (plus `ROADMAP.md` and `decisions/README.md`) now carry
+the current status. See section 12.4.
+
+### 12.4 Stage 0.2.1A Sensor-map correction — Arena validation record
+
+Synthetic spike validation in Arena (Linux x64, Node v22.22.3) of the 106-location correction.
+Detailed evidence: [`spikes/stage-0.2.1a-results.md` §0](spikes/stage-0.2.1a-results.md#0-sensor-map-correction-checkpoint-current).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, TypeScript 6.0.3 `tsc --noEmit` | PASS, 0 errors (lock file unchanged) |
+| 2 | Vite 8.3.2 production build | PASS |
+| 3 | Vitest (jsdom), 10 files | 60 / 60 PASS |
+| 4 | Runtime harness `node:test`, 2 files | 26 / 26 PASS |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | Golden fixtures regenerated and validated against the canonical map | PASS |
+| 7 | 10-minute harness measurement, 2 SSE clients | Exit 0; invariant violations 0; accepted second Jobs 0 |
+| 8 | Playwright spec parse (`--list`, no browser) | PASS, 17 tests |
+| 9 | Hard gates | 106 Sensors; 212 Thermocouple channels; 24 / 29 / 24 / 29; 2 Cannon slots; I7 / I16 absent; 0 duplicate IDs, slots, scan orders, `TC_F`, `TC_R`, or shared channels |
+| 10 | Markdown relative links | PASS — 44 files, 694 links, 0 broken |
+| 11 | Sensitive-data scan, changed and new files | PASS |
+| 12 | SHA-256 manifest regenerated and verified | PASS |
+| 13 | Full diff review | Performed before the correction commit |
+| 14 | Browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI | **NOT VERIFIED** in Arena — Owner-local re-run and manual UI re-review **PENDING**; 60-minute run **PAUSED** |
 
 ## 13. Required positive confirmations
 

@@ -12,7 +12,7 @@
 
 ## Context
 
-Twenty-four to twenty-eight sensors exist per wall, 104 in total, and each cleaning job costs
+Twenty-four to twenty-nine sensors exist per wall, 106 in total, and each cleaning job costs
 significant time and water. Two competing concerns drive selection:
 
 - **Cleanliness** — a sensor with a high DirtyScore should be cleaned sooner.

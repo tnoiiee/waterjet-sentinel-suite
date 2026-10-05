@@ -3,10 +3,14 @@
 **Document status:** [APPROVED] for the conceptual structure and boundaries described
 here. Concrete technology selection is `[PROPOSED]` or `[OPEN]` as marked.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
+framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
+`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This document describes the conceptual architecture of the application. It contains no
 implementation and authorises none. Production addresses, register maps, tag lists,
@@ -767,7 +771,7 @@ Equipment Runtime in a separate Windows Service behind a loopback API
 | Candidate A: React + TypeScript + Vite | `[PROPOSED]` candidate — **not accepted** |
 | Candidate B: Blazor Hybrid | `[PROPOSED]` candidate — **not rejected** |
 | Final UI framework selection | **`[OPEN]`** |
-| Selection route | Proposed Stage 0.2.1 spike (section 33) — `PROPOSED`, `[NOT AUTHORIZED]` |
+| Selection route | **SUPERSEDED:** the dual-candidate Stage 0.2.1 spike (section 33) is not performed — the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate |
 
 Both candidates are compared **inside the same architecture** — the same application-owned
 shell, the same embedded WebView, the same loopback ASP.NET Core Local Application API, and
@@ -793,7 +797,7 @@ kiosk stability.
 | Single ecosystem | Blazor reduces the number of build ecosystems, but that advantage does not by itself prove UI performance, graph quality, camera integration, or long-running kiosk stability |
 | Exclusion grounds | Neither candidate may be excluded for assumed Internet access, ease of closing a window, language preference, or ecosystem size alone |
 
-The dimension-by-dimension comparison (104 live Sensor cells, one-second update target,
+The dimension-by-dimension comparison (106 live Sensor cells, one-second update target,
 partial updates, visual states, trends, camera, grids, alarms, layout, shell integration, crash
 and reconnect, memory stability, component and visual regression testing, accessibility,
 offline build and restore, licensing, footprint, development effort, maintainability,
@@ -807,10 +811,12 @@ in that comparison is a measurement to be taken, not a result.
 
 The selected UI technology must support, at minimum:
 
-- **104 live Sensor cells** and **208 Thermocouple channels**, with a **one-second operational
-  update target**.
-- Wall layouts matching the approved physical baseline: **Left 24, Rear 28, Right 24,
-  Front 28**.
+- **106 live Sensor cells** and **212 Thermocouple channels**, with a **one-second operational
+  update target** (Owner domain correction during Stage 0.2.1A; supersedes 104 / 208).
+- Wall layouts matching the Owner-confirmed logical matrix: **Left 24, Rear 29, Right 24,
+  Front 29**, each wall six logical rows deep, with the two **Cannon equipment slots** (logical
+  I7 Rear, logical I16 Front) shown as neutral equipment, never as Sensors — see
+  [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed).
 - Wall-level **Dirty and Cleaner counts** (section 26).
 - **Sensor detail drill-down.**
 - **Active Cleaning Job visibility.**
@@ -1070,8 +1076,9 @@ Stage 0.2.1 spike.
 | Item | Value |
 | --- | --- |
 | Stage | **0.2.1 — UI and Runtime Technology Spike** |
-| Status | **`PROPOSED`** |
-| Authorization | **`[NOT AUTHORIZED]`** |
+| Status | **SUPERSEDED** — the dual-candidate proposal below is not performed |
+| Authorization | **`[NOT AUTHORIZED]`** as written |
+| Replaced by | The approved, narrower **React-first Stage 0.2.1A — React UI and Runtime Feasibility Spike** ([`spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md)). React final selection is **NOT YET APPROVED** and the UI framework remains `[OPEN]`. A **Blazor counter-spike requires a future Owner Scope Gate** and is **DEFERRED / `[NOT AUTHORIZED]`** |
 | Purpose | Select the UI framework and validate the live-state delivery and performance architecture with measured evidence |
 | Deliverable | A comparison report with measurements, a recommendation, and a decision record draft. **No production code.** |
 
@@ -1087,7 +1094,8 @@ implemented in disposable spike code, not in the repository structure of section
 
 ### 33.2 Minimum synthetic workload
 
-10 simulated Modbus devices; 104 Sensor locations; 208 Thermocouple channels; one-second update;
+10 simulated Modbus devices; 106 Sensor locations; 212 Thermocouple channels (corrected from the
+superseded 104 / 208 baseline); one-second update;
 Dirty/Cleaner classification; Dirty Score intensity; Good/Uncertain/Bad/Stale quality; queue
 badges; a selected Sensor; an Active Cleaning Job marker; an alarm marker; wall summary counts;
 a GlobalQueue preview; a pressure trend; a camera placeholder; UI disconnect/reconnect; one

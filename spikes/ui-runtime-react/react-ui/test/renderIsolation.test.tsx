@@ -22,11 +22,11 @@ function Harness({ store }: { store: PresentationStore }) {
 describe('render isolation (jsdom)', () => {
   beforeEach(() => renderCounter.reset());
 
-  it('renders 104 Sensor cells from the Snapshot', () => {
+  it('renders 106 Sensor cells from the Snapshot', () => {
     const store = new PresentationStore();
     store.applySnapshot(makeSnapshot(1));
     const { container } = render(<Harness store={store} />);
-    expect(container.querySelectorAll('[data-sensor-id]').length).toBe(104);
+    expect(container.querySelectorAll('[data-sensor-id]').length).toBe(106);
   });
 
   it('a Delta with one changed Sensor re-renders only that cell', () => {
@@ -35,10 +35,10 @@ describe('render isolation (jsdom)', () => {
     render(<Harness store={store} />);
     renderCounter.reset();
     act(() => {
-      store.applyDelta(makeDelta(1, { sensors: [makeSensor({ sensorId: 'SYN-RIGHT-07', wall: 'RIGHT', index: 7, dirtyScore: 72, lastValidatedScore: 72, classification: 'DIRTY' })] }));
+      store.applyDelta(makeDelta(1, { sensors: [makeSensor({ sensorId: 'H12', wall: 'RIGHT', dirtyScore: 72, lastValidatedScore: 72, classification: 'DIRTY' })] }));
     });
     expect(renderCounter.sensorCellRenders).toBe(1);
-    expect([...renderCounter.perSensor.keys()]).toEqual(['SYN-RIGHT-07']);
+    expect([...renderCounter.perSensor.keys()]).toEqual(['H12']);
   });
 
   it('a Delta with only panel singletons re-renders no Sensor cell', () => {
@@ -70,17 +70,17 @@ describe('render isolation (jsdom)', () => {
     store.applySnapshot(makeSnapshot(1));
     const { container } = render(<Harness store={store} />);
     const cell = (id: string) => container.querySelector(`[data-sensor-id="${id}"]`) as HTMLElement;
-    fireEvent.click(cell('SYN-LEFT-05'));
+    fireEvent.click(cell('G+101'));
     renderCounter.reset();
-    fireEvent.click(cell('SYN-REAR-12'));
+    fireEvent.click(cell('J9'));
     expect(renderCounter.sensorCellRenders).toBe(2);
-    expect(new Set(renderCounter.perSensor.keys())).toEqual(new Set(['SYN-LEFT-05', 'SYN-REAR-12']));
+    expect(new Set(renderCounter.perSensor.keys())).toEqual(new Set(['G+101', 'J9']));
     act(() => {
-      store.applyDelta(makeDelta(1, { sensors: [makeSensor({ sensorId: 'SYN-REAR-12', wall: 'REAR', index: 12, dirtyScore: 80, classification: 'DIRTY' })] }));
+      store.applyDelta(makeDelta(1, { sensors: [makeSensor({ sensorId: 'J9', wall: 'REAR', dirtyScore: 80, classification: 'DIRTY' })] }));
     });
-    expect(cell('SYN-REAR-12').getAttribute('aria-pressed')).toBe('true');
+    expect(cell('J9').getAttribute('aria-pressed')).toBe('true');
     act(() => store.applySnapshot(makeSnapshot(99)));
-    expect(cell('SYN-REAR-12').getAttribute('aria-pressed')).toBe('true');
+    expect(cell('J9').getAttribute('aria-pressed')).toBe('true');
   });
 
   it('full Operations page mounts in jsdom with all required areas (trend excluded: needs canvas)', () => {

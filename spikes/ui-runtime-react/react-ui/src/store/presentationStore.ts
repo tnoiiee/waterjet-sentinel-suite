@@ -22,6 +22,7 @@ import type {
   SensorPresentationState,
   TrendPoint,
   Wall,
+  WallMapSlot,
   WallSummary,
 } from '../../../contracts/operational';
 import { RingBuffer } from '../lib/ringBuffer';
@@ -57,7 +58,8 @@ export interface TrendView {
 
 export interface Slices {
   meta: Meta;
-  layout: Record<Wall, string[]>;
+  /** Per wall: logical rows (top to bottom), each row's slots in wall-column order. From Snapshot `wallMap` only. */
+  layout: WallLayout;
   config: PublishedConfigurationRevision | null;
   walls: WallSummary[];
   activeJob: ActiveCleaningJobState | null;
@@ -74,7 +76,20 @@ export type SliceKey = keyof Slices;
 export type ApplyResult = 'applied' | 'gap' | 'duplicate';
 
 const DELTA_SLICES = ['config', 'walls', 'activeJob', 'pump', 'queue', 'alarms', 'communication', 'runtime'] as const;
-const EMPTY_LAYOUT: Record<Wall, string[]> = { LEFT: [], REAR: [], RIGHT: [], FRONT: [] };
+export type WallLayout = Record<Wall, WallMapSlot[][]>;
+const EMPTY_LAYOUT: WallLayout = { LEFT: [], REAR: [], RIGHT: [], FRONT: [] };
+
+/** Groups the runtime-supplied wall map into rows. No wall rules or ID generation here. */
+export function layoutFromWallMap(wallMap: readonly WallMapSlot[] | undefined): WallLayout {
+  const out: WallLayout = { LEFT: [], REAR: [], RIGHT: [], FRONT: [] };
+  for (const slot of wallMap ?? []) {
+    const rows = out[slot.wall];
+    (rows[slot.wallRow - 1] ??= []).push(slot);
+  }
+  for (const rows of Object.values(out)) for (const row of rows) row?.sort((a, b) => a.wallColumn - b.wallColumn);
+  return out;
+}
+const layoutKey = (l: WallLayout) => JSON.stringify(Object.values(l).map((rows) => rows.map((r) => r.map((x) => `${x.slotId}:${x.slotType}:${x.sensorId ?? x.equipmentId}`))));
 
 export class PresentationStore {
   private sensors = new Map<string, SensorPresentationState>();
@@ -169,11 +184,8 @@ export class PresentationStore {
     const pending = new Set<SliceKey>();
     const oldIds = [...this.sensors.keys()];
     this.sensors = new Map(s.sensors.map((r) => [r.sensorId, r]));
-    const layout: Record<Wall, string[]> = { LEFT: [], REAR: [], RIGHT: [], FRONT: [] };
-    for (const r of s.sensors) layout[r.wall].push(r.sensorId);
-    const prevLayout = this.slices.layout;
-    const sameLayout = (Object.keys(layout) as Wall[]).every((w) => layout[w].join() === prevLayout[w].join());
-    if (!sameLayout) this.setSlice('layout', layout, pending);
+    const layout = layoutFromWallMap(s.wallMap);
+    if (layoutKey(layout) !== layoutKey(this.slices.layout)) this.setSlice('layout', layout, pending);
     this.setSlice('meta', { revision: s.revision, generatedAt: s.generatedAt, hasSnapshot: true }, pending);
     this.setSlice('config', s.config, pending);
     this.setSlice('walls', s.walls, pending);

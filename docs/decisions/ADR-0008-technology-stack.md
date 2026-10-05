@@ -166,7 +166,7 @@ The full dimension-by-dimension comparison is in
 
 | Decision | Alternative | Reason not selected |
 | --- | --- | --- |
-| **UI framework** | **Select Blazor Hybrid now because it uses C# and one toolchain** | Language unity and a smaller offline ecosystem are genuine advantages, but they do not demonstrate the one-second 104-cell workload, trend quality, camera integration, or long-running kiosk stability. Those require measurement |
+| **UI framework** | **Select Blazor Hybrid now because it uses C# and one toolchain** | Language unity and a smaller offline ecosystem are genuine advantages, but they do not demonstrate the one-second 106-cell workload, trend quality, camera integration, or long-running kiosk stability. Those require measurement |
 | **UI framework** | **Exclude React because it is assumed to need Internet access** | Incorrect: React can be built and deployed offline from local assets and a local package mirror. Excluding a candidate on a false premise would be a reasoning error |
 | Platform | Native Windows C++ or C# with a non-.NET runtime | Higher development and maintenance cost for the same offline Windows deployment, with weaker tooling for a small team; no requirement in the baseline forces a non-.NET platform |
 | Platform | Cross-platform runtime with an abstraction layer | The deployment target is one Windows workstation per Boiler Unit; abstracting the platform adds cost with no deployment benefit |
@@ -230,7 +230,7 @@ The full dimension-by-dimension comparison is in
 - `[NOT VERIFIED]`: offline restorability of every proposed dependency, and the licence
   position of every library — including the npm dependency tree if Candidate A is selected.
 - `[NOT VERIFIED]`: the performance suitability of either UI framework candidate. No
-  measurement exists for the 104-cell one-second workload, trend rendering, camera
+  measurement exists for the 106-cell one-second workload, trend rendering, camera
   integration, or long-running memory stability.
 - `[OPEN]`: **final UI framework (Candidate A or Candidate B)**; shell host framework; .NET
   version pin; logging provider; validation library (optional); unit-test framework;

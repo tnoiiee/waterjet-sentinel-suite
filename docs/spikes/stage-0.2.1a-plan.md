@@ -10,7 +10,7 @@ library.
 | Stage | 0.2.1A — React UI and Runtime Feasibility Spike |
 | Scope Gate | **APPROVED** |
 | Coding Start Gate | **APPROVED** |
-| Implementation | **IN PROGRESS** until a development checkpoint is submitted for review |
+| Implementation | **IN PROGRESS** — PR #3 **OPEN**, **NOT MERGED**; Sensor map corrected to the Owner's 106-location domain (section 6.1) |
 | Approved base | `e779f8ad2c856e367fd65985007a3da411bd0e73` (remote `main`) |
 | Working branch | `arena/01a108d8-waterjet-sentinel-suite` |
 | React | Primary feasibility candidate — **not** the final selection |
@@ -26,7 +26,7 @@ Results are recorded separately in [`stage-0.2.1a-results.md`](stage-0.2.1a-resu
 ## 1. Purpose
 
 Show, with evidence, whether a React + TypeScript + Vite Operations page can present the
-documented UI workload (104 Sensor locations folded from 208 Thermocouple channels, one active
+documented UI workload (106 Sensor locations folded from 212 Thermocouple channels, one active
 Cleaning Job, GlobalQueue preview, pressure trend, alarms, communication health) at a one-second
 cadence, fed by an authoritative runtime through a Snapshot-plus-Delta stream, without
 full-page re-rendering, unbounded growth, or state inference after reconnect.
@@ -134,9 +134,10 @@ All values below are **SYNTHETIC SPIKE PARAMETER — NOT A PRODUCTION VALUE**.
 
 | Item | Value |
 | --- | --- |
-| Devices | `SYN-TC-01`..`SYN-TC-08` (26 Thermocouple channels each), `SYN-PIO-01` (pump, valves, jets), `SYN-STS-01` (motion-controller status) |
-| Sensors | 104: `SYN-LEFT-01..24`, `SYN-REAR-01..28`, `SYN-RIGHT-01..24`, `SYN-FRONT-01..28` |
-| Thermocouple channels | 208 (two per Sensor), folded to 104 presentation records in the Runtime |
+| Devices | `SYN-TC-01`..`SYN-TC-08` (`SYN-TC-01`/`02`: 14 Sensors, 28 Thermocouple channels each; `SYN-TC-03`..`08`: 13 Sensors, 26 channels each), `SYN-PIO-01` (pump, valves, jets), `SYN-STS-01` (motion-controller status) |
+| Sensors | 106 Owner logical labels (section 6.1): Left 24, Rear 29, Right 24, Front 29. *Superseded baseline: 104 `SYN-<WALL>-NN` Sensors (Rear 28, Front 28).* |
+| Cannon slots | 2 equipment slots (logical I7 `CANNON_REAR`, logical I16 `CANNON_FRONT`) — not Sensors |
+| Thermocouple channels | 212 (`TC_F` + `TC_R` per Sensor), folded to 106 presentation records in the Runtime. *Superseded: 208.* |
 | Water Jets / Isolation Valves | 8 / 8 (`SYN-JET-1..8`, `SYN-VLV-1..8`, one-to-one) |
 | Motion controllers | 4 (`SYN-MC-1..4`) |
 | Active Cleaning Jobs | at most 1 |
@@ -152,6 +153,49 @@ All values below are **SYNTHETIC SPIKE PARAMETER — NOT A PRODUCTION VALUE**.
 
 Poll-plan entries carry `deviceId`, `functionCategory`, `startAddress`, `quantity`,
 `decodeInstructions`, `pollGroup`, `updateTargets`. Addresses are synthetic offsets only.
+
+### 6.1 Sensor map (Owner domain correction)
+
+The Owner corrected the protected count from 104 / 208 to **106 Sensor locations / 212
+Thermocouple channels** during Stage 0.2.1A. This is a domain correction, not a runtime defect.
+The single mapping source is `spikes/ui-runtime-react/contracts/sensorMap.mjs`. It is consumed
+by the runtime harness, the Snapshot (`wallMap`), the validator, the fixtures, the scenario
+runner, the wall summaries, and the tests. The React UI renders the Snapshot `wallMap` and never
+generates Sensor IDs or wall rules.
+
+| Logical row (top to bottom) | Labels | Wall columns |
+| --- | --- | --- |
+| 1 | `G+201`..`G+218` | Left 1–4 · Rear 5–9 · Right 10–13 · Front 14–18 |
+| 2 | `G+101`..`G+118` | as above |
+| 3 | `G1`..`G18` | as above |
+| 4 | `H1`..`H18` | as above |
+| 5 | `I1`..`I18` except **I7 = `CANNON_REAR`**, **I16 = `CANNON_FRONT`** | as above |
+| 6 | `J1`..`J18` | as above |
+
+- 18 × 6 = 108 logical slots = 106 Sensors + 2 Cannon slots. Wall grids are 6 rows deep (Left
+  4 columns, Rear 5, Right 4, Front 5), with no rotation or reversal. The U-shaped layout (Rear
+  top, Left and Right sides, Front bottom) is unchanged.
+- Each Sensor record carries `sensorId`, `wall`, `logicalColumn`, `logicalRow`, `wallColumn`,
+  `wallRow`, `scanOrder`, `deviceId`, `tcFrontChannel`, `tcRearChannel`. The mapping source also
+  holds `assignedWaterJet` and `assignedIsolationValve`.
+- **Synthetic, not Production:** `scanOrder` (row-major from the top row, left to right, Cannon
+  slots skipped), the device distribution, the channel identifiers, and the Water Jet / Isolation
+  Valve assignment (`SYN-JET-((scanOrder − 1) mod 8 + 1)`) are spike parameters. They are not a
+  Production scan order, register map, or Water Jet assignment.
+- Cannon slots are excluded from Sensor counts, Thermocouple channels, Dirty Score,
+  classification, quality, queue, selection, alarms, and Job targets. The runtime refuses
+  Sensor commands for Cannon IDs with `CANNON_NOT_A_SENSOR`.
+
+### 6.2 Determinism
+
+The synthetic process workload is deterministic for the same seed, scenario timeline,
+synthetic configuration, and code revision. The process model, the register noise of each
+device, and the simulated latency of each device use independent seeded streams, so the
+process values do not depend on how many polls the wall-clock scheduler executed. The
+cryptographic run token and scenario tokens are non-deterministic. They do not affect process
+values, scenario ordering, the device latency sequence, classification, or revision behaviour.
+Observed sample timing, Job phase timing, and the samples a client sees depend on the
+wall-clock scheduler, so identical wall-clock timing is **not** claimed.
 
 ## 7. Classification and quality
 

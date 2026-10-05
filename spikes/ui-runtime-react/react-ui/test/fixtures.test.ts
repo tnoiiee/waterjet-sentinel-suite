@@ -4,10 +4,11 @@ import snapshot from '../../contracts/fixtures/snapshot.example.json';
 import delta from '../../contracts/fixtures/delta.example.json';
 import { validateDelta, validateSnapshot } from '../../contracts/validate.mjs';
 import { PresentationStore } from '../src/store/presentationStore';
+import { SENSOR_IDS } from '../../contracts/sensorMap.mjs';
 import type { OperationalDelta, OperationalSnapshot } from '../../contracts/operational';
 
 describe('golden fixtures', () => {
-  it('snapshot fixture is structurally valid (104 sensors, 208 channels, 10 devices)', () => {
+  it('snapshot fixture is structurally valid (106 sensors, 212 channels, 108 wall-map slots, 10 devices)', () => {
     expect(validateSnapshot(snapshot)).toEqual([]);
   });
   it('delta fixture is structurally valid and chains from the snapshot fixture', () => {
@@ -17,8 +18,13 @@ describe('golden fixtures', () => {
   it('fixtures contain only synthetic identifiers', () => {
     const text = JSON.stringify(snapshot) + JSON.stringify(delta);
     expect(text).not.toMatch(/\b\d{1,3}(\.\d{1,3}){3}\b/);
-    const ids = text.match(/"sensorId":"([^"]+)"/g) ?? [];
-    expect(ids.every((m) => m.includes('SYN-'))).toBe(true);
+    // Sensor IDs are the Owner's logical labels from the canonical map; device IDs stay synthetic.
+    const ids = [...text.matchAll(/"(?:sensorId|targetSensorId)":"([^"]+)"/g)].map((m) => m[1]);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.every((id) => (SENSOR_IDS as readonly string[]).includes(id))).toBe(true);
+    const devs = [...text.matchAll(/"deviceId":"([^"]+)"/g)].map((m) => m[1]);
+    expect(devs.every((d) => d.startsWith('SYN-'))).toBe(true);
+    expect((snapshot as OperationalSnapshot).wallMap.filter((s) => s.slotType === 'CANNON').map((s) => s.equipmentId)).toEqual(['CANNON_REAR', 'CANNON_FRONT']);
   });
   it('fixtures exercise every quality state', () => {
     const q = new Set((snapshot as OperationalSnapshot).sensors.map((s) => s.quality));

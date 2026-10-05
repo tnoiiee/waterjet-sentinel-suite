@@ -18,12 +18,43 @@ export type QueueState = 'NONE' | 'READY' | 'HELD' | 'BLOCKED' | 'EXCLUDED' | 'A
 export type AlarmState = 'NONE' | 'ACTIVE_UNACK' | 'ACTIVE_ACK' | 'CLEARED_UNACK';
 export type AlarmSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 
+/**
+ * One logical position of the 18-column x 6-row matrix (108 positions). Delivered once in the
+ * Snapshot (`wallMap`); static, never in Deltas. The UI renders wall grids from these slots only.
+ * CANNON slots are equipment, not Sensors: no Sensor ID, no Thermocouple channels, no score.
+ */
+export type SlotType = 'SENSOR' | 'CANNON';
+
+export interface WallMapSlot {
+  slotId: string;
+  slotType: SlotType;
+  wall: Wall;
+  /** 1-18 across the whole matrix. */
+  logicalColumn: number;
+  /** 1-6, top to bottom (G+2xx, G+1xx, G, H, I, J). */
+  logicalRow: number;
+  /** 1-based column inside the wall (LEFT/RIGHT 1-4, REAR/FRONT 1-5). */
+  wallColumn: number;
+  /** 1-6 inside the wall; equals logicalRow (no rotation, no reversal). */
+  wallRow: number;
+  sensorId: string | null;
+  equipmentId: string | null;
+}
+
 export interface SensorPresentationState {
   sensorId: string;
+  slotType: 'SENSOR';
   wall: Wall;
-  index: number;
+  logicalColumn: number;
+  logicalRow: number;
+  wallColumn: number;
+  wallRow: number;
+  /** Synthetic spike scan order 1-106 (not a Production order). */
+  scanOrder: number;
   deviceId: string;
-  tcChannels: [string, string];
+  /** Synthetic Thermocouple channel identifiers (TC_F, TC_R). */
+  tcFrontChannel: string;
+  tcRearChannel: string;
   /** Folded from two Thermocouple channels. null when no current value. */
   dirtyScore: number | null;
   lastValidatedScore: number | null;
@@ -177,6 +208,8 @@ export interface OperationalSnapshot {
   revision: number;
   generatedAt: string;
   config: PublishedConfigurationRevision;
+  /** 108 logical slots: 106 SENSOR + 2 CANNON. Snapshot-only. */
+  wallMap: WallMapSlot[];
   sensors: SensorPresentationState[];
   walls: WallSummary[];
   activeJob: ActiveCleaningJobState | null;

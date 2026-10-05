@@ -26,15 +26,15 @@ async function cmd(h, command, params) {
 }
 const snapshot = async (h) => (await fetch(`${h.url}/api/snapshot`)).json();
 
-test('synthetic model: 104 sensors, 208 channels, wall counts, synthetic IDs only', () => {
+test('synthetic model: 106 sensors, 212 channels, wall counts 24/29/24/29, canonical IDs', () => {
   const s = buildSensors();
-  assert.equal(s.length, 104);
-  assert.equal(new Set(s.flatMap((x) => x.tcChannels)).size, 208);
+  assert.equal(s.length, 106);
+  assert.equal(new Set(s.flatMap((x) => [x.tcFrontChannel, x.tcRearChannel])).size, 212);
   const per = Object.groupBy(s, (x) => x.wall);
-  assert.deepEqual([per.LEFT.length, per.REAR.length, per.RIGHT.length, per.FRONT.length], [24, 28, 24, 28]);
-  assert.ok(s.every((x) => /^SYN-(LEFT|REAR|RIGHT|FRONT)-\d{2}$/.test(x.sensorId)));
-  assert.equal(s[0].sensorId, 'SYN-LEFT-01');
-  assert.equal(s[103].sensorId, 'SYN-FRONT-28');
+  assert.deepEqual([per.LEFT.length, per.REAR.length, per.RIGHT.length, per.FRONT.length], [24, 29, 24, 29]);
+  assert.equal(s[0].sensorId, 'G+201');
+  assert.equal(s[105].sensorId, 'J18');
+  assert.ok(!s.some((x) => x.sensorId === 'I7' || x.sensorId === 'I16'));
 });
 
 test('poll plan entries carry the required fields and three poll groups', () => {
@@ -42,6 +42,10 @@ test('poll plan entries carry the required fields and three poll groups', () => 
   for (const e of plan) for (const k of ['deviceId', 'functionCategory', 'startAddress', 'quantity', 'decodeInstructions', 'pollGroup', 'updateTargets']) assert.ok(k in e, `${e.id} missing ${k}`);
   assert.deepEqual([...new Set(plan.map((e) => e.pollGroup))].sort(), ['FAST', 'MEDIUM', 'SLOW']);
   assert.equal(new Set(plan.map((e) => e.deviceId)).size, 10);
+  const tc = plan.filter((e) => e.pollGroup === 'FAST' && e.deviceId.startsWith('SYN-TC-'));
+  assert.equal(tc.reduce((n, e) => n + e.quantity, 0), 212, 'TC poll quantity covers 212 channels');
+  assert.deepEqual(tc.map((e) => e.quantity), [28, 28, 26, 26, 26, 26, 26, 26]);
+  assert.equal(tc.reduce((n, e) => n + e.updateTargets.length, 0), 106);
 });
 
 test('synthetic parameters carry the synthetic label and planning values', () => {
@@ -94,7 +98,7 @@ test('device timeout: UNCERTAIN then BAD, other devices continue, recovery resto
     const otherBefore = h.runtime.scheduler.sessions.get('SYN-TC-05').pollsOk;
     await sleep(1900);
     let snap = await snapshot(h);
-    const s1 = snap.sensors.find((s) => s.sensorId === 'SYN-LEFT-01');
+    const s1 = snap.sensors.find((s) => s.sensorId === 'G+201');
     assert.ok(['UNCERTAIN', 'BAD'].includes(s1.quality), `quality ${s1.quality}`);
     if (s1.quality === 'UNCERTAIN') assert.equal(s1.classificationBasis, 'LAST_VALIDATED');
     await sleep(2500);
@@ -119,7 +123,7 @@ test('at most one active Cleaning Job: a second job request is refused', async (
     assert.equal(r.accepted, false);
     assert.equal(r.reason, 'ACTIVE_JOB_EXISTS');
     assert.equal(r.detail.activeJobs, 1);
-    const r2 = await cmd(h, 'start-job', { sensorId: 'SYN-REAR-05' });
+    const r2 = await cmd(h, 'start-job', { sensorId: 'G5' });
     assert.equal(r2.accepted, false);
     const m = h.runtime.metricsReport();
     assert.equal(m.jobs.acceptedSecondJobs, 0);
@@ -132,12 +136,12 @@ test('at most one active Cleaning Job: a second job request is refused', async (
 test('UNCERTAIN keeps last validated classification while values change', async () => {
   await withHarness(async (h) => {
     await sleep(1500);
-    const before = (await snapshot(h)).sensors.find((s) => s.sensorId === 'SYN-RIGHT-03');
-    await cmd(h, 'force-quality', { sensorId: 'SYN-RIGHT-03', quality: 'UNCERTAIN' });
+    const before = (await snapshot(h)).sensors.find((s) => s.sensorId === 'G11');
+    await cmd(h, 'force-quality', { sensorId: 'G11', quality: 'UNCERTAIN' });
     // move the raw value across the threshold while UNCERTAIN
-    h.runtime.proc.get('SYN-RIGHT-03').target = before.classification === 'DIRTY' ? 10 : 90;
+    h.runtime.proc.get('G11').target = before.classification === 'DIRTY' ? 10 : 90;
     await sleep(2300);
-    const after = (await snapshot(h)).sensors.find((s) => s.sensorId === 'SYN-RIGHT-03');
+    const after = (await snapshot(h)).sensors.find((s) => s.sensorId === 'G11');
     assert.equal(after.quality, 'UNCERTAIN');
     assert.equal(after.classificationBasis, 'LAST_VALIDATED');
     assert.equal(after.classification, before.classification);

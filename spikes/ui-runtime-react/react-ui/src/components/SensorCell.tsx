@@ -36,12 +36,13 @@ function SensorCellImpl({ sensorId, selected, threshold, onSelect }: SensorCellP
       aria-pressed={selected}
       title={v.ariaLabel}
       data-sensor-id={sensorId}
+      data-slot-type="SENSOR"
       data-process={v.process}
       data-quality={s.quality}
       data-alarm={v.alarm.state}
       onClick={() => onSelect(sensorId)}
     >
-      <span className={styles.index}>{String(s.index).padStart(2, '0')}</span>
+      <span className={styles.index}>{s.sensorId}</span>
       <span className={styles.score}>{v.scoreText}</span>
       {v.queueBadge && (
         <span className={styles.badge} title={v.queueBadge.title} data-queue={s.queueState}>

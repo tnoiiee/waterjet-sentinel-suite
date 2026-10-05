@@ -12,6 +12,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHarness } from '../runtime-harness/src/server.mjs';
 import { validateDelta, validateSnapshot } from '../contracts/validate.mjs';
+import { CANNON_IDS, EXPECTED, getSensorMap } from '../contracts/sensorMap.mjs';
+import { isOscillationSample } from '../runtime-harness/src/config.mjs';
 import { SseMirror } from './sse-client.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -70,7 +72,21 @@ await scenario('S01', 'Initial Snapshot', async () => {
   const snap = await api.snapshot();
   const errs = validateSnapshot(snap);
   check(errs.length === 0, errs.join('; '));
-  return { firstEvent: first.type, snapshotBytes: first.bytes, sensors: mirror.sensors.size, revision: first.revision };
+  const channels = new Set(snap.sensors.flatMap((s) => [s.tcFrontChannel, s.tcRearChannel])).size;
+  const cannons = snap.wallMap.filter((s) => s.slotType === 'CANNON');
+  const perWall = Object.fromEntries(snap.walls.map((w) => [w.wall, w.total]));
+  check(mirror.sensors.size === EXPECTED.sensors && channels === EXPECTED.channels, `sensors ${mirror.sensors.size} channels ${channels}`);
+  check(cannons.length === 2 && !snap.sensors.some((s) => ['I7', 'I16', ...CANNON_IDS].includes(s.sensorId)), 'Cannon slots wrong or present as Sensors');
+  return {
+    firstEvent: first.type,
+    snapshotBytes: first.bytes,
+    sensors: mirror.sensors.size,
+    thermocoupleChannels: channels,
+    perWall,
+    wallMapSlots: snap.wallMap.length,
+    cannonSlots: cannons.map((c) => `${c.equipmentId}@R${c.logicalRow}C${c.logicalColumn}`),
+    revision: first.revision,
+  };
 });
 
 await scenario('S02', 'One-second Deltas', async () => {
@@ -89,21 +105,23 @@ await scenario('S03', '30% Dirty', async () => {
   await api.cmd('set-dirty-mode', { mode: 'dirty30' });
   await sleep(2500);
   const n = dirtyGood();
-  check(n >= 24 && n <= 33, `dirty count ${n}`);
-  return { dirty: n, expectedApprox: 31, note: 'one sensor may be under active cleaning' };
+  const expected = Math.round(EXPECTED.sensors * 0.3);
+  check(n >= expected - 8 && n <= expected, `dirty count ${n}`);
+  return { dirty: n, expectedApprox: expected, population: EXPECTED.sensors, note: 'one sensor may be under active cleaning' };
 });
 
 await scenario('S04', '70% Dirty', async () => {
   await api.cmd('set-dirty-mode', { mode: 'dirty70' });
   await sleep(2500);
   const n = dirtyGood();
-  check(n >= 66 && n <= 75, `dirty count ${n}`);
-  return { dirty: n, expectedApprox: 73 };
+  const expected = Math.round(EXPECTED.sensors * 0.7);
+  check(n >= expected - 8 && n <= expected, `dirty count ${n}`);
+  return { dirty: n, expectedApprox: expected, population: EXPECTED.sensors };
 });
 
 await scenario('S05', 'Threshold oscillation around 50', async () => {
   await api.cmd('set-dirty-mode', { mode: 'oscillate' });
-  const ids = mirror.all().filter((s) => s.index <= 2).map((s) => s.sensorId);
+  const ids = mirror.all().filter(isOscillationSample).map((s) => s.sensorId);
   const prev = new Map();
   let flips = 0;
   for (let i = 0; i < 7; i += 1) {
@@ -122,7 +140,8 @@ await scenario('S05', 'Threshold oscillation around 50', async () => {
 await scenario('S06', 'All quality states', async () => {
   await api.cmd('quality-showcase', { enabled: true });
   await sleep(1300);
-  const q = Object.fromEntries(['SYN-LEFT-01', 'SYN-LEFT-02', 'SYN-LEFT-03', 'SYN-LEFT-04', 'SYN-LEFT-05'].map((id) => [id, mirror.sensor(id).quality]));
+  const showcase = getSensorMap().sensors.filter((x) => x.wall === 'LEFT').slice(0, 5).map((x) => x.sensorId); // G+201..G+205
+  const q = Object.fromEntries(showcase.map((id) => [id, mirror.sensor(id).quality]));
   const seen = new Set(mirror.all().map((s) => s.quality));
   check(['GOOD', 'UNCERTAIN', 'BAD', 'STALE', 'DISABLED'].every((x) => seen.has(x)), `missing quality: ${[...seen]}`);
   for (const s of mirror.all()) {
@@ -130,7 +149,7 @@ await scenario('S06', 'All quality states', async () => {
     if (s.quality === 'UNCERTAIN') check(s.classificationBasis !== 'CURRENT', `${s.sensorId} uncertain classified from current`);
   }
   await api.cmd('quality-showcase', { enabled: false });
-  return { qualities: q, uncertainBasis: mirror.sensor('SYN-LEFT-01').classificationBasis };
+  return { qualities: q, uncertainBasis: mirror.sensor(showcase[0]).classificationBasis };
 });
 
 await scenario('S07', 'Selection during updates', async () => {
@@ -158,7 +177,7 @@ await scenario('S09', 'GlobalQueue changes', async () => {
   await sleep(1200);
   const q2 = mirror.single.queue;
   await api.cmd('hold-queue', { held: false });
-  await api.cmd('enqueue', { sensorId: 'SYN-FRONT-20' });
+  await api.cmd('enqueue', { sensorId: 'H17' });
   await sleep(1200);
   const q3 = mirror.single.queue;
   for (const q of [q1, q2, q3]) {
@@ -191,11 +210,11 @@ await scenario('S10', 'Single Job progression', async () => {
 
 let alarmId;
 await scenario('S11', 'Active Alarm', async () => {
-  const before = mirror.sensor('SYN-REAR-07').classification;
-  const r = await api.cmd('raise-alarm', { sensorId: 'SYN-REAR-07' });
+  const before = mirror.sensor('H7').classification;
+  const r = await api.cmd('raise-alarm', { sensorId: 'H7' });
   alarmId = r.detail.alarmId;
   await sleep(400);
-  const s = mirror.sensor('SYN-REAR-07');
+  const s = mirror.sensor('H7');
   check(s.alarmState === 'ACTIVE_UNACK', `alarmState ${s.alarmState}`);
   check(['DIRTY', 'CLEANER', 'NOT_CLASSIFIED'].includes(s.classification), 'classification missing');
   return { alarmState: s.alarmState, classificationBefore: before, classificationAfter: s.classification, note: 'classification is independent of alarm state' };
@@ -204,12 +223,12 @@ await scenario('S11', 'Active Alarm', async () => {
 await scenario('S12', 'Cleared Ack Required', async () => {
   await api.cmd('clear-alarm', { alarmId });
   await sleep(400);
-  const a = mirror.sensor('SYN-REAR-07').alarmState;
+  const a = mirror.sensor('H7').alarmState;
   check(a === 'CLEARED_UNACK', `after clear ${a}`);
   const strip = mirror.single.alarms.clearedUnack;
   await api.cmd('ack-alarm', { alarmId });
   await sleep(400);
-  const b = mirror.sensor('SYN-REAR-07').alarmState;
+  const b = mirror.sensor('H7').alarmState;
   check(b === 'NONE', `after ack ${b}`);
   return { afterClear: a, clearedUnackCount: strip, afterAck: b };
 });

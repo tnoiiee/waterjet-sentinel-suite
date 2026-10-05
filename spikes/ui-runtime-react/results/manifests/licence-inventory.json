@@ -1,9 +1,9 @@
 {
   "label": "Stage 0.2.1A synthetic spike - react-ui dependency licence inventory",
-  "generatedAt": "2026-10-04T22:39:59.078Z",
+  "generatedAt": "2026-10-05T05:49:53.498Z",
   "totals": {
     "lockfileEntries": 122,
-    "installedHere": 97,
+    "installedHere": 99,
     "direct": 13,
     "runtimeBundle": 4,
     "withInstallScript": [
@@ -565,7 +565,7 @@
       "direct": false,
       "scope": "dev/build",
       "optional": true,
-      "installedHere": false,
+      "installedHere": true,
       "os": [
         "linux"
       ],
@@ -1287,7 +1287,7 @@
       "direct": false,
       "scope": "dev/build",
       "optional": true,
-      "installedHere": false,
+      "installedHere": true,
       "os": [
         "linux"
       ],

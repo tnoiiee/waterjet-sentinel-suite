@@ -1,20 +1,31 @@
 // WJSS Stage 0.2.1A — test helpers: synthetic records, snapshots, deltas, fake EventSource.
 import type { OperationalDelta, OperationalSnapshot, SensorPresentationState, Wall } from '../../contracts/operational';
 import type { EventSourceLike, MessageEventLike } from '../src/store/feed';
+// Tests take Sensor identity and positions from the canonical mapping source (never generated here).
+import { EXPECTED, getSensorMap, sensorById, wallMapSlots } from '../../contracts/sensorMap.mjs';
 
-const WALLS: Array<[Wall, number]> = [
-  ['LEFT', 24],
-  ['REAR', 28],
-  ['RIGHT', 24],
-  ['FRONT', 28],
-];
+const WALLS: Array<[Wall, number]> = (['LEFT', 'REAR', 'RIGHT', 'FRONT'] as Wall[]).map((w) => [w, EXPECTED.perWall[w]]);
+
+/** Canonical identity/position fields for a Sensor ID (falls back to G+201 for unknown IDs). */
+function canonical(sensorId: string) {
+  const m = sensorById(sensorId) ?? sensorById('G+201')!;
+  return {
+    slotType: 'SENSOR' as const,
+    wall: m.wall,
+    logicalColumn: m.logicalColumn,
+    logicalRow: m.logicalRow,
+    wallColumn: m.wallColumn,
+    wallRow: m.wallRow,
+    scanOrder: m.scanOrder,
+    deviceId: m.deviceId,
+    tcFrontChannel: m.tcFrontChannel,
+    tcRearChannel: m.tcRearChannel,
+  };
+}
 
 export function makeSensor(over: Partial<SensorPresentationState> & { sensorId: string }): SensorPresentationState {
   return {
-    wall: 'LEFT',
-    index: 1,
-    deviceId: 'SYN-TC-01',
-    tcChannels: ['SYN-TC-01:CH00', 'SYN-TC-01:CH01'],
+    ...canonical(over.sensorId),
     dirtyScore: 30,
     lastValidatedScore: 30,
     lastValidatedAt: '2026-01-01T00:00:00.000Z',
@@ -32,16 +43,7 @@ export function makeSensor(over: Partial<SensorPresentationState> & { sensorId: 
 }
 
 export function makeSensors(): SensorPresentationState[] {
-  const out: SensorPresentationState[] = [];
-  let g = 0;
-  for (const [wall, n] of WALLS) {
-    for (let i = 1; i <= n; i += 1) {
-      const dev = `SYN-TC-${String(Math.floor((2 * g) / 26) + 1).padStart(2, '0')}`;
-      out.push(makeSensor({ sensorId: `SYN-${wall}-${String(i).padStart(2, '0')}`, wall, index: i, deviceId: dev, tcChannels: [`${dev}:CH${String((2 * g) % 26).padStart(2, '0')}`, `${dev}:CH${String((2 * g + 1) % 26).padStart(2, '0')}`] }));
-      g += 1;
-    }
-  }
-  return out;
+  return getSensorMap().sensors.map((m) => makeSensor({ sensorId: m.sensorId }));
 }
 
 export function makeSnapshot(revision = 10, over: Partial<OperationalSnapshot> = {}): OperationalSnapshot {
@@ -52,6 +54,7 @@ export function makeSnapshot(revision = 10, over: Partial<OperationalSnapshot> =
     revision,
     generatedAt: new Date().toISOString(),
     config: { revision: 1, publishedAt: '2026-01-01T00:00:00.000Z', dirtyThreshold: 50, staleThresholdMs: 5000, label: 'SYNTHETIC SPIKE PARAMETER - NOT A PRODUCTION VALUE' },
+    wallMap: wallMapSlots(),
     sensors: makeSensors(),
     walls: WALLS.map(([wall, total]) => ({ wall, total, dirty: 0, cleaner: total, notClassified: 0, uncertain: 0, maxScore: 30 })),
     activeJob: null,

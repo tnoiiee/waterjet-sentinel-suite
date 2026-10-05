@@ -36,12 +36,12 @@ describe('SseFeed', () => {
     const { store, feed, es } = setup();
     const first = es();
     first.emit('snapshot', makeSnapshot(5));
-    first.emit('delta', makeDelta(7, { sensors: [makeSensor({ sensorId: 'SYN-LEFT-01', dirtyScore: 99 })] }));
+    first.emit('delta', makeDelta(7, { sensors: [makeSensor({ sensorId: 'G+201', dirtyScore: 99 })] }));
     expect(first.closed).toBe(true);
     expect(feed.opened).toBe(2);
     expect(store.getSlice('connection').state).toBe('RESYNCING');
     expect(store.revision).toBe(5);
-    expect(store.getSensor('SYN-LEFT-01')?.dirtyScore).toBe(30);
+    expect(store.getSensor('G+201')?.dirtyScore).toBe(30);
     es().emit('snapshot', makeSnapshot(9));
     expect(store.revision).toBe(9);
     expect(store.getSlice('connection').state).toBe('LIVE');

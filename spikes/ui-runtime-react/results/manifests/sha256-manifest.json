@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T23:00:20.860Z",
+  "generatedAt": "2026-10-05T05:50:05.813Z",
   "base": "spikes/ui-runtime-react/results",
   "entries": [
     {
@@ -9,43 +9,43 @@
     },
     {
       "path": "summary/arena-harness-smoke-10min.json",
-      "bytes": 2935,
-      "sha256": "f8be02b3f7f7929220bbab029b318528f511f38e76d0aa424e1ff140a45cf5ea"
+      "bytes": 2936,
+      "sha256": "afa43773c536abf142f4fc1e324805daf773caeea62bbb7c7000e3b4abd6a962"
     },
     {
       "path": "summary/arena-harness-smoke-10min.md",
-      "bytes": 1505,
-      "sha256": "a5f914ec7572a81996a3803c57a06d43960d4bc601c736c209ea2292e8b2cfc9"
+      "bytes": 1509,
+      "sha256": "4eee93e394cf5e7a2052e251699e1a347d82227a9ceac2fbaa84c2cc02cfe047"
     },
     {
       "path": "summary/arena-scenarios.json",
-      "bytes": 9444,
-      "sha256": "d773d4faa5523697ff9ad5121aff6000388fe7b027efd818adf2929e46def2bd"
+      "bytes": 9747,
+      "sha256": "ef3e371e702ae0ff59de592e8f5c58619f3ad26b7dad94180ed2533128be110d"
     },
     {
       "path": "summary/arena-scenarios.md",
-      "bytes": 4821,
-      "sha256": "c1c1be59659097b47cfe08152d16de463722f5cfe63fdd9f133cd68c74d0544a"
+      "bytes": 4976,
+      "sha256": "9fda37b0a07b775447bfd03c41f81a5938c603387fc1bfbc2d4fe7c183396444"
     },
     {
       "path": "summary/arena-validation.json",
-      "bytes": 2167,
-      "sha256": "6e73c036b9d7bdb76e91432c06d1b492f519172c8ead85f48df68478660f9887"
+      "bytes": 3004,
+      "sha256": "c04e507402be35f633e0112700af3a57b614f78e97d1b15fa4ee0cc50e8f88b7"
     },
     {
       "path": "summary/arena-validation.md",
-      "bytes": 1524,
-      "sha256": "7e8424a368dda7189efde745a076a60bfa62b44deb03df605720d33cef51d238"
+      "bytes": 2172,
+      "sha256": "c99b40320f55c09b247da2471f088cc69f8431dc47787f8f0efcc8f7d15774ac"
     },
     {
       "path": "manifests/licence-inventory.json",
-      "bytes": 46998,
-      "sha256": "df4ad421aaddf40acdb8c3185d5fe03f6dac65560d79c3946ea35ed90d8d7259"
+      "bytes": 46996,
+      "sha256": "2d39d74036540ad203bb4e3831d0f2118dcccb0bddeb9c71af7bc9d9c12b82be"
     },
     {
       "path": "manifests/licence-inventory.md",
-      "bytes": 10119,
-      "sha256": "d9867b7a2643b9671277ba1a9b8a05a5ceceb4c34d1b27a3de9d4c47724810e7"
+      "bytes": 10121,
+      "sha256": "f84bea8860af2aa8454872468b2998db8ba5b8650a35a1d796d748cad6b8f30a"
     },
     {
       "path": "manifests/react-ui-sbom.cdx.json",

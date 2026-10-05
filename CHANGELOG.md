@@ -27,13 +27,35 @@ removable synthetic feasibility spike — no Product code.**
 ### Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
 
 **Scope and Coding Start Gate:** `[APPROVED]`
-**Implementation:** IN PROGRESS — development checkpoint submitted for Owner review
-**Owner-local testing (installed Edge, Windows 11):** PENDING
-**Owner manual review:** PENDING
+**Implementation:** IN PROGRESS — PR #3 OPEN
+**Owner-local testing (installed Edge, Windows 11):** PASS for checkpoint `dd20a8bd` (superseded
+104-location map); re-run for the corrected Sensor map PENDING
+**Owner manual UI re-review:** PENDING · **60-minute run:** PAUSED
 **Merge:** NOT MERGED
 **React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
 **Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Changed — Owner domain correction: 106-location Sensor map
+
+- The Owner corrected the protected count from **104 / 208** to **106 Sensor locations / 212
+  Thermocouple channels** (Left 24, Rear 29, Right 24, Front 29). It is a domain correction, not
+  a runtime failure. Documents changed: `README.md`, `docs/DOMAIN_MODEL.md` (new §2.2.1 logical
+  matrix), `docs/REQUIREMENTS.md` (PHY-001, PHY-002, UIW-001, UIW-002), `docs/ARCHITECTURE.md`
+  (§24, §25.1, §33.2), `docs/TEST_STRATEGY.md`, `docs/ROADMAP.md`, `docs/MASTER_PLAN.md`,
+  `docs/CURRENT_STATE.md`, ADR-0002, ADR-0003, ADR-0006 to ADR-0009, the spike plan / results,
+  and the contract docs.
+- Spike: new single mapping source `contracts/sensorMap.mjs` (18 × 6 logical matrix, 106
+  Sensors, Cannon slots at logical I7 / I16, synthetic scan order, device, channel, and jet
+  assignment). It is consumed by the harness, Snapshot `wallMap`, validator, fixtures, scenario
+  runner, and tests. The React U-shaped map renders 6-row wall grids from the Snapshot wall map,
+  with neutral, non-selectable Cannon slots. Separate seeded random streams make the synthetic
+  process workload deterministic per seed. The runtime refuses Sensor commands for Cannon IDs.
+- Status headers corrected in the 12 documents previously reported stale in
+  `docs/CURRENT_STATE.md` §12.3, plus `docs/ROADMAP.md` and `docs/decisions/README.md`.
+- `docs/ARCHITECTURE.md` §33: the dual-candidate Stage 0.2.1 proposal is marked **SUPERSEDED**
+  by the React-first Stage 0.2.1A spike. A Blazor counter-spike requires a future Owner Scope
+  Gate.
 
 #### Added
 
@@ -168,7 +190,8 @@ created, and no device or database was contacted.** No dependency was installed.
 
 - Every protected decision is unchanged: one Boiler Unit per Workstation; Windows 11 Pro;
   English default with Thai contextual explanation; 104 Sensor locations; 208 Thermocouple
-  channels; Eight Water Jets; Four Galil DMC-B140-M controllers; one Water Jet to one dedicated
+  channels *(historical Stage 0.2 record — superseded by the Stage 0.2.1A Owner domain correction
+  to 106 Sensor locations / 212 Thermocouple channels)*; Eight Water Jets; Four Galil DMC-B140-M controllers; one Water Jet to one dedicated
   Isolation Valve; strictly sequential Cleaning Jobs; maximum one active Cleaning Job; parallel
   Water Jet Cleaning prohibited; GlobalQueue FIFO and source ownership; Hard Minimum Cleaning
   Interval on both source queues; `LastSuccessfulCleaningCompletedAt` never null; Operator as

@@ -5,10 +5,14 @@ Requirements marked `[OWNER CONFIRMED]` were explicitly confirmed by the Owner d
 Stage 0.1 documentation review and are binding. Requirements marked otherwise are not
 approved behaviour.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
+framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
+`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 Requirement identifiers are stable. Requirements are never silently deleted; if one is
 superseded, its status changes and the superseding requirement is recorded.
@@ -66,8 +70,8 @@ superseded, its status changes and the superseding requirement is recorded.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| PHY-001 | Boiler walls are Left, Rear, Right, and Front. Wall sensor counts are Left 24, Rear 28, Right 24, Front 28, giving 104 sensor locations. | `[APPROVED]` |
-| PHY-002 | Each sensor has two thermocouple channels: a front channel (`TC_F`) and a rear channel (`TC_R`), giving 208 channels in total. | `[APPROVED]` |
+| PHY-001 | Boiler walls are Left, Rear, Right, and Front. Wall sensor counts are Left 24, Rear 29, Right 24, Front 29, giving 106 sensor locations, laid out in an 18-column × 6-row logical matrix with two Cannon equipment slots (logical I7 Rear, logical I16 Front) that are not sensors. See [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed). Supersedes the earlier 104-location baseline (Rear 28, Front 28). | `[OWNER CONFIRMED]` |
+| PHY-002 | Each sensor has two thermocouple channels: a front channel (`TC_F`) and a rear channel (`TC_R`), giving 212 channels in total (supersedes the earlier 208). | `[OWNER CONFIRMED]` |
 | PHY-003 | Documentation and identifiers must distinguish the boiler wall name from the thermocouple side, because "Front" and "Rear" are both wall names and channel side names. | `[APPROVED]` |
 | PHY-004 | There are eight Water Jet assemblies. Each Water Jet has a horizontal X axis and a vertical Y axis. | `[APPROVED]` |
 | PHY-005 | One Galil controller controls two Water Jets; four controllers are expected in total, model DMC-B140-M, using axes A, B, C, and D. | `[APPROVED]` |
@@ -417,14 +421,14 @@ Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner ac
 | UIF-005 | **React can be built and deployed offline.** It must never be excluded on the basis that it requires Internet access. React introduces a second package and build ecosystem (Node.js/npm in addition to NuGet), which increases offline dependency-management and supply-chain effort without making offline development or deployment impossible. | `[APPROVED]` |
 | UIF-006 | Blazor Hybrid must not be selected solely because it uses C# or reduces the number of build ecosystems. Those advantages do not by themselves prove UI performance, graph quality, camera integration, or long-running kiosk stability. | `[APPROVED]` |
 | UIF-007 | The current evidence-based preference is React + TypeScript + Vite, based on the Owner's legacy operating experience with React/Vite and push-based updates, dense-visualisation fit, charting and camera ecosystem, and UI test tooling. **This preference is not final acceptance and not an approved selection.** | `[PROPOSED]` |
-| UIF-008 | Final framework selection requires the proposed Stage 0.2.1 UI and Runtime Technology Spike, which is `PROPOSED` and `[NOT AUTHORIZED]`. | `[PROPOSED]` |
+| UIF-008 | Final framework selection requires measured spike evidence. The proposed dual-candidate Stage 0.2.1 spike is **SUPERSEDED**: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate. | `[PROPOSED]` |
 
 ### 26.2 UI workload
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| UIW-001 | The UI must support **104 live Sensor cells** and **208 Thermocouple channels** with a **one-second operational update target**. | `[APPROVED]` |
-| UIW-002 | The UI must support the approved wall layouts: Left 24, Rear 28, Right 24, Front 28. | `[APPROVED]` |
+| UIW-001 | The UI must support **106 live Sensor cells** and **212 Thermocouple channels** with a **one-second operational update target** (Owner domain correction; supersedes 104 / 208). | `[APPROVED]` |
+| UIW-002 | The UI must support the Owner-confirmed wall layouts: Left 24 (4 × 6), Rear 29 (5 × 6 with the Rear Cannon slot), Right 24 (4 × 6), Front 29 (5 × 6 with the Front Cannon slot); Cannon slots are shown as neutral equipment, never as Sensors. | `[OWNER CONFIRMED]` |
 | UIW-003 | The UI must present wall-level **Dirty and Cleaner counts**, each with an explicit label, and a distinct Bad or unavailable count where applicable. Displaying only unlabelled numbers is prohibited. | `[APPROVED]` |
 | UIW-004 | The UI must support Sensor detail drill-down, Active Cleaning Job visibility, GlobalQueue preview, and Pump and pressure status. | `[APPROVED]` |
 | UIW-005 | The UI must support a live operational trend, an alarm banner, and an alarm workspace. | `[APPROVED]` |
@@ -532,7 +536,7 @@ Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner ac
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| SPI-001 | Proposed Stage 0.2.1 — UI and Runtime Technology Spike — is `PROPOSED` and `[NOT AUTHORIZED]`. It is not started by Stage 0.2 and requires its own approved Scope Gate. | `[PROPOSED]` |
+| SPI-001 | Proposed Stage 0.2.1 — UI and Runtime Technology Spike — is **SUPERSEDED** and was not performed: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate. | `[PROPOSED]` |
 | SPI-002 | The spike must compare Candidate A and Candidate B on the same synthetic data, the same runtime/API contract, the same Sensor presentation semantics, the same trend workload, the same camera placeholder or synthetic stream, the same reconnect scenario, and the same acceptance measures. | `[PROPOSED]` |
 | SPI-003 | The spike must use **synthetic data only** and must not access WAGO, Galil, Production SQL Server, or Production configuration. | `[PROPOSED]` |
 | SPI-004 | Spike results are application-level performance evidence only — never hardware evidence, never certification, and never a relaxation of the bench verification requirements. | `[PROPOSED]` |

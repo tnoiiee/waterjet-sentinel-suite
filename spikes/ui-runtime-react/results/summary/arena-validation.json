@@ -1,8 +1,15 @@
 {
   "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
-  "recordedAt": "2026-10-04T22:59:20.494Z",
+  "recordedAt": "2026-10-05T05:49:44.000Z",
   "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
+  "parentCheckpoint": "dd20a8bd",
+  "scope": "Stage 0.2.1A sensor-map correction (Owner domain correction: 106 Sensor locations / 212 Thermocouple channels)",
   "checks": [
+    {
+      "check": "npm ci (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
+      "result": "PASS",
+      "detail": "exit 0; package-lock.json unchanged"
+    },
     {
       "check": "tsc --noEmit (TypeScript 6.0.3)",
       "result": "PASS",
@@ -11,17 +18,17 @@
     {
       "check": "vite build (production)",
       "result": "PASS",
-      "detail": "JS 301.82 kB (gzip 100.79 kB), CSS 10.37 kB; ~0.23 s"
+      "detail": "JS 303.71 kB (gzip 101.41 kB), CSS 10.90 kB (gzip 3.45 kB)"
     },
     {
-      "check": "vitest (jsdom) 8 files",
+      "check": "vitest (jsdom) 10 files",
       "result": "PASS",
-      "detail": "53/53"
+      "detail": "60/60"
     },
     {
-      "check": "runtime-harness node:test",
+      "check": "runtime-harness node:test 2 files",
       "result": "PASS",
-      "detail": "14/14"
+      "detail": "26/26"
     },
     {
       "check": "scenario runner (28 scenarios)",
@@ -29,43 +36,54 @@
       "detail": "PASS 25, PASS+OWNER 2, OWNER-LOCAL 1, FAIL 0"
     },
     {
+      "check": "golden fixtures regenerated and validated against canonical map",
+      "result": "PASS",
+      "detail": "snapshot 106 sensors, 108 wallMap slots; delta chained"
+    },
+    {
       "check": "arena harness measurement 10 min, 2 SSE clients",
       "result": "PASS",
-      "detail": "exit 0; invariant violations 0; accepted second jobs 0"
+      "detail": "exit 0; invariant violations 0; accepted second jobs 0; jobs completed 21"
     },
     {
       "check": "playwright test --list (no browser)",
       "result": "PASS",
-      "detail": "16 tests in 2 files, project msedge"
+      "detail": "17 tests in 2 files, project msedge"
     },
     {
-      "check": "offline npm ci (unreachable registry 127.0.0.1:9, --offline)",
+      "check": "hard gates (sensor map)",
       "result": "PASS",
-      "detail": "exit 0; negative control ENOTCACHED exit 1; tsc/build/vitest/harness PASS on restored tree"
+      "detail": "106 sensors; 212 channels; 24/29/24/29; 2 cannon slots; I7/I16 absent; 0 duplicate IDs/slots/scanOrder/TC_F/TC_R; 0 shared channels"
     },
     {
-      "check": "sensitive-data scan (new and changed files)",
+      "check": "sensitive-data scan (changed and new files)",
       "result": "PASS",
       "detail": "no credentials/keys/connection strings; IPv4 only 127.0.0.1, 0.0.0.0, 192.0.2.10 (RFC 5737)"
     },
     {
       "check": "markdown relative links (all tracked and new .md)",
       "result": "PASS",
-      "detail": "0 broken"
+      "detail": "44 files, 694 links, 0 broken; 7 anchors, 0 broken"
     },
     {
       "check": "loopback-only bind",
       "result": "PASS",
       "detail": "harness socket 127.0.0.1; non-loopback refused by unit test"
+    },
+    {
+      "check": "offline npm ci rehearsal",
+      "result": "NOT RE-RUN",
+      "detail": "dependencies and lock file unchanged since dd20a8bd rehearsal (PASS)"
     }
   ],
   "notVerified": [
     "ASP.NET Core integration",
     "Windows Service behaviour",
     "WebView2 kiosk behaviour",
-    "installed-Edge rendering / heap / DOM / long tasks / end-to-end latency",
+    "installed-Edge rendering / heap / DOM / long tasks / end-to-end latency on the corrected map (Owner-local re-run PENDING)",
     "Windows process CPU and memory",
     "Windows offline restore",
-    "Extended (4 h) stability"
+    "Extended (4 h) stability",
+    "60-minute run (PAUSED)"
   ]
 }

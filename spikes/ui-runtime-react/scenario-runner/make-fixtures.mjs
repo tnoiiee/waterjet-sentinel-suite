@@ -16,7 +16,7 @@ await h.start();
 await new Promise((r) => setTimeout(r, 2600));
 // Exercise several presentation states so the fixture shows them.
 h.runtime.command('quality-showcase', { enabled: true });
-h.runtime.command('raise-alarm', { sensorId: 'SYN-REAR-05' });
+h.runtime.command('raise-alarm', { sensorId: 'G5' });
 await new Promise((r) => setTimeout(r, 1100));
 const { snap } = h.runtime.snapshot();
 const delta = await new Promise((resolve) => h.runtime.once('delta', (d) => resolve(d)));

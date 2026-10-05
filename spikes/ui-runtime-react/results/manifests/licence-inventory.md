@@ -1,8 +1,8 @@
 # Stage 0.2.1A — Licence inventory (react-ui)
 
-Generated 2026-10-04T22:39:59.078Z from `react-ui/package-lock.json` and installed `package.json` files.
+Generated 2026-10-05T05:49:53.498Z from `react-ui/package-lock.json` and installed `package.json` files.
 
-Lockfile entries: 122 · installed on the generating platform: 97 · direct: 13 · runtime bundle: 4
+Lockfile entries: 122 · installed on the generating platform: 99 · direct: 13 · runtime bundle: 4
 
 ## By licence
 
@@ -72,7 +72,7 @@ Lockfile entries: 122 · installed on the generating platform: 97 · direct: 13 
 | @rolldown/binding-linux-ppc64-gnu | 1.2.12 | MIT |  | dev/build | yes | no |
 | @rolldown/binding-linux-s390x-gnu | 1.2.12 | MIT |  | dev/build | yes | no |
 | @rolldown/binding-linux-x64-gnu | 1.2.12 | MIT |  | dev/build | yes | yes |
-| @rolldown/binding-linux-x64-musl | 1.2.12 | MIT |  | dev/build | yes | no |
+| @rolldown/binding-linux-x64-musl | 1.2.12 | MIT |  | dev/build | yes | yes |
 | @rolldown/binding-openharmony-arm64 | 1.2.12 | MIT |  | dev/build | yes | no |
 | @rolldown/binding-win32-arm64-msvc | 1.2.12 | MIT |  | dev/build | yes | no |
 | @rolldown/binding-win32-x64-msvc | 1.2.12 | MIT |  | dev/build | yes | no |
@@ -120,7 +120,7 @@ Lockfile entries: 122 · installed on the generating platform: 97 · direct: 13 
 | lightningcss-linux-arm64-gnu | 1.33.0 | MPL-2.0 |  | dev/build | yes | no |
 | lightningcss-linux-arm64-musl | 1.33.0 | MPL-2.0 |  | dev/build | yes | no |
 | lightningcss-linux-x64-gnu | 1.33.0 | MPL-2.0 |  | dev/build | yes | yes |
-| lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 |  | dev/build | yes | no |
+| lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 |  | dev/build | yes | yes |
 | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 |  | dev/build | yes | no |
 | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 |  | dev/build | yes | no |
 | lru-cache | 11.5.3 | BlueOak-1.0.0 |  | dev/build |  | yes |

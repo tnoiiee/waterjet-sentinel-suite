@@ -21,7 +21,7 @@ const sampleS = Number(process.env.WJSS_SOAK_SAMPLE_S ?? 15);
 // Synthetic scenario cycle applied during the soak (repeats).
 const CYCLE: Array<[string, Record<string, unknown>?]> = [
   ['set-dirty-mode', { mode: 'dirty30' }],
-  ['raise-alarm', { sensorId: 'SYN-REAR-07' }],
+  ['raise-alarm', { sensorId: 'H7' }],
   ['set-dirty-mode', { mode: 'oscillate' }],
   ['clear-alarm', {}],
   ['device-timeout', { deviceId: 'SYN-TC-06', enabled: true }],

@@ -16,11 +16,12 @@ Repository: `waterjet-sentinel-suite`
 | Stage 0.2 Scope Gate | **APPROVED** |
 | Stage 0.2 architecture checkpoint | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`) |
 | Stage 0.2 ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction — accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
-| Stage 0.2.1A Scope / Coding Start | **APPROVED** |
-| Stage 0.2.1A implementation | **IN PROGRESS** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); Owner-local testing and Owner manual review **PENDING**; **NOT MERGED** |
+| Stage 0.2.1A Scope Gate / Coding Start | **APPROVED** / **APPROVED** |
+| Stage 0.2.1A implementation | **IN PROGRESS** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); PR #3 **OPEN**, **NOT MERGED**; Sensor map corrected to the Owner's 106-location domain; Owner-local UI re-review **PENDING**; 60-minute run **PAUSED** |
 | React final selection | **NOT YET APPROVED** — the UI framework remains `[OPEN]` |
 | Blazor counter-spike | **DEFERRED / NOT AUTHORIZED** |
 | Stage 0.3 | **NOT AUTHORIZED** |
+| Production devices | **NOT AUTHORIZED** |
 | Repository contents | Documentation, repository governance, and one removable synthetic feasibility spike |
 | Application code | **None.** The Stage 0.2.1A spike is synthetic feasibility code, not Product code: no solution, no schema, no Product runtime. |
 | Application version | **NOT ESTABLISHED.** No runtime release exists. |
@@ -94,9 +95,10 @@ and reporting and export.
 | Item | Approved baseline |
 | --- | --- |
 | Boiler walls | Left, Rear, Right, Front |
-| Sensor locations | Left 24, Rear 28, Right 24, Front 28 — **104 total** |
+| Sensor locations | Left 24, Rear 29, Right 24, Front 29 — **106 total** (Owner domain correction during Stage 0.2.1A; supersedes the earlier 104-location baseline) |
+| Logical Sensor matrix | 18 logical columns × 6 logical rows = 108 positions: **106 Sensor locations + 2 Cannon equipment slots** (logical I7 Rear Cannon, logical I16 Front Cannon). Wall columns: Left 1–4, Rear 5–9, Right 10–13, Front 14–18. See [`docs/DOMAIN_MODEL.md`](docs/DOMAIN_MODEL.md) |
 | Thermocouple channels per sensor | 2 — front channel (`TC_F`) and rear channel (`TC_R`) |
-| Thermocouple channels total | **208** |
+| Thermocouple channels total | **212** (supersedes the earlier 208) |
 | Water Jet assemblies | 8, each with horizontal X and vertical Y axes |
 | Isolation Valves | **8 — exactly one dedicated per Water Jet.** Never shared |
 | Galil controllers | 4 (one controller per two Water Jets), model DMC-B140-M |
