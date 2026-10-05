@@ -4,9 +4,9 @@ import styles from './Operations.module.css';
 
 export function CameraPlaceholder() {
   return (
-    <section className={styles.panel} aria-label="Camera placeholder" data-testid="camera-placeholder">
+    <section className={`${styles.panel} ${styles.cameraPanel}`} aria-label="Camera placeholder" data-testid="camera-placeholder">
       <h2 className={styles.panelTitle}>Camera</h2>
-      <svg className={styles.camera} viewBox="0 0 320 180" role="img" aria-label="Camera placeholder: no camera connected">
+      <svg className={styles.camera} viewBox="0 0 320 180" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Camera placeholder: no camera connected">
         <defs>
           <pattern id="wjss-cam-stripes" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width="16" height="16" fill="#1d2127" />

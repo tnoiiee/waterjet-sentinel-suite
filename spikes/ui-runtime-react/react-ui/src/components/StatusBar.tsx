@@ -7,7 +7,7 @@ import { requestClose } from '../store/commands';
 import { useSlice } from '../store/hooks';
 import styles from './Operations.module.css';
 
-export function StatusBar({ onToggleDiagnostics }: { onToggleDiagnostics: () => void }) {
+export function StatusBar({ onToggleDiagnostics, diagnosticsOpen = false }: { onToggleDiagnostics: () => void; diagnosticsOpen?: boolean }) {
   const meta = useSlice('meta');
   const conn = useSlice('connection');
   const pump = useSlice('pump');
@@ -47,7 +47,7 @@ export function StatusBar({ onToggleDiagnostics }: { onToggleDiagnostics: () => 
       </span>
       <span className={`${styles.pill} ${devicesDown ? styles.pillWarn : ''}`}>Devices {comm ? comm.devices.length - devicesDown : 0}/{comm?.devices.length ?? 0} online</span>
       <span className={styles.spacer} />
-      <button type="button" className={styles.btn} onClick={onToggleDiagnostics} aria-keyshortcuts="D">
+      <button type="button" className={`${styles.btn} ${diagnosticsOpen ? styles.btnActive : ''}`} onClick={onToggleDiagnostics} aria-keyshortcuts="D" aria-expanded={diagnosticsOpen} data-testid="diagnostics-toggle">
         Diagnostics
       </button>
       <button type="button" className={styles.btn} onClick={onClose} data-testid="close-request">

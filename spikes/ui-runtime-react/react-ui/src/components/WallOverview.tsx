@@ -2,6 +2,8 @@
 // Front bottom). Subscribes only to layout, config, and wall summaries; Sensor cells subscribe
 // individually. Wall grids are rendered from the runtime Snapshot `wallMap` (6 logical rows per
 // wall, wall columns in logical-column order). No Sensor IDs or wall rules are defined here.
+// Placement (Rear top, Left / Right sides, Front bottom, compact center summary) is pure CSS
+// driven by the design tokens in ../global.css.
 import { memo, type CSSProperties } from 'react';
 import type { Wall, WallMapSlot, WallSummary } from '../../../contracts/operational';
 import { useSlice } from '../store/hooks';
@@ -48,11 +50,12 @@ const WallPanel = memo(function WallPanel({ wall, rows, threshold, selectedId, o
   return (
     <section className={`${styles.wall} ${styles[`wall_${wall}`]}`} aria-label={WALL_LABEL[wall]} data-wall={wall} data-wall-columns={cols} data-wall-rows={rows.length}>
       <header className={styles.wallHeader}>
-        <span>
-          {WALL_LABEL[wall]} <span className={styles.wallSpan}>{span}</span>
+        <span title={`${WALL_LABEL[wall]} — logical ${span}`}>
+          <span className={styles.wallTitle}>{WALL_LABEL[wall]}</span>
+          <span className={styles.wallSpan}>{span.replace('cols ', '')}</span>
         </span>
         {summary && (
-          <span className={styles.wallCounts}>
+          <span className={styles.wallCounts} title={`Dirty ${summary.dirty} · Cleaner ${summary.cleaner} · Not classified ${summary.notClassified}`}>
             D {summary.dirty} · C {summary.cleaner} · N/C {summary.notClassified}
           </span>
         )}
@@ -86,24 +89,33 @@ export function WallOverview({ selectedId, onSelect }: Props) {
   const ownsSelection = (w: Wall) => (selectedId && layout[w].some((row) => row.some((s) => s.sensorId === selectedId)) ? selectedId : null);
   return (
     <div className={styles.overview} data-testid="wall-overview">
-      {(['REAR', 'LEFT', 'RIGHT', 'FRONT'] as Wall[]).map((w) => (
-        <WallPanel key={w} wall={w} rows={layout[w]} threshold={threshold} selectedId={ownsSelection(w)} onSelect={onSelect} summary={summary(w)} />
-      ))}
-      <div className={styles.overviewCenter}>
-        <div className={styles.legendTitle} data-testid="map-totals">
-          {sensorCount} Sensor locations · {cannonCount} Cannon slots (synthetic)
+      <div className={styles.uSurface} data-testid="u-surface">
+        {(['REAR', 'LEFT', 'RIGHT', 'FRONT'] as Wall[]).map((w) => (
+          <WallPanel key={w} wall={w} rows={layout[w]} threshold={threshold} selectedId={ownsSelection(w)} onSelect={onSelect} summary={summary(w)} />
+        ))}
+        <div className={styles.overviewCenter} data-testid="map-center">
+          <div data-testid="map-totals">
+            <div className={styles.legendTitle} data-testid="map-sensor-count">
+              {sensorCount} Sensors
+            </div>
+            <div className={styles.legendSub} data-testid="map-cannon-count">
+              {cannonCount} Cannon slots · synthetic
+            </div>
+          </div>
+          <ul className={styles.legend} aria-label="Map legend">
+            <li><span className={styles.swDirty} /> Dirty</li>
+            <li><span className={styles.swCleaner} /> Cleaner</li>
+            <li><span className={styles.swNeutral} /> Not classified</li>
+            <li><span className={styles.swUncertain} /> Uncertain</li>
+            <li><span className={styles.swAlarm} /> Alarm</li>
+            <li><span className={styles.swSelected} /> Selected</li>
+            <li><span className={styles.swJob} /> Active Job</li>
+            <li><span className={styles.swCannon} /> Cannon</li>
+          </ul>
+          <div className={styles.thresholdNote}>
+            Dirty threshold {threshold} · synthetic config r{config?.revision ?? '-'}
+          </div>
         </div>
-        <ul className={styles.legend}>
-          <li><span className={styles.swDirty} /> Dirty (process)</li>
-          <li><span className={styles.swCleaner} /> Cleaner (process)</li>
-          <li><span className={styles.swNeutral} /> Not classified</li>
-          <li><span className={styles.swUncertain} /> Uncertain marker</li>
-          <li><span className={styles.swAlarm} /> Alarm border</li>
-          <li><span className={styles.swSelected} /> Selected</li>
-          <li><span className={styles.swJob} /> Active Job</li>
-          <li><span className={styles.swCannon} /> Cannon (equipment)</li>
-        </ul>
-        <div className={styles.thresholdNote}>Dirty threshold {threshold} (synthetic config rev {config?.revision ?? '-'})</div>
       </div>
     </div>
   );

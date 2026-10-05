@@ -2,8 +2,9 @@
 
 **Document status:** Evidence record for Stage 0.2.1A. **Arena evidence**, plus the Owner-local
 evidence the Owner reported for checkpoint `dd20a8bd`. That Owner-local evidence covers the
-superseded 104-location map and does **not** validate the corrected 106-location map, so the
-Owner-local re-run and manual UI re-review are **PENDING** and the 60-minute run is **PAUSED**. This
+superseded 104-location map and does **not** validate the corrected 106-location map or the
+fullscreen Operations layout refinement (§0A), so the Owner-local re-run and the manual 1920 × 1080
+F11 UI re-review are **PENDING** and the 60-minute run is **PAUSED**. This
 document does **not** select React as the final UI framework; the UI framework, Production
 transport, and Production chart library remain `[OPEN]`. Blazor counter-spike: **DEFERRED /
 NOT AUTHORIZED**.
@@ -16,7 +17,83 @@ PRODUCTION VALUES**.
 
 ---
 
-## 0. Sensor-map correction checkpoint (current)
+## 0A. Fullscreen Operations refinement checkpoint (current)
+
+The Owner approved a targeted Design Addendum for the existing Operations page. Primary target:
+Windows 11, Microsoft Edge, F11 fullscreen, **1920 × 1080**, zoom 100 %. The corrected Sensor
+domain is unchanged: 106 Sensors, 212 Thermocouple channels, 24 / 29 / 24 / 29, Cannon slots at
+I7 / I16, canonical row and column order, U-shaped orientation, central mapping source. The
+refinement is a fast-forward commit on top of `935973e6`; its SHA is recorded in the PR #3
+description.
+
+**What changed (presentation only):**
+
+- **Single design-token location** (`react-ui/src/global.css`): typography scale, page height
+  model, map / operations split, card heights, U geometry, Sensor cell scale. Component styles
+  only reference the tokens.
+- **Strict viewport-height model:** app root `100dvh`, `overflow: hidden`; top status bar
+  (34 px) and alarm strip (24 px); main grid `minmax(0, 1fr)` workspace plus a bounded bottom row
+  (`clamp(200px, 21vh, 240px)`, ≈ 227 px at 1080); all grid children `min-width: 0` /
+  `min-height: 0`. Fit comes from space allocation, not from smaller text.
+- **Sensor cells:** the Sensor Map area is the only CSS size container. Cell height is
+  `clamp(42px, (map height − fixed U terms) / 12, 50px)`; cell width is `clamp(44px,
+  min(height + 6px, (map width − 150px) / 13), 54px)`. Expected at 1920 × 1080 (layout
+  arithmetic, not a browser measurement): ≈ 50.4 × 44.4 px. Sensor ID 12.5 px / 700, value
+  15 px / 700, gap 4 px. Cannon slot: same outer size.
+- **U-shaped geometry:** wall blocks are absolutely placed inside one bounded map surface —
+  Rear centred at the top, Front centred at the bottom, Left / Right vertically centred at the
+  card edges, so the side walls share Y range with the Rear / Front blocks while their X ranges
+  stay disjoint. The map surface height is two wall blocks plus the compact centre; no empty grid
+  track and no transform scaling.
+- **Centre summary:** 204 × 136 px — `106 Sensors`, `2 Cannon slots · synthetic`, an
+  eight-entry legend (Dirty, Cleaner, Not classified, Uncertain, Alarm, Selected, Active Job,
+  Cannon), and the synthetic threshold caption.
+- **Map / operations split:** `clamp(700px, 44%, 900px)` for the map, remainder for the
+  operations column (≈ 44 % / 56 % at 1920); content width capped at 2240 px and centred.
+- **Sensor Detail:** two-column inspector, fixed 184 px; values truncate with the full text in a
+  tooltip; the UNCERTAIN note is one line.
+- **Active Cleaning Job:** fixed 132 px; Job ID, Sensor, Water Jet, Isolation Valve, P1–P6
+  (30 px cells), phase, progress, start time, single-job notice.
+- **GlobalQueue:** fixed 25 px header and 26 px rows; compact source reason (`DIRTY SCORE`,
+  `TEMP`, `TIME`, `TEMP + TIME`, `OPERATOR`, `SCENARIO`) with the full code as a tooltip; the
+  queue behaviour is unchanged.
+- **Bottom row:** same uPlot instance sized to its bounded host (legend height subtracted), 11 px
+  axes, four series, 600-point bound, setpoint, ready band, visible gaps. Camera placeholder
+  280 px wide, scaled with `preserveAspectRatio`.
+- **Diagnostics:** floating drawer (`position: fixed`, 320 px, `max-height: min(60vh, …)`)
+  below the status area, bounded above the bottom row, internal scrolling, Close button and the
+  `D` shortcut; all metrics retained.
+
+| Check (Arena, Linux x64) | Result |
+| --- | --- |
+| `npm ci --ignore-scripts --no-audit --no-fund` (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`), lock file unchanged | PASS |
+| TypeScript `tsc --noEmit` | PASS, 0 errors |
+| Vite production build | PASS — JS 307.27 kB (gzip 102.61 kB), CSS 17.45 kB (gzip 4.83 kB) |
+| Vitest (jsdom), 12 files | **75 / 75** PASS (was 60; 15 new in `layoutTokens.test.mjs` and `fullscreenLayout.test.tsx`) |
+| Runtime harness `node:test` | 26 / 26 PASS (12 mapping tests) |
+| Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| Playwright `--list` (no browser) | 22 tests — 5 new layout tests `LAYOUT-A`..`LAYOUT-E` in `e2e/layout.spec.ts` |
+| Mapping hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Cannon slots · I7 / I16 absent · 0 duplicates |
+| 1920 × 1080 / 1366 × 768 / 2560 × 1440 viewport fit | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run of `e2e/layout.spec.ts` and the manual F11 review are **PENDING** |
+
+**Layout tests (Owner-local, Edge):** `LAYOUT-A` 1920 × 1080 — document scroll ≤ client size,
+status bar, alarm strip, and six primary cards inside the viewport and non-overlapping, eight
+queue rows visible, computed cell 48–52 × 42–48 px, ID ≥ 12 px, value ≥ 14 px, Cannon size equal
+to a Sensor cell, 106 / 2 rendered, Trend and Camera inside their cards. `LAYOUT-B` U geometry
+— Rear above, Left left of, Right right of, Front below the centre; centre ≤ 210 × 170 px; no
+wall overlap; side walls share Y range with Rear / Front; canonical order. `LAYOUT-C`
+Diagnostics — unchanged document scroll size, inside the viewport, 300–340 px wide, never over
+Trend or Camera, closable, `D` toggle. `LAYOUT-D` 1366 × 768 — no page overflow, no card overlap,
+readable cells, overflow only inside panels with controlled scrolling. `LAYOUT-E` 2560 × 1440 —
+cells ≤ 54 × 50 px, bounded centre and side-wall spacing, centred content.
+
+**Known limitations:** at 1366 × 768 the full U-map (≈ 728 px high at the 42 px minimum cell
+height) does not fit the ≈ 490 px map area, so the map card and the GlobalQueue scroll
+internally; one-screen fit is **not** claimed there. Below 1100 px width the page falls back to
+one column with internal scrolling of the main area. Exact text widths depend on the installed
+Segoe UI metrics and are not observable in Arena.
+
+## 0. Sensor-map correction checkpoint
 
 The Owner corrected the protected count from 104 / 208 to **106 Sensor locations / 212
 Thermocouple channels** (Left 24, Rear 29, Right 24, Front 29). The Sensors sit in an 18 × 6
@@ -233,8 +310,13 @@ accepted second Jobs 0.
 
 ## 7. Owner-local handoff
 
-**Required re-run for the corrected map:** typecheck, Vitest, build, harness tests, Edge E2E
-(now 16 functional tests including `MAP`), and a manual UI review covering:
+**Required re-run for the fullscreen refinement checkpoint:** see
+[`OWNER_LOCAL_TESTING.md` §1B](../../spikes/ui-runtime-react/measurements/OWNER_LOCAL_TESTING.md#1b-re-run-after-the-fullscreen-layout-refinement-required)
+— typecheck, Vitest, build, harness tests, Edge E2E including `e2e/layout.spec.ts`, and a manual
+F11 review at 1920 × 1080, 100 % zoom, with four Owner screenshots.
+
+**Earlier re-run for the corrected map** (still covered by §1B): typecheck, Vitest, build,
+harness tests, Edge E2E (16 functional tests including `MAP`), and a manual UI review covering:
 
 - the U-shape;
 - 106 Sensors and 2 Cannons;
@@ -261,7 +343,8 @@ That listener is sandbox infrastructure, not the spike: the harness socket itsel
 ## 9. NOT VERIFIED
 
 ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · installed-Edge
-rendering, heap, DOM, long tasks, end-to-end latency (Owner-local, pending) · Windows process
+rendering, viewport fit at 1920 × 1080 / 1366 × 768 / 2560 × 1440, heap, DOM, long tasks,
+end-to-end latency (Owner-local, pending) · Windows process
 CPU / memory · Windows offline restore · Extended (4 h) stability · Production transport ·
 Production Delta sizes · Production Historian write path and overflow policy · accessibility
 level · any Production value.
@@ -272,13 +355,15 @@ level · any Production value.
 are as follows:
 
 1. The harness RSS trend over 10 minutes is not evaluated.
-2. Owner-local browser evidence exists only for the superseded `dd20a8bd` map. The re-run and
-   manual UI re-review of the corrected map are pending.
+2. Owner-local browser evidence exists only for the superseded `dd20a8bd` map. The re-run,
+   the Edge layout spec, and the manual 1920 × 1080 F11 UI re-review of the corrected map and
+   the fullscreen layout are pending.
 3. The synthetic Delta is a worst case close to full-Snapshot size.
 4. `@types/react` / `@types/react-dom` require Owner confirmation as dependencies.
 5. The Historian simulator defect found in S20 shows that the Production write path needs an
    explicit write-timeout rule (`[OPEN]`).
 
-Stage 0.2.1A Sensor mapping corrected · PR #3 OPEN, NOT MERGED · Owner-local UI re-review
+Stage 0.2.1A Sensor mapping corrected · fullscreen layout refined (Arena-supported validation
+complete) · PR #3 OPEN, NOT MERGED · Owner-local 1920 × 1080 UI re-review
 PENDING · 60-minute run PAUSED · React final selection NOT YET APPROVED · Blazor counter-spike
 NOT AUTHORIZED · Stage 0.3 NOT AUTHORIZED · Production device access NOT AUTHORIZED.

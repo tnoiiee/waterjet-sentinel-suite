@@ -42,10 +42,10 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction. Accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
 | Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
-| Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain |
-| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map; the re-run is **PENDING** |
-| Stage 0.2.1A Owner manual UI re-review (corrected map) | **PENDING** |
-| Stage 0.2.1A 60-minute Owner-local run | **PAUSED** until the Owner visually accepts the corrected map |
+| Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11) |
+| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map or the fullscreen layout refinement; the re-run (including the new Edge layout spec) is **PENDING** |
+| Stage 0.2.1A Owner manual UI re-review (corrected map and fullscreen 1920 × 1080 F11 layout) | **PENDING** |
+| Stage 0.2.1A 60-minute Owner-local run | **PAUSED** until the Owner visually accepts the corrected map and fullscreen layout |
 | Stage 0.2.1A merge | **NOT MERGED** |
 | React final selection | **NOT YET APPROVED** — UI framework `[OPEN]` |
 | Blazor counter-spike | **DEFERRED / NOT AUTHORIZED** |
@@ -225,10 +225,18 @@ items are listed in section 34 of the same document, and the decision records ar
 | Permission required for each operator queue action, and required reason text | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
 | Whether a sensor may be both held and rejected simultaneously | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
 | Queue snapshot storage format and retention inside Event history | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §11 |
-| Row alignment rule for walls of unequal size (24 versus 28); sensor identifier format | [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.2, [`REQUIREMENTS.md`](REQUIREMENTS.md) SCN-005 |
 | Exact motion limits, profiles, homing, pulses per engineering unit, and operational envelope | [`REQUIREMENTS.md`](REQUIREMENTS.md) GAL-006 `[NOT VERIFIED]` |
 | Exact pressure setpoints, rise timeout, stable dwell, and valve open/close timeouts | [`REQUIREMENTS.md`](REQUIREMENTS.md) PMP-005, VLV-003 `[NOT VERIFIED]` |
 | Sensor-to-Water-Jet mapping and exact production coordinates | Deployment data, `[NOT VERIFIED]` |
+
+**Resolved (DP-01):** the former open item *row alignment rule for walls of unequal size (24
+versus 28)* is closed. That wording used the superseded 28-Sensor Rear and Front walls. The wall
+distribution is **24 / 29 / 24 / 29** (Left / Rear / Right / Front). The Owner-confirmed
+canonical **18-column × 6-row** logical matrix aligns the logical rows of all four walls; the
+Cannon slots occupy logical **I7** (Rear) and **I16** (Front); the Sensor identifiers are the
+Owner logical labels (`G+2xx`, `G+1xx`, `G`, `H`, `I`, `J`). This is no longer an open mapping
+question. Production scan order, device distribution, and Water Jet assignment stay
+deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.2.1.
 
 ### 8.3 DCS and communication
 
@@ -343,13 +351,15 @@ accepted and merged Stage 0.2.*
 | Approved main base | `e779f8ad2c856e367fd65985007a3da411bd0e73` (verified remote `main` before coding) |
 | Stage branch | `arena/01a108d8-waterjet-sentinel-suite` |
 | Development checkpoint | `dd20a8bd` (104-location map, superseded by the Owner domain correction) |
-| Sensor-map correction checkpoint | A normal fast-forward commit on top of `dd20a8bd`. Its SHA is recorded in the delivery report and in the PR #3 description, **not** inside the commit that creates it |
+| Sensor-map correction checkpoint | `935973e6ff13aca26efa67148977db44b78be2e1` — normal fast-forward on top of `dd20a8bd` |
+| Fullscreen UI refinement checkpoint | A normal fast-forward commit on top of `935973e6`. Its SHA is recorded in the delivery report and in the PR #3 description, **not** inside the commit that creates it |
 | Local recovery before the correction | An Owner-authorised, one-time local reference recovery set the local branch to the already-pushed `dd20a8bd` after an exact identity proof. No history was rewritten, nothing was force-pushed, and AGENTS.md is unchanged |
+| Local recovery before the fullscreen refinement | The Arena sandbox was recreated (local branch at `e779f8ad`, checkpoint source present as working-tree changes). A second Owner-authorised, one-time, checkpoint-specific recovery: targeted fetch, complete-tree identity proof against `935973e6` (126 / 126 exact blob matches, 0 mismatches, 0 missing, 0 extra, 0 mode differences), compare-and-swap `update-ref` `e779f8ad` → `935973e6`, `read-tree` **without** `-u`; working tree unchanged. AGENTS.md is unchanged; this is not a general recovery rule |
 | Pull request | PR #3 to `main` — **OPEN** (PR #1 and PR #2 are not reused) |
 | Scope Gate / Coding Start Gate | **APPROVED** |
 | Implementation | **IN PROGRESS** |
 | Owner-local testing | `dd20a8bd` PASS (does not validate the corrected map); re-run **PENDING** |
-| Owner manual UI re-review | **PENDING** — 60-minute run **PAUSED** |
+| Owner manual UI re-review | **PENDING** (corrected map and fullscreen 1920 × 1080 F11 layout) — 60-minute run **PAUSED** |
 | Merge | **NOT MERGED** |
 | React final selection | **NOT YET APPROVED** |
 | Blazor counter-spike | **NOT AUTHORIZED** |
@@ -483,7 +493,7 @@ the current status. See section 12.4.
 ### 12.4 Stage 0.2.1A Sensor-map correction — Arena validation record
 
 Synthetic spike validation in Arena (Linux x64, Node v22.22.3) of the 106-location correction.
-Detailed evidence: [`spikes/stage-0.2.1a-results.md` §0](spikes/stage-0.2.1a-results.md#0-sensor-map-correction-checkpoint-current).
+Detailed evidence: [`spikes/stage-0.2.1a-results.md` §0](spikes/stage-0.2.1a-results.md#0-sensor-map-correction-checkpoint).
 
 | # | Check | Observed result |
 | --- | --- | --- |
@@ -501,6 +511,29 @@ Detailed evidence: [`spikes/stage-0.2.1a-results.md` §0](spikes/stage-0.2.1a-re
 | 12 | SHA-256 manifest regenerated and verified | PASS |
 | 13 | Full diff review | Performed before the correction commit |
 | 14 | Browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI | **NOT VERIFIED** in Arena — Owner-local re-run and manual UI re-review **PENDING**; 60-minute run **PAUSED** |
+
+### 12.5 Stage 0.2.1A fullscreen Operations refinement — Arena validation record
+
+Owner-approved Design Addendum: retain the U-shaped map, 106 Sensors, 212 Thermocouple channels,
+24 / 29 / 24 / 29, Cannon slots at I7 / I16; larger Sensor cells and text; smaller map centre;
+two-column Sensor Detail; compact Active Job and GlobalQueue; Trend and Camera in the first
+viewport; floating Diagnostics drawer; no page-level scrollbar at 1920 × 1080, Edge F11, 100 %
+zoom. Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0A](spikes/stage-0.2.1a-results.md#0a-fullscreen-operations-refinement-checkpoint-current).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci` (lock file restore), `tsc --noEmit` | PASS, 0 errors; dependencies unchanged |
+| 2 | Vite production build | PASS |
+| 3 | Vitest (jsdom), 12 files | 75 / 75 PASS (15 new: scale tokens, Diagnostics state, compact source reason, inspector, Active Job, mapping-independent cell classes, count and Cannon regressions) |
+| 4 | Runtime harness `node:test` | 26 / 26 PASS (12 mapping tests) |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 22 tests (5 new `LAYOUT-A`..`LAYOUT-E`) |
+| 7 | Hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Cannon slots · I7 / I16 absent · 0 duplicates |
+| 8 | Viewport fit, card bounds, computed cell sizes | **NOT VERIFIED** in Arena (no browser) — asserted by `e2e/layout.spec.ts`, Owner-local Edge run **PENDING** |
+| 9 | Markdown relative links | PASS — 44 files, 696 links, 0 broken; 10 anchors, 0 broken |
+| 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
+| 11 | Full diff review | Performed before the refinement commit |
 
 ## 13. Required positive confirmations
 

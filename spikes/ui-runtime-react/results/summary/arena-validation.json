@@ -1,14 +1,14 @@
 {
   "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
-  "recordedAt": "2026-10-05T05:49:44.000Z",
+  "recordedAt": "2026-10-05T13:59:24.000Z",
   "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
-  "parentCheckpoint": "dd20a8bd",
-  "scope": "Stage 0.2.1A sensor-map correction (Owner domain correction: 106 Sensor locations / 212 Thermocouple channels)",
+  "parentCheckpoint": "935973e6",
+  "scope": "Stage 0.2.1A fullscreen Operations UI refinement (Owner-approved Design Addendum; 1920 x 1080 Edge F11 target). Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
   "checks": [
     {
-      "check": "npm ci (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
+      "check": "npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
       "result": "PASS",
-      "detail": "exit 0; package-lock.json unchanged"
+      "detail": "exit 0; package-lock.json unchanged; no browser download"
     },
     {
       "check": "tsc --noEmit (TypeScript 6.0.3)",
@@ -18,17 +18,17 @@
     {
       "check": "vite build (production)",
       "result": "PASS",
-      "detail": "JS 303.71 kB (gzip 101.41 kB), CSS 10.90 kB (gzip 3.45 kB)"
+      "detail": "JS 307.27 kB (gzip 102.61 kB), CSS 17.45 kB (gzip 4.83 kB)"
     },
     {
-      "check": "vitest (jsdom) 10 files",
+      "check": "vitest (jsdom) 12 files",
       "result": "PASS",
-      "detail": "60/60"
+      "detail": "75/75 (15 new: layoutTokens 7, fullscreenLayout 8)"
     },
     {
       "check": "runtime-harness node:test 2 files",
       "result": "PASS",
-      "detail": "26/26"
+      "detail": "26/26 (sensorMap 12)"
     },
     {
       "check": "scenario runner (28 scenarios)",
@@ -36,19 +36,14 @@
       "detail": "PASS 25, PASS+OWNER 2, OWNER-LOCAL 1, FAIL 0"
     },
     {
-      "check": "golden fixtures regenerated and validated against canonical map",
+      "check": "golden fixtures validated against canonical map",
       "result": "PASS",
-      "detail": "snapshot 106 sensors, 108 wallMap slots; delta chained"
-    },
-    {
-      "check": "arena harness measurement 10 min, 2 SSE clients",
-      "result": "PASS",
-      "detail": "exit 0; invariant violations 0; accepted second jobs 0; jobs completed 21"
+      "detail": "fixtures unchanged; fixtures.test 6/6"
     },
     {
       "check": "playwright test --list (no browser)",
       "result": "PASS",
-      "detail": "17 tests in 2 files, project msedge"
+      "detail": "22 tests in 3 files (5 new layout tests LAYOUT-A..E), project msedge"
     },
     {
       "check": "hard gates (sensor map)",
@@ -56,19 +51,29 @@
       "detail": "106 sensors; 212 channels; 24/29/24/29; 2 cannon slots; I7/I16 absent; 0 duplicate IDs/slots/scanOrder/TC_F/TC_R; 0 shared channels"
     },
     {
-      "check": "sensitive-data scan (changed and new files)",
+      "check": "viewport fit 1920x1080 / 1366x768 / 2560x1440",
+      "result": "NOT VERIFIED",
+      "detail": "no browser in Arena; asserted by e2e/layout.spec.ts, Owner-local Edge run PENDING"
+    },
+    {
+      "check": "sensitive-data scan (added lines of changed and new files)",
       "result": "PASS",
-      "detail": "no credentials/keys/connection strings; IPv4 only 127.0.0.1, 0.0.0.0, 192.0.2.10 (RFC 5737)"
+      "detail": "no credentials/keys/connection strings/e-mail; IPv4 only 127.0.0.1; URLs only http://127.0.0.1:5181"
     },
     {
       "check": "markdown relative links (all tracked and new .md)",
       "result": "PASS",
-      "detail": "44 files, 694 links, 0 broken; 7 anchors, 0 broken"
+      "detail": "44 files, 696 links, 0 broken; 10 anchors, 0 broken"
     },
     {
       "check": "loopback-only bind",
       "result": "PASS",
       "detail": "harness socket 127.0.0.1; non-loopback refused by unit test"
+    },
+    {
+      "check": "arena harness measurement 10 min",
+      "result": "NOT RE-RUN",
+      "detail": "runtime unchanged since 935973e6 measurement (PASS); presentation-only change"
     },
     {
       "check": "offline npm ci rehearsal",
@@ -80,10 +85,12 @@
     "ASP.NET Core integration",
     "Windows Service behaviour",
     "WebView2 kiosk behaviour",
-    "installed-Edge rendering / heap / DOM / long tasks / end-to-end latency on the corrected map (Owner-local re-run PENDING)",
+    "installed-Edge rendering and viewport fit of the fullscreen layout (Owner-local re-run and manual F11 1920x1080 review PENDING)",
+    "heap / DOM / long tasks / end-to-end latency in Edge",
     "Windows process CPU and memory",
     "Windows offline restore",
     "Extended (4 h) stability",
-    "60-minute run (PAUSED)"
+    "60-minute run (PAUSED)",
+    "Production integration"
   ]
 }

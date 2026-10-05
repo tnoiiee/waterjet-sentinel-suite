@@ -1152,7 +1152,7 @@ punchlist. Nothing here may be closed by assumption.
 | Historian physical sizing, row sizes, index and partition strategy | No capacity model exists | Before retention defaults are ratified |
 | Recovery procedure for an interrupted Cleaning Job; fault-class taxonomy | Behaviour is undefined in the approved baseline | A later Stage Gate that specifies sequence recovery |
 | Configuration application without a runtime restart | Alternative not yet evaluated | Implementation Stage Gate |
-| **Final UI framework — Candidate A (React + TypeScript + Vite) versus Candidate B (Blazor Hybrid)** | Requires a measured comparison on the same synthetic workload; no measurement exists | **Stage 0.2.1 spike** (PROPOSED, NOT AUTHORIZED) |
+| **Final UI framework** | **`[OPEN]`.** The current evidence route is the **Stage 0.2.1A React-first feasibility spike** (synthetic); React final selection is **NOT YET APPROVED**. The dual-candidate Stage 0.2.1 comparison is **SUPERSEDED** (section 33). The **Blazor counter-spike is DEFERRED** | Owner decision after Stage 0.2.1A evidence. A Blazor counter-spike requires a **separate Owner Scope Gate**, only if React presents material concerns, the evidence remains insufficient, or the Owner requests a direct comparison |
 | Shell host framework | Implementation-level selection; no evidence available now | Implementation Stage Gate, after the framework decision |
 | Push transport and presentation-state payload encoding | The presentation contract is transport-agnostic; selecting a transport now would invent certainty | Stage 0.2.1 spike, then Implementation Stage Gate |
 | Chart/trend library | Library-neutral requirements are recorded in section 32; no library is selected | Stage 0.2.1 spike |

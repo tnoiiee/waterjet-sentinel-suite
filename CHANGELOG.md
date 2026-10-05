@@ -29,12 +29,29 @@ removable synthetic feasibility spike — no Product code.**
 **Scope and Coding Start Gate:** `[APPROVED]`
 **Implementation:** IN PROGRESS — PR #3 OPEN
 **Owner-local testing (installed Edge, Windows 11):** PASS for checkpoint `dd20a8bd` (superseded
-104-location map); re-run for the corrected Sensor map PENDING
-**Owner manual UI re-review:** PENDING · **60-minute run:** PAUSED
+104-location map); re-run for the corrected Sensor map and the fullscreen layout PENDING
+**Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **60-minute run:** PAUSED
 **Merge:** NOT MERGED
 **React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
 **Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Changed — Fullscreen Operations UI refinement (Owner-approved Design Addendum)
+
+- Presentation-only refinement of the React feasibility Operations page for Windows 11, Edge F11,
+  1920 × 1080, zoom 100 %: strict `100dvh` layout with no page-level scrolling; larger Sensor
+  cells (≈ 50 × 44 px at the target, capped at 54 × 50 px) with 12.5 px IDs and 15 px values;
+  U-shaped map retained with overlapping vertical bands and a compact 204 × 136 px centre
+  summary; two-column Sensor Detail inspector; compact Active Job and GlobalQueue (compact source
+  reasons); bounded Trend and Camera bottom row; floating, closable Diagnostics drawer. All sizes
+  come from one design-token location (`react-ui/src/global.css`).
+- Sensor domain, mapping, counts, Cannon positions, functional behaviour, and dependencies are
+  unchanged. New tests: 15 Vitest tests and 5 Owner-local Edge layout tests (`e2e/layout.spec.ts`).
+  Viewport fit is **NOT VERIFIED** in Arena (no browser); the Owner-local re-run is PENDING.
+- Documentation findings closed: **DP-01** (`docs/CURRENT_STATE.md` — the stale "24 versus 28"
+  row-alignment open item is resolved by the 18 × 6 canonical matrix, 24 / 29 / 24 / 29, Cannon
+  slots I7 / I16) and **DP-02** (`docs/ARCHITECTURE.md` §34 — final UI framework `[OPEN]`, route is
+  React-first Stage 0.2.1A feasibility, Blazor counter-spike deferred behind a separate Scope Gate).
 
 #### Changed — Owner domain correction: 106-location Sensor map
 

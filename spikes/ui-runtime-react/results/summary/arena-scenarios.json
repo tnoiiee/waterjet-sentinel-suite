@@ -2,7 +2,7 @@
   "label": "SYNTHETIC SPIKE EVIDENCE - NOT PRODUCTION VALIDATION",
   "stage": "0.2.1A",
   "environment": "Arena (Linux, Node harness in-process, SSE over 127.0.0.1, no browser)",
-  "generatedAt": "2026-10-05T05:37:14.353Z",
+  "generatedAt": "2026-10-05T13:56:37.595Z",
   "counts": {
     "PASS": 25,
     "PASS+OWNER": 2,
@@ -13,7 +13,7 @@
       "id": "S01",
       "name": "Initial Snapshot",
       "status": "PASS",
-      "durationMs": 6,
+      "durationMs": 7,
       "evidence": {
         "firstEvent": "snapshot",
         "snapshotBytes": 78284,
@@ -38,10 +38,10 @@
       "id": "S02",
       "name": "One-second Deltas",
       "status": "PASS",
-      "durationMs": 5201,
+      "durationMs": 5200,
       "evidence": {
         "deltasIn5_2s": 6,
-        "medianIntervalMs": 1000,
+        "medianIntervalMs": 1001,
         "gaps": 0,
         "lastValidated": true
       },
@@ -51,7 +51,7 @@
       "id": "S03",
       "name": "30% Dirty",
       "status": "PASS",
-      "durationMs": 2512,
+      "durationMs": 2510,
       "evidence": {
         "dirty": 32,
         "expectedApprox": 32,
@@ -64,7 +64,7 @@
       "id": "S04",
       "name": "70% Dirty",
       "status": "PASS",
-      "durationMs": 2505,
+      "durationMs": 2504,
       "evidence": {
         "dirty": 74,
         "expectedApprox": 74,
@@ -76,7 +76,7 @@
       "id": "S05",
       "name": "Threshold oscillation around 50",
       "status": "PASS",
-      "durationMs": 7012,
+      "durationMs": 7010,
       "evidence": {
         "oscillatingSensors": 8,
         "classificationFlipsIn7s": 23
@@ -87,7 +87,7 @@
       "id": "S06",
       "name": "All quality states",
       "status": "PASS",
-      "durationMs": 1311,
+      "durationMs": 1309,
       "evidence": {
         "qualities": {
           "G+201": "UNCERTAIN",
@@ -104,7 +104,7 @@
       "id": "S07",
       "name": "Selection during updates",
       "status": "PASS+OWNER",
-      "durationMs": 6,
+      "durationMs": 4,
       "evidence": {
         "runtimePart": "selection is not on the wire (UI-local)",
         "jsdom": "renderIsolation.test.tsx: selection survives Deltas and Snapshots",
@@ -131,7 +131,7 @@
       "id": "S09",
       "name": "GlobalQueue changes",
       "status": "PASS",
-      "durationMs": 2416,
+      "durationMs": 2411,
       "evidence": {
         "totalQueued": 32,
         "previewLength": 8,
@@ -153,7 +153,7 @@
       "id": "S10",
       "name": "Single Job progression",
       "status": "PASS",
-      "durationMs": 30173,
+      "durationMs": 30150,
       "evidence": {
         "phasesSeen": [
           "P1",
@@ -214,7 +214,7 @@
       "id": "S14",
       "name": "Other Devices continue",
       "status": "PASS",
-      "durationMs": 3,
+      "durationMs": 4,
       "evidence": {
         "pollsDuringTimeout": {
           "SYN-TC-01": 6,
@@ -243,7 +243,7 @@
       "id": "S16",
       "name": "UI disconnect",
       "status": "PASS",
-      "durationMs": 305,
+      "durationMs": 304,
       "evidence": {
         "droppedClients": 1,
         "lastRevisionSeen": 81
@@ -265,7 +265,7 @@
       "id": "S18",
       "name": "Authoritative re-snapshot",
       "status": "PASS",
-      "durationMs": 4,
+      "durationMs": 3,
       "evidence": {
         "snapshotRevision": 83,
         "lastSeenBeforeDrop": 81,
@@ -278,10 +278,10 @@
       "id": "S19",
       "name": "Historian slowdown",
       "status": "PASS",
-      "durationMs": 5210,
+      "durationMs": 5211,
       "evidence": {
         "deltasIn5_2s": 6,
-        "maxIntervalMs": 1174,
+        "maxIntervalMs": 1002,
         "revisionsAdvanced": 5
       },
       "error": null
@@ -290,16 +290,16 @@
       "id": "S20",
       "name": "Near-overflow behavior",
       "status": "PASS",
-      "durationMs": 1767,
+      "durationMs": 1741,
       "evidence": {
         "nearOverflow": true,
         "depthAtFull": 50000,
         "capacity": 50000,
-        "rejected": 6322,
+        "rejected": 6512,
         "gapMarkers": 1,
-        "pumpStopRoundTripMs": 4.22,
-        "nearOverflowClearedAfterRestoreMs": 515,
-        "depthAtClear": 37474,
+        "pumpStopRoundTripMs": 2.11,
+        "nearOverflowClearedAfterRestoreMs": 511,
+        "depthAtClear": 37284,
         "pumpAfterRestart": "STARTING"
       },
       "error": null
@@ -308,12 +308,12 @@
       "id": "S21",
       "name": "Bounded Trend",
       "status": "PASS",
-      "durationMs": 9011,
+      "durationMs": 9010,
       "evidence": {
         "acceleratedTicks": 89,
         "acceleratedCapacity": 50,
         "pointsRetained": 50,
-        "mainTrendPoints": 82,
+        "mainTrendPoints": 83,
         "mainCapacity": 600,
         "note": "accelerated parameters are test-only, not the planning values"
       },
@@ -325,7 +325,7 @@
       "status": "PASS+OWNER",
       "durationMs": 2,
       "evidence": {
-        "sourceFilesScanned": 20,
+        "sourceFilesScanned": 21,
         "externalUrlsOrMediaElements": 0,
         "browserPart": "OWNER-LOCAL e2e S22 (request-host check)"
       },
@@ -335,7 +335,7 @@
       "id": "S23",
       "name": "Synthetic close guard for Active Job",
       "status": "PASS",
-      "durationMs": 1511,
+      "durationMs": 1512,
       "evidence": {
         "evaluation": {
           "allowed": false,
@@ -378,7 +378,7 @@
       "id": "S26",
       "name": "Synthetic config revision",
       "status": "PASS",
-      "durationMs": 806,
+      "durationMs": 808,
       "evidence": {
         "configRevision": 2,
         "dirtyAtThreshold99": 0,
@@ -390,7 +390,7 @@
       "id": "S27",
       "name": "Refused second Job",
       "status": "PASS",
-      "durationMs": 7,
+      "durationMs": 6,
       "evidence": {
         "result": "ACTIVE_JOB_EXISTS",
         "activeJobs": 1,
@@ -404,7 +404,7 @@
       "id": "S28",
       "name": "Revision gap -> re-snapshot",
       "status": "PASS",
-      "durationMs": 3108,
+      "durationMs": 3107,
       "evidence": {
         "gapsDetected": 1,
         "resyncFirstEvent": "snapshot"

@@ -44,7 +44,7 @@ with `npm run harness` (section 2) and check:
 | # | Check |
 | --- | --- |
 | 1 | U-shaped plan view retained: Rear on top, Left on the left, Right on the right, Front at the bottom, legend in the centre |
-| 2 | 106 Sensor cells; centre legend reads `106 Sensor locations · 2 Cannon slots (synthetic)` |
+| 2 | 106 Sensor cells; centre summary reads `106 Sensors` and `2 Cannon slots · synthetic` |
 | 3 | 2 Cannon slots, neutral grey-dashed circles, not clickable or selectable: Rear wall row 5 / third column (logical I7), Front wall row 5 / third column (logical I16) |
 | 4 | Wall counts 24 / 29 / 24 / 29; each wall is 6 rows deep (Left 4 columns, Rear 5, Right 4, Front 5) |
 | 5 | IDs: rows top to bottom `G+2xx`, `G+1xx`, `G`, `H`, `I`, `J`; logical columns increase left to right (Left 1–4, Rear 5–9, Right 10–13, Front 14–18) |
@@ -54,13 +54,59 @@ with `npm run harness` (section 2) and check:
 Record the result for the Owner. Screenshots are allowed only if the Owner approves them as
 public-safe.
 
+## 1B. Re-run after the fullscreen layout refinement (required)
+
+Applies to the fullscreen refinement checkpoint (fast-forward on `935973e6`; SHA in the PR #3
+description). It also covers the section 1A checks. From `react-ui\`:
+
+```powershell
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm test                               # Vitest: expect 75 / 75
+npm run build
+node --test "../runtime-harness/test/**/*.test.mjs"   # expect 26 / 26
+npm run e2e -- e2e/operations.spec.ts e2e/layout.spec.ts   # 16 functional + 5 layout tests
+```
+
+Then the **manual F11 visual re-review**: `npm run harness`, open `http://127.0.0.1:5181` in
+Edge on a **1920 × 1080** display, press **F11**, browser zoom **100 %**.
+
+| # | Owner check |
+| --- | --- |
+| 1 | Sensor cells visibly larger than at `dd20a8bd` |
+| 2 | Sensor IDs readable |
+| 3 | Sensor values readable |
+| 4 | Wall titles readable |
+| 5 | U shape retained (Rear top, Left left, Right right, Front bottom) |
+| 6 | Cannon slots retained (Rear row 5 / third column = I7; Front row 5 / third column = I16) |
+| 7 | Centre gap materially smaller |
+| 8 | No excessive empty Sensor Map area |
+| 9 | No page-level scrollbar (vertical or horizontal) |
+| 10 | Complete Pressure Trend visible |
+| 11 | Complete Camera placeholder visible |
+| 12 | Eight GlobalQueue rows visible (use a Dirty scenario so at least 8 are queued) |
+| 13 | Sensor Detail uses the card width effectively (two columns) |
+| 14 | Diagnostics (`D` or the button) does not obscure critical content and closes |
+| 15 | Existing overlays remain clear (quality, queue badge, selection, Active Job, alarm) |
+
+**Screenshots required** (only if the Owner approves them as public-safe; otherwise keep them
+local):
+
+1. the full Operations page at the target;
+2. a selected Sensor with Sensor Detail;
+3. Diagnostics open;
+4. the Rear and Front Cannon slots visible.
+
+The **60-minute run stays PAUSED** until the Owner accepts the corrected visual layout.
+
 ## 2. Manual look (optional)
 
 ```powershell
 npm run harness            # serves dist/ and the harness on http://127.0.0.1:5181 (loopback)
 ```
 
-Open `http://127.0.0.1:5181` in Edge. Press `D` for the Spike Diagnostics overlay. The scenario
+Open `http://127.0.0.1:5181` in Edge. Press `D` (or the Diagnostics button) for the floating Spike Diagnostics drawer; close it with its Close button or `D`. The scenario
 token is in `runtime-harness\.run-token` (git-ignored) for manual `POST /api/spike/scenario` calls.
 
 ## 3. Functional scenarios (Edge)

@@ -1,4 +1,6 @@
-// WJSS Stage 0.2.1A — Spike Diagnostics overlay and browser-side measurement hook.
+// WJSS Stage 0.2.1A — Spike Diagnostics drawer and browser-side measurement hook.
+// The drawer floats (position: fixed) below the top status area, never consumes layout space,
+// never changes document scroll dimensions, scrolls internally, and can be closed.
 // Exposes window.__WJSS_SPIKE_DIAG__() for the Owner-local Playwright soak sampler.
 import { useEffect, useState } from 'react';
 import { renderCounter } from '../diagnostics/renderCounter';
@@ -76,7 +78,7 @@ export function useDiagnosticsHook() {
   }, [store]);
 }
 
-export function DiagnosticsOverlay({ open }: { open: boolean }) {
+export function DiagnosticsOverlay({ open, onClose }: { open: boolean; onClose?: () => void }) {
   const store = useStore();
   const runtime = useSlice('runtime');
   const [sample, setSample] = useState<DiagSample | null>(null);
@@ -96,50 +98,59 @@ export function DiagnosticsOverlay({ open }: { open: boolean }) {
   if (!open || !sample) return null;
   return (
     <aside className={styles.diag} aria-label="Spike diagnostics" data-testid="diagnostics">
-      <h2 className={styles.panelTitle}>Spike diagnostics (synthetic)</h2>
-      <dl className={styles.kv}>
-        <dt>Revision</dt>
-        <dd>{sample.revision}</dd>
-        <dt>Connection</dt>
-        <dd>{sample.connection}</dd>
-        <dt>Snapshots / Deltas</dt>
-        <dd>
-          {sample.snapshots} / {sample.deltas} ({rate.toFixed(2)}/s)
-        </dd>
-        <dt>Gaps / reconnects</dt>
-        <dd>
-          {sample.gaps} / {sample.reconnects}
-        </dd>
-        <dt>Last message</dt>
-        <dd>{(sample.lastMessageBytes / 1024).toFixed(1)} KiB</dd>
-        <dt>Lag (generatedAt→applied)</dt>
-        <dd>{sample.lastLagMs ?? '--'} ms</dd>
-        <dt>Cell renders (total)</dt>
-        <dd>{sample.sensorCellRendersTotal}</dd>
-        <dt>Sensor notifications (last Delta)</dt>
-        <dd>{sample.lastDeltaSensorNotifications}</dd>
-        <dt>Trend points</dt>
-        <dd>{sample.trendPoints}</dd>
-        <dt>DOM nodes</dt>
-        <dd>{sample.domNodes}</dd>
-        <dt>Long tasks</dt>
-        <dd>
-          {sample.longTasks} ({sample.longTaskMsTotal} ms)
-        </dd>
-        <dt>JS heap</dt>
-        <dd>{sample.jsHeapUsedMb ?? 'n/a'} MB</dd>
-        <dt>Harness RSS / loop p99</dt>
-        <dd>
-          {runtime?.rssMb ?? '--'} MB / {runtime?.eventLoopP99Ms ?? '--'} ms
-        </dd>
-        <dt>Historian depth</dt>
-        <dd>
-          {runtime?.historian.depth ?? '--'} / {runtime?.historian.capacity ?? '--'}
-          {runtime?.historian.nearOverflow ? ' · NEAR OVERFLOW' : ''} · rejected {runtime?.historian.rejected ?? 0}
-        </dd>
-        <dt>Invariant violations</dt>
-        <dd>{runtime?.invariantViolations ?? '--'}</dd>
-      </dl>
+      <div className={styles.diagHeader}>
+        <h2 className={styles.panelTitle}>Spike diagnostics (synthetic)</h2>
+        {onClose && (
+          <button type="button" className={styles.btn} onClick={onClose} aria-label="Close diagnostics" data-testid="diagnostics-close">
+            Close
+          </button>
+        )}
+      </div>
+      <div className={styles.diagBody}>
+        <dl className={styles.kv}>
+          <dt>Revision</dt>
+          <dd>{sample.revision}</dd>
+          <dt>Connection</dt>
+          <dd>{sample.connection}</dd>
+          <dt>Snapshots / Deltas</dt>
+          <dd>
+            {sample.snapshots} / {sample.deltas} ({rate.toFixed(2)}/s)
+          </dd>
+          <dt>Gaps / reconnects</dt>
+          <dd>
+            {sample.gaps} / {sample.reconnects}
+          </dd>
+          <dt>Last message</dt>
+          <dd>{(sample.lastMessageBytes / 1024).toFixed(1)} KiB</dd>
+          <dt>Lag (generatedAt→applied)</dt>
+          <dd>{sample.lastLagMs ?? '--'} ms</dd>
+          <dt>Cell renders (total)</dt>
+          <dd>{sample.sensorCellRendersTotal}</dd>
+          <dt>Sensor notifications (last Delta)</dt>
+          <dd>{sample.lastDeltaSensorNotifications}</dd>
+          <dt>Trend points</dt>
+          <dd>{sample.trendPoints}</dd>
+          <dt>DOM nodes</dt>
+          <dd>{sample.domNodes}</dd>
+          <dt>Long tasks</dt>
+          <dd>
+            {sample.longTasks} ({sample.longTaskMsTotal} ms)
+          </dd>
+          <dt>JS heap</dt>
+          <dd>{sample.jsHeapUsedMb ?? 'n/a'} MB</dd>
+          <dt>Harness RSS / loop p99</dt>
+          <dd>
+            {runtime?.rssMb ?? '--'} MB / {runtime?.eventLoopP99Ms ?? '--'} ms
+          </dd>
+          <dt>Historian depth</dt>
+          <dd>
+            {runtime?.historian.depth ?? '--'} / {runtime?.historian.capacity ?? '--'}
+            {runtime?.historian.nearOverflow ? ' · NEAR OVERFLOW' : ''} · rejected {runtime?.historian.rejected ?? 0}
+          </dd>
+          <dt>Invariant violations</dt>
+          <dd>{runtime?.invariantViolations ?? '--'}</dd>
+        </dl>
+      </div>
     </aside>
   );
 }

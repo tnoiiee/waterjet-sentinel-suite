@@ -1,8 +1,14 @@
-/* WJSS Stage 0.2.1A — Operations page layout and panel styles (spike). */
+/* WJSS Stage 0.2.1A — Operations page layout and panel styles (spike).
+   Fullscreen refinement (Owner Design Addendum): strict viewport-height layout, U-shaped map
+   retained, compact right-side cards, bounded bottom row, floating Diagnostics drawer.
+   All sizes come from the design tokens in ../global.css. */
 .app {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* ---------- status bar ---------- */
@@ -11,14 +17,20 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 4px 6px;
+  flex: none;
+  min-height: var(--top-status-h);
+  padding: 4px 10px;
   background: #0c0e11;
   border-bottom: 1px solid var(--line);
+  font-size: var(--font-chip);
+  line-height: 1.25;
 }
 .brand {
+  font-size: var(--font-app-title);
   font-weight: 700;
   margin-right: 4px;
+  white-space: nowrap;
 }
 .syntheticTag {
   font-size: 11px;
@@ -27,9 +39,11 @@
   background: #ffb300;
   padding: 2px 6px;
   border-radius: 3px;
+  white-space: nowrap;
 }
 .pill {
-  font-size: 12px;
+  font-size: var(--font-chip);
+  font-weight: 600;
   padding: 2px 8px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -63,22 +77,27 @@
 }
 .btn {
   font: inherit;
-  font-size: 12px;
+  font-size: var(--font-chip);
+  font-weight: 600;
   color: var(--text);
   background: #2a2e35;
   border: 1px solid #3a3f47;
   border-radius: 4px;
-  padding: 3px 10px;
+  padding: 2px 10px;
   cursor: pointer;
+  white-space: nowrap;
 }
 .btn:hover {
   background: #343941;
 }
+.btnActive {
+  border-color: #00e5ff;
+}
 .dialog {
   position: absolute;
   right: 10px;
-  top: 40px;
-  z-index: 20;
+  top: calc(var(--top-status-h) + 4px);
+  z-index: 40;
   width: 360px;
   padding: 10px 12px;
   background: #22262c;
@@ -89,30 +108,36 @@
 
 /* ---------- banners ---------- */
 .connBanner {
-  padding: 6px 12px;
+  flex: none;
+  padding: 4px 12px;
   background: #3c3f44;
   color: #fff;
   border-bottom: 1px solid #5b6068;
   font-weight: 600;
+  font-size: 12px;
 }
 .alarmStrip {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 2px 8px;
   align-items: center;
-  padding: 4px 10px;
-  min-height: 28px;
+  padding: 2px 10px;
+  min-height: var(--alarm-strip-h);
   background: #16181c;
   border-bottom: 1px solid var(--line);
-  font-size: 12px;
+  font-size: var(--font-alarm);
+  line-height: 1.3;
 }
 .alarmCounts {
   color: var(--muted);
+  white-space: nowrap;
 }
 .alarmItem {
-  padding: 1px 8px;
+  padding: 0 8px;
   border-radius: 3px;
   border: 1px solid #ff2fd2;
+  white-space: nowrap;
 }
 .alarmItem b {
   color: #ff2fd2;
@@ -129,113 +154,168 @@
 
 /* ---------- main grid ---------- */
 .main {
-  flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(340px, 1fr);
+  grid-template-columns: var(--map-col-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) var(--bottom-row-h);
   grid-template-areas:
     'overview side'
     'bottom bottom';
-  gap: 10px;
-  padding: 10px;
-  align-items: start;
+  gap: var(--layout-gap);
+  padding: var(--layout-pad);
+  flex: 1 1 0;
+  width: 100%;
+  max-width: var(--content-max-w);
+  margin: 0 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 .staleView {
   filter: saturate(0.25) brightness(0.8);
 }
+/* The Sensor Map area is the page's only size container; Sensor cell tokens resolve against it. */
 .overviewArea {
   grid-area: overview;
+  container-type: size;
+  min-height: 0;
+  min-width: 0;
 }
 .sideArea {
   grid-area: side;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--layout-gap);
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .bottomArea {
   grid-area: bottom;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) var(--camera-w);
+  gap: var(--layout-gap);
+  min-height: 0;
+  min-width: 0;
 }
+/* Narrow fallback (below the supported desktop range): single column, the main area scrolls
+   internally. No page-level horizontal scroll. */
 @media (max-width: 1100px) {
   .main {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto var(--bottom-row-h);
     grid-template-areas: 'overview' 'side' 'bottom';
+    overflow-y: auto;
   }
-  .bottomArea {
-    grid-template-columns: minmax(0, 1fr);
+  .overviewArea {
+    container-type: inline-size;
+  }
+  .overview {
+    height: auto;
+  }
+  .sideArea {
+    overflow: visible;
   }
 }
 
-/* ---------- four-wall overview (plan view) ---------- */
+/* ---------- U-shaped Sensor Map (plan view: Rear top, Left / Right sides, Front bottom) ---------- */
 .overview {
-  display: grid;
-  grid-template-columns: auto auto auto;
-  grid-template-areas:
-    'rear rear rear'
-    'left center right'
-    'front front front';
-  gap: 8px;
-  padding: 8px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 6px;
-  justify-content: start;
+  overflow: auto;
+}
+/* Map surface: wall blocks are placed in bounded, non-overlapping X ranges, so the side walls
+   share Y range with the Rear (top) and Front (bottom) blocks. No empty grid track, no
+   transform scaling. Height = two wall blocks + compact center summary. */
+.uSurface {
+  position: relative;
+  flex: none;
+  width: 100%;
+  min-width: calc(13 * var(--sensor-cell-width) + 10 * var(--sensor-gap) + 24px);
+  height: calc(2 * var(--wall-h) + var(--u-center-h) + 2 * var(--u-gap));
+  margin-block: auto;
 }
 .wall {
+  position: absolute;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--wall-header-gap);
+  width: fit-content;
+  height: var(--wall-h);
 }
 .wall_REAR {
-  grid-area: rear;
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
 }
 .wall_FRONT {
-  grid-area: front;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+}
+.wall_LEFT,
+.wall_RIGHT {
+  top: 0;
+  bottom: 0;
+  margin-block: auto;
 }
 .wall_LEFT {
-  grid-area: left;
+  left: 0;
 }
 .wall_RIGHT {
-  grid-area: right;
+  right: 0;
 }
 .wallHeader {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 11px;
+  gap: 6px;
+  height: var(--wall-header-h);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--font-wall-summary);
+  line-height: var(--wall-header-h);
   color: var(--muted);
+}
+.wallTitle {
+  font-size: var(--font-wall-title);
+  font-weight: 700;
+  color: var(--text);
 }
 .wallCounts {
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.cells {
-  display: grid;
-  gap: 5px;
-  padding: 4px;
+.wallSpan {
+  margin-left: 4px;
+  font-size: var(--font-wall-summary);
+  font-weight: 400;
+  color: var(--muted);
 }
 /* Wall grid: 6 logical rows; column count comes from the runtime wall map
    (LEFT/RIGHT 4, REAR/FRONT 5). Row wrappers keep the logical row structure in the DOM. */
 .cells {
-  grid-template-columns: repeat(var(--wall-cols, 5), var(--cell));
+  display: grid;
+  grid-template-columns: repeat(var(--wall-cols, 5), var(--sensor-cell-width));
+  grid-auto-rows: var(--sensor-cell-height);
+  gap: var(--sensor-gap);
 }
 .wallRow {
   display: contents;
 }
-.wall_REAR,
-.wall_FRONT {
-  justify-self: center;
-}
-.wallSpan {
-  opacity: 0.7;
-  margin-left: 4px;
-}
-/* Cannon equipment slot: neutral, never a process/quality colour, never selectable. */
+/* Cannon equipment slot: same outer size as a Sensor cell; neutral, never a process/quality
+   colour, never selectable. */
 .cannon {
-  width: var(--cell, 34px);
-  height: var(--cell, 34px);
-  box-sizing: border-box;
+  width: var(--sensor-cell-width);
+  height: var(--sensor-cell-height);
   border: 1px dashed #7d8794;
   border-radius: 50%;
   background: #262c33;
@@ -244,32 +324,43 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font: 600 8px/1 system-ui, sans-serif;
+  gap: 1px;
+  font: 700 11px/1 system-ui, 'Segoe UI', sans-serif;
   cursor: default;
   user-select: none;
 }
 .cannonGlyph {
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1;
 }
 .cannonText {
-  font-size: 7px;
+  font-size: 11px;
   letter-spacing: 0.02em;
 }
+/* Compact center summary and legend (no large empty card). */
 .overviewCenter {
-  grid-area: center;
+  position: absolute;
+  top: calc(var(--wall-h) + var(--u-gap));
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: var(--u-center-w);
+  height: var(--u-center-h);
   display: flex;
   flex-direction: column;
-  align-items: center;
   justify-content: center;
-  gap: 8px;
-  border: 1px dashed var(--line);
-  border-radius: 6px;
-  padding: 10px;
-  min-width: 200px;
+  gap: 4px;
+  overflow: hidden;
 }
 .legendTitle {
-  font-weight: 600;
+  font-size: var(--font-legend-title);
+  font-weight: 700;
+  line-height: 1.2;
+}
+.legendSub {
+  font-size: var(--font-legend);
+  color: var(--muted);
+  line-height: 1.2;
 }
 .legend {
   list-style: none;
@@ -277,19 +368,22 @@
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px 12px;
-  font-size: 11px;
-  color: var(--muted);
+  gap: 3px 8px;
+  font-size: var(--font-legend);
+  line-height: 1.2;
+  color: var(--text);
 }
 .legend li {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  white-space: nowrap;
 }
 .legend span {
   display: inline-block;
-  width: 12px;
-  height: 12px;
+  flex: none;
+  width: 11px;
+  height: 11px;
   border-radius: 2px;
 }
 .swDirty {
@@ -317,11 +411,11 @@
   background: #262c33;
   border: 1px dashed #7d8794;
   border-radius: 50%;
-  box-sizing: border-box;
 }
 .thresholdNote {
-  font-size: 11px;
+  font-size: var(--font-caption);
   color: var(--muted);
+  line-height: 1.2;
 }
 
 /* ---------- panels ---------- */
@@ -329,27 +423,41 @@
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   min-width: 0;
+  min-height: 0;
 }
 .panelTitle {
-  margin: 0 0 6px;
-  font-size: 13px;
-  font-weight: 600;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: var(--font-card-title);
+  font-weight: 700;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .muted {
   color: var(--muted);
   font-weight: 400;
 }
+.panelTitle .muted {
+  font-size: var(--font-label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .kv {
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 2px 10px;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0 10px;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-value);
 }
 .kv dt {
   color: var(--muted);
+  font-size: var(--font-label);
 }
 .kv dd {
   margin: 0;
@@ -364,13 +472,74 @@
 }
 .synthetic,
 .footnote {
-  margin: 6px 0 0;
-  font-size: 10px;
+  margin: 4px 0 0;
+  font-size: var(--font-caption);
+  line-height: 14px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sensor Detail: compact two-column inspector with a fixed height (no layout jump). */
+.detailPanel {
+  flex: none;
+  height: var(--detail-h);
+  overflow: hidden;
+}
+.inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 16px;
+}
+.inspectorCol {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  grid-auto-rows: var(--detail-row-h);
+  align-items: center;
+  column-gap: 10px;
+  margin: 0;
+  min-width: 0;
+}
+.inspectorCol dt {
+  color: var(--muted);
+  font-size: var(--font-label);
+  white-space: nowrap;
+}
+.inspectorCol dd {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-value);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.noteLine {
+  margin: 2px 0 0;
+  padding: 0 6px;
+  height: 16px;
+  line-height: 16px;
+  border-left: 3px solid #ffb300;
+  background: rgba(255, 179, 0, 0.08);
+  font-size: var(--font-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active Cleaning Job: compact fixed-height card. */
+.jobPanel {
+  flex: none;
+  height: var(--job-h);
+  overflow: hidden;
 }
 .jobHead {
-  font-size: 12px;
-  margin-bottom: 6px;
+  font-size: var(--font-value);
+  line-height: 16px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .phases {
   display: flex;
@@ -381,9 +550,11 @@
 }
 .phases li {
   flex: 1;
+  height: 30px;
+  line-height: 28px;
   text-align: center;
-  font-size: 11px;
-  padding: 3px 0;
+  font-size: 12px;
+  font-weight: 600;
   border-radius: 3px;
   border: 1px solid var(--line);
 }
@@ -399,43 +570,101 @@
 .phaseTodo {
   color: var(--muted);
 }
-.phaseLabel {
+.jobStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  height: 16px;
   font-size: 12px;
-  margin-top: 6px;
+  white-space: nowrap;
+}
+.phaseLabel {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .progress {
-  height: 4px;
-  margin-top: 4px;
+  flex: 1;
+  height: 6px;
   background: #2a2e35;
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 .progress div {
   height: 100%;
   background: #00e5ff;
 }
+
+/* GlobalQueue preview: flexible height, eight rows visible at the primary target. */
+.queuePanel {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tableWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  table-layout: fixed;
+  font-size: var(--font-queue-value);
 }
 .table th,
 .table td {
   text-align: left;
-  padding: 2px 4px;
+  padding: 0 6px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table thead tr {
+  height: var(--queue-head-h);
+}
+.table tbody tr {
+  height: var(--queue-row-h);
 }
 .table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
   color: var(--muted);
-  font-weight: 500;
+  font-size: var(--font-queue-head);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.colPos {
+  width: 34px;
+}
+.colSensor {
+  width: 76px;
+}
+.colScore {
+  width: 64px;
+}
+.colAge {
+  width: 92px;
+}
+.colStatus {
+  width: 96px;
+}
+.sensorCol {
+  font-weight: 600;
 }
 .reason {
-  white-space: normal;
-  max-width: 150px;
+  font-size: var(--font-queue-value);
+  letter-spacing: 0.02em;
 }
 .chip {
-  font-size: 10px;
+  font-size: var(--font-queue-status);
+  font-weight: 600;
   padding: 1px 6px;
   border-radius: 8px;
   border: 1px solid #5b6068;
@@ -456,27 +685,80 @@
   border-color: #9e9e9e;
   color: #bdbdbd;
 }
+
+/* Bottom row: Pressure Trend and Camera share one bounded row height. */
+.trendPanel,
+.cameraPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 6px 10px;
+}
 .trendHost {
+  position: relative;
+  flex: 1 1 0;
   width: 100%;
-  min-height: 150px;
+  min-height: 0;
+  overflow: hidden;
+}
+.trendHost :global(.u-legend) {
+  font-size: var(--font-axis);
+  line-height: 1.2;
+  margin: 0;
+}
+.trendHost :global(.u-legend .u-series > *) {
+  padding: 1px 4px;
+}
+.trendHost :global(.u-legend .u-marker) {
+  width: 10px;
+  height: 10px;
 }
 .camera {
   display: block;
+  flex: 1 1 0;
   width: 100%;
-  height: auto;
+  height: 100%;
+  min-height: 0;
 }
 
-/* ---------- diagnostics overlay ---------- */
+/* ---------- Diagnostics: floating, collapsible drawer (does not consume layout space) ---------- */
 .diag {
   position: fixed;
-  right: 12px;
-  bottom: 12px;
+  top: calc(var(--top-status-h) + var(--alarm-strip-h) + 8px);
+  right: 8px;
   z-index: 30;
-  width: 340px;
-  max-height: 80vh;
-  overflow: auto;
-  padding: 10px 12px;
-  background: rgba(12, 14, 17, 0.95);
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: min(60vh, calc(100dvh - var(--top-status-h) - var(--alarm-strip-h) - var(--bottom-row-h) - 24px));
+  display: flex;
+  flex-direction: column;
+  background: rgba(12, 14, 17, 0.96);
   border: 1px solid #4a4f57;
   border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  font-size: var(--font-diag);
+}
+.diagHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.diagHeader .panelTitle {
+  margin: 0;
+}
+.diagBody {
+  padding: 6px 10px 8px;
+  overflow: auto;
+  min-height: 0;
+}
+.diagBody .kv {
+  font-size: var(--font-diag);
+  row-gap: 2px;
+}
+.diagBody .kv dt {
+  font-size: var(--font-diag);
 }

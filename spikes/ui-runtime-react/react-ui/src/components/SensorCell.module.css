@@ -2,14 +2,14 @@
    render the independent channels (marker, badge, ring, outline, alarm border). */
 .cell {
   position: relative;
-  width: var(--cell, 34px);
-  height: var(--cell, 34px);
+  width: var(--sensor-cell-width);
+  height: var(--sensor-cell-height);
   padding: 0;
   margin: 0;
   border: 2px solid transparent;
   border-radius: 3px;
   color: #fff;
-  font: 600 10px/1 system-ui, sans-serif;
+  font: 700 var(--sensor-value-font-size) / 1.1 system-ui, 'Segoe UI', sans-serif;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -23,12 +23,20 @@
   outline: 2px dashed var(--selected, #00e5ff);
   outline-offset: 2px;
 }
+/* Sensor ID (the Owner logical label) and value: sizes come from the global design tokens. */
 .index {
-  font-size: 8px;
-  opacity: 0.8;
+  font-size: var(--sensor-id-font-size);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  opacity: 0.92;
 }
 .score {
-  font-size: 11px;
+  font-size: var(--sensor-value-font-size);
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 /* 3. Quality markers (never Dirty/Cleaner backgrounds for BAD/STALE/DISABLED). */
@@ -42,8 +50,8 @@
   top: 1px;
   width: 0;
   height: 0;
-  border-top: 11px solid #ffb300;
-  border-right: 11px solid transparent;
+  border-top: 13px solid #ffb300;
+  border-right: 13px solid transparent;
 }
 .q_BAD_HATCH {
   background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.28) 0 3px, transparent 3px 7px) !important;
@@ -61,13 +69,14 @@
   position: absolute;
   right: -4px;
   top: -5px;
-  min-width: 12px;
-  height: 12px;
-  padding: 0 2px;
-  border-radius: 6px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
   background: #e8eaed;
   color: #111;
-  font-size: 8px;
+  font-size: 10px;
+  font-weight: 700;
   line-height: 12px;
   text-shadow: none;
   border: 1px solid #111;

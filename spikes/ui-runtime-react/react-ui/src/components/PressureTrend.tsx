@@ -11,6 +11,16 @@ import { useSlice } from '../store/hooks';
 import styles from './Operations.module.css';
 
 const COLORS = ['#4fc3f7', '#ffd54f', '#ba68c8', '#81c784'];
+const AXIS_FONT = '11px system-ui, "Segoe UI", sans-serif';
+
+/** Plot size that fits the bounded host: the legend height is subtracted so the chart plus its
+ *  legend never exceed the bottom-row height. Falls back to 150 px when layout is unavailable. */
+function plotSize(el: HTMLElement, u: uPlot | null): { width: number; height: number } {
+  const legend = u?.root.querySelector<HTMLElement>('.u-legend');
+  const legendH = legend ? legend.offsetHeight : 22;
+  const h = el.clientHeight > 0 ? el.clientHeight - legendH - 2 : 150;
+  return { width: Math.max(200, el.clientWidth), height: Math.max(80, Math.floor(h)) };
+}
 
 export function toColumns(points: TrendPoint[]): uPlot.AlignedData {
   const n = points.length;
@@ -42,14 +52,14 @@ export function PressureTrend() {
     if (!el) return;
     const names = trend.seriesNames.length ? trend.seriesNames : ['S1', 'S2', 'S3', 'S4'];
     const opts: uPlot.Options = {
-      width: Math.max(200, el.clientWidth),
-      height: 150,
+      ...plotSize(el, null),
       legend: { show: true, live: false },
       cursor: { show: true, points: { show: false } },
       scales: { x: { time: true }, y: { range: [0, 130] } },
+      padding: [6, 8, 0, 0],
       axes: [
-        { stroke: '#9aa0a6', grid: { stroke: '#2a2e35' } },
-        { stroke: '#9aa0a6', grid: { stroke: '#2a2e35' }, size: 40 },
+        { stroke: '#9aa0a6', grid: { stroke: '#2a2e35' }, font: AXIS_FONT, size: 26, gap: 3 },
+        { stroke: '#9aa0a6', grid: { stroke: '#2a2e35' }, font: AXIS_FONT, size: 34, gap: 3 },
       ],
       series: [
         {},
@@ -88,7 +98,11 @@ export function PressureTrend() {
       },
     };
     plot.current = new uPlot(opts, toColumns(pointsRef.current), el);
-    const ro = new ResizeObserver(() => plot.current?.setSize({ width: Math.max(200, el.clientWidth), height: 150 }));
+    // Re-fit once the legend exists, then on every host resize (same instance, no recreation).
+    plot.current.setSize(plotSize(el, plot.current));
+    const ro = new ResizeObserver(() => {
+      if (plot.current) plot.current.setSize(plotSize(el, plot.current));
+    });
     ro.observe(el);
     return () => {
       ro.disconnect();
@@ -103,7 +117,7 @@ export function PressureTrend() {
   }, [trend.version, trend.points]);
 
   return (
-    <section className={styles.panel} aria-label="Pressure trend" data-testid="pressure-trend">
+    <section className={`${styles.panel} ${styles.trendPanel}`} aria-label="Pressure trend" data-testid="pressure-trend">
       <h2 className={styles.panelTitle}>
         Pressure trend <span className={styles.muted}>(synthetic units · {trend.points.length}/{trend.capacity} s · ready band shaded · gaps = no data)</span>
       </h2>

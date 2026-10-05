@@ -54,6 +54,21 @@ Consequences that must remain explicit:
   Production direction (.NET Equipment Runtime Windows Service, ASP.NET Core Local Application
   API, application-owned Windows kiosk shell).
 
+### 2.1 Owner Design Addendum — fullscreen Operations refinement
+
+After reviewing the corrected map, the Owner approved a targeted refinement of the existing
+Operations page (not a redesign and not a scope expansion). Primary target: Windows 11, Microsoft
+Edge, F11 fullscreen, 1920 × 1080, zoom 100 %, with no page-level scrollbar and every primary
+surface visible: status bar, alarm strip, full U-shaped Sensor Map, Sensor Detail, Active
+Cleaning Job, eight GlobalQueue rows, Pressure Trend, Camera. Approved direction: larger Sensor
+cells and text (48–52 × 42–48 px, ID 12–13 px, value 14–16 px), reduced map-centre space, a
+two-column Sensor Detail inspector, compact Active Job and GlobalQueue cards, a bounded bottom
+row, and a floating, closable Diagnostics drawer. Retained without change: the U shape, 106
+Sensors, 212 Thermocouple channels, 24 / 29 / 24 / 29, Cannon slots at I7 / I16, and all
+functional behaviour. Implementation and evidence:
+[results §0A](stage-0.2.1a-results.md#0a-fullscreen-operations-refinement-checkpoint-current).
+Browser fit is Owner-local evidence (`e2e/layout.spec.ts` and the manual F11 review).
+
 ## 3. Directory boundary
 
 ```text

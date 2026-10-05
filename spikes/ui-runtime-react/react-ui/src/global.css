@@ -1,4 +1,10 @@
-/* WJSS Stage 0.2.1A — global base styles (spike). System fonts only; no external assets. */
+/* WJSS Stage 0.2.1A — global base styles and the SINGLE design-token location (spike).
+   System fonts only; no external assets.
+
+   Owner-approved Design Addendum (fullscreen refinement): primary target Windows 11, Microsoft
+   Edge, F11 fullscreen, 1920 x 1080, zoom 100 %. All sizing for the Operations page is derived
+   from the custom properties below; component CSS files only reference them (no duplicated
+   sizes). Fit is obtained by space allocation, never by shrinking operational text. */
 :root {
   color-scheme: dark;
   --bg: #121418;
@@ -6,7 +12,76 @@
   --line: #2a2e35;
   --text: #e8eaed;
   --muted: #9aa0a6;
-  --cell: 30px;
+
+  /* ---- typography scale (px at the primary target) ---- */
+  --font-base: 13px;
+  --font-app-title: 14px;
+  --font-chip: 11.5px;
+  --font-alarm: 11px;
+  --font-card-title: 14px;
+  --font-wall-title: 14px;
+  --font-wall-summary: 11.5px;
+  --font-label: 11.5px;
+  --font-value: 12.5px;
+  --font-queue-head: 11px;
+  --font-queue-value: 12px;
+  --font-queue-status: 10.5px;
+  --font-legend: 12px;
+  --font-legend-title: 16px;
+  --font-caption: 11px;
+  --font-axis: 11px;
+  --font-diag: 11.5px;
+  --line-height: 1.3;
+
+  /* ---- page height model ---- */
+  --top-status-h: 34px;
+  --alarm-strip-h: 24px;
+  --layout-gap: 6px;
+  --layout-pad: 6px;
+  --bottom-row-h: clamp(200px, 21vh, 240px);
+  --camera-w: 280px;
+  --content-max-w: 2240px;
+
+  /* ---- main workspace split: Sensor Map ~44 %, Operations ~56 %, Map growth capped ---- */
+  --map-col-w: clamp(700px, 44%, 900px);
+
+  /* ---- right-side card heights ---- */
+  --detail-h: 184px;
+  --job-h: 132px;
+  --detail-row-h: 21px;
+  --queue-head-h: 25px;
+  --queue-row-h: 26px;
+
+  /* ---- U-shaped Sensor Map geometry ---- */
+  --sensor-gap: 4px;
+  --wall-header-h: 18px;
+  --wall-header-gap: 2px;
+  --u-gap: 4px;
+  --u-center-w: 204px;
+  --u-center-h: 136px;
+  /* Map card border (1 + 1) + padding (6 + 6). */
+  --map-chrome: 14px;
+
+  /* Sensor cell scale. Container query units (cqh / cqw) resolve against the Sensor Map area
+     (the only size container on the page), so the cells grow to use the available map height
+     and are capped: height 42..50 px, width 44..54 px (>= 48 px at 1920 x 1080). The constant
+     terms are the wall headers, the 10 inter-row gaps of the two stacked walls, the compact
+     center summary, the U gaps, the card chrome, and 6 px of slack. */
+  --sensor-cell-height: clamp(
+    42px,
+    calc(
+      (
+          100cqh - 2 * (var(--wall-header-h) + var(--wall-header-gap)) - 10 * var(--sensor-gap) -
+            var(--u-center-h) - 2 * var(--u-gap) - var(--map-chrome) - 6px
+        ) / 12
+    ),
+    50px
+  );
+  --sensor-cell-width: clamp(44px, min(calc(var(--sensor-cell-height) + 6px), calc((100cqw - 150px) / 13)), 54px);
+  --sensor-id-font-size: 12.5px;
+  --sensor-value-font-size: 15px;
+  /* One wall block: header + 6 rows + 5 gaps. */
+  --wall-h: calc(var(--wall-header-h) + var(--wall-header-gap) + 6 * var(--sensor-cell-height) + 5 * var(--sensor-gap));
 }
 * {
   box-sizing: border-box;
@@ -18,15 +93,5 @@ body,
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font: 13px/1.35 system-ui, 'Segoe UI', sans-serif;
-}
-@media (min-width: 1600px) {
-  :root {
-    --cell: 34px;
-  }
-}
-@media (max-width: 1100px) {
-  :root {
-    --cell: 26px;
-  }
+  font: var(--font-base) / var(--line-height) system-ui, 'Segoe UI', sans-serif;
 }

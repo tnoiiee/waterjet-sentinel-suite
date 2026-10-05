@@ -16,6 +16,7 @@ export function App({ showTrend = true }: { showTrend?: boolean }) {
   const conn = useSlice('connection');
   const onSelect = useCallback((id: string) => setSelectedId((cur) => (cur === id ? null : id)), []);
   const toggleDiag = useCallback(() => setDiagOpen((v) => !v), []);
+  const closeDiag = useCallback(() => setDiagOpen(false), []);
   useDiagnosticsHook();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -27,7 +28,7 @@ export function App({ showTrend = true }: { showTrend?: boolean }) {
 
   return (
     <div className={styles.app} data-connection={conn.state} data-testid="operations-page">
-      <StatusBar onToggleDiagnostics={toggleDiag} />
+      <StatusBar onToggleDiagnostics={toggleDiag} diagnosticsOpen={diagOpen} />
       <ConnectionBanner />
       <AlarmStrip />
       <main className={`${styles.main} ${conn.state === 'DISCONNECTED' ? styles.staleView : ''}`}>
@@ -44,7 +45,7 @@ export function App({ showTrend = true }: { showTrend?: boolean }) {
           <CameraPlaceholder />
         </div>
       </main>
-      <DiagnosticsOverlay open={diagOpen} />
+      <DiagnosticsOverlay open={diagOpen} onClose={closeDiag} />
     </div>
   );
 }
