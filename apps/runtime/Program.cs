@@ -80,9 +80,16 @@ app.MapGet(ApiRoutes.HealthReady, () => TypedResults.Json(
     },
     statusCode: StatusCodes.Status503ServiceUnavailable));
 
-app.Logger.LogInformation(
-    "WJSS Runtime host skeleton starting. profile={Profile} url={Url} stage={Stage} startedUtc={StartedUtc:O}",
-    profile, baseUrl, Stage03A1.Marker, startedUtc);
+// CA1873 correction (Owner-local build round 3, 2026-10-07): the argument
+// evaluation - including the {StartedUtc:O} round-trip formatting - is only
+// performed when Information logging is actually enabled. Same level, same
+// template, same structured payloads; no suppression, no interpolation.
+if (app.Logger.IsEnabled(LogLevel.Information))
+{
+    app.Logger.LogInformation(
+        "WJSS Runtime host skeleton starting. profile={Profile} url={Url} stage={Stage} startedUtc={StartedUtc:O}",
+        profile, baseUrl, Stage03A1.Marker, startedUtc);
+}
 
 try
 {

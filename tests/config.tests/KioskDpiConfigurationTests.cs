@@ -1,3 +1,5 @@
+using Xunit;
+
 namespace Wjss.Config.Examples.Tests;
 
 /// <summary>

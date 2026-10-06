@@ -23,6 +23,34 @@ evidence template). There is intentionally **no `global.json`** in the repositor
 SDK would be an unverified claim. If `dotnet` is missing or < 10.0, **STOP**: install/update the
 SDK, then start at step 1. Record the outcome even in this case.
 
+## 0A. Pre-build environment check (added after round 2)
+
+```powershell
+$env:TargetPath
+```
+
+MSBuild imports valid environment-variable names as global properties, and a
+`TargetPath` defined in the current PowerShell process **overrides normal
+project-output resolution** for every project in the build — producing
+cascading reference/namespace failures in perfectly good source. This is a
+local validation-environment prerequisite, **not a WJSS Product dependency**;
+the Product tree must never add paths, references, or workarounds to
+accommodate an external environment variable.
+
+If `TargetPath` is defined:
+
+```powershell
+$originalTargetPath = $env:TargetPath   # record it in the evidence template
+Remove-Item Env:TargetPath -ErrorAction SilentlyContinue
+```
+
+- This removes the override **from the current PowerShell process only**.
+- **Do NOT delete or modify the User-level or Machine-level environment
+  variable** — that belongs to whatever external toolset installed it.
+- Record the presence of the override (and its value if the Owner chooses to
+  quote it in the evidence comment) in the evidence template below; the
+  validation run itself is performed with the process-scope override removed.
+
 ## 1. Checkout the PR head
 
 ```powershell
@@ -43,8 +71,12 @@ The NuGet pins (`Microsoft.NET.Test.Sdk 17.12.0`, `xunit 2.9.2`, `xunit.runner.v
 2.8.2`) are **PROPOSED / UNVERIFIED** — this step is their first-ever resolution attempt.
 If restore fails for version reasons, note the exact error; substituting a nearby version is
 allowed **only** if recorded in the evidence template as a pin amendment (and mirrored into
-`Directory.Packages.props` in the fix commit). A lock file (`packages.lock.json`) is
-deliberately absent — do not commit one from this run.
+`Directory.Packages.props` in the fix commit). Lock files: the first real restore legitimately
+GENERATES a `packages.lock.json` per project. Leave the generated set **untracked and
+untouched** throughout validation — do not delete, clean, or edit them, and do not commit them
+during the run. They are assessed and committed only after the FULL validation passes, by
+explicit Owner decision (round-3 policy of 2026-10-07; supersedes the earlier "do not commit
+one from this run" shorthand).
 
 ## 3. Build everything (including the Windows-only kiosk)
 
@@ -124,8 +156,11 @@ STAGE 0.3A-1 OWNER-LOCAL VALIDATION
 date (local): ______  machine: ______
 dotnet --version: ______
 git rev-parse HEAD: ______
+0A env: TargetPath defined at session start? YES/NO (if YES: removed process-scope only;
+   value recorded here only if the Owner elects to quote it): ______
 2 restore: PASS/FAIL   notes: ______
   resolved pins: Microsoft.NET.Test.Sdk ___ xunit ___ xunit.runner.visualstudio ___
+  packages.lock.json generated (left untracked): count ___
 3 build (Release, sln): PASS/FAIL   warning count: ___ (list below if >0)
 4 dotnet test (sln): PASS/FAIL
   Wjss.Domain.Tests ___ / Wjss.Runtime.Core.Tests ___ / Wjss.Runtime.Api.Tests ___

@@ -25,6 +25,33 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Owner-local build correction round 3
+
+Root cause of the round-2 cascading `Wjss.Contracts` reference failures was identified as
+**local environment contamination**: a `TargetPath` variable defined in the Owner's active
+PowerShell process (set by an unrelated external motion-control toolset) was imported by
+MSBuild as a global property, hijacking output resolution. The Owner removed it from the
+process scope; the cascade vanished and ten projects then compiled: `Wjss.Time`,
+`Wjss.Kiosk`, `Wjss.Contracts`, `Wjss.Domain`, `Wjss.Adapters.Simulator`,
+`Wjss.Runtime.Core`, `Wjss.Runtime.Api.Tests`, `Wjss.Domain.Tests`,
+`Wjss.FixtureEmission.Tests`, `Wjss.Runtime.Core.Tests`. That first green compile proves the
+`ProjectReference` paths are correct. The repository adopts **no** vendor path,
+`ReferencePath`/`TargetPath` override, or KMotion-related reference of any kind — the only
+change is documentation: the runbook gains a mandatory pre-build environment check (process-
+scope removal only; never a permanent User/Machine deletion) and the lock-file policy now
+states that restore-generated `packages.lock.json` files stay untracked until the full
+validation passes. Two genuine source defects from the same round were fixed without any
+suppression or severity change: (1) `KioskDpiConfigurationTests.cs` was missing its
+per-file `using Xunit;` import (Fact resolution) — added, matching the existing explicit-using
+convention, no GlobalUsings file introduced; (2) CA1873 in `apps/runtime/Program.cs` — the
+startup `LogInformation` argument evaluation (including `{StartedUtc:O}` formatting) is now
+wrapped in `if (app.Logger.IsEnabled(LogLevel.Information))` guard at the exact level,
+template/structured payloads/behaviour unchanged; four new static source tests
+(`RuntimeStubPreservationSourceTests`) assert health/live, health/ready, profile-refusal
+ordering with exit codes 4/2/3, loopback binding, and the absence of suppression remain
+intact. **A full Owner-local Release build + test rerun is still required**; the generated
+lock-file set is untouched by this repository.
+
 ### Stage 0.3A-1 — Owner-local compile correction (`fix: resolve Owner-local .NET compile blockers`)
 
 **First real .NET evidence.** The Owner ran

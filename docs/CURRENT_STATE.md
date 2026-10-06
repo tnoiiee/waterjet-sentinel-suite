@@ -792,6 +792,24 @@ findings; negative controls flag every violation) and xUnit static tests
 Arena re-validation after correction: S1–S9 clean, TS 15/15, links green, spikes hash
 unchanged. **Status remains: .NET build NOT VERIFIED — Owner-local re-run required.**
 
+### 12.15 Stage 0.3A-1 Owner-local build round 3 — Arena validation record
+
+Owner evidence (2026-10-07): round-2 cascade root-caused to a **process-scoped `TargetPath`
+environment override** injected by an external motion-control toolset; after removal, ten
+projects compiled clean (Time, Kiosk, Contracts, Domain, Adapters.Simulator, Runtime.Core,
+Runtime.Api.Tests, Domain.Tests, FixtureEmission.Tests, Runtime.Core.Tests) — ProjectReference
+paths confirmed correct. Two genuine defects remained and are corrected as source on PR #4:
+missing `using Xunit;` in `KioskDpiConfigurationTests.cs` (per-file convention kept; no
+GlobalUsings), and CA1873 in the Runtime startup log (now `IsEnabled(LogLevel.Information)`
+guard; template, level, structured payloads, and every stub behaviour untouched — pinned by
+four new static source tests, `RuntimeStubPreservationSourceTests`). Repository policy
+recorded: no vendor paths, no `TargetPath`/`ReferencePath` overrides, no MSB3245 suppression;
+runbook §0A makes the environment check mandatory; restore-generated `packages.lock.json`
+files remain untracked pending full-pass Owner assessment. Arena static validation after
+correction: S1–S9 zero findings, TS 15/15, links green, `git diff --check` clean, spikes roll
+unchanged. **Status: first partial compile PASS is Owner-local evidence only; the full
+Release build + test rerun remains REQUIRED. No .NET success is claimed in this record.**
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:
