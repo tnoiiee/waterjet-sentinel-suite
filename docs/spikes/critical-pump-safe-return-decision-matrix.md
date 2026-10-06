@@ -122,11 +122,21 @@ always `OWNER DECISION REQUIRED`.
 | --- | --- | --- | --- |
 | Acknowledge role / permission | Any local UI user (same-origin loopback endpoint) | Who may acknowledge a critical alarm | OWNER DECISION REQUIRED |
 | Clear evidence | Synthetic `pump-fault-clear` command only | What evidence clears the condition (Pump status, pressure, Operator inspection record) | OWNER DECISION REQUIRED |
-| Resume authority | No Resume exists; `CRITICAL_SUSPENDED` persists; a synthetic test reset (review tooling, not a Resume) leaves the AutoSequence OFF | Who may resume, preconditions, confirmation steps | OWNER DECISION REQUIRED |
+| Resume authority | No Production Resume exists; `CRITICAL_SUSPENDED` persists through clear + acknowledge; the synthetic RESET CRITICAL SCENARIO (review tooling, not a Resume; only after clear + acknowledge + Safe Return complete) leaves the AutoSequence OFF and an explicit synthetic START is required | Who may resume, preconditions, confirmation steps | OWNER DECISION REQUIRED |
 | Minimise / move the modal | Not possible | Whether the modal may be minimised (e.g. to view the map) while the condition persists | OWNER DECISION REQUIRED |
 | Second alarm channel (horn, beacon, remote notification) | None | Whether a second channel is required | OWNER DECISION REQUIRED |
 | Modal after Safe Return failure | Stays open until a synthetic test reset | Production behaviour | OWNER DECISION REQUIRED |
 | Operator response text | Generic only (cleaning stopped; sequence suspended; inspect Pump and process; do not resume until cleared and authorised) | Product-specific operating instructions | OWNER DECISION REQUIRED |
+
+### G. Synthetic AutoSequence controls (final spike closeout — review tooling only)
+
+| Situation | Spike behaviour (synthetic) | Open question | Status |
+| --- | --- | --- | --- |
+| Production Pause / Resume model | Synthetic START / PAUSE AFTER CURRENT JOB / RESUME in Diagnostics only (`SYN · ` labels); pause acts on the AutoSequence, never on queue entries | Whether Production pauses the AutoSequence, the Cleaning Job lifecycle, or both; authority; confirmation | OWNER DECISION REQUIRED |
+| Pause with an Active Job | `PAUSE_REQUESTED`; the Job continues through Mandatory Safe Return; no next dispatch; `PAUSED` after release | Whether a Production pause may interrupt a Job | OWNER DECISION REQUIRED |
+| Operator abort of the Active Job | `ABORTING` → Mandatory Safe Return → `ABORTED` → release; never `COMPLETED`; no re-queue | Abort authority; re-queue of the aborted Sensor | OWNER DECISION REQUIRED |
+| Next dispatch after an abort while `RUNNING` | A later revision may dispatch the new head (never the release revision) | Whether an abort should also pause the AutoSequence | OWNER DECISION REQUIRED |
+| Reset of a cleared critical scenario | Only after clear + acknowledge + Safe Return complete, no Safe Return failure; → `OFF`; queue preserved; no dispatch, no Job, no Pump start | Production reset authority, evidence, and whether the queue is kept | OWNER DECISION REQUIRED |
 
 ## 3. What the spike proves (synthetic only)
 

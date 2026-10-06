@@ -43,7 +43,7 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
 | Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
 | Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11); Operations readability refined after the Owner screenshot review (sensor-cell zones, typography scale, desaturated process colours separated from alarm, card hierarchy); final Owner UI punchlist on `4129687a` (self-hosted Google Sans, marker in the value row, expanded identity, legend clipping, Water Jet display terminology, mixed queue sources, opt-in synthetic test controls) on `23f48daa`; GlobalQueue semantics corrected under the Owner domain correction (bounded ready-only synthetic queue, head-only atomic dispatch; previous synthetic queue behaviour SUPERSEDED, not eligible for production promotion) with the `READ-A` value-clipping and `WJ-A` test hotfixes ([results §0D](spikes/stage-0.2.1a-results.md#0d-globalqueue-semantics-correction-and-head-only-dispatch-stage-021a)); synthetic critical Main Pump handling (High Critical; AutoSequence `CRITICAL_SUSPENDED`; blocking critical modal) and Mandatory Safe Return for every Job outcome under the Owner critical Pump decision — SYNTHETIC PROOF ONLY, production safety NOT VERIFIED ([results §0E](spikes/stage-0.2.1a-results.md#0e-critical-main-pump-handling-and-mandatory-safe-return-stage-021a)) |
-| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map, the fullscreen layout, or the readability refinement; Owner-local Edge E2E at `4129687a`: **25 / 25 PASS** (≈ 1.3 min, Owner-reported). At `23f48daa`: 34 selected · 25 passed · 2 failed (`READ-A`, `WJ-A`) · 7 not run (Owner-reported). The re-run of the GlobalQueue-correction checkpoint (35-test selection) and of the critical Pump / Safe Return checkpoint (42-test selection, `CRIT-A`..`CRIT-F`, manual F11 review with 8 screenshots) is **PENDING**. Owner-local interrupted overnight observation of `ea23bc58`: **COMPLETED** — not a controlled benchmark ([results §0B.1](spikes/stage-0.2.1a-results.md#0b1-owner-local-interrupted-overnight-observation-recorded-as-reported-by-the-owner)) |
+| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map, the fullscreen layout, or the readability refinement; Owner-local Edge E2E at `4129687a`: **25 / 25 PASS** (≈ 1.3 min, Owner-reported). At `23f48daa`: 34 selected · 25 passed · 2 failed (`READ-A`, `WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) was not re-run separately. At the critical Pump / Safe Return checkpoint `81c87a44`: 42 selected · 32 passed · 1 failed (`S11/S12`, Dirty Score drifted between samples) · 9 not run (Owner-reported). The final spike closeout checkpoint (48-test selection, `SEQ-B`..`SEQ-G`, deterministic `S11/S12`, 18-step manual sequence with 10 screenshots) is **PENDING** the Owner-local final Edge gate. Owner-local interrupted overnight observation of `ea23bc58`: **COMPLETED** — not a controlled benchmark ([results §0B.1](spikes/stage-0.2.1a-results.md#0b1-owner-local-interrupted-overnight-observation-recorded-as-reported-by-the-owner)) |
 | Stage 0.2.1A controlled 15-minute Owner-local observation | **PAUSED** (Owner decision) |
 | Stage 0.2.1A Owner manual UI re-review (corrected map, fullscreen 1920 × 1080 F11 layout, readability refinement, final punchlist) | **PENDING** |
 | Stage 0.2.1A 60-minute Owner-local run | **Waived as a gate** by the Owner — not run |
@@ -224,7 +224,7 @@ items are listed in section 34 of the same document, and the decision records ar
 | Fault class taxonomy: when to stop motion versus abort motion | [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §11 |
 | Recovery procedure for `RECOVERY_REQUIRED`; whether retry is permitted; whether partial-path jobs may resume | [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §11 |
 | Permission required for each operator queue action, and required reason text | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
-| Whether a sensor may be both held and rejected simultaneously | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
+| Reject / Release Reject / Reorder semantics in a ready-only, head-only GlobalQueue (**OWNER DECISION REQUIRED**) | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
 | Queue snapshot storage format and retention inside Event history | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §11 |
 | Exact motion limits, profiles, homing, pulses per engineering unit, and operational envelope | [`REQUIREMENTS.md`](REQUIREMENTS.md) GAL-006 `[NOT VERIFIED]` |
 | Exact pressure setpoints, rise timeout, stable dwell, and valve open/close timeouts | [`REQUIREMENTS.md`](REQUIREMENTS.md) PMP-005, VLV-003 `[NOT VERIFIED]` |
@@ -265,7 +265,7 @@ deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.
 | Workstation clock discipline and drift bounds | [`ARCHITECTURE.md`](ARCHITECTURE.md) §7 |
 | Target test coverage thresholds and test execution tooling | [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §7 |
 | Critical Main Pump / Mandatory Safe Return policies: Safe Return failure, valve / axis failures, outcomes, re-queue, retry, acknowledge role, clear evidence, Resume authority, modal minimise, second alarm channel | [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md) (every row `OWNER DECISION REQUIRED`) |
-| Production Pause / Resume semantics replacing the superseded queue-level `HELD` | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2 |
+| Production Pause / Resume semantics (pause the AutoSequence or the Cleaning Job lifecycle) replacing the superseded queue-level `HELD` (**OWNER DECISION REQUIRED**) | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2 |
 
 ## 9. Not verified — standing list
 
@@ -650,6 +650,40 @@ Detailed evidence:
 | 8 | Hard gates (Sensor map) | 106 · 212 · 24 / 29 / 24 / 29 · 2 Water Jet reference slots (internal `CANNON_*`) · I7 / I16 absent · 0 duplicates |
 | 9 | Modal rendering, geometry, focus trap and Escape in Edge | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
 | 10 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
+
+### 12.10 Stage 0.2.1A final spike closeout (synthetic AutoSequence controls) — Arena validation record
+
+Owner final closeout on `81c87a44` (recovered by the Owner-authorized one-time recovery, identity
+proof 153 / 153) after the Owner-local Edge run of `81c87a44` (42 selected · 32 passed · 1 failed
+`S11/S12` · 9 not run). In the synthetic spike:
+
+- `S11/S12` is deterministic: the Sensor's Dirty Score is fixed and held (Score 82) and Score,
+  classification and the computed background must stay identical through Raise / Clear /
+  Acknowledge (no RGB tolerance).
+- Diagnostics-only synthetic AutoSequence controls (`SYN · ` labels, `--synthetic-test-controls`):
+  START AUTOSEQUENCE, PAUSE AFTER CURRENT JOB, RESUME AUTOSEQUENCE, ABORT ACTIVE JOB, and RESET
+  CRITICAL SCENARIO. Dispatch is always GlobalQueue Position 1; every Job ends through Mandatory
+  Safe Return; clear + acknowledge never resume; RESET never dispatches and requires an explicit
+  START. These are **not** the Production operator-control model.
+- Current-facing queue-level `HELD` / `BLOCKED` / `EXCLUDED` wording is removed; ADR-0003 is
+  **SUPERSEDED IN PART by Owner decision dated 2026-10-06**. Production Pause / Resume, abort
+  re-queue and Reject / Reorder in the ready-only queue are **OWNER DECISION REQUIRED**.
+
+Critical Pump / Safe Return behaviour, U-map, mapping, 106 / 212, 24 / 29 / 24 / 29, I7 / I16
+slots, fonts, and dependencies are unchanged. Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0F](spikes/stage-0.2.1a-results.md#0f-final-spike-closeout-synthetic-autosequence-controls-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, `tsc --noEmit` (project; strict `e2e/*.ts`) | PASS, 0 errors (strict e2e: only the 6 known absent Node type declarations in `soak.spec.ts` / `support.ts`); dependencies unchanged |
+| 2 | Vite production build | PASS — JS 345.17 kB (gzip 112.92 kB), CSS 31.70 kB (gzip 7.46 kB), WOFF2 47.67 kB unchanged |
+| 3 | Vitest (jsdom), 18 files | 138 / 138 PASS (new `autoSequenceControl.test.tsx`, 7 tests) |
+| 4 | Runtime harness `node:test` (× 3) | 60 / 60 PASS each run (new `autoSequenceControls.test.mjs`: A–G) |
+| 5 | Scenario runner, 35 scenarios | PASS 30 · PASS+OWNER 4 · OWNER-LOCAL 1 · FAIL 0 (new S35; S09 expects `PAUSE_REQUESTED` with an Active Job) |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 49 tests in 5 files; Owner-local selection 48 (`SEQ-B`..`SEQ-G` in `critical.spec.ts`; `S11/S12` rewritten) |
+| 7 | Hard gates (Sensor map) | 106 · 212 · 24 / 29 / 24 / 29 · 2 Water Jet reference slots (internal `CANNON_*`) · I7 / I16 absent · 0 duplicates |
+| 8 | Controls, alarm colour and modal in Edge | **NOT VERIFIED** in Arena (no browser) — Owner-local final Edge gate **PENDING** |
+| 9 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
 
 ## 13. Required positive confirmations
 

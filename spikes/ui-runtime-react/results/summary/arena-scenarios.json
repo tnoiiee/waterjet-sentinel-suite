@@ -2,9 +2,9 @@
   "label": "SYNTHETIC SPIKE EVIDENCE - NOT PRODUCTION VALIDATION",
   "stage": "0.2.1A",
   "environment": "Arena (Linux, Node harness in-process, SSE over 127.0.0.1, no browser)",
-  "generatedAt": "2026-10-06T15:52:37.477Z",
+  "generatedAt": "2026-10-06T17:34:16.444Z",
   "counts": {
-    "PASS": 29,
+    "PASS": 30,
     "PASS+OWNER": 4,
     "OWNER-LOCAL": 1
   },
@@ -16,7 +16,7 @@
       "durationMs": 8,
       "evidence": {
         "firstEvent": "snapshot",
-        "snapshotBytes": 79292,
+        "snapshotBytes": 79658,
         "sensors": 106,
         "thermocoupleChannels": 212,
         "perWall": {
@@ -38,10 +38,10 @@
       "id": "S02",
       "name": "One-second Deltas",
       "status": "PASS",
-      "durationMs": 5201,
+      "durationMs": 5200,
       "evidence": {
         "deltasIn5_2s": 6,
-        "medianIntervalMs": 1000,
+        "medianIntervalMs": 1001,
         "gaps": 0,
         "lastValidated": true
       },
@@ -51,7 +51,7 @@
       "id": "S03",
       "name": "30% Dirty",
       "status": "PASS",
-      "durationMs": 2509,
+      "durationMs": 2512,
       "evidence": {
         "dirty": 32,
         "expectedApprox": 32,
@@ -76,7 +76,7 @@
       "id": "S05",
       "name": "Threshold oscillation around 50",
       "status": "PASS",
-      "durationMs": 7014,
+      "durationMs": 7012,
       "evidence": {
         "oscillatingSensors": 8,
         "classificationFlipsIn7s": 23
@@ -87,7 +87,7 @@
       "id": "S06",
       "name": "All quality states",
       "status": "PASS",
-      "durationMs": 1313,
+      "durationMs": 1312,
       "evidence": {
         "qualities": {
           "G+201": "UNCERTAIN",
@@ -104,7 +104,7 @@
       "id": "S07",
       "name": "Selection during updates",
       "status": "PASS+OWNER",
-      "durationMs": 7,
+      "durationMs": 4,
       "evidence": {
         "runtimePart": "selection is not on the wire (UI-local)",
         "jsdom": "renderIsolation.test.tsx: selection survives Deltas and Snapshots",
@@ -116,7 +116,7 @@
       "id": "S08",
       "name": "Queue badge changes",
       "status": "PASS",
-      "durationMs": 6430,
+      "durationMs": 6428,
       "evidence": {
         "sensorsWithQueueStateChange": 3,
         "statesSeen": [
@@ -132,11 +132,11 @@
       "id": "S09",
       "name": "GlobalQueue changes (bounded, status-free; AutoSequence pause is not an entry state)",
       "status": "PASS",
-      "durationMs": 2414,
+      "durationMs": 2412,
       "evidence": {
         "totalQueued": 8,
         "capacity": 8,
-        "pausedAutoSequence": "PAUSED",
+        "pausedAutoSequence": "PAUSE_REQUESTED",
         "enqueueH17": "QUEUE_FULL",
         "fields": [
           "position",
@@ -153,7 +153,7 @@
       "id": "S10",
       "name": "Single Job progression",
       "status": "PASS",
-      "durationMs": 30157,
+      "durationMs": 27170,
       "evidence": {
         "phasesSeen": [
           "P1",
@@ -172,7 +172,7 @@
       "id": "S11",
       "name": "Active Alarm",
       "status": "PASS",
-      "durationMs": 403,
+      "durationMs": 404,
       "evidence": {
         "alarmState": "ACTIVE_UNACK",
         "classificationBefore": "DIRTY",
@@ -185,7 +185,7 @@
       "id": "S12",
       "name": "Cleared Ack Required",
       "status": "PASS",
-      "durationMs": 810,
+      "durationMs": 808,
       "evidence": {
         "afterClear": "CLEARED_UNACK",
         "clearedUnackCount": 1,
@@ -197,7 +197,7 @@
       "id": "S13",
       "name": "Device timeout",
       "status": "PASS",
-      "durationMs": 5010,
+      "durationMs": 5009,
       "evidence": {
         "affectedSensors": 13,
         "qualitiesSeen": [
@@ -217,13 +217,13 @@
       "durationMs": 4,
       "evidence": {
         "pollsDuringTimeout": {
-          "SYN-TC-01": 5,
-          "SYN-TC-02": 5,
-          "SYN-TC-04": 5,
-          "SYN-TC-05": 5,
-          "SYN-TC-06": 5,
-          "SYN-TC-07": 5,
-          "SYN-TC-08": 5
+          "SYN-TC-01": 6,
+          "SYN-TC-02": 6,
+          "SYN-TC-04": 6,
+          "SYN-TC-05": 6,
+          "SYN-TC-06": 6,
+          "SYN-TC-07": 6,
+          "SYN-TC-08": 6
         }
       },
       "error": null
@@ -232,9 +232,9 @@
       "id": "S15",
       "name": "Device recovery",
       "status": "PASS",
-      "durationMs": 1512,
+      "durationMs": 1511,
       "evidence": {
-        "recoveredWithinMs": 1509,
+        "recoveredWithinMs": 1508,
         "commAlarmAfterRecovery": "CLEARED_UNACK"
       },
       "error": null
@@ -243,10 +243,10 @@
       "id": "S16",
       "name": "UI disconnect",
       "status": "PASS",
-      "durationMs": 304,
+      "durationMs": 303,
       "evidence": {
         "droppedClients": 1,
-        "lastRevisionSeen": 87
+        "lastRevisionSeen": 84
       },
       "error": null
     },
@@ -257,7 +257,7 @@
       "durationMs": 1701,
       "evidence": {
         "firstEventAfterReconnect": "snapshot",
-        "sentLastEventId": 87
+        "sentLastEventId": 84
       },
       "error": null
     },
@@ -267,8 +267,8 @@
       "status": "PASS",
       "durationMs": 3,
       "evidence": {
-        "snapshotRevision": 89,
-        "lastSeenBeforeDrop": 87,
+        "snapshotRevision": 86,
+        "lastSeenBeforeDrop": 84,
         "missedDeltasReplayed": 0,
         "reconnectsWithLastEventId": 1
       },
@@ -278,7 +278,7 @@
       "id": "S19",
       "name": "Historian slowdown",
       "status": "PASS",
-      "durationMs": 5206,
+      "durationMs": 5208,
       "evidence": {
         "deltasIn5_2s": 6,
         "maxIntervalMs": 1001,
@@ -290,16 +290,16 @@
       "id": "S20",
       "name": "Near-overflow behavior",
       "status": "PASS",
-      "durationMs": 1741,
+      "durationMs": 1745,
       "evidence": {
         "nearOverflow": true,
         "depthAtFull": 50000,
         "capacity": 50000,
         "rejected": 6296,
         "gapMarkers": 1,
-        "pumpStopRoundTripMs": 2.24,
+        "pumpStopRoundTripMs": 2.46,
         "nearOverflowClearedAfterRestoreMs": 511,
-        "depthAtClear": 37526,
+        "depthAtClear": 38000,
         "pumpAfterRestart": "STARTING"
       },
       "error": null
@@ -308,12 +308,12 @@
       "id": "S21",
       "name": "Bounded Trend",
       "status": "PASS",
-      "durationMs": 9010,
+      "durationMs": 9011,
       "evidence": {
         "acceleratedTicks": 89,
         "acceleratedCapacity": 50,
         "pointsRetained": 50,
-        "mainTrendPoints": 85,
+        "mainTrendPoints": 82,
         "mainCapacity": 600,
         "note": "accelerated parameters are test-only, not the planning values"
       },
@@ -323,7 +323,7 @@
       "id": "S22",
       "name": "Camera placeholder",
       "status": "PASS+OWNER",
-      "durationMs": 2,
+      "durationMs": 3,
       "evidence": {
         "sourceFilesScanned": 27,
         "nonCodeAssetsNotScanned": [
@@ -342,7 +342,7 @@
       "id": "S23",
       "name": "Synthetic close guard for Active Job",
       "status": "PASS",
-      "durationMs": 1510,
+      "durationMs": 1513,
       "evidence": {
         "evaluation": {
           "allowed": false,
@@ -385,7 +385,7 @@
       "id": "S26",
       "name": "Synthetic config revision",
       "status": "PASS",
-      "durationMs": 809,
+      "durationMs": 810,
       "evidence": {
         "configRevision": 2,
         "dirtyAtThreshold99": 0,
@@ -413,7 +413,7 @@
       "status": "PASS",
       "durationMs": 3107,
       "evidence": {
-        "gapsDetected": 1,
+        "gapsDetected": 2,
         "resyncFirstEvent": "snapshot"
       },
       "error": null
@@ -422,7 +422,7 @@
       "id": "S29",
       "name": "Mixed GlobalQueue sources (bounded to 8)",
       "status": "PASS+OWNER",
-      "durationMs": 1212,
+      "durationMs": 1210,
       "evidence": {
         "sourceTypes": [
           "SYN_TIME_DUE",
@@ -451,7 +451,7 @@
       "id": "S30",
       "name": "Synthetic review presets (valid queue / job states)",
       "status": "PASS+OWNER",
-      "durationMs": 46,
+      "durationMs": 40,
       "evidence": {
         "sensorId": "G5",
         "states": {
@@ -472,7 +472,7 @@
       "id": "S31",
       "name": "Head-only atomic dispatch (no scan-forward; Owner examples A/B)",
       "status": "PASS",
-      "durationMs": 58,
+      "durationMs": 59,
       "evidence": {
         "queueBefore": [
           "G+110",
@@ -493,7 +493,7 @@
       "id": "S32",
       "name": "Bounded queue under load and Job linkage (dirty70, AutoSequence)",
       "status": "PASS",
-      "durationMs": 4035,
+      "durationMs": 4032,
       "evidence": {
         "maxQueueLength": 8,
         "dispatchesObserved": 1,
@@ -510,11 +510,11 @@
       "id": "S33",
       "name": "Main Pump trip during Job: critical suspension, Mandatory Safe Return, modal rules (synthetic)",
       "status": "PASS",
-      "durationMs": 8274,
+      "durationMs": 8244,
       "evidence": {
         "job": "SYN-JOB-0012",
         "steps": "SR1#101 SR2#103 SR3#104 SR4#105 SR5#106 SR6#107 SR7#108 SR8#109",
-        "safeReturnMs": 7653,
+        "safeReturnMs": 7626,
         "queueFrozen": 7,
         "autoSequenceAfterModal": "CRITICAL_SUSPENDED",
         "afterTestReset": "OFF"
@@ -525,12 +525,29 @@
       "id": "S34",
       "name": "Normal completion -> Mandatory Safe Return with delayed valve feedback (synthetic)",
       "status": "PASS",
-      "durationMs": 13936,
+      "durationMs": 13923,
       "evidence": {
         "job": "SYN-JOB-0013",
         "outcome": "COMPLETED",
         "valveConfirmAfterCommandMs": 5000,
         "steps": "SR1 SR2 SR3 SR4 SR5 SR6 SR7 SR8"
+      },
+      "error": null
+    },
+    {
+      "id": "S35",
+      "name": "Synthetic AutoSequence controls: Start / Pause After Current Job / Resume / Abort / Critical Reset (head-only)",
+      "status": "PASS",
+      "durationMs": 24036,
+      "evidence": {
+        "head1": "G+106",
+        "head2": "G+109",
+        "startPositionBefore": 1,
+        "pausedAfterAbort": true,
+        "resumeRefusedInCritical": true,
+        "resetModeAfter": "OFF",
+        "resetDispatched": false,
+        "explicitStartRequired": true
       },
       "error": null
     }

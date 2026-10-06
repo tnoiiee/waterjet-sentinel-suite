@@ -176,8 +176,11 @@ test('Gate C — at most one Job; no dispatch while a Job is active; sequence A 
   assert.equal(second.reason, 'ACTIVE_JOB_EXISTS');
   completeJob(rt);
   pub(rt);
+  assert.equal(rt.activeJobs.length, 0, 'no dispatch in the release revision (synthetic separation rule)');
+  pub(rt);
   assert.equal(rt.activeJobs[0].targetSensorId, 'H6', 'after A ends only the new head (B) is the candidate');
   completeJob(rt);
+  pub(rt);
   pub(rt);
   assert.equal(rt.activeJobs[0].targetSensorId, 'H7');
   assert.deepEqual(
@@ -216,6 +219,8 @@ test('Gate D — every automatic Job has a dispatch record (sensor = target, Pos
     assert.ok(rt.queueRevision >= lastRev);
     lastRev = rt.queueRevision;
     completeJob(rt);
+    pub(rt); // release revision: never a dispatch in it
+    assert.equal(rt.activeJobs.length, 0);
   }
   const log = rt.dispatchLog;
   assert.ok(log.length >= 12);

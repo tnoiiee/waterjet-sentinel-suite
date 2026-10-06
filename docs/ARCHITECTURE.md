@@ -108,7 +108,9 @@ Maintains four TempQueues and four TimeQueues — **eight source queues** — pl
 GlobalQueue with a target capacity of eight unique Sensor entries. It seeds GlobalQueue in
 the fixed source order, performs deduplication with earliest-position preservation, records
 merged reason flags against a single source owner, performs FIFO refill from that owner, and
-applies operator Hold, Reject, and Reorder. Ordering rules are fully specified in
+dispatches GlobalQueue Position 1 only (ready-to-dispatch entries, no scan-forward). Queue-level
+Hold is superseded (Owner decision, 2026-10-06); Reject / Reorder semantics in the ready-only queue
+are **OWNER DECISION REQUIRED**. Ordering rules are fully specified in
 [`QUEUE_MODEL.md`](QUEUE_MODEL.md). Queue evaluation runs at a 1 second interval.
 
 ### 4.5 Sequence and dispatch subsystem
@@ -860,7 +862,7 @@ framework-neutral: it defines what the UI must be able to express, not how to dr
 | 1 | Process classification | `DIRTY`, `CLEANER` |
 | 2 | Dirty Score intensity | 0 through 100 |
 | 3 | Data quality | `GOOD`, `UNCERTAIN`, `BAD`, `STALE`, `DISABLED` |
-| 4 | Queue state | TempQueue, TimeQueue, GlobalQueue position, Held, Blocked, Excluded |
+| 4 | Queue state | TempQueue, TimeQueue, GlobalQueue position (ready-to-dispatch entries only, FIFO, head-only dispatch — no Held / Blocked / Excluded entry states; see [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2) |
 | 5 | Interaction state | Selected, Not selected |
 | 6 | Execution state | Active Cleaning Job target, Not active |
 | 7 | Alarm state | Active alarm, Cleared acknowledgement required, Shelved, No alarm |

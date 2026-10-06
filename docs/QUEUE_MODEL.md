@@ -227,8 +227,9 @@ Refill must never produce a concurrent Cleaning Job. See SEQ-005 in
 | Release Reject | Ends the suppression early | Requires the action's permission |
 | Reorder | Changes GlobalQueue dispatch order | Cannot move an active Cleaning Job; does not bypass eligibility revalidation; does not alter source ownership |
 
-Reject, Release Reject and Reorder remain `[APPROVED]` behaviours; Hold and Release Hold are
-**superseded** (§7.2). Required permissions are `[OPEN]`.
+Hold and Release Hold are **superseded** (§7.2). How Reject, Release Reject and Reorder apply to
+a ready-only, head-only GlobalQueue is **OWNER DECISION REQUIRED** (the rows above record the
+earlier approved wording; no implementation exists). Required permissions are `[OPEN]`.
 
 Every action must produce an Event record containing:
 
@@ -274,6 +275,11 @@ queue-level `HELD` disposition and the Hold / Release Hold actions:
   queue entry.
 - Equipment waits (for example Pump readiness) belong to the AutoSequence or the Job; they are
   never queue entry states.
+- Pause therefore means pausing the **AutoSequence** or the **Cleaning Job lifecycle**; which
+  of the two (or both) a Production Pause addresses is **OWNER DECISION REQUIRED**. The Stage
+  0.2.1A spike adds only *synthetic* Diagnostics controls (START / PAUSE AFTER CURRENT JOB /
+  RESUME / ABORT ACTIVE JOB / RESET CRITICAL SCENARIO) that act on the AutoSequence and the Job,
+  never on queue entries; they are not the Production operator-control model.
 - Production Pause / Resume semantics, authority and the replacement for an Operator "hold one
   Sensor" need remain **pending Owner approval** (see
   [`spikes/queue-eligibility-decision-matrix.md`](spikes/queue-eligibility-decision-matrix.md)
@@ -308,7 +314,7 @@ This behaviour is `[OWNER CONFIRMED]` and is no longer an open item.
 1. Stop dispatching new Cleaning Jobs.
 2. Handle any active Cleaning Job according to the approved stop or recovery policy.
 3. Record the current GlobalQueue snapshot in Event history.
-4. Record Held, Rejected, and Reordered state in Event history.
+4. Record Rejected and Reordered state in Event history (queue-level Held is superseded, §7.2).
 5. Close the current AutoSequence instance.
 6. Do **not** preserve the old GlobalQueue as the executable Queue for a future
    AutoSequence.
@@ -379,7 +385,8 @@ boundaries apply.
 | Permission required for each operator queue action | `[OPEN]` |
 | Reason text requirements per action | `[OPEN]` |
 | Queue snapshot retention inside Event history | `[OPEN]` |
-| Whether a sensor may be both held and rejected simultaneously | `[OPEN]` |
+| Reject / Release Reject / Reorder semantics in a ready-only, head-only GlobalQueue | **OWNER DECISION REQUIRED** |
+| Production Pause / Resume (AutoSequence or Cleaning Job lifecycle) | **OWNER DECISION REQUIRED** |
 | Whether a rejected entry's disposition is recorded per-entry or per-sequence | `[OPEN]` |
 
 Resolved by Owner confirmation and therefore **not** open: Water Jet to Isolation Valve

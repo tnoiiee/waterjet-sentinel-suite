@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WJSS Stage 0.2.1A — Arena scenario runner: the 28 planned scenarios (+ S29..S34 spike additions) at the runtime / SSE
+// WJSS Stage 0.2.1A — Arena scenario runner: the 28 planned scenarios (+ S29..S35 spike additions) at the runtime / SSE
 // level against the Node synthetic harness on 127.0.0.1. Browser-only aspects are marked
 // OWNER-LOCAL and are covered by react-ui/e2e/operations.spec.ts (installed Edge).
 //
@@ -190,6 +190,7 @@ await scenario('S09', 'GlobalQueue changes (bounded, status-free; AutoSequence p
   await api.cmd('pause-auto-sequence', { paused: true });
   await sleep(1200);
   const q2 = mirror.single.queue;
+  const jobDuringPause = Boolean(mirror.single.activeJob);
   await api.cmd('pause-auto-sequence', { paused: false });
   const enq = await api.cmd('enqueue', { sensorId: 'H17' });
   await sleep(1200);
@@ -200,7 +201,10 @@ await scenario('S09', 'GlobalQueue changes (bounded, status-free; AutoSequence p
     q.entries.forEach((e, i) => check(e.position === i + 1, 'not FIFO positions'));
     check(q.entries.every((e) => !('status' in e)), 'queue entry carries a status');
   }
-  check(q2.autoSequence === 'PAUSED', `AutoSequence not PAUSED (${q2.autoSequence})`);
+  // Pause After Current Job (Owner 2026-10-06): with an Active Job the pause is PAUSE_REQUESTED
+  // (the Job continues through Mandatory Safe Return); without one it is PAUSED immediately.
+  const expectedPause = jobDuringPause ? 'PAUSE_REQUESTED' : 'PAUSED';
+  check(q2.autoSequence === expectedPause, `AutoSequence not ${expectedPause} (${q2.autoSequence})`);
   check(enq.accepted === true || enq.reason === 'QUEUE_FULL', JSON.stringify(enq));
   return { totalQueued: q3.totalQueued, capacity: q3.capacity, pausedAutoSequence: q2.autoSequence, enqueueH17: enq.accepted ? 'admitted' : enq.reason, fields: Object.keys(q3.entries[0] ?? {}) };
 });
@@ -614,6 +618,61 @@ await scenario('S34', 'Normal completion -> Mandatory Safe Return with delayed v
   check(snap.sequence.critical === null, 'normal completion raised a critical event');
   await api.cmd('auto-jobs', { enabled: true });
   return { job: o.jobId, outcome: o.outcome, valveConfirmAfterCommandMs: at('SR3') - at('SR2'), steps: o.events.filter((e) => e.step).map((e) => e.step).join(' ') };
+});
+
+await scenario('S35', 'Synthetic AutoSequence controls: Start / Pause After Current Job / Resume / Abort / Critical Reset (head-only)', async () => {
+  const until = async (f, ms) => {
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      if (await f()) return true;
+      await sleep(250);
+    }
+    throw new Error(`timeout ${ms} ms`);
+  };
+  const ctl = async () => (await api.snapshot()).sequence.controls;
+  await api.cmd('critical-reset'); // synthetic test reset ends the Job left by S34 (Safe Return) -> OFF
+  await api.cmd('auto-jobs', { enabled: false });
+  await until(async () => (await ctl()).start.enabled, 15000);
+  const head1 = (await api.snapshot()).queue.entries[0].sensorId;
+  let r = await api.cmd('autosequence-start');
+  let snap = await api.snapshot();
+  check(r.accepted && snap.activeJob?.targetSensorId === head1 && snap.activeJob.dispatch.positionBefore === 1, 'start not head-only');
+  r = await api.cmd('autosequence-pause-after-current-job');
+  check(r.detail?.mode === 'PAUSE_REQUESTED', JSON.stringify(r));
+  const head2 = (await api.snapshot()).queue.entries[0].sensorId;
+  r = await api.cmd('abort-active-job');
+  check(r.accepted, JSON.stringify(r));
+  check((await api.snapshot()).activeJob?.targetSensorId === head1, 'Job released before Safe Return');
+  await until(async () => !(await api.snapshot()).activeJob, 30000);
+  await sleep(2200);
+  snap = await api.snapshot();
+  check(snap.sequence.mode === 'PAUSED' && !snap.activeJob && snap.sequence.lastJobOutcome?.outcome === 'ABORTED', `after abort ${snap.sequence.mode}`);
+  r = await api.cmd('autosequence-resume');
+  check(r.accepted && (await api.snapshot()).activeJob?.targetSensorId === head2, 'resume not head-only');
+  await api.cmd('pump-trip');
+  r = await api.cmd('autosequence-resume');
+  check(!r.accepted, 'resume accepted in CRITICAL_SUSPENDED');
+  await api.cmd('critical-alarm-ack');
+  await api.cmd('pump-fault-clear');
+  check((await ctl()).resetCritical.reason === 'SAFE_RETURN_INCOMPLETE' || !(await api.snapshot()).activeJob, 'reset offered before Safe Return');
+  await until(async () => !(await api.snapshot()).activeJob, 30000);
+  snap = await api.snapshot();
+  check(snap.sequence.mode === 'CRITICAL_SUSPENDED', 'clear + ack resumed the AutoSequence');
+  const frozen = snap.queue.entries.map((e) => e.sensorId).join(',');
+  r = await api.cmd('critical-review-reset');
+  check(r.accepted, JSON.stringify(r));
+  await sleep(2200);
+  snap = await api.snapshot();
+  check(snap.sequence.mode === 'OFF' && !snap.activeJob, 'reset dispatched or did not return to OFF');
+  check(snap.queue.entries.map((e) => e.sensorId).join(',').startsWith(frozen), 'queue order changed by reset');
+  check(snap.sequence.controls.start.reason === 'PUMP_NOT_READY', 'reset started the Pump');
+  await api.cmd('pump-start');
+  await until(async () => (await ctl()).start.enabled, 15000);
+  const metrics = await api.metrics();
+  check(metrics.invariants.violations === 0 && metrics.jobs.acceptedSecondJobs === 0, 'invariant violation');
+  await api.cmd('critical-reset');
+  await api.cmd('auto-jobs', { enabled: true });
+  return { status: 'PASS', evidence: { head1, head2, startPositionBefore: 1, pausedAfterAbort: true, resumeRefusedInCritical: true, resetModeAfter: 'OFF', resetDispatched: false, explicitStartRequired: true } };
 });
 
 const finalMetrics = await api.metrics();

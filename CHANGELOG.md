@@ -30,14 +30,57 @@ removable synthetic feasibility spike — no Product code.**
 **Implementation:** IN PROGRESS — PR #3 OPEN
 **Owner-local testing (installed Edge, Windows 11):** Edge E2E **25 / 25 PASS** at checkpoint
 `4129687a` (Owner-reported, ≈ 1.3 min); at `23f48daa` 34 selected · 25 passed · 2 failed (`READ-A`,
-`WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) and the critical Pump / Safe Return
-checkpoint (42-test selection) are PENDING an Owner-local Edge re-run
+`WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) was not re-run separately; at the
+critical Pump / Safe Return checkpoint `81c87a44` 42 selected · 32 passed · 1 failed (`S11/S12`,
+Dirty Score drifted between samples) · 9 not run (Owner-reported). The final spike closeout
+checkpoint (48-test selection) is PENDING the Owner-local final Edge gate
 **Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **Controlled 15-minute
 observation:** PAUSED · **60-minute run:** waived as a gate by the Owner — not run
 **Merge:** NOT MERGED
 **React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
 **Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Fixed — Final spike closeout: explicit synthetic AutoSequence controls (synthetic review tooling)
+
+**SYNTHETIC REVIEW TOOLING — NOT THE PRODUCTION OPERATOR-CONTROL MODEL.** Production Pause /
+Resume, abort re-queue, Safe Return failure and reset authority remain OWNER DECISION REQUIRED.
+
+- **Recovery:** the Owner-authorized one-time recovery restored the local branch to `81c87a44`
+  (identity proof 153 / 153, compare-and-swap ref update, index-only refresh).
+- **S11/S12 made deterministic:** the Owner Edge run of `81c87a44` failed because the alarm test
+  compared backgrounds from two revisions while the synthetic Dirty Score drifted. The test now
+  fixes and holds the Score (`set-sensor-score { hold: true }`, Score 82, released by
+  `reset-sensor`), waits for that revision, and requires identical Score, classification and
+  computed background through Raise / Clear / Acknowledge — no RGB tolerance; auto jobs are off
+  during the test.
+- **Synthetic AutoSequence controls** (Diagnostics only, `--synthetic-test-controls`, `SYN · `
+  labels, token path, one click = one request, no target parameter):
+  - START AUTOSEQUENCE → `RUNNING` + atomic dispatch of Position 1 (the selected Sensor is never
+    used);
+  - PAUSE AFTER CURRENT JOB → `PAUSE_REQUESTED` (the Job continues through Mandatory Safe Return;
+    no next dispatch) → `PAUSED`; without a Job → `PAUSED` at once;
+  - RESUME AUTOSEQUENCE → only from `PAUSED`; head-only dispatch; never clears a critical
+    suspension;
+  - ABORT ACTIVE JOB → `ABORTING` → Mandatory Safe Return → `ABORTED` → release; no re-queue;
+    `PAUSE_REQUESTED` → `PAUSED`; `CRITICAL_SUSPENDED` stays;
+  - RESET CRITICAL SCENARIO → only after clear + acknowledge + Safe Return complete → `OFF`;
+    queue preserved; no dispatch, no Job, no Pump start; explicit START required.
+  - Every button shows its disabled reason as text (`sequence.controls`).
+- **Runtime:** `sequence.mode` (`OFF` / `RUNNING` / `PAUSE_REQUESTED` / `PAUSED` /
+  `CRITICAL_SUSPENDED`) and `sequence.controls`; the release revision of a Job never dispatches
+  (synthetic separation rule). Clear + acknowledge never resume.
+- **Tests:** harness `autoSequenceControls.test.mjs` (A–G; 60 / 60 ×3), Vitest
+  `autoSequenceControl.test.tsx` (138 / 138), scenario S35, Edge specs `SEQ-B`..`SEQ-G` in
+  `critical.spec.ts` (48-test Owner selection, same four files).
+- **Docs:** current-facing queue `HELD` / `BLOCKED` / `EXCLUDED` wording removed from
+  ARCHITECTURE, REQUIREMENTS (QUE-020, QUE-024, SPC-001), CONTROL_AUTHORITY, CLEANING_SEQUENCE,
+  CURRENT_STATE and QUEUE_MODEL. The "held and rejected simultaneously" question is removed; Reject
+  / Reorder in the ready-only queue and Production Pause / Resume are OWNER DECISION REQUIRED.
+  ADR-0003 is marked **SUPERSEDED IN PART by Owner decision dated 2026-10-06** (history kept).
+  Critical matrix gains §G. OWNER_LOCAL_TESTING §1G holds the final Edge gate.
+- **Unchanged:** critical Pump / Mandatory Safe Return behaviour, modal, Google Sans, Water Jet
+  slots, GlobalQueue cap 8, head-only dispatch, no status column, 106 / 212.
 
 #### Fixed — Critical Main Pump handling and Mandatory Safe Return (Owner critical Pump decision; synthetic)
 

@@ -332,6 +332,76 @@ There is also a valve-feedback-absent control for failure review.
 Policies shown as OWNER DECISION REQUIRED are listed in
 [`critical-pump-safe-return-decision-matrix.md`](../../../docs/spikes/critical-pump-safe-return-decision-matrix.md).
 
+## 1G. Re-run after the final spike closeout hotfix (required — final Owner-local Edge gate)
+
+**SYNTHETIC REVIEW TOOLING — NOT THE PRODUCTION OPERATOR-CONTROL MODEL.** This checkpoint is a
+fast-forward on `81c87a44`; its SHA is in the PR #3 description. It supersedes the counts of
+section 1F. From `react-ui\`:
+
+```powershell
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm test                               # Vitest: expect 138 / 138 (18 files)
+npm run build
+node --test "../runtime-harness/test/**/*.test.mjs"   # expect 60 / 60
+npm run e2e -- e2e/operations.spec.ts e2e/layout.spec.ts e2e/punchlist.spec.ts e2e/critical.spec.ts   # 48 tests
+```
+
+Changed / new specs (same four files; the command is unchanged):
+
+| Spec | What it checks |
+| --- | --- |
+| `S11/S12` (operations) | **Deterministic.** The Sensor's Dirty Score is fixed and held (`set-sensor-score { hold: true }`, Score 82); the test waits for that revision, then Raise Alarm / Clear / Acknowledge. Score, classification and the computed background must be **identical** (no RGB tolerance); marker and `ACTIVE_UNACK` / `CLEARED_UNACK` change only the alarm channel. Fixes the 81c87a44 Edge failure (score drifted between samples) |
+| `SEQ-B` (critical) | START AUTOSEQUENCE dispatches GlobalQueue Position 1 even with another Sensor selected; the queue shifts FIFO |
+| `SEQ-C` | PAUSE AFTER CURRENT JOB → `PAUSE_REQUESTED`; the Job continues through Safe Return; no next dispatch; `PAUSED` |
+| `SEQ-D` | RESUME only from `PAUSED`; dispatches the current head; disabled in `CRITICAL_SUSPENDED` |
+| `SEQ-E` | Clear + Acknowledge do not enable Resume; RESET disabled until Safe Return completes; RESET → `OFF`, no Job; explicit START needed |
+| `SEQ-F` | ABORT ACTIVE JOB: only with a Job; Safe Return steps visible; the Job is not released early; no next Job when paused |
+| `SEQ-G` | Controls only in Diagnostics; `SYN · ` labels; readable disabled reasons; no page overflow; keyboard activation; critical modal unchanged |
+
+**Manual F11 sequence (18 steps).** Run `npm run harness -- --synthetic-test-controls` in Edge at
+1920 × 1080, F11, 100 %. Press **D**; use **SYNTHETIC TEST CONTROL → Synthetic AutoSequence**.
+Every button shows its disabled reason as text underneath.
+
+| # | Action | Expected |
+| --- | --- | --- |
+| 1 | **SYN · RESET CRITICAL SCENARIO** if enabled, otherwise **Visual presets → Reset** | Mode `OFF · OFF`; no Active Job |
+| 2 | Note the GlobalQueue head (Position 1) and select a *different* Sensor on the map | Selection does not change the head |
+| 3 | **SYN · START AUTOSEQUENCE** | Mode `RUNNING`; Job target = the noted head (not the selected Sensor) |
+| 4 | **SYN · PAUSE AFTER CURRENT JOB** | Mode `PAUSE_REQUESTED`; the Job keeps running; RESUME disabled with reason |
+| 5 | Wait for the Job to finish | Safe Return runs (valve close → confirmed → axis Standby → confirmed) |
+| 6 | Observe | Mode `PAUSED · PAUSED`; no next Job; the head is unchanged |
+| 7 | **SYN · RESUME AUTOSEQUENCE** | Mode `RUNNING`; the new head starts |
+| 8 | **SYN · ABORT ACTIVE JOB** | `ABORTING`, then the Safe Return steps; the Job stays Active until Standby is confirmed |
+| 9 | After Safe Return | Outcome `ABORTED`; with mode `RUNNING` a later head may start (synthetic rule — never in the release revision) |
+| 10 | **Critical Pump / Safe Return → trip in P4** (with a Job running) | Critical modal at once; `CRITICAL_SUSPENDED`; Safe Return runs |
+| 11 | Acknowledge in the modal; **clear** the pump condition | Critical `CLEARED · ACKNOWLEDGED`; RESUME and START disabled |
+| 12 | Before Standby is confirmed | RESET disabled: "Mandatory Safe Return not complete" |
+| 13 | After Safe Return completes | The modal closes; mode still `CRITICAL_SUSPENDED` (no automatic Resume) |
+| 14 | **SYN · RESET CRITICAL SCENARIO** | Mode `OFF · OFF`; queue order unchanged |
+| 15 | Wait 5 s | No Job is created; the Pump is not started (START reason "Pump not ready") |
+| 16 | **SYN · START PUMP (synthetic signal)** | Pump ready after ~3 s |
+| 17 | **SYN · START AUTOSEQUENCE** | Mode `RUNNING` |
+| 18 | Observe | The GlobalQueue head (Position 1) becomes the Active Job target |
+
+**Screenshots to return (10):**
+
+1. Diagnostics with the Synthetic AutoSequence group and disabled reasons (mode `OFF`);
+2. after START (Job = head, another Sensor selected);
+3. `PAUSE_REQUESTED` with the Job running;
+4. `PAUSED` with no Job;
+5. ABORT ACTIVE JOB during Safe Return;
+6. critical modal with the drawer open;
+7. cleared + acknowledged, still `CRITICAL_SUSPENDED`, RESET disabled reason;
+8. after RESET (`OFF`, no Job);
+9. after START (head started);
+10. final Edge E2E summary (48 tests).
+
+Abort re-queue, Production Pause / Resume, Safe Return failure and reset authority are
+**OWNER DECISION REQUIRED** (see the
+[critical Pump / Safe Return matrix](../../../docs/spikes/critical-pump-safe-return-decision-matrix.md)).
+
 ## 2. Manual look (optional)
 
 ```powershell

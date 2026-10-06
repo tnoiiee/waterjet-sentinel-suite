@@ -14,6 +14,7 @@
 // Not part of any Production build without a separate diagnostic-build decision.
 import { useEffect, useRef, useState } from 'react';
 import { fetchTestControls, sendSyntheticScenario, type ScenarioResult } from '../store/commands';
+import type { SequenceControls } from '../../../contracts/operational';
 import { useSensor, useSlice } from '../store/hooks';
 import styles from './Operations.module.css';
 
@@ -61,7 +62,7 @@ const SENSOR_CONTROLS: { group: string; items: Control[] }[] = [
     ],
   },
   {
-    group: 'Active Job',
+    group: 'Active Job (isolated test preparation — not an operator Start)',
     items: [
       { id: 'job-set', label: 'Review Job (make queue head → dispatch)', command: 'review-job', params: { enabled: true } },
       { id: 'job-clear', label: 'End review Job', command: 'review-job', params: { enabled: false } },
@@ -96,9 +97,47 @@ const CRITICAL_CONTROLS: Control[] = [
   { id: 'crit-standby-delay', label: '7 · Delay Standby feedback (next SR)', command: 'safe-return-config', params: { standbyFeedbackDelayMs: 6000 } },
   { id: 'crit-clear', label: '8 · Clear Pump fault condition', command: 'pump-fault-clear', params: {} },
   { id: 'crit-ack', label: '9 · Acknowledge critical Alarm', command: 'critical-alarm-ack', params: {} },
-  { id: 'crit-reset', label: '10 · Reset critical scenario (test only — not a Resume)', command: 'critical-reset', params: {} },
+  { id: 'crit-reset', label: '10 · Reset critical scenario (test only — not a Resume)', command: 'critical-review-reset', params: {} },
   { id: 'crit-valve-absent', label: 'Valve closed feedback absent (next SR → failure review)', command: 'safe-return-config', params: { valveFeedback: 'ABSENT' } },
 ];
+
+// Synthetic AutoSequence controls (Owner final closeout). Runtime-authoritative: availability and
+// the disabled reason come from sequence.controls; the UI only renders them and sends ONE request
+// per click. Never a target parameter: the AutoSequence always dispatches GlobalQueue Position 1.
+// Not the Production operator-control model (roles / Pause / Resume policy: OWNER DECISION REQUIRED).
+interface SequenceControl extends Control {
+  key: keyof SequenceControls;
+}
+const SEQUENCE_CONTROLS: SequenceControl[] = [
+  { id: 'start', key: 'start', label: 'START AUTOSEQUENCE', command: 'autosequence-start', params: {} },
+  { id: 'pause', key: 'pauseAfterCurrentJob', label: 'PAUSE AFTER CURRENT JOB', command: 'autosequence-pause-after-current-job', params: {} },
+  { id: 'resume', key: 'resume', label: 'RESUME AUTOSEQUENCE', command: 'autosequence-resume', params: {} },
+  { id: 'abort', key: 'abortActiveJob', label: 'ABORT ACTIVE JOB', command: 'abort-active-job', params: {} },
+  { id: 'reset', key: 'resetCritical', label: 'RESET CRITICAL SCENARIO', command: 'critical-review-reset', params: {} },
+  { id: 'pump-start', key: 'pumpStart', label: 'START PUMP (synthetic signal)', command: 'pump-start', params: {} },
+];
+export const SEQUENCE_REASON_TEXT: Record<string, string> = {
+  CRITICAL_RESET_REQUIRED: 'Critical scenario active — clear, acknowledge, complete Safe Return, then RESET CRITICAL SCENARIO',
+  CRITICAL_SUSPENDED: 'AutoSequence CRITICAL_SUSPENDED — no Pause / Resume until the critical scenario is reset',
+  ACTIVE_JOB_PRESENT: 'An Active Job exists',
+  ALREADY_RUNNING: 'AutoSequence already RUNNING',
+  PAUSED_USE_RESUME: 'AutoSequence is paused — use RESUME AUTOSEQUENCE',
+  PUMP_NOT_READY: 'Pump not ready',
+  QUEUE_EMPTY: 'GlobalQueue is empty',
+  AUTOSEQUENCE_OFF: 'AutoSequence is OFF',
+  PAUSE_ALREADY_REQUESTED: 'Pause already requested — takes effect after the current Job',
+  ALREADY_PAUSED: 'AutoSequence already PAUSED',
+  PAUSE_REQUESTED_JOB_ACTIVE: 'Pause requested — wait for the current Job to finish Safe Return',
+  NOT_PAUSED: 'Only available from PAUSED',
+  NO_ACTIVE_JOB: 'No Active Job',
+  SAFE_RETURN_IN_PROGRESS: 'Mandatory Safe Return already in progress',
+  NO_CRITICAL_SCENARIO: 'No critical scenario to reset',
+  PUMP_CONDITION_ACTIVE: 'Pump stop / trip condition still active — clear it first',
+  CRITICAL_NOT_ACKNOWLEDGED: 'Critical Alarm not acknowledged',
+  SAFE_RETURN_FAILED: 'Safe Return failed — OWNER DECISION REQUIRED (no reset)',
+  SAFE_RETURN_INCOMPLETE: 'Mandatory Safe Return not complete — Active Job still held',
+  PUMP_ALREADY_RUNNING: 'Pump already running / starting',
+};
 
 // Queue → Job control without a Sensor: dispatches queue Position 1 only (head-only, atomic).
 const DISPATCH_HEAD: Control = { id: 'dispatch-head', label: 'Dispatch queue head (Position 1)', command: 'dispatch-head', params: {} };
@@ -107,6 +146,10 @@ export function SyntheticTestControl({ selectedId }: { selectedId: string | null
   const conn = useSlice('connection');
   const live = conn.state === 'LIVE';
   const sensor = useSensor(selectedId ?? '');
+  const seq = useSlice('sequence');
+  const queue = useSlice('queue');
+  const pump = useSlice('pump');
+  const job = useSlice('activeJob');
   const tokenRef = useRef<string | null>(null);
   const [availability, setAvailability] = useState<Availability>('checking');
   const [pending, setPending] = useState(false);
@@ -151,6 +194,26 @@ export function SyntheticTestControl({ selectedId }: { selectedId: string | null
     }
   };
 
+  const generalReason = !live ? 'Disconnected — controls disabled (nothing is queued)' : availability === 'disabled' ? 'Off — start the harness with --synthetic-test-controls' : availability === 'error' ? 'Unavailable' : availability === 'checking' ? 'Checking…' : pending ? 'Request in progress' : null;
+  const seqButton = (c: SequenceControl) => {
+    const g = seq?.controls?.[c.key];
+    const enabled = ready && Boolean(g?.enabled);
+    const why = generalReason ?? (g ? (g.enabled ? 'Available' : (SEQUENCE_REASON_TEXT[g.reason ?? ''] ?? g.reason ?? 'Unavailable')) : 'Awaiting runtime state');
+    return (
+      <div key={c.id} className={styles.ascRow} data-enabled={enabled}>
+        <button type="button" className={`${styles.ctrlBtn} ${styles.ascBtn}`} disabled={!enabled} onClick={() => void run(c, false)} data-testid={`asc-${c.id}`} aria-describedby={`asc-${c.id}-reason`}>
+          <span className={styles.ctrlSyn}>SYN</span> · {c.label}
+        </button>
+        <span id={`asc-${c.id}-reason`} className={enabled ? styles.ascReasonOk : styles.ascReason} data-testid={`asc-${c.id}-reason`}>
+          {enabled ? 'Available' : why}
+        </span>
+      </div>
+    );
+  };
+  const crit = seq?.critical ?? null;
+  const sr = job?.safeReturn ?? null;
+  const srText = job ? (sr ? `${job.lifecycle}${sr.step ? ` · ${sr.step}` : ''}` : 'Not started (Job RUNNING)') : seq?.lastJobOutcome ? `Complete · last ${seq.lastJobOutcome.jobId} ${seq.lastJobOutcome.outcome}` : '—';
+
   const button = (c: Control, needsSensor: boolean) => (
     <button key={c.id} type="button" className={styles.ctrlBtn} disabled={!ready || (needsSensor && !hasSensor)} onClick={() => void run(c, needsSensor)} data-testid={`stc-${c.id}`} title={`Synthetic: ${c.label}`}>
       <span className={styles.ctrlSyn}>SYN</span> {c.label}
@@ -172,6 +235,26 @@ export function SyntheticTestControl({ selectedId }: { selectedId: string | null
           {reasonDisabled}
         </p>
       )}
+      <div className={styles.stcGroup} data-testid="asc-group" aria-label="Synthetic AutoSequence control">
+        <div className={styles.stcGroupLabel}>Synthetic AutoSequence control (head-only · not the Production control model)</div>
+        <dl className={styles.ascFacts} data-testid="asc-facts">
+          <dt>AutoSequence</dt>
+          <dd data-testid="asc-mode">{seq ? `${seq.mode} · ${seq.autoSequence}` : '—'}</dd>
+          <dt>Active Job</dt>
+          <dd data-testid="asc-job">{job ? `${job.jobId} · ${job.targetSensorId}` : 'None'}</dd>
+          <dt>Queue head</dt>
+          <dd data-testid="asc-head">{queue?.entries[0]?.sensorId ?? '—'}</dd>
+          <dt>Queue count</dt>
+          <dd data-testid="asc-count">{queue ? `${queue.totalQueued} / ${queue.capacity}` : '—'}</dd>
+          <dt>Pump</dt>
+          <dd data-testid="asc-pump">{pump ? `${pump.state} · ${pump.ready ? 'READY' : 'NOT READY'}` : '—'}</dd>
+          <dt>Critical</dt>
+          <dd data-testid="asc-critical">{crit ? `${crit.conditionActive ? 'CONDITION ACTIVE' : 'CLEARED'} · ${crit.acknowledged ? 'ACKNOWLEDGED' : 'NOT ACKNOWLEDGED'}` : 'None'}</dd>
+          <dt>Safe Return</dt>
+          <dd data-testid="asc-sr">{srText}</dd>
+        </dl>
+        <div className={styles.ascList}>{SEQUENCE_CONTROLS.map(seqButton)}</div>
+      </div>
       <div className={styles.stcGroup}>
         <div className={styles.stcGroupLabel}>Presets (selected Sensor)</div>
         <div className={styles.stcGrid}>

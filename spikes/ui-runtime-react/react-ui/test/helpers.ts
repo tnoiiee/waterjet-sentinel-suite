@@ -1,5 +1,5 @@
 // WJSS Stage 0.2.1A — test helpers: synthetic records, snapshots, deltas, fake EventSource.
-import type { ActiveCleaningJobState, CriticalPumpEvent, DispatchRecord, OperationalDelta, OperationalSnapshot, QueueSummary, SensorPresentationState, SequenceState, Wall } from '../../contracts/operational';
+import type { ActiveCleaningJobState, CriticalPumpEvent, DispatchRecord, OperationalDelta, OperationalSnapshot, QueueSummary, SensorPresentationState, SequenceControls, SequenceState, Wall } from '../../contracts/operational';
 import type { EventSourceLike, MessageEventLike } from '../src/store/feed';
 // Tests take Sensor identity and positions from the canonical mapping source (never generated here).
 import { EXPECTED, getSensorMap, sensorById, wallMapSlots } from '../../contracts/sensorMap.mjs';
@@ -146,10 +146,26 @@ export function makeDispatch(sensorId: string, jobId: string, queueRevisionBefor
 }
 
 /** AutoSequence / critical / last-outcome slice (synthetic). */
+/** Runtime-style control availability (all disabled with a reason unless overridden). */
+export function makeControls(over: Partial<SequenceControls> = {}): SequenceControls {
+  const off = (reason: string) => ({ enabled: false, reason });
+  return {
+    start: off('QUEUE_EMPTY'),
+    pauseAfterCurrentJob: off('AUTOSEQUENCE_OFF'),
+    resume: off('NOT_PAUSED'),
+    abortActiveJob: off('NO_ACTIVE_JOB'),
+    resetCritical: off('NO_CRITICAL_SCENARIO'),
+    pumpStart: off('PUMP_ALREADY_RUNNING'),
+    ...over,
+  };
+}
+
 export function makeSequence(over: Partial<SequenceState> = {}): SequenceState {
   return {
     synthetic: true,
     autoSequence: 'OFF',
+    mode: 'OFF',
+    controls: makeControls(),
     critical: null,
     safeReturnConfig: { valveFeedbackDelayMs: 0, standbyFeedbackDelayMs: 0, valveFeedback: 'NORMAL', standbyFeedback: 'NORMAL' },
     lastJobOutcome: null,

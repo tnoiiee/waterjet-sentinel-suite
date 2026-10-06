@@ -124,13 +124,13 @@ any of the following, and must not be configurable to do so:
 
 | Situation | Required behaviour |
 | --- | --- |
-| Operator holds an entry, then a job would dispatch it | Dispatcher skips held entries; other entries preserve relative FIFO order; the queue is not blocked. `[APPROVED]` |
+| ~~Operator holds an entry, then a job would dispatch it~~ | **SUPERSEDED (Owner decision, 2026-10-06)** — queue entries are never held or skipped; the GlobalQueue is ready-only and dispatched head-only. Pause belongs to the AutoSequence or the Cleaning Job lifecycle; Production Pause / Resume is **OWNER DECISION REQUIRED** ([`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2). |
 | Operator tries to reorder an active Cleaning Job | Not permitted — Reorder cannot move an active Cleaning Job. `[APPROVED]` |
 | Operator rejects an entry that is about to dispatch | Reject removes the entry and suppresses the sensor from refill during the current Auto Sequence. `[APPROVED]` |
 | Operator reorders entries | Changes dispatch position only; never changes source ownership and never creates a second active Cleaning Job. `[OWNER CONFIRMED]` |
 | Valve becomes `OUT_OF_SERVICE` while its sensor sits in GlobalQueue | Associated sensors are excluded from TempQueue, TimeQueue, GlobalQueue, and refill. `[APPROVED]` |
 | Valve returns to service | Sensors re-enter normal source queue evaluation and must not be inserted into the middle of GlobalQueue. Requires cleared-state acknowledgement. `[OWNER CONFIRMED]` |
-| Operator stops the AutoSequence | Dispatch stops; the active job is handled per the approved stop or recovery policy; the Queue snapshot and Held/Rejected/Reordered state are recorded in Event history; the instance closes; the old GlobalQueue is not kept as the executable queue. `[OWNER CONFIRMED]` |
+| Operator stops the AutoSequence | Dispatch stops; the active job is handled per the approved stop or recovery policy; the Queue snapshot and Rejected/Reordered state are recorded in Event history (queue-level Held is superseded); the instance closes; the old GlobalQueue is not kept as the executable queue. `[OWNER CONFIRMED]` |
 | External stop removes the plant's ability to continue | Application must not re-assert commands; re-validation is required before any new command. `[PROPOSED]` |
 | Privileged session times out during manual hold-to-run | The manual hold-to-run operation must stop. An active Auto Sequence must not be aborted. `[APPROVED]` |
 | Operator attempts to close the Operations UI while a Cleaning Job is active or the Main Pump is running | The normal close request is rejected with a clear explanation and the Operator is directed back to the active operation or Pump/Sequence state. This is an **operational usability control**, not a safety protection, and it does not change equipment authority: the Equipment Runtime lifecycle, the WAGO watchdog, safe output states, and external hardware protection remain independent of it. `[OWNER CONFIRMED]` |

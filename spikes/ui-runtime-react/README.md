@@ -39,7 +39,7 @@ cd ../react-ui
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --ignore-scripts
 npm run typecheck && npm test && npm run build
 npm run harness                                                  # http://127.0.0.1:5181
-cd .. && node scenario-runner/run-scenarios.mjs                  # 34 scenarios (runtime / SSE level)
+cd .. && node scenario-runner/run-scenarios.mjs                  # 35 scenarios (runtime / SSE level)
 node scenario-runner/arena-measure.mjs --minutes 10              # harness measurement
 ```
 

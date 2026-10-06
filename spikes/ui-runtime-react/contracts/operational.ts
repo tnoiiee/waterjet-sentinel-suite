@@ -211,7 +211,29 @@ export interface QueueEntry {
  * suspension live here, never in queue entries. CRITICAL_SUSPENDED persists after the condition
  * is cleared; no automatic Resume (Resume authority is OWNER DECISION REQUIRED).
  */
-export type AutoSequenceState = 'CRITICAL_SUSPENDED' | 'OFF' | 'PAUSED' | 'JOB_ACTIVE' | 'PUMP_NOT_READY' | 'QUEUE_EMPTY' | 'READY_TO_DISPATCH';
+export type AutoSequenceState = 'CRITICAL_SUSPENDED' | 'OFF' | 'PAUSE_REQUESTED' | 'PAUSED' | 'JOB_ACTIVE' | 'PUMP_NOT_READY' | 'QUEUE_EMPTY' | 'READY_TO_DISPATCH';
+
+/**
+ * Synthetic AutoSequence lifecycle mode. RUNNING covers JOB_ACTIVE / PUMP_NOT_READY / QUEUE_EMPTY /
+ * READY_TO_DISPATCH. PAUSE_REQUESTED = PAUSE AFTER CURRENT JOB while a Job is still active.
+ */
+export type AutoSequenceMode = 'CRITICAL_SUSPENDED' | 'OFF' | 'PAUSE_REQUESTED' | 'PAUSED' | 'RUNNING';
+
+/** Runtime-computed availability of one synthetic AutoSequence control (reason code when disabled). */
+export interface SequenceControlAvailability {
+  enabled: boolean;
+  reason: string | null;
+}
+
+/** Synthetic AutoSequence controls (opt-in review tooling; not the Production operator-control model). */
+export interface SequenceControls {
+  start: SequenceControlAvailability;
+  pauseAfterCurrentJob: SequenceControlAvailability;
+  resume: SequenceControlAvailability;
+  abortActiveJob: SequenceControlAvailability;
+  resetCritical: SequenceControlAvailability;
+  pumpStart: SequenceControlAvailability;
+}
 
 /** Synthetic Main Pump critical event (High Critical device; synthetic proof only). */
 export interface CriticalPumpEvent {
@@ -272,6 +294,8 @@ export interface SafeReturnConfig {
 export interface SequenceState {
   synthetic: true;
   autoSequence: AutoSequenceState;
+  mode: AutoSequenceMode;
+  controls: SequenceControls;
   critical: CriticalPumpEvent | null;
   safeReturnConfig: SafeReturnConfig;
   lastJobOutcome: JobOutcomeRecord | null;

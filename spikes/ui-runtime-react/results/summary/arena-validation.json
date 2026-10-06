@@ -1,10 +1,10 @@
 {
  "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
- "recordedAt": "2026-10-06T15:57:02.000Z",
+ "recordedAt": "2026-10-06T17:38:29.000Z",
  "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
- "parentCheckpoint": "60cd0398",
- "ownerLocalAtParent": "Edge re-run of 60cd0398 not yet reported (PENDING); last Owner-reported run 23f48daa: 34 selected / 25 passed / 2 failed (READ-A, WJ-A) / 7 not run",
- "scope": "Stage 0.2.1A critical Main Pump handling and Mandatory Safe Return (Owner critical Pump decision; SYNTHETIC PROOF ONLY - PRODUCTION SAFETY NOT VERIFIED): pump event classes (commanded stop / unexpected stop / trip), AutoSequence CRITICAL_SUSPENDED (persists; no automatic Resume or next Job), Mandatory Safe Return SR1-SR8 for every Job outcome (valve close confirmed before axis Standby command; Job Active until Standby confirmed), high-severity blocking critical modal (Acknowledge only, no close, no Resume), synthetic review controls, queue-level HELD superseded in QUEUE_MODEL / DOMAIN_MODEL, critical Pump / Safe Return decision matrices A-F (OWNER DECISION REQUIRED). GlobalQueue unchanged: ready-only, <= 8, head-only dispatch. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
+ "parentCheckpoint": "81c87a44",
+ "ownerLocalAtParent": "Owner-reported Edge run of 81c87a44: 42 selected / 32 passed / 1 failed (S11/S12, Dirty Score drifted between samples) / 9 not run",
+ "scope": "Stage 0.2.1A final spike closeout (SYNTHETIC REVIEW TOOLING - NOT THE PRODUCTION OPERATOR-CONTROL MODEL): deterministic S11/S12 alarm colour test (fixed held Dirty Score 82, identical background, no RGB tolerance); Diagnostics-only synthetic AutoSequence controls START AUTOSEQUENCE / PAUSE AFTER CURRENT JOB / RESUME AUTOSEQUENCE / ABORT ACTIVE JOB / RESET CRITICAL SCENARIO (head-only dispatch; every Job through Mandatory Safe Return; clear + acknowledge never resume; reset never dispatches and requires an explicit START); sequence.mode / sequence.controls contract; current-facing queue-level HELD / BLOCKED / EXCLUDED wording removed; ADR-0003 SUPERSEDED IN PART by Owner decision dated 2026-10-06. Critical Pump / Safe Return behaviour unchanged. GlobalQueue unchanged: ready-only, <= 8, head-only dispatch. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
  "checks": [
   {
    "check": "npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
@@ -19,37 +19,37 @@
   {
    "check": "vite build (production)",
    "result": "PASS",
-   "detail": "JS 340.50 kB (gzip 111.65 kB; +12.60 kB / +3.60 kB gzip vs 60cd0398), CSS 30.92 kB (gzip 7.34 kB; +3.25 kB / +0.66 kB gzip), WOFF2 47.67 kB unchanged"
+   "detail": "JS 345.17 kB (gzip 112.92 kB; +4.67 kB / +1.27 kB gzip vs 81c87a44), CSS 31.70 kB (gzip 7.46 kB; +0.78 kB / +0.12 kB gzip), WOFF2 47.67 kB unchanged"
   },
   {
-   "check": "vitest (jsdom) 17 files",
+   "check": "vitest (jsdom) 18 files",
    "result": "PASS",
-   "detail": "131/131 (new criticalModal.test.tsx 10: absent without event, alertdialog / aria-modal / labelled, required content, no close button, inert background with Diagnostics outside, Escape ignored and focus trap, single acknowledge request without retry, cleared-before-Safe-Return stays open, Safe Return failure as text, disconnected disables Acknowledge, Active Job Safe Return panel, critical controls group; colorTokens critical palette distinctness and contrast; preCheck fixtures replaced by lifecycle / safeReturn / sequence)"
+   "detail": "138/138 (new autoSequenceControl.test.tsx 7: drawer-only, six SYN-labelled buttons, state and disabled reasons as text, one request per click without target or retry, CRITICAL_SUSPENDED disables Resume / Start, Safe Return abort reason, disconnected disables all)"
   },
   {
    "check": "runtime-harness node:test",
    "result": "PASS",
-   "detail": "51/51, stable over 3 consecutive runs (new safeReturn.test.mjs: gates 1 normal completion, 1b next head only after release, 2 abort / cancel / failure, 3 trip with Job, 3b stop / trip without Job, 3c commanded stop not a fault, 4 ordering, 5 Safe Return failure, 6 queue during suspension, review scenarios; harness critical-alarm acknowledge route same-origin loopback only)"
+   "detail": "60/60, stable over 3 consecutive runs (new autoSequenceControls.test.mjs A-G: start head-only ignoring selection, pause with / without Job, resume only from PAUSED and refused in CRITICAL / with Job, critical reset preconditions and no dispatch, abort through Safe Return, invariants; release-revision gate added to queueDispatch / safeReturn gates)"
   },
   {
-   "check": "scenario runner (34 scenarios)",
+   "check": "scenario runner (35 scenarios)",
    "result": "PASS",
-   "detail": "PASS 29, PASS+OWNER 4, OWNER-LOCAL 1, FAIL 0; S33 Pump trip during a Job: SR1-SR8 evidence indices increasing, Safe Return 7.65 s, queue frozen at 7 entries, CRITICAL_SUSPENDED after modal close, OFF after test reset; S34 normal completion with 5 s delayed valve feedback -> COMPLETED after Standby; S31 / S32 head-only dispatch unchanged; final invariant violations 0, accepted second Jobs 0"
+   "detail": "PASS 30, PASS+OWNER 4, OWNER-LOCAL 1, FAIL 0; new S35 synthetic AutoSequence controls (start / pause / abort -> PAUSED / resume head-only / resume refused while critical / reset -> OFF without dispatch / explicit start); S09 now expects PAUSE_REQUESTED while a Job is active; final invariant violations 0, accepted second Jobs 0"
   },
   {
-   "check": "Mandatory Safe Return / critical gates",
+   "check": "deterministic alarm colour (S11/S12) at runtime level",
    "result": "PASS",
-   "detail": "completion: COMPLETED only after SR5; abort / cancel / failure / trip: ABORTED, never COMPLETED; ordering valve close cmd < valve confirmed < axis cmd < Standby confirmed < outcome < release (runtime invariant + validator); Safe Return failure: Job retained, no outcome, no release, no dispatch, modal stays; queue during suspension <= 8, FIFO unchanged, revision and dispatch count frozen, no entry state. Browser part Owner-local PENDING"
+   "detail": "set-sensor-score hold: Score 82 / DIRTY constant over 8 samples (4 s) and unchanged after raise-alarm (ACTIVE_UNACK) and clear (CLEARED_UNACK); browser assertion Owner-local PENDING"
   },
   {
    "check": "golden fixtures validated against canonical map",
    "result": "PASS",
-   "detail": "fixtures regenerated for the lifecycle / safeReturn / sequence contract; fixtures.test PASS"
+   "detail": "fixtures regenerated for sequence.mode / sequence.controls; fixtures.test PASS"
   },
   {
    "check": "playwright test --list (no browser)",
    "result": "PASS",
-   "detail": "43 tests in 5 files; Owner-local selection (operations + layout + punchlist + critical) 42; new critical.spec.ts CRIT-A..CRIT-E and CRIT-F at 1920x1080 and 1366x768; layout / operations specs use abort-job { immediate: true }"
+   "detail": "49 tests in 5 files; Owner-local selection (operations + layout + punchlist + critical) 48; new SEQ-B..SEQ-G in critical.spec.ts; S11/S12 rewritten"
   },
   {
    "check": "hard gates (sensor map)",
@@ -59,17 +59,17 @@
   {
    "check": "font checks",
    "result": "PASS",
-   "detail": "WOFF2 47,672 B SHA-256 40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b unchanged; fontAsset tests PASS; Google Sans retained"
+   "detail": "WOFF2 47,672 B SHA-256 40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b unchanged; Google Sans retained"
   },
   {
    "check": "prohibited queue states / hidden overflow / coordinates (source scan)",
    "result": "PASS",
-   "detail": "no HELD / BLOCKED / EXCLUDED / WAITING_FOR_PUMP literals in runtime, contracts, or UI source; no slice(0, 8); no coordinates, addresses, Galil or Modbus data in Safe Return evidence; no Resume control"
+   "detail": "no HELD / BLOCKED / EXCLUDED / WAITING_FOR_PUMP literals in runtime, contracts, or UI source; no slice(0, 8); no coordinates, addresses, Galil or Modbus data; no Production Resume control; synthetic controls take no target"
   },
   {
-   "check": "critical modal rendering, geometry, focus and Escape in a browser",
+   "check": "synthetic controls, alarm colour and critical modal in a browser",
    "result": "NOT VERIFIED",
-   "detail": "no browser in Arena; asserted by e2e/critical.spec.ts, Owner-local Edge run and manual F11 review (8 screenshots) PENDING"
+   "detail": "no browser in Arena; asserted by e2e/operations.spec.ts S11/S12 and e2e/critical.spec.ts SEQ-B..G / CRIT-A..F; Owner-local final Edge gate and 18-step manual sequence (10 screenshots) PENDING"
   },
   {
    "check": "sensitive-data and public-boundary scan (added lines)",
@@ -79,12 +79,12 @@
   {
    "check": "markdown relative links (all tracked and new .md)",
    "result": "PASS",
-   "detail": "48 files, 749 links, 0 broken; 21 anchors, 0 broken"
+   "detail": "48 files, 760 links, 0 broken; 22 anchors, 0 broken"
   },
   {
    "check": "loopback-only bind",
    "result": "PASS",
-   "detail": "harness socket 127.0.0.1; non-loopback refused by unit test; critical acknowledge route same-origin loopback only"
+   "detail": "harness socket 127.0.0.1; synthetic controls via the existing token path only"
   },
   {
    "check": "arena harness measurement 10 min",
@@ -97,5 +97,5 @@
    "detail": "dependencies and lock file unchanged since dd20a8bd rehearsal (PASS)"
   }
  ],
- "notVerified": "ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · installed-Edge rendering of the critical modal, its geometry, focus trap and Escape handling, Safe Return panel and critical controls (Owner-local Edge run and manual F11 1920x1080 review PENDING) · physical Main Pump, protection relay, VFD, Isolation Valve, axis and Galil behaviour · Production interlocks and safety functions (no certification claimed) · heap / DOM / long tasks / end-to-end latency in Edge · Windows process CPU and memory · Windows offline restore · controlled 15-minute observation (PAUSED) · 60-minute run (waived as a gate, not run) · Extended (4 h) stability · Production queue runtime, eligibility policy, Safe Return failure policy, Resume authority, and alarm behaviour · Production stability · Modbus performance · Production integration."
+ "notVerified": "ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · installed-Edge rendering of the synthetic AutoSequence controls, the deterministic alarm colour test, the critical modal and Safe Return panel (Owner-local final Edge gate and manual F11 sequence PENDING) · physical Main Pump, protection relay, VFD, Isolation Valve, axis and Galil behaviour · Production interlocks and safety functions (no certification claimed) · heap / DOM / long tasks / end-to-end latency in Edge · Windows process CPU and memory · Windows offline restore · controlled 15-minute observation (PAUSED) · 60-minute run (waived as a gate, not run) · Extended (4 h) stability · Production queue runtime, Pause / Resume, abort re-queue, eligibility policy, Safe Return failure policy, Resume authority, and alarm behaviour · Production stability · Modbus performance · Production integration."
 }

@@ -99,7 +99,9 @@ test('Gate 1b — AutoSequence considers the next head only after SR7 (SR8)', ()
   snap(rt);
   assert.equal(rt.lastJobOutcome.jobId, job.jobId);
   assert.equal(rt.lastJobOutcome.events.at(-1).event, 'LATER_DISPATCH_MAY_BE_CONSIDERED');
-  assert.equal(rt.activeJobs[0].targetSensorId, 'H6', 'the next head is dispatched only after release');
+  assert.equal(rt.activeJobs.length, 0, 'no dispatch in the release revision (synthetic separation rule)');
+  snap(rt);
+  assert.equal(rt.activeJobs[0].targetSensorId, 'H6', 'the next head is dispatched only after release, at the next cycle');
   assert.ok(rt.activeJobs[0].dispatch.dispatchedAt >= rt.lastJobOutcome.finalizedAt);
 });
 

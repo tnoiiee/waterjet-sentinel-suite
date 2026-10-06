@@ -48,7 +48,7 @@ AutoSequence must execute Cleaning Jobs **strictly sequentially** `[OWNER CONFIR
 | INVARIANT-SEQ-002 | A second Cleaning Job must not enter an executing state until the current Cleaning Job has reached an approved safe and released terminal condition. |
 | INVARIANT-SEQ-003 | Different Water Jets, different Isolation Valves, different boiler walls, or different Galil controllers do not grant authority for concurrent Cleaning Jobs. |
 | INVARIANT-SEQ-004 | The selected eligible head of GlobalQueue is the only normal source for the next Cleaning Job. |
-| INVARIANT-SEQ-005 | Queue refill, score changes, Operator Reorder, Hold, Reject, valve exclusion, or equipment availability must never result in concurrent Cleaning Jobs. |
+| INVARIANT-SEQ-005 | Queue refill, score changes, Operator Reorder, Reject, valve exclusion, or equipment availability must never result in concurrent Cleaning Jobs. |
 | INVARIANT-SEQ-006 | Parallel Water Jet cleaning is prohibited. |
 
 **The Main Pump may remain running between Cleaning Jobs during an active AutoSequence, but
@@ -79,7 +79,7 @@ The normal sequence is an approved nineteen-step order `[APPROVED]`:
 
 | Step | Action | Verification / condition |
 | --- | --- | --- |
-| 1 | Select the GlobalQueue head | Head is not held; no blocking condition |
+| 1 | Select the GlobalQueue head | Position 1 only (the queue holds ready-to-dispatch entries only; no scan-forward). Waits belong to the AutoSequence or the Job, never to queue entries |
 | 2 | Revalidate permissions, eligibility, equipment state, and permissives | All must pass; otherwise the job must not start. Includes the one-active-job invariant check |
 | 3 | Reserve the assigned Water Jet | No other job may use it |
 | 4 | Verify Main Pump pressure readiness | Pressure value and quality must indicate readiness |
@@ -124,8 +124,9 @@ updates `LastSuccessfulCleaningCompletedAt`.
 
 Cleaning Job **outcomes** describe the result of an executed job: `COMPLETED`, `FAILED`,
 `ABORTED`, `RECOVERY_REQUIRED`. They are distinct from **queue entry dispositions**, which
-describe what happened to an entry in a queue: `HELD`, `RELEASED`, `REJECTED`, `REORDERED`,
-`REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION`.
+describe what happened to an entry in a queue: `RELEASED`, `REJECTED`, `REORDERED`,
+`REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION` (`HELD` is **superseded** by the Owner
+decision of 2026-10-06; see [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2).
 
 Operator Reject is a queue action, not a Cleaning Job outcome. A job that never executes
 because its entry was rejected produces no job outcome. See

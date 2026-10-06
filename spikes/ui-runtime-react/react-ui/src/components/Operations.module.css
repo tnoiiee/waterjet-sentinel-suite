@@ -1083,3 +1083,48 @@
   font-weight: 700;
   color: var(--uncertain);
 }
+
+/* Synthetic AutoSequence control (inside the scrolling Diagnostics drawer; never on Operations). */
+.ascFacts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-micro) var(--space-small);
+  margin: 0 0 var(--space-dense);
+  font-size: var(--font-diag);
+}
+.ascFacts dt {
+  color: var(--muted);
+}
+.ascFacts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-weight: 600;
+}
+.ascList {
+  display: grid;
+  gap: var(--space-inline);
+}
+.ascRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-small);
+}
+.ascBtn:not(:disabled) {
+  border-color: var(--selection);
+}
+.ascReason,
+.ascReasonOk {
+  min-width: 0;
+  font-size: var(--font-diag);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.ascReason {
+  color: var(--stc-state);
+}
+.ascReasonOk {
+  color: var(--text);
+}

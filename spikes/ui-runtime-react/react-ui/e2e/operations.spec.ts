@@ -124,18 +124,60 @@ test('S08/S09/S10 queue badges, GlobalQueue preview, single job progression', as
 });
 
 test('S11/S12 active alarm and cleared-ack-required, independent of Dirty colour', async ({ page, request }) => {
+  // Deterministic (Owner closeout): the Dirty Score is fixed and held through the synthetic
+  // scenario API, so every background sample comes from the SAME applied score. The previous
+  // version compared samples from different revisions while the score legitimately drifted.
+  type Rec = { sensorId: string; dirtyScore: number | null; classification: string; alarmState: string };
   const id = 'G16';
   const cell = page.locator(`[data-sensor-id="${id}"]`);
-  const bgBefore = await cell.evaluate((e) => getComputedStyle(e).backgroundColor);
-  const r = await scenario(request, 'raise-alarm', { sensorId: id });
-  await expect(cell).toHaveAttribute('data-alarm', 'ACTIVE_UNACK');
-  const bgAfter = await cell.evaluate((e) => getComputedStyle(e).backgroundColor);
-  expect(bgAfter).toBe(bgBefore);
-  await scenario(request, 'clear-alarm', { alarmId: r.detail.alarmId });
-  await expect(cell).toHaveAttribute('data-alarm', 'CLEARED_UNACK');
-  await expect(page.getByTestId('alarm-strip')).toContainText('acknowledgement required');
-  await scenario(request, 'ack-alarm', { alarmId: r.detail.alarmId });
-  await expect(cell).toHaveAttribute('data-alarm', 'NONE');
+  const rec = async () => {
+    const s = (await (await request.get('/api/snapshot')).json()) as { revision: number; sensors: Rec[] };
+    return { revision: s.revision, r: s.sensors.find((x) => x.sensorId === id)! };
+  };
+  const visual = () => cell.evaluate((e) => ({ bg: getComputedStyle(e).backgroundColor, inline: (e as HTMLElement).style.background, process: e.getAttribute('data-process') }));
+  await scenario(request, 'auto-jobs', { enabled: false }); // the Sensor must not become a Job target mid-test
+  try {
+    const fixed = await scenario(request, 'set-sensor-score', { sensorId: id, classification: 'DIRTY', hold: true });
+    expect(fixed.accepted, JSON.stringify(fixed)).toBe(true);
+    expect(fixed.detail.held).toBe(true);
+    const score = fixed.detail.score as number;
+    // Wait for the runtime revision that carries the fixed score, then for the UI to render it.
+    await expect.poll(async () => (await rec()).r.dirtyScore, { timeout: 10_000 }).toBe(score);
+    const applied = await rec();
+    expect(applied.r.classification).toBe('DIRTY');
+    await expect(cell).toHaveAttribute('data-process', 'DIRTY');
+    await expect(cell.locator('[data-part="value"]')).toHaveText(String(Math.round(score)));
+    await expect(cell).toHaveAttribute('data-alarm', 'NONE');
+    const before = await visual();
+    expect(before.inline).toContain('color-mix'); // Dirty shade derived from the fixed score
+
+    const r = await scenario(request, 'raise-alarm', { sensorId: id });
+    await expect(cell).toHaveAttribute('data-alarm', 'ACTIVE_UNACK');
+    const raised = await rec();
+    expect(raised.revision).toBeGreaterThan(applied.revision);
+    expect(raised.r.dirtyScore).toBe(score);
+    expect(raised.r.classification).toBe('DIRTY');
+    expect(raised.r.alarmState).toBe('ACTIVE_UNACK');
+    const during = await visual();
+    expect(during.process).toBe('DIRTY');
+    expect(during.inline).toBe(before.inline); // same process shade expression for the same score
+    expect(during.bg).toBe(before.bg); // the Alarm does not recolour the Sensor
+    await expect(cell.locator('[data-part="alarm-marker"]')).toBeVisible(); // separate warning channel
+
+    await scenario(request, 'clear-alarm', { alarmId: r.detail.alarmId });
+    await expect(cell).toHaveAttribute('data-alarm', 'CLEARED_UNACK');
+    await expect(page.getByTestId('alarm-strip')).toContainText('acknowledgement required');
+    const cleared = await rec();
+    expect(cleared.r.dirtyScore).toBe(score);
+    expect(cleared.r.classification).toBe('DIRTY');
+    expect((await visual()).bg).toBe(before.bg);
+
+    await scenario(request, 'ack-alarm', { alarmId: r.detail.alarmId });
+    await expect(cell).toHaveAttribute('data-alarm', 'NONE');
+  } finally {
+    await scenario(request, 'reset-sensor', { sensorId: id }); // releases the fixed-score hold
+    await scenario(request, 'auto-jobs', { enabled: true });
+  }
 });
 
 test('S13/S14/S15 device timeout, other devices continue, recovery', async ({ page, request }) => {

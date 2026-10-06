@@ -25,6 +25,82 @@ PRODUCTION VALUES**.
 
 ---
 
+## 0F. Final spike closeout: synthetic AutoSequence controls (Stage 0.2.1A)
+
+**SYNTHETIC REVIEW TOOLING — NOT THE PRODUCTION OPERATOR-CONTROL MODEL.** No physical device,
+interlock or Production protocol is involved; no safety certification is claimed.
+
+**Baseline and recovery.** The local branch had reverted to `main`. The Owner-authorized one-time
+recovery restored `81c87a44` (identity proof 153 / 153, compare-and-swap ref update, index-only
+refresh; no reset, no force push). This checkpoint is one normal fast-forward commit on
+`81c87a44`; its SHA is recorded in the PR #3 description.
+
+### 0F.1 Owner-local Edge failure at `81c87a44` and the deterministic alarm test
+
+Owner-reported: 42 selected · 32 passed · 1 failed · 9 not run (serial mode stopped after the
+failure). `S11/S12` compared the Sensor background before and after Raise Alarm:
+`color(srgb 0.625961 0.205451 0.168314)` vs `color(srgb 0.624471 0.20502 0.168)`. The alarm did
+not recolour the cell; the synthetic Dirty Score moved between the two revisions, and the Dirty
+shade follows the Score. The test now:
+
+1. disables auto jobs (the Sensor must not become a Job target);
+2. fixes and holds the Score through `set-sensor-score { classification: 'DIRTY', hold: true }`
+   (Score 82; the hold ends at `reset-sensor`);
+3. waits until the snapshot carries Score 82 / `DIRTY`, then records revision, Score,
+   classification, the inline `color-mix` shade and the computed background;
+4. Raise Alarm → `ACTIVE_UNACK`, marker visible, a later revision with the same Score and
+   classification, the **identical** shade expression and computed background;
+5. Clear → `CLEARED_UNACK` + "acknowledgement required", still identical; Acknowledge; reset.
+
+No RGB tolerance is used; the test is kept, not removed.
+
+### 0F.2 Synthetic AutoSequence control model
+
+`sequence.mode`: `OFF` / `RUNNING` / `PAUSE_REQUESTED` / `PAUSED` / `CRITICAL_SUSPENDED`;
+`sequence.controls`: `{ enabled, reason }` per control. Commands take no target; dispatch is always
+GlobalQueue Position 1, atomically (one Job, one `DispatchRecord`, `positionBefore` 1).
+
+| Control | Accepted when | Effect |
+| --- | --- | --- |
+| START AUTOSEQUENCE | No critical latch, no Job, not RUNNING / PAUSED, Pump ready, queue ≥ 1 | `RUNNING`; head dispatch (`SYN_AUTOSEQUENCE_START`) |
+| PAUSE AFTER CURRENT JOB | `RUNNING` | With a Job: `PAUSE_REQUESTED`, Job continues through Safe Return, no next dispatch, `PAUSED` after release. Without: `PAUSED`; queue unchanged |
+| RESUME AUTOSEQUENCE | `PAUSED`, no Job, Pump ready, queue ≥ 1 | `RUNNING`; head dispatch (`SYN_AUTOSEQUENCE_RESUME`); never clears a critical latch |
+| ABORT ACTIVE JOB | A Job not already in Safe Return | `ABORTING` → Safe Return (valve close + confirm, axis Standby + confirm) → `ABORTED` → release; no re-queue; `PAUSE_REQUESTED` → `PAUSED`; `CRITICAL_SUSPENDED` stays; with `RUNNING` a later revision may dispatch the new head (never the release revision) |
+| RESET CRITICAL SCENARIO | Cleared + acknowledged + Safe Return complete (no Job), no Safe Return failure | Latch removed; `OFF`; queue preserved; no dispatch / Job / Pump start; explicit START required |
+
+The UI (Diagnostics drawer only) shows mode, Job ID and target, queue head and count, Pump
+readiness, critical condition / acknowledgement, Safe Return step, and each disabled reason as text.
+Buttons are labelled `SYN · …`, send one request per click (no retry or replay), and are disabled
+while disconnected. Abort re-queue, Production Pause / Resume and reset authority are recorded in
+the [critical matrix §G](critical-pump-safe-return-decision-matrix.md) as OWNER DECISION REQUIRED.
+
+### 0F.3 Documentation consistency
+
+Current-facing queue `HELD` / `BLOCKED` / `EXCLUDED` wording was removed from ARCHITECTURE (§4.4,
+§26), REQUIREMENTS (QUE-020, QUE-024, QUE-027 / SEQ-005, SPC-001), CONTROL_AUTHORITY (§6),
+CLEANING_SEQUENCE (step 1, §4.2, INVARIANT-SEQ-005), CURRENT_STATE (open items) and QUEUE_MODEL
+(§7, §9.1, §12). The "held and rejected simultaneously" question was removed. ADR-0003 carries the
+note **SUPERSEDED IN PART by Owner decision dated 2026-10-06**; its history is unchanged.
+Historical sections of this results document are left as recorded.
+
+### 0F.4 Validation (Arena)
+
+| Check | Result |
+| --- | --- |
+| Vitest | 138 / 138 (18 files; new `autoSequenceControl.test.tsx` 7) |
+| Harness | 60 / 60 × 3 (new `autoSequenceControls.test.mjs` A–G) |
+| Scenarios | 30 PASS / 4 PASS+OWNER / 1 OWNER-LOCAL / 0 FAIL (35; new S35) |
+| Playwright list | 49 tests in 5 files (Owner-local selection 48) |
+| Build | JS 345.17 kB (gzip 112.92 kB); CSS 31.70 kB (gzip 7.46 kB); unchanged 47.67 kB WOFF2 |
+
+**PENDING (Owner-local final Edge gate):** the 48-test selection, the 18-step manual sequence and
+10 screenshots ([`OWNER_LOCAL_TESTING.md`](../../spikes/ui-runtime-react/measurements/OWNER_LOCAL_TESTING.md) §1G).
+
+**NOT VERIFIED:** browser rendering, Edge, WebView2, kiosk, hardware, Production queue / Pause /
+Resume behaviour, and Production safety.
+
+---
+
 ## 0E. Critical Main Pump handling and Mandatory Safe Return (Stage 0.2.1A)
 
 **SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED.** No physical Main Pump, protection

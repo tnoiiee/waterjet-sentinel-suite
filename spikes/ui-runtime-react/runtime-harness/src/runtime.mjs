@@ -164,7 +164,7 @@ export class SyntheticRuntime extends EventEmitter {
     this.acq = new Map(
       this.sensors.map((s) => [
         s.sensorId,
-        { rawScore: null, sourceTs: null, lastValidatedScore: null, lastValidatedAt: null, forcedQuality: null, disabled: false, cur: null },
+        { rawScore: null, heldScore: null, sourceTs: null, lastValidatedScore: null, lastValidatedAt: null, forcedQuality: null, disabled: false, cur: null },
       ]),
     );
     this.pressure = { values: [null, null, null, null], sourceTs: null };
@@ -178,6 +178,9 @@ export class SyntheticRuntime extends EventEmitter {
     this.lastDispatch = null;
     this.notAdmitted = new Map(); // sensorId -> reason; set only by an explicit test scenario
     this.autoSequencePaused = false; // AutoSequence (dispatch control) pause, not a queue state
+    // Synthetic dispatch-separation rule: after a Job is released (SR7) the AutoSequence never
+    // dispatches in the same published revision; the earliest next head dispatch is the next cycle.
+    this.releaseGate = false;
     // Mandatory Safe Return / critical handling (synthetic proof).
     this.evidenceSeq = 0; // monotonic synthetic evidence sequence index (ordering proof)
     this.srConfig = defaultSafeReturnConfig(); // synthetic feedback behaviour for the next Safe Return
@@ -311,7 +314,7 @@ export class SyntheticRuntime extends EventEmitter {
         const [a, b] = s.channelOffsets.map((off) => result.registers[off] * 0.1);
         const score = round1(clamp(((a + b) / 2 - 100) / 1.5, 0, 100));
         const acq = this.acq.get(s.sensorId);
-        acq.rawScore = score;
+        acq.rawScore = acq.heldScore ?? score; // synthetic fixed-score hold (review / tests)
         acq.sourceTs = result.sourceTimestamp;
         this.historian.offer({ t: result.sourceTimestamp, ch: s.tcFrontChannel, v: a });
         this.historian.offer({ t: result.sourceTimestamp, ch: s.tcRearChannel, v: b });
@@ -706,7 +709,8 @@ export class SyntheticRuntime extends EventEmitter {
     this.activeJobs.length = 0;
     this.lastJobEnd = outcome === 'COMPLETED' ? 'COMPLETED' : sr.trigger;
     const seqState = this.autoSequenceState();
-    const mayConsider = !['OFF', 'PAUSED', 'CRITICAL_SUSPENDED'].includes(seqState);
+    const mayConsider = !['OFF', 'PAUSED', 'PAUSE_REQUESTED', 'CRITICAL_SUSPENDED'].includes(seqState);
+    this.releaseGate = true; // no dispatch in the release revision (synthetic separation rule)
     this.srEvent(job, 'SR8', mayConsider ? 'LATER_DISPATCH_MAY_BE_CONSIDERED' : `LATER_DISPATCH_NOT_PERMITTED_${seqState}`, atMs);
     const d = job.dispatch;
     this.lastJobOutcome = Object.freeze({
@@ -796,16 +800,141 @@ export class SyntheticRuntime extends EventEmitter {
   autoSequenceState() {
     if (this.criticalSuspended) return 'CRITICAL_SUSPENDED';
     if (!this.autoJobs) return 'OFF';
-    if (this.autoSequencePaused) return 'PAUSED';
+    // PAUSE AFTER CURRENT JOB: the current Job continues (normal completion or abort, always via
+    // Mandatory Safe Return); no next head is dispatched; PAUSED once the Job is released.
+    if (this.autoSequencePaused) return this.activeJobs.length ? 'PAUSE_REQUESTED' : 'PAUSED';
     if (this.activeJobs.length) return 'JOB_ACTIVE';
     if (!this.pumpReady()) return 'PUMP_NOT_READY';
     if (!this.queue.length) return 'QUEUE_EMPTY';
     return 'READY_TO_DISPATCH';
   }
+  /** AutoSequence lifecycle mode (synthetic): OFF / RUNNING / PAUSE_REQUESTED / PAUSED / CRITICAL_SUSPENDED. */
+  autoSequenceMode() {
+    const st = this.autoSequenceState();
+    return ['CRITICAL_SUSPENDED', 'OFF', 'PAUSE_REQUESTED', 'PAUSED'].includes(st) ? st : 'RUNNING';
+  }
   /** AutoSequence: dispatch queue Position 1 only, only when READY_TO_DISPATCH. */
   autoDispatch() {
     if (this.autoSequenceState() !== 'READY_TO_DISPATCH') return null;
     return this.dispatchHead('SYN_AUTO_SEQUENCE');
+  }
+  /**
+   * Synthetic AutoSequence control availability (runtime-authoritative; the UI only renders it).
+   * SYNTHETIC REVIEW TOOLING — not the Production operator-control model; roles / permissions and
+   * the Production Pause / Resume policy are OWNER DECISION REQUIRED.
+   */
+  sequenceControls() {
+    const mode = this.autoSequenceMode();
+    const job = this.activeJobs[0] ?? null;
+    const f = this.pumpFault;
+    const critical = this.criticalSuspended || Boolean(f);
+    const pumpReady = this.pumpReady();
+    const queued = this.queue.length;
+    const c = (code) => ({ enabled: code === null, reason: code });
+    const first = (...pairs) => {
+      for (const [cond, code] of pairs) if (cond) return c(code);
+      return c(null);
+    };
+    return {
+      start: first(
+        [critical, 'CRITICAL_RESET_REQUIRED'],
+        [job !== null, 'ACTIVE_JOB_PRESENT'],
+        [mode === 'RUNNING', 'ALREADY_RUNNING'],
+        [mode === 'PAUSED' || mode === 'PAUSE_REQUESTED', 'PAUSED_USE_RESUME'],
+        [!pumpReady, 'PUMP_NOT_READY'],
+        [queued === 0, 'QUEUE_EMPTY'],
+      ),
+      pauseAfterCurrentJob: first(
+        [critical, 'CRITICAL_SUSPENDED'],
+        [mode === 'OFF', 'AUTOSEQUENCE_OFF'],
+        [mode === 'PAUSE_REQUESTED', 'PAUSE_ALREADY_REQUESTED'],
+        [mode === 'PAUSED', 'ALREADY_PAUSED'],
+      ),
+      resume: first(
+        [critical, 'CRITICAL_SUSPENDED'],
+        [mode === 'PAUSE_REQUESTED', 'PAUSE_REQUESTED_JOB_ACTIVE'],
+        [mode !== 'PAUSED', 'NOT_PAUSED'],
+        [job !== null, 'ACTIVE_JOB_PRESENT'],
+        [!pumpReady, 'PUMP_NOT_READY'],
+        [queued === 0, 'QUEUE_EMPTY'],
+      ),
+      abortActiveJob: first(
+        [job === null, 'NO_ACTIVE_JOB'],
+        [Boolean(job?.safeReturn), 'SAFE_RETURN_IN_PROGRESS'],
+      ),
+      resetCritical: first(
+        [!critical, 'NO_CRITICAL_SCENARIO'],
+        [Boolean(f?.conditionActive), 'PUMP_CONDITION_ACTIVE'],
+        [Boolean(f) && !f.acknowledged, 'CRITICAL_NOT_ACKNOWLEDGED'],
+        [job?.lifecycle === JOB_LIFECYCLE.FAILED, 'SAFE_RETURN_FAILED'],
+        [job !== null, 'SAFE_RETURN_INCOMPLETE'],
+      ),
+      pumpStart: first(
+        [critical, 'CRITICAL_SUSPENDED'],
+        [this.pump.state === 'RUNNING' || this.pump.state === 'STARTING', 'PUMP_ALREADY_RUNNING'],
+      ),
+    };
+  }
+  /** SYN START AUTOSEQUENCE: RUNNING + atomic dispatch of queue Position 1 (never the selection). */
+  autoSequenceStart() {
+    const g = this.sequenceControls().start;
+    if (!g.enabled) return { accepted: false, reason: g.reason };
+    this.autoJobs = true;
+    this.autoSequencePaused = false;
+    this.releaseGate = false;
+    const r = this.dispatchHead('SYN_AUTOSEQUENCE_START');
+    if (!r.accepted) {
+      this.autoJobs = false;
+      return r;
+    }
+    return { accepted: true, detail: { ...r.detail, mode: this.autoSequenceMode(), autoSequence: this.autoSequenceState() } };
+  }
+  /** SYN PAUSE AFTER CURRENT JOB: AutoSequence lifecycle only (not a queue hold, not a Job freeze). */
+  autoSequencePauseAfterCurrentJob() {
+    const g = this.sequenceControls().pauseAfterCurrentJob;
+    if (!g.enabled) return { accepted: false, reason: g.reason };
+    this.autoSequencePaused = true;
+    return { accepted: true, detail: { mode: this.autoSequenceMode(), autoSequence: this.autoSequenceState(), queueOrder: this.queueOrder } };
+  }
+  /** SYN RESUME AUTOSEQUENCE: from PAUSED only; head-only atomic dispatch; never clears CRITICAL_SUSPENDED. */
+  autoSequenceResume() {
+    const g = this.sequenceControls().resume;
+    if (!g.enabled) return { accepted: false, reason: g.reason };
+    this.autoSequencePaused = false;
+    this.releaseGate = false;
+    const r = this.dispatchHead('SYN_AUTOSEQUENCE_RESUME');
+    if (!r.accepted) {
+      this.autoSequencePaused = true;
+      return r;
+    }
+    return { accepted: true, detail: { ...r.detail, mode: this.autoSequenceMode(), autoSequence: this.autoSequenceState() } };
+  }
+  /** SYN ABORT ACTIVE JOB: ABORTING -> timed Mandatory Safe Return -> ABORTED; released only after SR5. */
+  abortActiveJob() {
+    const g = this.sequenceControls().abortActiveJob;
+    if (!g.enabled) return { accepted: false, reason: g.reason };
+    const job = this.activeJobs[0];
+    this.abortJob(SAFE_RETURN_TRIGGERS.OPERATOR_ABORT);
+    return { accepted: true, detail: { jobId: job.jobId, lifecycle: job.lifecycle, mode: this.autoSequenceMode() } };
+  }
+  /**
+   * SYN RESET CRITICAL SCENARIO (review tooling only — NOT a Resume). Accepted only after the
+   * condition cleared, the critical Alarm was acknowledged, Mandatory Safe Return completed (or no
+   * Job existed) and no Active Job / Safe Return failure remains. Clears the synthetic critical
+   * latch and leaves the AutoSequence OFF. Never dispatches, never creates a Job, never starts the
+   * Pump, never touches the GlobalQueue or unrelated Alarms. An explicit START is required after.
+   */
+  criticalReviewReset() {
+    const g = this.sequenceControls().resetCritical;
+    if (!g.enabled) return { accepted: false, reason: g.reason };
+    if (this.pumpFault) this.alarms.delete(this.pumpFault.alarmId);
+    this.pumpFault = null;
+    this.criticalSuspended = false;
+    this.criticalAt = null;
+    this.srConfig = defaultSafeReturnConfig();
+    this.autoJobs = false;
+    this.autoSequencePaused = false;
+    return { accepted: true, detail: { mode: this.autoSequenceMode(), autoSequence: this.autoSequenceState(), queueOrder: this.queueOrder, note: 'Synthetic critical review reset — not a Resume; explicit START required' } };
   }
 
   // ---- Main Pump critical events (synthetic)
@@ -1072,6 +1201,8 @@ export class SyntheticRuntime extends EventEmitter {
     return {
       synthetic: true,
       autoSequence: this.autoSequenceState(),
+      mode: this.autoSequenceMode(),
+      controls: this.sequenceControls(),
       critical: f
         ? {
             eventId: f.eventId,
@@ -1202,7 +1333,8 @@ export class SyntheticRuntime extends EventEmitter {
     this.updateCritical(now);
     this.classifyAll(now);
     this.updateQueue();
-    this.autoDispatch();
+    if (this.releaseGate) this.releaseGate = false; // release revision: no dispatch in it
+    else this.autoDispatch();
 
     const delta = { kind: 'delta', schema: DELTA_SCHEMA, synthetic: true, previousRevision: this.revision, revision: this.revision + 1, generatedAt: iso(now) };
     const records = [];
@@ -1298,10 +1430,12 @@ export class SyntheticRuntime extends EventEmitter {
     const acq = this.acq.get(sensorId);
     if (score === null) {
       pr.target = null;
+      acq.heldScore = null;
       return;
     }
     pr.target = score;
     pr.trueScore = score;
+    acq.heldScore = null; // a new review score replaces any previous fixed-score hold
     acq.rawScore = score;
     acq.sourceTs = Date.now();
   }
@@ -1371,14 +1505,16 @@ export class SyntheticRuntime extends EventEmitter {
     };
     if (preset === 'reset') {
       // Synthetic review reset includes the synthetic critical test reset (never a Resume).
-      if (this.criticalSuspended || this.pumpFault) this.resetCritical();
+      const wasCritical = this.criticalSuspended || Boolean(this.pumpFault);
+      if (wasCritical) this.resetCritical();
       const ids = [...(this.reviewTouched ?? [])];
       for (const id of ids) this.resetReviewSensor(id);
       if (this.activeJobs[0]?.heldPhaseIndex !== undefined || this.activeJobs[0]?.safeReturn) this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET);
       this.notAdmitted.clear();
       this.clearQueue();
       this.autoSequencePaused = false;
-      this.autoJobs = this.params.autoJobs;
+      // After a critical scenario the AutoSequence stays OFF (explicit START required; no auto Resume).
+      this.autoJobs = wasCritical ? false : this.params.autoJobs;
       settle(); // deterministic refill by the synthetic score source, bounded to QUEUE_CAPACITY
       return { accepted: true, detail: { preset, restored: ids, autoJobs: this.autoJobs, queued: this.queue.length } };
     }
@@ -1669,8 +1805,12 @@ export class SyntheticRuntime extends EventEmitter {
         const mode = p.classification;
         if (!['DIRTY', 'CLEANER', null].includes(mode ?? null)) return { accepted: false, reason: 'INVALID_CLASSIFICATION' };
         this.touch(p.sensorId);
-        this.setSensorScore(p.sensorId, mode ? REVIEW_SCORE[mode] : null);
-        return { accepted: true, detail: { score: mode ? REVIEW_SCORE[mode] : null } };
+        const score = mode ? REVIEW_SCORE[mode] : null;
+        this.setSensorScore(p.sensorId, score);
+        // hold: true fixes the published Dirty Score exactly (no synthetic process jitter) until
+        // the Sensor is reset — deterministic review / test preparation only.
+        if (score !== null && p.hold === true) this.acq.get(p.sensorId).heldScore = score;
+        return { accepted: true, detail: { score, held: score !== null && p.hold === true } };
       }
       case 'review-job': {
         if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
@@ -1777,6 +1917,17 @@ export class SyntheticRuntime extends EventEmitter {
         return this.resetCritical();
       case 'critical-scenario':
         return this.criticalScenario(p.scenario);
+      // Synthetic AutoSequence controls (opt-in review tooling; head-only dispatch; no target param).
+      case 'autosequence-start':
+        return this.autoSequenceStart();
+      case 'autosequence-pause-after-current-job':
+        return this.autoSequencePauseAfterCurrentJob();
+      case 'autosequence-resume':
+        return this.autoSequenceResume();
+      case 'abort-active-job':
+        return this.abortActiveJob();
+      case 'critical-review-reset':
+        return this.criticalReviewReset();
       case 'safe-return-config': {
         // Synthetic feedback behaviour for subsequent Safe Returns (review tooling only).
         const next = { ...this.srConfig };

@@ -3,43 +3,44 @@
 > SYNTHETIC SPIKE EVIDENCE — NOT PRODUCTION VALIDATION. Runtime / SSE level only; no browser in Arena.
 > `PASS+OWNER` = runtime part passed in Arena, browser part pending Owner-local Edge run. `OWNER-LOCAL` = browser-only.
 
-Generated: 2026-10-06T15:52:37.477Z
+Generated: 2026-10-06T17:34:16.444Z
 
-Counts: PASS 29 · PASS+OWNER 4 · OWNER-LOCAL 1 · final invariant violations 0 · accepted second jobs 0
+Counts: PASS 30 · PASS+OWNER 4 · OWNER-LOCAL 1 · final invariant violations 0 · accepted second jobs 0
 
 | ID | Scenario | Status | Duration (ms) | Key evidence |
 | --- | --- | --- | --- | --- |
-| S01 | Initial Snapshot | PASS | 8 | {"firstEvent":"snapshot","snapshotBytes":79292,"sensors":106,"thermocoupleChannels":212,"perWall":{"LEFT":24,"REAR":29,"RIGHT":24,"FRONT":29},"wallMapSlots":108,"cannonSlots":["CANNON_REAR@R5C7","CANNON_FRONT@R5C16"],"revision":1} |
-| S02 | One-second Deltas | PASS | 5201 | {"deltasIn5_2s":6,"medianIntervalMs":1000,"gaps":0,"lastValidated":true} |
-| S03 | 30% Dirty | PASS | 2509 | {"dirty":32,"expectedApprox":32,"population":106,"note":"one sensor may be under active cleaning"} |
+| S01 | Initial Snapshot | PASS | 8 | {"firstEvent":"snapshot","snapshotBytes":79658,"sensors":106,"thermocoupleChannels":212,"perWall":{"LEFT":24,"REAR":29,"RIGHT":24,"FRONT":29},"wallMapSlots":108,"cannonSlots":["CANNON_REAR@R5C7","CANNON_FRONT@R5C16"],"revision":1} |
+| S02 | One-second Deltas | PASS | 5200 | {"deltasIn5_2s":6,"medianIntervalMs":1001,"gaps":0,"lastValidated":true} |
+| S03 | 30% Dirty | PASS | 2512 | {"dirty":32,"expectedApprox":32,"population":106,"note":"one sensor may be under active cleaning"} |
 | S04 | 70% Dirty | PASS | 2505 | {"dirty":74,"expectedApprox":74,"population":106} |
-| S05 | Threshold oscillation around 50 | PASS | 7014 | {"oscillatingSensors":8,"classificationFlipsIn7s":23} |
-| S06 | All quality states | PASS | 1313 | {"qualities":{"G+201":"UNCERTAIN","G+202":"BAD","G+203":"STALE","G+204":"DISABLED","G+101":"GOOD"},"uncertainBasis":"LAST_VALIDATED"} |
-| S07 | Selection during updates | PASS+OWNER | 7 | {"runtimePart":"selection is not on the wire (UI-local)","jsdom":"renderIsolation.test.tsx: selection survives Deltas and Snapshots","browserPart":"OWNER-LOCAL e2e S07"} |
-| S08 | Queue badge changes | PASS | 6430 | {"sensorsWithQueueStateChange":3,"statesSeen":["ACTIVE","NONE","QUEUED"],"dispatchedHead":"G+209"} |
-| S09 | GlobalQueue changes (bounded, status-free; AutoSequence pause is not an entry state) | PASS | 2414 | {"totalQueued":8,"capacity":8,"pausedAutoSequence":"PAUSED","enqueueH17":"QUEUE_FULL","fields":["position","entryId","sensorId","sourceReason","dirtyScore","secondsSinceLastClean"]} |
-| S10 | Single Job progression | PASS | 30157 | {"phasesSeen":["P1","P2","P3","P4","P5","P6"],"jobsCompleted":1,"maxActiveJobs":1} |
-| S11 | Active Alarm | PASS | 403 | {"alarmState":"ACTIVE_UNACK","classificationBefore":"DIRTY","classificationAfter":"DIRTY","note":"classification is independent of alarm state"} |
-| S12 | Cleared Ack Required | PASS | 810 | {"afterClear":"CLEARED_UNACK","clearedUnackCount":1,"afterAck":"NONE"} |
-| S13 | Device timeout | PASS | 5010 | {"affectedSensors":13,"qualitiesSeen":["GOOD","UNCERTAIN","BAD"],"deviceState":"TIMEOUT","consecutiveTimeouts":4} |
-| S14 | Other Devices continue | PASS | 4 | {"pollsDuringTimeout":{"SYN-TC-01":5,"SYN-TC-02":5,"SYN-TC-04":5,"SYN-TC-05":5,"SYN-TC-06":5,"SYN-TC-07":5,"SYN-TC-08":5}} |
-| S15 | Device recovery | PASS | 1512 | {"recoveredWithinMs":1509,"commAlarmAfterRecovery":"CLEARED_UNACK"} |
-| S16 | UI disconnect | PASS | 304 | {"droppedClients":1,"lastRevisionSeen":87} |
-| S17 | UI reconnect | PASS | 1701 | {"firstEventAfterReconnect":"snapshot","sentLastEventId":87} |
-| S18 | Authoritative re-snapshot | PASS | 3 | {"snapshotRevision":89,"lastSeenBeforeDrop":87,"missedDeltasReplayed":0,"reconnectsWithLastEventId":1} |
-| S19 | Historian slowdown | PASS | 5206 | {"deltasIn5_2s":6,"maxIntervalMs":1001,"revisionsAdvanced":5} |
-| S20 | Near-overflow behavior | PASS | 1741 | {"nearOverflow":true,"depthAtFull":50000,"capacity":50000,"rejected":6296,"gapMarkers":1,"pumpStopRoundTripMs":2.24,"nearOverflowClearedAfterRestoreMs":511,"depthAtClear":37526,"pumpAfterRestart":"STARTING"} |
-| S21 | Bounded Trend | PASS | 9010 | {"acceleratedTicks":89,"acceleratedCapacity":50,"pointsRetained":50,"mainTrendPoints":85,"mainCapacity":600,"note":"accelerated parameters are test-only, not the planning values"} |
-| S22 | Camera placeholder | PASS+OWNER | 2 | {"sourceFilesScanned":27,"nonCodeAssetsNotScanned":["react-ui/src/assets/fonts/.gitattributes","react-ui/src/assets/fonts/FONT_SOURCE.md","react-ui/src/assets/fonts/GoogleSans-Latin-Variable.woff2","react-ui/src/assets/fonts/OFL.txt","react-ui/src/assets/fonts |
-| S23 | Synthetic close guard for Active Job | PASS | 1510 | {"evaluation":{"allowed":false,"reasons":["ACTIVE_JOB","PUMP_RUNNING"],"note":"Synthetic Operations UI close guard. Operational usability control only; not a safety protection and not hardware fail-safe."}} |
+| S05 | Threshold oscillation around 50 | PASS | 7012 | {"oscillatingSensors":8,"classificationFlipsIn7s":23} |
+| S06 | All quality states | PASS | 1312 | {"qualities":{"G+201":"UNCERTAIN","G+202":"BAD","G+203":"STALE","G+204":"DISABLED","G+101":"GOOD"},"uncertainBasis":"LAST_VALIDATED"} |
+| S07 | Selection during updates | PASS+OWNER | 4 | {"runtimePart":"selection is not on the wire (UI-local)","jsdom":"renderIsolation.test.tsx: selection survives Deltas and Snapshots","browserPart":"OWNER-LOCAL e2e S07"} |
+| S08 | Queue badge changes | PASS | 6428 | {"sensorsWithQueueStateChange":3,"statesSeen":["ACTIVE","NONE","QUEUED"],"dispatchedHead":"G+209"} |
+| S09 | GlobalQueue changes (bounded, status-free; AutoSequence pause is not an entry state) | PASS | 2412 | {"totalQueued":8,"capacity":8,"pausedAutoSequence":"PAUSE_REQUESTED","enqueueH17":"QUEUE_FULL","fields":["position","entryId","sensorId","sourceReason","dirtyScore","secondsSinceLastClean"]} |
+| S10 | Single Job progression | PASS | 27170 | {"phasesSeen":["P1","P2","P3","P4","P5","P6"],"jobsCompleted":1,"maxActiveJobs":1} |
+| S11 | Active Alarm | PASS | 404 | {"alarmState":"ACTIVE_UNACK","classificationBefore":"DIRTY","classificationAfter":"DIRTY","note":"classification is independent of alarm state"} |
+| S12 | Cleared Ack Required | PASS | 808 | {"afterClear":"CLEARED_UNACK","clearedUnackCount":1,"afterAck":"NONE"} |
+| S13 | Device timeout | PASS | 5009 | {"affectedSensors":13,"qualitiesSeen":["GOOD","UNCERTAIN","BAD"],"deviceState":"TIMEOUT","consecutiveTimeouts":4} |
+| S14 | Other Devices continue | PASS | 4 | {"pollsDuringTimeout":{"SYN-TC-01":6,"SYN-TC-02":6,"SYN-TC-04":6,"SYN-TC-05":6,"SYN-TC-06":6,"SYN-TC-07":6,"SYN-TC-08":6}} |
+| S15 | Device recovery | PASS | 1511 | {"recoveredWithinMs":1508,"commAlarmAfterRecovery":"CLEARED_UNACK"} |
+| S16 | UI disconnect | PASS | 303 | {"droppedClients":1,"lastRevisionSeen":84} |
+| S17 | UI reconnect | PASS | 1701 | {"firstEventAfterReconnect":"snapshot","sentLastEventId":84} |
+| S18 | Authoritative re-snapshot | PASS | 3 | {"snapshotRevision":86,"lastSeenBeforeDrop":84,"missedDeltasReplayed":0,"reconnectsWithLastEventId":1} |
+| S19 | Historian slowdown | PASS | 5208 | {"deltasIn5_2s":6,"maxIntervalMs":1001,"revisionsAdvanced":5} |
+| S20 | Near-overflow behavior | PASS | 1745 | {"nearOverflow":true,"depthAtFull":50000,"capacity":50000,"rejected":6296,"gapMarkers":1,"pumpStopRoundTripMs":2.46,"nearOverflowClearedAfterRestoreMs":511,"depthAtClear":38000,"pumpAfterRestart":"STARTING"} |
+| S21 | Bounded Trend | PASS | 9011 | {"acceleratedTicks":89,"acceleratedCapacity":50,"pointsRetained":50,"mainTrendPoints":82,"mainCapacity":600,"note":"accelerated parameters are test-only, not the planning values"} |
+| S22 | Camera placeholder | PASS+OWNER | 3 | {"sourceFilesScanned":27,"nonCodeAssetsNotScanned":["react-ui/src/assets/fonts/.gitattributes","react-ui/src/assets/fonts/FONT_SOURCE.md","react-ui/src/assets/fonts/GoogleSans-Latin-Variable.woff2","react-ui/src/assets/fonts/OFL.txt","react-ui/src/assets/fonts |
+| S23 | Synthetic close guard for Active Job | PASS | 1513 | {"evaluation":{"allowed":false,"reasons":["ACTIVE_JOB","PUMP_RUNNING"],"note":"Synthetic Operations UI close guard. Operational usability control only; not a safety protection and not hardware fail-safe."}} |
 | S24 | Synthetic close guard for Pump running | PASS | 7 | {"evaluation":{"allowed":false,"reasons":["PUMP_RUNNING"],"note":"Synthetic Operations UI close guard. Operational usability control only; not a safety protection and not hardware fail-safe."}} |
 | S25 | Viewport resize | OWNER-LOCAL | 0 | {"reason":"Browser layout cannot be exercised in Arena (no browser). Covered by react-ui/e2e/operations.spec.ts S25."} |
-| S26 | Synthetic config revision | PASS | 809 | {"configRevision":2,"dirtyAtThreshold99":0,"restoredRevision":3} |
+| S26 | Synthetic config revision | PASS | 810 | {"configRevision":2,"dirtyAtThreshold99":0,"restoredRevision":3} |
 | S27 | Refused second Job | PASS | 7 | {"result":"ACTIVE_JOB_EXISTS","activeJobs":1,"acceptedSecondJobs":0,"refusedSecondJobs":2,"invariantViolations":0} |
-| S28 | Revision gap -> re-snapshot | PASS | 3107 | {"gapsDetected":1,"resyncFirstEvent":"snapshot"} |
-| S29 | Mixed GlobalQueue sources (bounded to 8) | PASS+OWNER | 1212 | {"sourceTypes":["SYN_TIME_DUE","SYN_TEMP_AND_TIME","SYN_OPERATOR_REQUEST","SYN_TEMP_RISE","SYN_DIRTY_SCORE_ABOVE_THRESHOLD"],"entries":["1:G+203:SYN_TIME_DUE","2:G+113:SYN_TEMP_AND_TIME","3:H2:SYN_OPERATOR_REQUEST","4:I10:SYN_TEMP_RISE","5:J13:SYN_DIRTY_SCORE_ |
-| S30 | Synthetic review presets (valid queue / job states) | PASS+OWNER | 46 | {"sensorId":"G5","states":{"queued-dirty":"DIRTY/NONE/QUEUED · queue 8/8","queued-cleaner-non-score":"CLEANER/NONE/QUEUED · queue 8/8","selected-queued":"DIRTY/NONE/QUEUED · queue 8/8","dispatched-head-job":"DIRTY/NONE/ACTIVE/JOB · queue 8/8","alarm-on-active- |
-| S31 | Head-only atomic dispatch (no scan-forward; Owner examples A/B) | PASS | 58 | {"queueBefore":["G+110","G9","G8","I12"],"jobTarget":"G+110","newHead":"G9","dispatch":"SYN-DSP-0010","revisions":"121->122","secondDispatch":"ACTIVE_JOB_EXISTS","retarget":"ACTIVE_JOB_EXISTS"} |
-| S32 | Bounded queue under load and Job linkage (dirty70, AutoSequence) | PASS | 4035 | {"maxQueueLength":8,"dispatchesObserved":1,"queueMetrics":{"length":8,"capacity":8,"dispatches":11,"autoSequence":"JOB_ACTIVE"}} |
-| S33 | Main Pump trip during Job: critical suspension, Mandatory Safe Return, modal rules (synthetic) | PASS | 8274 | {"job":"SYN-JOB-0012","steps":"SR1#101 SR2#103 SR3#104 SR4#105 SR5#106 SR6#107 SR7#108 SR8#109","safeReturnMs":7653,"queueFrozen":7,"autoSequenceAfterModal":"CRITICAL_SUSPENDED","afterTestReset":"OFF"} |
-| S34 | Normal completion -> Mandatory Safe Return with delayed valve feedback (synthetic) | PASS | 13936 | {"job":"SYN-JOB-0013","outcome":"COMPLETED","valveConfirmAfterCommandMs":5000,"steps":"SR1 SR2 SR3 SR4 SR5 SR6 SR7 SR8"} |
+| S28 | Revision gap -> re-snapshot | PASS | 3107 | {"gapsDetected":2,"resyncFirstEvent":"snapshot"} |
+| S29 | Mixed GlobalQueue sources (bounded to 8) | PASS+OWNER | 1210 | {"sourceTypes":["SYN_TIME_DUE","SYN_TEMP_AND_TIME","SYN_OPERATOR_REQUEST","SYN_TEMP_RISE","SYN_DIRTY_SCORE_ABOVE_THRESHOLD"],"entries":["1:G+203:SYN_TIME_DUE","2:G+113:SYN_TEMP_AND_TIME","3:H2:SYN_OPERATOR_REQUEST","4:I10:SYN_TEMP_RISE","5:J13:SYN_DIRTY_SCORE_ |
+| S30 | Synthetic review presets (valid queue / job states) | PASS+OWNER | 40 | {"sensorId":"G5","states":{"queued-dirty":"DIRTY/NONE/QUEUED · queue 8/8","queued-cleaner-non-score":"CLEANER/NONE/QUEUED · queue 8/8","selected-queued":"DIRTY/NONE/QUEUED · queue 8/8","dispatched-head-job":"DIRTY/NONE/ACTIVE/JOB · queue 8/8","alarm-on-active- |
+| S31 | Head-only atomic dispatch (no scan-forward; Owner examples A/B) | PASS | 59 | {"queueBefore":["G+110","G9","G8","I12"],"jobTarget":"G+110","newHead":"G9","dispatch":"SYN-DSP-0010","revisions":"121->122","secondDispatch":"ACTIVE_JOB_EXISTS","retarget":"ACTIVE_JOB_EXISTS"} |
+| S32 | Bounded queue under load and Job linkage (dirty70, AutoSequence) | PASS | 4032 | {"maxQueueLength":8,"dispatchesObserved":1,"queueMetrics":{"length":8,"capacity":8,"dispatches":11,"autoSequence":"JOB_ACTIVE"}} |
+| S33 | Main Pump trip during Job: critical suspension, Mandatory Safe Return, modal rules (synthetic) | PASS | 8244 | {"job":"SYN-JOB-0012","steps":"SR1#101 SR2#103 SR3#104 SR4#105 SR5#106 SR6#107 SR7#108 SR8#109","safeReturnMs":7626,"queueFrozen":7,"autoSequenceAfterModal":"CRITICAL_SUSPENDED","afterTestReset":"OFF"} |
+| S34 | Normal completion -> Mandatory Safe Return with delayed valve feedback (synthetic) | PASS | 13923 | {"job":"SYN-JOB-0013","outcome":"COMPLETED","valveConfirmAfterCommandMs":5000,"steps":"SR1 SR2 SR3 SR4 SR5 SR6 SR7 SR8"} |
+| S35 | Synthetic AutoSequence controls: Start / Pause After Current Job / Resume / Abort / Critical Reset (head-only) | PASS | 24036 | {"head1":"G+106","head2":"G+109","startPositionBefore":1,"pausedAfterAbort":true,"resumeRefusedInCritical":true,"resetModeAfter":"OFF","resetDispatched":false,"explicitStartRequired":true} |

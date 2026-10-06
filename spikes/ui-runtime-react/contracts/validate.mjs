@@ -10,7 +10,9 @@ const CLASSES = new Set(['DIRTY', 'CLEANER', 'NOT_CLASSIFIED']);
 const BASES = new Set(['CURRENT', 'LAST_VALIDATED', 'NONE']);
 const QUEUE_STATES = new Set(['NONE', 'QUEUED', 'ACTIVE']);
 const QUEUE_CAPACITY = 8;
-const AUTO_SEQUENCE = new Set(['CRITICAL_SUSPENDED', 'OFF', 'PAUSED', 'JOB_ACTIVE', 'PUMP_NOT_READY', 'QUEUE_EMPTY', 'READY_TO_DISPATCH']);
+const AUTO_SEQUENCE = new Set(['CRITICAL_SUSPENDED', 'OFF', 'PAUSE_REQUESTED', 'PAUSED', 'JOB_ACTIVE', 'PUMP_NOT_READY', 'QUEUE_EMPTY', 'READY_TO_DISPATCH']);
+const AUTO_SEQUENCE_MODES = new Set(['CRITICAL_SUSPENDED', 'OFF', 'PAUSE_REQUESTED', 'PAUSED', 'RUNNING']);
+const SEQUENCE_CONTROLS = ['start', 'pauseAfterCurrentJob', 'resume', 'abortActiveJob', 'resetCritical', 'pumpStart'];
 const LIFECYCLES = new Set(['RUNNING', 'ABORTING', 'SAFE_RETURN_CLOSE_VALVE', 'SAFE_RETURN_VERIFY_VALVE_CLOSED', 'SAFE_RETURN_TO_STANDBY', 'SAFE_RETURN_VERIFY_STANDBY', 'SAFE_RETURN_FAILED']);
 const SR_ORDER = ['SR1', 'SR2', 'SR3', 'SR4', 'SR5', 'SR6', 'SR7', 'SR8'];
 const CRITICAL_KINDS = new Set(['MAIN_PUMP_UNEXPECTED_STOP', 'MAIN_PUMP_TRIP']);
@@ -117,6 +119,20 @@ function validateSequence(q, e) {
   if (!q || typeof q !== 'object') return e.push('sequence invalid');
   if (q.synthetic !== true) e.push('sequence.synthetic must be true');
   if (!AUTO_SEQUENCE.has(q.autoSequence)) e.push('sequence.autoSequence invalid');
+  if (!AUTO_SEQUENCE_MODES.has(q.mode)) e.push('sequence.mode invalid');
+  else {
+    const expected = ['CRITICAL_SUSPENDED', 'OFF', 'PAUSE_REQUESTED', 'PAUSED'].includes(q.autoSequence) ? q.autoSequence : 'RUNNING';
+    if (q.mode !== expected) e.push('sequence.mode inconsistent with autoSequence');
+  }
+  if (!q.controls || typeof q.controls !== 'object') e.push('sequence.controls invalid');
+  else {
+    for (const k of SEQUENCE_CONTROLS) {
+      const g = q.controls[k];
+      if (!g || typeof g.enabled !== 'boolean' || (g.enabled ? g.reason !== null : typeof g.reason !== 'string')) e.push(`sequence.controls.${k} invalid`);
+    }
+    // No Resume (and no Start) may be offered while CRITICAL_SUSPENDED (no automatic / implicit Resume).
+    if (q.autoSequence === 'CRITICAL_SUSPENDED' && (q.controls.resume?.enabled || q.controls.start?.enabled)) e.push('sequence.controls offer Start / Resume while CRITICAL_SUSPENDED');
+  }
   const c = q.critical;
   if (c !== null) {
     if (!c || !CRITICAL_KINDS.has(c.kind) || c.severity !== 'HIGH' || !isIso(c.raisedAt)) e.push('sequence.critical invalid');
