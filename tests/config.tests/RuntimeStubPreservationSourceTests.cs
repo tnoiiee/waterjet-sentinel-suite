@@ -15,7 +15,7 @@ namespace Wjss.Config.Examples.Tests;
 public sealed class RuntimeStubPreservationSourceTests
 {
     private static string Program =>
-        File.ReadAllText(Path.Combine(ExampleConfigTests.RepoRoot()!, "apps", "runtime", "Program.cs"));
+        File.ReadAllText(Path.Combine(ConfigTestPaths.RepoRoot(), "apps", "runtime", "Program.cs"));
 
     [Fact]
     public void Logging_Is_Guarded_Not_Suppressed()

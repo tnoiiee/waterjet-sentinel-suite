@@ -25,6 +25,28 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Owner-local build correction round 4
+
+With the external process `TargetPath` override gone, the Owner-local build reached **eleven
+projects compiling successfully**: `Wjss.Time`, `Wjss.Kiosk`, `Wjss.Contracts`,
+`Wjss.Adapters.Simulator`, `Wjss.Domain`, `Wjss.Runtime.Api.Tests`, `Wjss.FixtureEmission.Tests`,
+`Wjss.Runtime.Core`, `Wjss.Domain.Tests`, `Wjss.Runtime.Core.Tests`, `Wjss.Runtime` —
+confirming the ProjectReference graph, the WinForms DPI correction, `Optional<T>` + converter,
+and the CA1873 logging correction, and that no Product workaround for KMotion/`TargetPath` is
+required (none was added; the absolute toolset path appears only in the dated Owner evidence
+record). The single remaining failure was `Wjss.Config.Examples.Tests`: both
+source-preservation tests referenced `ExampleConfigTests.RepoRoot()` across namespaces
+(`Wjss.Config.Tests` vs `Wjss.Config.Examples.Tests`) — CS0103 ×2. Corrected minimally with
+the Owner's preferred mechanism: new `ConfigTestAssembly.cs` defines `internal sealed class
+ConfigTestAssemblyMarker` (a stable assembly anchor — no empty/fake substitute class, nothing
+dependent on a renamable test-class name) plus `internal static ConfigTestPaths.RepoRoot()`,
+anchored at `typeof(ConfigTestAssemblyMarker).Assembly.Location` with the identical
+walk-up-to-`.sln` discovery; both tests now share it, `ExampleConfigTests` itself is
+unchanged, all existing DPI/Runtime/configuration tests retained, no new dependency, no
+absolute paths, no weakened assertions, no Product-project logic. **Full Owner-local Release
+build + test re-run still required** — eleven green compiles are Owner evidence, and the
+config test project plus every test execution await the rerun.
+
 ### Stage 0.3A-1 — Owner-local build correction round 3
 
 Root cause of the round-2 cascading `Wjss.Contracts` reference failures was identified as

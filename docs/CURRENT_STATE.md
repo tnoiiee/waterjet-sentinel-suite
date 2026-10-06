@@ -810,6 +810,24 @@ correction: S1–S9 zero findings, TS 15/15, links green, `git diff --check` cle
 unchanged. **Status: first partial compile PASS is Owner-local evidence only; the full
 Release build + test rerun remains REQUIRED. No .NET success is claimed in this record.**
 
+### 12.16 Stage 0.3A-1 Owner-local build round 4 — Arena validation record
+
+Owner evidence on `c16804c` (TargetPath removed from the build process): **11 projects
+compile** — Time, Kiosk, Contracts, Adapters.Simulator, Domain, Runtime.Api.Tests,
+FixtureEmission.Tests, Runtime.Core, Domain.Tests, Runtime.Core.Tests, **Runtime** — proving
+the ProjectReference graph, the DPI correction, `Optional<T>`+converter, and the CA1873
+guard. Sole remaining failure: `Wjss.Config.Examples.Tests` CS0103 ×2 — cross-namespace use
+of `ExampleConfigTests.RepoRoot()`. Fixed per Owner preference with a stable assembly anchor:
+`ConfigTestAssemblyMarker` + shared internal `ConfigTestPaths.RepoRoot()` (walk-up to the
+solution file from `typeof(...).Assembly.Location`, behaviourally identical, repository
+SOURCE inspected, not build output); both preservation tests switched; `ExampleConfigTests`
+untouched; no fake classes, no new dependencies, no path or assertion changes. Arena static
+validation after correction: boundary scan 0 findings (S1–S9), anchor type count = 1, zero
+unresolved `ExampleConfigTests` code references, JSON 10/10, TS 15/15 (npm ci → typecheck →
+node --test), links green, `git diff --check` clean, spikes roll unchanged, no KMotion/
+TargetPath/vendor strings in Product source. **Status: .NET build of the config test project
+and all test executions remain Owner-local; full Release build rerun REQUIRED.**
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:

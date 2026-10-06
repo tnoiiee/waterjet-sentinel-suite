@@ -12,7 +12,7 @@ namespace Wjss.Config.Examples.Tests;
 public sealed class KioskDpiConfigurationTests
 {
     private static string Read(string relative) =>
-        File.ReadAllText(Path.Combine(ExampleConfigTests.RepoRoot()!, relative.Replace('/', Path.DirectorySeparatorChar)));
+        File.ReadAllText(Path.Combine(ConfigTestPaths.RepoRoot(), relative.Replace('/', Path.DirectorySeparatorChar)));
 
     [Fact]
     public void Manifest_Contains_No_Dpi_Elements()
