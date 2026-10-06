@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS clock adapters. Deterministic time control is a test requirement from
+    the start (simulator determinism, 0.3A-2). Stage 0.3A-1 provides the
+    abstraction and two implementations with no other behaviour.
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.Time</RootNamespace>
+    <AssemblyName>Wjss.Time</AssemblyName>
+  </PropertyGroup>
+
+</Project>

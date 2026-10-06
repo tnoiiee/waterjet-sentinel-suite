@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS structural contracts: authoritative C# records shared by the Equipment
+    Runtime, the Local Application API host, and (through the hand-authored
+    TypeScript mirror with golden-fixture parity) the React UI.
+
+    Stage 0.3A-1: STRUCTURAL ONLY. No runtime behaviour, no queue eligibility
+    policy, no alarm policy, no Production values.
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. Owner-local build required
+    (docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.Contracts</RootNamespace>
+    <AssemblyName>Wjss.Contracts</AssemblyName>
+  </PropertyGroup>
+
+</Project>

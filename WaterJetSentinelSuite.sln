@@ -1,0 +1,87 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Contracts", "packages\contracts\Wjss.Contracts.csproj", "{A1000003-0A10-4A10-8A10-0A100A100A03}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Domain", "packages\domain\Wjss.Domain.csproj", "{A1000004-0A10-4A10-8A10-0A100A100A04}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Runtime.Core", "packages\application\Wjss.Runtime.Core.csproj", "{A1000005-0A10-4A10-8A10-0A100A100A05}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Time", "packages\time\Wjss.Time.csproj", "{A1000006-0A10-4A10-8A10-0A100A100A06}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Adapters.Simulator", "adapters\simulator\Wjss.Adapters.Simulator.csproj", "{A1000007-0A10-4A10-8A10-0A100A100A07}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Runtime", "apps\runtime\Wjss.Runtime.csproj", "{A1000001-0A10-4A10-8A10-0A100A100A01}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Kiosk", "apps\kiosk\Wjss.Kiosk.csproj", "{A1000002-0A10-4A10-8A10-0A100A100A02}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Domain.Tests", "tests\domain.tests\Wjss.Domain.Tests.csproj", "{A1000008-0A10-4A10-8A10-0A100A100A08}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Runtime.Core.Tests", "tests\runtime.tests\Wjss.Runtime.Core.Tests.csproj", "{A1000009-0A10-4A10-8A10-0A100A100A09}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Runtime.Api.Tests", "tests\api.tests\Wjss.Runtime.Api.Tests.csproj", "{A1000010-0A10-4A10-8A10-0A100A100A10}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Config.Examples.Tests", "tests\config.tests\Wjss.Config.Examples.Tests.csproj", "{A1000011-0A10-4A10-8A10-0A100A100A11}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.FixtureEmission.Tests", "tests\integration\Wjss.FixtureEmission.Tests.csproj", "{A1000012-0A10-4A10-8A10-0A100A100A12}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A1000003-0A10-4A10-8A10-0A100A100A03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000003-0A10-4A10-8A10-0A100A100A03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000003-0A10-4A10-8A10-0A100A100A03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000003-0A10-4A10-8A10-0A100A100A03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000004-0A10-4A10-8A10-0A100A100A04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000004-0A10-4A10-8A10-0A100A100A04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000004-0A10-4A10-8A10-0A100A100A04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000004-0A10-4A10-8A10-0A100A100A04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000005-0A10-4A10-8A10-0A100A100A05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000005-0A10-4A10-8A10-0A100A100A05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000005-0A10-4A10-8A10-0A100A100A05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000005-0A10-4A10-8A10-0A100A100A05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000006-0A10-4A10-8A10-0A100A100A06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000006-0A10-4A10-8A10-0A100A100A06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000006-0A10-4A10-8A10-0A100A100A06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000006-0A10-4A10-8A10-0A100A100A06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000007-0A10-4A10-8A10-0A100A100A07}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000007-0A10-4A10-8A10-0A100A100A07}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000007-0A10-4A10-8A10-0A100A100A07}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000007-0A10-4A10-8A10-0A100A100A07}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000001-0A10-4A10-8A10-0A100A100A01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000001-0A10-4A10-8A10-0A100A100A01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000001-0A10-4A10-8A10-0A100A100A01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000001-0A10-4A10-8A10-0A100A100A01}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000002-0A10-4A10-8A10-0A100A100A02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000002-0A10-4A10-8A10-0A100A100A02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000002-0A10-4A10-8A10-0A100A100A02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000002-0A10-4A10-8A10-0A100A100A02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000008-0A10-4A10-8A10-0A100A100A08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000008-0A10-4A10-8A10-0A100A100A08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000008-0A10-4A10-8A10-0A100A100A08}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000008-0A10-4A10-8A10-0A100A100A08}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000009-0A10-4A10-8A10-0A100A100A09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000009-0A10-4A10-8A10-0A100A100A09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000009-0A10-4A10-8A10-0A100A100A09}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000009-0A10-4A10-8A10-0A100A100A09}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000010-0A10-4A10-8A10-0A100A100A10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000010-0A10-4A10-8A10-0A100A100A10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000010-0A10-4A10-8A10-0A100A100A10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000010-0A10-4A10-8A10-0A100A100A10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000011-0A10-4A10-8A10-0A100A100A11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000011-0A10-4A10-8A10-0A100A100A11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000011-0A10-4A10-8A10-0A100A100A11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000011-0A10-4A10-8A10-0A100A100A11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000012-0A10-4A10-8A10-0A100A100A12}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000012-0A10-4A10-8A10-0A100A100A12}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000012-0A10-4A10-8A10-0A100A100A12}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000012-0A10-4A10-8A10-0A100A100A12}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

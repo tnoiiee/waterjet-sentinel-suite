@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS Local Application API contract tests (structure/serialization). The
+    HTTP behaviour checks for /health/live and /health/ready run Owner-local
+    against the built host (docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md); they
+    are not faked here. SOURCE-AUTHORED IN ARENA.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Wjss.Runtime.Api.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

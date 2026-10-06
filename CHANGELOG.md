@@ -4,8 +4,9 @@ All notable changes to this repository are recorded in this file.
 
 The format follows the spirit of *Keep a Changelog*, adapted for a stage-gated project:
 entries correspond to Owner-approved Delivery Stages and to review corrections, not to
-releases of software. **The repository contains documentation and, from Stage 0.2.1A, one
-removable synthetic feasibility spike — no Product code.**
+releases of software. **The repository contains documentation, one removable synthetic
+feasibility spike (Stage 0.2.1A), and — from Stage 0.3A-1 — an authored-but-unvalidated
+product foundation source skeleton; no .NET build success is claimed for it.**
 
 ---
 
@@ -24,10 +25,48 @@ removable synthetic feasibility spike — no Product code.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Product foundation source checkpoint (authored in Arena; Owner-local validation PENDING)
+
+**Gate:** Owner Option-C amended Stage 0.3A Scope Gate — source-checkpoint authority only.
+**Status: NOT READY FOR MERGE.** .NET build **NOT RUN IN ARENA** (SDK/NuGet endpoints blocked
+in the sandbox); the mandatory pre-merge gate is
+[`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md).
+
+- Added the product foundation skeleton as **source only**: `WaterJetSentinelSuite.sln`
+  (12 projects); `packages/contracts/Wjss.Contracts` (18 files: snapshot/delta/command/status/
+  queue/config records + `QueueRules`/`SensorMap` invariants); `packages/domain`,
+  `packages/application`, `packages/time`; `adapters/simulator`; `apps/runtime` (health-stub:
+  live 200 / ready 503 `RUNTIME_NOT_IMPLEMENTED`); `apps/kiosk` (compile-only shell, no
+  WebView2 package); `apps/ui/README.md` (React scaffold is 0.3A-5 scope); five xUnit test
+  projects incl. `tests/integration` (golden-fixture generator + parity gate).
+- Added `packages/contracts/wjss-contracts-ts`: complete TypeScript structural mirror with
+  validator and **14/14 passing tests** (Arena-verified: `npm ci`, `tsc --noEmit`,
+  `node --test`); `typescript@6.0.3` install-verified, NuGet pins
+  `Microsoft.NET.Test.Sdk 17.12.0` / `xunit 2.9.2` / `xunit.runner.visualstudio 2.8.2`
+  **PROPOSED / UNVERIFIED** (first restore is Owner-local). No lock file committed.
+- Added `packages/contracts/fixtures/` (4) and `config/examples/` (2) as
+  **`PROVISIONAL STRUCTURAL FIXTURE`** artifacts (Node-authored to unblock the TS validator;
+  superseded by the .NET generator on the Owner-local run — never claimed as .NET-generated).
+- Added `tools/boundary-scan/boundary-scan.mjs`: repository-boundary gate S1–S7, currently
+  **0 findings**. Added `docs/STAGE_0.3A_PLAN.md` and the Owner-local validation runbook.
+- Added **DRAFT** ADR-0014 (contract skeleton; queue capacity 8; profile-start fail-closed;
+  documents the `activeJobCleared` delta-encoding deviation from the spike), ADR-0015
+  (loopback SSE transport + uPlot candidate; fills `[OPEN]` selections only on acceptance),
+  ADR-0016 (WinForms + WebView2 detection-only shell; drafts ADR-0006 §6.7) and indexed them.
+- Fixed `.gitignore`: the `**/[Pp]ackages/*` vendor rule conflicted with the new product
+  `packages/` tree; negations and bin/obj re-exclusions corrected and verified with
+  `git check-ignore` probes (product `packages/**` tracked; vendor dirs and build output
+  ignored).
+- Status records synchronized: `README.md` (status table, contents), this file,
+  `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`,
+  `docs/decisions/README.md`. **Not claimed:** compilation, tests passing on .NET, runtime
+  behaviour, fixture regeneration by .NET, kiosk behaviour, anything hardware-related.
+  **Authorized by nothing here:** 0.3A-2, merges, ZIP.
+
 ### Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
 
 **Scope and Coding Start Gate:** `[APPROVED]`
-**Implementation:** COMPLETE FOR DEVELOPMENT CHECKPOINT — PR #3 OPEN, ready for Owner merge
+**Implementation:** COMPLETE FOR DEVELOPMENT CHECKPOINT — **MERGED** (PR #3)
 **Owner-local testing (installed Edge, Windows 11):** Edge E2E **25 / 25 PASS** at checkpoint
 `4129687a` (Owner-reported, ≈ 1.3 min); at `23f48daa` 34 selected · 25 passed · 2 failed (`READ-A`,
 `WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) was not re-run separately; at the
@@ -37,7 +76,9 @@ checkpoint `114c0761` (48-test selection): **Owner-local final Edge gate PASS** 
 2026-10-07)
 **Owner manual review (1920 × 1080, Edge F11):** **PASS** at `114c0761` · **Controlled 15-minute
 and 60-minute observations:** waived as Stage 0.2.1A merge blockers — not run
-**Merge:** NOT MERGED
+**Merge:** **MERGED** — PR #3, merge commit `d8d28201e641e436293136d04ba7ee553802d4e5` (the
+Agent never merges; the Owner executed the merge. The "OPEN — NOT MERGED" wording in the
+closeout entry below reflects the state at the time it was written.)
 **Primary UI Framework:** **React selected** (Owner decision, 2026-10-07)
 **Blazor counter-spike:** NOT REQUIRED unless a future material blocker is identified
 **Main Development Scope Gate:** PENDING
@@ -63,7 +104,9 @@ and 60-minute observations:** waived as Stage 0.2.1A merge blockers — not run
   validation summary fields and manifest.
 - Not claimed: Production safety or stability, WebView2, kiosk, Modbus performance, hardware. No
   application, test, contract, dependency or Sensor-map change. **PR #3 NOT MERGED** (the Agent
-  never merges); Main Development coding **NOT STARTED**.
+  never merges); Main Development coding **NOT STARTED**. *Later status:* PR #3 was merged by the
+  Owner (`d8d28201`), and Main Development coding began with the Stage 0.3A-1 source checkpoint
+  recorded below.
 
 #### Fixed — Final spike closeout: explicit synthetic AutoSequence controls (synthetic review tooling)
 

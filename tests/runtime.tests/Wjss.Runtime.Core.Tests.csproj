@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS Runtime-core focused tests. At Stage 0.3A-1 the core is an empty wired
+    project (0.3A-2 adds the single-writer engine + these tests' subjects), so
+    this suite pins only the stage marker constants the health stub and the
+    0.3A-2 acceptance tests will both rely on. Owner-local execution required.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Wjss.Runtime.Core.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../packages/application/Wjss.Runtime.Core.csproj" />
+    <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -669,6 +669,16 @@ Rules that the structure expresses:
    exists in the repository.
 5. **No directory in this structure is created by Stage 0.2.** The structure is a documented
    direction, not a reservation of names.
+   *Update (2026-10-07, Stage 0.3A-1):* the rule held for Stage 0.2. The Owner's Option-C
+   amended gate now creates the structure **partially, as unvalidated source**: `apps/kiosk`,
+   `apps/runtime`, `packages/{domain,application,contracts,time}`,
+   `adapters/{simulator,time-as-packages/time}`, `tests/{domain.tests,integration}` (+ api,
+   config, runtime project folders), `tools/`, and `config/examples/` exist as the 0.3A-1
+   skeleton. Deliberately **not** created: `packages/persistence`, `adapters/modbus.wago`,
+   `adapters/galil`, `tests/ui`, and `deployment/` — each belongs to a later substage or gate.
+   Authored ≠ verified: nothing in the skeleton is claimed to build or run until the
+   Owner-local validation
+   ([`STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md)) PASSes.
 
 ## 21. Stage 0.2 required decision output — answers
 
@@ -1143,7 +1153,7 @@ punchlist. Nothing here may be closed by assumption.
 | Modbus TCP client library | Licence, offline availability, maintenance, and observability review cannot be performed in a Stage that installs nothing | Implementation Stage Gate |
 | Galil integration mechanism | Vendor interface options and their support status must be evaluated | Implementation Stage Gate |
 | Logging provider and validation library | Licence and offline-availability review | Implementation Stage Gate |
-| Unit-, integration-, and UI-test tooling | Licence and offline-availability review | Implementation Stage Gate / Test Stage Gate |
+| Unit-, integration-, and UI-test tooling | Licence and offline-availability review. *0.3A-1:* xunit pins committed as **PROPOSED/UNVERIFIED** (first real resolution is the Owner-local `dotnet restore`; UI tooling untouched) | Implementation Stage Gate / Test Stage Gate |
 | EF Core and SQL Server provider versions; compatibility with SQL Server 2025 Standard | Compatibility must be verified by observation, not assumed | Implementation Stage Gate |
 | Historian write-path measurement and escape-hatch decision | Requires measurement on the target workstation | Implementation Stage Gate |
 | Overflow, spool, and backpressure policy for the historian queue | Requires the measured write-path design first | Implementation Stage Gate |
@@ -1158,9 +1168,9 @@ punchlist. Nothing here may be closed by assumption.
 | Recovery procedure for an interrupted Cleaning Job; fault-class taxonomy | Behaviour is undefined in the approved baseline | A later Stage Gate that specifies sequence recovery |
 | Configuration application without a runtime restart | Alternative not yet evaluated | Implementation Stage Gate |
 | **Final UI framework** | **CLOSED — React selected as the Primary UI Framework** (Owner decision, 2026-10-07) on the evidence of the **Stage 0.2.1A React-first feasibility spike** (synthetic; Owner-local final Edge gate and manual review PASS). *History:* React final selection had been NOT YET APPROVED. The dual-candidate Stage 0.2.1 comparison is **SUPERSEDED** (section 33). The **Blazor counter-spike is DEFERRED** | Owner decision after Stage 0.2.1A evidence. A Blazor counter-spike requires a **separate Owner Scope Gate**, only if React presents material concerns, the evidence remains insufficient, or the Owner requests a direct comparison |
-| Shell host framework | Implementation-level selection; no evidence available now | Implementation Stage Gate, after the framework decision |
-| Push transport and presentation-state payload encoding | The presentation contract is transport-agnostic; selecting a transport now would invent certainty | Stage 0.2.1 spike, then Implementation Stage Gate |
-| Chart/trend library | Library-neutral requirements are recorded in section 32; no library is selected | Stage 0.2.1 spike |
+| Shell host framework | Implementation-level selection; no evidence available now. *0.3A-1:* WinForms+WebView2-detection drafted (ADR-0016, DRAFT); `apps/kiosk` is compile-only, references no shell package | Implementation Stage Gate, after the framework decision |
+| Push transport and presentation-state payload encoding | The presentation contract is transport-agnostic; selecting a transport now would invent certainty | Stage 0.2.1 spike, then Implementation Stage Gate. *0.3A-1:* payload encoding now has authored sources (`Wjss.Contracts` + TS mirror + fixtures) and DRAFT [ADR-0015](decisions/ADR-0015-ui-transport-and-chart-direction.md) drafts loopback SSE as the transport — still OPEN until acceptance; no transport is implemented in 0.3A-1 |
+| Chart/trend library | Library-neutral requirements are recorded in section 32; no library is selected. *0.3A-1:* uPlot drafted as candidate (ADR-0015 §3, DRAFT); no vendoring authorised yet, nothing referenced anywhere in the product tree | Stage 0.2.1 spike → 0.3A-5 Owner decision |
 | UI test tooling and visual regression tooling | Differs by framework candidate; ergonomics are a spike measurement | Stage 0.2.1 spike, then Test Stage Gate |
 | Camera integration mechanism per candidate | Camera integration is a spike workload for both candidates | Stage 0.2.1 spike |
 | Accessibility requirement level and verification method | Not yet ratified | A later UX/UI gate |

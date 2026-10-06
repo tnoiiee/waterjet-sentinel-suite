@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS simulator adapters. SIMULATOR-only acquisition and fault-injection
+    behaviour arrives in Stage 0.3A-2 (NOT AUTHORIZED). This project exists so
+    the adapter seam is real from the skeleton: it references the structural
+    contracts only. It must NEVER reference spikes/**, physical device
+    packages, or vendor SDKs.
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.Adapters.Simulator</RootNamespace>
+    <AssemblyName>Wjss.Adapters.Simulator</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+    <ProjectReference Include="../../packages/time/Wjss.Time.csproj" />
+  </ItemGroup>
+
+</Project>

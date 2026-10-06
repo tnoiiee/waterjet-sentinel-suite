@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS domain kernel: pure, transport-free, storage-free logic (dependency
+    rule 1 of ARCHITECTURE.md section 20). Stage 0.3A-1 carries only the
+    device-profile startup rule; queue eligibility, classification POLICY,
+    alarm policy and Safe Return failure policy are NOT here by design - they
+    are open Owner decisions (decision matrices) or later checkpoints.
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.Domain</RootNamespace>
+    <AssemblyName>Wjss.Domain</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../contracts/Wjss.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

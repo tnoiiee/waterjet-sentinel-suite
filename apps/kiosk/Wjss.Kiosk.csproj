@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS application-owned Windows shell - COMPILE-ONLY skeleton (Stage 0.3A-1).
+
+    Deliberately absent in this checkpoint (0.3A-5+): the WebView2 package,
+    navigation, external-link policy, close-guard wiring, and any Runtime
+    process control. The shell never holds Production control authority
+    (ADR-0006 / Owner Stage 0.3A gate).
+
+    EnableWindowsTargeting=true is set solution-wide (Directory.Build.props) so
+    a Linux .NET 10 SDK can compile this Windows-targeted skeleton in a future
+    Arena environment; it adds no behaviour.
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. WebView2 and kiosk
+    behaviour remain NOT VERIFIED.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>Wjss.Kiosk</RootNamespace>
+    <AssemblyName>Wjss.Kiosk</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+</Project>

@@ -42,16 +42,18 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction. Accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
 | Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
-| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. Checkpoint `114c0761` accepted by the Owner as the Development baseline (UI, synthetic AutoSequence controls, GlobalQueue presentation, critical Pump modal, Mandatory Safe Return behaviour) — see §12.11; [results §0G](spikes/stage-0.2.1a-results.md#0g-owner-local-final-review-and-stage-021a-closeout-documentation-only). *History:* branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11); Operations readability refined after the Owner screenshot review (sensor-cell zones, typography scale, desaturated process colours separated from alarm, card hierarchy); final Owner UI punchlist on `4129687a` (self-hosted Google Sans, marker in the value row, expanded identity, legend clipping, Water Jet display terminology, mixed queue sources, opt-in synthetic test controls) on `23f48daa`; GlobalQueue semantics corrected under the Owner domain correction (bounded ready-only synthetic queue, head-only atomic dispatch; previous synthetic queue behaviour SUPERSEDED, not eligible for production promotion) with the `READ-A` value-clipping and `WJ-A` test hotfixes ([results §0D](spikes/stage-0.2.1a-results.md#0d-globalqueue-semantics-correction-and-head-only-dispatch-stage-021a)); synthetic critical Main Pump handling (High Critical; AutoSequence `CRITICAL_SUSPENDED`; blocking critical modal) and Mandatory Safe Return for every Job outcome under the Owner critical Pump decision — SYNTHETIC PROOF ONLY, production safety NOT VERIFIED ([results §0E](spikes/stage-0.2.1a-results.md#0e-critical-main-pump-handling-and-mandatory-safe-return-stage-021a)) |
+| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT — MERGED** (PR #3, merge commit `d8d28201e641e436293136d04ba7ee553802d4e5`; formerly OPEN — READY FOR OWNER MERGE). Checkpoint `114c0761` accepted by the Owner as the Development baseline (UI, synthetic AutoSequence controls, GlobalQueue presentation, critical Pump modal, Mandatory Safe Return behaviour) — see §12.11; [results §0G](spikes/stage-0.2.1a-results.md#0g-owner-local-final-review-and-stage-021a-closeout-documentation-only). *History:* branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11); Operations readability refined after the Owner screenshot review (sensor-cell zones, typography scale, desaturated process colours separated from alarm, card hierarchy); final Owner UI punchlist on `4129687a` (self-hosted Google Sans, marker in the value row, expanded identity, legend clipping, Water Jet display terminology, mixed queue sources, opt-in synthetic test controls) on `23f48daa`; GlobalQueue semantics corrected under the Owner domain correction (bounded ready-only synthetic queue, head-only atomic dispatch; previous synthetic queue behaviour SUPERSEDED, not eligible for production promotion) with the `READ-A` value-clipping and `WJ-A` test hotfixes ([results §0D](spikes/stage-0.2.1a-results.md#0d-globalqueue-semantics-correction-and-head-only-dispatch-stage-021a)); synthetic critical Main Pump handling (High Critical; AutoSequence `CRITICAL_SUSPENDED`; blocking critical modal) and Mandatory Safe Return for every Job outcome under the Owner critical Pump decision — SYNTHETIC PROOF ONLY, production safety NOT VERIFIED ([results §0E](spikes/stage-0.2.1a-results.md#0e-critical-main-pump-handling-and-mandatory-safe-return-stage-021a)) |
 | Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map, the fullscreen layout, or the readability refinement; Owner-local Edge E2E at `4129687a`: **25 / 25 PASS** (≈ 1.3 min, Owner-reported). At `23f48daa`: 34 selected · 25 passed · 2 failed (`READ-A`, `WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) was not re-run separately. At the critical Pump / Safe Return checkpoint `81c87a44`: 42 selected · 32 passed · 1 failed (`S11/S12`, Dirty Score drifted between samples) · 9 not run (Owner-reported). Final spike closeout checkpoint `114c0761` (48-test selection, `SEQ-B`..`SEQ-G`, deterministic `S11/S12`, 18-step manual sequence): Owner-local final Edge gate **PASS** and Owner manual review **PASS** (Owner-reported, 2026-10-07; detailed counts and screenshots were not supplied to the Agent). Owner-local interrupted overnight observation of `ea23bc58`: **COMPLETED** — not a controlled benchmark ([results §0B.1](spikes/stage-0.2.1a-results.md#0b1-owner-local-interrupted-overnight-observation-recorded-as-reported-by-the-owner)) |
 | Stage 0.2.1A controlled 15-minute Owner-local observation | **Waived as a Stage 0.2.1A merge blocker** (Owner decision, 2026-10-07) — not run |
 | Stage 0.2.1A Owner manual review (`114c0761`) | **PASS** (Owner-reported, 2026-10-07) |
 | Stage 0.2.1A 60-minute Owner-local run | **Waived as a Stage 0.2.1A merge blocker** (Owner decision, 2026-10-07) — not run |
-| Stage 0.2.1A merge | **NOT MERGED** — PR #3 ready for Owner merge (the Agent never merges) |
+| Stage 0.2.1A merge | **MERGED** — PR #3 executed by the Owner (merge commit `d8d28201e641e436293136d04ba7ee553802d4e5`; the Agent never merges) |
 | Primary UI Framework | **React selected** (Owner decision, 2026-10-07); Production transport and chart library remain `[OPEN]` |
 | Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
-| Main Development Scope Gate | **PENDING** |
-| Stage 0.3 | **NOT AUTHORIZED** |
+| Main Development Scope Gate | **PENDING** for 0.3B+ — 0.3A proceeds under the Owner's Option-C amended gate only |
+| Stage 0.3 | **NOT AUTHORIZED** as a whole; **Stage 0.3A-1 source checkpoint** authored under the amended gate (see §11.4, §12.12) |
+| Stage 0.3A-1 .NET validation | **PENDING — mandatory Owner-local pre-merge gate** ([runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md)); no build/test/run success claimed in Arena |
+| Stage 0.3A-2 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
 
@@ -102,15 +104,15 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic, removable) |
-| Repository contents | Documentation, repository governance, and the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/` |
-| Application source code | **Does not exist.** The spike is synthetic feasibility code, not Product code |
-| Project or solution files | **Do not exist** (no .NET solution or project) |
-| Package manifests or dependencies | Spike only: `spikes/ui-runtime-react/react-ui/package.json` and `package-lock.json` (Owner-approved pins); `runtime-harness/package.json` has no dependencies. No Product package manifest |
+| Current stage | Stage 0.3A-1 — Product Foundation Source Checkpoint (authored; Owner-local .NET validation PENDING) |
+| Repository contents | Documentation, repository governance, the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/`, and the Stage 0.3A-1 product foundation source skeleton (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/`) |
+| Application source code | **Authored, unvalidated.** The Stage 0.3A-1 skeleton exists as source only — no .NET compile, restore, test, or execution success is claimed (blocked in Arena; Owner-local gate pending). The spike remains synthetic feasibility code, not Product code |
+| Project or solution files | `WaterJetSentinelSuite.sln` (12 projects) — source-committed, **never built in the authoring environment** |
+| Package manifests or dependencies | Spike: `spikes/ui-runtime-react/react-ui/package.json` + `package-lock.json` (Owner-approved pins); `runtime-harness/package.json` (no deps). Product: `Directory.Packages.props` (pins **PROPOSED/UNVERIFIED**), `packages/contracts/wjss-contracts-ts/package.json` + lockfile (`typescript@6.0.3`, install-verified in Arena). No `global.json`; no NuGet lock file |
 | Database schema or SQL scripts | **Do not exist** |
 | Modbus or Galil adapter | **Does not exist** |
-| Simulator | **No Product simulator.** The spike contains a synthetic Node runtime harness for feasibility only |
-| Automated tests | Spike tests only (Node `node:test` harness tests, Vitest jsdom tests, Playwright specs for Owner-local runs). No Product tests |
+| Simulator | **Simulator adapter seam exists** (`adapters/simulator`: csproj + README only — behaviour, seeded acquisition and fault injection are 0.3A-2 scope). Never a production-path component. The deterministic synthetic topology currently lives in the test-side fixture generator (`tests/integration/FixtureGenerator.cs`). The spike's Node harness remains feasibility-only |
+| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product tests **authored but never executed on .NET**: 5 xUnit projects (domain/runtime/api/config/fixture-parity) + TS mirror tests (14/14 PASS in Arena — the only green product-adjacent suite) |
 | CI workflow | **Does not exist** |
 | Installer or release artifact | **Does not exist** |
 | Production configuration | **Does not exist in this repository** |
@@ -378,6 +380,19 @@ accepted and merged Stage 0.2.*
 | Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
+
+### 11.4 Stage 0.3A-1 Product Foundation Source Checkpoint record
+
+| Item | Statement |
+| --- | --- |
+| Gate | Owner **Option-C amended gate** — Arena may author the approved 0.3A-1 source set; it may not compile .NET (SDK/NuGet blocked by the sandbox network) and must not claim build/test success |
+| Authored | Solution (12 projects); `Wjss.Contracts` (18 files) incl. queue capacity 8 + head-only consumption + profile-start fail-closed; Domain/Runtime.Core/Time/Simulator sources; Runtime health stub; compile-only Kiosk; 5 xUnit projects incl. the .NET golden-fixture generator + parity gate; TS mirror + validator; 4 provisional fixtures + 2 config examples; `tools/boundary-scan` (S1–S7, 0 findings); DRAFT ADR-0014/0015/0016; stage plan + Owner-local runbook; `.gitignore` product-`packages` conflict corrected |
+| Wire-contract deviation | Spike `activeJob: null` replaced by delta-only `activeJobCleared: true` (STJ encoding limit) — recorded in DRAFT ADR-0014 §2; TS validator rejects the old form |
+| Fixture provenance | Node-authored in Arena, labelled `PROVISIONAL STRUCTURAL FIXTURE`; **not** .NET-generated; superseded by the Owner-local generator run (runbook §5) |
+| Arena verification | TS: `npm ci` + `tsc --noEmit` clean + `node --test` 14/14 PASS + fixtures validate; boundary scan exit 0; all JSON parses; links/whitespace/secret checks — see §12.12 |
+| NOT verified | Every .NET claim: restore, build, tests, health-stub behaviour, kiosk, parity between C# generator and committed fixtures, NuGet pin availability |
+| Delivery | Single commit on `arena/dd551752-waterjet-sentinel-suite`; PR "Stage 0.3A-1: product foundation source skeleton" → `main`; **NOT READY FOR MERGE** until runbook verdict PASS |
+| Next | Owner-local runbook PASS → Owner merges → Owner explicitly authorizes **0.3A-2** (nothing advances otherwise; no ZIP before Stage 0.3 exit) |
 
 ### 11.1 Process deviation record
 
@@ -718,6 +733,33 @@ queue-level Hold wording in `CONTROL_AUTHORITY.md` (§4 invariant, §6 conflict 
 `QUEUE_MODEL.md` (snapshot contents), `TEST_STRATEGY.md` (operator-action tests) and
 `USER_PERMISSION_MODEL.md` (queue permissions), and updated the status banners. No runtime, React,
 CSS, contract, fixture, harness, scenario, E2E, dependency or Sensor-map file changed.
+
+### 12.12 Stage 0.3A-1 Product Foundation Source Checkpoint — Arena validation record
+
+Validation actually available inside Arena, executed 2026-10-07 on the final tree state (this
+record's tables are the authority for what was and was not checked):
+
+| # | Check | Tool / method | Result |
+| --- | --- | --- | --- |
+| 1 | TypeScript mirror typechecks | `npx tsc --noEmit` (strict) | **PASS** |
+| 2 | TS structural tests | `node --test test/validate.test.mjs` | **14/14 PASS** |
+| 3 | Committed fixtures validate structurally | validator CLI over `packages/contracts/fixtures/` + `config/examples/` | **PASS** (snapshot 0 issues; delta.basic gapless; delta.gap flagged) |
+| 4 | All repository JSON parses | `node` parse sweep of tracked `.json` (excl. `node_modules`) | **PASS** |
+| 5 | Boundary scan | `node tools/boundary-scan/boundary-scan.mjs .` | **0 findings** (S1–S7) |
+| 6 | Product tree references spike source | scanner rule S5 (code files only) | **PASS** — zero code references; prose boundary notes allowed |
+| 7 | Solution completeness | scanner rule S7: every `*.csproj` (non-spike) listed in `WaterJetSentinelSuite.sln` | **PASS** (12/12, no ghosts, braces balanced) |
+| 8 | Approved NuGet set only | read-back of `Directory.Packages.props` + all csproj `<PackageReference>` | **PASS** — exactly the three approved test packages; kiosk references no package; labels say PROPOSED/UNVERIFIED |
+| 9 | `.gitignore` product/packages conflict | corrected rules + `git check-ignore` probes; fixture/example files confirmed trackable without force-add | **PASS** |
+| 10 | No lock-file fabrication | `git ls-files` review; only npm-real lockfile (produced by genuine `npm install`) tracked; no `packages.lock.json` anywhere | **PASS** |
+| 11 | Spike tree immutability | sha256 roll over `spikes/**` compared to pre-work baseline | **PASS — identical** (see commit report) |
+| 12 | Whitespace hygiene | `git diff --check` | **PASS** (no errors) |
+| 13 | Secret-shaped literals | scanner rule S4 across repository text | **PASS** (0) |
+| 14 | Relative-link check | node sweep of markdown links in changed/new docs | **PASS** |
+
+**NOT PERFORMED (impossible in Arena, not failures):** `dotnet restore/build/test`, fixture
+regeneration via the .NET generator, Runtime/kiosk execution, NuGet pin resolution. See
+[`STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) — that run,
+reported verbatim into the PR, is the mandatory pre-merge gate.
 
 ## 13. Required positive confirmations
 

@@ -57,7 +57,7 @@ REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `ME
 | 0.2 | Technology and Solution Architecture Decision | `[APPROVED]` | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`); ADR-0006 to ADR-0013 **ACCEPTED** as direction, not implemented | Documentation-only technology and solution architecture decisions: UI delivery model, runtime process model, technology stack, database access and migrations, device adapter boundary, configuration and secrets, simulator-first development, offline deployment, and a documented repository structure direction — recorded as ADR candidates |
 | **0.2.1** | **UI and Runtime Technology Spike** | **`[PROPOSED]`** — **`[NOT AUTHORIZED]`** | Not started | Measured comparison of Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) inside the application-owned kiosk shell, using synthetic data only, plus validation of the live-state delivery, live-trend, and offline-restore architecture. Deliverable is a comparison report, a recommendation, and a decision-record draft — **no production code** |
 | **0.2.1A** | **React UI and Runtime Feasibility Spike** | **`[APPROVED]`** — Scope Gate and Coding Start approved | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761` (2026-10-07); React selected as the Primary UI Framework; controlled 15- / 60-minute observations waived as merge blockers; PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED** | Synthetic React feasibility spike in `spikes/ui-runtime-react/` (removable, no Product directory) plus [`docs/spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md) and [`docs/spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md). **React selected as the Primary UI Framework** (Owner decision, 2026-10-07); Blazor counter-spike **not required** unless a future material blocker is identified |
-| 0.3 | Architecture and Interface Specification | `[PROPOSED]` | Not started | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic — still documentation and specification only |
+| 0.3 | Architecture and Interface Specification | `[PROPOSED]` — **0.3A executing under the Owner's Option-C amended gate only** | 0.3A-1 source checkpoint **authored, Owner-local .NET validation PENDING** ([plan](STAGE_0.3A_PLAN.md), [runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md)); 0.3B+ not started | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic. The amended gate authorises product *foundation sources* (contracts/domain/simulator/runtime stub as source); documentation and specification discipline still governs everything else |
 | 0.4 | Offline Domain and Queue Engine Implementation | `[PROPOSED]` | Not started | First source code: pure domain logic with a simulator and automated tests; no device access |
 | 0.5 | Read-Only Monitoring Integration | `[PROPOSED]` | Not started | Modbus TCP read path against a simulator only; no production writes |
 | 0.6 | Supervisory Control Path with Simulator | `[PROPOSED]` | Not started | Valve, pump, and motion command paths exercised against a simulator only |
@@ -90,7 +90,11 @@ The 104 / 208 figures in historical records are the superseded baseline.
 Stages 0.3 through 0.8 are a **candidate** decomposition. The Owner may merge, split,
 reorder, or replace them. They are recorded here so that work is not invented ad hoc, not
 because they are approved. Stage 0.3 and later remain `[PROPOSED]` and are `[NOT AUTHORIZED]`
-until a later Owner Scope Gate approves them.
+until a later Owner Scope Gate approves them. **Update (2026-10-07):** the Owner's Option-C
+amended gate authorises **Stage 0.3A** work in gated substages (0.3A-1 source checkpoint now
+authored; Owner-local .NET validation is its mandatory pre-merge gate — see
+[`STAGE_0.3A_PLAN.md`](STAGE_0.3A_PLAN.md)); it authorises **no** other stage, and 0.3A-2+
+stay `[NOT AUTHORIZED]` until each is explicitly approved.
 
 ### 3.1 Recorded reconciliation of the Stage 0.2 title
 
@@ -106,7 +110,10 @@ precedence for Stage 0.2, so the ledger above records the approved title. Conseq
    configuration field specification — is **not authorised** by the approved Stage 0.2 gate
    and remains `[PROPOSED]` and `[NOT AUTHORIZED]`.
 2. The previously proposed Stage 0.3 deliverable remains `[PROPOSED]` and
-   `[NOT AUTHORIZED]`. It is **not** the same thing as Stage 0.2 and is not started.
+   `[NOT AUTHORIZED]`. It is **not** the same thing as Stage 0.2 and is not started. (Under the
+   later Option-C amended gate, the narrower **0.3A-1 source checkpoint** — contracts and
+   skeleton as *authored, unvalidated source* — exists; it is not the full Stage 0.3
+   deliverable and proves nothing until the Owner-local validation PASS.)
 3. The remaining open requirement and configuration items are listed in
    [`CURRENT_STATE.md`](CURRENT_STATE.md) section 8 and in
    [`ARCHITECTURE.md`](ARCHITECTURE.md) section 34, each with the gate that must close it.

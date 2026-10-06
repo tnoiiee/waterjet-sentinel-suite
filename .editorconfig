@@ -1,0 +1,35 @@
+# WJSS Stage 0.3A-1 - repository-wide formatting baseline.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,csx}]
+indent_size = 4
+indent_style = space
+csharp_new_line_before_open_brace = all
+csharp_style_namespace_declarations = file_scoped:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+
+[*.{csproj,props,targets,manifest,json,jsonc}]
+indent_size = 2
+indent_style = space
+
+[*.sln]
+indent_style = tab
+
+[*.{md,yml,yaml}]
+indent_size = 2
+indent_style = space
+
+# Vendored/generated content is excluded from formatting expectations.
+[{**/node_modules/**,**/bin/**,**/obj/**}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

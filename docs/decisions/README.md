@@ -9,10 +9,12 @@ Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
 Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
 **COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
-review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+review **PASS**), **MERGED** (PR #3, merge commit `d8d28201e641e436293136d04ba7ee553802d4e5`).
+**React selected as the
 Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
 `[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
-Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
+Main Development Scope Gate **PENDING**. Stage 0.3 — Option-C amended gate ACTIVE; **Stage 0.3A-1
+source checkpoint authored, awaiting Owner-local .NET validation** (see section below). Production device access `[NOT AUTHORIZED]`.
 
 This folder holds the decisions that shape the WaterJet Sentinel Suite. An ADR records a
 decision, its context, and its consequences so that later work does not re-litigate or
@@ -88,6 +90,19 @@ blocker is identified. ADR-0006 and ADR-0008 carry dated update notes; their his
 | [ADR-0011](ADR-0011-configuration-and-secrets.md) | Configuration and secrets | `ACCEPTED` (secret store `OPEN` inside) |
 | [ADR-0012](ADR-0012-simulator-first-development.md) | Simulator-first development | `ACCEPTED` |
 | [ADR-0013](ADR-0013-offline-deployment.md) | Offline deployment | `ACCEPTED` (package format and startup mechanism `OPEN` inside) |
+
+### Stage 0.3A records — DRAFT, authored in the source checkpoint
+
+Stage 0.3A-1 (Option-C amended gate) drafts three records alongside the product foundation
+skeleton. **All three are DRAFT: they are not `PROPOSED`, carry no authority, and bind no
+work until the Owner accepts them.** The spike-derived contract facts they record are
+already visible in the authored sources (`packages/contracts`, `tools/boundary-scan`).
+
+| ADR | Title | Status |
+| --- | --- | --- |
+| [ADR-0014](ADR-0014-product-contract-skeleton.md) | Product contract skeleton and queue capacity | `DRAFT` (includes the `activeJobCleared` encoding deviation from the spike) |
+| [ADR-0015](ADR-0015-ui-transport-and-chart-direction.md) | UI production transport and chart direction | `DRAFT` (fills the `[OPEN]` transport/chart selections; does not re-open React) |
+| [ADR-0016](ADR-0016-kiosk-shell-direction.md) | Kiosk shell direction | `DRAFT` (WinForms + WebView2 detection-only; drafting only — ADR-0006's `[OPEN]` marker stands until acceptance) |
 
 `PROPOSED` means *drafted and submitted*, never *approved*. Acceptance of an ADR within
 Stage 0.2 means acceptance of a **documentation decision**, not implementation proof. See

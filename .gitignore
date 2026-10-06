@@ -466,3 +466,32 @@ config/site/
 **/audit-logs/
 **/event-logs/
 **/production-logs/
+
+# ---------------------------------------------------------------------------
+# WJSS amendment (Stage 0.3A-1, Owner-approved gate section 6):
+# The ROOT /packages/ tree is tracked Product source (Wjss.Contracts,
+# Wjss.Domain, Wjss.Runtime.Core, Wjss.Time), not a Package-Restore output.
+# The upstream Visual Studio rule `**/[Pp]ackages/*` ignores every directory
+# inside any folder named `packages`, and Git never descends into an ignored
+# directory, so file-level negations alone cannot recover the Product tree.
+# Directories under root /packages/ are re-included first, files next, and
+# dependency/build outputs inside the Product tree are then re-excluded.
+# Every OTHER `packages/` directory (dependency restore folders at any other
+# depth) remains ignored by the original rule. node_modules and NuGet caches
+# stay ignored everywhere (global rules above, plus explicit rules here).
+# ---------------------------------------------------------------------------
+!/packages/**/
+!/packages/**
+/packages/**/[Bb]in/
+/packages/**/[Oo]bj/
+/packages/**/node_modules/
+/packages/**/[Ll]og/
+/packages/**/[Ll]ogs/
+/packages/**/TestResults/
+/packages/**/*.[Cc]ache
+/packages/**/*.user
+/packages/**/*.userosscache
+/packages/**/*.sln.docstates
+/packages/**/*.trx
+/packages/**/*.binlog
+/packages/**/*.nupkg

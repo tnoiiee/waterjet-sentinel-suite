@@ -10,28 +10,33 @@ Repository: `waterjet-sentinel-suite`
 
 | Item | Value |
 | --- | --- |
-| Current stage | **Stage 0.2.1A — React UI and Runtime Feasibility Spike** |
+| Current stage | **Stage 0.3A-1 — Product Foundation Source Checkpoint** (Owner Option-C amended gate; Owner-local .NET validation **PENDING**) |
 | Stage 0.1 Scope Gate | **APPROVED** |
 | Stage 0.1 implementation | **MERGED** — through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** |
 | Stage 0.2 architecture checkpoint | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`) |
 | Stage 0.2 ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction — accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1A Scope Gate / Coding Start | **APPROVED** / **APPROVED** |
-| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761`; PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**; controlled 15- and 60-minute observations **waived as merge blockers** |
+| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761`; **MERGED** — PR #3, merge commit `d8d28201e641e436293136d04ba7ee553802d4e5`; controlled 15- and 60-minute observations **waived as merge blockers** |
 | Primary UI Framework | **React selected** (Owner decision, 2026-10-07); Production transport and chart library remain `[OPEN]` |
 | Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
-| Main Development Scope Gate / Stage 0.3 | **PENDING** / **NOT AUTHORIZED** |
+| Main Development Scope Gate | **PENDING** — Stage 0.3A proceeds under the Owner's Option-C amended gate only; Stage 0.3B+ **NOT AUTHORIZED** |
+| Stage 0.3A-1 source checkpoint | **AUTHORED IN ARENA — NOT READY FOR MERGE.** .NET build **NOT RUN IN ARENA** (SDK/NuGet blocked in the sandbox); Owner-local validation per [`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) is the mandatory pre-merge gate. Stage 0.3A-2 **NOT AUTHORIZED** |
 | Production devices | **NOT AUTHORIZED** |
-| Repository contents | Documentation, repository governance, and one removable synthetic feasibility spike |
-| Application code | **None.** The Stage 0.2.1A spike is synthetic feasibility code, not Product code: no solution, no schema, no Product runtime. |
+| Repository contents | Documentation, repository governance, one removable synthetic feasibility spike, and — from Stage 0.3A-1 — the unvalidated product foundation skeleton |
+| Application code | **Authored, not validated.** Stage 0.3A-1 supplies the product foundation as source only (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/boundary-scan/`); the spike remains synthetic feasibility code, not Product code. **No .NET build, restore, test, or Runtime execution success is claimed anywhere**, and committed fixtures are `PROVISIONAL STRUCTURAL FIXTURE` until the Owner-local generator run replaces them |
 | Application version | **NOT ESTABLISHED.** No runtime release exists. |
 | Hardware connection | **Not authorised.** Production device access is prohibited. |
 | Production Write | **Not authorised.** |
 | Merge authority | **Owner only.** Agents never merge. |
 
-This repository contains documentation and, from Stage 0.2.1A, one removable **synthetic**
-React feasibility spike (`spikes/ui-runtime-react/`) that uses no device, no Production value,
-and no Product directory. Everything else described here is a design baseline, not a running
+This repository contains documentation, one removable **synthetic** React feasibility spike
+(`spikes/ui-runtime-react/`, Stage 0.2.1A) that uses no device, no Production value, and no
+Product directory, and — from Stage 0.3A-1 under the Owner's Option-C amended gate — the
+**product foundation source skeleton** (`packages/contracts`, `packages/domain`,
+`packages/application`, `packages/time`, `adapters/simulator`, `apps/runtime`, `apps/kiosk`,
+`tests/`, `config/examples/`, `tools/boundary-scan/`). That skeleton is **authored, not
+validated**: no .NET build has run in the authoring environment and nothing here is a running
 system. See
 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) for the stage status, the verified state,
 and the status legend used throughout.
@@ -40,9 +45,11 @@ Stage 0.2 recorded the technology and solution architecture — UI delivery mode
 process model, technology stack, database access and migrations, device adapter boundary,
 configuration and secrets, simulator-first development, and offline deployment — in
 [`docs/decisions/`](docs/decisions/README.md). The Owner accepted Stage 0.2 and ADR-0006 to
-ADR-0013 as architecture direction. **Accepted does not mean implemented**: nothing in them is
-implemented as Product code, items still marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]`
-keep those markers, and no capability or later stage is authorised by them.
+ADR-0013 as architecture direction. **Accepted does not mean implemented**: items still marked
+`[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` keep those markers, and no capability or later
+stage is authorised by acceptance. Stage 0.3A-1 authors product *sources* that follow these
+directions — that is drafting toward implementation, not implemented or verified code; its
+three companion records ADR-0014 to ADR-0016 are `DRAFT`.
 
 **React is selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Owner-local final Edge
 gate and manual review of the Stage 0.2.1A spike passed). The Blazor counter-spike is no longer
