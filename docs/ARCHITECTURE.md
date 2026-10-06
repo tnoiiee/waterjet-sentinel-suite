@@ -8,9 +8,11 @@ Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
 `5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
 Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
-**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
-framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
-`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This document describes the conceptual architecture of the application. It contains no
 implementation and authorises none. Production addresses, register maps, tag lists,
@@ -763,8 +765,9 @@ Consequences follow in sections 24 to 33. The evidence changes no protected deci
 The **delivery model is locked**: a local web UI rendered inside an application-owned kiosk
 shell window, with the shell owning the close guard and controlled navigation, and the
 Equipment Runtime in a separate Windows Service behind a loopback API
-([`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md)). The **final UI framework is
-`[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+([`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md)). **React selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Stage 0.2.1A Owner-local final Edge gate and manual review passed); the Blazor counter-spike is **not required** unless a future material blocker is identified. The framework had been
+returned to `[OPEN]` by the Owner-requested Stage 0.2 documentation review punchlist; the rows
+below keep that history.
 
 | Item | Status |
 | --- | --- |
@@ -772,8 +775,8 @@ Equipment Runtime in a separate Windows Service behind a loopback API
 | Local web UI (embedded WebView, static local assets) | `[PROPOSED]` — locked as the delivery model |
 | Candidate A: React + TypeScript + Vite | `[PROPOSED]` candidate — **not accepted** |
 | Candidate B: Blazor Hybrid | `[PROPOSED]` candidate — **not rejected** |
-| Final UI framework selection | **`[OPEN]`** |
-| Selection route | **SUPERSEDED:** the dual-candidate Stage 0.2.1 spike (section 33) is not performed — the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate |
+| Final UI framework selection | **React selected as the Primary UI Framework** (Owner decision, 2026-10-07) |
+| Selection route | **SUPERSEDED:** the dual-candidate Stage 0.2.1 spike (section 33) is not performed — the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07), and a Blazor counter-spike requires a future Owner Scope Gate |
 
 Both candidates are compared **inside the same architecture** — the same application-owned
 shell, the same embedded WebView, the same loopback ASP.NET Core Local Application API, and
@@ -1080,7 +1083,7 @@ Stage 0.2.1 spike.
 | Stage | **0.2.1 — UI and Runtime Technology Spike** |
 | Status | **SUPERSEDED** — the dual-candidate proposal below is not performed |
 | Authorization | **`[NOT AUTHORIZED]`** as written |
-| Replaced by | The approved, narrower **React-first Stage 0.2.1A — React UI and Runtime Feasibility Spike** ([`spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md)). React final selection is **NOT YET APPROVED** and the UI framework remains `[OPEN]`. A **Blazor counter-spike requires a future Owner Scope Gate** and is **DEFERRED / `[NOT AUTHORIZED]`** |
+| Replaced by | The approved, narrower **React-first Stage 0.2.1A — React UI and Runtime Feasibility Spike** ([`spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md)). **React selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Stage 0.2.1A Owner-local final Edge gate and manual review passed). A Blazor counter-spike is **not required** unless a future material blocker is identified |
 | Purpose | Select the UI framework and validate the live-state delivery and performance architecture with measured evidence |
 | Deliverable | A comparison report with measurements, a recommendation, and a decision record draft. **No production code.** |
 
@@ -1154,7 +1157,7 @@ punchlist. Nothing here may be closed by assumption.
 | Historian physical sizing, row sizes, index and partition strategy | No capacity model exists | Before retention defaults are ratified |
 | Recovery procedure for an interrupted Cleaning Job; fault-class taxonomy | Behaviour is undefined in the approved baseline | A later Stage Gate that specifies sequence recovery |
 | Configuration application without a runtime restart | Alternative not yet evaluated | Implementation Stage Gate |
-| **Final UI framework** | **`[OPEN]`.** The current evidence route is the **Stage 0.2.1A React-first feasibility spike** (synthetic); React final selection is **NOT YET APPROVED**. The dual-candidate Stage 0.2.1 comparison is **SUPERSEDED** (section 33). The **Blazor counter-spike is DEFERRED** | Owner decision after Stage 0.2.1A evidence. A Blazor counter-spike requires a **separate Owner Scope Gate**, only if React presents material concerns, the evidence remains insufficient, or the Owner requests a direct comparison |
+| **Final UI framework** | **CLOSED — React selected as the Primary UI Framework** (Owner decision, 2026-10-07) on the evidence of the **Stage 0.2.1A React-first feasibility spike** (synthetic; Owner-local final Edge gate and manual review PASS). *History:* React final selection had been NOT YET APPROVED. The dual-candidate Stage 0.2.1 comparison is **SUPERSEDED** (section 33). The **Blazor counter-spike is DEFERRED** | Owner decision after Stage 0.2.1A evidence. A Blazor counter-spike requires a **separate Owner Scope Gate**, only if React presents material concerns, the evidence remains insufficient, or the Owner requests a direct comparison |
 | Shell host framework | Implementation-level selection; no evidence available now | Implementation Stage Gate, after the framework decision |
 | Push transport and presentation-state payload encoding | The presentation contract is transport-agnostic; selecting a transport now would invent certainty | Stage 0.2.1 spike, then Implementation Stage Gate |
 | Chart/trend library | Library-neutral requirements are recorded in section 32; no library is selected | Stage 0.2.1 spike |

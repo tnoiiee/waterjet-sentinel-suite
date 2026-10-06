@@ -1,8 +1,10 @@
 # Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
 
-> **SYNTHETIC FEASIBILITY SPIKE — NOT PRODUCTION CODE.** React is the primary feasibility
-> candidate, **not** the final UI framework (`[OPEN]`). Blazor Hybrid is **deferred and not
-> authorized** (no files). The Production direction — .NET Equipment Runtime Windows Service,
+> **SYNTHETIC FEASIBILITY SPIKE — NOT PRODUCTION CODE.** Stage 0.2.1A is **COMPLETE FOR
+> DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate and manual review PASS, 2026-10-07) and
+> **React is selected as the Primary UI Framework**; this spike itself stays synthetic, removable
+> review code, not Product code. A Blazor counter-spike is **not required** unless a future
+> material blocker is identified (no files). The Production direction — .NET Equipment Runtime Windows Service,
 > ASP.NET Core Local Application API, application-owned Windows kiosk shell — is unchanged.
 
 Plan: [`../../docs/spikes/stage-0.2.1a-plan.md`](../../docs/spikes/stage-0.2.1a-plan.md) ·

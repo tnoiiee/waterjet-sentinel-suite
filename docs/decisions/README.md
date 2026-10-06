@@ -8,9 +8,11 @@ Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
 `5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
 Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
-**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
-framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
-`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This folder holds the decisions that shape the WaterJet Sentinel Suite. An ADR records a
 decision, its context, and its consequences so that later work does not re-litigate or
@@ -69,11 +71,12 @@ architecture direction. **Accepted does not mean implemented.** Selections insid
 still marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` keep those markers, and acceptance
 authorises no capability and no later stage.
 
-**The final UI framework is `[OPEN]`.** [`ADR-0006`](ADR-0006-ui-delivery-model.md) records
-Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid). The Owner approved the
-Stage 0.2.1A synthetic React feasibility spike (in progress, see
-[`../spikes/stage-0.2.1a-plan.md`](../spikes/stage-0.2.1a-plan.md)); React final selection is
-**not yet approved**, and the Blazor counter-spike is **deferred / `[NOT AUTHORIZED]`**.
+**React is selected as the Primary UI Framework** (Owner decision, 2026-10-07). [`ADR-0006`](ADR-0006-ui-delivery-model.md)
+recorded Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid); the Owner selected
+React after the Stage 0.2.1A synthetic React feasibility spike
+([`../spikes/stage-0.2.1a-plan.md`](../spikes/stage-0.2.1a-plan.md)) passed the Owner-local final
+Edge gate and manual review. The Blazor counter-spike is **not required** unless a future material
+blocker is identified. ADR-0006 and ADR-0008 carry dated update notes; their history is unchanged.
 
 | ADR | Title | Status |
 | --- | --- | --- |

@@ -17,10 +17,10 @@ Repository: `waterjet-sentinel-suite`
 | Stage 0.2 architecture checkpoint | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`) |
 | Stage 0.2 ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction — accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1A Scope Gate / Coding Start | **APPROVED** / **APPROVED** |
-| Stage 0.2.1A implementation | **IN PROGRESS** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); PR #3 **OPEN**, **NOT MERGED**; Sensor map corrected to the Owner's 106-location domain; Owner-local UI re-review **PENDING**; 60-minute run **PAUSED** |
-| React final selection | **NOT YET APPROVED** — the UI framework remains `[OPEN]` |
-| Blazor counter-spike | **DEFERRED / NOT AUTHORIZED** |
-| Stage 0.3 | **NOT AUTHORIZED** |
+| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761`; PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**; controlled 15- and 60-minute observations **waived as merge blockers** |
+| Primary UI Framework | **React selected** (Owner decision, 2026-10-07); Production transport and chart library remain `[OPEN]` |
+| Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
+| Main Development Scope Gate / Stage 0.3 | **PENDING** / **NOT AUTHORIZED** |
 | Production devices | **NOT AUTHORIZED** |
 | Repository contents | Documentation, repository governance, and one removable synthetic feasibility spike |
 | Application code | **None.** The Stage 0.2.1A spike is synthetic feasibility code, not Product code: no solution, no schema, no Product runtime. |
@@ -44,8 +44,10 @@ ADR-0013 as architecture direction. **Accepted does not mean implemented**: noth
 implemented as Product code, items still marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]`
 keep those markers, and no capability or later stage is authorised by them.
 
-**The final UI framework is `[OPEN]`.** Two candidates are recorded and compared on equal
-terms: Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
+**React is selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Owner-local final Edge
+gate and manual review of the Stage 0.2.1A spike passed). The Blazor counter-spike is no longer
+required unless a future material blocker is identified. *Historical context:* two candidates were
+recorded and compared on equal terms: Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
 in the same application-owned kiosk shell behind the same loopback API. The current
 evidence-based preference for Candidate A is explicitly **not acceptance**, and Candidate B is
 explicitly **not rejected**. React can be built and deployed offline; it introduces a second
@@ -53,8 +55,7 @@ package and build ecosystem, which increases offline dependency-management and s
 effort without making offline development or deployment impossible. Choosing the framework
 requires measured evidence: the Stage 0.2.1A React feasibility spike is approved and in
 progress (see [`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md)); React
-final selection is **not yet approved**, and the Blazor counter-spike is **deferred / not
-authorized**. See
+feasibility checkpoint is now complete and React is selected (see above). See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and
 [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 3.2.
 
@@ -194,7 +195,7 @@ local deployment information and are **not** in this repository.
 | Document | Purpose |
 | --- | --- |
 | [`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md) | Approved spike scope, architecture, scenarios, measurement plan |
-| [`docs/spikes/stage-0.2.1a-results.md`](docs/spikes/stage-0.2.1a-results.md) | Arena validation and measurement evidence; Owner-local results pending |
+| [`docs/spikes/stage-0.2.1a-results.md`](docs/spikes/stage-0.2.1a-results.md) | Arena validation and measurement evidence; Owner-local final Edge gate and manual review PASS (Owner-reported, §0G) |
 | [`spikes/ui-runtime-react/README.md`](spikes/ui-runtime-react/README.md) | Spike layout, run instructions, NOT VERIFIED list |
 
 ## Status legend

@@ -334,6 +334,13 @@ Policies shown as OWNER DECISION REQUIRED are listed in
 
 ## 1G. Re-run after the final spike closeout hotfix (required — final Owner-local Edge gate)
 
+> **RESULT (Owner-reported, 2026-10-07): OWNER-LOCAL FINAL EDGE GATE PASS · OWNER MANUAL REVIEW
+> PASS** at `114c07619f9fd249cd80b2e7a5f385ff9e081119`. React selected as the Primary UI
+> Framework; Stage 0.2.1A **COMPLETE FOR DEVELOPMENT CHECKPOINT**. The controlled 15-minute and
+> 60-minute observations (sections 4–6) are **waived as Stage 0.2.1A merge blockers**; they remain
+> available as optional tooling. Not claimed: Production safety or stability, WebView2, kiosk,
+> Modbus performance, hardware. The instructions below are kept as the procedure that was run.
+
 **SYNTHETIC REVIEW TOOLING — NOT THE PRODUCTION OPERATOR-CONTROL MODEL.** This checkpoint is a
 fast-forward on `81c87a44`; its SHA is in the PR #3 description. It supersedes the counts of
 section 1F. From `react-ui\`:

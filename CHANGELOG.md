@@ -27,19 +27,43 @@ removable synthetic feasibility spike — no Product code.**
 ### Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
 
 **Scope and Coding Start Gate:** `[APPROVED]`
-**Implementation:** IN PROGRESS — PR #3 OPEN
+**Implementation:** COMPLETE FOR DEVELOPMENT CHECKPOINT — PR #3 OPEN, ready for Owner merge
 **Owner-local testing (installed Edge, Windows 11):** Edge E2E **25 / 25 PASS** at checkpoint
 `4129687a` (Owner-reported, ≈ 1.3 min); at `23f48daa` 34 selected · 25 passed · 2 failed (`READ-A`,
 `WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) was not re-run separately; at the
 critical Pump / Safe Return checkpoint `81c87a44` 42 selected · 32 passed · 1 failed (`S11/S12`,
 Dirty Score drifted between samples) · 9 not run (Owner-reported). The final spike closeout
-checkpoint (48-test selection) is PENDING the Owner-local final Edge gate
-**Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **Controlled 15-minute
-observation:** PAUSED · **60-minute run:** waived as a gate by the Owner — not run
+checkpoint `114c0761` (48-test selection): **Owner-local final Edge gate PASS** (Owner-reported,
+2026-10-07)
+**Owner manual review (1920 × 1080, Edge F11):** **PASS** at `114c0761` · **Controlled 15-minute
+and 60-minute observations:** waived as Stage 0.2.1A merge blockers — not run
 **Merge:** NOT MERGED
-**React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
-**Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
+**Primary UI Framework:** **React selected** (Owner decision, 2026-10-07)
+**Blazor counter-spike:** NOT REQUIRED unless a future material blocker is identified
+**Main Development Scope Gate:** PENDING
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Docs — Stage 0.2.1A closeout: Owner-local final review PASS, React selected (documentation only)
+
+- **Owner decision (2026-10-07)** on `114c0761`: Owner-local final Edge gate **PASS**; Owner manual
+  review **PASS**; UI, synthetic AutoSequence controls, GlobalQueue presentation, critical Pump
+  modal and Mandatory Safe Return behaviour accepted as the **Development baseline**; **React
+  selected as the Primary UI Framework**; Blazor counter-spike **not required** unless a future
+  material blocker is identified; controlled 15- / 60-minute observations **waived as merge
+  blockers**. Stage 0.2.1A recorded as **COMPLETE FOR DEVELOPMENT CHECKPOINT**.
+- `docs/CONTROL_AUTHORITY.md`: the §4 invariant now reads "Queue refill, score changes, Operator
+  Reorder, Reject, AutoSequence lifecycle changes, valve exclusion and equipment availability must
+  never produce concurrent Cleaning Jobs"; the struck-through queue-hold conflict row is replaced by
+  the current rule (pause belongs to the AutoSequence or Job lifecycle). Remaining current-facing
+  queue-level Hold wording removed from `QUEUE_MODEL.md` (snapshot contents), `TEST_STRATEGY.md`
+  (operator-action tests) and `USER_PERMISSION_MODEL.md` (queue permissions).
+- Status banners (14 documents), README, CURRENT_STATE (§12.11), MASTER_PLAN, ARCHITECTURE §24 /
+  §34, REQUIREMENTS UIF-001 / UIF-003, decisions README, spike README, plan and results (§0G),
+  OWNER_LOCAL_TESTING §1G result, ADR-0006 / ADR-0008 dated update notes (history kept),
+  validation summary fields and manifest.
+- Not claimed: Production safety or stability, WebView2, kiosk, Modbus performance, hardware. No
+  application, test, contract, dependency or Sensor-map change. **PR #3 NOT MERGED** (the Agent
+  never merges); Main Development coding **NOT STARTED**.
 
 #### Fixed — Final spike closeout: explicit synthetic AutoSequence controls (synthetic review tooling)
 

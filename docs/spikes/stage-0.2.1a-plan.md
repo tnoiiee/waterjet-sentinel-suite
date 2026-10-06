@@ -15,7 +15,7 @@ library.
 | Working branch | `arena/01a108d8-waterjet-sentinel-suite` |
 | React | Primary feasibility candidate — **not** the final selection |
 | Blazor Hybrid | **DEFERRED AND NOT AUTHORIZED** — no files, no counter-spike without a separate Owner gate |
-| Final UI framework | `[OPEN]` |
+| Final UI framework | `[OPEN]` at plan time — **update (Owner decision, 2026-10-07): React selected as the Primary UI Framework**; Blazor counter-spike not required unless a future material blocker is identified |
 | Production transport | `[OPEN]` |
 | Production chart library | `[OPEN]` |
 

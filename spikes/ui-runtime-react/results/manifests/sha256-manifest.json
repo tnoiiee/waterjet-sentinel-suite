@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T17:38:44.807Z",
+  "generatedAt": "2026-10-06T18:24:54.367Z",
   "base": "spikes/ui-runtime-react/results",
   "entries": [
     {
@@ -29,13 +29,13 @@
     },
     {
       "path": "summary/arena-validation.json",
-      "bytes": 6941,
-      "sha256": "d374de8b1fcb5aa6b6a7d1bc32564c6c369646ce44da92432fc2860774fbc664"
+      "bytes": 7124,
+      "sha256": "bb6a7aee2262b268eb15e41ae7d729b0da57c4fb5165d85f565693f86d4cd8bf"
     },
     {
       "path": "summary/arena-validation.md",
-      "bytes": 6124,
-      "sha256": "84016a8fd4079d1c89b1b0caba932dad793c8b05205c76c0d4872adc44160d9c"
+      "bytes": 6315,
+      "sha256": "3a31f47b0607615c8d26d71cf3919a3fa350e5a6bb88bf163eb393b43c633745"
     },
     {
       "path": "manifests/licence-inventory.json",

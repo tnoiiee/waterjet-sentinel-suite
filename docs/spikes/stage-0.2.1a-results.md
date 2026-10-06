@@ -13,15 +13,49 @@ fixes `READ-A` / `WJ-A` — its Owner-local Edge re-run is **PENDING**. §0E add
 (SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED); its Owner-local Edge review is **PENDING**. The final UI punchlist (§0C) added nine Owner-local Edge specs, the
 controlled 15-minute observation is **PAUSED**, and the 60-minute run was waived as a gate by the
 Owner (not run). This
-document does **not** select React as the final UI framework; the UI framework, Production
-transport, and Production chart library remain `[OPEN]`. Blazor counter-spike: **DEFERRED /
-NOT AUTHORIZED**.
+document records evidence; the selection is the Owner's: **React was selected as the Primary UI
+Framework** (Owner decision, 2026-10-07, §0G). Production transport and Production chart library
+remain `[OPEN]`. Blazor counter-spike: **NOT REQUIRED** unless a future material blocker is
+identified. Statements of "PENDING" Owner-local runs in §0A–§0F are historical.
 
 Plan: [`stage-0.2.1a-plan.md`](stage-0.2.1a-plan.md) · Spike:
 [`../../spikes/ui-runtime-react/README.md`](../../spikes/ui-runtime-react/README.md)
 
 All values are produced by synthetic tooling with **SYNTHETIC SPIKE PARAMETERS — NOT
 PRODUCTION VALUES**.
+
+---
+
+## 0G. Owner-local final review and Stage 0.2.1A closeout (documentation only)
+
+**Owner decision dated 2026-10-07** on checkpoint `114c07619f9fd249cd80b2e7a5f385ff9e081119`
+(Owner-reported outcome; the Agent did not receive the raw Edge output or screenshots, so no
+per-test counts are recorded here):
+
+- **OWNER-LOCAL FINAL EDGE GATE: PASS** (48-test selection of §1G in
+  [`OWNER_LOCAL_TESTING.md`](../../spikes/ui-runtime-react/measurements/OWNER_LOCAL_TESTING.md)).
+- **OWNER MANUAL REVIEW: PASS** (18-step synthetic AutoSequence sequence of §1G).
+- The UI, synthetic AutoSequence controls, GlobalQueue presentation (ready-only, ≤ 8, head-only
+  dispatch, no status column), critical Pump modal and Mandatory Safe Return behaviour are
+  **accepted as the Development baseline**.
+- **REACT SELECTED AS PRIMARY UI FRAMEWORK.** The Blazor counter-spike is no longer required
+  unless a future material blocker is identified.
+- The controlled 15-minute and 60-minute observations are **waived as Stage 0.2.1A merge
+  blockers** (not run).
+- Stage 0.2.1A: **COMPLETE FOR DEVELOPMENT CHECKPOINT**. PR #3 is ready for Owner merge and is
+  **not merged**. The Main Development Scope Gate is **PENDING**; Production device access is
+  **NOT AUTHORIZED**.
+
+**Not claimed:** Production safety, Production stability, WebView2 validation, kiosk validation,
+Modbus performance, hardware validation. The synthetic AutoSequence controls remain review
+tooling; Production Pause / Resume, abort re-queue, Safe Return failure and reset authority remain
+**OWNER DECISION REQUIRED**.
+
+The closeout commit changes documentation and recorded evidence only (status banners, the
+remaining current-facing queue-level Hold wording in CONTROL_AUTHORITY / QUEUE_MODEL /
+TEST_STRATEGY / USER_PERMISSION_MODEL, ADR-0006 / ADR-0008 dated update notes, validation summary
+fields, manifest). No runtime, React, CSS, contract, fixture, harness, scenario, E2E, dependency or
+Sensor-map file changed, so the Arena validation of `114c0761` (§0F.4) still applies unchanged.
 
 ---
 

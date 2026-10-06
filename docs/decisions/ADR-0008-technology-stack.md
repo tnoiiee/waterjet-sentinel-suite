@@ -3,9 +3,14 @@
 - **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
   merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
   direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
-  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers. **The final UI framework
-  remains `[OPEN]`**; React final selection is not yet approved (Stage 0.2.1A feasibility
-  spike in progress); the Blazor counter-spike is deferred / not authorized.
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
+- **Owner decision update (2026-10-07):** **React is selected as the Primary UI Framework**
+  after the Stage 0.2.1A Owner-local final Edge gate and manual review passed. The Blazor
+  counter-spike is no longer required unless a future material blocker is identified. Statements
+  below that the final UI framework is `[OPEN]` or that Candidate A is "not accepted" are
+  **superseded by this update** and kept as decision history. The rest of this ADR is unchanged
+  (shell host, Production transport and chart library remain as marked; WebView2 and kiosk
+  behaviour remain `[NOT VERIFIED]`).
 - **Date:** 2026-10-04 (corrected 2026-10-05 by the Owner-requested Stage 0.2 documentation
   review punchlist)
 - **Supersedes:** Nothing. This record addresses the stack questions left `[OPEN]` by

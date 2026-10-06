@@ -9,9 +9,11 @@ Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
 `5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
 Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
-**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
-framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
-`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 Identifiers used in worked examples are **illustrative placeholders only**. Real sensor
 identifier formats and production mappings are not documented in this repository.
@@ -349,7 +351,8 @@ running queue.
 
 The Queue snapshot referenced by operator actions and sequence events must capture, at a
 minimum: Auto Sequence ID, entry positions, sensor identifiers, source owners, source reason
-flags (`TEMP_QUEUE` / `TIME_QUEUE`), hold and reject flags, and the capture timestamp. The
+flags (`TEMP_QUEUE` / `TIME_QUEUE`), reject flags, and the capture timestamp (queue-level hold
+is superseded, §7.2). The
 snapshot is stored in Event history.
 
 Snapshot storage format, compression, and retention are `[OPEN]`.

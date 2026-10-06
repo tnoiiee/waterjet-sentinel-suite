@@ -8,9 +8,11 @@ Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
 `5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
 Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
-**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
-framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
-`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 > **No runtime testing has occurred.** There is no application code, no build, no database
 > schema, and no device connection in this repository. Nothing in this project has been
@@ -63,7 +65,7 @@ are all pure functions of data plus configuration and must be covered exhaustive
 | GlobalQueue seeding | Fixed eight-source order, four TempQueues plus four TimeQueues present, deduplication with earliest position preserved, reasons merged, duplicate source advancing to its next candidate, underfull queue |
 | Source ownership | Owner is the source that established the preserved earliest position; merged reasons do not transfer ownership; refill after Reorder uses the original owner |
 | Refill | Shift forward preserving FIFO, refill from original source owner, empty tail when no candidate exists |
-| Operator actions | Hold skip without reordering, Release Hold, Reject suppression scope, suppression end at new Auto Sequence, Reorder without ownership change |
+| Operator actions | Head-only dispatch with no entry skipped (queue-level Hold superseded, Owner decision 2026-10-06 — [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2); Reject suppression scope, suppression end at new Auto Sequence, Reorder without ownership change (Reject / Reorder semantics in the ready-only queue are OWNER DECISION REQUIRED) |
 | Alarm model | Active awareness acknowledgement does not release a block; cleared-state acknowledgement is required; the prohibited auto-clear sequence cannot be constructed; cleared-but-unacknowledged presentation string |
 | Timestamps | No null, no `NEVER_CLEANED`, source transitions after a successful job only |
 | Determinism | Identical inputs produce identical ordering across repeated runs and across randomized input ordering |
@@ -175,7 +177,7 @@ constitutes hardware evidence, and passing them would not constitute certificati
 
 ### 3.8 Planned spike verification workload (proposed Stage 0.2.1)
 
-> **SUPERSEDED route.** The Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate. Stage 0.2.1A evidence is recorded in
+> **SUPERSEDED route.** The Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07); a Blazor counter-spike is not required unless a future material blocker is identified. Stage 0.2.1A evidence is recorded in
 > [`spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md).
 
 Status of every case in this group: **PLANNED — NOT EXECUTED.** They belong to the proposed

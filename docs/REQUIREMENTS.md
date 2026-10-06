@@ -10,9 +10,11 @@ Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
 `5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
 Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
-**IN PROGRESS**, PR #3 **OPEN**, **NOT MERGED**. React final selection **NOT YET APPROVED** (UI
-framework `[OPEN]`). Blazor counter-spike **DEFERRED / `[NOT AUTHORIZED]`**. Stage 0.3
-`[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 Requirement identifiers are stable. Requirements are never silently deleted; if one is
 superseded, its status changes and the superseding requirement is recorded.
@@ -388,7 +390,7 @@ Owner acceptance; they are recorded as ADR candidates in
 | ARC-016 | Simulator mode is the default development mode; physical adapters are disabled by default; test-hardware access is separate from Production Device access. | `[APPROVED]` |
 | ARC-017 | Simulation must be deterministic where practical, and must never be presented as hardware certification. | `[APPROVED]` |
 | ARC-018 | Stage 0.2 creates no runtime artefact, installs no dependency, contacts no device, creates no database object, and produces no ZIP or release. | `[APPROVED]` |
-| ARC-019 | Preferred UI delivery: an application-owned full-screen kiosk shell window hosting a local web UI as static local assets in an embedded WebView, with the close guard enforced by the shell. **The final UI framework is `[OPEN]`** and must not be named by this requirement. | `[PROPOSED]` — [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) |
+| ARC-019 | Preferred UI delivery: an application-owned full-screen kiosk shell window hosting a local web UI as static local assets in an embedded WebView, with the close guard enforced by the shell. This delivery requirement does not name the framework; the framework is recorded in UIF-003 (React selected as the Primary UI Framework, Owner decision 2026-10-07). | `[PROPOSED]` — [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) |
 | ARC-020 | Preferred process model: one kiosk shell process and one runtime Windows Service that owns all device sessions, command validation, job execution, queue evaluation, persistence, and database connectivity. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
 | ARC-021 | Preferred technology stack for the runtime, the Local Application API, and the persistence layer: .NET on the Long-Term Support track, C#, ASP.NET Core minimal API, built-in dependency injection and configuration, structured local logging, and offline packaging from a local package source. The exact .NET version is pinned at the implementation gate. **The UI framework is not decided by this requirement.** | `[PROPOSED]` — [`ADR-0008`](decisions/ADR-0008-technology-stack.md) |
 | ARC-022 | Preferred data access, stated in architecture language: transactional relational access for configuration, alarm, event, audit, job, user, and queue-snapshot data; a batch-oriented write path for Historian samples; a decoupled and prioritised Historian write path; versioned migrations that are never applied automatically at service start; and a measured escape hatch permitted only after evidence identifies a bottleneck. The ORM, mapper, micro-ORM, provider, and bulk-write mechanism remain `[OPEN]`. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
@@ -414,14 +416,14 @@ Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner ac
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| UIF-001 | **Candidate A — React + TypeScript + Vite — is a comparison candidate** for the UI framework, hosted as static local assets inside the application-owned kiosk shell. It must not be described as accepted or rejected. | `[PROPOSED]` |
+| UIF-001 | **Candidate A — React + TypeScript + Vite — is a comparison candidate** for the UI framework, hosted as static local assets inside the application-owned kiosk shell. *Superseded by UIF-003 (React selected, 2026-10-07); retained as history.* It must not be described as accepted or rejected. | `[PROPOSED]` (historical) |
 | UIF-002 | **Candidate B — Blazor Hybrid — is a comparison candidate** for the UI framework, hosted in the application-owned kiosk shell. It must not be described as accepted or rejected. | `[PROPOSED]` |
-| UIF-003 | **The final UI framework is `[OPEN]`.** No framework is selected by Stage 0.2, and no UI code may be created before the framework decision. | `[OPEN]` |
+| UIF-003 | **React is selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Stage 0.2.1A Owner-local final Edge gate and manual review). *History:* the final UI framework was `[OPEN]` at Stage 0.2, and no UI code was to be created before the framework decision. Production UI code still requires the Main Development Scope Gate. | `[OWNER CONFIRMED]` |
 | UIF-004 | Both candidates must be evaluated inside the same architecture: the same application-owned kiosk shell, the same embedded WebView, the same loopback ASP.NET Core Local Application API, and the same separate .NET Equipment Runtime Windows Service. Neither candidate may be compared against a general-purpose external browser. | `[APPROVED]` boundary |
 | UIF-005 | **React can be built and deployed offline.** It must never be excluded on the basis that it requires Internet access. React introduces a second package and build ecosystem (Node.js/npm in addition to NuGet), which increases offline dependency-management and supply-chain effort without making offline development or deployment impossible. | `[APPROVED]` |
 | UIF-006 | Blazor Hybrid must not be selected solely because it uses C# or reduces the number of build ecosystems. Those advantages do not by themselves prove UI performance, graph quality, camera integration, or long-running kiosk stability. | `[APPROVED]` |
 | UIF-007 | The current evidence-based preference is React + TypeScript + Vite, based on the Owner's legacy operating experience with React/Vite and push-based updates, dense-visualisation fit, charting and camera ecosystem, and UI test tooling. **This preference is not final acceptance and not an approved selection.** | `[PROPOSED]` |
-| UIF-008 | Final framework selection requires measured spike evidence. The proposed dual-candidate Stage 0.2.1 spike is **SUPERSEDED**: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate. | `[PROPOSED]` |
+| UIF-008 | Final framework selection requires measured spike evidence. The proposed dual-candidate Stage 0.2.1 spike is **SUPERSEDED**: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07; see UIF-003), and a Blazor counter-spike is not required unless a future material blocker is identified. | `[PROPOSED]` (historical) |
 
 ### 26.2 UI workload
 
@@ -536,7 +538,7 @@ Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner ac
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| SPI-001 | Proposed Stage 0.2.1 — UI and Runtime Technology Spike — is **SUPERSEDED** and was not performed: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React final selection is NOT YET APPROVED (framework `[OPEN]`), and a Blazor counter-spike requires a future Owner Scope Gate. | `[PROPOSED]` |
+| SPI-001 | Proposed Stage 0.2.1 — UI and Runtime Technology Spike — is **SUPERSEDED** and was not performed: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07; see UIF-003), and a Blazor counter-spike is not required unless a future material blocker is identified. | `[PROPOSED]` (historical) |
 | SPI-002 | The spike must compare Candidate A and Candidate B on the same synthetic data, the same runtime/API contract, the same Sensor presentation semantics, the same trend workload, the same camera placeholder or synthetic stream, the same reconnect scenario, and the same acceptance measures. | `[PROPOSED]` |
 | SPI-003 | The spike must use **synthetic data only** and must not access WAGO, Galil, Production SQL Server, or Production configuration. | `[PROPOSED]` |
 | SPI-004 | Spike results are application-level performance evidence only — never hardware evidence, never certification, and never a relaxation of the bench verification requirements. | `[PROPOSED]` |
