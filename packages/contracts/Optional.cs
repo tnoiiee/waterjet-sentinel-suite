@@ -61,9 +61,16 @@ public readonly struct Optional<T> : IEquatable<Optional<T>>
         ? _value!
         : throw new InvalidOperationException($"Optional is {_presence}; no value is available.");
 
+    // Present payloads delegate to EqualityComparer<T>.Default (Owner-local
+    // round 5, CA-corrected semantics): value equality for record types,
+    // reference equality for types that do not override equality. A plain
+    // `_value == other._value` would compile to reference comparison for the
+    // unconstrained T and wrongly split equal records. No recursive custom
+    // deep equality is invented here - each payload keeps its own .NET
+    // equality semantics.
     public bool Equals(Optional<T> other) =>
         _presence == other._presence &&
-        (_presence != Presence.Present || _value == other._value);
+        (_presence != Presence.Present || EqualityComparer<T>.Default.Equals(_value, other._value));
 
     public override bool Equals(object? obj) => obj is Optional<T> other && Equals(other);
 
@@ -75,12 +82,15 @@ public readonly struct Optional<T> : IEquatable<Optional<T>>
     public static bool operator !=(Optional<T> left, Optional<T> right) =>
         !left.Equals(right);
 
+    // Hash follows the same comparer so equal values hash equal:
+    // EqualityComparer<T>.Default.GetHashCode honours the payload's own
+    // GetHashcode override (records) or its reference hash (others).
     public override int GetHashCode() =>
         _presence switch
         {
             Presence.Absent => 0,
             Presence.Cleared => 1,
-            _ => HashCode.Combine(Presence.Present, _value),
+            _ => HashCode.Combine(Presence.Present, EqualityComparer<T>.Default.GetHashCode(_value!)),
         };
 
     public override string ToString() => _presence switch

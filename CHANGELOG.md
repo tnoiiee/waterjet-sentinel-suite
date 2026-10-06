@@ -25,6 +25,43 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Owner-local build & contract-test correction round 5
+
+**Test-run evidence recorded as NON-AUTHORITATIVE.** `dotnet test ... --no-build --no-restore`
+returned 49 / 42 pass / 7 fail / 0 skip, but the preceding full-solution Release build had
+**not** passed — assemblies may be stale (notably `Wjss.Config.Examples.Tests` "passed" though
+its source did not compile in that build). This result is explicitly **not** the checkpoint
+test record. Corrections in this round (source only; contract wire semantics untouched — the
+absent/object/null triple stands and `activeJobCleared` stays absent):
+
+- **Config test assembly anchor:** the round-4 `ConfigTestAssemblyMarker` + shared
+  `ConfigTestPaths.RepoRoot()` mechanism is verified in place for both preservation tests
+  (marker declared exactly once; zero code references to `ExampleConfigTests` remain; no fake
+  substitute class; repository-source discovery unchanged; no absolute paths; no Product
+  changes) — requirement completed in `12e3cfd`, confirmed here.
+- **Presence-aware JSON null assertions (3 failing tests):** `JsonNode` indexers map JSON
+  null to a CLR-null reference, so `json["activeJob"]!.GetValueKind()` NRE'd. Wire assertions
+  in `ContractEncodingTests` now go through `JsonDocument`/`JsonElement` using the exact
+  pattern — (A) absent: `TryGetProperty` false; (B) explicit null: true +
+  `JsonValueKind.Null`; (C) object: true + `JsonValueKind.Object` — across serialization AND
+  deserialization round-trip of all three `activeJob` states (new stability assertions in
+  required-test-4).
+- **`Optional<T>` payload equality:** `_value == other._value` compared present payloads by
+  reference for the unconstrained `T`, wrongly splitting equal records (round-5 owner-local
+  failure). `Equals` now delegates present-payload comparison to
+  `EqualityComparer<T>.Default`; `GetHashCode` mirrors it (equal values hash equal); `==`/`!=`
+  remain defined as `Equals`/`!Equals`; `Present(null)` still prohibited; wire serialization
+  byte-identical. No recursive custom deep-equality invented — payloads keep their own .NET
+  equality; new focused tests cover delegation for value-equal and reference-only payloads.
+- **Fixture drift (3 files) retained as EXPECTED provisional evidence:**
+  `snapshot.seed0.json`, `delta.basic.json`, `sensor-map.example.json`. Fixtures were NOT
+  touched in Arena; regeneration remains gated on (1) full Release build PASS and (2) all
+  non-parity test projects PASS first — now written into the runbook step 5 ordering gate.
+
+**Still required:** a clean full-solution Release build, then a `dotnet test` WITHOUT
+`--no-build` against fresh assemblies; only then may parity/fixture status be judged. No .NET
+success is claimed anywhere in this entry.
+
 ### Stage 0.3A-1 — Owner-local build correction round 4
 
 With the external process `TargetPath` override gone, the Owner-local build reached **eleven

@@ -105,6 +105,15 @@ All five test projects must pass, notably:
 
 ## 5. Fixture regeneration check (contract authority)
 
+> **Regeneration ordering gate (Owner, round 5 of 2026-10-07).** Do NOT run the
+> `WJSS_UPDATE_FIXTURES=1` regeneration in this step unless BOTH prerequisites are already
+> GREEN in the same session: (1) a successful **full-solution Release build** (steps 2-3),
+> and (2) **all non-parity test projects passing** (step 4). Fixture drift observed before
+> those gates is expected provisional-fixture evidence — record it in the evidence template,
+> do not treat it as a failed gate and do not regenerate to hide it. Current Arena-recorded
+> state (2026-10-07): drift on `snapshot.seed0.json`, `delta.basic.json`,
+> `sensor-map.example.json` is EXPECTED provisional drift pending the gates above.
+
 ```powershell
 $env:WJSS_UPDATE_FIXTURES = "1"
 dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release

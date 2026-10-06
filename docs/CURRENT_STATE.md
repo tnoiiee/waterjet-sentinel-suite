@@ -828,6 +828,27 @@ node --test), links green, `git diff --check` clean, spikes roll unchanged, no K
 TargetPath/vendor strings in Product source. **Status: .NET build of the config test project
 and all test executions remain Owner-local; full Release build rerun REQUIRED.**
 
+### 12.17 Stage 0.3A-1 Owner-local build & contract-test correction round 5 — Arena validation record
+
+Owner evidence (2026-10-07): full-solution Release build **not yet passing**; the subsequent
+`dotnet test --no-build` (49 total · 42 pass · 7 fail · 0 skip) is recorded **non-authoritative**
+— stale assemblies, including a config-test "success" despite that project not compiling in
+the preceding build. Source corrections on PR #4: (1) round-4 assembly-anchor mechanism
+verified complete (marker once; both preservation tests share `ConfigTestPaths.RepoRoot()`; no
+fake `ExampleConfigTests`; repository-source discovery unchanged); (2) the three failing
+serializer tests rewritten to presence-aware `JsonDocument`/`JsonElement` assertions
+(absent = `TryGetProperty` false / null = present + `JsonValueKind.Null` / object = present +
+`JsonValueKind.Object`), covering post-serialization and post-deserialization stability of all
+three `activeJob` states — wire contract untouched; (3) `Optional<T>` present-payload
+equality and hash delegated to `EqualityComparer<T>.Default` (fixes equal-records split by
+reference comparison; operators still exactly mirror `Equals`; `Present(null)` still rejected;
+serialization unchanged), with delegation-focused tests added; (4) fixture drift on the three
+named files retained as **expected provisional evidence** — Arena modified no fixture; the
+runbook now gates regeneration behind full-build PASS + all non-parity tests PASS. Arena static
+validation: S1–S9 zero findings; anchor/JSON checks green; TS 15/15 (npm ci → typecheck →
+node --test); links and whitespace clean; spikes roll unchanged. **No .NET build/test success
+claimed; Owner-local full Release build + fresh-assembly test run REQUIRED.**
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:

@@ -15,8 +15,12 @@ namespace Wjss.Runtime.Api.Tests;
 /// </summary>
 public sealed class ContractEncodingTests
 {
-    private static JsonObject SerializeToObject<T>(T value) =>
-        JsonSerializer.Deserialize<JsonObject>(JsonSerializer.Serialize(value, ContractJson.Options))!;
+    // Wire-token assertions go through JsonDocument/JsonElement: a JSON null
+    // materializes as a CLR-null JsonNode reference in the JsonNode model, so
+    // presence + token kind must be read from the document, never dereferenced
+    // off a JsonNode indexer (Owner-local round 5: NRE class).
+    private static JsonDocument SerializeToDocument<T>(T value) =>
+        JsonDocument.Parse(JsonSerializer.Serialize(value, ContractJson.Options));
 
     /// <summary>A complete, fixture-flavoured Active Job (synthetic values only).</summary>
     private const string ActiveJobJson = """
@@ -78,12 +82,14 @@ public sealed class ContractEncodingTests
             EquipmentId = "CANNON_REAR",
         };
 
-        var json = SerializeToObject(slot);
-        Assert.Equal("SLOT-R5-C07", (string?)json["slotId"]);
-        Assert.Equal("CANNON", (string?)json["slotType"]);
-        Assert.Equal("REAR", (string?)json["wall"]);
-        Assert.True(json.ContainsKey("sensorId"));
-        Assert.Equal(JsonValueKind.Null, json["sensorId"]!.GetValueKind());
+        using var doc = SerializeToDocument(slot);
+        var root = doc.RootElement;
+        Assert.Equal("SLOT-R5-C07", root.GetProperty("slotId").GetString());
+        Assert.Equal("CANNON", root.GetProperty("slotType").GetString());
+        Assert.Equal("REAR", root.GetProperty("wall").GetString());
+        // (B) explicit null: key present, token kind Null - no JsonNode dereference.
+        Assert.True(root.TryGetProperty("sensorId", out var sensorId));
+        Assert.Equal(JsonValueKind.Null, sensorId.ValueKind);
     }
 
     [Fact]
@@ -93,25 +99,26 @@ public sealed class ContractEncodingTests
         // "activeJob" key at all (never "activeJob": null, never empty).
         var delta = BareDelta(); // ActiveJob left at Optional.Absent
 
-        var json = SerializeToObject(delta);
+        using var doc = SerializeToDocument(delta);
+        var root = doc.RootElement;
 
         // Envelope keys always present:
-        Assert.Equal("delta", (string?)json["kind"]);
-        Assert.Equal("wjss.delta/1", (string?)json["schema"]);
-        Assert.Equal(1, (int?)json["apiVersion"]);
-        Assert.Equal(10, (int?)json["previousRevision"]);
-        Assert.Equal(11, (int?)json["revision"]);
+        Assert.Equal("delta", root.GetProperty("kind").GetString());
+        Assert.Equal("wjss.delta/1", root.GetProperty("schema").GetString());
+        Assert.Equal(1, root.GetProperty("apiVersion").GetInt32());
+        Assert.Equal(10, root.GetProperty("previousRevision").GetInt32());
+        Assert.Equal(11, root.GetProperty("revision").GetInt32());
 
-        // Everything untouched must be ABSENT (never null, never empty):
-        Assert.False(json.ContainsKey("sensors"));
-        Assert.False(json.ContainsKey("pump"));
-        Assert.False(json.ContainsKey("queue"));
-        Assert.False(json.ContainsKey("sequence"));
-        Assert.False(json.ContainsKey("activeJob"));
+        // (A) Everything untouched must be ABSENT (never null, never empty):
+        Assert.False(root.TryGetProperty("sensors", out _));
+        Assert.False(root.TryGetProperty("pump", out _));
+        Assert.False(root.TryGetProperty("queue", out _));
+        Assert.False(root.TryGetProperty("sequence", out _));
+        Assert.False(root.TryGetProperty("activeJob", out _));
 
         // Required test 5: the wall map is static and Snapshot-only; it may
         // never appear in a Delta key set.
-        Assert.False(json.ContainsKey("wallMap"));
+        Assert.False(root.TryGetProperty("wallMap", out _));
     }
 
     [Fact]
@@ -120,13 +127,14 @@ public sealed class ContractEncodingTests
         // Required test 2: replacement => JSON carries the full activeJob object.
         var delta = BareDelta() with { ActiveJob = Optional<ActiveCleaningJobState>.Present(BuildJob()) };
 
-        var json = SerializeToObject(delta);
+        using var doc = SerializeToDocument(delta);
 
-        Assert.True(json.ContainsKey("activeJob"));
-        var job = Assert.IsType<JsonObject>(json["activeJob"]);
-        Assert.Equal("J-300", (string?)job["jobId"]);
-        Assert.Equal("H7", (string?)job["targetSensorId"]);
-        Assert.Equal("RUNNING", (string?)job["lifecycle"]);
+        // (C) replacement: key present, token kind Object, full payload inside.
+        Assert.True(doc.RootElement.TryGetProperty("activeJob", out var job));
+        Assert.Equal(JsonValueKind.Object, job.ValueKind);
+        Assert.Equal("J-300", job.GetProperty("jobId").GetString());
+        Assert.Equal("H7", job.GetProperty("targetSensorId").GetString());
+        Assert.Equal("RUNNING", job.GetProperty("lifecycle").GetString());
     }
 
     [Fact]
@@ -135,10 +143,12 @@ public sealed class ContractEncodingTests
         // Required test 3: clear => JSON carries an explicit "activeJob": null.
         var delta = BareDelta() with { ActiveJob = Optional<ActiveCleaningJobState>.Cleared };
 
-        var json = SerializeToObject(delta);
+        using var doc = SerializeToDocument(delta);
 
-        Assert.True(json.ContainsKey("activeJob")); // present, unlike Absent
-        Assert.Equal(JsonValueKind.Null, json["activeJob"]!.GetValueKind());
+        // (B) clear: key PRESENT with token kind Null - distinct from Absent (A),
+        // read from the document so the JSON null never dereferences a JsonNode.
+        Assert.True(doc.RootElement.TryGetProperty("activeJob", out var clearedToken));
+        Assert.Equal(JsonValueKind.Null, clearedToken.ValueKind);
 
         // And the raw serialized text carries the exact encoding the mirror expects:
         var raw = JsonSerializer.Serialize(delta, ContractJson.Options);
@@ -169,16 +179,32 @@ public sealed class ContractEncodingTests
         var cleared = JsonSerializer.Deserialize<OperationalDelta>(clearedJson, ContractJson.Options)!;
         var replaced = JsonSerializer.Deserialize<OperationalDelta>(replacedJson, ContractJson.Options)!;
 
+        // Deserialized state distinction...
         Assert.True(absent.ActiveJob.IsAbsent);
         Assert.True(cleared.ActiveJob.IsCleared);
         Assert.False(cleared.ActiveJob.IsPresent);
         Assert.True(replaced.ActiveJob.IsPresent);
         Assert.Equal("J-300", replaced.ActiveJob.Value.JobId);
 
-        // Re-serialization is stable across the round-trip:
-        Assert.False(SerializeToObject(absent).ContainsKey("activeJob"));
-        Assert.Equal(JsonValueKind.Null, SerializeToObject(cleared)["activeJob"]!.GetValueKind());
-        Assert.NotNull(SerializeToObject(replaced)["activeJob"]);
+        // ...and re-serialization stability across the round-trip, all three
+        // states proven by wire presence + token kind (no JsonNode dereference):
+        using (var absentDoc = SerializeToDocument(absent))
+        {
+            Assert.False(absentDoc.RootElement.TryGetProperty("activeJob", out _)); // A
+        }
+
+        using (var clearedDoc = SerializeToDocument(cleared))
+        {
+            Assert.True(clearedDoc.RootElement.TryGetProperty("activeJob", out var t)); // B
+            Assert.Equal(JsonValueKind.Null, t.ValueKind);
+        }
+
+        using (var replacedDoc = SerializeToDocument(replaced))
+        {
+            Assert.True(replacedDoc.RootElement.TryGetProperty("activeJob", out var t)); // C
+            Assert.Equal(JsonValueKind.Object, t.ValueKind);
+            Assert.Equal("J-300", t.GetProperty("jobId").GetString());
+        }
     }
 
     [Fact]

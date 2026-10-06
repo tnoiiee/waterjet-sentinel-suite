@@ -39,8 +39,8 @@ public sealed class OptionalPresenceTests
     [Fact]
     public void Present_Equal_Value_Is_Equal()
     {
-        // Existing Equals semantics: the payload is compared with ==, which is
-        // value equality for string (and for record types).
+        // Round-5 semantics: Present payloads delegate to
+        // EqualityComparer<T>.Default - value equality for string (and records).
         Assert.True(Present("A") == Present("A"));
         Assert.True(Present("A").Equals(Present("A")));
         Assert.False(Present("A") != Present("A"));
@@ -84,8 +84,9 @@ public sealed class OptionalPresenceTests
     public void Contract_Record_Payload_Compares_By_Value_Equality()
     {
         // Two independently deserialized (reference-distinct) but equal
-        // ActiveCleaningJobState payloads compare equal, matching the record's
-        // value equality already used by Equals.
+        // ActiveCleaningJobState payloads compare equal: Equals delegates to
+        // EqualityComparer<T>.Default, which honours the record's value
+        // equality - and the hash codes match accordingly.
         const string JobJson = """
             {"jobId":"J-1","targetSensorId":"H7","jetId":"SYN-JET-01","valveId":"SYN-VLV-01",
              "phase":"P1","phaseLabel":"P1","phaseIndex":1,
@@ -101,8 +102,22 @@ public sealed class OptionalPresenceTests
 
         Assert.NotSame(job1, job2);
         Assert.True(Optional<ActiveCleaningJobState>.Present(job1) == Optional<ActiveCleaningJobState>.Present(job2));
+        Assert.Equal(
+            Optional<ActiveCleaningJobState>.Present(job1).GetHashCode(),
+            Optional<ActiveCleaningJobState>.Present(job2).GetHashCode());
         Assert.True(Optional<ActiveCleaningJobState>.Present(job1) != Optional<ActiveCleaningJobState>.Cleared);
         Assert.True(Optional<ActiveCleaningJobState>.Present(job1) != Optional<ActiveCleaningJobState>.Absent);
+    }
+
+    [Fact]
+    public void Present_Delegates_To_Default_Comparer_For_Reference_Types()
+    {
+        // A payload type with no equality overrides keeps the Default comparer's
+        // reference semantics: same instance -> equal, distinct instances ->
+        // not equal. Optional adds no graph comparison of its own.
+        var shared = new object();
+        Assert.True(Optional<object>.Present(shared) == Optional<object>.Present(shared));
+        Assert.True(Optional<object>.Present(new object()) != Optional<object>.Present(new object()));
     }
 
     [Fact]
