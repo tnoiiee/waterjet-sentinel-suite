@@ -184,7 +184,8 @@ The Playwright web server now starts the harness with `--synthetic-test-controls
 G+205 / G+218 / G+118 cell size), `IDENT-A`, `LEGEND-A`, `WJ-A`, `QUEUE-A`, `CTRL-A`..`CTRL-C`.
 The font is bundled, so no Windows font installation matters any more (Bahnschrift is no longer used).
 
-**Manual F11 review with the synthetic test controls:**
+**Manual F11 review with the synthetic test controls** (presets and queue checks below are
+**SUPERSEDED by section 1E**):
 
 ```powershell
 npm run harness -- --synthetic-test-controls   # http://127.0.0.1:5181, loopback only
@@ -214,6 +215,47 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5181/api/spike/scenario -He
 
 The **controlled 15-minute observation is PAUSED** (Owner decision). The **60-minute run was waived
 as a gate** by the Owner and is not run.
+
+## 1E. Re-run after the GlobalQueue semantics correction (required)
+
+**Recorded baseline:** at `23f48daa`, 34 selected · 25 passed · 2 failed (`READ-A`, `WJ-A`) · 7 not run
+(Owner-reported). This checkpoint (fast-forward on `23f48daa`; SHA in the PR #3 description)
+supersedes the counts and presets of section 1D. From `react-ui\`:
+
+```powershell
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm test                               # Vitest: expect 120 / 120 (16 files)
+npm run build
+node --test "../runtime-harness/test/**/*.test.mjs"   # expect 40 / 40
+npm run e2e -- e2e/operations.spec.ts e2e/layout.spec.ts e2e/punchlist.spec.ts   # 35 tests
+```
+
+Changed / new specs: `READ-A` unchanged (value-clipping fix is in CSS), `WJ-A` (Case A: no
+selection; Case B: Sensor detail stays), `QUEUE-A` (bounded to 8), new `QUEUE-B` (heading, "n / 8
+queued", no Status column, Active Job linked to its Position 1 dispatch), `CTRL-A` / `CTRL-B` (new
+presets, head-only dispatch, no retarget).
+
+**Manual F11 review** (`npm run harness -- --synthetic-test-controls`, Edge 1920 × 1080, F11, 100 %;
+select a Sensor, press **D**, use **SYNTHETIC TEST CONTROL**):
+
+| # | Owner check |
+| --- | --- |
+| 1 | G+205 (and every Sensor) value fully visible, centred; marker right of the value; ID unclipped; rail visible |
+| 2 | GlobalQueue heading "GlobalQueue · synthetic"; count "n / 8 queued · FIFO · not Production scheduling"; never more than 8 rows, never 76 / 77; no Status column |
+| 3 | Preset 1 Queued DIRTY: Sensor at Position 1, `Q` badge |
+| 4 | Preset 2 Queued CLEANER: source reason OPERATOR (synthetic non-score source) |
+| 5 | Preset 3 Selected queued: Sensor at Position 2 with the selection ring |
+| 6 | Preset 4 Dispatched head: Active Job = the Sensor, `J` badge, Diagnostics "Position 1 · Sensor · Queue revision a→b · SYN-DSP-…" |
+| 7 | Preset 5 Alarm on the Active Job Sensor: alarm triangle left, `J` badge right |
+| 8 | Preset 6 Alarm Sensor not admitted: not in the queue; Diagnostics "QUEUE ELIGIBILITY DIAGNOSTICS" shows "NOT ADMITTED · Reason pending Owner-approved eligibility policy" |
+| 9 | Preset 7 Head → Job: the former head becomes the Active Job; Position 2 moves to Position 1 |
+| 10 | Preset 8 Reset: bounded queue (0–8), AutoSequence resumes, no second Job |
+| 11 | Water Jet slots `WJ REAR` / `WJ FRONT` are not selectable and do not clear a Sensor selection |
+
+The **controlled 15-minute observation is PAUSED** and the **60-minute run was waived as a gate**
+(not run).
 
 ## 2. Manual look (optional)
 

@@ -150,7 +150,8 @@ describe('central UI scale tokens', () => {
     expect(cell).toMatch(/display:\s*grid/);
     // Symmetric value row: [spacer = marker size | value | marker zone].
     expect(cell).toMatch(/grid-template-columns:\s*var\(--sensor-marker-size\) minmax\(0, 1fr\) var\(--sensor-marker-size\)/);
-    expect(cell).toMatch(/grid-template-rows:\s*14px minmax\(0, 1fr\) var\(--sensor-rail-h\)/);
+    // Rows: ID (12 px) | value line box (>= 20 px, full Google Sans content area) | rail.
+    expect(cell).toMatch(/grid-template-rows:\s*var\(--sensor-id-row-h\) minmax\(var\(--sensor-value-line-h\), 1fr\) var\(--sensor-rail-h\)/);
     expect(cell).toMatch(/font-variant-numeric:\s*tabular-nums/);
     const idx = cellCss.match(/\.index\s*\{([^}]*)\}/)[1];
     // ID row: full usable cell width.
@@ -174,15 +175,53 @@ describe('central UI scale tokens', () => {
     }
   });
 
-  it('GlobalQueue columns follow the approved widths (Pos 40, Sensor 90..110, Score 90, Since clean 110, Status 90)', () => {
+  it('GlobalQueue columns follow the approved widths (Pos 40, Sensor 90..110, Score 90, Since clean 110); Status column removed', () => {
     const w = (c) => px(opsCss.match(new RegExp(`\\.${c}\\s*\\{[^}]*width:\\s*(\\d+)px`))[1]);
     expect(w('colPos')).toBe(40);
     expect(w('colSensor')).toBeGreaterThanOrEqual(90);
     expect(w('colSensor')).toBeLessThanOrEqual(110);
     expect(w('colScore')).toBe(90);
     expect(w('colAge')).toBe(110);
-    expect(w('colStatus')).toBe(90);
+    // Owner domain correction: queue entries carry no status, so there is no Status column.
+    expect(opsCss).not.toMatch(/\.colStatus\b|\.st_(READY|HELD|BLOCKED|EXCLUDED)\b/);
     expect(opsCss).toMatch(/\.table\s*\{[^}]*font-variant-numeric:\s*tabular-nums/);
   });
 });
 
+
+describe('Sensor cell vertical budget (Owner-local Edge READ-A value-clipping hotfix)', () => {
+  // Google Sans: typo ascent 966 / descent -286 per 1000 (USE_TYPO_METRICS) -> 20.03 px content
+  // area at 16 px; Chromium rounds ascent / descent to 15 + 5 = 20 px. A 16 px line box
+  // (line-height: 1) leaves text content below the value box, which Edge counted in scrollHeight.
+  const idRow = px(tokenValue('--sensor-id-row-h'));
+  const valueLine = px(tokenValue('--sensor-value-line-h'));
+  const rail = px(tokenValue('--sensor-rail-h'));
+  const minCell = px(tokenValue('--sensor-cell-height').match(/clamp\(\s*(\d+)px/)[1]);
+  const block = (sel) => cellCss.slice(cellCss.indexOf(`${sel} {`), cellCss.indexOf('}', cellCss.indexOf(`${sel} {`)));
+
+  it('value font stays 16 px and the ID font 13 px (no reduction)', () => {
+    expect(tokenValue('--sensor-value-font-size')).toBe('16px');
+    expect(tokenValue('--sensor-id-font-size')).toBe('13px');
+    expect(tokenValue('--sensor-marker-size')).toBe('8px');
+  });
+  it('the value line box holds the full Google Sans content area (>= 20 px), never line-height 1', () => {
+    expect(valueLine).toBeGreaterThanOrEqual(20);
+    expect(block('.score')).toMatch(/line-height:\s*var\(--sensor-value-line-h\)/);
+    expect(block('.score')).not.toMatch(/overflow|transform|scale/);
+  });
+  it('ID row + value line + rail fit the alarmed cell (2 px border, 0 padding) at the minimum cell height', () => {
+    expect(block('.alarm')).toMatch(/border:\s*2px solid/);
+    expect(block('.alarm')).toMatch(/padding:\s*0/);
+    expect(minCell).toBe(46);
+    expect(idRow + valueLine + rail).toBeLessThanOrEqual(minCell - 2 * 2);
+    // Normal cell: 1 px border + 1 px vertical padding on each side.
+    expect(idRow + valueLine + rail).toBeLessThanOrEqual(minCell - 2 * 1 - 2 * 1);
+  });
+  it('the ID row still contains the 13 px glyph ink (cap / digit height ~9.5 px)', () => {
+    expect(idRow).toBeGreaterThanOrEqual(12);
+    expect(block('.index')).toMatch(/line-height:\s*var\(--sensor-id-row-h\)/);
+  });
+  it('the grid rows use the budget tokens', () => {
+    expect(block('.cell')).toMatch(/grid-template-rows:\s*var\(--sensor-id-row-h\) minmax\(var\(--sensor-value-line-h\), 1fr\) var\(--sensor-rail-h\)/);
+  });
+});

@@ -462,7 +462,7 @@ test('READ-D GlobalQueue numeric alignment, status bar grouping, trend and camer
     for (const r of rights) expect(r.align).toBe('right');
     expect(Math.max(...rights.map((r) => r.right)) - Math.min(...rights.map((r) => r.right)), `col ${col} right edges`).toBeLessThanOrEqual(1);
   }
-  // Status chips use outline tokens, never red row backgrounds.
+  // GlobalQueue rows carry no status chips and never use red row backgrounds.
   const rowBgs = await rows.evaluateAll((trs) => trs.map((tr) => getComputedStyle(tr).backgroundColor));
   for (const bg of rowBgs) expect(bg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
   // Status bar priority groups, single row at the primary target.

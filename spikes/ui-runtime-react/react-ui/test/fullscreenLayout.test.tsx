@@ -8,7 +8,7 @@ import { StoreContext } from '../src/store/hooks';
 import { PresentationStore } from '../src/store/presentationStore';
 import { compactReason } from '../src/visual/queueReason';
 import { fmtElapsed } from '../src/components/Panels';
-import { makeSnapshot } from './helpers';
+import { makeDispatch, makeSnapshot, makeQueue } from './helpers';
 
 function mountApp(over: Parameters<typeof makeSnapshot>[1] = {}) {
   const store = new PresentationStore();
@@ -37,15 +37,8 @@ describe('compact GlobalQueue source reason (presentation only)', () => {
   });
 
   it('queue rows show the compact label; order and membership come from the runtime unchanged', () => {
-    const entries = ['G+201', 'H7', 'J18'].map((sensorId, i) => ({
-      position: i + 1,
-      sensorId,
-      sourceReason: 'SYN_DIRTY_SCORE_ABOVE_THRESHOLD',
-      dirtyScore: 70 + i,
-      secondsSinceLastClean: 600,
-      status: 'READY' as const,
-    }));
-    const { getByTestId } = mountApp({ queue: { totalQueued: 3, entries } });
+    const entries = ['G+201', 'H7', 'J18'].map((sensorId, i) => ({ sensorId, dirtyScore: 70 + i }));
+    const { getByTestId } = mountApp({ queue: makeQueue(entries) });
     const rows = [...getByTestId('queue-preview').querySelectorAll('tbody tr')];
     expect(rows.map((r) => r.children[1].textContent)).toEqual(['G+201', 'H7', 'J18']);
     for (const r of rows) {
@@ -131,6 +124,8 @@ describe('compact right-side cards', () => {
         startedAt: '2026-01-01T00:00:00.000Z',
         phaseStartedAt: '2026-01-01T00:00:10.000Z',
         phaseProgress: 0.42,
+        preCheck: 'PASSED',
+        dispatch: makeDispatch('H7', 'SYN-JOB-0007'),
       },
     });
     const job = getByTestId('active-job');
@@ -156,21 +151,14 @@ describe('compact right-side cards', () => {
     expect(fmtElapsed(t0, base - 5_000)).toBe('0:00');
   });
 
-  it('GlobalQueue: numeric columns are right-aligned tabular cells, status chips carry the status token', () => {
-    const entries = (['READY', 'HELD', 'BLOCKED', 'EXCLUDED'] as const).map((status, i) => ({
-      position: i + 1,
-      sensorId: ['G+201', 'H7', 'J18', 'I8'][i],
-      sourceReason: 'SYN_TEMP_RISE',
-      dirtyScore: 60 + i,
-      secondsSinceLastClean: 900,
-      status,
-    }));
-    const { getByTestId } = mountApp({ queue: { totalQueued: 4, entries } });
+  it('GlobalQueue: numeric columns are right-aligned tabular cells; no Status column or status chips', () => {
+    const entries = ['G+201', 'H7', 'J18', 'I8'].map((sensorId, i) => ({ sensorId, sourceReason: 'SYN_TEMP_RISE', dirtyScore: 60 + i, secondsSinceLastClean: 900 }));
+    const { getByTestId } = mountApp({ queue: makeQueue(entries) });
     const q = getByTestId('queue-preview');
-    expect([...q.querySelectorAll('th')].map((h) => h.textContent)).toEqual(['Pos', 'Sensor', 'Source reason', 'Score', 'Since clean', 'Status']);
+    expect([...q.querySelectorAll('th')].map((h) => h.textContent)).toEqual(['Pos', 'Sensor', 'Source reason', 'Score', 'Since clean']);
     const row = q.querySelector('tbody tr')!;
     for (const i of [0, 3, 4]) expect(row.children[i].className, `col ${i}`).toMatch(/numCol/);
-    expect([...q.querySelectorAll('[data-status]')].map((c) => c.getAttribute('data-status'))).toEqual(['READY', 'HELD', 'BLOCKED', 'EXCLUDED']);
+    expect(q.querySelectorAll('[data-status]')).toHaveLength(0);
     // Order and membership unchanged (presentation only).
     expect([...q.querySelectorAll('tbody tr')].map((r) => r.getAttribute('data-queue-position'))).toEqual(['1', '2', '3', '4']);
   });

@@ -1,96 +1,101 @@
 {
-  "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
-  "recordedAt": "2026-10-06T09:30:00.000Z",
-  "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
-  "parentCheckpoint": "4129687a",
-  "ownerLocalAtParent": "Edge E2E 25/25 PASS (Owner-reported, about 1.3 min)",
-  "scope": "Stage 0.2.1A final Owner UI punchlist: self-hosted Google Sans (OFL-1.1), quality marker in the value row, expanded application identity, legend clipping, Water Jet display terminology, mixed GlobalQueue sources (synthetic), opt-in SYNTHETIC TEST CONTROL. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
-  "checks": [
-    {
-      "check": "npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
-      "result": "PASS",
-      "detail": "exit 0; package.json and package-lock.json unchanged; no browser download; dependencies unchanged"
-    },
-    {
-      "check": "tsc --noEmit (TypeScript 6.0.3)",
-      "result": "PASS",
-      "detail": "0 errors (project); strict check of e2e/*.ts: 0 errors in layout/operations/punchlist specs; only the known absent Node type declarations in soak.spec.ts / support.ts (unchanged files)"
-    },
-    {
-      "check": "vite build (production)",
-      "result": "PASS",
-      "detail": "JS 325.93 kB (gzip 107.55 kB; +9.16 kB / +2.71 kB gzip vs 4129687a), CSS 28.16 kB (gzip 6.80 kB; +2.48 kB / +0.48 kB gzip), one hashed GoogleSans-Latin-Variable WOFF2 47.67 kB shared by preload and @font-face"
-    },
-    {
-      "check": "vitest (jsdom) 15 files",
-      "result": "PASS",
-      "detail": "109/109 (16 new: fontAsset 7, punchlist 9; 5 existing assertions updated to the Owner-approved values: 19 px title, 11 px subtitle, value-row marker grid, Water Jet summary text)"
-    },
-    {
-      "check": "runtime-harness node:test 3 files",
-      "result": "PASS",
-      "detail": "32/32 (6 new reviewControls: mixed queue, Water Jet refusal, default behaviour, presets 1..6, per-Sensor controls, opt-in token endpoint incl. JSON 404 under static serving)"
-    },
-    {
-      "check": "scenario runner (30 scenarios)",
-      "result": "PASS",
-      "detail": "PASS 25, PASS+OWNER 4, OWNER-LOCAL 1, FAIL 0; S29 mixed queue: 5 source types in the first 8 rows; S30 six presets, accepted second jobs 0; S22 scans browser-loadable sources (licence text files excluded and listed)"
-    },
-    {
-      "check": "golden fixtures validated against canonical map",
-      "result": "PASS",
-      "detail": "fixtures and contracts unchanged; fixtures.test PASS"
-    },
-    {
-      "check": "playwright test --list (no browser)",
-      "result": "PASS",
-      "detail": "35 tests in 4 files (9 new punchlist specs: FONT-A, CELL-A, IDENT-A, LEGEND-A, WJ-A, QUEUE-A, CTRL-A..C); project msedge; web server adds --synthetic-test-controls"
-    },
-    {
-      "check": "hard gates (sensor map)",
-      "result": "PASS",
-      "detail": "106 sensors; 212 channels; 24/29/24/29; 2 Water Jet reference slots (internal CANNON_*); I7/I16 absent; 0 duplicate IDs/scanOrder/channels"
-    },
-    {
-      "check": "font provenance and licence",
-      "result": "PASS",
-      "detail": "WOFF2 47,672 B SHA-256 40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b; OFL.txt / TRADEMARKS.md Git blobs 035131ac / 621fbbd8 match google/fonts; OFL-1.1, no Reserved Font Name; no TTF or other formats committed; .gitattributes prevents EOL conversion"
-    },
-    {
-      "check": "synthetic test-controls boundary (live harness, loopback)",
-      "result": "PASS",
-      "detail": "flag off: JSON 404; flag on: 200 same-origin, 403 cross-site Sec-Fetch-Site, 403 foreign Host; no-store; no CORS header"
-    },
-    {
-      "check": "Google Sans rendering, cell zones, legend bounds, controls in a browser",
-      "result": "NOT VERIFIED",
-      "detail": "no browser in Arena; asserted by e2e/punchlist.spec.ts and the existing layout specs, Owner-local Edge run PENDING"
-    },
-    {
-      "check": "sensitive-data and public-boundary scan (added lines)",
-      "result": "PASS",
-      "detail": "no credentials/keys/connection strings/e-mail; IPv4 only 127.0.0.1; URLs only http://127.0.0.1:5181 and official font/licence citations; no Production Water Jet numbers"
-    },
-    {
-      "check": "markdown relative links (all tracked and new .md)",
-      "result": "PASS",
-      "detail": "46 files, 706 links, 0 broken; 14 anchors, 0 broken"
-    },
-    {
-      "check": "loopback-only bind",
-      "result": "PASS",
-      "detail": "harness socket 127.0.0.1; non-loopback refused by unit test"
-    },
-    {
-      "check": "arena harness measurement 10 min",
-      "result": "NOT RE-RUN",
-      "detail": "publish/acquisition path unchanged; review commands are opt-in and not used by the measurement"
-    },
-    {
-      "check": "offline npm ci rehearsal",
-      "result": "NOT RE-RUN",
-      "detail": "dependencies and lock file unchanged since dd20a8bd rehearsal (PASS)"
-    }
-  ],
-  "notVerified": "ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · installed-Edge rendering of Google Sans, Sensor-cell zones, identity, legend bounds, and the synthetic test controls (Owner-local Edge run and manual F11 1920x1080 review PENDING) · heap / DOM / long tasks / end-to-end latency in Edge · Windows process CPU and memory · Windows offline restore · controlled 15-minute observation (PAUSED) · 60-minute run (waived as a gate, not run) · Extended (4 h) stability · Production queue / alarm behaviour · Production stability · Modbus performance · Production integration."
+ "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
+ "recordedAt": "2026-10-06T14:00:00.000Z",
+ "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
+ "parentCheckpoint": "23f48daa",
+ "ownerLocalAtParent": "Edge 34 selected / 25 passed / 2 failed (READ-A, WJ-A) / 7 not run (Owner-reported)",
+ "scope": "Stage 0.2.1A GlobalQueue semantics correction (Owner domain correction): bounded ready-only synthetic GlobalQueue (<= 8, no entry states), head-only atomic Queue -> Job dispatch with a synthetic dispatch record, Status column removed, Queue Eligibility Decision Matrix (proposal, OWNER DECISION REQUIRED), Edge value-clipping hotfix (READ-A), Water Jet test hotfix (WJ-A). Previous synthetic queue / job behaviour SUPERSEDED, not eligible for production promotion. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
+ "checks": [
+  {
+   "check": "npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
+   "result": "PASS",
+   "detail": "exit 0; package.json and package-lock.json unchanged; no browser download; dependencies unchanged"
+  },
+  {
+   "check": "tsc --noEmit (TypeScript 6.0.3)",
+   "result": "PASS",
+   "detail": "0 errors (project); strict check of e2e/*.ts: 0 errors in layout/operations/punchlist specs; only the known absent Node type declarations in soak.spec.ts / support.ts (unchanged files)"
+  },
+  {
+   "check": "vite build (production)",
+   "result": "PASS",
+   "detail": "JS 327.90 kB (gzip 108.05 kB; +1.97 kB / +0.50 kB gzip vs 23f48daa), CSS 27.67 kB (gzip 6.68 kB; -0.49 kB / -0.12 kB gzip), WOFF2 47.67 kB unchanged"
+  },
+  {
+   "check": "vitest (jsdom) 16 files",
+   "result": "PASS",
+   "detail": "120/120 (new globalQueue.test.tsx 6: heading/count, 0/8 and 8/8, no prohibited words or status, Q/J badges, Diagnostics dispatch summary and eligibility; Sensor-cell vertical budget guard; existing queue/preset/status-column assertions updated to the Owner domain correction)"
+  },
+  {
+   "check": "runtime-harness node:test",
+   "result": "PASS",
+   "detail": "40/40, stable over 3 consecutive runs (new queueDispatch.test.mjs 8: gates A-F; reviewControls updated to the new presets, QUEUE_FULL, no retarget)"
+  },
+  {
+   "check": "scenario runner (32 scenarios)",
+   "result": "PASS",
+   "detail": "PASS 27, PASS+OWNER 4, OWNER-LOCAL 1, FAIL 0; S08 head dispatch QUEUED -> ACTIVE; S09 paused AutoSequence, QUEUE_FULL, no entry status; S29 bounded to 8 with 5 source types; S30 eight presets; S31 Owner example queue G+110, G9, G8, I12 -> Job G+110, new head G9, revision +1, second dispatch and retarget refused; S32 dirty70 max queue 8, every Job linked to its Position 1 dispatch"
+  },
+  {
+   "check": "queue capacity / dispatch gates A-F",
+   "result": "PASS",
+   "detail": "A capacity <= 8, no overflow/duplicates, Water Jet excluded; B target = former head, atomic removal, Position 2 -> 1; C <= 1 Job, no second dispatch; D dispatch record per Job (sensor = target, Position 1, monotonic revisions); E UI count 0-8, no status chips (jsdom); F no arbitrary retarget, Review Job makes the Sensor head first, Reset bounded. Browser part Owner-local PENDING"
+  },
+  {
+   "check": "golden fixtures validated against canonical map",
+   "result": "PASS",
+   "detail": "fixtures regenerated for the corrected queue / job contract; fixtures.test PASS"
+  },
+  {
+   "check": "playwright test --list (no browser)",
+   "result": "PASS",
+   "detail": "36 tests in 4 files; Owner-local selection (operations + layout + punchlist) 35; new QUEUE-B; QUEUE-A, CTRL-A, CTRL-B, WJ-A rewritten"
+  },
+  {
+   "check": "hard gates (sensor map)",
+   "result": "PASS",
+   "detail": "106 sensors; 212 channels; 24/29/24/29; 2 Water Jet reference slots (internal CANNON_*); 108 slots; I7/I16 absent; 0 duplicate IDs; sensorMap.mjs / classify.mjs unchanged"
+  },
+  {
+   "check": "font checks",
+   "result": "PASS",
+   "detail": "WOFF2 47,672 B SHA-256 40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b unchanged; fontAsset tests PASS; Google Sans retained; no size or weight change for the value"
+  },
+  {
+   "check": "prohibited queue states / hidden overflow (source scan)",
+   "result": "PASS",
+   "detail": "no HELD / BLOCKED / EXCLUDED / READY queue-state literals in runtime, contracts, or UI source; no slice(0, 8) queue preview"
+  },
+  {
+   "check": "READ-A value clipping, WJ-A clicks, rendered GlobalQueue panel in a browser",
+   "result": "NOT VERIFIED",
+   "detail": "no browser in Arena; asserted by e2e/layout.spec.ts and e2e/punchlist.spec.ts, Owner-local Edge run PENDING"
+  },
+  {
+   "check": "sensitive-data and public-boundary scan (added lines)",
+   "result": "PASS",
+   "detail": "no credentials/keys/connection strings/e-mail; no IPv4 addresses or URLs in added lines; no Production Water Jet numbers"
+  },
+  {
+   "check": "markdown relative links (all tracked and new .md)",
+   "result": "PASS",
+   "detail": "47 files, 717 links, 0 broken; 17 anchors, 0 broken"
+  },
+  {
+   "check": "loopback-only bind",
+   "result": "PASS",
+   "detail": "harness socket 127.0.0.1; non-loopback refused by unit test"
+  },
+  {
+   "check": "arena harness measurement 10 min",
+   "result": "NOT RE-RUN",
+   "detail": "acquisition / publish path unchanged; queue now bounded (smaller payload)"
+  },
+  {
+   "check": "offline npm ci rehearsal",
+   "result": "NOT RE-RUN",
+   "detail": "dependencies and lock file unchanged since dd20a8bd rehearsal (PASS)"
+  }
+ ],
+ "notVerified": "ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · installed-Edge rendering of the value-clipping fix, Water Jet clicks, GlobalQueue panel, Diagnostics dispatch evidence, and the new presets (Owner-local Edge run and manual F11 1920x1080 review PENDING) · heap / DOM / long tasks / end-to-end latency in Edge · Windows process CPU and memory · Windows offline restore · controlled 15-minute observation (PAUSED) · 60-minute run (waived as a gate, not run) · Extended (4 h) stability · Production queue runtime, eligibility policy, and alarm behaviour · Production stability · Modbus performance · Production integration."
 }

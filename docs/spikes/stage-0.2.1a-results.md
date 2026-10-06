@@ -7,7 +7,9 @@ fullscreen Operations layout refinement (§0A), or the readability refinement (�
 Owner-local re-run and the manual 1920 × 1080 F11 UI re-review are **PENDING** and the 60-minute
 run is **PAUSED**. The Owner-reported interrupted overnight observation of `ea23bc58` is recorded
 in §0B.1; it is not a controlled benchmark. The Owner reported Edge E2E **25 / 25 PASS** at
-`4129687a`; the final UI punchlist (§0C) adds nine Owner-local Edge specs that are **PENDING**, the
+`4129687a` and 25 passed / 2 failed / 7 not run (34 selected) at `23f48daa`; §0D corrects the
+GlobalQueue semantics (Owner domain correction; previous synthetic queue behaviour SUPERSEDED) and
+fixes `READ-A` / `WJ-A` — its Owner-local Edge re-run is **PENDING**. The final UI punchlist (§0C) added nine Owner-local Edge specs, the
 controlled 15-minute observation is **PAUSED**, and the 60-minute run was waived as a gate by the
 Owner (not run). This
 document does **not** select React as the final UI framework; the UI framework, Production
@@ -19,6 +21,132 @@ Plan: [`stage-0.2.1a-plan.md`](stage-0.2.1a-plan.md) · Spike:
 
 All values are produced by synthetic tooling with **SYNTHETIC SPIKE PARAMETERS — NOT
 PRODUCTION VALUES**.
+
+---
+
+## 0D. GlobalQueue semantics correction and head-only dispatch (Stage 0.2.1A)
+
+**Baseline and recovery.** Owner-local Edge at `23f48daa`: 34 selected · 25 passed · 2 failed
+(`READ-A` — G+205 value clipped; `WJ-A` — waited for `detail-id` after clicking a non-selectable
+Water Jet slot) · 7 not run. The local branch had reverted to `e779f8ad`; the Owner-authorized
+one-time recovery restored it to `23f48daa` (identity proof 144 / 144, compare-and-swap ref update,
+index-only refresh; no reset, no force push). This checkpoint is one normal fast-forward commit on
+`23f48daa`; its SHA is recorded in the PR #3 description.
+
+### 0D.1 Owner domain correction and the superseded synthetic behaviour
+
+The GlobalQueue holds **ready-to-dispatch entries only** (presence = READY), at most **8**. There
+are no `BLOCKED` / `HELD` / `WAITING_*` / `EXCLUDED` / `INVALID` / `OUT_OF_SERVICE` / `DISABLED` /
+`BAD` / `STALE` entry states. Pause and pump / Water Jet / valve / pressure / pre-check waits belong
+to the Active Job or the AutoSequence. No eligibility condition is invented; see the
+[Queue Eligibility Decision Matrix](queue-eligibility-decision-matrix.md) (every row
+`OWNER DECISION REQUIRED`).
+
+**Defect in the previous synthetic model (`23f48daa` and earlier) — SUPERSEDED, NOT ELIGIBLE FOR
+PRODUCTION PROMOTION:**
+
+| Previous behaviour | Effect (Owner examples) |
+| --- | --- |
+| Auto start scanned forward past non-`READY` entries (per-entry `HELD` / `BLOCKED` / `EXCLUDED`) | Example A: Job `G+217` while the queue was `G+110, G9, G8, I12`. Example B: Job `I12` while the queue was `G+110, G9, G8` |
+| The score source admitted every Dirty Sensor; the UI showed an 8-row preview of an unbounded queue | Totals such as **76 / 77 queued** (historical, superseded); S29 recorded 33 |
+| Review controls could set an arbitrary Active Job target | A Job could exist for a Sensor that was never the queue head |
+
+### 0D.2 Bounded synthetic queue (spike only)
+
+- Deterministic generator, 0–8 entries, scenario-prepared synthetic Sensors only, FIFO, no
+  duplicates, Water Jet slots excluded, deterministic entry IDs (`SYN-QE-nnnnn`) and refill (score
+  source in scan order, only into free capacity), labelled "GlobalQueue · synthetic".
+- `enqueue` beyond capacity → `QUEUE_FULL`. `QueueSummary.entries` is the whole queue
+  (`totalQueued === entries.length`, `capacity: 8`, monotonic `revision`); no `slice(0, 8)`.
+- **NOT IMPLEMENTED (documented):** 4 TempQueues + 4 TimeQueues, entry / removal dwell, the full
+  eligibility policy, production source ownership and refill, Reject / Reorder, audit records,
+  recovery. Production Queue Runtime is a **Main Development** slice (not authorized).
+
+### 0D.3 Head-only dispatch, Active Job transition, dispatch record
+
+- `dispatchHead()` is the only Job creator. Only Position 1 is a candidate (no scan-forward). One
+  synchronous step removes the head entry, creates exactly one Job (`target = that Sensor`), and
+  writes one synthetic `DispatchRecord` (`SYN-DSP-nnnn`: queue revision before / after (+1),
+  `queueEntryId`, `positionBefore: 1`, sensor, source reason, job ID, origin). Position 2 becomes
+  Position 1.
+- At most one Active Job: dispatch is refused (`ACTIVE_JOB_EXISTS`) while a Job is active; the
+  AutoSequence state is `JOB_ACTIVE`; after the Job ends only the new head is a candidate.
+- Pump not ready → the Job (not the queue) waits in pre-check (`preCheck: WAITING_FOR_PUMP`,
+  shown as the Active Job phase). Synthetic `pump-stop` aborts the Active Job; the next head is
+  then dispatched by the AutoSequence and waits in pre-check until the pump is ready.
+- `pause-auto-sequence` (alias `hold-queue`) pauses dispatch (`autoSequence: PAUSED`); it changes
+  no queue entry.
+- Review controls never retarget: `review-job` is refused while a Job for another Sensor is active;
+  otherwise it first makes the Sensor the queue head (clears the synthetic queue and admits it),
+  then dispatches the head. `start-job` uses the same head preparation.
+
+Arena evidence (scenario runner): **S31** — queue `G+110, G9, G8, I12` with an alarm on `G+110`
+and BAD / STALE quality on `G9` / `G8` (the conditions that previously caused scan-forward):
+Job target `G+110`, new head `G9`, queue revision 123 → 124, second dispatch `ACTIVE_JOB_EXISTS`,
+retarget `ACTIVE_JOB_EXISTS`. **S32** — `dirty70` with AutoSequence: maximum queue length 8, every
+observed Job linked to a Position 1 dispatch of its own target. **S09** — paused AutoSequence;
+`enqueue` on a full queue → `QUEUE_FULL`; entry fields carry no status.
+
+### 0D.4 Hard gates (Arena)
+
+| Gate | Requirement | Evidence |
+| --- | --- | --- |
+| A | Capacity ≤ 8, no overflow, no duplicates, Water Jet excluded | `queueDispatch.test.mjs`, S09, S29, S32 |
+| B | Job target = former head; atomic removal; Position 2 → 1; no later position first | `queueDispatch.test.mjs`, S08, S31 |
+| C | ≤ 1 Job; no second dispatch; Job A then Job B | `queueDispatch.test.mjs`, S27, S31 |
+| D | Every automatic Job has a record; record sensor = target; Position 1; monotonic revisions | `queueDispatch.test.mjs`, S31, S32 |
+| E | UI explainable; count 0–8; no status chips | `globalQueue.test.tsx` (jsdom); Owner-local `QUEUE-B` |
+| F | No arbitrary retarget; Review Job makes the Sensor head first; Reset → valid bounded state | `reviewControls.test.mjs`, S30, S31; Owner-local `CTRL-B` |
+
+### 0D.5 GlobalQueue UI and Diagnostics
+
+- Heading **"GlobalQueue · synthetic"**; count **"n / 8 queued · FIFO · not Production
+  scheduling"** (n = 0..8). Columns: Pos · Sensor · Source reason · Score · Since clean.
+- **Status column removed** (no chips, no `data-status`). Replacement decision, as instructed:
+  the source reason is already a column, so nothing replaces it; no entry-age column was added and
+  no Source-owner semantics were invented.
+- Sensor cell badge: `Q` (queued, ready to dispatch) / `J` (Active Job target); the old HELD /
+  BLOCKED / EXCLUDED badge variants and tokens were removed.
+- Diagnostics drawer: **"QUEUE → JOB DISPATCH (SYNTHETIC EVIDENCE)"** — AutoSequence state and
+  "Position 1 · Sensor · Queue revision a→b · Dispatch ID" (or "No dispatch yet"). **"QUEUE
+  ELIGIBILITY DIAGNOSTICS"** appears only when a scenario sets it (preset 6), e.g. "G+110 · NOT
+  ADMITTED · Reason pending Owner-approved eligibility policy".
+- Presets (SYNTHETIC TEST CONTROL, selected Sensor): 1 Queued DIRTY · 2 Queued CLEANER (synthetic
+  non-score source) · 3 Selected queued · 4 Dispatched head becomes Active Job · 5 Alarm on the
+  Active Job Sensor · 6 Alarm Sensor not admitted (synthetic demo, policy pending) · 7 Queue head →
+  Job atomic transition · 8 Reset. Old preset names are refused (`UNKNOWN_PRESET`).
+
+### 0D.6 Edge value-clipping hotfix (READ-A)
+
+Cause: the value used `line-height: 1` (a 16 px line box) while Google Sans has a 20.03 px content
+area at 16 px (typo ascent 966 / descent −286, `USE_TYPO_METRICS`); about 2 px of text content fell
+below the line box and Chromium / Edge counts it in the value's `scrollHeight`, which `READ-A`
+reports as clipped (first on G+205, the first Sensor cell in DOM order). The row grid
+`14px | minmax(0, 1fr) | rail` left no room for a full line box.
+Fix (no font, size, or weight change; no overflow hiding; no transform): tokens
+`--sensor-id-row-h: 12px` (13 px ID, content 16.28 px, ink fits), `--sensor-value-line-h: 20px`
+(value `line-height` from the token), rows `12px | minmax(20px, 1fr) | rail`; the alarm state
+keeps its 2 px border with zero padding. Content height is 42.5 px at a 46.5 px cell (normal: 1 px
+border + 1 px padding; alarm: 2 px border); 12 + 20 + 10 = 42 px fits across the 46–50 px clamp.
+Cell bounds (52–56 × 46–50), ID 13 px, marker 8 px, value 16 px / 700 unchanged. Static guard:
+`layoutTokens.test.mjs` "Sensor cell vertical budget". **Rendered result NOT VERIFIED** in Arena.
+
+### 0D.7 Water Jet test hotfix (WJ-A)
+
+The behaviour was correct; the assertion was wrong. Case A: without a selection, clicking a Water
+Jet slot leaves `detail-id` absent, selects nothing, and sends no command. Case B: after selecting
+a Sensor (detail visible), clicking `WJ / REAR` then `WJ / FRONT` keeps the Sensor detail and selects
+no slot. Kept: no I7 / I16 Sensors, visible labels, no queue / job targeting.
+
+### 0D.8 Validation (Arena) and pending Owner-local evidence
+
+Arena: Vitest 120 / 120 (16 files), harness 40 / 40, scenarios 27 PASS / 4 PASS+OWNER /
+1 OWNER-LOCAL / 0 FAIL (32), Playwright list 36 tests in 4 files (Owner-local selection 35), build
+JS 327.90 kB (gzip 108.05 kB) and CSS 27.67 kB (gzip 6.68 kB) plus the unchanged 47.67 kB WOFF2. See
+[`arena-validation.md`](../../spikes/ui-runtime-react/results/summary/arena-validation.md).
+**PENDING (Owner-local Edge):** the 35-test selection including `READ-A`, `WJ-A`, `QUEUE-A`, `QUEUE-B`,
+`CTRL-A`..`CTRL-C`, and the manual F11 re-review. **NOT VERIFIED:** any browser rendering,
+production queue behaviour.
 
 ---
 
@@ -71,6 +199,9 @@ licence inventory: [`licence-inventory.md`](../../spikes/ui-runtime-react/result
 
 ### 0C.3 Mixed GlobalQueue sources (synthetic)
 
+> **SUPERSEDED by §0D** (unbounded queue, per-entry status). Historical record only; not eligible
+> for production promotion. The current S29 result is bounded to 8 entries.
+
 `queue-mixed-sources` (scenario command, test evidence only) freezes automatic job starts, then
 queues four canonical Sensors through explicit sources and appends every Dirty Sensor through the
 score source. Arena result (S29): first eight rows contain **5 source types** — `SYN_TIME_DUE`,
@@ -82,6 +213,10 @@ releases only the entries it owns (previously any non-OPERATOR entry); default r
 score and operator entries, so default behaviour is unchanged.
 
 ### 0C.4 SYNTHETIC TEST CONTROL (opt-in review tooling)
+
+> **Presets and queue / job semantics SUPERSEDED by §0D** (the six presets, "held Active Job
+> target", and the `BLOCKED` queue state no longer exist). The token / opt-in boundary below is
+> unchanged.
 
 - Enabled only with `--synthetic-test-controls` (or `WJSS_SPIKE_TEST_CONTROLS=1`); otherwise
   `GET /api/spike/test-controls` is a JSON 404 and the drawer section reads "Off".

@@ -62,10 +62,8 @@ export interface CellVisual {
 }
 
 const QUEUE_BADGES: Record<Exclude<QueueState, 'NONE'>, { code: string; title: string }> = {
-  READY: { code: 'R', title: 'Queued: Ready' },
-  HELD: { code: 'H', title: 'Queued: Held' },
-  BLOCKED: { code: 'B', title: 'Queued: Blocked' },
-  EXCLUDED: { code: 'X', title: 'Queued: Excluded' },
+  // Presence in the GlobalQueue means ready to dispatch; there is no per-entry status.
+  QUEUED: { code: 'Q', title: 'In GlobalQueue (synthetic): ready to dispatch' },
   ACTIVE: { code: 'J', title: 'Active Cleaning Job target' },
 };
 

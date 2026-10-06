@@ -8,7 +8,11 @@ const WALLS = EXPECTED.perWall;
 const QUALITIES = new Set(['GOOD', 'UNCERTAIN', 'BAD', 'STALE', 'DISABLED']);
 const CLASSES = new Set(['DIRTY', 'CLEANER', 'NOT_CLASSIFIED']);
 const BASES = new Set(['CURRENT', 'LAST_VALIDATED', 'NONE']);
-const QUEUE_STATES = new Set(['NONE', 'READY', 'HELD', 'BLOCKED', 'EXCLUDED', 'ACTIVE']);
+const QUEUE_STATES = new Set(['NONE', 'QUEUED', 'ACTIVE']);
+const QUEUE_CAPACITY = 8;
+const AUTO_SEQUENCE = new Set(['OFF', 'PAUSED', 'JOB_ACTIVE', 'QUEUE_EMPTY', 'READY_TO_DISPATCH']);
+// Prohibited GlobalQueue entry states and synonyms (Owner domain correction).
+const PROHIBITED_ENTRY_KEYS = ['status', 'state', 'entryStatus', 'blocked', 'held', 'excluded', 'waiting'];
 const ALARM_STATES = new Set(['NONE', 'ACTIVE_UNACK', 'ACTIVE_ACK', 'CLEARED_UNACK']);
 const POSITION_KEYS = ['wall', 'logicalColumn', 'logicalRow', 'wallColumn', 'wallRow', 'scanOrder', 'deviceId', 'tcFrontChannel', 'tcRearChannel'];
 const SLOT_KEYS = ['slotId', 'slotType', 'wall', 'logicalColumn', 'logicalRow', 'wallColumn', 'wallRow', 'sensorId', 'equipmentId'];
@@ -74,16 +78,45 @@ function validateJob(j, e) {
   if (typeof j !== 'object') return e.push('activeJob invalid');
   if (!isSensorId(j.targetSensorId)) e.push(`activeJob.targetSensorId invalid: ${j.targetSensorId}`);
   if (!PHASES.has(j.phase)) e.push('activeJob.phase invalid');
+  if (!['PASSED', 'WAITING_FOR_PUMP'].includes(j.preCheck)) e.push('activeJob.preCheck invalid');
+  validateDispatchRecord(j.dispatch, 'activeJob.dispatch', e);
+  if (j.dispatch && (j.dispatch.sensorId !== j.targetSensorId || j.dispatch.jobId !== j.jobId)) e.push('activeJob.dispatch does not match the Job (target / jobId)');
+}
+
+function validateDispatchRecord(d, path, e) {
+  if (!d || typeof d !== 'object') return e.push(`${path} missing`);
+  if (d.synthetic !== true) e.push(`${path}.synthetic must be true`);
+  if (d.positionBefore !== 1) e.push(`${path}.positionBefore must be 1 (head-only dispatch)`);
+  if (!isSensorId(d.sensorId)) e.push(`${path}.sensorId not a Sensor: ${d.sensorId}`);
+  if (!Number.isInteger(d.queueRevisionBefore) || d.queueRevisionAfter !== d.queueRevisionBefore + 1) e.push(`${path} queue revisions invalid`);
+  for (const k of ['dispatchId', 'queueEntryId', 'jobId', 'sourceReason', 'origin']) if (typeof d[k] !== 'string' || !d[k]) e.push(`${path}.${k} invalid`);
+  if (!isIso(d.dispatchedAt)) e.push(`${path}.dispatchedAt invalid`);
 }
 
 function validateQueue(q, e) {
   if (!q || !Array.isArray(q.entries)) return e.push('queue invalid');
-  if (q.entries.length > 8) e.push('queue preview exceeds 8 entries');
+  if (q.synthetic !== true) e.push('queue.synthetic must be true');
+  if (q.capacity !== QUEUE_CAPACITY) e.push(`queue.capacity must be ${QUEUE_CAPACITY}`);
+  if (q.entries.length > QUEUE_CAPACITY) e.push(`queue exceeds capacity ${QUEUE_CAPACITY} (${q.entries.length})`);
+  if (q.totalQueued !== q.entries.length) e.push('queue.totalQueued must equal entries.length (no hidden overflow)');
+  if (!Number.isInteger(q.revision) || q.revision < 0) e.push('queue.revision invalid');
+  if (!AUTO_SEQUENCE.has(q.autoSequence)) e.push('queue.autoSequence invalid');
+  const ids = new Set();
   q.entries.forEach((en, i) => {
     if (en.position !== i + 1) e.push(`queue.entries[${i}].position not FIFO order`);
-    if (!['READY', 'HELD', 'BLOCKED', 'EXCLUDED'].includes(en.status)) e.push(`queue.entries[${i}].status invalid`);
     if (!isSensorId(en.sensorId)) e.push(`queue.entries[${i}].sensorId not a Sensor: ${en.sensorId}`);
+    if (ids.has(en.sensorId)) e.push(`queue.entries[${i}] duplicate Sensor ${en.sensorId}`);
+    ids.add(en.sensorId);
+    if (typeof en.entryId !== 'string' || !en.entryId) e.push(`queue.entries[${i}].entryId invalid`);
+    for (const k of PROHIBITED_ENTRY_KEYS) if (k in en) e.push(`queue.entries[${i}].${k}: queue entries carry no status (presence means READY)`);
   });
+  if (q.lastDispatch !== null) validateDispatchRecord(q.lastDispatch, 'queue.lastDispatch', e);
+  if (!Array.isArray(q.eligibilityDiagnostics)) e.push('queue.eligibilityDiagnostics invalid');
+  else
+    q.eligibilityDiagnostics.forEach((d, i) => {
+      if (d.decision !== 'NOT_ADMITTED' || d.synthetic !== true || !isSensorId(d.sensorId)) e.push(`queue.eligibilityDiagnostics[${i}] invalid`);
+      if (ids.has(d.sensorId)) e.push(`queue.eligibilityDiagnostics[${i}]: ${d.sensorId} is NOT ADMITTED but queued`);
+    });
 }
 
 /** @returns {string[]} */
@@ -113,6 +146,16 @@ export function validateSnapshot(m) {
   validateJob(m.activeJob, e);
   if (!m.pump || typeof m.pump.state !== 'string') e.push('pump invalid');
   validateQueue(m.queue, e);
+  // Cross-check: per-Sensor queueState agrees with the queue entries and the Active Job.
+  if (Array.isArray(m.sensors) && m.queue && Array.isArray(m.queue.entries)) {
+    const queued = new Set(m.queue.entries.map((x) => x.sensorId));
+    const target = m.activeJob?.targetSensorId ?? null;
+    if (target && queued.has(target)) e.push(`Active Job target ${target} is still queued`);
+    for (const s of m.sensors) {
+      const want = s.sensorId === target ? 'ACTIVE' : queued.has(s.sensorId) ? 'QUEUED' : 'NONE';
+      if (s.queueState !== want) e.push(`${s.sensorId}.queueState ${s.queueState} != ${want}`);
+    }
+  }
   if (!m.alarms || !Array.isArray(m.alarms.items)) e.push('alarms invalid');
   if (!m.communication || !Array.isArray(m.communication.devices) || m.communication.devices.length !== 10) e.push('communication must list 10 devices');
   if (!m.runtime || typeof m.runtime.historian !== 'object') e.push('runtime invalid');

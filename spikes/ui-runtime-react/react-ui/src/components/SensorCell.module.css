@@ -7,6 +7,14 @@
      row 3: [ bottom rail: alarm icon (left) ........................ queue badge (right) ]
    The value row is symmetric (spacer width = marker zone width), so the value stays optically
    centred and never shifts when the quality marker appears or disappears.
+   Vertical budget (Edge value-clipping hotfix): Google Sans has typo ascent 966 / descent -286
+   (USE_TYPO_METRICS), i.e. a 20.03 px content area at 16 px. A 16 px line box (line-height: 1)
+   leaves ~2 px of text content below the box, which Chromium/Edge counts in scrollHeight (READ-A
+   "value clipped", first reported on G+205, the first Sensor cell in DOM order). The value now has
+   a full 20 px line box and the ID row is 12 px (13 px glyph ink spans ~0.9-10.6 px, inside the
+   box). Alarmed cells (2 px border, 0 padding) have 42.5 px of content height at a 46.5 px cell:
+   12 + 20 + 10 = 42 px fits at every cell height in the 46-50 px clamp. No scaling, no overflow
+   hiding on the value, no font-size reduction.
    Channel separation (no shared CSS property between channels):
      process + score  -> background         quality   -> marker zone (+ pattern)
      alarm            -> border + inset ring + rail icon
@@ -30,7 +38,7 @@
   cursor: pointer;
   display: grid;
   grid-template-columns: var(--sensor-marker-size) minmax(0, 1fr) var(--sensor-marker-size);
-  grid-template-rows: 14px minmax(0, 1fr) var(--sensor-rail-h);
+  grid-template-rows: var(--sensor-id-row-h) minmax(var(--sensor-value-line-h), 1fr) var(--sensor-rail-h);
   column-gap: var(--sensor-value-row-gap);
   align-items: center;
   box-shadow: var(--ring-alarm), var(--ring-select);
@@ -49,7 +57,7 @@
   overflow: hidden;
   font-size: var(--sensor-id-font-size);
   font-weight: 700;
-  line-height: 14px;
+  line-height: var(--sensor-id-row-h);
   white-space: nowrap;
   text-align: left;
   /* Labels use proportional digits (narrower); numeric values keep tabular numerals. */
@@ -75,7 +83,8 @@
   max-width: 100%;
   font-size: var(--sensor-value-font-size);
   font-weight: 700;
-  line-height: 1;
+  /* Full Google Sans content area (20.03 px at 16 px; Chromium rounds ascent/descent to 15 + 5). */
+  line-height: var(--sensor-value-line-h);
   white-space: nowrap;
 }
 /* Zone 4: bottom rail. */

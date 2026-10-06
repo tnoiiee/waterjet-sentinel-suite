@@ -165,27 +165,44 @@ await scenario('S08', 'Queue badge changes', async () => {
     await sleep(1000);
     for (const s of mirror.all()) (seen.get(s.sensorId) ?? seen.set(s.sensorId, new Set()).get(s.sensorId)).add(s.queueState);
   }
+  // Bounded queue: membership changes on dispatch / refill (a Job lasts 6 x 4 s), so the badge
+  // change is driven deterministically by one head-only dispatch (QUEUED -> ACTIVE).
+  await api.cmd('auto-jobs', { enabled: false });
+  await api.cmd('abort-job');
+  await sleep(1200);
+  for (const s of mirror.all()) (seen.get(s.sensorId) ?? seen.set(s.sensorId, new Set()).get(s.sensorId)).add(s.queueState);
+  const head = mirror.single.queue.entries[0]?.sensorId;
+  const d = await api.cmd('dispatch-head');
+  await sleep(1200);
+  for (const s of mirror.all()) seen.get(s.sensorId).add(s.queueState);
+  await api.cmd('auto-jobs', { enabled: true });
   const changed = [...seen.values()].filter((v) => v.size > 1).length;
   const states = new Set([...seen.values()].flatMap((v) => [...v]));
+  check(d.accepted === true && d.detail.dispatch.sensorId === head, `dispatch ${JSON.stringify(d)}`);
+  check(seen.get(head).has('QUEUED') && seen.get(head).has('ACTIVE'), 'head badge did not change QUEUED -> ACTIVE');
   check(changed > 0, 'no queue badge change observed');
-  return { sensorsWithQueueStateChange: changed, statesSeen: [...states] };
+  check([...states].every((x) => ['NONE', 'QUEUED', 'ACTIVE'].includes(x)), `unexpected queueState ${[...states]}`);
+  return { sensorsWithQueueStateChange: changed, statesSeen: [...states].sort(), dispatchedHead: head };
 });
 
-await scenario('S09', 'GlobalQueue changes', async () => {
+await scenario('S09', 'GlobalQueue changes (bounded, status-free; AutoSequence pause is not an entry state)', async () => {
   const q1 = mirror.single.queue;
-  await api.cmd('hold-queue', { held: true });
+  await api.cmd('pause-auto-sequence', { paused: true });
   await sleep(1200);
   const q2 = mirror.single.queue;
-  await api.cmd('hold-queue', { held: false });
-  await api.cmd('enqueue', { sensorId: 'H17' });
+  await api.cmd('pause-auto-sequence', { paused: false });
+  const enq = await api.cmd('enqueue', { sensorId: 'H17' });
   await sleep(1200);
   const q3 = mirror.single.queue;
   for (const q of [q1, q2, q3]) {
-    check(q.entries.length <= 8, 'preview > 8');
+    check(q.entries.length <= 8 && q.capacity === 8, 'queue exceeds capacity 8');
+    check(q.totalQueued === q.entries.length, 'hidden overflow (totalQueued != entries.length)');
     q.entries.forEach((e, i) => check(e.position === i + 1, 'not FIFO positions'));
+    check(q.entries.every((e) => !('status' in e)), 'queue entry carries a status');
   }
-  check(q2.entries.every((e) => e.status !== 'READY'), 'held queue still READY');
-  return { totalQueued: q3.totalQueued, previewLength: q3.entries.length, heldStatuses: [...new Set(q2.entries.map((e) => e.status))], fields: Object.keys(q3.entries[0] ?? {}) };
+  check(q2.autoSequence === 'PAUSED', `AutoSequence not PAUSED (${q2.autoSequence})`);
+  check(enq.accepted === true || enq.reason === 'QUEUE_FULL', JSON.stringify(enq));
+  return { totalQueued: q3.totalQueued, capacity: q3.capacity, pausedAutoSequence: q2.autoSequence, enqueueH17: enq.accepted ? 'admitted' : enq.reason, fields: Object.keys(q3.entries[0] ?? {}) };
 });
 
 await scenario('S10', 'Single Job progression', async () => {
@@ -428,12 +445,13 @@ await scenario('S28', 'Revision gap -> re-snapshot', async () => {
   return { gapsDetected: mirror2.gaps - g0, resyncFirstEvent: m3.events[0].type };
 });
 
-await scenario('S29', 'Mixed GlobalQueue sources', async () => {
+await scenario('S29', 'Mixed GlobalQueue sources (bounded to 8)', async () => {
   const r = await api.cmd('queue-mixed-sources');
   check(r.accepted === true, JSON.stringify(r));
   await sleep(1200);
   const snap = await api.snapshot();
-  const first8 = snap.queue.entries.slice(0, 8);
+  check(snap.queue.entries.length <= 8 && snap.queue.totalQueued === snap.queue.entries.length, `queue not bounded (${snap.queue.totalQueued})`);
+  const first8 = snap.queue.entries;
   const types = [...new Set(first8.map((e) => e.sourceReason))];
   check(types.length >= 3, `only ${types.length} source types in first 8 rows`);
   check(first8.every((e, i) => e.position === i + 1), 'FIFO positions not 1..n');
@@ -446,26 +464,99 @@ await scenario('S29', 'Mixed GlobalQueue sources', async () => {
   const dup = await api.cmd('enqueue', { sensorId: first8[0].sensorId, reason: 'TEMP' });
   check(dup.detail?.duplicate === true && dup.detail.owner === first8[0].sourceReason, 'duplicate changed owner');
   check((await api.metrics()).invariants.violations === 0, 'invariant violation');
-  return { status: 'PASS+OWNER', evidence: { sourceTypesFirst8: types, first8: first8.map((e) => `${e.position}:${e.sensorId}:${e.sourceReason}`), totalQueued: snap.queue.totalQueued, browserPart: 'OWNER-LOCAL e2e QUEUE-A' } };
+  return { status: 'PASS+OWNER', evidence: { sourceTypes: types, entries: first8.map((e) => `${e.position}:${e.sensorId}:${e.sourceReason}`), totalQueued: snap.queue.totalQueued, capacity: snap.queue.capacity, browserPart: 'OWNER-LOCAL e2e QUEUE-A' } };
 });
 
-await scenario('S30', 'Synthetic review presets (Alarm + Queue)', async () => {
+await scenario('S30', 'Synthetic review presets (valid queue / job states)', async () => {
   const id = (await api.snapshot()).sensors[40].sensorId;
   const out = {};
-  for (const preset of ['alarm-queue-dirty', 'alarm-queue-cleaner', 'selected-alarm-queue', 'job-alarm-queue', 'cleared-ack-queue']) {
+  const expectState = {
+    'queued-dirty': (s, snap) => s.queueState === 'QUEUED' && snap.queue.entries[0]?.sensorId === id,
+    'queued-cleaner-non-score': (s, snap) => s.queueState === 'QUEUED' && s.classification === 'CLEANER' && snap.queue.entries[0]?.sourceReason === 'SYN_OPERATOR_REQUEST',
+    'selected-queued': (s, snap) => s.queueState === 'QUEUED' && snap.queue.entries[1]?.sensorId === id,
+    'dispatched-head-job': (s, snap) => s.isActiveJobTarget && snap.activeJob?.dispatch.sensorId === id && snap.activeJob.dispatch.positionBefore === 1,
+    'alarm-on-active-job': (s) => s.isActiveJobTarget && s.alarmState === 'ACTIVE_UNACK',
+    'alarm-not-admitted': (s, snap) => s.queueState === 'NONE' && s.alarmState === 'ACTIVE_UNACK' && snap.queue.eligibilityDiagnostics.some((d) => d.sensorId === id),
+    'head-to-job-transition': (s, snap) => s.isActiveJobTarget && snap.activeJob?.dispatch.sensorId === id,
+  };
+  for (const [preset, ok] of Object.entries(expectState)) {
     const r = await api.cmd('visual-preset', { preset, sensorId: id });
     check(r.accepted === true, `${preset}: ${JSON.stringify(r)}`);
-    await sleep(1100);
-    const s = (await api.snapshot()).sensors.find((x) => x.sensorId === id);
-    out[preset] = `${s.classification}/${s.alarmState}/${s.queueState}${s.isActiveJobTarget ? '/JOB' : ''}`;
-    check(s.alarmState !== 'NONE', `${preset}: no alarm`);
-    check(s.queueState !== 'NONE', `${preset}: not queued / active`);
+    const snap = await api.snapshot();
+    const s = snap.sensors.find((x) => x.sensorId === id);
+    out[preset] = `${s.classification}/${s.alarmState}/${s.queueState}${s.isActiveJobTarget ? '/JOB' : ''} · queue ${snap.queue.totalQueued}/8`;
+    check(snap.queue.entries.length <= 8, `${preset}: queue > 8`);
+    check(ok(s, snap), `${preset}: unexpected state ${out[preset]}`);
+    if (snap.activeJob) check(snap.activeJob.dispatch.sensorId === snap.activeJob.targetSensorId, `${preset}: job not linked to its dispatch`);
   }
   const reset = await api.cmd('visual-preset', { preset: 'reset' });
   check(reset.accepted === true, 'reset refused');
+  const after = await api.snapshot();
+  check(after.queue.entries.length <= 8 && after.queue.eligibilityDiagnostics.length === 0, 'reset not bounded / demo left');
   const m = await api.metrics();
   check(m.jobs.acceptedSecondJobs === 0 && m.invariants.violations === 0, 'second job or invariant violation');
-  return { status: 'PASS+OWNER', evidence: { sensorId: id, states: out, presets: 6, browserPart: 'OWNER-LOCAL e2e CTRL-A..C' } };
+  return { status: 'PASS+OWNER', evidence: { sensorId: id, states: out, presets: 8, browserPart: 'OWNER-LOCAL e2e CTRL-A..C' } };
+});
+
+await scenario('S31', 'Head-only atomic dispatch (no scan-forward; Owner examples A/B)', async () => {
+  // Owner Example B queue: G+110, G9, G8, I12. Head carries an alarm and later entries have
+  // degraded quality: the old model skipped to I12; head-only dispatch must start G+110.
+  // Threshold 99 stops the synthetic score source from refilling, so the queue can be built
+  // explicitly over HTTP (every command triggers a publish).
+  await api.cmd('auto-jobs', { enabled: false });
+  await api.cmd('abort-job');
+  await api.cmd('publish-config', { dirtyThreshold: 99 });
+  for (const e of (await api.snapshot()).queue.entries) await api.cmd('dequeue', { sensorId: e.sensorId });
+  for (const id of ['G+110', 'G9', 'G8', 'I12']) await api.cmd('enqueue', { sensorId: id, reason: 'TIME_DUE' });
+  await api.cmd('raise-alarm', { sensorId: 'G+110' });
+  await api.cmd('force-quality', { sensorId: 'G9', quality: 'BAD' });
+  await api.cmd('force-quality', { sensorId: 'G8', quality: 'STALE' });
+  const before = (await api.snapshot()).queue;
+  check(before.entries[0]?.sensorId === 'G+110', `head is ${before.entries[0]?.sensorId}`);
+  const d = await api.cmd('dispatch-head');
+  check(d.accepted === true, JSON.stringify(d));
+  const snap = await api.snapshot();
+  check(snap.activeJob.targetSensorId === 'G+110', `job target ${snap.activeJob.targetSensorId}`);
+  check(snap.queue.entries[0].sensorId === before.entries[1].sensorId, 'Position 2 did not become Position 1');
+  check(d.detail.dispatch.queueRevisionAfter === d.detail.dispatch.queueRevisionBefore + 1, 'dispatch not one atomic queue revision');
+  const second = await api.cmd('dispatch-head');
+  check(second.accepted === false && second.reason === 'ACTIVE_JOB_EXISTS', 'second dispatch while a Job is active');
+  const retarget = await api.cmd('review-job', { sensorId: 'I12' });
+  check(retarget.accepted === false && (await api.snapshot()).activeJob.targetSensorId === 'G+110', 'Job retargeted');
+  for (const id of ['G9', 'G8']) await api.cmd('force-quality', { sensorId: id, quality: 'GOOD' });
+  await api.cmd('clear-alarm', { sensorId: 'G+110' });
+  await api.cmd('ack-alarm', { sensorId: 'G+110' });
+  await api.cmd('abort-job');
+  await api.cmd('publish-config', { dirtyThreshold: 50 });
+  await api.cmd('visual-preset', { preset: 'reset' });
+  const m = await api.metrics();
+  check(m.invariants.violations === 0 && m.jobs.acceptedSecondJobs === 0, 'invariant violation');
+  return { queueBefore: before.entries.map((e) => e.sensorId), jobTarget: 'G+110', newHead: snap.queue.entries[0].sensorId, dispatch: d.detail.dispatch.dispatchId, revisions: `${d.detail.dispatch.queueRevisionBefore}->${d.detail.dispatch.queueRevisionAfter}`, secondDispatch: second.reason, retarget: retarget.reason };
+});
+
+await scenario('S32', 'Bounded queue under load and Job linkage (dirty70, AutoSequence)', async () => {
+  await api.cmd('set-dirty-mode', { mode: 'dirty70' });
+  await api.cmd('auto-jobs', { enabled: true });
+  let maxLen = 0;
+  let unlinked = 0;
+  const seen = new Set();
+  for (let i = 0; i < 8; i += 1) {
+    await sleep(500);
+    const snap = await api.snapshot();
+    const q = snap.queue;
+    const j = snap.activeJob;
+    maxLen = Math.max(maxLen, q.entries.length, q.totalQueued);
+    if (j) {
+      seen.add(j.dispatch.dispatchId);
+      if (j.dispatch.sensorId !== j.targetSensorId || j.dispatch.positionBefore !== 1) unlinked += 1;
+    }
+  }
+  const m = await api.metrics();
+  await api.cmd('set-dirty-mode', { mode: 'normal' });
+  check(maxLen <= 8, `queue length ${maxLen} > 8`);
+  check(unlinked === 0, 'Active Job not linked to a Position 1 dispatch');
+  check(m.queue.length <= 8 && m.invariants.violations === 0, 'metrics bound / invariants');
+  return { maxQueueLength: maxLen, dispatchesObserved: seen.size, queueMetrics: { length: m.queue.length, capacity: m.queue.capacity, dispatches: m.queue.dispatches, autoSequence: m.queue.autoSequence } };
 });
 
 const finalMetrics = await api.metrics();

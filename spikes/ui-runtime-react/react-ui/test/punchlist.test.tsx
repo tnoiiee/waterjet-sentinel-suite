@@ -144,12 +144,12 @@ describe('SYNTHETIC TEST CONTROL (opt-in spike review tooling)', () => {
     const f = vi.fn(() => json(200, { enabled: true, token: 't-1' }));
     const none = mountControl(null, f);
     await waitFor(() => expect(none.getByTestId('synthetic-test-control').getAttribute('data-availability')).toBe('enabled'));
-    expect((none.getByTestId('stc-preset-dirty') as HTMLButtonElement).disabled).toBe(true);
+    expect((none.getByTestId('stc-preset-queued-dirty') as HTMLButtonElement).disabled).toBe(true);
     expect(none.getByTestId('stc-selected').textContent).toBe('—');
     expect((none.getByTestId('stc-preset-reset') as HTMLButtonElement).disabled).toBe(false);
     none.unmount();
     const sel = mountControl('H7', f);
-    await waitFor(() => expect((sel.getByTestId('stc-preset-dirty') as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect((sel.getByTestId('stc-preset-queued-dirty') as HTMLButtonElement).disabled).toBe(false));
     expect(sel.getByTestId('stc-selected').textContent).toBe('H7');
   });
 
@@ -161,16 +161,16 @@ describe('SYNTHETIC TEST CONTROL (opt-in spike review tooling)', () => {
       return json(200, { accepted: true, detail: {} });
     });
     const { getByTestId } = mountControl('G+205', f);
-    await waitFor(() => expect((getByTestId('stc-preset-dirty') as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect((getByTestId('stc-preset-queued-dirty') as HTMLButtonElement).disabled).toBe(false));
     await act(async () => {
-      fireEvent.click(getByTestId('stc-preset-dirty'));
+      fireEvent.click(getByTestId('stc-preset-queued-dirty'));
     });
     await waitFor(() => expect(getByTestId('stc-result').textContent).toBe('visual-preset: accepted'));
     const posts = calls.filter(([u]) => u === '/api/spike/scenario');
     expect(posts).toHaveLength(1);
     const [, init] = posts[0];
     expect((init!.headers as Record<string, string>)['x-spike-token']).toBe('tok-xyz');
-    expect(JSON.parse(String(init!.body))).toEqual({ command: 'visual-preset', params: { preset: 'alarm-queue-dirty', sensorId: 'G+205' } });
+    expect(JSON.parse(String(init!.body))).toEqual({ command: 'visual-preset', params: { preset: 'queued-dirty', sensorId: 'G+205' } });
     expect(window.localStorage.length).toBe(0);
     expect(window.sessionStorage.length).toBe(0);
   });

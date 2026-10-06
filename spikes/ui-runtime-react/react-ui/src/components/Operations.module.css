@@ -854,9 +854,6 @@
 .colAge {
   width: 110px;
 }
-.colStatus {
-  width: 90px;
-}
 .sensorCol {
   font-family: var(--font-sensor);
   font-weight: 700;
@@ -865,34 +862,7 @@
 .reason {
   color: var(--text);
 }
-.chip {
-  display: inline-block;
-  min-width: 68px;
-  text-align: center;
-  font-size: var(--font-badge);
-  font-weight: 700;
-  line-height: 16px;
-  padding: 0 var(--space-dense);
-  border-radius: 3px;
-  border: 1px solid var(--border-strong);
-}
-.st_READY {
-  border-color: var(--st-ready);
-  color: var(--st-ready);
-}
-.st_HELD {
-  border-color: var(--st-held);
-  color: var(--st-held);
-}
-.st_BLOCKED {
-  border-color: var(--st-blocked);
-  color: var(--st-blocked);
-  border-style: dashed;
-}
-.st_EXCLUDED {
-  border-color: var(--st-excluded);
-  color: var(--st-excluded);
-}
+/* GlobalQueue entries carry no status chips (presence means ready to dispatch). */
 
 /* Bottom row: Pressure Trend and Camera share one bounded row height. */
 .trendPanel,
@@ -1043,7 +1013,7 @@
   color: var(--muted);
 }
 .stcState {
-  color: var(--st-held);
+  color: var(--stc-state);
 }
 .stcResult {
   margin: var(--space-dense) 0 0;

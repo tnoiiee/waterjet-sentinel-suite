@@ -2,7 +2,7 @@
 // per-Sensor notification, bounded trend.
 import { describe, expect, it, vi } from 'vitest';
 import { PresentationStore } from '../src/store/presentationStore';
-import { makeDelta, makeSensor, makeSnapshot } from './helpers';
+import { makeDelta, makeDispatch, makeSensor, makeSnapshot, makeQueue } from './helpers';
 
 describe('PresentationStore', () => {
   it('applies a chained Delta and advances the revision', () => {
@@ -39,7 +39,7 @@ describe('PresentationStore', () => {
 
   it('Snapshot replaces all state (no merge with stale cache)', () => {
     const s = new PresentationStore();
-    s.applySnapshot(makeSnapshot(10, { activeJob: { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P2', phaseLabel: 'x', phaseIndex: 1, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:04Z', phaseProgress: 0.5 } }));
+    s.applySnapshot(makeSnapshot(10, { activeJob: { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P2', phaseLabel: 'x', phaseIndex: 1, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:04Z', phaseProgress: 0.5, preCheck: 'PASSED', dispatch: makeDispatch('G+203', 'SYN-JOB-0001') } }));
     s.applyDelta(makeDelta(10, { sensors: [makeSensor({ sensorId: 'G+202', alarmState: 'ACTIVE_UNACK' })] }));
     s.applySnapshot(makeSnapshot(50));
     expect(s.revision).toBe(50);
@@ -72,14 +72,14 @@ describe('PresentationStore', () => {
     const queue = vi.fn();
     s.subscribe('pump', pump);
     s.subscribe('queue', queue);
-    s.applyDelta(makeDelta(1, { queue: { totalQueued: 1, entries: [] } }));
+    s.applyDelta(makeDelta(1, { queue: makeQueue([], { revision: 1 }) }));
     expect(queue).toHaveBeenCalledTimes(1);
     expect(pump).not.toHaveBeenCalled();
   });
 
   it('applies activeJob null as a clear, and absent as unchanged', () => {
     const s = new PresentationStore();
-    const job = { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P1' as const, phaseLabel: 'x', phaseIndex: 0, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:00Z', phaseProgress: 0 };
+    const job = { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P1' as const, phaseLabel: 'x', phaseIndex: 0, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:00Z', phaseProgress: 0, preCheck: 'PASSED' as const, dispatch: makeDispatch('G+203', 'SYN-JOB-0001') };
     s.applySnapshot(makeSnapshot(1, { activeJob: job }));
     s.applyDelta(makeDelta(1));
     expect(s.getSlice('activeJob')).toEqual(job);

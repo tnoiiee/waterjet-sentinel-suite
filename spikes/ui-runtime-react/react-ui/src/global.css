@@ -65,11 +65,9 @@
   --ok: #7fcf9b;
   --ok-surface: rgba(127, 207, 155, 0.1);
 
-  /* ---- queue status tokens ---- */
-  --st-ready: #7fcf9b;
-  --st-held: #e8c15a;
-  --st-blocked: #ff9e7a;
-  --st-excluded: #a3aab2;
+  /* ---- synthetic test control state text (queue status tokens removed: GlobalQueue entries
+     carry no status; presence means ready to dispatch) ---- */
+  --stc-state: #e8c15a;
 
   /* ---- trend tokens (series differ in luminance as well as hue) ---- */
   --trend-s1: #8fd3ff;
@@ -175,6 +173,10 @@
   --sensor-cell-width: clamp(52px, min(calc(var(--sensor-cell-height) + 9px), calc((100cqw - 120px) / 13)), 56px);
   --sensor-id-font-size: 13px;
   --sensor-value-font-size: 16px;
+  /* Cell rows: ID 12 px + value line box 20 px + rail 10 px = 42 px <= 42.5 px (alarmed cell
+     content height at 46.5 px). See SensorCell.module.css (Edge value-clipping hotfix). */
+  --sensor-id-row-h: 12px;
+  --sensor-value-line-h: 20px;
   /* Quality marker (value row, right end). The value row is symmetric:
      [ spacer = marker size | value | marker zone ], so the value never shifts with quality. */
   --sensor-marker-size: 8px;

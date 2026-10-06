@@ -6,7 +6,7 @@ import { WallOverview } from '../src/components/WallOverview';
 import { renderCounter } from '../src/diagnostics/renderCounter';
 import { StoreContext } from '../src/store/hooks';
 import { PresentationStore } from '../src/store/presentationStore';
-import { makeDelta, makeSensor, makeSnapshot } from './helpers';
+import { makeDelta, makeSensor, makeSnapshot, makeQueue } from './helpers';
 import { useCallback, useState } from 'react';
 
 function Harness({ store }: { store: PresentationStore }) {
@@ -47,7 +47,7 @@ describe('render isolation (jsdom)', () => {
     render(<Harness store={store} />);
     renderCounter.reset();
     act(() => {
-      store.applyDelta(makeDelta(1, { queue: { totalQueued: 3, entries: [] }, trendPoint: { t: 1, series: [1, 2, 3, 4], setpoint: 100, jobActive: false, alarmActive: false } }));
+      store.applyDelta(makeDelta(1, { queue: makeQueue([], { revision: 3 }), trendPoint: { t: 1, series: [1, 2, 3, 4], setpoint: 100, jobActive: false, alarmActive: false } }));
     });
     expect(renderCounter.sensorCellRenders).toBe(0);
   });

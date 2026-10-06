@@ -1,5 +1,5 @@
 // WJSS Stage 0.2.1A — test helpers: synthetic records, snapshots, deltas, fake EventSource.
-import type { OperationalDelta, OperationalSnapshot, SensorPresentationState, Wall } from '../../contracts/operational';
+import type { DispatchRecord, OperationalDelta, OperationalSnapshot, QueueSummary, SensorPresentationState, Wall } from '../../contracts/operational';
 import type { EventSourceLike, MessageEventLike } from '../src/store/feed';
 // Tests take Sensor identity and positions from the canonical mapping source (never generated here).
 import { EXPECTED, getSensorMap, sensorById, wallMapSlots } from '../../contracts/sensorMap.mjs';
@@ -59,7 +59,7 @@ export function makeSnapshot(revision = 10, over: Partial<OperationalSnapshot> =
     walls: WALLS.map(([wall, total]) => ({ wall, total, dirty: 0, cleaner: total, notClassified: 0, uncertain: 0, maxScore: 30 })),
     activeJob: null,
     pump: { state: 'RUNNING', pressure: 100, setpoint: 100, readyBandLow: 90, readyBandHigh: 110, ready: true, stopRequestedAt: null },
-    queue: { totalQueued: 0, entries: [] },
+    queue: makeQueue([]),
     alarms: { activeUnack: 0, activeAck: 0, clearedUnack: 0, items: [] },
     communication: { devices: [] },
     runtime: { uptimeS: 1, rssMb: 50, heapUsedMb: 10, eventLoopP99Ms: 1, sseClients: 1, historian: { depth: 0, capacity: 50000, nearOverflow: false, rejected: 0, lastBatchLatencyMs: null, delayMs: 20, gapMarkers: 0 }, invariantViolations: 0, acceptedSecondJobs: 0, refusedSecondJobs: 0 },
@@ -99,4 +99,47 @@ export class FakeEventSource implements EventSourceLike {
     this.readyState = readyState;
     this.onerror?.({});
   }
+}
+
+/** Bounded synthetic GlobalQueue slice (ready-to-dispatch entries only; no per-entry status). */
+export function makeQueue(
+  entries: { sensorId: string; sourceReason?: string; dirtyScore?: number | null; secondsSinceLastClean?: number }[],
+  over: Partial<QueueSummary> = {},
+): QueueSummary {
+  return {
+    synthetic: true,
+    label: 'GlobalQueue · synthetic · FIFO · not Production scheduling',
+    capacity: 8,
+    totalQueued: entries.length,
+    revision: entries.length,
+    entries: entries.map((e, i) => ({
+      position: i + 1,
+      entryId: `SYN-QE-${String(i + 1).padStart(5, '0')}`,
+      sensorId: e.sensorId,
+      sourceReason: e.sourceReason ?? 'SYN_DIRTY_SCORE_ABOVE_THRESHOLD',
+      dirtyScore: e.dirtyScore ?? 70,
+      secondsSinceLastClean: e.secondsSinceLastClean ?? 600,
+    })),
+    autoSequence: 'OFF',
+    lastDispatch: null,
+    eligibilityDiagnostics: [],
+    ...over,
+  };
+}
+
+/** Synthetic dispatch record linking a Job to the queue head it was created from. */
+export function makeDispatch(sensorId: string, jobId: string, queueRevisionBefore = 10): DispatchRecord {
+  return {
+    dispatchId: `SYN-DSP-${jobId.slice(-4)}`,
+    synthetic: true,
+    queueRevisionBefore,
+    queueRevisionAfter: queueRevisionBefore + 1,
+    queueEntryId: 'SYN-QE-00001',
+    positionBefore: 1,
+    sensorId,
+    sourceReason: 'SYN_DIRTY_SCORE_ABOVE_THRESHOLD',
+    jobId,
+    origin: 'SYN_AUTO_SEQUENCE',
+    dispatchedAt: '2026-01-01T00:00:00.000Z',
+  };
 }

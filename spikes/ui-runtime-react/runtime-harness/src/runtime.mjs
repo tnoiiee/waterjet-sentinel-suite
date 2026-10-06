@@ -35,9 +35,27 @@ const iso = (ms) => (ms === null || ms === undefined ? null : new Date(ms).toISO
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const round1 = (v) => Math.round(v * 10) / 10;
 
-// Synthetic GlobalQueue source reasons (spike codes; the contract field is a free string).
-// Each queued Sensor keeps the reason of the source that FIRST queued it (source owner); later
-// sources never overwrite it (de-duplication by Sensor ID, FIFO order unchanged).
+// ---------------------------------------------------------------------------------------------
+// Synthetic GlobalQueue (Owner domain correction; supersedes the earlier unbounded queue model).
+//
+// SYNTHETIC — NOT PRODUCTION SCHEDULING. NOT ELIGIBLE FOR PRODUCTION PROMOTION.
+//  * The GlobalQueue holds ready-to-dispatch entries only. Presence in the queue means READY;
+//    there is no per-entry status (no BLOCKED / HELD / WAITING / EXCLUDED or synonyms).
+//  * Physical capacity: at most QUEUE_CAPACITY unique entries. No hidden overflow, no preview cut.
+//  * FIFO; only Position 1 is ever dispatched (no scan-forward). Dispatch is atomic: the head
+//    entry is removed and exactly one Cleaning Job is created for that Sensor, linked by a
+//    synthetic dispatch record. At most one Active Job; while it exists, dispatch is paused.
+//  * Operator pause belongs to the AutoSequence; Pump readiness waits belong to the Job
+//    pre-check (P1). Neither is a queue entry state.
+//  * Admission is a deterministic synthetic generator (sources below). No Alarm / Quality /
+//    equipment / interval eligibility rule is implemented — those await the Owner-approved
+//    Queue Eligibility Decision Matrix (docs/spikes/queue-eligibility-decision-matrix.md).
+//  * NOT IMPLEMENTED: 4 TempQueue + 4 TimeQueue split, dwell, production source ownership and
+//    refill, Reject / Reorder, audit, recovery.
+// ---------------------------------------------------------------------------------------------
+export const QUEUE_CAPACITY = 8;
+// Synthetic source reasons (spike codes; the contract field is a free string). A duplicate
+// admission never changes the existing entry (de-duplication by Sensor ID, FIFO unchanged).
 export const QUEUE_REASONS = Object.freeze({
   DIRTY_SCORE: 'SYN_DIRTY_SCORE_ABOVE_THRESHOLD',
   OPERATOR: 'SYN_OPERATOR_REQUEST',
@@ -49,6 +67,19 @@ export const QUEUE_REASONS = Object.freeze({
 const REVIEW_SCORE = Object.freeze({ DIRTY: 82, CLEANER: 18 });
 // Held review job: frozen at P2 so the Owner can inspect it; never completes on its own.
 const REVIEW_JOB_PHASE = 1;
+// Synthetic demonstration reason for preset 6 (policy pending; never a production rule).
+export const NOT_ADMITTED_DEMO_REASON = 'Reason pending Owner-approved eligibility policy (synthetic demonstration)';
+const DISPATCH_LOG_CAPACITY = 50;
+// Synthetic review presets (the eighth control is 'reset').
+export const PRESETS = Object.freeze([
+  'queued-dirty',
+  'queued-cleaner-non-score',
+  'selected-queued',
+  'dispatched-head-job',
+  'alarm-on-active-job',
+  'alarm-not-admitted',
+  'head-to-job-transition',
+]);
 
 export class SyntheticRuntime extends EventEmitter {
   constructor(overrides = {}) {
@@ -89,9 +120,16 @@ export class SyntheticRuntime extends EventEmitter {
     );
     this.pressure = { values: [null, null, null, null], sourceTs: null };
     this.pump = { state: 'RUNNING', changedAt: this.startedAt, stopRequestedAt: null };
-    this.queueOrder = [];
-    this.queueReason = new Map();
-    this.queueHeld = false;
+    // Bounded synthetic GlobalQueue: [{ entryId, sensorId, reason }] in FIFO order.
+    this.queue = [];
+    this.queueRevision = 0;
+    this.entrySeq = 0;
+    this.dispatchSeq = 0;
+    this.dispatchLog = []; // bounded synthetic dispatch evidence (not a production audit)
+    this.lastDispatch = null;
+    this.notAdmitted = new Map(); // sensorId -> reason; set only by an explicit test scenario
+    this.autoSequencePaused = false; // AutoSequence (dispatch control) pause, not a queue state
+    this.queueRejections = {};
     this.activeJobs = [];
     this.jobSeq = 0;
     this.jobsCompleted = 0;
@@ -323,64 +361,133 @@ export class SyntheticRuntime extends EventEmitter {
     const pio = this.scheduler.sessions.get('SYN-PIO-01');
     return this.pump.state === 'RUNNING' && pio.consecutiveTimeouts === 0 && v !== null && Math.abs(v - this.params.pumpSetpoint) <= this.params.pumpReadyBand;
   }
-  entryStatus(sensorId) {
-    const cur = this.acq.get(sensorId).cur;
-    if (!cur || cur.quality !== 'GOOD') return 'EXCLUDED';
-    if (this.sensorAlarmState(sensorId)[0] !== 'NONE') return 'BLOCKED';
-    if (this.queueHeld || !this.pumpReady()) return 'HELD';
-    return 'READY';
+  // ---- bounded synthetic queue primitives (every membership change bumps queueRevision)
+  /** FIFO Sensor IDs (read-only view). */
+  get queueOrder() {
+    return this.queue.map((e) => e.sensorId);
   }
-  updateQueue() {
-    const target = this.activeJobs[0]?.targetSensorId;
-    for (const s of this.sensors) {
-      const cur = this.acq.get(s.sensorId).cur;
-      const inQ = this.queueReason.has(s.sensorId);
-      if (s.sensorId === target) continue;
-      if (cur.basis === 'CURRENT' && cur.classification === 'DIRTY' && !inQ) {
-        this.queueOrder.push(s.sensorId);
-        this.queueReason.set(s.sensorId, QUEUE_REASONS.DIRTY_SCORE);
-      } else if (cur.basis === 'CURRENT' && cur.classification === 'CLEANER' && inQ && this.queueReason.get(s.sensorId) === QUEUE_REASONS.DIRTY_SCORE) {
-        // Only the score source releases its own entries; operator / temperature / time entries
-        // keep their source owner when unrelated process values change.
-        this.removeFromQueue(s.sensorId);
-      }
-    }
+  isQueued(sensorId) {
+    return this.queue.some((e) => e.sensorId === sensorId);
   }
+  queueEntry(sensorId) {
+    return this.queue.find((e) => e.sensorId === sensorId) ?? null;
+  }
+  rejectAdmission(reason) {
+    this.queueRejections[reason] = (this.queueRejections[reason] ?? 0) + 1;
+    return { admitted: false, reason };
+  }
+  /**
+   * Admit one Sensor at the tail. Synthetic generator only: the caller is a synthetic source that
+   * has prepared the Sensor as dispatch-ready. Never exceeds QUEUE_CAPACITY; duplicates are no-ops.
+   */
+  admit(sensorId, reason) {
+    if (isCannonId(sensorId)) return this.rejectAdmission('CANNON_NOT_A_SENSOR');
+    if (!this.sensorById.has(sensorId)) return this.rejectAdmission('UNKNOWN_SENSOR');
+    const existing = this.queueEntry(sensorId);
+    if (existing) return { admitted: false, reason: 'DUPLICATE', duplicate: true, owner: existing.reason, position: this.queue.indexOf(existing) + 1 };
+    if (this.activeJobs[0]?.targetSensorId === sensorId) return this.rejectAdmission('ACTIVE_JOB_TARGET');
+    if (this.notAdmitted.has(sensorId)) return this.rejectAdmission('NOT_ADMITTED_SYNTHETIC_DEMONSTRATION');
+    if (this.queue.length >= QUEUE_CAPACITY) return this.rejectAdmission('QUEUE_FULL');
+    this.entrySeq += 1;
+    this.queue.push({ entryId: `SYN-QE-${String(this.entrySeq).padStart(5, '0')}`, sensorId, reason });
+    this.queueRevision += 1;
+    return { admitted: true, reason: null, owner: reason, position: this.queue.length };
+  }
+  /** Explicit synthetic removal (operator dequeue / scenario preparation). */
   removeFromQueue(sensorId) {
-    if (!this.queueReason.has(sensorId)) return;
-    this.queueReason.delete(sensorId);
-    this.queueOrder.splice(this.queueOrder.indexOf(sensorId), 1);
+    const i = this.queue.findIndex((e) => e.sensorId === sensorId);
+    if (i < 0) return null;
+    const [entry] = this.queue.splice(i, 1);
+    this.queueRevision += 1;
+    return entry;
+  }
+  clearQueue() {
+    if (!this.queue.length) return 0;
+    const n = this.queue.length;
+    this.queue.length = 0;
+    this.queueRevision += 1;
+    return n;
+  }
+  /**
+   * Synthetic score source (deterministic refill). Scans Sensors in canonical scan order and admits
+   * CURRENT-basis DIRTY Sensors at the tail until the queue holds QUEUE_CAPACITY entries. This is
+   * the synthetic generator's preparation rule, not an eligibility policy. No automatic removal:
+   * the removal policy is OWNER DECISION REQUIRED (entries leave by dispatch or explicit removal).
+   */
+  updateQueue() {
+    for (const s of this.sensors) {
+      if (this.queue.length >= QUEUE_CAPACITY) return;
+      const cur = this.acq.get(s.sensorId).cur;
+      if (!cur || cur.basis !== 'CURRENT' || cur.classification !== 'DIRTY') continue;
+      if (this.isQueued(s.sensorId) || this.activeJobs[0]?.targetSensorId === s.sensorId || this.notAdmitted.has(s.sensorId)) continue;
+      this.admit(s.sensorId, QUEUE_REASONS.DIRTY_SCORE);
+    }
   }
   currentPhaseIndex(job, now) {
     if (job.heldPhaseIndex !== undefined) return job.heldPhaseIndex;
+    if (job.preCheck === 'WAITING_FOR_PUMP') return 0;
     return Math.floor((now - job.startedAtMs) / this.params.jobPhaseMs);
   }
-  startJob(sensorId, origin, { hold = false } = {}) {
+  /**
+   * Atomic head-only dispatch: remove queue Position 1 and create exactly one Cleaning Job for that
+   * Sensor, linked by a synthetic dispatch record. Never looks past Position 1. Pump readiness is a
+   * Job pre-check wait (P1), not a dispatch condition and not a queue entry state.
+   */
+  dispatchHead(origin, { hold = false } = {}) {
     if (this.activeJobs.length >= 1) {
       this.refusedSecondJobs += 1;
       return { accepted: false, reason: 'ACTIVE_JOB_EXISTS' };
     }
-    const refuse = (reason) => {
-      this.jobRefusals[reason] = (this.jobRefusals[reason] ?? 0) + 1;
-      return { accepted: false, reason };
-    };
-    if (isCannonId(sensorId)) return refuse('CANNON_NOT_A_SENSOR');
-    const s = this.sensorById.get(sensorId);
-    if (!s) return refuse('UNKNOWN_SENSOR');
-    if (!this.pumpReady()) return refuse('PUMP_NOT_READY');
-    const cur = this.acq.get(sensorId).cur;
-    if (cur && cur.quality !== 'GOOD') return refuse('SENSOR_QUALITY_NOT_GOOD');
-    if (this.sensorAlarmState(sensorId)[0] !== 'NONE') return refuse('SENSOR_BLOCKED_BY_ALARM');
+    if (!this.queue.length) {
+      this.jobRefusals.QUEUE_EMPTY = (this.jobRefusals.QUEUE_EMPTY ?? 0) + 1;
+      return { accepted: false, reason: 'QUEUE_EMPTY' };
+    }
     const now = Date.now();
+    const queueRevisionBefore = this.queueRevision;
+    const head = this.queue.shift(); // Position 1 only
+    this.queueRevision += 1;
+    const s = this.sensorById.get(head.sensorId);
     this.jobSeq += 1;
-    const job = { jobId: `SYN-JOB-${String(this.jobSeq).padStart(4, '0')}`, targetSensorId: sensorId, jetId: s.jetId, valveId: s.valveId, origin, startedAtMs: now };
+    this.dispatchSeq += 1;
+    const jobId = `SYN-JOB-${String(this.jobSeq).padStart(4, '0')}`;
+    const record = Object.freeze({
+      dispatchId: `SYN-DSP-${String(this.dispatchSeq).padStart(4, '0')}`,
+      synthetic: true,
+      queueRevisionBefore,
+      queueRevisionAfter: this.queueRevision,
+      queueEntryId: head.entryId,
+      positionBefore: 1,
+      sensorId: head.sensorId,
+      sourceReason: head.reason,
+      jobId,
+      origin,
+      dispatchedAt: iso(now),
+    });
+    const job = { jobId, targetSensorId: head.sensorId, jetId: s.jetId, valveId: s.valveId, origin, startedAtMs: now, dispatch: record, preCheck: 'PASSED' };
     if (hold) {
       job.heldPhaseIndex = REVIEW_JOB_PHASE;
       job.startedAtMs = now - REVIEW_JOB_PHASE * this.params.jobPhaseMs;
+    } else if (!this.pumpReady()) {
+      job.preCheck = 'WAITING_FOR_PUMP'; // Job lifecycle wait (P1), never a queue entry state
     }
     this.activeJobs.push(job);
-    this.removeFromQueue(sensorId);
-    return { accepted: true, reason: null, detail: { jobId: this.activeJobs[0].jobId } };
+    this.lastDispatch = record;
+    this.dispatchLog.push(record);
+    if (this.dispatchLog.length > DISPATCH_LOG_CAPACITY) this.dispatchLog.shift();
+    return { accepted: true, reason: null, detail: { jobId, dispatch: record } };
+  }
+  /**
+   * Synthetic test preparation: make `sensorId` queue Position 1 so that it can be dispatched by
+   * the head-only rule. Never reorders: if the Sensor is not already the head, the synthetic queue
+   * is cleared and the Sensor is admitted as the only entry (keeping its reason if it was queued).
+   */
+  prepareHead(sensorId, reason = QUEUE_REASONS.OPERATOR) {
+    if (this.queue[0]?.sensorId === sensorId) return { prepared: true, cleared: 0 };
+    const keep = this.queueEntry(sensorId)?.reason ?? reason;
+    this.notAdmitted.delete(sensorId);
+    const cleared = this.clearQueue();
+    const r = this.admit(sensorId, keep);
+    return { prepared: r.admitted, cleared, reason: r.reason };
   }
   abortJob(reason) {
     if (!this.activeJobs.length) return false;
@@ -392,6 +499,11 @@ export class SyntheticRuntime extends EventEmitter {
   advanceJob(now) {
     const job = this.activeJobs[0];
     if (!job) return;
+    if (job.preCheck === 'WAITING_FOR_PUMP') {
+      if (!this.pumpReady()) return;
+      job.preCheck = 'PASSED';
+      job.startedAtMs = now;
+    }
     if (this.currentPhaseIndex(job, now) >= PHASES.length) {
       const pr = this.proc.get(job.targetSensorId);
       pr.trueScore = this.rng.range(5, 15);
@@ -402,10 +514,17 @@ export class SyntheticRuntime extends EventEmitter {
       this.lastJobEnd = 'COMPLETED';
     }
   }
-  autoStart() {
-    if (!this.autoJobs || this.activeJobs.length) return;
-    const head = this.queueOrder.find((id) => this.entryStatus(id) === 'READY');
-    if (head) this.startJob(head, 'SYN_AUTO_SEQUENCE');
+  autoSequenceState() {
+    if (!this.autoJobs) return 'OFF';
+    if (this.autoSequencePaused) return 'PAUSED';
+    if (this.activeJobs.length) return 'JOB_ACTIVE';
+    if (!this.queue.length) return 'QUEUE_EMPTY';
+    return 'READY_TO_DISPATCH';
+  }
+  /** AutoSequence: dispatch queue Position 1 only, and only when no Job is active. */
+  autoDispatch() {
+    if (this.autoSequenceState() !== 'READY_TO_DISPATCH') return null;
+    return this.dispatchHead('SYN_AUTO_SEQUENCE');
   }
   advancePump(now) {
     if (this.pump.state === 'STARTING' && now - this.pump.changedAt >= this.params.pumpStartMs) this.setPump('RUNNING', now);
@@ -470,7 +589,7 @@ export class SyntheticRuntime extends EventEmitter {
       quality,
       qualityReason: reason,
       sourceTimestamp: iso(acq.sourceTs),
-      queueState: isTarget ? 'ACTIVE' : this.queueReason.has(s.sensorId) ? this.entryStatus(s.sensorId) : 'NONE',
+      queueState: isTarget ? 'ACTIVE' : this.isQueued(s.sensorId) ? 'QUEUED' : 'NONE',
       isActiveJobTarget: isTarget,
       alarmState,
       alarmSeverity,
@@ -495,18 +614,21 @@ export class SyntheticRuntime extends EventEmitter {
     const job = this.activeJobs[0];
     if (!job) return null;
     const idx = clamp(this.currentPhaseIndex(job, now), 0, PHASES.length - 1);
-    const phaseStart = job.startedAtMs + idx * this.params.jobPhaseMs;
+    const waiting = job.preCheck === 'WAITING_FOR_PUMP';
+    const phaseStart = waiting ? job.startedAtMs : job.startedAtMs + idx * this.params.jobPhaseMs;
     return {
       jobId: job.jobId,
       targetSensorId: job.targetSensorId,
       jetId: job.jetId,
       valveId: job.valveId,
       phase: PHASES[idx][0],
-      phaseLabel: PHASES[idx][1],
+      phaseLabel: waiting ? 'Pre-check — waiting for Pump (synthetic)' : PHASES[idx][1],
       phaseIndex: idx,
       startedAt: iso(job.startedAtMs),
       phaseStartedAt: iso(phaseStart),
-      phaseProgress: Math.round(clamp((now - phaseStart) / this.params.jobPhaseMs, 0, 1) * 10) / 10,
+      phaseProgress: waiting ? 0 : Math.round(clamp((now - phaseStart) / this.params.jobPhaseMs, 0, 1) * 10) / 10,
+      preCheck: job.preCheck,
+      dispatch: job.dispatch,
     };
   }
   pressureFresh() {
@@ -524,16 +646,24 @@ export class SyntheticRuntime extends EventEmitter {
     };
   }
   buildQueue(now) {
+    // The whole physical queue (<= QUEUE_CAPACITY). No preview cut, no hidden overflow.
     return {
-      totalQueued: this.queueOrder.length,
-      entries: this.queueOrder.slice(0, 8).map((id, i) => ({
+      synthetic: true,
+      label: 'GlobalQueue · synthetic · FIFO · not Production scheduling',
+      capacity: QUEUE_CAPACITY,
+      totalQueued: this.queue.length,
+      revision: this.queueRevision,
+      entries: this.queue.map((e, i) => ({
         position: i + 1,
-        sensorId: id,
-        sourceReason: this.queueReason.get(id),
-        dirtyScore: this.acq.get(id).rawScore,
-        secondsSinceLastClean: Math.round((now - this.proc.get(id).lastCleanAt) / 1000),
-        status: this.entryStatus(id),
+        entryId: e.entryId,
+        sensorId: e.sensorId,
+        sourceReason: e.reason,
+        dirtyScore: this.acq.get(e.sensorId).rawScore,
+        secondsSinceLastClean: Math.round((now - this.proc.get(e.sensorId).lastCleanAt) / 1000),
       })),
+      autoSequence: this.autoSequenceState(),
+      lastDispatch: this.lastDispatch,
+      eligibilityDiagnostics: [...this.notAdmitted].map(([sensorId, reason]) => ({ sensorId, decision: 'NOT_ADMITTED', reason, synthetic: true })),
     };
   }
   buildAlarms() {
@@ -604,7 +734,7 @@ export class SyntheticRuntime extends EventEmitter {
     this.advanceJob(now);
     this.classifyAll(now);
     this.updateQueue();
-    this.autoStart();
+    this.autoDispatch();
 
     const delta = { kind: 'delta', schema: DELTA_SCHEMA, synthetic: true, previousRevision: this.revision, revision: this.revision + 1, generatedAt: iso(now) };
     const records = [];
@@ -683,17 +813,14 @@ export class SyntheticRuntime extends EventEmitter {
   // ------------------------------------------------------------------ synthetic review helpers
   // Spike-only Owner review tooling (Diagnostics "SYNTHETIC TEST CONTROL"). Every helper acts on
   // the authoritative runtime state; the UI only sends one explicit command per click.
+  /** Synthetic non-score source admission (TEMP / TIME / TEMP+TIME / OPERATOR). Bounded. */
   enqueueWithReason(sensorId, reasonKey) {
     const reason = QUEUE_REASONS[reasonKey];
     if (!reason || reasonKey === 'DIRTY_SCORE') return { accepted: false, reason: 'INVALID_QUEUE_REASON' };
-    if (this.activeJobs[0]?.targetSensorId === sensorId) return { accepted: false, reason: 'ACTIVE_JOB_TARGET' };
-    if (this.queueReason.has(sensorId)) {
-      // De-duplication: the first source keeps ownership and FIFO position.
-      return { accepted: true, detail: { queued: false, duplicate: true, owner: this.queueReason.get(sensorId), position: this.queueOrder.indexOf(sensorId) + 1 } };
-    }
-    this.queueOrder.push(sensorId);
-    this.queueReason.set(sensorId, reason);
-    return { accepted: true, detail: { queued: true, duplicate: false, owner: reason, position: this.queueOrder.length } };
+    const r = this.admit(sensorId, reason);
+    if (r.duplicate) return { accepted: true, detail: { queued: false, duplicate: true, owner: r.owner, position: r.position } };
+    if (!r.admitted) return { accepted: false, reason: r.reason };
+    return { accepted: true, detail: { queued: true, duplicate: false, owner: reason, position: r.position } };
   }
   /** Hold a synthetic score (process target) and apply it to the acquisition value now. */
   setSensorScore(sensorId, score) {
@@ -717,22 +844,32 @@ export class SyntheticRuntime extends EventEmitter {
     acq.forcedQuality = null;
     this.setSensorScore(sensorId, null);
     for (const a of [...this.alarms.values()]) if (a.sensorId === sensorId) this.alarms.delete(a.alarmId);
-    if (this.queueReason.has(sensorId) && this.queueReason.get(sensorId) !== QUEUE_REASONS.DIRTY_SCORE) this.removeFromQueue(sensorId);
+    const entry = this.queueEntry(sensorId);
+    if (entry && entry.reason !== QUEUE_REASONS.DIRTY_SCORE) this.removeFromQueue(sensorId);
+    this.notAdmitted.delete(sensorId);
     if (this.activeJobs[0]?.targetSensorId === sensorId && this.activeJobs[0].heldPhaseIndex !== undefined) this.abortJob('SYN_REVIEW_RESET');
     this.reviewTouched?.delete(sensorId);
   }
-  /** Start a held (frozen) review job on the Sensor. Never creates a second job. */
+  /**
+   * Review Job (synthetic): the selected Sensor is prepared as queue Position 1 and then dispatched
+   * by the head-only rule as a held (frozen) review job. Never retargets an existing Job: if a Job
+   * for another Sensor is active the command is refused (end that Job first).
+   */
   reviewJob(sensorId) {
     this.autoJobs = false;
-    if (this.activeJobs.length && this.activeJobs[0].targetSensorId !== sensorId) this.abortJob('SYN_REVIEW_RETARGET');
-    if (this.activeJobs[0]?.targetSensorId === sensorId) {
-      this.activeJobs[0].heldPhaseIndex = REVIEW_JOB_PHASE;
-      return { accepted: true, detail: { jobId: this.activeJobs[0].jobId, held: true } };
+    const job = this.activeJobs[0];
+    if (job && job.targetSensorId !== sensorId) {
+      this.refusedSecondJobs += 1;
+      return { accepted: false, reason: 'ACTIVE_JOB_EXISTS', detail: { activeJobTarget: job.targetSensorId } };
     }
-    this.acq.get(sensorId).forcedQuality = null;
-    this.classifyAll(Date.now());
-    const r = this.startJob(sensorId, 'SYN_REVIEW_CONTROL', { hold: true });
-    return r.accepted ? { ...r, detail: { ...r.detail, held: true } } : r;
+    if (job) {
+      job.heldPhaseIndex = REVIEW_JOB_PHASE;
+      return { accepted: true, detail: { jobId: job.jobId, held: true, dispatch: job.dispatch } };
+    }
+    const prep = this.prepareHead(sensorId);
+    if (!prep.prepared) return { accepted: false, reason: prep.reason ?? 'NOT_PREPARED' };
+    const r = this.dispatchHead('SYN_REVIEW_CONTROL', { hold: true });
+    return r.accepted ? { ...r, detail: { ...r.detail, held: true, preparedHead: true, clearedEntries: prep.cleared } } : r;
   }
   sensorAlarmIds(sensorId) {
     return [...this.alarms.values()].filter((a) => a.sensorId === sensorId).map((a) => a.alarmId);
@@ -742,72 +879,125 @@ export class SyntheticRuntime extends EventEmitter {
     if (open) return open.alarmId;
     return this.raiseAlarm({ code: 'SYN-REVIEW-ALARM', text: `Synthetic review alarm ${sensorId}`, severity: 'HIGH', sensorId });
   }
-  /** Deterministic combined visual states for manual Owner review (one request = one preset). */
+  /** Two deterministic companion Sensors (canonical scan order) for multi-entry presets. */
+  companions(sensorId) {
+    return this.sensors
+      .slice(60)
+      .map((x) => x.sensorId)
+      .filter((id) => id !== sensorId)
+      .slice(0, 2);
+  }
+  /**
+   * Deterministic synthetic review presets (one request = one preset). Each preset first prepares
+   * a known state: AutoSequence off, any Job ended (synthetic abort — never retargeted), synthetic
+   * queue cleared. Queue entries are then admitted by synthetic sources; Jobs are created only by
+   * head-only dispatch. These are spike review states, not Production behaviour.
+   */
   visualPreset(preset, sensorId) {
-    const now = () => Date.now();
     const settle = () => {
-      this.classifyAll(now());
+      this.classifyAll(Date.now());
       this.updateQueue();
     };
     if (preset === 'reset') {
       const ids = [...(this.reviewTouched ?? [])];
       for (const id of ids) this.resetReviewSensor(id);
       if (this.activeJobs[0]?.heldPhaseIndex !== undefined) this.abortJob('SYN_REVIEW_RESET');
+      this.notAdmitted.clear();
+      this.clearQueue();
+      this.autoSequencePaused = false;
       this.autoJobs = this.params.autoJobs;
-      settle();
-      return { accepted: true, detail: { preset, restored: ids, autoJobs: this.autoJobs } };
+      settle(); // deterministic refill by the synthetic score source, bounded to QUEUE_CAPACITY
+      return { accepted: true, detail: { preset, restored: ids, autoJobs: this.autoJobs, queued: this.queue.length } };
     }
-    // Freeze automatic job starts so the reviewed state stays visible.
+    if (!PRESETS.includes(preset)) return { accepted: false, reason: 'UNKNOWN_PRESET' };
+    // Prepare: AutoSequence off, no Job, empty synthetic queue, selected Sensor restored.
     this.autoJobs = false;
+    this.abortJob('SYN_PRESET_PREPARE');
+    this.notAdmitted.clear();
+    this.clearQueue();
     this.resetReviewSensor(sensorId);
     this.touch(sensorId);
+    const [a, b] = this.companions(sensorId);
+    const prepareCompanions = () => {
+      for (const id of [a, b]) {
+        this.resetReviewSensor(id);
+        this.touch(id);
+      }
+      this.enqueueWithReason(a, 'TIME_DUE');
+      this.enqueueWithReason(b, 'TEMP');
+    };
     const detail = { preset, sensorId };
     switch (preset) {
-      case 'alarm-queue-dirty':
-      case 'selected-alarm-queue':
+      case 'queued-dirty':
         this.setSensorScore(sensorId, REVIEW_SCORE.DIRTY);
-        settle(); // the score source queues the Dirty Sensor (DIRTY SCORE owner)
-        if (preset === 'selected-alarm-queue' && !this.queueReason.has(sensorId)) this.enqueueWithReason(sensorId, 'TEMP_AND_TIME');
-        detail.alarmId = this.raiseReviewAlarm(sensorId);
+        this.classifyAll(Date.now());
+        this.admit(sensorId, QUEUE_REASONS.DIRTY_SCORE); // score source, Position 1
         break;
-      case 'alarm-queue-cleaner':
+      case 'queued-cleaner-non-score':
         this.setSensorScore(sensorId, REVIEW_SCORE.CLEANER);
-        settle();
-        this.enqueueWithReason(sensorId, 'TIME_DUE');
-        detail.alarmId = this.raiseReviewAlarm(sensorId);
+        this.classifyAll(Date.now());
+        this.admit(sensorId, QUEUE_REASONS.OPERATOR); // synthetic non-score source
         break;
-      case 'job-alarm-queue': {
+      case 'selected-queued':
         this.setSensorScore(sensorId, REVIEW_SCORE.DIRTY);
-        settle();
-        const job = this.reviewJob(sensorId);
-        if (!job.accepted) return { accepted: false, reason: job.reason, detail };
-        detail.jobId = job.detail.jobId;
-        // The Job target's queue state is ACTIVE (the runtime never keeps a target queued).
-        detail.alarmId = this.raiseReviewAlarm(sensorId);
+        this.classifyAll(Date.now());
+        this.resetReviewSensor(a);
+        this.touch(a);
+        this.enqueueWithReason(a, 'TIME_DUE'); // Position 1
+        this.admit(sensorId, QUEUE_REASONS.DIRTY_SCORE); // selected Sensor at Position 2
+        break;
+      case 'dispatched-head-job':
+      case 'alarm-on-active-job':
+      case 'head-to-job-transition': {
+        this.setSensorScore(sensorId, REVIEW_SCORE.DIRTY);
+        this.classifyAll(Date.now());
+        this.admit(sensorId, QUEUE_REASONS.DIRTY_SCORE); // Position 1
+        prepareCompanions(); // Positions 2 and 3
+        detail.queueBefore = this.queueOrder;
+        let r;
+        if (preset === 'head-to-job-transition') {
+          // AutoSequence resumes and dispatches Position 1 now; the Job runs and, after it ends,
+          // only the new head is the next candidate.
+          this.autoJobs = true;
+          r = this.autoDispatch();
+        } else {
+          r = this.dispatchHead('SYN_REVIEW_PRESET', { hold: true }); // held review Job
+        }
+        if (!r?.accepted) return { accepted: false, reason: r?.reason ?? 'NOT_DISPATCHED', detail };
+        detail.jobId = r.detail.jobId;
+        detail.dispatch = r.detail.dispatch;
+        detail.queueAfter = this.queueOrder;
+        if (preset === 'alarm-on-active-job') detail.alarmId = this.raiseReviewAlarm(sensorId);
         break;
       }
-      case 'cleared-ack-queue':
+      case 'alarm-not-admitted':
         this.setSensorScore(sensorId, REVIEW_SCORE.DIRTY);
-        settle();
         detail.alarmId = this.raiseReviewAlarm(sensorId);
-        this.clearAlarm(detail.alarmId); // ACTIVE_UNACK -> CLEARED_UNACK (ACK REQUIRED)
+        // Synthetic demonstration only: the scenario explicitly marks the Sensor NOT ADMITTED.
+        // No Alarm eligibility rule exists (OWNER DECISION REQUIRED).
+        this.notAdmitted.set(sensorId, NOT_ADMITTED_DEMO_REASON);
         break;
       default:
         return { accepted: false, reason: 'UNKNOWN_PRESET' };
     }
     settle();
-    return { accepted: true, detail: { ...detail, queueOwner: this.queueReason.get(sensorId) ?? null, activeJobs: this.activeJobs.length } };
+    const entry = this.queueEntry(sensorId);
+    return {
+      accepted: true,
+      detail: { ...detail, queuePosition: entry ? this.queue.indexOf(entry) + 1 : null, queueOwner: entry?.reason ?? null, queued: this.queue.length, activeJobs: this.activeJobs.length },
+    };
   }
   /**
    * Deterministic mixed-source GlobalQueue scenario (test evidence, not the default display).
-   * Clears the synthetic queue, freezes automatic job starts, then queues five canonical Sensors
-   * through four non-score sources and the score source, in a fixed FIFO order.
+   * Clears the synthetic queue, turns the AutoSequence off, then admits four canonical Sensors via
+   * four non-score sources and one via the score source; the score source then refills up to the
+   * capacity of 8 in canonical scan order. Bounded: never more than QUEUE_CAPACITY entries.
    */
   mixedQueueScenario() {
     this.autoJobs = false;
     this.abortJob('SYN_MIXED_QUEUE_SCENARIO');
-    this.queueOrder.length = 0;
-    this.queueReason.clear();
+    this.notAdmitted.clear();
+    this.clearQueue();
     const pick = (i) => this.sensors[i].sensorId; // canonical scan order, no Production address
     const plan = [
       [pick(2), 'TIME_DUE'],
@@ -824,14 +1014,16 @@ export class SyntheticRuntime extends EventEmitter {
     this.touch(dirtyId);
     this.setSensorScore(dirtyId, REVIEW_SCORE.DIRTY);
     this.classifyAll(Date.now());
-    this.updateQueue(); // score source appends every currently Dirty Sensor (FIFO, scan order)
+    this.admit(dirtyId, QUEUE_REASONS.DIRTY_SCORE);
+    this.updateQueue(); // deterministic refill to capacity (score source, scan order)
     return {
       accepted: true,
       detail: {
         explicit: plan.map(([sensorId, key]) => ({ sensorId, reason: QUEUE_REASONS[key] })),
         scoreSensor: dirtyId,
-        firstEight: this.queueOrder.slice(0, 8).map((id) => ({ sensorId: id, reason: this.queueReason.get(id) })),
-        totalQueued: this.queueOrder.length,
+        entries: this.queue.map((e) => ({ sensorId: e.sensorId, reason: e.reason })),
+        totalQueued: this.queue.length,
+        capacity: QUEUE_CAPACITY,
       },
     };
   }
@@ -851,9 +1043,18 @@ export class SyntheticRuntime extends EventEmitter {
     if (this.scheduler.maxGlobalInFlight > this.params.concurrency) this.violation('cross-device concurrency bound exceeded');
     if (this.revision <= this.lastInvariantRevision) this.violation('revision not monotonic');
     this.lastInvariantRevision = this.revision;
-    if (new Set(this.queueOrder).size !== this.queueOrder.length) this.violation('duplicate GlobalQueue entry');
-    const target = this.activeJobs[0]?.targetSensorId;
-    if (target && this.queueReason.has(target)) this.violation('active job target still queued');
+    const ids = this.queueOrder;
+    if (ids.length > QUEUE_CAPACITY) this.violation(`GlobalQueue exceeds capacity (${ids.length} > ${QUEUE_CAPACITY})`);
+    if (new Set(ids).size !== ids.length) this.violation('duplicate GlobalQueue entry');
+    if (ids.some((id) => isCannonId(id) || !this.sensorById.has(id))) this.violation('non-Sensor GlobalQueue entry');
+    if (this.queueRevision < (this.lastQueueRevision ?? 0)) this.violation('queue revision not monotonic');
+    this.lastQueueRevision = this.queueRevision;
+    const job = this.activeJobs[0];
+    const target = job?.targetSensorId;
+    if (target && this.isQueued(target)) this.violation('active job target still queued');
+    if (job && (!job.dispatch || job.dispatch.sensorId !== target || job.dispatch.positionBefore !== 1 || job.dispatch.jobId !== job.jobId)) {
+      this.violation(`active job ${job.jobId} not linked to a Position 1 dispatch record`);
+    }
     if (this.trend.length > this.params.trendCapacity) this.violation('trend exceeds capacity');
     if (this.historian.depth > this.historian.capacity) this.violation('historian exceeds capacity');
     for (const r of records) {
@@ -946,22 +1147,14 @@ export class SyntheticRuntime extends EventEmitter {
       }
       case 'enqueue': {
         if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
-        if (p.reason !== undefined && p.reason !== 'OPERATOR') {
-          this.touch(p.sensorId);
-          return this.enqueueWithReason(p.sensorId, p.reason);
-        }
-        if (!this.queueReason.has(p.sensorId) && this.activeJobs[0]?.targetSensorId !== p.sensorId) {
-          this.queueOrder.push(p.sensorId);
-          this.queueReason.set(p.sensorId, QUEUE_REASONS.OPERATOR);
-        }
-        return { accepted: true };
+        this.touch(p.sensorId);
+        return this.enqueueWithReason(p.sensorId, p.reason ?? 'OPERATOR');
       }
       case 'dequeue': {
         if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
-        const was = this.queueReason.get(p.sensorId) ?? null;
-        this.removeFromQueue(p.sensorId);
-        // A Sensor that is still Dirty is re-queued by the score source on the next publish.
-        return { accepted: true, detail: { removed: was !== null, owner: was } };
+        const was = this.removeFromQueue(p.sensorId);
+        // A Sensor that is still Dirty may be re-admitted at the tail by the synthetic score source.
+        return { accepted: true, detail: { removed: was !== null, owner: was?.reason ?? null } };
       }
       case 'set-sensor-score': {
         if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
@@ -986,31 +1179,56 @@ export class SyntheticRuntime extends EventEmitter {
         return { accepted: true };
       }
       case 'visual-preset': {
+        if (p.preset !== 'reset' && !PRESETS.includes(p.preset)) return { accepted: false, reason: 'UNKNOWN_PRESET' };
         if (p.preset !== 'reset' && !sensorOk(p.sensorId)) return { accepted: false, reason: p.sensorId ? sensorRefusal(p.sensorId) : 'SENSOR_REQUIRED' };
         return this.visualPreset(p.preset, p.sensorId);
       }
       case 'queue-mixed-sources':
         return this.mixedQueueScenario();
+      case 'pause-auto-sequence':
       case 'hold-queue':
-        this.queueHeld = p.held !== false;
-        return { accepted: true };
+        // AutoSequence (dispatch control) pause. Not a queue entry state: entries stay unchanged.
+        this.autoSequencePaused = (p.paused ?? p.held) !== false;
+        return { accepted: true, detail: { autoSequence: this.autoSequenceState() } };
       case 'auto-jobs':
         this.autoJobs = p.enabled !== false;
         return { accepted: true };
+      case 'dispatch-head':
+        // Synthetic manual dispatch of queue Position 1 (head-only, atomic).
+        return this.dispatchHead('SYN_SCENARIO_COMMAND');
       case 'start-job': {
-        this.classifyAll(Date.now());
-        return this.startJob(p.sensorId, 'SYN_SCENARIO_COMMAND');
+        // Synthetic scenario command. Never targets an arbitrary Sensor directly: the Sensor (if
+        // given) is first prepared as queue Position 1, then the head is dispatched atomically.
+        if (p.sensorId !== undefined && !sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
+        if (this.activeJobs.length) {
+          this.refusedSecondJobs += 1;
+          return { accepted: false, reason: 'ACTIVE_JOB_EXISTS' };
+        }
+        let prep = null;
+        if (p.sensorId !== undefined) {
+          this.touch(p.sensorId);
+          prep = this.prepareHead(p.sensorId);
+          if (!prep.prepared) return { accepted: false, reason: prep.reason ?? 'NOT_PREPARED' };
+        }
+        const r = this.dispatchHead('SYN_SCENARIO_COMMAND');
+        return r.accepted ? { ...r, detail: { ...r.detail, preparedHead: prep !== null, clearedEntries: prep?.cleared ?? 0 } } : r;
       }
       case 'second-job-attempt': {
-        // Ensure one job exists, then attempt a concurrent second job. Must be refused.
-        this.classifyAll(Date.now());
+        // Ensure one job exists (via head-only dispatch), then attempt a concurrent second dispatch
+        // and a second start-job. Both must be refused.
         let first = null;
         if (!this.activeJobs.length) {
-          const cand = this.sensors.find((s) => this.acq.get(s.sensorId).cur?.quality === 'GOOD' && this.sensorAlarmState(s.sensorId)[0] === 'NONE');
-          first = cand ? this.startJob(cand.sensorId, 'SYN_SCENARIO_COMMAND') : { accepted: false, reason: 'NO_CANDIDATE' };
+          if (!this.queue.length) {
+            const cand = this.sensors.find((s) => !isCannonId(s.sensorId));
+            this.admit(cand.sensorId, QUEUE_REASONS.OPERATOR);
+          }
+          first = this.dispatchHead('SYN_SCENARIO_COMMAND');
         }
-        const other = this.sensors.find((s) => s.sensorId !== this.activeJobs[0]?.targetSensorId);
-        const second = this.startJob(other.sensorId, 'SYN_SCENARIO_SECOND_JOB');
+        if (!this.queue.length) {
+          const other = this.sensors.find((s) => s.sensorId !== this.activeJobs[0]?.targetSensorId);
+          this.admit(other.sensorId, QUEUE_REASONS.OPERATOR);
+        }
+        const second = this.dispatchHead('SYN_SCENARIO_SECOND_JOB');
         return { accepted: second.accepted, reason: second.reason, detail: { first, second, activeJobs: this.activeJobs.length } };
       }
       case 'abort-job':
@@ -1082,6 +1300,7 @@ export class SyntheticRuntime extends EventEmitter {
       },
       historian: { ...this.historian.health(), accepted: this.historian.accepted, written: this.historian.written, batches: this.historian.batches, maxDepth: this.historian.maxDepth, nearOverflowEvents: this.historian.nearOverflowEvents, gapMarkerList: this.historian.gapMarkers.slice(-10) },
       jobs: { active: this.activeJobs.length, completed: this.jobsCompleted, aborted: this.jobsAborted, refusedSecondJobs: this.refusedSecondJobs, acceptedSecondJobs: this.acceptedSecondJobs, refusals: this.jobRefusals },
+      queue: { synthetic: true, capacity: QUEUE_CAPACITY, length: this.queue.length, revision: this.queueRevision, dispatches: this.dispatchSeq, autoSequence: this.autoSequenceState(), admissionRejections: this.queueRejections, recentDispatches: this.dispatchLog.slice(-10) },
       commands: cmd,
       pumpStopCommandMs: summarize(this.metrics.pumpStopLatencyMs.toArray(), 3),
       invariants: { violations: this.violationCount, recent: this.violations.slice(-10) },

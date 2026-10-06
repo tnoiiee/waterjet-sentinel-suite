@@ -211,14 +211,24 @@ function fmtAge(s: number): string {
   return `${(s / 86400).toFixed(1)} d`;
 }
 
+/**
+ * Bounded synthetic GlobalQueue (Owner domain correction). Every row is a ready-to-dispatch entry:
+ * presence means READY, so there is no per-entry status column or chip. The Status column was
+ * removed without replacement — Source reason already has its own column, and no entry age /
+ * queued-since value exists in the Runtime contract. Never Production scheduling.
+ */
 export function QueuePreview() {
   const q = useSlice('queue');
+  const count = q?.entries.length ?? 0;
+  const capacity = q?.capacity ?? 8;
   return (
-    <section className={`${styles.panel} ${styles.queuePanel}`} aria-label="GlobalQueue preview" data-testid="queue-preview">
+    <section className={`${styles.panel} ${styles.queuePanel}`} aria-label="GlobalQueue (synthetic)" data-testid="queue-preview" data-queue-count={count} data-queue-capacity={capacity}>
       <header className={styles.cardHeader}>
-        <h2 className={styles.panelTitle}>GlobalQueue preview</h2>
-        <span className={styles.cardMeta}>
-          <span className={styles.num}>{q?.totalQueued ?? 0}</span> queued · first 8 · FIFO
+        <h2 className={styles.panelTitle} data-testid="queue-title">
+          GlobalQueue · synthetic
+        </h2>
+        <span className={styles.cardMeta} data-testid="queue-count">
+          <span className={styles.num}>{count}</span> / <span className={styles.num}>{capacity}</span> queued · FIFO · not Production scheduling
         </span>
       </header>
       <div className={styles.tableWrap}>
@@ -229,7 +239,6 @@ export function QueuePreview() {
             <col />
             <col className={styles.colScore} />
             <col className={styles.colAge} />
-            <col className={styles.colStatus} />
           </colgroup>
           <thead>
             <tr>
@@ -238,14 +247,13 @@ export function QueuePreview() {
               <th>Source reason</th>
               <th className={styles.numCol}>Score</th>
               <th className={styles.numCol}>Since clean</th>
-              <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {(q?.entries ?? []).map((e) => {
               const r = compactReason(e.sourceReason);
               return (
-                <tr key={e.sensorId} data-queue-position={e.position}>
+                <tr key={e.entryId} data-queue-position={e.position} data-queue-entry={e.entryId}>
                   <td className={styles.numCol}>{e.position}</td>
                   <td className={styles.sensorCol}>{e.sensorId}</td>
                   <td className={styles.reason} title={r.full} data-testid="queue-reason">
@@ -253,11 +261,6 @@ export function QueuePreview() {
                   </td>
                   <td className={styles.numCol}>{e.dirtyScore === null ? '--' : e.dirtyScore.toFixed(1)}</td>
                   <td className={styles.numCol}>{fmtAge(e.secondsSinceLastClean)}</td>
-                  <td>
-                    <span className={`${styles.chip} ${styles[`st_${e.status}`]}`} data-status={e.status}>
-                      {e.status}
-                    </span>
-                  </td>
                 </tr>
               );
             })}

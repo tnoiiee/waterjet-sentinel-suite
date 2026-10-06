@@ -14,7 +14,12 @@ export type Wall = 'LEFT' | 'REAR' | 'RIGHT' | 'FRONT';
 export type Quality = 'GOOD' | 'UNCERTAIN' | 'BAD' | 'STALE' | 'DISABLED';
 export type Classification = 'DIRTY' | 'CLEANER' | 'NOT_CLASSIFIED';
 export type ClassificationBasis = 'CURRENT' | 'LAST_VALIDATED' | 'NONE';
-export type QueueState = 'NONE' | 'READY' | 'HELD' | 'BLOCKED' | 'EXCLUDED' | 'ACTIVE';
+/**
+ * Per-Sensor GlobalQueue membership (Owner domain correction). QUEUED = the Sensor has a
+ * ready-to-dispatch entry in the GlobalQueue (presence means READY); ACTIVE = Active Job target;
+ * NONE = not queued. There are no BLOCKED / HELD / WAITING / EXCLUDED entry states.
+ */
+export type QueueState = 'NONE' | 'QUEUED' | 'ACTIVE';
 export type AlarmState = 'NONE' | 'ACTIVE_UNACK' | 'ACTIVE_ACK' | 'CLEARED_UNACK';
 export type AlarmSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 
@@ -93,6 +98,29 @@ export interface ActiveCleaningJobState {
   startedAt: string;
   phaseStartedAt: string;
   phaseProgress: number;
+  /** Job pre-check lifecycle (P1). Pump readiness waits belong here, never to the queue. */
+  preCheck: 'PASSED' | 'WAITING_FOR_PUMP';
+  /** Synthetic dispatch evidence linking this Job to the queue head it was created from. */
+  dispatch: DispatchRecord;
+}
+
+/**
+ * Synthetic dispatch record (spike evidence, NOT a production audit record). Created atomically
+ * when queue Position 1 is removed and exactly one Cleaning Job is created for that Sensor.
+ */
+export interface DispatchRecord {
+  dispatchId: string;
+  synthetic: true;
+  queueRevisionBefore: number;
+  queueRevisionAfter: number;
+  queueEntryId: string;
+  /** Always 1: only the queue head is ever dispatched (no scan-forward). */
+  positionBefore: 1;
+  sensorId: string;
+  sourceReason: string;
+  jobId: string;
+  origin: string;
+  dispatchedAt: string;
 }
 
 export type PumpRunState = 'STOPPED' | 'STARTING' | 'RUNNING' | 'STOPPING';
@@ -107,20 +135,42 @@ export interface PumpState {
   stopRequestedAt: string | null;
 }
 
-export type QueueEntryStatus = 'READY' | 'HELD' | 'BLOCKED' | 'EXCLUDED';
-
+/** One ready-to-dispatch GlobalQueue entry. No per-entry status: presence means READY. */
 export interface QueueEntry {
   position: number;
+  entryId: string;
   sensorId: string;
   sourceReason: string;
   dirtyScore: number | null;
   secondsSinceLastClean: number;
-  status: QueueEntryStatus;
 }
 
+/** AutoSequence (dispatch control) state. Operator pause lives here, never in queue entries. */
+export type AutoSequenceState = 'OFF' | 'PAUSED' | 'JOB_ACTIVE' | 'QUEUE_EMPTY' | 'READY_TO_DISPATCH';
+
+/** Synthetic Queue Eligibility Diagnostics row (only when a test scenario explicitly sets it). */
+export interface EligibilityDiagnostic {
+  sensorId: string;
+  decision: 'NOT_ADMITTED';
+  reason: string;
+  synthetic: true;
+}
+
+/**
+ * The whole bounded synthetic GlobalQueue (FIFO). `entries.length <= capacity` (8) physically;
+ * `totalQueued === entries.length` — there is no hidden overflow and no preview cut.
+ */
 export interface QueueSummary {
+  synthetic: true;
+  label: string;
+  capacity: 8;
   totalQueued: number;
+  /** Monotonic queue revision; bumps on every membership change (admit, remove, dispatch). */
+  revision: number;
   entries: QueueEntry[];
+  autoSequence: AutoSequenceState;
+  lastDispatch: DispatchRecord | null;
+  eligibilityDiagnostics: EligibilityDiagnostic[];
 }
 
 export interface AlarmItem {

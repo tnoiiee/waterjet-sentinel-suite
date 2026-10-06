@@ -29,14 +29,59 @@ removable synthetic feasibility spike — no Product code.**
 **Scope and Coding Start Gate:** `[APPROVED]`
 **Implementation:** IN PROGRESS — PR #3 OPEN
 **Owner-local testing (installed Edge, Windows 11):** Edge E2E **25 / 25 PASS** at checkpoint
-`4129687a` (Owner-reported, ≈ 1.3 min); the final UI punchlist specs (`FONT-A`, `CELL-A`, `IDENT-A`,
-`LEGEND-A`, `WJ-A`, `QUEUE-A`, `CTRL-A`..`CTRL-C`) are PENDING an Owner-local Edge run
+`4129687a` (Owner-reported, ≈ 1.3 min); at `23f48daa` 34 selected · 25 passed · 2 failed (`READ-A`,
+`WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) is
+PENDING an Owner-local Edge re-run
 **Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **Controlled 15-minute
 observation:** PAUSED · **60-minute run:** waived as a gate by the Owner — not run
 **Merge:** NOT MERGED
 **React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
 **Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Fixed — GlobalQueue semantics correction and head-only synthetic dispatch (Owner domain correction)
+
+- **Recorded:** Owner-local Edge at `23f48daa`: 34 selected · 25 passed · 2 failed (`READ-A` G+205 value
+  clipped; `WJ-A` assertion waited for `detail-id` after a non-selectable Water Jet slot) · 7 not run.
+  The Owner-authorized one-time recovery restored the local branch to `23f48daa` (identity proof
+  144 / 144).
+- **Superseded:** the previous synthetic queue / job behaviour — per-entry `READY` / `HELD` /
+  `BLOCKED` / `EXCLUDED` status, auto start that scanned forward past non-ready entries (Owner
+  examples: Job `G+217` / `I12` while `G+110` was the head), an unbounded queue shown as an 8-row
+  preview (76 / 77 queued), and arbitrary review Job targets — is **SUPERSEDED** and **NOT ELIGIBLE
+  FOR PRODUCTION PROMOTION**.
+- **Bounded synthetic GlobalQueue:** ready-to-dispatch entries only (presence = READY), at most 8
+  unique entries physically (`QUEUE_FULL` beyond; `totalQueued === entries.length`; no hidden
+  overflow), FIFO, deterministic entry IDs and refill, Water Jet slots excluded, monotonic queue
+  revision. Per-Sensor `queueState` is `NONE` / `QUEUED` / `ACTIVE`. Labelled "GlobalQueue ·
+  synthetic … not Production scheduling".
+- **Head-only atomic dispatch:** `dispatchHead()` is the only Job creator: Position 1 only (no
+  scan-forward), one step removes the head, creates exactly one Job for that Sensor, and writes a
+  synthetic `DispatchRecord`; refused while a Job is active. Pump waits live on the Job
+  (`preCheck: WAITING_FOR_PUMP`); `pause-auto-sequence` (alias `hold-queue`) pauses dispatch without
+  touching entries. `start-job` / `review-job` make the Sensor the head first and never retarget.
+- **Contract (spike):** `QueueEntry.status` removed, `entryId` added; `QueueSummary` gains
+  `synthetic`, `label`, `capacity: 8`, `revision`, `autoSequence`, `lastDispatch`,
+  `eligibilityDiagnostics`; `ActiveCleaningJobState` gains `preCheck` and `dispatch`; fixtures
+  regenerated. Schema identifiers unchanged (transient spike stream, no persisted consumer).
+- **UI:** GlobalQueue Status column and chips removed (source reason already a column, so no
+  replacement); count "n / 8 queued · FIFO · not Production scheduling"; cell badge `Q` / `J`;
+  Diagnostics "QUEUE → JOB DISPATCH (SYNTHETIC EVIDENCE)" and, only when a scenario sets it, "QUEUE
+  ELIGIBILITY DIAGNOSTICS"; eight presets (Queued DIRTY, Queued CLEANER non-score, Selected queued,
+  Dispatched head → Job, Alarm on Active Job, Alarm not admitted (demo), Head → Job transition,
+  Reset).
+- **Decision Matrix (proposal only):** `docs/spikes/queue-eligibility-decision-matrix.md` — quality,
+  alarm, interval, equipment, and sequence rows, every one `OWNER DECISION REQUIRED`; conflicts with
+  `QUEUE_MODEL.md` §7.1 / `DOMAIN_MODEL.md` (`HELD`) recorded, not resolved.
+- **Edge value-clipping hotfix (`READ-A`):** value line box 20 px (full Google Sans content area at
+  16 px) and ID row 12 px via tokens; rows `12px | minmax(20px, 1fr) | rail`. No font, size, weight,
+  overflow, or transform change; cell 52–56 × 46–50 unchanged.
+- **Water Jet test hotfix (`WJ-A`):** Case A (no selection → no detail, no selection, no command) and
+  Case B (Sensor detail stays; no slot selected).
+- **Tests:** Vitest 120 / 120 (16 files; new `globalQueue.test.tsx`, cell budget guard); harness 40 / 40
+  (new `queueDispatch.test.mjs`, gates A–F); scenarios 32 (27 PASS / 4 PASS+OWNER / 1 OWNER-LOCAL /
+  0 FAIL; new S31 head-only dispatch, S32 bounded load); Playwright list 36 tests in 4 files (new
+  `QUEUE-B`; `QUEUE-A`, `CTRL-A`, `CTRL-B`, `WJ-A` rewritten). Browser results **NOT VERIFIED** in Arena.
 
 #### Changed — Final Owner UI punchlist (Owner screenshot review of `4129687a`)
 

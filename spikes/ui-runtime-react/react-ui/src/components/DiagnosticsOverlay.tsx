@@ -79,6 +79,59 @@ export function useDiagnosticsHook() {
   }, [store]);
 }
 
+/**
+ * Queue -> Job dispatch evidence (synthetic; not a production audit record) and Queue Eligibility
+ * Diagnostics. Ineligible Sensors never appear in the GlobalQueue; they are listed here only when a
+ * synthetic test scenario explicitly sets them (eligibility policy pending Owner approval).
+ */
+export function QueueDispatchDiagnostics() {
+  const job = useSlice('activeJob');
+  const queue = useSlice('queue');
+  const d = job?.dispatch ?? queue?.lastDispatch ?? null;
+  const fromActive = Boolean(job?.dispatch);
+  const notAdmitted = queue?.eligibilityDiagnostics ?? [];
+  return (
+    <>
+      <h3 className={styles.stcTitle}>QUEUE → JOB DISPATCH (SYNTHETIC EVIDENCE)</h3>
+      <dl className={styles.kv} data-testid="diag-dispatch" data-dispatch-id={d?.dispatchId ?? ''}>
+        <dt>AutoSequence</dt>
+        <dd data-testid="diag-auto-sequence">{queue?.autoSequence ?? '--'}</dd>
+        <dt>Queue revision</dt>
+        <dd>{queue?.revision ?? '--'}</dd>
+        {d ? (
+          <>
+            <dt>{fromActive ? 'Active Job dispatched from Queue' : 'Last dispatch (Job ended)'}</dt>
+            <dd data-testid="diag-dispatch-summary">
+              Position {d.positionBefore} · {d.sensorId} · Queue revision {d.queueRevisionBefore}→{d.queueRevisionAfter} · {d.dispatchId}
+            </dd>
+            <dt>Job / entry</dt>
+            <dd>
+              {d.jobId} · {d.queueEntryId} · {d.sourceReason}
+            </dd>
+          </>
+        ) : (
+          <>
+            <dt>Dispatch</dt>
+            <dd data-testid="diag-dispatch-summary">No dispatch yet</dd>
+          </>
+        )}
+      </dl>
+      {notAdmitted.length > 0 && (
+        <>
+          <h3 className={styles.stcTitle}>QUEUE ELIGIBILITY DIAGNOSTICS</h3>
+          <ul className={styles.stcNote} data-testid="diag-eligibility">
+            {notAdmitted.map((n) => (
+              <li key={n.sensorId} data-sensor={n.sensorId}>
+                {n.sensorId} · NOT ADMITTED · {n.reason}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
+  );
+}
+
 export function DiagnosticsOverlay({ open, onClose, selectedId = null }: { open: boolean; onClose?: () => void; selectedId?: string | null }) {
   const store = useStore();
   const runtime = useSlice('runtime');
@@ -110,6 +163,7 @@ export function DiagnosticsOverlay({ open, onClose, selectedId = null }: { open:
       <div className={styles.diagBody}>
         {/* Spike review tooling, grouped separately from the observational metrics below. */}
         <SyntheticTestControl selectedId={selectedId} />
+        <QueueDispatchDiagnostics />
         <h3 className={styles.stcTitle}>OBSERVATIONAL METRICS</h3>
         <dl className={styles.kv} data-testid="diag-metrics">
           <dt>Revision</dt>

@@ -191,52 +191,139 @@ test('LEGEND-A eight entries; swatches and labels fully inside the legend; no cl
 });
 
 test('WJ-A Water Jet reference slots read WJ / REAR and WJ / FRONT and are not selectable Sensors', async ({ page }) => {
+  // Owner-local Edge correction: a Water Jet slot is not selectable, so clicking it must not create
+  // or change a selection. The previous assertion waited for detail-id after clicking a slot with
+  // no prior selection; detail-id correctly never appears in that state.
   await open(page);
-  for (const [tid, side] of [
+  const slots = [
     ['wj-slot-rear', 'REAR'],
     ['wj-slot-front', 'FRONT'],
-  ]) {
+  ] as const;
+  for (const [tid, side] of slots) {
     const slot = page.getByTestId(tid);
+    await expect(slot).toBeVisible();
     await expect(slot).toContainText('WJ');
     await expect(slot).toContainText(side);
-    await slot.click({ force: true });
+    await expect(slot).toHaveAttribute('data-slot-type', 'CANNON');
+    await expect(slot).not.toHaveAttribute('data-sensor-id', /.*/);
+    await expect(slot).not.toHaveAttribute('aria-pressed', /.*/);
+    await expect(slot).not.toHaveAttribute('tabindex', /.*/);
+  }
+  // Water Jet slots are the logical I7 / I16 equipment positions: no I7 / I16 Sensor cells exist.
+  await expect(page.locator('[data-slot-type="SENSOR"][data-sensor-id="I7"], [data-slot-type="SENSOR"][data-sensor-id="I16"]')).toHaveCount(0);
+
+  // Record every spike command / scenario request issued while clicking the slots.
+  const commands: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() !== 'GET' && r.url().includes('/api/spike/')) commands.push(`${r.method()} ${r.url()}`);
+  });
+  const selectedCount = () => page.locator('[data-slot-type="SENSOR"][aria-pressed="true"]').count();
+  const queueText = async () => (await page.getByTestId('queue-preview').textContent()) ?? '';
+
+  // Case A — no current Sensor selection.
+  await expect(page.getByTestId('detail-id')).toHaveCount(0);
+  expect(await selectedCount()).toBe(0);
+  for (const [tid] of slots) {
+    await page.getByTestId(tid).click({ force: true });
+    await page.waitForTimeout(250);
+    await expect(page.getByTestId('detail-id'), `${tid}: no Sensor detail appears`).toHaveCount(0);
+    expect(await selectedCount(), `${tid}: no selection state created`).toBe(0);
+    await expect(page.getByTestId(tid)).not.toHaveClass(/selected/);
+  }
+  expect(commands, 'Case A: no command / queue / job request sent').toEqual([]);
+
+  // Case B — an existing Sensor selection is retained when Water Jet slots are clicked.
+  await page.locator('[data-sensor-id="G+205"]').click();
+  await expect(page.getByTestId('detail-id')).toHaveText('G+205');
+  const queueBefore = await queueText();
+  for (const [tid] of [slots[0], slots[1]]) {
+    await page.getByTestId(tid).click({ force: true });
+    await page.waitForTimeout(250);
+    await expect(page.getByTestId('detail-id'), `${tid}: Sensor detail unchanged`).toHaveText('G+205');
+    await expect(page.locator('[data-sensor-id="G+205"]')).toHaveAttribute('aria-pressed', 'true');
+    expect(await selectedCount(), `${tid}: exactly the original selection`).toBe(1);
+    await expect(page.getByTestId(tid)).not.toHaveClass(/selected/);
     await expect(page.getByTestId('detail-id')).not.toHaveText(/CANNON|WJ/);
   }
+  expect(commands, 'Case B: no command / queue / job request sent').toEqual([]);
+  // A Water Jet slot never becomes a queue entry or a Job target.
+  expect(await queueText()).not.toMatch(/\bWJ\b|CANNON/);
+  expect(queueBefore).not.toMatch(/\bWJ\b|CANNON/);
+
   await expect(page.getByTestId('map-cannon-count')).toHaveText('2 Water Jet reference slots · synthetic');
   await expect(page.locator('body')).not.toContainText(/\b2 Water Jets\b|Cannon/);
 });
 
-test('QUEUE-A mixed-source GlobalQueue: at least 3 source labels in the first 8 rows, FIFO positions', async ({ page }) => {
+test('QUEUE-A mixed-source GlobalQueue: bounded to 8, at least 3 source labels, FIFO positions', async ({ page }) => {
   await open(page);
   const token = await controlsToken(page);
   const res = await (await page.request.post('/api/spike/scenario', { headers: { 'x-spike-token': token }, data: { command: 'queue-mixed-sources', params: {} } })).json();
   expect(res.accepted).toBe(true);
+  expect(res.detail.totalQueued).toBeLessThanOrEqual(8);
   await page.waitForTimeout(1500);
   const labels = await page.getByTestId('queue-reason').allTextContents();
   expect(labels.length).toBeGreaterThanOrEqual(5);
+  expect(labels.length).toBeLessThanOrEqual(8);
   expect(labels.slice(0, 4)).toEqual(['TIME DUE', 'TEMP + TIME', 'OPERATOR', 'TEMP']);
-  expect(new Set(labels.slice(0, 8)).size).toBeGreaterThanOrEqual(3);
-  expect(labels.slice(0, 8)).toContain('DIRTY SCORE');
+  expect(new Set(labels).size).toBeGreaterThanOrEqual(3);
+  expect(labels).toContain('DIRTY SCORE');
+  await expect(page.getByTestId('queue-count')).toHaveText(`${labels.length} / 8 queued · FIFO · not Production scheduling`);
 });
 
-test('CTRL-A synthetic test control: disabled without selection; preset 1 gives Alarm + Queue on DIRTY without zone overlap', async ({ page }) => {
+test('QUEUE-B GlobalQueue is synthetic, bounded (0..8 of 8), status-free, and the Active Job links to the dispatched head', async ({ page, request }) => {
+  await scenario(request, 'set-dirty-mode', { mode: 'dirty70' });
+  await open(page);
+  await expect(page.getByTestId('queue-title')).toHaveText('GlobalQueue · synthetic');
+  const q = page.getByTestId('queue-preview');
+  for (let i = 0; i < 4; i += 1) {
+    const n = await q.locator('tbody tr').count();
+    expect(n).toBeLessThanOrEqual(8);
+    await expect(page.getByTestId('queue-count')).toHaveText(/^[0-8] \/ 8 queued · FIFO · not Production scheduling$/);
+    await page.waitForTimeout(1000);
+  }
+  await expect(q.locator('th')).toHaveText(['Pos', 'Sensor', 'Source reason', 'Score', 'Since clean']);
+  await expect(q.locator('[data-status]')).toHaveCount(0);
+  expect(await q.textContent()).not.toMatch(/\b(READY|BLOCKED|HELD|EXCLUDED|WAITING)\b/);
+  expect(await page.locator('body').textContent()).not.toMatch(/\b7[67] queued\b/);
+  // Active Job target == the Sensor of its Position 1 dispatch record (Diagnostics evidence).
+  await expect(page.getByTestId('active-job')).toContainText('SYN-JOB-', { timeout: 10_000 });
+  await page.getByTestId('diagnostics-toggle').click();
+  const summary = page.getByTestId('diag-dispatch-summary');
+  await expect(summary).toHaveText(/^Position 1 · \S+ · Queue revision \d+→\d+ · SYN-DSP-\d{4}$/);
+  const dispatched = (await summary.textContent())!.split(' · ')[1];
+  const snap = await (await request.get('/api/snapshot')).json();
+  if (snap.activeJob) {
+    expect(snap.activeJob.dispatch.sensorId).toBe(snap.activeJob.targetSensorId);
+    expect(snap.activeJob.dispatch.positionBefore).toBe(1);
+    expect(snap.queue.entries.map((e: { sensorId: string }) => e.sensorId)).not.toContain(snap.activeJob.targetSensorId);
+  }
+  expect(dispatched).toMatch(/^[GHIJ]\+?\d+$/);
+  await scenario(request, 'set-dirty-mode', { mode: 'normal' });
+});
+
+test('CTRL-A synthetic test control: disabled without selection; preset 1 queues the DIRTY Sensor at Position 1; alarm + badge zones separate', async ({ page }) => {
   await open(page);
   await page.getByTestId('diagnostics-toggle').click();
   const panel = page.getByTestId('synthetic-test-control');
   await expect(panel).toHaveAttribute('data-availability', 'enabled');
-  await expect(page.getByTestId('stc-preset-dirty')).toBeDisabled();
+  await expect(page.getByTestId('stc-preset-queued-dirty')).toBeDisabled();
   await page.locator('[data-sensor-id="G+205"]').click();
   await expect(page.getByTestId('stc-selected')).toHaveText('G+205');
-  await page.getByTestId('stc-preset-dirty').click();
+  await page.getByTestId('stc-preset-queued-dirty').click();
   await expect(page.getByTestId('stc-result')).toHaveText('visual-preset: accepted');
   const cell = page.locator('[data-sensor-id="G+205"]');
+  await expect(cell.locator('[data-part="queue-badge"]')).toHaveText('Q', { timeout: 5000 });
+  await expect(page.locator('[data-testid="queue-preview"] tbody tr').first().locator('td').nth(1)).toHaveText('G+205');
+  // Preset 5: Alarm on the Active Job Sensor -> alarm icon (left) and Job badge (right) on the rail.
+  await page.getByTestId('stc-preset-alarm-active-job').click();
+  await expect(page.getByTestId('stc-result')).toHaveText('visual-preset: accepted');
   await expect(cell.locator('[data-part="alarm-marker"]')).toBeVisible({ timeout: 5000 });
-  await expect(cell.locator('[data-part="queue-badge"]')).toBeVisible();
+  await expect(cell.locator('[data-part="queue-badge"]')).toHaveText('J');
   const z = await zones(page, 'G+205');
   expect(z.alarm && z.queue).toBeTruthy();
-  expect(intersects(z.alarm!, z.queue!), 'alarm vs queue').toBe(false);
+  expect(intersects(z.alarm!, z.queue!), 'alarm vs badge').toBe(false);
   expect(within(z.alarm!, z.rail) && within(z.queue!, z.rail)).toBe(true);
-  expect(z.alarm!.left).toBeLessThan(z.queue!.left); // alarm left, queue right
+  expect(z.alarm!.left).toBeLessThan(z.queue!.left); // alarm left, badge right
   expect(z.idScroll.sw).toBeLessThanOrEqual(z.idScroll.cw);
   if (z.marker) {
     expect(intersects(z.marker, z.alarm!)).toBe(false);
@@ -244,22 +331,48 @@ test('CTRL-A synthetic test control: disabled without selection; preset 1 gives 
   }
 });
 
-test('CTRL-B presets 2..5 apply the combined states; preset 6 resets; never two jobs', async ({ page, request }) => {
+test('CTRL-B presets 2..7 give valid queue / job states (head-only dispatch, no retarget); preset 8 resets; never two jobs', async ({ page, request }) => {
   await open(page);
   await page.getByTestId('diagnostics-toggle').click();
-  await page.locator('[data-sensor-id="G+218"]').click();
-  for (const p of ['preset-cleaner', 'preset-selected', 'preset-job', 'preset-cleared']) {
+  const id = 'G+218';
+  await page.locator(`[data-sensor-id="${id}"]`).click();
+  const rows = page.locator('[data-testid="queue-preview"] tbody tr');
+  const rowSensor = (i: number) => rows.nth(i).locator('td').nth(1);
+  const badge = page.locator(`[data-sensor-id="${id}"] [data-part="queue-badge"]`);
+  const apply = async (p: string) => {
     await page.getByTestId(`stc-${p}`).click();
     await expect(page.getByTestId('stc-result')).toHaveText('visual-preset: accepted');
-    await expect(page.locator('[data-sensor-id="G+218"] [data-part="alarm-marker"]')).toBeVisible({ timeout: 5000 });
-    const z = await zones(page, 'G+218');
+    await page.waitForTimeout(600);
+    expect(await rows.count(), p).toBeLessThanOrEqual(8);
+    await expect(page.locator('[data-testid="queue-preview"] [data-status]')).toHaveCount(0);
+    const z = await zones(page, id);
     expect(z.idScroll.sw, p).toBeLessThanOrEqual(z.idScroll.cw);
-  }
+  };
+  await apply('preset-queued-cleaner');
+  await expect(rowSensor(0)).toHaveText(id);
+  await expect(rows.first().getByTestId('queue-reason')).toHaveText('OPERATOR');
+  await apply('preset-selected-queued');
+  await expect(rowSensor(1)).toHaveText(id);
+  await expect(badge).toHaveText('Q');
+  await apply('preset-dispatched-head');
+  await expect(page.getByTestId('active-job')).toContainText(id);
+  await expect(badge).toHaveText('J');
+  await expect(page.getByTestId('diag-dispatch-summary')).toHaveText(new RegExp(`^Position 1 · ${id.replace('+', '\\+')} · `));
+  expect(await rows.allTextContents()).not.toContainEqual(expect.stringContaining(id));
+  await apply('preset-alarm-not-admitted');
+  await expect(page.locator(`[data-sensor-id="${id}"] [data-part="alarm-marker"]`)).toBeVisible();
+  await expect(badge).toHaveCount(0);
+  await expect(page.getByTestId('diag-eligibility')).toContainText(`${id} · NOT ADMITTED · Reason pending Owner-approved eligibility policy`);
+  await apply('preset-head-to-job');
+  await expect(page.getByTestId('active-job')).toContainText(id);
+  await expect(page.getByTestId('diag-eligibility')).toHaveCount(0);
   await page.getByTestId('stc-preset-reset').click();
   await expect(page.getByTestId('stc-result')).toHaveText('visual-preset: accepted');
+  await expect(page.getByTestId('queue-count')).toHaveText(/^[0-8] \/ 8 queued/);
   const m = await (await request.get('/api/spike/metrics')).json();
   expect(m.jobs.acceptedSecondJobs).toBe(0);
   expect(m.invariants.violations).toBe(0);
+  expect(m.queue.length).toBeLessThanOrEqual(8);
 });
 
 test('CTRL-C drawer scrolls internally: opening the controls never changes document dimensions', async ({ page }) => {
