@@ -29,12 +29,37 @@ test('MAP U-shaped wall map: 4 walls x 6 rows, 24/29/24/29 Sensors, Cannons at I
     ['RIGHT', '6', 24],
     ['FRONT', '6', 29],
   ]);
-  // Plan-view geometry: Rear above Left/Right, Front below; Left left of Right.
-  const box = async (w: string) => (await page.locator(`[data-wall="${w}"]`).boundingBox())!;
-  const [rear, left, right, front] = [await box('REAR'), await box('LEFT'), await box('RIGHT'), await box('FRONT')];
-  expect(rear.y + rear.height).toBeLessThanOrEqual(left.y + 1);
-  expect(left.x + left.width).toBeLessThanOrEqual(right.x);
-  expect(Math.max(left.y + left.height, right.y + right.height)).toBeLessThanOrEqual(front.y + 1);
+  // Plan-view U geometry, relative to the compact centre summary. The side walls intentionally
+  // share Y range with the Rear / Front blocks (approved fullscreen layout), so wall-to-wall
+  // Y-interval ordering is NOT asserted; positions are asserted against the centre instead.
+  const box = async (sel: string) => (await page.locator(sel).boundingBox())!;
+  const [rear, left, right, front] = [await box('[data-wall="REAR"]'), await box('[data-wall="LEFT"]'), await box('[data-wall="RIGHT"]'), await box('[data-wall="FRONT"]')];
+  const center = await box('[data-testid="map-center"]');
+  const surface = await box('[data-testid="u-surface"]');
+  type B = { x: number; y: number; width: number; height: number };
+  const cx = (b: B) => b.x + b.width / 2;
+  const cy = (b: B) => b.y + b.height / 2;
+  const intersects = (a: B, b: B) => a.x < b.x + b.width - 0.5 && b.x < a.x + a.width - 0.5 && a.y < b.y + b.height - 0.5 && b.y < a.y + a.height - 0.5;
+  expect(rear.y + rear.height, 'Rear above centre').toBeLessThanOrEqual(center.y + 0.5);
+  expect(left.x + left.width, 'Left left of centre').toBeLessThanOrEqual(center.x + 0.5);
+  expect(right.x, 'Right right of centre').toBeGreaterThanOrEqual(center.x + center.width - 0.5);
+  expect(front.y, 'Front below centre').toBeGreaterThanOrEqual(center.y + center.height - 0.5);
+  expect(cy(rear), 'Rear y-centre above Front y-centre').toBeLessThan(cy(front));
+  expect(cx(left), 'Left x-centre left of Right x-centre').toBeLessThan(cx(right));
+  expect(Math.abs(cx(rear) - cx(center)), 'Rear horizontally centred').toBeLessThanOrEqual(2);
+  expect(Math.abs(cx(front) - cx(center)), 'Front horizontally centred').toBeLessThanOrEqual(2);
+  const wallBoxes: [string, B][] = [
+    ['REAR', rear],
+    ['LEFT', left],
+    ['RIGHT', right],
+    ['FRONT', front],
+  ];
+  for (let i = 0; i < wallBoxes.length; i += 1) {
+    for (let j = i + 1; j < wallBoxes.length; j += 1) expect(intersects(wallBoxes[i][1], wallBoxes[j][1]), `${wallBoxes[i][0]} / ${wallBoxes[j][0]} intersect`).toBe(false);
+    expect(intersects(wallBoxes[i][1], center), `${wallBoxes[i][0]} intersects centre`).toBe(false);
+    const w = wallBoxes[i][1];
+    expect(w.x >= surface.x - 0.5 && w.y >= surface.y - 0.5 && w.x + w.width <= surface.x + surface.width + 0.5 && w.y + w.height <= surface.y + surface.height + 0.5, `${wallBoxes[i][0]} inside map bounds`).toBe(true);
+  }
   await expect(page.locator('[data-sensor-id="I7"]')).toHaveCount(0);
   await expect(page.locator('[data-sensor-id="I16"]')).toHaveCount(0);
   const cannon = page.locator('[data-equipment-id="CANNON_REAR"]');

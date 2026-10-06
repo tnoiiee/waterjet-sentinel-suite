@@ -1,85 +1,167 @@
 /* WJSS Stage 0.2.1A — global base styles and the SINGLE design-token location (spike).
    System fonts only; no external assets.
 
-   Owner-approved Design Addendum (fullscreen refinement): primary target Windows 11, Microsoft
-   Edge, F11 fullscreen, 1920 x 1080, zoom 100 %. All sizing for the Operations page is derived
-   from the custom properties below; component CSS files only reference them (no duplicated
-   sizes). Fit is obtained by space allocation, never by shrinking operational text. */
+   Owner-approved Design Addendum (fullscreen) plus the production-grade readability
+   refinement: primary target Windows 11, Microsoft Edge, F11 fullscreen, 1920 x 1080,
+   zoom 100 %. All colour, surface, spacing, typography, and sizing values for the
+   Operations page are defined here; component CSS files only reference them.
+   Industrial HMI practice is used as design guidance only — no standards certification is
+   claimed. Fit is obtained by space allocation, never by shrinking operational text. */
 :root {
   color-scheme: dark;
-  --bg: #121418;
-  --panel: #1a1d22;
-  --line: #2a2e35;
-  --text: #e8eaed;
-  --muted: #9aa0a6;
+
+  /* ---- surfaces (three restrained levels) and borders ---- */
+  --surface-page: #111316;
+  --surface-card: #191c20;
+  --surface-nested: #22262b;
+  --border-subtle: #2a2f35;
+  --border-strong: #3b4149;
+  /* legacy aliases used by older rules */
+  --bg: var(--surface-page);
+  --panel: var(--surface-card);
+  --line: var(--border-subtle);
+
+  /* ---- text ---- */
+  --text-strong: #f3f5f7;
+  --text: #e3e6ea;
+  --muted: #a3aab2;
+  --text-faint: #858c95;
+  /* Sensor cell text: pure white for the highest contrast on every process shade. */
+  --cell-text: #ffffff;
+
+  /* ---- process colours (approved semantics, reduced saturation, normalised luminance).
+         White text stays readable on every shade. ---- */
+  --cleaner-base: #256b4a;
+  --cleaner-strong: #2f8059;
+  --dirty-base: #b33a2f;
+  --dirty-strong: #8d2f27;
+  --not-classified: #3f454d;
+  --not-classified-hatch: rgba(255, 255, 255, 0.07);
+  --quality-neutral: #4a5058;
+  --quality-disabled: #353a40;
+  --quality-pattern: rgba(255, 255, 255, 0.26);
+
+  /* ---- state colours (never used for process condition) ---- */
+  --uncertain: #e8a33d;
+  --alarm: #ffc531;
+  --alarm-ink: #1a1400;
+  --alarm-surface: rgba(255, 197, 49, 0.14);
+  --selection: #36d6f0;
+  --job-outer: #ffffff;
+  --job-inner: #0b0d10;
+  --cannon-surface: #262b31;
+  --cannon-border: #7d8692;
+  --ok: #7fcf9b;
+  --ok-surface: rgba(127, 207, 155, 0.1);
+
+  /* ---- queue status tokens ---- */
+  --st-ready: #7fcf9b;
+  --st-held: #e8c15a;
+  --st-blocked: #ff9e7a;
+  --st-excluded: #a3aab2;
+
+  /* ---- trend tokens (series differ in luminance as well as hue) ---- */
+  --trend-s1: #8fd3ff;
+  --trend-s2: #f4c542;
+  --trend-s3: #c4a3ff;
+  --trend-s4: #4fbf7f;
+  --trend-grid: rgba(255, 255, 255, 0.07);
+  --trend-axis: #b3b9c0;
+  --trend-band: rgba(127, 207, 155, 0.16);
+  --trend-band-edge: rgba(127, 207, 155, 0.55);
+  --trend-setpoint: #e3e6ea;
+
+  /* ---- spacing scale ---- */
+  --space-micro: 2px;
+  --space-inline: 4px;
+  --space-dense: 6px;
+  --space-small: 8px;
+  --space-card: 12px;
+  --space-section: 16px;
+  --space-major: 24px;
 
   /* ---- typography scale (px at the primary target) ---- */
+  --font-ui: system-ui, 'Segoe UI', sans-serif;
+  /* Bahnschrift (Windows 10/11 system font, DIN-style) semi-condensed keeps 13 px Sensor IDs
+     inside the Sensor cell ID zone; Segoe UI is the fallback. */
+  --font-sensor: Bahnschrift, 'Segoe UI', system-ui, sans-serif;
+  --sensor-font-stretch: 87.5%;
   --font-base: 13px;
-  --font-app-title: 14px;
-  --font-chip: 11.5px;
-  --font-alarm: 11px;
-  --font-card-title: 14px;
+  --font-app-title: 15px;
+  --font-chip: 12.5px;
+  --font-alarm: 12px;
+  --font-card-title: 15px;
   --font-wall-title: 14px;
-  --font-wall-summary: 11.5px;
-  --font-label: 11.5px;
-  --font-value: 12.5px;
-  --font-queue-head: 11px;
-  --font-queue-value: 12px;
-  --font-queue-status: 10.5px;
+  --font-wall-meta: 12px;
+  --font-group: 11px;
+  --font-label: 12px;
+  --font-value: 13px;
+  --font-detail-id: 18px;
+  --font-job: 13px;
+  --font-queue-head: 12px;
+  --font-queue-row: 13px;
+  --font-badge: 11px;
   --font-legend: 12px;
   --font-legend-title: 16px;
   --font-caption: 11px;
-  --font-axis: 11px;
-  --font-diag: 11.5px;
+  --font-trend-title: 14px;
+  --font-axis: 12px;
+  --font-camera-title: 14px;
+  --font-camera-state: 12px;
+  --font-diag: 12px;
   --line-height: 1.3;
 
   /* ---- page height model ---- */
-  --top-status-h: 34px;
+  --top-status-h: 40px;
   --alarm-strip-h: 24px;
-  --layout-gap: 6px;
-  --layout-pad: 6px;
-  --bottom-row-h: clamp(200px, 21vh, 240px);
+  --layout-gap: var(--space-dense);
+  --layout-pad: var(--space-dense);
+  --bottom-row-h: clamp(196px, 19.3vh, 240px);
   --camera-w: 280px;
   --content-max-w: 2240px;
 
   /* ---- main workspace split: Sensor Map ~44 %, Operations ~56 %, Map growth capped ---- */
-  --map-col-w: clamp(700px, 44%, 900px);
+  --map-col-w: clamp(740px, 44%, 920px);
 
   /* ---- right-side card heights ---- */
-  --detail-h: 184px;
-  --job-h: 132px;
+  --detail-h: 212px;
+  --job-h: 160px;
   --detail-row-h: 21px;
-  --queue-head-h: 25px;
-  --queue-row-h: 26px;
+  --queue-head-h: 28px;
+  --queue-row-h: 28px;
 
   /* ---- U-shaped Sensor Map geometry ---- */
-  --sensor-gap: 4px;
+  --sensor-gap: var(--space-inline);
   --wall-header-h: 18px;
-  --wall-header-gap: 2px;
-  --u-gap: 4px;
+  --wall-header-gap: var(--space-micro);
+  --u-gap: var(--space-inline);
   --u-center-w: 204px;
-  --u-center-h: 136px;
-  /* Map card border (1 + 1) + padding (6 + 6). */
-  --map-chrome: 14px;
+  --u-center-h: 130px;
+  /* Map card border (1 + 1) + padding (4 + 4). */
+  --map-chrome: 10px;
 
-  /* Sensor cell scale. Container query units (cqh / cqw) resolve against the Sensor Map area
-     (the only size container on the page), so the cells grow to use the available map height
-     and are capped: height 42..50 px, width 44..54 px (>= 48 px at 1920 x 1080). The constant
-     terms are the wall headers, the 10 inter-row gaps of the two stacked walls, the compact
-     center summary, the U gaps, the card chrome, and 6 px of slack. */
+  /* Sensor cell scale. Container query units resolve against the Sensor Map area (the only
+     size container on the page). Height 46..50 px, width 52..56 px (about 55.5 x 46.5 px at
+     1920 x 1080 by layout arithmetic). The constant terms are the wall headers, the 10
+     inter-row gaps of the two stacked walls, the compact centre summary, the U gaps, the card
+     chrome, and 4 px of slack. Below the fit threshold the map card scrolls internally. */
   --sensor-cell-height: clamp(
-    42px,
+    46px,
     calc(
       (
           100cqh - 2 * (var(--wall-header-h) + var(--wall-header-gap)) - 10 * var(--sensor-gap) -
-            var(--u-center-h) - 2 * var(--u-gap) - var(--map-chrome) - 6px
+            var(--u-center-h) - 2 * var(--u-gap) - var(--map-chrome) - 4px
         ) / 12
     ),
     50px
   );
-  --sensor-cell-width: clamp(44px, min(calc(var(--sensor-cell-height) + 6px), calc((100cqw - 150px) / 13)), 54px);
-  --sensor-id-font-size: 12.5px;
-  --sensor-value-font-size: 15px;
+  --sensor-cell-width: clamp(52px, min(calc(var(--sensor-cell-height) + 9px), calc((100cqw - 120px) / 13)), 56px);
+  --sensor-id-font-size: 13px;
+  --sensor-value-font-size: 16px;
+  --sensor-marker-size: 10px;
+  /* Right-side ID-row reservation for the marker zone (marker + gap). */
+  --sensor-marker-reserve: 12px;
+  --sensor-rail-h: 10px;
   /* One wall block: header + 6 rows + 5 gaps. */
   --wall-h: calc(var(--wall-header-h) + var(--wall-header-gap) + 6 * var(--sensor-cell-height) + 5 * var(--sensor-gap));
 }
@@ -91,7 +173,7 @@ body,
 #root {
   margin: 0;
   height: 100%;
-  background: var(--bg);
+  background: var(--surface-page);
   color: var(--text);
-  font: var(--font-base) / var(--line-height) system-ui, 'Segoe UI', sans-serif;
+  font: var(--font-base) / var(--line-height) var(--font-ui);
 }

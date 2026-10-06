@@ -18,6 +18,8 @@ export function StatusBar({ onToggleDiagnostics, diagnosticsOpen = false }: { on
   const [closeEval, setCloseEval] = useState<CloseRequestEvaluation | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
   const devicesDown = comm?.devices.filter((d) => d.state !== 'ONLINE').length ?? 0;
+  const alarmTotal = alarms ? alarms.activeUnack + alarms.activeAck + alarms.clearedUnack : 0;
+  const alarmAttention = alarms ? alarms.activeUnack + alarms.clearedUnack : 0;
 
   const onClose = async () => {
     setCloseError(null);
@@ -30,22 +32,53 @@ export function StatusBar({ onToggleDiagnostics, diagnosticsOpen = false }: { on
 
   return (
     <header className={styles.statusBar} data-testid="status-bar">
-      <span className={styles.brand}>WJSS Operations</span>
-      <span className={styles.syntheticTag}>SYNTHETIC SPIKE — NOT PRODUCTION</span>
-      <span className={`${styles.pill} ${styles[`conn_${conn.state}`]}`} data-testid="conn-state">
-        {conn.state}
-      </span>
-      <span className={styles.pill}>rev {meta.revision < 0 ? '-' : meta.revision}</span>
-      <span className={styles.pill}>config r{config?.revision ?? '-'}</span>
-      <span className={styles.pill} data-testid="pump-state">
-        Pump {pump?.state ?? '-'}
-        {pump?.ready ? ' · ready' : ''}
-      </span>
-      <span className={styles.pill}>{job ? `Job ${job.phase} ${job.targetSensorId}` : 'No active job'}</span>
-      <span className={`${styles.pill} ${alarms && alarms.activeUnack + alarms.clearedUnack > 0 ? styles.pillAlarm : ''}`}>
-        Alarms {alarms ? alarms.activeUnack + alarms.activeAck + alarms.clearedUnack : 0}
-      </span>
-      <span className={`${styles.pill} ${devicesDown ? styles.pillWarn : ''}`}>Devices {comm ? comm.devices.length - devicesDown : 0}/{comm?.devices.length ?? 0} online</span>
+      <div className={styles.statusGroup} role="group" aria-label="Application" data-status-group="app">
+        <span className={styles.brand}>WJSS Operations</span>
+        <span className={styles.syntheticTag}>SYNTHETIC SPIKE — NOT PRODUCTION</span>
+      </div>
+      {/* Priority order: Alarm > Process (Job, Pump) > System (connection, devices) > Technical. */}
+      <div className={styles.statusGroup} role="group" aria-label="Alarm" data-status-group="alarm">
+        <span className={`${styles.pill} ${alarmAttention ? styles.pillAlarm : alarmTotal ? styles.pillAlarmAck : styles.pillOk}`} data-testid="alarm-state">
+          {alarmTotal ? (
+            <>
+              <span className={styles.pillGlyph} aria-hidden="true">
+                ▲
+              </span>
+              Alarms {alarmTotal}
+              {alarmAttention ? ` · ${alarmAttention} need ack` : ' · acknowledged'}
+            </>
+          ) : (
+            'Alarms 0'
+          )}
+        </span>
+      </div>
+      <div className={styles.statusGroup} role="group" aria-label="Process" data-status-group="process">
+        <span className={`${styles.pill} ${job ? styles.pillJob : ''}`} data-testid="job-state">
+          {job ? (
+            <>
+              Job {job.phase} → <b>{job.targetSensorId}</b>
+            </>
+          ) : (
+            'No active job'
+          )}
+        </span>
+        <span className={styles.pill} data-testid="pump-state">
+          Pump {pump?.state ?? '-'}
+          {pump?.ready ? ' · ready' : ''}
+        </span>
+      </div>
+      <div className={styles.statusGroup} role="group" aria-label="System" data-status-group="system">
+        <span className={`${styles.pill} ${styles[`conn_${conn.state}`]}`} data-testid="conn-state">
+          {conn.state}
+        </span>
+        <span className={`${styles.pill} ${devicesDown ? styles.pillWarn : ''}`}>
+          Devices {comm ? comm.devices.length - devicesDown : 0}/{comm?.devices.length ?? 0} online
+        </span>
+      </div>
+      <div className={`${styles.statusGroup} ${styles.statusTech}`} role="group" aria-label="Technical" data-status-group="technical">
+        <span className={styles.techItem}>rev {meta.revision < 0 ? '-' : meta.revision}</span>
+        <span className={styles.techItem}>config r{config?.revision ?? '-'}</span>
+      </div>
       <span className={styles.spacer} />
       <button type="button" className={`${styles.btn} ${diagnosticsOpen ? styles.btnActive : ''}`} onClick={onToggleDiagnostics} aria-keyshortcuts="D" aria-expanded={diagnosticsOpen} data-testid="diagnostics-toggle">
         Diagnostics

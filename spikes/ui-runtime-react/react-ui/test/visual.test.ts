@@ -1,7 +1,7 @@
 // WJSS Stage 0.2.1A — single visual mapping: seven independent dimensions,
 // Dirty-vs-Alarm independence, neutral presentation for BAD/STALE/DISABLED.
 import { describe, expect, it } from 'vitest';
-import { PALETTE, toCellVisual } from '../src/visual/toCellVisual';
+import { PALETTE, shade, toCellVisual } from '../src/visual/toCellVisual';
 import { makeSensor } from './helpers';
 
 const ctx = { selected: false, threshold: 50 };
@@ -21,7 +21,9 @@ describe('toCellVisual', () => {
   it('an alarm on a Cleaner Sensor does not turn it red', () => {
     const v = toCellVisual(makeSensor({ sensorId: 'G+201', alarmState: 'ACTIVE_UNACK', alarmSeverity: 'HIGH' }), ctx);
     expect(v.process).toBe('CLEANER');
-    expect(v.background).toContain(`hsl(${PALETTE.cleanerHue}`);
+    expect(v.background).toContain(PALETTE.cleanerBase);
+    expect(v.background).not.toContain(PALETTE.dirtyBase);
+    expect(v.background).not.toContain(PALETTE.alarm);
     expect(v.alarm.icon).toBe('!');
   });
 
@@ -74,5 +76,24 @@ describe('toCellVisual', () => {
     expect(all.alarm.state).toBe('ACTIVE_ACK');
     expect(none.selectedRing || none.activeJobOutline).toBe(false);
     expect(none.queueBadge).toBeNull();
+  });
+
+  it('NOT_CLASSIFIED with GOOD quality uses the graphite not-classified token, never a process colour', () => {
+    const v = toCellVisual(makeSensor({ sensorId: 'G+201', classification: 'NOT_CLASSIFIED', classificationBasis: 'NONE', dirtyScore: null, lastValidatedScore: null }), ctx);
+    expect(v.process).toBe('NEUTRAL');
+    expect(v.background).toBe(PALETTE.notClassified);
+    expect(v.qualityMarker).toBe('NONE');
+  });
+
+  it('Uncertain is a marker, never a background colour', () => {
+    const v = toCellVisual(makeSensor({ sensorId: 'G+201', quality: 'UNCERTAIN', classification: 'CLEANER', classificationBasis: 'LAST_VALIDATED', lastValidatedScore: 20 }), ctx);
+    expect(v.background).not.toContain(PALETTE.uncertainMarker);
+    expect(v.background).toContain(PALETTE.cleanerBase);
+  });
+
+  it('shade() mixes the strong token into the base token by intensity (0..100 %)', () => {
+    expect(shade('var(--a)', 'var(--b)', 0)).toBe('color-mix(in srgb, var(--b) 0%, var(--a))');
+    expect(shade('var(--a)', 'var(--b)', 0.5)).toBe('color-mix(in srgb, var(--b) 50%, var(--a))');
+    expect(shade('var(--a)', 'var(--b)', 7)).toBe('color-mix(in srgb, var(--b) 100%, var(--a))');
   });
 });

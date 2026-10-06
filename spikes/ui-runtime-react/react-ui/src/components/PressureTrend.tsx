@@ -10,8 +10,29 @@ import type { TrendPoint } from '../../../contracts/operational';
 import { useSlice } from '../store/hooks';
 import styles from './Operations.module.css';
 
-const COLORS = ['#4fc3f7', '#ffd54f', '#ba68c8', '#81c784'];
-const AXIS_FONT = '11px system-ui, "Segoe UI", sans-serif';
+/** Canvas cannot read CSS custom properties directly; trend colours are resolved once from the
+ *  central design tokens in global.css (with the same values as fallback for jsdom). Series
+ *  colours differ in luminance as well as hue. */
+const TOKEN_FALLBACK: Record<string, string> = {
+  '--trend-s1': '#8fd3ff',
+  '--trend-s2': '#f4c542',
+  '--trend-s3': '#c4a3ff',
+  '--trend-s4': '#4fbf7f',
+  '--trend-grid': 'rgba(255, 255, 255, 0.07)',
+  '--trend-axis': '#b3b9c0',
+  '--trend-band': 'rgba(127, 207, 155, 0.16)',
+  '--trend-band-edge': 'rgba(127, 207, 155, 0.55)',
+  '--trend-setpoint': '#e3e6ea',
+  '--alarm': '#ffc531',
+  '--selection': '#36d6f0',
+};
+export function token(name: string): string {
+  const v = typeof document !== 'undefined' ? getComputedStyle(document.documentElement).getPropertyValue(name).trim() : '';
+  return v || TOKEN_FALLBACK[name] || '#888';
+}
+export const TREND_LINE_WIDTH = 1.75;
+const AXIS_FONT = '12px system-ui, "Segoe UI", sans-serif';
+const fmtVal = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '--' : v.toFixed(1));
 
 /** Plot size that fits the bounded host: the legend height is subtracted so the chart plus its
  *  legend never exceed the bottom-row height. Falls back to 150 px when layout is unavailable. */
@@ -51,6 +72,12 @@ export function PressureTrend() {
     const el = host.current;
     if (!el) return;
     const names = trend.seriesNames.length ? trend.seriesNames : ['S1', 'S2', 'S3', 'S4'];
+    const colors = ['--trend-s1', '--trend-s2', '--trend-s3', '--trend-s4'].map(token);
+    const grid = token('--trend-grid');
+    const axis = token('--trend-axis');
+    const band = token('--trend-band');
+    const bandEdge = token('--trend-band-edge');
+    const alarmColor = token('--alarm');
     const opts: uPlot.Options = {
       ...plotSize(el, null),
       legend: { show: true, live: false },
@@ -58,13 +85,13 @@ export function PressureTrend() {
       scales: { x: { time: true }, y: { range: [0, 130] } },
       padding: [6, 8, 0, 0],
       axes: [
-        { stroke: '#9aa0a6', grid: { stroke: '#2a2e35' }, font: AXIS_FONT, size: 26, gap: 3 },
-        { stroke: '#9aa0a6', grid: { stroke: '#2a2e35' }, font: AXIS_FONT, size: 34, gap: 3 },
+        { stroke: axis, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid }, font: AXIS_FONT, size: 28, gap: 3 },
+        { stroke: axis, grid: { stroke: grid, width: 1 }, ticks: { stroke: grid }, font: AXIS_FONT, size: 38, gap: 3 },
       ],
       series: [
         {},
-        ...names.slice(0, 4).map((label, i) => ({ label, stroke: COLORS[i], width: 1.25, points: { show: false }, spanGaps: false })),
-        { label: 'Setpoint (syn)', stroke: '#e8eaed', dash: [4, 4], width: 1, points: { show: false } },
+        ...names.slice(0, 4).map((label, i) => ({ label, stroke: colors[i], width: TREND_LINE_WIDTH, points: { show: false }, spanGaps: false })),
+        { label: 'Setpoint (syn)', stroke: token('--trend-setpoint'), dash: [6, 4], width: 1.25, points: { show: false } },
       ],
       hooks: {
         drawClear: [
@@ -75,20 +102,24 @@ export function PressureTrend() {
             const y1 = u.valToPos(hi, 'y', true);
             const y2 = u.valToPos(lo, 'y', true);
             ctx.save();
-            ctx.fillStyle = 'rgba(129, 199, 132, 0.10)';
+            ctx.fillStyle = band;
             ctx.fillRect(left, y1, width, y2 - y1);
-            // Synthetic Job overlay (cyan spans) and Alarm overlay (magenta ticks).
+            // Ready-band edges: thin lines make the band readable without a heavy fill.
+            ctx.fillStyle = bandEdge;
+            ctx.fillRect(left, Math.round(y1), width, 1);
+            ctx.fillRect(left, Math.round(y2), width, 1);
+            // Synthetic Job overlay (faint cyan spans) and Alarm overlay (alarm-yellow ticks).
             const pts = pointsRef.current;
             const xs = u.data[0] as number[];
             for (let i = 0; i < pts.length && i < xs.length; i += 1) {
               const x0 = u.valToPos(xs[i], 'x', true);
               const x1 = i + 1 < xs.length ? u.valToPos(xs[i + 1], 'x', true) : x0 + 1;
               if (pts[i].jobActive) {
-                ctx.fillStyle = 'rgba(0, 229, 255, 0.07)';
+                ctx.fillStyle = 'rgba(54, 214, 240, 0.06)';
                 ctx.fillRect(x0, top, Math.max(1, x1 - x0), height);
               }
               if (pts[i].alarmActive) {
-                ctx.fillStyle = 'rgba(255, 47, 210, 0.8)';
+                ctx.fillStyle = alarmColor;
                 ctx.fillRect(x0, top + height - 4, Math.max(1, x1 - x0), 4);
               }
             }
@@ -116,11 +147,30 @@ export function PressureTrend() {
     plot.current?.setData(toColumns(trend.points));
   }, [trend.version, trend.points]);
 
+  const last = trend.points.length ? trend.points[trend.points.length - 1] : null;
+  const names = trend.seriesNames.length ? trend.seriesNames : ['S1', 'S2', 'S3', 'S4'];
   return (
     <section className={`${styles.panel} ${styles.trendPanel}`} aria-label="Pressure trend" data-testid="pressure-trend">
-      <h2 className={styles.panelTitle}>
-        Pressure trend <span className={styles.muted}>(synthetic units · {trend.points.length}/{trend.capacity} s · ready band shaded · gaps = no data)</span>
-      </h2>
+      <header className={styles.cardHeader}>
+        <h2 className={`${styles.panelTitle} ${styles.trendTitle}`}>Pressure trend</h2>
+        <span className={styles.trendSummary} data-testid="trend-summary">
+          {names.slice(0, 4).map((n, i) => (
+            <span key={n} className={styles.trendNow}>
+              {n} <b className={styles.num}>{fmtVal(last?.series[i])}</b>
+            </span>
+          ))}
+          <span className={styles.trendNow}>
+            setpoint <b className={styles.num}>{fmtVal(last?.setpoint)}</b>
+          </span>
+          <span className={styles.trendNow}>
+            ready band <b className={styles.num}>{bandRef.current[0]}–{bandRef.current[1]}</b>
+          </span>
+        </span>
+        <span className={styles.headerSpacer} />
+        <span className={styles.cardMeta}>
+          syn-units · <span className={styles.num}>{trend.points.length}/{trend.capacity}</span> s · gaps = no data
+        </span>
+      </header>
       <div ref={host} className={styles.trendHost} />
     </section>
   );

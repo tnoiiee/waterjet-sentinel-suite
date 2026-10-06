@@ -1,29 +1,29 @@
 {
   "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
-  "recordedAt": "2026-10-05T13:59:24.000Z",
+  "recordedAt": "2026-10-06T05:00:00.000Z",
   "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
-  "parentCheckpoint": "935973e6",
-  "scope": "Stage 0.2.1A fullscreen Operations UI refinement (Owner-approved Design Addendum; 1920 x 1080 Edge F11 target). Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
+  "parentCheckpoint": "ea23bc58",
+  "scope": "Stage 0.2.1A Operations readability refinement (Owner screenshot review) plus stale MAP U-shape E2E assertion correction; presentation and tests only. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
   "checks": [
     {
       "check": "npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
       "result": "PASS",
-      "detail": "exit 0; package-lock.json unchanged; no browser download"
+      "detail": "exit 0; package-lock.json unchanged; no browser download; dependencies unchanged"
     },
     {
       "check": "tsc --noEmit (TypeScript 6.0.3)",
       "result": "PASS",
-      "detail": "0 errors"
+      "detail": "0 errors (project); separate strict check of e2e/*.ts 0 errors (excluding absent Node type declarations for process.env)"
     },
     {
       "check": "vite build (production)",
       "result": "PASS",
-      "detail": "JS 307.27 kB (gzip 102.61 kB), CSS 17.45 kB (gzip 4.83 kB)"
+      "detail": "JS 316.77 kB (gzip 104.84 kB), CSS 25.68 kB (gzip 6.32 kB)"
     },
     {
-      "check": "vitest (jsdom) 12 files",
+      "check": "vitest (jsdom) 13 files",
       "result": "PASS",
-      "detail": "75/75 (15 new: layoutTokens 7, fullscreenLayout 8)"
+      "detail": "93/93 (18 new: colorTokens 5, visual 3, layoutTokens 4, fullscreenLayout 6; jsdom does not validate pixel overlap)"
     },
     {
       "check": "runtime-harness node:test 2 files",
@@ -38,22 +38,22 @@
     {
       "check": "golden fixtures validated against canonical map",
       "result": "PASS",
-      "detail": "fixtures unchanged; fixtures.test 6/6"
+      "detail": "fixtures unchanged; fixtures.test PASS"
     },
     {
       "check": "playwright test --list (no browser)",
       "result": "PASS",
-      "detail": "22 tests in 3 files (5 new layout tests LAYOUT-A..E), project msedge"
+      "detail": "26 tests in 3 files; operations.spec + layout.spec selection 25 (was 21; 4 new READ-A..READ-D; stale MAP U-shape assertion corrected), project msedge"
     },
     {
       "check": "hard gates (sensor map)",
       "result": "PASS",
-      "detail": "106 sensors; 212 channels; 24/29/24/29; 2 cannon slots; I7/I16 absent; 0 duplicate IDs/slots/scanOrder/TC_F/TC_R; 0 shared channels"
+      "detail": "106 sensors; 212 channels; 24/29/24/29; 2 cannon slots; I7/I16 absent; 0 duplicate IDs/scanOrder/channels"
     },
     {
-      "check": "viewport fit 1920x1080 / 1366x768 / 2560x1440",
+      "check": "ID / marker overlap, clipping, typography, viewport fit 1920x1080 / 1366x768 / 2560x1440",
       "result": "NOT VERIFIED",
-      "detail": "no browser in Arena; asserted by e2e/layout.spec.ts, Owner-local Edge run PENDING"
+      "detail": "no browser in Arena; asserted by e2e/layout.spec.ts (LAYOUT-A..E, READ-A..D), Owner-local Edge run PENDING"
     },
     {
       "check": "sensitive-data scan (added lines of changed and new files)",
@@ -63,7 +63,7 @@
     {
       "check": "markdown relative links (all tracked and new .md)",
       "result": "PASS",
-      "detail": "44 files, 696 links, 0 broken; 10 anchors, 0 broken"
+      "detail": "44 files, 699 links, 0 broken; 13 anchors, 0 broken"
     },
     {
       "check": "loopback-only bind",
@@ -85,12 +85,16 @@
     "ASP.NET Core integration",
     "Windows Service behaviour",
     "WebView2 kiosk behaviour",
-    "installed-Edge rendering and viewport fit of the fullscreen layout (Owner-local re-run and manual F11 1920x1080 review PENDING)",
+    "installed-Edge rendering, Sensor-cell overlap and clipping, typography, and viewport fit of the readability refinement (Owner-local Edge run and manual F11 1920x1080 review PENDING)",
+    "Bahnschrift glyph widths",
     "heap / DOM / long tasks / end-to-end latency in Edge",
     "Windows process CPU and memory",
     "Windows offline restore",
+    "controlled 15-minute observation (PENDING)",
     "Extended (4 h) stability",
     "60-minute run (PAUSED)",
+    "Production stability",
+    "Modbus performance",
     "Production integration"
   ]
 }

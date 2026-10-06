@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T14:00:23.234Z",
+  "generatedAt": "2026-10-06T04:44:34.401Z",
   "base": "spikes/ui-runtime-react/results",
   "entries": [
     {
@@ -20,22 +20,22 @@
     {
       "path": "summary/arena-scenarios.json",
       "bytes": 9747,
-      "sha256": "a427f5f17d5c483f0f58d76e7476e2026da1f414a903b60359d725eec3d369d1"
+      "sha256": "aa4da05736ab6d453609689cdc4633256b4e2a8f24943853040f406c67d11e9f"
     },
     {
       "path": "summary/arena-scenarios.md",
       "bytes": 4976,
-      "sha256": "3526550f17bc5ff08dd2ece156526ab7f2741f6fd8783cb4c5d6c3542aace0e3"
+      "sha256": "f6c569f4d2805f4e45bc9a1fd2fc9dbb4070bbf2b1d7b87d4b2b119f8624abdf"
     },
     {
       "path": "summary/arena-validation.json",
-      "bytes": 3522,
-      "sha256": "b6f7087773d912a7b7973aa14d17809891d8292abac21ce714d0beae0bb22446"
+      "bytes": 4075,
+      "sha256": "f0f089b50d75bf6ecdc8e275e9c1abc63af7e2d23b0e9d395dc29b76eb076efe"
     },
     {
       "path": "summary/arena-validation.md",
-      "bytes": 2622,
-      "sha256": "94a10a28af9ebd1d22153d2165127cdb9dbf8c3e13988ee71ec6ea9198f7f87d"
+      "bytes": 3159,
+      "sha256": "9ed4af09bcf63b62ff5c122ff7285ed59893875d157a24a617765f762141aacf"
     },
     {
       "path": "manifests/licence-inventory.json",

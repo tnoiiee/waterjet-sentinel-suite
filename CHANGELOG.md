@@ -30,11 +30,42 @@ removable synthetic feasibility spike — no Product code.**
 **Implementation:** IN PROGRESS — PR #3 OPEN
 **Owner-local testing (installed Edge, Windows 11):** PASS for checkpoint `dd20a8bd` (superseded
 104-location map); re-run for the corrected Sensor map and the fullscreen layout PENDING
-**Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **60-minute run:** PAUSED
+**Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **Controlled 15-minute
+observation:** PENDING · **60-minute run:** PAUSED
 **Merge:** NOT MERGED
 **React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
 **Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Changed — Operations readability refinement (Owner screenshot review)
+
+- **Stale test corrected:** the MAP E2E test asserted the pre-fullscreen Y-interval wall order;
+  it now asserts positions relative to the compact centre summary (Rear above, Left left, Right
+  right, Front below; centred Rear / Front; no wall or centre intersection; walls inside the map).
+  The layout was not changed to satisfy the stale test.
+- **Sensor cell zones:** ID top-left inside a width-limited zone, reserved 10 + 2 px top-right
+  marker zone (quality glyph), centred value, bottom rail (alarm triangle, queue badge). Cells
+  52–56 × 46–50 px; ID 13 px / 700 (Bahnschrift semi-condensed, Segoe UI fallback), value
+  16 px / 700, tabular numerals.
+- **Colours as central tokens:** desaturated Cleaner `#256B4A`–`#2F8059` and Dirty
+  `#B33A2F`–`#8D2F27`; graphite Not classified; neutral + pattern + glyph for BAD / STALE /
+  DISABLED; amber Uncertain dot; yellow alarm border + icon separated from Dirty red; cyan
+  selection; white double outline for the Active Job; three surface levels. No glow.
+- **Typography scale and spacing scale** centralised (no text below 11 px outside the 10 px
+  cell badge; 2 / 4 / 6 / 8 / 12 / 16 / 24 px spacing).
+- **Status bar** grouped Alarm → Process → System → Technical; actionable alarm strip.
+- **Sensor Detail** ID header and Process / Location / State / Source groups; **Active Job**
+  separated fields, completed / current / future phases, elapsed time; **GlobalQueue** fixed
+  column widths, right-aligned tabular numbers, token status chips; **Pressure Trend** thicker
+  lines, 12 px axes and legend, clearer band and setpoint, header summary; **Camera** placeholder
+  badge and NO SIGNAL state.
+- **Tests:** Vitest 93 / 93 (13 files); four new Edge specs `READ-A`..`READ-D`; `LAYOUT-A` /
+  `LAYOUT-D` / `LAYOUT-E` aligned to the approved readability scale. Browser results are **NOT
+  VERIFIED** in Arena; the Owner-local Edge run, the manual F11 review, and a controlled 15-minute
+  observation are **PENDING**; the 60-minute run stays **PAUSED**.
+- **Recorded:** the Owner-local interrupted overnight observation of `ea23bc58` (≈ 11 h 41 min wall
+  clock with host sleep, ≈ 4 h likely active; invariant violations 0, accepted second Jobs 0,
+  Historian rejections 0, 659 synthetic Jobs) — not a controlled benchmark.
 
 #### Changed — Fullscreen Operations UI refinement (Owner-approved Design Addendum)
 

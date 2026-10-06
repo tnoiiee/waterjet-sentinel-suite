@@ -2,32 +2,47 @@
 //
 // Every Sensor-cell style decision is made here and nowhere else. Seven independent
 // dimensions, each on its own visual channel:
-//   1. DIRTY / CLEANER classification -> background hue
-//   2. Dirty Score intensity          -> background shade (lightness)
-//   3. Data quality                   -> quality marker / pattern (amber marker for UNCERTAIN)
-//   4. Queue state                    -> badge
+//   1. DIRTY / CLEANER classification -> background colour family (central CSS tokens)
+//   2. Dirty Score intensity          -> background shade (color-mix of base and strong token)
+//   3. Data quality                   -> top-right quality marker (amber dot for UNCERTAIN;
+//                                        neutral background + pattern + glyph for BAD/STALE/DISABLED)
+//   4. Queue state                    -> bottom-right queue badge
 //   5. Selection (UI-local)           -> cyan outer ring
-//   6. Active Cleaning Job target     -> high-contrast double outline
-//   7. Alarm state                    -> bright magenta border + icon
+//   6. Active Cleaning Job target     -> high-contrast white double outline
+//   7. Alarm state                    -> yellow warning border + bottom-left warning icon
 //
 // Dirty red is a PROCESS-CONDITION colour. It is never used for alarm severity, and the
 // alarm colour is never used for process condition. BAD / STALE / DISABLED never receive
 // the ordinary Dirty or Cleaner background.
-// Colours are spike choices only; Production HMI palette remains [OPEN].
+// Colour VALUES live only in src/global.css (the single design-token location); this module
+// references them by CSS custom property. Colours are spike choices only; the Production HMI
+// palette remains [OPEN]. No standards certification is claimed.
 
 import type { AlarmState, QueueState, SensorPresentationState } from '../../../contracts/operational';
 
 export const PALETTE = Object.freeze({
-  dirtyHue: 4,
-  cleanerHue: 145,
-  neutral: '#5b6068',
-  neutralDisabled: '#3d4148',
-  uncertainMarker: '#ffb300',
-  alarm: '#ff2fd2',
-  selected: '#00e5ff',
-  jobOuter: '#ffffff',
-  jobInner: '#000000',
+  cleanerBase: 'var(--cleaner-base)',
+  cleanerStrong: 'var(--cleaner-strong)',
+  dirtyBase: 'var(--dirty-base)',
+  dirtyStrong: 'var(--dirty-strong)',
+  notClassified: 'var(--not-classified)',
+  neutral: 'var(--quality-neutral)',
+  neutralDisabled: 'var(--quality-disabled)',
+  uncertainMarker: 'var(--uncertain)',
+  alarm: 'var(--alarm)',
+  selected: 'var(--selection)',
+  jobOuter: 'var(--job-outer)',
+  jobInner: 'var(--job-inner)',
 });
+
+function clamp01(v: number): number {
+  return Math.min(1, Math.max(0, v));
+}
+
+/** Mix `pct` percent of `strong` into `base` (CSS Color 5 color-mix; Edge 111+). */
+export function shade(base: string, strong: string, intensity: number): string {
+  return `color-mix(in srgb, ${strong} ${Math.round(clamp01(intensity) * 100)}%, ${base})`;
+}
 
 export type ProcessVisual = 'DIRTY' | 'CLEANER' | 'NEUTRAL';
 export type QualityMarker = 'NONE' | 'UNCERTAIN_AMBER' | 'BAD_HATCH' | 'STALE_CLOCK' | 'DISABLED_SLASH';
@@ -54,12 +69,13 @@ const QUEUE_BADGES: Record<Exclude<QueueState, 'NONE'>, { code: string; title: s
   ACTIVE: { code: 'J', title: 'Active Cleaning Job target' },
 };
 
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 export function toCellVisual(s: SensorPresentationState, ctx: { selected: boolean; threshold: number }): CellVisual {
   const { threshold } = ctx;
   let process: ProcessVisual = 'NEUTRAL';
-  let background: string = s.quality === 'DISABLED' ? PALETTE.neutralDisabled : PALETTE.neutral;
+  const neutralQualityBg = s.quality === 'DISABLED' ? PALETTE.neutralDisabled : PALETTE.neutral;
+  let background: string =
+    s.quality === 'BAD' || s.quality === 'STALE' || s.quality === 'DISABLED' ? neutralQualityBg : PALETTE.notClassified;
   let intensity = 0;
   let detailNote: string | null = null;
 
@@ -71,11 +87,11 @@ export function toCellVisual(s: SensorPresentationState, ctx: { selected: boolea
     if (s.classification === 'DIRTY') {
       process = 'DIRTY';
       intensity = clamp01((shadeScore - threshold) / Math.max(1, 100 - threshold));
-      background = `hsl(${PALETTE.dirtyHue} 72% ${Math.round(50 - intensity * 24)}%)`;
+      background = shade(PALETTE.dirtyBase, PALETTE.dirtyStrong, intensity);
     } else {
       process = 'CLEANER';
       intensity = clamp01(shadeScore / Math.max(1, threshold));
-      background = `hsl(${PALETTE.cleanerHue} 42% ${Math.round(24 + intensity * 20)}%)`;
+      background = shade(PALETTE.cleanerBase, PALETTE.cleanerStrong, intensity);
     }
   }
 

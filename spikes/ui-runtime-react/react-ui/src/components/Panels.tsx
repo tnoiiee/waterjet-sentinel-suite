@@ -1,5 +1,6 @@
 // WJSS Stage 0.2.1A — Operations panels: Sensor Detail, Active Cleaning Job, GlobalQueue
 // preview, Alarm strip, Connection banner. Each subscribes only to the slice it shows.
+import type React from 'react';
 import type { JobPhase } from '../../../contracts/operational';
 import { useSensor, useSlice } from '../store/hooks';
 import { toCellVisual } from '../visual/toCellVisual';
@@ -9,50 +10,110 @@ import styles from './Operations.module.css';
 export function SensorDetail({ sensorId }: { sensorId: string | null }) {
   return (
     <section className={`${styles.panel} ${styles.detailPanel}`} aria-label="Sensor detail" data-testid="sensor-detail">
-      <h2 className={styles.panelTitle}>Sensor detail</h2>
-      {sensorId ? <SensorDetailBody sensorId={sensorId} /> : <p className={styles.muted}>Select a Sensor cell.</p>}
+      {sensorId ? (
+        <SensorDetailBody sensorId={sensorId} />
+      ) : (
+        <>
+          <header className={styles.cardHeader}>
+            <h2 className={styles.panelTitle}>Sensor detail</h2>
+          </header>
+          <p className={styles.muted}>Select a Sensor cell.</p>
+        </>
+      )}
     </section>
   );
 }
 
+type Emphasis = 'strong' | 'normal' | 'low';
+
 /** One inspector row; the full value is always available as a tooltip when it is truncated. */
-function Row({ label, value, testId }: { label: string; value: string; testId?: string }) {
+function Row({ label, value, testId, emphasis = 'normal', tone }: { label: string; value: string; testId?: string; emphasis?: Emphasis; tone?: 'alarm' | 'uncertain' }) {
   return (
     <>
       <dt>{label}</dt>
-      <dd data-testid={testId} title={value}>
+      <dd data-testid={testId} title={value} data-emphasis={emphasis} className={`${styles[`em_${emphasis}`]} ${tone ? styles[`tone_${tone}`] : ''}`}>
+        {tone === 'alarm' && (
+          <span className={styles.inlineGlyph} aria-hidden="true">
+            ▲{' '}
+          </span>
+        )}
         {value}
       </dd>
     </>
   );
 }
 
+/** A labelled group inside the inspector (no nested card). */
+function Group({ title, testId, children }: { title: string; testId: string; children: React.ReactNode }) {
+  return (
+    <div className={styles.inspectorGroup} role="group" aria-label={title} data-testid={testId}>
+      <div className={styles.groupLabel}>{title}</div>
+      <dl className={styles.inspectorCol}>{children}</dl>
+    </div>
+  );
+}
+
 function SensorDetailBody({ sensorId }: { sensorId: string }) {
   const s = useSensor(sensorId);
   const config = useSlice('config');
-  if (!s) return <p className={styles.muted}>No data for {sensorId}.</p>;
+  if (!s)
+    return (
+      <>
+        <header className={styles.cardHeader}>
+          <h2 className={styles.panelTitle}>Sensor detail</h2>
+        </header>
+        <p className={styles.muted}>No data for {sensorId}.</p>
+      </>
+    );
   const v = toCellVisual(s, { selected: true, threshold: config?.dirtyThreshold ?? 50 });
   const classification = `${s.classification.replace('_', ' ')}${s.classificationBasis === 'LAST_VALIDATED' ? ' (last validated)' : ''}`;
   const lastValidated = `${s.lastValidatedScore === null ? '--' : s.lastValidatedScore.toFixed(1)}${s.lastValidatedAt ? ` @ ${new Date(s.lastValidatedAt).toLocaleTimeString()}` : ''}`;
   return (
     <>
+      <header className={styles.cardHeader}>
+        <h2 className={styles.panelTitle}>Sensor detail</h2>
+        <span className={styles.detailId} data-testid="detail-id">
+          {s.sensorId}
+        </span>
+        <span className={styles.detailClass} data-process={v.process} data-testid="detail-class-chip">
+          {s.classification.replace('_', ' ')}
+        </span>
+        <span className={styles.headerSpacer} />
+        <span className={styles.syntheticNote} title="SYNTHETIC — not a Production value">
+          synthetic data
+        </span>
+      </header>
       <div className={styles.inspector} data-testid="detail-inspector">
-        <dl className={styles.inspectorCol} data-testid="detail-col-a">
-          <Row label="Sensor" value={s.sensorId} testId="detail-id" />
-          <Row label="Wall / position" value={`${s.wall} · logical column ${s.logicalColumn} · logical row ${s.logicalRow}`} testId="detail-position" />
-          <Row label="Classification" value={classification} testId="detail-class" />
-          <Row label="Dirty Score" value={s.dirtyScore === null ? '--' : s.dirtyScore.toFixed(1)} />
-          <Row label="Quality" value={`${s.quality}${s.qualityReason ? ` (${s.qualityReason})` : ''}`} testId="detail-quality" />
-          <Row label="Last validated" value={lastValidated} />
-        </dl>
-        <dl className={styles.inspectorCol} data-testid="detail-col-b">
-          <Row label="Queue" value={s.queueState} />
-          <Row label="Alarm" value={s.alarmState.replace('_', ' ')} />
-          <Row label="Device" value={s.deviceId} testId="detail-device" />
-          <Row label="TC_F channel" value={s.tcFrontChannel} testId="detail-tcf" />
-          <Row label="TC_R channel" value={s.tcRearChannel} testId="detail-tcr" />
-          <Row label="Data" value="SYNTHETIC — not a Production value" />
-        </dl>
+        <div className={styles.inspectorStack} data-testid="detail-col-a">
+          <Group title="Process" testId="detail-group-process">
+            <Row label="Classification" value={classification} testId="detail-class" emphasis="strong" />
+            <Row label="Dirty Score" value={s.dirtyScore === null ? '--' : s.dirtyScore.toFixed(1)} testId="detail-score" emphasis="strong" />
+            <Row label="Last validated" value={lastValidated} emphasis="low" />
+          </Group>
+          <Group title="Location" testId="detail-group-location">
+            <Row label="Wall / position" value={`${s.wall} · logical column ${s.logicalColumn} · logical row ${s.logicalRow}`} testId="detail-position" />
+          </Group>
+        </div>
+        <div className={styles.inspectorStack} data-testid="detail-col-b">
+          <Group title="State" testId="detail-group-state">
+            <Row label="Quality" value={`${s.quality}${s.qualityReason ? ` (${s.qualityReason})` : ''}`} testId="detail-quality" emphasis="strong" tone={s.quality === 'GOOD' ? undefined : 'uncertain'} />
+            <Row label="Queue" value={s.queueState} testId="detail-queue" emphasis="strong" />
+            <Row label="Alarm" value={s.alarmState.replace('_', ' ')} testId="detail-alarm" emphasis="strong" tone={s.alarmState === 'NONE' ? undefined : 'alarm'} />
+          </Group>
+          <Group title="Source" testId="detail-group-source">
+            <Row label="Device" value={s.deviceId} testId="detail-device" emphasis="low" />
+            <dt>TC_F / TC_R</dt>
+            <dd className={styles.em_low} data-emphasis="low">
+              <span data-testid="detail-tcf" title={s.tcFrontChannel}>
+                {s.tcFrontChannel}
+              </span>
+              {' / '}
+              <span data-testid="detail-tcr" title={s.tcRearChannel}>
+                {s.tcRearChannel}
+              </span>
+            </dd>
+          </Group>
+        </div>
       </div>
       {v.detailNote && (
         <p className={styles.noteLine} data-testid="detail-note" title={v.detailNote}>
@@ -65,32 +126,75 @@ function SensorDetailBody({ sensorId }: { sensorId: string }) {
 
 const PHASES: JobPhase[] = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
 
+/** Elapsed time since an ISO timestamp, as m:ss or h:mm:ss (presentation only). */
+export function fmtElapsed(fromIso: string, nowMs: number = Date.now()): string {
+  const total = Math.max(0, Math.floor((nowMs - Date.parse(fromIso)) / 1000));
+  if (!Number.isFinite(total)) return '--';
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = String(total % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}
+
 export function ActiveJobPanel() {
   const job = useSlice('activeJob');
+  const pct = job ? Math.round(job.phaseProgress * 100) : 0;
   return (
     <section className={`${styles.panel} ${styles.jobPanel}`} aria-label="Active Cleaning Job" data-testid="active-job">
-      <h2 className={styles.panelTitle}>Active Cleaning Job</h2>
+      <header className={styles.cardHeader}>
+        <h2 className={styles.panelTitle}>Active Cleaning Job</h2>
+        {job && (
+          <span className={styles.jobIdChip} data-testid="job-id">
+            {job.jobId}
+          </span>
+        )}
+      </header>
       {job ? (
         <>
-          <div className={styles.jobHead} title={`${job.jobId} → ${job.targetSensorId} · Water Jet ${job.jetId} · Isolation Valve ${job.valveId}`}>
-            <strong>{job.jobId}</strong> → <strong>{job.targetSensorId}</strong> · Jet {job.jetId} · Valve {job.valveId}
-          </div>
-          <ol className={styles.phases}>
+          <dl className={styles.jobFacts} data-testid="job-facts">
+            <div>
+              <dt>Target Sensor</dt>
+              <dd className={styles.jobTarget} data-testid="job-target">
+                {job.targetSensorId}
+              </dd>
+            </div>
+            <div>
+              <dt>Water Jet</dt>
+              <dd title={job.jetId}>{job.jetId}</dd>
+            </div>
+            <div>
+              <dt>Isolation Valve</dt>
+              <dd title={job.valveId}>{job.valveId}</dd>
+            </div>
+          </dl>
+          <ol className={styles.phases} aria-label="Job phases">
             {PHASES.map((p, i) => (
-              <li key={p} className={i < job.phaseIndex ? styles.phaseDone : i === job.phaseIndex ? styles.phaseCurrent : styles.phaseTodo} aria-current={i === job.phaseIndex ? 'step' : undefined}>
+              <li
+                key={p}
+                className={i < job.phaseIndex ? styles.phaseDone : i === job.phaseIndex ? styles.phaseCurrent : styles.phaseTodo}
+                aria-current={i === job.phaseIndex ? 'step' : undefined}
+                data-phase-state={i < job.phaseIndex ? 'done' : i === job.phaseIndex ? 'current' : 'future'}
+              >
+                {i < job.phaseIndex && (
+                  <span className={styles.phaseCheck} aria-hidden="true">
+                    ✓{' '}
+                  </span>
+                )}
                 {p}
               </li>
             ))}
           </ol>
           <div className={styles.jobStatus} data-testid="job-status">
             <span className={styles.phaseLabel} title={job.phaseLabel}>
-              {job.phase} · {job.phaseLabel}
+              <b>{job.phase}</b> {job.phaseLabel}
             </span>
-            <div className={styles.progress} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(job.phaseProgress * 100)}>
-              <div style={{ width: `${Math.round(job.phaseProgress * 100)}%` }} />
+            <div className={styles.progress} role="progressbar" aria-label="Phase progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+              <div style={{ width: `${pct}%` }} />
             </div>
-            <span>{Math.round(job.phaseProgress * 100)}%</span>
-            <span className={styles.muted}>started {new Date(job.startedAt).toLocaleTimeString()}</span>
+            <span className={styles.num}>{pct}%</span>
+            <span className={styles.jobElapsed} title={`Started ${new Date(job.startedAt).toLocaleTimeString()}`} data-testid="job-elapsed">
+              elapsed <span className={styles.num}>{fmtElapsed(job.startedAt)}</span>
+            </span>
           </div>
         </>
       ) : (
@@ -111,9 +215,12 @@ export function QueuePreview() {
   const q = useSlice('queue');
   return (
     <section className={`${styles.panel} ${styles.queuePanel}`} aria-label="GlobalQueue preview" data-testid="queue-preview">
-      <h2 className={styles.panelTitle}>
-        GlobalQueue preview <span className={styles.muted}>({q?.totalQueued ?? 0} queued, first 8, FIFO)</span>
-      </h2>
+      <header className={styles.cardHeader}>
+        <h2 className={styles.panelTitle}>GlobalQueue preview</h2>
+        <span className={styles.cardMeta}>
+          <span className={styles.num}>{q?.totalQueued ?? 0}</span> queued · first 8 · FIFO
+        </span>
+      </header>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <colgroup>
@@ -126,11 +233,11 @@ export function QueuePreview() {
           </colgroup>
           <thead>
             <tr>
-              <th>#</th>
+              <th className={styles.numCol}>Pos</th>
               <th>Sensor</th>
               <th>Source reason</th>
-              <th>Score</th>
-              <th>Since clean</th>
+              <th className={styles.numCol}>Score</th>
+              <th className={styles.numCol}>Since clean</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -139,15 +246,17 @@ export function QueuePreview() {
               const r = compactReason(e.sourceReason);
               return (
                 <tr key={e.sensorId} data-queue-position={e.position}>
-                  <td>{e.position}</td>
+                  <td className={styles.numCol}>{e.position}</td>
                   <td className={styles.sensorCol}>{e.sensorId}</td>
                   <td className={styles.reason} title={r.full} data-testid="queue-reason">
                     {r.label}
                   </td>
-                  <td>{e.dirtyScore === null ? '--' : e.dirtyScore.toFixed(1)}</td>
-                  <td>{fmtAge(e.secondsSinceLastClean)}</td>
+                  <td className={styles.numCol}>{e.dirtyScore === null ? '--' : e.dirtyScore.toFixed(1)}</td>
+                  <td className={styles.numCol}>{fmtAge(e.secondsSinceLastClean)}</td>
                   <td>
-                    <span className={`${styles.chip} ${styles[`st_${e.status}`]}`}>{e.status}</span>
+                    <span className={`${styles.chip} ${styles[`st_${e.status}`]}`} data-status={e.status}>
+                      {e.status}
+                    </span>
                   </td>
                 </tr>
               );
@@ -159,19 +268,42 @@ export function QueuePreview() {
   );
 }
 
+const ALARM_TEXT: Record<string, { condition: string; response: string }> = {
+  ACTIVE_UNACK: { condition: 'active, unacknowledged', response: 'acknowledge and inspect' },
+  ACTIVE_ACK: { condition: 'active, acknowledged', response: 'monitor until cleared' },
+  CLEARED_UNACK: { condition: 'cleared, acknowledgement required', response: 'acknowledge' },
+};
+
 export function AlarmStrip() {
   const a = useSlice('alarms');
-  const items = a?.items.slice(0, 4) ?? [];
+  const items = a?.items.slice(0, 3) ?? [];
+  const total = a ? a.activeUnack + a.activeAck + a.clearedUnack : 0;
   return (
-    <section className={styles.alarmStrip} aria-label="Alarm strip" data-testid="alarm-strip">
-      <span className={styles.alarmCounts}>
-        Alarms — active unack {a?.activeUnack ?? 0} · active ack {a?.activeAck ?? 0} · cleared, ack required {a?.clearedUnack ?? 0}
-      </span>
-      {items.map((it) => (
-        <span key={it.alarmId} className={`${styles.alarmItem} ${styles[`al_${it.state}`]}`} data-alarm-state={it.state}>
-          <b>!</b> {it.code} {it.sensorId ?? it.deviceId ?? ''} — {it.state === 'CLEARED_UNACK' ? 'cleared, acknowledgement required' : it.state === 'ACTIVE_ACK' ? 'active, acknowledged' : 'active, unacknowledged'}
+    <section className={`${styles.alarmStrip} ${total ? styles.alarmStripActive : ''}`} aria-label="Alarm strip" data-testid="alarm-strip" data-alarm-count={total}>
+      {total === 0 ? (
+        <span className={styles.alarmNone}>
+          <span className={styles.okDot} aria-hidden="true" />
+          No active alarms · no acknowledgement required
         </span>
-      ))}
+      ) : (
+        <>
+          <span className={styles.alarmCounts}>
+            <span className={styles.num}>{a?.activeUnack ?? 0}</span> active unack · <span className={styles.num}>{a?.activeAck ?? 0}</span> active ack ·{' '}
+            <span className={styles.num}>{a?.clearedUnack ?? 0}</span> cleared, ack required
+          </span>
+          {items.map((it) => {
+            const t = ALARM_TEXT[it.state] ?? { condition: it.state, response: 'review' };
+            return (
+              <span key={it.alarmId} className={`${styles.alarmItem} ${styles[`al_${it.state}`]}`} data-alarm-state={it.state}>
+                <span className={styles.alarmGlyph} aria-hidden="true">
+                  ▲
+                </span>
+                <b>{it.code}</b> {it.sensorId ?? it.deviceId ?? ''} — {t.condition} · <span className={styles.alarmResponse}>Response: {t.response}</span>
+              </span>
+            );
+          })}
+        </>
+      )}
     </section>
   );
 }

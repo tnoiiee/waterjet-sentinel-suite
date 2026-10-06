@@ -2,9 +2,11 @@
 
 **Document status:** Evidence record for Stage 0.2.1A. **Arena evidence**, plus the Owner-local
 evidence the Owner reported for checkpoint `dd20a8bd`. That Owner-local evidence covers the
-superseded 104-location map and does **not** validate the corrected 106-location map or the
-fullscreen Operations layout refinement (§0A), so the Owner-local re-run and the manual 1920 × 1080
-F11 UI re-review are **PENDING** and the 60-minute run is **PAUSED**. This
+superseded 104-location map and does **not** validate the corrected 106-location map, the
+fullscreen Operations layout refinement (§0A), or the readability refinement (§0B), so the
+Owner-local re-run and the manual 1920 × 1080 F11 UI re-review are **PENDING** and the 60-minute
+run is **PAUSED**. The Owner-reported interrupted overnight observation of `ea23bc58` is recorded
+in §0B.1; it is not a controlled benchmark. This
 document does **not** select React as the final UI framework; the UI framework, Production
 transport, and Production chart library remain `[OPEN]`. Blazor counter-spike: **DEFERRED /
 NOT AUTHORIZED**.
@@ -17,7 +19,172 @@ PRODUCTION VALUES**.
 
 ---
 
+## 0B. Operations readability refinement checkpoint (Stage 0.2.1A)
+
+The Owner's screenshot review of the fullscreen checkpoint (`ea23bc58`) found: status markers
+overlapping long Sensor IDs (for example `G+205`), small cells and text, small typography
+throughout, oversaturated Dirty / Cleaner colours, alarm and quality depending on colour, weak
+Sensor Detail hierarchy, a dense Active Job card, queue spacing and numeric alignment, trend
+legibility, an empty-looking camera card, and inconsistent surfaces. This checkpoint is a
+presentation-only refinement plus one stale test correction, delivered as one normal
+fast-forward commit on top of `ea23bc58`; its SHA is recorded in the PR #3 description.
+Industrial HMI practice was used as design guidance only; **no standards certification is
+claimed**.
+
+**Unchanged:** the U-shaped map (Rear top, Left / Right sides, Front bottom, compact centre),
+106 Sensors, 212 Thermocouple channels, 24 / 29 / 24 / 29, Cannon slots at I7 / I16, canonical
+row and column order, the central mapping source, the right-side card structure, the bottom
+Trend + Camera row, the runtime harness, the contracts, the queue logic, and the single-job
+rule. No dependency was added or changed.
+
+**Stale MAP assertion corrected.** `e2e/operations.spec.ts` (MAP test) still asserted the
+pre-fullscreen Y-interval order (Rear ends before the side walls begin; the side walls end
+before Front begins). The approved fullscreen layout deliberately lets the side walls share Y
+range with the Rear / Front blocks, so those assertions were stale. They were replaced by
+centre-relative assertions: Rear above the centre summary, Left left of it, Right right of it,
+Front below it; Rear y-centre above Front y-centre; Left x-centre left of Right x-centre; Rear
+and Front horizontally centred (± 2 px); no wall–wall and no wall–centre rectangle intersection;
+every wall inside the map surface. The 4-wall / 6-row / 106 / 24-29-24-29 / Cannon / selection
+assertions are unchanged. The layout was **not** changed to satisfy the stale test.
+
+**Sensor cell composition (zones, CSS grid, no absolute overlap):**
+
+| Zone | Content | Rule |
+| --- | --- | --- |
+| Top-left | Sensor ID, 13 px / 700, Bahnschrift semi-condensed (Windows system font; Segoe UI fallback) | Width limited to the cell minus the 12 px reserved marker zone; clipped to its own box, so it can never sit under a marker |
+| Top-right | Reserved 10 × 10 px marker zone (+ 2 px gap) | Data quality: amber dot (UNCERTAIN), cross (BAD), clock (STALE), slashed circle (DISABLED) — inline SVG, shape + colour |
+| Centre | Value, 16 px / 700, tabular numerals | Full width |
+| Bottom rail (10 px) | Alarm warning triangle (left), queue badge (right) | Never over the ID, value, or quality marker |
+
+Channels use disjoint CSS properties: process + score → background (`color-mix` of the base and
+strong token); quality → marker zone (+ neutral pattern for BAD / STALE / DISABLED); alarm →
+2 px yellow border + inset ring + rail icon (dashed when cleared-unacknowledged); selection →
+3 px cyan outer ring; Active Job → white double outline. The alarm border keeps the content box
+size (padding compensates), so the ID zone does not shrink when an alarm is raised.
+
+**Cell scale:** height `clamp(46px, …, 50px)`, width `clamp(52px, min(height + 9px, (map width −
+120px) / 13), 56px)`, gap 4 px; Cannon slot identical. Expected at 1920 × 1080 by layout
+arithmetic (**not** a browser measurement): ≈ 55.3 × 46.5 px, ID zone ≈ 37 px wide. The 13 px
+bold `G+205` in Segoe UI is ≈ 41 px wide and would not fit beside the marker zone in any 52–56 px
+cell; the Bahnschrift semi-condensed face is estimated at ≈ 32–34 px. Actual glyph widths are
+**not observable in Arena**; `READ-A` fails if any ID is clipped or touches the marker zone.
+
+**Colours (central tokens in `react-ui/src/global.css`; values nowhere else):** Cleaner
+`#256B4A` → `#2F8059`; Dirty `#B33A2F` → `#8D2F27`; Not classified graphite `#3F454D` with a
+subtle hatch; BAD / STALE / DISABLED neutral `#4A5058` / `#353A40` + pattern + glyph; Uncertain
+amber `#E8A33D` as a dot, never a background; Alarm yellow `#FFC531` border + triangle,
+separated from Dirty red by hue and luminance (≥ 3 : 1 against every Dirty shade); Selection cyan
+`#36D6F0`; Active Job white double outline; Cannon, three surface levels, two border levels, and
+four text levels. Sensor text is pure white: computed WCAG contrast ≥ 4.5 : 1 on every
+Dirty / Cleaner / neutral shade (`colorTokens.test.mjs`; with the off-white text token the
+lightest Cleaner shade gave 4.41 : 1, so a dedicated `--cell-text` token is used). No glow, no
+gradients, no glass, no heavy shadows.
+
+**Typography (px / weight):** app title 15 / 700; status chips 12.5 / 600; alarm strip 12; card
+titles 15 / 700; wall titles 14 / 700; wall metadata 12; Sensor ID 13 / 700; value 16 / 700;
+detail labels 12, values 13 / 600, Sensor ID header 18 / 700; Job body 13; queue headers
+12 / 650, rows 13, badges 11 / 700; trend title 14, axes and legend 12; camera title 14, state
+12; diagnostics 12; group labels and captions 11. No 8–9 px text. Tabular numerals for values,
+scores, times, revisions, pressure, and axes. Spacing scale 2 / 4 / 6 / 8 / 12 / 16 / 24 px.
+
+**Status bar (40 px) and alarm strip (24 px):** groups in priority order Alarm → Process (Job,
+Pump) → System (connection, devices) → Technical (revision, config, lower emphasis), separated
+by dividers, `role="group"` with labels. The alarm strip shows a compact
+`No active alarms · no acknowledgement required` state, and otherwise the counts plus, per alarm,
+the condition and the required response (`acknowledge and inspect`, `monitor until cleared`,
+`acknowledge`).
+
+**Sensor Detail (212 px):** header with the Sensor ID (18 px) and a classification chip; two
+columns — *Process* (Classification, Dirty Score, Last validated) and *Location* (Wall /
+position) | *State* (Quality, Queue, Alarm) and *Source* (Device, TC_F / TC_R). Classification,
+Dirty Score, Quality, Queue, and Alarm are emphasised; Device, channels, and timestamps are
+de-emphasised; the synthetic notice is a small header label. No nested cards.
+
+**Active Cleaning Job (160 px):** Job ID chip; Target Sensor / Water Jet / Isolation Valve as
+separate label-over-value fields; P1–P6 as completed (✓) / current (`aria-current="step"`) /
+future (dashed); phase label, progress bar, percentage, and elapsed time; single-job notice.
+
+**GlobalQueue:** columns Pos 40 / Sensor 100 / Source reason (flex) / Score 90 / Since clean 110 /
+Status 90 px; 28 px header and rows; 13 px tabular numerals, numeric columns right-aligned;
+subtle separators; no red rows; outline status chips from tokens (READY, HELD, BLOCKED dashed,
+EXCLUDED). Queue order and membership are unchanged.
+
+**Pressure Trend:** lines 1.75 px; series colours resolved from tokens and separated by
+luminance; axes and legend 12 px; lower-contrast grid; ready band with edge lines; dashed
+setpoint; 18 × 3 px legend samples; header summary of the latest series values, setpoint, and
+ready band. Still four series, 600-point bound, visible gaps, one uPlot instance, no animation.
+
+**Camera:** title, `SYNTHETIC PLACEHOLDER` badge, 48 px no-camera icon, `NO SIGNAL`, and
+`No video source configured`. No media element, no URL.
+
+**Height budget at 1920 × 1080 (layout arithmetic):** status 40 + alarm strip 24; main padding
+2 × 6, gap 6; bottom row `clamp(196px, 19.3vh, 240px)` ≈ 208; map workspace ≈ 790 (U surface
+≈ 776 + 10 chrome); right column: Detail 212, Job 160, GlobalQueue ≈ 394 (28 + 8 × 28 rows
+needed).
+
+| Check (Arena, Linux x64) | Result |
+| --- | --- |
+| `npm ci --ignore-scripts` (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`), lock file unchanged | PASS — dependencies unchanged |
+| TypeScript `tsc --noEmit` (project) and a separate strict check of `e2e/*.ts` | PASS, 0 errors |
+| Vite production build | PASS — JS 316.77 kB (gzip 104.84 kB), CSS 25.68 kB (gzip 6.32 kB) |
+| Vitest (jsdom), 13 files | **93 / 93** PASS (was 75; new `colorTokens.test.mjs` and new cases in `visual`, `layoutTokens`, `fullscreenLayout`) |
+| Runtime harness `node:test` | 26 / 26 PASS (12 mapping tests) |
+| Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| Playwright `--list` (no browser) | 26 tests in 3 files; `operations.spec.ts` + `layout.spec.ts` selection 25 (was 21; 4 new `READ-A`..`READ-D`) |
+| Mapping hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Cannon slots · I7 / I16 absent · 0 duplicates |
+| Overlap, clipping, typography, viewport fit in a browser | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
+
+jsdom performs no layout: the unit tests cover tokens, DOM zones, structure, groups,
+`aria-current`, tabular-column classes, and the camera state. They do **not** validate pixel
+overlap; that is asserted only by the Edge specs.
+
+**Browser tests (Owner-local, Edge):** `READ-A` — at 1920 × 1080 with the quality showcase,
+70 % Dirty, and three raised alarms: for all 106 cells the ID equals the Sensor ID, is not
+clipped, does not intersect the marker zone (≥ 1 px gap) or the rail; the value is not clipped;
+the quality marker sits inside its zone; the alarm icon and queue badge stay inside the cell and
+off the ID, value, and quality marker; ID ≥ 13 px, value ≥ 16 px; Cannon size unchanged; no
+page scroll. `READ-B` — alarm on a Dirty and on a Cleaner cell (alarm-token border ≥ 2 px + icon,
+background unchanged), selection ring on a Dirty cell, Active Job double outline on a Cleaner
+cell, exactly one current phase. `READ-C` — no visible text below 10 px; approved sizes and
+weights for the title, chips, alarm strip, card / wall titles, detail ID, labels, values, queue
+header, trend and camera titles, camera state; tabular numerals; no page scroll. `READ-D` —
+right-aligned queue Score and Since-clean columns with a common right edge, no red row
+backgrounds, status-bar group order and height ≤ 42 px, one uPlot instance with a 12 px legend,
+trend summary, camera icon ≥ 40 px with no media element. `LAYOUT-A`/`LAYOUT-D`/`LAYOUT-E` were
+aligned to the approved readability scale (cell 52–56 × 46–50 px, ID ≥ 13 px / 700, value
+≥ 16 px / 700; the 2560 × 1440 width cap follows the approved 56 px maximum); `LAYOUT-B` and
+`LAYOUT-C` are unchanged.
+
+**Known limitations:** at 1366 × 768 the U-map (≈ 770 px at the 46 px minimum height) exceeds
+the ≈ 490 px map area, so the map card scrolls internally (one-screen fit is not claimed there);
+the map column is at least 740 px so the U fits horizontally. Bahnschrift availability and exact
+glyph widths depend on the Windows installation and are not observable in Arena.
+
+### 0B.1 Owner-local interrupted overnight observation (recorded as reported by the Owner)
+
+| Item | Owner-reported value |
+| --- | --- |
+| Observation | Owner-local interrupted overnight observation: **COMPLETED**, from checkpoint `ea23bc58` |
+| Harness wall-clock uptime | ≈ 11 h 41 min; host sleep / hibernate occurred |
+| Likely active state-update exposure | ≈ 4 h |
+| Connection at capture | LIVE; reconnects 1; trend points 600 (bounded) |
+| Invariant violations | 0 |
+| Second Jobs accepted | 0 |
+| Historian samples rejected | 0 |
+| Synthetic Jobs completed | 659 |
+| Controlled 60-minute benchmark | **NOT PERFORMED** |
+| Production stability | **NOT VERIFIED** |
+| Modbus performance | **NOT TESTED** |
+
+This was an interrupted, uncontrolled observation and is **not** a controlled benchmark. Next
+Owner-local steps: full Edge E2E on this checkpoint, the manual F11 review, and a controlled
+15-minute observation ([handoff §1C](../../spikes/ui-runtime-react/measurements/OWNER_LOCAL_TESTING.md#1c-re-run-after-the-operations-readability-refinement-required)).
+The 60-minute run remains **PAUSED**.
+
 ## 0A. Fullscreen Operations refinement checkpoint (current)
+
+*Superseded for visual scale, colours, and card composition by §0B; retained as the record of the
+fullscreen checkpoint `ea23bc58`.*
 
 The Owner approved a targeted Design Addendum for the existing Operations page. Primary target:
 Windows 11, Microsoft Edge, F11 fullscreen, **1920 × 1080**, zoom 100 %. The corrected Sensor

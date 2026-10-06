@@ -100,6 +100,65 @@ local):
 
 The **60-minute run stays PAUSED** until the Owner accepts the corrected visual layout.
 
+## 1C. Re-run after the Operations readability refinement (required)
+
+Applies to the readability refinement checkpoint (fast-forward on `ea23bc58`; SHA in the PR #3
+description). It supersedes the test counts of section 1B and also covers the 1A / 1B checks.
+From `react-ui\`:
+
+```powershell
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm test                               # Vitest: expect 93 / 93 (13 files)
+npm run build
+node --test "../runtime-harness/test/**/*.test.mjs"   # expect 26 / 26
+npm run e2e -- e2e/operations.spec.ts e2e/layout.spec.ts   # 25 tests: 16 functional + LAYOUT-A..E + READ-A..D
+```
+
+`READ-A` checks, for all 106 cells, that the Sensor ID is not clipped and never touches the
+quality marker, alarm icon, or queue badge. If it fails only on ID clipping, record whether the
+**Bahnschrift** font is installed (Settings → Personalization → Fonts); it ships with Windows
+10 / 11 and the cell ID zone relies on its semi-condensed width.
+
+**Manual F11 review** — `npm run harness`, open `http://127.0.0.1:5181` in Edge on a
+**1920 × 1080** display, **F11**, zoom **100 %**. Use the quality showcase and a Dirty scenario
+so markers, badges, and eight queue rows are visible.
+
+| # | Owner check |
+| --- | --- |
+| 1 | Long IDs (`G+205`, `G+105`, `J18`) fully readable; no marker, badge, or alarm icon over any ID |
+| 2 | Cells and values larger and easier to read than at `ea23bc58` |
+| 3 | Dirty / Cleaner calmer (less saturated); Not classified graphite with a faint hatch |
+| 4 | Alarm (yellow border + triangle) clearly different from Dirty red, on Dirty and Cleaner cells |
+| 5 | UNCERTAIN amber dot, BAD cross, STALE clock, DISABLED slashed circle — readable without colour |
+| 6 | Selection (cyan ring) and Active Job (white double outline) distinguishable, also together with an alarm |
+| 7 | Status bar: Alarm, Process, System, Technical groups; revision / config visually quieter |
+| 8 | Sensor Detail: ID header, Process / Location / State / Source groups, clear emphasis |
+| 9 | Active Job: Target, Water Jet, Isolation Valve, P1–P6 with completed / current / future, progress, elapsed |
+| 10 | GlobalQueue: aligned numeric columns, calm status chips, no red rows |
+| 11 | Pressure Trend: readable axes and legend, distinct lines, ready band and setpoint clear, header summary |
+| 12 | Camera: title, synthetic placeholder badge, NO SIGNAL state — no longer looks empty |
+| 13 | U shape, Cannon slots (I7 / I16), right-side structure, and bottom row unchanged; no page scrollbar |
+
+**Controlled 15-minute observation** (after the review; host sleep and hibernate disabled for the
+duration, Edge in the foreground, no other heavy load). Two PowerShell windows, as in section 4:
+
+```powershell
+# window A
+$env:WJSS_SOAK_MINUTES = '15'; $env:WJSS_SOAK_LABEL = 'observe15'
+npm run e2e:soak
+# window B (start right after A)
+powershell -ExecutionPolicy Bypass -File ..\measurements\sample-processes.ps1 -Minutes 16 -IntervalSeconds 5 -Label observe15
+```
+
+Summarise with `measurements/summarize.mjs` as in section 4. Return the soak hard gates
+(section 7), connection state, reconnects, trend points, invariant violations, accepted second
+Jobs, Historian rejections, and the summary percentiles. The earlier Owner-local **interrupted
+overnight observation** of `ea23bc58` (≈ 11 h 41 min wall clock with host sleep, ≈ 4 h likely
+active) is recorded in the results document; it is **not** a controlled benchmark. The
+**60-minute run stays PAUSED** until the Owner authorises it.
+
 ## 2. Manual look (optional)
 
 ```powershell

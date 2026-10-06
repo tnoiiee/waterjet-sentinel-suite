@@ -42,9 +42,10 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction. Accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
 | Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
-| Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11) |
-| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map or the fullscreen layout refinement; the re-run (including the new Edge layout spec) is **PENDING** |
-| Stage 0.2.1A Owner manual UI re-review (corrected map and fullscreen 1920 × 1080 F11 layout) | **PENDING** |
+| Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11); Operations readability refined after the Owner screenshot review (sensor-cell zones, typography scale, desaturated process colours separated from alarm, card hierarchy) |
+| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map, the fullscreen layout, or the readability refinement; the re-run (including the Edge layout and readability specs) is **PENDING**. Owner-local interrupted overnight observation of `ea23bc58`: **COMPLETED** — not a controlled benchmark ([results §0B.1](spikes/stage-0.2.1a-results.md#0b1-owner-local-interrupted-overnight-observation-recorded-as-reported-by-the-owner)) |
+| Stage 0.2.1A controlled 15-minute Owner-local observation | **PENDING** |
+| Stage 0.2.1A Owner manual UI re-review (corrected map, fullscreen 1920 × 1080 F11 layout, readability refinement) | **PENDING** |
 | Stage 0.2.1A 60-minute Owner-local run | **PAUSED** until the Owner visually accepts the corrected map and fullscreen layout |
 | Stage 0.2.1A merge | **NOT MERGED** |
 | React final selection | **NOT YET APPROVED** — UI framework `[OPEN]` |
@@ -355,11 +356,15 @@ accepted and merged Stage 0.2.*
 | Fullscreen UI refinement checkpoint | A normal fast-forward commit on top of `935973e6`. Its SHA is recorded in the delivery report and in the PR #3 description, **not** inside the commit that creates it |
 | Local recovery before the correction | An Owner-authorised, one-time local reference recovery set the local branch to the already-pushed `dd20a8bd` after an exact identity proof. No history was rewritten, nothing was force-pushed, and AGENTS.md is unchanged |
 | Local recovery before the fullscreen refinement | The Arena sandbox was recreated (local branch at `e779f8ad`, checkpoint source present as working-tree changes). A second Owner-authorised, one-time, checkpoint-specific recovery: targeted fetch, complete-tree identity proof against `935973e6` (126 / 126 exact blob matches, 0 mismatches, 0 missing, 0 extra, 0 mode differences), compare-and-swap `update-ref` `e779f8ad` → `935973e6`, `read-tree` **without** `-u`; working tree unchanged. AGENTS.md is unchanged; this is not a general recovery rule |
+| Fullscreen UI refinement checkpoint SHA | `ea23bc589b2f61a9c97aaa2b1a1faa9d2ac31d68` |
+| Readability refinement checkpoint | A normal fast-forward commit on top of `ea23bc58` (presentation refinement plus the stale MAP U-shape assertion correction). Its SHA is recorded in the delivery report and in the PR #3 description, **not** inside the commit that creates it |
+| Local recovery before the readability refinement | The Arena sandbox was recreated again (local branch at `e779f8ad`, checkpoint source present as working-tree changes). A third Owner-authorised, one-time, checkpoint-specific recovery: targeted fetch, complete-tree identity proof against `ea23bc58` (130 / 130 exact blob matches, 0 mismatches, 0 missing, 0 extra, 0 mode differences), compare-and-swap `update-ref` `e779f8ad` → `ea23bc58`, `read-tree` **without** `-u`; working tree unchanged. AGENTS.md is unchanged; this is not a general recovery rule |
 | Pull request | PR #3 to `main` — **OPEN** (PR #1 and PR #2 are not reused) |
 | Scope Gate / Coding Start Gate | **APPROVED** |
 | Implementation | **IN PROGRESS** |
 | Owner-local testing | `dd20a8bd` PASS (does not validate the corrected map); re-run **PENDING** |
-| Owner manual UI re-review | **PENDING** (corrected map and fullscreen 1920 × 1080 F11 layout) — 60-minute run **PAUSED** |
+| Owner manual UI re-review | **PENDING** (corrected map, fullscreen 1920 × 1080 F11 layout, readability refinement) — controlled 15-minute observation **PENDING** — 60-minute run **PAUSED** |
+| Owner-local interrupted overnight observation (`ea23bc58`) | **COMPLETED** as reported by the Owner — not a controlled benchmark; Production stability **NOT VERIFIED** |
 | Merge | **NOT MERGED** |
 | React final selection | **NOT YET APPROVED** |
 | Blazor counter-spike | **NOT AUTHORIZED** |
@@ -534,6 +539,30 @@ zoom. Detailed evidence:
 | 9 | Markdown relative links | PASS — 44 files, 696 links, 0 broken; 10 anchors, 0 broken |
 | 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
 | 11 | Full diff review | Performed before the refinement commit |
+
+### 12.6 Stage 0.2.1A Operations readability refinement — Arena validation record
+
+Owner screenshot review of `ea23bc58`: status markers overlapped long Sensor IDs, small cells and
+typography, oversaturated process colours, alarm and quality relying on colour, weak card
+hierarchy. Presentation-only refinement plus the stale MAP U-shape assertion correction; the
+U-map, mapping, counts, Cannon slots, right-side structure, bottom row, runtime, and contracts are
+unchanged. Industrial HMI practice is guidance only; no standards certification is claimed.
+Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0B](spikes/stage-0.2.1a-results.md#0b-operations-readability-refinement-checkpoint-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci` (lock file restore), `tsc --noEmit` (project + strict `e2e/*.ts`) | PASS, 0 errors; dependencies unchanged |
+| 2 | Vite production build | PASS |
+| 3 | Vitest (jsdom), 13 files | 93 / 93 PASS (18 new: colour tokens and contrast, typography and spacing tokens, cell zones, queue columns, detail groups, job phases and elapsed time, status groups, alarm strip, camera state) |
+| 4 | Runtime harness `node:test` | 26 / 26 PASS (12 mapping tests) |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 26 tests in 3 files; operations + layout selection 25 (was 21; 4 new `READ-A`..`READ-D`) |
+| 7 | Hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Cannon slots · I7 / I16 absent · 0 duplicates |
+| 8 | ID / marker overlap, clipping, typography, viewport fit | **NOT VERIFIED** in Arena (no browser) — asserted by `e2e/layout.spec.ts`, Owner-local Edge run **PENDING** |
+| 9 | Markdown relative links and anchors | PASS (see the delivery report for counts) |
+| 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
+| 11 | Full diff review | Performed before the readability commit |
 
 ## 13. Required positive confirmations
 
