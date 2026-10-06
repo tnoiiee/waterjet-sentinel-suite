@@ -1,7 +1,9 @@
 # ADR-0013 — Offline Deployment
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
 - **Date:** 2026-10-04
 - **Supersedes:** Nothing. This record addresses the deployment questions left `[OPEN]` by
   [`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 11 and
@@ -200,7 +202,7 @@ That changes the economics of every deployment decision:
 | Backup schedule, retention, and off-box copy | Deployment Stage Gate, before deployment acceptance |
 | Restore test execution | Test Stage Gate (planned) and deployment acceptance |
 | Upgrade and rollback procedure, including the verified-backup requirement | Deployment Stage Gate |
-| Offline build and dependency-restoration verification for both UI framework candidates | Stage 0.2.1 spike (PROPOSED, NOT AUTHORIZED) |
+| Offline build and dependency-restoration verification for both UI framework candidates | Stage 0.2.1 spike (PROPOSED, NOT AUTHORIZED). Update: Stage 0.2.1A performs a Linux offline rehearsal for the React candidate only; Windows offline restore and the Blazor candidate remain NOT VERIFIED |
 | Offline package-mirror design for a second ecosystem, if Candidate A is selected | Deployment Stage Gate |
 | Any packaging or installation artefact | A later Stage Gate that explicitly authorises creating it |
 

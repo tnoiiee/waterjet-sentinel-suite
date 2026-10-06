@@ -12,7 +12,7 @@
 ## Context
 
 The system must supervise eight Water Jets, four motion controllers, a Main Pump, isolation
-valves, and 208 thermocouple channels on a single Boiler Unit. Three interface families are
+valves, and 212 thermocouple channels on a single Boiler Unit. Three interface families are
 involved:
 
 - **WAGO remote I/O** over Modbus TCP for digital inputs and outputs, analog inputs, and the

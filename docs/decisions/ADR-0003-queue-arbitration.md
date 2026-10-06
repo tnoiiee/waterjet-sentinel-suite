@@ -1,6 +1,7 @@
 # ADR-0003 — Queue Arbitration and Sequencing
 
-- **Status:** ACCEPTED
+- **Status:** ACCEPTED — **SUPERSEDED IN PART by Owner decision dated 2026-10-06** (see the
+  supersession note below)
 - **Date:** 2026-10-04 (corrected 2026-10-05 by the Owner-confirmed review punchlist)
 - **Scope:** How cleaning candidates are ranked, how the dispatch queue is seeded,
   deduplicated, owned, refilled, stopped, rebuilt, and modified by the Operator, and how
@@ -8,11 +9,28 @@
 - **Authority:** Approved Stage 0.1 Scope Gate, as corrected by the Owner-confirmed Stage
   0.1 documentation review punchlist.
 
+> **SUPERSEDED IN PART by Owner decision dated 2026-10-06.** The following parts of this ADR
+> no longer apply:
+>
+> - the queue-level `HELD` disposition and the Hold / Release Hold Operator actions;
+> - "skip held entries" dispatch (the dispatcher now dispatches GlobalQueue Position 1 only;
+>   no scan-forward);
+> - any `BLOCKED` or `EXCLUDED` queue entry state (the GlobalQueue holds ready-to-dispatch
+>   entries only; a Sensor that cannot be dispatched is not in the queue).
+>
+> Pause belongs to the **AutoSequence** or the **Cleaning Job lifecycle**, never to a queue
+> entry. Production Pause / Resume semantics and authority are **OWNER DECISION REQUIRED**, as
+> are Reject / Release Reject / Reorder semantics in the ready-only, head-only queue. The
+> remaining decisions (ranking, seeding, deduplication, ownership, refill, stop and rebuild,
+> sequential execution) stand. The text below is kept unchanged as the decision history; see
+> [`../QUEUE_MODEL.md`](../QUEUE_MODEL.md) §7.2 and
+> [`../spikes/queue-eligibility-decision-matrix.md`](../spikes/queue-eligibility-decision-matrix.md).
+
 ---
 
 ## Context
 
-Twenty-four to twenty-eight sensors exist per wall, 104 in total, and each cleaning job costs
+Twenty-four to twenty-nine sensors exist per wall, 106 in total, and each cleaning job costs
 significant time and water. Two competing concerns drive selection:
 
 - **Cleanliness** — a sensor with a high DirtyScore should be cleaned sooner.
@@ -81,7 +99,7 @@ Worked example, which is binding:
 
 ### Operator actions
 
-8. **Operator actions:** Hold, Release Hold, Reject, Release Reject, and Reorder. Hold leaves
+8. **Operator actions** *(Hold / Release Hold superseded 2026-10-06 — see the note above)*: Hold, Release Hold, Reject, Release Reject, and Reorder. Hold leaves
    the entry in place while the dispatcher skips it, without blocking the queue. Reject
    removes the entry and suppresses the sensor from refill for the current Auto Sequence.
    Every action produces a full Event record.
@@ -182,7 +200,8 @@ Worked example, which is binding:
 - `[NOT VERIFIED]`: the per-sensor `HardMinimumCleaningInterval` values, `DiffLowerBound`,
   `DiffUpperBound`, and `DirtyScoreThreshold` values. These are commissioning values.
 - `[OPEN]`: the permission required per operator action, reason text requirements, queue
-  snapshot retention, and whether a sensor may be both held and rejected simultaneously.
+  snapshot retention, and whether a sensor may be both held and rejected simultaneously
+  (*this question no longer applies: queue-level Hold is superseded, 2026-10-06*).
 - No queue or sequencing logic has been implemented or executed. Nothing in this decision
   has been tested.
 

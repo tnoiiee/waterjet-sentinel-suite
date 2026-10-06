@@ -1,0 +1,166 @@
+/* WJSS Stage 0.2.1A — Sensor cell styles. Colours come from toCellVisual() / global tokens;
+   these rules only lay out the zones and render the independent channels.
+
+   Zones (CSS grid, no absolute overlap; Owner-approved final structure):
+     row 1: [ Sensor ID — full usable cell width, 13 px / 700, never under a marker      ]
+     row 2: [ spacer (marker size) | value (centred, 16 px / 700) | quality marker zone ]
+     row 3: [ bottom rail: alarm icon (left) ........................ queue badge (right) ]
+   The value row is symmetric (spacer width = marker zone width), so the value stays optically
+   centred and never shifts when the quality marker appears or disappears.
+   Vertical budget (Edge value-clipping hotfix): Google Sans has typo ascent 966 / descent -286
+   (USE_TYPO_METRICS), i.e. a 20.03 px content area at 16 px. A 16 px line box (line-height: 1)
+   leaves ~2 px of text content below the box, which Chromium/Edge counts in scrollHeight (READ-A
+   "value clipped", first reported on G+205, the first Sensor cell in DOM order). The value now has
+   a full 20 px line box and the ID row is 12 px (13 px glyph ink spans ~0.9-10.6 px, inside the
+   box). Alarmed cells (2 px border, 0 padding) have 42.5 px of content height at a 46.5 px cell:
+   12 + 20 + 10 = 42 px fits at every cell height in the 46-50 px clamp. No scaling, no overflow
+   hiding on the value, no font-size reduction.
+   Channel separation (no shared CSS property between channels):
+     process + score  -> background         quality   -> marker zone (+ pattern)
+     alarm            -> border + inset ring + rail icon
+     selection        -> outer box-shadow ring (cyan)
+     active job       -> outline (white double) */
+.cell {
+  --ring-alarm: 0 0 0 0 transparent;
+  --ring-select: 0 0 0 0 transparent;
+  position: relative;
+  width: var(--sensor-cell-width);
+  height: var(--sensor-cell-height);
+  /* Content inset: left 1 + 1, right 1 (border only) so the longest ID (G+204, ~42.2 px at
+     13 px / 700 Google Sans) clears the value-row marker zone horizontally. */
+  padding: 1px 0 1px 1px;
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+  color: var(--cell-text);
+  font-family: var(--font-sensor);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: var(--sensor-marker-size) minmax(0, 1fr) var(--sensor-marker-size);
+  grid-template-rows: var(--sensor-id-row-h) minmax(var(--sensor-value-line-h), 1fr) var(--sensor-rail-h);
+  column-gap: var(--sensor-value-row-gap);
+  align-items: center;
+  box-shadow: var(--ring-alarm), var(--ring-select);
+  contain: layout paint;
+}
+.cell:focus-visible {
+  outline: 2px dashed var(--selection);
+  outline-offset: 2px;
+}
+/* Zone 1: Sensor ID (the Owner logical label) across the full usable cell width. */
+.index {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--sensor-id-font-size);
+  font-weight: 700;
+  line-height: var(--sensor-id-row-h);
+  white-space: nowrap;
+  text-align: left;
+  /* Labels use proportional digits (narrower); numeric values keep tabular numerals. */
+  font-variant-numeric: normal;
+}
+/* Zone 2: reserved quality-marker zone at the right end of the value row. Always present. */
+.markerZone {
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: end;
+  width: var(--sensor-marker-size);
+  height: var(--sensor-marker-size);
+  display: block;
+}
+.markerZone svg {
+  display: block;
+}
+/* Zone 3: value, centred between the symmetric spacer and marker columns. */
+.score {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: center;
+  max-width: 100%;
+  font-size: var(--sensor-value-font-size);
+  font-weight: 700;
+  /* Full Google Sans content area (20.03 px at 16 px; Chromium rounds ascent/descent to 15 + 5). */
+  line-height: var(--sensor-value-line-h);
+  white-space: nowrap;
+}
+/* Zone 4: bottom rail. */
+.rail {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  height: var(--sensor-rail-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.alarmIcon {
+  display: block;
+  flex: none;
+}
+.badge {
+  flex: none;
+  min-width: 13px;
+  height: var(--sensor-rail-h);
+  padding: 0 2px;
+  border-radius: 2px;
+  background: var(--text);
+  color: var(--surface-page);
+  font: 700 10px / var(--sensor-rail-h) var(--font-ui);
+  text-align: center;
+}
+.badge[data-queue='ACTIVE'] {
+  background: var(--job-outer);
+}
+
+/* Data quality patterns (never Dirty/Cleaner backgrounds for BAD/STALE/DISABLED). */
+.q_NONE,
+.q_UNCERTAIN_AMBER {
+}
+.notClassified {
+  background-image: repeating-linear-gradient(45deg, var(--not-classified-hatch) 0 2px, transparent 2px 6px);
+}
+.q_BAD_HATCH {
+  background-image: repeating-linear-gradient(45deg, var(--quality-pattern) 0 2px, transparent 2px 6px);
+}
+.q_STALE_CLOCK {
+  background-image: repeating-linear-gradient(0deg, var(--not-classified-hatch) 0 1px, transparent 1px 5px);
+}
+.q_DISABLED_SLASH {
+  background-image: linear-gradient(135deg, transparent 47%, var(--quality-pattern) 48% 52%, transparent 53%);
+  color: var(--muted);
+}
+
+/* Selection: cyan outer ring. */
+.selected {
+  --ring-select: 0 0 0 3px var(--selection);
+  z-index: 2;
+}
+
+/* Active Cleaning Job target: high-contrast double outline (white, dark inner separation). */
+.activeJob {
+  outline: 4px double var(--job-outer);
+  outline-offset: 1px;
+  z-index: 3;
+}
+.activeJob::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border: 1px solid var(--job-inner);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Alarm: yellow warning border + inset ring + rail icon. Never the Dirty red. */
+.alarm {
+  border: 2px solid var(--alarm);
+  /* Same content inset as a normal cell on the left (2 px), so the ID does not move. */
+  padding: 0;
+  --ring-alarm: inset 0 0 0 1px var(--alarm-ink);
+}
+.alarmCleared {
+  border-style: dashed;
+}

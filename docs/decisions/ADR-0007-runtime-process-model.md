@@ -1,7 +1,9 @@
 # ADR-0007 — Runtime Process Model
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
 - **Date:** 2026-10-04
 - **Supersedes:** Nothing. This record closes the process-architecture question left `[OPEN]`
   by [ADR-0002](ADR-0002-deployment-architecture.md) item 1 and by
@@ -18,7 +20,7 @@
 ## Context
 
 The application supervises real equipment: a Main Pump, eight Isolation Valves, four motion
-controllers, and 208 thermocouple channels. It must also run a Kiosk operator interface that
+controllers, and 212 thermocouple channels. It must also run a Kiosk operator interface that
 operators close, restart, and occasionally crash, and it must keep working when SQL Server is
 unavailable.
 
@@ -188,7 +190,7 @@ of the process model:
   behaviour. Restarting the service therefore loses no persisted truth but does lose derived
   live state, which must be re-established before any command is issued.
 - Push delivery replaces per-signal querying, so the UI's cost scales with the **number of
-  changed cells**, not with the number of signals. That is the property that keeps a 104-cell
+  changed cells**, not with the number of signals. That is the property that keeps a 106-cell
   page inside the one-second target.
 - The presentation-state contract becomes a first-class interface: it must define snapshot,
   delta, sequence, timestamp, and reconnect semantics, and it must be transport-agnostic.
@@ -218,7 +220,7 @@ of the process model:
 - `[OPEN]`: service identity and its database authorization; whether additional service
   processes are ever required, and the evidence that would justify them; the push transport;
   the presentation-state payload encoding; and how snapshot versus delta recovery is triggered.
-- `[NOT VERIFIED]`: end-to-end update latency and payload size for the 104-cell one-second
+- `[NOT VERIFIED]`: end-to-end update latency and payload size for the 106-cell one-second
   workload. No runtime, API, or UI exists, so nothing has been measured.
 - `[NOT AUTHORIZED]`: production device access; production valve and pump write control.
 
@@ -233,7 +235,7 @@ of the process model:
 | Splitting the API or historian writer into separate services | Only if measured evidence requires it; a new ADR would be required |
 | Restart, recovery, and resynchronization verification | Test Stage Gate — cases planned, not executed |
 | Push transport selection and presentation-state payload design | Stage 0.2.1 spike, then Implementation Stage Gate |
-| Live update latency and payload measurement for the 104-cell workload | Stage 0.2.1 spike |
+| Live update latency and payload measurement for the 106-cell workload | Stage 0.2.1 spike |
 
 ## Relationship to protected decisions
 

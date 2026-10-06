@@ -4,11 +4,16 @@
 construction and must be implemented exactly. Deviations require an approved change, not a
 local decision.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
-review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
-Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 Identifiers used in worked examples are **illustrative placeholders only**. Real sensor
 identifier formats and production mappings are not documented in this repository.
@@ -218,13 +223,15 @@ Refill must never produce a concurrent Cleaning Job. See SEQ-005 in
 
 | Action | Effect | Limits |
 | --- | --- | --- |
-| Hold | Entry stays in GlobalQueue; the dispatcher temporarily skips it | Other entries preserve relative FIFO order; a hold does not block the whole queue |
-| Release Hold | Entry becomes dispatchable again at its current position | — |
+| ~~Hold~~ | **SUPERSEDED (Owner decision, 2026-10-06)** — see §7.2. No queue entry is ever held or skipped | — |
+| ~~Release Hold~~ | **SUPERSEDED** together with Hold (§7.2) | — |
 | Reject | Entry is removed from the current GlobalQueue, and the sensor is suppressed from refilling during the current Auto Sequence | Suppression ends when a new Auto Sequence is created, unless released earlier |
 | Release Reject | Ends the suppression early | Requires the action's permission |
 | Reorder | Changes GlobalQueue dispatch order | Cannot move an active Cleaning Job; does not bypass eligibility revalidation; does not alter source ownership |
 
-All five actions are `[APPROVED]` behaviours. Their required permissions are `[OPEN]`.
+Hold and Release Hold are **superseded** (§7.2). How Reject, Release Reject and Reorder apply to
+a ready-only, head-only GlobalQueue is **OWNER DECISION REQUIRED** (the rows above record the
+earlier approved wording; no implementation exists). Required permissions are `[OPEN]`.
 
 Every action must produce an Event record containing:
 
@@ -246,8 +253,8 @@ from Cleaning Job outcomes, which describe the result of an executed job. See
 
 | Disposition | Meaning |
 | --- | --- |
-| `HELD` | Operator held the entry; dispatcher skips it |
-| `RELEASED` | A previous Hold or Reject suppression was released |
+| ~~`HELD`~~ | **SUPERSEDED (Owner decision, 2026-10-06)** — queue-level hold no longer exists (§7.2) |
+| `RELEASED` | A previous Reject suppression was released (the Hold part is superseded, §7.2) |
 | `REJECTED` | Operator removed the entry and suppressed the sensor for the current Auto Sequence |
 | `REORDERED` | Operator changed dispatch position; ownership unchanged |
 | `REMOVED_BY_ELIGIBILITY` | The entry no longer satisfies eligibility (for example, removal dwell completed, configuration changed, or the sensor became disabled) |
@@ -255,6 +262,32 @@ from Cleaning Job outcomes, which describe the result of an executed job. See
 
 `REJECTED` is **not** a Cleaning Job outcome. A job that is never executed because its entry
 was rejected produces no job outcome at all.
+
+### 7.2 Queue-level HELD superseded (Owner decision, 2026-10-06)
+
+The Owner GlobalQueue domain correction and the Owner critical Pump decision supersede the
+queue-level `HELD` disposition and the Hold / Release Hold actions:
+
+- The GlobalQueue holds **ready-to-dispatch entries only** (at most 8 in the Stage 0.2.1A spike).
+  Presence in the queue means READY; entries carry no state such as HELD, BLOCKED, WAITING or
+  EXCLUDED, and the dispatcher never skips an entry (head-only dispatch, no scan-forward).
+- A pause **before dispatch** belongs to the **AutoSequence** (for example `PAUSED`, or
+  `CRITICAL_SUSPENDED` after a Main Pump unexpected stop / trip). The queue stays unchanged.
+- A pause or wait **during a Cleaning Job** belongs to the **Cleaning Job** state, never to a
+  queue entry.
+- Equipment waits (for example Pump readiness) belong to the AutoSequence or the Job; they are
+  never queue entry states.
+- Pause therefore means pausing the **AutoSequence** or the **Cleaning Job lifecycle**; which
+  of the two (or both) a Production Pause addresses is **OWNER DECISION REQUIRED**. The Stage
+  0.2.1A spike adds only *synthetic* Diagnostics controls (START / PAUSE AFTER CURRENT JOB /
+  RESUME / ABORT ACTIVE JOB / RESET CRITICAL SCENARIO) that act on the AutoSequence and the Job,
+  never on queue entries; they are not the Production operator-control model.
+- Production Pause / Resume semantics, authority and the replacement for an Operator "hold one
+  Sensor" need remain **pending Owner approval** (see
+  [`spikes/queue-eligibility-decision-matrix.md`](spikes/queue-eligibility-decision-matrix.md)
+  and [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md)).
+
+This is a documentation correction only; no Production code, contract or data migration exists.
 
 ## 8. Sequential execution interaction
 
@@ -283,7 +316,7 @@ This behaviour is `[OWNER CONFIRMED]` and is no longer an open item.
 1. Stop dispatching new Cleaning Jobs.
 2. Handle any active Cleaning Job according to the approved stop or recovery policy.
 3. Record the current GlobalQueue snapshot in Event history.
-4. Record Held, Rejected, and Reordered state in Event history.
+4. Record Rejected and Reordered state in Event history (queue-level Held is superseded, §7.2).
 5. Close the current AutoSequence instance.
 6. Do **not** preserve the old GlobalQueue as the executable Queue for a future
    AutoSequence.
@@ -318,7 +351,8 @@ running queue.
 
 The Queue snapshot referenced by operator actions and sequence events must capture, at a
 minimum: Auto Sequence ID, entry positions, sensor identifiers, source owners, source reason
-flags (`TEMP_QUEUE` / `TIME_QUEUE`), hold and reject flags, and the capture timestamp. The
+flags (`TEMP_QUEUE` / `TIME_QUEUE`), reject flags, and the capture timestamp (queue-level hold
+is superseded, §7.2). The
 snapshot is stored in Event history.
 
 Snapshot storage format, compression, and retention are `[OPEN]`.
@@ -354,7 +388,8 @@ boundaries apply.
 | Permission required for each operator queue action | `[OPEN]` |
 | Reason text requirements per action | `[OPEN]` |
 | Queue snapshot retention inside Event history | `[OPEN]` |
-| Whether a sensor may be both held and rejected simultaneously | `[OPEN]` |
+| Reject / Release Reject / Reorder semantics in a ready-only, head-only GlobalQueue | **OWNER DECISION REQUIRED** |
+| Production Pause / Resume (AutoSequence or Cleaning Job lifecycle) | **OWNER DECISION REQUIRED** |
 | Whether a rejected entry's disposition is recorded per-entry or per-sequence | `[OPEN]` |
 
 Resolved by Owner confirmation and therefore **not** open: Water Jet to Isolation Valve

@@ -3,10 +3,16 @@
 **Document status:** [APPROVED] boundary statement. Bench verification items remain
 `[NOT VERIFIED]` and production write control remains `[NOT AUTHORIZED]`.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 > **Read this first.** WJSS is **not** a Safety Instrumented System. It does not replace
 > emergency stop circuits, hardwired protection, motor protection, mechanical limits, or

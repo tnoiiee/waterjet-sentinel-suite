@@ -54,8 +54,9 @@ REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `ME
 | Stage | Title | Gate | Implementation | Deliverable |
 | --- | --- | --- | --- | --- |
 | 0.1 | Repository Documentation Foundation | `[APPROVED]` | **MERGED** — merged to `main` through PR #1 (merge commit `d49eeee0d937465d61abd6e754b9a2bea5ef1d6a`) | Repository governance and documentation foundation |
-| 0.2 | Technology and Solution Architecture Decision | `[APPROVED]` | **SUBMITTED FOR OWNER REVIEW** — Owner manual review **PENDING**; **NOT MERGED** | Documentation-only technology and solution architecture decisions: UI delivery model, runtime process model, technology stack, database access and migrations, device adapter boundary, configuration and secrets, simulator-first development, offline deployment, and a documented repository structure direction — recorded as ADR candidates |
+| 0.2 | Technology and Solution Architecture Decision | `[APPROVED]` | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`); ADR-0006 to ADR-0013 **ACCEPTED** as direction, not implemented | Documentation-only technology and solution architecture decisions: UI delivery model, runtime process model, technology stack, database access and migrations, device adapter boundary, configuration and secrets, simulator-first development, offline deployment, and a documented repository structure direction — recorded as ADR candidates |
 | **0.2.1** | **UI and Runtime Technology Spike** | **`[PROPOSED]`** — **`[NOT AUTHORIZED]`** | Not started | Measured comparison of Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) inside the application-owned kiosk shell, using synthetic data only, plus validation of the live-state delivery, live-trend, and offline-restore architecture. Deliverable is a comparison report, a recommendation, and a decision-record draft — **no production code** |
+| **0.2.1A** | **React UI and Runtime Feasibility Spike** | **`[APPROVED]`** — Scope Gate and Coding Start approved | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761` (2026-10-07); React selected as the Primary UI Framework; controlled 15- / 60-minute observations waived as merge blockers; PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED** | Synthetic React feasibility spike in `spikes/ui-runtime-react/` (removable, no Product directory) plus [`docs/spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md) and [`docs/spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md). **React selected as the Primary UI Framework** (Owner decision, 2026-10-07); Blazor counter-spike **not required** unless a future material blocker is identified |
 | 0.3 | Architecture and Interface Specification | `[PROPOSED]` | Not started | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic — still documentation and specification only |
 | 0.4 | Offline Domain and Queue Engine Implementation | `[PROPOSED]` | Not started | First source code: pure domain logic with a simulator and automated tests; no device access |
 | 0.5 | Read-Only Monitoring Integration | `[PROPOSED]` | Not started | Modbus TCP read path against a simulator only; no production writes |
@@ -69,6 +70,22 @@ Stage 0.2.1 is inserted by the Owner-requested Stage 0.2 documentation review pu
 only authorised route to a UI framework decision. It remains `[PROPOSED]` and
 `[NOT AUTHORIZED]`; it is **not** started by Stage 0.2, and no prototype or spike code may be
 written until it has its own approved Scope Gate.
+
+**Stage 0.2.1A update.** The Owner approved a narrower Stage 0.2.1A Scope and Coding Start
+Gate: a synthetic React feasibility spike only. It produces feasibility evidence, not a
+framework selection; the two-candidate comparison of Stage 0.2.1 is not performed, the Blazor
+counter-spike is deferred and `[NOT AUTHORIZED]`, and the UI framework remains `[OPEN]` until
+the Owner records a selection. **Owner selection recorded (2026-10-07):** React is the Primary UI
+Framework; the Blazor counter-spike is not required unless a future material blocker is
+identified; Stage 0.2.1A is complete for the Development checkpoint; the Main Development Scope
+Gate is **PENDING**.
+
+**Stage 0.2.1A domain correction.** During Stage 0.2.1A the Owner corrected the physical
+baseline from 104 Sensor locations / 208 Thermocouple channels (Rear 28, Front 28) to **106
+Sensor locations / 212 Thermocouple channels** (Left 24, Rear 29, Right 24, Front 29). The
+Sensors sit in an 18 × 6 logical matrix with two Cannon equipment slots (logical I7 and I16), as
+set out in [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed).
+The 104 / 208 figures in historical records are the superseded baseline.
 
 Stages 0.3 through 0.8 are a **candidate** decomposition. The Owner may merge, split,
 reorder, or replace them. They are recorded here so that work is not invented ad hoc, not
@@ -95,6 +112,8 @@ precedence for Stage 0.2, so the ledger above records the approved title. Conseq
    [`ARCHITECTURE.md`](ARCHITECTURE.md) section 34, each with the gate that must close it.
 
 ### 3.2 Proposed Stage 0.2.1 — UI and Runtime Technology Spike
+
+> **SUPERSEDED.** The Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07); a Blazor counter-spike is not required unless a future material blocker is identified. This section is retained as history.
 
 | Item | Value |
 | --- | --- |

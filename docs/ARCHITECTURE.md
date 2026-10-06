@@ -3,10 +3,16 @@
 **Document status:** [APPROVED] for the conceptual structure and boundaries described
 here. Concrete technology selection is `[PROPOSED]` or `[OPEN]` as marked.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This document describes the conceptual architecture of the application. It contains no
 implementation and authorises none. Production addresses, register maps, tag lists,
@@ -104,7 +110,9 @@ Maintains four TempQueues and four TimeQueues — **eight source queues** — pl
 GlobalQueue with a target capacity of eight unique Sensor entries. It seeds GlobalQueue in
 the fixed source order, performs deduplication with earliest-position preservation, records
 merged reason flags against a single source owner, performs FIFO refill from that owner, and
-applies operator Hold, Reject, and Reorder. Ordering rules are fully specified in
+dispatches GlobalQueue Position 1 only (ready-to-dispatch entries, no scan-forward). Queue-level
+Hold is superseded (Owner decision, 2026-10-06); Reject / Reorder semantics in the ready-only queue
+are **OWNER DECISION REQUIRED**. Ordering rules are fully specified in
 [`QUEUE_MODEL.md`](QUEUE_MODEL.md). Queue evaluation runs at a 1 second interval.
 
 ### 4.5 Sequence and dispatch subsystem
@@ -757,8 +765,9 @@ Consequences follow in sections 24 to 33. The evidence changes no protected deci
 The **delivery model is locked**: a local web UI rendered inside an application-owned kiosk
 shell window, with the shell owning the close guard and controlled navigation, and the
 Equipment Runtime in a separate Windows Service behind a loopback API
-([`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md)). The **final UI framework is
-`[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+([`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md)). **React selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Stage 0.2.1A Owner-local final Edge gate and manual review passed); the Blazor counter-spike is **not required** unless a future material blocker is identified. The framework had been
+returned to `[OPEN]` by the Owner-requested Stage 0.2 documentation review punchlist; the rows
+below keep that history.
 
 | Item | Status |
 | --- | --- |
@@ -766,8 +775,8 @@ Equipment Runtime in a separate Windows Service behind a loopback API
 | Local web UI (embedded WebView, static local assets) | `[PROPOSED]` — locked as the delivery model |
 | Candidate A: React + TypeScript + Vite | `[PROPOSED]` candidate — **not accepted** |
 | Candidate B: Blazor Hybrid | `[PROPOSED]` candidate — **not rejected** |
-| Final UI framework selection | **`[OPEN]`** |
-| Selection route | Proposed Stage 0.2.1 spike (section 33) — `PROPOSED`, `[NOT AUTHORIZED]` |
+| Final UI framework selection | **React selected as the Primary UI Framework** (Owner decision, 2026-10-07) |
+| Selection route | **SUPERSEDED:** the dual-candidate Stage 0.2.1 spike (section 33) is not performed — the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07), and a Blazor counter-spike requires a future Owner Scope Gate |
 
 Both candidates are compared **inside the same architecture** — the same application-owned
 shell, the same embedded WebView, the same loopback ASP.NET Core Local Application API, and
@@ -793,7 +802,7 @@ kiosk stability.
 | Single ecosystem | Blazor reduces the number of build ecosystems, but that advantage does not by itself prove UI performance, graph quality, camera integration, or long-running kiosk stability |
 | Exclusion grounds | Neither candidate may be excluded for assumed Internet access, ease of closing a window, language preference, or ecosystem size alone |
 
-The dimension-by-dimension comparison (104 live Sensor cells, one-second update target,
+The dimension-by-dimension comparison (106 live Sensor cells, one-second update target,
 partial updates, visual states, trends, camera, grids, alarms, layout, shell integration, crash
 and reconnect, memory stability, component and visual regression testing, accessibility,
 offline build and restore, licensing, footprint, development effort, maintainability,
@@ -807,10 +816,12 @@ in that comparison is a measurement to be taken, not a result.
 
 The selected UI technology must support, at minimum:
 
-- **104 live Sensor cells** and **208 Thermocouple channels**, with a **one-second operational
-  update target**.
-- Wall layouts matching the approved physical baseline: **Left 24, Rear 28, Right 24,
-  Front 28**.
+- **106 live Sensor cells** and **212 Thermocouple channels**, with a **one-second operational
+  update target** (Owner domain correction during Stage 0.2.1A; supersedes 104 / 208).
+- Wall layouts matching the Owner-confirmed logical matrix: **Left 24, Rear 29, Right 24,
+  Front 29**, each wall six logical rows deep, with the two **Cannon equipment slots** (logical
+  I7 Rear, logical I16 Front) shown as neutral equipment, never as Sensors — see
+  [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed).
 - Wall-level **Dirty and Cleaner counts** (section 26).
 - **Sensor detail drill-down.**
 - **Active Cleaning Job visibility.**
@@ -854,7 +865,7 @@ framework-neutral: it defines what the UI must be able to express, not how to dr
 | 1 | Process classification | `DIRTY`, `CLEANER` |
 | 2 | Dirty Score intensity | 0 through 100 |
 | 3 | Data quality | `GOOD`, `UNCERTAIN`, `BAD`, `STALE`, `DISABLED` |
-| 4 | Queue state | TempQueue, TimeQueue, GlobalQueue position, Held, Blocked, Excluded |
+| 4 | Queue state | TempQueue, TimeQueue, GlobalQueue position (ready-to-dispatch entries only, FIFO, head-only dispatch — no Held / Blocked / Excluded entry states; see [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2) |
 | 5 | Interaction state | Selected, Not selected |
 | 6 | Execution state | Active Cleaning Job target, Not active |
 | 7 | Alarm state | Active alarm, Cleared acknowledgement required, Shelved, No alarm |
@@ -1070,8 +1081,9 @@ Stage 0.2.1 spike.
 | Item | Value |
 | --- | --- |
 | Stage | **0.2.1 — UI and Runtime Technology Spike** |
-| Status | **`PROPOSED`** |
-| Authorization | **`[NOT AUTHORIZED]`** |
+| Status | **SUPERSEDED** — the dual-candidate proposal below is not performed |
+| Authorization | **`[NOT AUTHORIZED]`** as written |
+| Replaced by | The approved, narrower **React-first Stage 0.2.1A — React UI and Runtime Feasibility Spike** ([`spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md)). **React selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Stage 0.2.1A Owner-local final Edge gate and manual review passed). A Blazor counter-spike is **not required** unless a future material blocker is identified |
 | Purpose | Select the UI framework and validate the live-state delivery and performance architecture with measured evidence |
 | Deliverable | A comparison report with measurements, a recommendation, and a decision record draft. **No production code.** |
 
@@ -1087,7 +1099,8 @@ implemented in disposable spike code, not in the repository structure of section
 
 ### 33.2 Minimum synthetic workload
 
-10 simulated Modbus devices; 104 Sensor locations; 208 Thermocouple channels; one-second update;
+10 simulated Modbus devices; 106 Sensor locations; 212 Thermocouple channels (corrected from the
+superseded 104 / 208 baseline); one-second update;
 Dirty/Cleaner classification; Dirty Score intensity; Good/Uncertain/Bad/Stale quality; queue
 badges; a selected Sensor; an Active Cleaning Job marker; an alarm marker; wall summary counts;
 a GlobalQueue preview; a pressure trend; a camera placeholder; UI disconnect/reconnect; one
@@ -1144,7 +1157,7 @@ punchlist. Nothing here may be closed by assumption.
 | Historian physical sizing, row sizes, index and partition strategy | No capacity model exists | Before retention defaults are ratified |
 | Recovery procedure for an interrupted Cleaning Job; fault-class taxonomy | Behaviour is undefined in the approved baseline | A later Stage Gate that specifies sequence recovery |
 | Configuration application without a runtime restart | Alternative not yet evaluated | Implementation Stage Gate |
-| **Final UI framework — Candidate A (React + TypeScript + Vite) versus Candidate B (Blazor Hybrid)** | Requires a measured comparison on the same synthetic workload; no measurement exists | **Stage 0.2.1 spike** (PROPOSED, NOT AUTHORIZED) |
+| **Final UI framework** | **CLOSED — React selected as the Primary UI Framework** (Owner decision, 2026-10-07) on the evidence of the **Stage 0.2.1A React-first feasibility spike** (synthetic; Owner-local final Edge gate and manual review PASS). *History:* React final selection had been NOT YET APPROVED. The dual-candidate Stage 0.2.1 comparison is **SUPERSEDED** (section 33). The **Blazor counter-spike is DEFERRED** | Owner decision after Stage 0.2.1A evidence. A Blazor counter-spike requires a **separate Owner Scope Gate**, only if React presents material concerns, the evidence remains insufficient, or the Owner requests a direct comparison |
 | Shell host framework | Implementation-level selection; no evidence available now | Implementation Stage Gate, after the framework decision |
 | Push transport and presentation-state payload encoding | The presentation contract is transport-agnostic; selecting a transport now would invent certainty | Stage 0.2.1 spike, then Implementation Stage Gate |
 | Chart/trend library | Library-neutral requirements are recorded in section 32; no library is selected | Stage 0.2.1 spike |

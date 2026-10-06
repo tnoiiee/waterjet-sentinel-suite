@@ -1,0 +1,174 @@
+/* WJSS Stage 0.2.1A — critical Main Pump modal (synthetic spike).
+ * Critical palette is distinct from: Dirty red (process), Alarm amber (alarm strip), selection
+ * cyan, Active Job white. No neon, no flashing, no animation. States are always also text. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-section);
+  background: var(--critical-backdrop);
+}
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-small);
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: var(--space-section) var(--space-major);
+  background: var(--critical-surface);
+  border: 3px solid var(--critical-edge);
+  border-radius: 8px;
+  color: var(--text-strong);
+  font-family: var(--font-ui);
+  font-size: var(--font-base);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+.dialog:focus-visible {
+  outline: 2px solid var(--text-strong);
+  outline-offset: 2px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+}
+.badge {
+  padding: 2px 10px;
+  background: var(--critical-edge);
+  color: var(--critical-ink);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  border-radius: 3px;
+}
+.severity {
+  color: var(--muted);
+  font-size: var(--font-label);
+}
+.title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.desc,
+.rule {
+  margin: 0;
+  color: var(--text);
+  line-height: 18px;
+}
+.rule {
+  color: var(--muted);
+  font-size: var(--font-label);
+}
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px var(--space-section);
+  margin: 0;
+  padding: var(--space-small) var(--space-card);
+  background: var(--critical-nested);
+  border-radius: 4px;
+}
+.facts dt {
+  color: var(--muted);
+}
+.facts dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.failed {
+  text-decoration: underline;
+}
+.steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-inline);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-label);
+}
+.steps li {
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  line-height: 16px;
+}
+.step_done {
+  border-color: var(--critical-edge);
+}
+.step_current {
+  border: 2px solid var(--text-strong);
+  font-weight: 700;
+}
+.step_failed {
+  border: 2px dashed var(--text-strong);
+  font-weight: 700;
+}
+.step_todo {
+  color: var(--muted);
+}
+.stepMark {
+  display: inline-block;
+  width: 1em;
+}
+.response {
+  padding: var(--space-small) var(--space-card);
+  border-left: 4px solid var(--critical-edge);
+  background: var(--critical-nested);
+}
+.responseTitle {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.response ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 18px;
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-card);
+}
+.note {
+  margin-right: auto;
+  color: var(--muted);
+}
+.ack {
+  min-width: 160px;
+  min-height: 40px;
+  padding: 0 var(--space-section);
+  border: 2px solid var(--text-strong);
+  border-radius: 4px;
+  background: var(--critical-ink);
+  color: var(--critical-surface);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ack:disabled {
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+.ack:focus-visible {
+  outline: 3px solid var(--critical-edge);
+  outline-offset: 2px;
+}
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

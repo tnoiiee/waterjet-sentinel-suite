@@ -1,0 +1,1944 @@
+{
+  "label": "Stage 0.2.1A synthetic spike - react-ui dependency licence inventory",
+  "generatedAt": "2026-10-06T09:14:28.900Z",
+  "totals": {
+    "lockfileEntries": 122,
+    "installedHere": 99,
+    "direct": 13,
+    "runtimeBundle": 4,
+    "withInstallScript": [
+      "fsevents (darwin, optional=true)"
+    ]
+  },
+  "byLicence": {
+    "MIT": 92,
+    "MIT-0": 2,
+    "Apache-2.0": 8,
+    "BSD-2-Clause": 2,
+    "MPL-2.0": 12,
+    "BlueOak-1.0.0": 1,
+    "CC0-1.0": 1,
+    "ISC": 2,
+    "BSD-3-Clause": 2
+  },
+  "flagged": [
+    {
+      "name": "lightningcss",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-android-arm64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-darwin-arm64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-darwin-x64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-freebsd-x64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-arm-gnueabihf",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-arm64-gnu",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-arm64-musl",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-x64-gnu",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-x64-musl",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-win32-arm64-msvc",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-win32-x64-msvc",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "scope": "dev/build",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    }
+  ],
+  "packages": [
+    {
+      "name": "@asamuzakjp/css-color",
+      "version": "7.1.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-1t1U8Cm3RBl9v…",
+      "flag": null
+    },
+    {
+      "name": "@asamuzakjp/dom-selector",
+      "version": "9.2.4",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-YnVzxDxLaqL0t…",
+      "flag": null
+    },
+    {
+      "name": "@babel/code-frame",
+      "version": "7.29.7",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Aup7aUOfpbAUg…",
+      "flag": null
+    },
+    {
+      "name": "@babel/helper-validator-identifier",
+      "version": "7.29.7",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-qehxGkRj55h/f…",
+      "flag": null
+    },
+    {
+      "name": "@babel/runtime",
+      "version": "7.29.7",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Nq8OhGWiZIZGV…",
+      "flag": null
+    },
+    {
+      "name": "@bramus/specificity",
+      "version": "2.4.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-ctxtJ/eA+t+6q…",
+      "flag": null
+    },
+    {
+      "name": "@csstools/color-helpers",
+      "version": "6.1.2",
+      "licence": "MIT-0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-grhRy3OKmniaA…",
+      "flag": null
+    },
+    {
+      "name": "@csstools/css-calc",
+      "version": "3.4.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-iex20d8CHVkyv…",
+      "flag": null
+    },
+    {
+      "name": "@csstools/css-color-parser",
+      "version": "4.2.6",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-iiPQ3iRWwnJke…",
+      "flag": null
+    },
+    {
+      "name": "@csstools/css-parser-algorithms",
+      "version": "4.0.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-40cSKyMvK+tq4…",
+      "flag": null
+    },
+    {
+      "name": "@csstools/css-syntax-patches-for-csstree",
+      "version": "1.1.15",
+      "licence": "MIT-0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-J0u7HkVl2nzSl…",
+      "flag": null
+    },
+    {
+      "name": "@csstools/css-tokenizer",
+      "version": "4.0.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-OoKoR0f76dCY6…",
+      "flag": null
+    },
+    {
+      "name": "@exodus/bytes",
+      "version": "1.16.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-IcpW84uEn3N7E…",
+      "flag": null
+    },
+    {
+      "name": "@jridgewell/resolve-uri",
+      "version": "3.1.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-bRISgCIjP20/t…",
+      "flag": null
+    },
+    {
+      "name": "@jridgewell/sourcemap-codec",
+      "version": "1.6.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-T7jf+5zgsZHwN…",
+      "flag": null
+    },
+    {
+      "name": "@jridgewell/trace-mapping",
+      "version": "0.3.31",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-zzNR+SdQSDJzc…",
+      "flag": null
+    },
+    {
+      "name": "@oxc-project/types",
+      "version": "0.152.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-oM/5rLBm2tPkg…",
+      "flag": null
+    },
+    {
+      "name": "@playwright/test",
+      "version": "1.63.0",
+      "licence": "Apache-2.0",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-oxMK4vllB9RK5…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-android-arm-eabi",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "android"
+      ],
+      "cpu": [
+        "arm"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-dB/a1214qKfHM…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-android-arm64",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "android"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-7KHFgQ5VJxIHc…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-darwin-arm64",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "darwin"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-3YIhqHD96nA5S…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-darwin-x64",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "darwin"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-UuuJ35MFw4gmF…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-freebsd-x64",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "freebsd"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-uMvssit0a4W+/…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-linux-arm-gnueabihf",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "arm"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-XcFu0R0xWnwzS…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-linux-arm64-gnu",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-260UrKgn8tz39…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-linux-arm64-musl",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-5YK1I9SqDkbPg…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-linux-ppc64-gnu",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "ppc64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-Rkcrmp7eFRg74…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-linux-s390x-gnu",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "s390x"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-qvK4DuAsQc2BS…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-linux-x64-gnu",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": true,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-Q9uLBO53Xd4QI…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-linux-x64-musl",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": true,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-3IBxWFMjbOZsk…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-openharmony-arm64",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "openharmony"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-xtX61xg4LKPkP…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-win32-arm64-msvc",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "win32"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-At7fPB6PCaIjz…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/binding-win32-x64-msvc",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "win32"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-WIw2haVKwjuYd…",
+      "flag": null
+    },
+    {
+      "name": "@rolldown/pluginutils",
+      "version": "1.0.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-2j9bGt5Jh8hj+…",
+      "flag": null
+    },
+    {
+      "name": "@testing-library/dom",
+      "version": "10.4.2",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-yzr2S9HyAIdhz…",
+      "flag": null
+    },
+    {
+      "name": "@testing-library/react",
+      "version": "16.3.3",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Uo193NgQbPMz6…",
+      "flag": null
+    },
+    {
+      "name": "@types/aria-query",
+      "version": "5.0.4",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-rfT93uj5s0PRL…",
+      "flag": null
+    },
+    {
+      "name": "@types/chai",
+      "version": "5.2.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Mw558oeA9fFbv…",
+      "flag": null
+    },
+    {
+      "name": "@types/deep-eql",
+      "version": "4.0.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-c9h9dVVMigMPc…",
+      "flag": null
+    },
+    {
+      "name": "@types/estree",
+      "version": "1.0.9",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-GhdPgy1el4/Im…",
+      "flag": null
+    },
+    {
+      "name": "@types/react",
+      "version": "19.3.0",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-N0rFCuH9YoxG9…",
+      "flag": null
+    },
+    {
+      "name": "@types/react-dom",
+      "version": "19.3.0",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-ZI7bU42mZXXKH…",
+      "flag": null
+    },
+    {
+      "name": "@vitejs/plugin-react",
+      "version": "6.1.1",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-yxLaQV9gkhS8e…",
+      "flag": null
+    },
+    {
+      "name": "@vitest/mocker",
+      "version": "5.0.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-T8sWAIbkSyAjk…",
+      "flag": null
+    },
+    {
+      "name": "@vitest/spy",
+      "version": "5.0.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-XhFysQTB8AZ+P…",
+      "flag": null
+    },
+    {
+      "name": "ansi-regex",
+      "version": "5.0.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-quJQXlTSUGL2L…",
+      "flag": null
+    },
+    {
+      "name": "ansi-styles",
+      "version": "5.2.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Cxwpt2SfTzTtX…",
+      "flag": null
+    },
+    {
+      "name": "aria-query",
+      "version": "5.3.0",
+      "licence": "Apache-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-b0P0sZPKtyu8H…",
+      "flag": null
+    },
+    {
+      "name": "assertion-error",
+      "version": "2.0.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Izi8RQcffqCeN…",
+      "flag": null
+    },
+    {
+      "name": "bidi-js",
+      "version": "1.1.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-fX1Onk0tdVPC7…",
+      "flag": null
+    },
+    {
+      "name": "chai",
+      "version": "6.3.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-XWAtwJ6OHO+tj…",
+      "flag": null
+    },
+    {
+      "name": "css-tree",
+      "version": "3.2.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-X7sjQzceUhu1u…",
+      "flag": null
+    },
+    {
+      "name": "csstype",
+      "version": "3.2.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-z1HGKcYy2xA8A…",
+      "flag": null
+    },
+    {
+      "name": "data-urls",
+      "version": "8.0.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-JQUCCK+/CAGbG…",
+      "flag": null
+    },
+    {
+      "name": "decimal.js",
+      "version": "10.6.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-YpgQiITW3JXGn…",
+      "flag": null
+    },
+    {
+      "name": "dequal",
+      "version": "2.0.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-0je+qPKHEMohv…",
+      "flag": null
+    },
+    {
+      "name": "detect-libc",
+      "version": "2.1.2",
+      "licence": "Apache-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Btj2BOOO83o3W…",
+      "flag": null
+    },
+    {
+      "name": "dom-accessibility-api",
+      "version": "0.5.16",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-X7BJ2yElsnOJ3…",
+      "flag": null
+    },
+    {
+      "name": "entities",
+      "version": "8.1.0",
+      "licence": "BSD-2-Clause",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-kxL7msIffSuh9…",
+      "flag": null
+    },
+    {
+      "name": "es-module-lexer",
+      "version": "2.3.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-poHGpORABojJJ…",
+      "flag": null
+    },
+    {
+      "name": "estree-walker",
+      "version": "3.0.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-7RUKfXgSMMkzt…",
+      "flag": null
+    },
+    {
+      "name": "expect-type",
+      "version": "1.4.0",
+      "licence": "Apache-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-KfYbmpRm0VbLj…",
+      "flag": null
+    },
+    {
+      "name": "fdir",
+      "version": "6.5.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-tIbYtZbucOs0B…",
+      "flag": null
+    },
+    {
+      "name": "fsevents",
+      "version": "2.3.3",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "darwin"
+      ],
+      "cpu": null,
+      "hasInstallScript": true,
+      "integrity": "sha512-5xoDfX+fL7faA…",
+      "flag": null
+    },
+    {
+      "name": "html-encoding-sniffer",
+      "version": "7.0.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-UikN5yr7xsCDA…",
+      "flag": null
+    },
+    {
+      "name": "is-potential-custom-element-name",
+      "version": "1.0.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-bCYeRA2rVibKZ…",
+      "flag": null
+    },
+    {
+      "name": "js-tokens",
+      "version": "4.0.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-RdJUflcE3cUzK…",
+      "flag": null
+    },
+    {
+      "name": "jsdom",
+      "version": "30.1.2",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-0FFE/jE1rppmV…",
+      "flag": null
+    },
+    {
+      "name": "lightningcss",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-WkUDrojuJs0xk…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-android-arm64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "android"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-gEpRTalKdosp4…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-darwin-arm64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "darwin"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-Sciaz8eenNTKn…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-darwin-x64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "darwin"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-Z5UPAxzrjlWNN…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-freebsd-x64",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "freebsd"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-QQM/Ti/hQajJw…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-arm-gnueabihf",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "arm"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-N7FVBe6iS24Ml…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-arm64-gnu",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-j2v/itmy4HlNx…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-arm64-musl",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-yiO5ROMuYQgXb…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-x64-gnu",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": true,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-ar+Ju7LmcN0Jo…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-linux-x64-musl",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": true,
+      "os": [
+        "linux"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-RYiYbkokw0trf…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-win32-arm64-msvc",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "win32"
+      ],
+      "cpu": [
+        "arm64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-1K+MPfLSFVpph…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lightningcss-win32-x64-msvc",
+      "version": "1.33.0",
+      "licence": "MPL-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": true,
+      "installedHere": false,
+      "os": [
+        "win32"
+      ],
+      "cpu": [
+        "x64"
+      ],
+      "hasInstallScript": false,
+      "integrity": "sha512-OlEICDx/Xl0Fq…",
+      "flag": "MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently"
+    },
+    {
+      "name": "lru-cache",
+      "version": "11.5.3",
+      "licence": "BlueOak-1.0.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-U4N8FgzmWxc8k…",
+      "flag": null
+    },
+    {
+      "name": "lz-string",
+      "version": "1.5.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-h5bgJWpxJNswb…",
+      "flag": null
+    },
+    {
+      "name": "magic-string",
+      "version": "1.4.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-vG+rjFRj1PqdI…",
+      "flag": null
+    },
+    {
+      "name": "mdn-data",
+      "version": "2.27.1",
+      "licence": "CC0-1.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-9Yubnt3e8A0OK…",
+      "flag": null
+    },
+    {
+      "name": "nanoid",
+      "version": "3.3.19",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Y2tUNy4ouw6tq…",
+      "flag": null
+    },
+    {
+      "name": "obug",
+      "version": "2.2.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-XrsrhT5sybtKI…",
+      "flag": null
+    },
+    {
+      "name": "parse5",
+      "version": "8.0.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-z1e/HMG90obSG…",
+      "flag": null
+    },
+    {
+      "name": "picocolors",
+      "version": "1.1.1",
+      "licence": "ISC",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-xceH2snhtb5M9…",
+      "flag": null
+    },
+    {
+      "name": "picomatch",
+      "version": "4.0.7",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-qcJu88Q2IWqJs…",
+      "flag": null
+    },
+    {
+      "name": "playwright",
+      "version": "1.63.0",
+      "licence": "Apache-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-+7ziBLidS4NaN…",
+      "flag": null
+    },
+    {
+      "name": "playwright-core",
+      "version": "1.63.0",
+      "licence": "Apache-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-rYCsBF/M5HjUc…",
+      "flag": null
+    },
+    {
+      "name": "postcss",
+      "version": "8.5.28",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-RRuzqDtt5Y9h3…",
+      "flag": null
+    },
+    {
+      "name": "pretty-format",
+      "version": "27.5.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Qb1gy5OrP5+zD…",
+      "flag": null
+    },
+    {
+      "name": "punycode",
+      "version": "2.3.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-vYt7UD1U9Wg61…",
+      "flag": null
+    },
+    {
+      "name": "react",
+      "version": "19.3.0",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "runtime-bundle",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-E8LUcbtBWt20b…",
+      "flag": null
+    },
+    {
+      "name": "react-dom",
+      "version": "19.3.0",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "runtime-bundle",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-JDk8dgif51OjF…",
+      "flag": null
+    },
+    {
+      "name": "react-is",
+      "version": "17.0.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-w2GsyukL62IJn…",
+      "flag": null
+    },
+    {
+      "name": "require-from-string",
+      "version": "2.0.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Xf0nWe6RseziF…",
+      "flag": null
+    },
+    {
+      "name": "rolldown",
+      "version": "1.2.12",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-8wafseiaG80xm…",
+      "flag": null
+    },
+    {
+      "name": "saxes",
+      "version": "6.0.0",
+      "licence": "ISC",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-xAg7SOnEhrm5z…",
+      "flag": null
+    },
+    {
+      "name": "scheduler",
+      "version": "0.28.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "runtime-bundle",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-juorfCmIkIw8t…",
+      "flag": null
+    },
+    {
+      "name": "source-map-js",
+      "version": "1.2.2",
+      "licence": "BSD-3-Clause",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-KGj/8Y43x35aZ…",
+      "flag": null
+    },
+    {
+      "name": "std-env",
+      "version": "4.3.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-OtU/EgQ1kIm5K…",
+      "flag": null
+    },
+    {
+      "name": "tinybench",
+      "version": "6.2.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-78U2TlB2CnVen…",
+      "flag": null
+    },
+    {
+      "name": "tinyexec",
+      "version": "1.3.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-GCvB3aoys96Iu…",
+      "flag": null
+    },
+    {
+      "name": "tinyglobby",
+      "version": "0.2.17",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-wXR/dYpcqKmfW…",
+      "flag": null
+    },
+    {
+      "name": "tldts",
+      "version": "7.4.16",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-QwBER5KMR86II…",
+      "flag": null
+    },
+    {
+      "name": "tldts-core",
+      "version": "7.4.16",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-MDolfaSJtlSK5…",
+      "flag": null
+    },
+    {
+      "name": "tough-cookie",
+      "version": "6.0.2",
+      "licence": "BSD-3-Clause",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-exgYmnmL/sJpR…",
+      "flag": null
+    },
+    {
+      "name": "tr46",
+      "version": "7.0.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-BcDSDW+SIGWVO…",
+      "flag": null
+    },
+    {
+      "name": "typescript",
+      "version": "6.0.3",
+      "licence": "Apache-2.0",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-y2TvuxSZPDyQa…",
+      "flag": null
+    },
+    {
+      "name": "undici",
+      "version": "8.11.2",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-u4UB2/IrKdU6l…",
+      "flag": null
+    },
+    {
+      "name": "uplot",
+      "version": "1.6.32",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "runtime-bundle",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-KIMVnG68zvu5X…",
+      "flag": null
+    },
+    {
+      "name": "vite",
+      "version": "8.3.2",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-SQr1x6W5vVSbR…",
+      "flag": null
+    },
+    {
+      "name": "vitest",
+      "version": "5.0.3",
+      "licence": "MIT",
+      "direct": true,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-xMw97S3rjdtj5…",
+      "flag": null
+    },
+    {
+      "name": "w3c-xmlserializer",
+      "version": "6.0.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-4Nsy8K5Tr6SPD…",
+      "flag": null
+    },
+    {
+      "name": "webidl-conversions",
+      "version": "8.0.1",
+      "licence": "BSD-2-Clause",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-BMhLD/Sw+GbJC…",
+      "flag": null
+    },
+    {
+      "name": "whatwg-mimetype",
+      "version": "5.0.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-sXcNcHOC51uPG…",
+      "flag": null
+    },
+    {
+      "name": "whatwg-url",
+      "version": "17.2.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-IhLIHNcBrzIix…",
+      "flag": null
+    },
+    {
+      "name": "why-is-node-running",
+      "version": "3.2.1",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-Tb2FUhB4vUsGQ…",
+      "flag": null
+    },
+    {
+      "name": "xml-name-validator",
+      "version": "5.0.0",
+      "licence": "Apache-2.0",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-EvGK8EJ3DhaHf…",
+      "flag": null
+    },
+    {
+      "name": "xmlchars",
+      "version": "2.2.0",
+      "licence": "MIT",
+      "direct": false,
+      "scope": "dev/build",
+      "optional": false,
+      "installedHere": true,
+      "os": null,
+      "cpu": null,
+      "hasInstallScript": false,
+      "integrity": "sha512-JZnDKK8B0RCDw…",
+      "flag": null
+    }
+  ],
+  "bundledAssets": [
+    {
+      "name": "Google Sans (Latin variable subset, wght 400-700)",
+      "file": "react-ui/src/assets/fonts/GoogleSans-Latin-Variable.woff2",
+      "bytes": 47672,
+      "sha256": "40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b",
+      "licence": "OFL-1.1",
+      "licenceFile": "react-ui/src/assets/fonts/OFL.txt (verbatim)",
+      "trademarkNotice": "react-ui/src/assets/fonts/TRADEMARKS.md (verbatim; \"Google\" / \"Google Sans\" are trademarks of Google LLC)",
+      "provenance": "react-ui/src/assets/fonts/FONT_SOURCE.md (official google/fonts repository, ofl/googlesans)",
+      "reservedFontName": "none declared",
+      "modifiedVersion": "yes - subset + instanced + WOFF2 (OFL Modified Version; name kept because no RFN is declared)",
+      "scope": "runtime-bundle (self-hosted; no CDN)",
+      "flag": "OFL-1.1 font licence (permits bundling with software; must not be sold by itself; licence text bundled)"
+    }
+  ],
+  "runtimeHarness": "runtime-harness/ has no dependencies (Node built-ins only).",
+  "scenarioRunnerAndMeasurements": "Node built-ins only (Windows sampler uses built-in PowerShell cmdlets)."
+}

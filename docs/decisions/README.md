@@ -3,9 +3,16 @@
 **Status of this index:** [APPROVED] at the Stage 0.1 documentation foundation, corrected
 by the Owner-confirmed documentation review punchlist.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]`; Stage 0.2 implementation **SUBMITTED FOR
-OWNER REVIEW**; Owner manual review **PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This folder holds the decisions that shape the WaterJet Sentinel Suite. An ADR records a
 decision, its context, and its consequences so that later work does not re-litigate or
@@ -56,36 +63,33 @@ question for a future approved technology decision.
 | [ADR-0004](ADR-0004-historian-strategy.md) | Historian strategy | `ACCEPTED` (retention defaults `PROPOSED`, capacity `NOT VERIFIED` inside) |
 | [ADR-0005](ADR-0005-hardware-safety-boundary.md) | Hardware safety boundary | `ACCEPTED` |
 
-### Stage 0.2 candidate records — submitted for Owner acceptance
+### Stage 0.2 records — accepted by the Owner
 
-**None of these records is accepted. `PROPOSED` is not binding, not implementation
-authorisation, and not evidence.** The Stage 0.2 Scope Gate is approved; the Stage 0.2
-architecture checkpoint is submitted for Owner review; documentation review is
-**CHANGES REQUESTED / IN PROGRESS**; Owner manual review is **PENDING**; the work is
-**NOT MERGED**; Stage 0.2.1 and Stage 0.3 are `[NOT AUTHORIZED]`.
+The Owner accepted Stage 0.2 (merged through PR #2, merge commit
+`e779f8ad2c856e367fd65985007a3da411bd0e73`) and recorded ADR-0006 to ADR-0013 `ACCEPTED` as
+architecture direction. **Accepted does not mean implemented.** Selections inside them that are
+still marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` keep those markers, and acceptance
+authorises no capability and no later stage.
 
-**The final UI framework is `[OPEN]`.** [`ADR-0006`](ADR-0006-ui-delivery-model.md) records
-Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) as comparison
-candidates. The current evidence-based preference for Candidate A is explicitly **not
-acceptance**, and Candidate B is explicitly **not rejected**. Selection requires the proposed
-Stage 0.2.1 spike, which is `[NOT AUTHORIZED]`.
-
-These records were created by the approved Stage 0.2 Scope Gate, *Technology and Solution
-Architecture Decision*. They are `PROPOSED`: the Agent may draft them, but only the Owner may
-record `ACCEPTED`. Until then they are not binding on future work.
+**React is selected as the Primary UI Framework** (Owner decision, 2026-10-07). [`ADR-0006`](ADR-0006-ui-delivery-model.md)
+recorded Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid); the Owner selected
+React after the Stage 0.2.1A synthetic React feasibility spike
+([`../spikes/stage-0.2.1a-plan.md`](../spikes/stage-0.2.1a-plan.md)) passed the Owner-local final
+Edge gate and manual review. The Blazor counter-spike is **not required** unless a future material
+blocker is identified. ADR-0006 and ADR-0008 carry dated update notes; their history is unchanged.
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [ADR-0006](ADR-0006-ui-delivery-model.md) | UI delivery model | `PROPOSED` |
-| [ADR-0007](ADR-0007-runtime-process-model.md) | Runtime process model | `PROPOSED` |
-| [ADR-0008](ADR-0008-technology-stack.md) | Technology stack | `PROPOSED` (several selections `OPEN` inside) |
-| [ADR-0009](ADR-0009-database-access-and-migrations.md) | Database access and migration strategy | `PROPOSED` (provider pin, sizing, overflow policy `OPEN` inside) |
-| [ADR-0010](ADR-0010-device-adapter-boundary.md) | Device adapter boundary | `PROPOSED` (library selections `OPEN` inside) |
-| [ADR-0011](ADR-0011-configuration-and-secrets.md) | Configuration and secrets | `PROPOSED` (secret store `OPEN` inside) |
-| [ADR-0012](ADR-0012-simulator-first-development.md) | Simulator-first development | `PROPOSED` |
-| [ADR-0013](ADR-0013-offline-deployment.md) | Offline deployment | `PROPOSED` (package format and startup mechanism `OPEN` inside) |
+| [ADR-0006](ADR-0006-ui-delivery-model.md) | UI delivery model | `ACCEPTED` |
+| [ADR-0007](ADR-0007-runtime-process-model.md) | Runtime process model | `ACCEPTED` |
+| [ADR-0008](ADR-0008-technology-stack.md) | Technology stack | `ACCEPTED` (several selections `OPEN` inside) |
+| [ADR-0009](ADR-0009-database-access-and-migrations.md) | Database access and migration strategy | `ACCEPTED` (provider pin, sizing, overflow policy `OPEN` inside) |
+| [ADR-0010](ADR-0010-device-adapter-boundary.md) | Device adapter boundary | `ACCEPTED` (library selections `OPEN` inside) |
+| [ADR-0011](ADR-0011-configuration-and-secrets.md) | Configuration and secrets | `ACCEPTED` (secret store `OPEN` inside) |
+| [ADR-0012](ADR-0012-simulator-first-development.md) | Simulator-first development | `ACCEPTED` |
+| [ADR-0013](ADR-0013-offline-deployment.md) | Offline deployment | `ACCEPTED` (package format and startup mechanism `OPEN` inside) |
 
-`PROPOSED` here means *drafted and submitted*, never *approved*. Acceptance of an ADR within
+`PROPOSED` means *drafted and submitted*, never *approved*. Acceptance of an ADR within
 Stage 0.2 means acceptance of a **documentation decision**, not implementation proof. See
 [`../CURRENT_STATE.md`](../CURRENT_STATE.md).
 

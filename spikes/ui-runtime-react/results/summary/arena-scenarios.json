@@ -1,0 +1,557 @@
+{
+  "label": "SYNTHETIC SPIKE EVIDENCE - NOT PRODUCTION VALIDATION",
+  "stage": "0.2.1A",
+  "environment": "Arena (Linux, Node harness in-process, SSE over 127.0.0.1, no browser)",
+  "generatedAt": "2026-10-06T17:34:16.444Z",
+  "counts": {
+    "PASS": 30,
+    "PASS+OWNER": 4,
+    "OWNER-LOCAL": 1
+  },
+  "scenarios": [
+    {
+      "id": "S01",
+      "name": "Initial Snapshot",
+      "status": "PASS",
+      "durationMs": 8,
+      "evidence": {
+        "firstEvent": "snapshot",
+        "snapshotBytes": 79658,
+        "sensors": 106,
+        "thermocoupleChannels": 212,
+        "perWall": {
+          "LEFT": 24,
+          "REAR": 29,
+          "RIGHT": 24,
+          "FRONT": 29
+        },
+        "wallMapSlots": 108,
+        "cannonSlots": [
+          "CANNON_REAR@R5C7",
+          "CANNON_FRONT@R5C16"
+        ],
+        "revision": 1
+      },
+      "error": null
+    },
+    {
+      "id": "S02",
+      "name": "One-second Deltas",
+      "status": "PASS",
+      "durationMs": 5200,
+      "evidence": {
+        "deltasIn5_2s": 6,
+        "medianIntervalMs": 1001,
+        "gaps": 0,
+        "lastValidated": true
+      },
+      "error": null
+    },
+    {
+      "id": "S03",
+      "name": "30% Dirty",
+      "status": "PASS",
+      "durationMs": 2512,
+      "evidence": {
+        "dirty": 32,
+        "expectedApprox": 32,
+        "population": 106,
+        "note": "one sensor may be under active cleaning"
+      },
+      "error": null
+    },
+    {
+      "id": "S04",
+      "name": "70% Dirty",
+      "status": "PASS",
+      "durationMs": 2505,
+      "evidence": {
+        "dirty": 74,
+        "expectedApprox": 74,
+        "population": 106
+      },
+      "error": null
+    },
+    {
+      "id": "S05",
+      "name": "Threshold oscillation around 50",
+      "status": "PASS",
+      "durationMs": 7012,
+      "evidence": {
+        "oscillatingSensors": 8,
+        "classificationFlipsIn7s": 23
+      },
+      "error": null
+    },
+    {
+      "id": "S06",
+      "name": "All quality states",
+      "status": "PASS",
+      "durationMs": 1312,
+      "evidence": {
+        "qualities": {
+          "G+201": "UNCERTAIN",
+          "G+202": "BAD",
+          "G+203": "STALE",
+          "G+204": "DISABLED",
+          "G+101": "GOOD"
+        },
+        "uncertainBasis": "LAST_VALIDATED"
+      },
+      "error": null
+    },
+    {
+      "id": "S07",
+      "name": "Selection during updates",
+      "status": "PASS+OWNER",
+      "durationMs": 4,
+      "evidence": {
+        "runtimePart": "selection is not on the wire (UI-local)",
+        "jsdom": "renderIsolation.test.tsx: selection survives Deltas and Snapshots",
+        "browserPart": "OWNER-LOCAL e2e S07"
+      },
+      "error": null
+    },
+    {
+      "id": "S08",
+      "name": "Queue badge changes",
+      "status": "PASS",
+      "durationMs": 6428,
+      "evidence": {
+        "sensorsWithQueueStateChange": 3,
+        "statesSeen": [
+          "ACTIVE",
+          "NONE",
+          "QUEUED"
+        ],
+        "dispatchedHead": "G+209"
+      },
+      "error": null
+    },
+    {
+      "id": "S09",
+      "name": "GlobalQueue changes (bounded, status-free; AutoSequence pause is not an entry state)",
+      "status": "PASS",
+      "durationMs": 2412,
+      "evidence": {
+        "totalQueued": 8,
+        "capacity": 8,
+        "pausedAutoSequence": "PAUSE_REQUESTED",
+        "enqueueH17": "QUEUE_FULL",
+        "fields": [
+          "position",
+          "entryId",
+          "sensorId",
+          "sourceReason",
+          "dirtyScore",
+          "secondsSinceLastClean"
+        ]
+      },
+      "error": null
+    },
+    {
+      "id": "S10",
+      "name": "Single Job progression",
+      "status": "PASS",
+      "durationMs": 27170,
+      "evidence": {
+        "phasesSeen": [
+          "P1",
+          "P2",
+          "P3",
+          "P4",
+          "P5",
+          "P6"
+        ],
+        "jobsCompleted": 1,
+        "maxActiveJobs": 1
+      },
+      "error": null
+    },
+    {
+      "id": "S11",
+      "name": "Active Alarm",
+      "status": "PASS",
+      "durationMs": 404,
+      "evidence": {
+        "alarmState": "ACTIVE_UNACK",
+        "classificationBefore": "DIRTY",
+        "classificationAfter": "DIRTY",
+        "note": "classification is independent of alarm state"
+      },
+      "error": null
+    },
+    {
+      "id": "S12",
+      "name": "Cleared Ack Required",
+      "status": "PASS",
+      "durationMs": 808,
+      "evidence": {
+        "afterClear": "CLEARED_UNACK",
+        "clearedUnackCount": 1,
+        "afterAck": "NONE"
+      },
+      "error": null
+    },
+    {
+      "id": "S13",
+      "name": "Device timeout",
+      "status": "PASS",
+      "durationMs": 5009,
+      "evidence": {
+        "affectedSensors": 13,
+        "qualitiesSeen": [
+          "GOOD",
+          "UNCERTAIN",
+          "BAD"
+        ],
+        "deviceState": "TIMEOUT",
+        "consecutiveTimeouts": 4
+      },
+      "error": null
+    },
+    {
+      "id": "S14",
+      "name": "Other Devices continue",
+      "status": "PASS",
+      "durationMs": 4,
+      "evidence": {
+        "pollsDuringTimeout": {
+          "SYN-TC-01": 6,
+          "SYN-TC-02": 6,
+          "SYN-TC-04": 6,
+          "SYN-TC-05": 6,
+          "SYN-TC-06": 6,
+          "SYN-TC-07": 6,
+          "SYN-TC-08": 6
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "S15",
+      "name": "Device recovery",
+      "status": "PASS",
+      "durationMs": 1511,
+      "evidence": {
+        "recoveredWithinMs": 1508,
+        "commAlarmAfterRecovery": "CLEARED_UNACK"
+      },
+      "error": null
+    },
+    {
+      "id": "S16",
+      "name": "UI disconnect",
+      "status": "PASS",
+      "durationMs": 303,
+      "evidence": {
+        "droppedClients": 1,
+        "lastRevisionSeen": 84
+      },
+      "error": null
+    },
+    {
+      "id": "S17",
+      "name": "UI reconnect",
+      "status": "PASS",
+      "durationMs": 1701,
+      "evidence": {
+        "firstEventAfterReconnect": "snapshot",
+        "sentLastEventId": 84
+      },
+      "error": null
+    },
+    {
+      "id": "S18",
+      "name": "Authoritative re-snapshot",
+      "status": "PASS",
+      "durationMs": 3,
+      "evidence": {
+        "snapshotRevision": 86,
+        "lastSeenBeforeDrop": 84,
+        "missedDeltasReplayed": 0,
+        "reconnectsWithLastEventId": 1
+      },
+      "error": null
+    },
+    {
+      "id": "S19",
+      "name": "Historian slowdown",
+      "status": "PASS",
+      "durationMs": 5208,
+      "evidence": {
+        "deltasIn5_2s": 6,
+        "maxIntervalMs": 1001,
+        "revisionsAdvanced": 5
+      },
+      "error": null
+    },
+    {
+      "id": "S20",
+      "name": "Near-overflow behavior",
+      "status": "PASS",
+      "durationMs": 1745,
+      "evidence": {
+        "nearOverflow": true,
+        "depthAtFull": 50000,
+        "capacity": 50000,
+        "rejected": 6296,
+        "gapMarkers": 1,
+        "pumpStopRoundTripMs": 2.46,
+        "nearOverflowClearedAfterRestoreMs": 511,
+        "depthAtClear": 38000,
+        "pumpAfterRestart": "STARTING"
+      },
+      "error": null
+    },
+    {
+      "id": "S21",
+      "name": "Bounded Trend",
+      "status": "PASS",
+      "durationMs": 9011,
+      "evidence": {
+        "acceleratedTicks": 89,
+        "acceleratedCapacity": 50,
+        "pointsRetained": 50,
+        "mainTrendPoints": 82,
+        "mainCapacity": 600,
+        "note": "accelerated parameters are test-only, not the planning values"
+      },
+      "error": null
+    },
+    {
+      "id": "S22",
+      "name": "Camera placeholder",
+      "status": "PASS+OWNER",
+      "durationMs": 3,
+      "evidence": {
+        "sourceFilesScanned": 27,
+        "nonCodeAssetsNotScanned": [
+          "react-ui/src/assets/fonts/.gitattributes",
+          "react-ui/src/assets/fonts/FONT_SOURCE.md",
+          "react-ui/src/assets/fonts/GoogleSans-Latin-Variable.woff2",
+          "react-ui/src/assets/fonts/OFL.txt",
+          "react-ui/src/assets/fonts/TRADEMARKS.md"
+        ],
+        "externalUrlsOrMediaElements": 0,
+        "browserPart": "OWNER-LOCAL e2e S22 (request-host check)"
+      },
+      "error": null
+    },
+    {
+      "id": "S23",
+      "name": "Synthetic close guard for Active Job",
+      "status": "PASS",
+      "durationMs": 1513,
+      "evidence": {
+        "evaluation": {
+          "allowed": false,
+          "reasons": [
+            "ACTIVE_JOB",
+            "PUMP_RUNNING"
+          ],
+          "note": "Synthetic Operations UI close guard. Operational usability control only; not a safety protection and not hardware fail-safe."
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "S24",
+      "name": "Synthetic close guard for Pump running",
+      "status": "PASS",
+      "durationMs": 7,
+      "evidence": {
+        "evaluation": {
+          "allowed": false,
+          "reasons": [
+            "PUMP_RUNNING"
+          ],
+          "note": "Synthetic Operations UI close guard. Operational usability control only; not a safety protection and not hardware fail-safe."
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "S25",
+      "name": "Viewport resize",
+      "status": "OWNER-LOCAL",
+      "durationMs": 0,
+      "evidence": {
+        "reason": "Browser layout cannot be exercised in Arena (no browser). Covered by react-ui/e2e/operations.spec.ts S25."
+      },
+      "error": null
+    },
+    {
+      "id": "S26",
+      "name": "Synthetic config revision",
+      "status": "PASS",
+      "durationMs": 810,
+      "evidence": {
+        "configRevision": 2,
+        "dirtyAtThreshold99": 0,
+        "restoredRevision": 3
+      },
+      "error": null
+    },
+    {
+      "id": "S27",
+      "name": "Refused second Job",
+      "status": "PASS",
+      "durationMs": 7,
+      "evidence": {
+        "result": "ACTIVE_JOB_EXISTS",
+        "activeJobs": 1,
+        "acceptedSecondJobs": 0,
+        "refusedSecondJobs": 2,
+        "invariantViolations": 0
+      },
+      "error": null
+    },
+    {
+      "id": "S28",
+      "name": "Revision gap -> re-snapshot",
+      "status": "PASS",
+      "durationMs": 3107,
+      "evidence": {
+        "gapsDetected": 2,
+        "resyncFirstEvent": "snapshot"
+      },
+      "error": null
+    },
+    {
+      "id": "S29",
+      "name": "Mixed GlobalQueue sources (bounded to 8)",
+      "status": "PASS+OWNER",
+      "durationMs": 1210,
+      "evidence": {
+        "sourceTypes": [
+          "SYN_TIME_DUE",
+          "SYN_TEMP_AND_TIME",
+          "SYN_OPERATOR_REQUEST",
+          "SYN_TEMP_RISE",
+          "SYN_DIRTY_SCORE_ABOVE_THRESHOLD"
+        ],
+        "entries": [
+          "1:G+203:SYN_TIME_DUE",
+          "2:G+113:SYN_TEMP_AND_TIME",
+          "3:H2:SYN_OPERATOR_REQUEST",
+          "4:I10:SYN_TEMP_RISE",
+          "5:J13:SYN_DIRTY_SCORE_ABOVE_THRESHOLD",
+          "6:G+201:SYN_DIRTY_SCORE_ABOVE_THRESHOLD",
+          "7:G+204:SYN_DIRTY_SCORE_ABOVE_THRESHOLD",
+          "8:G+213:SYN_DIRTY_SCORE_ABOVE_THRESHOLD"
+        ],
+        "totalQueued": 8,
+        "capacity": 8,
+        "browserPart": "OWNER-LOCAL e2e QUEUE-A"
+      },
+      "error": null
+    },
+    {
+      "id": "S30",
+      "name": "Synthetic review presets (valid queue / job states)",
+      "status": "PASS+OWNER",
+      "durationMs": 40,
+      "evidence": {
+        "sensorId": "G5",
+        "states": {
+          "queued-dirty": "DIRTY/NONE/QUEUED · queue 8/8",
+          "queued-cleaner-non-score": "CLEANER/NONE/QUEUED · queue 8/8",
+          "selected-queued": "DIRTY/NONE/QUEUED · queue 8/8",
+          "dispatched-head-job": "DIRTY/NONE/ACTIVE/JOB · queue 8/8",
+          "alarm-on-active-job": "DIRTY/ACTIVE_UNACK/ACTIVE/JOB · queue 8/8",
+          "alarm-not-admitted": "DIRTY/ACTIVE_UNACK/NONE · queue 8/8",
+          "head-to-job-transition": "DIRTY/NONE/ACTIVE/JOB · queue 8/8"
+        },
+        "presets": 8,
+        "browserPart": "OWNER-LOCAL e2e CTRL-A..C"
+      },
+      "error": null
+    },
+    {
+      "id": "S31",
+      "name": "Head-only atomic dispatch (no scan-forward; Owner examples A/B)",
+      "status": "PASS",
+      "durationMs": 59,
+      "evidence": {
+        "queueBefore": [
+          "G+110",
+          "G9",
+          "G8",
+          "I12"
+        ],
+        "jobTarget": "G+110",
+        "newHead": "G9",
+        "dispatch": "SYN-DSP-0010",
+        "revisions": "121->122",
+        "secondDispatch": "ACTIVE_JOB_EXISTS",
+        "retarget": "ACTIVE_JOB_EXISTS"
+      },
+      "error": null
+    },
+    {
+      "id": "S32",
+      "name": "Bounded queue under load and Job linkage (dirty70, AutoSequence)",
+      "status": "PASS",
+      "durationMs": 4032,
+      "evidence": {
+        "maxQueueLength": 8,
+        "dispatchesObserved": 1,
+        "queueMetrics": {
+          "length": 8,
+          "capacity": 8,
+          "dispatches": 11,
+          "autoSequence": "JOB_ACTIVE"
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "S33",
+      "name": "Main Pump trip during Job: critical suspension, Mandatory Safe Return, modal rules (synthetic)",
+      "status": "PASS",
+      "durationMs": 8244,
+      "evidence": {
+        "job": "SYN-JOB-0012",
+        "steps": "SR1#101 SR2#103 SR3#104 SR4#105 SR5#106 SR6#107 SR7#108 SR8#109",
+        "safeReturnMs": 7626,
+        "queueFrozen": 7,
+        "autoSequenceAfterModal": "CRITICAL_SUSPENDED",
+        "afterTestReset": "OFF"
+      },
+      "error": null
+    },
+    {
+      "id": "S34",
+      "name": "Normal completion -> Mandatory Safe Return with delayed valve feedback (synthetic)",
+      "status": "PASS",
+      "durationMs": 13923,
+      "evidence": {
+        "job": "SYN-JOB-0013",
+        "outcome": "COMPLETED",
+        "valveConfirmAfterCommandMs": 5000,
+        "steps": "SR1 SR2 SR3 SR4 SR5 SR6 SR7 SR8"
+      },
+      "error": null
+    },
+    {
+      "id": "S35",
+      "name": "Synthetic AutoSequence controls: Start / Pause After Current Job / Resume / Abort / Critical Reset (head-only)",
+      "status": "PASS",
+      "durationMs": 24036,
+      "evidence": {
+        "head1": "G+106",
+        "head2": "G+109",
+        "startPositionBefore": 1,
+        "pausedAfterAbort": true,
+        "resumeRefusedInCritical": true,
+        "resetModeAfter": "OFF",
+        "resetDispatched": false,
+        "explicitStartRequired": true
+      },
+      "error": null
+    }
+  ],
+  "finalInvariantViolations": 0,
+  "finalAcceptedSecondJobs": 0
+}

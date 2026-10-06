@@ -1,0 +1,46 @@
+{
+  "label": "arena environment record - Stage 0.2.1A synthetic spike",
+  "recordedAt": "2026-10-04T22:39:58.948Z",
+  "os": {
+    "platform": "linux",
+    "release": "6.1.158+",
+    "type": "Linux",
+    "arch": "x64"
+  },
+  "cpu": {
+    "model": "Intel(R) Xeon(R) Processor @ 2.60GHz",
+    "logicalCores": 2
+  },
+  "memoryGb": 3.8,
+  "node": "v22.22.3",
+  "npm": "10.9.8",
+  "git": {
+    "head": "e779f8ad2c856e367fd65985007a3da411bd0e73",
+    "branch": "arena/01a108d8-waterjet-sentinel-suite"
+  },
+  "dependencies": {
+    "lockfileVersion": 3,
+    "lockfileEntries": 122,
+    "installedOnThisPlatform": 97,
+    "direct": {
+      "react": "19.3.0",
+      "react-dom": "19.3.0",
+      "uplot": "1.6.32",
+      "@playwright/test": "1.63.0",
+      "@testing-library/dom": "10.4.2",
+      "@testing-library/react": "16.3.3",
+      "@types/react": "19.3.0",
+      "@types/react-dom": "19.3.0",
+      "@vitejs/plugin-react": "6.1.1",
+      "jsdom": "30.1.2",
+      "typescript": "6.0.3",
+      "vite": "8.3.2",
+      "vitest": "5.0.3"
+    }
+  },
+  "browserAvailable": false,
+  "notes": [
+    "No browser, no WebView2, no .NET, no Windows in Arena.",
+    "Harness and SSE measurements only."
+  ]
+}

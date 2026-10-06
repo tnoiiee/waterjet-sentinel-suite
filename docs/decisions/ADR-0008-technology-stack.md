@@ -1,8 +1,16 @@
 # ADR-0008 — Technology Stack
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`. **The final UI framework is
-  `[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
+- **Owner decision update (2026-10-07):** **React is selected as the Primary UI Framework**
+  after the Stage 0.2.1A Owner-local final Edge gate and manual review passed. The Blazor
+  counter-spike is no longer required unless a future material blocker is identified. Statements
+  below that the final UI framework is `[OPEN]` or that Candidate A is "not accepted" are
+  **superseded by this update** and kept as decision history. The rest of this ADR is unchanged
+  (shell host, Production transport and chart library remain as marked; WebView2 and kiosk
+  behaviour remain `[NOT VERIFIED]`).
 - **Date:** 2026-10-04 (corrected 2026-10-05 by the Owner-requested Stage 0.2 documentation
   review punchlist)
 - **Supersedes:** Nothing. This record addresses the stack questions left `[OPEN]` by
@@ -156,14 +164,14 @@ The full dimension-by-dimension comparison is in
 | Comparison candidates | Candidate A — React + TypeScript + Vite; Candidate B — Blazor Hybrid. Both hosted in the same application-owned shell with the same API contract, the same synthetic data, and the same acceptance measures |
 | Current evidence-based preference | Candidate A, based on the Owner's legacy operating experience with React/Vite and push updates, dense-visualisation fit, charting and camera ecosystem, and UI test tooling. **A preference is not an acceptance** |
 | Explicitly not a basis for selection | Internet access assumptions; ease of closing a window; C# language unity alone; ecosystem size alone |
-| Selection route | Proposed Stage 0.2.1 — UI and Runtime Technology Spike, `PROPOSED` and `[NOT AUTHORIZED]` |
+| Selection route | Proposed Stage 0.2.1 — UI and Runtime Technology Spike, `PROPOSED` and `[NOT AUTHORIZED]`. Update: Stage 0.2.1A synthetic React feasibility spike approved and in progress; selection not yet approved |
 | Effect on the rest of the stack | None: .NET, ASP.NET Core, the service host, dependency injection, configuration, logging, validation, and the adapter boundaries are unchanged by the framework decision |
 
 ## Alternatives considered
 
 | Decision | Alternative | Reason not selected |
 | --- | --- | --- |
-| **UI framework** | **Select Blazor Hybrid now because it uses C# and one toolchain** | Language unity and a smaller offline ecosystem are genuine advantages, but they do not demonstrate the one-second 104-cell workload, trend quality, camera integration, or long-running kiosk stability. Those require measurement |
+| **UI framework** | **Select Blazor Hybrid now because it uses C# and one toolchain** | Language unity and a smaller offline ecosystem are genuine advantages, but they do not demonstrate the one-second 106-cell workload, trend quality, camera integration, or long-running kiosk stability. Those require measurement |
 | **UI framework** | **Exclude React because it is assumed to need Internet access** | Incorrect: React can be built and deployed offline from local assets and a local package mirror. Excluding a candidate on a false premise would be a reasoning error |
 | Platform | Native Windows C++ or C# with a non-.NET runtime | Higher development and maintenance cost for the same offline Windows deployment, with weaker tooling for a small team; no requirement in the baseline forces a non-.NET platform |
 | Platform | Cross-platform runtime with an abstraction layer | The deployment target is one Windows workstation per Boiler Unit; abstracting the platform adds cost with no deployment benefit |
@@ -227,7 +235,7 @@ The full dimension-by-dimension comparison is in
 - `[NOT VERIFIED]`: offline restorability of every proposed dependency, and the licence
   position of every library — including the npm dependency tree if Candidate A is selected.
 - `[NOT VERIFIED]`: the performance suitability of either UI framework candidate. No
-  measurement exists for the 104-cell one-second workload, trend rendering, camera
+  measurement exists for the 106-cell one-second workload, trend rendering, camera
   integration, or long-running memory stability.
 - `[OPEN]`: **final UI framework (Candidate A or Candidate B)**; shell host framework; .NET
   version pin; logging provider; validation library (optional); unit-test framework;
@@ -239,7 +247,7 @@ The full dimension-by-dimension comparison is in
 
 | Item | Gate that must close it |
 | --- | --- |
-| **Final UI framework selection (Candidate A versus Candidate B)** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED) |
+| **Final UI framework selection (Candidate A versus Candidate B)** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED). Update: Stage 0.2.1A synthetic React feasibility spike approved and in progress; Blazor counter-spike deferred / not authorized |
 | .NET LTS version pin with a cited support reference | Implementation Stage Gate (before the first project file is created) |
 | Logging provider selection and licence review | Implementation Stage Gate |
 | Unit-test framework selection and pinning | Implementation Stage Gate (with the first test project) |

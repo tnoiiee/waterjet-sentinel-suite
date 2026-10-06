@@ -5,10 +5,16 @@ Entities marked `[OWNER CONFIRMED]` were explicitly confirmed by the Owner durin
 Stage 0.1 documentation review and are binding. Field-level storage design is `[PROPOSED]`
 or `[OPEN]` as marked.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 Stage 0.2 recorded no change to any entity, relationship, enumeration, or rule in this
 document. Its architecture decisions must conform to the domain rules recorded here; where a
@@ -52,12 +58,41 @@ An enumerated wall: `LEFT`, `REAR`, `RIGHT`, `FRONT`. Each wall has:
 
 | Attribute | Value | Status |
 | --- | --- | --- |
-| Sensor count | Left 24, Rear 28, Right 24, Front 28 | `[APPROVED]` |
-| Total sensor locations | 104 | `[APPROVED]` |
+| Sensor count | Left 24, Rear 29, Right 24, Front 29 | `[OWNER CONFIRMED]` — Owner domain correction during Stage 0.2.1A (supersedes the earlier Rear 28 / Front 28) |
+| Total sensor locations | 106 | `[OWNER CONFIRMED]` — supersedes the earlier 104 baseline |
 | Owns one TempQueue | yes — four TempQueues in total across all walls | `[APPROVED]` |
 | Owns one TimeQueue | yes — four TimeQueues in total across all walls | `[APPROVED]` |
 
-The alignment of rows across walls of unequal height (24 versus 28 sensors) is `[OPEN]`.
+#### 2.2.1 Logical Sensor matrix and Cannon slots `[OWNER CONFIRMED]`
+
+The Owner domain correction made during Stage 0.2.1A defines one logical matrix of
+**18 logical columns × 6 logical rows = 108 logical positions**. Two positions are **Cannon
+equipment slots**, so the matrix holds **106 Sensor locations**.
+
+| Logical row (top to bottom) | Logical labels |
+| --- | --- |
+| 1 | G+201 … G+218 |
+| 2 | G+101 … G+118 |
+| 3 | G1 … G18 |
+| 4 | H1 … H18 |
+| 5 | I1 … I18, except logical I7 = **Rear Cannon** and logical I16 = **Front Cannon** |
+| 6 | J1 … J18 |
+
+| Wall | Logical columns | Wall grid | Sensor locations |
+| --- | --- | --- | --- |
+| Left | 1–4 | 4 columns × 6 rows | 24 |
+| Rear | 5–9 | 5 columns × 6 rows | 29 (+ Rear Cannon at logical I7) |
+| Right | 10–13 | 4 columns × 6 rows | 24 |
+| Front | 14–18 | 5 columns × 6 rows | 29 (+ Front Cannon at logical I16) |
+
+- I7 and I16 are **not** Sensors. Cannon slots are equipment: they have no Sensor ID, no
+  Thermocouple channels, no Dirty Score or classification, no quality, and are never a
+  TempQueue, TimeQueue, GlobalQueue, selection, or Cleaning Job target.
+- Wall rows are the logical rows; there is no rotation or reversal. The question of row
+  alignment across walls of unequal height is resolved by this matrix.
+- The labels are a logical reference. They do **not** define Modbus addresses, register maps,
+  physical coordinates, Water Jet assignments, or any Production mapping, all of which remain
+  confidential deployment values and `[NOT VERIFIED]`.
 
 ### 2.3 Sensor
 
@@ -93,8 +128,9 @@ Rules:
 
 ### 2.4 ThermocoupleChannel
 
-One of two channels belonging to a Sensor: `TC_F` or `TC_R`. There are 208 channels in
-total across 104 sensors. `[APPROVED]`
+One of two channels belonging to a Sensor: `TC_F` or `TC_R`. There are 212 channels in
+total across 106 sensors. `[OWNER CONFIRMED]` — Owner domain correction during Stage 0.2.1A
+(supersedes the earlier 208 channels across 104 sensors).
 
 ### 2.5 DirtyScore
 
@@ -258,10 +294,16 @@ concurrent Cleaning Jobs. Parallel Water Jet cleaning is prohibited. `[OWNER CON
 | `QueueSource` | `TEMP_LEFT`, `TEMP_REAR`, `TEMP_RIGHT`, `TEMP_FRONT`, `TIME_LEFT`, `TIME_REAR`, `TIME_RIGHT`, `TIME_FRONT` | `[APPROVED]` |
 | `QueuePositionSourceReason` | `TEMP_QUEUE`, `TIME_QUEUE` | `[APPROVED]` |
 | `CleaningJobOutcome` | `COMPLETED`, `FAILED`, `ABORTED`, `RECOVERY_REQUIRED` | `[OWNER CONFIRMED]` |
-| `QueueEntryDisposition` | `HELD`, `RELEASED`, `REJECTED`, `REORDERED`, `REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION` | `[OWNER CONFIRMED]` |
+| `QueueEntryDisposition` | ~~`HELD`~~ (superseded), `RELEASED`, `REJECTED`, `REORDERED`, `REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION` | `[OWNER CONFIRMED]`; `HELD` **SUPERSEDED** (Owner decision, 2026-10-06) |
 
 `REJECTED` is an Operator queue action and a queue entry disposition. It is **not** a
 Cleaning Job outcome, because a rejected entry is never executed as a Cleaning Job.
+
+**Queue-level `HELD` is superseded** (Owner decision, 2026-10-06; see
+[`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2). The GlobalQueue holds ready-to-dispatch entries only.
+A pause before dispatch is an AutoSequence state; a pause during a Cleaning Job is a Cleaning
+Job state; equipment waits are never queue entry states. Production Pause / Resume semantics
+remain pending Owner approval.
 
 ## 5. DirtyScore rules
 

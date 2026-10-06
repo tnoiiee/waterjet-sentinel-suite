@@ -5,10 +5,16 @@ DCS Permissive Override. Every control action that writes to an output is
 `[NOT AUTHORIZED]` until the bench verification in [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md)
 is complete and recorded.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This document answers one question for every output: **who or what may command it, and
 under what conditions.** Where an answer is not yet determined, it is marked `[OPEN]` — it
@@ -74,8 +80,8 @@ unavailable, stale, or bad-quality indication must never be inferred as safe.
   has reached an approved safe and released terminal condition.
 - The selected eligible head of GlobalQueue is the only normal source for the next
   Cleaning Job.
-- Queue refill, score changes, Operator Reorder, Hold, Reject, valve exclusion, and
-  equipment availability must never produce concurrent Cleaning Jobs.
+- Queue refill, score changes, Operator Reorder, Reject, AutoSequence lifecycle changes, valve
+  exclusion and equipment availability must never produce concurrent Cleaning Jobs.
 
 "Allow unaffected Water Jets to continue" means **sequential** continuation: after the valve
 fault workflow is resolved and continuation is authorized, the AutoSequence may later select
@@ -120,13 +126,13 @@ any of the following, and must not be configurable to do so:
 
 | Situation | Required behaviour |
 | --- | --- |
-| Operator holds an entry, then a job would dispatch it | Dispatcher skips held entries; other entries preserve relative FIFO order; the queue is not blocked. `[APPROVED]` |
+| Operator pauses while entries are queued | The pause applies to the AutoSequence or the Cleaning Job lifecycle, never to a queue entry. The GlobalQueue holds ready-to-dispatch entries only and is dispatched head-only (Position 1, no scan-forward); no entry is skipped. Production Pause / Resume semantics are **OWNER DECISION REQUIRED** ([`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2; queue-level Hold superseded by the Owner decision of 2026-10-06). |
 | Operator tries to reorder an active Cleaning Job | Not permitted — Reorder cannot move an active Cleaning Job. `[APPROVED]` |
 | Operator rejects an entry that is about to dispatch | Reject removes the entry and suppresses the sensor from refill during the current Auto Sequence. `[APPROVED]` |
 | Operator reorders entries | Changes dispatch position only; never changes source ownership and never creates a second active Cleaning Job. `[OWNER CONFIRMED]` |
 | Valve becomes `OUT_OF_SERVICE` while its sensor sits in GlobalQueue | Associated sensors are excluded from TempQueue, TimeQueue, GlobalQueue, and refill. `[APPROVED]` |
 | Valve returns to service | Sensors re-enter normal source queue evaluation and must not be inserted into the middle of GlobalQueue. Requires cleared-state acknowledgement. `[OWNER CONFIRMED]` |
-| Operator stops the AutoSequence | Dispatch stops; the active job is handled per the approved stop or recovery policy; the Queue snapshot and Held/Rejected/Reordered state are recorded in Event history; the instance closes; the old GlobalQueue is not kept as the executable queue. `[OWNER CONFIRMED]` |
+| Operator stops the AutoSequence | Dispatch stops; the active job is handled per the approved stop or recovery policy; the Queue snapshot and Rejected/Reordered state are recorded in Event history; the instance closes; the old GlobalQueue is not kept as the executable queue. `[OWNER CONFIRMED]` |
 | External stop removes the plant's ability to continue | Application must not re-assert commands; re-validation is required before any new command. `[PROPOSED]` |
 | Privileged session times out during manual hold-to-run | The manual hold-to-run operation must stop. An active Auto Sequence must not be aborted. `[APPROVED]` |
 | Operator attempts to close the Operations UI while a Cleaning Job is active or the Main Pump is running | The normal close request is rejected with a clear explanation and the Operator is directed back to the active operation or Pump/Sequence state. This is an **operational usability control**, not a safety protection, and it does not change equipment authority: the Equipment Runtime lifecycle, the WAGO watchdog, safe output states, and external hardware protection remain independent of it. `[OWNER CONFIRMED]` |
@@ -151,6 +157,18 @@ turns a request into a dispatched command. This boundary is approved by the Stag
 Gate and is carried by the process model in
 [`decisions/ADR-0007`](decisions/ADR-0007-runtime-process-model.md); the UI delivery selection
 in [`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) does not change it.
+
+### 6.2 Critical suspension and Resume authority (Owner critical Pump decision, 2026-10-06)
+
+After a Main Pump unexpected stop or trip, the AutoSequence stays suspended until a future,
+Owner-approved Resume. No automatic Resume and no automatic next Job exist. Acknowledging the
+critical alarm creates no authority and does not resume.
+
+Who may resume, under which preconditions and with which confirmation is **OWNER DECISION
+REQUIRED** ([`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md) matrix F). The same applies to who may acknowledge.
+
+The Stage 0.2.1A spike's acknowledge endpoint is a synthetic, same-origin loopback request and
+the spike's synthetic test reset is review tooling. Neither is a Resume or an authority model.
 
 ## 7. Priority of command sources
 

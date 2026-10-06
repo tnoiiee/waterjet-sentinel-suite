@@ -1,0 +1,1130 @@
+/* WJSS Stage 0.2.1A — Operations page layout and panel styles (spike).
+   Fullscreen layout (Owner Design Addendum) plus the production-grade readability refinement:
+   strict viewport-height layout, U-shaped map retained, right-side cards with clear hierarchy,
+   bounded bottom row, floating Diagnostics drawer. Three restrained surface levels, no glass,
+   no gradients, no glow. All colour, spacing, typography, and size values come from the design
+   tokens in ../global.css. */
+/* Wrapper used to make the Operations page inert behind the critical modal; layout-neutral. */
+.inertScope {
+  display: contents;
+}
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- status bar: grouped by priority (Alarm > Process > System > Technical) ---------- */
+.statusBar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-inline) var(--space-small);
+  flex: none;
+  min-height: var(--top-status-h);
+  padding: var(--space-inline) var(--space-card);
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--font-chip);
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.statusGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-dense);
+  white-space: nowrap;
+}
+.statusGroup + .statusGroup {
+  padding-left: var(--space-small);
+  border-left: 1px solid var(--border-subtle);
+}
+/* Application identity: two-level block (product name, then console name), single status row. */
+.brand {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: var(--font-app-title);
+  font-weight: 700;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.brandName {
+  font-size: var(--font-app-title);
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: -0.005em;
+}
+.brandSub {
+  font-size: var(--font-app-subtitle);
+  font-weight: 650;
+  line-height: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.syntheticTag {
+  font-size: var(--font-badge);
+  font-weight: 700;
+  color: var(--alarm-ink);
+  background: var(--uncertain);
+  padding: var(--space-micro) var(--space-dense);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.pill {
+  font-size: var(--font-chip);
+  font-weight: 600;
+  padding: 3px var(--space-small);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface-card);
+  color: var(--text);
+  white-space: nowrap;
+}
+.pillGlyph {
+  margin-right: var(--space-inline);
+  color: var(--alarm);
+}
+.pillOk {
+  color: var(--muted);
+}
+.pillAlarm {
+  border-color: var(--alarm);
+  background: var(--alarm-surface);
+  color: var(--text-strong);
+}
+.pillAlarmAck {
+  border-color: var(--alarm);
+}
+.pillJob {
+  border-color: var(--selection);
+}
+.pillWarn {
+  border-color: var(--uncertain);
+  color: var(--text-strong);
+}
+.conn_LIVE {
+  border-color: var(--cleaner-strong);
+  color: var(--ok);
+}
+.conn_CONNECTING,
+.conn_RESYNCING {
+  border-color: var(--uncertain);
+  color: var(--text-strong);
+}
+.conn_DISCONNECTED {
+  border-color: var(--muted);
+  color: var(--text-strong);
+  background: var(--quality-neutral);
+}
+/* Technical group: lower visual emphasis. */
+.statusTech {
+  gap: var(--space-small);
+}
+.techItem {
+  font-size: var(--font-label);
+  color: var(--text-faint);
+}
+.spacer {
+  flex: 1;
+}
+.btn {
+  font: inherit;
+  font-size: var(--font-chip);
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface-nested);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 3px var(--space-card);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:hover {
+  background: var(--border-subtle);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--selection);
+  outline-offset: 1px;
+}
+.btnActive {
+  border-color: var(--selection);
+}
+.dialog {
+  position: absolute;
+  right: var(--space-card);
+  top: calc(var(--top-status-h) + var(--space-inline));
+  z-index: 40;
+  width: 380px;
+  padding: var(--space-card);
+  background: var(--surface-nested);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: var(--font-value);
+}
+
+/* ---------- banners ---------- */
+.connBanner {
+  flex: none;
+  padding: var(--space-inline) var(--space-card);
+  background: var(--quality-neutral);
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 600;
+  font-size: var(--font-alarm);
+}
+/* Alarm strip: compact normal state; actionable condition + required response when present. */
+.alarmStrip {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-micro) var(--space-small);
+  align-items: center;
+  padding: 1px var(--space-card);
+  min-height: var(--alarm-strip-h);
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--font-alarm);
+  line-height: 1.3;
+}
+.alarmStripActive {
+  background: var(--surface-card);
+}
+.alarmNone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-dense);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.okDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+.alarmCounts {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.alarmItem {
+  padding: 1px var(--space-small);
+  border-radius: 3px;
+  border: 1px solid var(--alarm);
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.alarmGlyph {
+  margin-right: var(--space-inline);
+  color: var(--alarm);
+}
+.alarmResponse {
+  color: var(--text);
+  font-weight: 600;
+}
+.al_ACTIVE_UNACK {
+  background: var(--alarm-surface);
+}
+.al_ACTIVE_ACK {
+  background: transparent;
+}
+.al_CLEARED_UNACK {
+  border-style: dashed;
+}
+
+/* ---------- main grid ---------- */
+.main {
+  display: grid;
+  grid-template-columns: var(--map-col-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) var(--bottom-row-h);
+  grid-template-areas:
+    'overview side'
+    'bottom bottom';
+  gap: var(--layout-gap);
+  padding: var(--layout-pad);
+  flex: 1 1 0;
+  width: 100%;
+  max-width: var(--content-max-w);
+  margin: 0 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.staleView {
+  filter: saturate(0.25) brightness(0.8);
+}
+/* The Sensor Map area is the page's only size container; Sensor cell tokens resolve against it. */
+.overviewArea {
+  grid-area: overview;
+  container-type: size;
+  min-height: 0;
+  min-width: 0;
+}
+.sideArea {
+  grid-area: side;
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-gap);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.bottomArea {
+  grid-area: bottom;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--camera-w);
+  gap: var(--layout-gap);
+  min-height: 0;
+  min-width: 0;
+}
+/* Narrow fallback (below the supported desktop range): single column, the main area scrolls
+   internally. No page-level horizontal scroll. */
+@media (max-width: 1100px) {
+  .main {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto var(--bottom-row-h);
+    grid-template-areas: 'overview' 'side' 'bottom';
+    overflow-y: auto;
+  }
+  .overviewArea {
+    container-type: inline-size;
+  }
+  .overview {
+    height: auto;
+  }
+  .sideArea {
+    overflow: visible;
+  }
+}
+
+/* ---------- U-shaped Sensor Map (plan view: Rear top, Left / Right sides, Front bottom) ---------- */
+.overview {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-inline);
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: auto;
+}
+/* Map surface: wall blocks are placed in bounded, non-overlapping X ranges, so the side walls
+   share Y range with the Rear (top) and Front (bottom) blocks. No empty grid track, no
+   transform scaling. Height = two wall blocks + compact center summary. */
+.uSurface {
+  position: relative;
+  flex: none;
+  width: 100%;
+  min-width: calc(13 * var(--sensor-cell-width) + 10 * var(--sensor-gap) + 12px);
+  height: calc(2 * var(--wall-h) + var(--u-center-h) + 2 * var(--u-gap));
+  margin-block: auto;
+}
+.wall {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: var(--wall-header-gap);
+  width: fit-content;
+  height: var(--wall-h);
+}
+.wall_REAR {
+  top: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+}
+.wall_FRONT {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+}
+.wall_LEFT,
+.wall_RIGHT {
+  top: 0;
+  bottom: 0;
+  margin-block: auto;
+}
+.wall_LEFT {
+  left: 0;
+}
+.wall_RIGHT {
+  right: 0;
+}
+.wallHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-dense);
+  height: var(--wall-header-h);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--font-wall-meta);
+  line-height: var(--wall-header-h);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.wallTitle {
+  font-size: var(--font-wall-title);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.wallCounts {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wallSpan {
+  margin-left: var(--space-inline);
+  font-size: var(--font-wall-meta);
+  font-weight: 400;
+  color: var(--muted);
+}
+/* Wall grid: 6 logical rows; column count comes from the runtime wall map
+   (LEFT/RIGHT 4, REAR/FRONT 5). Row wrappers keep the logical row structure in the DOM. */
+.cells {
+  display: grid;
+  grid-template-columns: repeat(var(--wall-cols, 5), var(--sensor-cell-width));
+  grid-auto-rows: var(--sensor-cell-height);
+  gap: var(--sensor-gap);
+}
+.wallRow {
+  display: contents;
+}
+/* Water Jet reference slot (internal legacy slotType CANNON): same outer size as a Sensor cell;
+   neutral, never a process/quality colour, never selectable. Visible text: "WJ" + "REAR"/"FRONT". */
+.cannon {
+  width: var(--sensor-cell-width);
+  height: var(--sensor-cell-height);
+  border: 1px dashed var(--cannon-border);
+  border-radius: 50%;
+  background: var(--cannon-surface);
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font: 700 var(--font-caption) / 1 var(--font-ui);
+  cursor: default;
+  user-select: none;
+}
+.cannonGlyph {
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-strong);
+  letter-spacing: 0.04em;
+}
+.cannonText {
+  font-size: var(--font-caption);
+  letter-spacing: 0.04em;
+}
+/* Compact center summary and legend (no large empty card). */
+.overviewCenter {
+  position: absolute;
+  top: calc(var(--wall-h) + var(--u-gap));
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: var(--u-center-w);
+  height: var(--u-center-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-dense);
+  overflow: hidden;
+}
+.totalsRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-small);
+  white-space: nowrap;
+}
+.legendTitle {
+  font-size: var(--font-legend-title);
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.legendSub {
+  font-size: var(--font-legend);
+  color: var(--muted);
+  line-height: 14px;
+  white-space: nowrap;
+}
+/* Dedicated bounded legend: 20 px icon column + label column; swatches are 16 x 16 SVGs drawn
+   inset (see LegendSwatch.tsx), so nothing extends outside the icon column. */
+.legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--legend-row-gap) var(--legend-col-gap);
+  font-size: var(--font-legend);
+  line-height: var(--legend-swatch);
+  color: var(--text);
+}
+.legendItem {
+  display: grid;
+  grid-template-columns: var(--legend-icon-col) minmax(0, 1fr);
+  column-gap: var(--legend-col-gap);
+  align-items: center;
+  min-width: 0;
+}
+.legendIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--legend-icon-col);
+  height: var(--legend-swatch);
+}
+.legendIcon svg {
+  display: block;
+  flex: none;
+  width: var(--legend-swatch);
+  height: var(--legend-swatch);
+}
+.legendLabel {
+  min-width: 0;
+  white-space: nowrap;
+}
+.thresholdNote {
+  font-size: var(--font-caption);
+  color: var(--muted);
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- panels (card surface level) ---------- */
+.panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: var(--space-small) var(--space-card);
+  min-width: 0;
+  min-height: 0;
+}
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-small);
+  height: 24px;
+  margin-bottom: var(--space-inline);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.headerSpacer {
+  flex: 1;
+}
+.cardMeta {
+  font-size: var(--font-label);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panelTitle {
+  flex: none;
+  margin: 0;
+  font-size: var(--font-card-title);
+  font-weight: 700;
+  line-height: 24px;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.muted {
+  color: var(--muted);
+  font-weight: 400;
+}
+.kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0 var(--space-card);
+  margin: 0;
+  font-size: var(--font-value);
+  font-variant-numeric: tabular-nums;
+}
+.kv dt {
+  color: var(--muted);
+  font-size: var(--font-label);
+}
+.kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.footnote {
+  margin: var(--space-micro) 0 0;
+  font-size: var(--font-caption);
+  line-height: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sensor Detail: strong ID header + two-column grouped inspector, fixed height (no jump). */
+.detailPanel {
+  flex: none;
+  height: var(--detail-h);
+  overflow: hidden;
+}
+.detailId {
+  font-family: var(--font-sensor);
+  font-size: var(--font-detail-id);
+  font-weight: 700;
+  line-height: 24px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.detailClass {
+  align-self: center;
+  padding: 1px var(--space-dense);
+  border-radius: 3px;
+  font-size: var(--font-badge);
+  font-weight: 700;
+  line-height: 16px;
+  color: var(--text-strong);
+  background: var(--not-classified);
+}
+.detailClass[data-process='DIRTY'] {
+  background: var(--dirty-base);
+}
+.detailClass[data-process='CLEANER'] {
+  background: var(--cleaner-base);
+}
+.syntheticNote {
+  font-size: var(--font-caption);
+  color: var(--text-faint);
+}
+.inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 var(--space-section);
+}
+.inspectorStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-inline);
+  min-width: 0;
+}
+.inspectorGroup {
+  min-width: 0;
+}
+.groupLabel {
+  height: 14px;
+  font-size: var(--font-group);
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.inspectorCol {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  grid-auto-rows: var(--detail-row-h);
+  align-items: center;
+  column-gap: var(--space-small);
+  margin: 0;
+  min-width: 0;
+}
+.inspectorCol dt {
+  color: var(--muted);
+  font-size: var(--font-label);
+  white-space: nowrap;
+}
+.inspectorCol dd {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--font-value);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.em_strong {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.em_normal {
+  font-weight: 600;
+  color: var(--text);
+}
+.em_low {
+  font-weight: 400;
+  color: var(--muted);
+}
+.tone_alarm {
+  color: var(--alarm);
+}
+.tone_uncertain {
+  color: var(--uncertain);
+}
+.inlineGlyph {
+  color: var(--alarm);
+}
+.noteLine {
+  margin: var(--space-micro) 0 0;
+  padding: 0 var(--space-dense);
+  height: 18px;
+  line-height: 18px;
+  border-left: 3px solid var(--uncertain);
+  background: var(--surface-nested);
+  font-size: var(--font-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active Cleaning Job: Target / Equipment / Phase / Progress / Elapsed, fixed height. */
+.jobPanel {
+  flex: none;
+  height: var(--job-h);
+  overflow: hidden;
+}
+.jobIdChip {
+  font-size: var(--font-label);
+  font-weight: 600;
+  color: var(--text);
+  padding: 0 var(--space-dense);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.jobFacts {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 var(--space-section);
+  margin: 0 0 var(--space-inline);
+  font-size: var(--font-job);
+}
+.jobFacts div {
+  min-width: 0;
+}
+.jobFacts dt {
+  font-size: var(--font-label);
+  line-height: 14px;
+  color: var(--muted);
+}
+.jobFacts dd {
+  margin: 0;
+  font-weight: 600;
+  line-height: 17px;
+  color: var(--text-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jobTarget {
+  font-family: var(--font-sensor);
+  font-size: 15px;
+}
+.phases {
+  display: flex;
+  gap: var(--space-inline);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.phases li {
+  flex: 1;
+  height: 26px;
+  line-height: 24px;
+  text-align: center;
+  font-size: var(--font-label);
+  font-weight: 600;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+}
+.phaseDone {
+  background: var(--surface-nested);
+  color: var(--text);
+}
+.phaseCheck {
+  color: var(--ok);
+}
+.phases li.phaseCurrent {
+  background: var(--selection);
+  border-color: var(--selection);
+  color: var(--job-inner);
+  font-weight: 700;
+}
+.phases li.phaseTodo {
+  border-style: dashed;
+  color: var(--text-faint);
+}
+.jobStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--space-small);
+  margin-top: var(--space-inline);
+  height: 18px;
+  font-size: var(--font-job);
+  white-space: nowrap;
+}
+.phaseLabel {
+  flex: none;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.progress {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  background: var(--surface-nested);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress div {
+  height: 100%;
+  background: var(--selection);
+}
+.jobElapsed {
+  color: var(--muted);
+}
+
+/* GlobalQueue preview: flexible height, eight rows visible at the primary target. */
+.queuePanel {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tableWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: var(--font-queue-row);
+  font-variant-numeric: tabular-nums;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 0 var(--space-small);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table th.numCol,
+.table td.numCol {
+  text-align: right;
+}
+.table thead tr {
+  height: var(--queue-head-h);
+}
+.table tbody tr {
+  height: var(--queue-row-h);
+}
+.table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-card);
+  color: var(--muted);
+  font-size: var(--font-queue-head);
+  font-weight: 650;
+  border-bottom-color: var(--border-strong);
+}
+.colPos {
+  width: 40px;
+}
+.colSensor {
+  width: 100px;
+}
+.colScore {
+  width: 90px;
+}
+.colAge {
+  width: 110px;
+}
+.sensorCol {
+  font-family: var(--font-sensor);
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.reason {
+  color: var(--text);
+}
+/* GlobalQueue entries carry no status chips (presence means ready to dispatch). */
+
+/* Bottom row: Pressure Trend and Camera share one bounded row height. */
+.trendPanel,
+.cameraPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--space-dense) var(--space-card);
+}
+.trendTitle {
+  font-size: var(--font-trend-title);
+}
+.trendSummary {
+  display: flex;
+  gap: var(--space-card);
+  font-size: var(--font-label);
+  color: var(--muted);
+  overflow: hidden;
+}
+.trendNow b {
+  color: var(--text-strong);
+  font-weight: 600;
+}
+.trendHost {
+  position: relative;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.trendHost :global(.u-legend) {
+  font-size: var(--font-axis);
+  line-height: 1.2;
+  margin: 0;
+  color: var(--text);
+}
+.trendHost :global(.u-legend .u-series > *) {
+  padding: 1px var(--space-inline);
+}
+.trendHost :global(.u-legend .u-marker) {
+  width: 18px;
+  height: 3px;
+  border-width: 0 !important;
+}
+.cameraTitle {
+  font-size: var(--font-camera-title);
+}
+.placeholderBadge {
+  align-self: center;
+  padding: 1px var(--space-dense);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  font-size: var(--font-badge);
+  font-weight: 700;
+  line-height: 15px;
+  color: var(--muted);
+}
+.cameraBody {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-inline);
+  background: var(--surface-nested);
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.cameraIcon {
+  display: block;
+  flex: none;
+  color: var(--muted);
+}
+.cameraState {
+  font-size: var(--font-camera-state);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-strong);
+}
+.cameraSub {
+  font-size: var(--font-camera-state);
+  color: var(--muted);
+}
+
+/* ---------- Diagnostics: floating, collapsible drawer (does not consume layout space) ---------- */
+.diag {
+  position: fixed;
+  top: calc(var(--top-status-h) + var(--alarm-strip-h) + 8px);
+  right: 8px;
+  /* Above the critical modal backdrop (z 50): opt-in synthetic review tooling only. */
+  z-index: 60;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: min(60vh, calc(100dvh - var(--top-status-h) - var(--alarm-strip-h) - var(--bottom-row-h) - 24px));
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-nested);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: var(--font-diag);
+}
+.diagHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-small);
+  padding: var(--space-dense) var(--space-card);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.diagBody {
+  padding: var(--space-dense) var(--space-card) var(--space-small);
+  overflow: auto;
+  min-height: 0;
+}
+.diagBody .kv {
+  font-size: var(--font-diag);
+  row-gap: var(--space-micro);
+}
+.diagBody .kv dt {
+  font-size: var(--font-diag);
+}
+
+/* ---------- SYNTHETIC TEST CONTROL (spike review tooling inside the Diagnostics drawer) ----------
+   Separate bordered section; the drawer body scrolls internally, so the controls never change
+   document dimensions. */
+.stc {
+  margin-bottom: var(--space-card);
+  padding: var(--space-small);
+  border: 1px dashed var(--uncertain);
+  border-radius: 4px;
+  background: var(--surface-card);
+}
+.stcTitle {
+  margin: 0 0 var(--space-inline);
+  font-size: var(--font-diag);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-strong);
+}
+.stcNote,
+.stcState,
+.stcResult {
+  margin: 0 0 var(--space-dense);
+  font-size: var(--font-diag);
+  line-height: 1.3;
+  color: var(--muted);
+}
+.stcState {
+  color: var(--stc-state);
+}
+.stcResult {
+  margin: var(--space-dense) 0 0;
+  color: var(--text);
+}
+.stcTarget {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-small);
+  margin-bottom: var(--space-dense);
+}
+.stcTargetLabel {
+  font-size: var(--font-diag);
+  color: var(--muted);
+}
+.stcTargetId {
+  font-size: var(--font-detail-id);
+  font-weight: 700;
+  color: var(--selection);
+}
+.stcGroup + .stcGroup {
+  margin-top: var(--space-dense);
+}
+.stcGroupLabel {
+  margin-bottom: var(--space-micro);
+  font-size: var(--font-group);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stcGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-inline);
+}
+.ctrlBtn {
+  min-width: 0;
+  padding: var(--space-inline) var(--space-dense);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-nested);
+  color: var(--text);
+  font: 600 var(--font-diag) / 1.25 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ctrlBtn:hover:not(:disabled) {
+  border-color: var(--selection);
+}
+.ctrlBtn:focus-visible {
+  outline: 2px solid var(--selection);
+  outline-offset: 1px;
+}
+.ctrlBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ctrlSyn {
+  font-size: var(--font-badge);
+  font-weight: 700;
+  color: var(--uncertain);
+}
+
+/* Synthetic AutoSequence control (inside the scrolling Diagnostics drawer; never on Operations). */
+.ascFacts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-micro) var(--space-small);
+  margin: 0 0 var(--space-dense);
+  font-size: var(--font-diag);
+}
+.ascFacts dt {
+  color: var(--muted);
+}
+.ascFacts dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-weight: 600;
+}
+.ascList {
+  display: grid;
+  gap: var(--space-inline);
+}
+.ascRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-small);
+}
+.ascBtn:not(:disabled) {
+  border-color: var(--selection);
+}
+.ascReason,
+.ascReasonOk {
+  min-width: 0;
+  font-size: var(--font-diag);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.ascReason {
+  color: var(--stc-state);
+}
+.ascReasonOk {
+  color: var(--text);
+}

@@ -3,8 +3,9 @@
 **Document status:** The verified state below is `[APPROVED]` as a factual record.
 Stage status wording and the open-item list were corrected by the Owner-confirmed Stage 0.1
 documentation review punchlist, updated by the approved Stage 0.2 Scope Gate — *Technology and
-Solution Architecture Decision*, and refined by the Owner-requested Stage 0.2 documentation
-review punchlist. Open items are `[OPEN]` and must not be resolved by assumption.
+Solution Architecture Decision*, refined by the Owner-requested Stage 0.2 documentation review
+punchlist, and updated for Stage 0.2 Owner acceptance and the approved Stage 0.2.1A spike.
+Open items are `[OPEN]` and must not be resolved by assumption.
 
 This document answers one question: *what is actually true right now, with evidence?*
 Nothing in this repository may contradict it. If something does, the discrepancy is reported
@@ -37,23 +38,52 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Stage 0.1 implementation | **MERGED** — merged to `main` through PR #1 |
 | Stage 0.1 Owner manual review | **Recorded as complete by the Owner** in the approved Stage 0.2 Scope Gate, which states that the previous Stage branch completed its role and was merged through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** — *Technology and Solution Architecture Decision* |
-| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review (Stage 0.2) | **CHANGES REQUESTED / IN PROGRESS** — the Owner-requested punchlist has been implemented on the same branch and pull request; re-review pending |
-| Owner manual review (Stage 0.2) | **PENDING** |
-| Merge | **NOT MERGED** |
-| Stage 0.2.1 | **NOT AUTHORIZED** |
+| Stage 0.2 architecture checkpoint | **OWNER ACCEPTED / MERGED** — merged to `main` through PR #2; source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`; merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73` |
+| ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction. Accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
+| Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
+| Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
+| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. Checkpoint `114c0761` accepted by the Owner as the Development baseline (UI, synthetic AutoSequence controls, GlobalQueue presentation, critical Pump modal, Mandatory Safe Return behaviour) — see §12.11; [results §0G](spikes/stage-0.2.1a-results.md#0g-owner-local-final-review-and-stage-021a-closeout-documentation-only). *History:* branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11); Operations readability refined after the Owner screenshot review (sensor-cell zones, typography scale, desaturated process colours separated from alarm, card hierarchy); final Owner UI punchlist on `4129687a` (self-hosted Google Sans, marker in the value row, expanded identity, legend clipping, Water Jet display terminology, mixed queue sources, opt-in synthetic test controls) on `23f48daa`; GlobalQueue semantics corrected under the Owner domain correction (bounded ready-only synthetic queue, head-only atomic dispatch; previous synthetic queue behaviour SUPERSEDED, not eligible for production promotion) with the `READ-A` value-clipping and `WJ-A` test hotfixes ([results §0D](spikes/stage-0.2.1a-results.md#0d-globalqueue-semantics-correction-and-head-only-dispatch-stage-021a)); synthetic critical Main Pump handling (High Critical; AutoSequence `CRITICAL_SUSPENDED`; blocking critical modal) and Mandatory Safe Return for every Job outcome under the Owner critical Pump decision — SYNTHETIC PROOF ONLY, production safety NOT VERIFIED ([results §0E](spikes/stage-0.2.1a-results.md#0e-critical-main-pump-handling-and-mandatory-safe-return-stage-021a)) |
+| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map, the fullscreen layout, or the readability refinement; Owner-local Edge E2E at `4129687a`: **25 / 25 PASS** (≈ 1.3 min, Owner-reported). At `23f48daa`: 34 selected · 25 passed · 2 failed (`READ-A`, `WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) was not re-run separately. At the critical Pump / Safe Return checkpoint `81c87a44`: 42 selected · 32 passed · 1 failed (`S11/S12`, Dirty Score drifted between samples) · 9 not run (Owner-reported). Final spike closeout checkpoint `114c0761` (48-test selection, `SEQ-B`..`SEQ-G`, deterministic `S11/S12`, 18-step manual sequence): Owner-local final Edge gate **PASS** and Owner manual review **PASS** (Owner-reported, 2026-10-07; detailed counts and screenshots were not supplied to the Agent). Owner-local interrupted overnight observation of `ea23bc58`: **COMPLETED** — not a controlled benchmark ([results §0B.1](spikes/stage-0.2.1a-results.md#0b1-owner-local-interrupted-overnight-observation-recorded-as-reported-by-the-owner)) |
+| Stage 0.2.1A controlled 15-minute Owner-local observation | **Waived as a Stage 0.2.1A merge blocker** (Owner decision, 2026-10-07) — not run |
+| Stage 0.2.1A Owner manual review (`114c0761`) | **PASS** (Owner-reported, 2026-10-07) |
+| Stage 0.2.1A 60-minute Owner-local run | **Waived as a Stage 0.2.1A merge blocker** (Owner decision, 2026-10-07) — not run |
+| Stage 0.2.1A merge | **NOT MERGED** — PR #3 ready for Owner merge (the Agent never merges) |
+| Primary UI Framework | **React selected** (Owner decision, 2026-10-07); Production transport and chart library remain `[OPEN]` |
+| Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
+| Main Development Scope Gate | **PENDING** |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
 
-Approval of the Stage 0.2 Scope Gate authorised the work. It is **not** acceptance of the
-Stage 0.2 implementation. The Stage 0.2 documentation review has requested changes; those
-changes are implemented in a review-correction checkpoint on the same branch and pull request,
-and re-review is pending. Nothing in this repository may describe the Stage 0.2 outcome as
-Owner accepted, final, merged, reviewed, or as a completed development checkpoint accepted by
-the Owner. Stage 0.2 is a documentation and architecture-decision checkpoint only: no
-application code exists, no dependency was installed, no device was contacted, and no
-Production Write was performed or authorised.
+The Owner accepted Stage 0.2 and it was merged through PR #2. Stage 0.2 was a documentation
+and architecture-decision checkpoint only. Acceptance of ADR-0006 to ADR-0013 records
+architecture direction; it is not implementation proof.
+
+Approval of the Stage 0.2.1A Scope and Coding Start Gates authorises a synthetic, removable
+React feasibility spike under `spikes/ui-runtime-react/`. It is **not** acceptance of the spike
+result and **not** a UI framework selection. **Owner decision, 2026-10-07:** after the Owner-local
+final Edge gate and the Owner manual review of `114c0761` passed, the Owner accepted the UI, the
+synthetic AutoSequence controls, the GlobalQueue presentation, the critical Pump modal and the
+Mandatory Safe Return behaviour as the **Development baseline**, recorded Stage 0.2.1A as
+**COMPLETE FOR DEVELOPMENT CHECKPOINT**, and selected **React as the Primary UI Framework**. Stage
+0.2.1A is **not merged** until the Owner merges PR #3, and this acceptance is not a Production
+safety, stability, WebView2, kiosk, Modbus or hardware validation. The spike uses synthetic data
+only: no device was contacted, no Production value is used, no Product directory exists, and
+no Production Write was performed or authorised.
+
+**Owner domain correction (Stage 0.2.1A).** The Owner corrected the physical baseline from 104
+Sensor locations / 208 Thermocouple channels (Left 24, Rear 28, Right 24, Front 28) to **106
+Sensor locations / 212 Thermocouple channels** (Left 24, Rear 29, Right 24, Front 29). The
+Sensors sit in an 18-column × 6-row logical matrix with two Cannon equipment slots, logical I7
+(Rear) and I16 (Front), which are not Sensors. See
+[`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed).
+This is a domain correction, not a runtime failure. Where 104 / 208 still appears in a
+historical record below, it is the **superseded baseline**.
+
+The synthetic process workload of the spike is deterministic for the same seed, scenario
+timeline, synthetic configuration, and code revision. Cryptographic run and scenario tokens are
+non-deterministic but do not affect process values, scenario ordering, the device latency
+sequence, classification, or revision behaviour. Identical wall-clock timing is not claimed.
 
 The Stage 0.1 process-deviation record in section 11.1 is retained unchanged.
 
@@ -72,15 +102,15 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.2 — Technology and Solution Architecture Decision (documentation and architecture decisions only) |
-| Repository contents | Documentation and repository governance only |
-| Application source code | **Does not exist** |
-| Project or solution files | **Do not exist** |
-| Package manifests or dependencies | **Do not exist** |
+| Current stage | Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic, removable) |
+| Repository contents | Documentation, repository governance, and the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/` |
+| Application source code | **Does not exist.** The spike is synthetic feasibility code, not Product code |
+| Project or solution files | **Do not exist** (no .NET solution or project) |
+| Package manifests or dependencies | Spike only: `spikes/ui-runtime-react/react-ui/package.json` and `package-lock.json` (Owner-approved pins); `runtime-harness/package.json` has no dependencies. No Product package manifest |
 | Database schema or SQL scripts | **Do not exist** |
 | Modbus or Galil adapter | **Does not exist** |
-| Simulator | **Does not exist** |
-| Automated tests | **Do not exist** |
+| Simulator | **No Product simulator.** The spike contains a synthetic Node runtime harness for feasibility only |
+| Automated tests | Spike tests only (Node `node:test` harness tests, Vitest jsdom tests, Playwright specs for Owner-local runs). No Product tests |
 | CI workflow | **Does not exist** |
 | Installer or release artifact | **Does not exist** |
 | Production configuration | **Does not exist in this repository** |
@@ -145,11 +175,14 @@ reopened without a new Owner decision.
    [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) is completed and recorded. `[NOT AUTHORIZED]`
 3. **No application code, schema, adapter, simulator, test, CI workflow, installer, or
    release artifact** may be created until a later Stage Gate authorises it. `[NOT AUTHORIZED]`
+   The only exception is the Stage 0.2.1A synthetic spike inside `spikes/ui-runtime-react/`,
+   within its approved scope. `[APPROVED]`
 4. **No production values** may be invented, inferred, or committed. `[NOT AUTHORIZED]`
 5. **No concurrent Cleaning Jobs.** Parallel Water Jet cleaning is prohibited. `[OWNER CONFIRMED]`
 6. **No merging.** Merge authority belongs to the Owner. `[APPROVED]`
 7. **No history rewriting or force push** without specific Owner authorisation. `[APPROVED]`
-8. **No new pull request** to replace the existing reviewed pull request. `[APPROVED]`
+8. **No reuse of PR #1 or PR #2.** Stage 0.2.1A is delivered through one new pull request to
+   `main`, as instructed by the Owner. `[APPROVED]`
 
 ## 8. Open items requiring Owner decisions
 
@@ -168,7 +201,7 @@ items are listed in section 34 of the same document, and the decision records ar
 
 | Item | Stage 0.2 disposition |
 | --- | --- |
-| Application language, runtime, UI framework, and UI delivery architecture | .NET with C# for the Equipment Runtime and Local Application API: `[PROPOSED]`; application-owned Windows kiosk shell: `[PROPOSED]`; embedded local web UI delivery model: `[PROPOSED]`; React + TypeScript + Vite: `[PROPOSED]` comparison candidate, not accepted; Blazor Hybrid: `[PROPOSED]` comparison candidate, not rejected; final UI framework: `[OPEN]`; exact .NET version: `[OPEN]`; final selection deferred to the proposed Stage 0.2.1 technology spike. Browser-based, desktop, and hybrid local-web delivery were all evaluated on requirements |
+| Application language, runtime, UI framework, and UI delivery architecture | .NET with C# for the Equipment Runtime and Local Application API: `[PROPOSED]`; application-owned Windows kiosk shell: `[PROPOSED]`; embedded local web UI delivery model: `[PROPOSED]`; React + TypeScript + Vite: `[PROPOSED]` comparison candidate, not accepted; Blazor Hybrid: `[PROPOSED]` comparison candidate, not rejected; final UI framework: `[OPEN]`; exact .NET version: `[OPEN]`; final selection deferred; the Stage 0.2.1A React feasibility spike is approved and in progress; Blazor counter-spike deferred / not authorized. Browser-based, desktop, and hybrid local-web delivery were all evaluated on requirements |
 | Process architecture, service identity, startup behaviour, and Equipment Runtime separation | Process model selected as `[PROPOSED]`; service identity `[OPEN]` |
 | Modbus TCP client library selection and licence acceptability | Boundary decided; library selection `[OPEN]` pending licence and offline-availability review |
 | Galil communication mechanism and library selection | `[OPEN]` — must be evaluated before motion code is written |
@@ -180,7 +213,7 @@ items are listed in section 34 of the same document, and the decision records ar
 | Backup, restore, and off-box copy | Remains `[OPEN]` — carried forward into the offline deployment decision |
 | Historian write-path measurement and overflow policy | Remains `[OPEN]` — requires measurement on the target workstation |
 | Kiosk startup mechanism, package format, firewall rules, diagnostic bundle contents | Remains `[OPEN]` — deployment-gate items |
-| **Final UI framework (Candidate A React + TypeScript + Vite versus Candidate B Blazor Hybrid)** | **Returned to `[OPEN]`** by the Owner-requested punchlist. A current evidence-based preference for Candidate A is recorded and is **not an acceptance**. Selection requires the proposed Stage 0.2.1 spike |
+| **Final UI framework (Candidate A React + TypeScript + Vite versus Candidate B Blazor Hybrid)** | **CLOSED — React selected as the Primary UI Framework** (Owner decision, 2026-10-07) after the Stage 0.2.1A Owner-local final Edge gate and manual review passed. Blazor counter-spike not required unless a future material blocker is identified |
 | Push transport and presentation-state payload encoding | `[OPEN]` — presentation contract is transport-agnostic |
 | Chart / trend library; UI test tooling; visual regression tooling | `[OPEN]` — library-neutral requirements recorded; selection needs spike evidence |
 | Site-specific invalid-value and sentinel mapping | `[OPEN]` — requires the Tag and data-quality contract; production values must never be committed |
@@ -197,12 +230,20 @@ items are listed in section 34 of the same document, and the decision records ar
 | Fault class taxonomy: when to stop motion versus abort motion | [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §11 |
 | Recovery procedure for `RECOVERY_REQUIRED`; whether retry is permitted; whether partial-path jobs may resume | [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §11 |
 | Permission required for each operator queue action, and required reason text | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
-| Whether a sensor may be both held and rejected simultaneously | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
+| Reject / Release Reject / Reorder semantics in a ready-only, head-only GlobalQueue (**OWNER DECISION REQUIRED**) | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §12 |
 | Queue snapshot storage format and retention inside Event history | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §11 |
-| Row alignment rule for walls of unequal size (24 versus 28); sensor identifier format | [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.2, [`REQUIREMENTS.md`](REQUIREMENTS.md) SCN-005 |
 | Exact motion limits, profiles, homing, pulses per engineering unit, and operational envelope | [`REQUIREMENTS.md`](REQUIREMENTS.md) GAL-006 `[NOT VERIFIED]` |
 | Exact pressure setpoints, rise timeout, stable dwell, and valve open/close timeouts | [`REQUIREMENTS.md`](REQUIREMENTS.md) PMP-005, VLV-003 `[NOT VERIFIED]` |
 | Sensor-to-Water-Jet mapping and exact production coordinates | Deployment data, `[NOT VERIFIED]` |
+
+**Resolved (DP-01):** the former open item *row alignment rule for walls of unequal size (24
+versus 28)* is closed. That wording used the superseded 28-Sensor Rear and Front walls. The wall
+distribution is **24 / 29 / 24 / 29** (Left / Rear / Right / Front). The Owner-confirmed
+canonical **18-column × 6-row** logical matrix aligns the logical rows of all four walls; the
+Cannon slots occupy logical **I7** (Rear) and **I16** (Front); the Sensor identifiers are the
+Owner logical labels (`G+2xx`, `G+1xx`, `G`, `H`, `I`, `J`). This is no longer an open mapping
+question. Production scan order, device distribution, and Water Jet assignment stay
+deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.2.1.
 
 ### 8.3 DCS and communication
 
@@ -229,6 +270,8 @@ items are listed in section 34 of the same document, and the decision records ar
 | Behaviour when the Historian is unavailable | [`ARCHITECTURE.md`](ARCHITECTURE.md) §9 |
 | Workstation clock discipline and drift bounds | [`ARCHITECTURE.md`](ARCHITECTURE.md) §7 |
 | Target test coverage thresholds and test execution tooling | [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §7 |
+| Critical Main Pump / Mandatory Safe Return policies: Safe Return failure, valve / axis failures, outcomes, re-queue, retry, acknowledge role, clear evidence, Resume authority, modal minimise, second alarm channel | [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md) (every row `OWNER DECISION REQUIRED`) |
+| Production Pause / Resume semantics (pause the AutoSequence or the Cleaning Job lifecycle) replacing the superseded queue-level `HELD` (**OWNER DECISION REQUIRED**) | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2 |
 
 ## 9. Not verified — standing list
 
@@ -249,7 +292,8 @@ items are listed in section 34 of the same document, and the decision records ar
 | Production register map, Tag List, and DCS signal contract | Confidential; never committed |
 | Sensor-to-Water-Jet and sensor-to-valve mapping | Deployment data; not recorded here |
 | Historian effective capacity and database sizing | No capacity model produced; no benchmark performed |
-| Runtime build, unit tests, integration tests, database tests, hardware tests | No code exists; not applicable at this stage |
+| Runtime build, unit tests, integration tests, database tests, hardware tests | No Product code exists; not applicable. Stage 0.2.1A synthetic spike tests are recorded in section 12.3 and are not Product verification |
+| Stage 0.2.1A WebView2, kiosk, end-to-end latency, long-run UI, Windows offline restore | Not measurable in Arena and not validated. The installed-Edge Owner-local final gate and manual review **PASSED** at `114c0761` (Owner-reported, 2026-10-07); controlled 15- / 60-minute observations waived as merge blockers, not run |
 
 ## 10. Sensitive data review
 
@@ -298,14 +342,42 @@ rebased, or rewritten.
 | Current Stage branch | `arena/01a1087c-waterjet-sentinel-suite` |
 | Pull request | https://github.com/tnoiiee/waterjet-sentinel-suite/pull/2 |
 | Stage 0.2 Scope Gate | **APPROVED** |
-| Stage 0.2 architecture checkpoint | **SUBMITTED FOR OWNER REVIEW** |
-| Documentation review | **CHANGES REQUIRED / IN PROGRESS** |
-| Owner manual review | **PENDING** |
-| Merge | **NOT MERGED** |
-| Stage 0.2.1 | **NOT AUTHORIZED** |
+| Stage 0.2 architecture checkpoint | **OWNER ACCEPTED** |
+| Source checkpoint accepted | `5bcf1b33f924ab30590a55736676200115874fa1` |
+| Merge | **MERGED** to `main` through PR #2 — merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`, which is the approved base of Stage 0.2.1A |
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
+
+*Rows above that described the Stage 0.2 review-in-progress state were replaced when the Owner
+accepted and merged Stage 0.2.*
+
+### 11.3 Stage 0.2.1A checkpoint record
+
+| Item | Value |
+| --- | --- |
+| Stage | 0.2.1A — React UI and Runtime Feasibility Spike (synthetic) |
+| Approved main base | `e779f8ad2c856e367fd65985007a3da411bd0e73` (verified remote `main` before coding) |
+| Stage branch | `arena/01a108d8-waterjet-sentinel-suite` |
+| Development checkpoint | `dd20a8bd` (104-location map, superseded by the Owner domain correction) |
+| Sensor-map correction checkpoint | `935973e6ff13aca26efa67148977db44b78be2e1` — normal fast-forward on top of `dd20a8bd` |
+| Fullscreen UI refinement checkpoint | A normal fast-forward commit on top of `935973e6`. Its SHA is recorded in the delivery report and in the PR #3 description, **not** inside the commit that creates it |
+| Local recovery before the correction | An Owner-authorised, one-time local reference recovery set the local branch to the already-pushed `dd20a8bd` after an exact identity proof. No history was rewritten, nothing was force-pushed, and AGENTS.md is unchanged |
+| Local recovery before the fullscreen refinement | The Arena sandbox was recreated (local branch at `e779f8ad`, checkpoint source present as working-tree changes). A second Owner-authorised, one-time, checkpoint-specific recovery: targeted fetch, complete-tree identity proof against `935973e6` (126 / 126 exact blob matches, 0 mismatches, 0 missing, 0 extra, 0 mode differences), compare-and-swap `update-ref` `e779f8ad` → `935973e6`, `read-tree` **without** `-u`; working tree unchanged. AGENTS.md is unchanged; this is not a general recovery rule |
+| Fullscreen UI refinement checkpoint SHA | `ea23bc589b2f61a9c97aaa2b1a1faa9d2ac31d68` |
+| Readability refinement checkpoint | A normal fast-forward commit on top of `ea23bc58` (presentation refinement plus the stale MAP U-shape assertion correction). Its SHA is recorded in the delivery report and in the PR #3 description, **not** inside the commit that creates it |
+| Local recovery before the readability refinement | The Arena sandbox was recreated again (local branch at `e779f8ad`, checkpoint source present as working-tree changes). A third Owner-authorised, one-time, checkpoint-specific recovery: targeted fetch, complete-tree identity proof against `ea23bc58` (130 / 130 exact blob matches, 0 mismatches, 0 missing, 0 extra, 0 mode differences), compare-and-swap `update-ref` `e779f8ad` → `ea23bc58`, `read-tree` **without** `-u`; working tree unchanged. AGENTS.md is unchanged; this is not a general recovery rule |
+| Pull request | PR #3 to `main` — **OPEN** (PR #1 and PR #2 are not reused) |
+| Scope Gate / Coding Start Gate | **APPROVED** |
+| Implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** (`114c0761`) |
+| Owner-local testing | Owner-local final Edge gate at `114c0761`: **PASS** (Owner-reported, 2026-10-07) |
+| Owner manual UI re-review | **PASS** at `114c0761` (Owner-reported) — controlled 15- and 60-minute observations **waived as merge blockers** |
+| Owner-local interrupted overnight observation (`ea23bc58`) | **COMPLETED** as reported by the Owner — not a controlled benchmark; Production stability **NOT VERIFIED** |
+| Merge | **NOT MERGED** — ready for Owner merge |
+| Primary UI Framework | **React selected** (Owner decision, 2026-10-07) |
+| Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
+| Stage 0.3 | **NOT AUTHORIZED** |
+| Production Device access | **NOT AUTHORIZED** |
 
 ### 11.1 Process deviation record
 
@@ -391,13 +463,261 @@ method shown. The exact commands are reported in the Stage 0.2 delivery report.
 | 5 | Every ADR keeps its required section set | Heading extraction per ADR | Status, Context, Decision, Alternatives considered, Consequences, Risks, Verification status, Follow-up gates, Relationship to protected decisions |
 | 6 | The UI framework selection is not presented as accepted | Cross-document search for framework-acceptance wording | Final framework is `[OPEN]`; both candidates are `[PROPOSED]`; the React preference is explicitly not acceptance; Blazor is explicitly not rejected |
 | 7 | The React offline claim is correct and present | Targeted search | "React can be built and deployed offline" is stated, together with the second-ecosystem cost and the explicit statement that this does not make offline development or deployment impossible |
-| 8 | Protected decisions remain stated and unmodified | Targeted `grep` runs, listed in the delivery report | All required statements found and unchanged: one Boiler Unit per Workstation, 104 Sensor locations, 208 Thermocouple channels, Eight Water Jets, Four Galil DMC-B140-M controllers, Water Jet to Isolation Valve one-to-one, strictly sequential Cleaning Jobs, maximum one active Cleaning Job, parallel cleaning prohibited, GlobalQueue FIFO and source ownership, `LastSuccessfulCleaningCompletedAt` never null, Operator baseline override role, cleared-state acknowledgement, Main Pump may remain running between sequential Jobs, WAGO fail-safe `[NOT VERIFIED]`, Production Write `[NOT AUTHORIZED]`, Production configuration never in the repository |
+| 8 | Protected decisions remain stated and unmodified | Targeted `grep` runs, listed in the delivery report | All required statements found and unchanged: one Boiler Unit per Workstation, 104 Sensor locations, 208 Thermocouple channels *(superseded baseline — corrected by the Owner to 106 / 212 during Stage 0.2.1A, see section 2)*, Eight Water Jets, Four Galil DMC-B140-M controllers, Water Jet to Isolation Valve one-to-one, strictly sequential Cleaning Jobs, maximum one active Cleaning Job, parallel cleaning prohibited, GlobalQueue FIFO and source ownership, `LastSuccessfulCleaningCompletedAt` never null, Operator baseline override role, cleared-state acknowledgement, Main Pump may remain running between sequential Jobs, WAGO fail-safe `[NOT VERIFIED]`, Production Write `[NOT AUTHORIZED]`, Production configuration never in the repository |
 | 9 | Architecture consistency | Targeted `grep` runs, listed in the delivery report | The UI owns no device session and cannot write to hardware; the Equipment Runtime service is the sole owner of physical device sessions; adapters contain no UI logic and the domain is independent of vendor libraries; the simulator implements the same application-facing contract; physical adapters are disabled by default; the runtime consumes only Published configuration; the UI does not read Modbus and does not query SQL for live state; no statement permits parallel Cleaning Jobs |
 | 10 | Sensitive-data scan | IPv4 and CIDR regex, credential-shaped regex, connection-string regex, numeric configuration patterns, and register-map-like rows, across all non-`.git` files | Zero matches |
 | 11 | Stage-status consistency | Stage-status wording search across every Markdown file | Zero remaining lines describing Stage 0.2 as `[NOT AUTHORIZED]`. Every file now states the current position: Stage 0.2 Scope Gate `[APPROVED]`; Stage 0.2 architecture checkpoint SUBMITTED FOR OWNER REVIEW; documentation review CHANGES REQUESTED / IN PROGRESS; Owner manual review PENDING; NOT MERGED; Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]` |
 | 12 | Cross-reference integrity | Search for the old `section 22` reference and for the new section numbers | The open-item section is now section 34 and the earlier references were corrected. Sections 23–33 referenced by the decision records all exist |
 | 13 | Full diff review | Complete diff read before the checkpoint commit | Every change is traceable to the punchlist; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
 | 14 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, simulator, or installer test was executed, and none is claimed |
+
+### 12.3 Stage 0.2.1A Arena validation record
+
+*Checkpoint `dd20a8bd`, recorded on the superseded 104-location map. See section 12.4 for the
+corrected map.*
+
+Synthetic spike validation in Arena (Linux x64, Node v22.22.3). Detailed evidence:
+[`spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md) and
+`spikes/ui-runtime-react/results/summary/arena-validation.md`.
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | TypeScript 6.0.3 `tsc --noEmit` | PASS, 0 errors |
+| 2 | Vite 8.3.2 production build | PASS |
+| 3 | Vitest (jsdom), 8 files | 53 / 53 PASS |
+| 4 | Runtime harness `node:test` | 14 / 14 PASS |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | 10-minute harness measurement, 2 SSE clients | Exit 0; invariant violations 0; accepted second Jobs 0 |
+| 7 | Playwright spec parse (`--list`, no browser) | PASS, 16 tests |
+| 8 | Offline `npm ci` against an unreachable registry | PASS; negative control `ENOTCACHED` |
+| 9 | Sensitive-data scan, new and changed files | PASS |
+| 10 | Markdown relative links | PASS, 0 broken |
+| 11 | Full diff review | Performed before the checkpoint commit |
+| 12 | Browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI | **NOT VERIFIED** in Arena — Owner-local testing PENDING |
+
+**Reported discrepancy — resolved.** At checkpoint `dd20a8bd` the status headers of 12
+documents still described the Stage 0.2 submission state: `SECURITY.md`, `ALARM_MODEL.md`,
+`ARCHITECTURE.md`, `CLEANING_SEQUENCE.md`, `CONTROL_AUTHORITY.md`, `DOMAIN_MODEL.md`,
+`HISTORIAN_RETENTION.md`, `QUEUE_MODEL.md`, `REQUIREMENTS.md`, `SAFETY_BOUNDARY.md`,
+`TEST_STRATEGY.md`, `USER_PERMISSION_MODEL.md`. The Owner authorised the correction with the
+Sensor-map domain correction, and all 12 (plus `ROADMAP.md` and `decisions/README.md`) now carry
+the current status. See section 12.4.
+
+### 12.4 Stage 0.2.1A Sensor-map correction — Arena validation record
+
+Synthetic spike validation in Arena (Linux x64, Node v22.22.3) of the 106-location correction.
+Detailed evidence: [`spikes/stage-0.2.1a-results.md` §0](spikes/stage-0.2.1a-results.md#0-sensor-map-correction-checkpoint).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, TypeScript 6.0.3 `tsc --noEmit` | PASS, 0 errors (lock file unchanged) |
+| 2 | Vite 8.3.2 production build | PASS |
+| 3 | Vitest (jsdom), 10 files | 60 / 60 PASS |
+| 4 | Runtime harness `node:test`, 2 files | 26 / 26 PASS |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | Golden fixtures regenerated and validated against the canonical map | PASS |
+| 7 | 10-minute harness measurement, 2 SSE clients | Exit 0; invariant violations 0; accepted second Jobs 0 |
+| 8 | Playwright spec parse (`--list`, no browser) | PASS, 17 tests |
+| 9 | Hard gates | 106 Sensors; 212 Thermocouple channels; 24 / 29 / 24 / 29; 2 Cannon slots; I7 / I16 absent; 0 duplicate IDs, slots, scan orders, `TC_F`, `TC_R`, or shared channels |
+| 10 | Markdown relative links | PASS — 44 files, 694 links, 0 broken |
+| 11 | Sensitive-data scan, changed and new files | PASS |
+| 12 | SHA-256 manifest regenerated and verified | PASS |
+| 13 | Full diff review | Performed before the correction commit |
+| 14 | Browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI | **NOT VERIFIED** in Arena — Owner-local re-run and manual UI re-review **PENDING**; 60-minute run **PAUSED** |
+
+### 12.5 Stage 0.2.1A fullscreen Operations refinement — Arena validation record
+
+Owner-approved Design Addendum: retain the U-shaped map, 106 Sensors, 212 Thermocouple channels,
+24 / 29 / 24 / 29, Cannon slots at I7 / I16; larger Sensor cells and text; smaller map centre;
+two-column Sensor Detail; compact Active Job and GlobalQueue; Trend and Camera in the first
+viewport; floating Diagnostics drawer; no page-level scrollbar at 1920 × 1080, Edge F11, 100 %
+zoom. Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0A](spikes/stage-0.2.1a-results.md#0a-fullscreen-operations-refinement-checkpoint-current).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci` (lock file restore), `tsc --noEmit` | PASS, 0 errors; dependencies unchanged |
+| 2 | Vite production build | PASS |
+| 3 | Vitest (jsdom), 12 files | 75 / 75 PASS (15 new: scale tokens, Diagnostics state, compact source reason, inspector, Active Job, mapping-independent cell classes, count and Cannon regressions) |
+| 4 | Runtime harness `node:test` | 26 / 26 PASS (12 mapping tests) |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 22 tests (5 new `LAYOUT-A`..`LAYOUT-E`) |
+| 7 | Hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Cannon slots · I7 / I16 absent · 0 duplicates |
+| 8 | Viewport fit, card bounds, computed cell sizes | **NOT VERIFIED** in Arena (no browser) — asserted by `e2e/layout.spec.ts`, Owner-local Edge run **PENDING** |
+| 9 | Markdown relative links | PASS — 44 files, 696 links, 0 broken; 10 anchors, 0 broken |
+| 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
+| 11 | Full diff review | Performed before the refinement commit |
+
+### 12.6 Stage 0.2.1A Operations readability refinement — Arena validation record
+
+Owner screenshot review of `ea23bc58`: status markers overlapped long Sensor IDs, small cells and
+typography, oversaturated process colours, alarm and quality relying on colour, weak card
+hierarchy. Presentation-only refinement plus the stale MAP U-shape assertion correction; the
+U-map, mapping, counts, Cannon slots, right-side structure, bottom row, runtime, and contracts are
+unchanged. Industrial HMI practice is guidance only; no standards certification is claimed.
+Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0B](spikes/stage-0.2.1a-results.md#0b-operations-readability-refinement-checkpoint-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci` (lock file restore), `tsc --noEmit` (project + strict `e2e/*.ts`) | PASS, 0 errors; dependencies unchanged |
+| 2 | Vite production build | PASS |
+| 3 | Vitest (jsdom), 13 files | 93 / 93 PASS (18 new: colour tokens and contrast, typography and spacing tokens, cell zones, queue columns, detail groups, job phases and elapsed time, status groups, alarm strip, camera state) |
+| 4 | Runtime harness `node:test` | 26 / 26 PASS (12 mapping tests) |
+| 5 | Scenario runner, 28 scenarios | PASS 25 · PASS+OWNER 2 · OWNER-LOCAL 1 · FAIL 0 |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 26 tests in 3 files; operations + layout selection 25 (was 21; 4 new `READ-A`..`READ-D`) |
+| 7 | Hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Cannon slots · I7 / I16 absent · 0 duplicates |
+| 8 | ID / marker overlap, clipping, typography, viewport fit | **NOT VERIFIED** in Arena (no browser) — asserted by `e2e/layout.spec.ts`, Owner-local Edge run **PENDING** |
+| 9 | Markdown relative links and anchors | PASS (see the delivery report for counts) |
+| 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
+| 11 | Full diff review | Performed before the readability commit |
+
+### 12.7 Stage 0.2.1A final Owner UI punchlist — Arena validation record
+
+Owner screenshot review of `4129687a` (Owner-local Edge E2E 25 / 25 PASS there). Presentation
+changes, opt-in synthetic review tooling, and synthetic queue-source evidence; the U-map, mapping,
+counts, I7 / I16 slots, right-side structure, bottom row, contracts, queue authority, FIFO model,
+single-job rule, and dependencies are unchanged. Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0C](spikes/stage-0.2.1a-results.md#0c-final-owner-ui-punchlist-checkpoint-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, `tsc --noEmit` (project; strict `e2e/*.ts`) | PASS, 0 errors (strict e2e: only the known absent Node type declarations in `soak.spec.ts` / `support.ts`); dependencies unchanged |
+| 2 | Vite production build | PASS — JS 325.93 kB (gzip 107.55 kB, +2.71 kB), CSS 28.16 kB (gzip 6.80 kB), one hashed WOFF2 47.67 kB |
+| 3 | Vitest (jsdom), 15 files | 109 / 109 PASS (16 new: font asset and wiring, identity, legend bounds, Water Jet slots, queue label, synthetic control boundary) |
+| 4 | Runtime harness `node:test` | 32 / 32 PASS (6 new: mixed queue, Water Jet refusal, default behaviour, presets, per-Sensor controls, token endpoint) |
+| 5 | Scenario runner, 30 scenarios | PASS 25 · PASS+OWNER 4 · OWNER-LOCAL 1 · FAIL 0 (S29 mixed queue: 5 source types in the first 8 rows; S30 six presets) |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 35 tests in 4 files (9 new: `FONT-A`, `CELL-A`, `IDENT-A`, `LEGEND-A`, `WJ-A`, `QUEUE-A`, `CTRL-A`..`CTRL-C`) |
+| 7 | Hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Water Jet reference slots (internal `CANNON_*`) · I7 / I16 absent · 0 duplicates |
+| 8 | Font provenance and licence | WOFF2 SHA-256 `40f917d9…1531b` and `OFL.txt` / `TRADEMARKS.md` Git blobs re-verified by test; OFL-1.1, no RFN; recorded in the licence inventory |
+| 9 | Rendered font, cell zones, legend bounds, controls in a browser | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
+| 10 | Public-repository boundary | Bundled font redistributable under OFL-1.1 with licence text; no Production Water Jet numbers, addresses, or credentials; per-run token files git-ignored; synthetic controls loopback-only and opt-in |
+| 11 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
+
+### 12.8 Stage 0.2.1A GlobalQueue semantics correction — Arena validation record
+
+Owner domain correction after the Owner-local Edge run of `23f48daa` (34 selected · 25 passed ·
+2 failed · 7 not run). The synthetic GlobalQueue now holds ready-to-dispatch entries only (≤ 8,
+no entry states), dispatch is head-only and atomic with a synthetic dispatch record, and the
+previous synthetic queue / job behaviour is **SUPERSEDED** (not eligible for production promotion).
+Eligibility conditions are a proposal awaiting the Owner:
+[queue eligibility decision matrix](spikes/queue-eligibility-decision-matrix.md) (every row
+`OWNER DECISION REQUIRED`). A Production Queue Runtime is a Main Development slice (not authorized).
+U-map, mapping, 106 / 212, 24 / 29 / 24 / 29, I7 / I16 slots, fonts, and dependencies are unchanged.
+Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0D](spikes/stage-0.2.1a-results.md#0d-globalqueue-semantics-correction-and-head-only-dispatch-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, `tsc --noEmit` (project; strict `e2e/*.ts`) | PASS, 0 errors (strict e2e: only the known absent Node type declarations in `soak.spec.ts` / `support.ts`); dependencies unchanged |
+| 2 | Vite production build | PASS — JS 327.90 kB (gzip 108.05 kB), CSS 27.67 kB (gzip 6.68 kB), WOFF2 47.67 kB unchanged |
+| 3 | Vitest (jsdom), 16 files | 120 / 120 PASS (new `globalQueue.test.tsx`; Sensor-cell vertical budget guard) |
+| 4 | Runtime harness `node:test` | 40 / 40 PASS (new `queueDispatch.test.mjs`: gates A–F) |
+| 5 | Scenario runner, 32 scenarios | PASS 27 · PASS+OWNER 4 · OWNER-LOCAL 1 · FAIL 0 (S31 head-only dispatch on the Owner example queue; S32 bounded queue under `dirty70`) |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 36 tests in 4 files; Owner-local selection 35 (new `QUEUE-B`; `QUEUE-A`, `CTRL-A`, `CTRL-B`, `WJ-A` rewritten) |
+| 7 | Queue capacity / dispatch gates A–F | PASS in Arena (harness + scenarios); UI gate E in jsdom; browser part Owner-local **PENDING** |
+| 8 | Hard gates (Sensor map) | 106 · 212 · 24 / 29 / 24 / 29 · 2 Water Jet reference slots (internal `CANNON_*`) · I7 / I16 absent · 0 duplicates |
+| 9 | Value clipping (`READ-A`), Water Jet clicks (`WJ-A`), rendered queue panel | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
+| 10 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
+
+### 12.9 Stage 0.2.1A critical Main Pump and Mandatory Safe Return — Arena validation record
+
+Owner critical Pump decision on `60cd0398` (recovered by the Owner-authorized one-time recovery,
+identity proof 147 / 147). In the synthetic spike:
+
+- The Main Pump is a High Critical device.
+- An unexpected stop or trip stops progression, water and dispatch. The AutoSequence becomes
+  `CRITICAL_SUSPENDED`, an Active Job enters Mandatory Safe Return, and a blocking critical modal
+  (alertdialog, Acknowledge only, no close, no Resume) opens.
+- Every Job outcome ends through Mandatory Safe Return. The valve close is commanded and confirmed
+  before the axis Standby command, and the Job stays Active until Standby is confirmed.
+- The GlobalQueue remains ready-only and is frozen while suspended.
+
+Queue-level `HELD` is superseded in [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2 and
+[`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) (Owner-authorized). Unresolved policies are listed in the
+[critical Pump / Safe Return decision matrix](spikes/critical-pump-safe-return-decision-matrix.md)
+(every row `OWNER DECISION REQUIRED`).
+
+**SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED.** No safety certification is claimed.
+
+U-map, mapping, 106 / 212, 24 / 29 / 24 / 29, I7 / I16 slots, fonts, and dependencies are unchanged.
+Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0E](spikes/stage-0.2.1a-results.md#0e-critical-main-pump-handling-and-mandatory-safe-return-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, `tsc --noEmit` (project; strict `e2e/*.ts`) | PASS, 0 errors (strict e2e: only the known absent Node type declarations in `soak.spec.ts` / `support.ts`); dependencies unchanged |
+| 2 | Vite production build | PASS — JS 340.50 kB (gzip 111.65 kB), CSS 30.92 kB (gzip 7.34 kB), WOFF2 47.67 kB unchanged |
+| 3 | Vitest (jsdom), 17 files | 131 / 131 PASS (new `criticalModal.test.tsx`; critical palette distinctness test) |
+| 4 | Runtime harness `node:test` (× 3) | 51 / 51 PASS each run (new `safeReturn.test.mjs`: gates 1–6; critical-alarm acknowledge route) |
+| 5 | Scenario runner, 34 scenarios | PASS 29 · PASS+OWNER 4 · OWNER-LOCAL 1 · FAIL 0 (S33 Pump trip during a Job; S34 normal completion with delayed valve feedback) |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 43 tests in 5 files; Owner-local selection 42 (new `critical.spec.ts`: `CRIT-A`..`CRIT-E`, `CRIT-F` × 2 viewports) |
+| 7 | Safe Return ordering, completion / abort / trip, failure, queue-during-suspension gates | PASS in Arena (harness + scenarios + validator); modal structure in jsdom; browser part Owner-local **PENDING** |
+| 8 | Hard gates (Sensor map) | 106 · 212 · 24 / 29 / 24 / 29 · 2 Water Jet reference slots (internal `CANNON_*`) · I7 / I16 absent · 0 duplicates |
+| 9 | Modal rendering, geometry, focus trap and Escape in Edge | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
+| 10 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
+
+### 12.10 Stage 0.2.1A final spike closeout (synthetic AutoSequence controls) — Arena validation record
+
+Owner final closeout on `81c87a44` (recovered by the Owner-authorized one-time recovery, identity
+proof 153 / 153) after the Owner-local Edge run of `81c87a44` (42 selected · 32 passed · 1 failed
+`S11/S12` · 9 not run). In the synthetic spike:
+
+- `S11/S12` is deterministic: the Sensor's Dirty Score is fixed and held (Score 82) and Score,
+  classification and the computed background must stay identical through Raise / Clear /
+  Acknowledge (no RGB tolerance).
+- Diagnostics-only synthetic AutoSequence controls (`SYN · ` labels, `--synthetic-test-controls`):
+  START AUTOSEQUENCE, PAUSE AFTER CURRENT JOB, RESUME AUTOSEQUENCE, ABORT ACTIVE JOB, and RESET
+  CRITICAL SCENARIO. Dispatch is always GlobalQueue Position 1; every Job ends through Mandatory
+  Safe Return; clear + acknowledge never resume; RESET never dispatches and requires an explicit
+  START. These are **not** the Production operator-control model.
+- Current-facing queue-level `HELD` / `BLOCKED` / `EXCLUDED` wording is removed; ADR-0003 is
+  **SUPERSEDED IN PART by Owner decision dated 2026-10-06**. Production Pause / Resume, abort
+  re-queue and Reject / Reorder in the ready-only queue are **OWNER DECISION REQUIRED**.
+
+Critical Pump / Safe Return behaviour, U-map, mapping, 106 / 212, 24 / 29 / 24 / 29, I7 / I16
+slots, fonts, and dependencies are unchanged. Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0F](spikes/stage-0.2.1a-results.md#0f-final-spike-closeout-synthetic-autosequence-controls-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, `tsc --noEmit` (project; strict `e2e/*.ts`) | PASS, 0 errors (strict e2e: only the 6 known absent Node type declarations in `soak.spec.ts` / `support.ts`); dependencies unchanged |
+| 2 | Vite production build | PASS — JS 345.17 kB (gzip 112.92 kB), CSS 31.70 kB (gzip 7.46 kB), WOFF2 47.67 kB unchanged |
+| 3 | Vitest (jsdom), 18 files | 138 / 138 PASS (new `autoSequenceControl.test.tsx`, 7 tests) |
+| 4 | Runtime harness `node:test` (× 3) | 60 / 60 PASS each run (new `autoSequenceControls.test.mjs`: A–G) |
+| 5 | Scenario runner, 35 scenarios | PASS 30 · PASS+OWNER 4 · OWNER-LOCAL 1 · FAIL 0 (new S35; S09 expects `PAUSE_REQUESTED` with an Active Job) |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 49 tests in 5 files; Owner-local selection 48 (`SEQ-B`..`SEQ-G` in `critical.spec.ts`; `S11/S12` rewritten) |
+| 7 | Hard gates (Sensor map) | 106 · 212 · 24 / 29 / 24 / 29 · 2 Water Jet reference slots (internal `CANNON_*`) · I7 / I16 absent · 0 duplicates |
+| 8 | Controls, alarm colour and modal in Edge | **NOT VERIFIED** in Arena (no browser) — Owner-local final Edge gate **PENDING** |
+| 9 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
+
+### 12.11 Stage 0.2.1A Owner-local final review and documentation closeout
+
+Owner decision dated 2026-10-07 on checkpoint `114c07619f9fd249cd80b2e7a5f385ff9e081119`
+(Owner-reported; the Agent received the outcome, not the raw Edge output or screenshots):
+
+| Item | Recorded result |
+| --- | --- |
+| Owner-local final Edge gate | **PASS** |
+| Owner manual review | **PASS** |
+| Development baseline | UI, synthetic AutoSequence controls, GlobalQueue presentation (ready-only, ≤ 8, head-only dispatch), critical Pump modal and Mandatory Safe Return behaviour **accepted** |
+| Primary UI Framework | **React selected** |
+| Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
+| Controlled 15-minute and 60-minute observations | **Waived as Stage 0.2.1A merge blockers** (not run) |
+| Stage 0.2.1A | **COMPLETE FOR DEVELOPMENT CHECKPOINT**; PR #3 **ready for Owner merge**, **NOT MERGED** |
+| Main Development Scope Gate | **PENDING** — no Main Development coding has started |
+| Production device access | **NOT AUTHORIZED** |
+
+Not claimed: Production safety, Production stability, WebView2 validation, kiosk validation,
+Modbus performance, hardware validation. Synthetic AutoSequence controls remain review tooling,
+not the Production operator-control model; Production Pause / Resume, abort re-queue and reset
+authority remain **OWNER DECISION REQUIRED**.
+
+The closeout commit is documentation-only. It also removed the remaining current-facing
+queue-level Hold wording in `CONTROL_AUTHORITY.md` (§4 invariant, §6 conflict table),
+`QUEUE_MODEL.md` (snapshot contents), `TEST_STRATEGY.md` (operator-action tests) and
+`USER_PERMISSION_MODEL.md` (queue permissions), and updated the status banners. No runtime, React,
+CSS, contract, fixture, harness, scenario, E2E, dependency or Sensor-map file changed.
 
 ## 13. Required positive confirmations
 
@@ -421,8 +741,9 @@ The documentation explicitly contains each of the following:
 | 14 | Domain logic does not depend on vendor device libraries | [`REQUIREMENTS.md`](REQUIREMENTS.md) ARC-007, [`decisions/ADR-0010`](decisions/ADR-0010-device-adapter-boundary.md) |
 | 15 | Simulation is not hardware verification or certification | [`decisions/ADR-0012`](decisions/ADR-0012-simulator-first-development.md), [`TEST_STRATEGY.md`](TEST_STRATEGY.md) §3.7 |
 
-This document must not be read as claiming any test, build, database, hardware, or device
-verification. See section 9.
+Apart from the Stage 0.2.1A synthetic spike validation recorded in section 12.3 (Arena, Node
+and jsdom only), this document must not be read as claiming any test, build, database,
+hardware, or device verification. See section 9.
 
 ---
 

@@ -1,0 +1,102 @@
+{
+ "label": "SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS",
+ "recordedAt": "2026-10-06T17:38:29.000Z",
+ "base": "e779f8ad2c856e367fd65985007a3da411bd0e73",
+ "parentCheckpoint": "81c87a44",
+ "ownerLocalAtParent": "Owner-reported Edge run of 81c87a44: 42 selected / 32 passed / 1 failed (S11/S12, Dirty Score drifted between samples) / 9 not run",
+ "ownerLocalFinal": "Owner-reported 2026-10-07 at 114c07619f9fd249cd80b2e7a5f385ff9e081119: OWNER-LOCAL FINAL EDGE GATE PASS; OWNER MANUAL REVIEW PASS; React selected as Primary UI Framework; Stage 0.2.1A COMPLETE FOR DEVELOPMENT CHECKPOINT; controlled 15- / 60-minute observations waived as merge blockers (raw Edge output not supplied to the Agent). Arena checks below were recorded at 114c0761; the closeout commit is documentation-only",
+ "scope": "Stage 0.2.1A final spike closeout (SYNTHETIC REVIEW TOOLING - NOT THE PRODUCTION OPERATOR-CONTROL MODEL): deterministic S11/S12 alarm colour test (fixed held Dirty Score 82, identical background, no RGB tolerance); Diagnostics-only synthetic AutoSequence controls START AUTOSEQUENCE / PAUSE AFTER CURRENT JOB / RESUME AUTOSEQUENCE / ABORT ACTIVE JOB / RESET CRITICAL SCENARIO (head-only dispatch; every Job through Mandatory Safe Return; clear + acknowledge never resume; reset never dispatches and requires an explicit START); sequence.mode / sequence.controls contract; current-facing queue-level HELD / BLOCKED / EXCLUDED wording removed; ADR-0003 SUPERSEDED IN PART by Owner decision dated 2026-10-06. Critical Pump / Safe Return behaviour unchanged. GlobalQueue unchanged: ready-only, <= 8, head-only dispatch. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels",
+ "checks": [
+  {
+   "check": "npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1)",
+   "result": "PASS",
+   "detail": "exit 0; package.json and package-lock.json unchanged; no browser download; dependencies unchanged"
+  },
+  {
+   "check": "tsc --noEmit (TypeScript 6.0.3)",
+   "result": "PASS",
+   "detail": "0 errors (project); strict check of e2e/*.ts: 0 errors in layout/operations/punchlist/critical specs; only the 6 known absent Node type declarations in soak.spec.ts / support.ts (unchanged files)"
+  },
+  {
+   "check": "vite build (production)",
+   "result": "PASS",
+   "detail": "JS 345.17 kB (gzip 112.92 kB; +4.67 kB / +1.27 kB gzip vs 81c87a44), CSS 31.70 kB (gzip 7.46 kB; +0.78 kB / +0.12 kB gzip), WOFF2 47.67 kB unchanged"
+  },
+  {
+   "check": "vitest (jsdom) 18 files",
+   "result": "PASS",
+   "detail": "138/138 (new autoSequenceControl.test.tsx 7: drawer-only, six SYN-labelled buttons, state and disabled reasons as text, one request per click without target or retry, CRITICAL_SUSPENDED disables Resume / Start, Safe Return abort reason, disconnected disables all)"
+  },
+  {
+   "check": "runtime-harness node:test",
+   "result": "PASS",
+   "detail": "60/60, stable over 3 consecutive runs (new autoSequenceControls.test.mjs A-G: start head-only ignoring selection, pause with / without Job, resume only from PAUSED and refused in CRITICAL / with Job, critical reset preconditions and no dispatch, abort through Safe Return, invariants; release-revision gate added to queueDispatch / safeReturn gates)"
+  },
+  {
+   "check": "scenario runner (35 scenarios)",
+   "result": "PASS",
+   "detail": "PASS 30, PASS+OWNER 4, OWNER-LOCAL 1, FAIL 0; new S35 synthetic AutoSequence controls (start / pause / abort -> PAUSED / resume head-only / resume refused while critical / reset -> OFF without dispatch / explicit start); S09 now expects PAUSE_REQUESTED while a Job is active; final invariant violations 0, accepted second Jobs 0"
+  },
+  {
+   "check": "deterministic alarm colour (S11/S12) at runtime level",
+   "result": "PASS",
+   "detail": "set-sensor-score hold: Score 82 / DIRTY constant over 8 samples (4 s) and unchanged after raise-alarm (ACTIVE_UNACK) and clear (CLEARED_UNACK); browser assertion Owner-local PENDING"
+  },
+  {
+   "check": "golden fixtures validated against canonical map",
+   "result": "PASS",
+   "detail": "fixtures regenerated for sequence.mode / sequence.controls; fixtures.test PASS"
+  },
+  {
+   "check": "playwright test --list (no browser)",
+   "result": "PASS",
+   "detail": "49 tests in 5 files; Owner-local selection (operations + layout + punchlist + critical) 48; new SEQ-B..SEQ-G in critical.spec.ts; S11/S12 rewritten"
+  },
+  {
+   "check": "hard gates (sensor map)",
+   "result": "PASS",
+   "detail": "106 sensors; 212 channels; 24/29/24/29; 2 Water Jet reference slots (internal CANNON_*); 108 slots; I7/I16 absent; 0 duplicate IDs; sensorMap.mjs / classify.mjs unchanged"
+  },
+  {
+   "check": "font checks",
+   "result": "PASS",
+   "detail": "WOFF2 47,672 B SHA-256 40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b unchanged; Google Sans retained"
+  },
+  {
+   "check": "prohibited queue states / hidden overflow / coordinates (source scan)",
+   "result": "PASS",
+   "detail": "no HELD / BLOCKED / EXCLUDED / WAITING_FOR_PUMP literals in runtime, contracts, or UI source; no slice(0, 8); no coordinates, addresses, Galil or Modbus data; no Production Resume control; synthetic controls take no target"
+  },
+  {
+   "check": "synthetic controls, alarm colour and critical modal in a browser",
+   "result": "OWNER-LOCAL PASS",
+   "detail": "no browser in Arena; Owner-local final Edge gate (48-test selection) and 18-step manual review PASS, Owner-reported 2026-10-07"
+  },
+  {
+   "check": "sensitive-data and public-boundary scan (added lines)",
+   "result": "PASS",
+   "detail": "no credentials/keys/connection strings/e-mail; no IPv4 addresses (other than loopback) or URLs in added lines; no Production Water Jet numbers; no safety certification claim"
+  },
+  {
+   "check": "markdown relative links (all tracked and new .md)",
+   "result": "PASS",
+   "detail": "48 files, 760 links, 0 broken; 22 anchors, 0 broken"
+  },
+  {
+   "check": "loopback-only bind",
+   "result": "PASS",
+   "detail": "harness socket 127.0.0.1; synthetic controls via the existing token path only"
+  },
+  {
+   "check": "arena harness measurement 10 min",
+   "result": "NOT RE-RUN",
+   "detail": "acquisition / publish path unchanged"
+  },
+  {
+   "check": "offline npm ci rehearsal",
+   "result": "NOT RE-RUN",
+   "detail": "dependencies and lock file unchanged since dd20a8bd rehearsal (PASS)"
+  }
+ ],
+ "notVerified": "ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · physical Main Pump, protection relay, VFD, Isolation Valve, axis and Galil behaviour · Production interlocks and safety functions (no certification claimed) · heap / DOM / long tasks / end-to-end latency in Edge · Windows process CPU and memory · Windows offline restore · controlled 15-minute and 60-minute observations (waived as Stage 0.2.1A merge blockers, not run) · Extended (4 h) stability · Production queue runtime, Pause / Resume, abort re-queue, eligibility policy, Safe Return failure policy, Resume authority, and alarm behaviour · Production stability · Modbus performance · Production integration."
+}

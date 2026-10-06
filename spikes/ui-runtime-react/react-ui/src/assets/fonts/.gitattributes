@@ -1,0 +1,5 @@
+# Bundled font files are kept byte-for-byte (verbatim licence texts; SHA-256 / Git blob
+# identities are verified by test/fontAsset.test.mjs). No end-of-line conversion on any platform.
+OFL.txt -text
+TRADEMARKS.md -text
+*.woff2 binary

@@ -1,0 +1,56 @@
+{
+  "generatedAt": "2026-10-06T18:24:54.367Z",
+  "base": "spikes/ui-runtime-react/results",
+  "entries": [
+    {
+      "path": "environment/arena-environment.json",
+      "bytes": 1192,
+      "sha256": "628c7c79f6fa66335a80c49977151161e68e7118d59aab0a2eab1706ebd8ab02"
+    },
+    {
+      "path": "summary/arena-harness-smoke-10min.json",
+      "bytes": 2936,
+      "sha256": "afa43773c536abf142f4fc1e324805daf773caeea62bbb7c7000e3b4abd6a962"
+    },
+    {
+      "path": "summary/arena-harness-smoke-10min.md",
+      "bytes": 1509,
+      "sha256": "4eee93e394cf5e7a2052e251699e1a347d82227a9ceac2fbaa84c2cc02cfe047"
+    },
+    {
+      "path": "summary/arena-scenarios.json",
+      "bytes": 14270,
+      "sha256": "7950691bb5a7d503e9f8467b4e349989117b8e6c1e8c16642b68b1f322b9786e"
+    },
+    {
+      "path": "summary/arena-scenarios.md",
+      "bytes": 7312,
+      "sha256": "5351ec3e03362cf86c860bf4b218cc5903b72cb5c4eb1b9de3b9167f748c6c3d"
+    },
+    {
+      "path": "summary/arena-validation.json",
+      "bytes": 7124,
+      "sha256": "bb6a7aee2262b268eb15e41ae7d729b0da57c4fb5165d85f565693f86d4cd8bf"
+    },
+    {
+      "path": "summary/arena-validation.md",
+      "bytes": 6315,
+      "sha256": "3a31f47b0607615c8d26d71cf3919a3fa350e5a6bb88bf163eb393b43c633745"
+    },
+    {
+      "path": "manifests/licence-inventory.json",
+      "bytes": 47972,
+      "sha256": "8ddd854243f8b469f08b4eda4526a60a90f50080dc364c001f1f113de900dbe3"
+    },
+    {
+      "path": "manifests/licence-inventory.md",
+      "bytes": 10846,
+      "sha256": "5e13acf1ffa48b99abcc62107b184f6921d369bd00bd519aeb602f52be3107a4"
+    },
+    {
+      "path": "manifests/react-ui-sbom.cdx.json",
+      "bytes": 135532,
+      "sha256": "158f12bdbc7ef9488b8b2af969db83fad9e61026e64f4ffc7a48bdaa94d6eac6"
+    }
+  ]
+}

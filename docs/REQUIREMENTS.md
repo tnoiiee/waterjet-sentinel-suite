@@ -5,10 +5,16 @@ Requirements marked `[OWNER CONFIRMED]` were explicitly confirmed by the Owner d
 Stage 0.1 documentation review and are binding. Requirements marked otherwise are not
 approved behaviour.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 implementation **SUBMITTED FOR OWNER REVIEW**; Owner manual review
-**PENDING**; **NOT MERGED**; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 Requirement identifiers are stable. Requirements are never silently deleted; if one is
 superseded, its status changes and the superseding requirement is recorded.
@@ -66,8 +72,8 @@ superseded, its status changes and the superseding requirement is recorded.
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| PHY-001 | Boiler walls are Left, Rear, Right, and Front. Wall sensor counts are Left 24, Rear 28, Right 24, Front 28, giving 104 sensor locations. | `[APPROVED]` |
-| PHY-002 | Each sensor has two thermocouple channels: a front channel (`TC_F`) and a rear channel (`TC_R`), giving 208 channels in total. | `[APPROVED]` |
+| PHY-001 | Boiler walls are Left, Rear, Right, and Front. Wall sensor counts are Left 24, Rear 29, Right 24, Front 29, giving 106 sensor locations, laid out in an 18-column × 6-row logical matrix with two Cannon equipment slots (logical I7 Rear, logical I16 Front) that are not sensors. See [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed). Supersedes the earlier 104-location baseline (Rear 28, Front 28). | `[OWNER CONFIRMED]` |
+| PHY-002 | Each sensor has two thermocouple channels: a front channel (`TC_F`) and a rear channel (`TC_R`), giving 212 channels in total (supersedes the earlier 208). | `[OWNER CONFIRMED]` |
 | PHY-003 | Documentation and identifiers must distinguish the boiler wall name from the thermocouple side, because "Front" and "Rear" are both wall names and channel side names. | `[APPROVED]` |
 | PHY-004 | There are eight Water Jet assemblies. Each Water Jet has a horizontal X axis and a vertical Y axis. | `[APPROVED]` |
 | PHY-005 | One Galil controller controls two Water Jets; four controllers are expected in total, model DMC-B140-M, using axes A, B, C, and D. | `[APPROVED]` |
@@ -94,7 +100,7 @@ superseded, its status changes and the superseding requirement is recorded.
 | SEQ-002 | **INVARIANT-SEQ-002.** A second Cleaning Job must not enter an executing state until the current Cleaning Job has reached an approved safe and released terminal condition. | `[OWNER CONFIRMED]` |
 | SEQ-003 | **INVARIANT-SEQ-003.** Different Water Jets, different Isolation Valves, different boiler walls, or different Galil controllers do not grant authority for concurrent Cleaning Jobs. | `[OWNER CONFIRMED]` |
 | SEQ-004 | **INVARIANT-SEQ-004.** The selected eligible head of GlobalQueue is the only normal source for the next Cleaning Job. | `[OWNER CONFIRMED]` |
-| SEQ-005 | **INVARIANT-SEQ-005.** Queue refill, score changes, Operator Reorder, Hold, Reject, valve exclusion, or equipment availability must never result in concurrent Cleaning Jobs. | `[OWNER CONFIRMED]` |
+| SEQ-005 | **INVARIANT-SEQ-005.** Queue refill, score changes, Operator Reorder, Reject, valve exclusion, or equipment availability must never result in concurrent Cleaning Jobs. | `[OWNER CONFIRMED]` |
 | SEQ-006 | **INVARIANT-SEQ-006.** Parallel Water Jet cleaning is prohibited. | `[OWNER CONFIRMED]` |
 | SEQ-007 | The normal dispatch cycle must be: select one eligible entry from the front of GlobalQueue; execute one complete Cleaning Job; confirm the valve is closed; return the Water Jet to Standby; confirm the Job reaches its approved terminal condition; remove or resolve the completed entry; shift the remaining FIFO entries; refill the tail using the source-owner rule; apply the next-job countdown and required gates; only then may the next Cleaning Job begin. | `[OWNER CONFIRMED]` |
 | SEQ-008 | The Main Pump may remain running between Cleaning Jobs during an active AutoSequence, but only one Water Jet may execute a Cleaning Job at a time. | `[OWNER CONFIRMED]` |
@@ -182,14 +188,14 @@ Full behaviour is specified in [`QUEUE_MODEL.md`](QUEUE_MODEL.md).
 | QUE-017 | GlobalQueue may contain fewer than eight entries only when fewer than eight unique eligible sensors are available. | `[APPROVED]` |
 | QUE-018 | The system must never duplicate a sensor, bypass HardMinimumCleaningInterval, use a disabled or inhibited sensor, or create a dummy job. | `[APPROVED]` |
 | QUE-019 | When an entry leaves GlobalQueue, remaining entries shift forward preserving FIFO order, and the tail is refilled from the source owner of the entry that left. If no eligible candidate exists, the tail remains empty. | `[APPROVED]` |
-| QUE-020 | Operator actions are Hold, Release Hold, Reject, Release Reject, and Reorder. Hold keeps the entry in the queue while the dispatcher skips it, without reordering others or blocking the queue. Reject removes the entry and suppresses the sensor from refill for the current Auto Sequence. | `[APPROVED]` |
+| QUE-020 | ~~Hold / Release Hold~~ **SUPERSEDED (Owner decision, 2026-10-06)**: the GlobalQueue holds ready-to-dispatch entries only and is dispatched head-only (no entry is held or skipped); pause belongs to the AutoSequence or the Cleaning Job lifecycle ([`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2). Earlier approved wording for the remaining actions: Reject removes the entry and suppresses the sensor from refill for the current Auto Sequence; Release Reject; Reorder. How Reject / Reorder apply to the ready-only head-only queue is **OWNER DECISION REQUIRED**. | `[APPROVED]` (Hold part superseded) |
 | QUE-021 | Every operator queue action must produce an Event record containing timestamp, user, action, sensor, reason, original position, new position when applicable, Auto Sequence ID, and queue snapshot reference. | `[APPROVED]` |
 | QUE-022 | Reorder must not move an active Cleaning Job, must not bypass eligibility revalidation, and must not alter source ownership. | `[APPROVED]` |
 | QUE-023 | Suppression created by Reject ends when a new Auto Sequence is created unless released earlier. | `[APPROVED]` |
-| QUE-024 | On Operator stop of an AutoSequence: stop dispatching new Cleaning Jobs; handle any active Cleaning Job according to the approved stop or recovery policy; record the current GlobalQueue snapshot in Event history; record Held, Rejected, and Reordered state in Event history; close the current AutoSequence instance; and do not preserve the old GlobalQueue as the executable Queue for a future AutoSequence. | `[OWNER CONFIRMED]` |
+| QUE-024 | On Operator stop of an AutoSequence: stop dispatching new Cleaning Jobs; handle any active Cleaning Job according to the approved stop or recovery policy; record the current GlobalQueue snapshot in Event history; record Rejected and Reordered state in Event history (queue-level Held superseded, Owner decision 2026-10-06); close the current AutoSequence instance; and do not preserve the old GlobalQueue as the executable Queue for a future AutoSequence. | `[OWNER CONFIRMED]` |
 | QUE-025 | On starting a new AutoSequence: read current process and configuration data; recalculate Dirty Scores; recalculate TimeSinceLastClean; re-evaluate HardMinimumCleaningInterval; rebuild all TempQueues; rebuild all TimeQueues; seed a new GlobalQueue; apply deduplication and refill; do not reload the previous executable GlobalQueue; and preserve the previous Queue only as history and evidence. | `[OWNER CONFIRMED]` |
 | QUE-026 | The previous Queue snapshot must be preserved in Event history as evidence of the previous AutoSequence. | `[APPROVED]` |
-| QUE-027 | Queue refill, score changes, Operator Reorder, Hold, Reject, valve exclusion, and equipment availability must never produce concurrent Cleaning Jobs. See SEQ-005. | `[OWNER CONFIRMED]` |
+| QUE-027 | Queue refill, score changes, Operator Reorder, Reject, valve exclusion, and equipment availability must never produce concurrent Cleaning Jobs. See SEQ-005. | `[OWNER CONFIRMED]` |
 
 ## 12. Deterministic scan order
 
@@ -384,7 +390,7 @@ Owner acceptance; they are recorded as ADR candidates in
 | ARC-016 | Simulator mode is the default development mode; physical adapters are disabled by default; test-hardware access is separate from Production Device access. | `[APPROVED]` |
 | ARC-017 | Simulation must be deterministic where practical, and must never be presented as hardware certification. | `[APPROVED]` |
 | ARC-018 | Stage 0.2 creates no runtime artefact, installs no dependency, contacts no device, creates no database object, and produces no ZIP or release. | `[APPROVED]` |
-| ARC-019 | Preferred UI delivery: an application-owned full-screen kiosk shell window hosting a local web UI as static local assets in an embedded WebView, with the close guard enforced by the shell. **The final UI framework is `[OPEN]`** and must not be named by this requirement. | `[PROPOSED]` — [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) |
+| ARC-019 | Preferred UI delivery: an application-owned full-screen kiosk shell window hosting a local web UI as static local assets in an embedded WebView, with the close guard enforced by the shell. This delivery requirement does not name the framework; the framework is recorded in UIF-003 (React selected as the Primary UI Framework, Owner decision 2026-10-07). | `[PROPOSED]` — [`ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) |
 | ARC-020 | Preferred process model: one kiosk shell process and one runtime Windows Service that owns all device sessions, command validation, job execution, queue evaluation, persistence, and database connectivity. | `[PROPOSED]` — [`ADR-0007`](decisions/ADR-0007-runtime-process-model.md) |
 | ARC-021 | Preferred technology stack for the runtime, the Local Application API, and the persistence layer: .NET on the Long-Term Support track, C#, ASP.NET Core minimal API, built-in dependency injection and configuration, structured local logging, and offline packaging from a local package source. The exact .NET version is pinned at the implementation gate. **The UI framework is not decided by this requirement.** | `[PROPOSED]` — [`ADR-0008`](decisions/ADR-0008-technology-stack.md) |
 | ARC-022 | Preferred data access, stated in architecture language: transactional relational access for configuration, alarm, event, audit, job, user, and queue-snapshot data; a batch-oriented write path for Historian samples; a decoupled and prioritised Historian write path; versioned migrations that are never applied automatically at service start; and a measured escape hatch permitted only after evidence identifies a bottleneck. The ORM, mapper, micro-ORM, provider, and bulk-write mechanism remain `[OPEN]`. | `[PROPOSED]` — [`ADR-0009`](decisions/ADR-0009-database-access-and-migrations.md) |
@@ -410,21 +416,21 @@ Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner ac
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| UIF-001 | **Candidate A — React + TypeScript + Vite — is a comparison candidate** for the UI framework, hosted as static local assets inside the application-owned kiosk shell. It must not be described as accepted or rejected. | `[PROPOSED]` |
+| UIF-001 | **Candidate A — React + TypeScript + Vite — is a comparison candidate** for the UI framework, hosted as static local assets inside the application-owned kiosk shell. *Superseded by UIF-003 (React selected, 2026-10-07); retained as history.* It must not be described as accepted or rejected. | `[PROPOSED]` (historical) |
 | UIF-002 | **Candidate B — Blazor Hybrid — is a comparison candidate** for the UI framework, hosted in the application-owned kiosk shell. It must not be described as accepted or rejected. | `[PROPOSED]` |
-| UIF-003 | **The final UI framework is `[OPEN]`.** No framework is selected by Stage 0.2, and no UI code may be created before the framework decision. | `[OPEN]` |
+| UIF-003 | **React is selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Stage 0.2.1A Owner-local final Edge gate and manual review). *History:* the final UI framework was `[OPEN]` at Stage 0.2, and no UI code was to be created before the framework decision. Production UI code still requires the Main Development Scope Gate. | `[OWNER CONFIRMED]` |
 | UIF-004 | Both candidates must be evaluated inside the same architecture: the same application-owned kiosk shell, the same embedded WebView, the same loopback ASP.NET Core Local Application API, and the same separate .NET Equipment Runtime Windows Service. Neither candidate may be compared against a general-purpose external browser. | `[APPROVED]` boundary |
 | UIF-005 | **React can be built and deployed offline.** It must never be excluded on the basis that it requires Internet access. React introduces a second package and build ecosystem (Node.js/npm in addition to NuGet), which increases offline dependency-management and supply-chain effort without making offline development or deployment impossible. | `[APPROVED]` |
 | UIF-006 | Blazor Hybrid must not be selected solely because it uses C# or reduces the number of build ecosystems. Those advantages do not by themselves prove UI performance, graph quality, camera integration, or long-running kiosk stability. | `[APPROVED]` |
 | UIF-007 | The current evidence-based preference is React + TypeScript + Vite, based on the Owner's legacy operating experience with React/Vite and push-based updates, dense-visualisation fit, charting and camera ecosystem, and UI test tooling. **This preference is not final acceptance and not an approved selection.** | `[PROPOSED]` |
-| UIF-008 | Final framework selection requires the proposed Stage 0.2.1 UI and Runtime Technology Spike, which is `PROPOSED` and `[NOT AUTHORIZED]`. | `[PROPOSED]` |
+| UIF-008 | Final framework selection requires measured spike evidence. The proposed dual-candidate Stage 0.2.1 spike is **SUPERSEDED**: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07; see UIF-003), and a Blazor counter-spike is not required unless a future material blocker is identified. | `[PROPOSED]` (historical) |
 
 ### 26.2 UI workload
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| UIW-001 | The UI must support **104 live Sensor cells** and **208 Thermocouple channels** with a **one-second operational update target**. | `[APPROVED]` |
-| UIW-002 | The UI must support the approved wall layouts: Left 24, Rear 28, Right 24, Front 28. | `[APPROVED]` |
+| UIW-001 | The UI must support **106 live Sensor cells** and **212 Thermocouple channels** with a **one-second operational update target** (Owner domain correction; supersedes 104 / 208). | `[APPROVED]` |
+| UIW-002 | The UI must support the Owner-confirmed wall layouts: Left 24 (4 × 6), Rear 29 (5 × 6 with the Rear Cannon slot), Right 24 (4 × 6), Front 29 (5 × 6 with the Front Cannon slot); Cannon slots are shown as neutral equipment, never as Sensors. | `[OWNER CONFIRMED]` |
 | UIW-003 | The UI must present wall-level **Dirty and Cleaner counts**, each with an explicit label, and a distinct Bad or unavailable count where applicable. Displaying only unlabelled numbers is prohibited. | `[APPROVED]` |
 | UIW-004 | The UI must support Sensor detail drill-down, Active Cleaning Job visibility, GlobalQueue preview, and Pump and pressure status. | `[APPROVED]` |
 | UIW-005 | The UI must support a live operational trend, an alarm banner, and an alarm workspace. | `[APPROVED]` |
@@ -451,7 +457,7 @@ Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner ac
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| SPC-001 | A Sensor cell must represent, independently: process classification (`DIRTY`, `CLEANER`); Dirty Score intensity 0–100; data quality (`GOOD`, `UNCERTAIN`, `BAD`, `STALE`, `DISABLED`); queue state (TempQueue, TimeQueue, GlobalQueue position, Held, Blocked, Excluded); interaction state (Selected, Not selected); execution state (Active Cleaning Job target, Not active); and alarm state (Active alarm, Cleared acknowledgement required, Shelved, No alarm). | `[APPROVED]` |
+| SPC-001 | A Sensor cell must represent, independently: process classification (`DIRTY`, `CLEANER`); Dirty Score intensity 0–100; data quality (`GOOD`, `UNCERTAIN`, `BAD`, `STALE`, `DISABLED`); queue state (TempQueue, TimeQueue, GlobalQueue position — ready-to-dispatch entries only; no Held / Blocked / Excluded entry states, see [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2); interaction state (Selected, Not selected); execution state (Active Cleaning Job target, Not active); and alarm state (Active alarm, Cleared acknowledgement required, Shelved, No alarm). | `[APPROVED]` |
 | SPC-002 | **Process classification display rule:** Dirty Score > 50 is `DIRTY`; Dirty Score <= 50 is `CLEANER`. | `[OWNER CONFIRMED]` |
 | SPC-003 | Where the classification threshold becomes configurable, the UI must read the **effective threshold from the Published configuration** and must not hard-code visual text around an assumed value. | `[APPROVED]` |
 | SPC-004 | Visual semantics direction: cell background represents Dirty/Cleaner classification; shade intensity may represent Dirty Score strength; a corner marker or pattern represents data quality; a badge represents queue state; a cyan outline may represent selection; a high-contrast double outline may represent the Active Cleaning Job target; an alarm icon and bright border represent alarm state. | `[PROPOSED]` |
@@ -532,7 +538,7 @@ Requirements marked `[PROPOSED]` are selections or refinements awaiting Owner ac
 
 | ID | Requirement | Status |
 | --- | --- | --- |
-| SPI-001 | Proposed Stage 0.2.1 — UI and Runtime Technology Spike — is `PROPOSED` and `[NOT AUTHORIZED]`. It is not started by Stage 0.2 and requires its own approved Scope Gate. | `[PROPOSED]` |
+| SPI-001 | Proposed Stage 0.2.1 — UI and Runtime Technology Spike — is **SUPERSEDED** and was not performed: the Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07; see UIF-003), and a Blazor counter-spike is not required unless a future material blocker is identified. | `[PROPOSED]` (historical) |
 | SPI-002 | The spike must compare Candidate A and Candidate B on the same synthetic data, the same runtime/API contract, the same Sensor presentation semantics, the same trend workload, the same camera placeholder or synthetic stream, the same reconnect scenario, and the same acceptance measures. | `[PROPOSED]` |
 | SPI-003 | The spike must use **synthetic data only** and must not access WAGO, Galil, Production SQL Server, or Production configuration. | `[PROPOSED]` |
 | SPI-004 | Spike results are application-level performance evidence only — never hardware evidence, never certification, and never a relaxation of the bench verification requirements. | `[PROPOSED]` |

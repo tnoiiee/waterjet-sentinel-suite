@@ -1,7 +1,9 @@
 # ADR-0009 — Database Access and Migration Strategy
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
 - **Date:** 2026-10-04
 - **Supersedes:** Nothing. This record addresses the data-access and migration questions left
   `[OPEN]` by [`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 11 and
@@ -24,7 +26,7 @@ very different kinds of data:
 1. **Accountability data** — Cleaning Job outcomes, alarms, events, audit records. These must
    be durable, complete, and never silently lost.
 2. **Process history** — thermocouple samples at the approved intervals, including
-   one-second detail during an active Cleaning Job, across 208 channels.
+   one-second detail during an active Cleaning Job, across 212 channels.
 3. **Configuration and user data** — the published engineering configuration, its revision
    history, local user accounts, roles, and permissions.
 
@@ -170,7 +172,7 @@ created in this Stage.
 | Alternative | Evaluation | Outcome |
 | --- | --- | --- |
 | A single prescribed data-access library, named now | The available evidence does not justify one. Naming a library here would be tool-ambiguous and would pre-empt licence and compatibility review | Rejected — architecture language recorded; library `[OPEN]` |
-| Transactional relational access with no escape hatch | Simplest and most uniform; but may fail the approved one-second detail requirement under 208-channel load. The requirement outranks uniformity | Rejected as an absolute rule; the measured escape hatch is permitted |
+| Transactional relational access with no escape hatch | Simplest and most uniform; but may fail the approved one-second detail requirement under 212-channel load. The requirement outranks uniformity | Rejected as an absolute rule; the measured escape hatch is permitted |
 | Hand-written SQL and stored procedures for everything | Maximum control and explainability, but much slower to build and maintain, and duplicates mapping logic already covered by the transactional access layer | Rejected |
 | Raw low-level ADO-style access with no mapping layer | No productivity or maintainability benefit for a small team | Rejected |
 | Committing to a specific high-rate write mechanism before measurement | Would record an unverifiable performance claim and pre-empt the licence and compatibility review | Rejected — decision deferred to measurement at the implementation gate |

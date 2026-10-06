@@ -4,11 +4,16 @@
 invariants, and its failure boundaries. All coordinate and timing values are
 `[NOT VERIFIED]` and none are invented here.
 
-**Stage status:** Stage 0.1 Scope Gate `[APPROVED]`; Stage 0.1 implementation merged to `main`
-through PR #1. Stage 0.2 Scope Gate `[APPROVED]` — *Technology and Solution Architecture
-Decision*; Stage 0.2 architecture checkpoint **SUBMITTED FOR OWNER REVIEW**; documentation
-review **CHANGES REQUESTED / IN PROGRESS**; Owner manual review **PENDING**; **NOT MERGED**;
-Stage 0.2.1 `[NOT AUTHORIZED]`; Stage 0.3 `[NOT AUTHORIZED]`.
+**Stage status:** Stage 0.1 merged to `main` through PR #1. Stage 0.2 — *Technology and
+Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
+`5bcf1b33f924ab30590a55736676200115874fa1`, merge `e779f8ad`); ADR-0006 to ADR-0013
+**ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
+Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
+**COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
+review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
+`[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
+Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
 
 This document specifies what a Cleaning Job is and how it is supervised. It contains no
 implementation, and it authorises no device access.
@@ -45,7 +50,7 @@ AutoSequence must execute Cleaning Jobs **strictly sequentially** `[OWNER CONFIR
 | INVARIANT-SEQ-002 | A second Cleaning Job must not enter an executing state until the current Cleaning Job has reached an approved safe and released terminal condition. |
 | INVARIANT-SEQ-003 | Different Water Jets, different Isolation Valves, different boiler walls, or different Galil controllers do not grant authority for concurrent Cleaning Jobs. |
 | INVARIANT-SEQ-004 | The selected eligible head of GlobalQueue is the only normal source for the next Cleaning Job. |
-| INVARIANT-SEQ-005 | Queue refill, score changes, Operator Reorder, Hold, Reject, valve exclusion, or equipment availability must never result in concurrent Cleaning Jobs. |
+| INVARIANT-SEQ-005 | Queue refill, score changes, Operator Reorder, Reject, valve exclusion, or equipment availability must never result in concurrent Cleaning Jobs. |
 | INVARIANT-SEQ-006 | Parallel Water Jet cleaning is prohibited. |
 
 **The Main Pump may remain running between Cleaning Jobs during an active AutoSequence, but
@@ -76,7 +81,7 @@ The normal sequence is an approved nineteen-step order `[APPROVED]`:
 
 | Step | Action | Verification / condition |
 | --- | --- | --- |
-| 1 | Select the GlobalQueue head | Head is not held; no blocking condition |
+| 1 | Select the GlobalQueue head | Position 1 only (the queue holds ready-to-dispatch entries only; no scan-forward). Waits belong to the AutoSequence or the Job, never to queue entries |
 | 2 | Revalidate permissions, eligibility, equipment state, and permissives | All must pass; otherwise the job must not start. Includes the one-active-job invariant check |
 | 3 | Reserve the assigned Water Jet | No other job may use it |
 | 4 | Verify Main Pump pressure readiness | Pressure value and quality must indicate readiness |
@@ -121,8 +126,9 @@ updates `LastSuccessfulCleaningCompletedAt`.
 
 Cleaning Job **outcomes** describe the result of an executed job: `COMPLETED`, `FAILED`,
 `ABORTED`, `RECOVERY_REQUIRED`. They are distinct from **queue entry dispositions**, which
-describe what happened to an entry in a queue: `HELD`, `RELEASED`, `REJECTED`, `REORDERED`,
-`REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION`.
+describe what happened to an entry in a queue: `RELEASED`, `REJECTED`, `REORDERED`,
+`REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION` (`HELD` is **superseded** by the Owner
+decision of 2026-10-06; see [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2).
 
 Operator Reject is a queue action, not a Cleaning Job outcome. A job that never executes
 because its entry was rejected produces no job outcome. See
@@ -242,6 +248,44 @@ failure condition.
 
 The pump state model is not motor protection and must never be presented as such. Motor
 protection remains external to the application.
+
+### 7.2 Main Pump critical event and Mandatory Safe Return (Owner critical Pump decision, 2026-10-06)
+
+The Owner classified the **Main Pump as a High Critical device**:
+
+- **Expected commanded stop** (A) is not a fault.
+- **Unexpected stop** (B) and **trip** (C) are High Critical events. On B or C, normal Cleaning
+  progression, cleaning water output and dispatch stop, and the AutoSequence is suspended (spike
+  name `CRITICAL_SUSPENDED`). An Active Job enters Mandatory Safe Return, and a blocking
+  high-severity alarm presentation appears.
+- The GlobalQueue is unchanged. There is no automatic Resume and no automatic next Job.
+
+**Every Cleaning Job, whatever the outcome, ends through Mandatory Safe Return:**
+
+1. stop normal Cleaning / water command;
+2. command the Isolation Valve closed;
+3. confirm closed;
+4. command the axis to the Standby Position;
+5. confirm Standby;
+6. finalize the outcome;
+7. release Active Job ownership;
+8. only then consider later sequencing.
+
+The valve close is commanded **and confirmed** before the axis return command. The Job remains
+the Active Job until Standby is confirmed.
+
+Still `[OPEN]` (OWNER DECISION REQUIRED), see [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md):
+
+- Safe Return failure handling;
+- valve / axis feedback failures;
+- outcome names;
+- re-queue and retry;
+- clear evidence and Resume authority.
+
+The Stage 0.2.1A spike demonstrates this behaviour with synthetic signals only
+([results §0E](spikes/stage-0.2.1a-results.md#0e-critical-main-pump-handling-and-mandatory-safe-return-stage-021a)).
+It is not a safety function, not motor protection and not verified on hardware. Section 7.1 is
+unchanged.
 
 ## 8. Motion supervision during a job
 

@@ -1,8 +1,16 @@
 # ADR-0006 — UI Delivery Model
 
-- **Status:** PROPOSED — submitted for Owner acceptance at the Stage 0.2 Owner Manual
-  Review. Not binding until the Owner records `ACCEPTED`. **The final UI framework is
-  `[OPEN]`**, corrected by the Owner-requested Stage 0.2 documentation review punchlist.
+- **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
+  merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
+  direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
+  `[OPEN]`, or `[NOT VERIFIED]` below keep those markers.
+- **Owner decision update (2026-10-07):** **React is selected as the Primary UI Framework**
+  after the Stage 0.2.1A Owner-local final Edge gate and manual review passed. The Blazor
+  counter-spike is no longer required unless a future material blocker is identified. Statements
+  below that the final UI framework is `[OPEN]` or that Candidate A is "not accepted" are
+  **superseded by this update** and kept as decision history. The rest of this ADR is unchanged
+  (shell host, Production transport and chart library remain as marked; WebView2 and kiosk
+  behaviour remain `[NOT VERIFIED]`).
 - **Date:** 2026-10-04 (corrected 2026-10-05 by the Owner-requested Stage 0.2 documentation
   review punchlist)
 - **Supersedes:** Nothing. This record closes the UI delivery question left `[OPEN]` by
@@ -159,7 +167,7 @@ performance-related row must be settled by measurement in the proposed Stage 0.2
 
 | Evaluation dimension | Candidate A — React + TypeScript + Vite | Candidate B — Blazor Hybrid | Note |
 | --- | --- | --- | --- |
-| 104 live Sensor cells | Component-per-cell model with keyed rendering supports partial updates | Component-per-cell model with diff-based rendering supports partial updates | Both must demonstrate the one-second target; neither is assumed |
+| 106 live Sensor cells | Component-per-cell model with keyed rendering supports partial updates | Component-per-cell model with diff-based rendering supports partial updates | Both must demonstrate the one-second target; neither is assumed |
 | One-second update target | Must be measured under the spike workload | Must be measured under the spike workload | Acceptance measure, not a claim |
 | Efficient partial updates | Explicit changed-state application; only affected cells re-render | Rendered diff over the component tree; only changed output is applied | Both are viable in principle; cost profile differs and is unmeasured |
 | Multiple visual states per Sensor | Class/attribute-driven styling; states compose naturally | Same, expressed in C# components | Presentation model is framework-neutral (see [`../ARCHITECTURE.md`](../ARCHITECTURE.md) section 26) |
@@ -234,7 +242,7 @@ performance-related row must be settled by measurement in the proposed Stage 0.2
 | Web view runtime absent, mismatched, or unserviceable on the target image | Kiosk cannot start offline | Verify the image; bundle a pinned offline runtime if it cannot be guaranteed; native desktop fallback remains available | `[NOT VERIFIED]` |
 | Spike deferred or skipped, framework chosen informally later | A framework is adopted without evidence, and the legacy performance failure returns | The proposed Stage 0.2.1 spike is the only authorised selection route; no UI code may be created before a framework decision | `[PROPOSED]` |
 | Candidate A's second ecosystem drifts or cannot be restored offline | Non-reproducible offline builds | Pinned versions, committed dependency manifest and lock file, prepared local mirror or vendored cache | `[OPEN]` |
-| Candidate B's per-update rendering cost is too high at 104 cells and one-second cadence | UI lags, defeating the legacy correction | Measured acceptance threshold in the spike; partial-update and virtualisation requirements are binding regardless of framework | `[NOT VERIFIED]` |
+| Candidate B's per-update rendering cost is too high at 106 cells and one-second cadence | UI lags, defeating the legacy correction | Measured acceptance threshold in the spike; partial-update and virtualisation requirements are binding regardless of framework | `[NOT VERIFIED]` |
 | Shell crash while a Cleaning Job is active | Operator loses visibility | Supervise and restart the shell; raise a visibility alarm; runtime continues and holds state | `[PROPOSED]` |
 | Close guard mistaken for protection | False safety belief | UIG-005/UIG-006 wording retained in every document that mentions it | `[OWNER CONFIRMED]` |
 | Camera integration assumed to be simple in one candidate | Late rework in the UI | Camera panel is an explicit spike workload for both candidates | `[PROPOSED]` |
@@ -246,7 +254,7 @@ performance-related row must be settled by measurement in the proposed Stage 0.2
 - `[OPEN]`: **the final UI framework** (Candidate A versus Candidate B), the shell host
   framework, the chart/trend library, the push transport, and the UI test tooling.
 - `[NOT VERIFIED]`: presence, version, and servicing behaviour of the web view runtime on the
-  target Windows 11 Pro image; suitability of either candidate for the 104-cell one-second
+  target Windows 11 Pro image; suitability of either candidate for the 106-cell one-second
   workload; memory stability over extended operation; camera integration.
 - No candidate is rejected. No candidate is accepted. The recorded preference for
   React + TypeScript + Vite is an evidence-based current position, not an approval.
@@ -256,7 +264,7 @@ performance-related row must be settled by measurement in the proposed Stage 0.2
 
 | Item | Gate that must close it |
 | --- | --- |
-| **Final UI framework selection — React + TypeScript + Vite versus Blazor Hybrid** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED) |
+| **Final UI framework selection — React + TypeScript + Vite versus Blazor Hybrid** | **Proposed Stage 0.2.1 — UI and Runtime Technology Spike** (PROPOSED, NOT AUTHORIZED). Update: the narrower Stage 0.2.1A synthetic React feasibility spike is approved and in progress; React final selection not yet approved; Blazor counter-spike deferred / not authorized |
 | Shell host framework selection | Implementation Stage Gate before UI code is created |
 | Web view runtime availability and offline installation path | Deployment and offline packaging Stage Gate, with workstation image evidence |
 | Shell supervision and recovery policy | Implementation Stage Gate (runtime/service supervision) |
