@@ -63,9 +63,11 @@ was explicitly **not rejected**; that position ended with the 2026-10-07 Owner s
 React can be built and deployed offline; it introduces a second
 package and build ecosystem, which increases offline dependency-management and supply-chain
 effort without making offline development or deployment impossible. Choosing the framework
-required measured evidence: the Stage 0.2.1A React feasibility spike is approved and in
-progress (see [`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md)); React
-feasibility checkpoint is now complete and React is selected (see above). See
+required measured evidence, and it was obtained: the Stage 0.2.1A React feasibility spike
+was approved, implemented, and **closed out** — the feasibility checkpoint is **complete**
+(Owner-local final Edge gate and manual review **PASS**;
+[`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md) is retained as
+history), and React is **selected** as the Primary UI Framework (see above). See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and
 [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 3.2.
 

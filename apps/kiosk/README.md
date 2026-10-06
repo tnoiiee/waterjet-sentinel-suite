@@ -11,9 +11,14 @@ direction drafted in
 | File | Present | State |
 | --- | --- | --- |
 | `Wjss.Kiosk.csproj` | yes | `WinForms` enabled; **no WebView2 package reference** — none is approved in `Directory.Packages.props` |
-| `Program.cs` | yes | message-loop entry; runtime detection = fixed-name `Environment` probe, **detection only** — no loader, no fallback chain, no registry walk (that design is ADR-0013 territory, gated at 0.3A-4) |
-| `MainForm.cs` | yes | borderless full-screen window + close-guard placeholder |
+| `Program.cs` | yes | WinForms message-loop entry only — visual styles, DPI mode, `Application.Run(new MainForm())`. **No WebView2 detection, loading or runtime probing of any kind exists** |
+| `MainForm.cs` | yes | Maximized, resizable skeleton window with a placeholder label; **no close guard is implemented** |
 | `app.manifest` | yes | DPI awareness + assembly identity |
+
+**WebView2 detection and the close guard belong to later authorized checkpoints** (the
+detection design is ADR-0013 territory, gated at Stage 0.3A-4/0.3A-5 per
+[`../../docs/decisions/ADR-0016-kiosk-shell-direction.md`](../../docs/decisions/ADR-0016-kiosk-shell-direction.md)).
+Nothing in this project performs or emulates them today.
 
 **Compile-only by contract.** This project must build; it must not navigate, load assets,
 spawn the Runtime, or show anything meaningful. No behaviour in here is asserted as working —
