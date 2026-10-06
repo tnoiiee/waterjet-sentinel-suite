@@ -5,10 +5,11 @@
 
     Package identity and versions below are PROPOSED from package metadata known to
     the authoring agent. The Arena environment cannot reach any NuGet endpoint, so
-    NO RESTORE COMPATIBILITY IS CLAIMED. The Owner-local restore (first-lock
-    generation, then --locked-mode) must verify these exact identities and versions
-    and MAY bump them to the current stable equivalent as part of the same
-    checkpoint review; any bump must update this file in a review-correction commit.
+    NO RESTORE COMPATIBILITY IS CLAIMED. The Owner-local restore (first lock-file
+    generation, then the locked-mode restore flag) must verify these exact
+    identities and versions and MAY bump them to the current stable equivalent as
+    part of the same checkpoint review; any bump must update this file in a
+    review-correction commit.
 
     Approved minimum set only (Stage 0.3A Scope Gate, Owner amendment):
       Microsoft.NET.Test.Sdk, xunit, xunit.runner.visualstudio.
@@ -27,7 +28,15 @@
     <!-- Test stack (xUnit selection: approved Owner pinning decision, Stage 0.3A). -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!--
+      Standard non-transitive test-runner metadata (Owner review correction E):
+      the vstest adapter is consumed only by the test host at run time and must
+      not flow into anything that transitively references a test project.
+    -->
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageVersion>
   </ItemGroup>
 
 </Project>

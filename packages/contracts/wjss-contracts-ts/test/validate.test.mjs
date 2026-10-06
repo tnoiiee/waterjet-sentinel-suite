@@ -50,6 +50,34 @@ test('snapshot with wallMap in delta is rejected', () => {
   assert.ok(result.issues.some((i) => i.includes('wallMap')));
 });
 
+test('delta activeJob three-state encoding is accepted', () => {
+  const base = fixture('delta.basic.json');
+
+  // absent key = unchanged (delta.basic.json carries no activeJob at all here after
+  // removing the review-time explicit-null; build both shapes explicitly):
+  const unchanged = { ...base };
+  delete unchanged.activeJob;
+  assert.deepEqual(validateEnvelope(unchanged).issues, []);
+
+  // explicit null = clear:
+  const cleared = { ...base, activeJob: null };
+  assert.deepEqual(validateEnvelope(cleared).issues, []);
+
+  // full object = replace (reuse the snapshot's job):
+  const snapshot = fixture('snapshot.seed0.json');
+  const replaced = { ...base, activeJob: snapshot.activeJob };
+  assert.deepEqual(validateEnvelope(replaced).issues, []);
+
+  // the removed boolean flag is rejected:
+  const badFlag = { ...base, activeJobCleared: true };
+  delete badFlag.activeJob;
+  assert.ok(validateEnvelope(badFlag).issues.some((i) => i.includes('activeJobCleared')));
+
+  // a partial/typed-wrong activeJob is rejected:
+  const badObj = { ...base, activeJob: { jobId: 'J-9' } };
+  assert.ok(validateEnvelope(badObj).issues.some((i) => i.includes('Active Job object')));
+});
+
 test('gap chain revision jump is flagged, not fatal', () => {
   const delta = { ...fixture('delta.basic.json'), previousRevision: 1, revision: 9 };
   const result = validateEnvelope(delta);

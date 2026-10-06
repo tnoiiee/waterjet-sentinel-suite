@@ -104,7 +104,7 @@ node tools/boundary-scan/boundary-scan.mjs .   # must print: 0 findings
 ```
 
 (`npm ci` must hit the Owner's normal registry; if the workstation mirrors npm like it mirrors
-NuGet, use the mirror.) Expected: 14/14 tests pass; both fixture sets validate; boundary scan
+NuGet, use the mirror.) Expected: 15/15 tests pass; both fixture sets validate; boundary scan
 exits 0.
 
 ## 7. Optional smoke (recommended, quick)
@@ -132,7 +132,7 @@ git rev-parse HEAD: ______
   Wjss.Config.Examples.Tests ___ / Wjss.FixtureEmission.Tests ___
 5 fixture regeneration: IDENTICAL / PROVISIONAL-MARKER-ONLY / DRIFT
   (if DRIFT — verbatim diff):
-6 npm run check: PASS/FAIL (tests ___/14)   boundary-scan: findings ___
+6 npm run check: PASS/FAIL (tests ___/15)   boundary-scan (S1-S8): findings ___
 7 health smoke: live ___ / ready ___
 verdict: PASS / FAIL — stages 2-6 all PASS and 5 ≠ DRIFT
 pin amendments made (if any): ______

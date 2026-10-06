@@ -100,7 +100,7 @@ already visible in the authored sources (`packages/contracts`, `tools/boundary-s
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [ADR-0014](ADR-0014-product-contract-skeleton.md) | Product contract skeleton and queue capacity | `DRAFT` (includes the `activeJobCleared` encoding deviation from the spike) |
+| [ADR-0014](ADR-0014-product-contract-skeleton.md) | Product contract skeleton and queue capacity | `DRAFT` (three-state `activeJob` encoding — the accepted spike baseline, restored by Owner review) |
 | [ADR-0015](ADR-0015-ui-transport-and-chart-direction.md) | UI production transport and chart direction | `DRAFT` (fills the `[OPEN]` transport/chart selections; does not re-open React) |
 | [ADR-0016](ADR-0016-kiosk-shell-direction.md) | Kiosk shell direction | `DRAFT` (WinForms + WebView2 detection-only; drafting only — ADR-0006's `[OPEN]` marker stands until acceptance) |
 

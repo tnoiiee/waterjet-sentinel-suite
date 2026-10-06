@@ -25,6 +25,47 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Source review correction (Owner findings A–E, same PR #4)
+
+Independent Owner source review of `205456e` found five issues; corrected here as one
+review-correction commit on PR #4. **Still no .NET build claim.**
+
+- **A — build-blocking XML defect (FIXED):** the `Directory.Packages.props` header comment
+  contained a double-hyphen sequence (`--locked-mode`), which is illegal in XML 1.0 and made
+  the file unparseable by MSBuild — the checkpoint's own restore would have failed at line 9.
+  Comment reworded; permanently guarded by new scanner rule **S8 XML well-formedness**
+  covering `*.csproj`, `*.props`, `*.targets`, `*.manifest`, `*.resx`, `*.config`
+  (verified against negative controls).
+- **B — Delta Active-Job clear semantics (RESTORED TO ACCEPTED BASELINE):** the
+  checkpoint-introduced `activeJobCleared: true` flag was **not approved**; the accepted
+  three-state encoding is back — key absent = unchanged, object = replace, explicit
+  `"activeJob": null` = clear. Implemented presence-aware with a scoped structural
+  technique (`Optional<T>` wrapper + converter attributed only on
+  `OperationalDelta.ActiveJob`; explicitly not a general serialization policy). The flag is
+  removed from the C# records, TypeScript types, validator (which now **rejects** it), the
+  fixtures (delta.basic exercises the null-clear key in lockstep with the .NET generator),
+  the xUnit suite (five three-state tests authored — NOT RUN in Arena), ADR-0014 (rewritten
+  with the rejected deviation kept as labeled history) and current-facing docs.
+- **C — current-facing stage banners:** the 12 authorized status-banner documents (SECURITY,
+  ALARM_MODEL, ARCHITECTURE, CLEANING_SEQUENCE, CONTROL_AUTHORITY, DOMAIN_MODEL,
+  HISTORIAN_RETENTION, QUEUE_MODEL, REQUIREMENTS, SAFETY_BOUNDARY, TEST_STRATEGY,
+  USER_PERMISSION_MODEL) now state PR #3 MERGED `d8d28201`, Stage 0.3A Scope Gate APPROVED,
+  0.3A-1 SOURCE CHECKPOINT AUTHORED with Owner-local validation PENDING, PR #4 OPEN — NOT
+  READY FOR MERGE, 0.3A-2 NOT AUTHORIZED, production-device access NOT AUTHORIZED. No
+  domain/queue/alarm/safety/control content below the banners was touched.
+- **D — README consistency:** the stale "preference is not acceptance" sentence is now
+  explicitly labeled historical; React selected (Owner decision 2026-10-07) stated plainly;
+  Blazor counter-spike not required absent a material blocker.
+- **E — test-runner metadata:** `xunit.runner.visualstudio` `PackageVersion` carries the
+  standard non-transitive pattern (`PrivateAssets=all`;
+  `IncludeAssets=runtime; build; native; contentfiles; analyzers; buildtransitive`).
+  Proposed versions unchanged (Owner-local restore still arbitrates them); no lock files
+  generated in Arena.
+- Arena validation for this correction: XML well-formedness 15/15 files clean + negative
+  controls flagged; JSON sweep green; `npm ci`/typecheck/`node --test` **15/15 PASS**
+  (lockfile untouched); boundary scan **0 findings (S1–S8)**; `spikes/**` sha256 roll
+  unchanged; `git diff --check` clean.
+
 ### Stage 0.3A-1 — Product foundation source checkpoint (authored in Arena; Owner-local validation PENDING)
 
 **Gate:** Owner Option-C amended Stage 0.3A Scope Gate — source-checkpoint authority only.
@@ -50,7 +91,8 @@ in the sandbox); the mandatory pre-merge gate is
 - Added `tools/boundary-scan/boundary-scan.mjs`: repository-boundary gate S1–S7, currently
   **0 findings**. Added `docs/STAGE_0.3A_PLAN.md` and the Owner-local validation runbook.
 - Added **DRAFT** ADR-0014 (contract skeleton; queue capacity 8; profile-start fail-closed;
-  documents the `activeJobCleared` delta-encoding deviation from the spike), ADR-0015
+  the delta clear-encoding it first drafted was superseded by the review-correction entry
+  below), ADR-0015
   (loopback SSE transport + uPlot candidate; fills `[OPEN]` selections only on acceptance),
   ADR-0016 (WinForms + WebView2 detection-only shell; drafts ADR-0006 §6.7) and indexed them.
 - Fixed `.gitignore`: the `**/[Pp]ackages/*` vendor rule conflicted with the new product

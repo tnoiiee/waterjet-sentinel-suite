@@ -13,13 +13,15 @@ namespace Wjss.Contracts;
 ///     reopens for a fresh Snapshot. No replay, no inference from a stale cache.
 ///   * no wallMap key (the wall map is static, Snapshot-only).
 ///
-/// Documented encoding deviation from the spike (recorded in ADR-0014 draft):
-/// the spike signalled "Job cleared" with an explicit `activeJob: null`.
-/// System.Text.Json cannot combine "omit when null" with "write explicit null"
-/// per-property, so the Product Delta clears the Active Job with
-/// <see cref="ActiveJobCleared"/> = true while omitting the activeJob key.
-/// A literal `activeJob: null` in a Product Delta is INVALID and is rejected
-/// by the contract validator (single unambiguous encoding).
+/// Active Job uses the full three-state encoding of the accepted baseline,
+/// restored by Owner review (no second boolean flag exists in the contract):
+///   * <c>activeJob</c> ABSENT      -> unchanged;
+///   * <c>activeJob</c> OBJECT      -> replace the Active Job;
+///   * <c>activeJob: null</c>       -> clear the Active Job (release/SR7 done).
+/// The distinction between "absent" and "explicit null" is implemented with
+/// the structural presence wrapper <see cref="Optional{T}"/> — a contract
+/// technique applied to this property ONLY, not a production serialization
+/// policy for other fields.
 /// </summary>
 public sealed record OperationalDelta
 {
@@ -48,12 +50,13 @@ public sealed record OperationalDelta
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<WallSummary>? Walls { get; init; }
 
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ActiveCleaningJobState? ActiveJob { get; init; }
-
-    /// <summary>true = the Active Job has been cleared (release/SR7 done); activeJob key must be absent.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? ActiveJobCleared { get; init; }
+    /// <summary>
+    /// Three-state Active Job slot (see type docs): Absent = unchanged,
+    /// Present = whole-record replacement, Cleared = explicit JSON null.
+    /// </summary>
+    [JsonConverter(typeof(OptionalJsonConverter<ActiveCleaningJobState>))]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public Optional<ActiveCleaningJobState> ActiveJob { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PumpState? Pump { get; init; }

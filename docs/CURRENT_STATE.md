@@ -112,7 +112,7 @@ No governance rule requires a documentation stage to advance a version number.
 | Database schema or SQL scripts | **Do not exist** |
 | Modbus or Galil adapter | **Does not exist** |
 | Simulator | **Simulator adapter seam exists** (`adapters/simulator`: csproj + README only — behaviour, seeded acquisition and fault injection are 0.3A-2 scope). Never a production-path component. The deterministic synthetic topology currently lives in the test-side fixture generator (`tests/integration/FixtureGenerator.cs`). The spike's Node harness remains feasibility-only |
-| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product tests **authored but never executed on .NET**: 5 xUnit projects (domain/runtime/api/config/fixture-parity) + TS mirror tests (14/14 PASS in Arena — the only green product-adjacent suite) |
+| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product tests **authored but never executed on .NET**: 5 xUnit projects (domain/runtime/api/config/fixture-parity) + TS mirror tests (15/15 PASS in Arena after the review correction — the only green product-adjacent suite) |
 | CI workflow | **Does not exist** |
 | Installer or release artifact | **Does not exist** |
 | Production configuration | **Does not exist in this repository** |
@@ -387,7 +387,7 @@ accepted and merged Stage 0.2.*
 | --- | --- |
 | Gate | Owner **Option-C amended gate** — Arena may author the approved 0.3A-1 source set; it may not compile .NET (SDK/NuGet blocked by the sandbox network) and must not claim build/test success |
 | Authored | Solution (12 projects); `Wjss.Contracts` (18 files) incl. queue capacity 8 + head-only consumption + profile-start fail-closed; Domain/Runtime.Core/Time/Simulator sources; Runtime health stub; compile-only Kiosk; 5 xUnit projects incl. the .NET golden-fixture generator + parity gate; TS mirror + validator; 4 provisional fixtures + 2 config examples; `tools/boundary-scan` (S1–S7, 0 findings); DRAFT ADR-0014/0015/0016; stage plan + Owner-local runbook; `.gitignore` product-`packages` conflict corrected |
-| Wire-contract deviation | Spike `activeJob: null` replaced by delta-only `activeJobCleared: true` (STJ encoding limit) — recorded in DRAFT ADR-0014 §2; TS validator rejects the old form |
+| Wire-contract correction | The checkpoint draft's `activeJobCleared` flag was **rejected by Owner review**; the accepted three-state baseline (absent = unchanged / object = replace / `null` = clear) is restored, implemented via the scoped `Optional<T>` presence wrapper (structural technique, ADR-0014 §2) |
 | Fixture provenance | Node-authored in Arena, labelled `PROVISIONAL STRUCTURAL FIXTURE`; **not** .NET-generated; superseded by the Owner-local generator run (runbook §5) |
 | Arena verification | TS: `npm ci` + `tsc --noEmit` clean + `node --test` 14/14 PASS + fixtures validate; boundary scan exit 0; all JSON parses; links/whitespace/secret checks — see §12.12 |
 | NOT verified | Every .NET claim: restore, build, tests, health-stub behaviour, kiosk, parity between C# generator and committed fixtures, NuGet pin availability |
@@ -760,6 +760,23 @@ record's tables are the authority for what was and was not checked):
 regeneration via the .NET generator, Runtime/kiosk execution, NuGet pin resolution. See
 [`STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) — that run,
 reported verbatim into the PR, is the mandatory pre-merge gate.
+
+### 12.13 Stage 0.3A-1 Owner source-review correction — Arena validation record
+
+Owner review of `205456e` returned findings A–E; this checkpoint addresses all five as a
+source correction on PR #4 (commit message `fix: correct Stage 0.3A-1 source checkpoint
+blockers`). Validation actually executed in Arena, on the corrected tree:
+
+| # | Check | Result |
+| --- | --- | --- |
+| A-1 | `Directory.Packages.props` XML comment double-hyphen (`--locked-mode`) | **REMOVED** — comment reworded; file parses |
+| A-2 | New scanner rule **S8 XML well-formedness** over `*.csproj/*.props/*.targets/*.manifest/*.resx/*.config` (comments: no `--`, terminated, not `-`-ended; attribute quoting; element nesting; stray `<`) | **PASS — repo 0 findings**; negative controls (bad comment, unquoted attr, unclosed element) each flagged, exit 1 |
+| B | `activeJobCleared` removed from C# contracts, TS types, validator, fixtures, tests, ADR and current-facing docs; three-state `activeJob` restored via `Optional<T>` + scoped converter; `delta.basic` fixture now exercises the explicit-null clear key (generator updated in lockstep) | **DONE** — C# compile/test NOT RUN (Arena); TS **15/15 PASS** incl. required-test-6 (three-state acceptance + flag rejection) |
+| E | `xunit.runner.visualstudio` carries `PrivateAssets=all` + standard `IncludeAssets` list at the `PackageVersion` (CPM flow); versions unchanged; no lock files generated | **DONE** (static read-back) |
+| C/D | Current-facing banners aligned in the 12 authorized files; README React-selection wording corrected (historical sentences labeled) | **DONE** — ad-hoc consistency sweep green |
+
+Still NOT claimed: any .NET restore/build/test result (sandbox unchanged). Fixtures remain
+`PROVISIONAL STRUCTURAL FIXTURE` pending the Owner-local regeneration.
 
 ## 13. Required positive confirmations
 

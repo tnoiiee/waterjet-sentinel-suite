@@ -58,6 +58,7 @@
       "alarmSeverity": null
     }
   ],
+  "activeJob": null,
   "pump": {
     "state": "STOPPING",
     "pressure": 20.5,

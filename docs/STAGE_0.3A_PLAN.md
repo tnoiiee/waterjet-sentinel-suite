@@ -73,7 +73,8 @@ trust.
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins
   disputes (ADR-0014 §1).
-- Delta semantics: sparse fields, `activeJobCleared` for job removal (never an explicit null),
+- Delta semantics: sparse fields; `activeJob` three-state (absent = unchanged / object =
+  replace / explicit null = clear) via the scoped `Optional<T>` presence technique;
   `gap`-style revision jumps ⇒ client re-snapshot, never a repair attempt.
 - Sequence-record ordering normative (ADR-0014 §5); queue head-only consumption, capacity 8,
   refusal `409 QUEUE_FULL` (ADR-0014 §3).
@@ -132,7 +133,7 @@ until 0.3A-4; no packages; supervision + close guard land with their gate.
 - Golden fixture regeneration: `WJSS_UPDATE_FIXTURES=1 dotnet test tests/integration` — the
   only sanctioned way fixtures change; committed fixtures MUST match.
 - TypeScript: `npm run check` (typecheck + `node --test` + fixture validation) — green in
-  Arena 2026-10-07 (14/14).
+  Arena 2026-10-07 (15/15 incl. the three-state `activeJob` tests from the review correction).
 - Node's validator is structural insurance, never the authority; the parity test is authority.
 
 ## 13. Boundary enforcement tooling

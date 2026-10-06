@@ -385,9 +385,13 @@ export interface OperationalSnapshot {
 }
 
 /**
- * Absent key = unchanged. There is NO `activeJob: null` encoding in the
- * Product Delta (spike encoding, rejected by ADR-0014): clearing the Active
- * Job sets `activeJobCleared: true` while omitting `activeJob`.
+ * Absent key = unchanged (accepted 0.2.1A baseline, restored by Owner review
+ * 2026-10-07 — three-state encoding, no boolean flag):
+ *   `activeJob` ABSENT  = unchanged;
+ *   `activeJob` OBJECT  = replace the Active Job;
+ *   `activeJob: null`   = clear the Active Job (release/SR7 done).
+ * In C# this presence distinction is carried by the Optional<T> wrapper
+ * (structural contract technique, applied to this property only).
  */
 export interface OperationalDelta {
   kind: 'delta';
@@ -400,8 +404,7 @@ export interface OperationalDelta {
   config?: PublishedConfigurationRevision;
   sensors?: SensorPresentationState[];
   walls?: WallSummary[];
-  activeJob?: ActiveCleaningJobState;
-  activeJobCleared?: true;
+  activeJob?: ActiveCleaningJobState | null;
   pump?: PumpState;
   queue?: QueueSummary;
   sequence?: SequenceState;

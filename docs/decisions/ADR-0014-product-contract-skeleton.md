@@ -34,15 +34,22 @@ shape into the product tree as .NET records. Two problems must be settled before
    the only source of contract truth. The TypeScript mirror
    (`packages/contracts/wjss-contracts-ts`) is structural documentation: its tests validate
    fixture shape, but any type disagreement resolves in favour of C#.
-2. **Delta encodes "job cleared" as `activeJobCleared: true`.** Deviation from the spike,
-   recorded here because it changes the wire contract:
-   - `activeJob` present ⇒ job set or replaced (value carries `jobId` + `points`).
-   - `activeJobCleared: true` ⇒ clear the active job (delta-only property; absent otherwise).
-   - literal `"activeJob": null` ⇒ **invalid**; the TS validator rejects it.
-   This replaces per-property explicit-null with an additive flag, which is the encoding
-   STJ produces from `JsonIgnoreCondition.WhenWritingNull` plus a nullable bool.
-   *Consequence to verify Owner-side:* the future product UI reducer must read the flag;
-   the spike UI cannot consume product deltas without this one change.
+2. **Delta keeps the accepted three-state `activeJob` encoding** (the 0.2.1A
+   spike baseline, confirmed by the Stage 0.3A-1 Owner review of 2026-10-07):
+   - `activeJob` ABSENT ⇒ unchanged;
+   - `activeJob` OBJECT ⇒ whole-record replacement;
+   - `"activeJob": null` ⇒ clear the Active Job (release / Safe-Return complete).
+   Because System.Text.Json cannot distinguish "property never set" from
+   "property set to null" on a bare nullable property, this is implemented
+   with a small structural presence wrapper (`Optional<T>` plus a converter
+   scoped to `OperationalDelta.ActiveJob` via `[JsonConverter]`). **This is a
+   structural contract technique, not Production policy**: no other Delta
+   field gains an explicit-null clear encoding in this checkpoint.
+   *History:* the first checkpoint draft had replaced `activeJob: null` with a
+   second boolean property (`activeJobCleared`) on serialization-convenience
+   grounds; the Owner review rejected the deviation and the baseline above was
+   restored in the same PR. The rejected flag is not part of the contract;
+   the TypeScript validator rejects any payload that carries it.
 3. **Queue capacity is 8, contiguous, head-only consumption.** Positions are 1..N, never
    sparse. A dequeue removes position 1; survivors shift down and the batch revision
    increments by exactly 1. Enqueue beyond capacity 8 is refused (HTTP 409, stable refusal
@@ -70,8 +77,12 @@ shape into the product tree as .NET records. Two problems must be settled before
 
 ## Alternatives considered
 
-- **Keep the spike's `activeJob: null` encoding with a custom converter.** Rejected: a
-  converter per holder type is maintenance surface for one boolean's worth of information.
+- **A second boolean clear property instead of the explicit null.** Rejected by the Owner
+  review: it changes the accepted wire contract to work around a serializer limitation that
+  one scoped presence wrapper resolves cleanly.
+- **Registering the Optional converter globally (affecting all fields).** Rejected: other
+  fields keep their existing "absent means unchanged, null never written" semantics; a
+  global converter would invent clear semantics they must not have.
 - **Capacity 16 / unbounded queue.** Rejected: ADR-0003 requires deterministic, supervised
   arbitration; unbounded queues hide operator error.
 - **Generate the TS mirror from C# in Stage 0.3A.** Rejected: build-time codegen requires the
@@ -84,11 +95,13 @@ shape into the product tree as .NET records. Two problems must be settled before
 - Every future stage that touches transport must keep the three artifacts (records, TS
   mirror, fixtures) in lockstep — enforced by `FixtureParityTests`, which is a *test*, run
   Owner-local, not a docs promise.
-- The `activeJobCleared` flag must be reflected in any UI-side reducer written for the product.
+- The UI-side reducer must distinguish all three `activeJob` states (ignore / replace /
+  clear); a payload carrying the rejected boolean form is invalid and validator-rejected.
 
 ## Verification status
 
-- Contracts, validator, fixtures: authored and Node-validated in Arena (14/14 tests green).
+- Contracts, validator, fixtures: authored and Node-validated in Arena (15/15 tests green
+  after the Owner-review correction of 2026-10-07; the 14-test count pre-dates it).
 - C# compilation of the contracts and the parity test: `NOT RUN IN ARENA` (no .NET SDK;
   sandbox network blocks it). **Owner-local run is the gate** — see
   [`../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md).

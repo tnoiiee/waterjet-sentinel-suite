@@ -406,6 +406,9 @@ internal static class FixtureGenerator
         Revision = 11,
         GeneratedAt = Timestamp,
         Sensors = [BuildSensor(1, false, false), BuildSensor(2, false, false)],
+        // Exercises the accepted three-state encoding: an explicit-null
+        // activeJob key CLEARS the Active Job (absent would mean unchanged).
+        ActiveJob = Optional<ActiveCleaningJobState>.Cleared,
         Pump = new PumpState
         {
             State = PumpRunState.STOPPING,

@@ -193,7 +193,11 @@ function validateQueue(q, path, issues) {
 
 function validateSharedBody(obj, path, issues) {
   if (obj.queue !== undefined && obj.queue !== null) validateQueue(obj.queue, `${path}.queue`, issues);
-  if (obj.activeJob !== undefined) validateActiveJob(obj.activeJob, `${path}.activeJob`, issues);
+  // null is a legitimate value in BOTH envelopes: Snapshot (no active job) and
+  // Delta (the accepted explicit-null CLEAR encoding). Only objects get struct-checked.
+  if (obj.activeJob !== undefined && obj.activeJob !== null) {
+    validateActiveJob(obj.activeJob, `${path}.activeJob`, issues);
+  }
   if (obj.sensors !== undefined && obj.sensors !== null) {
     for (const [i, s] of (obj.sensors ?? []).entries()) validateSensor(s, `${path}.sensors[${i}]`, issues);
   }
@@ -273,11 +277,15 @@ function validateDelta(obj, issues) {
   }
   const gap = isInt(obj.previousRevision) && isInt(obj.revision) ? obj.revision !== obj.previousRevision + 1 : true;
   if ('wallMap' in obj) issues.push('wallMap must never appear in a Delta');
-  if ('activeJob' in obj && obj.activeJob === null) {
-    issues.push('activeJob:null is not a valid Delta encoding (use activeJobCleared:true)');
+  // Three-state activeJob encoding (accepted baseline; Owner review 2026-10-07):
+  // absent key = unchanged | object = replace | explicit null = clear.
+  if ('activeJobCleared' in obj) {
+    issues.push('activeJobCleared is not part of the contract (removed; the clear encoding is an explicit "activeJob": null)');
   }
-  if (obj.activeJobCleared === true && 'activeJob' in obj) {
-    issues.push('activeJobCleared:true requires the activeJob key to be absent');
+  if ('activeJob' in obj && obj.activeJob !== null) {
+    if (typeof obj.activeJob !== 'object' || typeof obj.activeJob.jobId !== 'string' || typeof obj.activeJob.targetSensorId !== 'string') {
+      issues.push('Delta activeJob must be a full Active Job object (jobId + targetSensorId) or an explicit null');
+    }
   }
   if (Array.isArray(obj.sensors) && obj.sensors.length === 0) issues.push('an empty sensors Delta means whole-set replacement; emit nothing instead');
 

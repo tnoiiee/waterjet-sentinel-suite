@@ -51,16 +51,19 @@ stage is authorised by acceptance. Stage 0.3A-1 authors product *sources* that f
 directions — that is drafting toward implementation, not implemented or verified code; its
 three companion records ADR-0014 to ADR-0016 are `DRAFT`.
 
-**React is selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Owner-local final Edge
-gate and manual review of the Stage 0.2.1A spike passed). The Blazor counter-spike is no longer
-required unless a future material blocker is identified. *Historical context:* two candidates were
-recorded and compared on equal terms: Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
-in the same application-owned kiosk shell behind the same loopback API. The current
-evidence-based preference for Candidate A is explicitly **not acceptance**, and Candidate B is
-explicitly **not rejected**. React can be built and deployed offline; it introduces a second
+**React is selected as the Primary UI Framework** — this is a **settled Owner decision
+(2026-10-07)**, taken after the Owner-local final Edge gate and manual review of the Stage
+0.2.1A spike passed; it is no longer a preference awaiting acceptance. The Blazor
+counter-spike is **not required** unless a future material blocker is identified.
+*Historical context (superseded):* two candidates were recorded and compared on equal terms:
+Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
+in the same application-owned kiosk shell behind the same loopback API. At that time, the
+evidence-based preference for Candidate A was explicitly **not acceptance** and Candidate B
+was explicitly **not rejected**; that position ended with the 2026-10-07 Owner selection.
+React can be built and deployed offline; it introduces a second
 package and build ecosystem, which increases offline dependency-management and supply-chain
 effort without making offline development or deployment impossible. Choosing the framework
-requires measured evidence: the Stage 0.2.1A React feasibility spike is approved and in
+required measured evidence: the Stage 0.2.1A React feasibility spike is approved and in
 progress (see [`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md)); React
 feasibility checkpoint is now complete and React is selected (see above). See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and

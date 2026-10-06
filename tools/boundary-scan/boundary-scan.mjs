@@ -15,6 +15,7 @@
  *   S4 No credential-shaped literals anywhere (pwd/secret/key style assignments).
  *   S5 No product file references spikes/** (import/project reference/path).
  *   S6 No all-interface bind instructions in the Product tree.
+ *   S8 XML well-formedness across *.csproj/*.props/*.targets/*.manifest/*.resx/*.config.
  *
  * This tool is deterministic, dependency-free, and safe to run in CI later.
  */
@@ -193,11 +194,95 @@ if (existsSync(join(ROOT, 'WaterJetSentinelSuite.sln'))) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// S8 - XML well-formedness gate (Owner review correction A, 2026-10-07).
+// Every project/build/manifest XML file in the repository must be
+// well-formed. Static best-effort pre-filter for the defect classes MSBuild
+// rejects outright: double-hyphen or unterminated comments, unquoted
+// attribute values, unbalanced element nesting, stray '<' tokens. A finding
+// here is always real; a slip-through is still caught by the Owner-local
+// build (which remains the authority - this gate only front-runs it).
+// ---------------------------------------------------------------------------
+const XML_EXT = /\.(csproj|props|targets|manifest|resx|config)$/i;
+
+function lineOf(text, idx) {
+  return text.slice(0, idx).split('\n').length;
+}
+
+function checkXmlWellFormed(text) {
+  const issues = [];
+  const nOpen = (text.match(/<!--/g) || []).length;
+  const nClose = (text.match(/-->/g) || []).length;
+  if (nOpen !== nClose) {
+    issues.push(`unbalanced comment delimiters (${nOpen} "<!--" vs ${nClose} "-->")`);
+  }
+  for (const m of text.matchAll(/<!--([\s\S]*?)-->/g)) {
+    const body = m[1];
+    if (body.includes('--')) {
+      issues.push(`line ${lineOf(text, m.index)}: XML comment contains a double-hyphen sequence (forbidden by XML 1.0)`);
+    }
+    if (/-\s*$/.test(body)) {
+      issues.push(`line ${lineOf(text, m.index)}: XML comment must not end with '-'`);
+    }
+  }
+  // blank out comments, processing instructions and CDATA so tag scanning
+  // never trips over their content
+  const clean = text
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, (m0) => ' '.repeat(m0.length))
+    .replace(/<\?[\s\S]*?\?>/g, (m0) => ' '.repeat(m0.length))
+    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, (m0) => ' '.repeat(m0.length));
+  const stack = [];
+  const tagRe = /<(\/?)([A-Za-z_][\w:.-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/g;
+  for (const t of clean.matchAll(tagRe)) {
+    const closing = t[1] === '/';
+    const name = t[2];
+    const attrs = t[3];
+    const selfClose = t[4] === '/';
+    const at = lineOf(clean, t.index);
+    const attrPart = attrs.replace(/\s*=\s*"[^"]*"/g, '=Q').replace(/\s*=\s*'[^']*'/g, '=Q');
+    if (/\w[\w:.-]*\s*=\s*(?![Q"'])[^>\s]/.test(attrPart)) {
+      issues.push(`line ${at}: unquoted attribute value in <${name}>`);
+    }
+    if (selfClose || closing) {
+      if (closing) {
+        const top = stack.pop();
+        if (!top || top[0] !== name) {
+          issues.push(`line ${at}: closing </${name}> does not match ${top ? `<${top[0]}> opened at line ${top[1]}` : 'any open element'}`);
+        }
+      }
+    } else {
+      stack.push([name, at]);
+    }
+  }
+  if (stack.length > 0) {
+    issues.push(`unclosed element(s): ${stack.map((x) => `<${x[0]}> (line ${x[1]})`).join(', ')}`);
+  }
+  for (const sm of clean.matchAll(/<(?![!?/A-Za-z_])/g)) {
+    issues.push(`line ${lineOf(clean, sm.index)}: invalid '<' token in content (must be escaped)`);
+  }
+  return issues;
+}
+
+for (const { rel, full, dir } of walk(ROOT)) {
+  if (dir) continue;
+  if (!XML_EXT.test(rel)) continue;
+  let xmlText;
+  try {
+    xmlText = readFileSync(full, 'utf8');
+  } catch {
+    continue;
+  }
+  if (xmlText.includes('\u0000')) continue;
+  for (const issue of checkXmlWellFormed(xmlText)) {
+    findings.push({ rule: 'S8', at: rel, why: issue });
+  }
+}
+
 const counts = {};
 for (const f of findings) counts[f.rule] = (counts[f.rule] ?? 0) + 1;
 
 if (findings.length === 0) {
-  console.log('boundary-scan: 0 findings (S1-S7 clean)');
+  console.log('boundary-scan: 0 findings (S1-S8 clean)');
   process.exit(0);
 }
 
