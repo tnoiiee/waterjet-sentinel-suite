@@ -2,15 +2,10 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="0.0.0.0" name="Wjss.Kiosk" />
 
-  <!-- DPI + resize foundation (Owner gate section E): PerMonitorV2 so the
-       shell scales correctly at 100/125/150 % before WebView2 arrives. -->
-  <application xmlns="urn:schemas-microsoft-com:asm.v3">
-    <windowsSettings>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
-      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
-    </windowsSettings>
-  </application>
-
+  <!-- Windows compatibility declaration only. DPI is intentionally NOT declared
+       here: WFO0003 - WinForms configures DPI through the project property
+       (ApplicationHighDpiMode=PerMonitorV2 in Wjss.Kiosk.csproj), which the
+       WinForms ApplicationConfiguration.Initialize() entry point applies. -->
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
       <!-- Windows 10 / 11 (the supported workstation family; Windows 11 Pro is the product baseline). -->

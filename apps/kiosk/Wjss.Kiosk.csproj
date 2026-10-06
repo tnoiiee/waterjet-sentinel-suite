@@ -23,6 +23,9 @@
     <RootNamespace>Wjss.Kiosk</RootNamespace>
     <AssemblyName>Wjss.Kiosk</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFO0003 correction (Owner-local build 2026-10-07): DPI is configured
+         through the WinForms project property, never the app.manifest. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 
 </Project>

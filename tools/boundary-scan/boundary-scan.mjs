@@ -16,6 +16,8 @@
  *   S5 No product file references spikes/** (import/project reference/path).
  *   S6 No all-interface bind instructions in the Product tree.
  *   S8 XML well-formedness across *.csproj/*.props/*.targets/*.manifest/*.resx/*.config.
+ *   S9 Kiosk DPI configuration: no DPI elements in app.manifest; ProjectProperty
+ *      ApplicationHighDpiMode=PerMonitorV2 exactly once; generated-bootstrap entry point.
  *
  * This tool is deterministic, dependency-free, and safe to run in CI later.
  */
@@ -278,11 +280,53 @@ for (const { rel, full, dir } of walk(ROOT)) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// S9 - Kiosk DPI configuration (WFO0003 correction, Owner-local build of
+// 2026-10-07): WinForms DPI is configured by the project property, never by
+// app.manifest; the entry point must be the source-generated bootstrap.
+// Machine-checks the compile-error class so it cannot regress silently.
+// ---------------------------------------------------------------------------
+{
+  const manifestPath = join(ROOT, 'apps/kiosk/app.manifest');
+  const csprojPath = join(ROOT, 'apps/kiosk/Wjss.Kiosk.csproj');
+  const programPath = join(ROOT, 'apps/kiosk/Program.cs');
+  if (existsSync(manifestPath)) {
+    const manifest = readFileSync(manifestPath, 'utf8');
+    for (const token of ['dpiA' + 'ware', 'windowsSe' + 'ttings']) {
+      if (manifest.includes(token)) {
+        findings.push({ rule: 'S9', at: 'apps/kiosk/app.manifest', why: `DPI element '${token}' must not be declared in the manifest (WFO0003)` });
+      }
+    }
+    if (!manifest.includes('supportedOS')) {
+      findings.push({ rule: 'S9', at: 'apps/kiosk/app.manifest', why: 'Windows compatibility (supportedOS) declaration must remain' });
+    }
+  }
+  if (existsSync(csprojPath)) {
+    const csproj = readFileSync(csprojPath, 'utf8');
+    const decl = '<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>';
+    const occurrences = csproj.split(decl).length - 1;
+    if (occurrences !== 1) {
+      findings.push({ rule: 'S9', at: 'apps/kiosk/Wjss.Kiosk.csproj', why: `ApplicationHighDpiMode=PerMonitorV2 must appear exactly once (found ${occurrences})` });
+    }
+  }
+  if (existsSync(programPath)) {
+    const program = readFileSync(programPath, 'utf8');
+    const init = program.indexOf('ApplicationConfiguration.Initialize()');
+    const run = program.indexOf('Application.Run(new MainForm())');
+    if (init < 0 || run < 0 || init > run) {
+      findings.push({ rule: 'S9', at: 'apps/kiosk/Program.cs', why: 'ApplicationConfiguration.Initialize() must precede Application.Run(new MainForm())' });
+    }
+    if (program.includes('SetHighDpiMode')) {
+      findings.push({ rule: 'S9', at: 'apps/kiosk/Program.cs', why: 'separate SetHighDpiMode call duplicates the generated bootstrap' });
+    }
+  }
+}
+
 const counts = {};
 for (const f of findings) counts[f.rule] = (counts[f.rule] ?? 0) + 1;
 
 if (findings.length === 0) {
-  console.log('boundary-scan: 0 findings (S1-S8 clean)');
+  console.log('boundary-scan: 0 findings (S1-S9 clean)');
   process.exit(0);
 }
 

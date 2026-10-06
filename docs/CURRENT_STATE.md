@@ -778,6 +778,20 @@ blockers`). Validation actually executed in Arena, on the corrected tree:
 Still NOT claimed: any .NET restore/build/test result (sandbox unchanged). Fixtures remain
 `PROVISIONAL STRUCTURAL FIXTURE` pending the Owner-local regeneration.
 
+### 12.14 Stage 0.3A-1 Owner-local compile correction — Arena validation record
+
+Owner-local Release build of `355c064` (run twice, identical): **BUILD FAILED** —
+`Wjss.Kiosk` WFO0003 (manifest DPI) and `Wjss.Contracts` CA2231 (`Optional<T>` operators);
+`Wjss.Time` compiled. Corrected on PR #4 as source only (no suppressions, no severity or TFM
+changes, no package edits, no lock files; contract wire semantics untouched): manifest
+stripped of DPI elements (compatibility retained), `ApplicationHighDpiMode=PerMonitorV2` on
+the kiosk project, generated-bootstrap entry point, `operator ==`/`!=` on `Optional<T>`
+mirroring `Equals` exactly. New guards: scanner rule **S9** (DPI placement matrix, 0
+findings; negative controls flag every violation) and xUnit static tests
+(`KioskDpiConfigurationTests` ×3, `OptionalPresenceTests` ×7 — authored, NOT RUN in Arena).
+Arena re-validation after correction: S1–S9 clean, TS 15/15, links green, spikes hash
+unchanged. **Status remains: .NET build NOT VERIFIED — Owner-local re-run required.**
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:

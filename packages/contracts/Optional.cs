@@ -67,6 +67,14 @@ public readonly struct Optional<T> : IEquatable<Optional<T>>
 
     public override bool Equals(object? obj) => obj is Optional<T> other && Equals(other);
 
+    // CA2231 (Owner-local build 2026-10-07): the operators are exactly the
+    // Equals semantics - no independent behaviour, no wire or hash change.
+    public static bool operator ==(Optional<T> left, Optional<T> right) =>
+        left.Equals(right);
+
+    public static bool operator !=(Optional<T> left, Optional<T> right) =>
+        !left.Equals(right);
+
     public override int GetHashCode() =>
         _presence switch
         {

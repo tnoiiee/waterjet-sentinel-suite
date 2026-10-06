@@ -25,6 +25,35 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Owner-local compile correction (`fix: resolve Owner-local .NET compile blockers`)
+
+**First real .NET evidence.** The Owner ran
+`dotnet build .\WaterJetSentinelSuite.sln --configuration Release --no-restore` locally
+(twice, identical results): **BUILD FAILED** with exactly two errors —
+(1) `Wjss.Kiosk` (net10.0-windows) **WFO0003**: high-DPI settings declared in
+`app.manifest` must move to `Application.SetHighDpiMode`/`ApplicationHighDpiMode`;
+(2) `Wjss.Contracts` **CA2231** (warnings-as-errors): `Optional<T>` overrides
+`Equals` without equality operators. `Wjss.Time` compiled successfully. Both corrected as
+source only:
+
+- **WFO0003:** `apps/kiosk/app.manifest` — the `dpiAware`/`dpiAwareness` block (and its now-empty
+  `application/windowsSettings` container) removed; `supportedOS` compatibility retained.
+  `Wjss.Kiosk.csproj` — `ApplicationHighDpiMode=PerMonitorV2` added. `Program.cs` — manual
+  `EnableVisualStyles`/`SetCompatibleTextRenderingDefault`/`SetHighDpiMode` trio replaced by the
+  WinForms source-generated `ApplicationConfiguration.Initialize()` before `Application.Run`.
+  Guarded by new scanner rule **S9** and three static xUnit source tests
+  (`KioskDpiConfigurationTests`); kiosk README wording corrected (DPI via project property;
+  manifest compatibility-only).
+- **CA2231:** `Optional<T>` gains `operator ==`/`!=` defined exactly as `left.Equals(right)` —
+  struct shape, Absent/Cleared/Present semantics, converter behaviour, hash scheme, and the
+  three-state `activeJob` wire contract are all unchanged (contract wire semantics untouched).
+  `OptionalPresenceTests`: seven xUnit cases covering every required state pair, the nine-pair
+  operator-mirrors-Equals matrix, contract-record value equality, and hash conventions
+  (authored; **NOT RUN in Arena**).
+- No severities lowered, no suppressions, no TFM changes, no package/version edits, no lock
+  files. **A full Owner-local Release build + test re-run is required** — this correction fixes
+  the two reported errors as reviewed source; nothing here proves the next build passes.
+
 ### Stage 0.3A-1 — Source review correction (Owner findings A–E, same PR #4)
 
 Independent Owner source review of `205456e` found five issues; corrected here as one

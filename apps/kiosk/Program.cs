@@ -10,9 +10,11 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
-        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+        // WinForms source-generated bootstrap: applies the csproj-level
+        // application configuration (visual styles, text rendering, and
+        // ApplicationHighDpiMode=PerMonitorV2 - see the WFO0003 correction),
+        // then runs the skeleton window.
+        ApplicationConfiguration.Initialize();
         Application.Run(new MainForm());
     }
 }

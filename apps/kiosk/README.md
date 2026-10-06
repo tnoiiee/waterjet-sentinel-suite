@@ -10,10 +10,14 @@ direction drafted in
 
 | File | Present | State |
 | --- | --- | --- |
-| `Wjss.Kiosk.csproj` | yes | `WinForms` enabled; **no WebView2 package reference** — none is approved in `Directory.Packages.props` |
-| `Program.cs` | yes | WinForms message-loop entry only — visual styles, DPI mode, `Application.Run(new MainForm())`. **No WebView2 detection, loading or runtime probing of any kind exists** |
+| `Wjss.Kiosk.csproj` | yes | `WinForms` enabled + `ApplicationHighDpiMode=PerMonitorV2` (the DPI configuration source); **no WebView2 package reference** — none is approved in `Directory.Packages.props` |
+| `Program.cs` | yes | WinForms entry point only: `ApplicationConfiguration.Initialize()` then `Application.Run(new MainForm())`. **No WebView2 detection, loading or runtime probing of any kind exists**, and no separate DPI call is made (the generated bootstrap applies the project property) |
 | `MainForm.cs` | yes | Maximized, resizable skeleton window with a placeholder label; **no close guard is implemented** |
-| `app.manifest` | yes | DPI awareness + assembly identity |
+| `app.manifest` | yes | Windows compatibility (`supportedOS`) declarations only — **no DPI elements**; assembly identity |
+
+**DPI configuration (Owner-local WFO0003 correction, 2026-10-07):**
+- DPI mode is configured by the WinForms project property.
+- The manifest retains Windows compatibility declarations only.
 
 **WebView2 detection and the close guard belong to later authorized checkpoints** (the
 detection design is ADR-0013 territory, gated at Stage 0.3A-4/0.3A-5 per
