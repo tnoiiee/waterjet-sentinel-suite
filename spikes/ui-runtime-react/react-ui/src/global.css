@@ -1,5 +1,6 @@
 /* WJSS Stage 0.2.1A — global base styles and the SINGLE design-token location (spike).
-   System fonts only; no external assets.
+   Font: self-hosted Google Sans (OFL-1.1, see ./assets/fonts/FONT_SOURCE.md). Local WOFF2 only —
+   no CDN, no external CSS, no Internet access at runtime.
 
    Owner-approved Design Addendum (fullscreen) plus the production-grade readability
    refinement: primary target Windows 11, Microsoft Edge, F11 fullscreen, 1920 x 1080,
@@ -7,6 +8,15 @@
    Operations page are defined here; component CSS files only reference them.
    Industrial HMI practice is used as design guidance only — no standards certification is
    claimed. Fit is obtained by space allocation, never by shrinking operational text. */
+@font-face {
+  font-family: 'Google Sans';
+  src: url('./assets/fonts/GoogleSans-Latin-Variable.woff2') format('woff2');
+  font-weight: 400 700;
+  font-style: normal;
+  /* Block (short) instead of swap: the app also waits for document.fonts before first render,
+     so there is no fallback-font render followed by a geometry-changing reflow. */
+  font-display: block;
+}
 :root {
   color-scheme: dark;
 
@@ -49,6 +59,7 @@
   --selection: #36d6f0;
   --job-outer: #ffffff;
   --job-inner: #0b0d10;
+  /* Water Jet reference slot (internal legacy identifiers CANNON_REAR / CANNON_FRONT). */
   --cannon-surface: #262b31;
   --cannon-border: #7d8692;
   --ok: #7fcf9b;
@@ -81,13 +92,14 @@
   --space-major: 24px;
 
   /* ---- typography scale (px at the primary target) ---- */
-  --font-ui: system-ui, 'Segoe UI', sans-serif;
-  /* Bahnschrift (Windows 10/11 system font, DIN-style) semi-condensed keeps 13 px Sensor IDs
-     inside the Sensor cell ID zone; Segoe UI is the fallback. */
-  --font-sensor: Bahnschrift, 'Segoe UI', system-ui, sans-serif;
-  --sensor-font-stretch: 87.5%;
+  /* One family for every visible character (Owner decision): Google Sans, fallback Segoe UI. */
+  --font-family-ui: 'Google Sans';
+  --font-ui: var(--font-family-ui), 'Segoe UI', system-ui, sans-serif;
+  /* Sensor cells use the same family (no Sensor-specific exception). */
+  --font-sensor: var(--font-ui);
   --font-base: 13px;
-  --font-app-title: 15px;
+  --font-app-title: 19px;
+  --font-app-subtitle: 11px;
   --font-chip: 12.5px;
   --font-alarm: 12px;
   --font-card-title: 15px;
@@ -135,7 +147,7 @@
   --wall-header-h: 18px;
   --wall-header-gap: var(--space-micro);
   --u-gap: var(--space-inline);
-  --u-center-w: 204px;
+  --u-center-w: 208px;
   --u-center-h: 130px;
   /* Map card border (1 + 1) + padding (4 + 4). */
   --map-chrome: 10px;
@@ -145,6 +157,11 @@
      1920 x 1080 by layout arithmetic). The constant terms are the wall headers, the 10
      inter-row gaps of the two stacked walls, the compact centre summary, the U gaps, the card
      chrome, and 4 px of slack. Below the fit threshold the map card scrolls internally. */
+  /* Legend swatches (dedicated bounded component). */
+  --legend-icon-col: 20px;
+  --legend-swatch: 16px;
+  --legend-row-gap: 5px;
+  --legend-col-gap: 6px;
   --sensor-cell-height: clamp(
     46px,
     calc(
@@ -158,9 +175,10 @@
   --sensor-cell-width: clamp(52px, min(calc(var(--sensor-cell-height) + 9px), calc((100cqw - 120px) / 13)), 56px);
   --sensor-id-font-size: 13px;
   --sensor-value-font-size: 16px;
-  --sensor-marker-size: 10px;
-  /* Right-side ID-row reservation for the marker zone (marker + gap). */
-  --sensor-marker-reserve: 12px;
+  /* Quality marker (value row, right end). The value row is symmetric:
+     [ spacer = marker size | value | marker zone ], so the value never shifts with quality. */
+  --sensor-marker-size: 8px;
+  --sensor-value-row-gap: var(--space-micro);
   --sensor-rail-h: 10px;
   /* One wall block: header + 6 rows + 5 gaps. */
   --wall-h: calc(var(--wall-header-h) + var(--wall-header-gap) + 6 * var(--sensor-cell-height) + 5 * var(--sensor-gap));
@@ -176,4 +194,16 @@ body,
   background: var(--surface-page);
   color: var(--text);
   font: var(--font-base) / var(--line-height) var(--font-ui);
+}
+/* Every visible character uses the UI family: form controls do not inherit fonts by default,
+   and the uPlot stylesheet sets its own family (the canvas axes are configured separately). */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+body .uplot,
+body .uplot * {
+  font-family: var(--font-ui);
 }

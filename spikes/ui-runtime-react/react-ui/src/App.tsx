@@ -45,7 +45,7 @@ export function App({ showTrend = true }: { showTrend?: boolean }) {
           <CameraPlaceholder />
         </div>
       </main>
-      <DiagnosticsOverlay open={diagOpen} onClose={closeDiag} />
+      <DiagnosticsOverlay open={diagOpen} onClose={closeDiag} selectedId={selectedId} />
     </div>
   );
 }

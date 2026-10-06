@@ -1,10 +1,12 @@
 /* WJSS Stage 0.2.1A — Sensor cell styles. Colours come from toCellVisual() / global tokens;
    these rules only lay out the zones and render the independent channels.
 
-   Zones (CSS grid, no absolute overlap):
-     row 1: [ Sensor ID (top-left) ] [ reserved marker zone (top-right, quality) ]
-     row 2: [ value (centre / lower)                                            ]
-     row 3: [ bottom rail: alarm icon (left) ............ queue badge (right)  ]
+   Zones (CSS grid, no absolute overlap; Owner-approved final structure):
+     row 1: [ Sensor ID — full usable cell width, 13 px / 700, never under a marker      ]
+     row 2: [ spacer (marker size) | value (centred, 16 px / 700) | quality marker zone ]
+     row 3: [ bottom rail: alarm icon (left) ........................ queue badge (right) ]
+   The value row is symmetric (spacer width = marker zone width), so the value stays optically
+   centred and never shifts when the quality marker appears or disappears.
    Channel separation (no shared CSS property between channels):
      process + score  -> background         quality   -> marker zone (+ pattern)
      alarm            -> border + inset ring + rail icon
@@ -16,19 +18,20 @@
   position: relative;
   width: var(--sensor-cell-width);
   height: var(--sensor-cell-height);
-  padding: 1px 2px;
+  /* Content inset: left 1 + 1, right 1 (border only) so the longest ID (G+204, ~42.2 px at
+     13 px / 700 Google Sans) clears the value-row marker zone horizontally. */
+  padding: 1px 0 1px 1px;
   margin: 0;
   border: 1px solid rgba(0, 0, 0, 0.35);
   border-radius: 3px;
   color: var(--cell-text);
   font-family: var(--font-sensor);
-  font-stretch: var(--sensor-font-stretch);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--sensor-marker-size);
+  grid-template-columns: var(--sensor-marker-size) minmax(0, 1fr) var(--sensor-marker-size);
   grid-template-rows: 14px minmax(0, 1fr) var(--sensor-rail-h);
-  column-gap: calc(var(--sensor-marker-reserve) - var(--sensor-marker-size));
+  column-gap: var(--sensor-value-row-gap);
   align-items: center;
   box-shadow: var(--ring-alarm), var(--ring-select);
   contain: layout paint;
@@ -37,9 +40,9 @@
   outline: 2px dashed var(--selection);
   outline-offset: 2px;
 }
-/* Zone 1: Sensor ID (the Owner logical label). Clipped to its own zone by construction. */
+/* Zone 1: Sensor ID (the Owner logical label) across the full usable cell width. */
 .index {
-  grid-column: 1;
+  grid-column: 1 / -1;
   grid-row: 1;
   justify-self: start;
   max-width: 100%;
@@ -49,11 +52,14 @@
   line-height: 14px;
   white-space: nowrap;
   text-align: left;
+  /* Labels use proportional digits (narrower); numeric values keep tabular numerals. */
+  font-variant-numeric: normal;
 }
-/* Zone 2: reserved marker zone. Always present, even when empty. */
+/* Zone 2: reserved quality-marker zone at the right end of the value row. Always present. */
 .markerZone {
-  grid-column: 2;
-  grid-row: 1;
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: end;
   width: var(--sensor-marker-size);
   height: var(--sensor-marker-size);
   display: block;
@@ -61,11 +67,12 @@
 .markerZone svg {
   display: block;
 }
-/* Zone 3: value. */
+/* Zone 3: value, centred between the symmetric spacer and marker columns. */
 .score {
-  grid-column: 1 / -1;
+  grid-column: 2;
   grid-row: 2;
   justify-self: center;
+  max-width: 100%;
   font-size: var(--sensor-value-font-size);
   font-weight: 700;
   line-height: 1;
@@ -141,7 +148,8 @@
 /* Alarm: yellow warning border + inset ring + rail icon. Never the Dirty red. */
 .alarm {
   border: 2px solid var(--alarm);
-  padding: 0 1px;
+  /* Same content inset as a normal cell on the left (2 px), so the ID does not move. */
+  padding: 0;
   --ring-alarm: inset 0 0 0 1px var(--alarm-ink);
 }
 .alarmCleared {

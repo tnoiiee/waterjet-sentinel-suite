@@ -42,11 +42,11 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction. Accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1 (two-candidate spike as originally proposed) | Not started; superseded by the narrower Stage 0.2.1A |
 | Stage 0.2.1A Scope Gate and Coding Start Gate | **APPROVED** — *React UI and Runtime Feasibility Spike* (synthetic) |
-| Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11); Operations readability refined after the Owner screenshot review (sensor-cell zones, typography scale, desaturated process colours separated from alarm, card hierarchy) |
-| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map, the fullscreen layout, or the readability refinement; the re-run (including the Edge layout and readability specs) is **PENDING**. Owner-local interrupted overnight observation of `ea23bc58`: **COMPLETED** — not a controlled benchmark ([results §0B.1](spikes/stage-0.2.1a-results.md#0b1-owner-local-interrupted-overnight-observation-recorded-as-reported-by-the-owner)) |
-| Stage 0.2.1A controlled 15-minute Owner-local observation | **PENDING** |
-| Stage 0.2.1A Owner manual UI re-review (corrected map, fullscreen 1920 × 1080 F11 layout, readability refinement) | **PENDING** |
-| Stage 0.2.1A 60-minute Owner-local run | **PAUSED** until the Owner visually accepts the corrected map and fullscreen layout |
+| Stage 0.2.1A implementation | **IN PROGRESS** — branch `arena/01a108d8-waterjet-sentinel-suite`, PR #3 to `main` **OPEN**; Sensor map corrected to the Owner's 106-location domain (`935973e6`); fullscreen Operations layout refined under the Owner-approved Design Addendum (1920 × 1080, Edge F11); Operations readability refined after the Owner screenshot review (sensor-cell zones, typography scale, desaturated process colours separated from alarm, card hierarchy); final Owner UI punchlist on `4129687a` (self-hosted Google Sans, marker in the value row, expanded identity, legend clipping, Water Jet display terminology, mixed queue sources, opt-in synthetic test controls) |
+| Stage 0.2.1A Owner-local testing (installed Edge, Windows 11) | Checkpoint `dd20a8bd` (superseded 104-location map): **PASS**. Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Edge; `npm ci`, typecheck, Vitest 53 / 53, build, harness 14 / 14, and Edge E2E 15 / 15 all PASS. That evidence **does not validate** the corrected Sensor map, the fullscreen layout, or the readability refinement; Owner-local Edge E2E at `4129687a`: **25 / 25 PASS** (≈ 1.3 min, Owner-reported). The final UI punchlist re-run (nine new Edge specs plus the 25 existing) is **PENDING**. Owner-local interrupted overnight observation of `ea23bc58`: **COMPLETED** — not a controlled benchmark ([results §0B.1](spikes/stage-0.2.1a-results.md#0b1-owner-local-interrupted-overnight-observation-recorded-as-reported-by-the-owner)) |
+| Stage 0.2.1A controlled 15-minute Owner-local observation | **PAUSED** (Owner decision) |
+| Stage 0.2.1A Owner manual UI re-review (corrected map, fullscreen 1920 × 1080 F11 layout, readability refinement, final punchlist) | **PENDING** |
+| Stage 0.2.1A 60-minute Owner-local run | **Waived as a gate** by the Owner — not run |
 | Stage 0.2.1A merge | **NOT MERGED** |
 | React final selection | **NOT YET APPROVED** — UI framework `[OPEN]` |
 | Blazor counter-spike | **DEFERRED / NOT AUTHORIZED** |
@@ -563,6 +563,28 @@ Detailed evidence:
 | 9 | Markdown relative links and anchors | PASS (see the delivery report for counts) |
 | 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
 | 11 | Full diff review | Performed before the readability commit |
+
+### 12.7 Stage 0.2.1A final Owner UI punchlist — Arena validation record
+
+Owner screenshot review of `4129687a` (Owner-local Edge E2E 25 / 25 PASS there). Presentation
+changes, opt-in synthetic review tooling, and synthetic queue-source evidence; the U-map, mapping,
+counts, I7 / I16 slots, right-side structure, bottom row, contracts, queue authority, FIFO model,
+single-job rule, and dependencies are unchanged. Detailed evidence:
+[`spikes/stage-0.2.1a-results.md` §0C](spikes/stage-0.2.1a-results.md#0c-final-owner-ui-punchlist-checkpoint-stage-021a).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | `npm ci`, `tsc --noEmit` (project; strict `e2e/*.ts`) | PASS, 0 errors (strict e2e: only the known absent Node type declarations in `soak.spec.ts` / `support.ts`); dependencies unchanged |
+| 2 | Vite production build | PASS — JS 325.93 kB (gzip 107.55 kB, +2.71 kB), CSS 28.16 kB (gzip 6.80 kB), one hashed WOFF2 47.67 kB |
+| 3 | Vitest (jsdom), 15 files | 109 / 109 PASS (16 new: font asset and wiring, identity, legend bounds, Water Jet slots, queue label, synthetic control boundary) |
+| 4 | Runtime harness `node:test` | 32 / 32 PASS (6 new: mixed queue, Water Jet refusal, default behaviour, presets, per-Sensor controls, token endpoint) |
+| 5 | Scenario runner, 30 scenarios | PASS 25 · PASS+OWNER 4 · OWNER-LOCAL 1 · FAIL 0 (S29 mixed queue: 5 source types in the first 8 rows; S30 six presets) |
+| 6 | Playwright spec parse (`--list`, no browser) | PASS, 35 tests in 4 files (9 new: `FONT-A`, `CELL-A`, `IDENT-A`, `LEGEND-A`, `WJ-A`, `QUEUE-A`, `CTRL-A`..`CTRL-C`) |
+| 7 | Hard gates | 106 · 212 · 24 / 29 / 24 / 29 · 2 Water Jet reference slots (internal `CANNON_*`) · I7 / I16 absent · 0 duplicates |
+| 8 | Font provenance and licence | WOFF2 SHA-256 `40f917d9…1531b` and `OFL.txt` / `TRADEMARKS.md` Git blobs re-verified by test; OFL-1.1, no RFN; recorded in the licence inventory |
+| 9 | Rendered font, cell zones, legend bounds, controls in a browser | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
+| 10 | Public-repository boundary | Bundled font redistributable under OFL-1.1 with licence text; no Production Water Jet numbers, addresses, or credentials; per-run token files git-ignored; synthetic controls loopback-only and opt-in |
+| 11 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
 
 ## 13. Required positive confirmations
 

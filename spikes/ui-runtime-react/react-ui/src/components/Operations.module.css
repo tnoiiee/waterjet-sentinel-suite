@@ -42,11 +42,30 @@
   padding-left: var(--space-small);
   border-left: 1px solid var(--border-subtle);
 }
+/* Application identity: two-level block (product name, then console name), single status row. */
 .brand {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   font-size: var(--font-app-title);
   font-weight: 700;
   color: var(--text-strong);
   white-space: nowrap;
+}
+.brandName {
+  font-size: var(--font-app-title);
+  font-weight: 700;
+  line-height: 20px;
+  letter-spacing: -0.005em;
+}
+.brandSub {
+  font-size: var(--font-app-subtitle);
+  font-weight: 650;
+  line-height: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .syntheticTag {
   font-size: var(--font-badge);
@@ -378,8 +397,8 @@
 .wallRow {
   display: contents;
 }
-/* Cannon equipment slot: same outer size as a Sensor cell; neutral, never a process/quality
-   colour, never selectable. */
+/* Water Jet reference slot (internal legacy slotType CANNON): same outer size as a Sensor cell;
+   neutral, never a process/quality colour, never selectable. Visible text: "WJ" + "REAR"/"FRONT". */
 .cannon {
   width: var(--sensor-cell-width);
   height: var(--sensor-cell-height);
@@ -392,17 +411,19 @@
   align-items: center;
   justify-content: center;
   gap: 1px;
-  font: 700 var(--font-caption) / 1 var(--font-sensor);
+  font: 700 var(--font-caption) / 1 var(--font-ui);
   cursor: default;
   user-select: none;
 }
 .cannonGlyph {
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1;
+  color: var(--text-strong);
+  letter-spacing: 0.04em;
 }
 .cannonText {
   font-size: var(--font-caption);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 /* Compact center summary and legend (no large empty card). */
 .overviewCenter {
@@ -416,76 +437,71 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: var(--space-inline);
+  gap: var(--space-dense);
   overflow: hidden;
+}
+.totalsRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-small);
+  white-space: nowrap;
 }
 .legendTitle {
   font-size: var(--font-legend-title);
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 18px;
   color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
 }
 .legendSub {
   font-size: var(--font-legend);
   color: var(--muted);
-  line-height: 1.2;
+  line-height: 14px;
+  white-space: nowrap;
 }
+/* Dedicated bounded legend: 20 px icon column + label column; swatches are 16 x 16 SVGs drawn
+   inset (see LegendSwatch.tsx), so nothing extends outside the icon column. */
 .legend {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3px var(--space-small);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--legend-row-gap) var(--legend-col-gap);
   font-size: var(--font-legend);
-  line-height: 1.2;
+  line-height: var(--legend-swatch);
   color: var(--text);
 }
-.legend li {
+.legendItem {
+  display: grid;
+  grid-template-columns: var(--legend-icon-col) minmax(0, 1fr);
+  column-gap: var(--legend-col-gap);
+  align-items: center;
+  min-width: 0;
+}
+.legendIcon {
   display: flex;
   align-items: center;
-  gap: 5px;
-  white-space: nowrap;
+  justify-content: center;
+  width: var(--legend-icon-col);
+  height: var(--legend-swatch);
 }
-.legend span {
-  display: inline-block;
+.legendIcon svg {
+  display: block;
   flex: none;
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
+  width: var(--legend-swatch);
+  height: var(--legend-swatch);
 }
-.swDirty {
-  background: var(--dirty-base);
-}
-.swCleaner {
-  background: var(--cleaner-base);
-}
-.swNeutral {
-  background: var(--not-classified);
-  background-image: repeating-linear-gradient(45deg, var(--quality-pattern) 0 1px, transparent 1px 4px);
-}
-.legend span.swUncertain {
-  border-radius: 50%;
-  background: var(--uncertain);
-}
-.swAlarm {
-  border: 2px solid var(--alarm);
-}
-.swSelected {
-  box-shadow: 0 0 0 2px var(--selection);
-}
-.swJob {
-  outline: 3px double var(--job-outer);
-}
-.legend span.swCannon {
-  background: var(--cannon-surface);
-  border: 1px dashed var(--cannon-border);
-  border-radius: 50%;
+.legendLabel {
+  min-width: 0;
+  white-space: nowrap;
 }
 .thresholdNote {
   font-size: var(--font-caption);
   color: var(--muted);
-  line-height: 1.2;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- panels (card surface level) ---------- */
@@ -999,4 +1015,96 @@
 }
 .diagBody .kv dt {
   font-size: var(--font-diag);
+}
+
+/* ---------- SYNTHETIC TEST CONTROL (spike review tooling inside the Diagnostics drawer) ----------
+   Separate bordered section; the drawer body scrolls internally, so the controls never change
+   document dimensions. */
+.stc {
+  margin-bottom: var(--space-card);
+  padding: var(--space-small);
+  border: 1px dashed var(--uncertain);
+  border-radius: 4px;
+  background: var(--surface-card);
+}
+.stcTitle {
+  margin: 0 0 var(--space-inline);
+  font-size: var(--font-diag);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-strong);
+}
+.stcNote,
+.stcState,
+.stcResult {
+  margin: 0 0 var(--space-dense);
+  font-size: var(--font-diag);
+  line-height: 1.3;
+  color: var(--muted);
+}
+.stcState {
+  color: var(--st-held);
+}
+.stcResult {
+  margin: var(--space-dense) 0 0;
+  color: var(--text);
+}
+.stcTarget {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-small);
+  margin-bottom: var(--space-dense);
+}
+.stcTargetLabel {
+  font-size: var(--font-diag);
+  color: var(--muted);
+}
+.stcTargetId {
+  font-size: var(--font-detail-id);
+  font-weight: 700;
+  color: var(--selection);
+}
+.stcGroup + .stcGroup {
+  margin-top: var(--space-dense);
+}
+.stcGroupLabel {
+  margin-bottom: var(--space-micro);
+  font-size: var(--font-group);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.stcGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-inline);
+}
+.ctrlBtn {
+  min-width: 0;
+  padding: var(--space-inline) var(--space-dense);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface-nested);
+  color: var(--text);
+  font: 600 var(--font-diag) / 1.25 var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ctrlBtn:hover:not(:disabled) {
+  border-color: var(--selection);
+}
+.ctrlBtn:focus-visible {
+  outline: 2px solid var(--selection);
+  outline-offset: 1px;
+}
+.ctrlBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ctrlSyn {
+  font-size: var(--font-badge);
+  font-weight: 700;
+  color: var(--uncertain);
 }

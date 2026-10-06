@@ -52,9 +52,9 @@ describe('central UI scale tokens', () => {
     expect(px(tokenValue('--sensor-value-font-size'))).toBe(16);
     expect(px(tokenValue('--sensor-marker-size'))).toBeGreaterThanOrEqual(8);
     expect(px(tokenValue('--sensor-marker-size'))).toBeLessThanOrEqual(10);
-    // Reserved marker zone to the right of the ID row: 12..14 px.
-    expect(px(tokenValue('--sensor-marker-reserve'))).toBeGreaterThanOrEqual(12);
-    expect(px(tokenValue('--sensor-marker-reserve'))).toBeLessThanOrEqual(14);
+    // Owner-approved final structure: the quality marker sits at the right end of the value
+    // row (no longer in the ID row); the value row gap is the 2 px micro space.
+    expect(tokenValue('--sensor-value-row-gap')).toBe('var(--space-micro)');
     expect(px(tokenValue('--sensor-gap').replace('var(--space-inline)', '4px'))).toBe(4);
   });
 
@@ -112,7 +112,8 @@ describe('central UI scale tokens', () => {
     expect(fonts.length).toBeGreaterThanOrEqual(20);
     for (const [, name, v] of fonts) expect(Number(v), name).toBeGreaterThanOrEqual(11);
     const expected = {
-      '--font-app-title': 15,
+      '--font-app-title': 19,
+      '--font-app-subtitle': 11,
       '--font-alarm': 12,
       '--font-card-title': 15,
       '--font-wall-title': 14,
@@ -147,17 +148,24 @@ describe('central UI scale tokens', () => {
   it('Sensor cell zones: ID, reserved marker zone, value, and bottom rail are separate grid areas', () => {
     const cell = cellCss.match(/\.cell\s*\{([^}]*)\}/)[1];
     expect(cell).toMatch(/display:\s*grid/);
-    expect(cell).toMatch(/grid-template-columns:\s*minmax\(0, 1fr\) var\(--sensor-marker-size\)/);
+    // Symmetric value row: [spacer = marker size | value | marker zone].
+    expect(cell).toMatch(/grid-template-columns:\s*var\(--sensor-marker-size\) minmax\(0, 1fr\) var\(--sensor-marker-size\)/);
     expect(cell).toMatch(/grid-template-rows:\s*14px minmax\(0, 1fr\) var\(--sensor-rail-h\)/);
     expect(cell).toMatch(/font-variant-numeric:\s*tabular-nums/);
     const idx = cellCss.match(/\.index\s*\{([^}]*)\}/)[1];
-    expect(idx).toMatch(/grid-column:\s*1;/);
+    // ID row: full usable cell width.
+    expect(idx).toMatch(/grid-column:\s*1 \/ -1;/);
     expect(idx).toMatch(/grid-row:\s*1;/);
     expect(idx).toMatch(/overflow:\s*hidden/);
     expect(idx).not.toMatch(/position:\s*absolute/);
     const zone = cellCss.match(/\.markerZone\s*\{([^}]*)\}/)[1];
-    expect(zone).toMatch(/grid-column:\s*2;/);
-    expect(zone).toMatch(/grid-row:\s*1;/);
+    // Quality marker zone: right end of the value row (column 3, row 2), never in the ID row.
+    expect(zone).toMatch(/grid-column:\s*3;/);
+    expect(zone).toMatch(/grid-row:\s*2;/);
+    const score = cellCss.match(/\.score\s*\{([^}]*)\}/)[1];
+    expect(score).toMatch(/grid-column:\s*2;/);
+    expect(score).toMatch(/grid-row:\s*2;/);
+    expect(score).toMatch(/justify-self:\s*center/);
     expect(cellCss).toMatch(/\.rail\s*\{[^}]*grid-row:\s*3;/);
     // Markers never use absolute positioning over the ID.
     for (const sel of ['markerZone', 'rail', 'badge', 'alarmIcon']) {

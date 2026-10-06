@@ -356,14 +356,20 @@ await scenario('S22', 'Camera placeholder', async () => {
   const files = [];
   const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : files.push(path.join(d, e.name))));
   walk(src);
+  // Scan every browser-loadable source (code, styles, HTML, incl. index.html). The bundled font's
+  // licence / provenance text files (OFL.txt, TRADEMARKS.md, FONT_SOURCE.md) and the binary WOFF2
+  // are not loadable code: their URLs are licence citations, never requested by the UI.
+  files.push(path.join(root, 'react-ui', 'index.html'));
+  const code = files.filter((f) => /\.(tsx?|m?js|css|html)$/.test(f));
+  const notCode = files.filter((f) => !code.includes(f)).map((f) => path.relative(root, f));
   const hits = [];
-  for (const f of files) {
+  for (const f of code) {
     const t = fs.readFileSync(f, 'utf8');
     for (const m of t.matchAll(/(https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}[^\s'"`)]*/gi)) if (!/www\.w3\.org/.test(m[0])) hits.push(`${path.relative(root, f)}: ${m[0]}`);
     if (/<img|<video|<iframe/i.test(t)) hits.push(`${path.relative(root, f)}: media element`);
   }
   check(hits.length === 0, hits.join('; '));
-  return { status: 'PASS+OWNER', evidence: { sourceFilesScanned: files.length, externalUrlsOrMediaElements: 0, browserPart: 'OWNER-LOCAL e2e S22 (request-host check)' } };
+  return { status: 'PASS+OWNER', evidence: { sourceFilesScanned: code.length, nonCodeAssetsNotScanned: notCode, externalUrlsOrMediaElements: 0, browserPart: 'OWNER-LOCAL e2e S22 (request-host check)' } };
 });
 
 await scenario('S23', 'Synthetic close guard for Active Job', async () => {
@@ -420,6 +426,46 @@ await scenario('S28', 'Revision gap -> re-snapshot', async () => {
   check(m3.events[0].type === 'snapshot' && m3.revision === (await api.metrics()).revision, 'no fresh snapshot');
   m3.close();
   return { gapsDetected: mirror2.gaps - g0, resyncFirstEvent: m3.events[0].type };
+});
+
+await scenario('S29', 'Mixed GlobalQueue sources', async () => {
+  const r = await api.cmd('queue-mixed-sources');
+  check(r.accepted === true, JSON.stringify(r));
+  await sleep(1200);
+  const snap = await api.snapshot();
+  const first8 = snap.queue.entries.slice(0, 8);
+  const types = [...new Set(first8.map((e) => e.sourceReason))];
+  check(types.length >= 3, `only ${types.length} source types in first 8 rows`);
+  check(first8.every((e, i) => e.position === i + 1), 'FIFO positions not 1..n');
+  const ids = snap.queue.entries.map((e) => e.sensorId);
+  check(new Set(ids).size === ids.length, 'duplicate queue entry');
+  check(!ids.some((id) => /^CANNON_/.test(id)), 'Water Jet slot queued');
+  // Ownership stable across publishes: the four explicit sources keep order and reason.
+  const explicit = r.detail.explicit.map((e) => `${e.sensorId}:${e.reason}`);
+  check(JSON.stringify(first8.slice(0, 4).map((e) => `${e.sensorId}:${e.sourceReason}`)) === JSON.stringify(explicit), 'explicit sources reordered or re-owned');
+  const dup = await api.cmd('enqueue', { sensorId: first8[0].sensorId, reason: 'TEMP' });
+  check(dup.detail?.duplicate === true && dup.detail.owner === first8[0].sourceReason, 'duplicate changed owner');
+  check((await api.metrics()).invariants.violations === 0, 'invariant violation');
+  return { status: 'PASS+OWNER', evidence: { sourceTypesFirst8: types, first8: first8.map((e) => `${e.position}:${e.sensorId}:${e.sourceReason}`), totalQueued: snap.queue.totalQueued, browserPart: 'OWNER-LOCAL e2e QUEUE-A' } };
+});
+
+await scenario('S30', 'Synthetic review presets (Alarm + Queue)', async () => {
+  const id = (await api.snapshot()).sensors[40].sensorId;
+  const out = {};
+  for (const preset of ['alarm-queue-dirty', 'alarm-queue-cleaner', 'selected-alarm-queue', 'job-alarm-queue', 'cleared-ack-queue']) {
+    const r = await api.cmd('visual-preset', { preset, sensorId: id });
+    check(r.accepted === true, `${preset}: ${JSON.stringify(r)}`);
+    await sleep(1100);
+    const s = (await api.snapshot()).sensors.find((x) => x.sensorId === id);
+    out[preset] = `${s.classification}/${s.alarmState}/${s.queueState}${s.isActiveJobTarget ? '/JOB' : ''}`;
+    check(s.alarmState !== 'NONE', `${preset}: no alarm`);
+    check(s.queueState !== 'NONE', `${preset}: not queued / active`);
+  }
+  const reset = await api.cmd('visual-preset', { preset: 'reset' });
+  check(reset.accepted === true, 'reset refused');
+  const m = await api.metrics();
+  check(m.jobs.acceptedSecondJobs === 0 && m.invariants.violations === 0, 'second job or invariant violation');
+  return { status: 'PASS+OWNER', evidence: { sensorId: id, states: out, presets: 6, browserPart: 'OWNER-LOCAL e2e CTRL-A..C' } };
 });
 
 const finalMetrics = await api.metrics();

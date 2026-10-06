@@ -28,14 +28,54 @@ removable synthetic feasibility spike — no Product code.**
 
 **Scope and Coding Start Gate:** `[APPROVED]`
 **Implementation:** IN PROGRESS — PR #3 OPEN
-**Owner-local testing (installed Edge, Windows 11):** PASS for checkpoint `dd20a8bd` (superseded
-104-location map); re-run for the corrected Sensor map and the fullscreen layout PENDING
+**Owner-local testing (installed Edge, Windows 11):** Edge E2E **25 / 25 PASS** at checkpoint
+`4129687a` (Owner-reported, ≈ 1.3 min); the final UI punchlist specs (`FONT-A`, `CELL-A`, `IDENT-A`,
+`LEGEND-A`, `WJ-A`, `QUEUE-A`, `CTRL-A`..`CTRL-C`) are PENDING an Owner-local Edge run
 **Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **Controlled 15-minute
-observation:** PENDING · **60-minute run:** PAUSED
+observation:** PAUSED · **60-minute run:** waived as a gate by the Owner — not run
 **Merge:** NOT MERGED
 **React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
 **Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Changed — Final Owner UI punchlist (Owner screenshot review of `4129687a`)
+
+- **Recorded:** Owner-local Edge E2E 25 / 25 PASS at `4129687a` (≈ 1.3 min). The second
+  Owner-authorized atomic recovery restored the local branch to `4129687a` (identity proof 131 / 131).
+- **Google Sans, self-hosted (OFL-1.1):** one Latin variable WOFF2 subset (wght 400–700, 47,672 B)
+  built deterministically from the official `google/fonts` repository (`ofl/googlesans`, ref
+  `7085eb89`); verbatim `OFL.txt` and `TRADEMARKS.md` and a full provenance record
+  (`react-ui/src/assets/fonts/FONT_SOURCE.md`) alongside; build script
+  `measurements/font/build_google_sans_subset.py`. `@font-face` + preload, no CDN; fallback
+  `"Segoe UI", system-ui, sans-serif`; Bahnschrift removed. First render waits (≤ 2.5 s) for the
+  font so geometry does not reflow; uPlot canvas axes and form controls use the same family.
+- **Sensor cell:** the ID row now spans the full cell width (13 px / 700, no marker beside it);
+  the quality marker (8 px) moved to the right end of the value row with a symmetric
+  `spacer | value | marker` grid so the value (16 px / 700) stays centred; bottom rail unchanged
+  (alarm left, queue right); cell 52–56 × 46–50 px.
+- **Application identity:** "WaterJet Sentinel Suite" (19 px / 700) over a muted
+  "OPERATIONS CONSOLE" subtitle (11 px / 650, 0.06 em); synthetic badge kept separate; accessible
+  name "WaterJet Sentinel Suite — Operations Console".
+- **Legend:** dedicated `LegendSwatch` (16 × 16 SVG, symbols inset ≥ 2 px, no negative offsets) in a
+  fixed 20 px icon column; eight entries (Dirty, Cleaner, Not classified, Uncertain, Alarm, Selected,
+  Active Job, Water Jet); the clipped left edge is corrected.
+- **Water Jet terminology (display only):** slots read `WJ` / `REAR` and `WJ` / `FRONT`; summary
+  "2 Water Jet reference slots · synthetic" (never "2 Water Jets"; no Production equipment numbers).
+  `CANNON_REAR` / `CANNON_FRONT` and `slotType: 'CANNON'` remain the legacy internal identifiers
+  (contract and fixtures unchanged); I7 / I16 stay equipment-only.
+- **Mixed GlobalQueue sources (synthetic):** deterministic `queue-mixed-sources` scenario queues
+  TIME DUE, TEMP + TIME, OPERATOR, TEMP, then the DIRTY SCORE source (FIFO). The score source now
+  releases only the entries it owns; de-duplication keeps the first source owner and position.
+  Queue authority and the FIFO model are unchanged; default behaviour is unchanged.
+- **SYNTHETIC TEST CONTROL (opt-in):** Diagnostics drawer section enabled only when the harness runs
+  with `--synthetic-test-controls` (same-origin, loopback-host token endpoint; per-run token in
+  memory, dropped on disconnect). Per selected Sensor: alarm raise / clear → ACK REQUIRED / ack,
+  queue reasons, remove, quality, DIRTY / CLEANER, held Active Job target, reset; six presets.
+  Spike review tooling only — not an authentication model, not a Production path.
+- **Harness:** unknown `/api/*` routes now return a JSON 404 instead of the SPA fallback.
+- **Tests:** Vitest 109 / 109 (15 files; 16 new); harness 32 / 32 (6 new); scenarios 30 (S29 mixed
+  queue, S30 review presets; S22 scans browser-loadable sources only); Playwright list 35 tests in 4
+  files (9 new Owner-local specs). Browser results are **NOT VERIFIED** in Arena.
 
 #### Changed — Operations readability refinement (Owner screenshot review)
 

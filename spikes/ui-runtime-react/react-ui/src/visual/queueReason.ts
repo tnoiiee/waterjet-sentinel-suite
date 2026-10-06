@@ -19,6 +19,7 @@ export function compactReason(code: string | null | undefined): CompactReason {
   let label: string;
   if (hasTemp && hasTime) label = 'TEMP + TIME';
   else if (hasTemp) label = 'TEMP';
+  else if (/TIME_DUE/.test(bare)) label = 'TIME DUE';
   else if (hasTime) label = 'TIME';
   else if (/DIRTY_SCORE/.test(bare)) label = 'DIRTY SCORE';
   else if (/OPERATOR/.test(bare)) label = 'OPERATOR';

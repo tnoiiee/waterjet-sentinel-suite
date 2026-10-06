@@ -1,6 +1,6 @@
 {
   "label": "Stage 0.2.1A synthetic spike - react-ui dependency licence inventory",
-  "generatedAt": "2026-10-05T05:49:53.498Z",
+  "generatedAt": "2026-10-06T09:14:28.900Z",
   "totals": {
     "lockfileEntries": 122,
     "installedHere": 99,
@@ -1921,6 +1921,22 @@
       "hasInstallScript": false,
       "integrity": "sha512-JZnDKK8B0RCDw…",
       "flag": null
+    }
+  ],
+  "bundledAssets": [
+    {
+      "name": "Google Sans (Latin variable subset, wght 400-700)",
+      "file": "react-ui/src/assets/fonts/GoogleSans-Latin-Variable.woff2",
+      "bytes": 47672,
+      "sha256": "40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b",
+      "licence": "OFL-1.1",
+      "licenceFile": "react-ui/src/assets/fonts/OFL.txt (verbatim)",
+      "trademarkNotice": "react-ui/src/assets/fonts/TRADEMARKS.md (verbatim; \"Google\" / \"Google Sans\" are trademarks of Google LLC)",
+      "provenance": "react-ui/src/assets/fonts/FONT_SOURCE.md (official google/fonts repository, ofl/googlesans)",
+      "reservedFontName": "none declared",
+      "modifiedVersion": "yes - subset + instanced + WOFF2 (OFL Modified Version; name kept because no RFN is declared)",
+      "scope": "runtime-bundle (self-hosted; no CDN)",
+      "flag": "OFL-1.1 font licence (permits bundling with software; must not be sold by itself; licence text bundled)"
     }
   ],
   "runtimeHarness": "runtime-harness/ has no dependencies (Node built-ins only).",

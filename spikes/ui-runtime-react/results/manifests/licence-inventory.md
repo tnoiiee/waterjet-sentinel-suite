@@ -1,6 +1,6 @@
 # Stage 0.2.1A — Licence inventory (react-ui)
 
-Generated 2026-10-05T05:49:53.498Z from `react-ui/package-lock.json` and installed `package.json` files.
+Generated 2026-10-06T09:14:28.900Z from `react-ui/package-lock.json` and installed `package.json` files.
 
 Lockfile entries: 122 · installed on the generating platform: 99 · direct: 13 · runtime bundle: 4
 
@@ -34,6 +34,12 @@ Lockfile entries: 122 · installed on the generating platform: 99 · direct: 13 
 | lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 | dev/build | MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently |
 | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 | dev/build | MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently |
 | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | dev/build | MPL-2.0 (weak copyleft, file-level) - build-time only, recorded transparently |
+
+## Bundled non-npm assets
+
+| Asset | File | Bytes | SHA-256 | Licence | Reserved Font Name | Note |
+| --- | --- | --- | --- | --- | --- | --- |
+| Google Sans (Latin variable subset, wght 400-700) | `react-ui/src/assets/fonts/GoogleSans-Latin-Variable.woff2` | 47672 | `40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b` | OFL-1.1 | none declared | OFL-1.1 font licence (permits bundling with software; must not be sold by itself; licence text bundled); yes - subset + instanced + WOFF2 (OFL Modified Version; name kept because no RFN is declared); licence: react-ui/src/assets/fonts/OFL.txt (verbatim); provenance: react-ui/src/assets/fonts/FONT_SOURCE.md (official google/fonts repository, ofl/googlesans) |
 
 ## Install scripts
 

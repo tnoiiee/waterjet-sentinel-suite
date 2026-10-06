@@ -43,16 +43,15 @@ function SensorCellImpl({ sensorId, selected, threshold, onSelect }: SensorCellP
       data-alarm={v.alarm.state}
       onClick={() => onSelect(sensorId)}
     >
-      {/* Zone 1: Sensor ID, top-left. Its width excludes the reserved marker zone, so the ID
-          can never sit underneath a status marker. */}
+      {/* Zone 1: Sensor ID across the full usable cell width. No marker shares this row. */}
       <span className={styles.index} data-part="id">
         {s.sensorId}
       </span>
-      {/* Zone 2: reserved top-right marker zone (data quality). */}
+      {/* Zone 2: reserved quality-marker zone at the right end of the value row. */}
       <span className={styles.markerZone} data-part="marker-zone" aria-hidden="true">
         {v.qualityMarker !== 'NONE' && <QualityGlyph marker={v.qualityMarker} />}
       </span>
-      {/* Zone 3: value. */}
+      {/* Zone 3: value, centred (symmetric spacer | value | marker zone). */}
       <span className={styles.score} data-part="value">
         {v.scoreText}
       </span>
@@ -82,7 +81,7 @@ function AlarmGlyph() {
 
 /** Data-quality marker: amber dot (UNCERTAIN), cross (BAD), clock (STALE), slashed circle (DISABLED). */
 function QualityGlyph({ marker }: { marker: Exclude<CellVisual['qualityMarker'], 'NONE'> }) {
-  const common = { viewBox: '0 0 10 10', width: 10, height: 10, 'aria-hidden': true, focusable: false, 'data-part': 'quality-marker', 'data-marker': marker } as const;
+  const common = { viewBox: '0 0 10 10', width: 8, height: 8, 'aria-hidden': true, focusable: false, 'data-part': 'quality-marker', 'data-marker': marker } as const;
   switch (marker) {
     case 'UNCERTAIN_AMBER':
       return (

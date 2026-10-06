@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { renderCounter } from '../diagnostics/renderCounter';
 import { useSlice, useStore } from '../store/hooks';
 import type { PresentationStore } from '../store/presentationStore';
+import { SyntheticTestControl } from './SyntheticTestControl';
 import styles from './Operations.module.css';
 
 export interface DiagSample {
@@ -78,7 +79,7 @@ export function useDiagnosticsHook() {
   }, [store]);
 }
 
-export function DiagnosticsOverlay({ open, onClose }: { open: boolean; onClose?: () => void }) {
+export function DiagnosticsOverlay({ open, onClose, selectedId = null }: { open: boolean; onClose?: () => void; selectedId?: string | null }) {
   const store = useStore();
   const runtime = useSlice('runtime');
   const [sample, setSample] = useState<DiagSample | null>(null);
@@ -107,7 +108,10 @@ export function DiagnosticsOverlay({ open, onClose }: { open: boolean; onClose?:
         )}
       </div>
       <div className={styles.diagBody}>
-        <dl className={styles.kv}>
+        {/* Spike review tooling, grouped separately from the observational metrics below. */}
+        <SyntheticTestControl selectedId={selectedId} />
+        <h3 className={styles.stcTitle}>OBSERVATIONAL METRICS</h3>
+        <dl className={styles.kv} data-testid="diag-metrics">
           <dt>Revision</dt>
           <dd>{sample.revision}</dd>
           <dt>Connection</dt>

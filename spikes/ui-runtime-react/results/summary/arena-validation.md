@@ -2,24 +2,26 @@
 
 > SYNTHETIC SPIKE VALIDATION - ARENA (Linux, Node) ONLY - NO BROWSER RESULTS
 
-Recorded: 2026-10-06T05:00:00.000Z · Base: `e779f8ad2c856e367fd65985007a3da411bd0e73` · Parent checkpoint: `ea23bc58` · Scope: Stage 0.2.1A Operations readability refinement (Owner screenshot review) plus stale MAP U-shape E2E assertion correction; presentation and tests only. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels
+Recorded: 2026-10-06T09:30:00.000Z · Base: `e779f8ad2c856e367fd65985007a3da411bd0e73` · Parent checkpoint: `4129687a` (Owner-local Edge E2E 25/25 PASS) · Scope: Stage 0.2.1A final Owner UI punchlist: self-hosted Google Sans (OFL-1.1), quality marker in the value row, expanded application identity, legend clipping, Water Jet display terminology, mixed GlobalQueue sources (synthetic), opt-in SYNTHETIC TEST CONTROL. Sensor domain unchanged: 106 Sensor locations / 212 Thermocouple channels
 
 | Check | Result | Detail |
 | --- | --- | --- |
-| npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1) | PASS | exit 0; package-lock.json unchanged; no browser download; dependencies unchanged |
-| tsc --noEmit (TypeScript 6.0.3) | PASS | 0 errors (project); separate strict check of e2e/*.ts 0 errors (excluding absent Node type declarations for process.env) |
-| vite build (production) | PASS | JS 316.77 kB (gzip 104.84 kB), CSS 25.68 kB (gzip 6.32 kB) |
-| vitest (jsdom) 13 files | PASS | 93/93 (18 new: colorTokens 5, visual 3, layoutTokens 4, fullscreenLayout 6; jsdom does not validate pixel overlap) |
-| runtime-harness node:test 2 files | PASS | 26/26 (sensorMap 12) |
-| scenario runner (28 scenarios) | PASS | PASS 25, PASS+OWNER 2, OWNER-LOCAL 1, FAIL 0 |
-| golden fixtures validated against canonical map | PASS | fixtures unchanged; fixtures.test PASS |
-| playwright test --list (no browser) | PASS | 26 tests in 3 files; operations.spec + layout.spec selection 25 (was 21; 4 new READ-A..READ-D; stale MAP U-shape assertion corrected), project msedge |
-| hard gates (sensor map) | PASS | 106 sensors; 212 channels; 24/29/24/29; 2 cannon slots; I7/I16 absent; 0 duplicate IDs/scanOrder/channels |
-| ID / marker overlap, clipping, typography, viewport fit 1920x1080 / 1366x768 / 2560x1440 | NOT VERIFIED | no browser in Arena; asserted by e2e/layout.spec.ts (LAYOUT-A..E, READ-A..D), Owner-local Edge run PENDING |
-| sensitive-data scan (added lines of changed and new files) | PASS | no credentials/keys/connection strings/e-mail; IPv4 only 127.0.0.1; URLs only http://127.0.0.1:5181 |
-| markdown relative links (all tracked and new .md) | PASS | 44 files, 699 links, 0 broken; 13 anchors, 0 broken |
+| npm ci --ignore-scripts --no-audit --no-fund (PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1) | PASS | exit 0; package.json and package-lock.json unchanged; no browser download; dependencies unchanged |
+| tsc --noEmit (TypeScript 6.0.3) | PASS | 0 errors (project); strict check of e2e/*.ts: 0 errors in layout/operations/punchlist specs; only the known absent Node type declarations in soak.spec.ts / support.ts (unchanged files) |
+| vite build (production) | PASS | JS 325.93 kB (gzip 107.55 kB; +9.16 kB / +2.71 kB gzip vs 4129687a), CSS 28.16 kB (gzip 6.80 kB; +2.48 kB / +0.48 kB gzip), one hashed GoogleSans-Latin-Variable WOFF2 47.67 kB shared by preload and @font-face |
+| vitest (jsdom) 15 files | PASS | 109/109 (16 new: fontAsset 7, punchlist 9; 5 existing assertions updated to the Owner-approved values: 19 px title, 11 px subtitle, value-row marker grid, Water Jet summary text) |
+| runtime-harness node:test 3 files | PASS | 32/32 (6 new reviewControls: mixed queue, Water Jet refusal, default behaviour, presets 1..6, per-Sensor controls, opt-in token endpoint incl. JSON 404 under static serving) |
+| scenario runner (30 scenarios) | PASS | PASS 25, PASS+OWNER 4, OWNER-LOCAL 1, FAIL 0; S29 mixed queue: 5 source types in the first 8 rows; S30 six presets, accepted second jobs 0; S22 scans browser-loadable sources (licence text files excluded and listed) |
+| golden fixtures validated against canonical map | PASS | fixtures and contracts unchanged; fixtures.test PASS |
+| playwright test --list (no browser) | PASS | 35 tests in 4 files (9 new punchlist specs: FONT-A, CELL-A, IDENT-A, LEGEND-A, WJ-A, QUEUE-A, CTRL-A..C); project msedge; web server adds --synthetic-test-controls |
+| hard gates (sensor map) | PASS | 106 sensors; 212 channels; 24/29/24/29; 2 Water Jet reference slots (internal CANNON_*); I7/I16 absent; 0 duplicate IDs/scanOrder/channels |
+| font provenance and licence | PASS | WOFF2 47,672 B SHA-256 40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b; OFL.txt / TRADEMARKS.md Git blobs 035131ac / 621fbbd8 match google/fonts; OFL-1.1, no Reserved Font Name; no TTF or other formats committed; .gitattributes prevents EOL conversion |
+| synthetic test-controls boundary (live harness, loopback) | PASS | flag off: JSON 404; flag on: 200 same-origin, 403 cross-site Sec-Fetch-Site, 403 foreign Host; no-store; no CORS header |
+| Google Sans rendering, cell zones, legend bounds, controls in a browser | NOT VERIFIED | no browser in Arena; asserted by e2e/punchlist.spec.ts and the existing layout specs, Owner-local Edge run PENDING |
+| sensitive-data and public-boundary scan (added lines) | PASS | no credentials/keys/connection strings/e-mail; IPv4 only 127.0.0.1; URLs only http://127.0.0.1:5181 and official font/licence citations; no Production Water Jet numbers |
+| markdown relative links (all tracked and new .md) | PASS | 46 files, 706 links, 0 broken; 14 anchors, 0 broken |
 | loopback-only bind | PASS | harness socket 127.0.0.1; non-loopback refused by unit test |
-| arena harness measurement 10 min | NOT RE-RUN | runtime unchanged since 935973e6 measurement (PASS); presentation-only change |
+| arena harness measurement 10 min | NOT RE-RUN | publish/acquisition path unchanged; review commands are opt-in and not used by the measurement |
 | offline npm ci rehearsal | NOT RE-RUN | dependencies and lock file unchanged since dd20a8bd rehearsal (PASS) |
 
-**NOT VERIFIED:** ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · installed-Edge rendering, Sensor-cell overlap and clipping, typography, and viewport fit of the readability refinement (Owner-local Edge run and manual F11 1920x1080 review PENDING) · Bahnschrift glyph widths · heap / DOM / long tasks / end-to-end latency in Edge · Windows process CPU and memory · Windows offline restore · controlled 15-minute observation (PENDING) · Extended (4 h) stability · 60-minute run (PAUSED) · Production stability · Modbus performance · Production integration.
+**NOT VERIFIED:** ASP.NET Core integration · Windows Service behaviour · WebView2 kiosk behaviour · installed-Edge rendering of Google Sans, Sensor-cell zones, identity, legend bounds, and the synthetic test controls (Owner-local Edge run and manual F11 1920x1080 review PENDING) · heap / DOM / long tasks / end-to-end latency in Edge · Windows process CPU and memory · Windows offline restore · controlled 15-minute observation (PAUSED) · 60-minute run (waived as a gate, not run) · Extended (4 h) stability · Production queue / alarm behaviour · Production stability · Modbus performance · Production integration.

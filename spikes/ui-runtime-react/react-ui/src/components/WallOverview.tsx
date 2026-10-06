@@ -8,6 +8,7 @@ import { memo, type CSSProperties } from 'react';
 import type { Wall, WallMapSlot, WallSummary } from '../../../contracts/operational';
 import { useSlice } from '../store/hooks';
 import { SensorCell } from './SensorCell';
+import { LegendSwatch, type LegendKind } from './LegendSwatch';
 import styles from './Operations.module.css';
 
 interface Props {
@@ -16,31 +17,48 @@ interface Props {
 }
 
 const WALL_LABEL: Record<Wall, string> = { LEFT: 'Left wall', REAR: 'Rear wall', RIGHT: 'Right wall', FRONT: 'Front wall' };
-const CANNON_LABEL: Record<string, string> = { CANNON_REAR: 'Rear Cannon', CANNON_FRONT: 'Front Cannon' };
+// Visible terminology: "Water Jet reference slot". The internal identifiers CANNON_REAR /
+// CANNON_FRONT and slotType 'CANNON' are retained legacy spike contract identifiers (no contract
+// migration). These two map positions are logical reference slots, not a count of Water Jets
+// (the domain has eight Water Jets); no Production Water Jet number is assigned or guessed.
+const WATER_JET_LABEL: Record<string, string> = { CANNON_REAR: 'Rear Water Jet reference slot', CANNON_FRONT: 'Front Water Jet reference slot' };
+const WATER_JET_SIDE: Record<string, string> = { REAR: 'REAR', FRONT: 'FRONT' };
 
-/** Cannon equipment slot: neutral, not a Sensor, not selectable, not focusable. */
-function CannonSlot({ slot }: { slot: WallMapSlot }) {
-  const label = CANNON_LABEL[slot.equipmentId ?? ''] ?? slot.equipmentId ?? 'Cannon';
+/** Water Jet reference slot: neutral equipment, not a Sensor, not selectable, not focusable. */
+function WaterJetSlot({ slot }: { slot: WallMapSlot }) {
+  const label = WATER_JET_LABEL[slot.equipmentId ?? ''] ?? 'Water Jet reference slot';
   return (
     <div
       className={styles.cannon}
       role="img"
-      aria-label={`${label} — equipment slot, not a Sensor`}
-      title={`${label} — equipment slot, not a Sensor`}
+      aria-label={`${label} — equipment, not a Sensor`}
+      title={`${label} — equipment, not a Sensor (logical I${slot.logicalColumn})`}
       data-slot-type="CANNON"
       data-equipment-id={slot.equipmentId ?? undefined}
       data-logical-row={slot.logicalRow}
       data-logical-column={slot.logicalColumn}
+      data-testid={`wj-slot-${(WATER_JET_SIDE[slot.wall] ?? slot.wall).toLowerCase()}`}
     >
-      <span className={styles.cannonGlyph} aria-hidden="true">
-        ⊕
+      <span className={styles.cannonGlyph} aria-hidden="true" data-part="wj-code">
+        WJ
       </span>
-      <span className={styles.cannonText} aria-hidden="true">
-        {slot.wall === 'REAR' ? 'C-R' : slot.wall === 'FRONT' ? 'C-F' : 'C'}
+      <span className={styles.cannonText} aria-hidden="true" data-part="wj-side">
+        {WATER_JET_SIDE[slot.wall] ?? slot.wall}
       </span>
     </div>
   );
 }
+
+const LEGEND: [LegendKind, string][] = [
+  ['DIRTY', 'Dirty'],
+  ['CLEANER', 'Cleaner'],
+  ['NOT_CLASSIFIED', 'Not classified'],
+  ['UNCERTAIN', 'Uncertain'],
+  ['ALARM', 'Alarm'],
+  ['SELECTED', 'Selected'],
+  ['ACTIVE_JOB', 'Active Job'],
+  ['WATER_JET', 'Water Jet'],
+];
 
 const WallPanel = memo(function WallPanel({ wall, rows, threshold, selectedId, onSelect, summary }: { wall: Wall; rows: WallMapSlot[][]; threshold: number; selectedId: string | null; onSelect: (id: string) => void; summary?: WallSummary }) {
   const slots = rows.flat();
@@ -67,7 +85,7 @@ const WallPanel = memo(function WallPanel({ wall, rows, threshold, selectedId, o
               slot.slotType === 'SENSOR' && slot.sensorId ? (
                 <SensorCell key={slot.slotId} sensorId={slot.sensorId} threshold={threshold} selected={slot.sensorId === selectedId} onSelect={onSelect} />
               ) : (
-                <CannonSlot key={slot.slotId} slot={slot} />
+                <WaterJetSlot key={slot.slotId} slot={slot} />
               ),
             )}
           </div>
@@ -95,26 +113,31 @@ export function WallOverview({ selectedId, onSelect }: Props) {
         ))}
         <div className={styles.overviewCenter} data-testid="map-center">
           <div data-testid="map-totals">
-            <div className={styles.legendTitle} data-testid="map-sensor-count">
-              {sensorCount} Sensors
+            <div className={styles.totalsRow}>
+              <span className={styles.legendTitle} data-testid="map-sensor-count">
+                {sensorCount} Sensors
+              </span>
+              <span className={styles.thresholdNote} data-testid="map-threshold" title={`Dirty threshold ${threshold} · synthetic config r${config?.revision ?? '-'}`}>
+                Threshold {threshold} · r{config?.revision ?? '-'}
+              </span>
             </div>
+            {/* Two logical map reference slots — never "2 Water Jets" (the domain has eight). */}
             <div className={styles.legendSub} data-testid="map-cannon-count">
-              {cannonCount} Cannon slots · synthetic
+              {cannonCount} Water Jet reference slots · synthetic
             </div>
           </div>
-          <ul className={styles.legend} aria-label="Map legend">
-            <li><span className={styles.swDirty} /> Dirty</li>
-            <li><span className={styles.swCleaner} /> Cleaner</li>
-            <li><span className={styles.swNeutral} /> Not classified</li>
-            <li><span className={styles.swUncertain} /> Uncertain</li>
-            <li><span className={styles.swAlarm} /> Alarm</li>
-            <li><span className={styles.swSelected} /> Selected</li>
-            <li><span className={styles.swJob} /> Active Job</li>
-            <li><span className={styles.swCannon} /> Cannon</li>
+          <ul className={styles.legend} aria-label="Map legend" data-testid="map-legend">
+            {LEGEND.map(([kind, label]) => (
+              <li key={kind} className={styles.legendItem} data-legend={kind}>
+                <span className={styles.legendIcon}>
+                  <LegendSwatch kind={kind} />
+                </span>
+                <span className={styles.legendLabel} data-part="legend-label">
+                  {label}
+                </span>
+              </li>
+            ))}
           </ul>
-          <div className={styles.thresholdNote}>
-            Dirty threshold {threshold} · synthetic config r{config?.revision ?? '-'}
-          </div>
         </div>
       </div>
     </div>

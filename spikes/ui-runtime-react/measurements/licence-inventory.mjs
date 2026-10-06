@@ -4,6 +4,7 @@
 // Writes results/manifests/licence-inventory.{json,md}. Lists every lockfile entry (direct and
 // transitive, installed or platform-optional), its licence, scope (runtime bundle vs dev/build),
 // and flags non-permissive licences (MPL-2.0 is recorded transparently, not hidden).
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,6 +43,28 @@ for (const [key, v] of Object.entries(lock.packages)) {
   });
 }
 rows.sort((a, b) => a.name.localeCompare(b.name));
+
+// Bundled non-npm assets (committed files shipped in the spike bundle). Hash computed live.
+const fontDir = path.join(ui, 'src', 'assets', 'fonts');
+const fontFile = path.join(fontDir, 'GoogleSans-Latin-Variable.woff2');
+const bundledAssets = fs.existsSync(fontFile)
+  ? [
+      {
+        name: 'Google Sans (Latin variable subset, wght 400-700)',
+        file: 'react-ui/src/assets/fonts/GoogleSans-Latin-Variable.woff2',
+        bytes: fs.statSync(fontFile).size,
+        sha256: crypto.createHash('sha256').update(fs.readFileSync(fontFile)).digest('hex'),
+        licence: 'OFL-1.1',
+        licenceFile: 'react-ui/src/assets/fonts/OFL.txt (verbatim)',
+        trademarkNotice: 'react-ui/src/assets/fonts/TRADEMARKS.md (verbatim; "Google" / "Google Sans" are trademarks of Google LLC)',
+        provenance: 'react-ui/src/assets/fonts/FONT_SOURCE.md (official google/fonts repository, ofl/googlesans)',
+        reservedFontName: 'none declared',
+        modifiedVersion: 'yes - subset + instanced + WOFF2 (OFL Modified Version; name kept because no RFN is declared)',
+        scope: 'runtime-bundle (self-hosted; no CDN)',
+        flag: 'OFL-1.1 font licence (permits bundling with software; must not be sold by itself; licence text bundled)',
+      },
+    ]
+  : [];
 const byLicence = rows.reduce((a, r) => ((a[r.licence] = (a[r.licence] ?? 0) + 1), a), {});
 const out = {
   label: 'Stage 0.2.1A synthetic spike - react-ui dependency licence inventory',
@@ -50,6 +73,7 @@ const out = {
   byLicence,
   flagged: rows.filter((r) => r.flag).map((r) => ({ name: r.name, version: r.version, licence: r.licence, scope: r.scope, flag: r.flag })),
   packages: rows,
+  bundledAssets,
   runtimeHarness: 'runtime-harness/ has no dependencies (Node built-ins only).',
   scenarioRunnerAndMeasurements: 'Node built-ins only (Windows sampler uses built-in PowerShell cmdlets).',
 };
@@ -74,6 +98,12 @@ const md = [
   '| Package | Version | Licence | Scope | Note |',
   '| --- | --- | --- | --- | --- |',
   ...out.flagged.map((f) => `| ${f.name} | ${f.version} | ${f.licence} | ${f.scope} | ${f.flag} |`),
+  '',
+  '## Bundled non-npm assets',
+  '',
+  '| Asset | File | Bytes | SHA-256 | Licence | Reserved Font Name | Note |',
+  '| --- | --- | --- | --- | --- | --- | --- |',
+  ...(bundledAssets.length ? bundledAssets.map((a) => `| ${a.name} | \`${a.file}\` | ${a.bytes} | \`${a.sha256}\` | ${a.licence} | ${a.reservedFontName} | ${a.flag}; ${a.modifiedVersion}; licence: ${a.licenceFile}; provenance: ${a.provenance} |`) : ['| none | | | | | | |']),
   '',
   '## Install scripts',
   '',

@@ -6,7 +6,10 @@ superseded 104-location map and does **not** validate the corrected 106-location
 fullscreen Operations layout refinement (§0A), or the readability refinement (§0B), so the
 Owner-local re-run and the manual 1920 × 1080 F11 UI re-review are **PENDING** and the 60-minute
 run is **PAUSED**. The Owner-reported interrupted overnight observation of `ea23bc58` is recorded
-in §0B.1; it is not a controlled benchmark. This
+in §0B.1; it is not a controlled benchmark. The Owner reported Edge E2E **25 / 25 PASS** at
+`4129687a`; the final UI punchlist (§0C) adds nine Owner-local Edge specs that are **PENDING**, the
+controlled 15-minute observation is **PAUSED**, and the 60-minute run was waived as a gate by the
+Owner (not run). This
 document does **not** select React as the final UI framework; the UI framework, Production
 transport, and Production chart library remain `[OPEN]`. Blazor counter-spike: **DEFERRED /
 NOT AUTHORIZED**.
@@ -19,7 +22,101 @@ PRODUCTION VALUES**.
 
 ---
 
+## 0C. Final Owner UI punchlist checkpoint (Stage 0.2.1A)
+
+**Baseline.** Owner-local Edge E2E **25 / 25 PASS** at `4129687a` (Owner-reported, ≈ 1.3 min,
+installed Edge, Windows 11). The local branch was restored to `4129687a` by the second
+Owner-authorized atomic recovery (fetch, 131 / 131 identity proof, compare-and-swap ref update,
+index-only refresh; no reset, no force push). This checkpoint is one normal fast-forward commit on
+top of `4129687a`; its SHA is recorded in the PR #3 description.
+
+**Unchanged:** U-shaped map, wall order, 106 Sensors / 212 Thermocouple channels, 24 / 29 / 24 / 29,
+Water Jet reference slots at I7 / I16, canonical mapping source, right-side cards, bottom Trend +
+Camera row, contracts and fixtures, queue authority and FIFO model, single-job rule, dependencies
+(no package or lock-file change).
+
+### 0C.1 Google Sans (licence and provenance)
+
+| Item | Record |
+| --- | --- |
+| Source | Official `google/fonts` repository, `ofl/googlesans`, ref `7085eb89a950e85db5b166b7a58d414544b4140c` (directory last changed `a0e3dbcd`, 2026-09-24); downloaded 2026-10-06 |
+| Original | `GoogleSans[GRAD,opsz,wght].ttf`, 4,974,940 B, SHA-256 `d0a87d835a944b8b40d0e82a5651bb59ab97b936a2aeed5946eb57e7b2a3a90a`, Git blob verified |
+| Licence | SIL Open Font License 1.1, verbatim `OFL.txt`; **no Reserved Font Name** declared; `TRADEMARKS.md` kept verbatim ("Google" / "Google Sans" are trademarks of Google LLC; no affiliation implied) |
+| Bundled asset | `GoogleSans-Latin-Variable.woff2`, **47,672 B**, SHA-256 `40f917d9d0a4de0577c69089456c9e68d8ad3bbf58ac1f8ac91730538cb1531b` — Latin subset, wght 400–700 variable, GRAD 0 / opsz 18 pinned, `kern` + `tnum` kept; deterministic (fontTools 4.60.1, Brotli 1.1.0) |
+| Modified Version | Yes (subset / instance / WOFF2) — permitted by OFL-1.1; the name is kept because no RFN is declared |
+| Not bundled | Original TTF, italic, other formats or weights; no CDN, external CSS, conversion website, or Windows-installed copy |
+
+Full record: [`FONT_SOURCE.md`](../../spikes/ui-runtime-react/react-ui/src/assets/fonts/FONT_SOURCE.md) ·
+build script: [`build_google_sans_subset.py`](../../spikes/ui-runtime-react/measurements/font/build_google_sans_subset.py) ·
+licence inventory: [`licence-inventory.md`](../../spikes/ui-runtime-react/results/manifests/licence-inventory.md).
+
+### 0C.2 Presentation changes
+
+- **Font:** `@font-face` (local WOFF2, `font-display: block`) + preload; `--font-ui` =
+  `'Google Sans', 'Segoe UI', system-ui, sans-serif` on every visible text, including 13 px Sensor
+  IDs, form controls, and the uPlot canvas axes; Bahnschrift removed; first render waits up to
+  2.5 s for the font (no fallback render followed by a geometry reflow).
+- **Sensor cell:** grid `marker | 1fr | marker` (8 px marker, 2 px gaps); ID row spans the full
+  width (13 px / 700); quality marker at the right end of the value row; value 16 px / 700 centred;
+  rail unchanged (alarm left, queue right). Arena HarfBuzz measurement: longest ID `G+204` 42.24 px
+  of ≈ 53 px usable; value column ≈ 32 px versus `100` = 28.8 px.
+- **Identity:** "WaterJet Sentinel Suite" 19 px / 700 over "OPERATIONS CONSOLE" 11 px / 650,
+  0.06 em, muted; separate SYNTHETIC badge; accessible name with the full title.
+- **Legend:** `LegendSwatch` 16 × 16 SVG with inset symbols, 20 px icon column, 6 px column gap,
+  5 px row gap; eight entries.
+- **Water Jet terminology:** display labels `WJ REAR` / `WJ FRONT`, legend "Water Jet", summary
+  "2 Water Jet reference slots · synthetic". **Display vs internal:** `CANNON_REAR` /
+  `CANNON_FRONT` / `slotType: 'CANNON'` are legacy internal identifiers kept for contract and
+  fixture compatibility (renaming them needs a separate compatibility decision).
+
+### 0C.3 Mixed GlobalQueue sources (synthetic)
+
+`queue-mixed-sources` (scenario command, test evidence only) freezes automatic job starts, then
+queues four canonical Sensors through explicit sources and appends every Dirty Sensor through the
+score source. Arena result (S29): first eight rows contain **5 source types** — `SYN_TIME_DUE`,
+`SYN_TEMP_AND_TIME`, `SYN_OPERATOR_REQUEST`, `SYN_TEMP_RISE`, `SYN_DIRTY_SCORE_ABOVE_THRESHOLD`
+(UI labels TIME DUE, TEMP + TIME, OPERATOR, TEMP, DIRTY SCORE). Verified: FIFO positions 1..n,
+no duplicate IDs, first-source ownership kept on duplicate enqueue, explicit-source order stable
+across publishes, no Water Jet slot, invariant violations 0. Behaviour change: the score source
+releases only the entries it owns (previously any non-OPERATOR entry); default runs only contain
+score and operator entries, so default behaviour is unchanged.
+
+### 0C.4 SYNTHETIC TEST CONTROL (opt-in review tooling)
+
+- Enabled only with `--synthetic-test-controls` (or `WJSS_SPIKE_TEST_CONTROLS=1`); otherwise
+  `GET /api/spike/test-controls` is a JSON 404 and the drawer section reads "Off".
+- Token endpoint: same-origin only (`Sec-Fetch-Site` cross-site → 403), loopback `Host` only
+  (DNS-rebinding defence → 403), `no-store`, no CORS. The per-run token stays in memory, is dropped
+  whenever the connection is not LIVE, and is re-fetched after reconnect; never written to storage.
+  **Not an authentication model** and not a Production command path.
+- Controls (selected Sensor; disabled without a selection or when disconnected; Water Jet slots
+  are not selectable and are refused by the runtime): Raise Alarm, Clear Alarm → ACK REQUIRED,
+  Acknowledge, TempQueue / TimeQueue / combined reason, Remove Queue state, GOOD / UNCERTAIN / BAD /
+  STALE, DIRTY / CLEANER, Set / Clear held Active Job target, Reset Sensor.
+- **Six presets:** 1 Alarm + Queue on DIRTY · 2 Alarm + Queue on CLEANER · 3 Selected + Alarm +
+  Queue · 4 Active Job + Alarm + Queue · 5 Cleared Alarm + ACK REQUIRED + Queue · 6 Reset. One
+  request per click, no queueing, no retry, no replay; the runtime stays authoritative and the
+  never-two-jobs rule holds (S30: accepted second jobs 0).
+- A queued Sensor with an alarm is published as `BLOCKED`; an Active Job target as `ACTIVE`
+  (existing runtime semantics, unchanged).
+
+### 0C.5 Validation (Arena) and pending Owner-local evidence
+
+Arena: Vitest 109 / 109 (15 files), harness 32 / 32, scenarios 25 PASS / 4 PASS+OWNER /
+1 OWNER-LOCAL / 0 FAIL (30), Playwright list 35 tests in 4 files, build JS 325.93 kB (gzip
+107.55 kB, +2.71 kB) and CSS 28.16 kB (gzip 6.80 kB) plus the 47.67 kB WOFF2. See
+[`arena-validation.md`](../../spikes/ui-runtime-react/results/summary/arena-validation.md).
+**PENDING (Owner-local Edge):** `FONT-A`, `CELL-A`, `IDENT-A`, `LEGEND-A`, `WJ-A`, `QUEUE-A`,
+`CTRL-A`..`CTRL-C`, plus the 25 existing specs, and the manual F11 re-review. **NOT VERIFIED:**
+rendered Google Sans metrics in Edge, WebView2, kiosk shell, Production behaviour.
+
+---
+
 ## 0B. Operations readability refinement checkpoint (Stage 0.2.1A)
+
+> **Superseded in part by §0C:** the Sensor ID font is now the bundled Google Sans (Bahnschrift is
+> no longer used), the ID row spans the full cell width, and the quality marker moved to the
+> right end of the value row. The record below describes checkpoint `4129687a` as delivered.
 
 The Owner's screenshot review of the fullscreen checkpoint (`ea23bc58`) found: status markers
 overlapping long Sensor IDs (for example `G+205`), small cells and text, small typography

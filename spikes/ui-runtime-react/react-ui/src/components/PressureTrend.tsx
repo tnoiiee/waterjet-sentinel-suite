@@ -31,7 +31,8 @@ export function token(name: string): string {
   return v || TOKEN_FALLBACK[name] || '#888';
 }
 export const TREND_LINE_WIDTH = 1.75;
-const AXIS_FONT = '12px system-ui, "Segoe UI", sans-serif';
+// Canvas axes use the same self-hosted family as the rest of the UI (Google Sans).
+const AXIS_FONT = '12px "Google Sans", "Segoe UI", system-ui, sans-serif';
 const fmtVal = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '--' : v.toFixed(1));
 
 /** Plot size that fits the bounded host: the legend height is subtracted so the chart plus its

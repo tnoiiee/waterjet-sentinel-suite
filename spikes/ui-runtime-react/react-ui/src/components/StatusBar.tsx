@@ -33,8 +33,19 @@ export function StatusBar({ onToggleDiagnostics, diagnosticsOpen = false }: { on
   return (
     <header className={styles.statusBar} data-testid="status-bar">
       <div className={styles.statusGroup} role="group" aria-label="Application" data-status-group="app">
-        <span className={styles.brand}>WJSS Operations</span>
-        <span className={styles.syntheticTag}>SYNTHETIC SPIKE — NOT PRODUCTION</span>
+        {/* Application identity: product name (primary) and console name (secondary). The h1
+            accessible name is the full "WaterJet Sentinel Suite Operations Console". */}
+        <h1 className={styles.brand} data-testid="app-identity" aria-label="WaterJet Sentinel Suite — Operations Console">
+          <span className={styles.brandName} data-testid="app-name">
+            WaterJet Sentinel Suite
+          </span>
+          <span className={styles.brandSub} data-testid="app-subtitle">
+            Operations Console
+          </span>
+        </h1>
+        <span className={styles.syntheticTag} data-testid="synthetic-badge">
+          SYNTHETIC SPIKE — NOT PRODUCTION
+        </span>
       </div>
       {/* Priority order: Alarm > Process (Job, Pump) > System (connection, devices) > Technical. */}
       <div className={styles.statusGroup} role="group" aria-label="Alarm" data-status-group="alarm">

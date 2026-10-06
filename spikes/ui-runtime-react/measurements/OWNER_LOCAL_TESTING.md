@@ -1,6 +1,8 @@
 # Stage 0.2.1A — Owner-local test handoff (Windows 11, installed Microsoft Edge)
 
 **Status:** PREPARED. The Agent has run none of it: Arena has no browser and no WebView.
+**Latest Owner-local result:** Edge E2E 25 / 25 PASS at `4129687a`; the final UI punchlist re-run
+(section 1D) is **PENDING**.
 
 **Owner-local evidence recorded for checkpoint `dd20a8bd` (superseded 104-location map):**
 Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Microsoft Edge. `npm ci`,
@@ -158,6 +160,60 @@ Jobs, Historian rejections, and the summary percentiles. The earlier Owner-local
 overnight observation** of `ea23bc58` (≈ 11 h 41 min wall clock with host sleep, ≈ 4 h likely
 active) is recorded in the results document; it is **not** a controlled benchmark. The
 **60-minute run stays PAUSED** until the Owner authorises it.
+
+## 1D. Re-run after the final Owner UI punchlist (required)
+
+**Recorded baseline:** Owner-local Edge E2E **25 / 25 PASS** at `4129687a` (≈ 1.3 min). The punchlist
+checkpoint (fast-forward on `4129687a`; SHA in the PR #3 description) supersedes the counts of
+section 1C. From `react-ui\`:
+
+```powershell
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm test                               # Vitest: expect 109 / 109 (15 files)
+npm run build                          # emits one hashed GoogleSans-Latin-Variable-*.woff2
+node --test "../runtime-harness/test/**/*.test.mjs"   # expect 32 / 32
+npm run e2e -- e2e/operations.spec.ts e2e/layout.spec.ts e2e/punchlist.spec.ts   # 34 tests
+```
+
+The Playwright web server now starts the harness with `--synthetic-test-controls` (needed by
+`QUEUE-A` and `CTRL-A`..`CTRL-C`). New specs: `FONT-A` (Google Sans loaded via
+`document.fonts`, used by app text, IDs, values, legend, controls; no reflow after load),
+`CELL-A` (all 106 IDs unclipped; ID / marker / value / rail zones separate; value centred;
+G+205 / G+218 / G+118 cell size), `IDENT-A`, `LEGEND-A`, `WJ-A`, `QUEUE-A`, `CTRL-A`..`CTRL-C`.
+The font is bundled, so no Windows font installation matters any more (Bahnschrift is no longer used).
+
+**Manual F11 review with the synthetic test controls:**
+
+```powershell
+npm run harness -- --synthetic-test-controls   # http://127.0.0.1:5181, loopback only
+```
+
+Edge, **1920 × 1080**, **F11**, zoom **100 %**. Select a Sensor on the map, press **D** (or the
+Diagnostics button), and use **SYNTHETIC TEST CONTROL**. Presets 1–5 freeze automatic job starts;
+preset **6 Reset** restores them. Without the flag the section reads "Off" and nothing can be sent.
+
+| # | Owner check |
+| --- | --- |
+| 1 | All text in Google Sans (IDs, values, status bar, panels, legend, trend axes, buttons) |
+| 2 | ID row full width; `G+205`, `G+218`, `G+118` fully readable; quality marker at the right end of the value row; value centred |
+| 3 | Preset 1 / 2: alarm triangle (left) and queue badge (right) on a DIRTY and on a CLEANER cell, no overlap with ID, value, or marker |
+| 4 | Preset 3 / 4: selection ring or Active Job outline together with alarm and queue / ACTIVE state |
+| 5 | Preset 5: Cleared alarm with ACK REQUIRED and queue badge |
+| 6 | Identity: "WaterJet Sentinel Suite" with the "OPERATIONS CONSOLE" subtitle, separate SYNTHETIC badge |
+| 7 | Legend: eight entries, nothing clipped at the left edge; "Water Jet" entry |
+| 8 | Water Jet slots read `WJ REAR` / `WJ FRONT`; summary "2 Water Jet reference slots · synthetic" |
+| 9 | Mixed queue: run `queue-mixed-sources` (below) — first rows show TIME DUE, TEMP + TIME, OPERATOR, TEMP, DIRTY SCORE |
+
+```powershell
+# mixed-source queue (synthetic); token from runtime-harness\.run-token
+$t = Get-Content ..\runtime-harness\.run-token
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5181/api/spike/scenario -Headers @{ 'x-spike-token' = $t } -ContentType 'application/json' -Body '{"command":"queue-mixed-sources","params":{}}'
+```
+
+The **controlled 15-minute observation is PAUSED** (Owner decision). The **60-minute run was waived
+as a gate** by the Owner and is not run.
 
 ## 2. Manual look (optional)
 

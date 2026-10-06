@@ -54,7 +54,10 @@ describe('U-shaped Sensor map (106 Sensors, 2 Cannon slots)', () => {
     expect(container.querySelector('[data-sensor-id="I7"]')).toBeNull();
     expect(container.querySelector('[data-sensor-id="I16"]')).toBeNull();
     expect(getByTestId('map-sensor-count').textContent).toBe('106 Sensors');
-    expect(getByTestId('map-cannon-count').textContent).toBe('2 Cannon slots · synthetic');
+    // Visible terminology: two logical Water Jet reference slots — never "2 Water Jets".
+    expect(getByTestId('map-cannon-count').textContent).toBe('2 Water Jet reference slots · synthetic');
+    expect(getByTestId('map-center').textContent).not.toMatch(/\b2 Water Jets\b/);
+    expect(container.textContent).not.toMatch(/Cannon|C-R|C-F/);
     const per = Object.fromEntries([...container.querySelectorAll('[data-wall]')].map((w) => [w.getAttribute('data-wall'), w.querySelectorAll('[data-sensor-id]').length]));
     expect(per).toEqual({ REAR: 29, LEFT: 24, RIGHT: 24, FRONT: 29 });
   });

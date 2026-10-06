@@ -31,7 +31,9 @@ export default defineConfig({
   },
   projects: [{ name: 'msedge', use: { channel: 'msedge' } }],
   webServer: {
-    command: `node ../runtime-harness/src/main.mjs --port ${port} --static ./dist`,
+    // --synthetic-test-controls: opt-in spike review tooling (Diagnostics "SYNTHETIC TEST CONTROL"),
+    // needed by the CTRL-* specs. Loopback only; the token stays per-run.
+    command: `node ../runtime-harness/src/main.mjs --port ${port} --static ./dist --synthetic-test-controls`,
     url: `http://127.0.0.1:${port}/healthz`,
     reuseExistingServer: false,
     timeout: 30_000,

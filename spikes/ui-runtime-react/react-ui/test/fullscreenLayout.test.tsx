@@ -251,6 +251,6 @@ describe('no mapping, count, or Cannon regressions from the layout refinement', 
     const surface = getByTestId('u-surface');
     expect(surface.querySelectorAll('[data-wall]').length).toBe(4);
     expect(surface.contains(getByTestId('map-center'))).toBe(true);
-    expect(getByTestId('map-center').textContent).toMatch(/106 Sensors.*2 Cannon slots/);
+    expect(getByTestId('map-center').textContent).toMatch(/106 Sensors.*2 Water Jet reference slots/);
   });
 });

@@ -11,6 +11,9 @@
 //   POST /api/spike/scenario       synthetic scenario command (X-Spike-Token required)
 //   GET  /api/spike/metrics        harness metrics
 //   GET  /api/spike/poll-plan      synthetic poll plan
+//   GET  /api/spike/test-controls  ONLY with --synthetic-test-controls: per-run scenario token for
+//                                  the same-origin spike UI (Owner review tooling; NOT an
+//                                  authentication model; 404 when the flag is off)
 //   GET  /healthz                  liveness
 //   GET  /*                        static React build (react-ui/dist), when present
 
@@ -61,7 +64,20 @@ function readBody(req, limit = 16 * 1024) {
 }
 
 /**
- * @param {{ port?: number, host?: string, token?: string, staticDir?: string|null, params?: object }} opts
+ * Same-origin, loopback-host check for the test-controls token endpoint. Browsers send
+ * Sec-Fetch-Site; a cross-site page is refused. The Host header must name a loopback host
+ * (defence against DNS rebinding). Non-browser local clients (no Sec-Fetch-Site) are allowed:
+ * they can already read the git-ignored .run-token file.
+ */
+function testControlsRequestAllowed(req, port) {
+  const site = req.headers['sec-fetch-site'];
+  if (site !== undefined && site !== 'same-origin' && site !== 'none') return false;
+  const host = String(req.headers.host ?? '');
+  return [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`].includes(host);
+}
+
+/**
+ * @param {{ port?: number, host?: string, token?: string, staticDir?: string|null, params?: object, testControls?: boolean }} opts
  */
 export function createHarness(opts = {}) {
   const host = assertLoopbackHost(opts.host ?? '127.0.0.1');
@@ -71,6 +87,8 @@ export function createHarness(opts = {}) {
   runtime.sseClientCount = () => sse.clients.size;
   runtime.on('delta', (delta, json) => sse.broadcastDelta(delta.revision, json));
   const staticDir = opts.staticDir ? path.resolve(opts.staticDir) : null;
+  // Opt-in Owner review tooling (Diagnostics "SYNTHETIC TEST CONTROL"). Off by default.
+  const testControls = opts.testControls === true;
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
@@ -85,6 +103,11 @@ export function createHarness(opts = {}) {
       if (req.method === 'GET' && url.pathname === '/api/spike/metrics') return sendJson(res, 200, { ...runtime.metricsReport(), sse: { clients: sse.clients.size, ...sse.stats } });
       if (req.method === 'GET' && url.pathname === '/api/spike/poll-plan') return sendJson(res, 200, { label: runtime.params.label, plan: runtime.plan });
       if (req.method === 'POST' && url.pathname === '/api/spike/close-request') return sendJson(res, 200, runtime.closeRequest());
+      if (testControls && req.method === 'GET' && url.pathname === '/api/spike/test-controls') {
+        if (!testControlsRequestAllowed(req, server.address()?.port)) return sendJson(res, 403, { enabled: true, reason: 'SAME_ORIGIN_LOOPBACK_REQUIRED' });
+        // Per-run random token (memory only in the UI); synthetic scenario API scope only.
+        return sendJson(res, 200, { enabled: true, synthetic: true, scope: 'synthetic-scenario-api', token, note: 'Spike review tooling only. Not an authentication model. Per-run token, never persisted.' });
+      }
       if (req.method === 'POST' && url.pathname === '/api/spike/scenario') {
         const supplied = String(req.headers['x-spike-token'] ?? '');
         const a = Buffer.from(supplied);
@@ -105,6 +128,9 @@ export function createHarness(opts = {}) {
         }
         return sendJson(res, 200, runtime.command(body.command, body.params));
       }
+      // Unknown API routes are a JSON 404 (never the SPA fallback): e.g. /api/spike/test-controls
+      // without --synthetic-test-controls must read as "absent", not as index.html.
+      if (url.pathname.startsWith('/api/')) return sendJson(res, 404, { error: 'NOT_FOUND' });
       if (req.method === 'GET' && staticDir) return serveStatic(staticDir, url.pathname, res);
       sendJson(res, 404, { error: 'NOT_FOUND' });
     } catch (err) {
@@ -118,6 +144,7 @@ export function createHarness(opts = {}) {
     token,
     server,
     host,
+    testControls,
     async start() {
       runtime.start();
       await new Promise((resolve, reject) => {
