@@ -1,7 +1,7 @@
 // WJSS Stage 0.2.1A — Operations panels: Sensor Detail, Active Cleaning Job, GlobalQueue
 // preview, Alarm strip, Connection banner. Each subscribes only to the slice it shows.
 import type React from 'react';
-import type { JobPhase } from '../../../contracts/operational';
+import type { ActiveCleaningJobState, JobPhase } from '../../../contracts/operational';
 import { useSensor, useSlice } from '../store/hooks';
 import { toCellVisual } from '../visual/toCellVisual';
 import { compactReason } from '../visual/queueReason';
@@ -184,24 +184,48 @@ export function ActiveJobPanel() {
               </li>
             ))}
           </ol>
-          <div className={styles.jobStatus} data-testid="job-status">
-            <span className={styles.phaseLabel} title={job.phaseLabel}>
-              <b>{job.phase}</b> {job.phaseLabel}
-            </span>
-            <div className={styles.progress} role="progressbar" aria-label="Phase progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
-              <div style={{ width: `${pct}%` }} />
+          {job.safeReturn ? (
+            <SafeReturnStatus job={job} />
+          ) : (
+            <div className={styles.jobStatus} data-testid="job-status" data-lifecycle={job.lifecycle}>
+              <span className={styles.phaseLabel} title={job.phaseLabel}>
+                <b>{job.phase}</b> {job.phaseLabel}
+              </span>
+              <div className={styles.progress} role="progressbar" aria-label="Phase progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+                <div style={{ width: `${pct}%` }} />
+              </div>
+              <span className={styles.num}>{pct}%</span>
+              <span className={styles.jobElapsed} title={`Started ${new Date(job.startedAt).toLocaleTimeString()}`} data-testid="job-elapsed">
+                elapsed <span className={styles.num}>{fmtElapsed(job.startedAt)}</span>
+              </span>
             </div>
-            <span className={styles.num}>{pct}%</span>
-            <span className={styles.jobElapsed} title={`Started ${new Date(job.startedAt).toLocaleTimeString()}`} data-testid="job-elapsed">
-              elapsed <span className={styles.num}>{fmtElapsed(job.startedAt)}</span>
-            </span>
-          </div>
+          )}
         </>
       ) : (
         <p className={styles.muted}>No active Cleaning Job.</p>
       )}
       <p className={styles.footnote}>At most one Cleaning Job may be active. Synthetic workload only.</p>
     </section>
+  );
+}
+
+/**
+ * Mandatory Safe Return status (runtime evidence only). The Job remains the Active Job until
+ * Standby is confirmed; no outcome is shown until the runtime finalizes it.
+ */
+function SafeReturnStatus({ job }: { job: ActiveCleaningJobState }) {
+  const sr = job.safeReturn!;
+  const valve = `${sr.valve.command === 'CLOSE_COMMANDED' ? 'close commanded' : 'not commanded'} · ${sr.valve.feedback.replaceAll('_', ' ').toLowerCase()}`;
+  const axis = `${sr.axis.command === 'RETURN_COMMANDED' ? 'return commanded' : 'not commanded'} · ${sr.axis.standby.replaceAll('_', ' ').toLowerCase()}`;
+  return (
+    <div className={styles.jobStatus} data-testid="job-status" data-lifecycle={job.lifecycle}>
+      <span className={styles.phaseLabel} title={`${job.phaseLabel} · Isolation Valve ${valve} · Axis ${axis}`} data-testid="job-safe-return" data-sr-step={sr.step ?? ''}>
+        <b>{sr.step === 'SR_FAILED' ? 'SR FAILED' : sr.step}</b> {job.phaseLabel} · Valve {valve} · Axis {axis}
+      </span>
+      <span className={styles.jobElapsed} title={`Trigger ${sr.trigger} at ${new Date(sr.startedAt).toLocaleTimeString()}`}>
+        {sr.trigger.replace('SYN_', '').replaceAll('_', ' ').toLowerCase()}
+      </span>
+    </div>
   );
 }
 

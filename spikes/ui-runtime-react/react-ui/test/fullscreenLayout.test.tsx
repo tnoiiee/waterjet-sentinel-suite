@@ -124,7 +124,9 @@ describe('compact right-side cards', () => {
         startedAt: '2026-01-01T00:00:00.000Z',
         phaseStartedAt: '2026-01-01T00:00:10.000Z',
         phaseProgress: 0.42,
-        preCheck: 'PASSED',
+        lifecycle: 'RUNNING',
+        cleaningPhase: 'IN_PROGRESS',
+        safeReturn: null,
         dispatch: makeDispatch('H7', 'SYN-JOB-0007'),
       },
     });

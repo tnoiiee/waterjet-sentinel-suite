@@ -292,10 +292,16 @@ concurrent Cleaning Jobs. Parallel Water Jet cleaning is prohibited. `[OWNER CON
 | `QueueSource` | `TEMP_LEFT`, `TEMP_REAR`, `TEMP_RIGHT`, `TEMP_FRONT`, `TIME_LEFT`, `TIME_REAR`, `TIME_RIGHT`, `TIME_FRONT` | `[APPROVED]` |
 | `QueuePositionSourceReason` | `TEMP_QUEUE`, `TIME_QUEUE` | `[APPROVED]` |
 | `CleaningJobOutcome` | `COMPLETED`, `FAILED`, `ABORTED`, `RECOVERY_REQUIRED` | `[OWNER CONFIRMED]` |
-| `QueueEntryDisposition` | `HELD`, `RELEASED`, `REJECTED`, `REORDERED`, `REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION` | `[OWNER CONFIRMED]` |
+| `QueueEntryDisposition` | ~~`HELD`~~ (superseded), `RELEASED`, `REJECTED`, `REORDERED`, `REMOVED_BY_ELIGIBILITY`, `REMOVED_BY_EQUIPMENT_EXCLUSION` | `[OWNER CONFIRMED]`; `HELD` **SUPERSEDED** (Owner decision, 2026-10-06) |
 
 `REJECTED` is an Operator queue action and a queue entry disposition. It is **not** a
 Cleaning Job outcome, because a rejected entry is never executed as a Cleaning Job.
+
+**Queue-level `HELD` is superseded** (Owner decision, 2026-10-06; see
+[`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2). The GlobalQueue holds ready-to-dispatch entries only.
+A pause before dispatch is an AutoSequence state; a pause during a Cleaning Job is a Cleaning
+Job state; equipment waits are never queue entry states. Production Pause / Resume semantics
+remain pending Owner approval.
 
 ## 5. DirtyScore rules
 

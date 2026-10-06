@@ -2,7 +2,8 @@
 
 **Status:** PREPARED. The Agent has run none of it: Arena has no browser and no WebView.
 **Latest Owner-local result:** Edge E2E 25 / 25 PASS at `4129687a`; the final UI punchlist re-run
-(section 1D) is **PENDING**.
+(section 1D) is **PENDING**; the current required re-run is **section 1F** (critical Main Pump /
+Mandatory Safe Return, 42 tests + manual F11 review).
 
 **Owner-local evidence recorded for checkpoint `dd20a8bd` (superseded 104-location map):**
 Windows 11, Node v24.20.0, npm 11.19.0, Git 2.55.0.windows.5, installed Microsoft Edge. `npm ci`,
@@ -256,6 +257,80 @@ select a Sensor, press **D**, use **SYNTHETIC TEST CONTROL**):
 
 The **controlled 15-minute observation is PAUSED** and the **60-minute run was waived as a gate**
 (not run).
+
+## 1F. Re-run after the critical Main Pump / Mandatory Safe Return checkpoint (required)
+
+**SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED.** This checkpoint is a fast-forward on
+`60cd0398`; its SHA is in the PR #3 description. It supersedes the counts of section 1E and adds
+`e2e/critical.spec.ts`. From `react-ui\`:
+
+```powershell
+$env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm test                               # Vitest: expect 131 / 131 (17 files)
+npm run build
+node --test "../runtime-harness/test/**/*.test.mjs"   # expect 51 / 51
+npm run e2e -- e2e/operations.spec.ts e2e/layout.spec.ts e2e/punchlist.spec.ts e2e/critical.spec.ts   # 42 tests
+```
+
+New specs:
+
+| Spec | What it checks |
+| --- | --- |
+| `CRIT-A` | Pump trip during an Active Job: modal immediately, live Safe Return, queue frozen, `CRITICAL_SUSPENDED` |
+| `CRIT-B` | Unexpected stop with no Job: modal; no Safe Return required; no Job created |
+| `CRIT-C` | One Acknowledge; the modal stays while the condition is active |
+| `CRIT-D` | Condition cleared before Safe Return completes: the modal stays until Standby is confirmed |
+| `CRIT-E` | Cleared + Safe Return complete + acknowledged → modal closes; still `CRITICAL_SUSPENDED`; no Resume control; no new Job |
+| `CRIT-F` (1920 × 1080 and 1366 × 768) | Geometry inside the viewport, background blocked, focus trap, Escape ignored, no close button |
+
+`layout.spec.ts` / `operations.spec.ts` now end Jobs with the scenario-only `abort-job { immediate: true }`.
+
+**Manual F11 review.** Run `npm run harness -- --synthetic-test-controls` in Edge at 1920 × 1080,
+F11, 100 %. Press **D** and use **SYNTHETIC TEST CONTROL → Critical Pump / Safe Return**. The ten
+controls are:
+
+1. stop with no Job;
+2. trip with no Job;
+3. trip in P1;
+4. trip in P4;
+5. normal completion → Safe Return;
+6. valve feedback delay;
+7. Standby feedback delay;
+8. clear;
+9. acknowledge;
+10. reset (test only — **not a Resume**).
+
+There is also a valve-feedback-absent control for failure review.
+
+| # | Owner check |
+| --- | --- |
+| 1 | Control 4 (trip in P4): the modal "CRITICAL ALARM — MAIN PUMP TRIPPED" appears at once, centered and fully inside the screen. The background is dimmed and not clickable. There is no X; Acknowledge is the only button |
+| 2 | The modal shows time, condition, acknowledge state, AutoSequence `CRITICAL_SUSPENDED`, Job / target / phase, the live Safe Return step, and valve / axis / Standby. The response text is generic |
+| 3 | Escape does nothing; Tab stays inside the modal; there is no flashing |
+| 4 | Safe Return progresses: valve close commanded → closed confirmed → **only then** axis to Standby → Standby confirmed. The Active Job panel shows the same step |
+| 5 | GlobalQueue entries and order are unchanged during the event; no new Job starts |
+| 6 | Control 9 (Acknowledge): state ACKNOWLEDGED; the modal stays open while the fault is active |
+| 7 | Control 6, then 3, then 8 (clear) before Safe Return completes: the modal stays open until Standby is confirmed |
+| 8 | Clear + Safe Return complete + acknowledged: the modal closes, the AutoSequence stays `CRITICAL_SUSPENDED`, there is no Resume button, and no next Job starts |
+| 9 | Control 5 (normal completion): no modal; Safe Return runs; the outcome in Diagnostics → Sequence is `COMPLETED` only after Standby is confirmed |
+| 10 | Modal colours are plum / orchid, distinct from dirty red, alarm amber, selection cyan and the white Job ring; state is readable as text |
+| 11 | Control 10 (reset) leaves the AutoSequence `OFF` (not resumed) |
+
+**Screenshots to return (8):**
+
+1. modal during an Active Job;
+2. Safe Return at the valve step;
+3. Safe Return at the Standby step;
+4. acknowledged with the fault still active;
+5. cleared with Safe Return incomplete;
+6. normal-completion Safe Return;
+7. GlobalQueue unchanged during the event;
+8. final Edge E2E summary.
+
+Policies shown as OWNER DECISION REQUIRED are listed in
+[`critical-pump-safe-return-decision-matrix.md`](../../../docs/spikes/critical-pump-safe-return-decision-matrix.md).
 
 ## 2. Manual look (optional)
 

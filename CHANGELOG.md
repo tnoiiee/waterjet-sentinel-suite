@@ -30,14 +30,77 @@ removable synthetic feasibility spike — no Product code.**
 **Implementation:** IN PROGRESS — PR #3 OPEN
 **Owner-local testing (installed Edge, Windows 11):** Edge E2E **25 / 25 PASS** at checkpoint
 `4129687a` (Owner-reported, ≈ 1.3 min); at `23f48daa` 34 selected · 25 passed · 2 failed (`READ-A`,
-`WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) is
-PENDING an Owner-local Edge re-run
+`WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) and the critical Pump / Safe Return
+checkpoint (42-test selection) are PENDING an Owner-local Edge re-run
 **Owner manual UI re-review (1920 × 1080, Edge F11):** PENDING · **Controlled 15-minute
 observation:** PAUSED · **60-minute run:** waived as a gate by the Owner — not run
 **Merge:** NOT MERGED
 **React final selection:** NOT YET APPROVED — UI framework `[OPEN]`
 **Blazor counter-spike:** DEFERRED / `[NOT AUTHORIZED]`
 **Stage 0.3:** `[NOT AUTHORIZED]`
+
+#### Fixed — Critical Main Pump handling and Mandatory Safe Return (Owner critical Pump decision; synthetic)
+
+**SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED.** No physical Pump, relay, VFD, valve,
+axis, Galil program or interlock is involved; no safety certification is claimed; no Production
+coordinates, addresses or protocols are used.
+
+- **Recovery:** the Owner-authorized one-time recovery restored the local branch to `60cd0398`
+  (identity proof 147 / 147, compare-and-swap ref update, index-only refresh).
+- **Pump event classes:** the Main Pump is High Critical.
+  - Expected commanded stop: not a fault (no modal, no suspension), but an Active Job still Safe
+    Returns.
+  - Unexpected stop / trip: stops progression, water and dispatch. The AutoSequence becomes
+    `CRITICAL_SUSPENDED` (persists; no automatic Resume, no automatic next Job, no
+    `WAITING_FOR_PUMP` Job) and an Active Job enters Mandatory Safe Return.
+  - The GlobalQueue is frozen unchanged.
+- **Mandatory Safe Return for every outcome** (SR1–SR8):
+  - The valve close is commanded and confirmed before the axis Standby command.
+  - The Job stays Active until Standby is confirmed and released.
+  - `COMPLETED` applies only after Standby is confirmed; every other trigger gives `ABORTED`.
+  - On Safe Return failure (`SAFE_RETURN_FAILED`), the Job is retained with no outcome, release or
+    dispatch, and the modal stays.
+  - Evidence carries increasing indices, a bounded outcome log and no coordinates.
+  - The validator checks the ordering on every Snapshot.
+- **Superseded:** the synthetic Job pre-check pump wait (`preCheck` on a Job). A Job is no longer
+  created while the Pump is not ready; the AutoSequence shows `PUMP_NOT_READY`. Scenario
+  `abort-job` is now timed through Safe Return (`{ immediate: true }` is a scenario-only shortcut).
+- **Critical modal:**
+  - Layout: "CRITICAL ALARM — MAIN PUMP STOPPED / TRIPPED", centered, viewport-fitted, over an
+    inert dimmed background.
+  - Content: live Safe Return step, valve / axis / Standby, and generic response text.
+  - Controls: Acknowledge is the only action (same-origin loopback `POST /api/spike/critical-alarm-ack`);
+    there is no close button and no Resume button. Acknowledge is not a clear.
+  - Closing: the modal closes only when the alarm is cleared, Safe Return is complete and the alarm
+    is acknowledged; the sequence stays suspended.
+  - Accessibility: alertdialog, aria-modal, labelled; Escape does not dismiss; focus trap; polite
+    announcements; no flashing.
+  - Palette: distinct plum / orchid tokens.
+- **UI:**
+  - The Active Job panel shows the Safe Return status.
+  - Diagnostics gains a Sequence section.
+  - `--synthetic-test-controls` gains the "Critical Pump / Safe Return" group: 10 Owner controls
+    plus valve-feedback-absent.
+- **Docs:**
+  - Queue-level `HELD` / Hold / Release Hold are **SUPERSEDED** in `docs/QUEUE_MODEL.md` §7.2 and
+    `docs/DOMAIN_MODEL.md` (Owner-authorized).
+  - New `docs/spikes/critical-pump-safe-return-decision-matrix.md` (matrices A–F, every row OWNER
+    DECISION REQUIRED).
+  - The queue eligibility matrix gained §6.
+  - Notes added to CLEANING_SEQUENCE, ALARM_MODEL and CONTROL_AUTHORITY.
+  - Results §0E; CURRENT_STATE §12.9; OWNER_LOCAL_TESTING §1F.
+- **Arena validation:**
+
+  | Check | Result |
+  | --- | --- |
+  | Vitest | 131 / 131 (17 files) |
+  | Harness | 51 / 51 × 3 |
+  | Scenarios | 29 / 4 / 1 / 0 (34) |
+  | Playwright list | 43 tests in 5 files (Owner-local 42) |
+  | Build | JS 340.50 kB, CSS 30.92 kB |
+
+  Dependencies are unchanged. **NOT VERIFIED:** browser / Edge / WebView2 rendering, hardware,
+  and Production safety.
 
 #### Fixed — GlobalQueue semantics correction and head-only synthetic dispatch (Owner domain correction)
 

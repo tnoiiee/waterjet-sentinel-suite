@@ -156,6 +156,18 @@ Gate and is carried by the process model in
 [`decisions/ADR-0007`](decisions/ADR-0007-runtime-process-model.md); the UI delivery selection
 in [`decisions/ADR-0006`](decisions/ADR-0006-ui-delivery-model.md) does not change it.
 
+### 6.2 Critical suspension and Resume authority (Owner critical Pump decision, 2026-10-06)
+
+After a Main Pump unexpected stop or trip, the AutoSequence stays suspended until a future,
+Owner-approved Resume. No automatic Resume and no automatic next Job exist. Acknowledging the
+critical alarm creates no authority and does not resume.
+
+Who may resume, under which preconditions and with which confirmation is **OWNER DECISION
+REQUIRED** ([`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md) matrix F). The same applies to who may acknowledge.
+
+The Stage 0.2.1A spike's acknowledge endpoint is a synthetic, same-origin loopback request and
+the spike's synthetic test reset is review tooling. Neither is a Resume or an authority model.
+
 ## 7. Priority of command sources
 
 When more than one source could command the same output, the highest applicable priority

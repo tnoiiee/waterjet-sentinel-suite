@@ -9,11 +9,16 @@ import { validateSnapshot } from '../../contracts/validate.mjs';
 
 const PROHIBITED = /\b(BLOCKED|HELD|HELD_BY_OPERATOR|WAITING_FOR_PUMP|WAITING_FOR_EQUIPMENT|EXCLUDED|INVALID|OUT_OF_SERVICE|DISABLED|BAD|STALE)\b/;
 
-/** In-process runtime (no scheduler) with an empty queue and the AutoSequence off. */
-function fresh(extra = {}) {
+/** In-process runtime (no scheduler) with an empty queue, the AutoSequence off, Pump ready. */
+function fresh(extra = {}, { pumpReady = true } = {}) {
   const rt = new SyntheticRuntime({ autoJobs: false, ...extra });
   rt.classifyAll(Date.now());
   rt.clearQueue();
+  if (pumpReady) {
+    // In-process stand-in for a fresh in-band synthetic pressure sample (no acquisition loop).
+    rt.pressure.values = [100, 97, 94, 95];
+    rt.pressure.sourceTs = Date.now();
+  }
   return rt;
 }
 /** In-process acquisition stand-in: copy the synthetic process scores into fresh GOOD samples. */
@@ -31,15 +36,19 @@ const snap = (rt) => {
   pub(rt);
   return rt.snapshot().snap;
 };
-/** Finish the active Job immediately (synthetic time travel) and publish once. */
+/**
+ * Finish the active Job (synthetic time travel past P6 and past the whole Mandatory Safe Return).
+ * The Job is released only after SR1..SR7 in order.
+ */
 function completeJob(rt) {
   const job = rt.activeJobs[0];
   assert.ok(job, 'no active job to complete');
-  job.preCheck = 'PASSED';
   delete job.heldPhaseIndex;
-  job.startedAtMs = Date.now() - 7 * rt.params.jobPhaseMs;
+  job.startedAtMs = Date.now() - 6 * rt.params.jobPhaseMs - 60000;
   rt.advanceJob(Date.now());
   assert.equal(rt.activeJobs.length, 0);
+  assert.equal(rt.lastJobOutcome.jobId, job.jobId);
+  assert.equal(rt.lastJobOutcome.outcome, 'COMPLETED');
 }
 /** Deterministic queue of Sensor IDs via the synthetic non-score source (Water Jet never used). */
 function seed(rt, ids, reason = 'TIME_DUE') {
@@ -130,18 +139,26 @@ test('Gate B — Job target = former head; atomic removal; Position 2 becomes Po
   assert.equal(rt2.activeJobs[0].targetSensorId, 'G+110');
 });
 
-test('Gate B — Job pre-check waits for the Pump; the entry is not kept in the queue as WAITING', () => {
-  const rt = fresh();
+test('Gate B — Pump not ready: no Job is created (no Job waits for the Pump); queue unchanged, no entry state', () => {
+  const rt = fresh({ autoJobs: true }, { pumpReady: false });
   seed(rt, ['H3', 'H4']);
   assert.equal(rt.pumpReady(), false); // in-process runtime: no pressure samples yet
+  const rev = rt.queueRevision;
   const r = rt.dispatchHead('SYN_TEST');
-  assert.equal(r.accepted, true);
+  assert.equal(r.accepted, false);
+  assert.equal(r.reason, 'PUMP_NOT_READY');
   const s = snap(rt);
-  assert.equal(s.activeJob.targetSensorId, 'H3');
-  assert.equal(s.activeJob.preCheck, 'WAITING_FOR_PUMP');
-  assert.equal(s.activeJob.phase, 'P1');
-  assert.deepEqual(rt.queueOrder, ['H4']);
+  assert.equal(s.activeJob, null);
+  assert.equal(s.queue.autoSequence, 'PUMP_NOT_READY', 'the wait belongs to the AutoSequence');
+  assert.deepEqual(rt.queueOrder, ['H3', 'H4']);
+  assert.equal(rt.queueRevision, rev);
+  assert.ok(!PROHIBITED.test(JSON.stringify(s.queue.entries)));
   assert.deepEqual(validateSnapshot(s), []);
+  // Pump becomes ready: the AutoSequence dispatches the unchanged head.
+  rt.pressure.values = [100, 97, 94, 95];
+  rt.pressure.sourceTs = Date.now();
+  pub(rt);
+  assert.equal(rt.activeJobs[0].targetSensorId, 'H3');
 });
 
 test('Gate C — at most one Job; no dispatch while a Job is active; sequence A then B', () => {
@@ -236,7 +253,9 @@ test('Gate F — no arbitrary retarget; start-job / Review Job make the Sensor t
   const same = rt.dispatch('review-job', { sensorId: 'G6' });
   assert.equal(same.accepted, true);
   assert.equal(same.detail.dispatch.sensorId, 'G6');
-  rt.abortJob('TEST');
+  rt.syntheticResetJob();
+  assert.equal(rt.activeJobs.length, 0);
+  assert.equal(rt.lastJobOutcome.outcome, 'ABORTED');
   // Review Job with no active Job: head prepared first, then dispatched.
   seed(rt, ['G7', 'G8']);
   const rv = rt.dispatch('review-job', { sensorId: 'G8' });

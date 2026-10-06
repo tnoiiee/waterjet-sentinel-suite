@@ -329,7 +329,7 @@ test('READ-A 1920 x 1080: Sensor ID, quality marker, value, alarm icon and queue
 
 test('READ-B alarm, selection and Active Job are distinct channels on both Dirty and Cleaner cells', async ({ page, request }) => {
   await scenario(request, 'auto-jobs', { enabled: false });
-  await scenario(request, 'abort-job');
+  await scenario(request, 'abort-job', { immediate: true });
   await scenario(request, 'set-dirty-mode', { mode: 'dirty30' });
   await scenario(request, 'pump-start'); // ALREADY_RUNNING is fine
   await open(page, 1920, 1080);
@@ -390,7 +390,7 @@ test('READ-B alarm, selection and Active Job are distinct channels on both Dirty
     await scenario(request, 'ack-alarm', { alarmId: a });
     await scenario(request, 'clear-alarm', { alarmId: a });
   }
-  await scenario(request, 'abort-job');
+  await scenario(request, 'abort-job', { immediate: true });
   await scenario(request, 'set-dirty-mode', { mode: 'normal' });
   await scenario(request, 'auto-jobs', { enabled: true });
 });

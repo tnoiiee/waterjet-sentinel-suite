@@ -10,7 +10,10 @@ const CLASSES = new Set(['DIRTY', 'CLEANER', 'NOT_CLASSIFIED']);
 const BASES = new Set(['CURRENT', 'LAST_VALIDATED', 'NONE']);
 const QUEUE_STATES = new Set(['NONE', 'QUEUED', 'ACTIVE']);
 const QUEUE_CAPACITY = 8;
-const AUTO_SEQUENCE = new Set(['OFF', 'PAUSED', 'JOB_ACTIVE', 'QUEUE_EMPTY', 'READY_TO_DISPATCH']);
+const AUTO_SEQUENCE = new Set(['CRITICAL_SUSPENDED', 'OFF', 'PAUSED', 'JOB_ACTIVE', 'PUMP_NOT_READY', 'QUEUE_EMPTY', 'READY_TO_DISPATCH']);
+const LIFECYCLES = new Set(['RUNNING', 'ABORTING', 'SAFE_RETURN_CLOSE_VALVE', 'SAFE_RETURN_VERIFY_VALVE_CLOSED', 'SAFE_RETURN_TO_STANDBY', 'SAFE_RETURN_VERIFY_STANDBY', 'SAFE_RETURN_FAILED']);
+const SR_ORDER = ['SR1', 'SR2', 'SR3', 'SR4', 'SR5', 'SR6', 'SR7', 'SR8'];
+const CRITICAL_KINDS = new Set(['MAIN_PUMP_UNEXPECTED_STOP', 'MAIN_PUMP_TRIP']);
 // Prohibited GlobalQueue entry states and synonyms (Owner domain correction).
 const PROHIBITED_ENTRY_KEYS = ['status', 'state', 'entryStatus', 'blocked', 'held', 'excluded', 'waiting'];
 const ALARM_STATES = new Set(['NONE', 'ACTIVE_UNACK', 'ACTIVE_ACK', 'CLEARED_UNACK']);
@@ -78,9 +81,58 @@ function validateJob(j, e) {
   if (typeof j !== 'object') return e.push('activeJob invalid');
   if (!isSensorId(j.targetSensorId)) e.push(`activeJob.targetSensorId invalid: ${j.targetSensorId}`);
   if (!PHASES.has(j.phase)) e.push('activeJob.phase invalid');
-  if (!['PASSED', 'WAITING_FOR_PUMP'].includes(j.preCheck)) e.push('activeJob.preCheck invalid');
+  if ('preCheck' in j) e.push('activeJob.preCheck superseded (no Job waits for the Pump)');
+  if (!LIFECYCLES.has(j.lifecycle)) e.push(`activeJob.lifecycle invalid: ${j.lifecycle}`);
+  if (j.lifecycle === 'RUNNING' && j.safeReturn !== null) e.push('activeJob RUNNING must not carry a Safe Return record');
+  if (j.lifecycle !== 'RUNNING') {
+    const sr = j.safeReturn;
+    if (!sr || sr.synthetic !== true || !Array.isArray(sr.events)) e.push('activeJob.safeReturn missing during Safe Return');
+    else {
+      validateSafeReturnOrder(sr.events, 'activeJob.safeReturn', e);
+      if (sr.events.some((x) => ['SR6', 'SR7', 'SR8'].includes(x.step))) e.push('activeJob.safeReturn: outcome / release before the Job is released');
+      if (sr.axis?.command === 'RETURN_COMMANDED' && sr.valve?.feedback !== 'CLOSED_CONFIRMED') e.push('activeJob.safeReturn: axis return commanded before Isolation Valve closed confirmed');
+    }
+  }
   validateDispatchRecord(j.dispatch, 'activeJob.dispatch', e);
   if (j.dispatch && (j.dispatch.sensorId !== j.targetSensorId || j.dispatch.jobId !== j.jobId)) e.push('activeJob.dispatch does not match the Job (target / jobId)');
+}
+
+/** Present steps must be contiguous from SR1 with strictly increasing evidence indices. */
+function validateSafeReturnOrder(events, path, e, complete = false) {
+  let prev = -1;
+  let gap = false;
+  for (const step of SR_ORDER) {
+    const ev = events.find((x) => x.step === step);
+    if (!ev) {
+      gap = true;
+      continue;
+    }
+    if (gap || !Number.isInteger(ev.seq) || ev.seq <= prev) return e.push(`${path}: Safe Return order invalid at ${step}`);
+    prev = ev.seq;
+  }
+  if (complete && gap) e.push(`${path}: Safe Return incomplete`);
+}
+
+function validateSequence(q, e) {
+  if (!q || typeof q !== 'object') return e.push('sequence invalid');
+  if (q.synthetic !== true) e.push('sequence.synthetic must be true');
+  if (!AUTO_SEQUENCE.has(q.autoSequence)) e.push('sequence.autoSequence invalid');
+  const c = q.critical;
+  if (c !== null) {
+    if (!c || !CRITICAL_KINDS.has(c.kind) || c.severity !== 'HIGH' || !isIso(c.raisedAt)) e.push('sequence.critical invalid');
+    else {
+      if (q.autoSequence !== 'CRITICAL_SUSPENDED') e.push('sequence.critical present but AutoSequence not CRITICAL_SUSPENDED');
+      if (!c.modalOpen && (c.conditionActive || !c.acknowledged || !c.safeReturnComplete)) e.push('sequence.critical modal closed before clear + acknowledge + Safe Return complete');
+    }
+  }
+  const o = q.lastJobOutcome;
+  if (o !== null) {
+    if (!o || o.synthetic !== true || !['COMPLETED', 'ABORTED'].includes(o.outcome) || !Array.isArray(o.events)) e.push('sequence.lastJobOutcome invalid');
+    else {
+      validateSafeReturnOrder(o.events, 'sequence.lastJobOutcome', e, true);
+      if (o.outcome === 'COMPLETED' && o.trigger !== 'SYN_CLEANING_PHASES_COMPLETE') e.push('sequence.lastJobOutcome COMPLETED without cleaning-phases-complete trigger');
+    }
+  }
 }
 
 function validateDispatchRecord(d, path, e) {
@@ -146,6 +198,8 @@ export function validateSnapshot(m) {
   validateJob(m.activeJob, e);
   if (!m.pump || typeof m.pump.state !== 'string') e.push('pump invalid');
   validateQueue(m.queue, e);
+  validateSequence(m.sequence, e);
+  if (m.sequence && m.queue && m.sequence.autoSequence !== m.queue.autoSequence) e.push('sequence.autoSequence != queue.autoSequence');
   // Cross-check: per-Sensor queueState agrees with the queue entries and the Active Job.
   if (Array.isArray(m.sensors) && m.queue && Array.isArray(m.queue.entries)) {
     const queued = new Set(m.queue.entries.map((x) => x.sensorId));
@@ -178,5 +232,6 @@ export function validateDelta(m) {
   if ('wallMap' in m) e.push('wallMap is Snapshot-only and must not appear in a Delta');
   if ('activeJob' in m) validateJob(m.activeJob, e);
   if (m.queue !== undefined) validateQueue(m.queue, e);
+  if (m.sequence !== undefined) validateSequence(m.sequence, e);
   return e;
 }

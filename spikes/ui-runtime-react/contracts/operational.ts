@@ -98,10 +98,70 @@ export interface ActiveCleaningJobState {
   startedAt: string;
   phaseStartedAt: string;
   phaseProgress: number;
-  /** Job pre-check lifecycle (P1). Pump readiness waits belong here, never to the queue. */
-  preCheck: 'PASSED' | 'WAITING_FOR_PUMP';
+  /**
+   * Synthetic Job lifecycle. Every Job ends through Mandatory Safe Return; the Job remains the
+   * Active Job until Standby is confirmed (SR5) and the outcome is finalized (SR6/SR7).
+   * Spike names only — Production enum names are NOT approved.
+   */
+  lifecycle: JobLifecycle;
+  /** IN_PROGRESS while RUNNING; frozen at the Safe Return trigger. Not the Job outcome. */
+  cleaningPhase: 'IN_PROGRESS' | 'CLEANING_PHASES_COMPLETE' | 'CLEANING_STOPPED';
   /** Synthetic dispatch evidence linking this Job to the queue head it was created from. */
   dispatch: DispatchRecord;
+  /** Present from SR1 until the Job is released. */
+  safeReturn: SafeReturnState | null;
+}
+
+export type JobLifecycle =
+  | 'RUNNING'
+  | 'ABORTING'
+  | 'SAFE_RETURN_CLOSE_VALVE'
+  | 'SAFE_RETURN_VERIFY_VALVE_CLOSED'
+  | 'SAFE_RETURN_TO_STANDBY'
+  | 'SAFE_RETURN_VERIFY_STANDBY'
+  | 'SAFE_RETURN_FAILED';
+
+export type SafeReturnTrigger =
+  | 'SYN_CLEANING_PHASES_COMPLETE'
+  | 'SYN_OPERATOR_ABORT'
+  | 'SYN_CANCELLED'
+  | 'SYN_FAILURE'
+  | 'SYN_PUMP_UNEXPECTED_STOP'
+  | 'SYN_PUMP_TRIP'
+  | 'SYN_COMMANDED_PUMP_STOP'
+  | 'SYN_TEST_RESET';
+
+/** Synthetic Safe Return evidence (transient spike evidence, NOT a Production audit record). */
+export interface SafeReturnEvent {
+  /** Global monotonic synthetic evidence index (ordering proof). */
+  seq: number;
+  step: 'SR1' | 'SR2' | 'SR3' | 'SR4' | 'SR5' | 'SR6' | 'SR7' | 'SR8' | null;
+  event: string;
+  at: string;
+}
+
+export interface SafeReturnState {
+  synthetic: true;
+  step: 'SR1' | 'SR2' | 'SR3' | 'SR4' | 'SR5' | 'SR_FAILED' | null;
+  trigger: SafeReturnTrigger;
+  pendingOutcome: 'COMPLETED' | 'ABORTED';
+  phaseAtTrigger: JobPhase;
+  startedAt: string;
+  valve: {
+    valveId: string;
+    command: 'NOT_COMMANDED' | 'CLOSE_COMMANDED';
+    commandSeq: number | null;
+    feedback: 'NOT_CONFIRMED' | 'CLOSED_CONFIRMED' | 'ABSENT';
+    feedbackSeq: number | null;
+  };
+  axis: {
+    command: 'NOT_COMMANDED' | 'RETURN_COMMANDED';
+    commandSeq: number | null;
+    standby: 'NOT_CONFIRMED' | 'STANDBY_CONFIRMED' | 'ABSENT';
+    standbySeq: number | null;
+  };
+  failure: { reason: string; atLifecycle: JobLifecycle; at: string; seq: number } | null;
+  events: SafeReturnEvent[];
 }
 
 /**
@@ -123,7 +183,8 @@ export interface DispatchRecord {
   dispatchedAt: string;
 }
 
-export type PumpRunState = 'STOPPED' | 'STARTING' | 'RUNNING' | 'STOPPING';
+/** TRIPPED: synthetic trip state (not a physical protection relay / VFD state). */
+export type PumpRunState = 'STOPPED' | 'STARTING' | 'RUNNING' | 'STOPPING' | 'TRIPPED';
 
 export interface PumpState {
   state: PumpRunState;
@@ -145,8 +206,76 @@ export interface QueueEntry {
   secondsSinceLastClean: number;
 }
 
-/** AutoSequence (dispatch control) state. Operator pause lives here, never in queue entries. */
-export type AutoSequenceState = 'OFF' | 'PAUSED' | 'JOB_ACTIVE' | 'QUEUE_EMPTY' | 'READY_TO_DISPATCH';
+/**
+ * AutoSequence (dispatch control) state. Operator pause, Pump readiness waits and critical
+ * suspension live here, never in queue entries. CRITICAL_SUSPENDED persists after the condition
+ * is cleared; no automatic Resume (Resume authority is OWNER DECISION REQUIRED).
+ */
+export type AutoSequenceState = 'CRITICAL_SUSPENDED' | 'OFF' | 'PAUSED' | 'JOB_ACTIVE' | 'PUMP_NOT_READY' | 'QUEUE_EMPTY' | 'READY_TO_DISPATCH';
+
+/** Synthetic Main Pump critical event (High Critical device; synthetic proof only). */
+export interface CriticalPumpEvent {
+  eventId: string;
+  kind: 'MAIN_PUMP_UNEXPECTED_STOP' | 'MAIN_PUMP_TRIP';
+  severity: 'HIGH';
+  raisedAt: string;
+  evidenceSeq: number;
+  conditionActive: boolean;
+  clearedAt: string | null;
+  acknowledged: boolean;
+  acknowledgedAt: string | null;
+  alarmId: string;
+  jobId: string | null;
+  targetSensorId: string | null;
+  phaseAtEvent: JobPhase | null;
+  safeReturnRequired: boolean;
+  safeReturnComplete: boolean;
+  safeReturnFailed: boolean;
+  /** Closes only when condition cleared AND acknowledged AND Safe Return complete (if required). */
+  modalOpen: boolean;
+  modalClosedAt: string | null;
+}
+
+/** Frozen record of the last released Job (transient synthetic evidence, not an audit record). */
+export interface JobOutcomeRecord {
+  synthetic: true;
+  jobId: string;
+  targetSensorId: string;
+  dispatchId: string;
+  queueRevisionBefore: number;
+  queueRevisionAfter: number;
+  queueEntryId: string;
+  phaseAtTrigger: JobPhase;
+  trigger: SafeReturnTrigger;
+  cleaningPhasesComplete: boolean;
+  outcome: 'COMPLETED' | 'ABORTED';
+  valveId: string;
+  valveCloseCommandSeq: number;
+  valveClosedConfirmedSeq: number;
+  axisReturnCommandSeq: number;
+  standbyConfirmedSeq: number;
+  outcomeSeq: number;
+  releaseSeq: number;
+  autoSequenceAtRelease: AutoSequenceState;
+  finalizedAt: string;
+  events: SafeReturnEvent[];
+}
+
+export interface SafeReturnConfig {
+  valveFeedbackDelayMs: number;
+  standbyFeedbackDelayMs: number;
+  valveFeedback: 'NORMAL' | 'ABSENT';
+  standbyFeedback: 'NORMAL' | 'ABSENT';
+}
+
+/** AutoSequence / critical / last outcome view (synthetic sequence authority). */
+export interface SequenceState {
+  synthetic: true;
+  autoSequence: AutoSequenceState;
+  critical: CriticalPumpEvent | null;
+  safeReturnConfig: SafeReturnConfig;
+  lastJobOutcome: JobOutcomeRecord | null;
+}
 
 /** Synthetic Queue Eligibility Diagnostics row (only when a test scenario explicitly sets it). */
 export interface EligibilityDiagnostic {
@@ -265,6 +394,7 @@ export interface OperationalSnapshot {
   activeJob: ActiveCleaningJobState | null;
   pump: PumpState;
   queue: QueueSummary;
+  sequence: SequenceState;
   alarms: AlarmSummary;
   communication: CommunicationHealth;
   runtime: RuntimeHealth;
@@ -285,6 +415,7 @@ export interface OperationalDelta {
   activeJob?: ActiveCleaningJobState | null;
   pump?: PumpState;
   queue?: QueueSummary;
+  sequence?: SequenceState;
   alarms?: AlarmSummary;
   communication?: CommunicationHealth;
   runtime?: RuntimeHealth;

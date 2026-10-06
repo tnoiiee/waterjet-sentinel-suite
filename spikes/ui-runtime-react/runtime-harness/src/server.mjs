@@ -8,6 +8,10 @@
 //   GET  /api/stream               SSE: snapshot first, then deltas
 //   GET  /api/snapshot             current OperationalSnapshot (JSON)
 //   POST /api/spike/close-request  synthetic close-guard evaluation (no token)
+//   POST /api/spike/critical-alarm-ack  acknowledge the synthetic critical Pump Alarm from the
+//                                  blocking modal (same-origin loopback only, no token). Ack is
+//                                  NOT a clear, NOT a Resume. Ack role / authority: OWNER
+//                                  DECISION REQUIRED (spike: any local UI user).
 //   POST /api/spike/scenario       synthetic scenario command (X-Spike-Token required)
 //   GET  /api/spike/metrics        harness metrics
 //   GET  /api/spike/poll-plan      synthetic poll plan
@@ -103,6 +107,10 @@ export function createHarness(opts = {}) {
       if (req.method === 'GET' && url.pathname === '/api/spike/metrics') return sendJson(res, 200, { ...runtime.metricsReport(), sse: { clients: sse.clients.size, ...sse.stats } });
       if (req.method === 'GET' && url.pathname === '/api/spike/poll-plan') return sendJson(res, 200, { label: runtime.params.label, plan: runtime.plan });
       if (req.method === 'POST' && url.pathname === '/api/spike/close-request') return sendJson(res, 200, runtime.closeRequest());
+      if (req.method === 'POST' && url.pathname === '/api/spike/critical-alarm-ack') {
+        if (!testControlsRequestAllowed(req, server.address()?.port)) return sendJson(res, 403, { accepted: false, reason: 'SAME_ORIGIN_LOOPBACK_REQUIRED' });
+        return sendJson(res, 200, runtime.command('critical-alarm-ack', {}));
+      }
       if (testControls && req.method === 'GET' && url.pathname === '/api/spike/test-controls') {
         if (!testControlsRequestAllowed(req, server.address()?.port)) return sendJson(res, 403, { enabled: true, reason: 'SAME_ORIGIN_LOOPBACK_REQUIRED' });
         // Per-run random token (memory only in the UI); synthetic scenario API scope only.

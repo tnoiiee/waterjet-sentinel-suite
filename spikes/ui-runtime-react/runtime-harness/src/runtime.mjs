@@ -30,6 +30,55 @@ const PHASES = [
   ['P6', 'Close-out (synthetic)'],
 ];
 const SERIES_NAMES = ['Pump discharge', 'Header', 'Manifold A', 'Manifold B'];
+
+// ---------------------------------------------------------------------------------------------
+// Mandatory Safe Return and Main Pump critical handling (Owner critical decision).
+//
+// SYNTHETIC PROOF ONLY — not a physical Pump, protection relay, VFD, Isolation Valve, axis, motion
+// profile, or Production interlock. No safety or motion certification is claimed. The state names
+// below are synthetic spike names; Production enum / outcome names are NOT approved.
+//  * Every Cleaning Job ends through Mandatory Safe Return, whatever the trigger:
+//    SR1 stop normal Cleaning / water command -> SR2 command Isolation Valve closed -> SR3 confirm
+//    closed -> SR4 command axis return to Standby -> SR5 confirm Standby -> SR6 finalize outcome ->
+//    SR7 release Active Job ownership -> SR8 only then may later sequencing be considered.
+//  * The Job stays the Active Job throughout; COMPLETED / ABORTED exist only after SR5.
+//  * Main Pump unexpected stop / trip: AutoSequence -> CRITICAL_SUSPENDED (no dispatch, no new Job,
+//    no automatic Resume), GlobalQueue frozen unchanged, Active Job -> Safe Return, blocking modal.
+// ---------------------------------------------------------------------------------------------
+export const JOB_LIFECYCLE = Object.freeze({
+  RUNNING: 'RUNNING',
+  ABORTING: 'ABORTING',
+  CLOSE_VALVE: 'SAFE_RETURN_CLOSE_VALVE',
+  VERIFY_VALVE: 'SAFE_RETURN_VERIFY_VALVE_CLOSED',
+  TO_STANDBY: 'SAFE_RETURN_TO_STANDBY',
+  VERIFY_STANDBY: 'SAFE_RETURN_VERIFY_STANDBY',
+  FAILED: 'SAFE_RETURN_FAILED',
+});
+const LIFECYCLE_STEP = Object.freeze({
+  ABORTING: ['SR1', 'Aborting — normal Cleaning and water command stopped'],
+  SAFE_RETURN_CLOSE_VALVE: ['SR2', 'Mandatory Safe Return — Isolation Valve close commanded'],
+  SAFE_RETURN_VERIFY_VALVE_CLOSED: ['SR3', 'Mandatory Safe Return — confirming Isolation Valve closed'],
+  SAFE_RETURN_TO_STANDBY: ['SR4', 'Mandatory Safe Return — axis returning to Standby'],
+  SAFE_RETURN_VERIFY_STANDBY: ['SR5', 'Mandatory Safe Return — confirming Standby Position'],
+  SAFE_RETURN_FAILED: ['SR_FAILED', 'Mandatory Safe Return FAILED — Active Job retained'],
+});
+export const SAFE_RETURN_TRIGGERS = Object.freeze({
+  CLEANING_COMPLETE: 'SYN_CLEANING_PHASES_COMPLETE',
+  OPERATOR_ABORT: 'SYN_OPERATOR_ABORT',
+  CANCELLED: 'SYN_CANCELLED',
+  FAILURE: 'SYN_FAILURE',
+  PUMP_UNEXPECTED_STOP: 'SYN_PUMP_UNEXPECTED_STOP',
+  PUMP_TRIP: 'SYN_PUMP_TRIP',
+  COMMANDED_PUMP_STOP: 'SYN_COMMANDED_PUMP_STOP',
+  TEST_RESET: 'SYN_TEST_RESET',
+});
+const ABORT_CAUSES = Object.freeze({ OPERATOR_ABORT: 'OPERATOR_ABORT', CANCELLED: 'CANCELLED', FAILURE: 'FAILURE' });
+export const CRITICAL_KINDS = Object.freeze({ UNEXPECTED_STOP: 'MAIN_PUMP_UNEXPECTED_STOP', TRIP: 'MAIN_PUMP_TRIP' });
+export const CRITICAL_SCENARIOS = Object.freeze(['pump-stop-no-job', 'pump-trip-no-job', 'pump-trip-p1', 'pump-trip-p4', 'normal-completion-safe-return']);
+const OUTCOME_LOG_CAPACITY = 20;
+/** Commands refused while the AutoSequence is CRITICAL_SUSPENDED (queue frozen, no new Job). */
+const SUSPENSION_REFUSED = new Set(['enqueue', 'dequeue', 'review-job', 'visual-preset', 'queue-mixed-sources', 'dispatch-head', 'start-job', 'second-job-attempt', 'pump-start', 'reset-sensor']);
+const defaultSafeReturnConfig = () => ({ valveFeedbackDelayMs: 0, standbyFeedbackDelayMs: 0, valveFeedback: 'NORMAL', standbyFeedback: 'NORMAL' });
 const ALARM_RANK = { NONE: 0, CLEARED_UNACK: 1, ACTIVE_ACK: 2, ACTIVE_UNACK: 3 };
 const iso = (ms) => (ms === null || ms === undefined ? null : new Date(ms).toISOString());
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -129,6 +178,15 @@ export class SyntheticRuntime extends EventEmitter {
     this.lastDispatch = null;
     this.notAdmitted = new Map(); // sensorId -> reason; set only by an explicit test scenario
     this.autoSequencePaused = false; // AutoSequence (dispatch control) pause, not a queue state
+    // Mandatory Safe Return / critical handling (synthetic proof).
+    this.evidenceSeq = 0; // monotonic synthetic evidence sequence index (ordering proof)
+    this.srConfig = defaultSafeReturnConfig(); // synthetic feedback behaviour for the next Safe Return
+    this.pumpFault = null; // Main Pump unexpected stop / trip critical event (synthetic)
+    this.criticalSeq = 0;
+    this.criticalSuspended = false; // AutoSequence CRITICAL_SUSPENDED (sequence authority, never a queue state)
+    this.criticalAt = null; // { dispatchSeq, queueRevision } at suspension (invariant evidence)
+    this.lastJobOutcome = null;
+    this.jobOutcomeLog = [];
     this.queueRejections = {};
     this.activeJobs = [];
     this.jobSeq = 0;
@@ -237,7 +295,7 @@ export class SyntheticRuntime extends EventEmitter {
       }
     } else if (entry.id === 'SYN-PIO-01/fast/pressure') {
       const level = this.pumpLevel(Date.now());
-      const jetting = this.activeJobs[0] && this.currentPhaseIndex(this.activeJobs[0], Date.now()) === 3;
+      const jetting = this.isJetting(this.activeJobs[0], Date.now());
       const offsets = [0, -3, jetting ? -12 : -6, -5];
       for (let i = 0; i < 4; i += 1) {
         const v = level * (this.params.pumpSetpoint + offsets[i]) + noise.range(-1.5, 1.5) * level;
@@ -303,7 +361,7 @@ export class SyntheticRuntime extends EventEmitter {
     for (const s of this.sensors) {
       const pr = this.proc.get(s.sensorId);
       if (this.activeJobs[0]?.targetSensorId === s.sensorId) {
-        if (this.currentPhaseIndex(this.activeJobs[0], Date.now()) === 3) pr.trueScore = pr.trueScore * 0.8;
+        if (this.isJetting(this.activeJobs[0], Date.now())) pr.trueScore = pr.trueScore * 0.8;
         continue;
       }
       if (pr.oscillate) {
@@ -388,6 +446,8 @@ export class SyntheticRuntime extends EventEmitter {
     if (this.activeJobs[0]?.targetSensorId === sensorId) return this.rejectAdmission('ACTIVE_JOB_TARGET');
     if (this.notAdmitted.has(sensorId)) return this.rejectAdmission('NOT_ADMITTED_SYNTHETIC_DEMONSTRATION');
     if (this.queue.length >= QUEUE_CAPACITY) return this.rejectAdmission('QUEUE_FULL');
+    // Critical suspension freezes the GlobalQueue unchanged (FIFO preserved); no entry state added.
+    if (this.criticalSuspended) return this.rejectAdmission('CRITICAL_SUSPENDED');
     this.entrySeq += 1;
     this.queue.push({ entryId: `SYN-QE-${String(this.entrySeq).padStart(5, '0')}`, sensorId, reason });
     this.queueRevision += 1;
@@ -415,6 +475,7 @@ export class SyntheticRuntime extends EventEmitter {
    * the removal policy is OWNER DECISION REQUIRED (entries leave by dispatch or explicit removal).
    */
   updateQueue() {
+    if (this.criticalSuspended) return; // frozen during critical suspension
     for (const s of this.sensors) {
       if (this.queue.length >= QUEUE_CAPACITY) return;
       const cur = this.acq.get(s.sensorId).cur;
@@ -424,9 +485,13 @@ export class SyntheticRuntime extends EventEmitter {
     }
   }
   currentPhaseIndex(job, now) {
+    if (job.safeReturn) return job.safeReturn.phaseIndexAtTrigger; // Cleaning phase frozen at SR1
     if (job.heldPhaseIndex !== undefined) return job.heldPhaseIndex;
-    if (job.preCheck === 'WAITING_FOR_PUMP') return 0;
     return Math.floor((now - job.startedAtMs) / this.params.jobPhaseMs);
+  }
+  /** Synthetic water output: only a RUNNING Job in P4 jets. Never during Safe Return. */
+  isJetting(job, now) {
+    return Boolean(job) && job.lifecycle === JOB_LIFECYCLE.RUNNING && this.currentPhaseIndex(job, now) === 3;
   }
   /**
    * Atomic head-only dispatch: remove queue Position 1 and create exactly one Cleaning Job for that
@@ -437,6 +502,16 @@ export class SyntheticRuntime extends EventEmitter {
     if (this.activeJobs.length >= 1) {
       this.refusedSecondJobs += 1;
       return { accepted: false, reason: 'ACTIVE_JOB_EXISTS' };
+    }
+    if (this.criticalSuspended) {
+      this.jobRefusals.CRITICAL_SUSPENDED = (this.jobRefusals.CRITICAL_SUSPENDED ?? 0) + 1;
+      return { accepted: false, reason: 'CRITICAL_SUSPENDED' };
+    }
+    // Synthetic conservative choice: no Job is created while the Pump is not ready (no Job ever
+    // waits for the Pump). The Production rule is OWNER DECISION REQUIRED (decision matrix A).
+    if (!this.pumpReady()) {
+      this.jobRefusals.PUMP_NOT_READY = (this.jobRefusals.PUMP_NOT_READY ?? 0) + 1;
+      return { accepted: false, reason: 'PUMP_NOT_READY' };
     }
     if (!this.queue.length) {
       this.jobRefusals.QUEUE_EMPTY = (this.jobRefusals.QUEUE_EMPTY ?? 0) + 1;
@@ -463,12 +538,10 @@ export class SyntheticRuntime extends EventEmitter {
       origin,
       dispatchedAt: iso(now),
     });
-    const job = { jobId, targetSensorId: head.sensorId, jetId: s.jetId, valveId: s.valveId, origin, startedAtMs: now, dispatch: record, preCheck: 'PASSED' };
+    const job = { jobId, targetSensorId: head.sensorId, jetId: s.jetId, valveId: s.valveId, origin, startedAtMs: now, dispatch: record, lifecycle: JOB_LIFECYCLE.RUNNING, safeReturn: null };
     if (hold) {
       job.heldPhaseIndex = REVIEW_JOB_PHASE;
       job.startedAtMs = now - REVIEW_JOB_PHASE * this.params.jobPhaseMs;
-    } else if (!this.pumpReady()) {
-      job.preCheck = 'WAITING_FOR_PUMP'; // Job lifecycle wait (P1), never a queue entry state
     }
     this.activeJobs.push(job);
     this.lastDispatch = record;
@@ -489,48 +562,389 @@ export class SyntheticRuntime extends EventEmitter {
     const r = this.admit(sensorId, keep);
     return { prepared: r.admitted, cleared, reason: r.reason };
   }
-  abortJob(reason) {
-    if (!this.activeJobs.length) return false;
+  // ---- Mandatory Safe Return (synthetic proof; see the header comment above)
+  srEvent(job, step, event, atMs) {
+    this.evidenceSeq += 1;
+    job.safeReturn.events.push({ seq: this.evidenceSeq, step, event, at: iso(atMs) });
+    return this.evidenceSeq;
+  }
+  /** SR1: stop normal Cleaning / water command; the Job stays Active. */
+  enterSafeReturn(job, trigger, atMs) {
+    const complete = trigger === SAFE_RETURN_TRIGGERS.CLEANING_COMPLETE;
+    const idx = clamp(this.currentPhaseIndex(job, atMs), 0, PHASES.length - 1);
+    const c = this.srConfig;
+    job.safeReturn = {
+      trigger,
+      pendingOutcome: complete ? 'COMPLETED' : 'ABORTED',
+      phaseIndexAtTrigger: idx,
+      cleaningPhasesComplete: complete,
+      startedAtMs: atMs,
+      stepEnteredAtMs: atMs,
+      immediate: false,
+      valveFeedback: c.valveFeedback,
+      standbyFeedback: c.standbyFeedback,
+      valveFeedbackDelayMs: c.valveFeedbackDelayMs,
+      standbyFeedbackDelayMs: c.standbyFeedbackDelayMs,
+      valve: { valveId: job.valveId, command: 'NOT_COMMANDED', commandSeq: null, commandAtMs: null, feedback: 'NOT_CONFIRMED', feedbackSeq: null, feedbackAtMs: null },
+      axis: { command: 'NOT_COMMANDED', commandSeq: null, commandAtMs: null, standby: 'NOT_CONFIRMED', standbySeq: null, standbyAtMs: null },
+      events: [],
+      failure: null,
+      triggerSeq: null,
+      stopSeq: null,
+    };
+    const sr = job.safeReturn;
+    sr.triggerSeq = this.srEvent(job, null, `TRIGGER_ACCEPTED ${trigger}`, atMs);
+    sr.stopSeq = this.srEvent(job, 'SR1', 'NORMAL_CLEANING_AND_WATER_COMMAND_STOPPED', atMs);
+    if (complete) this.srCloseValve(job, atMs);
+    else job.lifecycle = JOB_LIFECYCLE.ABORTING;
+  }
+  /** SR2: command the Isolation Valve closed (always before any axis return command). */
+  srCloseValve(job, atMs) {
+    const sr = job.safeReturn;
+    sr.valve.command = 'CLOSE_COMMANDED';
+    sr.valve.commandAtMs = atMs;
+    sr.valve.commandSeq = this.srEvent(job, 'SR2', 'ISOLATION_VALVE_CLOSE_COMMANDED', atMs);
+    job.lifecycle = JOB_LIFECYCLE.CLOSE_VALVE;
+    sr.stepEnteredAtMs = atMs;
+  }
+  failSafeReturn(job, reason, atMs) {
+    const sr = job.safeReturn;
+    if (job.lifecycle === JOB_LIFECYCLE.VERIFY_VALVE) sr.valve.feedback = 'ABSENT';
+    if (job.lifecycle === JOB_LIFECYCLE.VERIFY_STANDBY) sr.axis.standby = 'ABSENT';
+    sr.failure = { reason, atLifecycle: job.lifecycle, atMs, seq: this.srEvent(job, null, `SAFE_RETURN_FAILED ${reason}`, atMs) };
+    // Synthetic failure state: no outcome is finalized, Active Job ownership is retained, no
+    // further dispatch. The Production failure policy is OWNER DECISION REQUIRED.
+    job.lifecycle = JOB_LIFECYCLE.FAILED;
+  }
+  /**
+   * Deterministic step machine. Event times are the step thresholds (not the call time), so the
+   * evidence is identical however often it is polled. `immediate` (synthetic test scaffolding)
+   * runs the same ordered steps with zero synthetic durations.
+   */
+  advanceSafeReturn(job, now) {
+    const L = JOB_LIFECYCLE;
+    const sr = job.safeReturn;
+    // Immediate (test scaffolding): never earlier than the latest recorded step time.
+    if (sr.immediate) now = Math.max(now, sr.stepEnteredAtMs, sr.valve.commandAtMs ?? 0, sr.axis.commandAtMs ?? 0);
+    for (let guard = 0; guard < 12 && this.activeJobs[0] === job; guard += 1) {
+      const step = sr.immediate ? 0 : this.params.safeReturnStepMs;
+      const fb = sr.immediate ? 0 : this.params.safeReturnFeedbackMs;
+      switch (job.lifecycle) {
+        case L.ABORTING: {
+          const at = sr.stepEnteredAtMs + step;
+          if (now < at) return;
+          this.srCloseValve(job, at);
+          break;
+        }
+        case L.CLOSE_VALVE: {
+          const at = sr.stepEnteredAtMs + step;
+          if (now < at) return;
+          job.lifecycle = L.VERIFY_VALVE;
+          sr.stepEnteredAtMs = at;
+          break;
+        }
+        case L.VERIFY_VALVE: {
+          if (sr.valveFeedback === 'ABSENT') {
+            const at = sr.valve.commandAtMs + (sr.immediate ? 0 : this.params.safeReturnTimeoutMs);
+            if (now >= at) this.failSafeReturn(job, 'ISOLATION_VALVE_CLOSED_FEEDBACK_ABSENT', at);
+            return;
+          }
+          const at = Math.max(sr.stepEnteredAtMs, sr.valve.commandAtMs + fb + (sr.immediate ? 0 : sr.valveFeedbackDelayMs));
+          if (now < at) return;
+          sr.valve.feedback = 'CLOSED_CONFIRMED';
+          sr.valve.feedbackAtMs = at;
+          sr.valve.feedbackSeq = this.srEvent(job, 'SR3', 'ISOLATION_VALVE_CLOSED_CONFIRMED', at);
+          // SR4 is issued only after SR3 confirmation.
+          sr.axis.command = 'RETURN_COMMANDED';
+          sr.axis.commandAtMs = at;
+          sr.axis.commandSeq = this.srEvent(job, 'SR4', 'AXIS_RETURN_TO_STANDBY_COMMANDED', at);
+          job.lifecycle = L.TO_STANDBY;
+          sr.stepEnteredAtMs = at;
+          break;
+        }
+        case L.TO_STANDBY: {
+          const at = sr.stepEnteredAtMs + step;
+          if (now < at) return;
+          job.lifecycle = L.VERIFY_STANDBY;
+          sr.stepEnteredAtMs = at;
+          break;
+        }
+        case L.VERIFY_STANDBY: {
+          if (sr.standbyFeedback === 'ABSENT') {
+            const at = sr.axis.commandAtMs + (sr.immediate ? 0 : this.params.safeReturnTimeoutMs);
+            if (now >= at) this.failSafeReturn(job, 'STANDBY_POSITION_FEEDBACK_ABSENT', at);
+            return;
+          }
+          const at = Math.max(sr.stepEnteredAtMs, sr.axis.commandAtMs + fb + (sr.immediate ? 0 : sr.standbyFeedbackDelayMs));
+          if (now < at) return;
+          sr.axis.standby = 'STANDBY_CONFIRMED';
+          sr.axis.standbyAtMs = at;
+          sr.axis.standbySeq = this.srEvent(job, 'SR5', 'STANDBY_POSITION_CONFIRMED', at);
+          this.finalizeJob(job, at);
+          return;
+        }
+        default:
+          return;
+      }
+    }
+  }
+  /** SR6 finalize the outcome, SR7 release Active Job ownership, SR8 record the sequencing gate. */
+  finalizeJob(job, atMs) {
+    const sr = job.safeReturn;
+    const outcome = sr.pendingOutcome;
+    const outcomeSeq = this.srEvent(job, 'SR6', `JOB_OUTCOME_${outcome}`, atMs);
+    if (outcome === 'COMPLETED') {
+      const pr = this.proc.get(job.targetSensorId);
+      pr.trueScore = this.rng.range(5, 15);
+      if (pr.target !== null) pr.target = pr.trueScore;
+      pr.lastCleanAt = atMs;
+      this.jobsCompleted += 1;
+    } else {
+      this.jobsAborted += 1;
+    }
+    const releaseSeq = this.srEvent(job, 'SR7', 'ACTIVE_JOB_RELEASED', atMs);
     this.activeJobs.length = 0;
-    this.jobsAborted += 1;
-    this.lastJobEnd = reason;
+    this.lastJobEnd = outcome === 'COMPLETED' ? 'COMPLETED' : sr.trigger;
+    const seqState = this.autoSequenceState();
+    const mayConsider = !['OFF', 'PAUSED', 'CRITICAL_SUSPENDED'].includes(seqState);
+    this.srEvent(job, 'SR8', mayConsider ? 'LATER_DISPATCH_MAY_BE_CONSIDERED' : `LATER_DISPATCH_NOT_PERMITTED_${seqState}`, atMs);
+    const d = job.dispatch;
+    this.lastJobOutcome = Object.freeze({
+      synthetic: true,
+      jobId: job.jobId,
+      targetSensorId: job.targetSensorId,
+      dispatchId: d.dispatchId,
+      queueRevisionBefore: d.queueRevisionBefore,
+      queueRevisionAfter: d.queueRevisionAfter,
+      queueEntryId: d.queueEntryId,
+      phaseAtTrigger: PHASES[sr.phaseIndexAtTrigger][0],
+      trigger: sr.trigger,
+      cleaningPhasesComplete: sr.cleaningPhasesComplete,
+      outcome,
+      valveId: job.valveId,
+      valveCloseCommandSeq: sr.valve.commandSeq,
+      valveClosedConfirmedSeq: sr.valve.feedbackSeq,
+      axisReturnCommandSeq: sr.axis.commandSeq,
+      standbyConfirmedSeq: sr.axis.standbySeq,
+      outcomeSeq,
+      releaseSeq,
+      autoSequenceAtRelease: seqState,
+      finalizedAt: iso(atMs),
+      events: Object.freeze(sr.events.map((e) => Object.freeze({ ...e }))),
+    });
+    this.jobOutcomeLog.push(this.lastJobOutcome);
+    if (this.jobOutcomeLog.length > OUTCOME_LOG_CAPACITY) this.jobOutcomeLog.shift();
+    this.updateCritical(atMs);
+  }
+  /**
+   * End the Active Job through Mandatory Safe Return (never an instant removal). Returns true when
+   * a Job existed. A second trigger during Safe Return is recorded and does not restart it.
+   */
+  abortJob(trigger, { immediate = false } = {}) {
+    const job = this.activeJobs[0];
+    if (!job) return false;
+    const now = Date.now();
+    if (!job.safeReturn) this.enterSafeReturn(job, trigger, now);
+    else this.srEvent(job, null, `ADDITIONAL_TRIGGER_NOTED ${trigger}`, now);
+    if (immediate) {
+      job.safeReturn.immediate = true;
+      this.advanceSafeReturn(job, now);
+    }
     return true;
+  }
+  /**
+   * Synthetic test scaffolding (presets, scenario preparation, test reset): restore the synthetic
+   * feedback devices, then run the ordered Safe Return with zero synthetic durations. The Job still
+   * passes SR1..SR8 in order and ends ABORTED with the given trigger.
+   */
+  syntheticResetJob(trigger = SAFE_RETURN_TRIGGERS.TEST_RESET) {
+    this.srConfig = defaultSafeReturnConfig();
+    const job = this.activeJobs[0];
+    if (!job) return false;
+    const sr = job.safeReturn;
+    if (sr) {
+      sr.valveFeedback = 'NORMAL';
+      sr.standbyFeedback = 'NORMAL';
+      if (job.lifecycle === JOB_LIFECYCLE.FAILED) {
+        job.lifecycle = sr.failure.atLifecycle;
+        this.srEvent(job, null, 'SYN_TEST_RESET_FEEDBACK_RESTORED', Date.now());
+      }
+    }
+    return this.abortJob(trigger, { immediate: true });
   }
   advanceJob(now) {
     const job = this.activeJobs[0];
     if (!job) return;
-    if (job.preCheck === 'WAITING_FOR_PUMP') {
-      if (!this.pumpReady()) return;
-      job.preCheck = 'PASSED';
-      job.startedAtMs = now;
+    if (job.safeReturn) {
+      this.advanceSafeReturn(job, now);
+      return;
     }
-    if (this.currentPhaseIndex(job, now) >= PHASES.length) {
-      const pr = this.proc.get(job.targetSensorId);
-      pr.trueScore = this.rng.range(5, 15);
-      if (pr.target !== null) pr.target = pr.trueScore;
-      pr.lastCleanAt = now;
-      this.activeJobs.length = 0;
-      this.jobsCompleted += 1;
-      this.lastJobEnd = 'COMPLETED';
+    if (job.heldPhaseIndex !== undefined) return; // held review Job: frozen until ended
+    const endAt = job.startedAtMs + PHASES.length * this.params.jobPhaseMs;
+    if (now >= endAt) {
+      // Cleaning phases complete != Job complete: Mandatory Safe Return first.
+      this.enterSafeReturn(job, SAFE_RETURN_TRIGGERS.CLEANING_COMPLETE, endAt);
+      this.advanceSafeReturn(job, now);
     }
   }
+  /**
+   * AutoSequence state (sequence authority, never a queue entry state). CRITICAL_SUSPENDED takes
+   * precedence and persists until an authorised Resume (future work) — here only the synthetic
+   * test reset leaves it. PUMP_NOT_READY: the AutoSequence waits; no Job is created and no queue
+   * entry changes (the Production readiness rule is OWNER DECISION REQUIRED).
+   */
   autoSequenceState() {
+    if (this.criticalSuspended) return 'CRITICAL_SUSPENDED';
     if (!this.autoJobs) return 'OFF';
     if (this.autoSequencePaused) return 'PAUSED';
     if (this.activeJobs.length) return 'JOB_ACTIVE';
+    if (!this.pumpReady()) return 'PUMP_NOT_READY';
     if (!this.queue.length) return 'QUEUE_EMPTY';
     return 'READY_TO_DISPATCH';
   }
-  /** AutoSequence: dispatch queue Position 1 only, and only when no Job is active. */
+  /** AutoSequence: dispatch queue Position 1 only, only when READY_TO_DISPATCH. */
   autoDispatch() {
     if (this.autoSequenceState() !== 'READY_TO_DISPATCH') return null;
     return this.dispatchHead('SYN_AUTO_SEQUENCE');
+  }
+
+  // ---- Main Pump critical events (synthetic)
+  /** Unexpected stop or trip: High-severity critical event. Never a normal Job completion. */
+  pumpCritical(kind) {
+    if (this.pumpFault?.conditionActive) return { accepted: false, reason: 'CRITICAL_CONDITION_ALREADY_ACTIVE' };
+    const now = Date.now();
+    const trip = kind === 'TRIP';
+    this.setPump(trip ? 'TRIPPED' : 'STOPPED', now);
+    this.pump.stopRequestedAt = null;
+    // Stop dispatch immediately; no new Job; GlobalQueue frozen unchanged.
+    this.criticalSuspended = true;
+    this.criticalAt = { dispatchSeq: this.dispatchSeq, queueRevision: this.queueRevision };
+    this.criticalSeq += 1;
+    const alarmId = this.raiseAlarm({
+      code: trip ? 'SYN-MAIN-PUMP-TRIP' : 'SYN-MAIN-PUMP-UNEXPECTED-STOP',
+      text: trip ? 'Main Pump tripped (synthetic critical event)' : 'Main Pump stopped unexpectedly (synthetic critical event)',
+      severity: 'HIGH',
+    });
+    const job = this.activeJobs[0] ?? null;
+    const trigger = trip ? SAFE_RETURN_TRIGGERS.PUMP_TRIP : SAFE_RETURN_TRIGGERS.PUMP_UNEXPECTED_STOP;
+    const phaseAtEvent = job ? PHASES[clamp(this.currentPhaseIndex(job, now), 0, PHASES.length - 1)][0] : null;
+    if (job) {
+      if (!job.safeReturn) this.enterSafeReturn(job, trigger, now);
+      else this.srEvent(job, null, `CRITICAL_EVENT_DURING_SAFE_RETURN ${trigger}`, now);
+    }
+    this.evidenceSeq += 1;
+    this.pumpFault = {
+      eventId: `SYN-CRIT-${String(this.criticalSeq).padStart(4, '0')}`,
+      kind: trip ? CRITICAL_KINDS.TRIP : CRITICAL_KINDS.UNEXPECTED_STOP,
+      raisedAtMs: now,
+      evidenceSeq: this.evidenceSeq,
+      conditionActive: true,
+      clearedAtMs: null,
+      acknowledged: false,
+      acknowledgedAtMs: null,
+      alarmId,
+      jobId: job?.jobId ?? null,
+      targetSensorId: job?.targetSensorId ?? null,
+      phaseAtEvent,
+      safeReturnRequired: Boolean(job),
+      modalOpen: true,
+      modalClosedAtMs: null,
+    };
+    return { accepted: true, detail: { eventId: this.pumpFault.eventId, autoSequence: this.autoSequenceState(), jobId: job?.jobId ?? null, lifecycle: job?.lifecycle ?? null, queueOrder: this.queueOrder } };
+  }
+  /** Synthetic condition clear. Does not restart the Pump, does not Resume, does not dispatch. */
+  clearPumpCondition() {
+    const f = this.pumpFault;
+    if (!f?.conditionActive) return { accepted: false, reason: 'NO_ACTIVE_CRITICAL_CONDITION' };
+    const now = Date.now();
+    f.conditionActive = false;
+    f.clearedAtMs = now;
+    if (this.pump.state === 'TRIPPED') this.setPump('STOPPED', now);
+    this.clearAlarm(f.alarmId);
+    this.updateCritical(now);
+    return { accepted: true, detail: { modalOpen: f.modalOpen, autoSequence: this.autoSequenceState() } };
+  }
+  /** Acknowledges the Alarm presentation only (not a clear, not a Resume, not a Job outcome). */
+  ackCritical() {
+    const f = this.pumpFault;
+    if (!f) return { accepted: false, reason: 'NO_CRITICAL_EVENT' };
+    if (f.acknowledged) return { accepted: false, reason: 'ALREADY_ACKNOWLEDGED' };
+    this.ackAlarm(f.alarmId);
+    this.markCriticalAcknowledged(Date.now());
+    this.updateCritical(Date.now());
+    return { accepted: true, detail: { modalOpen: f.modalOpen, conditionActive: f.conditionActive, autoSequence: this.autoSequenceState() } };
+  }
+  markCriticalAcknowledged(now) {
+    const f = this.pumpFault;
+    if (f && !f.acknowledged) {
+      f.acknowledged = true;
+      f.acknowledgedAtMs = now;
+    }
+  }
+  criticalSafeReturnComplete() {
+    const f = this.pumpFault;
+    return Boolean(f) && (!f.safeReturnRequired || this.activeJobs[0]?.jobId !== f.jobId);
+  }
+  /** Modal closes only when: condition cleared AND acknowledged AND Safe Return complete (if any). */
+  updateCritical(now) {
+    const f = this.pumpFault;
+    if (!f || !f.modalOpen) return;
+    if (!f.conditionActive && f.acknowledged && this.criticalSafeReturnComplete()) {
+      f.modalOpen = false;
+      f.modalClosedAtMs = now;
+    }
+  }
+  /**
+   * Synthetic test reset of the critical scenario (review tooling only) — NOT a Resume. Restores
+   * the synthetic devices, ends any Job through the ordered Safe Return, removes the synthetic
+   * critical event, restarts the synthetic Pump, and leaves the AutoSequence IDLE.
+   */
+  resetCritical() {
+    const now = Date.now();
+    if (this.activeJobs.length) this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET);
+    if (this.activeJobs.length) return { accepted: false, reason: 'SAFE_RETURN_NOT_COMPLETED' };
+    if (this.pumpFault) this.alarms.delete(this.pumpFault.alarmId);
+    this.pumpFault = null;
+    this.criticalSuspended = false;
+    this.criticalAt = null;
+    this.srConfig = defaultSafeReturnConfig();
+    if (this.pump.state !== 'RUNNING' && this.pump.state !== 'STARTING') this.setPump('STARTING', now);
+    this.pump.stopRequestedAt = null;
+    this.autoJobs = false;
+    return { accepted: true, detail: { autoSequence: this.autoSequenceState(), note: 'Synthetic test reset — not a Resume' } };
+  }
+  /** Deterministic synthetic critical review scenarios (test controls). */
+  criticalScenario(name) {
+    if (!CRITICAL_SCENARIOS.includes(name)) return { accepted: false, reason: 'UNKNOWN_CRITICAL_SCENARIO' };
+    if (this.criticalSuspended || this.pumpFault) return { accepted: false, reason: 'CRITICAL_SCENARIO_ACTIVE' };
+    const keepConfig = { ...this.srConfig };
+    if (this.activeJobs.length) this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET);
+    this.srConfig = keepConfig; // feedback-delay review settings apply to the scenario's Safe Return
+    if (name === 'pump-stop-no-job') return this.pumpCritical('UNEXPECTED_STOP');
+    if (name === 'pump-trip-no-job') return this.pumpCritical('TRIP');
+    if (!this.queue.length) {
+      const cand = this.sensors.find((x) => !this.notAdmitted.has(x.sensorId));
+      this.admit(cand.sensorId, QUEUE_REASONS.OPERATOR);
+    }
+    const r = this.dispatchHead('SYN_CRITICAL_SCENARIO');
+    if (!r.accepted) return r;
+    const job = this.activeJobs[0];
+    const now = Date.now();
+    const ms = this.params.jobPhaseMs;
+    if (name === 'pump-trip-p4') job.startedAtMs = now - Math.round(3.5 * ms); // synthetic time shift into P4
+    if (name === 'normal-completion-safe-return') {
+      job.startedAtMs = now - (PHASES.length * ms - 2000); // P6 ends in 2 s, then Safe Return
+      return { accepted: true, detail: { jobId: job.jobId, dispatch: r.detail.dispatch } };
+    }
+    const t = this.pumpCritical('TRIP');
+    return { ...t, detail: { ...t.detail, dispatch: r.detail.dispatch } };
   }
   advancePump(now) {
     if (this.pump.state === 'STARTING' && now - this.pump.changedAt >= this.params.pumpStartMs) this.setPump('RUNNING', now);
     if (this.pump.state === 'STOPPING' && now - this.pump.changedAt >= this.params.pumpStopMs) this.setPump('STOPPED', now);
   }
   setPump(state, now) {
+    // States: RUNNING, STARTING, STOPPING, STOPPED, TRIPPED (synthetic).
     this.pump.state = state;
     this.pump.changedAt = now;
   }
@@ -544,6 +958,9 @@ export class SyntheticRuntime extends EventEmitter {
   }
   ackAlarm(alarmId) {
     const targets = alarmId ? [this.alarms.get(alarmId)].filter(Boolean) : [...this.alarms.values()];
+    if (this.pumpFault && targets.some((a) => a.alarmId === this.pumpFault.alarmId)) {
+      this.markCriticalAcknowledged(Date.now()); // keep the critical event in sync (ack != clear)
+    }
     for (const a of targets) {
       if (a.state === 'ACTIVE_UNACK') a.state = 'ACTIVE_ACK';
       else if (a.state === 'CLEARED_UNACK') this.alarms.delete(a.alarmId);
@@ -551,7 +968,8 @@ export class SyntheticRuntime extends EventEmitter {
     return targets.length;
   }
   clearAlarm(alarmId) {
-    const targets = alarmId ? [this.alarms.get(alarmId)].filter(Boolean) : [...this.alarms.values()];
+    // The critical Pump Alarm clears only through the synthetic condition clear (pump-fault-clear).
+    const targets = (alarmId ? [this.alarms.get(alarmId)].filter(Boolean) : [...this.alarms.values()]).filter((a) => !(this.pumpFault?.conditionActive && a.alarmId === this.pumpFault.alarmId));
     for (const a of targets) {
       if (a.state === 'ACTIVE_UNACK') a.state = 'CLEARED_UNACK';
       else if (a.state === 'ACTIVE_ACK') this.alarms.delete(a.alarmId);
@@ -614,21 +1032,70 @@ export class SyntheticRuntime extends EventEmitter {
     const job = this.activeJobs[0];
     if (!job) return null;
     const idx = clamp(this.currentPhaseIndex(job, now), 0, PHASES.length - 1);
-    const waiting = job.preCheck === 'WAITING_FOR_PUMP';
-    const phaseStart = waiting ? job.startedAtMs : job.startedAtMs + idx * this.params.jobPhaseMs;
+    const sr = job.safeReturn;
+    const phaseStart = sr ? sr.startedAtMs : job.startedAtMs + idx * this.params.jobPhaseMs;
+    const step = LIFECYCLE_STEP[job.lifecycle] ?? null;
     return {
       jobId: job.jobId,
       targetSensorId: job.targetSensorId,
       jetId: job.jetId,
       valveId: job.valveId,
       phase: PHASES[idx][0],
-      phaseLabel: waiting ? 'Pre-check — waiting for Pump (synthetic)' : PHASES[idx][1],
+      phaseLabel: step ? step[1] : PHASES[idx][1],
       phaseIndex: idx,
       startedAt: iso(job.startedAtMs),
       phaseStartedAt: iso(phaseStart),
-      phaseProgress: waiting ? 0 : Math.round(clamp((now - phaseStart) / this.params.jobPhaseMs, 0, 1) * 10) / 10,
-      preCheck: job.preCheck,
+      phaseProgress: sr ? 0 : Math.round(clamp((now - phaseStart) / this.params.jobPhaseMs, 0, 1) * 10) / 10,
+      lifecycle: job.lifecycle,
+      cleaningPhase: sr ? (sr.cleaningPhasesComplete ? 'CLEANING_PHASES_COMPLETE' : 'CLEANING_STOPPED') : 'IN_PROGRESS',
       dispatch: job.dispatch,
+      safeReturn: sr
+        ? {
+            synthetic: true,
+            step: step ? step[0] : null,
+            trigger: sr.trigger,
+            pendingOutcome: sr.pendingOutcome,
+            phaseAtTrigger: PHASES[sr.phaseIndexAtTrigger][0],
+            startedAt: iso(sr.startedAtMs),
+            valve: { valveId: sr.valve.valveId, command: sr.valve.command, commandSeq: sr.valve.commandSeq, feedback: sr.valve.feedback, feedbackSeq: sr.valve.feedbackSeq },
+            axis: { command: sr.axis.command, commandSeq: sr.axis.commandSeq, standby: sr.axis.standby, standbySeq: sr.axis.standbySeq },
+            failure: sr.failure ? { reason: sr.failure.reason, atLifecycle: sr.failure.atLifecycle, at: iso(sr.failure.atMs), seq: sr.failure.seq } : null,
+            events: sr.events.map((e) => ({ ...e })),
+          }
+        : null,
+    };
+  }
+  /** AutoSequence, critical event and last Job outcome (synthetic sequence authority view). */
+  buildSequence() {
+    const f = this.pumpFault;
+    const job = this.activeJobs[0];
+    return {
+      synthetic: true,
+      autoSequence: this.autoSequenceState(),
+      critical: f
+        ? {
+            eventId: f.eventId,
+            kind: f.kind,
+            severity: 'HIGH',
+            raisedAt: iso(f.raisedAtMs),
+            evidenceSeq: f.evidenceSeq,
+            conditionActive: f.conditionActive,
+            clearedAt: iso(f.clearedAtMs),
+            acknowledged: f.acknowledged,
+            acknowledgedAt: iso(f.acknowledgedAtMs),
+            alarmId: f.alarmId,
+            jobId: f.jobId,
+            targetSensorId: f.targetSensorId,
+            phaseAtEvent: f.phaseAtEvent,
+            safeReturnRequired: f.safeReturnRequired,
+            safeReturnComplete: this.criticalSafeReturnComplete(),
+            safeReturnFailed: Boolean(f.safeReturnRequired && job?.jobId === f.jobId && job.lifecycle === JOB_LIFECYCLE.FAILED),
+            modalOpen: f.modalOpen,
+            modalClosedAt: iso(f.modalClosedAtMs),
+          }
+        : null,
+      safeReturnConfig: { ...this.srConfig },
+      lastJobOutcome: this.lastJobOutcome,
     };
   }
   pressureFresh() {
@@ -732,6 +1199,7 @@ export class SyntheticRuntime extends EventEmitter {
     }
     this.advancePump(now);
     this.advanceJob(now);
+    this.updateCritical(now);
     this.classifyAll(now);
     this.updateQueue();
     this.autoDispatch();
@@ -756,6 +1224,7 @@ export class SyntheticRuntime extends EventEmitter {
       activeJob: this.buildActiveJob(now),
       pump: this.buildPump(),
       queue: this.buildQueue(now),
+      sequence: this.buildSequence(),
       alarms: this.buildAlarms(),
       communication: this.buildCommunication(),
       runtime: this.buildRuntime(this.sseClientCount?.() ?? 0),
@@ -799,6 +1268,7 @@ export class SyntheticRuntime extends EventEmitter {
       activeJob: s.activeJob.value,
       pump: s.pump.value,
       queue: s.queue.value,
+      sequence: s.sequence.value,
       alarms: s.alarms.value,
       communication: s.communication.value,
       runtime: s.runtime.value,
@@ -847,7 +1317,7 @@ export class SyntheticRuntime extends EventEmitter {
     const entry = this.queueEntry(sensorId);
     if (entry && entry.reason !== QUEUE_REASONS.DIRTY_SCORE) this.removeFromQueue(sensorId);
     this.notAdmitted.delete(sensorId);
-    if (this.activeJobs[0]?.targetSensorId === sensorId && this.activeJobs[0].heldPhaseIndex !== undefined) this.abortJob('SYN_REVIEW_RESET');
+    if (this.activeJobs[0]?.targetSensorId === sensorId && this.activeJobs[0].heldPhaseIndex !== undefined) this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET);
     this.reviewTouched?.delete(sensorId);
   }
   /**
@@ -862,6 +1332,7 @@ export class SyntheticRuntime extends EventEmitter {
       this.refusedSecondJobs += 1;
       return { accepted: false, reason: 'ACTIVE_JOB_EXISTS', detail: { activeJobTarget: job.targetSensorId } };
     }
+    if (job?.safeReturn) return { accepted: false, reason: 'SAFE_RETURN_IN_PROGRESS', detail: { jobId: job.jobId, lifecycle: job.lifecycle } };
     if (job) {
       job.heldPhaseIndex = REVIEW_JOB_PHASE;
       return { accepted: true, detail: { jobId: job.jobId, held: true, dispatch: job.dispatch } };
@@ -899,9 +1370,11 @@ export class SyntheticRuntime extends EventEmitter {
       this.updateQueue();
     };
     if (preset === 'reset') {
+      // Synthetic review reset includes the synthetic critical test reset (never a Resume).
+      if (this.criticalSuspended || this.pumpFault) this.resetCritical();
       const ids = [...(this.reviewTouched ?? [])];
       for (const id of ids) this.resetReviewSensor(id);
-      if (this.activeJobs[0]?.heldPhaseIndex !== undefined) this.abortJob('SYN_REVIEW_RESET');
+      if (this.activeJobs[0]?.heldPhaseIndex !== undefined || this.activeJobs[0]?.safeReturn) this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET);
       this.notAdmitted.clear();
       this.clearQueue();
       this.autoSequencePaused = false;
@@ -912,7 +1385,7 @@ export class SyntheticRuntime extends EventEmitter {
     if (!PRESETS.includes(preset)) return { accepted: false, reason: 'UNKNOWN_PRESET' };
     // Prepare: AutoSequence off, no Job, empty synthetic queue, selected Sensor restored.
     this.autoJobs = false;
-    this.abortJob('SYN_PRESET_PREPARE');
+    this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET);
     this.notAdmitted.clear();
     this.clearQueue();
     this.resetReviewSensor(sensorId);
@@ -995,7 +1468,7 @@ export class SyntheticRuntime extends EventEmitter {
    */
   mixedQueueScenario() {
     this.autoJobs = false;
-    this.abortJob('SYN_MIXED_QUEUE_SCENARIO');
+    this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET);
     this.notAdmitted.clear();
     this.clearQueue();
     const pick = (i) => this.sensors[i].sensorId; // canonical scan order, no Production address
@@ -1034,6 +1507,26 @@ export class SyntheticRuntime extends EventEmitter {
     this.violations.push({ at: iso(Date.now()), revision: this.revision, msg });
     if (this.violations.length > 100) this.violations.shift();
   }
+  /** valve close cmd < valve closed confirmed < axis return cmd < standby confirmed < outcome < release. */
+  checkSafeReturnOrder(events, jobId, complete = false) {
+    const order = ['SR1', 'SR2', 'SR3', 'SR4', 'SR5', 'SR6', 'SR7', 'SR8'];
+    const seqOf = (step) => events.find((e) => e.step === step)?.seq ?? null;
+    let prev = -1;
+    let gap = false;
+    for (const step of order) {
+      const q = seqOf(step);
+      if (q === null) {
+        gap = true;
+        continue;
+      }
+      if (gap || q <= prev) {
+        this.violation(`Safe Return order violated for ${jobId} at ${step}`);
+        return;
+      }
+      prev = q;
+    }
+    if (complete && gap) this.violation(`Safe Return incomplete for released ${jobId}`);
+  }
   checkInvariants(records) {
     if (this.activeJobs.length > 1) {
       this.acceptedSecondJobs += 1;
@@ -1055,6 +1548,17 @@ export class SyntheticRuntime extends EventEmitter {
     if (job && (!job.dispatch || job.dispatch.sensorId !== target || job.dispatch.positionBefore !== 1 || job.dispatch.jobId !== job.jobId)) {
       this.violation(`active job ${job.jobId} not linked to a Position 1 dispatch record`);
     }
+    // Mandatory Safe Return ordering and critical-suspension invariants (synthetic proof).
+    if (job?.safeReturn) this.checkSafeReturnOrder(job.safeReturn.events, job.jobId);
+    if (this.lastJobOutcome && this.lastJobOutcome !== this.lastCheckedOutcome) {
+      this.checkSafeReturnOrder(this.lastJobOutcome.events, this.lastJobOutcome.jobId, true);
+      this.lastCheckedOutcome = this.lastJobOutcome;
+    }
+    if (this.criticalSuspended && this.criticalAt) {
+      if (this.dispatchSeq !== this.criticalAt.dispatchSeq) this.violation('dispatch during critical suspension');
+      if (this.queueRevision !== this.criticalAt.queueRevision) this.violation('GlobalQueue changed during critical suspension');
+    }
+    if (job && job.lifecycle !== JOB_LIFECYCLE.RUNNING && !job.safeReturn) this.violation(`job ${job.jobId} lifecycle without Safe Return record`);
     if (this.trend.length > this.params.trendCapacity) this.violation('trend exceeds capacity');
     if (this.historian.depth > this.historian.capacity) this.violation('historian exceeds capacity');
     for (const r of records) {
@@ -1089,6 +1593,10 @@ export class SyntheticRuntime extends EventEmitter {
   }
   dispatch(name, p) {
     const sensorOk = (id) => this.sensorById.has(id);
+    // Critical suspension: the GlobalQueue is frozen unchanged and no Job may be created.
+    if (this.criticalSuspended && SUSPENSION_REFUSED.has(name) && !(name === 'visual-preset' && p.preset === 'reset') && !(name === 'review-job' && p.enabled === false)) {
+      return { accepted: false, reason: 'CRITICAL_SUSPENDED', detail: { autoSequence: 'CRITICAL_SUSPENDED' } };
+    }
     // Cannon slots are equipment, not Sensors: never a quality, alarm, queue, or job target.
     const sensorRefusal = (id) => (isCannonId(id) ? 'CANNON_NOT_A_SENSOR' : 'UNKNOWN_SENSOR');
     const deviceOk = (id) => this.devices.has(id);
@@ -1168,7 +1676,7 @@ export class SyntheticRuntime extends EventEmitter {
         if (!sensorOk(p.sensorId)) return { accepted: false, reason: sensorRefusal(p.sensorId) };
         if (p.enabled === false) {
           const held = this.activeJobs[0]?.targetSensorId === p.sensorId;
-          return { accepted: held ? this.abortJob('SYN_REVIEW_CLEAR') : false, reason: held ? null : 'NOT_JOB_TARGET' };
+          return { accepted: held ? this.syntheticResetJob(SAFE_RETURN_TRIGGERS.TEST_RESET) : false, reason: held ? null : 'NOT_JOB_TARGET' };
         }
         this.touch(p.sensorId);
         return this.reviewJob(p.sensorId);
@@ -1231,21 +1739,60 @@ export class SyntheticRuntime extends EventEmitter {
         const second = this.dispatchHead('SYN_SCENARIO_SECOND_JOB');
         return { accepted: second.accepted, reason: second.reason, detail: { first, second, activeJobs: this.activeJobs.length } };
       }
-      case 'abort-job':
-        return { accepted: this.abortJob('SYN_SCENARIO_ABORT') };
+      case 'abort-job': {
+        // Synthetic abort cause -> Mandatory Safe Return (the Job stays Active until SR7).
+        const cause = p.cause ?? 'OPERATOR_ABORT';
+        if (!ABORT_CAUSES[cause]) return { accepted: false, reason: 'INVALID_ABORT_CAUSE' };
+        const trigger = SAFE_RETURN_TRIGGERS[cause];
+        const job = this.activeJobs[0];
+        const ok = this.abortJob(trigger, { immediate: p.immediate === true });
+        return ok ? { accepted: true, detail: { jobId: job.jobId, trigger, lifecycle: this.activeJobs[0]?.lifecycle ?? 'RELEASED' } } : { accepted: false, reason: 'NO_ACTIVE_JOB' };
+      }
       case 'pump-start': {
         if (this.pump.state === 'RUNNING' || this.pump.state === 'STARTING') return { accepted: false, reason: 'ALREADY_RUNNING' };
+        if (this.pumpFault?.conditionActive) return { accepted: false, reason: 'CRITICAL_CONDITION_ACTIVE' };
         this.setPump('STARTING', Date.now());
         this.pump.stopRequestedAt = null;
         return { accepted: true };
       }
       case 'pump-stop': {
-        if (this.pump.state === 'STOPPED' || this.pump.state === 'STOPPING') return { accepted: false, reason: 'ALREADY_STOPPED' };
+        // Expected commanded stop (category A): not a fault, no critical modal. An Active Job
+        // still ends through the timed Mandatory Safe Return; no new Job while the Pump is down.
+        if (['STOPPED', 'STOPPING', 'TRIPPED'].includes(this.pump.state)) return { accepted: false, reason: 'ALREADY_STOPPED' };
         const now = Date.now();
-        this.abortJob('SYN_PUMP_STOP');
+        const hadJob = this.abortJob(SAFE_RETURN_TRIGGERS.COMMANDED_PUMP_STOP);
         this.setPump('STOPPING', now);
         this.pump.stopRequestedAt = now;
-        return { accepted: true };
+        return { accepted: true, detail: { safeReturn: hadJob, lifecycle: this.activeJobs[0]?.lifecycle ?? null } };
+      }
+      case 'pump-unexpected-stop':
+        return this.pumpCritical('UNEXPECTED_STOP');
+      case 'pump-trip':
+        return this.pumpCritical('TRIP');
+      case 'pump-fault-clear':
+        return this.clearPumpCondition();
+      case 'critical-alarm-ack':
+        return this.ackCritical();
+      case 'critical-reset':
+        return this.resetCritical();
+      case 'critical-scenario':
+        return this.criticalScenario(p.scenario);
+      case 'safe-return-config': {
+        // Synthetic feedback behaviour for subsequent Safe Returns (review tooling only).
+        const next = { ...this.srConfig };
+        for (const k of ['valveFeedbackDelayMs', 'standbyFeedbackDelayMs']) {
+          if (p[k] === undefined) continue;
+          const v = Number(p[k]);
+          if (!Number.isFinite(v) || v < 0 || v > 15000) return { accepted: false, reason: 'INVALID_DELAY' };
+          next[k] = v;
+        }
+        for (const k of ['valveFeedback', 'standbyFeedback']) {
+          if (p[k] === undefined) continue;
+          if (!['NORMAL', 'ABSENT'].includes(p[k])) return { accepted: false, reason: 'INVALID_FEEDBACK_MODE' };
+          next[k] = p[k];
+        }
+        this.srConfig = next;
+        return { accepted: true, detail: { safeReturnConfig: { ...next } } };
       }
       case 'historian-delay': {
         const d = Number(p.delayMs);

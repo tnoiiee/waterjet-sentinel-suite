@@ -82,7 +82,8 @@ entry is removed**. They never introduce an entry state.
 | No Water Jet assignment | Not eligible (no dispatch target) | Remove | Configuration / GlobalQueue admission | configuration revision | — | OWNER DECISION REQUIRED |
 | No valve assignment | Not eligible | Remove | Configuration / GlobalQueue admission | configuration revision | — | OWNER DECISION REQUIRED |
 | Valve / Water Jet excluded by the Operator | Not eligible | Remove (`REMOVED_BY_EQUIPMENT_EXCLUSION`) | GlobalQueue admission | exclusion user / time / reason | QUEUE_MODEL §7.1, §8 | OWNER DECISION REQUIRED |
-| Equipment temporarily unavailable (pump not ready, pressure low, jet busy) | Proposal: **no effect on the queue** — the Active Job / AutoSequence waits in pre-check | Keep | Job pre-check / AutoSequence | wait start / end on the Job | CLEANING_SEQUENCE (job lifecycle) | OWNER DECISION REQUIRED |
+| Equipment temporarily unavailable (pump not ready, pressure low, jet busy) | Proposal: **no effect on the queue** — the AutoSequence waits before dispatch. Spike (2026-10-06): no Job is created while the Pump is not ready; AutoSequence shows `PUMP_NOT_READY`; the entry stays unchanged (no `WAITING_FOR_PUMP` Job, no entry state) | Keep | AutoSequence (before dispatch) | wait start / end on the AutoSequence | CLEANING_SEQUENCE (job lifecycle) | OWNER DECISION REQUIRED |
+| Main Pump unexpected stop / trip (High Critical) | Owner decision (fixed): no new Job, no dispatch; AutoSequence `CRITICAL_SUSPENDED`; queue **frozen unchanged** (FIFO kept, no entry state). Admission while suspended: spike refuses (`CRITICAL_SUSPENDED`) — Production rule pending | Keep (frozen) | AutoSequence | critical event, suspension start, queue revision unchanged | [critical Pump matrix](critical-pump-safe-return-decision-matrix.md) | Suspension: OWNER DECISION (fixed); admission while suspended: OWNER DECISION REQUIRED |
 | Equipment communication failure | Proposal: no effect on queue entry; the Job pre-check fails or waits | Keep | Job pre-check | device health at pre-check | — | OWNER DECISION REQUIRED |
 
 ### E. Sequence and history
@@ -98,12 +99,16 @@ entry is removed**. They never introduce an entry state.
 
 ## 4. Conflicts with existing domain text (for the Owner)
 
-These are recorded, not resolved. The domain documents were **not** edited by this checkpoint.
+Recorded by the GlobalQueue correction checkpoint. **Update (Owner critical Pump decision,
+2026-10-06):** the two `HELD` conflicts are **resolved** — queue-level `HELD` and Hold / Release
+Hold are superseded in [`../QUEUE_MODEL.md`](../QUEUE_MODEL.md) §7.2 and
+[`../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) (Owner-authorized documentation edit). The §8 row
+remains recorded, not resolved.
 
 | Document | Text | Conflict with the Owner correction |
 | --- | --- | --- |
-| `docs/QUEUE_MODEL.md` §7.1 | `HELD` — "Operator held the entry; dispatcher skips it" | A held entry that the dispatcher skips is a scan-forward over a non-ready entry. Under the correction, pause belongs to the AutoSequence and the queue contains ready entries only |
-| `docs/DOMAIN_MODEL.md` (`QueueEntryDisposition`, `[OWNER CONFIRMED]`) | includes `HELD` | Same as above. Dispositions are audit events ("what happened"), which may remain valid for `REJECTED`, `REORDERED`, `REMOVED_BY_*` |
+| `docs/QUEUE_MODEL.md` §7.1 | `HELD` — "Operator held the entry; dispatcher skips it" | **RESOLVED — SUPERSEDED (2026-10-06).** A held entry that the dispatcher skips is a scan-forward over a non-ready entry. Pause before dispatch = AutoSequence; pause during a Job = Job state; Production Pause / Resume pending |
+| `docs/DOMAIN_MODEL.md` (`QueueEntryDisposition`, `[OWNER CONFIRMED]`) | includes `HELD` | **RESOLVED — `HELD` SUPERSEDED (2026-10-06).** `REJECTED`, `REORDERED`, `REMOVED_BY_*` unchanged |
 | `docs/QUEUE_MODEL.md` §8 | "Cleaning Job fails or requires recovery — The next Job is blocked" | Compatible if "blocked" is read as an AutoSequence state, not a queue entry state |
 
 ## 5. What the spike shows instead
@@ -112,3 +117,14 @@ These are recorded, not resolved. The domain documents were **not** edited by th
   synthetic test scenario explicitly sets it (preset 6), with the reason "Reason pending
   Owner-approved eligibility policy". This is a synthetic demonstration, not an eligibility rule.
 - No row in this matrix is approved; no row is implemented.
+
+## 6. Owner critical Pump decision — queue rows (2026-10-06)
+
+| Row | Statement | Status |
+| --- | --- | --- |
+| Ready-only | The GlobalQueue holds ready-to-dispatch entries only (≤ 8 in the spike); presence means READY | Owner decision (fixed) |
+| Pump waits are not entry states | Pump readiness and Pump critical events are AutoSequence (or Job) states; no entry state, no `WAITING_FOR_PUMP` Job | Owner decision (fixed); readiness rule itself OWNER DECISION REQUIRED |
+| HELD superseded | Queue-level `HELD`, Hold and Release Hold are superseded | Owner decision (fixed) |
+| Re-queue of an aborted Sensor | Whether / when a Sensor whose Job ended `ABORTED` (Pump trip, Operator abort, failure) re-enters the queue | OWNER DECISION REQUIRED (spike: no automatic re-queue) |
+| Queue during suspension | Admission / removal / reorder while `CRITICAL_SUSPENDED` | OWNER DECISION REQUIRED (spike: frozen, admissions refused) |
+

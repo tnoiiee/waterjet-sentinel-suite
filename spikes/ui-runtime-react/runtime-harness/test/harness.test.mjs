@@ -223,7 +223,7 @@ test('close guard refuses while Active Job or Pump running', async () => {
   await withHarness(async (h) => {
     await sleep(1300);
     await cmd(h, 'auto-jobs', { enabled: false });
-    await cmd(h, 'abort-job');
+    await cmd(h, 'abort-job', { immediate: true });
     let ev = await (await fetch(`${h.url}/api/spike/close-request`, { method: 'POST' })).json();
     assert.deepEqual(ev.reasons, ['PUMP_RUNNING']);
     assert.match(ev.note, /not a safety protection/);
@@ -231,9 +231,48 @@ test('close guard refuses while Active Job or Pump running', async () => {
     assert.equal(job.detail.first.accepted, true);
     ev = await (await fetch(`${h.url}/api/spike/close-request`, { method: 'POST' })).json();
     assert.deepEqual(ev.reasons.sort(), ['ACTIVE_JOB', 'PUMP_RUNNING']);
-    await cmd(h, 'pump-stop');
+    // Expected commanded stop: the Active Job stays Active through the timed Mandatory Safe Return.
+    const stop = await cmd(h, 'pump-stop');
+    assert.equal(stop.detail.safeReturn, true);
     await sleep(2300);
     ev = await (await fetch(`${h.url}/api/spike/close-request`, { method: 'POST' })).json();
+    assert.deepEqual(ev.reasons, ['ACTIVE_JOB'], 'Job still Active during Safe Return');
+    await sleep(6500);
+    ev = await (await fetch(`${h.url}/api/spike/close-request`, { method: 'POST' })).json();
     assert.equal(ev.allowed, true);
+    const snap = await snapshot(h);
+    assert.equal(snap.sequence.lastJobOutcome.trigger, 'SYN_COMMANDED_PUMP_STOP');
+    assert.equal(snap.sequence.lastJobOutcome.outcome, 'ABORTED');
+    assert.equal(snap.sequence.critical, null, 'commanded stop is not a critical event');
+  });
+});
+
+test('critical-alarm-ack endpoint: same-origin loopback only, no token; ack is not a clear; modal state from runtime', async () => {
+  await withHarness(async (h) => {
+    await sleep(1200);
+    await cmd(h, 'auto-jobs', { enabled: false });
+    await cmd(h, 'abort-job', { immediate: true }); // no Job at the event: no Safe Return required
+    const trip = await cmd(h, 'pump-trip');
+    assert.equal(trip.accepted, true);
+    const cross = await fetch(`${h.url}/api/spike/critical-alarm-ack`, { method: 'POST', headers: { 'sec-fetch-site': 'cross-site' } });
+    assert.equal(cross.status, 403);
+    assert.equal(h.runtime.pumpFault.acknowledged, false);
+    const r = await (await fetch(`${h.url}/api/spike/critical-alarm-ack`, { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } })).json();
+    assert.equal(r.accepted, true);
+    assert.equal(r.detail.conditionActive, true, 'acknowledge does not clear the condition');
+    await sleep(200);
+    let snap = await snapshot(h);
+    assert.equal(snap.sequence.critical.acknowledged, true);
+    assert.equal(snap.sequence.critical.modalOpen, true);
+    assert.equal(snap.sequence.autoSequence, 'CRITICAL_SUSPENDED');
+    const again = await (await fetch(`${h.url}/api/spike/critical-alarm-ack`, { method: 'POST' })).json();
+    assert.equal(again.reason, 'ALREADY_ACKNOWLEDGED');
+    await cmd(h, 'pump-fault-clear');
+    await sleep(200);
+    snap = await snapshot(h);
+    assert.equal(snap.sequence.critical.modalOpen, false);
+    assert.equal(snap.sequence.autoSequence, 'CRITICAL_SUSPENDED');
+    assert.deepEqual(validateSnapshot(snap), []);
+    await cmd(h, 'critical-reset');
   });
 });

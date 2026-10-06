@@ -194,7 +194,7 @@ test('S22 camera placeholder is local; the page only talks to loopback', async (
 
 test('S23/S24 synthetic close guard: Active Job and Pump running', async ({ page, request }) => {
   await scenario(request, 'auto-jobs', { enabled: false });
-  await scenario(request, 'abort-job');
+  await scenario(request, 'abort-job', { immediate: true });
   await page.waitForTimeout(500);
   await page.getByTestId('close-request').click();
   await expect(page.getByTestId('close-refused')).toContainText('Pump running');

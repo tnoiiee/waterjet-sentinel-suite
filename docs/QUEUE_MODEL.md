@@ -221,13 +221,14 @@ Refill must never produce a concurrent Cleaning Job. See SEQ-005 in
 
 | Action | Effect | Limits |
 | --- | --- | --- |
-| Hold | Entry stays in GlobalQueue; the dispatcher temporarily skips it | Other entries preserve relative FIFO order; a hold does not block the whole queue |
-| Release Hold | Entry becomes dispatchable again at its current position | — |
+| ~~Hold~~ | **SUPERSEDED (Owner decision, 2026-10-06)** — see §7.2. No queue entry is ever held or skipped | — |
+| ~~Release Hold~~ | **SUPERSEDED** together with Hold (§7.2) | — |
 | Reject | Entry is removed from the current GlobalQueue, and the sensor is suppressed from refilling during the current Auto Sequence | Suppression ends when a new Auto Sequence is created, unless released earlier |
 | Release Reject | Ends the suppression early | Requires the action's permission |
 | Reorder | Changes GlobalQueue dispatch order | Cannot move an active Cleaning Job; does not bypass eligibility revalidation; does not alter source ownership |
 
-All five actions are `[APPROVED]` behaviours. Their required permissions are `[OPEN]`.
+Reject, Release Reject and Reorder remain `[APPROVED]` behaviours; Hold and Release Hold are
+**superseded** (§7.2). Required permissions are `[OPEN]`.
 
 Every action must produce an Event record containing:
 
@@ -249,8 +250,8 @@ from Cleaning Job outcomes, which describe the result of an executed job. See
 
 | Disposition | Meaning |
 | --- | --- |
-| `HELD` | Operator held the entry; dispatcher skips it |
-| `RELEASED` | A previous Hold or Reject suppression was released |
+| ~~`HELD`~~ | **SUPERSEDED (Owner decision, 2026-10-06)** — queue-level hold no longer exists (§7.2) |
+| `RELEASED` | A previous Reject suppression was released (the Hold part is superseded, §7.2) |
 | `REJECTED` | Operator removed the entry and suppressed the sensor for the current Auto Sequence |
 | `REORDERED` | Operator changed dispatch position; ownership unchanged |
 | `REMOVED_BY_ELIGIBILITY` | The entry no longer satisfies eligibility (for example, removal dwell completed, configuration changed, or the sensor became disabled) |
@@ -258,6 +259,27 @@ from Cleaning Job outcomes, which describe the result of an executed job. See
 
 `REJECTED` is **not** a Cleaning Job outcome. A job that is never executed because its entry
 was rejected produces no job outcome at all.
+
+### 7.2 Queue-level HELD superseded (Owner decision, 2026-10-06)
+
+The Owner GlobalQueue domain correction and the Owner critical Pump decision supersede the
+queue-level `HELD` disposition and the Hold / Release Hold actions:
+
+- The GlobalQueue holds **ready-to-dispatch entries only** (at most 8 in the Stage 0.2.1A spike).
+  Presence in the queue means READY; entries carry no state such as HELD, BLOCKED, WAITING or
+  EXCLUDED, and the dispatcher never skips an entry (head-only dispatch, no scan-forward).
+- A pause **before dispatch** belongs to the **AutoSequence** (for example `PAUSED`, or
+  `CRITICAL_SUSPENDED` after a Main Pump unexpected stop / trip). The queue stays unchanged.
+- A pause or wait **during a Cleaning Job** belongs to the **Cleaning Job** state, never to a
+  queue entry.
+- Equipment waits (for example Pump readiness) belong to the AutoSequence or the Job; they are
+  never queue entry states.
+- Production Pause / Resume semantics, authority and the replacement for an Operator "hold one
+  Sensor" need remain **pending Owner approval** (see
+  [`spikes/queue-eligibility-decision-matrix.md`](spikes/queue-eligibility-decision-matrix.md)
+  and [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md)).
+
+This is a documentation correction only; no Production code, contract or data migration exists.
 
 ## 8. Sequential execution interaction
 

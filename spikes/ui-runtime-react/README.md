@@ -15,7 +15,7 @@ Results: [`../../docs/spikes/stage-0.2.1a-results.md`](../../docs/spikes/stage-0
 | [`contracts/`](contracts/CONTRACTS.md) | Snapshot / Delta contract types, the single classification module, the single Sensor mapping source (`sensorMap.mjs`: 106 Sensors, 2 Cannon slots, 212 channels), structural validator, golden fixtures |
 | `runtime-harness/` | Node synthetic runtime harness: built-ins only (`node:http`, `node:events`, `node:perf_hooks`, …), **no dependencies**, binds to `127.0.0.1` only |
 | `react-ui/` | React 19 + TypeScript 6 + Vite 8 Operations page (one page), uPlot trend, Vitest (jsdom) tests, Playwright specs for Owner-local Edge runs |
-| `scenario-runner/` | 28-scenario runner and Arena measurement driver (Node built-ins only) |
+| `scenario-runner/` | 34-scenario runner and Arena measurement driver (Node built-ins only) |
 | `measurements/` | Environment record, licence inventory, SHA-256 manifest, Owner-local summariser and Windows process sampler, [offline restore](measurements/OFFLINE_RESTORE.md) and [Owner-local testing](measurements/OWNER_LOCAL_TESTING.md) guides |
 | `results/` | `environment/`, `summary/`, `manifests/` (committed); `raw/` (git-ignored) |
 
@@ -39,7 +39,7 @@ cd ../react-ui
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --ignore-scripts
 npm run typecheck && npm test && npm run build
 npm run harness                                                  # http://127.0.0.1:5181
-cd .. && node scenario-runner/run-scenarios.mjs                  # 28 scenarios (runtime / SSE level)
+cd .. && node scenario-runner/run-scenarios.mjs                  # 34 scenarios (runtime / SSE level)
 node scenario-runner/arena-measure.mjs --minutes 10              # harness measurement
 ```
 

@@ -10,6 +10,16 @@ export async function requestClose(fetchImpl: typeof fetch = fetch): Promise<Clo
   return (await res.json()) as CloseRequestEvaluation;
 }
 
+/**
+ * Acknowledge the synthetic critical Pump Alarm from the blocking modal. One explicit request per
+ * click, no retry. Acknowledge is NOT a clear and NOT a Resume (the runtime decides everything).
+ */
+export async function acknowledgeCriticalAlarm(fetchImpl: typeof fetch = fetch): Promise<{ accepted: boolean; reason: string | null }> {
+  const res = await fetchImpl('/api/spike/critical-alarm-ack', { method: 'POST', cache: 'no-store', credentials: 'same-origin' });
+  const body = (await res.json().catch(() => ({}))) as { accepted?: boolean; reason?: string | null };
+  return { accepted: res.ok && body.accepted === true, reason: body.reason ?? (res.ok ? null : `HTTP_${res.status}`) };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Synthetic test control (spike Owner review tooling). Available only when the harness runs with
 // --synthetic-test-controls. The per-run token is held in memory by the caller (never persisted,

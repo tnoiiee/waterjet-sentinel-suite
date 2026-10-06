@@ -12,6 +12,9 @@ const TOKEN = 'review-test-token';
 async function withHarness(fn, opts = {}) {
   const h = createHarness({ port: 0, token: TOKEN, ...opts });
   await h.start();
+  // No Job is ever created while the synthetic Pump is not ready: wait for the first in-band
+  // pressure sample before exercising presets that dispatch the queue head.
+  for (let i = 0; i < 60 && !h.runtime.pumpReady(); i += 1) await new Promise((r) => setTimeout(r, 100));
   try {
     await fn(h);
   } finally {
@@ -194,7 +197,7 @@ test('eight review presets: valid queue / job states, head-only dispatch, never 
 test('per-Sensor review controls: alarm raise / clear / ack, queue reasons, remove, quality, Review Job (no retarget)', async () => {
   await withHarness(async (h) => {
     await cmd(h, 'auto-jobs', { enabled: false });
-    await cmd(h, 'abort-job');
+    await cmd(h, 'abort-job', { immediate: true });
     const id = (await snapshot(h)).sensors[12].sensorId;
     await cmd(h, 'raise-alarm', { sensorId: id });
     assert.equal(sensorOf(await snapshot(h), id).alarmState, 'ACTIVE_UNACK');

@@ -1,5 +1,5 @@
 // WJSS Stage 0.2.1A — test helpers: synthetic records, snapshots, deltas, fake EventSource.
-import type { DispatchRecord, OperationalDelta, OperationalSnapshot, QueueSummary, SensorPresentationState, Wall } from '../../contracts/operational';
+import type { ActiveCleaningJobState, CriticalPumpEvent, DispatchRecord, OperationalDelta, OperationalSnapshot, QueueSummary, SensorPresentationState, SequenceState, Wall } from '../../contracts/operational';
 import type { EventSourceLike, MessageEventLike } from '../src/store/feed';
 // Tests take Sensor identity and positions from the canonical mapping source (never generated here).
 import { EXPECTED, getSensorMap, sensorById, wallMapSlots } from '../../contracts/sensorMap.mjs';
@@ -60,6 +60,7 @@ export function makeSnapshot(revision = 10, over: Partial<OperationalSnapshot> =
     activeJob: null,
     pump: { state: 'RUNNING', pressure: 100, setpoint: 100, readyBandLow: 90, readyBandHigh: 110, ready: true, stopRequestedAt: null },
     queue: makeQueue([]),
+    sequence: makeSequence(),
     alarms: { activeUnack: 0, activeAck: 0, clearedUnack: 0, items: [] },
     communication: { devices: [] },
     runtime: { uptimeS: 1, rssMb: 50, heapUsedMb: 10, eventLoopP99Ms: 1, sseClients: 1, historian: { depth: 0, capacity: 50000, nearOverflow: false, rejected: 0, lastBatchLatencyMs: null, delayMs: 20, gapMarkers: 0 }, invariantViolations: 0, acceptedSecondJobs: 0, refusedSecondJobs: 0 },
@@ -141,5 +142,63 @@ export function makeDispatch(sensorId: string, jobId: string, queueRevisionBefor
     jobId,
     origin: 'SYN_AUTO_SEQUENCE',
     dispatchedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+/** AutoSequence / critical / last-outcome slice (synthetic). */
+export function makeSequence(over: Partial<SequenceState> = {}): SequenceState {
+  return {
+    synthetic: true,
+    autoSequence: 'OFF',
+    critical: null,
+    safeReturnConfig: { valveFeedbackDelayMs: 0, standbyFeedbackDelayMs: 0, valveFeedback: 'NORMAL', standbyFeedback: 'NORMAL' },
+    lastJobOutcome: null,
+    ...over,
+  };
+}
+
+/** Synthetic critical Pump event (modal open by default). */
+export function makeCritical(over: Partial<CriticalPumpEvent> = {}): CriticalPumpEvent {
+  return {
+    eventId: 'SYN-CRIT-0001',
+    kind: 'MAIN_PUMP_TRIP',
+    severity: 'HIGH',
+    raisedAt: '2026-01-01T00:00:10.000Z',
+    evidenceSeq: 3,
+    conditionActive: true,
+    clearedAt: null,
+    acknowledged: false,
+    acknowledgedAt: null,
+    alarmId: 'SYN-ALM-0001',
+    jobId: 'SYN-JOB-0001',
+    targetSensorId: 'G+203',
+    phaseAtEvent: 'P4',
+    safeReturnRequired: true,
+    safeReturnComplete: false,
+    safeReturnFailed: false,
+    modalOpen: true,
+    modalClosedAt: null,
+    ...over,
+  };
+}
+
+/** Running Active Job (no Safe Return yet). */
+export function makeJob(over: Partial<ActiveCleaningJobState> = {}): ActiveCleaningJobState {
+  return {
+    jobId: 'SYN-JOB-0001',
+    targetSensorId: 'G+203',
+    jetId: 'SYN-JET-3',
+    valveId: 'SYN-VLV-3',
+    phase: 'P1',
+    phaseLabel: 'Pre-check (synthetic)',
+    phaseIndex: 0,
+    startedAt: '2026-01-01T00:00:00Z',
+    phaseStartedAt: '2026-01-01T00:00:00Z',
+    phaseProgress: 0,
+    lifecycle: 'RUNNING',
+    cleaningPhase: 'IN_PROGRESS',
+    dispatch: makeDispatch(over.targetSensorId ?? 'G+203', over.jobId ?? 'SYN-JOB-0001'),
+    safeReturn: null,
+    ...over,
   };
 }

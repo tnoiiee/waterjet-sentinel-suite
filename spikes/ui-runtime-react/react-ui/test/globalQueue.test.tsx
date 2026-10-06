@@ -43,7 +43,9 @@ const job: ActiveCleaningJobState = {
   startedAt: '2026-10-06T00:00:00.000Z',
   phaseStartedAt: '2026-10-06T00:00:05.000Z',
   phaseProgress: 0.4,
-  preCheck: 'PASSED',
+  lifecycle: 'RUNNING',
+  cleaningPhase: 'IN_PROGRESS',
+  safeReturn: null,
   dispatch,
 };
 

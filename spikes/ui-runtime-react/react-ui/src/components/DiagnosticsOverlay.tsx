@@ -132,6 +132,42 @@ export function QueueDispatchDiagnostics() {
   );
 }
 
+/**
+ * AutoSequence / critical Pump event / Mandatory Safe Return evidence (synthetic, transient; not
+ * a Production audit record). Links dispatch -> Job -> trigger -> steps -> outcome -> state.
+ */
+export function SequenceDiagnostics() {
+  const seq = useSlice('sequence');
+  const job = useSlice('activeJob');
+  const c = seq?.critical ?? null;
+  const o = seq?.lastJobOutcome ?? null;
+  const sr = job?.safeReturn ?? null;
+  const steps = (sr?.events ?? o?.events ?? []).filter((e) => e.step).map((e) => `${e.step}#${e.seq}`).join(' ');
+  return (
+    <>
+      <h3 className={styles.stcTitle}>AUTOSEQUENCE · CRITICAL · SAFE RETURN (SYNTHETIC EVIDENCE)</h3>
+      <dl className={styles.kv} data-testid="diag-sequence" data-auto-sequence={seq?.autoSequence ?? ''}>
+        <dt>AutoSequence</dt>
+        <dd data-testid="diag-sequence-state">{seq?.autoSequence ?? '--'}</dd>
+        <dt>Critical event</dt>
+        <dd data-testid="diag-critical">
+          {c ? `${c.eventId} · ${c.kind} · condition ${c.conditionActive ? 'ACTIVE' : 'CLEARED'} · ${c.acknowledged ? 'ACK' : 'UNACK'} · modal ${c.modalOpen ? 'OPEN' : 'CLOSED'}` : 'None'}
+        </dd>
+        <dt>Safe Return</dt>
+        <dd data-testid="diag-safe-return">
+          {sr ? `${job?.jobId} · ${sr.step} · ${sr.trigger} · pending ${sr.pendingOutcome}` : o ? `Last: ${o.jobId} · ${o.dispatchId} · ${o.trigger} · ${o.outcome} · ${o.autoSequenceAtRelease}` : 'None'}
+        </dd>
+        <dt>Step evidence</dt>
+        <dd data-testid="diag-sr-steps">{steps || '--'}</dd>
+        <dt>Next SR feedback</dt>
+        <dd>
+          valve {seq?.safeReturnConfig.valveFeedback ?? '--'} +{seq?.safeReturnConfig.valveFeedbackDelayMs ?? 0} ms · Standby {seq?.safeReturnConfig.standbyFeedback ?? '--'} +{seq?.safeReturnConfig.standbyFeedbackDelayMs ?? 0} ms
+        </dd>
+      </dl>
+    </>
+  );
+}
+
 export function DiagnosticsOverlay({ open, onClose, selectedId = null }: { open: boolean; onClose?: () => void; selectedId?: string | null }) {
   const store = useStore();
   const runtime = useSlice('runtime');
@@ -164,6 +200,7 @@ export function DiagnosticsOverlay({ open, onClose, selectedId = null }: { open:
         {/* Spike review tooling, grouped separately from the observational metrics below. */}
         <SyntheticTestControl selectedId={selectedId} />
         <QueueDispatchDiagnostics />
+        <SequenceDiagnostics />
         <h3 className={styles.stcTitle}>OBSERVATIONAL METRICS</h3>
         <dl className={styles.kv} data-testid="diag-metrics">
           <dt>Revision</dt>

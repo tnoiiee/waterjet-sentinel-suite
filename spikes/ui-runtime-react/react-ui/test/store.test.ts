@@ -39,7 +39,7 @@ describe('PresentationStore', () => {
 
   it('Snapshot replaces all state (no merge with stale cache)', () => {
     const s = new PresentationStore();
-    s.applySnapshot(makeSnapshot(10, { activeJob: { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P2', phaseLabel: 'x', phaseIndex: 1, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:04Z', phaseProgress: 0.5, preCheck: 'PASSED', dispatch: makeDispatch('G+203', 'SYN-JOB-0001') } }));
+    s.applySnapshot(makeSnapshot(10, { activeJob: { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P2', phaseLabel: 'x', phaseIndex: 1, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:04Z', phaseProgress: 0.5, lifecycle: 'RUNNING', cleaningPhase: 'IN_PROGRESS', safeReturn: null, dispatch: makeDispatch('G+203', 'SYN-JOB-0001') } }));
     s.applyDelta(makeDelta(10, { sensors: [makeSensor({ sensorId: 'G+202', alarmState: 'ACTIVE_UNACK' })] }));
     s.applySnapshot(makeSnapshot(50));
     expect(s.revision).toBe(50);
@@ -79,7 +79,7 @@ describe('PresentationStore', () => {
 
   it('applies activeJob null as a clear, and absent as unchanged', () => {
     const s = new PresentationStore();
-    const job = { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P1' as const, phaseLabel: 'x', phaseIndex: 0, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:00Z', phaseProgress: 0, preCheck: 'PASSED' as const, dispatch: makeDispatch('G+203', 'SYN-JOB-0001') };
+    const job = { jobId: 'SYN-JOB-0001', targetSensorId: 'G+203', jetId: 'SYN-JET-3', valveId: 'SYN-VLV-3', phase: 'P1' as const, phaseLabel: 'x', phaseIndex: 0, startedAt: '2026-01-01T00:00:00Z', phaseStartedAt: '2026-01-01T00:00:00Z', phaseProgress: 0, lifecycle: 'RUNNING' as const, cleaningPhase: 'IN_PROGRESS' as const, safeReturn: null, dispatch: makeDispatch('G+203', 'SYN-JOB-0001') };
     s.applySnapshot(makeSnapshot(1, { activeJob: job }));
     s.applyDelta(makeDelta(1));
     expect(s.getSlice('activeJob')).toEqual(job);

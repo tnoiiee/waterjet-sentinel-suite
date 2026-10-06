@@ -64,6 +64,32 @@ describe('central colour tokens', () => {
     expect(tok('--selection')).not.toBe(alarm);
   });
 
+  it('critical modal palette is distinct from Dirty red, Alarm amber, selection cyan and Active Job white', () => {
+    const edge = tok('--critical-edge');
+    const surface = tok('--critical-surface');
+    for (const other of ['--dirty-base', '--dirty-strong', '--alarm', '--selection', '--job-outer', '--uncertain']) expect(edge).not.toBe(tok(other));
+    // Hue separation from Dirty red and Alarm amber (degrees on the colour wheel).
+    const hue = (hex) => {
+      const [r, g, b] = rgb(hex).map((c) => c / 255);
+      const mx = Math.max(r, g, b);
+      const mn = Math.min(r, g, b);
+      const d = mx - mn;
+      if (d === 0) return 0;
+      const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    };
+    const dist = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+    expect(dist(hue(edge), hue(tok('--dirty-base')))).toBeGreaterThanOrEqual(25);
+    expect(dist(hue(edge), hue(tok('--alarm')))).toBeGreaterThanOrEqual(60);
+    expect(dist(hue(edge), hue(tok('--selection')))).toBeGreaterThanOrEqual(60);
+    // Readable text on the critical surface (WCAG AA).
+    expect(contrast(tok('--critical-ink'), surface)).toBeGreaterThanOrEqual(7);
+    expect(contrast(tok('--text-strong'), surface)).toBeGreaterThanOrEqual(7);
+    // Not neon: saturation-limited edge (max channel minus min channel below 75 % of range).
+    const [r, g, b] = rgb(edge);
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(0.75 * 255);
+  });
+
   it('TS palette only references tokens (no colour values outside global.css)', () => {
     const ts = fs.readFileSync(path.resolve(here, '../src/visual/toCellVisual.ts'), 'utf8');
     const palette = ts.slice(ts.indexOf('export const PALETTE'), ts.indexOf('});', ts.indexOf('export const PALETTE')));

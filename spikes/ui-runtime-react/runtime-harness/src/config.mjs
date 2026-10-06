@@ -27,6 +27,13 @@ export const DEFAULT_PARAMS = Object.freeze({
   historianNearOverflowRatio: 0.8,
   historianDelayMs: 20,
   jobPhaseMs: 4000,
+  /** Mandatory Safe Return (synthetic proof): minimum time per step, nominal feedback time after a
+   *  command, and the feedback timeout that ends in SAFE_RETURN_FAILED. Not Production timings. */
+  safeReturnStepMs: 1500,
+  safeReturnFeedbackMs: 3000,
+  safeReturnTimeoutMs: 20000,
+  /** Delay applied by the synthetic "feedback delay" review controls. */
+  safeReturnReviewDelayMs: 6000,
   pumpStartMs: 3000,
   pumpStopMs: 2000,
   /** Normalised synthetic pressure units (syn-units). Not a pressure setpoint. */

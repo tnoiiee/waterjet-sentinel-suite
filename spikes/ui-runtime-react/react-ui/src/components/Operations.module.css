@@ -4,6 +4,10 @@
    bounded bottom row, floating Diagnostics drawer. Three restrained surface levels, no glass,
    no gradients, no glow. All colour, spacing, typography, and size values come from the design
    tokens in ../global.css. */
+/* Wrapper used to make the Operations page inert behind the critical modal; layout-neutral. */
+.inertScope {
+  display: contents;
+}
 .app {
   display: flex;
   flex-direction: column;
@@ -955,7 +959,8 @@
   position: fixed;
   top: calc(var(--top-status-h) + var(--alarm-strip-h) + 8px);
   right: 8px;
-  z-index: 30;
+  /* Above the critical modal backdrop (z 50): opt-in synthetic review tooling only. */
+  z-index: 60;
   width: 320px;
   max-width: calc(100vw - 16px);
   max-height: min(60vh, calc(100dvh - var(--top-status-h) - var(--alarm-strip-h) - var(--bottom-row-h) - 24px));

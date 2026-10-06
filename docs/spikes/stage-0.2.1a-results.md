@@ -9,7 +9,8 @@ run is **PAUSED**. The Owner-reported interrupted overnight observation of `ea23
 in §0B.1; it is not a controlled benchmark. The Owner reported Edge E2E **25 / 25 PASS** at
 `4129687a` and 25 passed / 2 failed / 7 not run (34 selected) at `23f48daa`; §0D corrects the
 GlobalQueue semantics (Owner domain correction; previous synthetic queue behaviour SUPERSEDED) and
-fixes `READ-A` / `WJ-A` — its Owner-local Edge re-run is **PENDING**. The final UI punchlist (§0C) added nine Owner-local Edge specs, the
+fixes `READ-A` / `WJ-A` — its Owner-local Edge re-run is **PENDING**. §0E adds synthetic critical Main Pump handling and Mandatory Safe Return
+(SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED); its Owner-local Edge review is **PENDING**. The final UI punchlist (§0C) added nine Owner-local Edge specs, the
 controlled 15-minute observation is **PAUSED**, and the 60-minute run was waived as a gate by the
 Owner (not run). This
 document does **not** select React as the final UI framework; the UI framework, Production
@@ -21,6 +22,171 @@ Plan: [`stage-0.2.1a-plan.md`](stage-0.2.1a-plan.md) · Spike:
 
 All values are produced by synthetic tooling with **SYNTHETIC SPIKE PARAMETERS — NOT
 PRODUCTION VALUES**.
+
+---
+
+## 0E. Critical Main Pump handling and Mandatory Safe Return (Stage 0.2.1A)
+
+**SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED.** No physical Main Pump, protection
+relay, VFD, Isolation Valve, axis, Galil program or Production interlock is involved. No safety,
+motion or standards certification is claimed. No Production coordinates, addresses or protocol
+details are used.
+
+**Baseline and recovery.** The local branch had reverted. The Owner-authorized one-time recovery
+restored `60cd0398` (identity proof 147 / 147, compare-and-swap ref update, index-only refresh; no
+reset, no force push). This checkpoint is one normal fast-forward commit on `60cd0398`; its SHA is
+recorded in the PR #3 description.
+
+### 0E.1 Owner critical Pump decision and pump event classes
+
+The Main Pump is a **High Critical device**. Spike classification:
+
+| Class | Synthetic event | Handling |
+| --- | --- | --- |
+| A | Expected commanded stop (`pump-stop`) | Not a fault: no critical modal and no suspension. An Active Job still Safe Returns (trigger `SYN_COMMANDED_PUMP_STOP`, outcome `ABORTED`) |
+| B | Unexpected stop | High Critical: stop progression, water and dispatch → AutoSequence `CRITICAL_SUSPENDED` → Active Job enters Mandatory Safe Return → modal immediately |
+| C | Trip | As B (trigger `SYN_PUMP_TRIP`) |
+
+The GlobalQueue stays unchanged during B / C (FIFO, no entry state). The spike has no automatic
+Resume, no automatic next Job and no `WAITING_FOR_PUMP` Job. If the Pump is not ready at dispatch,
+no Job is created and the AutoSequence shows `PUMP_NOT_READY`.
+
+### 0E.2 AutoSequence `CRITICAL_SUSPENDED`
+
+`CRITICAL_SUSPENDED` is checked first in the AutoSequence state derivation. It persists after the
+modal closes. Only the synthetic test reset (review tooling, **not a Resume**) leaves it, and the
+AutoSequence is then `OFF`. While suspended, the runtime refuses these commands (`CRITICAL_SUSPENDED`):
+
+- enqueue, dequeue and review-job;
+- visual presets and mixed sources;
+- dispatch-head, start-job and second-job attempts;
+- pump-start and reset-sensor.
+
+Two runtime invariants hold throughout: the queue revision and the dispatch count stay frozen.
+
+### 0E.3 Mandatory Safe Return (every outcome)
+
+Steps:
+
+1. **SR1** stop water;
+2. **SR2** command the Isolation Valve closed;
+3. **SR3** confirm closed;
+4. **SR4** command the axis to the Standby Position;
+5. **SR5** confirm Standby;
+6. **SR6** finalize the outcome;
+7. **SR7** release the Active Job;
+8. **SR8** let the AutoSequence consider dispatch.
+
+Rules:
+
+- The Job stays the Active Job (state `SAFE_RETURN_*` / `ABORTING`) until SR7.
+- Normal completion (P6 end) → `COMPLETED`, which is applied only after SR5.
+- Abort, cancel, failure, Pump stop / trip and test reset → `ABORTED` (never `COMPLETED`).
+  `abort-job { immediate: true }` remains as a scenario-only shortcut for older layout specs.
+- Synthetic timings: minimum step 1.5 s; feedback 3 s; timeout 20 s; review delay 6 s. These are
+  SYNTHETIC SPIKE PARAMETERS.
+- **Safe Return failure** (feedback absent beyond the timeout): `SAFE_RETURN_FAILED`. The Job is
+  retained with no outcome, release or dispatch, and the modal stays open. The failure policy is
+  **OWNER DECISION REQUIRED**.
+- Evidence is a transient `safeReturn` object on the Active Job plus `lastOutcome` and a bounded
+  outcome log (20). It contains per-step times and monotonically increasing evidence indices, and
+  never any coordinates or addresses.
+- The validator enforces the order: valve close command < valve confirmed < axis command <
+  Standby confirmed < outcome < release.
+
+### 0E.4 Critical modal
+
+- **Title:** "CRITICAL ALARM — MAIN PUMP STOPPED" / "… TRIPPED".
+- **Content:** time, condition, acknowledge state, AutoSequence, Job / target / phase, live Safe
+  Return step, valve / axis / Standby, and the generic response text.
+- **Layout:** centered and fitted to the viewport, over a dimmed, blocked (`inert`) background.
+  Diagnostics stays outside the inert scope (z 60 over the backdrop at z 50).
+- **Controls:** no close button; **Acknowledge** is the only action (`POST /api/spike/critical-alarm-ack`,
+  same-origin loopback only; a repeat returns `ALREADY_ACKNOWLEDGED`).
+- **Acknowledge** is not a clear and not a Resume. The modal closes only when the condition is
+  cleared **and** Safe Return is complete **and** the alarm is acknowledged. The sequence then
+  stays suspended, and there is no Resume button.
+- **Accessibility:**
+  - `role="alertdialog"`, `aria-modal`, labelled title and description;
+  - state shown as text, not colour alone;
+  - Escape does not dismiss, and focus is trapped with initial focus on Acknowledge;
+  - polite live region; no flashing animation.
+- **Palette:** dark plum surface `#2a1024` with orchid edge `#d0559c` and white ink (contrast ≥ 7).
+  It is tested to be distinct from dirty red (≥ 25° hue), alarm amber and selection cyan (≥ 60°),
+  and from the white Job style. No neon.
+- **Active Job panel:** shows the Safe Return step and the valve / axis state.
+- **Diagnostics:** a Sequence section shows the AutoSequence, the critical event and the last
+  outcome.
+
+### 0E.5 Synthetic review controls (`--synthetic-test-controls` only)
+
+The "Critical Pump / Safe Return" group has the ten Owner controls:
+
+1. stop with no Job;
+2. trip with no Job;
+3. trip in P1;
+4. trip in P4;
+5. normal completion → Safe Return;
+6. valve feedback delay;
+7. Standby feedback delay;
+8. clear;
+9. acknowledge;
+10. reset (test only — not a Resume).
+
+It also has one valve-feedback-absent control for failure review. The controls are disabled when
+synthetic controls are off or the UI is disconnected, send a single request and never retry.
+
+### 0E.6 GlobalQueue and HELD documentation
+
+The GlobalQueue remains **ready-to-dispatch only** (≤ 8, FIFO, head-only, no entry state).
+Queue-level `HELD` is **superseded**, by Owner authorization, in [`../QUEUE_MODEL.md`](../QUEUE_MODEL.md) §7.2 and
+[`../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md). A pause before dispatch is an AutoSequence state; a
+pause during a Job is a Job state. Production Pause / Resume is pending.
+
+### 0E.7 Owner decision matrices
+
+[`critical-pump-safe-return-decision-matrix.md`](critical-pump-safe-return-decision-matrix.md) has
+six matrices, every row **OWNER DECISION REQUIRED**:
+
+- A — readiness and stop / trip by phase P1–P6;
+- B — valve failures;
+- C — axis failures;
+- D — Safe Return exceptions;
+- E — outcomes / re-queue / retry;
+- F — acknowledge role, clear evidence, Resume authority, minimise, second channel.
+
+The queue matrix gained §6, which covers ready-only queues and the superseded HELD.
+
+### 0E.8 Validation (Arena) and pending Owner-local evidence
+
+**Arena results:**
+
+| Check | Result |
+| --- | --- |
+| Vitest | 131 / 131 (17 files; new `criticalModal.test.tsx` 10, critical palette test) |
+| Harness | 51 / 51 × 3 (new `safeReturn.test.mjs` gates 1–6 + scenarios; ack-route test) |
+| Scenarios | 29 PASS / 4 PASS+OWNER / 1 OWNER-LOCAL / 0 FAIL (34) |
+| Playwright list | 43 tests in 5 files (Owner-local selection 42) |
+| Build | JS 340.50 kB (gzip 111.65 kB); CSS 30.92 kB (gzip 7.34 kB); unchanged 47.67 kB WOFF2 |
+
+Scenario detail:
+
+- S33 trip during a Job: SR1–SR8 evidence indices increasing, Safe Return 7.65 s, queue frozen at
+  7, `CRITICAL_SUSPENDED` after the modal closed, `OFF` after the test reset.
+- S34 normal completion with a 5 s delayed valve feedback → `COMPLETED`.
+
+See [`arena-validation.md`](../../spikes/ui-runtime-react/results/summary/arena-validation.md).
+
+**PENDING (Owner-local Edge):**
+
+- `CRIT-A`..`CRIT-E`;
+- `CRIT-F` at 1920 × 1080 and 1366 × 768;
+- the earlier selection;
+- the manual F11 review with 8 screenshots
+  ([`OWNER_LOCAL_TESTING.md`](../../spikes/ui-runtime-react/measurements/OWNER_LOCAL_TESTING.md) §1F).
+
+**NOT VERIFIED:** browser rendering, Edge, WebView2, kiosk, hardware, Production Pump / valve /
+axis behaviour, and Production safety.
 
 ---
 
@@ -74,6 +240,9 @@ PRODUCTION PROMOTION:**
 - Pump not ready → the Job (not the queue) waits in pre-check (`preCheck: WAITING_FOR_PUMP`,
   shown as the Active Job phase). Synthetic `pump-stop` aborts the Active Job; the next head is
   then dispatched by the AutoSequence and waits in pre-check until the pump is ready.
+  **Superseded by §0E:** no Job is created while the Pump is not ready (AutoSequence
+  `PUMP_NOT_READY`); `pump-stop` sends the Active Job through Mandatory Safe Return; a Pump
+  unexpected stop / trip suspends the AutoSequence (`CRITICAL_SUSPENDED`).
 - `pause-auto-sequence` (alias `hold-queue`) pauses dispatch (`autoSequence: PAUSED`); it changes
   no queue entry.
 - Review controls never retarget: `review-job` is refused while a Job for another Sensor is active;

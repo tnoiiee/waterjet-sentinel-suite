@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// WJSS Stage 0.2.1A — Arena scenario runner: the 28 planned scenarios at the runtime / SSE
+// WJSS Stage 0.2.1A — Arena scenario runner: the 28 planned scenarios (+ S29..S34 spike additions) at the runtime / SSE
 // level against the Node synthetic harness on 127.0.0.1. Browser-only aspects are marked
 // OWNER-LOCAL and are covered by react-ui/e2e/operations.spec.ts (installed Edge).
 //
@@ -168,7 +168,7 @@ await scenario('S08', 'Queue badge changes', async () => {
   // Bounded queue: membership changes on dispatch / refill (a Job lasts 6 x 4 s), so the badge
   // change is driven deterministically by one head-only dispatch (QUEUED -> ACTIVE).
   await api.cmd('auto-jobs', { enabled: false });
-  await api.cmd('abort-job');
+  await api.cmd('abort-job', { immediate: true });
   await sleep(1200);
   for (const s of mirror.all()) (seen.get(s.sensorId) ?? seen.set(s.sensorId, new Set()).get(s.sensorId)).add(s.queueState);
   const head = mirror.single.queue.entries[0]?.sensorId;
@@ -391,7 +391,7 @@ await scenario('S22', 'Camera placeholder', async () => {
 
 await scenario('S23', 'Synthetic close guard for Active Job', async () => {
   await api.cmd('auto-jobs', { enabled: false });
-  await api.cmd('abort-job');
+  await api.cmd('abort-job', { immediate: true });
   await sleep(1500);
   const r = await api.cmd('second-job-attempt');
   const ev = await api.close();
@@ -401,7 +401,7 @@ await scenario('S23', 'Synthetic close guard for Active Job', async () => {
 });
 
 await scenario('S24', 'Synthetic close guard for Pump running', async () => {
-  await api.cmd('abort-job');
+  await api.cmd('abort-job', { immediate: true });
   const ev = await api.close();
   check(ev.allowed === false && ev.reasons.length === 1 && ev.reasons[0] === 'PUMP_RUNNING', JSON.stringify(ev));
   await api.cmd('auto-jobs', { enabled: true });
@@ -504,7 +504,7 @@ await scenario('S31', 'Head-only atomic dispatch (no scan-forward; Owner example
   // Threshold 99 stops the synthetic score source from refilling, so the queue can be built
   // explicitly over HTTP (every command triggers a publish).
   await api.cmd('auto-jobs', { enabled: false });
-  await api.cmd('abort-job');
+  await api.cmd('abort-job', { immediate: true });
   await api.cmd('publish-config', { dirtyThreshold: 99 });
   for (const e of (await api.snapshot()).queue.entries) await api.cmd('dequeue', { sensorId: e.sensorId });
   for (const id of ['G+110', 'G9', 'G8', 'I12']) await api.cmd('enqueue', { sensorId: id, reason: 'TIME_DUE' });
@@ -526,7 +526,7 @@ await scenario('S31', 'Head-only atomic dispatch (no scan-forward; Owner example
   for (const id of ['G9', 'G8']) await api.cmd('force-quality', { sensorId: id, quality: 'GOOD' });
   await api.cmd('clear-alarm', { sensorId: 'G+110' });
   await api.cmd('ack-alarm', { sensorId: 'G+110' });
-  await api.cmd('abort-job');
+  await api.cmd('abort-job', { immediate: true });
   await api.cmd('publish-config', { dirtyThreshold: 50 });
   await api.cmd('visual-preset', { preset: 'reset' });
   const m = await api.metrics();
@@ -557,6 +557,63 @@ await scenario('S32', 'Bounded queue under load and Job linkage (dirty70, AutoSe
   check(unlinked === 0, 'Active Job not linked to a Position 1 dispatch');
   check(m.queue.length <= 8 && m.invariants.violations === 0, 'metrics bound / invariants');
   return { maxQueueLength: maxLen, dispatchesObserved: seen.size, queueMetrics: { length: m.queue.length, capacity: m.queue.capacity, dispatches: m.queue.dispatches, autoSequence: m.queue.autoSequence } };
+});
+
+await scenario('S33', 'Main Pump trip during Job: critical suspension, Mandatory Safe Return, modal rules (synthetic)', async () => {
+  await api.cmd('auto-jobs', { enabled: false });
+  await api.cmd('abort-job', { immediate: true });
+  await sleep(600);
+  const t = await api.cmd('critical-scenario', { scenario: 'pump-trip-p4' });
+  check(t.accepted === true, JSON.stringify(t));
+  let snap = await api.snapshot();
+  const queueAtTrip = snap.queue.entries.map((e) => e.sensorId);
+  const revAtTrip = snap.queue.revision;
+  check(snap.sequence.autoSequence === 'CRITICAL_SUSPENDED', `AutoSequence ${snap.sequence.autoSequence}`);
+  check(snap.sequence.critical?.modalOpen === true && snap.sequence.critical.phaseAtEvent === 'P4', 'modal / phase');
+  check(snap.activeJob?.lifecycle === 'ABORTING', `lifecycle ${snap.activeJob?.lifecycle}`);
+  check((await api.cmd('dispatch-head')).reason === 'CRITICAL_SUSPENDED', 'dispatch while suspended');
+  await api.cmd('critical-alarm-ack');
+  await api.cmd('pump-fault-clear');
+  snap = await api.snapshot();
+  check(snap.sequence.critical.modalOpen === true, 'modal closed before Safe Return complete');
+  const jobId = snap.activeJob.jobId;
+  const t0 = performance.now();
+  while ((await api.snapshot()).activeJob && performance.now() - t0 < 15000) await sleep(250);
+  snap = await api.snapshot();
+  const o = snap.sequence.lastJobOutcome;
+  check(o?.jobId === jobId && o.outcome === 'ABORTED' && o.trigger === 'SYN_PUMP_TRIP', JSON.stringify(o)?.slice(0, 200));
+  check(o.valveClosedConfirmedSeq < o.axisReturnCommandSeq, 'axis before valve confirm');
+  check(snap.sequence.critical.modalOpen === false, 'modal still open after clear + ack + Safe Return');
+  check(snap.sequence.autoSequence === 'CRITICAL_SUSPENDED', 'suspension did not persist');
+  check(JSON.stringify(snap.queue.entries.map((e) => e.sensorId)) === JSON.stringify(queueAtTrip) && snap.queue.revision === revAtTrip, 'queue changed during suspension');
+  const reset = await api.cmd('critical-reset');
+  check(reset.accepted === true, 'test reset');
+  const m = await api.metrics();
+  check(m.invariants.violations === 0, 'invariant violation');
+  return { job: jobId, steps: o.events.filter((e) => e.step).map((e) => `${e.step}#${e.seq}`).join(' '), safeReturnMs: Math.round(performance.now() - t0), queueFrozen: queueAtTrip.length, autoSequenceAfterModal: 'CRITICAL_SUSPENDED', afterTestReset: reset.detail.autoSequence };
+});
+
+await scenario('S34', 'Normal completion -> Mandatory Safe Return with delayed valve feedback (synthetic)', async () => {
+  await api.cmd('auto-jobs', { enabled: false });
+  await sleep(3200); // synthetic Pump restart after the S33 test reset
+  await api.cmd('safe-return-config', { valveFeedbackDelayMs: 2000 });
+  const r = await api.cmd('critical-scenario', { scenario: 'normal-completion-safe-return' });
+  check(r.accepted === true, JSON.stringify(r));
+  await sleep(3600); // P6 ends 2 s after the command; progression is evaluated on the 1 s tick
+  let snap = await api.snapshot();
+  check(snap.activeJob?.cleaningPhase === 'CLEANING_PHASES_COMPLETE', `cleaningPhase ${snap.activeJob?.cleaningPhase}`);
+  check(snap.sequence.lastJobOutcome?.jobId !== r.detail.jobId, 'outcome before Standby');
+  const t0 = performance.now();
+  while ((await api.snapshot()).activeJob && performance.now() - t0 < 20000) await sleep(250);
+  snap = await api.snapshot();
+  const o = snap.sequence.lastJobOutcome;
+  await api.cmd('safe-return-config', { valveFeedbackDelayMs: 0 });
+  check(o?.jobId === r.detail.jobId && o.outcome === 'COMPLETED', JSON.stringify(o)?.slice(0, 200));
+  const at = (step) => Date.parse(o.events.find((e) => e.step === step).at);
+  check(at('SR3') - at('SR2') >= 5000 - 5, 'valve delay not honoured');
+  check(snap.sequence.critical === null, 'normal completion raised a critical event');
+  await api.cmd('auto-jobs', { enabled: true });
+  return { job: o.jobId, outcome: o.outcome, valveConfirmAfterCommandMs: at('SR3') - at('SR2'), steps: o.events.filter((e) => e.step).map((e) => e.step).join(' ') };
 });
 
 const finalMetrics = await api.metrics();

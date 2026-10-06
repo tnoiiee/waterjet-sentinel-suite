@@ -20,6 +20,7 @@ import type {
   QueueSummary,
   RuntimeHealth,
   SensorPresentationState,
+  SequenceState,
   TrendPoint,
   Wall,
   WallMapSlot,
@@ -65,6 +66,8 @@ export interface Slices {
   activeJob: ActiveCleaningJobState | null;
   pump: PumpState | null;
   queue: QueueSummary | null;
+  /** AutoSequence / critical Pump event / last Job outcome (runtime-authoritative). */
+  sequence: SequenceState | null;
   alarms: AlarmSummary | null;
   communication: CommunicationHealth | null;
   runtime: RuntimeHealth | null;
@@ -75,7 +78,7 @@ export type SliceKey = keyof Slices;
 
 export type ApplyResult = 'applied' | 'gap' | 'duplicate';
 
-const DELTA_SLICES = ['config', 'walls', 'activeJob', 'pump', 'queue', 'alarms', 'communication', 'runtime'] as const;
+const DELTA_SLICES = ['config', 'walls', 'activeJob', 'pump', 'queue', 'sequence', 'alarms', 'communication', 'runtime'] as const;
 export type WallLayout = Record<Wall, WallMapSlot[][]>;
 const EMPTY_LAYOUT: WallLayout = { LEFT: [], REAR: [], RIGHT: [], FRONT: [] };
 
@@ -119,6 +122,7 @@ export class PresentationStore {
       activeJob: null,
       pump: null,
       queue: null,
+      sequence: null,
       alarms: null,
       communication: null,
       runtime: null,
@@ -192,6 +196,7 @@ export class PresentationStore {
     this.setSlice('activeJob', s.activeJob, pending);
     this.setSlice('pump', s.pump, pending);
     this.setSlice('queue', s.queue, pending);
+    this.setSlice('sequence', s.sequence ?? null, pending);
     this.setSlice('alarms', s.alarms, pending);
     this.setSlice('communication', s.communication, pending);
     this.setSlice('runtime', s.runtime, pending);

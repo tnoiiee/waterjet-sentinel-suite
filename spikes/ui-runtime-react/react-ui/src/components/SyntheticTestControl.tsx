@@ -83,6 +83,23 @@ const PRESETS: Control[] = [
   { id: 'preset-head-to-job', label: '7 · Queue head → Job atomic transition', command: 'visual-preset', params: { preset: 'head-to-job-transition' } },
 ];
 const RESET_PRESET: Control = { id: 'preset-reset', label: '8 · Reset', command: 'visual-preset', params: { preset: 'reset' } };
+// Critical Main Pump / Mandatory Safe Return review controls (synthetic proof only — never a real
+// Pump, protection relay, VFD, Isolation Valve, axis or interlock). Ten Owner-listed controls plus
+// a valve-feedback-absent control for reviewing the SAFE_RETURN_FAILED presentation.
+const CRITICAL_CONTROLS: Control[] = [
+  { id: 'crit-stop-no-job', label: '1 · Pump unexpected stop (no Job)', command: 'critical-scenario', params: { scenario: 'pump-stop-no-job' } },
+  { id: 'crit-trip-no-job', label: '2 · Pump trip (no Job)', command: 'critical-scenario', params: { scenario: 'pump-trip-no-job' } },
+  { id: 'crit-trip-p1', label: '3 · Pump trip during Job P1', command: 'critical-scenario', params: { scenario: 'pump-trip-p1' } },
+  { id: 'crit-trip-p4', label: '4 · Pump trip during Job P4', command: 'critical-scenario', params: { scenario: 'pump-trip-p4' } },
+  { id: 'crit-normal-sr', label: '5 · Normal completion → Safe Return', command: 'critical-scenario', params: { scenario: 'normal-completion-safe-return' } },
+  { id: 'crit-valve-delay', label: '6 · Delay valve closed feedback (next SR)', command: 'safe-return-config', params: { valveFeedbackDelayMs: 6000 } },
+  { id: 'crit-standby-delay', label: '7 · Delay Standby feedback (next SR)', command: 'safe-return-config', params: { standbyFeedbackDelayMs: 6000 } },
+  { id: 'crit-clear', label: '8 · Clear Pump fault condition', command: 'pump-fault-clear', params: {} },
+  { id: 'crit-ack', label: '9 · Acknowledge critical Alarm', command: 'critical-alarm-ack', params: {} },
+  { id: 'crit-reset', label: '10 · Reset critical scenario (test only — not a Resume)', command: 'critical-reset', params: {} },
+  { id: 'crit-valve-absent', label: 'Valve closed feedback absent (next SR → failure review)', command: 'safe-return-config', params: { valveFeedback: 'ABSENT' } },
+];
+
 // Queue → Job control without a Sensor: dispatches queue Position 1 only (head-only, atomic).
 const DISPATCH_HEAD: Control = { id: 'dispatch-head', label: 'Dispatch queue head (Position 1)', command: 'dispatch-head', params: {} };
 
@@ -161,6 +178,10 @@ export function SyntheticTestControl({ selectedId }: { selectedId: string | null
           {PRESETS.map((c) => button(c, true))}
           {button(RESET_PRESET, false)}
         </div>
+      </div>
+      <div className={styles.stcGroup} data-testid="stc-critical-group">
+        <div className={styles.stcGroupLabel}>Critical Pump / Safe Return (synthetic proof only)</div>
+        <div className={styles.stcGrid}>{CRITICAL_CONTROLS.map((c) => button(c, false))}</div>
       </div>
       <div className={styles.stcGroup}>
         <div className={styles.stcGroupLabel}>Queue → Job (head only)</div>

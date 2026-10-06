@@ -246,6 +246,44 @@ failure condition.
 The pump state model is not motor protection and must never be presented as such. Motor
 protection remains external to the application.
 
+### 7.2 Main Pump critical event and Mandatory Safe Return (Owner critical Pump decision, 2026-10-06)
+
+The Owner classified the **Main Pump as a High Critical device**:
+
+- **Expected commanded stop** (A) is not a fault.
+- **Unexpected stop** (B) and **trip** (C) are High Critical events. On B or C, normal Cleaning
+  progression, cleaning water output and dispatch stop, and the AutoSequence is suspended (spike
+  name `CRITICAL_SUSPENDED`). An Active Job enters Mandatory Safe Return, and a blocking
+  high-severity alarm presentation appears.
+- The GlobalQueue is unchanged. There is no automatic Resume and no automatic next Job.
+
+**Every Cleaning Job, whatever the outcome, ends through Mandatory Safe Return:**
+
+1. stop normal Cleaning / water command;
+2. command the Isolation Valve closed;
+3. confirm closed;
+4. command the axis to the Standby Position;
+5. confirm Standby;
+6. finalize the outcome;
+7. release Active Job ownership;
+8. only then consider later sequencing.
+
+The valve close is commanded **and confirmed** before the axis return command. The Job remains
+the Active Job until Standby is confirmed.
+
+Still `[OPEN]` (OWNER DECISION REQUIRED), see [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md):
+
+- Safe Return failure handling;
+- valve / axis feedback failures;
+- outcome names;
+- re-queue and retry;
+- clear evidence and Resume authority.
+
+The Stage 0.2.1A spike demonstrates this behaviour with synthetic signals only
+([results §0E](spikes/stage-0.2.1a-results.md#0e-critical-main-pump-handling-and-mandatory-safe-return-stage-021a)).
+It is not a safety function, not motor protection and not verified on hardware. Section 7.1 is
+unchanged.
+
 ## 8. Motion supervision during a job
 
 - Galil model: DMC-B140-M; stepper motors with encoder feedback. `[APPROVED]`

@@ -218,6 +218,33 @@ suppression, and grouping rules are `[OPEN]`.
 6. **Blocking release, acknowledgement, and shelving semantics are unchanged.** This
    subsection adds boundaries only; it does not alter section 3 through section 6.
 
+## 9.2 Main Pump critical alarm presentation (Owner critical Pump decision, 2026-10-06)
+
+A Main Pump unexpected stop or trip is a **High Critical** alarm condition. It is presented by a
+large blocking modal with these properties:
+
+- It shows the time, the condition, the acknowledgement state, the AutoSequence state, the Active
+  Job / target / phase and the live Safe Return step.
+- It has no close button; Acknowledge is the only action.
+- Escape does not dismiss it.
+- It is accessible as an alert dialog, and state is not conveyed by colour alone.
+
+**Acknowledge is awareness only** (consistent with section 3.1). It does not clear the condition
+and does not resume anything. The modal closes only when the condition is cleared **and**
+Mandatory Safe Return is complete **and** the alarm is acknowledged, and the AutoSequence then
+remains suspended. Sections 3 through 6 are unchanged.
+
+Still open (OWNER DECISION REQUIRED, [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md) matrix F):
+
+- the acknowledge role;
+- clear evidence;
+- Resume authority;
+- minimising;
+- a second alarm channel.
+
+The Stage 0.2.1A spike shows this with synthetic signals only. It is not verified in a browser
+from Arena or on hardware.
+
 ## 10. Open items
 
 | Item | Status |
