@@ -23,7 +23,10 @@
         "sensorId": "G+201",
         "equipmentId": null,
         "scanOrderSynthetic": 1,
-        "tcChannels": "SYN-TC-01:CH00,SYN-TC-01:CH01"
+        "tcChannels": [
+          "SYN-TC-01:CH00",
+          "SYN-TC-01:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R1-C02",
@@ -36,7 +39,10 @@
         "sensorId": "G+202",
         "equipmentId": null,
         "scanOrderSynthetic": 2,
-        "tcChannels": "SYN-TC-01:CH02,SYN-TC-01:CH03"
+        "tcChannels": [
+          "SYN-TC-01:CH02",
+          "SYN-TC-01:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R1-C03",
@@ -49,7 +55,10 @@
         "sensorId": "G+203",
         "equipmentId": null,
         "scanOrderSynthetic": 3,
-        "tcChannels": "SYN-TC-01:CH04,SYN-TC-01:CH05"
+        "tcChannels": [
+          "SYN-TC-01:CH04",
+          "SYN-TC-01:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R1-C04",
@@ -62,7 +71,10 @@
         "sensorId": "G+204",
         "equipmentId": null,
         "scanOrderSynthetic": 4,
-        "tcChannels": "SYN-TC-01:CH06,SYN-TC-01:CH07"
+        "tcChannels": [
+          "SYN-TC-01:CH06",
+          "SYN-TC-01:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R1-C05",
@@ -75,7 +87,10 @@
         "sensorId": "G+205",
         "equipmentId": null,
         "scanOrderSynthetic": 5,
-        "tcChannels": "SYN-TC-01:CH08,SYN-TC-01:CH09"
+        "tcChannels": [
+          "SYN-TC-01:CH08",
+          "SYN-TC-01:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R1-C06",
@@ -88,7 +103,10 @@
         "sensorId": "G+206",
         "equipmentId": null,
         "scanOrderSynthetic": 6,
-        "tcChannels": "SYN-TC-01:CH10,SYN-TC-01:CH11"
+        "tcChannels": [
+          "SYN-TC-01:CH10",
+          "SYN-TC-01:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R1-C07",
@@ -101,7 +119,10 @@
         "sensorId": "G+207",
         "equipmentId": null,
         "scanOrderSynthetic": 7,
-        "tcChannels": "SYN-TC-01:CH12,SYN-TC-01:CH13"
+        "tcChannels": [
+          "SYN-TC-01:CH12",
+          "SYN-TC-01:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R1-C08",
@@ -114,7 +135,10 @@
         "sensorId": "G+208",
         "equipmentId": null,
         "scanOrderSynthetic": 8,
-        "tcChannels": "SYN-TC-01:CH14,SYN-TC-01:CH15"
+        "tcChannels": [
+          "SYN-TC-01:CH14",
+          "SYN-TC-01:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R1-C09",
@@ -127,7 +151,10 @@
         "sensorId": "G+209",
         "equipmentId": null,
         "scanOrderSynthetic": 9,
-        "tcChannels": "SYN-TC-01:CH16,SYN-TC-01:CH17"
+        "tcChannels": [
+          "SYN-TC-01:CH16",
+          "SYN-TC-01:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R1-C10",
@@ -140,7 +167,10 @@
         "sensorId": "G+210",
         "equipmentId": null,
         "scanOrderSynthetic": 10,
-        "tcChannels": "SYN-TC-01:CH18,SYN-TC-01:CH19"
+        "tcChannels": [
+          "SYN-TC-01:CH18",
+          "SYN-TC-01:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R1-C11",
@@ -153,7 +183,10 @@
         "sensorId": "G+211",
         "equipmentId": null,
         "scanOrderSynthetic": 11,
-        "tcChannels": "SYN-TC-01:CH20,SYN-TC-01:CH21"
+        "tcChannels": [
+          "SYN-TC-01:CH20",
+          "SYN-TC-01:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R1-C12",
@@ -166,7 +199,10 @@
         "sensorId": "G+212",
         "equipmentId": null,
         "scanOrderSynthetic": 12,
-        "tcChannels": "SYN-TC-01:CH22,SYN-TC-01:CH23"
+        "tcChannels": [
+          "SYN-TC-01:CH22",
+          "SYN-TC-01:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R1-C13",
@@ -179,7 +215,10 @@
         "sensorId": "G+213",
         "equipmentId": null,
         "scanOrderSynthetic": 13,
-        "tcChannels": "SYN-TC-01:CH24,SYN-TC-01:CH25"
+        "tcChannels": [
+          "SYN-TC-01:CH24",
+          "SYN-TC-01:CH25"
+        ]
       },
       {
         "slotId": "SLOT-R1-C14",
@@ -192,7 +231,10 @@
         "sensorId": "G+214",
         "equipmentId": null,
         "scanOrderSynthetic": 14,
-        "tcChannels": "SYN-TC-01:CH26,SYN-TC-01:CH27"
+        "tcChannels": [
+          "SYN-TC-01:CH26",
+          "SYN-TC-01:CH27"
+        ]
       },
       {
         "slotId": "SLOT-R1-C15",
@@ -205,7 +247,10 @@
         "sensorId": "G+215",
         "equipmentId": null,
         "scanOrderSynthetic": 15,
-        "tcChannels": "SYN-TC-02:CH00,SYN-TC-02:CH01"
+        "tcChannels": [
+          "SYN-TC-02:CH00",
+          "SYN-TC-02:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R1-C16",
@@ -218,7 +263,10 @@
         "sensorId": "G+216",
         "equipmentId": null,
         "scanOrderSynthetic": 16,
-        "tcChannels": "SYN-TC-02:CH02,SYN-TC-02:CH03"
+        "tcChannels": [
+          "SYN-TC-02:CH02",
+          "SYN-TC-02:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R1-C17",
@@ -231,7 +279,10 @@
         "sensorId": "G+217",
         "equipmentId": null,
         "scanOrderSynthetic": 17,
-        "tcChannels": "SYN-TC-02:CH04,SYN-TC-02:CH05"
+        "tcChannels": [
+          "SYN-TC-02:CH04",
+          "SYN-TC-02:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R1-C18",
@@ -244,7 +295,10 @@
         "sensorId": "G+218",
         "equipmentId": null,
         "scanOrderSynthetic": 18,
-        "tcChannels": "SYN-TC-02:CH06,SYN-TC-02:CH07"
+        "tcChannels": [
+          "SYN-TC-02:CH06",
+          "SYN-TC-02:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R2-C01",
@@ -257,7 +311,10 @@
         "sensorId": "G+101",
         "equipmentId": null,
         "scanOrderSynthetic": 19,
-        "tcChannels": "SYN-TC-02:CH08,SYN-TC-02:CH09"
+        "tcChannels": [
+          "SYN-TC-02:CH08",
+          "SYN-TC-02:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R2-C02",
@@ -270,7 +327,10 @@
         "sensorId": "G+102",
         "equipmentId": null,
         "scanOrderSynthetic": 20,
-        "tcChannels": "SYN-TC-02:CH10,SYN-TC-02:CH11"
+        "tcChannels": [
+          "SYN-TC-02:CH10",
+          "SYN-TC-02:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R2-C03",
@@ -283,7 +343,10 @@
         "sensorId": "G+103",
         "equipmentId": null,
         "scanOrderSynthetic": 21,
-        "tcChannels": "SYN-TC-02:CH12,SYN-TC-02:CH13"
+        "tcChannels": [
+          "SYN-TC-02:CH12",
+          "SYN-TC-02:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R2-C04",
@@ -296,7 +359,10 @@
         "sensorId": "G+104",
         "equipmentId": null,
         "scanOrderSynthetic": 22,
-        "tcChannels": "SYN-TC-02:CH14,SYN-TC-02:CH15"
+        "tcChannels": [
+          "SYN-TC-02:CH14",
+          "SYN-TC-02:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R2-C05",
@@ -309,7 +375,10 @@
         "sensorId": "G+105",
         "equipmentId": null,
         "scanOrderSynthetic": 23,
-        "tcChannels": "SYN-TC-02:CH16,SYN-TC-02:CH17"
+        "tcChannels": [
+          "SYN-TC-02:CH16",
+          "SYN-TC-02:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R2-C06",
@@ -322,7 +391,10 @@
         "sensorId": "G+106",
         "equipmentId": null,
         "scanOrderSynthetic": 24,
-        "tcChannels": "SYN-TC-02:CH18,SYN-TC-02:CH19"
+        "tcChannels": [
+          "SYN-TC-02:CH18",
+          "SYN-TC-02:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R2-C07",
@@ -335,7 +407,10 @@
         "sensorId": "G+107",
         "equipmentId": null,
         "scanOrderSynthetic": 25,
-        "tcChannels": "SYN-TC-02:CH20,SYN-TC-02:CH21"
+        "tcChannels": [
+          "SYN-TC-02:CH20",
+          "SYN-TC-02:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R2-C08",
@@ -348,7 +423,10 @@
         "sensorId": "G+108",
         "equipmentId": null,
         "scanOrderSynthetic": 26,
-        "tcChannels": "SYN-TC-02:CH22,SYN-TC-02:CH23"
+        "tcChannels": [
+          "SYN-TC-02:CH22",
+          "SYN-TC-02:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R2-C09",
@@ -361,7 +439,10 @@
         "sensorId": "G+109",
         "equipmentId": null,
         "scanOrderSynthetic": 27,
-        "tcChannels": "SYN-TC-02:CH24,SYN-TC-02:CH25"
+        "tcChannels": [
+          "SYN-TC-02:CH24",
+          "SYN-TC-02:CH25"
+        ]
       },
       {
         "slotId": "SLOT-R2-C10",
@@ -374,7 +455,10 @@
         "sensorId": "G+110",
         "equipmentId": null,
         "scanOrderSynthetic": 28,
-        "tcChannels": "SYN-TC-02:CH26,SYN-TC-02:CH27"
+        "tcChannels": [
+          "SYN-TC-02:CH26",
+          "SYN-TC-02:CH27"
+        ]
       },
       {
         "slotId": "SLOT-R2-C11",
@@ -387,7 +471,10 @@
         "sensorId": "G+111",
         "equipmentId": null,
         "scanOrderSynthetic": 29,
-        "tcChannels": "SYN-TC-03:CH00,SYN-TC-03:CH01"
+        "tcChannels": [
+          "SYN-TC-03:CH00",
+          "SYN-TC-03:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R2-C12",
@@ -400,7 +487,10 @@
         "sensorId": "G+112",
         "equipmentId": null,
         "scanOrderSynthetic": 30,
-        "tcChannels": "SYN-TC-03:CH02,SYN-TC-03:CH03"
+        "tcChannels": [
+          "SYN-TC-03:CH02",
+          "SYN-TC-03:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R2-C13",
@@ -413,7 +503,10 @@
         "sensorId": "G+113",
         "equipmentId": null,
         "scanOrderSynthetic": 31,
-        "tcChannels": "SYN-TC-03:CH04,SYN-TC-03:CH05"
+        "tcChannels": [
+          "SYN-TC-03:CH04",
+          "SYN-TC-03:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R2-C14",
@@ -426,7 +519,10 @@
         "sensorId": "G+114",
         "equipmentId": null,
         "scanOrderSynthetic": 32,
-        "tcChannels": "SYN-TC-03:CH06,SYN-TC-03:CH07"
+        "tcChannels": [
+          "SYN-TC-03:CH06",
+          "SYN-TC-03:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R2-C15",
@@ -439,7 +535,10 @@
         "sensorId": "G+115",
         "equipmentId": null,
         "scanOrderSynthetic": 33,
-        "tcChannels": "SYN-TC-03:CH08,SYN-TC-03:CH09"
+        "tcChannels": [
+          "SYN-TC-03:CH08",
+          "SYN-TC-03:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R2-C16",
@@ -452,7 +551,10 @@
         "sensorId": "G+116",
         "equipmentId": null,
         "scanOrderSynthetic": 34,
-        "tcChannels": "SYN-TC-03:CH10,SYN-TC-03:CH11"
+        "tcChannels": [
+          "SYN-TC-03:CH10",
+          "SYN-TC-03:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R2-C17",
@@ -465,7 +567,10 @@
         "sensorId": "G+117",
         "equipmentId": null,
         "scanOrderSynthetic": 35,
-        "tcChannels": "SYN-TC-03:CH12,SYN-TC-03:CH13"
+        "tcChannels": [
+          "SYN-TC-03:CH12",
+          "SYN-TC-03:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R2-C18",
@@ -478,7 +583,10 @@
         "sensorId": "G+118",
         "equipmentId": null,
         "scanOrderSynthetic": 36,
-        "tcChannels": "SYN-TC-03:CH14,SYN-TC-03:CH15"
+        "tcChannels": [
+          "SYN-TC-03:CH14",
+          "SYN-TC-03:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R3-C01",
@@ -491,7 +599,10 @@
         "sensorId": "G1",
         "equipmentId": null,
         "scanOrderSynthetic": 37,
-        "tcChannels": "SYN-TC-03:CH16,SYN-TC-03:CH17"
+        "tcChannels": [
+          "SYN-TC-03:CH16",
+          "SYN-TC-03:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R3-C02",
@@ -504,7 +615,10 @@
         "sensorId": "G2",
         "equipmentId": null,
         "scanOrderSynthetic": 38,
-        "tcChannels": "SYN-TC-03:CH18,SYN-TC-03:CH19"
+        "tcChannels": [
+          "SYN-TC-03:CH18",
+          "SYN-TC-03:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R3-C03",
@@ -517,7 +631,10 @@
         "sensorId": "G3",
         "equipmentId": null,
         "scanOrderSynthetic": 39,
-        "tcChannels": "SYN-TC-03:CH20,SYN-TC-03:CH21"
+        "tcChannels": [
+          "SYN-TC-03:CH20",
+          "SYN-TC-03:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R3-C04",
@@ -530,7 +647,10 @@
         "sensorId": "G4",
         "equipmentId": null,
         "scanOrderSynthetic": 40,
-        "tcChannels": "SYN-TC-03:CH22,SYN-TC-03:CH23"
+        "tcChannels": [
+          "SYN-TC-03:CH22",
+          "SYN-TC-03:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R3-C05",
@@ -543,7 +663,10 @@
         "sensorId": "G5",
         "equipmentId": null,
         "scanOrderSynthetic": 41,
-        "tcChannels": "SYN-TC-03:CH24,SYN-TC-03:CH25"
+        "tcChannels": [
+          "SYN-TC-03:CH24",
+          "SYN-TC-03:CH25"
+        ]
       },
       {
         "slotId": "SLOT-R3-C06",
@@ -556,7 +679,10 @@
         "sensorId": "G6",
         "equipmentId": null,
         "scanOrderSynthetic": 42,
-        "tcChannels": "SYN-TC-04:CH00,SYN-TC-04:CH01"
+        "tcChannels": [
+          "SYN-TC-04:CH00",
+          "SYN-TC-04:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R3-C07",
@@ -569,7 +695,10 @@
         "sensorId": "G7",
         "equipmentId": null,
         "scanOrderSynthetic": 43,
-        "tcChannels": "SYN-TC-04:CH02,SYN-TC-04:CH03"
+        "tcChannels": [
+          "SYN-TC-04:CH02",
+          "SYN-TC-04:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R3-C08",
@@ -582,7 +711,10 @@
         "sensorId": "G8",
         "equipmentId": null,
         "scanOrderSynthetic": 44,
-        "tcChannels": "SYN-TC-04:CH04,SYN-TC-04:CH05"
+        "tcChannels": [
+          "SYN-TC-04:CH04",
+          "SYN-TC-04:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R3-C09",
@@ -595,7 +727,10 @@
         "sensorId": "G9",
         "equipmentId": null,
         "scanOrderSynthetic": 45,
-        "tcChannels": "SYN-TC-04:CH06,SYN-TC-04:CH07"
+        "tcChannels": [
+          "SYN-TC-04:CH06",
+          "SYN-TC-04:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R3-C10",
@@ -608,7 +743,10 @@
         "sensorId": "G10",
         "equipmentId": null,
         "scanOrderSynthetic": 46,
-        "tcChannels": "SYN-TC-04:CH08,SYN-TC-04:CH09"
+        "tcChannels": [
+          "SYN-TC-04:CH08",
+          "SYN-TC-04:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R3-C11",
@@ -621,7 +759,10 @@
         "sensorId": "G11",
         "equipmentId": null,
         "scanOrderSynthetic": 47,
-        "tcChannels": "SYN-TC-04:CH10,SYN-TC-04:CH11"
+        "tcChannels": [
+          "SYN-TC-04:CH10",
+          "SYN-TC-04:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R3-C12",
@@ -634,7 +775,10 @@
         "sensorId": "G12",
         "equipmentId": null,
         "scanOrderSynthetic": 48,
-        "tcChannels": "SYN-TC-04:CH12,SYN-TC-04:CH13"
+        "tcChannels": [
+          "SYN-TC-04:CH12",
+          "SYN-TC-04:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R3-C13",
@@ -647,7 +791,10 @@
         "sensorId": "G13",
         "equipmentId": null,
         "scanOrderSynthetic": 49,
-        "tcChannels": "SYN-TC-04:CH14,SYN-TC-04:CH15"
+        "tcChannels": [
+          "SYN-TC-04:CH14",
+          "SYN-TC-04:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R3-C14",
@@ -660,7 +807,10 @@
         "sensorId": "G14",
         "equipmentId": null,
         "scanOrderSynthetic": 50,
-        "tcChannels": "SYN-TC-04:CH16,SYN-TC-04:CH17"
+        "tcChannels": [
+          "SYN-TC-04:CH16",
+          "SYN-TC-04:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R3-C15",
@@ -673,7 +823,10 @@
         "sensorId": "G15",
         "equipmentId": null,
         "scanOrderSynthetic": 51,
-        "tcChannels": "SYN-TC-04:CH18,SYN-TC-04:CH19"
+        "tcChannels": [
+          "SYN-TC-04:CH18",
+          "SYN-TC-04:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R3-C16",
@@ -686,7 +839,10 @@
         "sensorId": "G16",
         "equipmentId": null,
         "scanOrderSynthetic": 52,
-        "tcChannels": "SYN-TC-04:CH20,SYN-TC-04:CH21"
+        "tcChannels": [
+          "SYN-TC-04:CH20",
+          "SYN-TC-04:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R3-C17",
@@ -699,7 +855,10 @@
         "sensorId": "G17",
         "equipmentId": null,
         "scanOrderSynthetic": 53,
-        "tcChannels": "SYN-TC-04:CH22,SYN-TC-04:CH23"
+        "tcChannels": [
+          "SYN-TC-04:CH22",
+          "SYN-TC-04:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R3-C18",
@@ -712,7 +871,10 @@
         "sensorId": "G18",
         "equipmentId": null,
         "scanOrderSynthetic": 54,
-        "tcChannels": "SYN-TC-04:CH24,SYN-TC-04:CH25"
+        "tcChannels": [
+          "SYN-TC-04:CH24",
+          "SYN-TC-04:CH25"
+        ]
       },
       {
         "slotId": "SLOT-R4-C01",
@@ -725,7 +887,10 @@
         "sensorId": "H1",
         "equipmentId": null,
         "scanOrderSynthetic": 55,
-        "tcChannels": "SYN-TC-05:CH00,SYN-TC-05:CH01"
+        "tcChannels": [
+          "SYN-TC-05:CH00",
+          "SYN-TC-05:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R4-C02",
@@ -738,7 +903,10 @@
         "sensorId": "H2",
         "equipmentId": null,
         "scanOrderSynthetic": 56,
-        "tcChannels": "SYN-TC-05:CH02,SYN-TC-05:CH03"
+        "tcChannels": [
+          "SYN-TC-05:CH02",
+          "SYN-TC-05:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R4-C03",
@@ -751,7 +919,10 @@
         "sensorId": "H3",
         "equipmentId": null,
         "scanOrderSynthetic": 57,
-        "tcChannels": "SYN-TC-05:CH04,SYN-TC-05:CH05"
+        "tcChannels": [
+          "SYN-TC-05:CH04",
+          "SYN-TC-05:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R4-C04",
@@ -764,7 +935,10 @@
         "sensorId": "H4",
         "equipmentId": null,
         "scanOrderSynthetic": 58,
-        "tcChannels": "SYN-TC-05:CH06,SYN-TC-05:CH07"
+        "tcChannels": [
+          "SYN-TC-05:CH06",
+          "SYN-TC-05:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R4-C05",
@@ -777,7 +951,10 @@
         "sensorId": "H5",
         "equipmentId": null,
         "scanOrderSynthetic": 59,
-        "tcChannels": "SYN-TC-05:CH08,SYN-TC-05:CH09"
+        "tcChannels": [
+          "SYN-TC-05:CH08",
+          "SYN-TC-05:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R4-C06",
@@ -790,7 +967,10 @@
         "sensorId": "H6",
         "equipmentId": null,
         "scanOrderSynthetic": 60,
-        "tcChannels": "SYN-TC-05:CH10,SYN-TC-05:CH11"
+        "tcChannels": [
+          "SYN-TC-05:CH10",
+          "SYN-TC-05:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R4-C07",
@@ -803,7 +983,10 @@
         "sensorId": "H7",
         "equipmentId": null,
         "scanOrderSynthetic": 61,
-        "tcChannels": "SYN-TC-05:CH12,SYN-TC-05:CH13"
+        "tcChannels": [
+          "SYN-TC-05:CH12",
+          "SYN-TC-05:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R4-C08",
@@ -816,7 +999,10 @@
         "sensorId": "H8",
         "equipmentId": null,
         "scanOrderSynthetic": 62,
-        "tcChannels": "SYN-TC-05:CH14,SYN-TC-05:CH15"
+        "tcChannels": [
+          "SYN-TC-05:CH14",
+          "SYN-TC-05:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R4-C09",
@@ -829,7 +1015,10 @@
         "sensorId": "H9",
         "equipmentId": null,
         "scanOrderSynthetic": 63,
-        "tcChannels": "SYN-TC-05:CH16,SYN-TC-05:CH17"
+        "tcChannels": [
+          "SYN-TC-05:CH16",
+          "SYN-TC-05:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R4-C10",
@@ -842,7 +1031,10 @@
         "sensorId": "H10",
         "equipmentId": null,
         "scanOrderSynthetic": 64,
-        "tcChannels": "SYN-TC-05:CH18,SYN-TC-05:CH19"
+        "tcChannels": [
+          "SYN-TC-05:CH18",
+          "SYN-TC-05:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R4-C11",
@@ -855,7 +1047,10 @@
         "sensorId": "H11",
         "equipmentId": null,
         "scanOrderSynthetic": 65,
-        "tcChannels": "SYN-TC-05:CH20,SYN-TC-05:CH21"
+        "tcChannels": [
+          "SYN-TC-05:CH20",
+          "SYN-TC-05:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R4-C12",
@@ -868,7 +1063,10 @@
         "sensorId": "H12",
         "equipmentId": null,
         "scanOrderSynthetic": 66,
-        "tcChannels": "SYN-TC-05:CH22,SYN-TC-05:CH23"
+        "tcChannels": [
+          "SYN-TC-05:CH22",
+          "SYN-TC-05:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R4-C13",
@@ -881,7 +1079,10 @@
         "sensorId": "H13",
         "equipmentId": null,
         "scanOrderSynthetic": 67,
-        "tcChannels": "SYN-TC-05:CH24,SYN-TC-05:CH25"
+        "tcChannels": [
+          "SYN-TC-05:CH24",
+          "SYN-TC-05:CH25"
+        ]
       },
       {
         "slotId": "SLOT-R4-C14",
@@ -894,7 +1095,10 @@
         "sensorId": "H14",
         "equipmentId": null,
         "scanOrderSynthetic": 68,
-        "tcChannels": "SYN-TC-06:CH00,SYN-TC-06:CH01"
+        "tcChannels": [
+          "SYN-TC-06:CH00",
+          "SYN-TC-06:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R4-C15",
@@ -907,7 +1111,10 @@
         "sensorId": "H15",
         "equipmentId": null,
         "scanOrderSynthetic": 69,
-        "tcChannels": "SYN-TC-06:CH02,SYN-TC-06:CH03"
+        "tcChannels": [
+          "SYN-TC-06:CH02",
+          "SYN-TC-06:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R4-C16",
@@ -920,7 +1127,10 @@
         "sensorId": "H16",
         "equipmentId": null,
         "scanOrderSynthetic": 70,
-        "tcChannels": "SYN-TC-06:CH04,SYN-TC-06:CH05"
+        "tcChannels": [
+          "SYN-TC-06:CH04",
+          "SYN-TC-06:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R4-C17",
@@ -933,7 +1143,10 @@
         "sensorId": "H17",
         "equipmentId": null,
         "scanOrderSynthetic": 71,
-        "tcChannels": "SYN-TC-06:CH06,SYN-TC-06:CH07"
+        "tcChannels": [
+          "SYN-TC-06:CH06",
+          "SYN-TC-06:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R4-C18",
@@ -946,7 +1159,10 @@
         "sensorId": "H18",
         "equipmentId": null,
         "scanOrderSynthetic": 72,
-        "tcChannels": "SYN-TC-06:CH08,SYN-TC-06:CH09"
+        "tcChannels": [
+          "SYN-TC-06:CH08",
+          "SYN-TC-06:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R5-C01",
@@ -959,7 +1175,10 @@
         "sensorId": "I1",
         "equipmentId": null,
         "scanOrderSynthetic": 73,
-        "tcChannels": "SYN-TC-06:CH10,SYN-TC-06:CH11"
+        "tcChannels": [
+          "SYN-TC-06:CH10",
+          "SYN-TC-06:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R5-C02",
@@ -972,7 +1191,10 @@
         "sensorId": "I2",
         "equipmentId": null,
         "scanOrderSynthetic": 74,
-        "tcChannels": "SYN-TC-06:CH12,SYN-TC-06:CH13"
+        "tcChannels": [
+          "SYN-TC-06:CH12",
+          "SYN-TC-06:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R5-C03",
@@ -985,7 +1207,10 @@
         "sensorId": "I3",
         "equipmentId": null,
         "scanOrderSynthetic": 75,
-        "tcChannels": "SYN-TC-06:CH14,SYN-TC-06:CH15"
+        "tcChannels": [
+          "SYN-TC-06:CH14",
+          "SYN-TC-06:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R5-C04",
@@ -998,7 +1223,10 @@
         "sensorId": "I4",
         "equipmentId": null,
         "scanOrderSynthetic": 76,
-        "tcChannels": "SYN-TC-06:CH16,SYN-TC-06:CH17"
+        "tcChannels": [
+          "SYN-TC-06:CH16",
+          "SYN-TC-06:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R5-C05",
@@ -1011,7 +1239,10 @@
         "sensorId": "I5",
         "equipmentId": null,
         "scanOrderSynthetic": 77,
-        "tcChannels": "SYN-TC-06:CH18,SYN-TC-06:CH19"
+        "tcChannels": [
+          "SYN-TC-06:CH18",
+          "SYN-TC-06:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R5-C06",
@@ -1024,7 +1255,10 @@
         "sensorId": "I6",
         "equipmentId": null,
         "scanOrderSynthetic": 78,
-        "tcChannels": "SYN-TC-06:CH20,SYN-TC-06:CH21"
+        "tcChannels": [
+          "SYN-TC-06:CH20",
+          "SYN-TC-06:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R5-C07",
@@ -1049,7 +1283,10 @@
         "sensorId": "I8",
         "equipmentId": null,
         "scanOrderSynthetic": 79,
-        "tcChannels": "SYN-TC-06:CH22,SYN-TC-06:CH23"
+        "tcChannels": [
+          "SYN-TC-06:CH22",
+          "SYN-TC-06:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R5-C09",
@@ -1062,7 +1299,10 @@
         "sensorId": "I9",
         "equipmentId": null,
         "scanOrderSynthetic": 80,
-        "tcChannels": "SYN-TC-06:CH24,SYN-TC-06:CH25"
+        "tcChannels": [
+          "SYN-TC-06:CH24",
+          "SYN-TC-06:CH25"
+        ]
       },
       {
         "slotId": "SLOT-R5-C10",
@@ -1075,7 +1315,10 @@
         "sensorId": "I10",
         "equipmentId": null,
         "scanOrderSynthetic": 81,
-        "tcChannels": "SYN-TC-07:CH00,SYN-TC-07:CH01"
+        "tcChannels": [
+          "SYN-TC-07:CH00",
+          "SYN-TC-07:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R5-C11",
@@ -1088,7 +1331,10 @@
         "sensorId": "I11",
         "equipmentId": null,
         "scanOrderSynthetic": 82,
-        "tcChannels": "SYN-TC-07:CH02,SYN-TC-07:CH03"
+        "tcChannels": [
+          "SYN-TC-07:CH02",
+          "SYN-TC-07:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R5-C12",
@@ -1101,7 +1347,10 @@
         "sensorId": "I12",
         "equipmentId": null,
         "scanOrderSynthetic": 83,
-        "tcChannels": "SYN-TC-07:CH04,SYN-TC-07:CH05"
+        "tcChannels": [
+          "SYN-TC-07:CH04",
+          "SYN-TC-07:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R5-C13",
@@ -1114,7 +1363,10 @@
         "sensorId": "I13",
         "equipmentId": null,
         "scanOrderSynthetic": 84,
-        "tcChannels": "SYN-TC-07:CH06,SYN-TC-07:CH07"
+        "tcChannels": [
+          "SYN-TC-07:CH06",
+          "SYN-TC-07:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R5-C14",
@@ -1127,7 +1379,10 @@
         "sensorId": "I14",
         "equipmentId": null,
         "scanOrderSynthetic": 85,
-        "tcChannels": "SYN-TC-07:CH08,SYN-TC-07:CH09"
+        "tcChannels": [
+          "SYN-TC-07:CH08",
+          "SYN-TC-07:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R5-C15",
@@ -1140,7 +1395,10 @@
         "sensorId": "I15",
         "equipmentId": null,
         "scanOrderSynthetic": 86,
-        "tcChannels": "SYN-TC-07:CH10,SYN-TC-07:CH11"
+        "tcChannels": [
+          "SYN-TC-07:CH10",
+          "SYN-TC-07:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R5-C16",
@@ -1165,7 +1423,10 @@
         "sensorId": "I17",
         "equipmentId": null,
         "scanOrderSynthetic": 87,
-        "tcChannels": "SYN-TC-07:CH12,SYN-TC-07:CH13"
+        "tcChannels": [
+          "SYN-TC-07:CH12",
+          "SYN-TC-07:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R5-C18",
@@ -1178,7 +1439,10 @@
         "sensorId": "I18",
         "equipmentId": null,
         "scanOrderSynthetic": 88,
-        "tcChannels": "SYN-TC-07:CH14,SYN-TC-07:CH15"
+        "tcChannels": [
+          "SYN-TC-07:CH14",
+          "SYN-TC-07:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R6-C01",
@@ -1191,7 +1455,10 @@
         "sensorId": "J1",
         "equipmentId": null,
         "scanOrderSynthetic": 89,
-        "tcChannels": "SYN-TC-07:CH16,SYN-TC-07:CH17"
+        "tcChannels": [
+          "SYN-TC-07:CH16",
+          "SYN-TC-07:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R6-C02",
@@ -1204,7 +1471,10 @@
         "sensorId": "J2",
         "equipmentId": null,
         "scanOrderSynthetic": 90,
-        "tcChannels": "SYN-TC-07:CH18,SYN-TC-07:CH19"
+        "tcChannels": [
+          "SYN-TC-07:CH18",
+          "SYN-TC-07:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R6-C03",
@@ -1217,7 +1487,10 @@
         "sensorId": "J3",
         "equipmentId": null,
         "scanOrderSynthetic": 91,
-        "tcChannels": "SYN-TC-07:CH20,SYN-TC-07:CH21"
+        "tcChannels": [
+          "SYN-TC-07:CH20",
+          "SYN-TC-07:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R6-C04",
@@ -1230,7 +1503,10 @@
         "sensorId": "J4",
         "equipmentId": null,
         "scanOrderSynthetic": 92,
-        "tcChannels": "SYN-TC-07:CH22,SYN-TC-07:CH23"
+        "tcChannels": [
+          "SYN-TC-07:CH22",
+          "SYN-TC-07:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R6-C05",
@@ -1243,7 +1519,10 @@
         "sensorId": "J5",
         "equipmentId": null,
         "scanOrderSynthetic": 93,
-        "tcChannels": "SYN-TC-07:CH24,SYN-TC-07:CH25"
+        "tcChannels": [
+          "SYN-TC-07:CH24",
+          "SYN-TC-07:CH25"
+        ]
       },
       {
         "slotId": "SLOT-R6-C06",
@@ -1256,7 +1535,10 @@
         "sensorId": "J6",
         "equipmentId": null,
         "scanOrderSynthetic": 94,
-        "tcChannels": "SYN-TC-08:CH00,SYN-TC-08:CH01"
+        "tcChannels": [
+          "SYN-TC-08:CH00",
+          "SYN-TC-08:CH01"
+        ]
       },
       {
         "slotId": "SLOT-R6-C07",
@@ -1269,7 +1551,10 @@
         "sensorId": "J7",
         "equipmentId": null,
         "scanOrderSynthetic": 95,
-        "tcChannels": "SYN-TC-08:CH02,SYN-TC-08:CH03"
+        "tcChannels": [
+          "SYN-TC-08:CH02",
+          "SYN-TC-08:CH03"
+        ]
       },
       {
         "slotId": "SLOT-R6-C08",
@@ -1282,7 +1567,10 @@
         "sensorId": "J8",
         "equipmentId": null,
         "scanOrderSynthetic": 96,
-        "tcChannels": "SYN-TC-08:CH04,SYN-TC-08:CH05"
+        "tcChannels": [
+          "SYN-TC-08:CH04",
+          "SYN-TC-08:CH05"
+        ]
       },
       {
         "slotId": "SLOT-R6-C09",
@@ -1295,7 +1583,10 @@
         "sensorId": "J9",
         "equipmentId": null,
         "scanOrderSynthetic": 97,
-        "tcChannels": "SYN-TC-08:CH06,SYN-TC-08:CH07"
+        "tcChannels": [
+          "SYN-TC-08:CH06",
+          "SYN-TC-08:CH07"
+        ]
       },
       {
         "slotId": "SLOT-R6-C10",
@@ -1308,7 +1599,10 @@
         "sensorId": "J10",
         "equipmentId": null,
         "scanOrderSynthetic": 98,
-        "tcChannels": "SYN-TC-08:CH08,SYN-TC-08:CH09"
+        "tcChannels": [
+          "SYN-TC-08:CH08",
+          "SYN-TC-08:CH09"
+        ]
       },
       {
         "slotId": "SLOT-R6-C11",
@@ -1321,7 +1615,10 @@
         "sensorId": "J11",
         "equipmentId": null,
         "scanOrderSynthetic": 99,
-        "tcChannels": "SYN-TC-08:CH10,SYN-TC-08:CH11"
+        "tcChannels": [
+          "SYN-TC-08:CH10",
+          "SYN-TC-08:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R6-C12",
@@ -1334,7 +1631,10 @@
         "sensorId": "J12",
         "equipmentId": null,
         "scanOrderSynthetic": 100,
-        "tcChannels": "SYN-TC-08:CH12,SYN-TC-08:CH13"
+        "tcChannels": [
+          "SYN-TC-08:CH12",
+          "SYN-TC-08:CH13"
+        ]
       },
       {
         "slotId": "SLOT-R6-C13",
@@ -1347,7 +1647,10 @@
         "sensorId": "J13",
         "equipmentId": null,
         "scanOrderSynthetic": 101,
-        "tcChannels": "SYN-TC-08:CH14,SYN-TC-08:CH15"
+        "tcChannels": [
+          "SYN-TC-08:CH14",
+          "SYN-TC-08:CH15"
+        ]
       },
       {
         "slotId": "SLOT-R6-C14",
@@ -1360,7 +1663,10 @@
         "sensorId": "J14",
         "equipmentId": null,
         "scanOrderSynthetic": 102,
-        "tcChannels": "SYN-TC-08:CH16,SYN-TC-08:CH17"
+        "tcChannels": [
+          "SYN-TC-08:CH16",
+          "SYN-TC-08:CH17"
+        ]
       },
       {
         "slotId": "SLOT-R6-C15",
@@ -1373,7 +1679,10 @@
         "sensorId": "J15",
         "equipmentId": null,
         "scanOrderSynthetic": 103,
-        "tcChannels": "SYN-TC-08:CH18,SYN-TC-08:CH19"
+        "tcChannels": [
+          "SYN-TC-08:CH18",
+          "SYN-TC-08:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R6-C16",
@@ -1386,7 +1695,10 @@
         "sensorId": "J16",
         "equipmentId": null,
         "scanOrderSynthetic": 104,
-        "tcChannels": "SYN-TC-08:CH20,SYN-TC-08:CH21"
+        "tcChannels": [
+          "SYN-TC-08:CH20",
+          "SYN-TC-08:CH21"
+        ]
       },
       {
         "slotId": "SLOT-R6-C17",
@@ -1399,7 +1711,10 @@
         "sensorId": "J17",
         "equipmentId": null,
         "scanOrderSynthetic": 105,
-        "tcChannels": "SYN-TC-08:CH22,SYN-TC-08:CH23"
+        "tcChannels": [
+          "SYN-TC-08:CH22",
+          "SYN-TC-08:CH23"
+        ]
       },
       {
         "slotId": "SLOT-R6-C18",
@@ -1412,12 +1727,15 @@
         "sensorId": "J18",
         "equipmentId": null,
         "scanOrderSynthetic": 106,
-        "tcChannels": "SYN-TC-08:CH24,SYN-TC-08:CH25"
+        "tcChannels": [
+          "SYN-TC-08:CH24",
+          "SYN-TC-08:CH25"
+        ]
       }
     ]
   },
   "notes": [
-    "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution), not Production data.",
+    "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution); tcChannels is an exact two-entry array (front = lower channel index, rear = higher), not Production data.",
     "Cannon slots are equipment, not Sensors; they carry no sensorId and no thermocouple channels.",
     "The logical matrix and wall distribution are the Owner-confirmed structure (106 locations, 212 channels)."
   ],

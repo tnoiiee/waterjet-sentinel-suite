@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Wjss.Contracts;
 
@@ -76,12 +77,24 @@ internal static class ExampleFiles
                     slot["scanOrderSynthetic"] = scan;
                     var deviceId = FixtureGenerator.DeviceIdFor(scan);
                     var idx = FixtureGenerator.IndexOnDevice(scan);
-                    slot["tcChannels"] = $"{deviceId}:CH{2 * idx:D2},{deviceId}:CH{2 * idx + 1:D2}";
+                    // tcChannels: structured JSON array of EXACTLY two channel strings — never
+                    // a comma-delimited scalar. Index 0 = lower channel index (front),
+                    // index 1 = higher (rear).
+                    slot["tcChannels"] = new JsonArray(
+                        JsonValue.Create($"{deviceId}:CH{2 * idx:D2}"),
+                        JsonValue.Create($"{deviceId}:CH{2 * idx + 1:D2}"));
                 }
 
                 slots.Add(slot);
             }
         }
+
+        // Pre-serialization self-validation (Owner round 6): the generated mapping must pass
+        // the same TcChannelRules the example tests enforce — 108 slots / 106 sensors /
+        // 2 cannons / exactly 2 channels per sensor / 212 globally unique channels.
+        TcChannelRules.RequireValidMapping(slots
+            .Select(s => JsonSerializer.Deserialize<SensorMapSlotExample>(s!.ToJsonString(), ContractJson.Options)!)
+            .ToArray());
 
         var root = new JsonObject
         {
@@ -103,7 +116,7 @@ internal static class ExampleFiles
             },
             ["notes"] = new JsonArray
             {
-                "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution), not Production data.",
+                "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution); tcChannels is an exact two-entry array (front = lower channel index, rear = higher), not Production data.",
                 "Cannon slots are equipment, not Sensors; they carry no sensorId and no thermocouple channels.",
                 "The logical matrix and wall distribution are the Owner-confirmed structure (106 locations, 212 channels).",
             },

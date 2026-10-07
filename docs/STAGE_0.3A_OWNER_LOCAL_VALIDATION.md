@@ -134,6 +134,30 @@ carry the `fixtureStatus` PROVISIONAL marker. Handle precisely:
   auto-fixing.** This is a C#/TS drift finding. Record it verbatim; the fix direction (C#
   generator vs. mirror) is an Owner call per ADR-0014 §1.
 
+> **Sensor-map regeneration after the tcChannels shape correction (round 6).** The
+> committed `config/examples/sensor-map.example.json` was regenerated in Arena into the
+> array form for TypeScript validation only and remains PROVISIONAL until confirmed by
+> the .NET generator. Sequence after the Owner reviews/pulls the fix commit:
+>
+> 1. Preserve the rejected fixture set (the drifted `snapshot.seed0.json`,
+>    `delta.basic.json`, and comma-delimited `sensor-map.example.json`) as validation
+>    evidence — copy them to a scratch location outside the repository first.
+> 2. Reset the three drifted files to their committed state:
+>    `git checkout -- packages/contracts/fixtures/snapshot.seed0.json packages/contracts/fixtures/delta.basic.json config/examples/sensor-map.example.json`
+> 3. Pull the correction commit and rebuild the full solution in Release (0 warnings /
+>    0 errors required).
+> 4. Rerun the API, domain, config, runtime, and integration test projects against fresh
+>    assemblies (parity may still report drift — that is exactly what this sequence closes).
+> 5. Run the regeneration gate above (`WJSS_UPDATE_FIXTURES=1`).
+> 6. Review the generated `sensor-map.example.json` diff: `tcChannels` must be arrays of
+>    exactly two channel strings on every SENSOR slot and absent on CANNON slots; a scalar
+>    string anywhere fails the gate (ADR-0014 decision 8).
+> 7. Run `npm run check` in `packages/contracts/wjss-contracts-ts`.
+> 8. Rerun fixture/delta parity tests — they must pass with no residual diff beyond the
+>    `fixtureStatus` marker handling above.
+> 9. Rerun the full test suite and record the results in the PR. Do not merge while any
+>    drift or any scalar `tcChannels` emission remains.
+
 ## 6. TypeScript mirror + structural validator
 
 ```powershell
@@ -145,8 +169,9 @@ node tools/boundary-scan/boundary-scan.mjs .   # must print: 0 findings
 ```
 
 (`npm ci` must hit the Owner's normal registry; if the workstation mirrors npm like it mirrors
-NuGet, use the mirror.) Expected: 15/15 tests pass; both fixture sets validate; boundary scan
-exits 0.
+NuGet, use the mirror.) Expected: 24/24 tests pass, including the new sensor-map block
+that covers the tcChannels array contract (ADR-0014 decision 8); both fixture sets
+validate; boundary scan exits 0.
 
 ## 7. Optional smoke (recommended, quick)
 

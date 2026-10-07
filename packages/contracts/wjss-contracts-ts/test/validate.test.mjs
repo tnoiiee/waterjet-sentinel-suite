@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { validateEnvelope, canonicalSensorIds, sensorIdFor } from '../validate.mjs';
+import { validateEnvelope, canonicalSensorIds, sensorIdFor, validateSensorMapExample, sensorMapSummary } from '../validate.mjs';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`../../fixtures/${name}`, import.meta.url), 'utf8'));
 
@@ -136,4 +136,99 @@ test('uncertain quality cannot claim current basis', () => {
   target.classificationBasis = 'CURRENT';
   const result = validateEnvelope(snapshot);
   assert.ok(result.issues.some((i) => i.includes('UNCERTAIN')));
+});
+
+// --- sensor-map configuration example: structured tcChannels (Stage 0.3A-1 correction) ---
+
+const exampleUrl = new URL('../../../../config/examples/sensor-map.example.json', import.meta.url);
+const sensorMapDoc = () => ({ ...JSON.parse(readFileSync(exampleUrl, 'utf8')), kind: 'sensor-map' });
+const mutateSlots = (fn) => {
+  const doc = sensorMapDoc();
+  fn(doc.logicalMatrix.slots);
+  return doc;
+};
+
+test('sensor-map example validates with the canonical totals', () => {
+  const result = validateSensorMapExample(sensorMapDoc());
+  assert.deepEqual(result.issues, []);
+  const s = sensorMapSummary(sensorMapDoc());
+  assert.deepEqual(
+    { slots: s.slots, sensors: s.sensors, cannons: s.cannons, totalChannels: s.totalChannels, distinctChannels: s.distinctChannels },
+    { slots: 108, sensors: 106, cannons: 2, totalChannels: 212, distinctChannels: 212 },
+  );
+  assert.deepEqual(s.sensorsPerWall, { LEFT: 24, REAR: 29, RIGHT: 24, FRONT: 29 });
+  assert.deepEqual(s.cannonLogicalLabels, ['I16', 'I7']);
+});
+
+test('sensor-map example file stores tcChannels as arrays, never comma strings', () => {
+  const raw = readFileSync(exampleUrl, 'utf8');
+  assert.ok(raw.includes('"tcChannels": ['));
+  assert.ok(!raw.includes('"tcChannels": "'));
+});
+
+test('tcChannels as a comma-delimited scalar is rejected, not normalized', () => {
+  const result = validateSensorMapExample(
+    mutateSlots((slots) => { slots[0].tcChannels = 'SYN-TC-01:CH00,SYN-TC-01:CH01'; }),
+  );
+  assert.ok(result.issues.some((i) => i.includes('comma-delimited strings are rejected')));
+});
+
+test('tcChannels arrays with lengths other than exactly two are rejected', () => {
+  for (const channels of [[], ['SYN-TC-01:CH00'], ['SYN-TC-01:CH00', 'SYN-TC-01:CH01', 'SYN-TC-01:CH02']]) {
+    const result = validateSensorMapExample(
+      mutateSlots((slots) => { slots[0].tcChannels = channels; }),
+    );
+    assert.ok(
+      result.issues.some((i) => i.includes('exactly 2 entries')),
+      `length ${channels.length} should be rejected: ${result.issues.join('; ')}`,
+    );
+  }
+});
+
+test('empty channel strings and duplicate pairs are rejected', () => {
+  for (const channels of [['', 'SYN-TC-01:CH01'], ['   ', 'SYN-TC-01:CH01'], ['SYN-TC-01:CH00', 'SYN-TC-01:CH00']]) {
+    const result = validateSensorMapExample(
+      mutateSlots((slots) => { slots[0].tcChannels = channels; }),
+    );
+    assert.ok(result.issues.length > 0, `should reject ${JSON.stringify(channels)}`);
+  }
+});
+
+test('a channel assigned to two sensors is rejected (global uniqueness, 212 distinct)', () => {
+  const result = validateSensorMapExample(
+    mutateSlots((slots) => { slots[0].tcChannels = ['SYN-TC-01:CH02', 'SYN-TC-01:CH03']; }),
+  );
+  assert.ok(result.issues.some((i) => i.includes('duplicate thermocouple channel')));
+  assert.ok(result.issues.some((i) => i.includes('globally unique')));
+});
+
+test('cannon slots must not carry channels and sensor slots must carry them', () => {
+  const cannonWith = validateSensorMapExample(
+    mutateSlots((slots) => { slots.find((x) => x.slotType === 'CANNON').tcChannels = ['SYN-TC-01:CH99', 'SYN-TC-01:CH98']; }),
+  );
+  assert.ok(cannonWith.issues.some((i) => i.includes('CANNON slot must not carry thermocouple channels')));
+
+  const missing = validateSensorMapExample(
+    mutateSlots((slots) => { delete slots[0].tcChannels; }),
+  );
+  assert.ok(missing.issues.some((i) => i.includes('must carry a tcChannels array')));
+});
+
+test('a cannon disguised as a sensor (wrong shape) is rejected', () => {
+  const result = validateSensorMapExample(
+    mutateSlots((slots) => {
+      slots[0].slotType = 'CANNON';
+      slots[0].sensorId = null;
+      slots[0].equipmentId = 'CANNON_REAR';
+    }),
+  );
+  // 107 cannons / 105 sensors composition + the displaced sensor totals: all rejected
+  assert.ok(result.issues.some((i) => i.includes('sensor slots must number 106')));
+  assert.ok(result.issues.some((i) => i.includes('cannon slots must number 2')));
+});
+
+test('validateEnvelope dispatches the sensor-map kind', () => {
+  const result = validateEnvelope(sensorMapDoc());
+  assert.equal(result.kind, 'sensor-map');
+  assert.deepEqual(result.issues, []);
 });

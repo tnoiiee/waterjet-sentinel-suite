@@ -849,6 +849,26 @@ validation: S1–S9 zero findings; anchor/JSON checks green; TS 15/15 (npm ci �
 node --test); links and whitespace clean; spikes roll unchanged. **No .NET build/test success
 claimed; Owner-local full Release build + fresh-assembly test run REQUIRED.**
 
+### 12.18 Stage 0.3A-1 thermocouple channel contract shape correction (round 6) — Arena validation record
+
+Owner-local progress (2026-10-07, rounds 3–5): full Release build **0 warnings / 0
+errors**, corrected checkpoint suite **50/50**, fixture/delta parity **7/7**; the earlier
+`--no-build` 42/49 stays recorded as non-authoritative. Residual drift on the three
+provisional files led to a confirmed shape defect: `tcChannels` was a comma-delimited
+scalar string in the Arena-authored sensor-map example (its test split it). Correction on
+PR #4: structured two-entry array per SENSOR slot (deterministic front-then-rear order),
+absent on CANNON slots; `SensorMapSlotExample` + `TcChannelRules` (`packages/contracts/
+TcChannels.cs`) make the shape contractual and reject every invalid form; the generator
+emits arrays and self-validates through the rules before serializing; the committed
+example file was regenerated in array form for TypeScript validation only (still
+PROVISIONAL — Owner regeneration after a full Release build remains mandatory and the
+comma-delimited fixtures are kept as evidence); snapshot/delta presentation keeps
+`tcFrontChannel`/`tcRearChannel` unchanged. ADR-0014 decision 8 records the rule and the
+rejection history. Arena static validation: S1–S9 zero findings; JSON parse green; TS
+24/24 (npm ci → typecheck → node --test); links and whitespace clean; spikes roll
+unchanged. Round-6 C# is compile-reviewed only, **not built or tested in Arena**; Owner
+must rerun the full sequence including the fixture regeneration gate.
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:

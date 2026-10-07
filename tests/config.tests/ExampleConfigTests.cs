@@ -1,4 +1,6 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using Wjss.Contracts;
 using Xunit;
 
 namespace Wjss.Config.Tests;
@@ -75,11 +77,25 @@ public sealed class ExampleConfigTests
         Assert.DoesNotContain("CANNON_REAR", ids);
         Assert.DoesNotContain("CANNON_FRONT", ids);
 
-        var channelCount = sensors.Sum(s =>
-            ((string?)s!["tcChannels"] ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Length);
-        Assert.Equal(212, channelCount);
+        // device distribution + TC channels: 106 sensors x 2 channels = 212 unique channels,
+        // validated through the structured contract record (an array of exactly two strings);
+        // a comma-delimited scalar never binds and is rejected before these assertions run
+        var slotRecords = slots
+            .Select(s => JsonSerializer.Deserialize<SensorMapSlotExample>(s!.ToJsonString(), ContractJson.Options)!)
+            .ToArray();
+        TcChannelRules.RequireValidMapping(slotRecords); // 108 slots / 106 sensors / 2 cannons / 212 distinct channels
+        Assert.All(slotRecords.Where(r => !r.IsCannon), r =>
+        {
+            Assert.NotNull(r.TcChannels);
+            Assert.Equal(2, r.TcChannels!.Count);
+            Assert.Equal(r.TcChannels[0], r.TcChannels[0].Trim());
+        });
+        Assert.All(slotRecords.Where(r => r.IsCannon), r => Assert.Null(r.TcChannels));
+        foreach (var wall in new[] { Wall.LEFT, Wall.REAR, Wall.RIGHT, Wall.FRONT })
+        {
+            var expected = wall == Wall.LEFT || wall == Wall.RIGHT ? 24 : 29;
+            Assert.Equal(expected, slotRecords.Count(r => r.Wall == wall && !r.IsCannon));
+        }
     }
 
     [Fact]

@@ -13,6 +13,7 @@
  * the signal for the consumer to drop state and request a fresh Snapshot.
  */
 
+export const SENSOR_MAP_SCHEMA = 'wjss.sensor-map/1';
 export const SNAPSHOT_SCHEMA = 'wjss.snapshot/1';
 export const DELTA_SCHEMA = 'wjss.delta/1';
 export const API_VERSION = 1;
@@ -220,8 +221,139 @@ export function validateEnvelope(obj) {
 
   if (obj.kind === 'snapshot') return validateSnapshot(obj, issues);
   if (obj.kind === 'delta') return validateDelta(obj, issues);
-  issues.push('kind must be snapshot|delta');
+  if (obj.kind === 'sensor-map') return validateSensorMapExample(obj, issues);
+  issues.push('kind must be snapshot|delta|sensor-map');
   return { kind: null, issues, gap: false };
+}
+
+/**
+ * Canonical geometry of the sensor-map configuration EXAMPLE (Stage 0.3A-1).
+ * tcChannels is validated as a structured array of exactly two non-empty unique
+ * strings per SENSOR slot, absent on CANNON slots; a comma-delimited scalar is a
+ * rejection, never a normalization. logicalColumn/logicalRow are 0-based here.
+ */
+export const SENSOR_MAP = Object.freeze({
+  columns: 18,
+  rows: 6,
+  sensorLocations: 106,
+  thermocoupleChannels: 212,
+  matrixSlots: 108,
+  cannonSlots: 2,
+  channelsPerSensor: 2,
+  sensorsPerWall: Object.freeze({ LEFT: 24, REAR: 29, RIGHT: 24, FRONT: 29 }),
+  cannonLogicalRow: 5,
+  cannonLogicalColumns: Object.freeze([7, 16]),
+});
+
+export function validateSensorMapChannels(channels, { slotType = 'SENSOR', allowAbsent = false } = {}) {
+  const issues = [];
+  if (channels === undefined || channels === null) {
+    if (allowAbsent || slotType === 'CANNON') return issues;
+    issues.push('SENSOR slot must carry a tcChannels array');
+    return issues;
+  }
+  if (typeof channels === 'string') {
+    issues.push('tcChannels must be a JSON array of exactly two channel strings; comma-delimited strings are rejected');
+    return issues;
+  }
+  if (!Array.isArray(channels)) {
+    issues.push('tcChannels must be a JSON array');
+    return issues;
+  }
+  if (slotType === 'CANNON') {
+    if (channels.length > 0) issues.push('CANNON slot must not carry thermocouple channels');
+    return issues;
+  }
+  if (channels.length !== SENSOR_MAP.channelsPerSensor) {
+    issues.push(`tcChannels must contain exactly ${SENSOR_MAP.channelsPerSensor} entries; got ${channels.length}`);
+    return issues;
+  }
+  const [first, second] = channels;
+  for (const ch of [first, second]) {
+    if (typeof ch !== 'string' || ch.trim().length === 0) issues.push('thermocouple channel entries must be non-empty strings');
+  }
+  if (first === second) issues.push('sensor slot must not duplicate a thermocouple channel');
+  return issues;
+}
+
+export function validateSensorMapExample(obj, issues = []) {
+  if (obj.schema !== undefined && obj.schema !== SENSOR_MAP_SCHEMA) issues.push(`schema must be ${SENSOR_MAP_SCHEMA}`);
+  const matrix = obj.logicalMatrix;
+  if (!matrix || typeof matrix !== 'object') {
+    issues.push('logicalMatrix is required');
+    return { kind: 'sensor-map', issues, gap: false };
+  }
+  if (matrix.columns !== SENSOR_MAP.columns) issues.push(`logicalMatrix.columns must be ${SENSOR_MAP.columns}`);
+  if (matrix.rows !== SENSOR_MAP.rows) issues.push(`logicalMatrix.rows must be ${SENSOR_MAP.rows}`);
+  if (matrix.sensorLocations !== SENSOR_MAP.sensorLocations) issues.push(`logicalMatrix.sensorLocations must be ${SENSOR_MAP.sensorLocations}`);
+  if (matrix.thermocoupleChannels !== SENSOR_MAP.thermocoupleChannels) issues.push(`logicalMatrix.thermocoupleChannels must be ${SENSOR_MAP.thermocoupleChannels}`);
+  for (const [wall, count] of Object.entries(SENSOR_MAP.sensorsPerWall)) {
+    if (matrix.sensorsPerWall?.[wall] !== count) issues.push(`sensorsPerWall.${wall} must be ${count}`);
+  }
+  const slots = matrix.slots;
+  if (!Array.isArray(slots)) {
+    issues.push('logicalMatrix.slots must be an array');
+    return { kind: 'sensor-map', issues, gap: false };
+  }
+  if (slots.length !== SENSOR_MAP.matrixSlots) issues.push(`slot count must be ${SENSOR_MAP.matrixSlots}; got ${slots.length}`);
+
+  const seenChannels = new Set();
+  const allChannels = [];
+  let sensors = 0;
+  let cannons = 0;
+  for (const s of slots) {
+    if (s?.slotType === 'CANNON') {
+      cannons++;
+      issues.push(...validateSensorMapChannels(s.tcChannels, { slotType: 'CANNON', allowAbsent: true }));
+      if (s.sensorId != null) issues.push(`${s.slotId}: cannon slot must not carry a sensorId`);
+      if (s.equipmentId == null) issues.push(`${s.slotId}: cannon slot requires equipmentId`);
+    } else if (s?.slotType === 'SENSOR') {
+      sensors++;
+      const chIssues = validateSensorMapChannels(s.tcChannels, { slotType: 'SENSOR' });
+      for (const c of chIssues) issues.push(`${s.slotId}: ${c}`);
+      if (Array.isArray(s.tcChannels)) {
+        for (const ch of s.tcChannels) {
+          allChannels.push(ch);
+          if (typeof ch === 'string') {
+            if (seenChannels.has(ch)) issues.push(`${s.slotId}: duplicate thermocouple channel ${ch} across sensors`);
+            seenChannels.add(ch);
+          }
+        }
+      }
+      if (s.sensorId == null) issues.push(`${s.slotId}: sensor slot requires sensorId`);
+      else if (!SENSOR_ID_SET.has(s.sensorId)) issues.push(`${s.sensorId}: unknown sensor id`);
+      if (s.equipmentId != null) issues.push(`${s.slotId}: sensor slot must not carry equipmentId`);
+    } else {
+      issues.push(`${s?.slotId ?? '?'}: slotType must be SENSOR|CANNON`);
+    }
+  }
+  if (sensors !== SENSOR_MAP.sensorLocations) issues.push(`sensor slots must number ${SENSOR_MAP.sensorLocations}; got ${sensors}`);
+  if (cannons !== SENSOR_MAP.cannonSlots) issues.push(`cannon slots must number ${SENSOR_MAP.cannonSlots}; got ${cannons}`);
+  if (allChannels.length !== SENSOR_MAP.thermocoupleChannels) issues.push(`total channels must be ${SENSOR_MAP.thermocoupleChannels}; got ${allChannels.length}`);
+  if (seenChannels.size !== SENSOR_MAP.thermocoupleChannels) issues.push(`channels must be globally unique across the 212; got ${seenChannels.size}`);
+  return { kind: 'sensor-map', issues, gap: false };
+}
+
+/** Derived summary used by tests and reviewers to assert the canonical totals. */
+export function sensorMapSummary(obj) {
+  const slots = obj?.logicalMatrix?.slots ?? [];
+  const sensors = slots.filter((s) => s.slotType === 'SENSOR');
+  const cannons = slots.filter((s) => s.slotType === 'CANNON');
+  const channels = sensors.flatMap((s) => (Array.isArray(s.tcChannels) ? s.tcChannels : []));
+  const byWall = {};
+  for (const wall of ['LEFT', 'REAR', 'RIGHT', 'FRONT']) {
+    byWall[wall] = sensors.filter((s) => s.wall === wall).length;
+  }
+  return {
+    slots: slots.length,
+    sensors: sensors.length,
+    cannons: cannons.length,
+    channelsPerSensor: sensors.length === 0 ? null : channels.length / sensors.length,
+    totalChannels: channels.length,
+    distinctChannels: new Set(channels).size,
+    sensorsPerWall: byWall,
+    cannonLogicalLabels: cannons.map((c) => c.logicalLabel).sort(),
+  };
 }
 
 function validateSnapshot(obj, issues) {

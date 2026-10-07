@@ -447,3 +447,49 @@ export interface HealthReadyPayload {
   detail: string;
   stageMarker: string;
 }
+
+/**
+ * Sensor-map configuration EXAMPLE (config/examples/sensor-map.example.json) —
+ * structural mirror of the generator's shape (logicalColumn/logicalRow are 0-based
+ * here, matching the C# canonical matrix; they are example-file fields, not snapshot
+ * wire fields).
+ *
+ * Stage 0.3A-1 correction: `tcChannels` is a structured array of EXACTLY two
+ * thermocouple channel strings on SENSOR slots (index 0 = lower channel index =
+ * front, index 1 = higher = rear) and is never present on CANNON slots. The earlier
+ * comma-delimited scalar string is not a valid encoding; validators must reject it
+ * (not normalize it). Snapshot/delta presentation keeps its existing separate
+ * `tcFrontChannel`/`tcRearChannel` fields.
+ */
+export type TcChannels = readonly [string, string];
+
+export interface SensorMapSlotExample {
+  slotId: string;
+  slotType: SlotType;
+  wall: Wall;
+  /** 0-17 across the matrix. */
+  logicalColumn: number;
+  /** 0-5, top to bottom (G+2xx, G+1xx, G, H, I, J). */
+  logicalRow: number;
+  /** 1-based inside the wall (LEFT/RIGHT 1-4, REAR/FRONT 1-5). */
+  wallColumn: number;
+  wallRow: number;
+  sensorId: string | null;
+  equipmentId: string | null;
+  logicalLabel?: string | null;
+  scanOrderSynthetic?: number | null;
+  tcChannels?: TcChannels;
+}
+
+export interface SensorMapExample {
+  schema: 'wjss.sensor-map/1';
+  fixtureStatus: string;
+  logicalMatrix: {
+    columns: number;
+    rows: number;
+    sensorLocations: number;
+    thermocoupleChannels: number;
+    sensorsPerWall: Record<Wall, number>;
+    slots: SensorMapSlotExample[];
+  };
+}

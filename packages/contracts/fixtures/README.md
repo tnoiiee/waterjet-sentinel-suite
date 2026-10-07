@@ -21,6 +21,14 @@
 - No claim is made here that .NET generation has run or that parity has
   passed — that evidence comes from the Owner-local validation document
   (`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`, steps 10–11).
+- Round 6 (2026-10-07): the sensor-map example shape changed — `tcChannels`
+  is a structured array of exactly two channel strings per sensor
+  (ADR-0014 decision 8). `config/examples/sensor-map.example.json` was
+  regenerated in the array form in Arena for TypeScript validation only; the
+  preceding comma-delimited form (and the snapshot/delta files that drifted
+  against it) is superseded evidence for the Owner regeneration sequence in
+  the validation document §5 — regeneration stays gated behind a successful
+  full Release build and passing non-parity tests.
 
 ## Rules the fixtures demonstrate (and the validator enforces)
 

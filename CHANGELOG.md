@@ -25,6 +25,42 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Thermocouple channel contract shape correction (round 6)
+
+Owner-local state (2026-10-07, rounds 3–5): after the two analyzer errors and the
+`TargetPath` environment root cause were cleared, the full solution Release build
+passed 0 warnings / 0 errors, the corrected checkpoint suite passed 50/50 and
+fixture/delta parity 7/7 — superseding the explicitly non-authoritative `--no-build`
+42/49 result. Residual drift on the three provisional files surfaced a real shape
+defect: the sensor-map example encoded each sensor's thermocouple pair as one
+comma-delimited string and its test asserted that by splitting the string.
+
+- **Contract correction**: `tcChannels` in the sensor-map configuration example is a
+  structured JSON array of exactly two channel strings per SENSOR slot (index 0 = lower
+  channel index / front, index 1 = higher / rear); CANNON slots never carry it. New
+  `SensorMapSlotExample` record + `TcChannelRules` in `packages/contracts/TcChannels.cs`
+  reject scalar strings (deserialization cannot bind them), wrong lengths, empty
+  entries, per-sensor and cross-sensor duplicates, and cannon-as-sensor composition;
+  canonical totals 108 slots / 106 sensors / 2 cannons / 2×2 channels / 212 globally
+  unique channels / walls 24-29-24-29. Snapshot/delta presentation keeps the existing
+  separate `tcFrontChannel`/`tcRearChannel` fields — not renamed, not merged.
+- Generator (`tests/integration/ExampleFiles.cs`) emits the array form and validates the
+  mapping through `TcChannelRules` before serializing. `config/examples/sensor-map.example.json`
+  was regenerated in Arena in the new form so TypeScript validation can run; it remains
+  PROVISIONAL — final truth comes from the Owner regeneration sequence after the full
+  Release build (rejected comma-delimited fixtures retained as validation evidence).
+- Tests: focused serialization/deserialization/rejection coverage for every invalid
+  channel shape plus the full typed mapping validation of the committed example
+  (`tests/config.tests/TcChannelContractTests.cs`; example test upgraded from string
+  splitting to typed contract validation). TypeScript validator + types mirror the
+  contract (scalar-string and every array-shape negative; positive canonical totals),
+  tests 15 → 24 green. ADR-0014 decision 8 records the structural rule and that the
+  earlier comma-delimited form was detected by Owner validation and rejected pre-merge.
+- No Product project, `.csproj`, `.sln`, TFW, warning-policy, package-version, or
+  dependency changes; no lock file touched; no fixture under `packages/contracts/fixtures/`
+  modified; spikes immutable (roll `101be71b…3fbc5`). C# sources compile-reviewed only:
+  **not built in Arena**. Owner-local rerun of the full validation sequence REQUIRED.
+
 ### Stage 0.3A-1 — Owner-local build & contract-test correction round 5
 
 **Test-run evidence recorded as NON-AUTHORITATIVE.** `dotnet test ... --no-build --no-restore`

@@ -73,7 +73,25 @@ shape into the product tree as .NET records. Two problems must be settled before
 7. **Config examples** (`config/examples/*.example.json`) carry structure and simulator-only
    values; device addresses, register-to-signal mappings, tag inventories, coordinates,
    limits and credentials never enter the repository (see `tools/boundary-scan`, rules
-   S1–S3).
+   S1–S3). The sensor-map example follows the canonical matrix structure: 18 columns,
+   6 rows, 108 slots (106 sensor + 2 cannon), sensors-per-wall 24/29/24/29 — the
+   `logicalMatrix` shape the publication pipeline (0.3A-F) will later consume.
+8. **Sensor-map `tcChannels` is a structured channel array** (Owner round 6, 2026-10-07).
+   In the sensor-map configuration example, each SENSOR slot carries `tcChannels` as a JSON
+   array of exactly two thermocouple channel strings — never a comma-delimited scalar.
+   Deterministic order: index 0 is the pair's lower channel index (front), index 1 the
+   higher (rear). CANNON slots never carry `tcChannels`. The shape is contractual:
+   `SensorMapSlotExample` + `TcChannelRules` (`packages/contracts/TcChannels.cs`) reject a
+   scalar string (System.Text.Json cannot bind it to the array property), a wrong array
+   length, empty entries, duplicate channels within a sensor, duplicate channels across
+   sensors, and any cannon-as-sensor composition; the totals are fixed at 108 slots,
+   106 sensors, 2 cannons, exactly 2 channels per sensor, and 212 globally unique
+   channels. This record applies to the slot-array form only: snapshot/delta presentation
+   keeps its existing separate `tcFrontChannel`/`tcRearChannel` fields.
+   *History:* the Arena-authored example originally encoded the pair as a comma-delimited
+   string and its test asserted that by splitting the string. The Owner detected the shape
+   defect during local validation; it is documented here as a correction made before merge,
+   and comma-delimited `tcChannels` must never be accepted again.
 
 ## Alternatives considered
 
@@ -100,10 +118,22 @@ shape into the product tree as .NET records. Two problems must be settled before
 
 ## Verification status
 
-- Contracts, validator, fixtures: authored and Node-validated in Arena (15/15 tests green
-  after the Owner-review correction of 2026-10-07; the 14-test count pre-dates it).
-- C# compilation of the contracts and the parity test: `NOT RUN IN ARENA` (no .NET SDK;
-  sandbox network blocks it). **Owner-local run is the gate** — see
+- Owner-local validation (2026-10-07, rounds 3–5): full Release build 0 warnings
+  0 errors after the environment root cause (`TargetPath`) and the two analyzer errors
+  were fixed; the corrected checkpoint suite passed 50/50, fixture/delta parity 7/7 —
+  the earlier `--no-build` result (42/49 over stale assemblies) is explicitly
+  non-authoritative. The residual drift of the three provisional files
+  (`snapshot.seed0.json`, `delta.basic.json`, `sensor-map.example.json`) led the Owner
+  to detect the sensor-map `tcChannels` shape defect corrected by decision 8: the
+  committed example was regenerated in array form for TypeScript validation only and
+  remains PROVISIONAL pending the Owner regeneration sequence.
+- Contracts, validator, fixtures: authored and Node-validated in Arena (TypeScript
+  tests 24/24 green after the tcChannels correction; the 15/15 count pre-dates it and
+  14/14 pre-dates the earlier Owner-review correction).
+- Round-6 code (the tcChannels contract, generator self-validation, and the C#
+  channel tests) is compile-reviewed only: **not compiled or tested in Arena** (no
+  .NET SDK; sandbox network blocks it). The Owner-local rerun of the full suite plus
+  the sensor-map regeneration gate remains the merge gate — see
   [`../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md).
 
 ## References
