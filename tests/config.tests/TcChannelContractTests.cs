@@ -52,7 +52,9 @@ public sealed class TcChannelContractTests
 
     // CA1861 correction (Owner round 6): the cannon expectation constants are static
     // readonly fields, not inline array arguments. Assert.Equal only enumerates them,
-    // so sharing one immutable instance is safe.
+    // so sharing one immutable instance is safe. The sequence IS the accepted logical
+    // order (I7 then I16) and is compared only against structurally ordered data
+    // (logicalRow/logicalColumn) — never against a lexicographic label sort (round 6d).
     private static readonly int[] ExpectedCannonLogicalColumns = [7, 16];
     private static readonly string[] ExpectedCannonLogicalLabels = ["I7", "I16"];
 
@@ -236,18 +238,39 @@ public sealed class TcChannelContractTests
         Assert.Equal(29, sensorsByWall["FRONT"]);
 
         // exactly the canonical two cannon slots (row 5, logical columns 7 and 16),
-        // each without channels; I7/I16 are their logical labels
+        // each without channels and without a sensorId; I7/I16 are their logical labels
         var cannons = records.Where(r => r.IsCannon).ToArray();
         Assert.Equal(2, cannons.Length);
         Assert.All(cannons, c =>
         {
             Assert.Equal(5, c.LogicalRow);
             Assert.Null(c.TcChannels);
+            Assert.Null(c.SensorId);
             Assert.NotNull(c.EquipmentId);
             Assert.NotNull(c.LogicalLabel);
         });
-        Assert.Equal(ExpectedCannonLogicalColumns, cannons.Select(c => c.LogicalColumn).OrderBy(x => x));
-        Assert.Equal(ExpectedCannonLogicalLabels, cannons.Select(c => c.LogicalLabel).OrderBy(x => x!));
+
+        // Round 6d: logical order (I7, then I16) is ordered by STRUCTURED position —
+        // logicalRow then logicalColumn. The removed defect was lexicographic label
+        // sorting, which yields I16 before I7. No numbers are parsed out of labels and
+        // no expectation was re-sorted to match text ordering.
+        var orderedCannons = cannons
+            .OrderBy(c => c.LogicalRow)
+            .ThenBy(c => c.LogicalColumn)
+            .ToArray();
+        Assert.Equal(ExpectedCannonLogicalColumns, orderedCannons.Select(c => c.LogicalColumn));
+        Assert.Equal(ExpectedCannonLogicalLabels, orderedCannons.Select(c => c.LogicalLabel));
+
+        // explicit position-to-cannon pairing (row I / columns 7 and 16), asserted per
+        // slot so the mapping cannot pass through an ordering accident:
+        Assert.Equal("I7", orderedCannons[0].LogicalLabel);
+        Assert.Equal(5, orderedCannons[0].LogicalRow);
+        Assert.Equal(7, orderedCannons[0].LogicalColumn);
+        Assert.Equal("CANNON_REAR", orderedCannons[0].EquipmentId);
+        Assert.Equal("I16", orderedCannons[1].LogicalLabel);
+        Assert.Equal(5, orderedCannons[1].LogicalRow);
+        Assert.Equal(16, orderedCannons[1].LogicalColumn);
+        Assert.Equal("CANNON_FRONT", orderedCannons[1].EquipmentId);
 
         // no sensor slot lacks the array or has the wrong length; no cannon-as-sensor
         Assert.All(records.Where(r => !r.IsCannon), r =>

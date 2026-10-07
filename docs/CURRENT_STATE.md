@@ -906,6 +906,27 @@ enabled. Arena mirrored the structural assertions in Python against the committe
 all pass. Owner-local **final build + fresh full-suite rerun** REQUIRED before merge; no
 .NET/xUnit success claimed in Arena.
 
+### 12.21 Stage 0.3A-1 round 6d cannon logical ordering test correction — Arena validation record
+
+Owner-local at `39577e2`: Release build **PASS 0/0**; fresh full suite 61 / **60 passed /
+1 failed** / 0 skipped; parity 7/7; boundary scan S1–S9 clean. The lone failure —
+`Example_Mapping_Validates_Through_The_Typed_Contract` — was a TEST-ordering defect, not a
+mapping/contract defect: cannon labels were compared in lexicographic order
+(`OrderBy(label)` → `I16, I7`) instead of the accepted logical order (`I7, I16`). Round 6d
+fixes the assertion pipeline to sort cannon SLOTS by structured position
+(`LogicalRow`, then `LogicalColumn`), keeps the expected `[7, 16]` / `["I7","I16"]`
+sequences, adds explicit per-slot I7/I16 row/column/equipment pairing and a cannon
+`sensorId`-absence check, and retains every canonical count. Ordering defect-class sweep
+across the Stage 0.3A-1 test tree found no other lexicographic sorting of labels/IDs, no
+label numeric parsing where structured fields exist, and no set/sequence confusion;
+the only other `OrderBy` sites sort by structured numeric fields or parse inputs for the
+product API under test. Product source, contracts, fixtures, TypeScript mirror, lock files
+and spikes unchanged (zero diff); expectations were not flipped to match text sorting and
+no sorting dependency was added. Arena mirrored the corrected pipeline in Python against
+the committed example: structured ordering yields I7→I16 while lexicographic yields
+I16→I7, confirming the defect and its correction. Owner-local **final build + fresh
+full-suite rerun (61/61)** REQUIRED before merge.
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:

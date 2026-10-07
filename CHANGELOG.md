@@ -25,6 +25,31 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Round 6d cannon logical ordering test correction (`fix: order cannon assertions by logical position`)
+
+Owner-local at `39577e2` (2026-10-07): Release build **PASS 0/0**; fresh full suite
+**61 / 60 passed / 1 failed**; parity 7/7; boundary scan clean. The single failure was a
+test-ordering defect in `Example_Mapping_Validates_Through_The_Typed_Contract`: the cannon
+label sequence was produced by `OrderBy` on the `logicalLabel` STRINGS, which sorts
+lexicographically to `I16, I7` while the accepted logical order is `I7, I16`. The
+mapping and contract were correct and remain unchanged.
+
+Correction (test source only): the cannon assertion pipeline now orders the cannon SLOTS
+by structured position — `OrderBy(LogicalRow).ThenBy(LogicalColumn)` — and reads
+`logicalLabel` from that order; the expected sequences stay `[7, 16]` / `["I7","I16"]`.
+Per-slot pairing is asserted explicitly (I7 at row 5 / column 7 / `CANNON_REAR`; I16 at
+row 5 / column 16 / `CANNON_FRONT`), and cannons gained a `sensorId`-absence assertion;
+row-5, no-`tcChannels`, and all canonical counts (108/106/2, 212 total = 212 unique, walls
+24-29-24-29) remain. Ordering defect-class sweep over the full Stage 0.3A-1 test tree:
+the only other `OrderBy` sites sort by structured numeric fields (`WallColumns` ranges by
+`FirstColumn`) or are input parsing for the product API under test — no lexicographic
+ordering of labels/IDs, no numeric parsing out of labels where structured fields exist, no
+sequence/set mismatches — remains. No expectation was flipped to match text sorting, no
+padding normalization, no natural-sort dependency. Product contracts, `TcChannelRules`,
+generator, TypeScript mirror, fixtures, examples, lock files and spikes: zero diff.
+Final Owner-local Release build + fresh full-suite rerun REQUIRED; no .NET/xUnit success
+claimed in Arena.
+
 ### Stage 0.3A-1 — Round 6c structural JSON assertion correction (`fix: assert tc channel JSON shape structurally`)
 
 Owner-local state at `0b088ad` (2026-10-07): full Release build **PASS, 0 warnings / 0
