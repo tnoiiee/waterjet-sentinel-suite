@@ -93,8 +93,13 @@
     color: var(--info); font-weight: 600;
   }
   .card.wide { grid-column: 1 / -1; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
-  .tile { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+  /*
+    Two tile columns at the wide-desktop card width (340-380 px): ten metrics pack
+    into five full rows with no empty cells and captions that stay on one line, and
+    the track list keeps collapsing automatically in a narrower window.
+  */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .tile { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
   .tile .k { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; }
   .tile .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .tile .s { color: var(--muted); font-size: 11px; }
@@ -124,6 +129,9 @@
   .kv.split .v { text-align: left; }
   .kv .k { color: var(--muted); }
   .kv .v { text-align: right; font-weight: 600; overflow-wrap: break-word; }
+  /* Secondary line of a pair: muted and smaller, so a foundation placeholder
+     explanation never reads as the operational value itself. */
+  .kv .v-sub { color: var(--muted); font-weight: 400; font-size: 11px; line-height: 1.3; margin-top: 1px; }
   .note { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
   .scroll { max-height: 380px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
@@ -219,7 +227,7 @@
     </section>
 
     <section class="card wide">
-      <h2>Sensor sample &mdash; evolving values</h2>
+      <h2>Sensor values &mdash; synthetic evolution</h2>
       <div class="filters">
         <span class="pill" id="pill-wallfilter">Wall: ALL</span>
         <button type="button" data-wall="ALL">All walls</button>
@@ -350,9 +358,11 @@
   function renderFoundation(status) {
     var counts = status.sensorCounts;
     var tiles = [
-      { k: "Logical slots", v: counts.logicalSlots.count, s: counts.logicalSlots.label },
-      { k: "Sensors", v: counts.sensorLocations.count, s: counts.sensorLocations.label },
-      { k: "Thermocouple channels", v: counts.thermocoupleChannels.count, s: counts.thermocoupleChannels.label },
+      // Operator-facing captions; the machine label the API publishes stays in the
+      // tile tooltip instead of the visible line.
+      { k: "Logical slots", v: counts.logicalSlots.count, s: "logical map", title: counts.logicalSlots.label },
+      { k: "Sensors", v: counts.sensorLocations.count, s: "sensor locations", title: counts.sensorLocations.label },
+      { k: "Thermocouple channels", v: counts.thermocoupleChannels.count, s: "validated channels", title: counts.thermocoupleChannels.label },
       {
         k: "Cannons",
         v: counts.cannonSlots.map(function (c) { return c.logicalLabel; }).join(" \u00b7 "),
@@ -383,25 +393,46 @@
     });
   }
 
+  // One key/value pair. The operational value keeps its own bold line; an optional
+  // secondary line carries the foundation placeholder explanation in muted type.
+  function addPair(host, key, value, secondary) {
+    var k = document.createElement("div");
+    k.className = "k";
+    text(k, key);
+
+    var v = document.createElement("div");
+    v.className = "v";
+    var main = document.createElement("div");
+    main.className = "v-main";
+    text(main, value);
+    v.appendChild(main);
+
+    if (secondary) {
+      var sub = document.createElement("div");
+      sub.className = "v-sub";
+      text(sub, secondary);
+      v.appendChild(sub);
+    }
+
+    host.appendChild(k);
+    host.appendChild(v);
+  }
+
   function renderRuntimeState(status) {
     var host = el("kv-runtime");
     host.textContent = "";
     var rows = [
-      ["Queue", status.queueCount + " / " + status.queueCapacity + " (" + status.queuePlaceholder + ")"],
-      ["Active job", status.activeJobPresent ? ("present: " + status.activeJobId) : "none"],
-      ["Pump", status.pumpState + " (" + status.pumpPlaceholder + ")"],
-      ["Alarms", status.activeAlarmCount + " active, " + status.clearedAlarmCount + " cleared"],
-      ["Newest Delta revision", status.newestDeltaRevision === null ? "none" : status.newestDeltaRevision],
-      ["Current revision", status.currentRevision === null ? "-" : status.currentRevision],
-      ["Last fault", status.lastFaultCode ? (status.lastFaultCode + ": " + status.lastFaultDetail) : "none"],
-      ["Startup fault", status.startupFaultCode ? status.startupFaultCode : "none"],
-      ["Server time", status.serverTimeUtc]
+      { k: "Queue", v: status.queueCount + " / " + status.queueCapacity, s: status.queuePlaceholder },
+      { k: "Active job", v: status.activeJobPresent ? ("present: " + status.activeJobId) : "none" },
+      { k: "Pump", v: status.pumpState, s: status.pumpPlaceholder },
+      { k: "Alarms", v: status.activeAlarmCount + " active, " + status.clearedAlarmCount + " cleared" },
+      { k: "Newest Delta revision", v: status.newestDeltaRevision === null ? "none" : status.newestDeltaRevision },
+      { k: "Current revision", v: status.currentRevision === null ? "-" : status.currentRevision },
+      { k: "Last fault", v: status.lastFaultCode ? (status.lastFaultCode + ": " + status.lastFaultDetail) : "none" },
+      { k: "Startup fault", v: status.startupFaultCode ? status.startupFaultCode : "none" },
+      { k: "Server time", v: timeOf(status.serverTimeUtc) }
     ];
-    rows.forEach(function (row) {
-      var k = document.createElement("div"); k.className = "k"; text(k, row[0]);
-      var v = document.createElement("div"); v.className = "v"; text(v, row[1]);
-      host.appendChild(k); host.appendChild(v);
-    });
+    rows.forEach(function (row) { addPair(host, row.k, row.v, row.s); });
   }
 
   function renderWalls(walls) {
@@ -539,11 +570,7 @@
       ["Trend points", snapshot.trend.points.length + " / capacity " + snapshot.trend.capacity],
       ["Stage marker", snapshot.runtime.stageMarker]
     ];
-    rows.forEach(function (row) {
-      var k = document.createElement("div"); k.className = "k"; text(k, row[0]);
-      var v = document.createElement("div"); v.className = "v"; text(v, row[1]);
-      host.appendChild(k); host.appendChild(v);
-    });
+    rows.forEach(function (row) { addPair(host, row[0], row[1]); });
 
     text(el("note-copy"),
       "The Snapshot JSON above is the exact payload served by " + SNAPSHOT_PREFIX + " at revision " +
