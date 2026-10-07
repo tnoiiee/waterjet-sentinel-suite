@@ -13,7 +13,7 @@ namespace Wjss.Runtime.Core.Tests;
 /// </summary>
 public sealed class RuntimeStateInvariantTests
 {
-    private enum Tamper
+    public enum Tamper
     {
         Profile,
         SensorCount,
