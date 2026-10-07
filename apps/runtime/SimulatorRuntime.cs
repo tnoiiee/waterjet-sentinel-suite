@@ -393,6 +393,20 @@ public sealed class SimulatorRuntime : IAsyncDisposable
                 "The deterministic synthetic evolution lifecycle has not been started.");
         }
 
+        // Fail closed rather than assume: readiness verifies the projection it is
+        // about to claim instead of trusting that the composition-time projection
+        // still matches the committed revision.
+        var projection = RuntimeSnapshotProjector.Project(
+            _store!.Current, _store.Counters, UptimeSeconds);
+
+        if (projection.Revision != _store.Current.Revision)
+        {
+            return RuntimeReadiness.NotReady(
+                RuntimeReadinessCodes.InitialSnapshotUnavailable,
+                $"The Snapshot projection reports revision {projection.Revision}, "
+                + $"not the committed revision {_store.Current.Revision}.");
+        }
+
         return RuntimeReadiness.IsReady(
             $"SIMULATOR runtime ready at revision {_store.Current.Revision} (tick interval {_options.TickIntervalMilliseconds} ms).");
     }
