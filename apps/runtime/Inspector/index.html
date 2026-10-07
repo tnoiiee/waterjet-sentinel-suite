@@ -23,7 +23,7 @@
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
   body {
     font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    font-size: 13px;
+    font-size: 13.5px;
     line-height: 1.35;
     overflow-x: hidden;
   }
@@ -63,7 +63,7 @@
     border: 1px solid var(--warn); color: #1c1503; background: var(--warn); font-weight: 600;
   }
   .banner.show { display: block; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 10px; align-items: start; }
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
     padding: 10px 12px 12px; min-width: 0;
@@ -80,7 +80,7 @@
   .tile .s { color: var(--muted); font-size: 11px; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #1c2831; }
-  th { color: var(--muted); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .5px; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
   td.num, th.num { text-align: right; }
   .walltiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
   .wall { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; }
@@ -96,6 +96,12 @@
   .pill.STALE { color: #ffd9d5; border-color: #74332c; }
   .pill.BAD { color: #ffc9c4; border-color: #8a2f26; background: #3a1512; }
   .kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; }
+  /* Split mode packs two key/value pairs per row, so wide cards stop stretching. */
+  .kv.split {
+    grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+    column-gap: 26px;
+  }
+  .kv.split .v { text-align: left; }
   .kv .k { color: var(--muted); }
   .kv .v { text-align: right; font-weight: 600; }
   .note { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
@@ -158,7 +164,7 @@
 
     <section class="card">
       <h2>Runtime state</h2>
-      <div class="kv" id="kv-runtime"></div>
+      <div class="kv split" id="kv-runtime"></div>
       <p class="note">Queue dispatch, Pump commands, Cleaning Jobs and Safe Return actuation are not implemented in this checkpoint. The queue and Pump blocks above are placeholders of the foundation, labelled as such in the API.</p>
     </section>
 
@@ -230,7 +236,7 @@
 
     <section class="card wide">
       <h2>Snapshot</h2>
-      <div class="kv" id="kv-snapshot"></div>
+      <div class="kv split" id="kv-snapshot"></div>
       <p class="note" id="note-copy"></p>
     </section>
   </main>
@@ -271,11 +277,18 @@
     return digits === undefined ? String(value) : value.toFixed(digits);
   }
 
+  // 24-hour review clock with milliseconds: HH:mm:ss.mmm (local workstation time).
+  function clockOf(date) {
+    function pad(value, width) { return String(value).padStart(width, "0"); }
+    return pad(date.getHours(), 2) + ":" + pad(date.getMinutes(), 2) + ":" + pad(date.getSeconds(), 2)
+      + "." + pad(date.getMilliseconds(), 3);
+  }
+
   function timeOf(iso) {
     if (!iso) { return "-"; }
     var parsed = new Date(iso);
     if (isNaN(parsed.getTime())) { return String(iso); }
-    return parsed.toLocaleTimeString() + "." + String(parsed.getMilliseconds()).padStart(3, "0");
+    return clockOf(parsed);
   }
 
   function fetchJson(path) {
@@ -320,7 +333,14 @@
       { k: "Logical slots", v: counts.logicalSlots.count, s: counts.logicalSlots.label },
       { k: "Sensors", v: counts.sensorLocations.count, s: counts.sensorLocations.label },
       { k: "Thermocouple channels", v: counts.thermocoupleChannels.count, s: counts.thermocoupleChannels.label },
-      { k: "Cannons", v: counts.cannons.count, s: counts.cannonLabels.map(function (c) { return c.label; }).join(", ") },
+      {
+        k: "Cannons",
+        v: counts.cannonSlots.map(function (c) { return c.logicalLabel; }).join(" \u00b7 "),
+        s: counts.cannons.count + " slots \u00b7 " + counts.cannonSlots.map(function (c) { return c.equipmentId; }).join(", "),
+        title: counts.cannonSlots.map(function (c) {
+          return c.logicalLabel + " = " + c.equipmentId + " (logical row " + c.logicalRow + ", column " + c.logicalColumn + ")";
+        }).join(" | ")
+      },
       { k: "Tick interval", v: status.tickIntervalMilliseconds + " ms", s: "configured" },
       { k: "Synthetic seed", v: status.syntheticSeed, s: "determinism identity" },
       { k: "State history", v: status.stateHistoryDepth + " / " + status.stateHistoryCapacity, s: "depth / capacity" },
@@ -334,6 +354,7 @@
     tiles.forEach(function (tile) {
       var box = document.createElement("div");
       box.className = "tile";
+      if (tile.title) { box.title = tile.title; }
       var k = document.createElement("div"); k.className = "k"; text(k, tile.k);
       var v = document.createElement("div"); v.className = "v"; text(v, tile.v);
       var s = document.createElement("div"); s.className = "s"; text(s, tile.s);
@@ -489,7 +510,7 @@
     var rows = [
       ["Schema", snapshot.schema + " (kind " + snapshot.kind + ", API v" + snapshot.apiVersion + ")"],
       ["Revision", snapshot.revision],
-      ["Generated at", snapshot.generatedAt],
+      ["Generated at", timeOf(snapshot.generatedAt)],
       ["Device profile", snapshot.deviceProfile],
       ["Wall map slots", snapshot.wallMap.length],
       ["Sensors", snapshot.sensors.length],

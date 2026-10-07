@@ -25,6 +25,11 @@ public sealed class RuntimeHostCompositionTests
 {
     private static readonly DateTimeOffset Instant = new(2026, 10, 7, 0, 0, 0, TimeSpan.Zero);
 
+    // CA1861: constant sequences shared by the feed test are static readonly fields,
+    // not inline array arguments (the arrays are only enumerated).
+    private static readonly int[] ExpectedFeedRevisions = [4, 3, 2];
+    private static readonly int[] ExpectedFeedPreviousRevisions = [3, 2, 1];
+
     /// <summary>Development-shaped options: SIMULATOR only, bounded, no real device identity.</summary>
     private static RuntimeHostOptions DefaultOptions() => new()
     {
@@ -226,6 +231,65 @@ public sealed class RuntimeHostCompositionTests
         Assert.Equal(string.Empty, defaultCode);
         Assert.Equal(RuntimeHostOptions.DefaultTickIntervalMilliseconds, loaded.TickIntervalMilliseconds);
         Assert.True(loaded.TryValidate(out _, out _));
+    }
+
+    [Fact]
+    public async Task Delta_Feed_Reports_A_Contiguous_Newest_First_Run_As_Clean()
+    {
+        // A retained newest-first run must not be flagged as a gap: every entry
+        // continues the entry walked before it, the newest entry has no newer
+        // neighbour, and the oldest entry is not judged against history outside the
+        // bounded window. (The projection previously compared an entry's own
+        // previousRevision with the value carried from its newer neighbour, so every
+        // row except the newest was reported as a gap.)
+        var options = DefaultOptions();
+        var runtime = SimulatorRuntime.Create(options, new TestClock(Instant));
+
+        try
+        {
+            // Three accepted ticks through the real evolution + Delta projection,
+            // no timers: one accepted tick commits exactly one revision.
+            var history = new RuntimeDeltaHistory(capacity: 8);
+            var state = runtime.State; // composed revision 1 at Instant
+
+            for (var tick = 1; tick <= 3; tick++)
+            {
+                var outcome = RuntimeSyntheticEvolution.Tick(
+                    state, options.SyntheticSeed, state.Revision, Instant.AddSeconds(tick));
+
+                Assert.True(outcome.Accepted, outcome.RefusalReason);
+                Assert.NotNull(outcome.Result);
+
+                history.Append(RuntimeDeltaProjector.Project(state, outcome.Result!));
+                state = outcome.Result!.State;
+            }
+
+            var feed = RuntimeDeltaFeed.From(history, state.Revision);
+
+            Assert.Equal(3, feed.Count);
+            Assert.True(feed.NewestFirst);
+            Assert.Equal(4, feed.NewestDeltaRevision);
+            Assert.Equal(state.Revision, feed.CurrentRevision);
+            Assert.Equal(ExpectedFeedRevisions, feed.Items.Select(item => item.Revision));
+            Assert.Equal(ExpectedFeedPreviousRevisions, feed.Items.Select(item => item.PreviousRevision));
+
+            // Adjacent pairs continue the chain...
+            for (var index = 0; index + 1 < feed.Items.Count; index++)
+            {
+                Assert.Equal(feed.Items[index].PreviousRevision, feed.Items[index + 1].Revision);
+            }
+
+            // ...and no row - newest, middle or oldest - is reported as a gap.
+            Assert.All(feed.Items, item =>
+            {
+                Assert.False(item.HasRevisionGap);
+                Assert.True(item.AppliesCleanly);
+            });
+        }
+        finally
+        {
+            await runtime.DisposeAsync();
+        }
     }
 
     [Fact]

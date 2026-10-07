@@ -17,6 +17,28 @@ public sealed record RuntimeUnavailablePayload
     public required string StageMarker { get; init; }
 }
 
+/// <summary>
+/// One Cannon equipment slot as the read-only API presents it: the Owner-facing
+/// logical reference (I7, I16) together with the canonical machine equipment
+/// identity, which is never replaced or re-derived. The logical label is a
+/// display projection of the slot's logical column (the accepted labelling
+/// <c>I&lt;logicalColumn&gt;</c>); the machine identity stays the Product state value.
+/// </summary>
+public sealed record RuntimeCannonReference
+{
+    /// <summary>Owner-facing logical reference: I7 (Rear) and I16 (Front).</summary>
+    public required string LogicalLabel { get; init; }
+
+    /// <summary>Canonical machine equipment identity: CANNON_REAR or CANNON_FRONT.</summary>
+    public required string EquipmentId { get; init; }
+
+    /// <summary>Logical matrix row of the slot (5 for both Cannon slots).</summary>
+    public required int LogicalRow { get; init; }
+
+    /// <summary>Logical matrix column of the slot (7 Rear, 16 Front).</summary>
+    public required int LogicalColumn { get; init; }
+}
+
 /// <summary>One protected-baseline count of the synthetic map, as observed by the host.</summary>
 public sealed record RuntimeSensorCount
 {
@@ -63,8 +85,12 @@ public sealed record RuntimeStatusSensorCounts
     /// <summary>2 Cannon slots.</summary>
     public required RuntimeSensorCount Cannons { get; init; }
 
-    /// <summary>Canonical Cannon equipment labels: I7 and I16.</summary>
-    public required IReadOnlyList<RuntimeSensorCount> CannonLabels { get; init; }
+    /// <summary>
+    /// The two Cannon slots in canonical logical order (I7 Rear, I16 Front), each
+    /// carrying its Owner-facing logical reference and its canonical machine
+    /// equipment identity.
+    /// </summary>
+    public required IReadOnlyList<RuntimeCannonReference> CannonSlots { get; init; }
 
     /// <summary>The counts the adapter publishes for this build.</summary>
     public static RuntimeStatusSensorCounts Canonical() => new()
@@ -89,8 +115,14 @@ public sealed record RuntimeStatusSensorCounts
             Label = nameof(CanonicalSensorMap.CannonSlotCount),
             Count = CanonicalSensorMap.CannonSlotCount,
         },
-        CannonLabels = [.. CanonicalSensorMap.CannonSlots
-            .Select(slot => new RuntimeSensorCount { Label = slot.EquipmentId, Count = 1 })],
+        CannonSlots = [.. CanonicalSensorMap.CannonSlots
+            .Select(slot => new RuntimeCannonReference
+            {
+                LogicalLabel = $"I{slot.Column}",
+                EquipmentId = slot.EquipmentId,
+                LogicalRow = slot.Row,
+                LogicalColumn = slot.Column,
+            })],
     };
 }
 
@@ -243,18 +275,32 @@ public sealed record RuntimeDeltaFeedItem
     /// <summary>Three-state Active Job encoding of this Delta: absent, present or cleared.</summary>
     public required DeltaJobEncoding ActiveJobEncoding { get; init; }
 
-    /// <summary>True when applying this Delta to a consumer holding <see cref="PreviousRevision"/> performs a clean step.</summary>
+    /// <summary>True when this entry continues its retained neighbour: a consumer holding <see cref="PreviousRevision"/> steps cleanly onto <see cref="Revision"/>.</summary>
     public required bool AppliesCleanly { get; init; }
 
-    /// <summary>True when this entry sits after a missing predecessor: the feed reports the gap instead of hiding it.</summary>
+    /// <summary>
+    /// True only when this entry provably does NOT continue its newer retained
+    /// neighbour: the neighbour declared this entry's predecessor revision, and a
+    /// mismatch means a step is missing between them. The newest retained entry has
+    /// no newer neighbour and is therefore never flagged, and the oldest retained
+    /// entry is judged only against its retained neighbour - the window boundary
+    /// never fabricates a gap for history the bounded feed does not hold.
+    /// </summary>
     public required bool HasRevisionGap { get; init; }
 }
 
 /// <summary>
 /// Bounded recent Delta activity (the <c>GET /api/v1/deltas</c> body). The feed is
-/// capped by <see cref="Capacity"/> and never exposes unbounded history; a gap in
-/// the retained run is reported as data (<see cref="RuntimeDeltaFeedItem.HasRevisionGap"/>),
-/// never silently closed.
+/// capped by <see cref="Capacity"/> and never exposes unbounded history.
+///
+/// Chain continuity is a property of the RETENTION ORDER, not of the whole
+/// history: the run is newest first, so an entry continues the chain when its own
+/// <c>revision</c> equals the <c>previousRevision</c> its newer neighbour declared
+/// (equivalently, when its <c>previousRevision</c> equals the next older retained
+/// entry's <c>revision</c>). A provable mismatch is reported as data
+/// (<see cref="RuntimeDeltaFeedItem.HasRevisionGap"/>), never silently closed.
+/// <see cref="CurrentRevision"/> is reported as context only and is deliberately
+/// NOT compared against every row: a bounded window must not look like a gap.
 /// </summary>
 public sealed record RuntimeDeltaFeed
 {
@@ -274,13 +320,17 @@ public sealed record RuntimeDeltaFeed
         ArgumentNullException.ThrowIfNull(history);
 
         var items = new List<RuntimeDeltaFeedItem>(history.Count);
-        int? expectedNext = null;
+
+        // The revision this entry must have to be the immediate predecessor step
+        // of the entry walked before it (newest first), or null for the newest
+        // retained entry, which has no newer neighbour.
+        int? expectedRevision = null;
 
         foreach (var delta in history.NewestFirst)
         {
-            var gap = expectedNext is not null && delta.PreviousRevision != expectedNext;
+            var gap = expectedRevision is not null && delta.Revision != expectedRevision;
             items.Add(ToItem(delta, gap));
-            expectedNext = delta.PreviousRevision;
+            expectedRevision = delta.PreviousRevision;
         }
 
         return new RuntimeDeltaFeed
