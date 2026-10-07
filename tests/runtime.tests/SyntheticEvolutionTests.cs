@@ -59,8 +59,11 @@ public sealed class SyntheticEvolutionTests
         var state = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
         var instant = RuntimeTestFixture.Instant.AddSeconds(1);
 
-        var first = Advance(state, 1, instant, 1UL);
-        var second = Advance(state, 1, instant, 2UL);
+        // The helper's fourth parameter is the rules object and the fifth is the
+        // seed, so the seed is passed by name: two distinct seeds, one tick, one
+        // explicit instant, default rules.
+        var first = Advance(state, 1, instant, seed: 1UL);
+        var second = Advance(state, 1, instant, seed: 2UL);
 
         Assert.NotEqual(
             first.Sensors.Select(sensor => sensor.DirtyScore).ToArray(),

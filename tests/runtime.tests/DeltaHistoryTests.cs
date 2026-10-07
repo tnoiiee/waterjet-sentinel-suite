@@ -11,6 +11,12 @@ namespace Wjss.Runtime.Core.Tests;
 /// </summary>
 public sealed class DeltaHistoryTests
 {
+    /// <summary>Revisions retained by a capacity-3 history after five appends, newest first.</summary>
+    private static readonly int[] RetainedRevisionsNewestFirst = [5, 4, 3];
+
+    /// <summary>The gapless apply-order chain that advances a consumer from revision 2 to revision 5.</summary>
+    private static readonly int[] CatchUpChainApplyOrder = [3, 4, 5];
+
     [Fact]
     public void Capacities_Are_Explicit_And_Independent_Of_The_Revision_History()
     {
@@ -48,7 +54,7 @@ public sealed class DeltaHistoryTests
         Assert.Equal(3, history.Count);
         Assert.Equal(5, history.NewestRevision);
         Assert.Equal(3, history.OldestRevision);
-        Assert.Equal(new[] { 5, 4, 3 }, history.NewestFirst.Select(delta => delta.Revision).ToArray());
+        Assert.Equal(RetainedRevisionsNewestFirst, history.NewestFirst.Select(delta => delta.Revision).ToArray());
         Assert.Null(history.Find(2));
         var found = history.Find(3);
         Assert.NotNull(found);
@@ -97,7 +103,7 @@ public sealed class DeltaHistoryTests
         Assert.Equal(RuntimeDeltaCatchUp.CompleteCode, complete.Code);
         Assert.Equal(2, complete.FromRevision);
         Assert.Equal(5, complete.ToRevision);
-        Assert.Equal(new[] { 3, 4, 5 }, complete.Chain.Select(delta => delta.Revision).ToArray());
+        Assert.Equal(CatchUpChainApplyOrder, complete.Chain.Select(delta => delta.Revision).ToArray());
         Assert.Equal(2, complete.Chain[0].PreviousRevision);
         Assert.Equal(complete.Chain[0].Revision, complete.Chain[1].PreviousRevision);
         Assert.Equal(complete.Chain[1].Revision, complete.Chain[2].PreviousRevision);

@@ -17,6 +17,12 @@ namespace Wjss.Runtime.Core.Tests;
 /// </summary>
 public sealed class SnapshotDeltaTests
 {
+    /// <summary>Revisions produced by the three accepted ticks of the chain test, in tick order.</summary>
+    private static readonly int[] DeltaRevisionsInTickOrder = [2, 3, 4];
+
+    /// <summary>Committed store history after those three ticks, newest first.</summary>
+    private static readonly int[] CommittedHistoryNewestFirst = [4, 3, 2, 1];
+
     [Fact]
     public void A_Textbook_Tick_Delta_Carries_Only_What_Changed()
     {
@@ -96,8 +102,8 @@ public sealed class SnapshotDeltaTests
         }
 
         // No duplicate revision, no skipped revision: one accepted tick, one step.
-        Assert.Equal(new[] { 2, 3, 4 }, revisions);
-        Assert.Equal(new[] { 4, 3, 2, 1 }, store.History.Select(entry => entry.Revision).ToArray());
+        Assert.Equal(DeltaRevisionsInTickOrder, revisions);
+        Assert.Equal(CommittedHistoryNewestFirst, store.History.Select(entry => entry.Revision).ToArray());
         Assert.Equal(4, state.Revision);
     }
 
