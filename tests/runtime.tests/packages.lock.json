@@ -93,6 +93,13 @@
           "xunit.extensibility.core": "[2.9.2]"
         }
       },
+      "wjss.adapters.simulator": {
+        "type": "Project",
+        "dependencies": {
+          "Wjss.Contracts": "[1.0.0, )",
+          "Wjss.Time": "[1.0.0, )"
+        }
+      },
       "wjss.contracts": {
         "type": "Project"
       },

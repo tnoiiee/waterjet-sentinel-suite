@@ -1,10 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    WJSS Runtime-core focused tests. At Stage 0.3A-1 the core is an empty wired
-    project (0.3A-2 adds the single-writer engine + these tests' subjects), so
-    this suite pins only the stage marker constants the health stub and the
-    0.3A-2 acceptance tests will both rely on. Owner-local execution required.
+    WJSS Runtime-core focused tests. Stage 0.3A-1 pinned only the stage markers
+    (the core was an empty wired staging area). Stage 0.3A-2A adds the
+    single-writer Runtime State Store and the deterministic SIMULATOR initial
+    state, so this suite now exercises those subjects: revision progression,
+    atomic refusal, bounded history, no mutable leakage, protected-baseline
+    invariants (108 / 106 / 212 / I7 / I16, wall counts 24-29-24-29) and the
+    snapshot projection.
+
+    The simulator reference is required because the deterministic initial state
+    is composed from the SIMULATOR synthetic map, exactly as the composition
+    root will compose it. Owner-local execution required; the project graph
+    change means the Owner-local restore refreshes this project's
+    packages.lock.json (a real restore, never a hand edit).
   -->
 
   <PropertyGroup>
@@ -25,6 +34,7 @@
   <ItemGroup>
     <ProjectReference Include="../../packages/application/Wjss.Runtime.Core.csproj" />
     <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+    <ProjectReference Include="../../adapters/simulator/Wjss.Adapters.Simulator.csproj" />
   </ItemGroup>
 
 </Project>

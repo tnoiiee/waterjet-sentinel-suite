@@ -93,7 +93,41 @@
           "xunit.extensibility.core": "[2.9.2]"
         }
       },
+      "wjss.adapters.simulator": {
+        "type": "Project",
+        "dependencies": {
+          "Wjss.Contracts": "[1.0.0, )",
+          "Wjss.Time": "[1.0.0, )"
+        }
+      },
       "wjss.contracts": {
+        "type": "Project"
+      },
+      "wjss.domain": {
+        "type": "Project",
+        "dependencies": {
+          "Wjss.Contracts": "[1.0.0, )"
+        }
+      },
+      "wjss.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "Wjss.Adapters.Simulator": "[1.0.0, )",
+          "Wjss.Contracts": "[1.0.0, )",
+          "Wjss.Domain": "[1.0.0, )",
+          "Wjss.Runtime.Core": "[1.0.0, )",
+          "Wjss.Time": "[1.0.0, )"
+        }
+      },
+      "wjss.runtime.core": {
+        "type": "Project",
+        "dependencies": {
+          "Wjss.Contracts": "[1.0.0, )",
+          "Wjss.Domain": "[1.0.0, )",
+          "Wjss.Time": "[1.0.0, )"
+        }
+      },
+      "wjss.time": {
         "type": "Project"
       }
     }

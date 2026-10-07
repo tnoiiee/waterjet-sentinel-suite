@@ -260,3 +260,295 @@ whitespace or formatting, private implementation details, or test code testing o
 code. Rely instead on: the compiler, analyzers, XML/JSON parsers, the static boundary scanner,
 and focused semantic code review. Existing meaningful contract, mapping, startup-safety and
 parity tests stay.
+
+## 12. Stage 0.3A-2A Checkpoint A — Owner-local validation (appended 2026-10-07)
+
+Checkpoint A (Runtime State Foundation, SIMULATOR-only) changes `packages/application`,
+`packages/time`, `adapters/simulator` and `tests/runtime.tests` only. `apps/runtime` is
+**unchanged**, so the §7 health smoke still returns the 0.3A-1 answers
+(`live` 200 ALIVE/SIMULATOR/`runtimeImplemented=false`/`STAGE_03A1_SKELETON`; `ready` 503
+`RUNTIME_NOT_IMPLEMENTED`) and is expected to stay that way until Checkpoint C.
+
+Prerequisites are §0 (SDK **10.0.401** exactly) and §0A (no process-scope `TargetPath`).
+
+```powershell
+git fetch origin arena/873f0015-waterjet-sentinel-suite
+git switch arena/873f0015-waterjet-sentinel-suite
+
+# FIRST restore after the new project reference (see the lock note below).
+# This is a real restore: it refreshes tests/runtime.tests/packages.lock.json.
+dotnet restore WaterJetSentinelSuite.sln
+
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build
+```
+
+Expected: Release build 0 warnings / 0 errors; the 61 existing tests still pass; the new
+Runtime-core tests in `Wjss.Runtime.Core.Tests` pass (Arena executes nothing, so the count is
+**not claimed** here — record the observed numbers in the PR comment). Optional focused run:
+
+```powershell
+dotnet test tests/runtime.tests -c Release --no-build --logger "console;verbosity=detailed"
+```
+
+**Lock-file note (round-3 policy still applies).** Checkpoint A adds
+`Wjss.Adapters.Simulator` as a project reference of `tests/runtime.tests` (the composition the
+runtime will use: SIMULATOR source → contracts → Runtime core). The affected
+`tests/runtime.tests/packages.lock.json` must therefore be refreshed **by the real restore
+above**, never hand-edited, and committed with the checkpoint review. The other eleven lock
+files are expected to be unchanged; report any other diff instead of accepting it silently.
+
+**Expected evidence to record.** Build result and warning count; per-project test counts; the
+boundary scan result (`node tools/boundary-scan/boundary-scan.mjs .` — must exit 0); the
+`tests/runtime.tests/packages.lock.json` diff; a statement of anything that differs from the
+expectations above. If any Runtime-core test fails, that is a Checkpoint A defect: stop and
+report it rather than adjusting the test to match the code.
+
+### 12.1 Checkpoint A Owner-local result (2026-10-07) — PASSED
+
+Recorded from the Owner's run; Arena did not execute any .NET command.
+
+| Item | Observed |
+| --- | --- |
+| Validated feature head | `a512aa76c4b2d7633d2a83b10c523c318b3a420e` |
+| Lock-refresh commit (genuine restore output) | `55d3b8b4b7d7ba51b28a0b66adb7445e7ffb579c` — one file: `tests/runtime.tests/packages.lock.json`, +7 lines, adds `wjss.adapters.simulator` (Project) with `Wjss.Contracts` + `Wjss.Time`; no absolute path |
+| .NET SDK / xUnit runtime | `10.0.401` / .NET 10.0.12 |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Full .NET tests | **101 total / 101 passed / 0 failed / 0 skipped** |
+| Locked restore | **PASS** |
+| Boundary scan (S1–S9) | **0 findings** |
+| Working Tree | **CLEAN** |
+
+Correction chain validated by this run: `b389805` (CA1859), `93e8f24` (CS0051), `b75bccb`
+(synthetic-example test compile), `a512aa7` (SensorChannels tamper isolation). Checkpoint A is
+complete for a development checkpoint and **not merged**. **Checkpoint B is authorized**; its
+Owner-local commands are recorded in §13 of this runbook. Checkpoint C remains NOT AUTHORIZED;
+TEST_HARDWARE and PRODUCTION remain NOT AUTHORIZED.
+
+**Recorded discrepancy (not silently repaired).** Section 7 above writes the smoke paths as
+`/api/v1/health/live` and `/api/v1/health/ready`, which do not match the implemented route
+constants (`ApiRoutes.HealthLive` = `/health/live`, `ApiRoutes.HealthReady` = `/health/ready`,
+the paths the Owner's Stage 0.3A-2 instruction also names). Section 7 is a dated Stage 0.3A-1
+record and is left unmodified; the Owner-local smoke for this checkpoint should use
+`http://127.0.0.1:5181/health/live` and `http://127.0.0.1:5181/health/ready`.
+
+## 13. Stage 0.3A-2A Checkpoint B — Owner-local validation (appended 2026-10-07)
+
+Checkpoint B is **source authored in Arena and NOT COMPILED / NOT EXECUTED there**. The
+Owner-local run below is the validation of record, and the mandatory gate before the
+checkpoint can be treated as validated. No hardware, no device, no Production profile.
+
+Run from the repository root on the Owner workstation (SDK exactly `10.0.401`), on the
+Checkpoint B commit:
+
+| # | Step | Command | Expected |
+| --- | --- | --- | --- |
+| 1 | Genuine restore (only if a Project or Package reference changed; Checkpoint B changed neither) | `dotnet restore WaterJetSentinelSuite.sln` | Success; if a real restore rewrites a `packages.lock.json`, commit that genuine output — never hand-edit it. No lock churn is expected from Checkpoint B |
+| 2 | Locked-restore verification | `dotnet restore WaterJetSentinelSuite.sln --locked-mode` | Success against the committed lock files |
+| 3 | Release build | `dotnet build WaterJetSentinelSuite.sln -c Release --no-restore` | **0 warnings, 0 errors** |
+| 4 | Full test suite | `dotnet test WaterJetSentinelSuite.sln -c Release --no-build` | All tests pass, including the new evolution / Delta / apply / history tests. Checkpoint A recorded 101/101; the total rises by the number of new tests |
+| 5 | Boundary scan | `node tools/boundary-scan/boundary-scan.mjs .` | Exit 0 — **0 findings (S1-S9 clean)** |
+| 6 | Working Tree | `git status` | Clean after the run and any genuine lock refresh |
+
+**What the Owner-local run must demonstrate for Checkpoint B.** Each item is covered by an
+automated test in `tests/runtime.tests/`; no item is claimed as executed in Arena.
+
+1. Repeatable evolution from the same seed, tick sequence and clock: the same state and the
+   same serialized Snapshot/Delta sequence.
+2. Revision progression: +1 exactly once per accepted tick, one committed state per tick,
+   and refusals committing nothing.
+3. A gapless Delta chain whose `previousRevision` / `revision` / `generatedAt` agree with the
+   committed revisions, with no duplicate and no skipped revision.
+4. Bounded trend: capacity respected, oldest point dropped deterministically, and published
+   windows never mutated.
+5. Bounded Delta history: oldest-entry eviction, newest revision discoverable, and refused
+   transitions never recorded.
+6. Gap detection: a revision mismatch yields a machine-readable fresh-Snapshot-required result
+   and applies nothing; catch-up with a missing link never fabricates a Delta.
+7. Snapshot reconstruction parity: applying the Deltas in order reproduces direct evolution
+   through the Snapshot projection.
+8. The three Active Job states on the wire: absent key, object, explicit null.
+9. `TEST_HARDWARE` and `PRODUCTION` remain refused at the startup gate and the evolution gate.
+
+### 13.1 Checkpoint B Owner-local result (2026-10-07) — PASSED
+
+Recorded from the Owner's run; Arena did not execute any .NET command.
+
+| Item | Observed |
+| --- | --- |
+| Validated head | `cfa6d4a376bbf10a87db2349045cb6b9b57bb544` (consolidated correction after the Checkpoint B feature commit `619f999`) |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Full .NET tests | **129 total / 129 passed / 0 failed / 0 skipped** |
+| Locked restore | **PASS** |
+| Lock drift | **NONE** |
+| Boundary scan (S1–S9) | **0 findings** |
+| Working Tree | **CLEAN** |
+
+Correction rounds validated by this run: `dd45bf6` (CS0102), `8692b77` (test-source alignment),
+`cfa6d4a` (consolidated). **Product behaviour changed in exactly one place** —
+`RuntimeDeltaHistory.CatchUpFrom` now selects the Delta that continues the consumer revision
+(`previousRevision` match) rather than the Delta whose own revision equals it; the other five
+findings were test-side (structural `TrendPoint` comparison via
+`RuntimeTestFixture.AssertTrendPointsEquivalent`, and three re-derived revision expectations).
+Checkpoint B is complete for a development checkpoint and **not merged**. **Checkpoint C is
+authorized**; `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
+
+## 14. Stage 0.3A-2A Checkpoint C — Owner-local validation and Function/Logic/UI review (appended before the Owner run)
+
+Checkpoint C is the first **usable review path** of Stage 0.3A-2A: a composed SIMULATOR runtime
+whose authoritative state evolves deterministically, a **read-only** HTTP surface over it, and a
+development-only Runtime Inspector page that polls that surface. Checkpoint C sources are
+**authored in Arena and NOT COMPILED / NOT EXECUTED there**; the run below is the validation of
+record. No hardware, no device, no `TEST_HARDWARE`, no `PRODUCTION`, no write, no command.
+
+Prerequisites are §0 (SDK **10.0.401** exactly) and §0A (no process-scope `TargetPath`).
+
+### 14.1 Build, restore and test (same gate as Checkpoints A and B)
+
+```powershell
+git fetch origin arena/873f0015-waterjet-sentinel-suite
+git switch arena/873f0015-waterjet-sentinel-suite
+
+# FIRST restore after the Project-graph change (see the lock note below).
+# This is a real restore; it refreshes two lock files with genuine output.
+dotnet restore WaterJetSentinelSuite.sln
+
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build
+node tools/boundary-scan/boundary-scan.mjs .
+```
+
+Expected: Release build **0 warnings / 0 errors**; the 129 Owner-validated tests still pass and
+the Checkpoint C additions pass (Arena executes nothing, so no total is claimed here — record the
+observed numbers); boundary scan **exit 0, 0 findings (S1–S9)**.
+
+**Lock-file note (expected churn, genuine output only).** Checkpoint C adds
+`Wjss.Adapters.Simulator` as a project reference of `apps/runtime`, and `Wjss.Runtime` as a
+project reference of `tests/api.tests`. Two lock files are therefore expected to change —
+`apps/runtime/packages.lock.json` (gains `wjss.adapters.simulator`) and
+`tests/api.tests/packages.lock.json` (gains `wjss.runtime`, `wjss.runtime.core`, `wjss.domain`,
+`wjss.adapters.simulator`, `wjss.time`) — produced by the real restore above and committed as
+such. The other ten lock files are expected to be unchanged; report any other diff instead of
+accepting it silently. Never hand-edit a lock file.
+
+### 14.2 Start the SIMULATOR runtime (read-only host)
+
+```powershell
+$env:WJSS_DEVICE_PROFILE   = "SIMULATOR"
+$env:WJSS_API_PORT         = "5181"
+$env:WJSS_SYNTHETIC_SEED   = "20261007"
+$env:WJSS_TICK_INTERVAL_MS = "1000"
+
+dotnet run --project apps/runtime/Wjss.Runtime.csproj -c Release --no-build
+```
+
+Every variable is optional (defaults: `SIMULATOR`, port `5181`, seed `20261007`, tick interval
+`1000` ms). Expected console: the Information startup line
+`profile=SIMULATOR url=http://127.0.0.1:5181 stage=STAGE_03A2C_RUNTIME_API`. The host answers on
+**loopback only**; it binds nothing else and contacts nothing.
+
+### 14.3 Open the Inspector and review Function / Logic / UI (the point of this checkpoint)
+
+Open in the workstation browser: **`http://127.0.0.1:5181/inspector`**
+
+| # | Review item | Expected observation |
+| --- | --- | --- |
+| 1 | Readiness badge | **READY** (green) with code `RUNTIME_READY`; the header shows the `SIMULATOR` badge and the stage marker `STAGE_03A2C_RUNTIME_API` |
+| 2 | Revision progression | the displayed revision increases by exactly **1 per second** (the configured tick interval), with no skipped or repeated revision |
+| 3 | Last update | refreshes every ~1 s; the update banner is hidden while polls succeed |
+| 4 | Sensor values | the Sensor sample table shows values, classification and quality changing over time; use the wall buttons and the quality select to narrow the display |
+| 5 | Wall summaries | Left / Rear / Right / Front show Sensor totals **24 / 29 / 24 / 29**, classification counts and a max score that move as the values evolve |
+| 6 | Foundation metrics | **108** logical slots, **106** Sensors, **212** Thermocouple channels, Cannons **I7** and **I16**, the tick interval, and state/Delta history depth vs capacity |
+| 7 | Runtime state | queue `0 / 8` labelled as a foundation placeholder, Active Job *none*, Pump `STOPPED` labelled as a placeholder, alarm counts, rejected transitions `0`, no fault |
+| 8 | Delta activity | one row per accepted revision (bounded, newest first) with previous revision, timestamp, changed Sensor count, changed wall count, sections and chain status (*clean*) |
+| 9 | Local interactions | *Pause display*, *Toggle density*, wall selection, quality selection and *Copy current Snapshot JSON* change only this browser page. Confirm the revision keeps progressing while the display is paused (the Runtime is untouched) |
+| 10 | Safety notice | the footer states Development Inspector, read-only, SIMULATOR only, `TEST_HARDWARE` not authorized, `PRODUCTION` not authorized, control commands not implemented |
+| 11 | No control surface | there is no button, field or menu that could start, stop, dispatch, command or configure anything; no write request is sent (confirm in the browser's network view: all requests are `GET`) |
+| 12 | Layout | at 1920 × 1080 the page has **no horizontal page scrollbar**; the tables scroll inside their own cards |
+| 13 | Failure handling | stop the host (Ctrl+C in its console): within a few seconds the page shows the stale-data banner and stops updating values; **no** value is fabricated |
+
+### 14.4 Retrieve the read-only endpoints
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5181/health/live      # 200 ALIVE, runtimeImplemented=true
+Invoke-RestMethod http://127.0.0.1:5181/health/ready     # 200 READY, code RUNTIME_READY, stage marker
+Invoke-RestMethod http://127.0.0.1:5181/api/v1/snapshot  # wjss.snapshot/1, current revision
+Invoke-RestMethod http://127.0.0.1:5181/api/v1/runtime   # read-only Runtime status
+Invoke-RestMethod http://127.0.0.1:5181/api/v1/deltas    # bounded recent Delta activity
+```
+
+`GET /api/v1/runtime` reports: `ready`, `readinessCode`, `readinessDetail`, `profile`,
+`stageMarker`, `currentRevision`, `generatedAt`, `lastUpdateAt`, `syntheticSeed`,
+`tickIntervalMilliseconds`, `evolutionRunning`, `sensorCounts` (108 / 106 / 212 / 2 with the
+Cannon labels), `walls`, the queue block (bounded `0 / 8`, placeholder-labelled), Active Job
+presence, the Pump placeholder, alarm counts, history depths vs capacities, the newest Delta
+revision, accepted ticks, rejected transitions, uptime, server time and the last fault fields
+(null while nothing faulted).
+
+**Read-only proof (expect `405 Method Not Allowed`; the route exists for GET only):**
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:5181/api/v1/snapshot -Method POST
+Invoke-WebRequest http://127.0.0.1:5181/inspector       -Method POST
+```
+
+### 14.5 Restart repeatability
+
+Stop the host, start it again with the **same** `WJSS_SYNTHETIC_SEED` and the same
+`WJSS_TICK_INTERVAL_MS`, and compare the first seconds of the Sensor table and the wall
+summaries. The synthetic value stream is a function of (seed, tick number, Sensor identity), so
+the same seed reproduces the same per-tick score/classification sequence from revision 1.
+Timestamps differ, because they are the real instants of the run; byte-identical timestamps are
+**not** claimed. `revision 1` is always the composed initial revision.
+
+### 14.6 Refusals (unchanged start gate — check them; do not weaken them)
+
+```powershell
+$env:WJSS_DEVICE_PROFILE = "TEST_HARDWARE"   # dotnet run ... -> exit 2, PROFILE_NOT_AUTHORIZED_FOR_STAGE_03A, nothing bound
+$env:WJSS_DEVICE_PROFILE = "PRODUCTION"      # dotnet run ... -> exit 2, same refusal, nothing bound
+$env:WJSS_DEVICE_PROFILE = "NONSENSE"        # dotnet run ... -> exit 4, unknown profile label, nothing bound
+$env:WJSS_DEVICE_PROFILE = "SIMULATOR"; $env:WJSS_TICK_INTERVAL_MS = "5"   # exit 4, INVALID_TICK_INTERVAL
+$env:WJSS_TICK_INTERVAL_MS = "1000"; $env:WJSS_API_PORT = "70000"          # -> exit 4, INVALID_API_PORT
+```
+
+Record the observed exit code and the printed refusal code. A refusal must never bind a port:
+the port stays free (`Get-NetTCPConnection -LocalPort 5181 -ErrorAction SilentlyContinue` returns
+nothing).
+
+### 14.7 Clean stop
+
+In the host console press **Ctrl+C**. Expected: the process exits, the port is released, and no
+further revision is produced (reopening `/api/v1/runtime` is not possible because nothing is
+listening). Nothing was persisted, nothing was dispatched, no device was contacted.
+
+### 14.8 What to record in the PR comment
+
+Build result and warning count; per-project test counts and the total; the boundary-scan result;
+the two lock-file diffs; the observed `GET /api/v1/runtime` counts (108 / 106 / 212, I7/I16, wall
+totals 24 / 29 / 24 / 29); the observed revision progression; the `405` results; the refusal exit
+codes; the UI observations of §14.3 (including items 11–13); and anything that differs from the
+expectations above. If a check fails, stop and report it — never adjust the code or a pinned
+expectation merely to match one observed run.
+
+### 14.9 Checkpoint C Owner-local result (2026-10-07) — PASSED
+
+Recorded from the Owner's run; Arena did not execute any .NET command.
+
+| Item | Observed |
+| --- | --- |
+| Validated head | `faa79145a925832baa2ac8685f7fecf7a093552d` (`chore: refresh Checkpoint C project locks`, parent `e6a5a6c`) |
+| .NET SDK | `10.0.401` |
+| Locked restore | **PASS** |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Fresh full .NET tests | **139 total / 139 passed / 0 failed / 0 skipped** |
+| Boundary scan (S1–S9) | **0 findings** |
+| Working tree after lock handoff | **CLEAN** |
+| Function and Logic review (§14.4) | **PASSED** — ALIVE / READY / `RUNTIME_READY`; revision progression and five-second advancement PASS; Delta history bounded 64 / 64; continuous newest-first chain with `hasRevisionGap` false; Cannon I7 / I16 references; 108 / 106 / 212; walls 24 / 29 / 24 / 29; Sensor values evolving; rejected transitions 0; queue 0 / 8 placeholder only; no Active Job; Pump STOPPED placeholder only; no command or write path |
+| Inspector UI review (§14.3, 1920 x 1080) | **PASSED — punchlist CLOSED** — no critical UI blocker; layout correction confirmed; the authorized minor presentation punchlist was applied in the commit immediately following this section's record and the final Owner visual review closed it at `b97d05a` |
+| Owner final visual review (2026-10-07) | **FINAL OWNER VISUAL REVIEW (2026-10-07): Inspector UI/UX review PASSED; the minor punchlist is CLOSED.** Verified visually at 1920 x 1080: human-readable Foundation captions present; Queue and Pump placeholder explanations visually secondary; `SENSOR VALUES — SYNTHETIC EVOLUTION` title present; Foundation Metrics complete two-column layout; Runtime State uses the available width; no one-word-per-line wrapping remains; Snapshot compact; Delta and Sensor tables retain card-local scrolling; `HH:mm:ss.mmm` timestamps; Delta chain displays clean; I7 and I16 are the visible Cannon labels; synthetic UNCERTAIN and BAD quality states visible with reasons; no page-level horizontal scroll; safety footer and read-only boundary visible; no Critical UI blocker remains. One **optional future polish** item is recorded and explicitly non-blocking (top-row vertical balance, because Foundation Metrics is taller than Runtime State): it is deferred, does not require a change round, and is not authorised as part of Checkpoint C. |
+
+Correction chain validated by this run: `1d7b105` (CS0120 readiness correction), `01bb2aa` (seed-type
+disambiguation), `349264a` (ambiguous Inspector route removed), `40284b4` (Delta chain status),
+`e6a5a6c` (Runtime state layout width), `faa79145a925832baa2ac8685f7fecf7a093552d` (genuine lock refresh). Checkpoint C is complete
+for a development checkpoint and **not merged**; `TEST_HARDWARE` and `PRODUCTION` remain NOT
+AUTHORIZED.

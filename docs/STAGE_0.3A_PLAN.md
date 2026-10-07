@@ -75,6 +75,106 @@ Ordering note (Owner ruling): **0.3A-5 is UI-first** — the product UI is valid
 the Runtime stream before any historian/alarm scope is added, mirroring how the spike earned
 trust.
 
+**0.3A-2 delivery split (Owner instruction 2026-10-07):** 0.3A-2 is delivered in three
+checkpoints on one branch and one pull request — **A** Runtime State Store + deterministic
+SIMULATOR initial state + `wjss.snapshot/1` projection (**OWNER-LOCALLY VALIDATED 2026-10-07**:
+build 0/0, suite 101/101, locked restore PASS, boundary S1–S9 clean, genuine lock refresh
+`55d3b8b`; see [`CURRENT_STATE.md`](CURRENT_STATE.md) §11.5/§12.24); **B** synthetic evolution + Snapshot/Delta
+foundation (gapless revisions, bounded Delta history, re-snapshot on detected gap); **C**
+read-only Runtime API (`GET /api/v1/snapshot`, `GET /api/v1/runtime`, `GET /health/live`,
+`GET /health/ready`) + the lightweight dev-only Runtime Inspector UI. SSE stays out of scope
+unless the Inspector demonstrably requires it — polling is preferred. The 0.3A-2 row above
+describes the substage as originally planned and is preserved as authored-time state.
+**Status after Checkpoint A validation (2026-10-07):** A complete for a development checkpoint
+(not merged); **B AUTHORIZED** — deterministic synthetic evolution (explicit seed + tick sequence
++ clock), atomic transitions, wall-summary recalculation, bounded trend append, `wjss.delta/1`
+generation, bounded Delta history, Delta apply/reconstruction and revision-gap detection;
+**C remains NOT AUTHORIZED**, SIMULATOR only, no SSE, no write/command endpoint, no device
+access.
+
+## 5b. Stage 0.3A-2A Checkpoint B record (appended 2026-10-07)
+
+**Source authored in Arena; NOT COMPILED and NOT EXECUTED in Arena** (no .NET SDK there).
+Owner instruction 2026-10-07 authorized Checkpoint B: deterministic synthetic evolution plus
+the Snapshot/Delta foundation, on the validated Checkpoint A store, SIMULATOR only.
+
+Boundaries this record fixes (all inside `packages/application/Runtime/`, plus tests):
+
+| Area | Decision |
+| --- | --- |
+| Determinism | Every presented value is a pure function of the committed state, an explicit seed, an explicit tick number and an explicit tick instant. No ambient wall-clock read, no `System.Random`, no static mutable state, no thread-timing input, no culture-sensitive formatting or parsing |
+| Seed type | `ulong` at the evolution boundary; the adapter's `SyntheticSeed` stays adapter-side (Runtime.Core must not depend on an adapter). The walk's derivation is distinct from the adapter's initial-score derivation and from `FixtureGenerator`'s formula: **no equality is claimed**, unification stays `[OPEN]` |
+| Score | Unitless synthetic development presentation value, tenths-of-a-point walk bounded to 0.0-100.0, explicitly rounded to one decimal place with a culture-invariant midpoint rule. Not a certified process measurement; carries no device address, calibration constant or Production limit |
+| Classification | Reused contract rule only: strictly above the published threshold is `DIRTY`; below is `CLEANER`. No new wire enum, no new wire status |
+| Quality paths | GOOD (current basis, validated value refreshed), UNCERTAIN (fresh value presented, classification and basis kept from the last validated value), STALE (no fresh value; last reading instant retained), BAD (no usable value), and `NONE` basis when the last validated evidence is missing or older than the synthetic retention window. No control behaviour is derived from any of them |
+| Atomic transition | The engine never commits: it returns a candidate, and the single writer of the Runtime State Store validates and publishes it. Revision +1 exactly once per accepted tick; one committed state per accepted tick; refusals produce no candidate and leave the committed revision untouched |
+| Refusal codes | `EVOLUTION_TICK_SEQUENCE`, `EVOLUTION_TICK_TIME`, `DELTA_OUT_OF_ORDER`, `RESNAPSHOT_REQUIRED` added to `RuntimeRefusalCodes`; the profile gate reuses the domain startup policy code (`PROFILE_NOT_AUTHORIZED_FOR_STAGE_03A`). No existing code changed |
+| Trend | One point per accepted tick, four fixed series (pressure, setpoint, ready-band-low, ready-band-high) mirroring the published Pump presentation block, oldest point dropped deterministically at capacity, published windows never mutated. `wjss.snapshot/1` still carries the whole window |
+| Delta | `wjss.delta/1` from the accepted transition: `previousRevision` = the prior committed revision, `revision` = `previousRevision + 1`, `generatedAt` = the accepted tick instant; whole-record replacements only; unchanged sections omitted; the wall map is never in a Delta. The Runtime health block is deliberately absent from Deltas (uptime and counters are ambient diagnostics, not part of the deterministic chain) |
+| Active Job | The contract's exact three-state slot: absent = unchanged, object = replacement, explicit JSON null = cleared. No second clear flag exists anywhere in the generation, wire or apply path |
+| Apply | Total or nothing: a revision mismatch yields `RESNAPSHOT_REQUIRED` (machine-readable) and applies nothing; a self-inconsistent Delta (previous records disagreeing, configuration-derived identity rewritten, wall summaries disagreeing with the Sensors) is refused and never normalized; the reconstructed revision must pass the same structural invariants the store enforces |
+| Delta history | In-memory only, newest-first ordering, explicit minimum/maximum/default capacities independent of the revision-history capacity, deterministic oldest-entry eviction, refused transitions never recorded, newest revision always discoverable. No persistence, no Historian |
+| Gap detection | Detect only. A gap returns a fresh-Snapshot-required result; no Delta is inferred, the stream is not continued, and no reconnect/retry/resynchronization behaviour exists |
+
+Checkpoint B deliberately implements none of Checkpoint C: no runtime API route beyond the
+existing health stub, no Runtime Inspector UI, no write or command endpoint, no SSE.
+
+**Status after Checkpoint B validation (2026-10-07).** B is **OWNER-LOCALLY VALIDATED** at
+`cfa6d4a` (Release build 0 warnings / 0 errors; full suite 129/129; locked restore PASS; lock
+drift NONE; boundary S1–S9 clean; Working Tree clean — see
+[`CURRENT_STATE.md`](CURRENT_STATE.md) §11.6/§12.25). The consolidated correction changed exactly
+one Product behaviour: `RuntimeDeltaHistory.CatchUpFrom` now continues the consumer revision
+instead of re-selecting the already-applied step.
+
+**Checkpoint C (OWNER-AUTHORIZED, 2026-10-07)** delivers the earliest usable Owner-local
+Function/Logic/UI review path: SIMULATOR runtime composition in `apps/runtime` with explicit
+synthetic configuration, a deterministic single-writer evolution lifecycle (one accepted tick =
+one committed revision, explicit cancellation, clean shutdown, observed tick exceptions), the
+read-only API `GET /api/v1/snapshot`, `GET /api/v1/runtime`, `GET /api/v1/deltas` plus the
+existing `GET /health/live` and `GET /health/ready` readiness semantics, and a development-only
+Runtime Inspector at `GET /inspector` that polls those endpoints. No write or command endpoint,
+no SSE (polling preferred), no TEST_HARDWARE, no PRODUCTION, no persistence, no installer.
+
+
+
+## 5c. Stage 0.3A-2A Checkpoint C record (appended 2026-10-07)
+
+**Source authored in Arena; NOT COMPILED and NOT EXECUTED there.** Owner instruction 2026-10-07
+authorized Checkpoint C on the Owner-locally validated Checkpoint B foundation (`cfa6d4a`;
+129/129). Two slices on the same branch and PR:
+
+- **C1+C2 — `06aca79`** (`feat(runtime): compose the simulator runtime, lifecycle and read-only
+  API`): `apps/runtime/RuntimeHostOptions.cs`, `apps/runtime/SimulatorRuntime.cs`,
+  `apps/runtime/RuntimeApiResponses.cs`, the rewritten `apps/runtime/Program.cs`, the read-only
+  route identities in `packages/contracts/ApiRoutes.cs`, the health-payload documentation update,
+  the `STAGE_03A2C_RUNTIME_API` marker, and the test sources (host reference in
+  `tests/api.tests` with `RuntimeHostCompositionTests`; `RuntimeStartGateSourceTests` replacing the
+  stage-0.3A-1 stub pin).
+- **C3 — the commit carrying this record**: `apps/runtime/Inspector/index.html` served at
+  `GET /inspector`, the Inspector source pin, and runbook §14 (Owner-local Function/Logic/UI
+  review).
+
+| Area | Decision |
+| --- | --- |
+| Composition order | Device profile → port → synthetic configuration → runtime composition → lifecycle start → listener. A refused profile or a malformed value can never bind a port; a composition fault still answers readiness with a structured `503` instead of degrading silently |
+| Configuration | `WJSS_DEVICE_PROFILE`, `WJSS_API_PORT`, `WJSS_SYNTHETIC_SEED`, `WJSS_TICK_INTERVAL_MS`, `WJSS_STATE_HISTORY_CAPACITY`, `WJSS_DELTA_HISTORY_CAPACITY`; defaults `SIMULATOR`, `5181`, the adapter's documented default seed, `1000` ms, and the `RuntimeLimits` defaults. Tick interval bounded 100–60000 ms; capacities bounded by the proven `RuntimeLimits` ranges. Refusals are values with machine codes, printed before any listener exists |
+| Lifecycle | One non-overlapping evolution loop; one accepted tick = one committed revision through the store's single writer; the timer paces execution while every presented value remains a function of (seed, tick number, committed state); refusals advance no revision and emit no Delta, and tick instants advance monotonically so a refusal cannot stall the loop; consecutive tick failures bounded; explicit `CancellationTokenSource`; clean shutdown observes the loop without rethrowing; tick exceptions and startup/fatal faults are observed, counted and reported as machine codes |
+| Readiness | `live` (200) is liveness only. `ready` is 200 only when the profile is SIMULATOR, the synthetic configuration validates, the store is initialized, the initial Snapshot projection exists, the revision system is initialized, the evolution lifecycle has started, and no startup or fatal fault was observed; otherwise `503` with `CONFIGURATION_NOT_VALIDATED`, `PROFILE_NOT_SIMULATOR`, `EVOLUTION_NOT_STARTED`, `STORE_NOT_INITIALIZED`, `REVISION_NOT_INITIALIZED`, `INITIAL_SNAPSHOT_UNAVAILABLE`, `STARTUP_FAULT` or `FATAL_RUNTIME_FAULT`. The store, revision and projection preconditions are verified at the moment readiness answers; no silent fallback |
+| API | GET-only: `/health/live`, `/health/ready`, `/api/v1/snapshot` (current `wjss.snapshot/1`), `/api/v1/runtime` (read-only status incl. protected-baseline counts, wall summaries, bounded history depths, newest Delta revision, rejected transitions, fault codes), `/api/v1/deltas` (bounded recent activity with a reported gap flag), `/inspector`. Every payload uses the shared `ContractJson.Options` policy; no second JSON policy exists in the host |
+| Inspector | Development-only static page served from the build output, no Node pipeline and no framework: ~1 s GET-only polling with non-overlapping requests, visible stale-data banner, bounded Delta rows, wall-grouped Sensor table proving values/classification/quality evolve, foundation metrics, wall summaries, runtime state with placeholder labelling, Snapshot facts and copy-JSON. Local interactions never alter Runtime state; no control affordance exists; the page states the safety boundary (Development Inspector, read-only, SIMULATOR only, `TEST_HARDWARE` and `PRODUCTION` not authorized, control commands not implemented) |
+| Still absent by instruction | Write API, Runtime commands, queue dispatch, Cleaning Job start/pause/resume/abort, Pump/Valve/Axis commands, Safe Return execution, `TEST_HARDWARE`, `PRODUCTION`, physical device adapters, Modbus/Galil/KMotion/PLC, database, Historian persistence, authentication expansion, WebView2 shell migration, full Product UI migration, SSE, installer, ZIP, release, deployment, `spikes/**` changes |
+
+**Status after this record (Owner-local validation, 2026-10-07).** Checkpoint C is
+**OWNER-LOCALLY VALIDATED** at the genuine lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d`: SDK `10.0.401`, locked
+restore PASS, Release build **0 warnings / 0 errors**, fresh full .NET suite **139 / 139 passed /
+0 failed / 0 skipped**, boundary scan **S1–S9 clean**, worktree CLEAN. The Owner **Function/Logic
+review PASSED**, the **Inspector UI review PASSED**, and the final Owner visual review **closed the
+minor punchlist** (runbook §14.9); one optional future polish item (top-row vertical balance) is
+recorded as deferred and non-blocking and must not trigger another change round.
+The expected lock churn materialised exactly as predicted — `apps/runtime/packages.lock.json` and
+`tests/api.tests/packages.lock.json`, genuine restore output, no package version changed — and PR #5
+remains **OPEN — NOT MERGED**. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins
@@ -117,6 +217,22 @@ order and TC channel mapping currently live in the shared generator
 duplicate. **0.3A-2 scope:** seeded acquisition inside the adapter, tick-based state evolution,
 injectable faults (gap, stale, refusal). Determinism is a hard requirement either way: same
 seed ⇒ same fixture bytes — this is what makes `FixtureParityTests` meaningful.
+
+**0.3A-2A state (Checkpoint A):** `adapters/simulator/Synthetic/` now supplies the canonical
+synthetic map (`SyntheticSensorMap`: 108 slots / 106 Sensors / 2 Cannon slots at logical I7 and
+I16, row-major scan order, device distribution 14 + 14 + 13 × 6, `SYN-TC-nn:CHmm` channel
+identities) and the seeded initial Sensor projection (`SyntheticSeed`,
+`DeterministicValueSource` — splitmix64; no `System.Random`, no static mutable state). The
+project depends only on `Wjss.Contracts` and `Wjss.Time`, so the Runtime composes its first
+revision from a SIMULATOR source without any application-layer reference. A runtime-side parity
+test pins the map composition to the committed `config/examples/sensor-map.example.json`.
+
+**Deferred, not silently diverged:** the "reuse rather than duplicate" consolidation between
+this source and `tests/integration/FixtureGenerator.cs` is `[OPEN]` — the fixture-side
+provisional formulas are untouched in 0.3A-2A, and the Runtime's synthetic values are
+seed-derived presentation values, deliberately **not** claimed equal to the fixture generator's
+`ScoreFor` formula. Seeded tick evolution, quality/classification evolution and fault injection
+remain Checkpoint B scope.
 
 ## 10. Runtime API and health
 
