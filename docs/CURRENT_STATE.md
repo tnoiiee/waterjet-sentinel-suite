@@ -52,7 +52,7 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
 | Main Development Scope Gate | **PENDING** for 0.3B+ — 0.3A proceeds under the Owner's Option-C amended gate only |
 | Stage 0.3 | **NOT AUTHORIZED** as a whole; **Stage 0.3A-1 source checkpoint** authored under the amended gate (see §11.4, §12.12) |
-| Stage 0.3A-1 .NET validation | **PENDING — mandatory Owner-local pre-merge gate** ([runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md)); no build/test/run success claimed in Arena |
+| Stage 0.3A-1 .NET validation | **PASSED (Owner-local, 2026-10-07)** — Release build 0 warnings / 0 errors, full suite 61/61, TypeScript 24/24, parity 7/7, boundary S1–S9 clean; PR #4 READY FOR OWNER MERGE (not merged). See §12.22 and the [runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) verdict; Arena claims no .NET execution of its own |
 | Stage 0.3A-2 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
@@ -104,15 +104,15 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.3A-1 — Product Foundation Source Checkpoint (authored; Owner-local .NET validation PENDING) |
+| Current stage | Stage 0.3A-1 — Product Foundation Source Checkpoint (Owner-local validation PASSED; development checkpoint READY; PR #4 ready for Owner merge) |
 | Repository contents | Documentation, repository governance, the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/`, and the Stage 0.3A-1 product foundation source skeleton (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/`) |
-| Application source code | **Authored, unvalidated.** The Stage 0.3A-1 skeleton exists as source only — no .NET compile, restore, test, or execution success is claimed (blocked in Arena; Owner-local gate pending). The spike remains synthetic feasibility code, not Product code |
+| Application source code | **Validated at checkpoint scope by the Owner-local run** (Release 0/0; 61/61; fixtures and lock files genuine, transferred and verified; SDK pinned `10.0.401`). Arena itself ran no .NET and claims no compile/test success of its own. The spike remains synthetic feasibility code, not Product code |
 | Project or solution files | `WaterJetSentinelSuite.sln` (12 projects) — source-committed, **never built in the authoring environment** |
-| Package manifests or dependencies | Spike: `spikes/ui-runtime-react/react-ui/package.json` + `package-lock.json` (Owner-approved pins); `runtime-harness/package.json` (no deps). Product: `Directory.Packages.props` (pins **PROPOSED/UNVERIFIED**), `packages/contracts/wjss-contracts-ts/package.json` + lockfile (`typescript@6.0.3`, install-verified in Arena). No `global.json`; no NuGet lock file |
+| Package manifests or dependencies | Spike: `spikes/ui-runtime-react/react-ui/package.json` + `package-lock.json` (Owner-approved pins); `runtime-harness/package.json` (no deps). Product: `Directory.Packages.props` (pins **PROPOSED/UNVERIFIED**), `packages/contracts/wjss-contracts-ts/package.json` + lockfile (`typescript@6.0.3`, install-verified in Arena). `global.json` pins the Owner-validated SDK `10.0.401` (`rollForward: latestPatch`, added at closeout per Owner decision); the twelve genuine Owner-local `packages.lock.json` are committed (transferred by handoff `488b98fb…`, never Arena-generated) |
 | Database schema or SQL scripts | **Do not exist** |
 | Modbus or Galil adapter | **Does not exist** |
 | Simulator | **Simulator adapter seam exists** (`adapters/simulator`: csproj + README only — behaviour, seeded acquisition and fault injection are 0.3A-2 scope). Never a production-path component. The deterministic synthetic topology currently lives in the test-side fixture generator (`tests/integration/FixtureGenerator.cs`). The spike's Node harness remains feasibility-only |
-| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product tests **authored but never executed on .NET**: 5 xUnit projects (domain/runtime/api/config/fixture-parity) + TS mirror tests (15/15 PASS in Arena after the review correction — the only green product-adjacent suite) |
+| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product .NET tests (5 xUnit projects, 61 tests): **PASSED Owner-locally at closeout** — fresh full-suite 61/61 behind a clean 0/0 Release build (§12.22); Arena executed only the TS mirror (**24/24** via `npm ci` → typecheck → `node --test`) and never claims .NET execution itself |
 | CI workflow | **Does not exist** |
 | Installer or release artifact | **Does not exist** |
 | Production configuration | **Does not exist in this repository** |
@@ -392,7 +392,8 @@ accepted and merged Stage 0.2.*
 | Arena verification | TS: `npm ci` + `tsc --noEmit` clean + `node --test` 14/14 PASS + fixtures validate; boundary scan exit 0; all JSON parses; links/whitespace/secret checks — see §12.12 |
 | NOT verified | Every .NET claim: restore, build, tests, health-stub behaviour, kiosk, parity between C# generator and committed fixtures, NuGet pin availability |
 | Delivery | Single commit on `arena/dd551752-waterjet-sentinel-suite`; PR "Stage 0.3A-1: product foundation source skeleton" → `main`; **NOT READY FOR MERGE** until runbook verdict PASS |
-| Next | Owner-local runbook PASS → Owner merges → Owner explicitly authorizes **0.3A-2** (nothing advances otherwise; no ZIP before Stage 0.3 exit) |
+| Next | ~~Owner-local runbook PASS~~ **DONE** → Owner merges PR #4 (READY FOR OWNER MERGE — closeout 2026-10-07, see §12.22) → Owner explicitly authorizes **0.3A-2** (nothing advances otherwise; no ZIP before Stage 0.3 exit) |
+| CLOSEOUT (2026-10-07) | Rows above describing "Node-authored fixtures", "NOT READY FOR MERGE" and blanket "NOT verified" are preserved as authored-time state. Authoritative current state: Owner-local Release build PASS (0/0), fresh suite **61/61**, TS 24/24, parity 7/7, boundary clean; fixtures and the 12 lock files are the genuine .NET/restore outputs transferred via handoff `488b98fb…`; SDK pinned `global.json` → `10.0.401`. **PR #4 READY FOR OWNER MERGE — NOT MERGED**; 0.3A-2 and Production devices NOT AUTHORIZED |
 
 ### 11.1 Process deviation record
 
@@ -926,6 +927,29 @@ no sorting dependency was added. Arena mirrored the corrected pipeline in Python
 the committed example: structured ordering yields I7→I16 while lexicographic yields
 I16→I7, confirming the defect and its correction. Owner-local **final build + fresh
 full-suite rerun (61/61)** REQUIRED before merge.
+
+### 12.22 Stage 0.3A-1 final Owner-local evidence closeout — PASSED
+
+**STAGE 0.3A-1 OWNER-LOCAL VALIDATION PASSED** (Owner, 2026-10-07; authoritative because
+the full Release build completed successfully immediately before the fresh full-suite
+run). Final Release build: PASS, 0 warnings / 0 errors, all 12 projects, 3.7 s. Final
+fresh .NET suite: 61 / 61 passed / 0 failed / 0 skipped (5.5 s). SDK 10.0.401, xUnit
+observed runtime .NET 10.0.12. TypeScript 24/24; FixtureEmission parity 7/7; boundary
+scan S1–S9 0 findings. Health: live 200 (ALIVE / SIMULATOR / runtimeImplemented=false /
+STAGE_03A1_SKELETON), ready 503 (RUNTIME_NOT_IMPLEMENTED). Profile gates fail-closed:
+SIMULATOR starts; TEST_HARDWARE exit 2; PRODUCTION exit 2; invalid profile exit 4; no
+silent fallback with `--no-launch-profile`. Port collision on 5181: refusal, exit 3. The
+tcChannels contract re-verified: 108/106/2, exact-two-element arrays (CLR
+`System.Object[]`), 212 = 212 unique, 0 duplicates, 0 wrong-count sensors, cannons
+I7/I16 channel-free, walls 24-29-24-29. Closeout commits: handoff `488b98fb…` (12
+genuine `packages.lock.json` + 3 .NET-generated fixtures — verified in Arena against the
+full static battery; Arena never generated or modified them) and the documentation
+closeout (`global.json` pin `10.0.401` / `latestPatch` from Owner-validated evidence;
+test policy recorded in the runbook §11; TargetPath process-scope prerequisite retained in
+§0A; CHANGELOG placement sentence, ADR-0016 environment-probe residue and the
+fixtures-README section pointer corrected; dated per-round records untouched). **PR #4:
+READY FOR OWNER MERGE — NOT MERGED. Stage 0.3A-2 NOT AUTHORIZED. Production device
+access NOT AUTHORIZED.**
 
 ## 13. Required positive confirmations
 

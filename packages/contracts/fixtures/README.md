@@ -9,26 +9,26 @@
 
 ## Status of these files
 
-**PROVISIONAL STRUCTURAL FIXTURES — OWNER-LOCAL .NET GENERATION REQUIRED.**
+**.NET-GENERATED GOLDEN FIXTURES — Owner-local validation PASSED (2026-10-07).**
 
-- Authored in Arena by a deterministic Node script (the Arena sandbox has no
-  .NET SDK); every file carries `"fixtureStatus"` with the marker above.
-- C# records in `../` are authoritative. The .NET generator
-  (`tests/integration/FixtureGenerator.cs`) regenerates these files Owner-local;
-  on the first Owner-local run it MUST produce semantically equal JSON. If it
-  differs, the regenerated files replace these in a review-correction commit
-  and the TypeScript validator run re-confirms them.
-- No claim is made here that .NET generation has run or that parity has
-  passed — that evidence comes from the Owner-local validation document
-  (`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`, steps 10–11).
-- Round 6 (2026-10-07): the sensor-map example shape changed — `tcChannels`
-  is a structured array of exactly two channel strings per sensor
-  (ADR-0014 decision 8). `config/examples/sensor-map.example.json` was
-  regenerated in the array form in Arena for TypeScript validation only; the
-  preceding comma-delimited form (and the snapshot/delta files that drifted
-  against it) is superseded evidence for the Owner regeneration sequence in
-  the validation document §5 — regeneration stays gated behind a successful
-  full Release build and passing non-parity tests.
+- These committed files are the genuine .NET generator output, transferred from
+  the Owner's validated Working Tree (handoff commit `488b98fb…`) — not
+  Arena-authored substitutes. Parity (`FixtureParityTests`) passed 7/7 against
+  them and the TypeScript validator accepts them (24/24).
+- The in-file `"fixtureStatus"` marker still reads `PROVISIONAL STRUCTURAL
+  FIXTURE …` because the generator constant (`FixtureGenerator.FixtureStatus`)
+  writes that string; removing the marker means amending the generator constant
+  and is a later Owner decision — until then the label is a generator-emitted
+  stage marker, not a statement that .NET generation is outstanding.
+- C# records in `../` remain authoritative; regeneration for any contract
+  change follows the runbook §5 gate (full Release build + non-parity tests
+  green first). Evidence: `docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md` §10.
+- History (2026-10-07, rounds 6–6d): the sensor-map example shape changed —
+  `tcChannels` became a structured array of exactly two channel strings per
+  sensor (ADR-0014 decision 8); the interim comma-delimited form and the
+  Arena-side array conversion are superseded evidence. At closeout all three
+  files above (plus the example) are the Owner-validated .NET-generated
+  versions — the Arena conversion was replaced by the genuine transfer.
 
 ## Rules the fixtures demonstrate (and the validator enforces)
 

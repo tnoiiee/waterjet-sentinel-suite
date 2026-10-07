@@ -5,8 +5,14 @@ All notable changes to this repository are recorded in this file.
 The format follows the spirit of *Keep a Changelog*, adapted for a stage-gated project:
 entries correspond to Owner-approved Delivery Stages and to review corrections, not to
 releases of software. **The repository contains documentation, one removable synthetic
-feasibility spike (Stage 0.2.1A), and — from Stage 0.3A-1 — an authored-but-unvalidated
-product foundation source skeleton; no .NET build success is claimed for it.**
+feasibility spike (Stage 0.2.1A), and — from Stage 0.3A-1 — the product foundation source
+checkpoint VALIDATED Owner-locally (Release build 0 warnings / 0 errors; full .NET suite
+61/61; TypeScript 24/24; fixture parity 7/7; boundary scan S1–S9 clean): the committed
+fixtures are the genuine .NET-generated files and the twelve `packages.lock.json` are
+genuine restore output, both transferred from the Owner's validated Working Tree
+(handoff commit `488b98fb70c20ed6e028043e31b661f64d0c92f4`); the .NET SDK is pinned by
+`global.json` at Owner-validated `10.0.401`. Arena never ran .NET; this Owner-local
+evidence is authoritative for the checkpoint.**
 
 ---
 
@@ -24,6 +30,72 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 ---
 
 ## [Unreleased]
+
+### Stage 0.3A-1 — Final Owner-Local Evidence Closeout (`chore: close Stage 0.3A-1 validation evidence`)
+
+**STAGE 0.3A-1 OWNER-LOCAL VALIDATION PASSED.** Owner-local at predecessor `685e056` /
+final test state `a9ef185` (2026-10-07): full Release build **PASS — 0 warnings, 0 errors**
+(all 12 projects, 3.7 s); fresh full .NET suite **61 total / 61 passed / 0 failed / 0
+skipped** (5.5 s) — authoritative because the build completed successfully immediately
+before the run. Environment: .NET SDK **10.0.401**, xUnit observed runtime **.NET 10.0.12**.
+TypeScript **24/24**; FixtureEmission parity **7/7**; boundary scan **0 findings (S1–S9
+clean)**. Health: live HTTP 200 (`status=ALIVE`, `deviceProfile=SIMULATOR`,
+`runtimeImplemented=false`, `stageMarker=STAGE_03A1_SKELETON`); ready HTTP 503
+(`RUNTIME_NOT_IMPLEMENTED`). Profile gates fail-closed: SIMULATOR starts; `TEST_HARDWARE`
+and `PRODUCTION` refused with exit 2; invalid profile refused with exit 4; no silent
+fallback under `--no-launch-profile`. Port collision on 5181: explicit refusal, exit 3.
+The tcChannels structural contract re-verified end to end (108 slots / 106 sensors /
+2 cannons / exact-two-element arrays / 212 total = 212 unique / 0 duplicates / cannons
+I7+I16 channel-free / walls 24-29-24-29; first-sensor shape CLR `System.Object[]`, JSON
+`["SYN-TC-01:CH00","SYN-TC-01:CH01"]`).
+
+Closeout content (this commit; documentation + SDK pin only — no behavior, contract,
+generator, test, or dependency change):
+
+- **`global.json` (new, repository root)**: pins the exact Owner-validated stable SDK
+  `10.0.401` with `rollForward: latestPatch` — the narrowest policy consistent with the
+  Stage 0.3A decision that an SDK pin is only added once Owner-validated (the runbook's
+  former "intentionally no global.json" rule is superseded by this Owner decision); no
+  Preview or RC SDK is referenced.
+- **Genuine Owner-local artifacts recorded** (transferred by handoff commit `488b98fb…`,
+  verified in Arena, never generated here): exactly **12** `packages.lock.json` files —
+  valid JSON, correct per-project paths, framework sections consistent with each csproj
+  TFM (`net10.0-windows7.0` for the kiosk), zero absolute local paths, zero credential
+  findings, every Direct entry exactly matching the `Directory.Packages.props` pins
+  (`Microsoft.NET.Test.Sdk 17.12.0`, `xunit 2.9.2`, `xunit.runner.visualstudio 2.8.2`)
+  with no unapproved package, and locked-restore policy still enabled; plus the **3**
+  .NET-generated array fixtures (`config/examples/sensor-map.example.json`,
+  `packages/contracts/fixtures/delta.basic.json`, `packages/contracts/fixtures/snapshot.seed0.json`)
+  — all §7 shape/identity checks pass in Arena and the TypeScript validator accepts the
+  transferred files (24/24). The previously rejected comma-delimited fixtures are not
+  used; the `fixtureStatus` PROVISIONAL label remains inside the files because the
+  generator constant still writes it — removing that marker is a later Owner call.
+- **Environment finding recorded** (runbook §0A, already process-scope only): an external
+  `TargetPath` process variable from another local toolset was imported by MSBuild as a
+  global property and hijacked output resolution; removal from the current PowerShell
+  process (`Remove-Item Env:TargetPath -ErrorAction SilentlyContinue`) resolved it. Not a
+  WJSS dependency or repository defect; no User/Machine deletion, no repository-side
+  override, no suppression — and none is ever added.
+- **Test policy agreed for subsequent checkpoints** (runbook §11): automated tests only for
+  product behavior, safety invariants, public/wire contracts, deterministic state
+  transitions, cross-language parity, and meaningful product-impacting regressions;
+  compiler, analyzers, parsers, the boundary scanner, and focused semantic review carry
+  syntax/imports/analyzer-pattern/formatting/private-detail concerns instead. Existing
+  contract, mapping, startup-safety and parity tests are retained; no new tests were added
+  in this closeout.
+- **Wording residues corrected**: the CHANGELOG header placement sentence (above) now
+  states the validated repository contents, and ADR-0016 item 3 no longer describes an
+  `Environment.GetEnvironmentVariable` WebView2 probe in the 0.3A-1 kiosk (the stub contains
+  no environment probing of any kind; runtime detection begins at 0.3A-4 per ADR-0013);
+  `packages/contracts/fixtures/README.md`'s validation pointer now cites the correct runbook
+  section. README, CURRENT_STATE, STAGE_0.3A_PLAN, the validation runbook, ADR-0014 and the
+  fixture/tooling READMEs move to the validated status; dated per-round records are kept
+  untouched as state-at-the-time evidence.
+
+**PR #4: READY FOR OWNER MERGE — NOT MERGED** (the Agent never merges; merge, and any
+decision to drop the remaining `fixtureStatus` marker, is an Owner call). Stage 0.3A-2
+**NOT AUTHORIZED**; Production device access **NOT AUTHORIZED**; `spikes/**` immutable
+(roll `101be71b…3fbc5` re-verified).
 
 ### Stage 0.3A-1 — Round 6d cannon logical ordering test correction (`fix: order cannon assertions by logical position`)
 

@@ -34,11 +34,15 @@ close guarding, DPI behaviour) that must not be discovered at 0.3A-5 design time
    The shell contains **zero domain logic, zero rendering logic**. All UI truth lives in the
    React assets; all state truth lives in the Runtime.
 3. **Stage 0.3A-1 containment:** `apps/kiosk` is *compile-only*: window, message loop,
-   manifest, DPI awareness, and `Environment.GetEnvironmentVariable` detection of the
-   fixed `Microsoft.Web.WebView2.Core` name. **No WebView2 NuGet package is referenced, no
-   loader, no fallback chain, no registry probing** — ADR-0013's runtime-detection design
-   (fixed name → fixed legacy directory → documented message; **no** search walk) is
-   implemented no earlier than Stage 0.3A-4, behind its own Owner gate.
+   manifest, DPI awareness — and **nothing else**. The stub performs **no environment
+   probing of any kind**: no `Environment.GetEnvironmentVariable` read, no WebView2
+   reference of any form, no loader, no fallback chain, no registry probing. (Closeout
+   correction 2026-10-07: this item previously described an `Environment.GetEnvironmentVariable`
+   detection step that was never present in the validated stub — the review corrections of
+   rounds 1–2 removed the probe and the wording had not caught up.) ADR-0013's
+   runtime-detection design (fixed name → fixed legacy directory → documented message;
+   **no** search walk) is implemented no earlier than Stage 0.3A-4, behind its own Owner
+   gate.
 4. **Runtime-not-ready UX is in-scope for the shell** (a static local page, no network): the
    operator must be able to tell "Runtime starting / Runtime dead" from "device fault".
 

@@ -17,3 +17,8 @@ values, production thresholds, credentials, site identifiers, and any
 The publication/validation pipeline (Draft vs Published revisions, validation
 blocking, immutable in-memory snapshot, application state gates) is Stage
 0.3A-F content and is NOT implemented by these examples.
+
+Since the 2026-10-07 closeout these files are the .NET generator's own output
+(`tests/integration/ExampleFiles.cs`, transferred via the Owner handoff) — the
+sensor-map example's `tcChannels` is the exact two-entry array contract of
+ADR-0014 decision 8, and TypeScript validation of the shape passes 24/24.

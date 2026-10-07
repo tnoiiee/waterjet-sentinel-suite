@@ -10,7 +10,7 @@ Repository: `waterjet-sentinel-suite`
 
 | Item | Value |
 | --- | --- |
-| Current stage | **Stage 0.3A-1 — Product Foundation Source Checkpoint** (Owner Option-C amended gate; Owner-local .NET validation **PENDING**) |
+| Current stage | **Stage 0.3A-1 — Product Foundation Source Checkpoint** — **OWNER-LOCAL VALIDATION PASSED / DEVELOPMENT CHECKPOINT READY** (Release build 0 warnings / 0 errors; full .NET suite 61/61; TypeScript 24/24; fixture parity 7/7; boundary scan S1–S9 clean) |
 | Stage 0.1 Scope Gate | **APPROVED** |
 | Stage 0.1 implementation | **MERGED** — through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** |
@@ -21,10 +21,11 @@ Repository: `waterjet-sentinel-suite`
 | Primary UI Framework | **React selected** (Owner decision, 2026-10-07); Production transport and chart library remain `[OPEN]` |
 | Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
 | Main Development Scope Gate | **PENDING** — Stage 0.3A proceeds under the Owner's Option-C amended gate only; Stage 0.3B+ **NOT AUTHORIZED** |
-| Stage 0.3A-1 source checkpoint | **AUTHORED IN ARENA — NOT READY FOR MERGE.** .NET build **NOT RUN IN ARENA** (SDK/NuGet blocked in the sandbox); Owner-local validation per [`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) is the mandatory pre-merge gate. Stage 0.3A-2 **NOT AUTHORIZED** |
+| Stage 0.3A-1 source checkpoint | **OWNER-LOCAL VALIDATION PASSED — DEVELOPMENT CHECKPOINT READY.** Validated Owner-locally per [`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) (full verdict recorded in that document and in PR #4). Arena never ran .NET; the Owner-local result is authoritative. **PR #4: READY FOR OWNER MERGE — NOT MERGED.** Stage 0.3A-2 **NOT AUTHORIZED** |
 | Production devices | **NOT AUTHORIZED** |
-| Repository contents | Documentation, repository governance, one removable synthetic feasibility spike, and — from Stage 0.3A-1 — the unvalidated product foundation skeleton |
-| Application code | **Authored, not validated.** Stage 0.3A-1 supplies the product foundation as source only (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/boundary-scan/`); the spike remains synthetic feasibility code, not Product code. **No .NET build, restore, test, or Runtime execution success is claimed anywhere**, and committed fixtures are `PROVISIONAL STRUCTURAL FIXTURE` until the Owner-local generator run replaces them |
+| Repository contents | Documentation, repository governance, one removable synthetic feasibility spike, and — from Stage 0.3A-1 — the Owner-validated product foundation: solution + project sources, `global.json` (SDK `10.0.401`), twelve genuine Owner-local `packages.lock.json`, and the .NET-generated fixtures and examples |
+| Repository contents note | `spikes/` remains synthetic feasibility code outside the Product build graph; the 15 transferred artifacts come from the Owner's validated Working Tree (handoff commit `488b98fb…`) — Arena generated none of them |
+| Application code | **Validated for the checkpoint scope** Owner-locally (Release 0/0; 61/61; TS 24/24; parity 7/7; boundary clean; health + profile + port gates as recorded in the validation document). Arena claims no .NET execution of its own. The committed fixtures are .NET-GENERATED; the in-file `fixtureStatus` PROVISIONAL marker persists only because the generator constant still writes it — removal is a later Owner decision |
 | Application version | **NOT ESTABLISHED.** No runtime release exists. |
 | Hardware connection | **Not authorised.** Production device access is prohibited. |
 | Production Write | **Not authorised.** |

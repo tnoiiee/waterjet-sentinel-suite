@@ -140,9 +140,15 @@ shape into the product tree as .NET records. Two problems must be settled before
   TypeScript 24/24; parity 7/7; boundary scan clean). The fresh 61-test suite then showed
   2 failures that were formatting-sensitive TEST assertions (serialized-text matching
   across indented JSON), corrected in round 6c to pure structural `JsonValueKind`
-  inspection — contract, generator, serializer and fixtures untouched. One final
-  Owner-local build + fresh full-suite rerun closes the merge gate — see
-  [`../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md).
+  inspection — contract, generator, serializer and fixtures untouched.
+- **CLOSED (Owner-local, 2026-10-07):** the final Release build passed with **0 warnings /
+  0 errors** and the fresh full suite passed **61/61**; genuine restore-generated lock files
+  (12) and the .NET-generated fixtures (3, array-shaped) were committed via the Owner
+  handoff and verified statically in Arena; `global.json` now pins SDK `10.0.401`.
+  **Stage 0.3A-1 validation gate: PASSED.** This ADR moves from DRAFT toward ACCEPTED as
+  the implementation record of the accepted checkpoint; formal acceptance status remains an
+  Owner action — see
+  [`../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) §10.
 
 ## References
 

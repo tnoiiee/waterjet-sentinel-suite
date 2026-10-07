@@ -1,9 +1,11 @@
 # Stage 0.3A — Product Foundation Plan
 
-- **Status:** ACTIVE under the Owner's Option-C amended gate. Stage status at time of writing:
-  **0.3A-1 source checkpoint authored in Arena; Owner-local .NET validation PENDING;
-  0.3A-2 `[NOT AUTHORIZED]`.** This file is a working plan, not an approval; the approvals
-  that matter are the Owner's gate messages and the protected ADRs.
+- **Status:** ACTIVE under the Owner's Option-C amended gate. Stage status (closeout of
+  2026-10-07): **0.3A-1 OWNER-LOCAL VALIDATION PASSED — development checkpoint READY;
+  PR #4 READY FOR OWNER MERGE (not merged); genuine lock files + .NET-generated fixtures
+  committed; SDK pinned (`global.json` → `10.0.401`); 0.3A-2 `[NOT AUTHORIZED]`.** This
+  file is a working plan, not an approval; the approvals that matter are the Owner's gate
+  messages and the protected ADRs.
 - **Date:** 2026-10-07
 - **Governing records:** [`decisions/README.md`](decisions/README.md) (stages 0.1/0.2 status),
   [`ROADMAP.md`](ROADMAP.md), [`MASTER_PLAN.md`](MASTER_PLAN.md), and the stage-0.3A DRAFT
@@ -51,14 +53,18 @@ amended Scope Gate and is re-checked at each substage boundary.
 - No production transport implementation, no UI build pipeline, no chart rendering, no
   historian persistence, no alarms, no auth — those are 0.3A-3..-6 / later stages.
 - No WebView2 reference, no new NuGet/ npm packages beyond the approved minimum set.
-- No `global.json`, no lockfile fabrication, no CI definitions in 0.3A-1.
+- No lockfile fabrication, no CI definitions in 0.3A-1. The `global.json` prohibition held
+  while no build had ever run; at the 2026-10-07 closeout the Owner directed pinning the
+  validated SDK (`10.0.401`, `rollForward: latestPatch`) and committed the twelve genuine
+  restore-generated lock files via handoff — both are Owner decisions recorded in the
+  validation document §10, not Arena constructions.
 - No spike deletion/move; no ZIP archive until Stage 0.3 exits (Owner rule).
 
 ## 5. Substage plan
 
 | Substage | Content | Exit gate |
 | --- | --- | --- |
-| **0.3A-1** | This checkpoint: source skeleton, contracts, tests source, fixtures (provisional), scan tool, docs/ADRs draft | Owner-local validation run PASS → PR merge |
+| **0.3A-1** | This checkpoint: source skeleton, contracts, tests source, fixtures, scan tool, docs/ADRs draft | **Exit gate SATISFIED — see correction below: Owner-local validation run PASS (61/61; 0/0 build; parity 7/7) → PR merge by Owner** |
 | **0.3A-2** | Runtime event loop: simulator tick → snapshot/delta publication, SSE framing, heartbeat, re-snapshot on gap (per ADR-0015 draft) | tests + Owner smoke via curl |
 | **0.3A-3** | Config loading pipeline: example → published-config normalization, validation errors, revisioning | config tests green on Windows |
 | **0.3A-4** | Kiosk behaviour: WebView2 detection design implemented (ADR-0013 §detection), Runtime supervision, close guard | manual Owner checklist on workstation |

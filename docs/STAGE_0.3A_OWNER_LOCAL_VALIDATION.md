@@ -18,10 +18,13 @@
 dotnet --version
 ```
 
-Required: .NET **10.0 SDK** (any 10.0.x servicing band; record the exact version in the
-evidence template). There is intentionally **no `global.json`** in the repository — pinning a
-SDK would be an unverified claim. If `dotnet` is missing or < 10.0, **STOP**: install/update the
-SDK, then start at step 1. Record the outcome even in this case.
+Required: .NET SDK **10.0.401** exactly as pinned by the repository-root `global.json`
+(`rollForward: latestPatch` — the Owner-validated stable SDK; the pin was added at the
+2026-10-07 closeout, superseding the former intentional absence, which existed only while no
+build had ever run; no Preview/RC is referenced or accepted). `dotnet --version` must satisfy
+the pin; record the exact version in the evidence template. If `dotnet` is missing or does not
+satisfy the pin, **STOP**: install/update the SDK, then start at step 1. Record the outcome even
+in this case.
 
 ## 0A. Pre-build environment check (added after round 2)
 
@@ -72,11 +75,12 @@ The NuGet pins (`Microsoft.NET.Test.Sdk 17.12.0`, `xunit 2.9.2`, `xunit.runner.v
 If restore fails for version reasons, note the exact error; substituting a nearby version is
 allowed **only** if recorded in the evidence template as a pin amendment (and mirrored into
 `Directory.Packages.props` in the fix commit). Lock files: the first real restore legitimately
-GENERATES a `packages.lock.json` per project. Leave the generated set **untracked and
-untouched** throughout validation — do not delete, clean, or edit them, and do not commit them
-during the run. They are assessed and committed only after the FULL validation passes, by
-explicit Owner decision (round-3 policy of 2026-10-07; supersedes the earlier "do not commit
-one from this run" shorthand).
+GENERATES a `packages.lock.json` per project. Leave the generated set **untouched during the
+run** — never hand-author or edit a lock file. They are assessed and committed only after the
+FULL validation passes, by explicit Owner decision (round-3 policy of 2026-10-07). **Status at
+closeout:** this gate has been satisfied — the twelve genuine Owner-local lock files were
+committed via the handoff (`488b98fb…`) after the passing run; future restores must keep them
+in sync through real restores, not manual edits.
 
 ## 3. Build everything (including the Windows-only kiosk)
 
@@ -194,7 +198,7 @@ git rev-parse HEAD: ______
    value recorded here only if the Owner elects to quote it): ______
 2 restore: PASS/FAIL   notes: ______
   resolved pins: Microsoft.NET.Test.Sdk ___ xunit ___ xunit.runner.visualstudio ___
-  packages.lock.json generated (left untracked): count ___
+  packages.lock.json committed (genuine, from the passing restore): count 12 at closeout
 3 build (Release, sln): PASS/FAIL   warning count: ___ (list below if >0)
 4 dotnet test (sln): PASS/FAIL
   Wjss.Domain.Tests ___ / Wjss.Runtime.Core.Tests ___ / Wjss.Runtime.Api.Tests ___
@@ -214,6 +218,45 @@ explicitly. A FAIL keeps the PR open; no substage advances on partial passes.
 
 Until the completed template exists in the PR: no claim that anything compiles, restores,
 passes, or runs. Arena-side validation covers only: JSON parseability, the TypeScript mirror
-(typecheck + 14 structural tests + fixture validation), the boundary scan, and the
-documentation/consistency checks recorded in the PR description. The fixtures remain
-`PROVISIONAL STRUCTURAL FIXTURE` until step 5 replaces them through the .NET generator.
+(typecheck + 24 structural tests + fixture validation), the boundary scan, and the
+documentation/consistency checks recorded in the PR description. (Closeout of 2026-10-07:
+the template was completed and posted; the Owner-local verdict is recorded in §10; the
+committed fixtures are the genuine .NET-generated files transferred from the validated
+Working Tree — the in-file `fixtureStatus` PROVISIONAL label persists only because the
+generator constant still writes it.)
+
+## 10. FINAL VERDICT — Stage 0.3A-1 (Owner-local, 2026-10-07)
+
+**STAGE 0.3A-1 OWNER-LOCAL VALIDATION PASSED.** Recorded from the Owner's authoritative run
+at predecessor `685e056` / final test state `a9ef185` (full Release build completed
+successfully immediately before the fresh full-suite run, which is what makes the result
+authoritative):
+
+| Gate | Result |
+| --- | --- |
+| Release build (full solution) | **PASS** — 0 warnings, 0 errors, 12/12 projects, 3.7 s |
+| Fresh full .NET suite | **61 / 61 passed**, 0 failed, 0 skipped (5.5 s) |
+| .NET SDK / xUnit runtime | **10.0.401** / .NET 10.0.12 |
+| TypeScript mirror | **24 / 24 PASS** |
+| Fixture parity (FixtureEmission) | **7 / 7 PASS** |
+| Boundary scan | **0 findings**, S1–S9 clean |
+| Health endpoints | live **200** (`ALIVE`, `SIMULATOR`, `runtimeImplemented=false`, `STAGE_03A1_SKELETON`); ready **503** (`RUNTIME_NOT_IMPLEMENTED`) |
+| Profile fail-closed gates | SIMULATOR starts; TEST_HARDWARE refused exit **2**; PRODUCTION refused exit **2**; invalid profile refused exit **4**; no silent fallback with `--no-launch-profile` |
+| Port collision (5181) | explicit refusal, exit **3** |
+| tcChannels structural contract | 108 slots / 106 sensors / 2 cannons / exact-two arrays / 212 = 212 unique / 0 duplicates / I7+I16 channel-free / walls 24-29-24-29 (CLR `System.Object[]`) |
+| Environment prerequisite (§0A) | `TargetPath` (external toolset, process-scoped) — removal resolves; **not** a WJSS defect; runbook keeps process-scope cleanup only |
+| Artifacts at closeout | 12 genuine `packages.lock.json` + 3 .NET-generated fixtures transferred from the validated Working Tree (handoff `488b98fb…`); Arena generated none |
+
+**Outcome: PR #4 READY FOR OWNER MERGE (not merged — the Agent never merges).** Stage 0.3A-2
+NOT AUTHORIZED. Production device access NOT AUTHORIZED.
+
+## 11. Test policy for subsequent checkpoints (agreed at closeout)
+
+Add automated tests **only** for: product behavior; safety invariants; public or wire
+contracts; deterministic state transitions; cross-language parity; and meaningful regressions
+with product impact. Do **not** add tests solely for: syntax errors, missing imports,
+compiler-detectable mistakes, analyzer-detectable patterns, documentation wording, JSON
+whitespace or formatting, private implementation details, or test code testing other test
+code. Rely instead on: the compiler, analyzers, XML/JSON parsers, the static boundary scanner,
+and focused semantic code review. Existing meaningful contract, mapping, startup-safety and
+parity tests stay.
