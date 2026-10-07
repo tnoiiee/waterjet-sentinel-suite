@@ -31,6 +31,55 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-2A — Runtime State Foundation, Checkpoint A (`feat: add runtime state store and deterministic simulator initial state`)
+
+**Source-only checkpoint (Arena authored; NOT COMPILED and NOT EXECUTED in Arena).** Under the
+Owner's 2026-10-07 instruction, Stage 0.3A-2 is delivered in three checkpoints (A → B → C) on
+one branch, SIMULATOR profile only. This is Checkpoint A: the in-memory Runtime State Store and
+the deterministic SIMULATOR initial state, projected as `wjss.snapshot/1`.
+
+Added:
+
+- **Runtime State Store** (`packages/application/Runtime/`): single authoritative writer issued
+  once per store (`WRITER_ALREADY_ACTIVE` on a second request); immutable `RuntimeState`
+  revisions with read-only collection wrappers copied at the ingest point; monotonic and
+  gapless revision progression (`REVISION_NOT_NEXT`, `REVISION_NOT_MONOTONIC`); full validation
+  before the published reference is swapped, so a refused commit leaves state, revision and
+  history untouched (atomic, no partial commit); bounded revision-activity history
+  (1–1024, default 64) and bounded trend window; no static mutable state.
+- **Protected-baseline invariants** (`RuntimeStateInvariants`): 108 logical slots, 106 Sensor
+  projections in ScanOrder 1–106, 212 distinct Thermocouple channels, Cannon slots only at
+  logical I7/I16, wall counts 24/29/24/29, queue capacity 8 with contiguous positions, bounded
+  trend width, alarm counters equal to their items, device health only for configured devices,
+  SIMULATOR-only states. Each refusal carries a stable machine code (`RuntimeRefusalCodes`).
+- **Deterministic SIMULATOR initial state**: `packages/time/UtcTimestamps.cs` (one wire
+  timestamp encoding), `RuntimeStateComposer` (initial revision 1; no Active Job; GlobalQueue
+  empty at revision 0; every sequence control disabled with
+  `CONTROL_NOT_IMPLEMENTED_STAGE_03A_2A`; Pump STOPPED with `ready = false`, pressure null and
+  zeroed setpoint/band because no pump configuration is published in this substage; communication
+  health publishes no fabricated device evidence; bounded trend window empty) and
+  `RuntimeSnapshotProjector` (envelope identity, explicit-null `activeJob`, SSE/historian blocks
+  reported unwired). The composition runs `Wjss.Domain.ProfileStartPolicy`, so TEST_HARDWARE and
+  PRODUCTION are refused at composition exactly as they are refused at startup.
+- **Simulator synthetic source** (`adapters/simulator/Synthetic/`): `SyntheticSeed`,
+  `DeterministicValueSource` (splitmix64) and `SyntheticSensorMap` (canonical map + seeded
+  initial Sensor projection). The map composition is parity-tested against the committed
+  `config/examples/sensor-map.example.json`; the fixture generator is untouched and its
+  unification with this source is recorded `[OPEN]`.
+- **Tests** (`tests/runtime.tests/`, source-authored, not executed in Arena): state-store
+  contract, protected-baseline invariants with machine-code assertions, snapshot projection,
+  deterministic initial state and synthetic-map parity. `StageMarkerTests` migrates the
+  Stage 0.3A-1 "empty staging area" assertion to the state-foundation identity.
+- **Records**: `docs/CURRENT_STATE.md` §11.5 + §12.23, `docs/STAGE_0.3A_PLAN.md` §5/§9,
+  runbook §12 (Owner-local commands for Checkpoint A), adapter README.
+
+Arena verification: boundary scan **0 findings (S1–S9 clean)**, exit 0 on the changed worktree;
+C# balance/whitespace/final-newline sweep clean; `git diff --cached --check` clean;
+contract-member cross-check performed by review. **NOT VERIFIED:** every .NET claim (restore,
+Release build, xUnit run), the `tests/runtime.tests/packages.lock.json` refresh required by the
+new simulator project reference (real Owner-local restore only — never hand-edited), and
+Checkpoints B and C (not started). Owner-local validation: runbook §12.
+
 ### Stage 0.3A-1 — Final Owner-Local Evidence Closeout (`chore: close Stage 0.3A-1 validation evidence`)
 
 **STAGE 0.3A-1 OWNER-LOCAL VALIDATION PASSED.** Owner-local at predecessor `685e056` /

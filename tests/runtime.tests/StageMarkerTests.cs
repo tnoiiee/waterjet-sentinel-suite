@@ -5,8 +5,12 @@ using Xunit;
 namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
-/// Pins the Stage 0.3A-1 markers. If 0.3A-2 lands and someone removes the
-/// marker while /health/ready still answers it, these tests must fail.
+/// Pins the stage markers and the identity of the Runtime core assembly.
+///
+/// Stage 0.3A-1 asserted that Wjss.Runtime.Core was an empty staging area. Stage
+/// 0.3A-2A replaces that authored-time statement with the state-foundation
+/// identity, and the 0.3A-1 marker constants stay pinned because the readiness
+/// payload keeps answering them until a later checkpoint replaces the answer.
 /// </summary>
 public sealed class StageMarkerTests
 {
@@ -18,15 +22,15 @@ public sealed class StageMarkerTests
     }
 
     [Fact]
-    public void Core_Assembly_Is_Empty_Wired_Staging_Area()
+    public void Core_Assembly_Is_Wired_And_Carries_The_State_Foundation()
     {
-        // Wjss.Runtime.Core has no public types at 0.3A-1 by design (0.3A-2
-        // adds the single-writer engine). Loading by name proves the project
-        // is in the solution graph and its output is reachable; the compiler
-        // does not bake a static reference to an assembly no type is used
-        // from, so we resolve it through the default load context instead.
+        // Loading by name proves the project is in the solution graph and its
+        // output is reachable; the runtime state foundation is the core's first
+        // public surface (Stage 0.3A-2A).
         var loaded = Assembly.Load(new AssemblyName("Wjss.Runtime.Core"));
+
         Assert.Equal("Wjss.Runtime.Core", loaded.GetName().Name);
-        Assert.Empty(loaded.GetExportedTypes());
+        Assert.Equal(typeof(RuntimeStateStore).Assembly, loaded);
+        Assert.Equal("STAGE_03A2A_STATE_STORE", RuntimeStage.Marker);
     }
 }

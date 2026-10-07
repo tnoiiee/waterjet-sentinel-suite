@@ -1,11 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    WJSS Equipment Runtime core. Stage 0.3A-1: marker + wiring only. The
-    single-writer authoritative state engine, revision generation, snapshot /
-    delta generation, shutdown boundaries and simulator composition arrive in
-    Stage 0.3A-2 and are NOT AUTHORIZED yet.
-    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA.
+    WJSS Equipment Runtime core.
+
+    Stage 0.3A-2A (authorized): the single-writer Runtime State Store, the
+    immutable Runtime revision, the protected-baseline invariants, wall-summary
+    recalculation, the deterministic initial-state composition (SIMULATOR only)
+    and the wjss.snapshot/1 projection. Nothing else is implemented: revision
+    deltas, SSE, command routes, queue dispatch, job execution, pump and valve
+    control and configuration publication remain outside this checkpoint.
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. The Owner-local build and
+    test run are the validation of record.
   -->
 
   <PropertyGroup>

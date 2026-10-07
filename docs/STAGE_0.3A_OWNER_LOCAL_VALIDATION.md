@@ -260,3 +260,53 @@ whitespace or formatting, private implementation details, or test code testing o
 code. Rely instead on: the compiler, analyzers, XML/JSON parsers, the static boundary scanner,
 and focused semantic code review. Existing meaningful contract, mapping, startup-safety and
 parity tests stay.
+
+## 12. Stage 0.3A-2A Checkpoint A — Owner-local validation (appended 2026-10-07)
+
+Checkpoint A (Runtime State Foundation, SIMULATOR-only) changes `packages/application`,
+`packages/time`, `adapters/simulator` and `tests/runtime.tests` only. `apps/runtime` is
+**unchanged**, so the §7 health smoke still returns the 0.3A-1 answers
+(`live` 200 ALIVE/SIMULATOR/`runtimeImplemented=false`/`STAGE_03A1_SKELETON`; `ready` 503
+`RUNTIME_NOT_IMPLEMENTED`) and is expected to stay that way until Checkpoint C.
+
+Prerequisites are §0 (SDK **10.0.401** exactly) and §0A (no process-scope `TargetPath`).
+
+```powershell
+git fetch origin arena/873f0015-waterjet-sentinel-suite
+git switch arena/873f0015-waterjet-sentinel-suite
+
+# FIRST restore after the new project reference (see the lock note below).
+# This is a real restore: it refreshes tests/runtime.tests/packages.lock.json.
+dotnet restore WaterJetSentinelSuite.sln
+
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build
+```
+
+Expected: Release build 0 warnings / 0 errors; the 61 existing tests still pass; the new
+Runtime-core tests in `Wjss.Runtime.Core.Tests` pass (Arena executes nothing, so the count is
+**not claimed** here — record the observed numbers in the PR comment). Optional focused run:
+
+```powershell
+dotnet test tests/runtime.tests -c Release --no-build --logger "console;verbosity=detailed"
+```
+
+**Lock-file note (round-3 policy still applies).** Checkpoint A adds
+`Wjss.Adapters.Simulator` as a project reference of `tests/runtime.tests` (the composition the
+runtime will use: SIMULATOR source → contracts → Runtime core). The affected
+`tests/runtime.tests/packages.lock.json` must therefore be refreshed **by the real restore
+above**, never hand-edited, and committed with the checkpoint review. The other eleven lock
+files are expected to be unchanged; report any other diff instead of accepting it silently.
+
+**Expected evidence to record.** Build result and warning count; per-project test counts; the
+boundary scan result (`node tools/boundary-scan/boundary-scan.mjs .` — must exit 0); the
+`tests/runtime.tests/packages.lock.json` diff; a statement of anything that differs from the
+expectations above. If any Runtime-core test fails, that is a Checkpoint A defect: stop and
+report it rather than adjusting the test to match the code.
+
+**Recorded discrepancy (not silently repaired).** Section 7 above writes the smoke paths as
+`/api/v1/health/live` and `/api/v1/health/ready`, which do not match the implemented route
+constants (`ApiRoutes.HealthLive` = `/health/live`, `ApiRoutes.HealthReady` = `/health/ready`,
+the paths the Owner's Stage 0.3A-2 instruction also names). Section 7 is a dated Stage 0.3A-1
+record and is left unmodified; the Owner-local smoke for this checkpoint should use
+`http://127.0.0.1:5181/health/live` and `http://127.0.0.1:5181/health/ready`.

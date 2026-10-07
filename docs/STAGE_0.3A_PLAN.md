@@ -75,6 +75,16 @@ Ordering note (Owner ruling): **0.3A-5 is UI-first** — the product UI is valid
 the Runtime stream before any historian/alarm scope is added, mirroring how the spike earned
 trust.
 
+**0.3A-2 delivery split (Owner instruction 2026-10-07):** 0.3A-2 is delivered in three
+checkpoints on one branch and one pull request — **A** Runtime State Store + deterministic
+SIMULATOR initial state + `wjss.snapshot/1` projection (source authored; see
+[`CURRENT_STATE.md`](CURRENT_STATE.md) §11.5/§12.23); **B** synthetic evolution + Snapshot/Delta
+foundation (gapless revisions, bounded Delta history, re-snapshot on detected gap); **C**
+read-only Runtime API (`GET /api/v1/snapshot`, `GET /api/v1/runtime`, `GET /health/live`,
+`GET /health/ready`) + the lightweight dev-only Runtime Inspector UI. SSE stays out of scope
+unless the Inspector demonstrably requires it — polling is preferred. The 0.3A-2 row above
+describes the substage as originally planned and is preserved as authored-time state.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins
@@ -117,6 +127,22 @@ order and TC channel mapping currently live in the shared generator
 duplicate. **0.3A-2 scope:** seeded acquisition inside the adapter, tick-based state evolution,
 injectable faults (gap, stale, refusal). Determinism is a hard requirement either way: same
 seed ⇒ same fixture bytes — this is what makes `FixtureParityTests` meaningful.
+
+**0.3A-2A state (Checkpoint A):** `adapters/simulator/Synthetic/` now supplies the canonical
+synthetic map (`SyntheticSensorMap`: 108 slots / 106 Sensors / 2 Cannon slots at logical I7 and
+I16, row-major scan order, device distribution 14 + 14 + 13 × 6, `SYN-TC-nn:CHmm` channel
+identities) and the seeded initial Sensor projection (`SyntheticSeed`,
+`DeterministicValueSource` — splitmix64; no `System.Random`, no static mutable state). The
+project depends only on `Wjss.Contracts` and `Wjss.Time`, so the Runtime composes its first
+revision from a SIMULATOR source without any application-layer reference. A runtime-side parity
+test pins the map composition to the committed `config/examples/sensor-map.example.json`.
+
+**Deferred, not silently diverged:** the "reuse rather than duplicate" consolidation between
+this source and `tests/integration/FixtureGenerator.cs` is `[OPEN]` — the fixture-side
+provisional formulas are untouched in 0.3A-2A, and the Runtime's synthetic values are
+seed-derived presentation values, deliberately **not** claimed equal to the fixture generator's
+`ScoreFor` formula. Seeded tick evolution, quality/classification evolution and fault injection
+remain Checkpoint B scope.
 
 ## 10. Runtime API and health
 
