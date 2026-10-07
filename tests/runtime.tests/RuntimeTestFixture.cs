@@ -2,6 +2,7 @@ using System.Text.Json;
 using Wjss.Adapters.Simulator;
 using Wjss.Contracts;
 using Wjss.Time;
+using Xunit;
 
 namespace Wjss.Runtime.Core.Tests;
 
@@ -60,6 +61,43 @@ internal static class RuntimeTestFixture
         HistoryDepth = 1,
         HistoryCapacity = historyCapacity,
     };
+
+    /// <summary>
+    /// Structural comparison of two bounded-trend sequences.
+    ///
+    /// <see cref="TrendPoint"/> carries its fixed-width series as a
+    /// <c>double?[]</c>, and the compiler-generated record equality compares that
+    /// array by REFERENCE: two independently produced points with identical values
+    /// are not equal through <c>Assert.Equal</c>. This helper compares the fields
+    /// the contract defines - <c>T</c>, the series length and every element value,
+    /// <c>Setpoint</c>, <c>JobActive</c> and <c>AlarmActive</c> - so the assertion
+    /// tests the presented values rather than the array identity. The contract type
+    /// is deliberately left unchanged; this is a comparison helper only.
+    /// </summary>
+    internal static void AssertTrendPointsEquivalent(
+        IReadOnlyList<TrendPoint> expected,
+        IReadOnlyList<TrendPoint> actual)
+    {
+        Assert.Equal(expected.Count, actual.Count);
+
+        for (var index = 0; index < expected.Count; index++)
+        {
+            var expectedPoint = expected[index];
+            var actualPoint = actual[index];
+
+            Assert.Equal(expectedPoint.T, actualPoint.T);
+            Assert.Equal(expectedPoint.Series.Length, actualPoint.Series.Length);
+
+            for (var series = 0; series < expectedPoint.Series.Length; series++)
+            {
+                Assert.Equal(expectedPoint.Series[series], actualPoint.Series[series]);
+            }
+
+            Assert.Equal(expectedPoint.Setpoint, actualPoint.Setpoint);
+            Assert.Equal(expectedPoint.JobActive, actualPoint.JobActive);
+            Assert.Equal(expectedPoint.AlarmActive, actualPoint.AlarmActive);
+        }
+    }
 
     /// <summary>
     /// Serializes the snapshot projection of one state under the contract

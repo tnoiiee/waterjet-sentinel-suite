@@ -189,7 +189,11 @@ public sealed class RuntimeDeltaHistory
         }
     }
 
-    /// <summary>Finds the retained Delta of one revision, or null.</summary>
+    /// <summary>
+    /// Finds the retained Delta whose OWN revision is the given revision, or null.
+    /// This is the step that produced that revision, not the step that continues it;
+    /// the continuation lookup is internal to <see cref="CatchUpFrom"/>.
+    /// </summary>
     public RuntimeDelta? Find(int revision)
     {
         lock (_gate)
@@ -200,9 +204,12 @@ public sealed class RuntimeDeltaHistory
 
     /// <summary>
     /// Builds the gapless apply-order chain that advances a consumer from
-    /// <paramref name="revision"/> to the newest retained revision. When any link
-    /// is missing (an evicted or never-recorded revision), the result requires a
-    /// fresh Snapshot: no Delta is inferred and nothing past the gap is offered.
+    /// <paramref name="revision"/> to the newest retained revision. Each link is the
+    /// retained Delta whose <c>previousRevision</c> is the consumer's current
+    /// revision, so the first link continues <paramref name="revision"/> exactly.
+    /// When any link is missing (an evicted or never-recorded revision), the result
+    /// requires a fresh Snapshot: no Delta is inferred and nothing past the gap is
+    /// offered.
     /// </summary>
     public RuntimeDeltaCatchUp CatchUpFrom(int revision)
     {
@@ -229,7 +236,12 @@ public sealed class RuntimeDeltaHistory
 
             while (current < newest)
             {
-                var next = FindUnlocked(current);
+                // The Delta that CONTINUES the consumer's revision is the one whose
+                // previousRevision is that revision. Selecting a Delta by its own
+                // revision instead would pick the step the consumer has already
+                // applied, which either reports a spurious gap or walks the same
+                // entry forever.
+                var next = FindContinuingUnlocked(current);
                 if (next is null)
                 {
                     return RuntimeDeltaCatchUp.NeedsSnapshot(
@@ -252,6 +264,24 @@ public sealed class RuntimeDeltaHistory
         for (var index = 0; index < _entries.Count; index++)
         {
             if (_entries[index].Revision == revision)
+            {
+                return _entries[index];
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The retained Delta that continues <paramref name="previousRevision"/>: the
+    /// step whose own <c>previousRevision</c> is that revision and which therefore
+    /// advances a consumer holding it to <c>previousRevision + 1</c>.
+    /// </summary>
+    private RuntimeDelta? FindContinuingUnlocked(int previousRevision)
+    {
+        for (var index = 0; index < _entries.Count; index++)
+        {
+            if (_entries[index].PreviousRevision == previousRevision)
             {
                 return _entries[index];
             }

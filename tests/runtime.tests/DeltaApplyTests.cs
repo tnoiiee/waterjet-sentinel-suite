@@ -45,7 +45,7 @@ public sealed class DeltaApplyTests
         Assert.Equal(direct.GeneratedAtUtc, reconstructed.GeneratedAtUtc);
         Assert.Equal(direct.Sensors, reconstructed.Sensors);
         Assert.Equal(direct.Walls, reconstructed.Walls);
-        Assert.Equal(direct.Trend.Points, reconstructed.Trend.Points);
+        RuntimeTestFixture.AssertTrendPointsEquivalent(direct.Trend.Points, reconstructed.Trend.Points);
         Assert.Equal(direct.ActiveJob, reconstructed.ActiveJob);
         Assert.Equal(RuntimeTestFixture.SerializeSnapshot(direct), RuntimeTestFixture.SerializeSnapshot(reconstructed));
     }
@@ -116,7 +116,7 @@ public sealed class DeltaApplyTests
         var writer = store.CreateWriter();
         var state = store.Current;
 
-        var (_, delta) = RuntimeDeltaTestFixture.CommitTick(
+        var (committed, delta) = RuntimeDeltaTestFixture.CommitTick(
             writer, state, 1, RuntimeTestFixture.Instant.AddSeconds(1));
 
         var wrongWalls = delta with
@@ -172,9 +172,14 @@ public sealed class DeltaApplyTests
         Assert.Equal(RuntimeRefusalCodes.StateInvalid, duplicateOutcome.Code);
         Assert.Null(duplicateOutcome.State);
 
-        // Nothing above touched the consumer revision.
+        // Nothing above touched either revision. The setup tick published exactly one
+        // revision (tick 1 advances the composed revision 1 to revision 2), so the
+        // store still holds that commit while the consumer state under test is
+        // untouched at revision 1: the four refusals applied nothing anywhere.
         Assert.Equal(1, state.Revision);
-        Assert.Equal(1, store.CurrentRevision);
+        Assert.Equal(2, store.CurrentRevision);
+        Assert.Equal(delta.Revision, store.CurrentRevision);
+        Assert.Same(committed, store.Current);
     }
 
     [Fact]

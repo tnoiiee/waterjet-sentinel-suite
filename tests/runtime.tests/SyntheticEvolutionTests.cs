@@ -41,7 +41,7 @@ public sealed class SyntheticEvolutionTests
 
             Assert.Equal(first.Sensors, second.Sensors);
             Assert.Equal(first.Walls, second.Walls);
-            Assert.Equal(first.Trend.Points, second.Trend.Points);
+            RuntimeTestFixture.AssertTrendPointsEquivalent(first.Trend.Points, second.Trend.Points);
             Assert.Equal(
                 RuntimeTestFixture.SerializeSnapshot(first),
                 RuntimeTestFixture.SerializeSnapshot(second));

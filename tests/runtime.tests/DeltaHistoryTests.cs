@@ -11,11 +11,19 @@ namespace Wjss.Runtime.Core.Tests;
 /// </summary>
 public sealed class DeltaHistoryTests
 {
-    /// <summary>Revisions retained by a capacity-3 history after five appends, newest first.</summary>
-    private static readonly int[] RetainedRevisionsNewestFirst = [5, 4, 3];
+    /// <summary>
+    /// Revisions retained by a capacity-3 history after five appends, newest first.
+    /// The composed initial revision is 1 and every accepted tick commits exactly one
+    /// successor, so five ticks produce Delta revisions 2, 3, 4, 5 and 6; a capacity-3
+    /// window evicts the oldest two and keeps 4, 5 and 6.
+    /// </summary>
+    private static readonly int[] RetainedRevisionsNewestFirst = [6, 5, 4];
 
-    /// <summary>The gapless apply-order chain that advances a consumer from revision 2 to revision 5.</summary>
-    private static readonly int[] CatchUpChainApplyOrder = [3, 4, 5];
+    /// <summary>
+    /// The gapless apply-order chain that advances a consumer holding revision 3 -
+    /// the oldest revision the retained window still continues - to revision 6.
+    /// </summary>
+    private static readonly int[] CatchUpChainApplyOrder = [4, 5, 6];
 
     [Fact]
     public void Capacities_Are_Explicit_And_Independent_Of_The_Revision_History()
@@ -52,13 +60,17 @@ public sealed class DeltaHistoryTests
         }
 
         Assert.Equal(3, history.Count);
-        Assert.Equal(5, history.NewestRevision);
-        Assert.Equal(3, history.OldestRevision);
+        Assert.Equal(6, history.NewestRevision);
+        Assert.Equal(4, history.OldestRevision);
         Assert.Equal(RetainedRevisionsNewestFirst, history.NewestFirst.Select(delta => delta.Revision).ToArray());
-        Assert.Null(history.Find(2));
-        var found = history.Find(3);
+
+        // The eviction boundary, derived from the same sequence: Delta revisions 2
+        // and 3 were evicted, so revision 4 is both the oldest retained entry and the
+        // step that continues revision 3.
+        Assert.Null(history.Find(3));
+        var found = history.Find(4);
         Assert.NotNull(found);
-        Assert.Equal(2, found.PreviousRevision);
+        Assert.Equal(3, found.PreviousRevision);
 
         // Re-appending the newest Delta is refused and changes nothing.
         Assert.Throws<InvalidOperationException>(() => history.Append(deltas[^1]));
@@ -96,23 +108,24 @@ public sealed class DeltaHistoryTests
             history.Append(delta);
         }
 
-        // Revisions 3, 4 and 5 are retained; a consumer at 2 can be advanced.
-        var complete = history.CatchUpFrom(2);
+        // Revisions 4, 5 and 6 are retained, and the window still continues revision 3,
+        // so a consumer holding 3 is advanced to 6 in apply order.
+        var complete = history.CatchUpFrom(3);
 
         Assert.True(complete.Available);
         Assert.Equal(RuntimeDeltaCatchUp.CompleteCode, complete.Code);
-        Assert.Equal(2, complete.FromRevision);
-        Assert.Equal(5, complete.ToRevision);
+        Assert.Equal(3, complete.FromRevision);
+        Assert.Equal(6, complete.ToRevision);
         Assert.Equal(CatchUpChainApplyOrder, complete.Chain.Select(delta => delta.Revision).ToArray());
-        Assert.Equal(2, complete.Chain[0].PreviousRevision);
+        Assert.Equal(3, complete.Chain[0].PreviousRevision);
         Assert.Equal(complete.Chain[0].Revision, complete.Chain[1].PreviousRevision);
         Assert.Equal(complete.Chain[1].Revision, complete.Chain[2].PreviousRevision);
 
         // The consumer that is already current gets an empty, available chain.
-        var current = history.CatchUpFrom(5);
+        var current = history.CatchUpFrom(6);
         Assert.True(current.Available);
         Assert.Empty(current.Chain);
-        Assert.Equal(5, current.ToRevision);
+        Assert.Equal(6, current.ToRevision);
     }
 
     [Fact]
@@ -124,13 +137,13 @@ public sealed class DeltaHistoryTests
             history.Append(delta);
         }
 
-        // Revision 2 was evicted, so the chain from 1 has a gap: it is not
-        // inferred, filled in or continued past.
+        // The Delta that continues revision 1 is revision 2, which was evicted, so the
+        // chain from 1 has a gap: it is not inferred, filled in or continued past.
         var gap = history.CatchUpFrom(1);
         Assert.False(gap.Available);
         Assert.Equal(RuntimeRefusalCodes.ResnapshotRequired, gap.Code);
         Assert.Empty(gap.Chain);
-        Assert.Equal(5, gap.ToRevision);
+        Assert.Equal(6, gap.ToRevision);
 
         // A consumer ahead of the newest retained revision cannot go backwards.
         var ahead = history.CatchUpFrom(9);
