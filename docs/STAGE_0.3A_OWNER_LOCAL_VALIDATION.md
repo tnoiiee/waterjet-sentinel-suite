@@ -369,3 +369,26 @@ automated test in `tests/runtime.tests/`; no item is claimed as executed in Aren
    through the Snapshot projection.
 8. The three Active Job states on the wire: absent key, object, explicit null.
 9. `TEST_HARDWARE` and `PRODUCTION` remain refused at the startup gate and the evolution gate.
+
+### 13.1 Checkpoint B Owner-local result (2026-10-07) — PASSED
+
+Recorded from the Owner's run; Arena did not execute any .NET command.
+
+| Item | Observed |
+| --- | --- |
+| Validated head | `cfa6d4a376bbf10a87db2349045cb6b9b57bb544` (consolidated correction after the Checkpoint B feature commit `619f999`) |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Full .NET tests | **129 total / 129 passed / 0 failed / 0 skipped** |
+| Locked restore | **PASS** |
+| Lock drift | **NONE** |
+| Boundary scan (S1–S9) | **0 findings** |
+| Working Tree | **CLEAN** |
+
+Correction rounds validated by this run: `dd45bf6` (CS0102), `8692b77` (test-source alignment),
+`cfa6d4a` (consolidated). **Product behaviour changed in exactly one place** —
+`RuntimeDeltaHistory.CatchUpFrom` now selects the Delta that continues the consumer revision
+(`previousRevision` match) rather than the Delta whose own revision equals it; the other five
+findings were test-side (structural `TrendPoint` comparison via
+`RuntimeTestFixture.AssertTrendPointsEquivalent`, and three re-derived revision expectations).
+Checkpoint B is complete for a development checkpoint and **not merged**. **Checkpoint C is
+authorized**; `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.

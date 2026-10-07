@@ -119,6 +119,22 @@ Boundaries this record fixes (all inside `packages/application/Runtime/`, plus t
 Checkpoint B deliberately implements none of Checkpoint C: no runtime API route beyond the
 existing health stub, no Runtime Inspector UI, no write or command endpoint, no SSE.
 
+**Status after Checkpoint B validation (2026-10-07).** B is **OWNER-LOCALLY VALIDATED** at
+`cfa6d4a` (Release build 0 warnings / 0 errors; full suite 129/129; locked restore PASS; lock
+drift NONE; boundary S1–S9 clean; Working Tree clean — see
+[`CURRENT_STATE.md`](CURRENT_STATE.md) §11.6/§12.25). The consolidated correction changed exactly
+one Product behaviour: `RuntimeDeltaHistory.CatchUpFrom` now continues the consumer revision
+instead of re-selecting the already-applied step.
+
+**Checkpoint C (OWNER-AUTHORIZED, 2026-10-07)** delivers the earliest usable Owner-local
+Function/Logic/UI review path: SIMULATOR runtime composition in `apps/runtime` with explicit
+synthetic configuration, a deterministic single-writer evolution lifecycle (one accepted tick =
+one committed revision, explicit cancellation, clean shutdown, observed tick exceptions), the
+read-only API `GET /api/v1/snapshot`, `GET /api/v1/runtime`, `GET /api/v1/deltas` plus the
+existing `GET /health/live` and `GET /health/ready` readiness semantics, and a development-only
+Runtime Inspector at `GET /inspector` that polls those endpoints. No write or command endpoint,
+no SSE (polling preferred), no TEST_HARDWARE, no PRODUCTION, no persistence, no installer.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins

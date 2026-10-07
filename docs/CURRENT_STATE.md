@@ -53,7 +53,7 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Main Development Scope Gate | **PENDING** for 0.3B+ — 0.3A proceeds under the Owner's Option-C amended gate only |
 | Stage 0.3 | **NOT AUTHORIZED** as a whole; **Stage 0.3A-1 source checkpoint** authored under the amended gate (see §11.4, §12.12) |
 | Stage 0.3A-1 .NET validation | **PASSED (Owner-local, 2026-10-07)** — Release build 0 warnings / 0 errors, full suite 61/61, TypeScript 24/24, parity 7/7, boundary S1–S9 clean; PR #4 READY FOR OWNER MERGE (not merged). See §12.22 and the [runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) verdict; Arena claims no .NET execution of its own |
-| Stage 0.3A-2 | **AUTHORIZED** — Owner instruction 2026-10-07, three checkpoints A → B → C on one branch, SIMULATOR profile only. **Checkpoint A OWNER-LOCALLY VALIDATED (2026-10-07)**: Release build 0 warnings / 0 errors, full .NET suite **101/101**, locked restore PASS, boundary scan S1–S9 clean, genuine lock-refresh commit `55d3b8b` (see §11.5, §12.23, §12.24). **Checkpoint B (deterministic synthetic evolution + Snapshot/Delta foundation) AUTHORIZED — source authored in Arena, NOT COMPILED / NOT EXECUTED in Arena** (see §11.6). **Checkpoint C NOT AUTHORIZED**; **NOT MERGED** |
+| Stage 0.3A-2 | **AUTHORIZED** — Owner instruction 2026-10-07, three checkpoints A → B → C on one branch, SIMULATOR profile only. **Checkpoint A OWNER-LOCALLY VALIDATED (2026-10-07)**: Release build 0 warnings / 0 errors, full .NET suite **101/101**, locked restore PASS, boundary scan S1–S9 clean, genuine lock-refresh commit `55d3b8b` (see §11.5, §12.23, §12.24). **Checkpoint B OWNER-LOCALLY VALIDATED (2026-10-07)** at `cfa6d4a`: Release build 0 warnings / 0 errors, full .NET suite **129/129**, locked restore PASS, lock drift NONE, boundary S1–S9 clean (see §11.6, §12.25). **Checkpoint C (read-only Runtime API + development Runtime Inspector) OWNER-AUTHORIZED**; **NOT MERGED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
 
@@ -104,7 +104,7 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.3A-2A Checkpoint B — deterministic synthetic evolution + Snapshot/Delta foundation, **source authored in Arena, NOT COMPILED and NOT EXECUTED in Arena**; Owner-local validation pending (see §11.6). Checkpoint A is Owner-locally validated at feature head `a512aa7` + genuine lock-refresh commit `55d3b8b` (build 0/0, suite 101/101, locked restore PASS, boundary clean — §12.24); Checkpoint C NOT AUTHORIZED |
+| Current stage | Stage 0.3A-2A Checkpoint C — read-only Runtime API + development Runtime Inspector, **source authored in Arena, NOT COMPILED and NOT EXECUTED in Arena**; Owner-local Function/Logic/UI review is the validation of record (see §11.7). Checkpoints A (`55d3b8b`) and B (`cfa6d4a`) are Owner-locally validated (A 101/101 — §12.24; B 129/129 — §12.25) |
 | Repository contents | Documentation, repository governance, the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/`, and the Stage 0.3A-1 product foundation source skeleton (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/`) |
 | Application source code | **Validated at checkpoint scope by the Owner-local run** (Release 0/0; 61/61; fixtures and lock files genuine, transferred and verified; SDK pinned `10.0.401`). Arena itself ran no .NET and claims no compile/test success of its own. The spike remains synthetic feasibility code, not Product code |
 | Project or solution files | `WaterJetSentinelSuite.sln` (12 projects) — source-committed, **never built in the authoring environment** |
@@ -112,7 +112,7 @@ No governance rule requires a documentation stage to advance a version number.
 | Database schema or SQL scripts | **Do not exist** |
 | Modbus or Galil adapter | **Does not exist** |
 | Simulator | **SIMULATOR-only source** — from Stage 0.3A-2A, `adapters/simulator/Synthetic/` holds the canonical synthetic map (`SyntheticSensorMap`: 108 slots / 106 Sensors / 2 Cannon slots I7+I16, scan order, device distribution 14+14+13×6, `SYN-TC-nn:CHmm` channel identities) and the seeded initial Sensor projection (`SyntheticSeed`, `DeterministicValueSource` — splitmix64, no `System.Random`, no static mutable state). Never a production-path component; no acquisition loop, no fault injection yet (Checkpoint B scope). The map composition is pinned to the committed `config/examples/sensor-map.example.json` by a parity test in `tests/runtime.tests`; the fixture-side generator (`tests/integration/FixtureGenerator.cs`) is untouched and its unification with the adapter remains `[OPEN]`. Checkpoint B adds the evolution source (`SyntheticEvolution`: explicit seed + tick sequence + clock, quality paths GOOD / UNCERTAIN (Last Validated basis) / STALE with deterministic recovery, bounded 0–100 unitless score walk) — source authored, not compiled in Arena. The spike's Node harness remains feasibility-only |
-| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product .NET tests (5 xUnit projects): **Stage 0.3A-2A Checkpoint A PASSED Owner-locally (2026-10-07)** — Release build 0 warnings / 0 errors and full suite **101 total / 101 passed / 0 failed / 0 skipped** on SDK `10.0.401` (xUnit observed runtime .NET 10.0.12), locked restore PASS, boundary scan S1–S9 clean, at validated feature head `a512aa7` + lock refresh `55d3b8b` (§12.24); the earlier 0.3A-1 baseline remains the 61/61 record (§12.22). Arena executed only the TS mirror (**24/24**) and never claims .NET execution itself. Checkpoint B test sources are authored in Arena and **not executed anywhere yet** |
+| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product .NET tests (5 xUnit projects): **Stage 0.3A-2A Checkpoint A PASSED Owner-locally (2026-10-07)** — Release build 0 warnings / 0 errors and full suite **101 total / 101 passed / 0 failed / 0 skipped** on SDK `10.0.401` (xUnit observed runtime .NET 10.0.12), locked restore PASS, boundary scan S1–S9 clean, at validated feature head `a512aa7` + lock refresh `55d3b8b` (§12.24); the earlier 0.3A-1 baseline remains the 61/61 record (§12.22). Arena executed only the TS mirror (**24/24**) and never claims .NET execution itself. Checkpoint B is **PASSED Owner-locally (2026-10-07)** — Release build 0 warnings / 0 errors and full suite **129 total / 129 passed / 0 failed / 0 skipped** on the consolidated correction `cfa6d4a`, locked restore PASS, no lock drift, boundary S1–S9 clean (§12.25). Checkpoint C test sources are authored in Arena and **not executed anywhere yet** |
 | CI workflow | **Does not exist** |
 | Installer or release artifact | **Does not exist** |
 | Production configuration | **Does not exist in this repository** |
@@ -421,8 +421,11 @@ accepted and merged Stage 0.2.*
 | Deliberately absent | Runtime API routes beyond the existing health stub, Runtime Inspector UI, SSE, write/command endpoints, queue dispatch, job execution, Pump/Valve/Axis/Cleaning commands, Safe Return actuation, configuration writes, persistence/Historian, auth, installer/release work, `spikes/**` changes, `apps/runtime/Program.cs` changes |
 | Arena verification | Boundary scan exit 0 (**0 findings, S1–S9 clean**); brace-balance, trailing-whitespace, final-newline and tab sweeps; `using`-directive resolution sweep (missing/unused namespaces); declaration sweep for every referenced type; determinism grep for ambient clocks and `System.Random`; `git diff --check`. **No .NET restore, build, or test execution happened in Arena** |
 | NOT verified | Every .NET claim (restore, Release build, xUnit execution of the new tests); the behaviour is **source authored / statically reviewed / NOT COMPILED and NOT EXECUTED in Arena**. Owner-local validation per runbook §13 is the validation of record |
-| Delivery | Same branch and PR #5, after the Checkpoint A evidence commit; **NOT MERGED** (only the Owner merges). Checkpoint C is not started |
-| Next | Owner-local validation of Checkpoint B (runbook §13), then the Owner's decision on Checkpoint C (read-only API + lightweight Runtime Inspector) |
+| Correction chain (Owner-local build rounds) | `dd45bf6` CS0102 disambiguation (the `DeltaApplyOutcome.Applied` property kept; the success factory renamed to `Success`); `8692b77` test-source alignment (named `seed:` arguments, four CA1861 constant arrays hoisted to named `private static readonly` fields); `cfa6d4a` consolidated correction — **the only Product behaviour change of the three: `RuntimeDeltaHistory.CatchUpFrom` now selects the Delta that CONTINUES the consumer revision (`previousRevision` match) instead of the Delta whose own revision equals it**, which removed a spurious fresh-Snapshot result and a non-terminating walk; the remaining five findings were test-side (two structural `TrendPoint` comparisons via the shared `RuntimeTestFixture.AssertTrendPointsEquivalent` helper because `Series` is an array and record equality compares it by reference; three derived revision-expectation corrections: chain starts at revision 2, capacity-3 retention 4/5/6, catch-up input 3) |
+| Delivery | Same branch and PR #5, after the Checkpoint A evidence commit; **NOT MERGED** (only the Owner merges) |
+| Owner-local validation (2026-10-07) | **PASSED** at consolidated correction `cfa6d4a376bbf10a87db2349045cb6b9b57bb544`: Release build **0 warnings / 0 errors**; full .NET suite **129 total / 129 passed / 0 failed / 0 skipped**; **locked restore PASS**; **lock drift NONE**; boundary scan **0 findings (S1–S9 clean)**; Working Tree **CLEAN**. Recorded in §12.25 |
+| Status | **Checkpoint B COMPLETE for a development checkpoint** (Owner-locally validated; SUBMITTED FOR OWNER REVIEW — NOT MERGED). Checkpoint B is **OWNER-LOCALLY VALIDATED** |
+| Next | **Checkpoint C AUTHORIZED** — SIMULATOR runtime composition, deterministic evolution lifecycle, read-only Runtime API (`GET /api/v1/snapshot`, `GET /api/v1/runtime`, `GET /api/v1/deltas`), readiness semantics and a development-only Runtime Inspector; see §11.7 |
 
 ### 11.1 Process deviation record
 
@@ -1034,6 +1037,47 @@ its own corrections (per the strict correction scope), so the four correction SH
 recorded here by this evidence commit and in the PR #5 review comments; the fixture generator
 and the committed fixtures remain untouched (regeneration stays an Owner-local gate); the
 `FixtureGenerator` ↔ adapter unification remains `[OPEN]`.
+
+### 12.25 Stage 0.3A-2A Checkpoint B — Owner-local validation record (PASSED)
+
+**Result (Owner-reported, 2026-10-07; authoritative because the Release build completed
+successfully immediately before the test run).** Validated head
+`cfa6d4a376bbf10a87db2349045cb6b9b57bb544` (the consolidated correction of the
+`feat(runtime): add deterministic synthetic evolution and snapshot/delta foundation`
+checkpoint), on the Owner-locally validated Checkpoint A store.
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | Release build (`dotnet build -c Release --no-restore`) | **PASS — 0 warnings, 0 errors** |
+| 2 | Full .NET test suite | **129 total / 129 passed / 0 failed / 0 skipped** |
+| 3 | Locked restore | **PASS** |
+| 4 | Lock drift | **NONE** |
+| 5 | Boundary scan (S1–S9) | **0 findings** — clean |
+| 6 | Working Tree after the run | **CLEAN** |
+| 7 | Correction rounds validated by this run | `dd45bf6` (CS0102: `DeltaApplyOutcome` factory renamed `Success`, property `Applied` retained) → `8692b77` (test-source alignment: named `seed:` arguments; four CA1861 constant arrays hoisted) → `cfa6d4a` (consolidated: catch-up continuation lookup + five test-side corrections) |
+
+**What the consolidated correction actually changed (recorded truthfully from the final diff).**
+
+*Product behaviour — one method.* `RuntimeDeltaHistory.CatchUpFrom` walked the chain with a
+lookup that matched a Delta by its **own** revision, so it selected the step the consumer had
+already applied. That produced a spurious fresh-Snapshot result when that step was no longer
+retained, and a non-terminating walk when it was. The walk now selects the Delta that
+**continues** the consumer revision (`FindContinuingUnlocked`, matched on `previousRevision`);
+gap detection, eviction, ordering, the public `Find` semantics and the composed revision
+sequence are unchanged. This is the only Product behaviour change of the three rounds.
+
+*Test-side corrections — no Product behaviour involved.* Two structural `TrendPoint`
+comparisons now use the single shared helper `RuntimeTestFixture.AssertTrendPointsEquivalent`
+(`TrendPoint.Series` is `double?[]`, so record equality compared the array by reference and two
+value-identical points were never equal); and three revision expectations were re-derived
+(the committed Delta chain starts at revision 2, so capacity-3 retention is 4/5/6 and a
+catch-up input of revision 3 advances to revision 6 — the earlier values were off by one).
+
+**Arena position.** Arena authored the Checkpoint B sources and all three correction rounds,
+ran the static battery (boundary scan, structural/whitespace checks, `git diff --check`,
+contract cross-checks, a mechanical re-derivation of the revision and history arithmetic) and
+**ran no .NET command**: the build, locked restore and 129/129 suite are Owner-local evidence.
+Checkpoint B is complete for a development checkpoint and **NOT MERGED**.
 
 ## 13. Required positive confirmations
 

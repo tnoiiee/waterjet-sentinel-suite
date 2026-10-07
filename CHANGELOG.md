@@ -31,6 +31,42 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-2A Checkpoint B — Owner-local validation recorded
+
+**STAGE 0.3A-2A CHECKPOINT B OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07).** Validated
+head `cfa6d4a376bbf10a87db2349045cb6b9b57bb544` (the consolidated correction of the Checkpoint B
+feature commit `619f999`), on the Owner-locally validated Checkpoint A store.
+
+| Item | Observed |
+| --- | --- |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Full .NET tests | **129 total / 129 passed / 0 failed / 0 skipped** |
+| Locked restore | **PASS** |
+| Lock drift | **NONE** |
+| Boundary scan | **0 findings (S1–S9 clean)** |
+| Working Tree | **CLEAN** |
+
+Three correction rounds were validated by that run: `dd45bf6` (CS0102 — the `DeltaApplyOutcome`
+success factory renamed to `Success`; the `Applied` outcome property retained),
+`8692b77` (test-source alignment — named `seed:` arguments and four CA1861 constant arrays
+hoisted to named `private static readonly` fields) and `cfa6d4a` (consolidated).
+
+**Recorded truthfully from the final diff:** the only Product behaviour change in those rounds is
+inside `RuntimeDeltaHistory.CatchUpFrom`, which now selects the Delta that **continues** the
+consumer revision (`previousRevision` match) instead of the Delta whose own revision equals it —
+removing a spurious fresh-Snapshot result and a non-terminating walk while leaving gap detection,
+eviction, ordering, `Find` semantics and the revision sequence unchanged. The other five findings
+were test-side: two structural `TrendPoint` comparisons through the shared
+`RuntimeTestFixture.AssertTrendPointsEquivalent` helper (`TrendPoint.Series` is an array, so
+record equality compared it by reference) and three re-derived revision expectations (the chain
+starts at revision 2, so capacity-3 retention is 4/5/6 and catch-up from revision 3 reaches 6).
+
+This closeout records evidence only: no runtime, contract, test, fixture, lock-file or tooling
+change. **Checkpoint B is complete for a development checkpoint — SUBMITTED FOR OWNER REVIEW,
+NOT MERGED.** **Checkpoint C (read-only Runtime API + development Runtime Inspector) is
+OWNER-AUTHORIZED**; TEST_HARDWARE and PRODUCTION remain **NOT AUTHORIZED**. Arena ran no .NET
+command of its own and claims no compile or test result.
+
 ### Stage 0.3A-2A Checkpoint B — Deterministic synthetic evolution and Snapshot/Delta foundation (`feat(runtime): add deterministic synthetic evolution and snapshot/delta foundation`)
 
 **Source-only checkpoint (Arena authored; NOT COMPILED and NOT EXECUTED in Arena).** Under the
