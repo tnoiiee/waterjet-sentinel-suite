@@ -168,8 +168,9 @@ authorized Checkpoint C on the Owner-locally validated Checkpoint B foundation (
 **OWNER-LOCALLY VALIDATED** at the genuine lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d`: SDK `10.0.401`, locked
 restore PASS, Release build **0 warnings / 0 errors**, fresh full .NET suite **139 / 139 passed /
 0 failed / 0 skipped**, boundary scan **S1–S9 clean**, worktree CLEAN. The Owner **Function/Logic
-review PASSED** and the **Inspector UI review PASSED WITH MINOR PUNCHLIST** (runbook §14.9); the
-authorized minor presentation punchlist is applied in the commit immediately following this record.
+review PASSED**, the **Inspector UI review PASSED**, and the final Owner visual review **closed the
+minor punchlist** (runbook §14.9); one optional future polish item (top-row vertical balance) is
+recorded as deferred and non-blocking and must not trigger another change round.
 The expected lock churn materialised exactly as predicted — `apps/runtime/packages.lock.json` and
 `tests/api.tests/packages.lock.json`, genuine restore output, no package version changed — and PR #5
 remains **OPEN — NOT MERGED**. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
