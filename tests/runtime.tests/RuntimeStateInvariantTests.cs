@@ -155,7 +155,7 @@ public sealed class RuntimeStateInvariantTests
         },
         Tamper.SensorChannels => state with
         {
-            Sensors = ReplaceFirst(state.Sensors, state.Sensors[1] with { TcFrontChannel = state.Sensors[0].TcRearChannel }),
+            Sensors = ReplaceFirst(state.Sensors, state.Sensors[0] with { TcFrontChannel = state.Sensors[1].TcRearChannel }),
         },
         Tamper.CannonSlotPosition => state with
         {
