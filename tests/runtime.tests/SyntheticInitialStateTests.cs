@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Wjss.Adapters.Simulator;
 using Wjss.Contracts;
@@ -192,17 +193,22 @@ public sealed class SyntheticInitialStateTests
         sequence.Controls.PumpStart,
     ];
 
-    private static IReadOnlyList<SensorMapSlotExample> ReadExampleSlots()
+    /// <summary>
+    /// Reads the committed synthetic sensor-map example through the shared contract
+    /// serializer. The slots node is deserialized directly (never re-serialized to a
+    /// string first), and a missing slots array or a null deserialization result fails
+    /// loudly instead of silently yielding an empty map.
+    /// </summary>
+    private static List<SensorMapSlotExample> ReadExampleSlots()
     {
-        var root = JsonNode.Parse(File.ReadAllText(ExampleSensorMapPath()))!;
-        var array = root["logicalMatrix"]!["slots"]!.AsArray();
-        var slots = new List<SensorMapSlotExample>(array.Count);
-        foreach (var node in array)
-        {
-            slots.Add(node!.Deserialize<SensorMapSlotExample>(ContractJson.Options)!);
-        }
+        var path = ExampleSensorMapPath();
+        var root = JsonNode.Parse(File.ReadAllText(path));
+        var slotsNode = root?["logicalMatrix"]?["slots"]
+            ?? throw new InvalidOperationException($"'{path}' does not carry a logicalMatrix.slots array.");
 
-        return slots;
+        return JsonSerializer.Deserialize<List<SensorMapSlotExample>>(slotsNode, ContractJson.Options)
+            ?? throw new InvalidOperationException(
+                $"'{path}' logicalMatrix.slots could not be deserialized into sensor-map slots.");
     }
 
     private static string ExampleSensorMapPath()
