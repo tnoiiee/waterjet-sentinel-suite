@@ -1,8 +1,8 @@
 using System.Globalization;
-using Wjss.Adapters.Simulator;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime.Core;
+using SimulatorSeed = Wjss.Adapters.Simulator.SyntheticSeed;
 
 namespace Wjss.Runtime;
 
@@ -95,7 +95,7 @@ public sealed record RuntimeHostOptions
         refusalCode = string.Empty;
         refusalDetail = string.Empty;
 
-        var syntheticSeed = SyntheticSeed.DefaultSeed.Value;
+        var syntheticSeed = SimulatorSeed.DefaultSeed.Value;
         var seedLabel = readEnvironment(SeedVariable);
         if (!string.IsNullOrWhiteSpace(seedLabel)
             && !ulong.TryParse(seedLabel.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out syntheticSeed))
