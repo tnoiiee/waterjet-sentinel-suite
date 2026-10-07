@@ -77,13 +77,20 @@ trust.
 
 **0.3A-2 delivery split (Owner instruction 2026-10-07):** 0.3A-2 is delivered in three
 checkpoints on one branch and one pull request — **A** Runtime State Store + deterministic
-SIMULATOR initial state + `wjss.snapshot/1` projection (source authored; see
-[`CURRENT_STATE.md`](CURRENT_STATE.md) §11.5/§12.23); **B** synthetic evolution + Snapshot/Delta
+SIMULATOR initial state + `wjss.snapshot/1` projection (**OWNER-LOCALLY VALIDATED 2026-10-07**:
+build 0/0, suite 101/101, locked restore PASS, boundary S1–S9 clean, genuine lock refresh
+`55d3b8b`; see [`CURRENT_STATE.md`](CURRENT_STATE.md) §11.5/§12.24); **B** synthetic evolution + Snapshot/Delta
 foundation (gapless revisions, bounded Delta history, re-snapshot on detected gap); **C**
 read-only Runtime API (`GET /api/v1/snapshot`, `GET /api/v1/runtime`, `GET /health/live`,
 `GET /health/ready`) + the lightweight dev-only Runtime Inspector UI. SSE stays out of scope
 unless the Inspector demonstrably requires it — polling is preferred. The 0.3A-2 row above
 describes the substage as originally planned and is preserved as authored-time state.
+**Status after Checkpoint A validation (2026-10-07):** A complete for a development checkpoint
+(not merged); **B AUTHORIZED** — deterministic synthetic evolution (explicit seed + tick sequence
++ clock), atomic transitions, wall-summary recalculation, bounded trend append, `wjss.delta/1`
+generation, bounded Delta history, Delta apply/reconstruction and revision-gap detection;
+**C remains NOT AUTHORIZED**, SIMULATOR only, no SSE, no write/command endpoint, no device
+access.
 
 ## 6. Contract boundary rules
 

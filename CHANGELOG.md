@@ -31,6 +31,37 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-2A Checkpoint A — Owner-local validation recorded (documentation-only closeout)
+
+**STAGE 0.3A-2A CHECKPOINT A OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07).**
+Validated feature head `a512aa76c4b2d7633d2a83b10c523c318b3a420e`; genuine lock-refresh commit
+`55d3b8b4b7d7ba51b28a0b66adb7445e7ffb579c`. .NET SDK **10.0.401**; xUnit observed runtime
+**.NET 10.0.12**; Release build **PASS — 0 warnings, 0 errors**; full .NET suite
+**101 total / 101 passed / 0 failed / 0 skipped**; **locked restore PASS**; boundary scan
+**0 findings (S1–S9 clean)**; Working Tree **clean** after the Owner-local lock commit and push.
+The lock refresh changed exactly one file — `tests/runtime.tests/packages.lock.json` — adding the
+`wjss.adapters.simulator` Project dependency with `Wjss.Contracts` and `Wjss.Time`; no absolute
+Owner-local path and no unexpected source or fixture change.
+
+Checkpoint A correction chain (each a focused commit on PR #5, authored in Arena, validated
+Owner-locally as part of the run above):
+
+| Commit | Correction |
+| --- | --- |
+| `f51408e` | Checkpoint A feature commit (Runtime State Store + deterministic SIMULATOR initial state + `wjss.snapshot/1` projection) |
+| `b389805` | CA1859 — `FreezePoints` returns the concrete `ReadOnlyCollection<TrendPoint>` |
+| `93e8f24` | CS0051 — the nested theory parameter enum `Tamper` is `public` |
+| `b75bccb` | CS1061 + CA1859 — the synthetic-example test deserializes the slots node explicitly and returns the concrete `List<SensorMapSlotExample>` |
+| `a512aa7` | SensorChannels tamper isolation — the fixture preserves ScanOrder/identity so the pinned `SENSOR_TC_CHANNELS` code is the deterministic refusal |
+| `55d3b8b` | Genuine Owner-local lock refresh (one file, one Project dependency) |
+
+This closeout records evidence only: no runtime, contract, test, fixture, lock-file or tooling
+change, and no version claim. **Checkpoint A is complete for a development checkpoint —
+SUBMITTED FOR OWNER REVIEW, NOT MERGED.** Checkpoint B (deterministic synthetic evolution +
+Snapshot/Delta foundation) is now **AUTHORIZED**; Checkpoint C remains **NOT AUTHORIZED**;
+TEST_HARDWARE and PRODUCTION device access remain **NOT AUTHORIZED**. Arena ran no .NET command
+of its own and claims no compile or test result.
+
 ### Stage 0.3A-2A — Runtime State Foundation, Checkpoint A (`feat: add runtime state store and deterministic simulator initial state`)
 
 **Source-only checkpoint (Arena authored; NOT COMPILED and NOT EXECUTED in Arena).** Under the

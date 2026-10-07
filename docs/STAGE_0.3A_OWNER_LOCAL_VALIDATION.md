@@ -304,6 +304,27 @@ boundary scan result (`node tools/boundary-scan/boundary-scan.mjs .` — must ex
 expectations above. If any Runtime-core test fails, that is a Checkpoint A defect: stop and
 report it rather than adjusting the test to match the code.
 
+### 12.1 Checkpoint A Owner-local result (2026-10-07) — PASSED
+
+Recorded from the Owner's run; Arena did not execute any .NET command.
+
+| Item | Observed |
+| --- | --- |
+| Validated feature head | `a512aa76c4b2d7633d2a83b10c523c318b3a420e` |
+| Lock-refresh commit (genuine restore output) | `55d3b8b4b7d7ba51b28a0b66adb7445e7ffb579c` — one file: `tests/runtime.tests/packages.lock.json`, +7 lines, adds `wjss.adapters.simulator` (Project) with `Wjss.Contracts` + `Wjss.Time`; no absolute path |
+| .NET SDK / xUnit runtime | `10.0.401` / .NET 10.0.12 |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Full .NET tests | **101 total / 101 passed / 0 failed / 0 skipped** |
+| Locked restore | **PASS** |
+| Boundary scan (S1–S9) | **0 findings** |
+| Working Tree | **CLEAN** |
+
+Correction chain validated by this run: `b389805` (CA1859), `93e8f24` (CS0051), `b75bccb`
+(synthetic-example test compile), `a512aa7` (SensorChannels tamper isolation). Checkpoint A is
+complete for a development checkpoint and **not merged**. **Checkpoint B is authorized**; its
+Owner-local commands are recorded in §13 of this runbook. Checkpoint C remains NOT AUTHORIZED;
+TEST_HARDWARE and PRODUCTION remain NOT AUTHORIZED.
+
 **Recorded discrepancy (not silently repaired).** Section 7 above writes the smoke paths as
 `/api/v1/health/live` and `/api/v1/health/ready`, which do not match the implemented route
 constants (`ApiRoutes.HealthLive` = `/health/live`, `ApiRoutes.HealthReady` = `/health/ready`,

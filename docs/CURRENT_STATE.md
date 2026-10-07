@@ -53,7 +53,7 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Main Development Scope Gate | **PENDING** for 0.3B+ — 0.3A proceeds under the Owner's Option-C amended gate only |
 | Stage 0.3 | **NOT AUTHORIZED** as a whole; **Stage 0.3A-1 source checkpoint** authored under the amended gate (see §11.4, §12.12) |
 | Stage 0.3A-1 .NET validation | **PASSED (Owner-local, 2026-10-07)** — Release build 0 warnings / 0 errors, full suite 61/61, TypeScript 24/24, parity 7/7, boundary S1–S9 clean; PR #4 READY FOR OWNER MERGE (not merged). See §12.22 and the [runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) verdict; Arena claims no .NET execution of its own |
-| Stage 0.3A-2 | **AUTHORIZED for Checkpoint A only** — Owner instruction 2026-10-07 (three checkpoints A → B → C on one branch, SIMULATOR profile only). Checkpoint A (Runtime State Foundation) source authored — **SUBMITTED FOR OWNER REVIEW**; Checkpoints B and C **NOT STARTED**; **NOT MERGED**; Arena ran no .NET (see §11.5, §12.23) |
+| Stage 0.3A-2 | **AUTHORIZED** — Owner instruction 2026-10-07, three checkpoints A → B → C on one branch, SIMULATOR profile only. **Checkpoint A OWNER-LOCALLY VALIDATED (2026-10-07)**: Release build 0 warnings / 0 errors, full .NET suite **101/101**, locked restore PASS, boundary scan S1–S9 clean, genuine lock-refresh commit `55d3b8b` (see §11.5, §12.23, §12.24). **Checkpoint B (deterministic synthetic evolution + Snapshot/Delta foundation) AUTHORIZED — source authored in Arena, NOT COMPILED / NOT EXECUTED in Arena** (see §11.6). **Checkpoint C NOT AUTHORIZED**; **NOT MERGED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
 
@@ -104,15 +104,15 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.3A-2A — Runtime State Foundation Checkpoint A, **source authored in Arena, NOT COMPILED and NOT EXECUTED in Arena**; Owner-local validation pending (see §11.5, §12.23). Stage 0.3A-1 remains the last Owner-local validated position (PR #4 READY FOR OWNER MERGE — NOT MERGED) |
+| Current stage | Stage 0.3A-2A Checkpoint B — deterministic synthetic evolution + Snapshot/Delta foundation, **source authored in Arena, NOT COMPILED and NOT EXECUTED in Arena**; Owner-local validation pending (see §11.6). Checkpoint A is Owner-locally validated at feature head `a512aa7` + genuine lock-refresh commit `55d3b8b` (build 0/0, suite 101/101, locked restore PASS, boundary clean — §12.24); Checkpoint C NOT AUTHORIZED |
 | Repository contents | Documentation, repository governance, the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/`, and the Stage 0.3A-1 product foundation source skeleton (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/`) |
 | Application source code | **Validated at checkpoint scope by the Owner-local run** (Release 0/0; 61/61; fixtures and lock files genuine, transferred and verified; SDK pinned `10.0.401`). Arena itself ran no .NET and claims no compile/test success of its own. The spike remains synthetic feasibility code, not Product code |
 | Project or solution files | `WaterJetSentinelSuite.sln` (12 projects) — source-committed, **never built in the authoring environment** |
 | Package manifests or dependencies | Spike: `spikes/ui-runtime-react/react-ui/package.json` + `package-lock.json` (Owner-approved pins); `runtime-harness/package.json` (no deps). Product: `Directory.Packages.props` (pins **PROPOSED/UNVERIFIED**), `packages/contracts/wjss-contracts-ts/package.json` + lockfile (`typescript@6.0.3`, install-verified in Arena). `global.json` pins the Owner-validated SDK `10.0.401` (`rollForward: latestPatch`, added at closeout per Owner decision); the twelve genuine Owner-local `packages.lock.json` are committed (transferred by handoff `488b98fb…`, never Arena-generated) |
 | Database schema or SQL scripts | **Do not exist** |
 | Modbus or Galil adapter | **Does not exist** |
-| Simulator | **SIMULATOR-only source** — from Stage 0.3A-2A, `adapters/simulator/Synthetic/` holds the canonical synthetic map (`SyntheticSensorMap`: 108 slots / 106 Sensors / 2 Cannon slots I7+I16, scan order, device distribution 14+14+13×6, `SYN-TC-nn:CHmm` channel identities) and the seeded initial Sensor projection (`SyntheticSeed`, `DeterministicValueSource` — splitmix64, no `System.Random`, no static mutable state). Never a production-path component; no acquisition loop, no fault injection yet (Checkpoint B scope). The map composition is pinned to the committed `config/examples/sensor-map.example.json` by a parity test in `tests/runtime.tests`; the fixture-side generator (`tests/integration/FixtureGenerator.cs`) is untouched and its unification with the adapter remains `[OPEN]`. The spike's Node harness remains feasibility-only |
-| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product .NET tests (5 xUnit projects, 61 tests): **PASSED Owner-locally at closeout** — fresh full-suite 61/61 behind a clean 0/0 Release build (§12.22); Arena executed only the TS mirror (**24/24**) and never claims .NET execution itself. Stage 0.3A-2A adds Runtime-core test sources (fixture, state store, invariants, snapshot projection, synthetic initial state) — **source-authored, not executed anywhere yet**; the Owner-local run is the validation of record |
+| Simulator | **SIMULATOR-only source** — from Stage 0.3A-2A, `adapters/simulator/Synthetic/` holds the canonical synthetic map (`SyntheticSensorMap`: 108 slots / 106 Sensors / 2 Cannon slots I7+I16, scan order, device distribution 14+14+13×6, `SYN-TC-nn:CHmm` channel identities) and the seeded initial Sensor projection (`SyntheticSeed`, `DeterministicValueSource` — splitmix64, no `System.Random`, no static mutable state). Never a production-path component; no acquisition loop, no fault injection yet (Checkpoint B scope). The map composition is pinned to the committed `config/examples/sensor-map.example.json` by a parity test in `tests/runtime.tests`; the fixture-side generator (`tests/integration/FixtureGenerator.cs`) is untouched and its unification with the adapter remains `[OPEN]`. Checkpoint B adds the evolution source (`SyntheticEvolution`: explicit seed + tick sequence + clock, quality paths GOOD / UNCERTAIN (Last Validated basis) / STALE with deterministic recovery, bounded 0–100 unitless score walk) — source authored, not compiled in Arena. The spike's Node harness remains feasibility-only |
+| Automated tests | Spike tests (Node `node:test`, Vitest, Playwright — Owner-local). Product .NET tests (5 xUnit projects): **Stage 0.3A-2A Checkpoint A PASSED Owner-locally (2026-10-07)** — Release build 0 warnings / 0 errors and full suite **101 total / 101 passed / 0 failed / 0 skipped** on SDK `10.0.401` (xUnit observed runtime .NET 10.0.12), locked restore PASS, boundary scan S1–S9 clean, at validated feature head `a512aa7` + lock refresh `55d3b8b` (§12.24); the earlier 0.3A-1 baseline remains the 61/61 record (§12.22). Arena executed only the TS mirror (**24/24**) and never claims .NET execution itself. Checkpoint B test sources are authored in Arena and **not executed anywhere yet** |
 | CI workflow | **Does not exist** |
 | Installer or release artifact | **Does not exist** |
 | Production configuration | **Does not exist in this repository** |
@@ -405,7 +405,11 @@ accepted and merged Stage 0.2.*
 | Arena verification | Boundary scan exit 0 (**0 findings, S1–S9 clean**) run on the changed worktree; final-newline / trailing-whitespace / tab checks; brace-balance script over every changed C# file; contract-member cross-check of every referenced type against `packages/contracts`; JSON re-parse of `config/examples/sensor-map.example.json` used by the parity test. **No .NET restore, build, or test execution happened in Arena** |
 | NOT verified | Every .NET claim (restore, Release build, xUnit execution of the new tests); the `tests/runtime.tests/packages.lock.json` refresh required by the new `Wjss.Adapters.Simulator` project reference (real Owner-local restore only, never hand-edited); the deliberate difference between the seed-derived synthetic presentation values and `tests/integration/FixtureGenerator.ScoreFor` (fixture formula preserved, not claimed equal); Checkpoints B and C (not started) |
 | Delivery | Branch `arena/873f0015-waterjet-sentinel-suite`; **Checkpoint A commit `f51408e400935f7dd899d27544d8e7d9d18949b5`** (parent `bdf7f8f277b85087e3e53c067fe956fca7e04f90`, the approved remote `main` base); one pull request opened from this branch → `main` for all three checkpoints. The SHA above is recorded by this follow-up documentation commit, because AGENTS.md §4.6 forbids recording a commit's own SHA inside the commit that creates it. Checkpoint A status: **SUBMITTED FOR OWNER REVIEW — NOT MERGED** (the Agent never merges) |
-| Next | Owner-local validation of Checkpoint A (runbook §12), then the Owner's decision to proceed to Checkpoint B (synthetic evolution + Snapshot/Delta foundation). Checkpoint C (read-only API + lightweight Runtime Inspector) only after that |
+| Correction chain (all pushed to the same branch/PR) | `b389805` CA1859 correction (concrete `ReadOnlyCollection<TrendPoint>` return); `93e8f24` CS0051 correction (`public enum Tamper` for the xUnit theory); `b75bccb` CS1061 + CA1859 synthetic-example test compile correction (`JsonSerializer.Deserialize<List<SensorMapSlotExample>>` on the slots node, concrete helper return type); `a512aa7` SensorChannels tamper isolation (fixture preserved ScanOrder/identity so the pinned code `SENSOR_TC_CHANNELS` is reached) |
+| Genuine lock refresh | `55d3b8b4b7d7ba51b28a0b66adb7445e7ffb579c` — Owner-local real restore; changes exactly `tests/runtime.tests/packages.lock.json` (+7 lines) adding the `wjss.adapters.simulator` Project dependency with `Wjss.Contracts` and `Wjss.Time`. No absolute Owner-local path, no other file changed |
+| Owner-local validation (2026-10-07) | **PASSED** at feature head `a512aa76c4b2d7633d2a83b10c523c318b3a420e` + lock refresh `55d3b8b`: .NET SDK **10.0.401**, xUnit runtime **.NET 10.0.12**; Release build **0 warnings / 0 errors**; full .NET suite **101 total / 101 passed / 0 failed / 0 skipped**; **locked restore PASS**; boundary scan **0 findings (S1–S9 clean)**; Working Tree clean after the lock commit and push. Recorded in §12.24 |
+| Status | **Checkpoint A COMPLETE for development checkpoint** (Owner-locally validated; SUBMITTED FOR OWNER REVIEW — NOT MERGED, the Agent never merges) |
+| Next | **Checkpoint B AUTHORIZED** (deterministic synthetic evolution + Snapshot/Delta foundation) — see §11.6; Checkpoint C (read-only API + lightweight Runtime Inspector) remains **NOT AUTHORIZED** |
 
 ### 11.1 Process deviation record
 
@@ -987,6 +991,36 @@ IN ARENA**, and any statement that Stage 0.3A-2 is "delivered" carries the quali
 records the 0.3A-1 closeout position and is preserved as authored-time state; the Owner's
 2026-10-07 instruction recorded in §11.5 authorizes Checkpoint A of Stage 0.3A-2. Production
 device access and Production Write remain **NOT AUTHORIZED**.
+
+### 12.24 Stage 0.3A-2A Checkpoint A — Owner-local validation record (PASSED)
+
+**Result (Owner-reported, 2026-10-07; authoritative because the Release build completed
+successfully immediately before the test run).** Validated feature head
+`a512aa76c4b2d7633d2a83b10c523c318b3a420e`; genuine lock-refresh commit
+`55d3b8b4b7d7ba51b28a0b66adb7445e7ffb579c`. .NET SDK **10.0.401** (xUnit observed runtime
+**.NET 10.0.12**).
+
+| # | Check | Observed result |
+| --- | --- | --- |
+| 1 | Release build (`dotnet build -c Release --no-restore`) | **PASS — 0 warnings, 0 errors** |
+| 2 | Full .NET test suite | **101 total / 101 passed / 0 failed / 0 skipped** |
+| 3 | Locked restore | **PASS** |
+| 4 | Boundary scan (S1–S9) | **0 findings** — clean |
+| 5 | Working Tree after the Owner-local lock commit and push | **CLEAN** |
+| 6 | Lock-refresh scope | Only `tests/runtime.tests/packages.lock.json` changed; adds the `wjss.adapters.simulator` Project dependency with `Wjss.Contracts` + `Wjss.Time`; no absolute Owner-local path; no unexpected source or fixture change |
+| 7 | Pre-validation correction chain (Owner-local rounds, Arena-authored) | `b389805` CA1859 → `93e8f24` CS0051 → `b75bccb` synthetic-example test compile (CS1061 + CA1859) → `a512aa7` SensorChannels tamper isolation; each pushed as a focused commit on the same PR #5 branch |
+
+**Arena position.** Arena authored the Checkpoint A sources and corrections, ran the static
+battery (boundary scan, brace/whitespace/final-newline checks, `git diff --check`, contract
+cross-checks) and **ran no .NET command**: the validated build, locked restore and 101/101 suite
+are Owner-local evidence. Checkpoint A is complete for a development checkpoint and **NOT
+MERGED**; only the Owner merges.
+
+**Deliberate scope boundaries recorded at closeout.** Checkpoint A wrote no documentation of
+its own corrections (per the strict correction scope), so the four correction SHAs above are
+recorded here by this evidence commit and in the PR #5 review comments; the fixture generator
+and the committed fixtures remain untouched (regeneration stays an Owner-local gate); the
+`FixtureGenerator` ↔ adapter unification remains `[OPEN]`.
 
 ## 13. Required positive confirmations
 
