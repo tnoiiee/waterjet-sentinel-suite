@@ -236,6 +236,7 @@ public sealed class RuntimeHostCompositionTests
         Assert.Equal("/api/v1/snapshot", ApiRoutes.Snapshot);
         Assert.Equal("/api/v1/runtime", ApiRoutes.Runtime);
         Assert.Equal("/api/v1/deltas", ApiRoutes.Deltas);
+        Assert.Equal("/inspector", ApiRoutes.Inspector);
     }
 
     private static void AssertRefuses(string variable, string value, string expectedCode)

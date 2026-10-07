@@ -392,3 +392,145 @@ findings were test-side (structural `TrendPoint` comparison via
 `RuntimeTestFixture.AssertTrendPointsEquivalent`, and three re-derived revision expectations).
 Checkpoint B is complete for a development checkpoint and **not merged**. **Checkpoint C is
 authorized**; `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
+
+## 14. Stage 0.3A-2A Checkpoint C — Owner-local validation and Function/Logic/UI review (appended before the Owner run)
+
+Checkpoint C is the first **usable review path** of Stage 0.3A-2A: a composed SIMULATOR runtime
+whose authoritative state evolves deterministically, a **read-only** HTTP surface over it, and a
+development-only Runtime Inspector page that polls that surface. Checkpoint C sources are
+**authored in Arena and NOT COMPILED / NOT EXECUTED there**; the run below is the validation of
+record. No hardware, no device, no `TEST_HARDWARE`, no `PRODUCTION`, no write, no command.
+
+Prerequisites are §0 (SDK **10.0.401** exactly) and §0A (no process-scope `TargetPath`).
+
+### 14.1 Build, restore and test (same gate as Checkpoints A and B)
+
+```powershell
+git fetch origin arena/873f0015-waterjet-sentinel-suite
+git switch arena/873f0015-waterjet-sentinel-suite
+
+# FIRST restore after the Project-graph change (see the lock note below).
+# This is a real restore; it refreshes two lock files with genuine output.
+dotnet restore WaterJetSentinelSuite.sln
+
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build
+node tools/boundary-scan/boundary-scan.mjs .
+```
+
+Expected: Release build **0 warnings / 0 errors**; the 129 Owner-validated tests still pass and
+the Checkpoint C additions pass (Arena executes nothing, so no total is claimed here — record the
+observed numbers); boundary scan **exit 0, 0 findings (S1–S9)**.
+
+**Lock-file note (expected churn, genuine output only).** Checkpoint C adds
+`Wjss.Adapters.Simulator` as a project reference of `apps/runtime`, and `Wjss.Runtime` as a
+project reference of `tests/api.tests`. Two lock files are therefore expected to change —
+`apps/runtime/packages.lock.json` (gains `wjss.adapters.simulator`) and
+`tests/api.tests/packages.lock.json` (gains `wjss.runtime`, `wjss.runtime.core`, `wjss.domain`,
+`wjss.adapters.simulator`, `wjss.time`) — produced by the real restore above and committed as
+such. The other ten lock files are expected to be unchanged; report any other diff instead of
+accepting it silently. Never hand-edit a lock file.
+
+### 14.2 Start the SIMULATOR runtime (read-only host)
+
+```powershell
+$env:WJSS_DEVICE_PROFILE   = "SIMULATOR"
+$env:WJSS_API_PORT         = "5181"
+$env:WJSS_SYNTHETIC_SEED   = "20261007"
+$env:WJSS_TICK_INTERVAL_MS = "1000"
+
+dotnet run --project apps/runtime/Wjss.Runtime.csproj -c Release --no-build
+```
+
+Every variable is optional (defaults: `SIMULATOR`, port `5181`, seed `20261007`, tick interval
+`1000` ms). Expected console: the Information startup line
+`profile=SIMULATOR url=http://127.0.0.1:5181 stage=STAGE_03A2C_RUNTIME_API`. The host answers on
+**loopback only**; it binds nothing else and contacts nothing.
+
+### 14.3 Open the Inspector and review Function / Logic / UI (the point of this checkpoint)
+
+Open in the workstation browser: **`http://127.0.0.1:5181/inspector`**
+
+| # | Review item | Expected observation |
+| --- | --- | --- |
+| 1 | Readiness badge | **READY** (green) with code `RUNTIME_READY`; the header shows the `SIMULATOR` badge and the stage marker `STAGE_03A2C_RUNTIME_API` |
+| 2 | Revision progression | the displayed revision increases by exactly **1 per second** (the configured tick interval), with no skipped or repeated revision |
+| 3 | Last update | refreshes every ~1 s; the update banner is hidden while polls succeed |
+| 4 | Sensor values | the Sensor sample table shows values, classification and quality changing over time; use the wall buttons and the quality select to narrow the display |
+| 5 | Wall summaries | Left / Rear / Right / Front show Sensor totals **24 / 29 / 24 / 29**, classification counts and a max score that move as the values evolve |
+| 6 | Foundation metrics | **108** logical slots, **106** Sensors, **212** Thermocouple channels, Cannons **I7** and **I16**, the tick interval, and state/Delta history depth vs capacity |
+| 7 | Runtime state | queue `0 / 8` labelled as a foundation placeholder, Active Job *none*, Pump `STOPPED` labelled as a placeholder, alarm counts, rejected transitions `0`, no fault |
+| 8 | Delta activity | one row per accepted revision (bounded, newest first) with previous revision, timestamp, changed Sensor count, changed wall count, sections and chain status (*clean*) |
+| 9 | Local interactions | *Pause display*, *Toggle density*, wall selection, quality selection and *Copy current Snapshot JSON* change only this browser page. Confirm the revision keeps progressing while the display is paused (the Runtime is untouched) |
+| 10 | Safety notice | the footer states Development Inspector, read-only, SIMULATOR only, `TEST_HARDWARE` not authorized, `PRODUCTION` not authorized, control commands not implemented |
+| 11 | No control surface | there is no button, field or menu that could start, stop, dispatch, command or configure anything; no write request is sent (confirm in the browser's network view: all requests are `GET`) |
+| 12 | Layout | at 1920 × 1080 the page has **no horizontal page scrollbar**; the tables scroll inside their own cards |
+| 13 | Failure handling | stop the host (Ctrl+C in its console): within a few seconds the page shows the stale-data banner and stops updating values; **no** value is fabricated |
+
+### 14.4 Retrieve the read-only endpoints
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:5181/health/live      # 200 ALIVE, runtimeImplemented=true
+Invoke-RestMethod http://127.0.0.1:5181/health/ready     # 200 READY, code RUNTIME_READY, stage marker
+Invoke-RestMethod http://127.0.0.1:5181/api/v1/snapshot  # wjss.snapshot/1, current revision
+Invoke-RestMethod http://127.0.0.1:5181/api/v1/runtime   # read-only Runtime status
+Invoke-RestMethod http://127.0.0.1:5181/api/v1/deltas    # bounded recent Delta activity
+```
+
+`GET /api/v1/runtime` reports: `ready`, `readinessCode`, `readinessDetail`, `profile`,
+`stageMarker`, `currentRevision`, `generatedAt`, `lastUpdateAt`, `syntheticSeed`,
+`tickIntervalMilliseconds`, `evolutionRunning`, `sensorCounts` (108 / 106 / 212 / 2 with the
+Cannon labels), `walls`, the queue block (bounded `0 / 8`, placeholder-labelled), Active Job
+presence, the Pump placeholder, alarm counts, history depths vs capacities, the newest Delta
+revision, accepted ticks, rejected transitions, uptime, server time and the last fault fields
+(null while nothing faulted).
+
+**Read-only proof (expect `405 Method Not Allowed`; the route exists for GET only):**
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:5181/api/v1/snapshot -Method POST
+Invoke-WebRequest http://127.0.0.1:5181/inspector       -Method POST
+```
+
+### 14.5 Restart repeatability
+
+Stop the host, start it again with the **same** `WJSS_SYNTHETIC_SEED` and the same
+`WJSS_TICK_INTERVAL_MS`, and compare the first seconds of the Sensor table and the wall
+summaries. The synthetic value stream is a function of (seed, tick number, Sensor identity), so
+the same seed reproduces the same per-tick score/classification sequence from revision 1.
+Timestamps differ, because they are the real instants of the run; byte-identical timestamps are
+**not** claimed. `revision 1` is always the composed initial revision.
+
+### 14.6 Refusals (unchanged start gate — check them; do not weaken them)
+
+```powershell
+$env:WJSS_DEVICE_PROFILE = "TEST_HARDWARE"   # dotnet run ... -> exit 2, PROFILE_NOT_AUTHORIZED_FOR_STAGE_03A, nothing bound
+$env:WJSS_DEVICE_PROFILE = "PRODUCTION"      # dotnet run ... -> exit 2, same refusal, nothing bound
+$env:WJSS_DEVICE_PROFILE = "NONSENSE"        # dotnet run ... -> exit 4, unknown profile label, nothing bound
+$env:WJSS_DEVICE_PROFILE = "SIMULATOR"; $env:WJSS_TICK_INTERVAL_MS = "5"   # exit 4, INVALID_TICK_INTERVAL
+$env:WJSS_TICK_INTERVAL_MS = "1000"; $env:WJSS_API_PORT = "70000"          # -> exit 4, INVALID_API_PORT
+```
+
+Record the observed exit code and the printed refusal code. A refusal must never bind a port:
+the port stays free (`Get-NetTCPConnection -LocalPort 5181 -ErrorAction SilentlyContinue` returns
+nothing).
+
+### 14.7 Clean stop
+
+In the host console press **Ctrl+C**. Expected: the process exits, the port is released, and no
+further revision is produced (reopening `/api/v1/runtime` is not possible because nothing is
+listening). Nothing was persisted, nothing was dispatched, no device was contacted.
+
+### 14.8 What to record in the PR comment
+
+Build result and warning count; per-project test counts and the total; the boundary-scan result;
+the two lock-file diffs; the observed `GET /api/v1/runtime` counts (108 / 106 / 212, I7/I16, wall
+totals 24 / 29 / 24 / 29); the observed revision progression; the `405` results; the refusal exit
+codes; the UI observations of §14.3 (including items 11–13); and anything that differs from the
+expectations above. If a check fails, stop and report it — never adjust the code or a pinned
+expectation merely to match one observed run.
+
+### 14.9 Checkpoint C Owner-local result
+
+**Not yet run.** To be recorded from the Owner's run; Arena does not claim any execution. The
+Checkpoint C sources are authored and statically reviewed only.

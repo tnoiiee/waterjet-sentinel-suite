@@ -21,6 +21,9 @@ public sealed class RuntimeStartGateSourceTests
     private static string Program =>
         File.ReadAllText(Path.Combine(ConfigTestPaths.RepoRoot(), "apps", "runtime", "Program.cs"));
 
+    private static string InspectorPage =>
+        File.ReadAllText(Path.Combine(ConfigTestPaths.RepoRoot(), "apps", "runtime", "Inspector", "index.html"));
+
     [Fact]
     public void Logging_Is_Guarded_Not_Suppressed()
     {
@@ -98,6 +101,7 @@ public sealed class RuntimeStartGateSourceTests
         Assert.Contains("app.MapGet(ApiRoutes.Snapshot", src, StringComparison.Ordinal);
         Assert.Contains("app.MapGet(ApiRoutes.Runtime", src, StringComparison.Ordinal);
         Assert.Contains("app.MapGet(ApiRoutes.Deltas", src, StringComparison.Ordinal);
+        Assert.Contains("app.MapGet(ApiRoutes.Inspector", src, StringComparison.Ordinal);
 
         // No write/command route exists anywhere in the host.
         foreach (var writeVerb in new[] { "MapPost", "MapPut", "MapPatch", "MapDelete", "MapMethods" })
@@ -105,7 +109,36 @@ public sealed class RuntimeStartGateSourceTests
             Assert.DoesNotContain(writeVerb, src, StringComparison.Ordinal);
         }
 
-        // No streaming surface: observers poll, nothing streams.
+        // No streaming surface: the Inspector polls, it does not stream.
         Assert.DoesNotContain("text/event-stream", src, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Inspector_Page_Is_Present_And_Polls_With_Get_Only()
+    {
+        var page = InspectorPage;
+
+        // It is the development Inspector and it says so.
+        Assert.Contains("Runtime Inspector", page, StringComparison.Ordinal);
+        Assert.Contains("SIMULATOR", page, StringComparison.Ordinal);
+        Assert.Contains("read-only", page, StringComparison.Ordinal);
+        Assert.Contains("TEST_HARDWARE is not authorized", page, StringComparison.Ordinal);
+        Assert.Contains("PRODUCTION device access is not authorized", page, StringComparison.Ordinal);
+
+        // It polls exactly the read-only endpoints.
+        Assert.Contains("/api/v1/snapshot", page, StringComparison.Ordinal);
+        Assert.Contains("/api/v1/runtime", page, StringComparison.Ordinal);
+        Assert.Contains("/api/v1/deltas", page, StringComparison.Ordinal);
+
+        // Every request it issues is a GET; no write verb appears in its script.
+        Assert.Contains("method: \"GET\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("method: \"POST\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("method: \"PUT\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("method: \"PATCH\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("method: \"DELETE\"", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("XMLHttpRequest", page, StringComparison.Ordinal);
+
+        // The bounded Delta view stays bounded in the DOM as well.
+        Assert.Contains("MAX_DELTA_ROWS", page, StringComparison.Ordinal);
     }
 }

@@ -31,6 +31,40 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-2A Checkpoint C — read-only Runtime API and development Runtime Inspector (source authored in Arena)
+
+**SOURCE AUTHORED IN ARENA; NOT COMPILED and NOT EXECUTED there.** No Owner-local validation has
+been recorded for this checkpoint yet, and nothing below is a build, test or UI result.
+
+Delivered on the same branch and pull request (#5) as Checkpoints A and B, in two slices:
+
+- **C1+C2 — `06aca79d03c57b703768afffecf95735de7a91d5`** (`feat(runtime): compose the simulator
+  runtime, lifecycle and read-only API`): `apps/runtime/RuntimeHostOptions.cs` (explicit
+  synthetic configuration with safe development defaults and clear refusals),
+  `apps/runtime/SimulatorRuntime.cs` (deterministic composition of the initial revision,
+  single-writer evolution lifecycle: one non-overlapping loop, one accepted tick = one committed
+  revision, refusal advances nothing and emits no Delta, explicit cancellation, observed tick
+  exceptions, clean shutdown, structured startup/fatal fault codes),
+  `apps/runtime/RuntimeApiResponses.cs`, the rewritten `apps/runtime/Program.cs` (validate →
+  compose → start → listen, with `GET /api/v1/snapshot`, `GET /api/v1/runtime`,
+  `GET /api/v1/deltas`, `GET /health/live`, `GET /health/ready` and one shared JSON policy),
+  the read-only route identities in `packages/contracts/ApiRoutes.cs`, the health-payload
+  documentation update, the `STAGE_03A2C_RUNTIME_API` marker, and the test sources.
+- **C3 — the commit that carries this entry**: the development Runtime Inspector page
+  (`apps/runtime/Inspector/index.html`, served at `GET /inspector`), the Inspector source test,
+  and Owner-local runbook section 14 with the Function/Logic/UI review checklist.
+
+**Read-only by construction.** No write, command, dispatch, queue, job, pump, valve, axis, Safe
+Return or configuration route exists; no constant is declared for one. Every surface described
+here observes the Runtime. `TEST_HARDWARE` and `PRODUCTION` remain **NOT AUTHORIZED** and are
+refused before any port is bound. SSE is not implemented; the Inspector polls with GET requests
+about once per second and keeps only a bounded number of Delta rows.
+
+**Not verified:** every .NET claim (restore, Release build, xUnit execution of the new tests), the
+actual browser behaviour and layout of the Inspector, and the two lock files the new project
+references are expected to refresh (`apps/runtime/packages.lock.json`,
+`tests/api.tests/packages.lock.json`) — genuine restore output only, never hand-edited.
+
 ### Stage 0.3A-2A Checkpoint B — Owner-local validation recorded
 
 **STAGE 0.3A-2A CHECKPOINT B OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07).** Validated

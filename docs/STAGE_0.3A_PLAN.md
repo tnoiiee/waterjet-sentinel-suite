@@ -135,6 +135,41 @@ existing `GET /health/live` and `GET /health/ready` readiness semantics, and a d
 Runtime Inspector at `GET /inspector` that polls those endpoints. No write or command endpoint,
 no SSE (polling preferred), no TEST_HARDWARE, no PRODUCTION, no persistence, no installer.
 
+
+
+## 5c. Stage 0.3A-2A Checkpoint C record (appended 2026-10-07)
+
+**Source authored in Arena; NOT COMPILED and NOT EXECUTED there.** Owner instruction 2026-10-07
+authorized Checkpoint C on the Owner-locally validated Checkpoint B foundation (`cfa6d4a`;
+129/129). Two slices on the same branch and PR:
+
+- **C1+C2 — `06aca79`** (`feat(runtime): compose the simulator runtime, lifecycle and read-only
+  API`): `apps/runtime/RuntimeHostOptions.cs`, `apps/runtime/SimulatorRuntime.cs`,
+  `apps/runtime/RuntimeApiResponses.cs`, the rewritten `apps/runtime/Program.cs`, the read-only
+  route identities in `packages/contracts/ApiRoutes.cs`, the health-payload documentation update,
+  the `STAGE_03A2C_RUNTIME_API` marker, and the test sources (host reference in
+  `tests/api.tests` with `RuntimeHostCompositionTests`; `RuntimeStartGateSourceTests` replacing the
+  stage-0.3A-1 stub pin).
+- **C3 — the commit carrying this record**: `apps/runtime/Inspector/index.html` served at
+  `GET /inspector`, the Inspector source pin, and runbook §14 (Owner-local Function/Logic/UI
+  review).
+
+| Area | Decision |
+| --- | --- |
+| Composition order | Device profile → port → synthetic configuration → runtime composition → lifecycle start → listener. A refused profile or a malformed value can never bind a port; a composition fault still answers readiness with a structured `503` instead of degrading silently |
+| Configuration | `WJSS_DEVICE_PROFILE`, `WJSS_API_PORT`, `WJSS_SYNTHETIC_SEED`, `WJSS_TICK_INTERVAL_MS`, `WJSS_STATE_HISTORY_CAPACITY`, `WJSS_DELTA_HISTORY_CAPACITY`; defaults `SIMULATOR`, `5181`, the adapter's documented default seed, `1000` ms, and the `RuntimeLimits` defaults. Tick interval bounded 100–60000 ms; capacities bounded by the proven `RuntimeLimits` ranges. Refusals are values with machine codes, printed before any listener exists |
+| Lifecycle | One non-overlapping evolution loop; one accepted tick = one committed revision through the store's single writer; the timer paces execution while every presented value remains a function of (seed, tick number, committed state); refusals advance no revision and emit no Delta, and tick instants advance monotonically so a refusal cannot stall the loop; consecutive tick failures bounded; explicit `CancellationTokenSource`; clean shutdown observes the loop without rethrowing; tick exceptions and startup/fatal faults are observed, counted and reported as machine codes |
+| Readiness | `live` (200) is liveness only. `ready` is 200 only when the profile is SIMULATOR, the synthetic configuration validates, the store is initialized, the initial Snapshot projection exists, the revision system is initialized, the evolution lifecycle has started, and no startup or fatal fault was observed; otherwise `503` with `CONFIGURATION_NOT_VALIDATED`, `PROFILE_NOT_SIMULATOR`, `EVOLUTION_NOT_STARTED`, `STORE_NOT_INITIALIZED`, `REVISION_NOT_INITIALIZED`, `STARTUP_FAULT` or `FATAL_RUNTIME_FAULT`. No silent fallback |
+| API | GET-only: `/health/live`, `/health/ready`, `/api/v1/snapshot` (current `wjss.snapshot/1`), `/api/v1/runtime` (read-only status incl. protected-baseline counts, wall summaries, bounded history depths, newest Delta revision, rejected transitions, fault codes), `/api/v1/deltas` (bounded recent activity with a reported gap flag), `/inspector`. Every payload uses the shared `ContractJson.Options` policy; no second JSON policy exists in the host |
+| Inspector | Development-only static page served from the build output, no Node pipeline and no framework: ~1 s GET-only polling with non-overlapping requests, visible stale-data banner, bounded Delta rows, wall-grouped Sensor table proving values/classification/quality evolve, foundation metrics, wall summaries, runtime state with placeholder labelling, Snapshot facts and copy-JSON. Local interactions never alter Runtime state; no control affordance exists; the page states the safety boundary (Development Inspector, read-only, SIMULATOR only, `TEST_HARDWARE` and `PRODUCTION` not authorized, control commands not implemented) |
+| Still absent by instruction | Write API, Runtime commands, queue dispatch, Cleaning Job start/pause/resume/abort, Pump/Valve/Axis commands, Safe Return execution, `TEST_HARDWARE`, `PRODUCTION`, physical device adapters, Modbus/Galil/KMotion/PLC, database, Historian persistence, authentication expansion, WebView2 shell migration, full Product UI migration, SSE, installer, ZIP, release, deployment, `spikes/**` changes |
+
+**Status after this record.** Checkpoint C is **source authored and statically reviewed only —
+not validated anywhere yet**; the Owner-local Function/Logic/UI review in runbook §14 is the
+validation of record, and §14.9 holds its (still empty) result slot. The expected Owner-local lock
+churn is `apps/runtime/packages.lock.json` and `tests/api.tests/packages.lock.json` (genuine
+restore output only). `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins

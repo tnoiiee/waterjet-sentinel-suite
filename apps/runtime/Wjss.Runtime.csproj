@@ -13,6 +13,7 @@
       GET /api/v1/snapshot -> current wjss.snapshot/1 projection
       GET /api/v1/runtime  -> read-only Runtime status
       GET /api/v1/deltas   -> bounded recent Delta activity
+      GET /inspector       -> development-only Runtime Inspector page
 
     No write, command, dispatch or SSE surface exists. Startup with any device
     profile other than SIMULATOR is refused BEFORE any port is bound.
@@ -28,6 +29,14 @@
     <AssemblyName>Wjss.Runtime</AssemblyName>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The development Inspector page ships with the host output so the route can
+      serve it from the build directory without a Node build pipeline.
+    -->
+    <Content Include="Inspector\index.html" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../adapters/simulator/Wjss.Adapters.Simulator.csproj" />

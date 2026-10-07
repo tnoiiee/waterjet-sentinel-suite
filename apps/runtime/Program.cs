@@ -1,12 +1,13 @@
 using System.Globalization;
+using System.Text;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime;
 using Wjss.Runtime.Core;
 using Wjss.Time;
 
-// WJSS Runtime host - Stage 0.3A-2C: SIMULATOR runtime composition, deterministic
-// synthetic evolution lifecycle and read-only API.
+// WJSS Runtime host - Stage 0.3A-2C: SIMULATOR runtime composition, read-only API
+// and the development Runtime Inspector.
 //
 // Order of operations is part of the safety posture: device-profile validation,
 // port configuration and synthetic configuration validation all happen BEFORE the
@@ -110,6 +111,7 @@ builder.WebHost.UseUrls(baseUrl);
 
 var app = builder.Build();
 var startedUtc = DateTimeOffset.UtcNow;
+var inspectorPagePath = Path.Combine(AppContext.BaseDirectory, "Inspector", "index.html");
 
 // 5. Start the deterministic synthetic evolution lifecycle: one non-overlapping
 //    loop, one accepted tick = one committed revision, cancelled on shutdown.
@@ -137,6 +139,14 @@ IResult RuntimeEndpoint() => Results.Json(BuildStatus(), ContractJson.Options);
 IResult DeltasEndpoint() => Results.Json(
     RuntimeDeltaFeed.From(runtime.Deltas, runtime.IsInitialized ? runtime.State.Revision : null),
     ContractJson.Options);
+
+IResult InspectorEndpoint() => File.Exists(inspectorPagePath)
+    ? Results.File(inspectorPagePath, "text/html; charset=utf-8")
+    : Results.Text(
+        "The development Inspector page is not present in this build output.",
+        "text/plain",
+        Encoding.UTF8,
+        StatusCodes.Status500InternalServerError);
 
 // 7. Health: live = host alive (never a readiness claim); ready = the full
 //    readiness contract, 200 only when every condition holds, else 503 with a
@@ -171,6 +181,8 @@ app.MapGet(ApiRoutes.HealthReady, () =>
 app.MapGet(ApiRoutes.Snapshot, SnapshotEndpoint);
 app.MapGet(ApiRoutes.Runtime, RuntimeEndpoint);
 app.MapGet(ApiRoutes.Deltas, DeltasEndpoint);
+app.MapGet(ApiRoutes.Inspector, InspectorEndpoint);
+app.MapGet(ApiRoutes.Inspector + "/", InspectorEndpoint);
 
 RuntimeStatus BuildStatus()
 {
