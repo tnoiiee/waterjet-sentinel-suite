@@ -164,11 +164,15 @@ authorized Checkpoint C on the Owner-locally validated Checkpoint B foundation (
 | Inspector | Development-only static page served from the build output, no Node pipeline and no framework: ~1 s GET-only polling with non-overlapping requests, visible stale-data banner, bounded Delta rows, wall-grouped Sensor table proving values/classification/quality evolve, foundation metrics, wall summaries, runtime state with placeholder labelling, Snapshot facts and copy-JSON. Local interactions never alter Runtime state; no control affordance exists; the page states the safety boundary (Development Inspector, read-only, SIMULATOR only, `TEST_HARDWARE` and `PRODUCTION` not authorized, control commands not implemented) |
 | Still absent by instruction | Write API, Runtime commands, queue dispatch, Cleaning Job start/pause/resume/abort, Pump/Valve/Axis commands, Safe Return execution, `TEST_HARDWARE`, `PRODUCTION`, physical device adapters, Modbus/Galil/KMotion/PLC, database, Historian persistence, authentication expansion, WebView2 shell migration, full Product UI migration, SSE, installer, ZIP, release, deployment, `spikes/**` changes |
 
-**Status after this record.** Checkpoint C is **source authored and statically reviewed only —
-not validated anywhere yet**; the Owner-local Function/Logic/UI review in runbook §14 is the
-validation of record, and §14.9 holds its (still empty) result slot. The expected Owner-local lock
-churn is `apps/runtime/packages.lock.json` and `tests/api.tests/packages.lock.json` (genuine
-restore output only). `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
+**Status after this record (Owner-local validation, 2026-10-07).** Checkpoint C is
+**OWNER-LOCALLY VALIDATED** at the genuine lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d`: SDK `10.0.401`, locked
+restore PASS, Release build **0 warnings / 0 errors**, fresh full .NET suite **139 / 139 passed /
+0 failed / 0 skipped**, boundary scan **S1–S9 clean**, worktree CLEAN. The Owner **Function/Logic
+review PASSED** and the **Inspector UI review PASSED WITH MINOR PUNCHLIST** (runbook §14.9); the
+authorized minor presentation punchlist is applied in the commit immediately following this record.
+The expected lock churn materialised exactly as predicted — `apps/runtime/packages.lock.json` and
+`tests/api.tests/packages.lock.json`, genuine restore output, no package version changed — and PR #5
+remains **OPEN — NOT MERGED**. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
 
 ## 6. Contract boundary rules
 

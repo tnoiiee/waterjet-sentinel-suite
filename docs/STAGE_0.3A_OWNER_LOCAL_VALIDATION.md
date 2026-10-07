@@ -530,7 +530,24 @@ codes; the UI observations of §14.3 (including items 11–13); and anything tha
 expectations above. If a check fails, stop and report it — never adjust the code or a pinned
 expectation merely to match one observed run.
 
-### 14.9 Checkpoint C Owner-local result
+### 14.9 Checkpoint C Owner-local result (2026-10-07) — PASSED
 
-**Not yet run.** To be recorded from the Owner's run; Arena does not claim any execution. The
-Checkpoint C sources are authored and statically reviewed only.
+Recorded from the Owner's run; Arena did not execute any .NET command.
+
+| Item | Observed |
+| --- | --- |
+| Validated head | `faa79145a925832baa2ac8685f7fecf7a093552d` (`chore: refresh Checkpoint C project locks`, parent `e6a5a6c`) |
+| .NET SDK | `10.0.401` |
+| Locked restore | **PASS** |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Fresh full .NET tests | **139 total / 139 passed / 0 failed / 0 skipped** |
+| Boundary scan (S1–S9) | **0 findings** |
+| Working tree after lock handoff | **CLEAN** |
+| Function and Logic review (§14.4) | **PASSED** — ALIVE / READY / `RUNTIME_READY`; revision progression and five-second advancement PASS; Delta history bounded 64 / 64; continuous newest-first chain with `hasRevisionGap` false; Cannon I7 / I16 references; 108 / 106 / 212; walls 24 / 29 / 24 / 29; Sensor values evolving; rejected transitions 0; queue 0 / 8 placeholder only; no Active Job; Pump STOPPED placeholder only; no command or write path |
+| Inspector UI review (§14.3, 1920 x 1080) | **PASSED WITH MINOR PUNCHLIST** — no critical UI blocker; layout correction confirmed; the authorized minor presentation punchlist is applied in the commit immediately following this section's record |
+
+Correction chain validated by this run: `1d7b105` (CS0120 readiness correction), `01bb2aa` (seed-type
+disambiguation), `349264a` (ambiguous Inspector route removed), `40284b4` (Delta chain status),
+`e6a5a6c` (Runtime state layout width), `faa79145a925832baa2ac8685f7fecf7a093552d` (genuine lock refresh). Checkpoint C is complete
+for a development checkpoint and **not merged**; `TEST_HARDWARE` and `PRODUCTION` remain NOT
+AUTHORIZED.

@@ -31,10 +31,33 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
+
+**STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh
+commit `faa79145a925832baa2ac8685f7fecf7a093552d` (`chore: refresh Checkpoint C project locks`; parent `e6a5a6c`, the Inspector
+layout hotfix). Arena executed no .NET command; this evidence is authoritative.
+
+| Item | Observed |
+| --- | --- |
+| .NET SDK | `10.0.401` |
+| Locked restore | **PASS** |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Fresh full .NET tests | **139 total / 139 passed / 0 failed / 0 skipped** |
+| Boundary scan (S1–S9) | **0 findings** |
+| Working tree after lock handoff | **CLEAN** |
+| Lock-refresh commit | `faa79145a925832baa2ac8685f7fecf7a093552d` — exactly `apps/runtime/packages.lock.json` and `tests/api.tests/packages.lock.json`; genuine restore output; no package version changed; no absolute path, no credential |
+| Function / Logic review | **PASSED** — `ALIVE` / `READY` / `RUNTIME_READY`; revision progression and five-second advancement PASS; Delta history bounded 64 / 64; newest-first chain continuous with `hasRevisionGap` false; Cannon projection I7 = CANNON_REAR (row 5, column 7) and I16 = CANNON_FRONT (row 5, column 16); 108 / 106 / 212 and wall totals 24 / 29 / 24 / 29 retained; Sensor values evolving; rejected transitions 0; queue 0 / 8 placeholder only; no Active Job; Pump STOPPED placeholder only; no command or write path |
+| Inspector UI review (1920 x 1080) | **PASSED WITH MINOR PUNCHLIST** — no critical UI blocker; the Runtime state layout correction holds; the authorized minor presentation punchlist is applied in the commit immediately following this entry |
+| Test accounting | 129 (Checkpoint B) + 9 (Checkpoint C additions) + 1 (Delta-feed continuity projection test) = **139** |
+
+PR #5 remains **OPEN — NOT MERGED**; `TEST_HARDWARE` and `PRODUCTION` remain **NOT AUTHORIZED**.
+
 ### Stage 0.3A-2A Checkpoint C — read-only Runtime API and development Runtime Inspector (source authored in Arena)
 
-**SOURCE AUTHORED IN ARENA; NOT COMPILED and NOT EXECUTED there.** No Owner-local validation has
-been recorded for this checkpoint yet, and nothing below is a build, test or UI result.
+**SOURCE AUTHORED IN ARENA; NOT COMPILED and NOT EXECUTED there.** Owner-local validation has
+since been recorded in the entry above: at the lock-refresh commit the delivered sources build
+with 0 warnings / 0 errors and the fresh full .NET suite passes 139 / 139. That evidence is the
+Owner's; nothing in the entry below is an Arena build, test or UI result.
 
 Delivered on the same branch and pull request (#5) as Checkpoints A and B, in two slices:
 
@@ -60,10 +83,11 @@ here observes the Runtime. `TEST_HARDWARE` and `PRODUCTION` remain **NOT AUTHORI
 refused before any port is bound. SSE is not implemented; the Inspector polls with GET requests
 about once per second and keeps only a bounded number of Delta rows.
 
-**Not verified:** every .NET claim (restore, Release build, xUnit execution of the new tests), the
-actual browser behaviour and layout of the Inspector, and the two lock files the new project
-references are expected to refresh (`apps/runtime/packages.lock.json`,
-`tests/api.tests/packages.lock.json`) — genuine restore output only, never hand-edited.
+**Subsequently verified Owner-locally (see the entry above):** every .NET claim (restore, Release
+build, xUnit execution of these tests), the Inspector browser behaviour and layout at
+1920 x 1080, and the two expected lock refreshes (`apps/runtime/packages.lock.json`,
+`tests/api.tests/packages.lock.json`) — genuine restore output, committed as `faa79145`, never
+hand-edited. Arena still executed nothing itself.
 
 ### Stage 0.3A-2A Checkpoint B — Owner-local validation recorded
 
