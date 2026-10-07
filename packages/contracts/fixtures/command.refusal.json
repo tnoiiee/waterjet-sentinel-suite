@@ -1,0 +1,7 @@
+{
+  "fixtureStatus": "PROVISIONAL STRUCTURAL FIXTURE - OWNER-LOCAL .NET GENERATION REQUIRED",
+  "accepted": false,
+  "command": "autosequence-start",
+  "reasonCode": "RUNTIME_NOT_IMPLEMENTED",
+  "detail": "Stage 0.3A-1 skeleton: the command surface arrives with the API host checkpoint (0.3A-3) after Owner-local validation."
+}

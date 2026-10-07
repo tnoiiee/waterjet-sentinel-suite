@@ -1,0 +1,16 @@
+{
+  "_label": "PUBLIC-SAFE EXAMPLE - SYNTHETIC - INCOMPLETE BY DESIGN - NOT FOR DEPLOYMENT",
+  "deviceProfile": "SIMULATOR",
+  "configuration": {
+    "revision": 1,
+    "publishedAt": "2026-10-07T00:00:00.000Z",
+    "label": "SYNTHETIC EXAMPLE - NOT A PRODUCTION VALUE",
+    "dirtyThreshold": 50.5,
+    "staleThresholdMs": 5000
+  },
+  "notes": [
+    "Shape example only. The publication/validation pipeline is Stage 0.3A-F.",
+    "Production values must never be committed to this repository."
+  ],
+  "fixtureStatus": "PROVISIONAL STRUCTURAL FIXTURE - OWNER-LOCAL .NET GENERATION REQUIRED"
+}

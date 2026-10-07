@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS public-safe configuration EXAMPLE tests. The publication/validation
+    pipeline (config revisions, rejection of invalid publication, in-memory
+    immutable snapshot) is Stage 0.3A-F; these tests only pin what the example
+    files must guarantee in the repository: parseable JSON, explicit
+    synthetic-example labelling, SIMULATOR-only profile, and the absence of
+    prohibited production vocabulary. SOURCE-AUTHORED IN ARENA.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Wjss.Config.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

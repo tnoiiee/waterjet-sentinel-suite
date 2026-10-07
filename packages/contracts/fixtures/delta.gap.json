@@ -1,0 +1,27 @@
+{
+  "fixtureStatus": "PROVISIONAL STRUCTURAL FIXTURE - OWNER-LOCAL .NET GENERATION REQUIRED",
+  "kind": "delta",
+  "schema": "wjss.delta/1",
+  "apiVersion": 1,
+  "previousRevision": 7,
+  "revision": 12,
+  "generatedAt": "2026-10-07T00:00:00.000Z",
+  "runtime": {
+    "uptimeSeconds": 42,
+    "sseClients": 1,
+    "invariantViolations": 0,
+    "acceptedSecondJobs": 0,
+    "refusedSecondJobs": 0,
+    "historian": {
+      "wired": false,
+      "depth": 0,
+      "capacity": 0,
+      "nearOverflow": false,
+      "rejected": 0,
+      "lastBatchLatencyMs": null,
+      "gapMarkers": 0
+    },
+    "currentRevision": 12,
+    "stageMarker": "STAGE_03A1_SKELETON"
+  }
+}

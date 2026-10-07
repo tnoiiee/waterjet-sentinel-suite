@@ -1,0 +1,34 @@
+<Project>
+
+  <!--
+    WJSS Stage 0.3A-1 - central package management (pinned versions).
+
+    Package identity and versions below are PROPOSED from package metadata known to
+    the authoring agent. The Arena environment cannot reach any NuGet endpoint, so
+    NO RESTORE COMPATIBILITY IS CLAIMED. The Owner-local restore (first lock-file
+    generation, then the locked-mode restore flag) must verify these exact
+    identities and versions and MAY bump them to the current stable equivalent as
+    part of the same checkpoint review; any bump must update this file in a
+    review-correction commit.
+
+    Approved minimum set only (Stage 0.3A Scope Gate, Owner amendment):
+      Microsoft.NET.Test.Sdk, xunit, xunit.runner.visualstudio.
+    Explicitly not added: coverlet, the embedded web-view package, a third-party
+    logging provider, a validation library, and any database or physical-
+    transport vendor package (the S3 list in tools/boundary-scan is the machine
+    check of this rule).
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Test stack (xUnit selection: approved Owner pinning decision, Stage 0.3A). -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+</Project>

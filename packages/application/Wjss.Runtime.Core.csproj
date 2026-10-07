@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS Equipment Runtime core. Stage 0.3A-1: marker + wiring only. The
+    single-writer authoritative state engine, revision generation, snapshot /
+    delta generation, shutdown boundaries and simulator composition arrive in
+    Stage 0.3A-2 and are NOT AUTHORIZED yet.
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.Runtime.Core</RootNamespace>
+    <AssemblyName>Wjss.Runtime.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../contracts/Wjss.Contracts.csproj" />
+    <ProjectReference Include="../domain/Wjss.Domain.csproj" />
+    <ProjectReference Include="../time/Wjss.Time.csproj" />
+  </ItemGroup>
+
+</Project>

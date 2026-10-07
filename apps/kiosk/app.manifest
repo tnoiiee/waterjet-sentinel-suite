@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
+  <assemblyIdentity version="0.0.0.0" name="Wjss.Kiosk" />
+
+  <!-- Windows compatibility declaration only. DPI is intentionally NOT declared
+       here: WFO0003 - WinForms configures DPI through the project property
+       (ApplicationHighDpiMode=PerMonitorV2 in Wjss.Kiosk.csproj), which the
+       WinForms ApplicationConfiguration.Initialize() entry point applies. -->
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 / 11 (the supported workstation family; Windows 11 Pro is the product baseline). -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+    </application>
+  </compatibility>
+</assembly>

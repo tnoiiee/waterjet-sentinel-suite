@@ -9,10 +9,12 @@ Solution Architecture Decision* — **OWNER ACCEPTED / MERGED** (source
 **ACCEPTED** (architecture direction, not implemented). Stage 0.2.1A — React UI and Runtime
 Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implementation
 **COMPLETE FOR DEVELOPMENT CHECKPOINT** (Owner-local final Edge gate **PASS**, Owner manual
-review **PASS**), PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**. **React selected as the
+review **PASS**), **PR #3 MERGED** (merge commit `d8d28201e641e436293136d04ba7ee553802d4e5`). **React selected as the
 Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
 `[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
-Main Development Scope Gate **PENDING**. Stage 0.3 `[NOT AUTHORIZED]`. Production device access `[NOT AUTHORIZED]`.
+Main Development Scope Gate **PENDING** (0.3B+). **Stage 0.3A Scope Gate APPROVED** (Owner Option-C amended gate).
+**Stage 0.3A-1 SOURCE CHECKPOINT AUTHORED** — **Owner-local .NET validation PENDING** — **PR #4 OPEN — NOT READY FOR MERGE**.
+**Stage 0.3A-2 NOT AUTHORIZED**. Production device access **NOT AUTHORIZED**.
 
 > **No runtime testing has occurred.** There is no application code, no build, no database
 > schema, and no device connection in this repository. Nothing in this project has been

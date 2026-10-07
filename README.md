@@ -10,28 +10,34 @@ Repository: `waterjet-sentinel-suite`
 
 | Item | Value |
 | --- | --- |
-| Current stage | **Stage 0.2.1A — React UI and Runtime Feasibility Spike** |
+| Current stage | **Stage 0.3A-1 — Product Foundation Source Checkpoint** — **OWNER-LOCAL VALIDATION PASSED / DEVELOPMENT CHECKPOINT READY** (Release build 0 warnings / 0 errors; full .NET suite 61/61; TypeScript 24/24; fixture parity 7/7; boundary scan S1–S9 clean) |
 | Stage 0.1 Scope Gate | **APPROVED** |
 | Stage 0.1 implementation | **MERGED** — through PR #1 |
 | Stage 0.2 Scope Gate | **APPROVED** |
 | Stage 0.2 architecture checkpoint | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`) |
 | Stage 0.2 ADR-0006 to ADR-0013 | **ACCEPTED** as architecture direction — accepted does **not** mean implemented; items marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` inside them keep those markers |
 | Stage 0.2.1A Scope Gate / Coding Start | **APPROVED** / **APPROVED** |
-| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761`; PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED**; controlled 15- and 60-minute observations **waived as merge blockers** |
+| Stage 0.2.1A implementation | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — synthetic feasibility spike in [`spikes/ui-runtime-react/`](spikes/ui-runtime-react/README.md); Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761`; **MERGED** — PR #3, merge commit `d8d28201e641e436293136d04ba7ee553802d4e5`; controlled 15- and 60-minute observations **waived as merge blockers** |
 | Primary UI Framework | **React selected** (Owner decision, 2026-10-07); Production transport and chart library remain `[OPEN]` |
 | Blazor counter-spike | **NOT REQUIRED** unless a future material blocker is identified |
-| Main Development Scope Gate / Stage 0.3 | **PENDING** / **NOT AUTHORIZED** |
+| Main Development Scope Gate | **PENDING** — Stage 0.3A proceeds under the Owner's Option-C amended gate only; Stage 0.3B+ **NOT AUTHORIZED** |
+| Stage 0.3A-1 source checkpoint | **OWNER-LOCAL VALIDATION PASSED — DEVELOPMENT CHECKPOINT READY.** Validated Owner-locally per [`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) (full verdict recorded in that document and in PR #4). Arena never ran .NET; the Owner-local result is authoritative. **PR #4: READY FOR OWNER MERGE — NOT MERGED.** Stage 0.3A-2 **NOT AUTHORIZED** |
 | Production devices | **NOT AUTHORIZED** |
-| Repository contents | Documentation, repository governance, and one removable synthetic feasibility spike |
-| Application code | **None.** The Stage 0.2.1A spike is synthetic feasibility code, not Product code: no solution, no schema, no Product runtime. |
+| Repository contents | Documentation, repository governance, one removable synthetic feasibility spike, and — from Stage 0.3A-1 — the Owner-validated product foundation: solution + project sources, `global.json` (SDK `10.0.401`), twelve genuine Owner-local `packages.lock.json`, and the .NET-generated fixtures and examples |
+| Repository contents note | `spikes/` remains synthetic feasibility code outside the Product build graph; the 15 transferred artifacts come from the Owner's validated Working Tree (handoff commit `488b98fb…`) — Arena generated none of them |
+| Application code | **Validated for the checkpoint scope** Owner-locally (Release 0/0; 61/61; TS 24/24; parity 7/7; boundary clean; health + profile + port gates as recorded in the validation document). Arena claims no .NET execution of its own. The committed fixtures are .NET-GENERATED; the in-file `fixtureStatus` PROVISIONAL marker persists only because the generator constant still writes it — removal is a later Owner decision |
 | Application version | **NOT ESTABLISHED.** No runtime release exists. |
 | Hardware connection | **Not authorised.** Production device access is prohibited. |
 | Production Write | **Not authorised.** |
 | Merge authority | **Owner only.** Agents never merge. |
 
-This repository contains documentation and, from Stage 0.2.1A, one removable **synthetic**
-React feasibility spike (`spikes/ui-runtime-react/`) that uses no device, no Production value,
-and no Product directory. Everything else described here is a design baseline, not a running
+This repository contains documentation, one removable **synthetic** React feasibility spike
+(`spikes/ui-runtime-react/`, Stage 0.2.1A) that uses no device, no Production value, and no
+Product directory, and — from Stage 0.3A-1 under the Owner's Option-C amended gate — the
+**product foundation source skeleton** (`packages/contracts`, `packages/domain`,
+`packages/application`, `packages/time`, `adapters/simulator`, `apps/runtime`, `apps/kiosk`,
+`tests/`, `config/examples/`, `tools/boundary-scan/`). That skeleton is **authored, not
+validated**: no .NET build has run in the authoring environment and nothing here is a running
 system. See
 [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) for the stage status, the verified state,
 and the status legend used throughout.
@@ -40,22 +46,29 @@ Stage 0.2 recorded the technology and solution architecture — UI delivery mode
 process model, technology stack, database access and migrations, device adapter boundary,
 configuration and secrets, simulator-first development, and offline deployment — in
 [`docs/decisions/`](docs/decisions/README.md). The Owner accepted Stage 0.2 and ADR-0006 to
-ADR-0013 as architecture direction. **Accepted does not mean implemented**: nothing in them is
-implemented as Product code, items still marked `[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]`
-keep those markers, and no capability or later stage is authorised by them.
+ADR-0013 as architecture direction. **Accepted does not mean implemented**: items still marked
+`[PROPOSED]`, `[OPEN]`, or `[NOT VERIFIED]` keep those markers, and no capability or later
+stage is authorised by acceptance. Stage 0.3A-1 authors product *sources* that follow these
+directions — that is drafting toward implementation, not implemented or verified code; its
+three companion records ADR-0014 to ADR-0016 are `DRAFT`.
 
-**React is selected as the Primary UI Framework** (Owner decision, 2026-10-07, after the Owner-local final Edge
-gate and manual review of the Stage 0.2.1A spike passed). The Blazor counter-spike is no longer
-required unless a future material blocker is identified. *Historical context:* two candidates were
-recorded and compared on equal terms: Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
-in the same application-owned kiosk shell behind the same loopback API. The current
-evidence-based preference for Candidate A is explicitly **not acceptance**, and Candidate B is
-explicitly **not rejected**. React can be built and deployed offline; it introduces a second
+**React is selected as the Primary UI Framework** — this is a **settled Owner decision
+(2026-10-07)**, taken after the Owner-local final Edge gate and manual review of the Stage
+0.2.1A spike passed; it is no longer a preference awaiting acceptance. The Blazor
+counter-spike is **not required** unless a future material blocker is identified.
+*Historical context (superseded):* two candidates were recorded and compared on equal terms:
+Candidate A — React + TypeScript + Vite — and Candidate B — Blazor Hybrid — each hosted
+in the same application-owned kiosk shell behind the same loopback API. At that time, the
+evidence-based preference for Candidate A was explicitly **not acceptance** and Candidate B
+was explicitly **not rejected**; that position ended with the 2026-10-07 Owner selection.
+React can be built and deployed offline; it introduces a second
 package and build ecosystem, which increases offline dependency-management and supply-chain
 effort without making offline development or deployment impossible. Choosing the framework
-requires measured evidence: the Stage 0.2.1A React feasibility spike is approved and in
-progress (see [`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md)); React
-feasibility checkpoint is now complete and React is selected (see above). See
+required measured evidence, and it was obtained: the Stage 0.2.1A React feasibility spike
+was approved, implemented, and **closed out** — the feasibility checkpoint is **complete**
+(Owner-local final Edge gate and manual review **PASS**;
+[`docs/spikes/stage-0.2.1a-plan.md`](docs/spikes/stage-0.2.1a-plan.md) is retained as
+history), and React is **selected** as the Primary UI Framework (see above). See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and
 [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 3.2.
 

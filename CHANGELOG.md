@@ -4,8 +4,15 @@ All notable changes to this repository are recorded in this file.
 
 The format follows the spirit of *Keep a Changelog*, adapted for a stage-gated project:
 entries correspond to Owner-approved Delivery Stages and to review corrections, not to
-releases of software. **The repository contains documentation and, from Stage 0.2.1A, one
-removable synthetic feasibility spike — no Product code.**
+releases of software. **The repository contains documentation, one removable synthetic
+feasibility spike (Stage 0.2.1A), and — from Stage 0.3A-1 — the product foundation source
+checkpoint VALIDATED Owner-locally (Release build 0 warnings / 0 errors; full .NET suite
+61/61; TypeScript 24/24; fixture parity 7/7; boundary scan S1–S9 clean): the committed
+fixtures are the genuine .NET-generated files and the twelve `packages.lock.json` are
+genuine restore output, both transferred from the Owner's validated Working Tree
+(handoff commit `488b98fb70c20ed6e028043e31b661f64d0c92f4`); the .NET SDK is pinned by
+`global.json` at Owner-validated `10.0.401`. Arena never ran .NET; this Owner-local
+evidence is authoritative for the checkpoint.**
 
 ---
 
@@ -24,10 +31,397 @@ removable synthetic feasibility spike — no Product code.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Final Owner-Local Evidence Closeout (`chore: close Stage 0.3A-1 validation evidence`)
+
+**STAGE 0.3A-1 OWNER-LOCAL VALIDATION PASSED.** Owner-local at predecessor `685e056` /
+final test state `a9ef185` (2026-10-07): full Release build **PASS — 0 warnings, 0 errors**
+(all 12 projects, 3.7 s); fresh full .NET suite **61 total / 61 passed / 0 failed / 0
+skipped** (5.5 s) — authoritative because the build completed successfully immediately
+before the run. Environment: .NET SDK **10.0.401**, xUnit observed runtime **.NET 10.0.12**.
+TypeScript **24/24**; FixtureEmission parity **7/7**; boundary scan **0 findings (S1–S9
+clean)**. Health: live HTTP 200 (`status=ALIVE`, `deviceProfile=SIMULATOR`,
+`runtimeImplemented=false`, `stageMarker=STAGE_03A1_SKELETON`); ready HTTP 503
+(`RUNTIME_NOT_IMPLEMENTED`). Profile gates fail-closed: SIMULATOR starts; `TEST_HARDWARE`
+and `PRODUCTION` refused with exit 2; invalid profile refused with exit 4; no silent
+fallback under `--no-launch-profile`. Port collision on 5181: explicit refusal, exit 3.
+The tcChannels structural contract re-verified end to end (108 slots / 106 sensors /
+2 cannons / exact-two-element arrays / 212 total = 212 unique / 0 duplicates / cannons
+I7+I16 channel-free / walls 24-29-24-29; first-sensor shape CLR `System.Object[]`, JSON
+`["SYN-TC-01:CH00","SYN-TC-01:CH01"]`).
+
+Closeout content (this commit; documentation + SDK pin only — no behavior, contract,
+generator, test, or dependency change):
+
+- **`global.json` (new, repository root)**: pins the exact Owner-validated stable SDK
+  `10.0.401` with `rollForward: latestPatch` — the narrowest policy consistent with the
+  Stage 0.3A decision that an SDK pin is only added once Owner-validated (the runbook's
+  former "intentionally no global.json" rule is superseded by this Owner decision); no
+  Preview or RC SDK is referenced.
+- **Genuine Owner-local artifacts recorded** (transferred by handoff commit `488b98fb…`,
+  verified in Arena, never generated here): exactly **12** `packages.lock.json` files —
+  valid JSON, correct per-project paths, framework sections consistent with each csproj
+  TFM (`net10.0-windows7.0` for the kiosk), zero absolute local paths, zero credential
+  findings, every Direct entry exactly matching the `Directory.Packages.props` pins
+  (`Microsoft.NET.Test.Sdk 17.12.0`, `xunit 2.9.2`, `xunit.runner.visualstudio 2.8.2`)
+  with no unapproved package, and locked-restore policy still enabled; plus the **3**
+  .NET-generated array fixtures (`config/examples/sensor-map.example.json`,
+  `packages/contracts/fixtures/delta.basic.json`, `packages/contracts/fixtures/snapshot.seed0.json`)
+  — all §7 shape/identity checks pass in Arena and the TypeScript validator accepts the
+  transferred files (24/24). The previously rejected comma-delimited fixtures are not
+  used; the `fixtureStatus` PROVISIONAL label remains inside the files because the
+  generator constant still writes it — removing that marker is a later Owner call.
+- **Environment finding recorded** (runbook §0A, already process-scope only): an external
+  `TargetPath` process variable from another local toolset was imported by MSBuild as a
+  global property and hijacked output resolution; removal from the current PowerShell
+  process (`Remove-Item Env:TargetPath -ErrorAction SilentlyContinue`) resolved it. Not a
+  WJSS dependency or repository defect; no User/Machine deletion, no repository-side
+  override, no suppression — and none is ever added.
+- **Test policy agreed for subsequent checkpoints** (runbook §11): automated tests only for
+  product behavior, safety invariants, public/wire contracts, deterministic state
+  transitions, cross-language parity, and meaningful product-impacting regressions;
+  compiler, analyzers, parsers, the boundary scanner, and focused semantic review carry
+  syntax/imports/analyzer-pattern/formatting/private-detail concerns instead. Existing
+  contract, mapping, startup-safety and parity tests are retained; no new tests were added
+  in this closeout.
+- **Wording residues corrected**: the CHANGELOG header placement sentence (above) now
+  states the validated repository contents, and ADR-0016 item 3 no longer describes an
+  `Environment.GetEnvironmentVariable` WebView2 probe in the 0.3A-1 kiosk (the stub contains
+  no environment probing of any kind; runtime detection begins at 0.3A-4 per ADR-0013);
+  `packages/contracts/fixtures/README.md`'s validation pointer now cites the correct runbook
+  section. README, CURRENT_STATE, STAGE_0.3A_PLAN, the validation runbook, ADR-0014 and the
+  fixture/tooling READMEs move to the validated status; dated per-round records are kept
+  untouched as state-at-the-time evidence.
+
+**PR #4: READY FOR OWNER MERGE — NOT MERGED** (the Agent never merges; merge, and any
+decision to drop the remaining `fixtureStatus` marker, is an Owner call). Stage 0.3A-2
+**NOT AUTHORIZED**; Production device access **NOT AUTHORIZED**; `spikes/**` immutable
+(roll `101be71b…3fbc5` re-verified).
+
+### Stage 0.3A-1 — Round 6d cannon logical ordering test correction (`fix: order cannon assertions by logical position`)
+
+Owner-local at `39577e2` (2026-10-07): Release build **PASS 0/0**; fresh full suite
+**61 / 60 passed / 1 failed**; parity 7/7; boundary scan clean. The single failure was a
+test-ordering defect in `Example_Mapping_Validates_Through_The_Typed_Contract`: the cannon
+label sequence was produced by `OrderBy` on the `logicalLabel` STRINGS, which sorts
+lexicographically to `I16, I7` while the accepted logical order is `I7, I16`. The
+mapping and contract were correct and remain unchanged.
+
+Correction (test source only): the cannon assertion pipeline now orders the cannon SLOTS
+by structured position — `OrderBy(LogicalRow).ThenBy(LogicalColumn)` — and reads
+`logicalLabel` from that order; the expected sequences stay `[7, 16]` / `["I7","I16"]`.
+Per-slot pairing is asserted explicitly (I7 at row 5 / column 7 / `CANNON_REAR`; I16 at
+row 5 / column 16 / `CANNON_FRONT`), and cannons gained a `sensorId`-absence assertion;
+row-5, no-`tcChannels`, and all canonical counts (108/106/2, 212 total = 212 unique, walls
+24-29-24-29) remain. Ordering defect-class sweep over the full Stage 0.3A-1 test tree:
+the only other `OrderBy` sites sort by structured numeric fields (`WallColumns` ranges by
+`FirstColumn`) or are input parsing for the product API under test — no lexicographic
+ordering of labels/IDs, no numeric parsing out of labels where structured fields exist, no
+sequence/set mismatches — remains. No expectation was flipped to match text sorting, no
+padding normalization, no natural-sort dependency. Product contracts, `TcChannelRules`,
+generator, TypeScript mirror, fixtures, examples, lock files and spikes: zero diff.
+Final Owner-local Release build + fresh full-suite rerun REQUIRED; no .NET/xUnit success
+claimed in Arena.
+
+### Stage 0.3A-1 — Round 6c structural JSON assertion correction (`fix: assert tc channel JSON shape structurally`)
+
+Owner-local state at `0b088ad` (2026-10-07): full Release build **PASS, 0 warnings / 0
+errors**; fresh full test run 61 total / 59 passed / 2 failed / 0 skipped. Both failures —
+`Serializing_Valid_Mapping_Emits_Two_Item_Arrays_And_Never_A_Comma_Scalar` and
+`Example_Mapping_Validates_Through_The_Typed_Contract` — were test-assertion defects: they
+tried to disprove the scalar shape by matching serialized text
+(`Assert.DoesNotContain("\"tcChannels\": \"", …)`), which crosses the indented writer's
+formatting whitespace and matched into the first array item. The accepted contract itself is
+verified and frozen: exact-two-element arrays, CLR `System.Object[]`, 108/106/2 composition,
+212 total = 212 unique channels, 0 duplicates, I7/I16, walls 24-29-24-29; TypeScript 24/24;
+fixture parity 7/7; boundary scan clean.
+
+Corrections (test sources only):
+
+- `TcChannelContractTests.cs`: every shape claim is now proven structurally from parsed
+  documents — presence, `JsonValueKind.Array`, never `JsonValueKind.String`, exactly two
+  `JsonValueKind.String` items, non-empty and whitespace-pure values, distinct pairs,
+  deterministic front-then-rear order (compared on the `:CH<digits>` values, not on text),
+  cannon `tcChannels` key absence, and the full canonical 108/106/2/106-arrays/0-scalars/
+  212/212/0-duplicates/walls mapping over the committed example.
+- Defect-class sweep over the Stage 0.3A-1 test tree removed the remaining two assertions of
+  the same class: the redundant serialized-text follow-up in `Delta_RequiredTest3`
+  (the structural presence+`JsonValueKind.Null` pair already proves it) and the whitespace-
+  baked `deviceProfile` text guards in `ExampleConfigTests`, which now recursively scan the
+  parsed example JSON (compact-form evasion closed). Intentional source-preservation text
+  guards (Kiosk DPI, Runtime stub, prohibited-vocabulary scan) and the JsonNode structural
+  assertions of round 6b are unchanged; no comma-splitting, no normalization, no suppression,
+  `TreatWarningsAsErrors` and `AnalysisLevel` untouched, no CA1861-style inline constant
+  arrays added, all `[Fact]`/`[Theory]` files carry the xUnit import.
+- Contract (`packages/contracts/TcChannels.cs`), generator, serializer, fixtures, examples,
+  TypeScript mirror, lock files, and package versions are **unchanged**.
+
+Owner-local final build + fresh full-suite rerun REQUIRED; no .NET build or xUnit success is
+claimed in Arena (round-6c C# is compile-reviewed only, with its structural assertions
+mirrored green in Python against the committed example).
+
+### Stage 0.3A-1 — Round 6 Owner-local test correction (`fix: align config tests with tc channel arrays`)
+
+Owner-local result for round 6 (2026-10-07): the tcChannels structured-array contract is
+**accepted** — the .NET generator produced 108 slots / 106 sensors / 2 cannons, 106 sensors
+with `tcChannels` arrays (CLR shape `System.Object[]`, JSON `["…:CH00","…:CH01"]`), 212 total
+and 212 unique channels, 0 duplicates, 0 wrong-count sensors, cannons I7/I16, walls
+24/29/24/29; TypeScript validation 24/24, fixture parity 7/7, boundary scan S1–S9 clean. The
+`--no-build` suite run (49/50) is recorded **non-authoritative**: `Wjss.Config.Examples.Tests`
+could not rebuild from current source, so a stale assembly ran. Two config-test corrections,
+source-only — contract, generator, fixtures, serializer, and package versions untouched:
+
+- **CA1861 compile errors** in `tests/config.tests/TcChannelContractTests.cs` (lines 166–167):
+  the cannon-identity expectations were inline constant arrays passed to `Assert.Equal`.
+  Extracted to named `private static readonly` fields (`ExpectedCannonLogicalColumns`,
+  `ExpectedCannonLogicalLabels`); the comparison only enumerates them, so sharing the
+  immutable instances is safe. No suppression, no severity or `TreatWarningsAsErrors` change.
+- **Stale `tcChannels` assertion shape** in `tests/config.tests/ExampleConfigTests.cs`: the
+  pre-correction assembly called `GetValue<string>()` on the `tcChannels` node and failed
+  with "The node must be of type 'JsonValue'". The test now inspects the accepted structure
+  directly: `tcChannels` must cast to a `JsonArray` (a scalar comma-delimited string fails
+  as a shape error), exactly two non-empty string items per sensor, distinct within the pair,
+  212 total items across 106 sensors, 212 globally unique, and cannon slots must not carry
+  the key. Canonical counts and the typed `TcChannelRules.RequireValidMapping` verification
+  remain. No comma-splitting was reintroduced.
+
+Owner-local clean full Release build + fresh full-suite rerun REQUIRED after this correction;
+no .NET build or xUnit success is claimed in Arena.
+
+### Stage 0.3A-1 — Thermocouple channel contract shape correction (round 6)
+
+Owner-local state (2026-10-07, rounds 3–5): after the two analyzer errors and the
+`TargetPath` environment root cause were cleared, the full solution Release build
+passed 0 warnings / 0 errors, the corrected checkpoint suite passed 50/50 and
+fixture/delta parity 7/7 — superseding the explicitly non-authoritative `--no-build`
+42/49 result. Residual drift on the three provisional files surfaced a real shape
+defect: the sensor-map example encoded each sensor's thermocouple pair as one
+comma-delimited string and its test asserted that by splitting the string.
+
+- **Contract correction**: `tcChannels` in the sensor-map configuration example is a
+  structured JSON array of exactly two channel strings per SENSOR slot (index 0 = lower
+  channel index / front, index 1 = higher / rear); CANNON slots never carry it. New
+  `SensorMapSlotExample` record + `TcChannelRules` in `packages/contracts/TcChannels.cs`
+  reject scalar strings (deserialization cannot bind them), wrong lengths, empty
+  entries, per-sensor and cross-sensor duplicates, and cannon-as-sensor composition;
+  canonical totals 108 slots / 106 sensors / 2 cannons / 2×2 channels / 212 globally
+  unique channels / walls 24-29-24-29. Snapshot/delta presentation keeps the existing
+  separate `tcFrontChannel`/`tcRearChannel` fields — not renamed, not merged.
+- Generator (`tests/integration/ExampleFiles.cs`) emits the array form and validates the
+  mapping through `TcChannelRules` before serializing. `config/examples/sensor-map.example.json`
+  was regenerated in Arena in the new form so TypeScript validation can run; it remains
+  PROVISIONAL — final truth comes from the Owner regeneration sequence after the full
+  Release build (rejected comma-delimited fixtures retained as validation evidence).
+- Tests: focused serialization/deserialization/rejection coverage for every invalid
+  channel shape plus the full typed mapping validation of the committed example
+  (`tests/config.tests/TcChannelContractTests.cs`; example test upgraded from string
+  splitting to typed contract validation). TypeScript validator + types mirror the
+  contract (scalar-string and every array-shape negative; positive canonical totals),
+  tests 15 → 24 green. ADR-0014 decision 8 records the structural rule and that the
+  earlier comma-delimited form was detected by Owner validation and rejected pre-merge.
+- No Product project, `.csproj`, `.sln`, TFW, warning-policy, package-version, or
+  dependency changes; no lock file touched; no fixture under `packages/contracts/fixtures/`
+  modified; spikes immutable (roll `101be71b…3fbc5`). C# sources compile-reviewed only:
+  **not built in Arena**. Owner-local rerun of the full validation sequence REQUIRED.
+
+### Stage 0.3A-1 — Owner-local build & contract-test correction round 5
+
+**Test-run evidence recorded as NON-AUTHORITATIVE.** `dotnet test ... --no-build --no-restore`
+returned 49 / 42 pass / 7 fail / 0 skip, but the preceding full-solution Release build had
+**not** passed — assemblies may be stale (notably `Wjss.Config.Examples.Tests` "passed" though
+its source did not compile in that build). This result is explicitly **not** the checkpoint
+test record. Corrections in this round (source only; contract wire semantics untouched — the
+absent/object/null triple stands and `activeJobCleared` stays absent):
+
+- **Config test assembly anchor:** the round-4 `ConfigTestAssemblyMarker` + shared
+  `ConfigTestPaths.RepoRoot()` mechanism is verified in place for both preservation tests
+  (marker declared exactly once; zero code references to `ExampleConfigTests` remain; no fake
+  substitute class; repository-source discovery unchanged; no absolute paths; no Product
+  changes) — requirement completed in `12e3cfd`, confirmed here.
+- **Presence-aware JSON null assertions (3 failing tests):** `JsonNode` indexers map JSON
+  null to a CLR-null reference, so `json["activeJob"]!.GetValueKind()` NRE'd. Wire assertions
+  in `ContractEncodingTests` now go through `JsonDocument`/`JsonElement` using the exact
+  pattern — (A) absent: `TryGetProperty` false; (B) explicit null: true +
+  `JsonValueKind.Null`; (C) object: true + `JsonValueKind.Object` — across serialization AND
+  deserialization round-trip of all three `activeJob` states (new stability assertions in
+  required-test-4).
+- **`Optional<T>` payload equality:** `_value == other._value` compared present payloads by
+  reference for the unconstrained `T`, wrongly splitting equal records (round-5 owner-local
+  failure). `Equals` now delegates present-payload comparison to
+  `EqualityComparer<T>.Default`; `GetHashCode` mirrors it (equal values hash equal); `==`/`!=`
+  remain defined as `Equals`/`!Equals`; `Present(null)` still prohibited; wire serialization
+  byte-identical. No recursive custom deep-equality invented — payloads keep their own .NET
+  equality; new focused tests cover delegation for value-equal and reference-only payloads.
+- **Fixture drift (3 files) retained as EXPECTED provisional evidence:**
+  `snapshot.seed0.json`, `delta.basic.json`, `sensor-map.example.json`. Fixtures were NOT
+  touched in Arena; regeneration remains gated on (1) full Release build PASS and (2) all
+  non-parity test projects PASS first — now written into the runbook step 5 ordering gate.
+
+**Still required:** a clean full-solution Release build, then a `dotnet test` WITHOUT
+`--no-build` against fresh assemblies; only then may parity/fixture status be judged. No .NET
+success is claimed anywhere in this entry.
+
+### Stage 0.3A-1 — Owner-local build correction round 4
+
+With the external process `TargetPath` override gone, the Owner-local build reached **eleven
+projects compiling successfully**: `Wjss.Time`, `Wjss.Kiosk`, `Wjss.Contracts`,
+`Wjss.Adapters.Simulator`, `Wjss.Domain`, `Wjss.Runtime.Api.Tests`, `Wjss.FixtureEmission.Tests`,
+`Wjss.Runtime.Core`, `Wjss.Domain.Tests`, `Wjss.Runtime.Core.Tests`, `Wjss.Runtime` —
+confirming the ProjectReference graph, the WinForms DPI correction, `Optional<T>` + converter,
+and the CA1873 logging correction, and that no Product workaround for KMotion/`TargetPath` is
+required (none was added; the absolute toolset path appears only in the dated Owner evidence
+record). The single remaining failure was `Wjss.Config.Examples.Tests`: both
+source-preservation tests referenced `ExampleConfigTests.RepoRoot()` across namespaces
+(`Wjss.Config.Tests` vs `Wjss.Config.Examples.Tests`) — CS0103 ×2. Corrected minimally with
+the Owner's preferred mechanism: new `ConfigTestAssembly.cs` defines `internal sealed class
+ConfigTestAssemblyMarker` (a stable assembly anchor — no empty/fake substitute class, nothing
+dependent on a renamable test-class name) plus `internal static ConfigTestPaths.RepoRoot()`,
+anchored at `typeof(ConfigTestAssemblyMarker).Assembly.Location` with the identical
+walk-up-to-`.sln` discovery; both tests now share it, `ExampleConfigTests` itself is
+unchanged, all existing DPI/Runtime/configuration tests retained, no new dependency, no
+absolute paths, no weakened assertions, no Product-project logic. **Full Owner-local Release
+build + test re-run still required** — eleven green compiles are Owner evidence, and the
+config test project plus every test execution await the rerun.
+
+### Stage 0.3A-1 — Owner-local build correction round 3
+
+Root cause of the round-2 cascading `Wjss.Contracts` reference failures was identified as
+**local environment contamination**: a `TargetPath` variable defined in the Owner's active
+PowerShell process (set by an unrelated external motion-control toolset) was imported by
+MSBuild as a global property, hijacking output resolution. The Owner removed it from the
+process scope; the cascade vanished and ten projects then compiled: `Wjss.Time`,
+`Wjss.Kiosk`, `Wjss.Contracts`, `Wjss.Domain`, `Wjss.Adapters.Simulator`,
+`Wjss.Runtime.Core`, `Wjss.Runtime.Api.Tests`, `Wjss.Domain.Tests`,
+`Wjss.FixtureEmission.Tests`, `Wjss.Runtime.Core.Tests`. That first green compile proves the
+`ProjectReference` paths are correct. The repository adopts **no** vendor path,
+`ReferencePath`/`TargetPath` override, or KMotion-related reference of any kind — the only
+change is documentation: the runbook gains a mandatory pre-build environment check (process-
+scope removal only; never a permanent User/Machine deletion) and the lock-file policy now
+states that restore-generated `packages.lock.json` files stay untracked until the full
+validation passes. Two genuine source defects from the same round were fixed without any
+suppression or severity change: (1) `KioskDpiConfigurationTests.cs` was missing its
+per-file `using Xunit;` import (Fact resolution) — added, matching the existing explicit-using
+convention, no GlobalUsings file introduced; (2) CA1873 in `apps/runtime/Program.cs` — the
+startup `LogInformation` argument evaluation (including `{StartedUtc:O}` formatting) is now
+wrapped in `if (app.Logger.IsEnabled(LogLevel.Information))` guard at the exact level,
+template/structured payloads/behaviour unchanged; four new static source tests
+(`RuntimeStubPreservationSourceTests`) assert health/live, health/ready, profile-refusal
+ordering with exit codes 4/2/3, loopback binding, and the absence of suppression remain
+intact. **A full Owner-local Release build + test rerun is still required**; the generated
+lock-file set is untouched by this repository.
+
+### Stage 0.3A-1 — Owner-local compile correction (`fix: resolve Owner-local .NET compile blockers`)
+
+**First real .NET evidence.** The Owner ran
+`dotnet build .\WaterJetSentinelSuite.sln --configuration Release --no-restore` locally
+(twice, identical results): **BUILD FAILED** with exactly two errors —
+(1) `Wjss.Kiosk` (net10.0-windows) **WFO0003**: high-DPI settings declared in
+`app.manifest` must move to `Application.SetHighDpiMode`/`ApplicationHighDpiMode`;
+(2) `Wjss.Contracts` **CA2231** (warnings-as-errors): `Optional<T>` overrides
+`Equals` without equality operators. `Wjss.Time` compiled successfully. Both corrected as
+source only:
+
+- **WFO0003:** `apps/kiosk/app.manifest` — the `dpiAware`/`dpiAwareness` block (and its now-empty
+  `application/windowsSettings` container) removed; `supportedOS` compatibility retained.
+  `Wjss.Kiosk.csproj` — `ApplicationHighDpiMode=PerMonitorV2` added. `Program.cs` — manual
+  `EnableVisualStyles`/`SetCompatibleTextRenderingDefault`/`SetHighDpiMode` trio replaced by the
+  WinForms source-generated `ApplicationConfiguration.Initialize()` before `Application.Run`.
+  Guarded by new scanner rule **S9** and three static xUnit source tests
+  (`KioskDpiConfigurationTests`); kiosk README wording corrected (DPI via project property;
+  manifest compatibility-only).
+- **CA2231:** `Optional<T>` gains `operator ==`/`!=` defined exactly as `left.Equals(right)` —
+  struct shape, Absent/Cleared/Present semantics, converter behaviour, hash scheme, and the
+  three-state `activeJob` wire contract are all unchanged (contract wire semantics untouched).
+  `OptionalPresenceTests`: seven xUnit cases covering every required state pair, the nine-pair
+  operator-mirrors-Equals matrix, contract-record value equality, and hash conventions
+  (authored; **NOT RUN in Arena**).
+- No severities lowered, no suppressions, no TFM changes, no package/version edits, no lock
+  files. **A full Owner-local Release build + test re-run is required** — this correction fixes
+  the two reported errors as reviewed source; nothing here proves the next build passes.
+
+### Stage 0.3A-1 — Source review correction (Owner findings A–E, same PR #4)
+
+Independent Owner source review of `205456e` found five issues; corrected here as one
+review-correction commit on PR #4. **Still no .NET build claim.**
+
+- **A — build-blocking XML defect (FIXED):** the `Directory.Packages.props` header comment
+  contained a double-hyphen sequence (`--locked-mode`), which is illegal in XML 1.0 and made
+  the file unparseable by MSBuild — the checkpoint's own restore would have failed at line 9.
+  Comment reworded; permanently guarded by new scanner rule **S8 XML well-formedness**
+  covering `*.csproj`, `*.props`, `*.targets`, `*.manifest`, `*.resx`, `*.config`
+  (verified against negative controls).
+- **B — Delta Active-Job clear semantics (RESTORED TO ACCEPTED BASELINE):** the
+  checkpoint-introduced `activeJobCleared: true` flag was **not approved**; the accepted
+  three-state encoding is back — key absent = unchanged, object = replace, explicit
+  `"activeJob": null` = clear. Implemented presence-aware with a scoped structural
+  technique (`Optional<T>` wrapper + converter attributed only on
+  `OperationalDelta.ActiveJob`; explicitly not a general serialization policy). The flag is
+  removed from the C# records, TypeScript types, validator (which now **rejects** it), the
+  fixtures (delta.basic exercises the null-clear key in lockstep with the .NET generator),
+  the xUnit suite (five three-state tests authored — NOT RUN in Arena), ADR-0014 (rewritten
+  with the rejected deviation kept as labeled history) and current-facing docs.
+- **C — current-facing stage banners:** the 12 authorized status-banner documents (SECURITY,
+  ALARM_MODEL, ARCHITECTURE, CLEANING_SEQUENCE, CONTROL_AUTHORITY, DOMAIN_MODEL,
+  HISTORIAN_RETENTION, QUEUE_MODEL, REQUIREMENTS, SAFETY_BOUNDARY, TEST_STRATEGY,
+  USER_PERMISSION_MODEL) now state PR #3 MERGED `d8d28201`, Stage 0.3A Scope Gate APPROVED,
+  0.3A-1 SOURCE CHECKPOINT AUTHORED with Owner-local validation PENDING, PR #4 OPEN — NOT
+  READY FOR MERGE, 0.3A-2 NOT AUTHORIZED, production-device access NOT AUTHORIZED. No
+  domain/queue/alarm/safety/control content below the banners was touched.
+- **D — README consistency:** the stale "preference is not acceptance" sentence is now
+  explicitly labeled historical; React selected (Owner decision 2026-10-07) stated plainly;
+  Blazor counter-spike not required absent a material blocker.
+- **E — test-runner metadata:** `xunit.runner.visualstudio` `PackageVersion` carries the
+  standard non-transitive pattern (`PrivateAssets=all`;
+  `IncludeAssets=runtime; build; native; contentfiles; analyzers; buildtransitive`).
+  Proposed versions unchanged (Owner-local restore still arbitrates them); no lock files
+  generated in Arena.
+- Arena validation for this correction: XML well-formedness 15/15 files clean + negative
+  controls flagged; JSON sweep green; `npm ci`/typecheck/`node --test` **15/15 PASS**
+  (lockfile untouched); boundary scan **0 findings (S1–S8)**; `spikes/**` sha256 roll
+  unchanged; `git diff --check` clean.
+
+### Stage 0.3A-1 — Product foundation source checkpoint (authored in Arena; Owner-local validation PENDING)
+
+**Gate:** Owner Option-C amended Stage 0.3A Scope Gate — source-checkpoint authority only.
+**Status: NOT READY FOR MERGE.** .NET build **NOT RUN IN ARENA** (SDK/NuGet endpoints blocked
+in the sandbox); the mandatory pre-merge gate is
+[`docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md).
+
+- Added the product foundation skeleton as **source only**: `WaterJetSentinelSuite.sln`
+  (12 projects); `packages/contracts/Wjss.Contracts` (18 files: snapshot/delta/command/status/
+  queue/config records + `QueueRules`/`SensorMap` invariants); `packages/domain`,
+  `packages/application`, `packages/time`; `adapters/simulator`; `apps/runtime` (health-stub:
+  live 200 / ready 503 `RUNTIME_NOT_IMPLEMENTED`); `apps/kiosk` (compile-only shell, no
+  WebView2 package); `apps/ui/README.md` (React scaffold is 0.3A-5 scope); five xUnit test
+  projects incl. `tests/integration` (golden-fixture generator + parity gate).
+- Added `packages/contracts/wjss-contracts-ts`: complete TypeScript structural mirror with
+  validator and **14/14 passing tests** (Arena-verified: `npm ci`, `tsc --noEmit`,
+  `node --test`); `typescript@6.0.3` install-verified, NuGet pins
+  `Microsoft.NET.Test.Sdk 17.12.0` / `xunit 2.9.2` / `xunit.runner.visualstudio 2.8.2`
+  **PROPOSED / UNVERIFIED** (first restore is Owner-local). No lock file committed.
+- Added `packages/contracts/fixtures/` (4) and `config/examples/` (2) as
+  **`PROVISIONAL STRUCTURAL FIXTURE`** artifacts (Node-authored to unblock the TS validator;
+  superseded by the .NET generator on the Owner-local run — never claimed as .NET-generated).
+- Added `tools/boundary-scan/boundary-scan.mjs`: repository-boundary gate S1–S7, currently
+  **0 findings**. Added `docs/STAGE_0.3A_PLAN.md` and the Owner-local validation runbook.
+- Added **DRAFT** ADR-0014 (contract skeleton; queue capacity 8; profile-start fail-closed;
+  the delta clear-encoding it first drafted was superseded by the review-correction entry
+  below), ADR-0015
+  (loopback SSE transport + uPlot candidate; fills `[OPEN]` selections only on acceptance),
+  ADR-0016 (WinForms + WebView2 detection-only shell; drafts ADR-0006 §6.7) and indexed them.
+- Fixed `.gitignore`: the `**/[Pp]ackages/*` vendor rule conflicted with the new product
+  `packages/` tree; negations and bin/obj re-exclusions corrected and verified with
+  `git check-ignore` probes (product `packages/**` tracked; vendor dirs and build output
+  ignored).
+- Status records synchronized: `README.md` (status table, contents), this file,
+  `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`, `docs/ROADMAP.md`, `docs/ARCHITECTURE.md`,
+  `docs/decisions/README.md`. **Not claimed:** compilation, tests passing on .NET, runtime
+  behaviour, fixture regeneration by .NET, kiosk behaviour, anything hardware-related.
+  **Authorized by nothing here:** 0.3A-2, merges, ZIP.
+
 ### Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
 
 **Scope and Coding Start Gate:** `[APPROVED]`
-**Implementation:** COMPLETE FOR DEVELOPMENT CHECKPOINT — PR #3 OPEN, ready for Owner merge
+**Implementation:** COMPLETE FOR DEVELOPMENT CHECKPOINT — **MERGED** (PR #3)
 **Owner-local testing (installed Edge, Windows 11):** Edge E2E **25 / 25 PASS** at checkpoint
 `4129687a` (Owner-reported, ≈ 1.3 min); at `23f48daa` 34 selected · 25 passed · 2 failed (`READ-A`,
 `WJ-A`) · 7 not run (Owner-reported). The GlobalQueue-correction checkpoint (35-test selection) was not re-run separately; at the
@@ -37,7 +431,9 @@ checkpoint `114c0761` (48-test selection): **Owner-local final Edge gate PASS** 
 2026-10-07)
 **Owner manual review (1920 × 1080, Edge F11):** **PASS** at `114c0761` · **Controlled 15-minute
 and 60-minute observations:** waived as Stage 0.2.1A merge blockers — not run
-**Merge:** NOT MERGED
+**Merge:** **MERGED** — PR #3, merge commit `d8d28201e641e436293136d04ba7ee553802d4e5` (the
+Agent never merges; the Owner executed the merge. The "OPEN — NOT MERGED" wording in the
+closeout entry below reflects the state at the time it was written.)
 **Primary UI Framework:** **React selected** (Owner decision, 2026-10-07)
 **Blazor counter-spike:** NOT REQUIRED unless a future material blocker is identified
 **Main Development Scope Gate:** PENDING
@@ -63,7 +459,9 @@ and 60-minute observations:** waived as Stage 0.2.1A merge blockers — not run
   validation summary fields and manifest.
 - Not claimed: Production safety or stability, WebView2, kiosk, Modbus performance, hardware. No
   application, test, contract, dependency or Sensor-map change. **PR #3 NOT MERGED** (the Agent
-  never merges); Main Development coding **NOT STARTED**.
+  never merges); Main Development coding **NOT STARTED**. *Later status:* PR #3 was merged by the
+  Owner (`d8d28201`), and Main Development coding began with the Stage 0.3A-1 source checkpoint
+  recorded below.
 
 #### Fixed — Final spike closeout: explicit synthetic AutoSequence controls (synthetic review tooling)
 
