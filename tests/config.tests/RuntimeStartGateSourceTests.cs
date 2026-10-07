@@ -3,16 +3,20 @@ using Xunit;
 namespace Wjss.Config.Examples.Tests;
 
 /// <summary>
-/// Focused source coverage for the CA1873 logging correction (Owner-local
-/// build round 3). The correction must not change any Stage 0.3A-1 Runtime
-/// stub behaviour, so this test asserts the invariants directly against the
-/// authored source of <c>apps/runtime/Program.cs</c>: health/live semantics,
-/// health/ready semantics, profile validation ordering (refusals before the
-/// listener exists), the refusal exit codes, loopback binding, and the
-/// presence of the IsEnabled guard instead of any suppression mechanism.
-/// Static source assertions only - no Runtime is launched here.
+/// Focused source and asset coverage for the Runtime host start gate and the
+/// read-only surface contract.
+///
+/// Stage 0.3A-1 pinned the skeleton's stub answers (health/ready always 503 +
+/// RUNTIME_NOT_IMPLEMENTED, health/live implemented:false). Stage 0.3A-2C is
+/// authorized to replace those stub answers with the composed SIMULATOR runtime
+/// and its readiness contract, so the assertions below pin the NEW contract while
+/// keeping every start-gate rule that must not change: profile validation before
+/// the listener exists, the refusal exit codes, loopback binding, no suppression
+/// mechanism, and no write, command or SSE route anywhere in the host.
+///
+/// Static source and asset assertions only - no Runtime is launched here.
 /// </summary>
-public sealed class RuntimeStubPreservationSourceTests
+public sealed class RuntimeStartGateSourceTests
 {
     private static string Program =>
         File.ReadAllText(Path.Combine(ConfigTestPaths.RepoRoot(), "apps", "runtime", "Program.cs"));
@@ -34,18 +38,25 @@ public sealed class RuntimeStubPreservationSourceTests
     }
 
     [Fact]
-    public void Health_Live_And_Ready_Behavior_Unchanged()
+    public void Health_Semantics_Follow_The_Checkpoint_C_Readiness_Contract()
     {
         var src = Program;
-        // live: 200 ALIVE payload, implemented:false, stage marker present.
+
+        // live: 200 ALIVE while the host process is alive, and no readiness claim.
         Assert.Contains("app.MapGet(ApiRoutes.HealthLive", src, StringComparison.Ordinal);
         Assert.Contains("Status = \"ALIVE\"", src, StringComparison.Ordinal);
-        Assert.Contains("RuntimeImplemented = false", src, StringComparison.Ordinal);
-        Assert.Contains("StageMarker = Stage03A1.Marker", src, StringComparison.Ordinal);
-        // ready: 503 with the explicit not-implemented code.
+        Assert.Contains("RuntimeImplemented = true", src, StringComparison.Ordinal);
+        Assert.Contains("StageMarker = RuntimeStage.Marker", src, StringComparison.Ordinal);
+
+        // ready: 200 only when ready, else 503 with the structured readiness code.
         Assert.Contains("app.MapGet(ApiRoutes.HealthReady", src, StringComparison.Ordinal);
-        Assert.Contains("Stage03A1.RuntimeNotImplemented", src, StringComparison.Ordinal);
+        Assert.Contains("runtime.Readiness()", src, StringComparison.Ordinal);
+        Assert.Contains("readiness.Code", src, StringComparison.Ordinal);
+        Assert.Contains("StatusCodes.Status200OK", src, StringComparison.Ordinal);
         Assert.Contains("StatusCodes.Status503ServiceUnavailable", src, StringComparison.Ordinal);
+
+        // The superseded stub answer is gone from the host.
+        Assert.DoesNotContain("Stage03A1.RuntimeNotImplemented", src, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -62,7 +73,7 @@ public sealed class RuntimeStubPreservationSourceTests
         var bind = src.IndexOf("app.MapGet", StringComparison.Ordinal);
         Assert.True(parse >= 0 && require >= 0 && bind >= 0 && parse < bind && require < bind,
             "profile validation must precede the listener (refusals never bind a port)");
-        Assert.Contains("return 4;", src, StringComparison.Ordinal); // unknown profile
+        Assert.Contains("return 4;", src, StringComparison.Ordinal); // unknown profile / bad configuration
         Assert.Contains("return 2;", src, StringComparison.Ordinal); // TEST_HARDWARE / PRODUCTION refusal
         Assert.Contains("return 3;", src, StringComparison.Ordinal); // occupied port
     }
@@ -76,5 +87,25 @@ public sealed class RuntimeStubPreservationSourceTests
         // No environment override mechanisms were introduced by any correction:
         Assert.DoesNotContain("TargetPath", src, StringComparison.Ordinal);
         Assert.DoesNotContain("ReferencePath", src, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Host_Exposes_Read_Only_Routes_And_No_Write_Or_Stream_Route()
+    {
+        var src = Program;
+
+        // The read-only surface is registered.
+        Assert.Contains("app.MapGet(ApiRoutes.Snapshot", src, StringComparison.Ordinal);
+        Assert.Contains("app.MapGet(ApiRoutes.Runtime", src, StringComparison.Ordinal);
+        Assert.Contains("app.MapGet(ApiRoutes.Deltas", src, StringComparison.Ordinal);
+
+        // No write/command route exists anywhere in the host.
+        foreach (var writeVerb in new[] { "MapPost", "MapPut", "MapPatch", "MapDelete", "MapMethods" })
+        {
+            Assert.DoesNotContain(writeVerb, src, StringComparison.Ordinal);
+        }
+
+        // No streaming surface: observers poll, nothing streams.
+        Assert.DoesNotContain("text/event-stream", src, StringComparison.Ordinal);
     }
 }

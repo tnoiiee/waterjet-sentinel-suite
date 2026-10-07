@@ -12,19 +12,22 @@ public sealed record HealthLivePayload
     /// <summary>Active device profile, echoed for display parity (SIMULATOR in Stage 0.3A).</summary>
     public required DeviceProfile DeviceProfile { get; init; }
 
-    /// <summary>False at Stage 0.3A-1: liveness of the host is not the Product Runtime.</summary>
+    /// <summary>True from Stage 0.3A-2C: the composed SIMULATOR Runtime answers this host. Liveness still is not a readiness claim.</summary>
     public required bool RuntimeImplemented { get; init; }
 
     public required string StageMarker { get; init; }
 }
 
-/// <summary>Response body of GET /health/ready (503 with <see cref="Code"/> until the Runtime is implemented).</summary>
+/// <summary>
+/// Response body of GET /health/ready: 200 only when every readiness condition
+/// holds, otherwise 503 with the <see cref="Code"/> that refused.
+/// </summary>
 public sealed record HealthReadyPayload
 {
-    /// <summary>"NOT_READY" at Stage 0.3A-1.</summary>
+    /// <summary>"READY" on 200; "NOT_READY" on 503.</summary>
     public required string Status { get; init; }
 
-    /// <summary>Machine code; at Stage 0.3A-1 always <see cref="Stage03A1.RuntimeNotImplemented"/>.</summary>
+    /// <summary>Machine readiness code (e.g. RUNTIME_READY, EVOLUTION_NOT_STARTED, STARTUP_FAULT); never prose, never a silent fallback.</summary>
     public required string Code { get; init; }
 
     public required string Detail { get; init; }

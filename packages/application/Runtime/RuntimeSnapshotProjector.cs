@@ -11,8 +11,13 @@ namespace Wjss.Runtime.Core;
 /// </summary>
 public static class RuntimeStage
 {
-    /// <summary>Stage 0.3A-2A: state store, deterministic initial state and snapshot projection.</summary>
-    public const string Marker = "STAGE_03A2A_STATE_STORE";
+    /// <summary>
+    /// Stage 0.3A-2C: the state store, deterministic synthetic evolution, the
+    /// Snapshot/Delta foundation and the read-only Runtime API + development
+    /// Inspector that observe them. The marker moves only with the substage that
+    /// actually exists, so it is never a claim of completeness.
+    /// </summary>
+    public const string Marker = "STAGE_03A2C_RUNTIME_API";
 }
 
 /// <summary>

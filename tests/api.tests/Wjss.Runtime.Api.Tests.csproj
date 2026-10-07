@@ -1,10 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    WJSS Local Application API contract tests (structure/serialization). The
-    HTTP behaviour checks for /health/live and /health/ready run Owner-local
-    against the built host (docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md); they
-    are not faked here. SOURCE-AUTHORED IN ARENA.
+    WJSS Local Application API contract tests: route identities, structural
+    serialization, and (from Stage 0.3A-2C) the SIMULATOR runtime composition,
+    readiness answers and read-only surface facts of the host project.
+
+    The reference to the host project is what makes composition and readiness
+    testable without launching a listener: the tests compose the runtime in
+    process and read its answers. The host endpoint behaviour itself is exercised
+    Owner-local against the built host
+    (docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md section 14).
+
+    The reference adds a project, not a NuGet package, so this project's
+    packages.lock.json is expected to be unchanged; if the Owner-local restore
+    reports drift, the regenerated lock file is committed (a real restore, never
+    a hand edit).
   -->
 
   <PropertyGroup>
@@ -24,6 +34,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+    <ProjectReference Include="../../apps/runtime/Wjss.Runtime.csproj" />
   </ItemGroup>
 
 </Project>
