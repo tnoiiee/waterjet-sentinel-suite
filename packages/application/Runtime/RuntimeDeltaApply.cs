@@ -27,8 +27,13 @@ public sealed record DeltaApplyOutcome
     /// <summary>The reconstructed revision; null when refused.</summary>
     public RuntimeState? State { get; init; }
 
-    /// <summary>Builds the applied outcome.</summary>
-    public static DeltaApplyOutcome Applied(RuntimeState state) => new()
+    /// <summary>
+    /// Builds the successful outcome. The factory is named <c>Success</c> because
+    /// the outcome STATE is the <see cref="Applied"/> property: a factory sharing
+    /// that identifier is a duplicate member declaration (CS0102). The refusal
+    /// counterpart is <see cref="Refused"/>.
+    /// </summary>
+    public static DeltaApplyOutcome Success(RuntimeState state) => new()
     {
         Applied = true,
         ResnapshotRequired = false,
@@ -211,7 +216,7 @@ public static class RuntimeDeltaApply
                 $"Refused Delta {delta.Revision}: the reconstructed revision failed structural validation. {detail} Nothing was applied.");
         }
 
-        return DeltaApplyOutcome.Applied(candidate);
+        return DeltaApplyOutcome.Success(candidate);
     }
 
     private static bool IdentityUnchanged(SensorPresentationState before, SensorPresentationState after) =>
