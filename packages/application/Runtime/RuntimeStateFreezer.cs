@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Wjss.Contracts;
 
 namespace Wjss.Runtime.Core;
@@ -30,7 +31,7 @@ internal static class RuntimeStateFreezer
         },
     };
 
-    private static IReadOnlyList<TrendPoint> FreezePoints(IReadOnlyList<TrendPoint> points)
+    private static ReadOnlyCollection<TrendPoint> FreezePoints(IReadOnlyList<TrendPoint> points)
     {
         var copies = new TrendPoint[points.Count];
         for (var index = 0; index < points.Count; index++)
