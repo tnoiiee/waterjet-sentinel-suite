@@ -272,12 +272,18 @@ public sealed class TcChannelContractTests
         Assert.Equal(16, orderedCannons[1].LogicalColumn);
         Assert.Equal("CANNON_FRONT", orderedCannons[1].EquipmentId);
 
-        // no sensor slot lacks the array or has the wrong length; no cannon-as-sensor
+        // No sensor slot lacks the array or has the wrong length; and no sensor carries a
+        // logicalLabel at all. Round 6d hotfix: the previous line was
+        // Assert.False(r.LogicalLabel?.Contains("CANNON", ...)), a bool? that is null for
+        // every sensor (xunit's Assert.False(bool?) rejects null rather than coercing it).
+        // The generator assigns logicalLabel ONLY on the cannon branch, so the actual
+        // Sensor contract is label ABSENCE - asserted directly, not coerced to false.
+        // Any label on a sensor (cannon disguise included) now fails here.
         Assert.All(records.Where(r => !r.IsCannon), r =>
         {
             Assert.NotNull(r.TcChannels);
             Assert.Equal(2, r.TcChannels!.Count);
-            Assert.False(r.LogicalLabel?.Contains("CANNON", StringComparison.Ordinal));
+            Assert.Null(r.LogicalLabel);
         });
     }
 
