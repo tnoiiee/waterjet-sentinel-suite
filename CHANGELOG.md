@@ -25,6 +25,43 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Round 6c structural JSON assertion correction (`fix: assert tc channel JSON shape structurally`)
+
+Owner-local state at `0b088ad` (2026-10-07): full Release build **PASS, 0 warnings / 0
+errors**; fresh full test run 61 total / 59 passed / 2 failed / 0 skipped. Both failures —
+`Serializing_Valid_Mapping_Emits_Two_Item_Arrays_And_Never_A_Comma_Scalar` and
+`Example_Mapping_Validates_Through_The_Typed_Contract` — were test-assertion defects: they
+tried to disprove the scalar shape by matching serialized text
+(`Assert.DoesNotContain("\"tcChannels\": \"", …)`), which crosses the indented writer's
+formatting whitespace and matched into the first array item. The accepted contract itself is
+verified and frozen: exact-two-element arrays, CLR `System.Object[]`, 108/106/2 composition,
+212 total = 212 unique channels, 0 duplicates, I7/I16, walls 24-29-24-29; TypeScript 24/24;
+fixture parity 7/7; boundary scan clean.
+
+Corrections (test sources only):
+
+- `TcChannelContractTests.cs`: every shape claim is now proven structurally from parsed
+  documents — presence, `JsonValueKind.Array`, never `JsonValueKind.String`, exactly two
+  `JsonValueKind.String` items, non-empty and whitespace-pure values, distinct pairs,
+  deterministic front-then-rear order (compared on the `:CH<digits>` values, not on text),
+  cannon `tcChannels` key absence, and the full canonical 108/106/2/106-arrays/0-scalars/
+  212/212/0-duplicates/walls mapping over the committed example.
+- Defect-class sweep over the Stage 0.3A-1 test tree removed the remaining two assertions of
+  the same class: the redundant serialized-text follow-up in `Delta_RequiredTest3`
+  (the structural presence+`JsonValueKind.Null` pair already proves it) and the whitespace-
+  baked `deviceProfile` text guards in `ExampleConfigTests`, which now recursively scan the
+  parsed example JSON (compact-form evasion closed). Intentional source-preservation text
+  guards (Kiosk DPI, Runtime stub, prohibited-vocabulary scan) and the JsonNode structural
+  assertions of round 6b are unchanged; no comma-splitting, no normalization, no suppression,
+  `TreatWarningsAsErrors` and `AnalysisLevel` untouched, no CA1861-style inline constant
+  arrays added, all `[Fact]`/`[Theory]` files carry the xUnit import.
+- Contract (`packages/contracts/TcChannels.cs`), generator, serializer, fixtures, examples,
+  TypeScript mirror, lock files, and package versions are **unchanged**.
+
+Owner-local final build + fresh full-suite rerun REQUIRED; no .NET build or xUnit success is
+claimed in Arena (round-6c C# is compile-reviewed only, with its structural assertions
+mirrored green in Python against the committed example).
+
 ### Stage 0.3A-1 — Round 6 Owner-local test correction (`fix: align config tests with tc channel arrays`)
 
 Owner-local result for round 6 (2026-10-07): the tcChannels structured-array contract is

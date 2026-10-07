@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Wjss.Config.Examples.Tests; // ConfigTestPaths — shared repository-root discovery (round 4 anchor)
@@ -11,6 +12,10 @@ namespace Wjss.Config.Tests;
 /// JSON array of exactly two thermocouple channel strings — never a comma-delimited
 /// scalar. Covers serialization, deserialization, rejection of earlier/invalid shapes,
 /// the full 108-slot example mapping, and the canonical totals (106 sensors / 212 TC).
+/// All JSON-shape claims are proven STRUCTURALLY from parsed documents
+/// (presence + <see cref="JsonValueKind"/>), never by matching serialized text:
+/// whitespace-sensitive Contains checks against indented JSON crossed formatting
+/// boundaries and were removed in the Owner round 6c correction.
 /// Snapshot/delta presentation keeps its separate tcFrontChannel/tcRearChannel fields
 /// (covered by the wall-map/contract encoding tests); these tests cover the slot-array
 /// contract only. Compile-only in Arena: Owner-local test run is the arbiter.
@@ -51,26 +56,37 @@ public sealed class TcChannelContractTests
     private static readonly int[] ExpectedCannonLogicalColumns = [7, 16];
     private static readonly string[] ExpectedCannonLogicalLabels = ["I7", "I16"];
 
-    // (A) Serialization of a valid mapping produces exactly two channel array tokens per
-    // sensor and never a comma-delimited scalar.
+    // (A) Serialization of a valid mapping is proven from the PARSED document: the
+    // tcChannels property exists, is an array (never the scalar kind), carries exactly
+    // two non-empty, whitespace-pure, distinct string items in deterministic order.
     [Fact]
     public void Serializing_Valid_Mapping_Emits_Two_Item_Arrays_And_Never_A_Comma_Scalar()
     {
         var slot = Sensor("L-R0-C00", "SYN-TC-01:CH00", "SYN-TC-01:CH01");
-        var json = JsonSerializer.Serialize(slot, Options);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(slot, Options));
+        var root = doc.RootElement;
 
-        using var doc = JsonDocument.Parse(json);
-        Assert.True(doc.RootElement.TryGetProperty("tcChannels", out var tc));
-        Assert.Equal(JsonValueKind.Array, tc.ValueKind);
+        Assert.True(root.TryGetProperty("tcChannels", out var tc),
+            "serialized sensor slot must carry tcChannels");
+        Assert.NotEqual(JsonValueKind.String, tc.ValueKind); // never a comma-delimited scalar
+        Assert.Equal(JsonValueKind.Array, tc.ValueKind);      // the accepted shape
         Assert.Equal(2, tc.GetArrayLength());
-        Assert.Equal("SYN-TC-01:CH00", tc[0].GetString());
-        Assert.Equal("SYN-TC-01:CH01", tc[1].GetString());
-        Assert.Contains("\"tcChannels\": [", json); // array token under the indented contract writer...
-        Assert.DoesNotContain("\"tcChannels\": \"", json); // ...and never a quoted scalar
+        Assert.Equal(JsonValueKind.String, tc[0].ValueKind);
+        Assert.Equal(JsonValueKind.String, tc[1].ValueKind);
+        var first = tc[0].GetString()!;
+        var second = tc[1].GetString()!;
+        Assert.False(first.Trim().Length == 0);
+        Assert.False(second.Trim().Length == 0);
+        Assert.Equal(first, first.Trim());   // stored pure: no surrounding whitespace
+        Assert.Equal(second, second.Trim());
+        Assert.NotEqual(first, second);      // distinct within the pair
+        Assert.Equal("SYN-TC-01:CH00", first);  // deterministic order retained: front...
+        Assert.Equal("SYN-TC-01:CH01", second); // ...then rear
 
         var cannonJson = JsonSerializer.Serialize(Cannon("CANNON_REAR"), Options);
         using var cannonDoc = JsonDocument.Parse(cannonJson);
         Assert.False(cannonDoc.RootElement.TryGetProperty("tcChannels", out _));
+        // absent on cannons: not an empty array, not an explicit null token
     }
 
     // (B) Deserialization: a two-string array binds; invalid shapes are rejected.
@@ -153,10 +169,71 @@ public sealed class TcChannelContractTests
             TcChannelRules.TotalChannelCount,
             records.Where(r => !r.IsCannon).Sum(r => r.TcChannels!.Count)); // 212
 
-        // raw file text: every tcChannels token is an array, never a scalar
-        var raw = ExampleSensorMapJson();
-        Assert.Contains("\"tcChannels\": [", raw);
-        Assert.DoesNotContain("\"tcChannels\": \"", raw);
+        // structural pass over the committed example document (round 6c): the shape
+        // claims below read parsed JsonElement kinds only - no serialized-text matching
+        using var example = JsonDocument.Parse(ExampleSensorMapJson());
+        var slotElements = example.RootElement
+            .GetProperty("logicalMatrix")
+            .GetProperty("slots")
+            .EnumerateArray()
+            .ToArray();
+        Assert.Equal(108, slotElements.Length);
+
+        // no sensor anywhere carries the scalar-string shape
+        Assert.Equal(0, slotElements.Count(s =>
+            s.TryGetProperty("tcChannels", out var t) && t.ValueKind == JsonValueKind.String));
+
+        var allChannels = new List<string>();
+        var distinctChannels = new HashSet<string>(StringComparer.Ordinal);
+        var sensorsByWall = new Dictionary<string, int>(StringComparer.Ordinal);
+        var sensorSlots = 0;
+        var cannonSlots = 0;
+        var sensorArrayShapes = 0;
+        foreach (var element in slotElements)
+        {
+            var isCannon = string.Equals(element.GetProperty("slotType").GetString(), "CANNON", StringComparison.Ordinal);
+            var hasChannels = element.TryGetProperty("tcChannels", out var tc);
+            if (isCannon)
+            {
+                cannonSlots++;
+                Assert.False(hasChannels,
+                    $"cannon {element.GetProperty("slotId").GetString()}: tcChannels must be absent");
+                continue;
+            }
+
+            sensorSlots++;
+            var slotId = element.GetProperty("slotId").GetString()!;
+            Assert.True(hasChannels, $"sensor {slotId}: tcChannels must be present");
+            Assert.Equal(JsonValueKind.Array, tc.ValueKind); // presence + kind: scalar/number/null all fail here
+            sensorArrayShapes++;
+            Assert.Equal(2, tc.GetArrayLength());
+            Assert.Equal(JsonValueKind.String, tc[0].ValueKind);
+            Assert.Equal(JsonValueKind.String, tc[1].ValueKind);
+            var pairFirst = tc[0].GetString()!;
+            var pairSecond = tc[1].GetString()!;
+            Assert.False(pairFirst.Trim().Length == 0, $"sensor {slotId}: empty channel entry");
+            Assert.False(pairSecond.Trim().Length == 0, $"sensor {slotId}: empty channel entry");
+            Assert.Equal(pairFirst, pairFirst.Trim());
+            Assert.Equal(pairSecond, pairSecond.Trim());
+            Assert.NotEqual(pairFirst, pairSecond); // distinct within the pair
+            AssertPairOrderedFrontFirst(tc, slotId); // deterministic order: lower index first
+            allChannels.Add(pairFirst);
+            allChannels.Add(pairSecond);
+            Assert.True(distinctChannels.Add(pairFirst), $"sensor {slotId}: duplicate channel {pairFirst}");
+            Assert.True(distinctChannels.Add(pairSecond), $"sensor {slotId}: duplicate channel {pairSecond}");
+            var wall = element.GetProperty("wall").GetString()!;
+            sensorsByWall[wall] = sensorsByWall.GetValueOrDefault(wall) + 1;
+        }
+
+        Assert.Equal(106, sensorSlots);
+        Assert.Equal(2, cannonSlots);
+        Assert.Equal(106, sensorArrayShapes); // every sensor array-shaped; 0 scalar (asserted above)
+        Assert.Equal(212, allChannels.Count);            // total channel strings
+        Assert.Equal(212, distinctChannels.Count);       // globally unique; 0 duplicates
+        Assert.Equal(24, sensorsByWall["LEFT"]);
+        Assert.Equal(29, sensorsByWall["REAR"]);
+        Assert.Equal(24, sensorsByWall["RIGHT"]);
+        Assert.Equal(29, sensorsByWall["FRONT"]);
 
         // exactly the canonical two cannon slots (row 5, logical columns 7 and 16),
         // each without channels; I7/I16 are their logical labels
@@ -179,6 +256,36 @@ public sealed class TcChannelContractTests
             Assert.Equal(2, r.TcChannels!.Count);
             Assert.False(r.LogicalLabel?.Contains("CANNON", StringComparison.Ordinal));
         });
+    }
+
+    /// <summary>
+    /// Deterministic channel order is a contract property of the channel VALUES
+    /// (front = lower channel index first, rear second) - asserted on parsed string
+    /// values, not on serialized text. Applies whenever both entries carry the
+    /// synthetic ":CH&lt;digits&gt;" suffix the generator emits.
+    /// </summary>
+    private static void AssertPairOrderedFrontFirst(JsonElement tcArray, string slotId)
+    {
+        var first = tcArray[0].GetString()!;
+        var second = tcArray[1].GetString()!;
+        if (TryChannelIndex(first, out var firstIndex) && TryChannelIndex(second, out var secondIndex))
+        {
+            Assert.True(firstIndex < secondIndex,
+                $"sensor {slotId}: tcChannels must be ordered front ({first}) before rear ({second})");
+        }
+    }
+
+    private static bool TryChannelIndex(string channel, out int index)
+    {
+        index = 0;
+        var marker = channel.LastIndexOf(":CH", StringComparison.Ordinal);
+        if (marker < 0)
+        {
+            return false;
+        }
+        var tail = channel.AsSpan(marker + ":CH".Length);
+        return tail.Length > 0
+            && int.TryParse(tail, NumberStyles.None, CultureInfo.InvariantCulture, out index);
     }
 
     private static string ExampleSensorMapJson()

@@ -886,6 +886,26 @@ cannons key-free), keeping canonical counts and the typed `TcChannelRules` verif
 Arena static validation green; C# remains compile-reviewed only. Owner-local clean Release
 build + fresh full-suite pass REQUIRED before merge.
 
+### 12.20 Stage 0.3A-1 round 6c structural JSON assertion correction — Arena validation record
+
+Owner-local at `0b088ad`: Release build **PASS 0 warnings / 0 errors**; fresh full suite
+**61 total / 59 passed / 2 failed / 0 skipped**. Both failures were formatting-sensitive
+test assertions in `tests/config.tests/TcChannelContractTests.cs` that "proved" the scalar
+form was absent by matching serialized text across the indented writer's whitespace; the
+tcChannels contract itself is Owner-verified and frozen (exact-two-element arrays,
+108/106/2, 212 = 212 unique, I7/I16, 24-29-24-29, TS 24/24, parity 7/7, S1–S9 clean).
+Round 6c replaced every shape claim with structural `JsonDocument`/`JsonValueKind`
+inspection (presence, Array-kind, exactly two String-kind items, non-empty and
+whitespace-pure, distinct, deterministic front-first order asserted on channel VALUES,
+cannon key absence, full canonical mapping totals), and a defect-class sweep removed the
+last two same-class serialized-text assertions elsewhere
+(`Delta_RequiredTest3` redundancy; `ExampleConfigTests` deviceProfile text guards now
+recursively scan parsed JSON). Contract, generator, serializer, fixtures, examples,
+TypeScript mirror and lock files unchanged; no suppressions; `TreatWarningsAsErrors`
+enabled. Arena mirrored the structural assertions in Python against the committed example:
+all pass. Owner-local **final build + fresh full-suite rerun** REQUIRED before merge; no
+.NET/xUnit success claimed in Arena.
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:

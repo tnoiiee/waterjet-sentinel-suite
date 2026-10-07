@@ -131,9 +131,17 @@ shape into the product tree as .NET records. Two problems must be settled before
   tests 24/24 green after the tcChannels correction; the 15/15 count pre-dates it and
   14/14 pre-dates the earlier Owner-review correction).
 - Round-6 code (the tcChannels contract, generator self-validation, and the C#
-  channel tests) is compile-reviewed only: **not compiled or tested in Arena** (no
-  .NET SDK; sandbox network blocks it). The Owner-local rerun of the full suite plus
-  the sensor-map regeneration gate remains the merge gate — see
+  channel tests) is authored in Arena, where no .NET SDK exists: the C# is
+  compile-reviewed only there; the Owner's local build is the validator.
+- Owner-local at `0b088ad` (rounds 6b/6c, 2026-10-07): full Release build **PASS 0
+  warnings / 0 errors**; the tcChannels contract, generator mapping, regenerated fixtures
+  and parity are VERIFIED (108/106/2 slots; 106 sensor arrays; 212 total = 212 unique
+  channels; 0 duplicates; cannons I7/I16; walls 24-29-24-29; CLR `System.Object[]`;
+  TypeScript 24/24; parity 7/7; boundary scan clean). The fresh 61-test suite then showed
+  2 failures that were formatting-sensitive TEST assertions (serialized-text matching
+  across indented JSON), corrected in round 6c to pure structural `JsonValueKind`
+  inspection — contract, generator, serializer and fixtures untouched. One final
+  Owner-local build + fresh full-suite rerun closes the merge gate — see
   [`../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md).
 
 ## References

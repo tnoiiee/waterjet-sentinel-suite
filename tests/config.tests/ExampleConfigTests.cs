@@ -150,12 +150,47 @@ public sealed class ExampleConfigTests
     [Fact]
     public void No_Production_Profile_Ever_Appears_In_Examples()
     {
+        // Structural scan (round 6c): every deviceProfile property value in the parsed
+        // document must stay SIMULATOR. The previous serialized-text guard baked the
+        // indented writer's spacing ("\"deviceProfile\": \"...") into the pattern, so the
+        // same prohibited value in compactly written JSON would have passed vacuously.
         var dir = Path.Combine(RepoRoot()!, "config", "examples");
         foreach (var file in Directory.EnumerateFiles(dir, "*.json"))
         {
-            var text = File.ReadAllText(file);
-            Assert.DoesNotContain("\"deviceProfile\": \"PRODUCTION", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("\"deviceProfile\": \"TEST_HARDWARE", text, StringComparison.Ordinal);
+            using var doc = JsonDocument.Parse(File.ReadAllText(file));
+            AssertNoProductionProfile(doc.RootElement, file);
+        }
+    }
+
+    private static void AssertNoProductionProfile(JsonElement element, string file)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (string.Equals(property.Name, "deviceProfile", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var value = property.Value.ValueKind == JsonValueKind.String
+                            ? property.Value.GetString()
+                            : null;
+                        Assert.False(
+                            value?.StartsWith("PRODUCTION", StringComparison.OrdinalIgnoreCase) == true
+                            || value?.StartsWith("TEST_HARDWARE", StringComparison.OrdinalIgnoreCase) == true,
+                            $"{Path.GetFileName(file)}: deviceProfile must never be Production or test-hardware (found '{value}')");
+                    }
+
+                    AssertNoProductionProfile(property.Value, file);
+                }
+
+                break;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                {
+                    AssertNoProductionProfile(item, file);
+                }
+
+                break;
         }
     }
 

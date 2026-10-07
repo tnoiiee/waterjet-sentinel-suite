@@ -150,9 +150,9 @@ public sealed class ContractEncodingTests
         Assert.True(doc.RootElement.TryGetProperty("activeJob", out var clearedToken));
         Assert.Equal(JsonValueKind.Null, clearedToken.ValueKind);
 
-        // And the raw serialized text carries the exact encoding the mirror expects:
-        var raw = JsonSerializer.Serialize(delta, ContractJson.Options);
-        Assert.Contains("\"activeJob\": null", raw, StringComparison.Ordinal);
+        // (Round 6c: a serialized-text Contains follow-up was removed here. Presence +
+        // JsonValueKind.Null above is the same claim, proven without depending on the
+        // indented writer's whitespace.)
     }
 
     [Fact]
@@ -220,10 +220,14 @@ public sealed class ContractEncodingTests
     public void Snapshot_Keeps_Explicit_Nulls_For_Cleared_Legacy_Encoding()
     {
         // In a Snapshot (global Never-ignore), a null member is written as an
-        // explicit null - "no Active Job" must be visible, not absent.
+        // explicit null - "no Active Job" must be visible, not absent. Proven
+        // structurally from the parsed document (round 6c): the serialized-text
+        // Contains this test used to rely on matched formatting whitespace, not
+        // contract meaning.
         var payload = new { activeJob = (object?)null };
-        var json = JsonSerializer.Serialize(payload, ContractJson.Options);
-        Assert.Contains("\"activeJob\": null", json, StringComparison.Ordinal);
+        using var doc = SerializeToDocument(payload);
+        Assert.True(doc.RootElement.TryGetProperty("activeJob", out var token));
+        Assert.Equal(JsonValueKind.Null, token.ValueKind);
     }
 
     [Fact]
