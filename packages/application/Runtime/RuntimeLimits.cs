@@ -18,6 +18,20 @@ public static class RuntimeLimits
     /// <summary>Largest accepted revision-history capacity (a bounded buffer cannot be unbounded by request).</summary>
     public const int MaximumRevisionHistoryCapacity = 1024;
 
+    /// <summary>
+    /// Delta entries retained per Runtime Delta History instance. Deliberately a
+    /// separate bound from the revision-activity history: the two buffers answer
+    /// different questions (what the store did, and what a consumer may apply) and
+    /// a user of one must never resize the other implicitly.
+    /// </summary>
+    public const int DefaultDeltaHistoryCapacity = 64;
+
+    /// <summary>Smallest accepted Delta-history capacity.</summary>
+    public const int MinimumDeltaHistoryCapacity = 1;
+
+    /// <summary>Largest accepted Delta-history capacity (a bounded buffer cannot be unbounded by request).</summary>
+    public const int MaximumDeltaHistoryCapacity = 1024;
+
     /// <summary>Trend points retained in the Runtime trend window.</summary>
     public const int DefaultTrendCapacity = 600;
 

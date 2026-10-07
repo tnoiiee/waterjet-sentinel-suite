@@ -85,4 +85,23 @@ public static class RuntimeRefusalCodes
 
     /// <summary>A suspended AutoSequence requires a latched critical event.</summary>
     public const string SequenceCriticalLatch = "SEQUENCE_CRITICAL_LATCH";
+
+    // ---------------------------------------------------------------------
+    // Checkpoint B — synthetic evolution, Delta generation and Delta history.
+    // ---------------------------------------------------------------------
+
+    /// <summary>The requested evolution tick time is not later than the committed state time.</summary>
+    public const string EvolutionTickTime = "EVOLUTION_TICK_TIME";
+
+    /// <summary>The requested evolution tick number is not strictly after the committed tick number.</summary>
+    public const string EvolutionTickSequence = "EVOLUTION_TICK_SEQUENCE";
+
+    /// <summary>The Delta does not continue the committed revision chain (previousRevision is not the committed revision).</summary>
+    public const string DeltaOutOfOrder = "DELTA_OUT_OF_ORDER";
+
+    /// <summary>
+    /// The consumer's revision cannot be advanced by the available Deltas: a fresh
+    /// Snapshot must be requested. Nothing is applied or fabricated after this result.
+    /// </summary>
+    public const string ResnapshotRequired = "RESNAPSHOT_REQUIRED";
 }

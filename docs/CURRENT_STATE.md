@@ -411,6 +411,19 @@ accepted and merged Stage 0.2.*
 | Status | **Checkpoint A COMPLETE for development checkpoint** (Owner-locally validated; SUBMITTED FOR OWNER REVIEW — NOT MERGED, the Agent never merges) |
 | Next | **Checkpoint B AUTHORIZED** (deterministic synthetic evolution + Snapshot/Delta foundation) — see §11.6; Checkpoint C (read-only API + lightweight Runtime Inspector) remains **NOT AUTHORIZED** |
 
+### 11.6 Stage 0.3A-2A Checkpoint B — deterministic synthetic evolution + Snapshot/Delta foundation
+
+| Item | Record |
+| --- | --- |
+| Gate | **Owner instruction 2026-10-07**: Checkpoint A of Stage 0.3A-2 is Owner-locally validated (build 0/0, suite 101/101, locked restore PASS, boundary S1–S9 clean at feature head `a512aa7` + lock refresh `55d3b8b`), and **Checkpoint B is authorized** on that validated store, SIMULATOR profile only. Checkpoint C remains NOT AUTHORIZED; TEST_HARDWARE and PRODUCTION remain NOT AUTHORIZED |
+| Delivered (source) | `packages/application/Runtime/`: `RuntimeSyntheticEvolution` (rules, tick outcome, deterministic walk and quality schedules), `RuntimeDelta` (apply-safe Delta plus the three-state Active Job slot), `RuntimeDeltaProjector` (Runtime-side and `wjss.delta/1` wire projection), `RuntimeDeltaApply` (strict total-or-nothing application), `RuntimeDeltaHistory` (bounded history and catch-up/gap results), `RuntimeTrendBuffer` (shared bounded append rule); the clock helper gains strict wire-timestamp parsing; `RuntimeRefusalCodes` gains `EVOLUTION_TICK_SEQUENCE`, `EVOLUTION_TICK_TIME`, `DELTA_OUT_OF_ORDER`, `RESNAPSHOT_REQUIRED`; `RuntimeLimits` gains explicit Delta-history capacities. Tests: `SyntheticEvolutionTests`, `SnapshotDeltaTests`, `DeltaApplyTests`, `DeltaHistoryTests` and the scenario helper `RuntimeDeltaTestFixture` |
+| Semantics | Deterministic evolution from explicit (state, seed, tick number, tick instant) only; revision +1 exactly once per accepted tick; one committed state per accepted tick; refusals carry no candidate and change nothing; wall summaries recalculated from the complete evolved Sensor collection; bounded trend append with deterministic oldest-drop; `wjss.snapshot/1` retained; `wjss.delta/1` gapless with whole-record replacement and the exact three-state Active Job encoding; strict apply path (revision mismatch ⇒ machine-readable resnapshot-required, nothing applied, nothing normalized); bounded in-memory Delta history with deterministic oldest-eviction; gap detection only (no fabricated Delta, no continuation past a gap, no reconnect/retry/SSE) |
+| Deliberately absent | Runtime API routes beyond the existing health stub, Runtime Inspector UI, SSE, write/command endpoints, queue dispatch, job execution, Pump/Valve/Axis/Cleaning commands, Safe Return actuation, configuration writes, persistence/Historian, auth, installer/release work, `spikes/**` changes, `apps/runtime/Program.cs` changes |
+| Arena verification | Boundary scan exit 0 (**0 findings, S1–S9 clean**); brace-balance, trailing-whitespace, final-newline and tab sweeps; `using`-directive resolution sweep (missing/unused namespaces); declaration sweep for every referenced type; determinism grep for ambient clocks and `System.Random`; `git diff --check`. **No .NET restore, build, or test execution happened in Arena** |
+| NOT verified | Every .NET claim (restore, Release build, xUnit execution of the new tests); the behaviour is **source authored / statically reviewed / NOT COMPILED and NOT EXECUTED in Arena**. Owner-local validation per runbook §13 is the validation of record |
+| Delivery | Same branch and PR #5, after the Checkpoint A evidence commit; **NOT MERGED** (only the Owner merges). Checkpoint C is not started |
+| Next | Owner-local validation of Checkpoint B (runbook §13), then the Owner's decision on Checkpoint C (read-only API + lightweight Runtime Inspector) |
+
 ### 11.1 Process deviation record
 
 | Item | Statement |

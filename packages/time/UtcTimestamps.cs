@@ -19,4 +19,28 @@ public static class UtcTimestamps
     /// <summary>Formats one instant in the wire encoding. Culture-invariant and deterministic.</summary>
     public static string Format(DateTimeOffset instant) =>
         instant.ToUniversalTime().ToString(MillisecondFormat, CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// Parses the wire encoding back to an instant. Only the exact millisecond
+    /// shape is accepted: anything else (another shape, a local offset, a missing
+    /// literal Z) is rejected rather than reinterpreted, so a malformed payload
+    /// cannot silently become a plausible timestamp. Culture-invariant and
+    /// deterministic; the result is always UTC.
+    /// </summary>
+    public static bool TryParse(string? text, out DateTimeOffset instant)
+    {
+        if (!string.IsNullOrWhiteSpace(text)
+            && DateTimeOffset.TryParseExact(
+                text,
+                MillisecondFormat,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out instant))
+        {
+            return true;
+        }
+
+        instant = default;
+        return false;
+    }
 }

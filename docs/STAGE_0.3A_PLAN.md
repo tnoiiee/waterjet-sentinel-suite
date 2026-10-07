@@ -92,6 +92,33 @@ generation, bounded Delta history, Delta apply/reconstruction and revision-gap d
 **C remains NOT AUTHORIZED**, SIMULATOR only, no SSE, no write/command endpoint, no device
 access.
 
+## 5b. Stage 0.3A-2A Checkpoint B record (appended 2026-10-07)
+
+**Source authored in Arena; NOT COMPILED and NOT EXECUTED in Arena** (no .NET SDK there).
+Owner instruction 2026-10-07 authorized Checkpoint B: deterministic synthetic evolution plus
+the Snapshot/Delta foundation, on the validated Checkpoint A store, SIMULATOR only.
+
+Boundaries this record fixes (all inside `packages/application/Runtime/`, plus tests):
+
+| Area | Decision |
+| --- | --- |
+| Determinism | Every presented value is a pure function of the committed state, an explicit seed, an explicit tick number and an explicit tick instant. No ambient wall-clock read, no `System.Random`, no static mutable state, no thread-timing input, no culture-sensitive formatting or parsing |
+| Seed type | `ulong` at the evolution boundary; the adapter's `SyntheticSeed` stays adapter-side (Runtime.Core must not depend on an adapter). The walk's derivation is distinct from the adapter's initial-score derivation and from `FixtureGenerator`'s formula: **no equality is claimed**, unification stays `[OPEN]` |
+| Score | Unitless synthetic development presentation value, tenths-of-a-point walk bounded to 0.0-100.0, explicitly rounded to one decimal place with a culture-invariant midpoint rule. Not a certified process measurement; carries no device address, calibration constant or Production limit |
+| Classification | Reused contract rule only: strictly above the published threshold is `DIRTY`; below is `CLEANER`. No new wire enum, no new wire status |
+| Quality paths | GOOD (current basis, validated value refreshed), UNCERTAIN (fresh value presented, classification and basis kept from the last validated value), STALE (no fresh value; last reading instant retained), BAD (no usable value), and `NONE` basis when the last validated evidence is missing or older than the synthetic retention window. No control behaviour is derived from any of them |
+| Atomic transition | The engine never commits: it returns a candidate, and the single writer of the Runtime State Store validates and publishes it. Revision +1 exactly once per accepted tick; one committed state per accepted tick; refusals produce no candidate and leave the committed revision untouched |
+| Refusal codes | `EVOLUTION_TICK_SEQUENCE`, `EVOLUTION_TICK_TIME`, `DELTA_OUT_OF_ORDER`, `RESNAPSHOT_REQUIRED` added to `RuntimeRefusalCodes`; the profile gate reuses the domain startup policy code (`PROFILE_NOT_AUTHORIZED_FOR_STAGE_03A`). No existing code changed |
+| Trend | One point per accepted tick, four fixed series (pressure, setpoint, ready-band-low, ready-band-high) mirroring the published Pump presentation block, oldest point dropped deterministically at capacity, published windows never mutated. `wjss.snapshot/1` still carries the whole window |
+| Delta | `wjss.delta/1` from the accepted transition: `previousRevision` = the prior committed revision, `revision` = `previousRevision + 1`, `generatedAt` = the accepted tick instant; whole-record replacements only; unchanged sections omitted; the wall map is never in a Delta. The Runtime health block is deliberately absent from Deltas (uptime and counters are ambient diagnostics, not part of the deterministic chain) |
+| Active Job | The contract's exact three-state slot: absent = unchanged, object = replacement, explicit JSON null = cleared. No second clear flag exists anywhere in the generation, wire or apply path |
+| Apply | Total or nothing: a revision mismatch yields `RESNAPSHOT_REQUIRED` (machine-readable) and applies nothing; a self-inconsistent Delta (previous records disagreeing, configuration-derived identity rewritten, wall summaries disagreeing with the Sensors) is refused and never normalized; the reconstructed revision must pass the same structural invariants the store enforces |
+| Delta history | In-memory only, newest-first ordering, explicit minimum/maximum/default capacities independent of the revision-history capacity, deterministic oldest-entry eviction, refused transitions never recorded, newest revision always discoverable. No persistence, no Historian |
+| Gap detection | Detect only. A gap returns a fresh-Snapshot-required result; no Delta is inferred, the stream is not continued, and no reconnect/retry/resynchronization behaviour exists |
+
+Checkpoint B deliberately implements none of Checkpoint C: no runtime API route beyond the
+existing health stub, no Runtime Inspector UI, no write or command endpoint, no SSE.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins

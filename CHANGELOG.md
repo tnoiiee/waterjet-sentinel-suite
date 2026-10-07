@@ -31,6 +31,62 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-2A Checkpoint B — Deterministic synthetic evolution and Snapshot/Delta foundation (`feat(runtime): add deterministic synthetic evolution and snapshot/delta foundation`)
+
+**Source-only checkpoint (Arena authored; NOT COMPILED and NOT EXECUTED in Arena).** Under the
+Owner's 2026-10-07 instruction, Checkpoint B continues the Owner-locally validated Checkpoint A
+store with deterministic synthetic evolution and the Snapshot/Delta foundation, SIMULATOR only.
+
+CHANGED
+
+- `packages/application/Runtime/RuntimeSyntheticEvolution.cs` (new): `SyntheticEvolutionRules`,
+  `SyntheticEvolutionResult`, `SyntheticTickOutcome` and the deterministic tick. Presentation
+  values are pure functions of (committed state, explicit seed, explicit tick number, explicit
+  tick instant); the score is a unitless synthetic development value in 0.0-100.0 built from a
+  bounded tenths-of-a-point walk with explicit culture-invariant rounding; the quality schedule
+  is per-Sensor and deterministic; `GOOD` writes the validated value, `UNCERTAIN` presents a
+  fresh value while keeping the last validated classification basis, `STALE` and `BAD` present no
+  value, and an absent or expired basis is reported as no basis at all. Refusals
+  (`EVOLUTION_TICK_SEQUENCE`, `EVOLUTION_TICK_TIME`, domain profile gate) return no candidate.
+- `packages/application/Runtime/RuntimeDelta.cs` (new): the apply-safe Delta with whole-record
+  replacements, retained previous records for clean reversal, and the three-state Active Job
+  slot (`DeltaJobEncoding` / `DeltaJobState`) that mirrors the contract exactly — absent =
+  unchanged, object = replacement, explicit null = clear. No second clear flag exists.
+- `packages/application/Runtime/RuntimeDeltaProjector.cs` (new): the only Delta envelope
+  producer, with the Runtime-side Delta and the `wjss.delta/1` wire projection (unchanged
+  sections omitted, no fabricated runtime diagnostics block).
+- `packages/application/Runtime/RuntimeDeltaApply.cs` (new): strict total-or-nothing
+  application; a revision mismatch yields a machine-readable `RESNAPSHOT_REQUIRED` result and
+  applies nothing; a self-inconsistent Delta is refused, never normalized; the reconstructed
+  revision must pass the same structural invariants the store enforces.
+- `packages/application/Runtime/RuntimeDeltaHistory.cs` (new): bounded in-memory history
+  (newest-first, explicit minimum/maximum/default capacities independent of the revision
+  history, deterministic oldest eviction, refused transitions never recorded) plus
+  `CatchUpFrom`, which returns a gapless apply-order chain or the fresh-Snapshot-required result
+  and never infers a missing Delta.
+- `packages/application/Runtime/RuntimeTrendBuffer.cs` (new): the single bounded-append rule
+  shared by evolution and Delta application.
+- `packages/application/Runtime/RuntimeRefusalCodes.cs`, `RuntimeLimits.cs`: additive codes and
+  Delta-history capacity bounds; no existing member changed.
+- `packages/time/UtcTimestamps.cs`: strict, culture-invariant wire-timestamp parsing.
+- `tests/runtime.tests/`: `SyntheticEvolutionTests`, `SnapshotDeltaTests`, `DeltaApplyTests`,
+  `DeltaHistoryTests`, `RuntimeDeltaTestFixture`.
+- `docs/STAGE_0.3A_PLAN.md` §5b and `docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md` §13 record the
+  scope and the Owner-local validation plan; `docs/CURRENT_STATE.md` §11.6 records the position.
+
+UNCHANGED
+
+- Contracts (`packages/contracts/**`) including every fixture, `Directory.Build.props`,
+  `global.json`, `TreatWarningsAsErrors`, `AnalysisLevel`, all `packages.lock.json`,
+  `apps/runtime/Program.cs`, `spikes/**`, the protected baseline shape (108 slots / 106 Sensors /
+  212 channels / I7+I16 / wall counts 24-29-24-29 / Single Active Job / head-only GlobalQueue),
+  and the SIMULATOR-only startup refusal of TEST_HARDWARE and PRODUCTION.
+
+NOT VERIFIED
+
+- Every .NET claim: Arena ran no restore, build or test. Owner-local validation per runbook §13
+  remains the validation of record. Checkpoint C is not started and stays NOT AUTHORIZED.
+
 ### Stage 0.3A-2A Checkpoint A — Owner-local validation recorded (documentation-only closeout)
 
 **STAGE 0.3A-2A CHECKPOINT A OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07).**

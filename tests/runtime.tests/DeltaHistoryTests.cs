@@ -1,0 +1,179 @@
+using Wjss.Adapters.Simulator;
+using Xunit;
+
+namespace Wjss.Runtime.Core.Tests;
+
+/// <summary>
+/// The bounded Delta history: explicit capacities, deterministic oldest-entry
+/// eviction, newest-revision discovery, refused transitions never recorded, and
+/// catch-up that either returns a gapless apply-order chain or requires a fresh
+/// Snapshot — it never fabricates the missing Delta and never continues past a gap.
+/// </summary>
+public sealed class DeltaHistoryTests
+{
+    [Fact]
+    public void Capacities_Are_Explicit_And_Independent_Of_The_Revision_History()
+    {
+        var defaultHistory = new RuntimeDeltaHistory();
+        Assert.Equal(RuntimeLimits.DefaultDeltaHistoryCapacity, defaultHistory.Capacity);
+        Assert.Equal(0, defaultHistory.Count);
+        Assert.Null(defaultHistory.NewestRevision);
+        Assert.Null(defaultHistory.OldestRevision);
+
+        var smallest = new RuntimeDeltaHistory(RuntimeLimits.MinimumDeltaHistoryCapacity);
+        Assert.Equal(RuntimeLimits.MinimumDeltaHistoryCapacity, smallest.Capacity);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RuntimeDeltaHistory(0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new RuntimeDeltaHistory(RuntimeLimits.MaximumDeltaHistoryCapacity + 1));
+
+        // Creating a Delta history never resizes the store's own revision history.
+        var store = RuntimeTestFixture.CreateStore(SyntheticSeed.DefaultSeed);
+        var deltas = new RuntimeDeltaHistory(RuntimeLimits.MinimumDeltaHistoryCapacity);
+        Assert.Equal(RuntimeLimits.MinimumDeltaHistoryCapacity, deltas.Capacity);
+        Assert.Equal(RuntimeLimits.DefaultRevisionHistoryCapacity, store.HistoryCapacity);
+    }
+
+    [Fact]
+    public void Oldest_Entry_Is_Evicted_Deterministically_And_The_Newest_Is_Discoverable()
+    {
+        var history = new RuntimeDeltaHistory(3);
+        var deltas = BuildChain(5);
+
+        foreach (var delta in deltas)
+        {
+            history.Append(delta);
+        }
+
+        Assert.Equal(3, history.Count);
+        Assert.Equal(5, history.NewestRevision);
+        Assert.Equal(3, history.OldestRevision);
+        Assert.Equal(new[] { 5, 4, 3 }, history.NewestFirst.Select(delta => delta.Revision).ToArray());
+        Assert.Null(history.Find(2));
+        var found = history.Find(3);
+        Assert.NotNull(found);
+        Assert.Equal(2, found.PreviousRevision);
+
+        // Re-appending the newest Delta is refused and changes nothing.
+        Assert.Throws<InvalidOperationException>(() => history.Append(deltas[^1]));
+        Assert.Equal(3, history.Count);
+    }
+
+    [Fact]
+    public void A_Refused_Transition_Is_Never_Recorded()
+    {
+        var history = new RuntimeDeltaHistory(4);
+        var deltas = BuildChain(3);
+
+        history.Append(deltas[0]);
+        Assert.Equal(1, history.Count);
+
+        // Malformed: revision is not previousRevision + 1.
+        var malformed = deltas[1] with { Revision = deltas[1].Revision + 2 };
+        Assert.Throws<InvalidOperationException>(() => history.Append(malformed));
+        Assert.Equal(1, history.Count);
+        Assert.Equal(2, history.NewestRevision);
+
+        // Not a continuation: previousRevision is ahead of the newest entry.
+        var ahead = deltas[2] with { PreviousRevision = 9, Revision = 10 };
+        Assert.Throws<InvalidOperationException>(() => history.Append(ahead));
+        Assert.Equal(1, history.Count);
+        Assert.Equal(2, history.NewestRevision);
+    }
+
+    [Fact]
+    public void Catch_Up_Returns_A_Gapless_Apply_Order_Chain()
+    {
+        var history = new RuntimeDeltaHistory(3);
+        foreach (var delta in BuildChain(5))
+        {
+            history.Append(delta);
+        }
+
+        // Revisions 3, 4 and 5 are retained; a consumer at 2 can be advanced.
+        var complete = history.CatchUpFrom(2);
+
+        Assert.True(complete.Available);
+        Assert.Equal(RuntimeDeltaCatchUp.CompleteCode, complete.Code);
+        Assert.Equal(2, complete.FromRevision);
+        Assert.Equal(5, complete.ToRevision);
+        Assert.Equal(new[] { 3, 4, 5 }, complete.Chain.Select(delta => delta.Revision).ToArray());
+        Assert.Equal(2, complete.Chain[0].PreviousRevision);
+        Assert.Equal(complete.Chain[0].Revision, complete.Chain[1].PreviousRevision);
+        Assert.Equal(complete.Chain[1].Revision, complete.Chain[2].PreviousRevision);
+
+        // The consumer that is already current gets an empty, available chain.
+        var current = history.CatchUpFrom(5);
+        Assert.True(current.Available);
+        Assert.Empty(current.Chain);
+        Assert.Equal(5, current.ToRevision);
+    }
+
+    [Fact]
+    public void Catch_Up_Requires_A_Fresh_Snapshot_When_Any_Link_Is_Missing()
+    {
+        var history = new RuntimeDeltaHistory(3);
+        foreach (var delta in BuildChain(5))
+        {
+            history.Append(delta);
+        }
+
+        // Revision 2 was evicted, so the chain from 1 has a gap: it is not
+        // inferred, filled in or continued past.
+        var gap = history.CatchUpFrom(1);
+        Assert.False(gap.Available);
+        Assert.Equal(RuntimeRefusalCodes.ResnapshotRequired, gap.Code);
+        Assert.Empty(gap.Chain);
+        Assert.Equal(5, gap.ToRevision);
+
+        // A consumer ahead of the newest retained revision cannot go backwards.
+        var ahead = history.CatchUpFrom(9);
+        Assert.False(ahead.Available);
+        Assert.Equal(RuntimeRefusalCodes.ResnapshotRequired, ahead.Code);
+        Assert.Empty(ahead.Chain);
+
+        // An empty history always requires a Snapshot.
+        var empty = new RuntimeDeltaHistory(3).CatchUpFrom(1);
+        Assert.False(empty.Available);
+        Assert.Equal(RuntimeRefusalCodes.ResnapshotRequired, empty.Code);
+        Assert.Empty(empty.Chain);
+    }
+
+    [Fact]
+    public void NewestFirst_Is_A_Read_Only_Copy()
+    {
+        var history = new RuntimeDeltaHistory(3);
+        foreach (var delta in BuildChain(2))
+        {
+            history.Append(delta);
+        }
+
+        var snapshot = history.NewestFirst;
+        Assert.Equal(2, snapshot.Count);
+
+        history.Append(BuildChain(3)[^1]);
+
+        // The copy taken earlier is unaffected by the later append.
+        Assert.Equal(2, snapshot.Count);
+        Assert.Equal(3, history.Count);
+    }
+
+    private static List<RuntimeDelta> BuildChain(int count)
+    {
+        var store = RuntimeTestFixture.CreateStore(SyntheticSeed.DefaultSeed);
+        var writer = store.CreateWriter();
+        var state = store.Current;
+        var deltas = new List<RuntimeDelta>();
+
+        for (var tick = 1; tick <= count; tick++)
+        {
+            var (committed, delta) = RuntimeDeltaTestFixture.CommitTick(
+                writer, state, tick, RuntimeTestFixture.Instant.AddSeconds(tick));
+
+            deltas.Add(delta);
+            state = committed;
+        }
+
+        return deltas;
+    }
+}

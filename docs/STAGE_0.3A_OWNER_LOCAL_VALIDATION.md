@@ -331,3 +331,41 @@ constants (`ApiRoutes.HealthLive` = `/health/live`, `ApiRoutes.HealthReady` = `/
 the paths the Owner's Stage 0.3A-2 instruction also names). Section 7 is a dated Stage 0.3A-1
 record and is left unmodified; the Owner-local smoke for this checkpoint should use
 `http://127.0.0.1:5181/health/live` and `http://127.0.0.1:5181/health/ready`.
+
+## 13. Stage 0.3A-2A Checkpoint B — Owner-local validation (appended 2026-10-07)
+
+Checkpoint B is **source authored in Arena and NOT COMPILED / NOT EXECUTED there**. The
+Owner-local run below is the validation of record, and the mandatory gate before the
+checkpoint can be treated as validated. No hardware, no device, no Production profile.
+
+Run from the repository root on the Owner workstation (SDK exactly `10.0.401`), on the
+Checkpoint B commit:
+
+| # | Step | Command | Expected |
+| --- | --- | --- | --- |
+| 1 | Genuine restore (only if a Project or Package reference changed; Checkpoint B changed neither) | `dotnet restore WaterJetSentinelSuite.sln` | Success; if a real restore rewrites a `packages.lock.json`, commit that genuine output — never hand-edit it. No lock churn is expected from Checkpoint B |
+| 2 | Locked-restore verification | `dotnet restore WaterJetSentinelSuite.sln --locked-mode` | Success against the committed lock files |
+| 3 | Release build | `dotnet build WaterJetSentinelSuite.sln -c Release --no-restore` | **0 warnings, 0 errors** |
+| 4 | Full test suite | `dotnet test WaterJetSentinelSuite.sln -c Release --no-build` | All tests pass, including the new evolution / Delta / apply / history tests. Checkpoint A recorded 101/101; the total rises by the number of new tests |
+| 5 | Boundary scan | `node tools/boundary-scan/boundary-scan.mjs .` | Exit 0 — **0 findings (S1-S9 clean)** |
+| 6 | Working Tree | `git status` | Clean after the run and any genuine lock refresh |
+
+**What the Owner-local run must demonstrate for Checkpoint B.** Each item is covered by an
+automated test in `tests/runtime.tests/`; no item is claimed as executed in Arena.
+
+1. Repeatable evolution from the same seed, tick sequence and clock: the same state and the
+   same serialized Snapshot/Delta sequence.
+2. Revision progression: +1 exactly once per accepted tick, one committed state per tick,
+   and refusals committing nothing.
+3. A gapless Delta chain whose `previousRevision` / `revision` / `generatedAt` agree with the
+   committed revisions, with no duplicate and no skipped revision.
+4. Bounded trend: capacity respected, oldest point dropped deterministically, and published
+   windows never mutated.
+5. Bounded Delta history: oldest-entry eviction, newest revision discoverable, and refused
+   transitions never recorded.
+6. Gap detection: a revision mismatch yields a machine-readable fresh-Snapshot-required result
+   and applies nothing; catch-up with a missing link never fabricates a Delta.
+7. Snapshot reconstruction parity: applying the Deltas in order reproduces direct evolution
+   through the Snapshot projection.
+8. The three Active Job states on the wire: absent key, object, explicit null.
+9. `TEST_HARDWARE` and `PRODUCTION` remain refused at the startup gate and the evolution gate.
