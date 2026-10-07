@@ -63,7 +63,27 @@
     border: 1px solid var(--warn); color: #1c1503; background: var(--warn); font-weight: 600;
   }
   .banner.show { display: block; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 10px; align-items: start; }
+  /*
+    Two explicit columns. The previous track list
+    (repeat(auto-fit, minmax(330px, 1fr))) produced five equal 1fr tracks, and the
+    wide sections below (grid-column: 1 / -1) span all five - so no track was ever
+    empty and auto-fit never collapsed one. The two cards of the top row therefore
+    shared two ~370 px tracks each while three tracks of that row stayed empty, which
+    squeezed the Runtime state key/value text into a few characters per line.
+
+    Foundation metrics keeps a compact 340-380 px column; Runtime state takes every
+    remaining pixel (minmax(0, 1fr) also removes the min-content floor, so a long
+    value wraps instead of widening the page). Wide sections still span both columns.
+  */
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(340px, 380px) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+  }
+  @media (max-width: 1100px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+  }
   .card {
     background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
     padding: 10px 12px 12px; min-width: 0;
@@ -103,7 +123,7 @@
   }
   .kv.split .v { text-align: left; }
   .kv .k { color: var(--muted); }
-  .kv .v { text-align: right; font-weight: 600; }
+  .kv .v { text-align: right; font-weight: 600; overflow-wrap: break-word; }
   .note { color: var(--muted); font-size: 11.5px; margin-top: 8px; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
   .scroll { max-height: 380px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
