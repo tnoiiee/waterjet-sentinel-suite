@@ -8,7 +8,7 @@
   "generatedAt": "2026-10-07T00:00:00.000Z",
   "sensors": [
     {
-      "sensorId": "G+201",
+      "sensorId": "G\u002B201",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
@@ -33,7 +33,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+202",
+      "sensorId": "G\u002B202",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,

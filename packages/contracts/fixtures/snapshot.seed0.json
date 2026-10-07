@@ -22,7 +22,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G+201",
+      "sensorId": "G\u002B201",
       "equipmentId": null
     },
     {
@@ -33,7 +33,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G+202",
+      "sensorId": "G\u002B202",
       "equipmentId": null
     },
     {
@@ -44,7 +44,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G+203",
+      "sensorId": "G\u002B203",
       "equipmentId": null
     },
     {
@@ -55,7 +55,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G+204",
+      "sensorId": "G\u002B204",
       "equipmentId": null
     },
     {
@@ -66,7 +66,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G+205",
+      "sensorId": "G\u002B205",
       "equipmentId": null
     },
     {
@@ -77,7 +77,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G+206",
+      "sensorId": "G\u002B206",
       "equipmentId": null
     },
     {
@@ -88,7 +88,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G+207",
+      "sensorId": "G\u002B207",
       "equipmentId": null
     },
     {
@@ -99,7 +99,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G+208",
+      "sensorId": "G\u002B208",
       "equipmentId": null
     },
     {
@@ -110,7 +110,7 @@
       "logicalRow": 1,
       "wallColumn": 5,
       "wallRow": 1,
-      "sensorId": "G+209",
+      "sensorId": "G\u002B209",
       "equipmentId": null
     },
     {
@@ -121,7 +121,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G+210",
+      "sensorId": "G\u002B210",
       "equipmentId": null
     },
     {
@@ -132,7 +132,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G+211",
+      "sensorId": "G\u002B211",
       "equipmentId": null
     },
     {
@@ -143,7 +143,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G+212",
+      "sensorId": "G\u002B212",
       "equipmentId": null
     },
     {
@@ -154,7 +154,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G+213",
+      "sensorId": "G\u002B213",
       "equipmentId": null
     },
     {
@@ -165,7 +165,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G+214",
+      "sensorId": "G\u002B214",
       "equipmentId": null
     },
     {
@@ -176,7 +176,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G+215",
+      "sensorId": "G\u002B215",
       "equipmentId": null
     },
     {
@@ -187,7 +187,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G+216",
+      "sensorId": "G\u002B216",
       "equipmentId": null
     },
     {
@@ -198,7 +198,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G+217",
+      "sensorId": "G\u002B217",
       "equipmentId": null
     },
     {
@@ -209,7 +209,7 @@
       "logicalRow": 1,
       "wallColumn": 5,
       "wallRow": 1,
-      "sensorId": "G+218",
+      "sensorId": "G\u002B218",
       "equipmentId": null
     },
     {
@@ -220,7 +220,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G+101",
+      "sensorId": "G\u002B101",
       "equipmentId": null
     },
     {
@@ -231,7 +231,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G+102",
+      "sensorId": "G\u002B102",
       "equipmentId": null
     },
     {
@@ -242,7 +242,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G+103",
+      "sensorId": "G\u002B103",
       "equipmentId": null
     },
     {
@@ -253,7 +253,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G+104",
+      "sensorId": "G\u002B104",
       "equipmentId": null
     },
     {
@@ -264,7 +264,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G+105",
+      "sensorId": "G\u002B105",
       "equipmentId": null
     },
     {
@@ -275,7 +275,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G+106",
+      "sensorId": "G\u002B106",
       "equipmentId": null
     },
     {
@@ -286,7 +286,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G+107",
+      "sensorId": "G\u002B107",
       "equipmentId": null
     },
     {
@@ -297,7 +297,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G+108",
+      "sensorId": "G\u002B108",
       "equipmentId": null
     },
     {
@@ -308,7 +308,7 @@
       "logicalRow": 2,
       "wallColumn": 5,
       "wallRow": 2,
-      "sensorId": "G+109",
+      "sensorId": "G\u002B109",
       "equipmentId": null
     },
     {
@@ -319,7 +319,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G+110",
+      "sensorId": "G\u002B110",
       "equipmentId": null
     },
     {
@@ -330,7 +330,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G+111",
+      "sensorId": "G\u002B111",
       "equipmentId": null
     },
     {
@@ -341,7 +341,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G+112",
+      "sensorId": "G\u002B112",
       "equipmentId": null
     },
     {
@@ -352,7 +352,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G+113",
+      "sensorId": "G\u002B113",
       "equipmentId": null
     },
     {
@@ -363,7 +363,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G+114",
+      "sensorId": "G\u002B114",
       "equipmentId": null
     },
     {
@@ -374,7 +374,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G+115",
+      "sensorId": "G\u002B115",
       "equipmentId": null
     },
     {
@@ -385,7 +385,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G+116",
+      "sensorId": "G\u002B116",
       "equipmentId": null
     },
     {
@@ -396,7 +396,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G+117",
+      "sensorId": "G\u002B117",
       "equipmentId": null
     },
     {
@@ -407,7 +407,7 @@
       "logicalRow": 2,
       "wallColumn": 5,
       "wallRow": 2,
-      "sensorId": "G+118",
+      "sensorId": "G\u002B118",
       "equipmentId": null
     },
     {
@@ -1205,7 +1205,7 @@
   ],
   "sensors": [
     {
-      "sensorId": "G+201",
+      "sensorId": "G\u002B201",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
@@ -1230,7 +1230,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+202",
+      "sensorId": "G\u002B202",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
@@ -1255,7 +1255,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+203",
+      "sensorId": "G\u002B203",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
@@ -1280,7 +1280,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+204",
+      "sensorId": "G\u002B204",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
@@ -1305,7 +1305,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+205",
+      "sensorId": "G\u002B205",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
@@ -1330,7 +1330,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+206",
+      "sensorId": "G\u002B206",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
@@ -1355,7 +1355,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+207",
+      "sensorId": "G\u002B207",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
@@ -1380,7 +1380,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+208",
+      "sensorId": "G\u002B208",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
@@ -1405,7 +1405,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+209",
+      "sensorId": "G\u002B209",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
@@ -1430,7 +1430,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+210",
+      "sensorId": "G\u002B210",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
@@ -1455,7 +1455,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+211",
+      "sensorId": "G\u002B211",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
@@ -1480,7 +1480,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+212",
+      "sensorId": "G\u002B212",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
@@ -1505,7 +1505,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+213",
+      "sensorId": "G\u002B213",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
@@ -1530,7 +1530,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+214",
+      "sensorId": "G\u002B214",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
@@ -1555,7 +1555,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+215",
+      "sensorId": "G\u002B215",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
@@ -1580,7 +1580,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+216",
+      "sensorId": "G\u002B216",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
@@ -1605,7 +1605,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+217",
+      "sensorId": "G\u002B217",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
@@ -1630,7 +1630,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+218",
+      "sensorId": "G\u002B218",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
@@ -1655,7 +1655,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+101",
+      "sensorId": "G\u002B101",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
@@ -1680,7 +1680,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+102",
+      "sensorId": "G\u002B102",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
@@ -1705,7 +1705,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+103",
+      "sensorId": "G\u002B103",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
@@ -1730,7 +1730,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+104",
+      "sensorId": "G\u002B104",
       "slotType": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
@@ -1755,7 +1755,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+105",
+      "sensorId": "G\u002B105",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
@@ -1780,7 +1780,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+106",
+      "sensorId": "G\u002B106",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
@@ -1805,7 +1805,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+107",
+      "sensorId": "G\u002B107",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
@@ -1830,7 +1830,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+108",
+      "sensorId": "G\u002B108",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
@@ -1855,7 +1855,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+109",
+      "sensorId": "G\u002B109",
       "slotType": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
@@ -1880,7 +1880,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+110",
+      "sensorId": "G\u002B110",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
@@ -1905,7 +1905,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+111",
+      "sensorId": "G\u002B111",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
@@ -1930,7 +1930,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+112",
+      "sensorId": "G\u002B112",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
@@ -1955,7 +1955,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+113",
+      "sensorId": "G\u002B113",
       "slotType": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
@@ -1980,7 +1980,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+114",
+      "sensorId": "G\u002B114",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
@@ -2005,7 +2005,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+115",
+      "sensorId": "G\u002B115",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
@@ -2030,7 +2030,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+116",
+      "sensorId": "G\u002B116",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
@@ -2055,7 +2055,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+117",
+      "sensorId": "G\u002B117",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
@@ -2080,7 +2080,7 @@
       "alarmSeverity": null
     },
     {
-      "sensorId": "G+118",
+      "sensorId": "G\u002B118",
       "slotType": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
@@ -3990,7 +3990,7 @@
       {
         "position": 1,
         "entryId": "Q-201",
-        "sensorId": "G+210",
+        "sensorId": "G\u002B210",
         "sourceReason": "DIRTY_SCORE",
         "dirtyScore": 60.5,
         "secondsSinceLastClean": 3600
