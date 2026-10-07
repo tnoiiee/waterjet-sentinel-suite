@@ -181,8 +181,10 @@ app.MapGet(ApiRoutes.HealthReady, () =>
 app.MapGet(ApiRoutes.Snapshot, SnapshotEndpoint);
 app.MapGet(ApiRoutes.Runtime, RuntimeEndpoint);
 app.MapGet(ApiRoutes.Deltas, DeltasEndpoint);
+// ONE registration only: ASP.NET Core matches a template with or without a
+// trailing slash, so a second "/inspector/" endpoint is a second candidate for
+// the same request and makes the match ambiguous (AmbiguousMatchException).
 app.MapGet(ApiRoutes.Inspector, InspectorEndpoint);
-app.MapGet(ApiRoutes.Inspector + "/", InspectorEndpoint);
 
 RuntimeStatus BuildStatus()
 {
