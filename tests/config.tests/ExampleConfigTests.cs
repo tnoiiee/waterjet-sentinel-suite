@@ -77,19 +77,49 @@ public sealed class ExampleConfigTests
         Assert.DoesNotContain("CANNON_REAR", ids);
         Assert.DoesNotContain("CANNON_FRONT", ids);
 
-        // device distribution + TC channels: 106 sensors x 2 channels = 212 unique channels,
-        // validated through the structured contract record (an array of exactly two strings);
-        // a comma-delimited scalar never binds and is rejected before these assertions run
+        // tcChannels STRUCTURE (round 6b): every SENSOR slot exposes a JsonArray of exactly
+        // two non-empty string items, distinct within the pair; scalar (comma-delimited)
+        // nodes are rejected as a matter of shape. No comma-splitting anywhere and no
+        // GetValue<string>() on the array node itself — only the two string ITEMS are read
+        // as values. (The stale pre-correction assembly failed exactly here: the accepted
+        // contract stores tcChannels as a JsonArray, not a JsonValue.)
+        var channelPairs = sensors.Select(sensor =>
+        {
+            var node = sensor!["tcChannels"];
+            Assert.NotNull(node);
+            var tcArray = node as JsonArray; // a scalar (comma-delimited) JsonValue casts to null
+            Assert.True(tcArray is not null,
+                $"sensor {(string?)sensor!["slotId"]}: tcChannels must be a JSON array, not a scalar string");
+            Assert.Equal(2, tcArray!.Count);
+            var pair = tcArray.Select(item =>
+            {
+                Assert.NotNull(item);
+                Assert.Equal(JsonValueKind.String, item!.GetValueKind());
+                var value = item!.GetValue<string>();
+                Assert.False(value.Trim().Length == 0,
+                    "thermocouple channel entries must be non-empty JSON strings");
+                Assert.Equal(value, value.Trim()); // entries are stored pure, without surrounding whitespace
+                return value;
+            }).ToArray();
+            Assert.NotEqual(pair[0], pair[1]);
+            return pair;
+        }).ToArray();
+
+        var allChannels = channelPairs.SelectMany(pair => pair).ToArray();
+        Assert.Equal(212, allChannels.Length);             // exactly 2 channels for each of the 106 sensors
+        Assert.Equal(212, allChannels.Distinct().Count()); // globally unique across the machine
+        foreach (var cannon in cannons)
+        {
+            Assert.Null(cannon!["tcChannels"]); // cannon slots never carry the key at all
+        }
+
+        // canonical totals re-verified through the typed contract record: a scalar string
+        // could not even deserialize into the array property (TcChannelRules rejects every
+        // other invalid shape: lengths 0/1/3, blanks, duplicates, cannon channels)
         var slotRecords = slots
             .Select(s => JsonSerializer.Deserialize<SensorMapSlotExample>(s!.ToJsonString(), ContractJson.Options)!)
             .ToArray();
         TcChannelRules.RequireValidMapping(slotRecords); // 108 slots / 106 sensors / 2 cannons / 212 distinct channels
-        Assert.All(slotRecords.Where(r => !r.IsCannon), r =>
-        {
-            Assert.NotNull(r.TcChannels);
-            Assert.Equal(2, r.TcChannels!.Count);
-            Assert.Equal(r.TcChannels[0], r.TcChannels[0].Trim());
-        });
         Assert.All(slotRecords.Where(r => r.IsCannon), r => Assert.Null(r.TcChannels));
         foreach (var wall in new[] { Wall.LEFT, Wall.REAR, Wall.RIGHT, Wall.FRONT })
         {

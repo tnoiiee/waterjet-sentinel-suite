@@ -25,6 +25,34 @@ product foundation source skeleton; no .NET build success is claimed for it.**
 
 ## [Unreleased]
 
+### Stage 0.3A-1 — Round 6 Owner-local test correction (`fix: align config tests with tc channel arrays`)
+
+Owner-local result for round 6 (2026-10-07): the tcChannels structured-array contract is
+**accepted** — the .NET generator produced 108 slots / 106 sensors / 2 cannons, 106 sensors
+with `tcChannels` arrays (CLR shape `System.Object[]`, JSON `["…:CH00","…:CH01"]`), 212 total
+and 212 unique channels, 0 duplicates, 0 wrong-count sensors, cannons I7/I16, walls
+24/29/24/29; TypeScript validation 24/24, fixture parity 7/7, boundary scan S1–S9 clean. The
+`--no-build` suite run (49/50) is recorded **non-authoritative**: `Wjss.Config.Examples.Tests`
+could not rebuild from current source, so a stale assembly ran. Two config-test corrections,
+source-only — contract, generator, fixtures, serializer, and package versions untouched:
+
+- **CA1861 compile errors** in `tests/config.tests/TcChannelContractTests.cs` (lines 166–167):
+  the cannon-identity expectations were inline constant arrays passed to `Assert.Equal`.
+  Extracted to named `private static readonly` fields (`ExpectedCannonLogicalColumns`,
+  `ExpectedCannonLogicalLabels`); the comparison only enumerates them, so sharing the
+  immutable instances is safe. No suppression, no severity or `TreatWarningsAsErrors` change.
+- **Stale `tcChannels` assertion shape** in `tests/config.tests/ExampleConfigTests.cs`: the
+  pre-correction assembly called `GetValue<string>()` on the `tcChannels` node and failed
+  with "The node must be of type 'JsonValue'". The test now inspects the accepted structure
+  directly: `tcChannels` must cast to a `JsonArray` (a scalar comma-delimited string fails
+  as a shape error), exactly two non-empty string items per sensor, distinct within the pair,
+  212 total items across 106 sensors, 212 globally unique, and cannon slots must not carry
+  the key. Canonical counts and the typed `TcChannelRules.RequireValidMapping` verification
+  remain. No comma-splitting was reintroduced.
+
+Owner-local clean full Release build + fresh full-suite rerun REQUIRED after this correction;
+no .NET build or xUnit success is claimed in Arena.
+
 ### Stage 0.3A-1 — Thermocouple channel contract shape correction (round 6)
 
 Owner-local state (2026-10-07, rounds 3–5): after the two analyzer errors and the

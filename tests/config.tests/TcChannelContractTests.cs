@@ -45,6 +45,12 @@ public sealed class TcChannelContractTests
 
     private static readonly JsonSerializerOptions Options = ContractJson.Options;
 
+    // CA1861 correction (Owner round 6): the cannon expectation constants are static
+    // readonly fields, not inline array arguments. Assert.Equal only enumerates them,
+    // so sharing one immutable instance is safe.
+    private static readonly int[] ExpectedCannonLogicalColumns = [7, 16];
+    private static readonly string[] ExpectedCannonLogicalLabels = ["I7", "I16"];
+
     // (A) Serialization of a valid mapping produces exactly two channel array tokens per
     // sensor and never a comma-delimited scalar.
     [Fact]
@@ -163,8 +169,8 @@ public sealed class TcChannelContractTests
             Assert.NotNull(c.EquipmentId);
             Assert.NotNull(c.LogicalLabel);
         });
-        Assert.Equal(new[] { 7, 16 }, cannons.Select(c => c.LogicalColumn).OrderBy(x => x));
-        Assert.Equal(new[] { "I7", "I16" }, cannons.Select(c => c.LogicalLabel).OrderBy(x => x!));
+        Assert.Equal(ExpectedCannonLogicalColumns, cannons.Select(c => c.LogicalColumn).OrderBy(x => x));
+        Assert.Equal(ExpectedCannonLogicalLabels, cannons.Select(c => c.LogicalLabel).OrderBy(x => x!));
 
         // no sensor slot lacks the array or has the wrong length; no cannon-as-sensor
         Assert.All(records.Where(r => !r.IsCannon), r =>

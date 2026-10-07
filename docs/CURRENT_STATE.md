@@ -869,6 +869,23 @@ rejection history. Arena static validation: S1–S9 zero findings; JSON parse gr
 unchanged. Round-6 C# is compile-reviewed only, **not built or tested in Arena**; Owner
 must rerun the full sequence including the fixture regeneration gate.
 
+### 12.19 Stage 0.3A-1 round 6 Owner-local test correction — Arena validation record
+
+Owner-local round-6 validation (2026-10-07): the tcChannels structured-array contract is
+VERIFIED by the .NET generator (108/106/2 slots; 212 total and 212 unique channels; 0
+duplicates; 0 scalar sensors; cannons I7/I16; walls 24-29-24-29; CLR shape `System.Object[]`
+with JSON two-string arrays), TypeScript 24/24, parity 7/7 after regeneration, boundary scan
+S1–S9 clean. The `--no-build` 49/50 suite count is **non-authoritative** —
+`Wjss.Config.Examples.Tests` did not rebuild (CA1861 in the new channel tests) and a stale
+assembly ran the pre-correction `GetValue<string>()` assertion against the now-array
+`tcChannels` node. Source-only corrections on PR #4: inline constant arrays extracted to
+named `private static readonly` fields (no suppression, `TreatWarningsAsErrors` untouched),
+and `ExampleConfigTests` now asserts the JsonArray shape directly (array cast required —
+scalar strings fail as shape errors; two non-empty string items per sensor; 212 unique;
+cannons key-free), keeping canonical counts and the typed `TcChannelRules` verification.
+Arena static validation green; C# remains compile-reviewed only. Owner-local clean Release
+build + fresh full-suite pass REQUIRED before merge.
+
 ## 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:
