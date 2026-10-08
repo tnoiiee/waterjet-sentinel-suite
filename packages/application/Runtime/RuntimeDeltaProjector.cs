@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Wjss.Contracts;
 using Wjss.Time;
 
@@ -42,19 +43,8 @@ public static class RuntimeDeltaProjector
 
         var candidate = evolution.State;
 
-        if (candidate.Revision != previous.Revision + 1)
-        {
-            throw new InvalidOperationException(
-                $"[{RuntimeRefusalCodes.RevisionNotNext}] Refused to project a Delta from revision {previous.Revision} "
-                + $"to {candidate.Revision}: a Delta is exactly one revision step. Nothing was projected.");
-        }
+        RequireNextStep(previous, candidate);
 
-        if (candidate.GeneratedAtUtc <= previous.GeneratedAtUtc)
-        {
-            throw new InvalidOperationException(
-                $"[{RuntimeRefusalCodes.EvolutionTickTime}] Refused to project a Delta from revision {previous.Revision} "
-                + "to an instant that is not strictly later. Nothing was projected.");
-        }
 
         return new RuntimeDelta
         {
@@ -64,12 +54,67 @@ public static class RuntimeDeltaProjector
             ChangedSensors = RuntimeCollections.Freeze(evolution.ChangedSensors),
             PreviousSensors = RuntimeCollections.Freeze(evolution.PreviousSensors),
             ChangedWalls = RuntimeCollections.Freeze(ChangedWalls(previous.Walls, candidate.Walls)),
-            Pump = candidate.Pump.Equals(previous.Pump) ? null : candidate.Pump,
-            Queue = candidate.Queue.Equals(previous.Queue) ? null : candidate.Queue,
-            Sequence = candidate.Sequence.Equals(previous.Sequence) ? null : candidate.Sequence,
-            Alarms = candidate.Alarms.Equals(previous.Alarms) ? null : candidate.Alarms,
-            Communication = candidate.Communication.Equals(previous.Communication) ? null : candidate.Communication,
+            Pump = SameContent(candidate.Pump, previous.Pump) ? null : candidate.Pump,
+            Queue = SameContent(candidate.Queue, previous.Queue) ? null : candidate.Queue,
+            Sequence = SameContent(candidate.Sequence, previous.Sequence) ? null : candidate.Sequence,
+            Alarms = SameContent(candidate.Alarms, previous.Alarms) ? null : candidate.Alarms,
+            Communication = SameContent(candidate.Communication, previous.Communication) ? null : candidate.Communication,
             TrendPoint = evolution.AppendedTrendPoint,
+            ActiveJob = EncodeActiveJob(previous.ActiveJob, candidate.ActiveJob),
+        };
+    }
+
+    /// <summary>
+    /// CP-3b pure candidate path: projects the transition from <paramref name="previous"/> to a candidate revision
+    /// built by the caller, without a synthetic evolution. The Sensors must keep the same identities in the same
+    /// order, because a Sensor topology change is not a Delta and is refused. No trend point is appended, so
+    /// <c>TrendPoint</c> is absent. The whole-record rules are the same as in <see cref="Project"/>.
+    /// </summary>
+    public static RuntimeDelta ProjectCandidate(RuntimeState previous, RuntimeState candidate)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+        ArgumentNullException.ThrowIfNull(candidate);
+        RequireNextStep(previous, candidate);
+
+        if (previous.Sensors.Count != candidate.Sensors.Count)
+        {
+            throw new InvalidOperationException(
+                "Refused to project a Delta: the Sensor identity set changed. Nothing was projected.");
+        }
+
+        var changedSensors = new List<SensorPresentationState>();
+        var previousSensors = new List<SensorPresentationState>();
+        for (var index = 0; index < candidate.Sensors.Count; index++)
+        {
+            var before = previous.Sensors[index];
+            var next = candidate.Sensors[index];
+            if (!string.Equals(before.SensorId, next.SensorId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Refused to project a Delta: the Sensor order changed. Nothing was projected.");
+            }
+
+            if (!SameContent(before, next))
+            {
+                changedSensors.Add(next);
+                previousSensors.Add(before);
+            }
+        }
+
+        return new RuntimeDelta
+        {
+            PreviousRevision = previous.Revision,
+            Revision = candidate.Revision,
+            GeneratedAtUtc = candidate.GeneratedAtUtc,
+            ChangedSensors = RuntimeCollections.Freeze(changedSensors),
+            PreviousSensors = RuntimeCollections.Freeze(previousSensors),
+            ChangedWalls = RuntimeCollections.Freeze(ChangedWalls(previous.Walls, candidate.Walls)),
+            Pump = SameContent(candidate.Pump, previous.Pump) ? null : candidate.Pump,
+            Queue = SameContent(candidate.Queue, previous.Queue) ? null : candidate.Queue,
+            Sequence = SameContent(candidate.Sequence, previous.Sequence) ? null : candidate.Sequence,
+            Alarms = SameContent(candidate.Alarms, previous.Alarms) ? null : candidate.Alarms,
+            Communication = SameContent(candidate.Communication, previous.Communication) ? null : candidate.Communication,
+            TrendPoint = AppendedTrendPoint(previous.Trend, candidate.Trend),
             ActiveJob = EncodeActiveJob(previous.ActiveJob, candidate.ActiveJob),
         };
     }
@@ -107,6 +152,71 @@ public static class RuntimeDeltaProjector
         };
     }
 
+    /// <summary>
+    /// Carries exactly one appended candidate trend point. An unchanged window carries nothing. Any other change is
+    /// refused explicitly: a changed window identity, changed history, a removal, more than one appended point, or an
+    /// append beyond the window capacity (an eviction is a removal).
+    /// </summary>
+    private static TrendPoint? AppendedTrendPoint(TrendWindow previous, TrendWindow candidate)
+    {
+        if (previous.Capacity != candidate.Capacity || !SameContent(previous.SeriesNames, candidate.SeriesNames))
+        {
+            throw new InvalidOperationException("Refused to project a Delta: the trend window identity changed. Nothing was projected.");
+        }
+
+        var before = previous.Points.Count;
+        var after = candidate.Points.Count;
+        if (after == before)
+        {
+            if (SameContent(previous.Points, candidate.Points))
+            {
+                return null;
+            }
+
+            throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
+        }
+
+        if (after != before + 1 || after > candidate.Capacity)
+        {
+            throw new InvalidOperationException(
+                "Refused to project a Delta: the trend changed by a removal or by more than one appended point. Nothing was projected.");
+        }
+
+        for (var index = 0; index < before; index++)
+        {
+            if (!SameContent(previous.Points[index], candidate.Points[index]))
+            {
+                throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
+            }
+        }
+
+        return candidate.Points[before];
+    }
+
+    private static void RequireNextStep(RuntimeState previous, RuntimeState candidate)
+    {
+        if (candidate.Revision != previous.Revision + 1)
+        {
+            throw new InvalidOperationException(
+                $"[{RuntimeRefusalCodes.RevisionNotNext}] Refused to project a Delta from revision {previous.Revision} "
+                + $"to {candidate.Revision}: a Delta is exactly one revision step. Nothing was projected.");
+        }
+
+        if (candidate.GeneratedAtUtc <= previous.GeneratedAtUtc)
+        {
+            throw new InvalidOperationException(
+                $"[{RuntimeRefusalCodes.EvolutionTickTime}] Refused to project a Delta from revision {previous.Revision} "
+                + "to an instant that is not strictly later. Nothing was projected.");
+        }
+    }
+
+    /// <summary>
+    /// Content equality on the canonical contract JSON. Record Equals compares collection members by reference, so a
+    /// rebuilt but identical Queue, Sequence or Active Job would otherwise emit a spurious section.
+    /// </summary>
+    private static bool SameContent<T>(T left, T right) =>
+        JsonSerializer.Serialize(left, ContractJson.Options) == JsonSerializer.Serialize(right, ContractJson.Options);
+
     private static List<WallSummary> ChangedWalls(
         IReadOnlyList<WallSummary> previous, IReadOnlyList<WallSummary> candidate)
     {
@@ -133,7 +243,7 @@ public static class RuntimeDeltaProjector
             return previous is null ? DeltaJobState.Unchanged() : DeltaJobState.Cleared();
         }
 
-        return previous is null || !candidate.Equals(previous)
+        return previous is null || !SameContent(candidate, previous)
             ? DeltaJobState.Replaced(candidate)
             : DeltaJobState.Unchanged();
     }

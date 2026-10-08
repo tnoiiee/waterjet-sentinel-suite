@@ -31,6 +31,22 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.4A CP-3a / CP-3b — Owner-local validation and Final Source Review (documentation only, 2026-10-09)
+
+- Owner-local validation reported PASS on `a315e90be28fb5e9662c6a7179587c992273cb88` (Owner-reported; not reproduced in Arena): Release build 0 warnings and 0 errors; full .NET 552/552; focused Runtime.Core 430/430; Retention and Projection 131/131; direct Valve-retention regression 1/1; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean.
+- Valve feedback retention defect closed (`fix(runtime): retain only observed valve feedback`): only the valve observation record is retained as the valve identity, not the preparation context record or the Safe Return step record.
+- CP-3a and CP-3b Final Source Review PASSED: no blocking defect. Non-blocking follow-ups NB-1 to NB-8 are recorded in MASTER_PLAN §3.3.5. NB-1, the Safe Return label vocabulary, is an Owner contract decision that gates any wire emission.
+- Documentation corrections: the CP-3 UNCHANGED list omitted the FU-1 change to `SequencingStateValidator.cs`; the Safe Return vocabulary conflict is disclosed; superseded status wording is annotated and not erased.
+- CP-3c and CP-4 NOT AUTHORIZED. PR #9 OPEN, NOT MERGED. This entry changes documentation only.
+
+### Stage 0.4A CP-3a / CP-3b — completion correction (Owner-authorized; NOT compiled or executed in Arena; NOT VALIDATED until Owner-local gates pass; not merged)
+
+*Superseded 2026-10-09 by the validation entry above; retained as dated evidence.*
+
+- CP-3a (kernel): the public `PreviewAxisStandbyLedger` is removed. AxisStandbySeq is written at SR5 and is observable only through the release SR5 record. FU-1, FU-2 and FU-4 are unchanged. Thirteen facts and one two-row theory.
+- CP-3b (simulator library, no host wiring): the scenario catalogue is bound to the canonical Runtime Sensor set. Five-scope bounded retention: evidence log of 256, current-Job Safe Return tail of 16, last dispatch, last Job outcome, first critical. Pure projection of the GlobalQueue, Sensor queue state, Active Job, Safe Return, Sequence, critical event and last Job outcome. The Delta candidate path carries one appended trend point and refuses other trend changes. Planned tests: 236 cases in `tests/runtime.tests/Simulator/`.
+- Owner-local validation required (Release build with 0 warnings, full .NET suite, fixture parity, TypeScript, boundary scan). CP-3c and CP-4 NOT AUTHORIZED. Not merged.
+
 ### Stage 0.4A CP-2 — Owner-local validation and Final Source Review (documentation only, 2026-10-08)
 
 - **OWNER-LOCALLY VALIDATED** at validated head `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c` (Owner-reported; Arena did not run the toolchain). .NET SDK 10.0.401; xUnit runtime .NET 10.0.12; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests **300 total / 300 passed / 0 failed / 0 skipped** (CP-1 validated suite 253 + CP-2 new facts 47); fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan 0 findings (S1–S9 clean); `git diff --check` PASS; final Owner-local working tree CLEAN. No Owner-local artifact commit was required.

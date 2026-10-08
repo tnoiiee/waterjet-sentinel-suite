@@ -46,14 +46,20 @@ namespace Wjss.Runtime.Core.Sequencing;
 /// </summary>
 public static class SequencingKernel
 {
+    /// <summary>Safe Return reason for valve movement away from OPEN during CLEANING (CP-3a, FU-4).</summary>
+    internal const string ValveLostDuringCleaning = "VALVE_LOST_DURING_CLEANING";
+
     /// <summary>The initial state: AutoSequence OFF, empty queue, revision 0, no Job.</summary>
     public static SequencingState Initial() =>
         new(Array.Empty<SequencingEntry>(), 0, null, AutoSequenceMode.OFF, false, 0, 1, 1);
 
     /// <summary>
     /// Applies one event and returns the next state with its evidence records. An
-    /// inconsistent input state is refused with SEQUENCING_STATE_INVALID and
-    /// changes nothing except the evidence sequence.
+    /// inconsistent input state is refused with SEQUENCING_STATE_INVALID, and the only
+    /// change is the evidence sequence advancing by one. A negative or exhausted
+    /// (int.MaxValue) evidence sequence cannot advance: Apply then throws
+    /// InvalidOperationException with COUNTER_NOT_INCREMENTABLE before any state or
+    /// evidence is produced (CP-1 behaviour, unchanged).
     /// </summary>
     public static SequencingTransition Apply(SequencingState state, SequencingEvent sequencingEvent)
     {
@@ -705,6 +711,19 @@ public static class SequencingKernel
             return trail.Finish(state with { ActiveJob = stopped }, SequencingOutcome.APPLIED);
         }
 
+        // CP-3a (FU-4): movement away from OPEN during CLEANING is a valve-loss failure. Safe Return starts in the
+        // same transition: water off, paired valve close requested, pending FAILED. The Queue and the critical
+        // latch are unchanged. The triggering reading is never reused to confirm the close; a later CLOSED
+        // observation confirms SR3.
+        if (job.CleaningActive && job.LastValveFeedback == ValveFeedbackState.OPEN && observed != ValveFeedbackState.OPEN)
+        {
+            var lossTrail = new EvidenceTrail(state.EvidenceSeq);
+            lossTrail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.ValveFeedbackObserved, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING, valve: observed));
+            var lost = job with { LastValveFeedback = observed };
+            var lostStopped = StartSafeReturn(lossTrail, lost, kind, e.At, SequencingCodes.TriggerExecutionFailure, CleaningJobOutcome.FAILED, ValveLostDuringCleaning, JobLifecycle.RUNNING);
+            return lossTrail.Finish(state with { ActiveJob = lostStopped }, SequencingOutcome.APPLIED);
+        }
+
         var unchanged = job.LastValveFeedback == observed;
         var outcome = unchanged ? SequencingOutcome.NO_OP : SequencingOutcome.APPLIED;
         var code = unchanged ? SequencingCodes.ValveFeedbackUnchanged : SequencingCodes.ValveFeedbackObserved;
@@ -791,8 +810,8 @@ public static class SequencingKernel
         const JobLifecycle awaiting = JobLifecycle.SAFE_RETURN_VERIFY_STANDBY;
         var trail = new EvidenceTrail(state.EvidenceSeq);
 
-        trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR5), job, awaiting, awaiting, step: SafeReturnStep.SR5, axis: AxisFeedbackState.AT_STANDBY));
-        trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR6), job, awaiting, awaiting, step: SafeReturnStep.SR6, jobOutcome: job.PendingOutcome));
+        var standby = WriteAxisStandby(trail, job, e);
+        trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR6), standby, awaiting, awaiting, step: SafeReturnStep.SR6, jobOutcome: standby.PendingOutcome));
         trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.JobReleased, job, awaiting, null, step: SafeReturnStep.SR7));
 
         var released = state with
@@ -801,6 +820,19 @@ public static class SequencingKernel
             Mode = state.Mode == AutoSequenceMode.PAUSE_REQUESTED ? AutoSequenceMode.PAUSED : state.Mode,
         };
         return trail.Finish(released, SequencingOutcome.APPLIED);
+    }
+
+    /// <summary>
+    /// Records SR5 (Standby confirmed) and returns the Job with AxisStandbySeq set to that record's evidence
+    /// sequence. The release path is the only caller. The released Job is not retained, so the value is observed
+    /// through the SR5 evidence record of the release transition.
+    /// </summary>
+    private static SequencingActiveJob WriteAxisStandby(EvidenceTrail trail, SequencingActiveJob job, AxisFeedbackObserved e)
+    {
+        const string kind = SequencingCodes.KindAxisFeedbackObserved;
+        const JobLifecycle awaiting = JobLifecycle.SAFE_RETURN_VERIFY_STANDBY;
+        var standbySeq = trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR5), job, awaiting, awaiting, step: SafeReturnStep.SR5, axis: AxisFeedbackState.AT_STANDBY));
+        return job with { Ledger = job.Ledger with { AxisStandbySeq = standbySeq } };
     }
 
     private static SequencingTransition ExpireFeedback(SequencingState state, FeedbackTimeoutExpired e)
