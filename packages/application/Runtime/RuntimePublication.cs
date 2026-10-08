@@ -25,6 +25,7 @@ public sealed class RuntimePublicationStore
 {
     private RuntimePublication _published;
     private int _writerIssued;
+    private readonly object _writeGate = new();
 
     private RuntimePublicationStore(RuntimePublication initial) => _published = initial;
 
@@ -54,6 +55,14 @@ public sealed class RuntimePublicationStore
     }
 
     internal RuntimePublicationResult Publish(int expectedRevision, RuntimeState candidate, RuntimeDelta delta)
+    {
+        lock (_writeGate)
+        {
+            return PublishLocked(expectedRevision, candidate, delta);
+        }
+    }
+
+    private RuntimePublicationResult PublishLocked(int expectedRevision, RuntimeState candidate, RuntimeDelta delta)
     {
         // The sole writer serializes calls. Never change the published reference until
         // every check and copy has succeeded. Exceptions also leave it unchanged.
