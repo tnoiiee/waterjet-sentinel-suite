@@ -13,6 +13,12 @@ namespace Wjss.Runtime.Core.Tests;
 /// </summary>
 public sealed class SequencingRuntimeProjectionTests
 {
+    private static readonly string[] ExpectedSr1Sr2Events =
+        ["SR1", "SR2"];
+
+    private static readonly string[] ExpectedSr1ThroughSr4Events =
+        ["SR1", "SR2", "SR3", "SR4"];
+
     public static IEnumerable<object[]> AllScenarioIds() =>
         Enum.GetValues<SimulatorScenarioId>().Select(id => new object[] { id });
 
@@ -307,7 +313,9 @@ public sealed class SequencingRuntimeProjectionTests
         Assert.Equal("UNKNOWN", sr.Axis.Standby);
         Assert.Null(sr.Axis.StandbySeq);
         Assert.Null(sr.Failure);
-        Assert.Equal(new[] { "SR1", "SR2" }, sr.Events.Select(record => record.Event).ToArray());
+        Assert.Equal(
+            ExpectedSr1Sr2Events,
+            sr.Events.Select(record => record.Event).ToArray());
 
         var later = SimulatorRunHarness.Required(
             SimulatorRunHarness.Required(run.CandidateAt(8).ActiveJob).SafeReturn);
@@ -317,7 +325,9 @@ public sealed class SequencingRuntimeProjectionTests
         Assert.Equal("CLOSED", later.Valve.Feedback);
         Assert.Equal(valveObserved.Seq, later.Valve.FeedbackSeq);
         Assert.Equal(SimulatorRunHarness.RecordWithCode(run.TransitionAt(8), "SR4").Seq, later.Axis.CommandSeq);
-        Assert.Equal(new[] { "SR1", "SR2", "SR3", "SR4" }, later.Events.Select(record => record.Event).ToArray());
+        Assert.Equal(
+            ExpectedSr1ThroughSr4Events,
+            later.Events.Select(record => record.Event).ToArray());
 
         Assert.Null(run.CandidateAt(9).ActiveJob);
         Assert.NotNull(run.CandidateAt(9).Sequence.LastJobOutcome);
@@ -478,7 +488,9 @@ public sealed class SequencingRuntimeProjectionTests
         Assert.Equal(SequencingOutcome.NO_OP, run.TransitionAt(8).Outcome);
         Assert.Equal(CriticalPumpKind.MAIN_PUMP_UNEXPECTED_STOP, critical.Kind);
         Assert.Equal(first.Seq, critical.EvidenceSeq);
-        Assert.True(run.FinalRetention.EvidenceLog.Any(record => record.Pump == PumpObservation.TRIP));
+        Assert.Contains(
+            run.FinalRetention.EvidenceLog,
+            record => record.Pump == PumpObservation.TRIP);
         Assert.Equal(PumpObservation.UNEXPECTED_STOP, SimulatorRunHarness.Required(run.FinalRetention.FirstCritical).Observation);
     }
 

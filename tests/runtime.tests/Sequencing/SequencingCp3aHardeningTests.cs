@@ -245,8 +245,16 @@ public sealed class SequencingCp3aHardeningTests
         return new SequencingTopology(assignments, NonSensorIds);
     }
 
-    private static SequencingEvent Admit(int second, string sensorId) =>
-        new AdmitQueueEntry(At(second), SequencingAdmissionSource.SCENARIO_PREPARED, sensorId, "SCENARIO_PREPARED", 0, Topology());
+    private static AdmitQueueEntry Admit(
+        int second,
+        string sensorId) =>
+        new(
+            At(second),
+            SequencingAdmissionSource.SCENARIO_PREPARED,
+            sensorId,
+            "SCENARIO_PREPARED",
+            0,
+            Topology());
 
     private static ValveLimitObserved Valve(int second, bool upper, bool lower) => new(At(second), "IV1", upper, lower);
 
