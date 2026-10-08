@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Wjss.Config.Examples.Tests; // ConfigTestPaths — shared repository-root discovery
 using Wjss.Contracts;
@@ -28,6 +29,10 @@ public sealed class SensorParameterMigrationTests
         ["IV1", "IV2", "IV3", "IV4", "IV5", "IV6", "IV7", "IV8"];
 
     private static readonly string[] ExpectedNonSensorGapLogicalIds = ["I7", "I16"];
+
+    private static readonly string[] ExpectedBooleanPropertyNames = ["Enabled"];
+
+    private static readonly string[] ExpectedLogicalPositionKindNames = ["SENSOR", "NON_SENSOR_GAP"];
 
     private static SensorParameterImportOutcome Import(string csv) =>
         SensorParameterCsvImporter.Import(csv);
@@ -388,14 +393,17 @@ public sealed class SensorParameterMigrationTests
         });
 
         // The gap rows' sensorname values remain the logicalId values of NON_SENSOR_GAP
-        // positions and never create a SensorConfiguration.
+        // positions and never create a SensorConfiguration. The importer's canonical
+        // order is numeric structured order by order_total — I7 (78) before I16 (87) —
+        // never lexicographic id order (which would put I16 first).
+        var gapPositions = result.LogicalPositions
+            .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
+            .ToArray();
         Assert.Equal(
             ExpectedNonSensorGapLogicalIds,
-            result.LogicalPositions
-                .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
-                .Select(p => p.LogicalId)
-                .OrderBy(id => id, StringComparer.Ordinal)
-                .ToArray());
+            gapPositions.Select(p => p.LogicalId).ToArray());
+        Assert.Equal(78, gapPositions[0].OrderTotal);
+        Assert.Equal(87, gapPositions[1].OrderTotal);
         Assert.DoesNotContain(result.Sensors, s => s.SensorId is "I7" or "I16");
     }
 
@@ -452,21 +460,64 @@ public sealed class SensorParameterMigrationTests
         });
     }
 
-    // ---- T17 -----------------------------------------------------------------
+    // ---- T17 (semantic replacement: output + contract shape, no source text) --
 
     [Fact]
-    public void No_Unapproved_Derivations_In_Importer_Source()
+    public void Migration_Output_Preserves_Raw_Values_And_Emits_No_Unapproved_Derivations()
     {
-        var importer = File.ReadAllText(Path.Combine(
-            ConfigTestPaths.RepoRoot(), "packages", "domain", "SensorParameterCsvImporter.cs"));
+        var rows = SyntheticSensorParameterCsv.BuildRows();
+        var result = AcceptedResult(SyntheticSensorParameterCsv.ToCsv(rows));
 
-        Assert.DoesNotContain("UseDirtyScoreThreshold", importer, StringComparison.Ordinal);
-        Assert.DoesNotContain("HasVerifiedCleaningHistory", importer, StringComparison.Ordinal);
-        Assert.DoesNotContain("LastSuccessfulCleaningCompletedAt", importer, StringComparison.Ordinal);
-        Assert.DoesNotContain("HardMinimumCleaningInterval", importer, StringComparison.Ordinal);
-        Assert.DoesNotContain("TimeSpan", importer, StringComparison.Ordinal);
-        Assert.DoesNotContain("ToUniversalTime", importer, StringComparison.Ordinal);
-        Assert.DoesNotContain("ToLocalTime", importer, StringComparison.Ordinal);
+        // Every approved import is preserved verbatim from its legacy row, keyed by the
+        // legacy record identifier provenance: the raw threshold value, the raw cleaning
+        // count, the raw offset-free last-clean string, and the raw unknown-unit
+        // minimum-time value.
+        var rowsByRecordId = rows.Skip(1).ToDictionary(row => row[0], row => row);
+        Assert.All(result.Sensors, sensor =>
+        {
+            var row = rowsByRecordId[sensor.LegacyRecordId];
+            Assert.Equal(double.Parse(row[8], CultureInfo.InvariantCulture), sensor.DirtyScoreThreshold);
+            Assert.Equal(int.Parse(row[9], CultureInfo.InvariantCulture), sensor.CleaningCount);
+            Assert.Equal(row[11].Length == 0 ? null : row[11], sensor.LastCleanTimestampRaw);
+            Assert.Equal(row[12].Length == 0 ? null : row[12], sensor.MinTimeAllowAddToQueueRaw);
+        });
+
+        // The source timezone remains UNKNOWN/deferred: every preserved last-clean value
+        // is still the offset-free legacy string (no UTC variant, no offset suffix), and
+        // each one raised exactly the MIGRATION_TIMEZONE_UNKNOWN warning.
+        Assert.All(result.Sensors, sensor =>
+        {
+            if (sensor.LastCleanTimestampRaw is not null)
+            {
+                Assert.False(
+                    sensor.LastCleanTimestampRaw.EndsWith("Z", StringComparison.Ordinal),
+                    "the raw last-clean value must remain the offset-free legacy string");
+                Assert.False(
+                    sensor.LastCleanTimestampRaw.EndsWith("+00:00", StringComparison.Ordinal),
+                    "no UTC offset may be invented for the raw last-clean value");
+            }
+        });
+        Assert.Equal(
+            ExpectedTimezoneWarnings,
+            result.Warnings.Count(w => w.Code == MigrationRefusalCodes.MigrationTimezoneUnknown));
+
+        // Public Contract shape: the ONLY bool the record can carry is Enabled — no
+        // unapproved derived boolean (no threshold-gate flag, no verified-history flag)
+        // exists — and no canonical DateTimeOffset/DateTime or TimeSpan is invented.
+        var booleanProperties = typeof(SensorConfigurationRecord).GetProperties()
+            .Where(p => p.PropertyType == typeof(bool))
+            .Select(p => p.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(ExpectedBooleanPropertyNames, booleanProperties);
+
+        Assert.Empty(typeof(SensorConfigurationRecord).GetProperties().Where(p =>
+            p.PropertyType == typeof(DateTimeOffset)
+            || p.PropertyType == typeof(DateTimeOffset?)
+            || p.PropertyType == typeof(DateTime)
+            || p.PropertyType == typeof(DateTime?)
+            || p.PropertyType == typeof(TimeSpan)
+            || p.PropertyType == typeof(TimeSpan?)));
     }
 
     // ---- T18 -----------------------------------------------------------------
@@ -485,28 +536,52 @@ public sealed class SensorParameterMigrationTests
         });
     }
 
-    // ---- T19 -----------------------------------------------------------------
+    // ---- T19 (semantic replacement: imported output + public kinds, no source text)
 
     [Fact]
-    public void Canonical_Output_Uses_NonSensorGap_And_Never_Cannon()
+    public void Canonical_Output_Contains_Only_Sensor_And_NonSensorGap_Positions()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
-        Assert.All(result.LogicalPositions, p =>
-            Assert.True(
-                p.PositionKind is LogicalPositionKind.SENSOR or LogicalPositionKind.NON_SENSOR_GAP,
-                "canonical positions use only SENSOR and NON_SENSOR_GAP"));
+        // I7 and I16 are NON_SENSOR_GAP positions in the importer's canonical orderTotal
+        // order, and neither yields a SensorConfiguration.
+        var gapPositions = result.LogicalPositions
+            .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
+            .ToArray();
+        Assert.Equal(
+            ExpectedNonSensorGapLogicalIds,
+            gapPositions.Select(p => p.LogicalId).ToArray());
+        Assert.DoesNotContain(result.Sensors, s => s.SensorId is "I7" or "I16");
 
-        // The canonical vocabulary surface never references the transitional SlotType.
-        var repoRoot = ConfigTestPaths.RepoRoot();
-        var importer = File.ReadAllText(Path.Combine(repoRoot, "packages", "domain", "SensorParameterCsvImporter.cs"));
-        var topology = File.ReadAllText(Path.Combine(repoRoot, "packages", "contracts", "Topology.cs"));
-        var config = File.ReadAllText(Path.Combine(repoRoot, "packages", "contracts", "Config.cs"));
-        Assert.DoesNotContain("SlotType", importer, StringComparison.Ordinal);
-        Assert.DoesNotContain("SlotType", topology, StringComparison.Ordinal);
-        Assert.DoesNotContain("SlotType", config, StringComparison.Ordinal);
-        Assert.DoesNotContain("CANNON", topology, StringComparison.Ordinal);
+        // The canonical kind vocabulary is exactly SENSOR and NON_SENSOR_GAP: the
+        // Runtime's transitional SlotType representation is not part of the canonical
+        // output vocabulary.
+        Assert.Equal(
+            ExpectedLogicalPositionKindNames,
+            Enum.GetNames<LogicalPositionKind>());
+
+        // No canonical record carries a property of the transitional slot vocabulary.
+        Assert.Empty(new[]
+        {
+            typeof(LogicalPositionRecord),
+            typeof(SensorConfigurationRecord),
+            typeof(WaterJetConfiguration),
+            typeof(IsolationValveConfiguration),
+        }.SelectMany(type => type.GetProperties())
+            .Where(p => p.PropertyType == typeof(SlotType)));
+
+        // No Cannon entity or identity exists anywhere in the imported output.
+        var allIdentities = result.LogicalPositions.Select(p => p.LogicalId)
+            .Concat(result.Sensors.Select(s => s.SensorId))
+            .Concat(result.WaterJets.Select(w => w.WaterJetId))
+            .Concat(result.IsolationValves.Select(v => v.ValveId))
+            .ToArray();
+        Assert.All(allIdentities, id =>
+            Assert.False(
+                id.Contains("CANN", StringComparison.Ordinal),
+                $"no Cannon identity may appear in canonical output, found '{id}'"));
     }
+
 
     // ---- T20 -----------------------------------------------------------------
 

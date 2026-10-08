@@ -119,7 +119,7 @@ public sealed class MigratedExampleShapeTests
                 _ => throw new InvalidOperationException("synthetic example left the canonical grid"),
             };
             Assert.Equal($"WJ{expectedOrdinal}", JsonNodeExtensions.RequireString(sensor, "assignedWaterJetId"));
-            Assert.Equal($"IV{expectedOrdinal}", JsonNodeExtensions.RequireString(sensor, "dedicatedIsolationValveId"));
+            Assert.Equal($"IV{expectedOrdinal}", JsonNodeExtensions.RequireString(sensor, "assignedIsolationValveId"));
         }
 
         var opposite = new Dictionary<string, string>
