@@ -43,7 +43,9 @@ public sealed class SequencingStateIntegrityTests
         var properties = typeof(SequencingState).GetProperties(BindingFlags.Instance | BindingFlags.Public);
 
         Assert.NotEmpty(properties);
-        Assert.Empty(properties.Where(property => property.SetMethod is { IsPublic: true }));
+        Assert.DoesNotContain(
+            properties,
+            property => property.SetMethod is { IsPublic: true });
     }
 
     [Fact]
