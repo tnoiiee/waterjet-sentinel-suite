@@ -197,6 +197,31 @@ public sealed class SequencingRetentionTests
         Assert.Equal(ValveFeedbackState.CLOSED, closed.ValveFeedback);
         Assert.Equal(run.TransitionAt(8).Evidence.Seq, open.Seq);
         Assert.Equal(ValveFeedbackState.OPEN, open.ValveFeedback);
+
+        // Tick 4 is the CLOSED observation. Tick 5 (AdvanceJobPreparation) carries CLOSED only as prerequisite context,
+        // and tick 6 (BeginCleaning) carries no valve feedback. Neither may replace the observation identity.
+        var closedObservation = SimulatorRunHarness.RecordWithCode(run.TransitionAt(4), SequencingCodes.ValveFeedbackObserved).Seq;
+        var preparation = SimulatorRunHarness.RecordWithCode(run.TransitionAt(5), SequencingCodes.PreparationAdvanced);
+        Assert.Equal(ValveFeedbackState.CLOSED, preparation.ValveFeedback);
+        Assert.Equal(closedObservation, closed.Seq);
+        Assert.Equal(closedObservation, SimulatorRunHarness.Required(run.RetentionAt(5).CurrentValveFeedback).Seq);
+        Assert.Equal(closedObservation, SimulatorRunHarness.Required(run.RetentionAt(6).CurrentValveFeedback).Seq);
+
+        // A later real observation (tick 8, OPEN) replaces it with its own sequence.
+        Assert.Equal(SimulatorRunHarness.RecordWithCode(run.TransitionAt(8), SequencingCodes.ValveFeedbackObserved).Seq, open.Seq);
+    }
+
+    [Fact]
+    public void Valve_Feedback_Retention_Ignores_The_Safe_Return_Step_Recorded_With_The_Observation()
+    {
+        // EXPLICIT_ABORT tick 8 is a CLOSED observation during Safe Return. The same transition also records SR3, which
+        // repeats the CLOSED value. The retained feedback must remain the observation record, not the step.
+        var run = SimulatorRunHarness.RunScenario(SimulatorScenarioId.EXPLICIT_ABORT);
+        var observation = SimulatorRunHarness.RecordWithCode(run.TransitionAt(8), SequencingCodes.ValveFeedbackObserved);
+        var step = SimulatorRunHarness.RecordWithCode(run.TransitionAt(8), "SR3");
+
+        Assert.Equal(ValveFeedbackState.CLOSED, step.ValveFeedback);
+        Assert.Equal(observation.Seq, SimulatorRunHarness.Required(run.RetentionAt(8).CurrentValveFeedback).Seq);
     }
 
     [Fact]

@@ -134,7 +134,13 @@ public sealed record SequencingRetention
                 phaseStartedAt = evidence.At;
             }
 
-            if (evidence.Outcome == SequencingOutcome.APPLIED && evidence.ValveFeedback is not null)
+            // Only an actual Valve observation is retained. AdvanceJobPreparation carries ValveFeedback as prerequisite
+            // context, and the Safe Return step SR3 (or SR_FAILED) of the same observation repeats the observed value.
+            // Neither may replace the observation identity, so a step record is excluded.
+            if (evidence.Outcome == SequencingOutcome.APPLIED
+                && evidence.EventKind == SequencingCodes.KindValveLimitObserved
+                && evidence.ValveFeedback is not null
+                && evidence.Step is null)
             {
                 valveFeedback = evidence;
             }
