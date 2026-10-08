@@ -59,6 +59,11 @@ public static class SequencingCodes
     public const string ReleaseJobMismatch = "RELEASE_JOB_MISMATCH";
     public const string ReleaseSeqNotAfterDispatch = "RELEASE_SEQ_NOT_AFTER_DISPATCH";
 
+    // State integrity (Owner correction 2026-10-08). The refusal code is returned by Apply;
+    // projections throw InvalidOperationException whose message starts with StateInvalid.
+    public const string StateInvalid = "SEQUENCING_STATE_INVALID";
+    public const string CounterNotIncrementable = "COUNTER_NOT_INCREMENTABLE";
+
     // Synthetic identifier prefixes (deterministic counters; no clock, no random value).
     public const string EntryIdPrefix = "SYN-QE-";
     public const string JobIdPrefix = "SYN-JOB-";

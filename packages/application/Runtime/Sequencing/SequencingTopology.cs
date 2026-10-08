@@ -60,13 +60,21 @@ public sealed record SequencingTopology(
                 : SequencingCodes.SensorUnknown;
         }
 
-        var jetIndex = Array.IndexOf(WaterJetIds, assignment.JetId);
-        var valveIndex = Array.IndexOf(IsolationValveIds, assignment.ValveId);
-        if (jetIndex < 0 || jetIndex != valveIndex)
+        if (!IsPairedOrdinal(assignment.JetId, assignment.ValveId))
         {
             return SequencingCodes.EntryInvalid;
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// True only for a WJn paired with the same ordinal IVn, with n in 1..8. This is
+    /// the single WJn/IVn pairing rule, shared by admission and state validation.
+    /// </summary>
+    internal static bool IsPairedOrdinal(string jetId, string valveId)
+    {
+        var jetIndex = Array.IndexOf(WaterJetIds, jetId);
+        return jetIndex >= 0 && jetIndex == Array.IndexOf(IsolationValveIds, valveId);
     }
 }
