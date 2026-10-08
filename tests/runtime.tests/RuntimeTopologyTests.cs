@@ -179,8 +179,38 @@ public sealed class RuntimeTopologyTests
         var roundTripped = JsonSerializer.Deserialize<OperationalSnapshot>(wire, ContractJson.Options);
 
         Assert.NotNull(roundTripped);
-        Assert.Equal(snapshot.WaterJets, roundTripped.WaterJets);
-        Assert.Equal(snapshot.IsolationValves, roundTripped.IsolationValves);
+
+        // Record equality would compare the nested PlacementAnchors collection by
+        // reference (a frozen wrapper before serialization, a List<string> after
+        // deserialization), so the round-trip is asserted field-by-field instead;
+        // the anchor sequence itself is compared by contents.
+        var expectedWaterJetCount = snapshot.WaterJets.Count;
+        var roundTripWaterJetCount = roundTripped.WaterJets.Count;
+        Assert.Equal(expectedWaterJetCount, roundTripWaterJetCount);
+        for (var ordinal = 0; ordinal < snapshot.WaterJets.Count; ordinal++)
+        {
+            var expected = snapshot.WaterJets[ordinal];
+            var actual = roundTripped.WaterJets[ordinal];
+            Assert.Equal(expected.WaterJetId, actual.WaterJetId);
+            Assert.Equal(expected.InstalledWall, actual.InstalledWall);
+            Assert.Equal(expected.InstalledRegion, actual.InstalledRegion);
+            Assert.Equal(expected.PlacementKind, actual.PlacementKind);
+            Assert.Equal(expected.PlacementAnchors, actual.PlacementAnchors);
+            Assert.Equal(expected.TargetWall, actual.TargetWall);
+            Assert.Equal(expected.TargetRegion, actual.TargetRegion);
+            Assert.Equal(expected.DedicatedIsolationValveId, actual.DedicatedIsolationValveId);
+        }
+
+        var expectedIsolationValveCount = snapshot.IsolationValves.Count;
+        var roundTripIsolationValveCount = roundTripped.IsolationValves.Count;
+        Assert.Equal(expectedIsolationValveCount, roundTripIsolationValveCount);
+        for (var ordinal = 0; ordinal < snapshot.IsolationValves.Count; ordinal++)
+        {
+            var expected = snapshot.IsolationValves[ordinal];
+            var actual = roundTripped.IsolationValves[ordinal];
+            Assert.Equal(expected.ValveId, actual.ValveId);
+            Assert.Equal(expected.ServedWaterJetId, actual.ServedWaterJetId);
+        }
         Assert.All(roundTripped.Sensors.Zip(snapshot.Sensors), pair =>
         {
             Assert.Equal(pair.Second.AssignedWaterJetId, pair.First.AssignedWaterJetId);

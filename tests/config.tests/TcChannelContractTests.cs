@@ -96,7 +96,7 @@ public sealed class TcChannelContractTests
     public void Deserializing_Two_String_Array_Binds_Into_The_Contract_Record()
     {
         const string slotJson = """
-            {"slotId":"L-R0-C00","slotType":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
+            {"slotId":"L-R0-C00","positionKind":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
              "wallColumn":0,"wallRow":0,"sensorId":"L-R0-C00",
              "tcChannels":["SYN-TC-01:CH00","SYN-TC-01:CH01"]}
             """;
@@ -111,7 +111,7 @@ public sealed class TcChannelContractTests
         // The earlier encoding shape: a scalar string in place of the array. The contract
         // does not "support then normalize" it — System.Text.Json refuses to bind it.
         const string legacyJson = """
-            {"slotId":"L-R0-C00","slotType":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
+            {"slotId":"L-R0-C00","positionKind":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
              "wallColumn":0,"wallRow":0,"sensorId":"L-R0-C00","tcChannels":"SYN-TC-01:CH00,SYN-TC-01:CH01"}
             """;
         Assert.Throws<JsonException>(() =>
