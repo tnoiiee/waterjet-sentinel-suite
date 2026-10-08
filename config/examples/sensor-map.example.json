@@ -1736,7 +1736,7 @@
   },
   "notes": [
     "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution); tcChannels is an exact two-entry array (front = lower channel index, rear = higher), not Production data.",
-    "Cannon slots are equipment, not Sensors; they carry no sensorId and no thermocouple channels.",
+    "NON_SENSOR_GAP slots (I7, I16) are placement anchors, not Sensors; they carry no sensorId, no thermocouple channels, and only the Water Jet each physically anchors.",
     "The logical matrix and wall distribution are the Owner-confirmed structure (106 locations, 212 channels)."
   ],
   "fixtureStatus": "PROVISIONAL STRUCTURAL FIXTURE - OWNER-LOCAL .NET GENERATION REQUIRED"
