@@ -31,6 +31,32 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.4A CP-1 — Final evidence amendment, F1 closed, CP-1 Final Source Review passed (documentation only, 2026-10-08)
+
+- **OWNER-LOCALLY VALIDATED** at head `03144f43122bed2bd011b26886f663c2b46b79c4` (Owner-reported; Arena did not run the toolchain). .NET SDK 10.0.401; xUnit runtime .NET 10.0.12; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests 253/253 passed; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean; `git diff --check` PASS; working tree clean. No artifact commit was required.
+- **Correction chain:** `2cfe648` (CP-1) → `27c939e` (validation record) → `7b84824` (CP-2 scope gate proposal) → `23b276f` (`fix(runtime): enforce sequencing state integrity`) → `03144f4` (`fix(tests): use predicate assertion for public setters`, xUnit2029 analyzer correction, test-only).
+- **F1 reclassified and CLOSED:** the earlier "FOLLOW-UP RECOMMENDED BEFORE MERGE, not a blocking public-boundary defect" classification is withdrawn. F1 is a BLOCKING STATE-INTEGRITY DEFECT. Root cause: public construction and public init mutation of `SequencingState`; caller-owned collections could alias state; `Apply` had no state-integrity guard; an inconsistent Mode / critical-latch combination could silently project as running. Correction: internal construction boundary; read-only queue copy; deterministic validator; invalid `Apply` fails closed with `SEQUENCING_STATE_INVALID`; invalid projections throw with the stable code; default-as-running removed; checked counters.
+- **CP-1 Final Source Review: PASSED.** Carried forward as CP-2 preconditions, not CP-1 blockers: F2 (single evidence sequence) and F3 (release accepted under the critical latch, consistent with the approved CP-2 interpretation).
+- **Status:** CP-2 scope gate PROPOSED ONLY (prerequisite F1 corrected and validated). CP-2, CP-3 and CP-4 NOT AUTHORIZED. PR #7 OPEN, NOT MERGED.
+
+### Stage 0.4A CP-0 / CP-1 — Owner-local validation recorded and CP-1 Final Source Review (documentation only, 2026-10-08)
+
+- **OWNER-LOCALLY VALIDATED** at feature head `2cfe648d512241d9fef459cd91c663b9780753f9` (CP-1; parent `1f76da8` = CP-0; base `909d028`). Owner-reported: .NET SDK 10.0.401; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests 217/217 passed; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean; `git diff --check` PASS; working tree clean. No artifact commit was required.
+- **CP-1 Final Source Review (read-only):** no blocking public-boundary defect. FOLLOW-UP RECOMMENDED BEFORE MERGE for the public `SequencingState` constructor (a caller can bypass the critical latch or construct an over-capacity or inconsistent state; the kernel does not validate its input). CP-2 precondition: a single evidence sequence (the CP-1 release check currently compares a separate Safe Return sequence). No Runtime, API, Inspector, contract, schema or fixture change.
+- The Stage 0.4A CP-2 scope gate is **proposed** (MASTER_PLAN §3.3.1). CP-2, CP-3 and CP-4 are NOT AUTHORIZED. PR #7 remains OPEN and NOT MERGED.
+
+### Stage 0.4A CP-0 — Status and ADR reconciliation for Stage 0.4A sequencing (documentation only, 2026-10-08)
+
+- Recorded that PR #5 (merge `a74db62`) and PR #6 (merge `909d028`, the Stage 0.4A approved base) are
+  MERGED to `main`, and that Stage 0.3A-3 is COMPLETE. Superseded the stale "PR OPEN", "Checkpoint C NOT
+  AUTHORIZED" and "config loading pipeline" status text with dated notes; historical text is retained.
+- Recorded the Stage 0.4A scope gate and the Owner rulings for CP-1 (ready-only FIFO queue, capacity 8,
+  head-only dispatch, single Active Job, pump waiting outside Queue entries, head-revalidation removal,
+  pause as Job/AutoSequence state). Open items D6–D12 are listed, not decided.
+- Appended a reconciliation note to ADR-0014 (status remains DRAFT). No contract, fixture, source, test,
+  or schema change. CP-2, CP-3 and CP-4 are NOT AUTHORIZED.
+- Source authored in Arena; NOT COMPILED IN ARENA; NOT EXECUTED IN ARENA.
+
 ### Stage 0.3A-3 Checkpoint A — Equipment topology decision and legacy parameter migration specification (planning only)
 
 Owner-authorized Checkpoint A (planning / decision / specification only) on verified
