@@ -18,7 +18,8 @@ namespace Wjss.Runtime.Core.Sequencing;
 /// CP-2 combinations checked: lifecycle against sub-stage, cleaning and water flags;
 /// the Safe Return ledger against lifecycle and step; trigger against pending
 /// outcome; the critical latch against a Pump trigger; the failure code against the
-/// wait that failed; and the ledger order against the evidence sequence.
+/// wait that failed; the ledger order against the evidence sequence; and (CP-3a, FU-1) a
+/// critical latch with a RUNNING Job.
 /// </para>
 /// </summary>
 internal static class SequencingStateValidator
@@ -71,6 +72,7 @@ internal static class SequencingStateValidator
     internal const string JobLedgerInvalid = "JOB_LEDGER_INVALID";
     internal const string JobStepMismatch = "JOB_STEP_MISMATCH";
     internal const string JobFailureInvalid = "JOB_FAILURE_INVALID";
+    internal const string JobRunningUnderLatch = "JOB_RUNNING_UNDER_LATCH";
 
     /// <summary>Returns the first violation identity, or null when the state is consistent.</summary>
     internal static string? FirstViolation(SequencingState state)
@@ -265,11 +267,11 @@ internal static class SequencingStateValidator
         }
 
         return job.Lifecycle == JobLifecycle.RUNNING
-            ? RunningJobViolation(job)
+            ? RunningJobViolation(state, job)
             : SafeReturnJobViolation(state, job);
     }
 
-    private static string? RunningJobViolation(SequencingActiveJob job)
+    private static string? RunningJobViolation(SequencingState state, SequencingActiveJob job)
     {
         if (job.Trigger is not null
             || job.TriggerReason is not null
@@ -318,7 +320,9 @@ internal static class SequencingStateValidator
             return JobPumpGateInvalid;
         }
 
-        return null;
+        // CP-3a (FU-1): a RUNNING Job never coexists with the critical latch. This check runs last, so every
+        // earlier RUNNING identity keeps its code.
+        return state.CriticalSuspended ? JobRunningUnderLatch : null;
     }
 
     private static string? SafeReturnJobViolation(SequencingState state, SequencingActiveJob job)
