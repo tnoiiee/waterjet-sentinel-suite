@@ -95,6 +95,12 @@
       },
       "wjss.contracts": {
         "type": "Project"
+      },
+      "wjss.domain": {
+        "type": "Project",
+        "dependencies": {
+          "Wjss.Contracts": "[1.0.0, )"
+        }
       }
     }
   }

@@ -2,7 +2,7 @@ namespace Wjss.Contracts;
 
 /// <summary>
 /// One logical position of the Owner-confirmed 18-column x 6-row matrix
-/// (108 positions: 106 Sensor locations + 2 Cannon equipment slots).
+/// (108 positions: 106 Sensor locations + 2 NON_SENSOR_GAP placement anchors).
 /// Delivered once in the Snapshot as <c>wallMap</c>; static; NEVER in a Delta.
 /// The UI renders wall grids from these slots only and generates no IDs.
 /// </summary>
@@ -11,7 +11,8 @@ public sealed record WallMapSlot
     /// <summary>Stable slot identity, e.g. "SLOT-R5-C07". Derived from row/column, never invented per deployment.</summary>
     public required string SlotId { get; init; }
 
-    public required SlotType SlotType { get; init; }
+    /// <summary>SENSOR for the 106 actual Sensors; NON_SENSOR_GAP for I7 and I16 (no Sensor identity, no channels, no scan order).</summary>
+    public required LogicalPositionKind PositionKind { get; init; }
     public required Wall Wall { get; init; }
 
     /// <summary>1-18 across the whole matrix.</summary>
@@ -26,16 +27,20 @@ public sealed record WallMapSlot
     /// <summary>1-6 inside the wall; equals LogicalRow (no rotation, no reversal).</summary>
     public required int WallRow { get; init; }
 
-    /// <summary>Sensor identity; null for Cannon slots. A Cannon ID is never a Sensor ID.</summary>
+    /// <summary>Sensor identity; null for NON_SENSOR_GAP positions. An equipment identity is never a Sensor ID.</summary>
     public string? SensorId { get; init; }
 
-    /// <summary>Equipment identity (Cannon); null for Sensor slots.</summary>
-    public string? EquipmentId { get; init; }
+    /// <summary>
+    /// The Water Jet physically anchored at this position; non-null only for NON_SENSOR_GAP
+    /// positions (I7 anchors WJ3, I16 anchors WJ1). The gap is a location anchor only — it
+    /// is never a Water Jet identity and never a Sensor identity.
+    /// </summary>
+    public string? GapAnchorForWaterJetId { get; init; }
 }
 
 /// <summary>
 /// Canonical logical matrix structure (Owner-confirmed). The count identities and
-/// Cannon slot positions are protected domain facts. Scan order, device
+/// NON_SENSOR_GAP positions are protected domain facts. Scan order, device
 /// distribution, channel identifiers and equipment assignment are NOT here:
 /// they belong to Published Configuration (later stage) and are never invented.
 /// </summary>
@@ -46,9 +51,9 @@ public static class CanonicalSensorMap
     public const int SensorLocations = 106;
     public const int ThermocoupleChannelCount = 212;
     public const int MatrixSlots = 108;
-    public const int CannonSlotCount = 2;
+    public const int NonSensorGapCount = 2;
 
-    /// <summary>Wall totals: sensors per wall (Cannon slots are equipment, not Sensors).</summary>
+    /// <summary>Wall totals: sensors per wall (NON_SENSOR_GAP positions are not Sensors).</summary>
     public static readonly IReadOnlyDictionary<Wall, int> SensorsPerWall =
         new Dictionary<Wall, int> { [Wall.LEFT] = 24, [Wall.REAR] = 29, [Wall.RIGHT] = 24, [Wall.FRONT] = 29 };
 
@@ -62,11 +67,15 @@ public static class CanonicalSensorMap
             [Wall.FRONT] = (14, 18),
         };
 
-    /// <summary>Cannon equipment slots (logical I7 = Rear, logical I16 = Front). Not Sensors.</summary>
-    public static readonly (string EquipmentId, int Row, int Column)[] CannonSlots =
+    /// <summary>
+    /// The two NON_SENSOR_GAP positions and the Water Jets they physically anchor
+    /// (logical I7 = Rear anchoring WJ3, logical I16 = Front anchoring WJ1). They are
+    /// location anchors only — never Sensors, never equipment identities.
+    /// </summary>
+    public static readonly (string LogicalId, string AnchorWaterJetId, int Row, int Column)[] NonSensorGapSlots =
     [
-        ("CANNON_REAR", 5, 7),
-        ("CANNON_FRONT", 5, 16),
+        ("I7", "WJ3", 5, 7),
+        ("I16", "WJ1", 5, 16),
     ];
 
     /// <summary>Sensor ID for a logical row key and column, per the Owner-confirmed labelling.</summary>

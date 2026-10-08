@@ -31,6 +31,229 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-3 Checkpoint A — Equipment topology decision and legacy parameter migration specification (planning only)
+
+Owner-authorized Checkpoint A (planning / decision / specification only) on verified
+remote-main base `a74db62c4a7d4d8d5d2185cfe77a4c0229b01fce` (PR #5 foundation). New
+[`ADR-0017`](docs/decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md)
+(`PROPOSED`) and companion report
+[`docs/STAGE_0.3A-3_CHECKPOINT_A.md`](docs/STAGE_0.3A-3_CHECKPOINT_A.md) record:
+
+- The **corrected sensor topology**, superseding the I7/I16 "Cannon equipment slot"
+  interpretation: I7 and I16 are **NON_SENSOR_GAP** positions — location anchors only
+  (I7 → WJ3, I16 → WJ1); sensor sequence skips them (I6→I8, I15→I17). Protected counts
+  stand: 108 logical positions / 106 Sensors / 212 TC channels / Left 24, Rear 29,
+  Right 24, Front 29.
+- **WJ1–WJ8** installed positions (wall, region, placement kind, anchors) and target
+  coverage (opposite wall, matching region) as separate concepts; **IV1–IV8** with
+  mandatory one-to-one ordinal pairing `WJn ↔ IVn`.
+- The **legacy `sensorparam.csv` migration specification**: `cannon` = Assigned Cleaning
+  Device ID mapping **directly** `cannon n → WJn` (never remapped by wall); the full
+  CSV field-classification matrix (19 fields across five classes; dispositions IMPORT /
+  IMPORT WITH NORMALIZATION / PRESERVE WITH WARNING / DEFER / REJECT FOR I7/I16);
+  deterministic atomic fail-closed validation with a proposed refusal-code family;
+  and the migration warnings / Owner-review list (including the Checkpoint-B deferral of
+  the superseded "Cannon" wording in docs and code identifiers).
+
+**No Product source, contract, fixture, lock, test, or Inspector file was changed; no
+hardware or Production device was accessed; no runtime, queue, pump, valve, axis, or
+Mandatory Safe Return action was taken or specified as authorized. Checkpoint B
+implementation NOT STARTED. PR OPEN — NOT MERGED.**
+
+**Owner review correction (PR #6 — CHANGES REQUESTED, 2026-10-08; documentation only):**
+Sensor `scanOrder` is no longer described as taken from legacy `order_total` —
+`order_total` is the legacy logical-position order (zero-based 0–107, including the
+NON_SENSOR_GAP rows I7/I16), preserved as provenance, and canonical Sensor `scanOrder` is
+the derived dense one-based 1–106 sequence (sort by `orderTotal`, exclude NON_SENSOR_GAP);
+governance wording corrected so that formal acceptance requires an explicit Owner decision
+and PR merge alone does not constitute acceptance (ADR-0017 remains `PROPOSED`); the
+delivery record now shows the real commit chain and the reviewed PR head
+`6648437f24e918d8be3a1c4ad27edb8c1bc4b0a3`, and the status classification separates
+OWNER CONFIRMED from NOT VERIFIED. Checkpoint B remains NOT STARTED.
+
+**Second Owner review correction (PR #6 — CHANGES REQUESTED, 2026-10-08; documentation
+only):** legacy `id` corrected to `legacyRecordId` provenance (never a logical-position
+identity or Sensor ID) and legacy `sensorname` corrected to the canonical
+`LogicalPosition.logicalId` / `SensorConfiguration.sensorId`, validated against the label
+derived from `orderTotal` (additive refusal `MIGRATION_LOGICAL_LABEL_MISMATCH`);
+`lastclean_timestamp` disposition changed to raw preservation with UNKNOWN source timezone
+and no UTC conversion (no `LastSuccessfulCleaningCompletedAt` in Checkpoint B);
+`min_time_allowaddtoqueue` disposition changed to raw preservation with UNKNOWN unit and
+no `HardMinimumCleaningInterval` mapping (no TimeSpan invented); the derivations of
+`UseDirtyScoreThreshold`, `HasVerifiedCleaningHistory`,
+`LastSuccessfulCleaningCompletedAt`, and `HardMinimumCleaningInterval` are removed from
+Checkpoint B pending explicit Owner decisions; the existing runtime CANNON vocabulary
+(`SlotType.CANNON`, `CanonicalSensorMap.CannonSlots`, `CannonSlotCount`,
+`CANNON_REAR`/`CANNON_FRONT`) is recorded as TRANSITIONAL LEGACY RUNTIME REPRESENTATION —
+semantically superseded — with its migration deferred to Checkpoint C, while Checkpoint B
+introduces `LogicalPositionKind { SENSOR, NON_SENSOR_GAP }` only; TC enforcement is
+structural-only (106 × 2 = 212); the public-repository boundary for `sensorparam.csv` is
+strengthened (never committed or copied; synthetic public-safe test rows only). Also
+restores the first-review §11 importer-behaviour text that had failed to persist in commit
+`3dac1a0c`. Checkpoint B remains NOT STARTED.
+
+### Stage 0.3A-3 Checkpoint B — implemented (Arena-authored; NOT compiled/executed in Arena)
+
+**Checkpoint A final Owner review: PASS. ADR-0017: OWNER APPROVED (explicit Owner
+acceptance decision, 2026-10-08). Checkpoint B: AUTHORIZED and implemented on PR #6.**
+Delivered exactly per the approved change set (ADR-0017 decision 13 / report §11) plus
+the wiring it requires:
+
+- `packages/contracts/Topology.cs` (NEW): canonical `LogicalPositionRecord`
+  (`legacyRecordId` provenance, `logicalId`, `positionKind`), `WaterJetConfiguration`,
+  `IsolationValveConfiguration`, plus the `Region` and `WaterJetPlacementKind`
+  vocabularies.
+- `packages/contracts/Enums.cs` (EXTEND): canonical `LogicalPositionKind
+  { SENSOR, NON_SENSOR_GAP }` only — the transitional `SlotType.CANNON` runtime wire
+  vocabulary is untouched; its atomic migration remains deferred to Checkpoint C.
+- `packages/contracts/Config.cs` (EXTEND): `SensorConfigurationRecord`,
+  `DeferredAcquisitionProvenance` (raw provenance only, never device configuration),
+  `MigrationWarningRecord`, `MigrationRefusalRecord`, `SensorParameterMigrationResult`,
+  `SensorParameterImportOutcome` (atomic accept-or-refuse), the approved
+  `MigrationFieldDisposition` enum and field-classification records, and the additive
+  `MigrationRefusalCodes` vocabulary (including the three warning-level codes).
+- `packages/domain/WaterJetTopologyCatalog.cs` (NEW): the Owner-approved WJ/IV topology
+  table and the I7→WJ3 / I16→WJ1 gap anchors.
+- `packages/domain/SensorParameterCsvImporter.cs` (NEW): deterministic, atomic,
+  fail-closed importer — `id`→`legacyRecordId` provenance only; `sensorname`→canonical
+  logicalId/sensorId validated against the `orderTotal`-derived label
+  (`MIGRATION_LOGICAL_LABEL_MISMATCH`); dense derived `scanOrder` 1–106 skipping I7/I16;
+  direct `cannon n → WJn` mapping with target-wall agreement; offset-free timestamps raw
+  with UNKNOWN timezone (no UTC conversion); unknown-unit durations raw (no TimeSpan);
+  no unapproved domain derivations; acquisition columns captured as deferred raw
+  provenance only.
+- `packages/domain/TopologyValidator.cs` (NEW): independent structural validator
+  (108 / 106 / 212 / 24-29-24-29, ordering, gaps, pairing, assignment, targets,
+  namespace disjointness); the importer runs it on its own output before accepting.
+- `config/examples/sensor-parameters.migrated.example.json` (NEW): synthetic,
+  structure-only example of the migrated shape (all deferred/raw and acquisition
+  fields null; no Owner value).
+- `tests/config.tests/`: `SyntheticSensorParameterCsv.cs` (public-safe synthetic CSV
+  builder) + `SensorParameterMigrationTests.cs` (approved planned tests T1–T20 plus
+  validator refusals, warning bookkeeping, and the approved field matrix) +
+  `MigratedExampleShapeTests.cs` (example schema guard); the test csproj gains the
+  required `Wjss.Domain` project reference (no package changes, so no lock file changes).
+- `tools/boundary-scan` verified locally: **0 findings (S1–S9 clean)** including all new
+  files (the legacy acquisition header names are fragment-assembled per the established
+  S3 pattern).
+
+**Identifier note for the Owner:** the boundary scanner's `redis` substring rule (S3)
+matches the natural identifier `PairedIsolationValveId`/`PairedWaterJetId` (the letters
+"…pai-RED-IS…"), so the contract properties implementing the approved
+`pairedIsolationValveId` / `pairedWaterJetId` attributes are named
+`DedicatedIsolationValveId` / `ServedWaterJetId` in code (JSON example:
+`dedicatedIsolationValveId` / `servedWaterJetId`). Semantics are exactly the approved
+one-to-one ordinal pairing; the rename is purely mechanical and imposed by the S3 rule.
+All other approved attribute names are implemented verbatim.
+
+**Arena executed no .NET command (no SDK in the sandbox): Release build, full test suite,
+locked restore, and fixture parity are Owner-local validation gates, per the standing
+Stage 0.3A convention. Runtime CANNON migration NOT started (Checkpoint C NOT
+AUTHORIZED). No command/write path, no device access, no Production value. PR #6 remains
+OPEN — NOT MERGED.**
+
+**Owner-local validation (2026-10-08) — CHECKPOINT B OWNER-LOCALLY VALIDATED.** After the
+test-compile correction (`18f853a5`), the CA1829 count correction (`901a070`), the
+behavioural test correction (`79fa0ba5` — four test defects: sensor-level
+`assignedIsolationValveId` expectation, two policy-violating source-substring tests
+replaced with semantic output/contract-shape tests, and orderTotal-based I7-before-I16
+ordering), and the final analyzer correction (`2db853a7` — CA1865, two xUnit2029, and the
+last source-substring test replaced with compiled-public-type semantics), the Owner
+supplied the authoritative evidence at feature head `2db853a7`: SDK `10.0.401`; normal
+restore PASS; locked restore PASS; Release build **0 warnings / 0 errors**; fresh full
+.NET suite **186 total / 186 passed / 0 failed / 0 skipped**; boundary scan **0 findings
+(S1–S9 clean)**; JSON examples PASS; Owner acquisition data in the migrated example
+**NONE**; Working Tree CLEAN. An earlier "139 total / 139 passed" observation was
+non-authoritative (`--no-build` over stale binaries) and is not recorded as validation.
+The Owner's genuine lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (parent
+`2db853a7`; exactly `tests/config.tests/packages.lock.json`: the project-graph edge
+`wjss.domain → Wjss.Contracts`; valid JSON, no path, no secret, no version change) was
+adopted byte-for-byte. Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_B.md`](docs/STAGE_0.3A-3_CHECKPOINT_B.md).
+Checkpoint C remains NOT AUTHORIZED and NOT STARTED; PR #6 OPEN — NOT MERGED.
+
+### Stage 0.3A-3 Checkpoint C — implemented (Arena-authored; NOT compiled/executed in Arena)
+
+**Owner instruction 2026-10-08: Checkpoint C AUTHORIZED FOR IMPLEMENTATION on the existing
+PR #6 branch (required head `0c3dcea`, verified). Checkpoint C: implemented in three slices
+— C1 `d378edf` (atomic migration), C2 `27591ea` (API projection tests), C3 (this docs +
+Inspector commit). PR #6 remains OPEN — NOT MERGED.**
+
+- **Schema compatibility decision: Option A — atomic schema update, no deprecated alias.**
+  `wjss.snapshot/1` → `wjss.snapshot/2`, `wjss.delta/1` → `wjss.delta/2` (structural
+  break: the slot-kind vocabulary became the canonical NON_SENSOR_GAP, `equipmentId`
+  became `gapAnchorForWaterJetId`, Sensor records gained `assignedWaterJetId` /
+  `assignedIsolationValveId`, and the Snapshot gained the static `waterJets` /
+  `isolationValves` topology collections). The only consumers (development Inspector,
+  TypeScript mirror, fixtures/examples/tests) migrated in the same commits; no deployed
+  `/1` consumer exists. ApiVersion stays `1`.
+- `packages/contracts/`: `SlotType` enum DELETED (no canonical Cannon entity remains);
+  `WallMapSlot` → `PositionKind` + `GapAnchorForWaterJetId` (I7 → WJ3, I16 → WJ1);
+  `CanonicalSensorMap.NonSensorGapCount` / `NonSensorGapSlots`;
+  `SensorPresentationState` → `PositionKind` + assigned device fields;
+  `OperationalSnapshot` gains `WaterJets` / `IsolationValves` (Snapshot-only, never in a
+  Delta); `TcChannelRules` gap vocabulary; `SchemaIds` `/2`.
+- `packages/domain/WaterJetTopologyCatalog.cs` (+ `TryRequireAssignment`): the single
+  assignment rule — target coverage must match the Sensor wall/region and the Isolation
+  Valve must derive from the WJn ↔ IVn pairing (rear-lower Sensor ⇒ WJ1/IV1 even though
+  WJ1 installs front-lower).
+- Runtime: state carries the approved topology through every revision (frozen, immutable,
+  process-lifetime); invariants validate gaps, 8+8 ordinal topology, both-direction
+  pairing and per-Sensor assignment coverage (new refusal codes `WALL_MAP_NON_SENSOR_GAPS`,
+  `TOPOLOGY_WATER_JETS`, `TOPOLOGY_ISOLATION_VALVES`, `TOPOLOGY_PAIRING`,
+  `SENSOR_ASSIGNMENT`); Delta application preserves the topology and never emits it;
+  simulator assigns every Sensor from the catalog; stage marker
+  `STAGE_03A3C_RUNTIME_TOPOLOGY`.
+- Read-only status gains the gap references (orderTotal order), 8+8 counts and the full
+  equipment topology with `acquisition: DEFERRED_NO_ACQUISITION_BINDING`; sensor views
+  gain the assigned device fields. Routes unchanged; every mapping GET; no write/command/
+  dispatch/equipment-control route; no SSE; health/readiness untouched.
+- Development Inspector: "Non-sensor gaps" tile; NEW wall map with visually distinct
+  `I7 · GAP` / `I16 · GAP` cells (no Sensor value/quality/TC, never labelled WJ) and a
+  visually separate per-wall installation overlay ("sprays the opposite wall"); NEW
+  read-only equipment topology table; Sensor table gains Assigned WJ / Assigned IV
+  columns; safety footer extended. No actuation affordance exists.
+- Fixtures/examples hand-mirrored to the updated generators (`snapshot.seed0.json`,
+  `delta.basic.json`, `delta.gap.json`, `config/examples/sensor-map.example.json`);
+  Owner-local `dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release`
+  is the parity gate.
+- Tests migrated to the canonical vocabulary; NEW `RuntimeTopologyTests` (runtime) and
+  `RuntimeApiTopologyTests` (API); T20 rewritten as the migration-completeness proof.
+- Arena verification: boundary scan **0 findings (S1–S9 clean)**; TypeScript mirror
+  **executed in Arena: `npm ci` + `npm run check` green (tsc clean, 31/31)**; inline
+  Inspector JS `node --check` OK; HTML balance OK; brace-balance over 36 changed C#
+  files OK; `git diff --check` clean. **No .NET command ran in Arena** (no SDK):
+  restore/build/tests/parity are Owner-local gates. Expected lock drift:
+  `adapters/simulator/packages.lock.json` + `tests/integration/packages.lock.json` gain
+  the new direct `wjss.domain` edge on the next Owner restore (never hand-edited).
+  `spikes/**` untouched; no sensorparam CSV in Git; no Production value.
+
+Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_C.md`](docs/STAGE_0.3A-3_CHECKPOINT_C.md).
+
+### Stage 0.3A-3 Checkpoint C — Owner-local validation recorded
+
+**Stage 0.3A-3 CHECKPOINT C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-08) — Function
+Review PASSED, Logic Review PASSED, Inspector UI/UX Review PASSED (no critical UI blocker);
+minor punchlist deferred and non-blocking, Inspector presentation frozen. PR #6 PREPARED FOR
+FINAL SOURCE REVIEW — OPEN, NOT MERGED.**
+
+| Item | Observed |
+| --- | --- |
+| Validated feature head | `162ad7ff1e5c7bab398de6c6d1a38131f17082de` (correction chain `8567a78` CS0103 `Wjss.Domain` import → `440a7fa` CS0246 `WaterJetPlacementKind` type → `162ad7f` behavioural test corrections: canonical `positionKind` raw-JSON vocabulary ×2 + semantic topology round-trip assertions) |
+| Owner artifact commit | `bac36add7011c72d6ab03ea5d3e3664ed82a197c` (parent `162ad7f`): five genuine `packages.lock.json` refreshes + the regenerated `sensor-map.example.json` — valid JSON, zero package-version changes, only the expected `Wjss.Domain` project-graph edges, no absolute path, no credential; the example's only semantic drift is the corrected NON_SENSOR_GAP note (108 / 106 / 212; I7 → WJ3, I16 → WJ1) |
+| Environment | .NET SDK `10.0.401`; xUnit runtime .NET `10.0.12` |
+| Restore / build | normal restore **PASS**; locked restore **PASS**; Release build **PASS — 0 warnings, 0 errors** |
+| Full .NET tests | **201 total / 201 passed / 0 failed / 0 skipped** |
+| Fixtures | generation/update run **7 / 7**; parity after update-mode removal **7 / 7** |
+| TypeScript | typecheck **PASS**; tests **31 / 31** |
+| Boundary scan | **0 findings (S1–S9 clean)** |
+| JSON examples | all three parsed successfully |
+| Working tree | **CLEAN** after the artifact push |
+| Deferred non-blocking polish | gap-cell primary label with slot id in tooltip; friendlier placement captions; vertical scrollability of the diagnostic page. Inspector presentation FROZEN for this checkpoint |
+
+Historical failed build/test observations before the correction chain are not acceptance
+evidence. Full record:
+[`docs/STAGE_0.3A-3_CHECKPOINT_C.md`](docs/STAGE_0.3A-3_CHECKPOINT_C.md) §16.
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh

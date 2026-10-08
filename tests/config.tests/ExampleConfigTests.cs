@@ -46,7 +46,7 @@ public sealed class ExampleConfigTests
     }
 
     [Fact]
-    public void Sensor_Map_Example_Matches_Canonical_Counts_And_Excludes_Cannons_From_Sensors()
+    public void Sensor_Map_Example_Matches_Canonical_Counts_And_Excludes_Gap_Positions_From_Sensors()
     {
         var path = Path.Combine(RepoRoot()!, "config", "examples", "sensor-map.example.json");
         var node = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
@@ -55,27 +55,27 @@ public sealed class ExampleConfigTests
         var slots = matrix["slots"]!.AsArray();
         Assert.Equal(108, slots.Count);
 
-        var sensors = slots.Where(s => (string?)s!["slotType"] == "SENSOR").ToArray();
-        var cannons = slots.Where(s => (string?)s!["slotType"] == "CANNON").ToArray();
+        var sensors = slots.Where(s => (string?)s!["positionKind"] == "SENSOR").ToArray();
+        var nonSensorGaps = slots.Where(s => (string?)s!["positionKind"] == "NON_SENSOR_GAP").ToArray();
         Assert.Equal(106, sensors.Length);
-        Assert.Equal(2, cannons.Length);
+        Assert.Equal(2, nonSensorGaps.Length);
 
-        foreach (var cannon in cannons)
+        foreach (var gap in nonSensorGaps)
         {
-            Assert.Null(cannon!["sensorId"]);
-            Assert.NotNull(cannon["equipmentId"]);
+            Assert.Null(gap!["sensorId"]);
+            Assert.NotNull(gap["gapAnchorForWaterJetId"]);
         }
 
         foreach (var sensor in sensors)
         {
-            Assert.Null(sensor!["equipmentId"]);
+            Assert.Null(sensor!["gapAnchorForWaterJetId"]);
             Assert.NotNull(sensor["sensorId"]);
         }
 
         var ids = sensors.Select(s => (string?)s!["sensorId"]).ToArray();
         Assert.Equal(ids.Length, ids.Distinct().Count());
-        Assert.DoesNotContain("CANNON_REAR", ids);
-        Assert.DoesNotContain("CANNON_FRONT", ids);
+        Assert.DoesNotContain("I7", ids);
+        Assert.DoesNotContain("I16", ids);
 
         // tcChannels STRUCTURE (round 6b): every SENSOR slot exposes a JsonArray of exactly
         // two non-empty string items, distinct within the pair; scalar (comma-delimited)
@@ -108,23 +108,23 @@ public sealed class ExampleConfigTests
         var allChannels = channelPairs.SelectMany(pair => pair).ToArray();
         Assert.Equal(212, allChannels.Length);             // exactly 2 channels for each of the 106 sensors
         Assert.Equal(212, allChannels.Distinct().Count()); // globally unique across the machine
-        foreach (var cannon in cannons)
+        foreach (var gap in nonSensorGaps)
         {
-            Assert.Null(cannon!["tcChannels"]); // cannon slots never carry the key at all
+            Assert.Null(gap!["tcChannels"]); // NON_SENSOR_GAP slots never carry the key at all
         }
 
         // canonical totals re-verified through the typed contract record: a scalar string
         // could not even deserialize into the array property (TcChannelRules rejects every
-        // other invalid shape: lengths 0/1/3, blanks, duplicates, cannon channels)
+        // other invalid shape: lengths 0/1/3, blanks, duplicates, NON_SENSOR_GAP channels)
         var slotRecords = slots
             .Select(s => JsonSerializer.Deserialize<SensorMapSlotExample>(s!.ToJsonString(), ContractJson.Options)!)
             .ToArray();
-        TcChannelRules.RequireValidMapping(slotRecords); // 108 slots / 106 sensors / 2 cannons / 212 distinct channels
-        Assert.All(slotRecords.Where(r => r.IsCannon), r => Assert.Null(r.TcChannels));
+        TcChannelRules.RequireValidMapping(slotRecords); // 108 slots / 106 sensors / 2 gaps / 212 distinct channels
+        Assert.All(slotRecords.Where(r => r.IsNonSensorGap), r => Assert.Null(r.TcChannels));
         foreach (var wall in new[] { Wall.LEFT, Wall.REAR, Wall.RIGHT, Wall.FRONT })
         {
             var expected = wall == Wall.LEFT || wall == Wall.RIGHT ? 24 : 29;
-            Assert.Equal(expected, slotRecords.Count(r => r.Wall == wall && !r.IsCannon));
+            Assert.Equal(expected, slotRecords.Count(r => r.Wall == wall && !r.IsNonSensorGap));
         }
     }
 

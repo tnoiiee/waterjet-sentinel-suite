@@ -1,7 +1,7 @@
 {
   "fixtureStatus": "PROVISIONAL STRUCTURAL FIXTURE - OWNER-LOCAL .NET GENERATION REQUIRED",
   "kind": "delta",
-  "schema": "wjss.delta/1",
+  "schema": "wjss.delta/2",
   "apiVersion": 1,
   "previousRevision": 10,
   "revision": 11,
@@ -9,7 +9,7 @@
   "sensors": [
     {
       "sensorId": "G\u002B201",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 1,
@@ -17,6 +17,8 @@
       "wallRow": 1,
       "scanOrder": 1,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-01:CH00",
       "tcRearChannel": "SYN-TC-01:CH01",
       "dirtyScore": 37.5,
@@ -34,7 +36,7 @@
     },
     {
       "sensorId": "G\u002B202",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 1,
@@ -42,6 +44,8 @@
       "wallRow": 1,
       "scanOrder": 2,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-01:CH02",
       "tcRearChannel": "SYN-TC-01:CH03",
       "dirtyScore": 74.5,

@@ -22,3 +22,12 @@ Since the 2026-10-07 closeout these files are the .NET generator's own output
 (`tests/integration/ExampleFiles.cs`, transferred via the Owner handoff) — the
 sensor-map example's `tcChannels` is the exact two-entry array contract of
 ADR-0014 decision 8, and TypeScript validation of the shape passes 24/24.
+
+Stage 0.3A-3 Checkpoint B adds `sensor-parameters.migrated.example.json`: the
+canonical shape of the migrated legacy sensor parameters (ADR-0017) — 108
+logical positions (I7/I16 as NON_SENSOR_GAP anchors), 106 Sensor
+configurations with dense scanOrder 1–106, the WJ1–WJ8 / IV1–IV8 paired
+topology, and an empty warnings array. Every value is synthetic; the deferred
+raw fields and the acquisition-binding provenance are null; the Owner CSV
+itself and every real acquisition value never enter Git. The related
+publication/validation pipeline remains Stage 0.3A-F content.

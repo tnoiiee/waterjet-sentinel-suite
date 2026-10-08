@@ -1,4 +1,5 @@
 using Wjss.Contracts;
+using Wjss.Domain;
 
 namespace Wjss.Runtime.Core;
 
@@ -152,7 +153,7 @@ public static class RuntimeStateInvariants
         var seenSlotIds = new HashSet<string>(StringComparer.Ordinal);
         var seenSensorIds = new HashSet<string>(StringComparer.Ordinal);
         var sensorSlots = 0;
-        var cannonSlots = 0;
+        var nonSensorGapSlots = 0;
 
         for (var index = 0; index < wallMap.Count; index++)
         {
@@ -201,36 +202,36 @@ public static class RuntimeStateInvariants
                     out detail);
             }
 
-            if (slot.SlotType == SlotType.SENSOR)
+            if (slot.PositionKind == LogicalPositionKind.SENSOR)
             {
                 sensorSlots++;
                 var expectedSensorId = CanonicalSensorMap.SensorIdFor(expectedRow, expectedColumn);
-                if (slot.EquipmentId is not null
+                if (slot.GapAnchorForWaterJetId is not null
                     || !string.Equals(slot.SensorId, expectedSensorId, StringComparison.Ordinal)
                     || !seenSensorIds.Add(expectedSensorId))
                 {
                     return Refuse(
                         RuntimeRefusalCodes.WallMapSensorBinding,
                         $"Sensor slot '{slot.SlotId}' must carry the unique canonical Sensor identity "
-                        + $"'{expectedSensorId}' and no equipment identity; got Sensor '{slot.SensorId ?? "<none>"}' "
-                        + $"and equipment '{slot.EquipmentId ?? "<none>"}'.",
+                        + $"'{expectedSensorId}' and no gap-anchor identity; got Sensor '{slot.SensorId ?? "<none>"}' "
+                        + $"and gap anchor '{slot.GapAnchorForWaterJetId ?? "<none>"}'.",
                         out reasonCode,
                         out detail);
                 }
             }
-            else if (slot.SlotType == SlotType.CANNON)
+            else if (slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
             {
-                cannonSlots++;
-                var expectedEquipmentId = ExpectedCannonEquipmentId(expectedRow, expectedColumn);
-                if (expectedEquipmentId is null
-                    || !string.Equals(slot.EquipmentId, expectedEquipmentId, StringComparison.Ordinal)
+                nonSensorGapSlots++;
+                var expectedAnchor = ExpectedGapAnchor(expectedRow, expectedColumn);
+                if (expectedAnchor is null
+                    || !string.Equals(slot.GapAnchorForWaterJetId, expectedAnchor, StringComparison.Ordinal)
                     || slot.SensorId is not null)
                 {
                     return Refuse(
-                        RuntimeRefusalCodes.WallMapCannonSlots,
-                        $"A Cannon equipment slot is valid only at logical I7 (row 5, column 7) and I16 "
-                        + $"(row 5, column 16); slot '{slot.SlotId}' is at row {expectedRow}, column {expectedColumn} "
-                        + $"and carries equipment '{slot.EquipmentId ?? "<none>"}'.",
+                        RuntimeRefusalCodes.WallMapNonSensorGaps,
+                        $"A NON_SENSOR_GAP slot is valid only at logical I7 (row 5, column 7, anchoring WJ3) and I16 "
+                        + $"(row 5, column 16, anchoring WJ1); slot '{slot.SlotId}' is at row {expectedRow}, column {expectedColumn} "
+                        + $"and carries anchor '{slot.GapAnchorForWaterJetId ?? "<none>"}'.",
                         out reasonCode,
                         out detail);
                 }
@@ -239,7 +240,7 @@ public static class RuntimeStateInvariants
             {
                 return Refuse(
                     RuntimeRefusalCodes.WallMapSlotIdentity,
-                    $"Slot '{slot.SlotId}' declares unsupported slot type '{slot.SlotType}'.",
+                    $"Slot '{slot.SlotId}' declares unsupported position kind '{slot.PositionKind}'.",
                     out reasonCode,
                     out detail);
             }
@@ -254,11 +255,11 @@ public static class RuntimeStateInvariants
                 out detail);
         }
 
-        if (cannonSlots != CanonicalSensorMap.CannonSlotCount)
+        if (nonSensorGapSlots != CanonicalSensorMap.NonSensorGapCount)
         {
             return Refuse(
-                RuntimeRefusalCodes.WallMapCannonSlots,
-                $"The wall map must hold exactly {CanonicalSensorMap.CannonSlotCount} Cannon slots; got {cannonSlots}.",
+                RuntimeRefusalCodes.WallMapNonSensorGaps,
+                $"The wall map must hold exactly {CanonicalSensorMap.NonSensorGapCount} NON_SENSOR_GAP slots; got {nonSensorGapSlots}.",
                 out reasonCode,
                 out detail);
         }
@@ -266,13 +267,13 @@ public static class RuntimeStateInvariants
         return true;
     }
 
-    private static string? ExpectedCannonEquipmentId(int row, int column)
+    private static string? ExpectedGapAnchor(int row, int column)
     {
-        foreach (var (equipmentId, cannonRow, cannonColumn) in CanonicalSensorMap.CannonSlots)
+        foreach (var (_, anchorWaterJetId, gapRow, gapColumn) in CanonicalSensorMap.NonSensorGapSlots)
         {
-            if (cannonRow == row && cannonColumn == column)
+            if (gapRow == row && gapColumn == column)
             {
-                return equipmentId;
+                return anchorWaterJetId;
             }
         }
 
@@ -305,7 +306,7 @@ public static class RuntimeStateInvariants
         var scanSlots = new List<WallMapSlot>(CanonicalSensorMap.SensorLocations);
         for (var index = 0; index < wallMap.Count; index++)
         {
-            if (wallMap[index].SlotType == SlotType.SENSOR)
+            if (wallMap[index].PositionKind == LogicalPositionKind.SENSOR)
             {
                 scanSlots.Add(wallMap[index]);
             }
@@ -350,7 +351,8 @@ public static class RuntimeStateInvariants
             }
 
             var slot = scanSlots[index];
-            if (sensor.SlotType != SlotType.SENSOR
+            var region = WaterJetTopologyCatalog.RegionForLogicalRow(sensor.LogicalRow);
+            if (sensor.PositionKind != LogicalPositionKind.SENSOR
                 || !string.Equals(sensor.SensorId, slot.SensorId, StringComparison.Ordinal)
                 || sensor.Wall != slot.Wall
                 || sensor.LogicalRow != slot.LogicalRow
@@ -363,6 +365,17 @@ public static class RuntimeStateInvariants
                     RuntimeRefusalCodes.SensorIdentity,
                     $"Sensor '{sensor.SensorId}' (ScanOrder {sensor.ScanOrder}) does not match its canonical wall-map "
                     + $"slot '{slot.SlotId}' and device identity.",
+                    out reasonCode,
+                    out detail);
+            }
+
+            if (!WaterJetTopologyCatalog.TryRequireAssignment(sensor.SensorId, sensor.Wall, region, sensor.AssignedWaterJetId, sensor.AssignedIsolationValveId))
+            {
+                return Refuse(
+                    RuntimeRefusalCodes.SensorAssignment,
+                    $"Sensor '{sensor.SensorId}' (ScanOrder {sensor.ScanOrder}) is not covered by its assigned topology: "
+                    + $"water jet '{sensor.AssignedWaterJetId}' with isolation valve '{sensor.AssignedIsolationValveId}' "
+                    + $"must target wall {sensor.Wall} region {region}.",
                     out reasonCode,
                     out detail);
             }

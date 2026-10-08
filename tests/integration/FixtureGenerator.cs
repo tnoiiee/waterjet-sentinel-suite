@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Wjss.Contracts;
+using Wjss.Domain;
 
 namespace Wjss.FixtureEmission.Tests;
 
@@ -61,7 +62,7 @@ internal static class FixtureGenerator
         {
             for (var col = 1; col <= CanonicalSensorMap.LogicalColumnCount; col++)
             {
-                if (CanonicalSensorMap.CannonSlots.Any(c => c.Row == row && c.Column == col))
+                if (CanonicalSensorMap.NonSensorGapSlots.Any(c => c.Row == row && c.Column == col))
                 {
                     continue;
                 }
@@ -88,18 +89,18 @@ internal static class FixtureGenerator
             {
                 var wall = CanonicalSensorMap.WallForColumn(col);
                 var (first, _) = CanonicalSensorMap.WallColumns[wall];
-                var cannon = CanonicalSensorMap.CannonSlots.FirstOrDefault(c => c.Row == row && c.Column == col);
+                var gap = CanonicalSensorMap.NonSensorGapSlots.FirstOrDefault(c => c.Row == row && c.Column == col);
                 slots.Add(new WallMapSlot
                 {
                     SlotId = $"SLOT-R{row}-C{col:D2}",
-                    SlotType = cannon.Item1 is null ? SlotType.SENSOR : SlotType.CANNON,
+                    PositionKind = gap.Item1 is null ? LogicalPositionKind.SENSOR : LogicalPositionKind.NON_SENSOR_GAP,
                     Wall = wall,
                     LogicalColumn = col,
                     LogicalRow = row,
                     WallColumn = col - first + 1,
                     WallRow = row,
-                    SensorId = cannon.Item1 is null ? CanonicalSensorMap.SensorIdFor(row, col) : null,
-                    EquipmentId = cannon.Item1,
+                    SensorId = gap.Item1 is null ? CanonicalSensorMap.SensorIdFor(row, col) : null,
+                    GapAnchorForWaterJetId = gap.Item2,
                 });
             }
         }
@@ -116,11 +117,14 @@ internal static class FixtureGenerator
         var uncertain = scanOrder % 7 == 0;
         var deviceId = DeviceIdFor(scanOrder);
         var idx = IndexOnDevice(scanOrder);
+        var region = WaterJetTopologyCatalog.RegionForLogicalRow(row);
+        var assigned = WaterJetTopologyCatalog.WaterJets.Single(w =>
+            w.TargetWall == wall && w.TargetRegion == region);
 
         return new SensorPresentationState
         {
             SensorId = CanonicalSensorMap.SensorIdFor(row, col),
-            SlotType = SlotType.SENSOR,
+            PositionKind = LogicalPositionKind.SENSOR,
             Wall = wall,
             LogicalColumn = col,
             LogicalRow = row,
@@ -128,6 +132,8 @@ internal static class FixtureGenerator
             WallRow = row,
             ScanOrder = scanOrder,
             DeviceId = deviceId,
+            AssignedWaterJetId = assigned.WaterJetId,
+            AssignedIsolationValveId = assigned.DedicatedIsolationValveId,
             TcFrontChannel = $"{deviceId}:CH{2 * idx:D2}",
             TcRearChannel = $"{deviceId}:CH{2 * idx + 1:D2}",
             DirtyScore = score,
@@ -279,6 +285,8 @@ internal static class FixtureGenerator
             DeviceProfile = DeviceProfile.SIMULATOR,
             WallMap = BuildWallMap(),
             Sensors = sensors,
+            WaterJets = WaterJetTopologyCatalog.WaterJets,
+            IsolationValves = WaterJetTopologyCatalog.IsolationValves,
             Walls = walls,
             ActiveJob = BuildActiveJob(),
             Pump = new PumpState

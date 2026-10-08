@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+    <ProjectReference Include="../../packages/domain/Wjss.Domain.csproj" />
   </ItemGroup>
 
 </Project>

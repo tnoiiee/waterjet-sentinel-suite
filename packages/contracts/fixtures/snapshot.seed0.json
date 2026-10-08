@@ -1,7 +1,7 @@
 {
   "fixtureStatus": "PROVISIONAL STRUCTURAL FIXTURE - OWNER-LOCAL .NET GENERATION REQUIRED",
   "kind": "snapshot",
-  "schema": "wjss.snapshot/1",
+  "schema": "wjss.snapshot/2",
   "apiVersion": 1,
   "revision": 10,
   "generatedAt": "2026-10-07T00:00:00.000Z",
@@ -16,1197 +16,1197 @@
   "wallMap": [
     {
       "slotId": "SLOT-R1-C01",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
       "sensorId": "G\u002B201",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C02",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
       "sensorId": "G\u002B202",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C03",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
       "sensorId": "G\u002B203",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C04",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
       "sensorId": "G\u002B204",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C05",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
       "sensorId": "G\u002B205",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C06",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
       "sensorId": "G\u002B206",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C07",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
       "sensorId": "G\u002B207",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C08",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
       "sensorId": "G\u002B208",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C09",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 1,
       "wallColumn": 5,
       "wallRow": 1,
       "sensorId": "G\u002B209",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
       "sensorId": "G\u002B210",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
       "sensorId": "G\u002B211",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
       "sensorId": "G\u002B212",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
       "sensorId": "G\u002B213",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
       "sensorId": "G\u002B214",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
       "sensorId": "G\u002B215",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
       "sensorId": "G\u002B216",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
       "sensorId": "G\u002B217",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R1-C18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 1,
       "wallColumn": 5,
       "wallRow": 1,
       "sensorId": "G\u002B218",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C01",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
       "sensorId": "G\u002B101",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C02",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
       "sensorId": "G\u002B102",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C03",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
       "sensorId": "G\u002B103",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C04",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
       "sensorId": "G\u002B104",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C05",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
       "sensorId": "G\u002B105",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C06",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
       "sensorId": "G\u002B106",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C07",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
       "sensorId": "G\u002B107",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C08",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
       "sensorId": "G\u002B108",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C09",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 2,
       "wallColumn": 5,
       "wallRow": 2,
       "sensorId": "G\u002B109",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
       "sensorId": "G\u002B110",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
       "sensorId": "G\u002B111",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
       "sensorId": "G\u002B112",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
       "sensorId": "G\u002B113",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
       "sensorId": "G\u002B114",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
       "sensorId": "G\u002B115",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
       "sensorId": "G\u002B116",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
       "sensorId": "G\u002B117",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R2-C18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 2,
       "wallColumn": 5,
       "wallRow": 2,
       "sensorId": "G\u002B118",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C01",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
       "sensorId": "G1",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C02",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
       "sensorId": "G2",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C03",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
       "sensorId": "G3",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C04",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
       "sensorId": "G4",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C05",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
       "sensorId": "G5",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C06",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
       "sensorId": "G6",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C07",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
       "sensorId": "G7",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C08",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
       "sensorId": "G8",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C09",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 3,
       "wallColumn": 5,
       "wallRow": 3,
       "sensorId": "G9",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
       "sensorId": "G10",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
       "sensorId": "G11",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
       "sensorId": "G12",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
       "sensorId": "G13",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
       "sensorId": "G14",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
       "sensorId": "G15",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
       "sensorId": "G16",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
       "sensorId": "G17",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R3-C18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 3,
       "wallColumn": 5,
       "wallRow": 3,
       "sensorId": "G18",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C01",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
       "sensorId": "H1",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C02",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
       "sensorId": "H2",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C03",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
       "sensorId": "H3",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C04",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
       "sensorId": "H4",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C05",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
       "sensorId": "H5",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C06",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
       "sensorId": "H6",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C07",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
       "sensorId": "H7",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C08",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
       "sensorId": "H8",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C09",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 4,
       "wallColumn": 5,
       "wallRow": 4,
       "sensorId": "H9",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
       "sensorId": "H10",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
       "sensorId": "H11",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
       "sensorId": "H12",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
       "sensorId": "H13",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
       "sensorId": "H14",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
       "sensorId": "H15",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
       "sensorId": "H16",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
       "sensorId": "H17",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R4-C18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 4,
       "wallColumn": 5,
       "wallRow": 4,
       "sensorId": "H18",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C01",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
       "sensorId": "I1",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C02",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
       "sensorId": "I2",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C03",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
       "sensorId": "I3",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C04",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
       "sensorId": "I4",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C05",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
       "sensorId": "I5",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C06",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
       "sensorId": "I6",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C07",
-      "slotType": "CANNON",
+      "positionKind": "NON_SENSOR_GAP",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
       "sensorId": null,
-      "equipmentId": "CANNON_REAR"
+      "gapAnchorForWaterJetId": "WJ3"
     },
     {
       "slotId": "SLOT-R5-C08",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
       "sensorId": "I8",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C09",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 5,
       "wallColumn": 5,
       "wallRow": 5,
       "sensorId": "I9",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
       "sensorId": "I10",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
       "sensorId": "I11",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
       "sensorId": "I12",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
       "sensorId": "I13",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
       "sensorId": "I14",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
       "sensorId": "I15",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C16",
-      "slotType": "CANNON",
+      "positionKind": "NON_SENSOR_GAP",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
       "sensorId": null,
-      "equipmentId": "CANNON_FRONT"
+      "gapAnchorForWaterJetId": "WJ1"
     },
     {
       "slotId": "SLOT-R5-C17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
       "sensorId": "I17",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R5-C18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 5,
       "wallColumn": 5,
       "wallRow": 5,
       "sensorId": "I18",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C01",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
       "sensorId": "J1",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C02",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
       "sensorId": "J2",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C03",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
       "sensorId": "J3",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C04",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
       "sensorId": "J4",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C05",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
       "sensorId": "J5",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C06",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
       "sensorId": "J6",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C07",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
       "sensorId": "J7",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C08",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
       "sensorId": "J8",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C09",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 6,
       "wallColumn": 5,
       "wallRow": 6,
       "sensorId": "J9",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
       "sensorId": "J10",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
       "sensorId": "J11",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
       "sensorId": "J12",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
       "sensorId": "J13",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
       "sensorId": "J14",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
       "sensorId": "J15",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
       "sensorId": "J16",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
       "sensorId": "J17",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     },
     {
       "slotId": "SLOT-R6-C18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 6,
       "wallColumn": 5,
       "wallRow": 6,
       "sensorId": "J18",
-      "equipmentId": null
+      "gapAnchorForWaterJetId": null
     }
   ],
   "sensors": [
     {
       "sensorId": "G\u002B201",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 1,
@@ -1214,6 +1214,8 @@
       "wallRow": 1,
       "scanOrder": 1,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-01:CH00",
       "tcRearChannel": "SYN-TC-01:CH01",
       "dirtyScore": 37.5,
@@ -1231,7 +1233,7 @@
     },
     {
       "sensorId": "G\u002B202",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 1,
@@ -1239,6 +1241,8 @@
       "wallRow": 1,
       "scanOrder": 2,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-01:CH02",
       "tcRearChannel": "SYN-TC-01:CH03",
       "dirtyScore": 74.5,
@@ -1256,7 +1260,7 @@
     },
     {
       "sensorId": "G\u002B203",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 1,
@@ -1264,6 +1268,8 @@
       "wallRow": 1,
       "scanOrder": 3,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-01:CH04",
       "tcRearChannel": "SYN-TC-01:CH05",
       "dirtyScore": 10.5,
@@ -1281,7 +1287,7 @@
     },
     {
       "sensorId": "G\u002B204",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 1,
@@ -1289,6 +1295,8 @@
       "wallRow": 1,
       "scanOrder": 4,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-01:CH06",
       "tcRearChannel": "SYN-TC-01:CH07",
       "dirtyScore": 47.5,
@@ -1306,7 +1314,7 @@
     },
     {
       "sensorId": "G\u002B205",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 1,
@@ -1314,6 +1322,8 @@
       "wallRow": 1,
       "scanOrder": 5,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-01:CH08",
       "tcRearChannel": "SYN-TC-01:CH09",
       "dirtyScore": 84.5,
@@ -1331,7 +1341,7 @@
     },
     {
       "sensorId": "G\u002B206",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 1,
@@ -1339,6 +1349,8 @@
       "wallRow": 1,
       "scanOrder": 6,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-01:CH10",
       "tcRearChannel": "SYN-TC-01:CH11",
       "dirtyScore": 20.5,
@@ -1356,7 +1368,7 @@
     },
     {
       "sensorId": "G\u002B207",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 1,
@@ -1364,6 +1376,8 @@
       "wallRow": 1,
       "scanOrder": 7,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-01:CH12",
       "tcRearChannel": "SYN-TC-01:CH13",
       "dirtyScore": 57.5,
@@ -1381,7 +1395,7 @@
     },
     {
       "sensorId": "G\u002B208",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 1,
@@ -1389,6 +1403,8 @@
       "wallRow": 1,
       "scanOrder": 8,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-01:CH14",
       "tcRearChannel": "SYN-TC-01:CH15",
       "dirtyScore": 94.5,
@@ -1406,7 +1422,7 @@
     },
     {
       "sensorId": "G\u002B209",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 1,
@@ -1414,6 +1430,8 @@
       "wallRow": 1,
       "scanOrder": 9,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-01:CH16",
       "tcRearChannel": "SYN-TC-01:CH17",
       "dirtyScore": 30.5,
@@ -1431,7 +1449,7 @@
     },
     {
       "sensorId": "G\u002B210",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 1,
@@ -1439,6 +1457,8 @@
       "wallRow": 1,
       "scanOrder": 10,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-01:CH18",
       "tcRearChannel": "SYN-TC-01:CH19",
       "dirtyScore": 67.5,
@@ -1456,7 +1476,7 @@
     },
     {
       "sensorId": "G\u002B211",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 1,
@@ -1464,6 +1484,8 @@
       "wallRow": 1,
       "scanOrder": 11,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-01:CH20",
       "tcRearChannel": "SYN-TC-01:CH21",
       "dirtyScore": 3.5,
@@ -1481,7 +1503,7 @@
     },
     {
       "sensorId": "G\u002B212",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 1,
@@ -1489,6 +1511,8 @@
       "wallRow": 1,
       "scanOrder": 12,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-01:CH22",
       "tcRearChannel": "SYN-TC-01:CH23",
       "dirtyScore": 40.5,
@@ -1506,7 +1530,7 @@
     },
     {
       "sensorId": "G\u002B213",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 1,
@@ -1514,6 +1538,8 @@
       "wallRow": 1,
       "scanOrder": 13,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-01:CH24",
       "tcRearChannel": "SYN-TC-01:CH25",
       "dirtyScore": 77.5,
@@ -1531,7 +1557,7 @@
     },
     {
       "sensorId": "G\u002B214",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 1,
@@ -1539,6 +1565,8 @@
       "wallRow": 1,
       "scanOrder": 14,
       "deviceId": "SYN-TC-01",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-01:CH26",
       "tcRearChannel": "SYN-TC-01:CH27",
       "dirtyScore": 13.5,
@@ -1556,7 +1584,7 @@
     },
     {
       "sensorId": "G\u002B215",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 1,
@@ -1564,6 +1592,8 @@
       "wallRow": 1,
       "scanOrder": 15,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-02:CH00",
       "tcRearChannel": "SYN-TC-02:CH01",
       "dirtyScore": 50.5,
@@ -1581,7 +1611,7 @@
     },
     {
       "sensorId": "G\u002B216",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 1,
@@ -1589,6 +1619,8 @@
       "wallRow": 1,
       "scanOrder": 16,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-02:CH02",
       "tcRearChannel": "SYN-TC-02:CH03",
       "dirtyScore": 87.5,
@@ -1606,7 +1638,7 @@
     },
     {
       "sensorId": "G\u002B217",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 1,
@@ -1614,6 +1646,8 @@
       "wallRow": 1,
       "scanOrder": 17,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-02:CH04",
       "tcRearChannel": "SYN-TC-02:CH05",
       "dirtyScore": 23.5,
@@ -1631,7 +1665,7 @@
     },
     {
       "sensorId": "G\u002B218",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 1,
@@ -1639,6 +1673,8 @@
       "wallRow": 1,
       "scanOrder": 18,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-02:CH06",
       "tcRearChannel": "SYN-TC-02:CH07",
       "dirtyScore": 60.5,
@@ -1656,7 +1692,7 @@
     },
     {
       "sensorId": "G\u002B101",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 2,
@@ -1664,6 +1700,8 @@
       "wallRow": 2,
       "scanOrder": 19,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-02:CH08",
       "tcRearChannel": "SYN-TC-02:CH09",
       "dirtyScore": 97.5,
@@ -1681,7 +1719,7 @@
     },
     {
       "sensorId": "G\u002B102",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 2,
@@ -1689,6 +1727,8 @@
       "wallRow": 2,
       "scanOrder": 20,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-02:CH10",
       "tcRearChannel": "SYN-TC-02:CH11",
       "dirtyScore": 33.5,
@@ -1706,7 +1746,7 @@
     },
     {
       "sensorId": "G\u002B103",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 2,
@@ -1714,6 +1754,8 @@
       "wallRow": 2,
       "scanOrder": 21,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-02:CH12",
       "tcRearChannel": "SYN-TC-02:CH13",
       "dirtyScore": 70.5,
@@ -1731,7 +1773,7 @@
     },
     {
       "sensorId": "G\u002B104",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 2,
@@ -1739,6 +1781,8 @@
       "wallRow": 2,
       "scanOrder": 22,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ8",
+      "assignedIsolationValveId": "IV8",
       "tcFrontChannel": "SYN-TC-02:CH14",
       "tcRearChannel": "SYN-TC-02:CH15",
       "dirtyScore": 6.5,
@@ -1756,7 +1800,7 @@
     },
     {
       "sensorId": "G\u002B105",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 2,
@@ -1764,6 +1808,8 @@
       "wallRow": 2,
       "scanOrder": 23,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-02:CH16",
       "tcRearChannel": "SYN-TC-02:CH17",
       "dirtyScore": 43.5,
@@ -1781,7 +1827,7 @@
     },
     {
       "sensorId": "G\u002B106",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 2,
@@ -1789,6 +1835,8 @@
       "wallRow": 2,
       "scanOrder": 24,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-02:CH18",
       "tcRearChannel": "SYN-TC-02:CH19",
       "dirtyScore": 80.5,
@@ -1806,7 +1854,7 @@
     },
     {
       "sensorId": "G\u002B107",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 2,
@@ -1814,6 +1862,8 @@
       "wallRow": 2,
       "scanOrder": 25,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-02:CH20",
       "tcRearChannel": "SYN-TC-02:CH21",
       "dirtyScore": 16.5,
@@ -1831,7 +1881,7 @@
     },
     {
       "sensorId": "G\u002B108",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 2,
@@ -1839,6 +1889,8 @@
       "wallRow": 2,
       "scanOrder": 26,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-02:CH22",
       "tcRearChannel": "SYN-TC-02:CH23",
       "dirtyScore": 53.5,
@@ -1856,7 +1908,7 @@
     },
     {
       "sensorId": "G\u002B109",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 2,
@@ -1864,6 +1916,8 @@
       "wallRow": 2,
       "scanOrder": 27,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ5",
+      "assignedIsolationValveId": "IV5",
       "tcFrontChannel": "SYN-TC-02:CH24",
       "tcRearChannel": "SYN-TC-02:CH25",
       "dirtyScore": 90.5,
@@ -1881,7 +1935,7 @@
     },
     {
       "sensorId": "G\u002B110",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 2,
@@ -1889,6 +1943,8 @@
       "wallRow": 2,
       "scanOrder": 28,
       "deviceId": "SYN-TC-02",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-02:CH26",
       "tcRearChannel": "SYN-TC-02:CH27",
       "dirtyScore": 26.5,
@@ -1906,7 +1962,7 @@
     },
     {
       "sensorId": "G\u002B111",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 2,
@@ -1914,6 +1970,8 @@
       "wallRow": 2,
       "scanOrder": 29,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-03:CH00",
       "tcRearChannel": "SYN-TC-03:CH01",
       "dirtyScore": 63.5,
@@ -1931,7 +1989,7 @@
     },
     {
       "sensorId": "G\u002B112",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 2,
@@ -1939,6 +1997,8 @@
       "wallRow": 2,
       "scanOrder": 30,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-03:CH02",
       "tcRearChannel": "SYN-TC-03:CH03",
       "dirtyScore": 100.5,
@@ -1956,7 +2016,7 @@
     },
     {
       "sensorId": "G\u002B113",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 2,
@@ -1964,6 +2024,8 @@
       "wallRow": 2,
       "scanOrder": 31,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ6",
+      "assignedIsolationValveId": "IV6",
       "tcFrontChannel": "SYN-TC-03:CH04",
       "tcRearChannel": "SYN-TC-03:CH05",
       "dirtyScore": 36.5,
@@ -1981,7 +2043,7 @@
     },
     {
       "sensorId": "G\u002B114",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 2,
@@ -1989,6 +2051,8 @@
       "wallRow": 2,
       "scanOrder": 32,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-03:CH06",
       "tcRearChannel": "SYN-TC-03:CH07",
       "dirtyScore": 73.5,
@@ -2006,7 +2070,7 @@
     },
     {
       "sensorId": "G\u002B115",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 2,
@@ -2014,6 +2078,8 @@
       "wallRow": 2,
       "scanOrder": 33,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-03:CH08",
       "tcRearChannel": "SYN-TC-03:CH09",
       "dirtyScore": 9.5,
@@ -2031,7 +2097,7 @@
     },
     {
       "sensorId": "G\u002B116",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 2,
@@ -2039,6 +2105,8 @@
       "wallRow": 2,
       "scanOrder": 34,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-03:CH10",
       "tcRearChannel": "SYN-TC-03:CH11",
       "dirtyScore": 46.5,
@@ -2056,7 +2124,7 @@
     },
     {
       "sensorId": "G\u002B117",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 2,
@@ -2064,6 +2132,8 @@
       "wallRow": 2,
       "scanOrder": 35,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-03:CH12",
       "tcRearChannel": "SYN-TC-03:CH13",
       "dirtyScore": 83.5,
@@ -2081,7 +2151,7 @@
     },
     {
       "sensorId": "G\u002B118",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 2,
@@ -2089,6 +2159,8 @@
       "wallRow": 2,
       "scanOrder": 36,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ7",
+      "assignedIsolationValveId": "IV7",
       "tcFrontChannel": "SYN-TC-03:CH14",
       "tcRearChannel": "SYN-TC-03:CH15",
       "dirtyScore": 19.5,
@@ -2106,7 +2178,7 @@
     },
     {
       "sensorId": "G1",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 3,
@@ -2114,6 +2186,8 @@
       "wallRow": 3,
       "scanOrder": 37,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-03:CH16",
       "tcRearChannel": "SYN-TC-03:CH17",
       "dirtyScore": 56.5,
@@ -2131,7 +2205,7 @@
     },
     {
       "sensorId": "G2",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 3,
@@ -2139,6 +2213,8 @@
       "wallRow": 3,
       "scanOrder": 38,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-03:CH18",
       "tcRearChannel": "SYN-TC-03:CH19",
       "dirtyScore": 93.5,
@@ -2156,7 +2232,7 @@
     },
     {
       "sensorId": "G3",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 3,
@@ -2164,6 +2240,8 @@
       "wallRow": 3,
       "scanOrder": 39,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-03:CH20",
       "tcRearChannel": "SYN-TC-03:CH21",
       "dirtyScore": 29.5,
@@ -2181,7 +2259,7 @@
     },
     {
       "sensorId": "G4",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 3,
@@ -2189,6 +2267,8 @@
       "wallRow": 3,
       "scanOrder": 40,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-03:CH22",
       "tcRearChannel": "SYN-TC-03:CH23",
       "dirtyScore": 66.5,
@@ -2206,7 +2286,7 @@
     },
     {
       "sensorId": "G5",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 3,
@@ -2214,6 +2294,8 @@
       "wallRow": 3,
       "scanOrder": 41,
       "deviceId": "SYN-TC-03",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-03:CH24",
       "tcRearChannel": "SYN-TC-03:CH25",
       "dirtyScore": 2.5,
@@ -2231,7 +2313,7 @@
     },
     {
       "sensorId": "G6",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 3,
@@ -2239,6 +2321,8 @@
       "wallRow": 3,
       "scanOrder": 42,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-04:CH00",
       "tcRearChannel": "SYN-TC-04:CH01",
       "dirtyScore": 39.5,
@@ -2256,7 +2340,7 @@
     },
     {
       "sensorId": "G7",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 3,
@@ -2264,6 +2348,8 @@
       "wallRow": 3,
       "scanOrder": 43,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-04:CH02",
       "tcRearChannel": "SYN-TC-04:CH03",
       "dirtyScore": 76.5,
@@ -2281,7 +2367,7 @@
     },
     {
       "sensorId": "G8",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 3,
@@ -2289,6 +2375,8 @@
       "wallRow": 3,
       "scanOrder": 44,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-04:CH04",
       "tcRearChannel": "SYN-TC-04:CH05",
       "dirtyScore": 12.5,
@@ -2306,7 +2394,7 @@
     },
     {
       "sensorId": "G9",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 3,
@@ -2314,6 +2402,8 @@
       "wallRow": 3,
       "scanOrder": 45,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-04:CH06",
       "tcRearChannel": "SYN-TC-04:CH07",
       "dirtyScore": 49.5,
@@ -2331,7 +2421,7 @@
     },
     {
       "sensorId": "G10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 3,
@@ -2339,6 +2429,8 @@
       "wallRow": 3,
       "scanOrder": 46,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-04:CH08",
       "tcRearChannel": "SYN-TC-04:CH09",
       "dirtyScore": 86.5,
@@ -2356,7 +2448,7 @@
     },
     {
       "sensorId": "G11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 3,
@@ -2364,6 +2456,8 @@
       "wallRow": 3,
       "scanOrder": 47,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-04:CH10",
       "tcRearChannel": "SYN-TC-04:CH11",
       "dirtyScore": 22.5,
@@ -2381,7 +2475,7 @@
     },
     {
       "sensorId": "G12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 3,
@@ -2389,6 +2483,8 @@
       "wallRow": 3,
       "scanOrder": 48,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-04:CH12",
       "tcRearChannel": "SYN-TC-04:CH13",
       "dirtyScore": 59.5,
@@ -2406,7 +2502,7 @@
     },
     {
       "sensorId": "G13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 3,
@@ -2414,6 +2510,8 @@
       "wallRow": 3,
       "scanOrder": 49,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-04:CH14",
       "tcRearChannel": "SYN-TC-04:CH15",
       "dirtyScore": 96.5,
@@ -2431,7 +2529,7 @@
     },
     {
       "sensorId": "G14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 3,
@@ -2439,6 +2537,8 @@
       "wallRow": 3,
       "scanOrder": 50,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-04:CH16",
       "tcRearChannel": "SYN-TC-04:CH17",
       "dirtyScore": 32.5,
@@ -2456,7 +2556,7 @@
     },
     {
       "sensorId": "G15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 3,
@@ -2464,6 +2564,8 @@
       "wallRow": 3,
       "scanOrder": 51,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-04:CH18",
       "tcRearChannel": "SYN-TC-04:CH19",
       "dirtyScore": 69.5,
@@ -2481,7 +2583,7 @@
     },
     {
       "sensorId": "G16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 3,
@@ -2489,6 +2591,8 @@
       "wallRow": 3,
       "scanOrder": 52,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-04:CH20",
       "tcRearChannel": "SYN-TC-04:CH21",
       "dirtyScore": 5.5,
@@ -2506,7 +2610,7 @@
     },
     {
       "sensorId": "G17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 3,
@@ -2514,6 +2618,8 @@
       "wallRow": 3,
       "scanOrder": 53,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-04:CH22",
       "tcRearChannel": "SYN-TC-04:CH23",
       "dirtyScore": 42.5,
@@ -2531,7 +2637,7 @@
     },
     {
       "sensorId": "G18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 3,
@@ -2539,6 +2645,8 @@
       "wallRow": 3,
       "scanOrder": 54,
       "deviceId": "SYN-TC-04",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-04:CH24",
       "tcRearChannel": "SYN-TC-04:CH25",
       "dirtyScore": 79.5,
@@ -2556,7 +2664,7 @@
     },
     {
       "sensorId": "H1",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 4,
@@ -2564,6 +2672,8 @@
       "wallRow": 4,
       "scanOrder": 55,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-05:CH00",
       "tcRearChannel": "SYN-TC-05:CH01",
       "dirtyScore": 15.5,
@@ -2581,7 +2691,7 @@
     },
     {
       "sensorId": "H2",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 4,
@@ -2589,6 +2699,8 @@
       "wallRow": 4,
       "scanOrder": 56,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-05:CH02",
       "tcRearChannel": "SYN-TC-05:CH03",
       "dirtyScore": 52.5,
@@ -2606,7 +2718,7 @@
     },
     {
       "sensorId": "H3",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 4,
@@ -2614,6 +2726,8 @@
       "wallRow": 4,
       "scanOrder": 57,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-05:CH04",
       "tcRearChannel": "SYN-TC-05:CH05",
       "dirtyScore": 89.5,
@@ -2631,7 +2745,7 @@
     },
     {
       "sensorId": "H4",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 4,
@@ -2639,6 +2753,8 @@
       "wallRow": 4,
       "scanOrder": 58,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-05:CH06",
       "tcRearChannel": "SYN-TC-05:CH07",
       "dirtyScore": 25.5,
@@ -2656,7 +2772,7 @@
     },
     {
       "sensorId": "H5",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 4,
@@ -2664,6 +2780,8 @@
       "wallRow": 4,
       "scanOrder": 59,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-05:CH08",
       "tcRearChannel": "SYN-TC-05:CH09",
       "dirtyScore": 62.5,
@@ -2681,7 +2799,7 @@
     },
     {
       "sensorId": "H6",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 4,
@@ -2689,6 +2807,8 @@
       "wallRow": 4,
       "scanOrder": 60,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-05:CH10",
       "tcRearChannel": "SYN-TC-05:CH11",
       "dirtyScore": 99.5,
@@ -2706,7 +2826,7 @@
     },
     {
       "sensorId": "H7",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 4,
@@ -2714,6 +2834,8 @@
       "wallRow": 4,
       "scanOrder": 61,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-05:CH12",
       "tcRearChannel": "SYN-TC-05:CH13",
       "dirtyScore": 35.5,
@@ -2731,7 +2853,7 @@
     },
     {
       "sensorId": "H8",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 4,
@@ -2739,6 +2861,8 @@
       "wallRow": 4,
       "scanOrder": 62,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-05:CH14",
       "tcRearChannel": "SYN-TC-05:CH15",
       "dirtyScore": 72.5,
@@ -2756,7 +2880,7 @@
     },
     {
       "sensorId": "H9",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 4,
@@ -2764,6 +2888,8 @@
       "wallRow": 4,
       "scanOrder": 63,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-05:CH16",
       "tcRearChannel": "SYN-TC-05:CH17",
       "dirtyScore": 8.5,
@@ -2781,7 +2907,7 @@
     },
     {
       "sensorId": "H10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 4,
@@ -2789,6 +2915,8 @@
       "wallRow": 4,
       "scanOrder": 64,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-05:CH18",
       "tcRearChannel": "SYN-TC-05:CH19",
       "dirtyScore": 45.5,
@@ -2806,7 +2934,7 @@
     },
     {
       "sensorId": "H11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 4,
@@ -2814,6 +2942,8 @@
       "wallRow": 4,
       "scanOrder": 65,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-05:CH20",
       "tcRearChannel": "SYN-TC-05:CH21",
       "dirtyScore": 82.5,
@@ -2831,7 +2961,7 @@
     },
     {
       "sensorId": "H12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 4,
@@ -2839,6 +2969,8 @@
       "wallRow": 4,
       "scanOrder": 66,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-05:CH22",
       "tcRearChannel": "SYN-TC-05:CH23",
       "dirtyScore": 18.5,
@@ -2856,7 +2988,7 @@
     },
     {
       "sensorId": "H13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 4,
@@ -2864,6 +2996,8 @@
       "wallRow": 4,
       "scanOrder": 67,
       "deviceId": "SYN-TC-05",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-05:CH24",
       "tcRearChannel": "SYN-TC-05:CH25",
       "dirtyScore": 55.5,
@@ -2881,7 +3015,7 @@
     },
     {
       "sensorId": "H14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 4,
@@ -2889,6 +3023,8 @@
       "wallRow": 4,
       "scanOrder": 68,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-06:CH00",
       "tcRearChannel": "SYN-TC-06:CH01",
       "dirtyScore": 92.5,
@@ -2906,7 +3042,7 @@
     },
     {
       "sensorId": "H15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 4,
@@ -2914,6 +3050,8 @@
       "wallRow": 4,
       "scanOrder": 69,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-06:CH02",
       "tcRearChannel": "SYN-TC-06:CH03",
       "dirtyScore": 28.5,
@@ -2931,7 +3069,7 @@
     },
     {
       "sensorId": "H16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 4,
@@ -2939,6 +3077,8 @@
       "wallRow": 4,
       "scanOrder": 70,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-06:CH04",
       "tcRearChannel": "SYN-TC-06:CH05",
       "dirtyScore": 65.5,
@@ -2956,7 +3096,7 @@
     },
     {
       "sensorId": "H17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 4,
@@ -2964,6 +3104,8 @@
       "wallRow": 4,
       "scanOrder": 71,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-06:CH06",
       "tcRearChannel": "SYN-TC-06:CH07",
       "dirtyScore": 1.5,
@@ -2981,7 +3123,7 @@
     },
     {
       "sensorId": "H18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 4,
@@ -2989,6 +3131,8 @@
       "wallRow": 4,
       "scanOrder": 72,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-06:CH08",
       "tcRearChannel": "SYN-TC-06:CH09",
       "dirtyScore": 38.5,
@@ -3006,7 +3150,7 @@
     },
     {
       "sensorId": "I1",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 5,
@@ -3014,6 +3158,8 @@
       "wallRow": 5,
       "scanOrder": 73,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-06:CH10",
       "tcRearChannel": "SYN-TC-06:CH11",
       "dirtyScore": 75.5,
@@ -3031,7 +3177,7 @@
     },
     {
       "sensorId": "I2",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 5,
@@ -3039,6 +3185,8 @@
       "wallRow": 5,
       "scanOrder": 74,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-06:CH12",
       "tcRearChannel": "SYN-TC-06:CH13",
       "dirtyScore": 11.5,
@@ -3056,7 +3204,7 @@
     },
     {
       "sensorId": "I3",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 5,
@@ -3064,6 +3212,8 @@
       "wallRow": 5,
       "scanOrder": 75,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-06:CH14",
       "tcRearChannel": "SYN-TC-06:CH15",
       "dirtyScore": 48.5,
@@ -3081,7 +3231,7 @@
     },
     {
       "sensorId": "I4",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 5,
@@ -3089,6 +3239,8 @@
       "wallRow": 5,
       "scanOrder": 76,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-06:CH16",
       "tcRearChannel": "SYN-TC-06:CH17",
       "dirtyScore": 85.5,
@@ -3106,7 +3258,7 @@
     },
     {
       "sensorId": "I5",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 5,
@@ -3114,6 +3266,8 @@
       "wallRow": 5,
       "scanOrder": 77,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-06:CH18",
       "tcRearChannel": "SYN-TC-06:CH19",
       "dirtyScore": 21.5,
@@ -3131,7 +3285,7 @@
     },
     {
       "sensorId": "I6",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 5,
@@ -3139,6 +3293,8 @@
       "wallRow": 5,
       "scanOrder": 78,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-06:CH20",
       "tcRearChannel": "SYN-TC-06:CH21",
       "dirtyScore": 58.5,
@@ -3156,7 +3312,7 @@
     },
     {
       "sensorId": "I8",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 5,
@@ -3164,6 +3320,8 @@
       "wallRow": 5,
       "scanOrder": 79,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-06:CH22",
       "tcRearChannel": "SYN-TC-06:CH23",
       "dirtyScore": 95.5,
@@ -3181,7 +3339,7 @@
     },
     {
       "sensorId": "I9",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 5,
@@ -3189,6 +3347,8 @@
       "wallRow": 5,
       "scanOrder": 80,
       "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-06:CH24",
       "tcRearChannel": "SYN-TC-06:CH25",
       "dirtyScore": 31.5,
@@ -3206,7 +3366,7 @@
     },
     {
       "sensorId": "I10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 5,
@@ -3214,6 +3374,8 @@
       "wallRow": 5,
       "scanOrder": 81,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-07:CH00",
       "tcRearChannel": "SYN-TC-07:CH01",
       "dirtyScore": 68.5,
@@ -3231,7 +3393,7 @@
     },
     {
       "sensorId": "I11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 5,
@@ -3239,6 +3401,8 @@
       "wallRow": 5,
       "scanOrder": 82,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-07:CH02",
       "tcRearChannel": "SYN-TC-07:CH03",
       "dirtyScore": 4.5,
@@ -3256,7 +3420,7 @@
     },
     {
       "sensorId": "I12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 5,
@@ -3264,6 +3428,8 @@
       "wallRow": 5,
       "scanOrder": 83,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-07:CH04",
       "tcRearChannel": "SYN-TC-07:CH05",
       "dirtyScore": 41.5,
@@ -3281,7 +3447,7 @@
     },
     {
       "sensorId": "I13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 5,
@@ -3289,6 +3455,8 @@
       "wallRow": 5,
       "scanOrder": 84,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-07:CH06",
       "tcRearChannel": "SYN-TC-07:CH07",
       "dirtyScore": 78.5,
@@ -3306,7 +3474,7 @@
     },
     {
       "sensorId": "I14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 5,
@@ -3314,6 +3482,8 @@
       "wallRow": 5,
       "scanOrder": 85,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-07:CH08",
       "tcRearChannel": "SYN-TC-07:CH09",
       "dirtyScore": 14.5,
@@ -3331,7 +3501,7 @@
     },
     {
       "sensorId": "I15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 5,
@@ -3339,6 +3509,8 @@
       "wallRow": 5,
       "scanOrder": 86,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-07:CH10",
       "tcRearChannel": "SYN-TC-07:CH11",
       "dirtyScore": 51.5,
@@ -3356,7 +3528,7 @@
     },
     {
       "sensorId": "I17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 5,
@@ -3364,6 +3536,8 @@
       "wallRow": 5,
       "scanOrder": 87,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-07:CH12",
       "tcRearChannel": "SYN-TC-07:CH13",
       "dirtyScore": 88.5,
@@ -3381,7 +3555,7 @@
     },
     {
       "sensorId": "I18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 5,
@@ -3389,6 +3563,8 @@
       "wallRow": 5,
       "scanOrder": 88,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-07:CH14",
       "tcRearChannel": "SYN-TC-07:CH15",
       "dirtyScore": 24.5,
@@ -3406,7 +3582,7 @@
     },
     {
       "sensorId": "J1",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 1,
       "logicalRow": 6,
@@ -3414,6 +3590,8 @@
       "wallRow": 6,
       "scanOrder": 89,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH16",
       "tcRearChannel": "SYN-TC-07:CH17",
       "dirtyScore": 61.5,
@@ -3431,7 +3609,7 @@
     },
     {
       "sensorId": "J2",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 2,
       "logicalRow": 6,
@@ -3439,6 +3617,8 @@
       "wallRow": 6,
       "scanOrder": 90,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH18",
       "tcRearChannel": "SYN-TC-07:CH19",
       "dirtyScore": 98.5,
@@ -3456,7 +3636,7 @@
     },
     {
       "sensorId": "J3",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 3,
       "logicalRow": 6,
@@ -3464,6 +3644,8 @@
       "wallRow": 6,
       "scanOrder": 91,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH20",
       "tcRearChannel": "SYN-TC-07:CH21",
       "dirtyScore": 34.5,
@@ -3481,7 +3663,7 @@
     },
     {
       "sensorId": "J4",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "LEFT",
       "logicalColumn": 4,
       "logicalRow": 6,
@@ -3489,6 +3671,8 @@
       "wallRow": 6,
       "scanOrder": 92,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ4",
+      "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH22",
       "tcRearChannel": "SYN-TC-07:CH23",
       "dirtyScore": 71.5,
@@ -3506,7 +3690,7 @@
     },
     {
       "sensorId": "J5",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 5,
       "logicalRow": 6,
@@ -3514,6 +3698,8 @@
       "wallRow": 6,
       "scanOrder": 93,
       "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-07:CH24",
       "tcRearChannel": "SYN-TC-07:CH25",
       "dirtyScore": 7.5,
@@ -3531,7 +3717,7 @@
     },
     {
       "sensorId": "J6",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 6,
       "logicalRow": 6,
@@ -3539,6 +3725,8 @@
       "wallRow": 6,
       "scanOrder": 94,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH00",
       "tcRearChannel": "SYN-TC-08:CH01",
       "dirtyScore": 44.5,
@@ -3556,7 +3744,7 @@
     },
     {
       "sensorId": "J7",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 6,
@@ -3564,6 +3752,8 @@
       "wallRow": 6,
       "scanOrder": 95,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH02",
       "tcRearChannel": "SYN-TC-08:CH03",
       "dirtyScore": 81.5,
@@ -3581,7 +3771,7 @@
     },
     {
       "sensorId": "J8",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 8,
       "logicalRow": 6,
@@ -3589,6 +3779,8 @@
       "wallRow": 6,
       "scanOrder": 96,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH04",
       "tcRearChannel": "SYN-TC-08:CH05",
       "dirtyScore": 17.5,
@@ -3606,7 +3798,7 @@
     },
     {
       "sensorId": "J9",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 9,
       "logicalRow": 6,
@@ -3614,6 +3806,8 @@
       "wallRow": 6,
       "scanOrder": 97,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH06",
       "tcRearChannel": "SYN-TC-08:CH07",
       "dirtyScore": 54.5,
@@ -3631,7 +3825,7 @@
     },
     {
       "sensorId": "J10",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 10,
       "logicalRow": 6,
@@ -3639,6 +3833,8 @@
       "wallRow": 6,
       "scanOrder": 98,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH08",
       "tcRearChannel": "SYN-TC-08:CH09",
       "dirtyScore": 91.5,
@@ -3656,7 +3852,7 @@
     },
     {
       "sensorId": "J11",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 11,
       "logicalRow": 6,
@@ -3664,6 +3860,8 @@
       "wallRow": 6,
       "scanOrder": 99,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH10",
       "tcRearChannel": "SYN-TC-08:CH11",
       "dirtyScore": 27.5,
@@ -3681,7 +3879,7 @@
     },
     {
       "sensorId": "J12",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 12,
       "logicalRow": 6,
@@ -3689,6 +3887,8 @@
       "wallRow": 6,
       "scanOrder": 100,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH12",
       "tcRearChannel": "SYN-TC-08:CH13",
       "dirtyScore": 64.5,
@@ -3706,7 +3906,7 @@
     },
     {
       "sensorId": "J13",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "RIGHT",
       "logicalColumn": 13,
       "logicalRow": 6,
@@ -3714,6 +3914,8 @@
       "wallRow": 6,
       "scanOrder": 101,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH14",
       "tcRearChannel": "SYN-TC-08:CH15",
       "dirtyScore": 0.5,
@@ -3731,7 +3933,7 @@
     },
     {
       "sensorId": "J14",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 14,
       "logicalRow": 6,
@@ -3739,6 +3941,8 @@
       "wallRow": 6,
       "scanOrder": 102,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH16",
       "tcRearChannel": "SYN-TC-08:CH17",
       "dirtyScore": 37.5,
@@ -3756,7 +3960,7 @@
     },
     {
       "sensorId": "J15",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 15,
       "logicalRow": 6,
@@ -3764,6 +3968,8 @@
       "wallRow": 6,
       "scanOrder": 103,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH18",
       "tcRearChannel": "SYN-TC-08:CH19",
       "dirtyScore": 74.5,
@@ -3781,7 +3987,7 @@
     },
     {
       "sensorId": "J16",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 6,
@@ -3789,6 +3995,8 @@
       "wallRow": 6,
       "scanOrder": 104,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH20",
       "tcRearChannel": "SYN-TC-08:CH21",
       "dirtyScore": 10.5,
@@ -3806,7 +4014,7 @@
     },
     {
       "sensorId": "J17",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 17,
       "logicalRow": 6,
@@ -3814,6 +4022,8 @@
       "wallRow": 6,
       "scanOrder": 105,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH22",
       "tcRearChannel": "SYN-TC-08:CH23",
       "dirtyScore": 47.5,
@@ -3831,7 +4041,7 @@
     },
     {
       "sensorId": "J18",
-      "slotType": "SENSOR",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 18,
       "logicalRow": 6,
@@ -3839,6 +4049,8 @@
       "wallRow": 6,
       "scanOrder": 106,
       "deviceId": "SYN-TC-08",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH24",
       "tcRearChannel": "SYN-TC-08:CH25",
       "dirtyScore": 84.5,
@@ -3853,6 +4065,148 @@
       "isActiveJobTarget": false,
       "alarmState": "NONE",
       "alarmSeverity": null
+    }
+  ],
+  "waterJets": [
+    {
+      "waterJetId": "WJ1",
+      "installedWall": "FRONT",
+      "installedRegion": "LOWER",
+      "placementKind": "NON_SENSOR_GAP",
+      "placementAnchors": [
+        "I15",
+        "I17"
+      ],
+      "targetWall": "REAR",
+      "targetRegion": "LOWER",
+      "dedicatedIsolationValveId": "IV1"
+    },
+    {
+      "waterJetId": "WJ2",
+      "installedWall": "LEFT",
+      "installedRegion": "LOWER",
+      "placementKind": "BETWEEN_HORIZONTAL",
+      "placementAnchors": [
+        "J2",
+        "J3"
+      ],
+      "targetWall": "RIGHT",
+      "targetRegion": "LOWER",
+      "dedicatedIsolationValveId": "IV2"
+    },
+    {
+      "waterJetId": "WJ3",
+      "installedWall": "REAR",
+      "installedRegion": "LOWER",
+      "placementKind": "NON_SENSOR_GAP",
+      "placementAnchors": [
+        "I6",
+        "I8"
+      ],
+      "targetWall": "FRONT",
+      "targetRegion": "LOWER",
+      "dedicatedIsolationValveId": "IV3"
+    },
+    {
+      "waterJetId": "WJ4",
+      "installedWall": "RIGHT",
+      "installedRegion": "LOWER",
+      "placementKind": "BETWEEN_HORIZONTAL",
+      "placementAnchors": [
+        "J11",
+        "J12"
+      ],
+      "targetWall": "LEFT",
+      "targetRegion": "LOWER",
+      "dedicatedIsolationValveId": "IV4"
+    },
+    {
+      "waterJetId": "WJ5",
+      "installedWall": "FRONT",
+      "installedRegion": "UPPER",
+      "placementKind": "BETWEEN_VERTICAL",
+      "placementAnchors": [
+        "G\u002B216",
+        "G\u002B116"
+      ],
+      "targetWall": "REAR",
+      "targetRegion": "UPPER",
+      "dedicatedIsolationValveId": "IV5"
+    },
+    {
+      "waterJetId": "WJ6",
+      "installedWall": "LEFT",
+      "installedRegion": "UPPER",
+      "placementKind": "JUNCTION",
+      "placementAnchors": [
+        "G\u002B102",
+        "G\u002B202",
+        "G\u002B203"
+      ],
+      "targetWall": "RIGHT",
+      "targetRegion": "UPPER",
+      "dedicatedIsolationValveId": "IV6"
+    },
+    {
+      "waterJetId": "WJ7",
+      "installedWall": "REAR",
+      "installedRegion": "UPPER",
+      "placementKind": "BETWEEN_VERTICAL",
+      "placementAnchors": [
+        "G\u002B207",
+        "G\u002B107"
+      ],
+      "targetWall": "FRONT",
+      "targetRegion": "UPPER",
+      "dedicatedIsolationValveId": "IV7"
+    },
+    {
+      "waterJetId": "WJ8",
+      "installedWall": "RIGHT",
+      "installedRegion": "UPPER",
+      "placementKind": "JUNCTION",
+      "placementAnchors": [
+        "G\u002B111",
+        "G\u002B211",
+        "G\u002B212"
+      ],
+      "targetWall": "LEFT",
+      "targetRegion": "UPPER",
+      "dedicatedIsolationValveId": "IV8"
+    }
+  ],
+  "isolationValves": [
+    {
+      "valveId": "IV1",
+      "servedWaterJetId": "WJ1"
+    },
+    {
+      "valveId": "IV2",
+      "servedWaterJetId": "WJ2"
+    },
+    {
+      "valveId": "IV3",
+      "servedWaterJetId": "WJ3"
+    },
+    {
+      "valveId": "IV4",
+      "servedWaterJetId": "WJ4"
+    },
+    {
+      "valveId": "IV5",
+      "servedWaterJetId": "WJ5"
+    },
+    {
+      "valveId": "IV6",
+      "servedWaterJetId": "WJ6"
+    },
+    {
+      "valveId": "IV7",
+      "servedWaterJetId": "WJ7"
+    },
+    {
+      "valveId": "IV8",
+      "servedWaterJetId": "WJ8"
     }
   ],
   "walls": [

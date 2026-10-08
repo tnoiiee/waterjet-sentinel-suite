@@ -37,11 +37,21 @@ public sealed record RuntimeState
     /// <summary>Published Configuration revision the Runtime is applying.</summary>
     public required PublishedConfigurationRevision Config { get; init; }
 
-    /// <summary>108 logical slots (106 SENSOR + 2 CANNON), canonical row-major order.</summary>
+    /// <summary>108 logical slots (106 SENSOR + 2 NON_SENSOR_GAP), canonical row-major order.</summary>
     public required IReadOnlyList<WallMapSlot> WallMap { get; init; }
 
     /// <summary>106 Sensor projections, ordered by ScanOrder 1..106.</summary>
     public required IReadOnlyList<SensorPresentationState> Sensors { get; init; }
+
+    /// <summary>
+    /// The approved Water Jet topology (exactly 8, WJn ↔ IVn paired). Static
+    /// configuration topology — NOT a controllable device instance; it is fixed for
+    /// the process lifetime and carried unchanged through every revision.
+    /// </summary>
+    public required IReadOnlyList<WaterJetConfiguration> WaterJets { get; init; }
+
+    /// <summary>The approved Isolation Valve topology (exactly 8). Static configuration topology, same lifetime rules as <see cref="WaterJets"/>.</summary>
+    public required IReadOnlyList<IsolationValveConfiguration> IsolationValves { get; init; }
 
     /// <summary>Four wall summaries, canonical wall order (Left, Rear, Right, Front), recalculated from the Sensors.</summary>
     public required IReadOnlyList<WallSummary> Walls { get; init; }

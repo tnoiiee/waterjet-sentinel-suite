@@ -36,7 +36,19 @@ public static class RuntimeRefusalCodes
     public const string WallMapSlotIdentity = "WALL_MAP_SLOT_IDENTITY";
 
     /// <summary>Exactly two Cannon equipment slots are required, at logical I7 and I16.</summary>
-    public const string WallMapCannonSlots = "WALL_MAP_CANNON_SLOTS";
+    public const string WallMapNonSensorGaps = "WALL_MAP_NON_SENSOR_GAPS";
+
+    /// <summary>The Snapshot topology must carry exactly 8 Water Jets in ordinal order.</summary>
+    public const string TopologyWaterJets = "TOPOLOGY_WATER_JETS";
+
+    /// <summary>The Snapshot topology must carry exactly 8 Isolation Valves in ordinal order.</summary>
+    public const string TopologyIsolationValves = "TOPOLOGY_ISOLATION_VALVES";
+
+    /// <summary>Every WJn must pair with IVn and vice versa; no other pairing exists.</summary>
+    public const string TopologyPairing = "TOPOLOGY_PAIRING";
+
+    /// <summary>A Sensor's assigned Water Jet must exist, target the Sensor's wall/region, and derive its Isolation Valve.</summary>
+    public const string SensorAssignment = "SENSOR_ASSIGNMENT";
 
     /// <summary>A Sensor slot must carry exactly the canonical Sensor identity for its position.</summary>
     public const string WallMapSensorBinding = "WALL_MAP_SENSOR_BINDING";

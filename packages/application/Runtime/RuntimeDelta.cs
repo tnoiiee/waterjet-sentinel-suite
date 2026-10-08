@@ -3,7 +3,7 @@ using Wjss.Contracts;
 namespace Wjss.Runtime.Core;
 
 /// <summary>
-/// Encoding of the three-state <c>activeJob</c> slot of <c>wjss.delta/1</c>. The
+/// Encoding of the three-state <c>activeJob</c> slot of <c>wjss.delta/2</c>. The
 /// names mirror the contract wording: an ABSENT slot leaves the consumer's Active
 /// Job untouched, a PRESENT object replaces it wholesale, and an explicit JSON
 /// null clears it. There is deliberately no separate "cleared" boolean in the
@@ -54,7 +54,7 @@ public sealed record DeltaJobState
 }
 
 /// <summary>
-/// Immutable, fully merged <c>wjss.delta/1</c> payload for one committed Runtime
+/// Immutable, fully merged <c>wjss.delta/2</c> payload for one committed Runtime
 /// revision transition.
 ///
 /// Semantics fixed by the accepted baseline and this checkpoint:

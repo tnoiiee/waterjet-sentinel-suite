@@ -1,4 +1,5 @@
 using Wjss.Contracts;
+using Wjss.Domain;
 using Wjss.Time;
 
 namespace Wjss.Adapters.Simulator;
@@ -6,8 +7,12 @@ namespace Wjss.Adapters.Simulator;
 /// <summary>
 /// The canonical synthetic Sensor map of the SIMULATOR profile, derived from the
 /// accepted logical matrix (<see cref="CanonicalSensorMap"/>): 108 logical slots
-/// arranged row-major, of which 106 are Sensor locations and 2 are Cannon
-/// equipment slots at logical I7 (Rear) and I16 (Front).
+/// arranged row-major, of which 106 are Sensor locations and 2 are NON_SENSOR_GAP
+/// placement anchors at logical I7 (anchoring WJ3) and I16 (anchoring WJ1).
+/// Every Sensor carries its assigned Water Jet and derived Isolation Valve per
+/// the approved topology (<see cref="WaterJetTopologyCatalog"/>): the legacy
+/// cleaning-device ordinal maps directly to WJn, and the assigned device may be
+/// installed on the opposite wall.
 ///
 /// The map composition is the one the committed
 /// <c>config/examples/sensor-map.example.json</c> documents: the same scan order
@@ -30,8 +35,8 @@ public static class SyntheticSensorMap
     /// <summary>106 Sensor locations (protected baseline).</summary>
     public const int SensorCount = CanonicalSensorMap.SensorLocations;
 
-    /// <summary>2 Cannon equipment slots: logical I7 and I16 (protected baseline).</summary>
-    public const int CannonCount = CanonicalSensorMap.CannonSlotCount;
+    /// <summary>2 NON_SENSOR_GAP positions: logical I7 and I16 (protected baseline).</summary>
+    public const int NonSensorGapCount = CanonicalSensorMap.NonSensorGapCount;
 
     /// <summary>212 Thermocouple channels: two per Sensor location (protected baseline).</summary>
     public const int ThermocoupleChannelCount = CanonicalSensorMap.ThermocoupleChannelCount;
@@ -57,7 +62,8 @@ public static class SyntheticSensorMap
 
     /// <summary>
     /// Builds the 108-slot wall map in canonical row-major order, with the two
-    /// Cannon equipment slots and no fabricated identity.
+    /// NON_SENSOR_GAP positions carrying their Water Jet placement anchors and no
+    /// fabricated identity.
     /// </summary>
     public static IReadOnlyList<WallMapSlot> BuildWallMap()
     {
@@ -68,19 +74,19 @@ public static class SyntheticSensorMap
             {
                 var wall = CanonicalSensorMap.WallForColumn(column);
                 var (firstColumn, _) = CanonicalSensorMap.WallColumns[wall];
-                var cannonEquipmentId = CannonEquipmentIdAt(row, column);
+                var gapAnchor = GapAnchorAt(row, column);
 
                 slots.Add(new WallMapSlot
                 {
                     SlotId = $"SLOT-R{row}-C{column:D2}",
-                    SlotType = cannonEquipmentId is null ? SlotType.SENSOR : SlotType.CANNON,
+                    PositionKind = gapAnchor is null ? LogicalPositionKind.SENSOR : LogicalPositionKind.NON_SENSOR_GAP,
                     Wall = wall,
                     LogicalColumn = column,
                     LogicalRow = row,
                     WallColumn = column - firstColumn + 1,
                     WallRow = row,
-                    SensorId = cannonEquipmentId is null ? CanonicalSensorMap.SensorIdFor(row, column) : null,
-                    EquipmentId = cannonEquipmentId,
+                    SensorId = gapAnchor is null ? CanonicalSensorMap.SensorIdFor(row, column) : null,
+                    GapAnchorForWaterJetId = gapAnchor,
                 });
             }
         }
@@ -115,10 +121,14 @@ public static class SyntheticSensorMap
             var indexOnDevice = IndexOnDevice(scanOrder);
             var score = InitialScoreFor(seed, scanOrder);
 
+            var region = WaterJetTopologyCatalog.RegionForLogicalRow(row);
+            var assigned = WaterJetTopologyCatalog.WaterJets.Single(w =>
+                w.TargetWall == wall && w.TargetRegion == region);
+
             sensors.Add(new SensorPresentationState
             {
                 SensorId = CanonicalSensorMap.SensorIdFor(row, column),
-                SlotType = SlotType.SENSOR,
+                PositionKind = LogicalPositionKind.SENSOR,
                 Wall = wall,
                 LogicalColumn = column,
                 LogicalRow = row,
@@ -126,6 +136,8 @@ public static class SyntheticSensorMap
                 WallRow = row,
                 ScanOrder = scanOrder,
                 DeviceId = deviceId,
+                AssignedWaterJetId = assigned.WaterJetId,
+                AssignedIsolationValveId = assigned.DedicatedIsolationValveId,
                 TcFrontChannel = $"{deviceId}:CH{2 * indexOnDevice:D2}",
                 TcRearChannel = $"{deviceId}:CH{2 * indexOnDevice + 1:D2}",
                 DirtyScore = score,
@@ -169,7 +181,7 @@ public static class SyntheticSensorMap
         {
             for (var column = 1; column <= CanonicalSensorMap.LogicalColumnCount; column++)
             {
-                if (CannonEquipmentIdAt(row, column) is null)
+                if (GapAnchorAt(row, column) is null)
                 {
                     positions.Add((row, column));
                 }
@@ -179,13 +191,13 @@ public static class SyntheticSensorMap
         return positions.ToArray();
     }
 
-    private static string? CannonEquipmentIdAt(int row, int column)
+    private static string? GapAnchorAt(int row, int column)
     {
-        foreach (var (equipmentId, cannonRow, cannonColumn) in CanonicalSensorMap.CannonSlots)
+        foreach (var (_, anchorWaterJetId, gapRow, gapColumn) in CanonicalSensorMap.NonSensorGapSlots)
         {
-            if (cannonRow == row && cannonColumn == column)
+            if (gapRow == row && gapColumn == column)
             {
-                return equipmentId;
+                return anchorWaterJetId;
             }
         }
 

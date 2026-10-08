@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Wjss.Adapters.Simulator;
 using Wjss.Contracts;
+using Wjss.Domain;
 using Wjss.Time;
 using Xunit;
 
@@ -43,6 +44,8 @@ internal static class RuntimeTestFixture
             config,
             SyntheticSensorMap.BuildWallMap(),
             SyntheticSensorMap.BuildInitialSensors(config, seed, instant),
+            WaterJetTopologyCatalog.WaterJets,
+            WaterJetTopologyCatalog.IsolationValves,
             instant);
     }
 

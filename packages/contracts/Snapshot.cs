@@ -28,11 +28,25 @@ public sealed record OperationalSnapshot
     /// <summary>The active device profile, displayed in the chrome (ADR-0012 no-silent-substitution).</summary>
     public required DeviceProfile DeviceProfile { get; init; }
 
-    /// <summary>108 logical slots: 106 SENSOR + 2 CANNON. Static; Snapshot-only; never in a Delta.</summary>
+    /// <summary>108 logical slots: 106 SENSOR + 2 NON_SENSOR_GAP. Static; Snapshot-only; never in a Delta.</summary>
     public required IReadOnlyList<WallMapSlot> WallMap { get; init; }
 
     /// <summary>All 106 Sensor projections, ordered by ScanOrder.</summary>
     public required IReadOnlyList<SensorPresentationState> Sensors { get; init; }
+
+    /// <summary>
+    /// The approved Water Jet topology (exactly 8: WJ1–WJ8 with installed position,
+    /// placement anchors and opposite-wall target coverage). Static configuration
+    /// topology — NOT a controllable device instance; Snapshot-only; never in a Delta.
+    /// </summary>
+    public required IReadOnlyList<WaterJetConfiguration> WaterJets { get; init; }
+
+    /// <summary>
+    /// The approved Isolation Valve topology (exactly 8: IV1–IV8, one-to-one ordinal
+    /// paired with the Water Jets). Static configuration topology — NOT a controllable
+    /// device instance; Snapshot-only; never in a Delta.
+    /// </summary>
+    public required IReadOnlyList<IsolationValveConfiguration> IsolationValves { get; init; }
 
     public required IReadOnlyList<WallSummary> Walls { get; init; }
 

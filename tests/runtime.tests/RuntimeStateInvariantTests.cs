@@ -7,8 +7,9 @@ namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
 /// Protected-baseline invariants: 108 logical slots, 106 Sensor locations, 212
-/// Thermocouple channels, Cannon slots at logical I7 and I16 only, wall counts
-/// 24 / 29 / 24 / 29, one Active Job at most, bounded queue and bounded trend.
+/// Thermocouple channels, NON_SENSOR_GAP positions at logical I7 and I16 only,
+/// wall counts 24 / 29 / 24 / 29, one Active Job at most, bounded queue and
+/// bounded trend.
 /// Each refusal is asserted through its machine reason code, not through prose.
 /// </summary>
 public sealed class RuntimeStateInvariantTests
@@ -20,7 +21,7 @@ public sealed class RuntimeStateInvariantTests
         SensorOrder,
         SensorIdentity,
         SensorChannels,
-        CannonSlotPosition,
+        NonSensorGapPosition,
         WallSummary,
         ActiveTarget,
         QueueShape,
@@ -40,7 +41,7 @@ public sealed class RuntimeStateInvariantTests
 
         var slotCount = state.WallMap.Count;
         var uniqueSlotCount = state.WallMap.Select(slot => slot.SlotId).Distinct(StringComparer.Ordinal).Count();
-        var sensorSlotCount = state.WallMap.Count(slot => slot.SlotType == SlotType.SENSOR);
+        var sensorSlotCount = state.WallMap.Count(slot => slot.PositionKind == LogicalPositionKind.SENSOR);
         var sensorProjectionCount = state.Sensors.Count;
         var channels = state.Sensors
             .SelectMany(sensor => new[] { sensor.TcFrontChannel, sensor.TcRearChannel })
@@ -57,17 +58,17 @@ public sealed class RuntimeStateInvariantTests
     }
 
     [Fact]
-    public void Cannon_Slots_Are_Logical_I7_And_I16_And_Are_Not_Sensors()
+    public void NonSensorGap_Positions_Are_Logical_I7_And_I16_Anchor_WJ3_And_WJ1_And_Are_Not_Sensors()
     {
         var state = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
 
-        var cannonSlots = state.WallMap.Where(slot => slot.SlotType == SlotType.CANNON).ToArray();
-        var cannonSlotCount = cannonSlots.Length;
-        Assert.Equal(CanonicalSensorMap.CannonSlotCount, cannonSlotCount);
-        Assert.Contains(cannonSlots, slot =>
-            slot.EquipmentId == "CANNON_REAR" && slot.LogicalRow == 5 && slot.LogicalColumn == 7 && slot.SensorId is null);
-        Assert.Contains(cannonSlots, slot =>
-            slot.EquipmentId == "CANNON_FRONT" && slot.LogicalRow == 5 && slot.LogicalColumn == 16 && slot.SensorId is null);
+        var gapSlots = state.WallMap.Where(slot => slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP).ToArray();
+        var gapSlotCount = gapSlots.Length;
+        Assert.Equal(CanonicalSensorMap.NonSensorGapCount, gapSlotCount);
+        Assert.Contains(gapSlots, slot =>
+            slot.GapAnchorForWaterJetId == "WJ3" && slot.LogicalRow == 5 && slot.LogicalColumn == 7 && slot.SensorId is null);
+        Assert.Contains(gapSlots, slot =>
+            slot.GapAnchorForWaterJetId == "WJ1" && slot.LogicalRow == 5 && slot.LogicalColumn == 16 && slot.SensorId is null);
         Assert.DoesNotContain(state.Sensors, sensor => sensor.SensorId == "I7" || sensor.SensorId == "I16");
     }
 
@@ -99,7 +100,7 @@ public sealed class RuntimeStateInvariantTests
     [InlineData(Tamper.SensorOrder, RuntimeRefusalCodes.SensorOrder)]
     [InlineData(Tamper.SensorIdentity, RuntimeRefusalCodes.SensorIdentity)]
     [InlineData(Tamper.SensorChannels, RuntimeRefusalCodes.SensorChannels)]
-    [InlineData(Tamper.CannonSlotPosition, RuntimeRefusalCodes.WallMapCannonSlots)]
+    [InlineData(Tamper.NonSensorGapPosition, RuntimeRefusalCodes.WallMapNonSensorGaps)]
     [InlineData(Tamper.WallSummary, RuntimeRefusalCodes.WallSummaryMismatch)]
     [InlineData(Tamper.ActiveTarget, RuntimeRefusalCodes.SensorActiveTarget)]
     [InlineData(Tamper.QueueShape, RuntimeRefusalCodes.QueueShape)]
@@ -137,7 +138,14 @@ public sealed class RuntimeStateInvariantTests
         {
             var refused = Assert.Throws<InvalidOperationException>(() =>
             {
-                _ = RuntimeStateComposer.ComposeInitial(profile, config, wallMap, sensors, RuntimeTestFixture.Instant);
+                _ = RuntimeStateComposer.ComposeInitial(
+                    profile,
+                    config,
+                    wallMap,
+                    sensors,
+                    WaterJetTopologyCatalog.WaterJets,
+                    WaterJetTopologyCatalog.IsolationValves,
+                    RuntimeTestFixture.Instant);
             });
 
             Assert.Contains(ProfileStartPolicy.RefusalCode, refused.Message, StringComparison.Ordinal);
@@ -157,15 +165,15 @@ public sealed class RuntimeStateInvariantTests
         {
             Sensors = ReplaceFirst(state.Sensors, state.Sensors[0] with { TcFrontChannel = state.Sensors[1].TcRearChannel }),
         },
-        Tamper.CannonSlotPosition => state with
+        Tamper.NonSensorGapPosition => state with
         {
             WallMap = ReplaceFirst(
                 state.WallMap,
                 state.WallMap[0] with
                 {
-                    SlotType = SlotType.CANNON,
+                    PositionKind = LogicalPositionKind.NON_SENSOR_GAP,
                     SensorId = null,
-                    EquipmentId = "CANNON_REAR",
+                    GapAnchorForWaterJetId = "WJ3",
                 }),
         },
         Tamper.WallSummary => state with

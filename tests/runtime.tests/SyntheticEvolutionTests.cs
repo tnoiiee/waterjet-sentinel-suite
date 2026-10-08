@@ -179,11 +179,11 @@ public sealed class SyntheticEvolutionTests
                 .Distinct(StringComparer.Ordinal)
                 .Count());
 
-        var cannonSlots = evolved.WallMap.Where(slot => slot.SlotType == SlotType.CANNON).ToArray();
-        Assert.Equal(2, cannonSlots.Length);
-        Assert.Contains(cannonSlots, slot => slot.LogicalRow == 5 && slot.LogicalColumn == 7);
-        Assert.Contains(cannonSlots, slot => slot.LogicalRow == 5 && slot.LogicalColumn == 16);
-        Assert.All(cannonSlots, slot => Assert.Null(slot.SensorId));
+        var gapSlots = evolved.WallMap.Where(slot => slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP).ToArray();
+        Assert.Equal(2, gapSlots.Length);
+        Assert.Contains(gapSlots, slot => slot.LogicalRow == 5 && slot.LogicalColumn == 7);
+        Assert.Contains(gapSlots, slot => slot.LogicalRow == 5 && slot.LogicalColumn == 16);
+        Assert.All(gapSlots, slot => Assert.Null(slot.SensorId));
 
         Assert.Equal(24, evolved.Sensors.Count(sensor => sensor.Wall == Wall.LEFT));
         Assert.Equal(29, evolved.Sensors.Count(sensor => sensor.Wall == Wall.REAR));

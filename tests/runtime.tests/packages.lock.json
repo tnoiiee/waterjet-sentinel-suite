@@ -97,6 +97,7 @@
         "type": "Project",
         "dependencies": {
           "Wjss.Contracts": "[1.0.0, )",
+          "Wjss.Domain": "[1.0.0, )",
           "Wjss.Time": "[1.0.0, )"
         }
       },

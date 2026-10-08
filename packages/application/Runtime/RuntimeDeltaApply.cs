@@ -220,13 +220,15 @@ public static class RuntimeDeltaApply
     }
 
     private static bool IdentityUnchanged(SensorPresentationState before, SensorPresentationState after) =>
-        before.SlotType == after.SlotType
+        before.PositionKind == after.PositionKind
         && before.Wall == after.Wall
         && before.LogicalColumn == after.LogicalColumn
         && before.LogicalRow == after.LogicalRow
         && before.WallColumn == after.WallColumn
         && before.WallRow == after.WallRow
         && before.ScanOrder == after.ScanOrder
+        && string.Equals(before.AssignedWaterJetId, after.AssignedWaterJetId, StringComparison.Ordinal)
+        && string.Equals(before.AssignedIsolationValveId, after.AssignedIsolationValveId, StringComparison.Ordinal)
         && string.Equals(before.DeviceId, after.DeviceId, StringComparison.Ordinal)
         && string.Equals(before.TcFrontChannel, after.TcFrontChannel, StringComparison.Ordinal)
         && string.Equals(before.TcRearChannel, after.TcRearChannel, StringComparison.Ordinal);

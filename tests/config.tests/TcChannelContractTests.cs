@@ -25,7 +25,7 @@ public sealed class TcChannelContractTests
     private static SensorMapSlotExample Sensor(string slotId, params string[] channels) => new()
     {
         SlotId = slotId,
-        SlotType = SlotType.SENSOR,
+        PositionKind = LogicalPositionKind.SENSOR,
         Wall = Wall.LEFT,
         LogicalColumn = 0,
         LogicalRow = 0,
@@ -35,28 +35,28 @@ public sealed class TcChannelContractTests
         TcChannels = channels,
     };
 
-    private static SensorMapSlotExample Cannon(string slotId) => new()
+    private static SensorMapSlotExample Gap(string slotId) => new()
     {
         SlotId = slotId,
-        SlotType = SlotType.CANNON,
+        PositionKind = LogicalPositionKind.NON_SENSOR_GAP,
         Wall = Wall.REAR,
         LogicalColumn = 7,
         LogicalRow = 5,
         WallColumn = 7,
         WallRow = 5,
-        EquipmentId = "CANNON_REAR",
+        GapAnchorForWaterJetId = "WJ3",
         LogicalLabel = "I7",
     };
 
     private static readonly JsonSerializerOptions Options = ContractJson.Options;
 
-    // CA1861 correction (Owner round 6): the cannon expectation constants are static
+    // CA1861 correction (Owner round 6): the gap expectation constants are static
     // readonly fields, not inline array arguments. Assert.Equal only enumerates them,
     // so sharing one immutable instance is safe. The sequence IS the accepted logical
     // order (I7 then I16) and is compared only against structurally ordered data
     // (logicalRow/logicalColumn) — never against a lexicographic label sort (round 6d).
-    private static readonly int[] ExpectedCannonLogicalColumns = [7, 16];
-    private static readonly string[] ExpectedCannonLogicalLabels = ["I7", "I16"];
+    private static readonly int[] ExpectedGapLogicalColumns = [7, 16];
+    private static readonly string[] ExpectedGapLogicalLabels = ["I7", "I16"];
 
     // (A) Serialization of a valid mapping is proven from the PARSED document: the
     // tcChannels property exists, is an array (never the scalar kind), carries exactly
@@ -85,10 +85,10 @@ public sealed class TcChannelContractTests
         Assert.Equal("SYN-TC-01:CH00", first);  // deterministic order retained: front...
         Assert.Equal("SYN-TC-01:CH01", second); // ...then rear
 
-        var cannonJson = JsonSerializer.Serialize(Cannon("CANNON_REAR"), Options);
-        using var cannonDoc = JsonDocument.Parse(cannonJson);
-        Assert.False(cannonDoc.RootElement.TryGetProperty("tcChannels", out _));
-        // absent on cannons: not an empty array, not an explicit null token
+        var gapJson = JsonSerializer.Serialize(Gap("SLOT-R5-C07"), Options);
+        using var gapDoc = JsonDocument.Parse(gapJson);
+        Assert.False(gapDoc.RootElement.TryGetProperty("tcChannels", out _));
+        // absent on NON_SENSOR_GAP slots: not an empty array, not an explicit null token
     }
 
     // (B) Deserialization: a two-string array binds; invalid shapes are rejected.
@@ -96,7 +96,7 @@ public sealed class TcChannelContractTests
     public void Deserializing_Two_String_Array_Binds_Into_The_Contract_Record()
     {
         const string slotJson = """
-            {"slotId":"L-R0-C00","slotType":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
+            {"slotId":"L-R0-C00","positionKind":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
              "wallColumn":0,"wallRow":0,"sensorId":"L-R0-C00",
              "tcChannels":["SYN-TC-01:CH00","SYN-TC-01:CH01"]}
             """;
@@ -111,7 +111,7 @@ public sealed class TcChannelContractTests
         // The earlier encoding shape: a scalar string in place of the array. The contract
         // does not "support then normalize" it — System.Text.Json refuses to bind it.
         const string legacyJson = """
-            {"slotId":"L-R0-C00","slotType":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
+            {"slotId":"L-R0-C00","positionKind":"SENSOR","wall":"LEFT","logicalColumn":0,"logicalRow":0,
              "wallColumn":0,"wallRow":0,"sensorId":"L-R0-C00","tcChannels":"SYN-TC-01:CH00,SYN-TC-01:CH01"}
             """;
         Assert.Throws<JsonException>(() =>
@@ -133,7 +133,7 @@ public sealed class TcChannelContractTests
     }
 
     [Fact]
-    public void Cross_Sensor_Duplicates_And_Cannon_Channels_Are_Rejected()
+    public void Cross_Sensor_Duplicates_And_Gap_Channels_Are_Rejected()
     {
         // same channel claimed by two sensors
         var a = Sensor("A", "SYN-TC-01:CH00", "SYN-TC-01:CH01");
@@ -143,14 +143,14 @@ public sealed class TcChannelContractTests
         {
             slots.Add(Sensor($"PAD-{i:D3}", $"SYN-TC-90:CH{i * 2:D2}", $"SYN-TC-90:CH{i * 2 + 1:D2}"));
         }
-        slots.Add(Cannon("CANNON_REAR"));
-        slots.Add(Cannon("CANNON_FRONT") with { LogicalColumn = 16, WallColumn = 16, LogicalLabel = "I16", EquipmentId = "CANNON_FRONT" });
+        slots.Add(Gap("SLOT-R5-C07"));
+        slots.Add(Gap("SLOT-R5-C16") with { LogicalColumn = 16, WallColumn = 16, LogicalLabel = "I16", GapAnchorForWaterJetId = "WJ1" });
         Assert.Throws<ArgumentException>(() => TcChannelRules.RequireValidMapping(slots));
 
-        // a cannon carrying channels is rejected without counting sensors
-        var badCannon = Cannon("CANNON_FRONT") with { TcChannels = new[] { "SYN-TC-01:CH13", "SYN-TC-01:CH14" } };
+        // a NON_SENSOR_GAP slot carrying channels is rejected without counting sensors
+        var badGap = Gap("SLOT-R5-C16") with { TcChannels = new[] { "SYN-TC-01:CH13", "SYN-TC-01:CH14" } };
         Assert.Throws<ArgumentException>(() =>
-            TcChannelRules.RequireCannonCarriesNoChannels(badCannon.TcChannels, badCannon.SlotId));
+            TcChannelRules.RequireNonSensorGapCarriesNoChannels(badGap.TcChannels, badGap.SlotId));
     }
 
     // (C) The generated example itself, through the typed contract.
@@ -165,11 +165,11 @@ public sealed class TcChannelContractTests
         TcChannelRules.RequireValidMapping(records);
 
         Assert.Equal(TcChannelRules.SlotCount, records.Length);       // 108
-        Assert.Equal(TcChannelRules.SensorSlotCount, records.Count(r => !r.IsCannon)); // 106
-        Assert.Equal(TcChannelRules.CannonSlotCount, records.Count(r => r.IsCannon));  // 2
+        Assert.Equal(TcChannelRules.SensorSlotCount, records.Count(r => !r.IsNonSensorGap)); // 106
+        Assert.Equal(TcChannelRules.NonSensorGapSlotCount, records.Count(r => r.IsNonSensorGap));  // 2
         Assert.Equal(
             TcChannelRules.TotalChannelCount,
-            records.Where(r => !r.IsCannon).Sum(r => r.TcChannels!.Count)); // 212
+            records.Where(r => !r.IsNonSensorGap).Sum(r => r.TcChannels!.Count)); // 212
 
         // structural pass over the committed example document (round 6c): the shape
         // claims below read parsed JsonElement kinds only - no serialized-text matching
@@ -189,17 +189,17 @@ public sealed class TcChannelContractTests
         var distinctChannels = new HashSet<string>(StringComparer.Ordinal);
         var sensorsByWall = new Dictionary<string, int>(StringComparer.Ordinal);
         var sensorSlots = 0;
-        var cannonSlots = 0;
+        var nonSensorGapSlots = 0;
         var sensorArrayShapes = 0;
         foreach (var element in slotElements)
         {
-            var isCannon = string.Equals(element.GetProperty("slotType").GetString(), "CANNON", StringComparison.Ordinal);
+            var isGap = string.Equals(element.GetProperty("positionKind").GetString(), "NON_SENSOR_GAP", StringComparison.Ordinal);
             var hasChannels = element.TryGetProperty("tcChannels", out var tc);
-            if (isCannon)
+            if (isGap)
             {
-                cannonSlots++;
+                nonSensorGapSlots++;
                 Assert.False(hasChannels,
-                    $"cannon {element.GetProperty("slotId").GetString()}: tcChannels must be absent");
+                    $"NON_SENSOR_GAP {element.GetProperty("slotId").GetString()}: tcChannels must be absent");
                 continue;
             }
 
@@ -228,7 +228,7 @@ public sealed class TcChannelContractTests
         }
 
         Assert.Equal(106, sensorSlots);
-        Assert.Equal(2, cannonSlots);
+        Assert.Equal(2, nonSensorGapSlots);
         Assert.Equal(106, sensorArrayShapes); // every sensor array-shaped; 0 scalar (asserted above)
         Assert.Equal(212, allChannels.Count);            // total channel strings
         Assert.Equal(212, distinctChannels.Count);       // globally unique; 0 duplicates
@@ -237,16 +237,16 @@ public sealed class TcChannelContractTests
         Assert.Equal(24, sensorsByWall["RIGHT"]);
         Assert.Equal(29, sensorsByWall["FRONT"]);
 
-        // exactly the canonical two cannon slots (row 5, logical columns 7 and 16),
+        // exactly the canonical two NON_SENSOR_GAP slots (row 5, logical columns 7 and 16),
         // each without channels and without a sensorId; I7/I16 are their logical labels
-        var cannons = records.Where(r => r.IsCannon).ToArray();
-        Assert.Equal(2, cannons.Length);
-        Assert.All(cannons, c =>
+        var gaps = records.Where(r => r.IsNonSensorGap).ToArray();
+        Assert.Equal(2, gaps.Length);
+        Assert.All(gaps, c =>
         {
             Assert.Equal(5, c.LogicalRow);
             Assert.Null(c.TcChannels);
             Assert.Null(c.SensorId);
-            Assert.NotNull(c.EquipmentId);
+            Assert.NotNull(c.GapAnchorForWaterJetId);
             Assert.NotNull(c.LogicalLabel);
         });
 
@@ -254,32 +254,32 @@ public sealed class TcChannelContractTests
         // logicalRow then logicalColumn. The removed defect was lexicographic label
         // sorting, which yields I16 before I7. No numbers are parsed out of labels and
         // no expectation was re-sorted to match text ordering.
-        var orderedCannons = cannons
+        var orderedGaps = gaps
             .OrderBy(c => c.LogicalRow)
             .ThenBy(c => c.LogicalColumn)
             .ToArray();
-        Assert.Equal(ExpectedCannonLogicalColumns, orderedCannons.Select(c => c.LogicalColumn));
-        Assert.Equal(ExpectedCannonLogicalLabels, orderedCannons.Select(c => c.LogicalLabel));
+        Assert.Equal(ExpectedGapLogicalColumns, orderedGaps.Select(c => c.LogicalColumn));
+        Assert.Equal(ExpectedGapLogicalLabels, orderedGaps.Select(c => c.LogicalLabel));
 
-        // explicit position-to-cannon pairing (row I / columns 7 and 16), asserted per
+        // explicit position-to-gap-anchor pairing (row I / columns 7 and 16), asserted per
         // slot so the mapping cannot pass through an ordering accident:
-        Assert.Equal("I7", orderedCannons[0].LogicalLabel);
-        Assert.Equal(5, orderedCannons[0].LogicalRow);
-        Assert.Equal(7, orderedCannons[0].LogicalColumn);
-        Assert.Equal("CANNON_REAR", orderedCannons[0].EquipmentId);
-        Assert.Equal("I16", orderedCannons[1].LogicalLabel);
-        Assert.Equal(5, orderedCannons[1].LogicalRow);
-        Assert.Equal(16, orderedCannons[1].LogicalColumn);
-        Assert.Equal("CANNON_FRONT", orderedCannons[1].EquipmentId);
+        Assert.Equal("I7", orderedGaps[0].LogicalLabel);
+        Assert.Equal(5, orderedGaps[0].LogicalRow);
+        Assert.Equal(7, orderedGaps[0].LogicalColumn);
+        Assert.Equal("WJ3", orderedGaps[0].GapAnchorForWaterJetId);
+        Assert.Equal("I16", orderedGaps[1].LogicalLabel);
+        Assert.Equal(5, orderedGaps[1].LogicalRow);
+        Assert.Equal(16, orderedGaps[1].LogicalColumn);
+        Assert.Equal("WJ1", orderedGaps[1].GapAnchorForWaterJetId);
 
         // No sensor slot lacks the array or has the wrong length; and no sensor carries a
         // logicalLabel at all. Round 6d hotfix: the previous line was
         // Assert.False(r.LogicalLabel?.Contains("CANNON", ...)), a bool? that is null for
         // every sensor (xunit's Assert.False(bool?) rejects null rather than coercing it).
-        // The generator assigns logicalLabel ONLY on the cannon branch, so the actual
+        // The generator assigns logicalLabel ONLY on the NON_SENSOR_GAP branch, so the actual
         // Sensor contract is label ABSENCE - asserted directly, not coerced to false.
-        // Any label on a sensor (cannon disguise included) now fails here.
-        Assert.All(records.Where(r => !r.IsCannon), r =>
+        // Any label on a sensor (gap disguise included) now fails here.
+        Assert.All(records.Where(r => !r.IsNonSensorGap), r =>
         {
             Assert.NotNull(r.TcChannels);
             Assert.Equal(2, r.TcChannels!.Count);

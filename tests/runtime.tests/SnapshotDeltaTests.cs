@@ -7,7 +7,7 @@ using Xunit;
 namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
-/// <c>wjss.delta/1</c> generation and the Snapshot foundation it continues: the
+/// <c>wjss.delta/2</c> generation and the Snapshot foundation it continues: the
 /// gapless revision chain, the sections a Delta does and does not carry, the
 /// three-state Active Job encoding on the wire, Snapshot agreement with the
 /// committed revision, and the determinism of the whole serialized sequence.

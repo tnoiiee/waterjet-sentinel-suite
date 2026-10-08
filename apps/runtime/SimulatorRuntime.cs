@@ -1,5 +1,6 @@
 using Wjss.Adapters.Simulator;
 using Wjss.Contracts;
+using Wjss.Domain;
 using Wjss.Runtime.Core;
 using Wjss.Time;
 
@@ -278,6 +279,8 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             config,
             SyntheticSensorMap.BuildWallMap(),
             SyntheticSensorMap.BuildInitialSensors(config, seed, composedAtUtc),
+            WaterJetTopologyCatalog.WaterJets,
+            WaterJetTopologyCatalog.IsolationValves,
             composedAtUtc);
 
         var store = RuntimeStateStore.Create(initialState, options.StateHistoryCapacity);

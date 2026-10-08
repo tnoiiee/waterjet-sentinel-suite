@@ -18,7 +18,7 @@ public sealed class CanonicalMapStructureTests
         Assert.Equal(108, CanonicalSensorMap.MatrixSlots);
         Assert.Equal(106, CanonicalSensorMap.SensorLocations);
         Assert.Equal(212, CanonicalSensorMap.ThermocoupleChannelCount);
-        Assert.Equal(2, CanonicalSensorMap.CannonSlotCount);
+        Assert.Equal(2, CanonicalSensorMap.NonSensorGapCount);
 
         Assert.Equal(24, CanonicalSensorMap.SensorsPerWall[Wall.LEFT]);
         Assert.Equal(29, CanonicalSensorMap.SensorsPerWall[Wall.REAR]);
@@ -40,10 +40,10 @@ public sealed class CanonicalMapStructureTests
     }
 
     [Fact]
-    public void Cannon_Slots_Are_Equipment_At_I7_And_I16()
+    public void NonSensorGap_Positions_Anchor_WJ3_And_WJ1_At_I7_And_I16()
     {
-        Assert.Equal(("CANNON_REAR", 5, 7), CanonicalSensorMap.CannonSlots[0]);
-        Assert.Equal(("CANNON_FRONT", 5, 16), CanonicalSensorMap.CannonSlots[1]);
+        Assert.Equal(("I7", "WJ3", 5, 7), CanonicalSensorMap.NonSensorGapSlots[0]);
+        Assert.Equal(("I16", "WJ1", 5, 16), CanonicalSensorMap.NonSensorGapSlots[1]);
     }
 
     [Fact]
