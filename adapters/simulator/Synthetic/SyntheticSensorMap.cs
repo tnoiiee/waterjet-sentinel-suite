@@ -1,4 +1,5 @@
 using Wjss.Contracts;
+using Wjss.Domain;
 using Wjss.Time;
 
 namespace Wjss.Adapters.Simulator;
