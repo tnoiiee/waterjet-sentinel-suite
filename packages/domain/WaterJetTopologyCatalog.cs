@@ -144,4 +144,35 @@ public static class WaterJetTopologyCatalog
     /// <summary>Resolves a Water Jet by exact id, or null when the id is not one of WJ1–WJ8.</summary>
     public static WaterJetConfiguration? FindWaterJet(string waterJetId) =>
         WaterJetsById.TryGetValue(waterJetId, out var waterJet) ? waterJet : null;
+
+    /// <summary>
+    /// Verifies one Sensor's cleaning-device assignment against the approved topology:
+    /// the assigned Water Jet must exist, its TARGET coverage must match the Sensor's
+    /// wall and region (assignment follows responsibility for the target wall, never
+    /// the installed position — the legacy cleaning-device ordinal maps directly to
+    /// WJn and a rear-lower Sensor is assigned WJ1 even though WJ1 installs on the
+    /// front-lower wall), and the Isolation Valve must be exactly that Water Jet's
+    /// dedicated IVn. Returns false on any mismatch; never throws for an assignment
+    /// problem, so callers can refuse with their own reason code.
+    /// </summary>
+    public static bool TryRequireAssignment(
+        string sensorId,
+        Wall sensorWall,
+        Region sensorRegion,
+        string? assignedWaterJetId,
+        string? assignedIsolationValveId)
+    {
+        if (string.IsNullOrWhiteSpace(sensorId)
+            || string.IsNullOrWhiteSpace(assignedWaterJetId)
+            || string.IsNullOrWhiteSpace(assignedIsolationValveId))
+        {
+            return false;
+        }
+
+        var waterJet = FindWaterJet(assignedWaterJetId);
+        return waterJet is not null
+            && waterJet.TargetWall == sensorWall
+            && waterJet.TargetRegion == sensorRegion
+            && string.Equals(waterJet.DedicatedIsolationValveId, assignedIsolationValveId, StringComparison.Ordinal);
+    }
 }

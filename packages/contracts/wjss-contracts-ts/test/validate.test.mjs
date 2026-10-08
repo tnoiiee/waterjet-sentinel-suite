@@ -5,12 +5,12 @@ import { validateEnvelope, canonicalSensorIds, sensorIdFor, validateSensorMapExa
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`../../fixtures/${name}`, import.meta.url), 'utf8'));
 
-test('canonical sensor id set has 106 unique ids, no cannon ids', () => {
+test('canonical sensor id set has 106 unique ids, no gap identities', () => {
   const ids = canonicalSensorIds();
   assert.equal(ids.length, 106);
   assert.equal(new Set(ids).size, 106);
-  assert.ok(!ids.includes('CANNON_REAR'));
-  assert.ok(!ids.includes('CANNON_FRONT'));
+  assert.ok(!ids.includes('I7'));
+  assert.ok(!ids.includes('I16'));
 });
 
 test('sensorIdFor matches owner logical labels', () => {
@@ -92,11 +92,59 @@ test('prohibited production-scope key names are caught', () => {
   assert.ok(result.issues.some((i) => i.includes('prohibited')));
 });
 
-test('cannon-as-sensor is rejected', () => {
+test('a gap identity as sensorId is rejected', () => {
   const snapshot = fixture('snapshot.seed0.json');
-  snapshot.sensors[0].sensorId = 'CANNON_REAR';
+  snapshot.sensors[0].sensorId = 'I7';
   const result = validateEnvelope(snapshot);
   assert.ok(result.issues.some((i) => i.includes('canonical Sensor')));
+});
+
+test('snapshot carries the approved topology: 8 WJs, 8 IVs, ordinal pairing, opposite-wall coverage', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  assert.equal(snapshot.waterJets.length, 8);
+  assert.equal(snapshot.isolationValves.length, 8);
+  snapshot.waterJets.forEach((w, i) => {
+    assert.equal(w.waterJetId, `WJ${i + 1}`);
+    assert.equal(w.dedicatedIsolationValveId, `IV${i + 1}`);
+    assert.equal(w.targetWall, w.installedWall === 'LEFT' ? 'RIGHT' : w.installedWall === 'RIGHT' ? 'LEFT' : w.installedWall === 'REAR' ? 'FRONT' : 'REAR');
+  });
+  snapshot.isolationValves.forEach((v, i) => assert.equal(v.servedWaterJetId, `WJ${i + 1}`));
+});
+
+test('a WJn not paired with IVn is rejected', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  snapshot.waterJets[2].dedicatedIsolationValveId = 'IV4';
+  const result = validateEnvelope(snapshot);
+  assert.ok(result.issues.some((i) => i.includes('must pair with IV3')));
+});
+
+test('a Sensor assigned a device that does not target its wall is rejected', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const rearLower = snapshot.sensors.find((s) => s.wall === 'REAR' && s.logicalRow === 5);
+  assert.equal(rearLower.assignedWaterJetId, 'WJ1'); // rear-lower Sensor -> WJ1 (WJ1 installs FRONT-lower)
+  rearLower.assignedWaterJetId = 'WJ3';
+  rearLower.assignedIsolationValveId = 'IV3';
+  const result = validateEnvelope(snapshot);
+  assert.ok(result.issues.some((i) => i.includes('does not target this Sensor')));
+});
+
+test('an assigned isolation valve that breaks the WJn/IVn pairing is rejected', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  snapshot.sensors[0].assignedIsolationValveId = 'IV9';
+  const result = validateEnvelope(snapshot);
+  assert.ok(result.issues.some((i) => i.includes('derive from the WJn')));
+});
+
+test('waterJets in a Delta is rejected (immutable topology, Snapshot-only)', () => {
+  const delta = { ...fixture('delta.basic.json'), waterJets: fixture('snapshot.seed0.json').waterJets };
+  const result = validateEnvelope(delta);
+  assert.ok(result.issues.some((i) => i.includes('waterJets must never appear in a Delta')));
+});
+
+test('isolationValves in a Delta is rejected (immutable topology, Snapshot-only)', () => {
+  const delta = { ...fixture('delta.basic.json'), isolationValves: fixture('snapshot.seed0.json').isolationValves };
+  const result = validateEnvelope(delta);
+  assert.ok(result.issues.some((i) => i.includes('isolationValves must never appear in a Delta')));
 });
 
 test('queue overflow beyond 8 is rejected', () => {
@@ -153,11 +201,11 @@ test('sensor-map example validates with the canonical totals', () => {
   assert.deepEqual(result.issues, []);
   const s = sensorMapSummary(sensorMapDoc());
   assert.deepEqual(
-    { slots: s.slots, sensors: s.sensors, cannons: s.cannons, totalChannels: s.totalChannels, distinctChannels: s.distinctChannels },
-    { slots: 108, sensors: 106, cannons: 2, totalChannels: 212, distinctChannels: 212 },
+    { slots: s.slots, sensors: s.sensors, nonSensorGaps: s.nonSensorGaps, totalChannels: s.totalChannels, distinctChannels: s.distinctChannels },
+    { slots: 108, sensors: 106, nonSensorGaps: 2, totalChannels: 212, distinctChannels: 212 },
   );
   assert.deepEqual(s.sensorsPerWall, { LEFT: 24, REAR: 29, RIGHT: 24, FRONT: 29 });
-  assert.deepEqual(s.cannonLogicalLabels, ['I16', 'I7']);
+  assert.deepEqual(s.gapLogicalLabels, ['I7', 'I16']); // canonical orderTotal order, never lexicographic
 });
 
 test('sensor-map example file stores tcChannels as arrays, never comma strings', () => {
@@ -202,11 +250,11 @@ test('a channel assigned to two sensors is rejected (global uniqueness, 212 dist
   assert.ok(result.issues.some((i) => i.includes('globally unique')));
 });
 
-test('cannon slots must not carry channels and sensor slots must carry them', () => {
-  const cannonWith = validateSensorMapExample(
-    mutateSlots((slots) => { slots.find((x) => x.slotType === 'CANNON').tcChannels = ['SYN-TC-01:CH99', 'SYN-TC-01:CH98']; }),
+test('NON_SENSOR_GAP slots must not carry channels and sensor slots must carry them', () => {
+  const gapWith = validateSensorMapExample(
+    mutateSlots((slots) => { slots.find((x) => x.positionKind === 'NON_SENSOR_GAP').tcChannels = ['SYN-TC-01:CH99', 'SYN-TC-01:CH98']; }),
   );
-  assert.ok(cannonWith.issues.some((i) => i.includes('CANNON slot must not carry thermocouple channels')));
+  assert.ok(gapWith.issues.some((i) => i.includes('NON_SENSOR_GAP slot must not carry thermocouple channels')));
 
   const missing = validateSensorMapExample(
     mutateSlots((slots) => { delete slots[0].tcChannels; }),
@@ -214,17 +262,26 @@ test('cannon slots must not carry channels and sensor slots must carry them', ()
   assert.ok(missing.issues.some((i) => i.includes('must carry a tcChannels array')));
 });
 
-test('a cannon disguised as a sensor (wrong shape) is rejected', () => {
+test('a gap position disguised as a sensor (wrong shape) is rejected', () => {
   const result = validateSensorMapExample(
     mutateSlots((slots) => {
-      slots[0].slotType = 'CANNON';
+      slots[0].positionKind = 'NON_SENSOR_GAP';
       slots[0].sensorId = null;
-      slots[0].equipmentId = 'CANNON_REAR';
+      slots[0].gapAnchorForWaterJetId = 'WJ3';
     }),
   );
-  // 107 cannons / 105 sensors composition + the displaced sensor totals: all rejected
+  // 3 gaps / 105 sensors composition + the displaced sensor totals: all rejected
   assert.ok(result.issues.some((i) => i.includes('sensor slots must number 106')));
-  assert.ok(result.issues.some((i) => i.includes('cannon slots must number 2')));
+  assert.ok(result.issues.some((i) => i.includes('NON_SENSOR_GAP slots must number 2')));
+});
+
+test('a gap anchor that contradicts its position is rejected (I7 anchors WJ3, I16 anchors WJ1)', () => {
+  const result = validateSensorMapExample(
+    mutateSlots((slots) => {
+      slots.find((x) => x.logicalLabel === 'I7').gapAnchorForWaterJetId = 'WJ1';
+    }),
+  );
+  assert.ok(result.issues.some((i) => i.includes('gap anchor')));
 });
 
 test('validateEnvelope dispatches the sensor-map kind', () => {

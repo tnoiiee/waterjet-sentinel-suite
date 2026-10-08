@@ -140,14 +140,14 @@ public sealed class SyntheticInitialStateTests
             var position = (slot.LogicalRow, slot.LogicalColumn);
             var generated = generatedSlots[position];
             Assert.Equal(slot.SlotId, generated.SlotId);
-            Assert.Equal(slot.SlotType, generated.SlotType);
+            Assert.Equal(slot.PositionKind, generated.PositionKind);
             Assert.Equal(slot.Wall, generated.Wall);
             Assert.Equal(slot.WallColumn, generated.WallColumn);
             Assert.Equal(slot.WallRow, generated.WallRow);
 
-            if (slot.SlotType == SlotType.CANNON)
+            if (slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
             {
-                Assert.Equal(slot.EquipmentId, generated.EquipmentId);
+                Assert.Equal(slot.GapAnchorForWaterJetId, generated.GapAnchorForWaterJetId);
                 Assert.Null(generated.SensorId);
                 continue;
             }

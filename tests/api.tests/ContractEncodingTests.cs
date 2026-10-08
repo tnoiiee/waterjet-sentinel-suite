@@ -72,20 +72,20 @@ public sealed class ContractEncodingTests
         var slot = new WallMapSlot
         {
             SlotId = "SLOT-R5-C07",
-            SlotType = SlotType.CANNON,
+            PositionKind = LogicalPositionKind.NON_SENSOR_GAP,
             Wall = Wall.REAR,
             LogicalColumn = 7,
             LogicalRow = 5,
             WallColumn = 3,
             WallRow = 5,
             SensorId = null,
-            EquipmentId = "CANNON_REAR",
+            GapAnchorForWaterJetId = "WJ3",
         };
 
         using var doc = SerializeToDocument(slot);
         var root = doc.RootElement;
         Assert.Equal("SLOT-R5-C07", root.GetProperty("slotId").GetString());
-        Assert.Equal("CANNON", root.GetProperty("slotType").GetString());
+        Assert.Equal("NON_SENSOR_GAP", root.GetProperty("positionKind").GetString());
         Assert.Equal("REAR", root.GetProperty("wall").GetString());
         // (B) explicit null: key present, token kind Null - no JsonNode dereference.
         Assert.True(root.TryGetProperty("sensorId", out var sensorId));
@@ -104,7 +104,7 @@ public sealed class ContractEncodingTests
 
         // Envelope keys always present:
         Assert.Equal("delta", root.GetProperty("kind").GetString());
-        Assert.Equal("wjss.delta/1", root.GetProperty("schema").GetString());
+        Assert.Equal("wjss.delta/2", root.GetProperty("schema").GetString());
         Assert.Equal(1, root.GetProperty("apiVersion").GetInt32());
         Assert.Equal(10, root.GetProperty("previousRevision").GetInt32());
         Assert.Equal(11, root.GetProperty("revision").GetInt32());
@@ -161,7 +161,7 @@ public sealed class ContractEncodingTests
         // Required test 4: round-trip keeps absent / null / object apart.
         var envelope = (JsonObject)JsonNode.Parse(
             """
-            {"kind":"delta","schema":"wjss.delta/1","apiVersion":1,
+            {"kind":"delta","schema":"wjss.delta/2","apiVersion":1,
              "previousRevision":10,"revision":11,"generatedAt":"2026-10-07T00:00:00.000Z"}
             """)!;
 

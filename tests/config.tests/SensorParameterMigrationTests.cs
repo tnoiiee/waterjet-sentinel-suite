@@ -561,7 +561,9 @@ public sealed class SensorParameterMigrationTests
             ExpectedLogicalPositionKindNames,
             Enum.GetNames<LogicalPositionKind>());
 
-        // No canonical record carries a property of the transitional slot vocabulary.
+        // No canonical record carries a property of the former transitional slot
+        // vocabulary (the SlotType representation was deleted in Checkpoint C; the
+        // check is name-based because the type itself no longer exists).
         var canonicalRecordProperties = new[]
         {
             typeof(LogicalPositionRecord),
@@ -569,7 +571,10 @@ public sealed class SensorParameterMigrationTests
             typeof(WaterJetConfiguration),
             typeof(IsolationValveConfiguration),
         }.SelectMany(type => type.GetProperties()).ToArray();
-        Assert.DoesNotContain(canonicalRecordProperties, p => p.PropertyType == typeof(SlotType));
+        var transitionalSlotTypeProperties = canonicalRecordProperties
+            .Where(p => p.PropertyType.Name == "SlotType")
+            .ToArray();
+        Assert.Empty(transitionalSlotTypeProperties);
 
         // No Cannon entity or identity exists anywhere in the imported output.
         var allIdentities = result.LogicalPositions.Select(p => p.LogicalId)
@@ -587,24 +592,37 @@ public sealed class SensorParameterMigrationTests
     // ---- T20 (semantic replacement: compiled public types, no source text) ----
 
     [Fact]
-    public void Runtime_Cannon_Vocabulary_Remains_Transitional_And_Untouched()
+    public void Runtime_Vocabulary_Is_Migrated_To_NonSensorGap_With_No_Transitional_Type_Left()
     {
-        // The transitional Runtime vocabulary still exists as compiled public surface,
-        // and its atomic migration stays deferred to Checkpoint C.
-        Assert.Contains("CANNON", Enum.GetNames<SlotType>());
-        Assert.Equal(2, CanonicalSensorMap.CannonSlotCount);
-        Assert.Contains(CanonicalSensorMap.CannonSlots, slot =>
-            slot.EquipmentId == "CANNON_REAR" && slot.Row == 5 && slot.Column == 7);
-        Assert.Contains(CanonicalSensorMap.CannonSlots, slot =>
-            slot.EquipmentId == "CANNON_FRONT" && slot.Row == 5 && slot.Column == 16);
+        // Checkpoint C completed the atomic migration: the canonical position
+        // vocabulary is exactly SENSOR and NON_SENSOR_GAP (order matters: the
+        // enumeration declares SENSOR first), the two NON_SENSOR_GAP positions are
+        // I7 anchoring WJ3 and I16 anchoring WJ1, and the former transitional
+        // CANNON slot vocabulary no longer exists as compiled public surface —
+        // no alias connects it to the canonical vocabulary.
+        var kindNames = Enum.GetNames<LogicalPositionKind>();
+        Assert.Equal(2, kindNames.Length);
+        Assert.Equal("SENSOR", kindNames[0]);
+        Assert.Equal("NON_SENSOR_GAP", kindNames[1]);
 
-        // The canonical vocabulary is exactly SENSOR and NON_SENSOR_GAP and contains no
-        // Cannon member: no alias connects the two vocabularies. (No canonical topology
-        // Contract uses SlotType — asserted by
-        // Canonical_Output_Contains_Only_Sensor_And_NonSensorGap_Positions.)
-        Assert.Equal(ExpectedLogicalPositionKindNames, Enum.GetNames<LogicalPositionKind>());
-        Assert.DoesNotContain(Enum.GetNames<LogicalPositionKind>(), name =>
-            name.Contains("CANN", StringComparison.Ordinal));
+        var nonSensorGapCount = CanonicalSensorMap.NonSensorGapCount;
+        Assert.Equal(2, nonSensorGapCount);
+        Assert.Equal(("I7", "WJ3", 5, 7), CanonicalSensorMap.NonSensorGapSlots[0]);
+        Assert.Equal(("I16", "WJ1", 5, 16), CanonicalSensorMap.NonSensorGapSlots[1]);
+
+        var wallMapSlotProperties = typeof(WallMapSlot).GetProperties();
+        Assert.Contains(wallMapSlotProperties, p => p.Name == "PositionKind");
+        Assert.Contains(wallMapSlotProperties, p => p.Name == "GapAnchorForWaterJetId");
+        var transitionalProperties = wallMapSlotProperties
+            .Where(p => p.Name is "SlotType" or "EquipmentId")
+            .ToArray();
+        Assert.Empty(transitionalProperties);
+
+        var contractTypes = typeof(CanonicalSensorMap).Assembly.GetTypes();
+        var transitionalTypes = contractTypes
+            .Where(t => t.Name == "SlotType")
+            .ToArray();
+        Assert.Empty(transitionalTypes);
     }
 
     // ---- warning bookkeeping ---------------------------------------------------

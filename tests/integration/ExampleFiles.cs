@@ -50,24 +50,24 @@ internal static class ExampleFiles
         {
             for (var col = 1; col <= CanonicalSensorMap.LogicalColumnCount; col++)
             {
-                var cannon = CanonicalSensorMap.CannonSlots.FirstOrDefault(c => c.Row == row && c.Column == col);
+                var gap = CanonicalSensorMap.NonSensorGapSlots.FirstOrDefault(c => c.Row == row && c.Column == col);
                 var wall = CanonicalSensorMap.WallForColumn(col);
                 var (first, _) = CanonicalSensorMap.WallColumns[wall];
 
                 var slot = new JsonObject
                 {
                     ["slotId"] = $"SLOT-R{row}-C{col:D2}",
-                    ["slotType"] = cannon.Item1 is null ? "SENSOR" : "CANNON",
+                    ["positionKind"] = gap.Item1 is null ? "SENSOR" : "NON_SENSOR_GAP",
                     ["wall"] = wall.ToString(),
                     ["logicalColumn"] = col,
                     ["logicalRow"] = row,
                     ["wallColumn"] = col - first + 1,
                     ["wallRow"] = row,
-                    ["sensorId"] = cannon.Item1 is null ? CanonicalSensorMap.SensorIdFor(row, col) : null,
-                    ["equipmentId"] = cannon.Item1,
+                    ["sensorId"] = gap.Item1 is null ? CanonicalSensorMap.SensorIdFor(row, col) : null,
+                    ["gapAnchorForWaterJetId"] = gap.Item2,
                 };
 
-                if (cannon.Item1 is not null)
+                if (gap.Item1 is not null)
                 {
                     slot["logicalLabel"] = $"I{col}";
                 }
@@ -91,7 +91,7 @@ internal static class ExampleFiles
 
         // Pre-serialization self-validation (Owner round 6): the generated mapping must pass
         // the same TcChannelRules the example tests enforce — 108 slots / 106 sensors /
-        // 2 cannons / exactly 2 channels per sensor / 212 globally unique channels.
+        // 2 NON_SENSOR_GAP slots / exactly 2 channels per sensor / 212 globally unique channels.
         TcChannelRules.RequireValidMapping(slots
             .Select(s => JsonSerializer.Deserialize<SensorMapSlotExample>(s!.ToJsonString(), ContractJson.Options)!)
             .ToArray());
@@ -117,7 +117,7 @@ internal static class ExampleFiles
             ["notes"] = new JsonArray
             {
                 "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution); tcChannels is an exact two-entry array (front = lower channel index, rear = higher), not Production data.",
-                "Cannon slots are equipment, not Sensors; they carry no sensorId and no thermocouple channels.",
+                "NON_SENSOR_GAP slots (I7, I16) are placement anchors, not Sensors; they carry no sensorId, no thermocouple channels, and only the Water Jet each physically anchors.",
                 "The logical matrix and wall distribution are the Owner-confirmed structure (106 locations, 212 channels).",
             },
             ["fixtureStatus"] = FixtureGenerator.FixtureStatus,

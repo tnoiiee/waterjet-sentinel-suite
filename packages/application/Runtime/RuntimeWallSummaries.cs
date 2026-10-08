@@ -10,7 +10,7 @@ namespace Wjss.Runtime.Core;
 /// be committed.
 ///
 /// Canonical wall order is Left, Rear, Right, Front (DOMAIN_MODEL.md section 1,
-/// rule 2). Cannon slots are equipment, not Sensors, and contribute nothing.
+/// rule 2). NON_SENSOR_GAP positions are not Sensors and contribute nothing.
 /// </summary>
 public static class RuntimeWallSummaries
 {

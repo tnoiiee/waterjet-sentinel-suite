@@ -20,6 +20,8 @@ internal static class RuntimeStateFreezer
     {
         WallMap = RuntimeCollections.Freeze(state.WallMap),
         Sensors = RuntimeCollections.Freeze(state.Sensors),
+        WaterJets = RuntimeCollections.Freeze(state.WaterJets),
+        IsolationValves = RuntimeCollections.Freeze(state.IsolationValves),
         Walls = RuntimeCollections.Freeze(state.Walls),
         Queue = state.Queue with { Entries = RuntimeCollections.Freeze(state.Queue.Entries) },
         Alarms = state.Alarms with { Items = RuntimeCollections.Freeze(state.Alarms.Items) },

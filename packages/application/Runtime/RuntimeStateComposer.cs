@@ -66,11 +66,15 @@ public static class RuntimeStateComposer
         PublishedConfigurationRevision config,
         IReadOnlyList<WallMapSlot> wallMap,
         IReadOnlyList<SensorPresentationState> sensors,
+        IReadOnlyList<WaterJetConfiguration> waterJets,
+        IReadOnlyList<IsolationValveConfiguration> isolationValves,
         DateTimeOffset generatedAtUtc)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(wallMap);
         ArgumentNullException.ThrowIfNull(sensors);
+        ArgumentNullException.ThrowIfNull(waterJets);
+        ArgumentNullException.ThrowIfNull(isolationValves);
 
         if (!ProfileStartPolicy.TryRequireStartable(profile, out var refusalCode, out var refusalReason))
         {
@@ -85,6 +89,8 @@ public static class RuntimeStateComposer
             Config = config,
             WallMap = RuntimeCollections.Freeze(wallMap),
             Sensors = RuntimeCollections.Freeze(sensors),
+            WaterJets = RuntimeCollections.Freeze(waterJets),
+            IsolationValves = RuntimeCollections.Freeze(isolationValves),
             Walls = RuntimeWallSummaries.Recalculate(sensors),
             ActiveJob = null,
             Pump = IdlePump(),

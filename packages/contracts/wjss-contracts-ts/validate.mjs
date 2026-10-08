@@ -13,9 +13,9 @@
  * the signal for the consumer to drop state and request a fresh Snapshot.
  */
 
-export const SENSOR_MAP_SCHEMA = 'wjss.sensor-map/1';
-export const SNAPSHOT_SCHEMA = 'wjss.snapshot/1';
-export const DELTA_SCHEMA = 'wjss.delta/1';
+export const SENSOR_MAP_SCHEMA = 'wjss.sensor-map/2';
+export const SNAPSHOT_SCHEMA = 'wjss.snapshot/2';
+export const DELTA_SCHEMA = 'wjss.delta/2';
 export const API_VERSION = 1;
 
 // ---- canonical structure (mirror of Wjss.Contracts.CanonicalSensorMap) ----
@@ -27,10 +27,23 @@ const WALL_GROUPS = [
   ['RIGHT', 10, 13],
   ['FRONT', 14, 18],
 ];
-const CANNON_SLOTS = [
-  ['CANNON_REAR', 5, 7],
-  ['CANNON_FRONT', 5, 16],
+const GAP_SLOTS = [
+  ['I7', 'WJ3', 5, 7],
+  ['I16', 'WJ1', 5, 16],
 ];
+
+/** Approved target coverage: assignment follows the TARGET wall/region (legacy cleaning-device ordinal maps directly to WJn). */
+export const TARGET_COVERAGE = [
+  ['REAR', 'LOWER', 'WJ1'],
+  ['RIGHT', 'LOWER', 'WJ2'],
+  ['FRONT', 'LOWER', 'WJ3'],
+  ['LEFT', 'LOWER', 'WJ4'],
+  ['REAR', 'UPPER', 'WJ5'],
+  ['RIGHT', 'UPPER', 'WJ6'],
+  ['FRONT', 'UPPER', 'WJ7'],
+  ['LEFT', 'UPPER', 'WJ8'],
+];
+const COVERAGE_BY_ID = new Map(TARGET_COVERAGE.map(([w, r, id]) => [id, `${w}|${r}`]));
 
 export function sensorIdFor(row, col) {
   if (row === 1) return `G+${200 + col}`;
@@ -49,11 +62,18 @@ export function wallForColumn(col) {
   throw new Error(`bad column ${col}`);
 }
 
+/** Vertical region of a logical row: rows 1-2 (G+2xx, G+1xx) are UPPER; rows 3-6 (G, H, I, J) are LOWER. */
+export function regionForLogicalRow(row) {
+  if (row === 1 || row === 2) return 'UPPER';
+  if (row >= 3 && row <= 6) return 'LOWER';
+  throw new Error(`bad row ${row}`);
+}
+
 export function canonicalSensorIds() {
   const ids = [];
   for (let row = 1; row <= LOGICAL_ROWS; row += 1) {
     for (let col = 1; col <= LOGICAL_COLUMNS; col += 1) {
-      if (CANNON_SLOTS.some(([, r, c]) => r === row && c === col)) continue;
+      if (GAP_SLOTS.some(([, , r, c]) => r === row && c === col)) continue;
       ids.push(sensorIdFor(row, col));
     }
   }
@@ -61,7 +81,8 @@ export function canonicalSensorIds() {
 }
 
 const SENSOR_ID_SET = new Set(canonicalSensorIds());
-const CANNON_ID_SET = new Set(CANNON_SLOTS.map(([id]) => id));
+const WATER_JET_IDS = TARGET_COVERAGE.map(([, , id]) => id);
+const ISOLATION_VALVE_IDS = WATER_JET_IDS.map((id) => `IV${id.slice(2)}`);
 
 // ---------------------------------------------------------------- helpers
 const isInt = (n) => Number.isInteger(n);
@@ -87,14 +108,19 @@ function scanProhibitedKeys(node, path, issues, depth = 0) {
 
 function validateSlot(slot, path, issues) {
   if (!isStr(slot.slotId)) issues.push(`${path}.slotId`);
-  if (slot.slotType === 'CANNON') {
-    if (slot.sensorId !== null) issues.push(`${path}: CANNON slot carries sensorId`);
-    if (!CANNON_ID_SET.has(slot.equipmentId)) issues.push(`${path}: unknown CANNON equipmentId`);
-  } else if (slot.slotType === 'SENSOR') {
-    if (slot.equipmentId !== null) issues.push(`${path}: SENSOR slot carries equipmentId`);
+  if (slot.positionKind === 'NON_SENSOR_GAP') {
+    if (slot.sensorId !== null) issues.push(`${path}: NON_SENSOR_GAP position carries sensorId`);
+    if (slot.gapAnchorForWaterJetId === null || slot.gapAnchorForWaterJetId === undefined) {
+      issues.push(`${path}: NON_SENSOR_GAP position requires gapAnchorForWaterJetId`);
+    } else {
+      const match = GAP_SLOTS.find(([, anchor, r, c]) => anchor === slot.gapAnchorForWaterJetId && r === slot.logicalRow && c === slot.logicalColumn);
+      if (!match) issues.push(`${path}: gap anchor must match the I7/WJ3 or I16/WJ1 position`);
+    }
+  } else if (slot.positionKind === 'SENSOR') {
+    if (slot.gapAnchorForWaterJetId !== null) issues.push(`${path}: SENSOR slot carries gapAnchorForWaterJetId`);
     if (!SENSOR_ID_SET.has(slot.sensorId)) issues.push(`${path}: sensorId not in canonical set`);
   } else {
-    issues.push(`${path}: bad slotType`);
+    issues.push(`${path}: bad positionKind`);
   }
   const group = WALL_GROUPS.find(([, f, l]) => slot.logicalColumn >= f && slot.logicalColumn <= l);
   if (!group || group[0] !== slot.wall) issues.push(`${path}: wall/column mismatch`);
@@ -102,15 +128,62 @@ function validateSlot(slot, path, issues) {
   if (slot.wallRow !== slot.logicalRow) issues.push(`${path}: wallRow must equal logicalRow`);
   const expectedId = `SLOT-R${slot.logicalRow}-C${String(slot.logicalColumn).padStart(2, '0')}`;
   if (slot.slotId !== expectedId) issues.push(`${path}: slotId ${slot.slotId} != ${expectedId}`);
-  const isCannonSlot = CANNON_SLOTS.some(([, r, c]) => r === slot.logicalRow && c === slot.logicalColumn);
-  if (isCannonSlot !== (slot.slotType === 'CANNON')) issues.push(`${path}: Cannon position mismatch (I7/I16 only)`);
+  const isGapSlot = GAP_SLOTS.some(([, , r, c]) => r === slot.logicalRow && c === slot.logicalColumn);
+  if (isGapSlot !== (slot.positionKind === 'NON_SENSOR_GAP')) issues.push(`${path}: NON_SENSOR_GAP position mismatch (I7/I16 only)`);
+}
+
+function validateWaterJets(waterJets, path, issues) {
+  if (!Array.isArray(waterJets) || waterJets.length !== 8) {
+    issues.push(`${path}: exactly 8 approved Water Jets required (got ${waterJets?.length})`);
+    return;
+  }
+  for (const [i, w] of waterJets.entries()) {
+    const expectedId = WATER_JET_IDS[i];
+    if (w.waterJetId !== expectedId) issues.push(`${path}[${i}]: must be ${expectedId} in ordinal order`);
+    const expectedValve = `IV${expectedId.slice(2)}`;
+    if (w.dedicatedIsolationValveId !== expectedValve) issues.push(`${path}[${i}]: must pair with ${expectedValve}`);
+    const coverage = COVERAGE_BY_ID.get(expectedId);
+    if (`${w.targetWall}|${w.targetRegion}` !== coverage) {
+      issues.push(`${path}[${i}]: target coverage must be ${coverage}`);
+    }
+    if (w.installedWall === w.targetWall && w.installedRegion === w.targetRegion) {
+      // No approved device targets its own installed position; fail explicitly rather than silently.
+      issues.push(`${path}[${i}]: installed position must differ from target coverage (opposite-wall coverage)`);
+    }
+    if (!Array.isArray(w.placementAnchors) || w.placementAnchors.length === 0 || !w.placementAnchors.every(isStr)) {
+      issues.push(`${path}[${i}]: placementAnchors must be a non-empty string array`);
+    }
+  }
+}
+
+function validateIsolationValves(isolationValves, path, issues) {
+  if (!Array.isArray(isolationValves) || isolationValves.length !== 8) {
+    issues.push(`${path}: exactly 8 approved Isolation Valves required (got ${isolationValves?.length})`);
+    return;
+  }
+  for (const [i, v] of isolationValves.entries()) {
+    const expectedId = ISOLATION_VALVE_IDS[i];
+    if (v.valveId !== expectedId) issues.push(`${path}[${i}]: must be ${expectedId} in ordinal order`);
+    if (v.servedWaterJetId !== WATER_JET_IDS[i]) issues.push(`${path}[${i}]: must serve ${WATER_JET_IDS[i]}`);
+  }
 }
 
 function validateSensor(s, path, issues) {
   if (!isStr(s.sensorId) || !SENSOR_ID_SET.has(s.sensorId)) {
-    issues.push(`${path}: sensorId must be a canonical Sensor id (a Cannon is never a Sensor)`);
+    issues.push(`${path}: sensorId must be a canonical Sensor id (a gap position is never a Sensor)`);
   }
-  if (s.slotType !== 'SENSOR') issues.push(`${path}: slotType must be SENSOR`);
+  if (s.positionKind !== 'SENSOR') issues.push(`${path}: positionKind must be SENSOR`);
+  const coverage = COVERAGE_BY_ID.get(s.assignedWaterJetId);
+  if (coverage === undefined) {
+    issues.push(`${path}: assignedWaterJetId must be one of WJ1-WJ8`);
+  } else {
+    if (`${s.wall}|${regionForLogicalRow(s.logicalRow)}` !== coverage) {
+      issues.push(`${path}: assigned Water Jet ${s.assignedWaterJetId} does not target this Sensor's wall/region (${coverage})`);
+    }
+    if (s.assignedIsolationValveId !== `IV${s.assignedWaterJetId.slice(2)}`) {
+      issues.push(`${path}: assignedIsolationValveId must derive from the WJn ↔ IVn pairing`);
+    }
+  }
   if (!['GOOD', 'UNCERTAIN', 'BAD', 'STALE', 'DISABLED'].includes(s.quality)) issues.push(`${path}: bad quality`);
   if (!['DIRTY', 'CLEANER', 'NOT_CLASSIFIED'].includes(s.classification)) issues.push(`${path}: bad classification`);
   if (!['CURRENT', 'LAST_VALIDATED', 'NONE'].includes(s.classificationBasis)) issues.push(`${path}: bad classificationBasis`);
@@ -229,7 +302,7 @@ export function validateEnvelope(obj) {
 /**
  * Canonical geometry of the sensor-map configuration EXAMPLE (Stage 0.3A-1).
  * tcChannels is validated as a structured array of exactly two non-empty unique
- * strings per SENSOR slot, absent on CANNON slots; a comma-delimited scalar is a
+ * strings per SENSOR slot, absent on NON_SENSOR_GAP slots; a comma-delimited scalar is a
  * rejection, never a normalization. logicalColumn/logicalRow are 0-based here.
  */
 export const SENSOR_MAP = Object.freeze({
@@ -238,17 +311,19 @@ export const SENSOR_MAP = Object.freeze({
   sensorLocations: 106,
   thermocoupleChannels: 212,
   matrixSlots: 108,
-  cannonSlots: 2,
+  nonSensorGapSlots: 2,
   channelsPerSensor: 2,
   sensorsPerWall: Object.freeze({ LEFT: 24, REAR: 29, RIGHT: 24, FRONT: 29 }),
-  cannonLogicalRow: 5,
-  cannonLogicalColumns: Object.freeze([7, 16]),
+  gapLogicalRow: 5,
+  gapLogicalColumns: Object.freeze([7, 16]),
+  waterJets: 8,
+  isolationValves: 8,
 });
 
-export function validateSensorMapChannels(channels, { slotType = 'SENSOR', allowAbsent = false } = {}) {
+export function validateSensorMapChannels(channels, { positionKind = 'SENSOR', allowAbsent = false } = {}) {
   const issues = [];
   if (channels === undefined || channels === null) {
-    if (allowAbsent || slotType === 'CANNON') return issues;
+    if (allowAbsent || positionKind === 'NON_SENSOR_GAP') return issues;
     issues.push('SENSOR slot must carry a tcChannels array');
     return issues;
   }
@@ -260,8 +335,8 @@ export function validateSensorMapChannels(channels, { slotType = 'SENSOR', allow
     issues.push('tcChannels must be a JSON array');
     return issues;
   }
-  if (slotType === 'CANNON') {
-    if (channels.length > 0) issues.push('CANNON slot must not carry thermocouple channels');
+  if (positionKind === 'NON_SENSOR_GAP') {
+    if (channels.length > 0) issues.push('NON_SENSOR_GAP slot must not carry thermocouple channels');
     return issues;
   }
   if (channels.length !== SENSOR_MAP.channelsPerSensor) {
@@ -300,16 +375,17 @@ export function validateSensorMapExample(obj, issues = []) {
   const seenChannels = new Set();
   const allChannels = [];
   let sensors = 0;
-  let cannons = 0;
+  let nonSensorGaps = 0;
   for (const s of slots) {
-    if (s?.slotType === 'CANNON') {
-      cannons++;
-      issues.push(...validateSensorMapChannels(s.tcChannels, { slotType: 'CANNON', allowAbsent: true }));
-      if (s.sensorId != null) issues.push(`${s.slotId}: cannon slot must not carry a sensorId`);
-      if (s.equipmentId == null) issues.push(`${s.slotId}: cannon slot requires equipmentId`);
-    } else if (s?.slotType === 'SENSOR') {
+    if (s?.positionKind === 'NON_SENSOR_GAP') {
+      nonSensorGaps++;
+      issues.push(...validateSensorMapChannels(s.tcChannels, { positionKind: 'NON_SENSOR_GAP', allowAbsent: true }));
+      if (s.sensorId != null) issues.push(`${s.slotId}: NON_SENSOR_GAP slot must not carry a sensorId`);
+      const match = GAP_SLOTS.find(([, anchor, r, c]) => anchor === s.gapAnchorForWaterJetId && r === s.logicalRow && c === s.logicalColumn);
+      if (s.gapAnchorForWaterJetId == null || !match) issues.push(`${s.slotId}: NON_SENSOR_GAP slot requires its gap anchor (I7 → WJ3, I16 → WJ1)`);
+    } else if (s?.positionKind === 'SENSOR') {
       sensors++;
-      const chIssues = validateSensorMapChannels(s.tcChannels, { slotType: 'SENSOR' });
+      const chIssues = validateSensorMapChannels(s.tcChannels, { positionKind: 'SENSOR' });
       for (const c of chIssues) issues.push(`${s.slotId}: ${c}`);
       if (Array.isArray(s.tcChannels)) {
         for (const ch of s.tcChannels) {
@@ -322,13 +398,13 @@ export function validateSensorMapExample(obj, issues = []) {
       }
       if (s.sensorId == null) issues.push(`${s.slotId}: sensor slot requires sensorId`);
       else if (!SENSOR_ID_SET.has(s.sensorId)) issues.push(`${s.sensorId}: unknown sensor id`);
-      if (s.equipmentId != null) issues.push(`${s.slotId}: sensor slot must not carry equipmentId`);
+      if (s.gapAnchorForWaterJetId != null) issues.push(`${s.slotId}: sensor slot must not carry gapAnchorForWaterJetId`);
     } else {
-      issues.push(`${s?.slotId ?? '?'}: slotType must be SENSOR|CANNON`);
+      issues.push(`${s?.slotId ?? '?'}: positionKind must be SENSOR|NON_SENSOR_GAP`);
     }
   }
   if (sensors !== SENSOR_MAP.sensorLocations) issues.push(`sensor slots must number ${SENSOR_MAP.sensorLocations}; got ${sensors}`);
-  if (cannons !== SENSOR_MAP.cannonSlots) issues.push(`cannon slots must number ${SENSOR_MAP.cannonSlots}; got ${cannons}`);
+  if (nonSensorGaps !== SENSOR_MAP.nonSensorGapSlots) issues.push(`NON_SENSOR_GAP slots must number ${SENSOR_MAP.nonSensorGapSlots}; got ${nonSensorGaps}`);
   if (allChannels.length !== SENSOR_MAP.thermocoupleChannels) issues.push(`total channels must be ${SENSOR_MAP.thermocoupleChannels}; got ${allChannels.length}`);
   if (seenChannels.size !== SENSOR_MAP.thermocoupleChannels) issues.push(`channels must be globally unique across the 212; got ${seenChannels.size}`);
   return { kind: 'sensor-map', issues, gap: false };
@@ -337,8 +413,8 @@ export function validateSensorMapExample(obj, issues = []) {
 /** Derived summary used by tests and reviewers to assert the canonical totals. */
 export function sensorMapSummary(obj) {
   const slots = obj?.logicalMatrix?.slots ?? [];
-  const sensors = slots.filter((s) => s.slotType === 'SENSOR');
-  const cannons = slots.filter((s) => s.slotType === 'CANNON');
+  const sensors = slots.filter((s) => s.positionKind === 'SENSOR');
+  const nonSensorGaps = slots.filter((s) => s.positionKind === 'NON_SENSOR_GAP');
   const channels = sensors.flatMap((s) => (Array.isArray(s.tcChannels) ? s.tcChannels : []));
   const byWall = {};
   for (const wall of ['LEFT', 'REAR', 'RIGHT', 'FRONT']) {
@@ -347,12 +423,13 @@ export function sensorMapSummary(obj) {
   return {
     slots: slots.length,
     sensors: sensors.length,
-    cannons: cannons.length,
+    nonSensorGaps: nonSensorGaps.length,
     channelsPerSensor: sensors.length === 0 ? null : channels.length / sensors.length,
     totalChannels: channels.length,
     distinctChannels: new Set(channels).size,
     sensorsPerWall: byWall,
-    cannonLogicalLabels: cannons.map((c) => c.logicalLabel).sort(),
+    // Canonical row-major order (orderTotal), never lexicographic label order.
+    gapLogicalLabels: nonSensorGaps.map((c) => c.logicalLabel),
   };
 }
 
@@ -368,6 +445,8 @@ function validateSnapshot(obj, issues) {
   const sensors = obj.sensors ?? [];
   if (sensors.length !== 106) issues.push(`sensors must contain all 106 records (got ${sensors.length})`);
   for (const [i, slot] of map.entries()) validateSlot(slot, `wallMap[${i}]`, issues);
+  validateWaterJets(obj.waterJets, '$.waterJets', issues);
+  validateIsolationValves(obj.isolationValves, '$.isolationValves', issues);
 
   const scans = new Set();
   const channels = new Set();
@@ -409,6 +488,8 @@ function validateDelta(obj, issues) {
   }
   const gap = isInt(obj.previousRevision) && isInt(obj.revision) ? obj.revision !== obj.previousRevision + 1 : true;
   if ('wallMap' in obj) issues.push('wallMap must never appear in a Delta');
+  if ('waterJets' in obj) issues.push('waterJets must never appear in a Delta (process-lifetime immutable topology; Snapshot establishes it)');
+  if ('isolationValves' in obj) issues.push('isolationValves must never appear in a Delta (process-lifetime immutable topology; Snapshot establishes it)');
   // Three-state activeJob encoding (accepted baseline; Owner review 2026-10-07):
   // absent key = unchanged | object = replace | explicit null = clear.
   if ('activeJobCleared' in obj) {

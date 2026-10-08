@@ -91,16 +91,16 @@ public sealed class RuntimeSnapshotProjectionTests
         {
             var slot = snapshot.WallMap.Single(candidate =>
                 candidate.LogicalRow == sensor.LogicalRow && candidate.LogicalColumn == sensor.LogicalColumn);
-            Assert.Equal(SlotType.SENSOR, slot.SlotType);
+            Assert.Equal(LogicalPositionKind.SENSOR, slot.PositionKind);
             Assert.Equal(sensor.SensorId, slot.SensorId);
             Assert.Equal(sensor.Wall, slot.Wall);
             Assert.Equal(sensor.WallColumn, slot.WallColumn);
         }
 
-        var sensorSlots = snapshot.WallMap.Where(slot => slot.SlotType == SlotType.SENSOR).ToArray();
+        var sensorSlots = snapshot.WallMap.Where(slot => slot.PositionKind == LogicalPositionKind.SENSOR).ToArray();
         Assert.Equal(snapshot.Sensors.Count, sensorSlots.Length);
-        Assert.DoesNotContain(sensorSlots, slot => slot.EquipmentId is not null);
-        Assert.DoesNotContain(snapshot.WallMap, slot => slot.SlotType == SlotType.CANNON && slot.SensorId is not null);
+        Assert.DoesNotContain(sensorSlots, slot => slot.GapAnchorForWaterJetId is not null);
+        Assert.DoesNotContain(snapshot.WallMap, slot => slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP && slot.SensorId is not null);
     }
 
     [Fact]

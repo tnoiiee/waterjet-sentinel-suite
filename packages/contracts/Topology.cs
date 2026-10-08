@@ -8,8 +8,9 @@ namespace Wjss.Contracts;
 /// <see cref="LogicalPositionRecord"/> (one per logical matrix position, 108 records),
 /// <see cref="WaterJetConfiguration"/> (exactly 8) and
 /// <see cref="IsolationValveConfiguration"/> (exactly 8, one-to-one ordinal paired with
-/// the Water Jets). They are configuration-shaped data, not Runtime presentation state:
-/// the Snapshot wire surface (<c>WallMapSlot</c>, <c>SlotType</c>) is NOT touched here.
+/// the Water Jets). The Water Jet / Isolation Valve records are ALSO the Snapshot's
+/// static topology collections since the Stage 0.3A-3 Checkpoint C migration (they are
+/// configuration topology references, never controllable device instances).
 ///
 /// No Production acquisition parameter exists in this file: acquisition bindings remain
 /// deferred raw provenance (<see cref="DeferredAcquisitionProvenance"/> in Config.cs).

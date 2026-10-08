@@ -8,7 +8,7 @@ namespace Wjss.Contracts;
 /// example-contract record, not a runtime configuration type: the publication
 /// pipeline is Stage 0.3A-F content.
 /// Thermocouple channels are a structured array — exactly two entries per SENSOR
-/// slot and never present on CANNON slots. A comma-delimited scalar string is not
+/// slot and never present on NON_SENSOR_GAP slots. A comma-delimited scalar string is not
 /// a valid encoding and is rejected by deserialization itself (System.Text.Json
 /// cannot bind a JSON string to <see cref="IReadOnlyList{T}"/>) and by every rule
 /// in <see cref="TcChannelRules"/>.
@@ -16,28 +16,32 @@ namespace Wjss.Contracts;
 public sealed record SensorMapSlotExample
 {
     public required string SlotId { get; init; }
-    public required SlotType SlotType { get; init; }
+
+    /// <summary>SENSOR for the 106 actual Sensors; NON_SENSOR_GAP for I7 and I16.</summary>
+    public required LogicalPositionKind PositionKind { get; init; }
     public required Wall Wall { get; init; }
     public required int LogicalColumn { get; init; }
     public required int LogicalRow { get; init; }
     public required int WallColumn { get; init; }
     public required int WallRow { get; init; }
     public string? SensorId { get; init; }
-    public string? EquipmentId { get; init; }
+
+    /// <summary>The Water Jet physically anchored here; non-null only for NON_SENSOR_GAP slots (I7 → WJ3, I16 → WJ1).</summary>
+    public string? GapAnchorForWaterJetId { get; init; }
     public string? LogicalLabel { get; init; }
     public int? ScanOrderSynthetic { get; init; }
 
     /// <summary>
     /// The two thermocouple channels for a SENSOR slot, as a JSON array of exactly
     /// two strings. Deterministic order: index 0 is the pair's lower channel index
-    /// (front), index 1 the higher (rear). Absent on CANNON slots: the key is
-    /// omitted (null is never written for this example-shape property), so a
-    /// cannon can never smuggle in an empty array either.
+    /// (front), index 1 the higher (rear). Absent on NON_SENSOR_GAP slots: the key is
+    /// omitted (null is never written for this example-shape property), so a gap can
+    /// never smuggle in an empty array either.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? TcChannels { get; init; }
 
-    public bool IsCannon => SlotType == SlotType.CANNON;
+    public bool IsNonSensorGap => PositionKind == LogicalPositionKind.NON_SENSOR_GAP;
 }
 
 /// <summary>
@@ -50,7 +54,7 @@ public static class TcChannelRules
 {
     public const int ChannelsPerSensor = 2;
     public const int SensorSlotCount = CanonicalSensorMap.SensorLocations;          // 106
-    public const int CannonSlotCount = CanonicalSensorMap.CannonSlotCount;          // 2
+    public const int NonSensorGapSlotCount = CanonicalSensorMap.NonSensorGapCount;  // 2
     public const int SlotCount = CanonicalSensorMap.MatrixSlots;                    // 108
     public const int TotalChannelCount = CanonicalSensorMap.ThermocoupleChannelCount; // 212
 
@@ -79,19 +83,19 @@ public static class TcChannelRules
         }
     }
 
-    /// <summary>A CANNON slot carries no thermocouple channels (absent or empty only).</summary>
-    public static void RequireCannonCarriesNoChannels(IReadOnlyList<string>? channels, string slotId)
+    /// <summary>A NON_SENSOR_GAP slot carries no thermocouple channels (absent or empty only).</summary>
+    public static void RequireNonSensorGapCarriesNoChannels(IReadOnlyList<string>? channels, string slotId)
     {
         if (channels is { Count: > 0 })
         {
-            throw new ArgumentException($"Cannon slot {slotId} must not carry thermocouple channels.", nameof(channels));
+            throw new ArgumentException($"NON_SENSOR_GAP slot {slotId} must not carry thermocouple channels.", nameof(channels));
         }
     }
 
     /// <summary>
     /// Full mapping check: slot composition, per-slot channel shape, global channel
-    /// uniqueness, and the canonical totals (108 slots, 106 sensors, 2 cannons,
-    /// exactly 2 channels per sensor, 212 distinct channels).
+    /// uniqueness, and the canonical totals (108 slots, 106 sensors, 2 NON_SENSOR_GAP
+    /// slots, exactly 2 channels per sensor, 212 distinct channels).
     /// </summary>
     public static void RequireValidMapping(IReadOnlyList<SensorMapSlotExample> slots)
     {
@@ -102,13 +106,13 @@ public static class TcChannelRules
 
         var seenChannels = new HashSet<string>(StringComparer.Ordinal);
         var sensors = 0;
-        var cannons = 0;
+        var nonSensorGaps = 0;
         foreach (var slot in slots)
         {
-            if (slot.IsCannon)
+            if (slot.IsNonSensorGap)
             {
-                cannons++;
-                RequireCannonCarriesNoChannels(slot.TcChannels, slot.SlotId);
+                nonSensorGaps++;
+                RequireNonSensorGapCarriesNoChannels(slot.TcChannels, slot.SlotId);
             }
             else
             {
@@ -126,10 +130,10 @@ public static class TcChannelRules
             }
         }
 
-        if (sensors != SensorSlotCount || cannons != CannonSlotCount)
+        if (sensors != SensorSlotCount || nonSensorGaps != NonSensorGapSlotCount)
         {
             throw new ArgumentException(
-                $"Expected {SensorSlotCount} sensor and {CannonSlotCount} cannon slots; got {sensors} and {cannons}.",
+                $"Expected {SensorSlotCount} sensor and {NonSensorGapSlotCount} NON_SENSOR_GAP slots; got {sensors} and {nonSensorGaps}.",
                 nameof(slots));
         }
         if (seenChannels.Count != TotalChannelCount)

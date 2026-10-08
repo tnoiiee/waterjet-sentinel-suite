@@ -14,12 +14,21 @@
  * before the Owner answers the decision matrices.
  */
 
-export const SNAPSHOT_SCHEMA = 'wjss.snapshot/1' as const;
-export const DELTA_SCHEMA = 'wjss.delta/1' as const;
+export const SNAPSHOT_SCHEMA = 'wjss.snapshot/2' as const;
+export const DELTA_SCHEMA = 'wjss.delta/2' as const;
 export const API_VERSION = 1 as const;
 
 export type Wall = 'LEFT' | 'REAR' | 'RIGHT' | 'FRONT';
-export type SlotType = 'SENSOR' | 'CANNON';
+export type Region = 'UPPER' | 'LOWER';
+/**
+ * Canonical logical-position kind (ADR-0017). NON_SENSOR_GAP positions (I7, I16)
+ * are location anchors only: never Sensors, never equipment entities. The
+ * formerly transitional 'CANNON' slot vocabulary was migrated away atomically
+ * (Stage 0.3A-3 Checkpoint C); no alias exists.
+ */
+export type LogicalPositionKind = 'SENSOR' | 'NON_SENSOR_GAP';
+/** How a Water Jet is physically mounted (Owner-approved topology table). */
+export type WaterJetPlacementKind = 'NON_SENSOR_GAP' | 'BETWEEN_HORIZONTAL' | 'BETWEEN_VERTICAL' | 'JUNCTION';
 export type Quality = 'GOOD' | 'UNCERTAIN' | 'BAD' | 'STALE' | 'DISABLED';
 export type Classification = 'DIRTY' | 'CLEANER' | 'NOT_CLASSIFIED';
 export type ClassificationBasis = 'CURRENT' | 'LAST_VALIDATED' | 'NONE';
@@ -60,7 +69,7 @@ export type StandbyLabel = 'NOT_CONFIRMED' | 'STANDBY_CONFIRMED' | 'ABSENT';
 
 export interface WallMapSlot {
   slotId: string;
-  slotType: SlotType;
+  positionKind: LogicalPositionKind;
   wall: Wall;
   /** 1-18 across the matrix. */
   logicalColumn: number;
@@ -70,12 +79,34 @@ export interface WallMapSlot {
   wallColumn: number;
   wallRow: number;
   sensorId: string | null;
-  equipmentId: string | null;
+  /** The Water Jet physically anchored here; non-null only for NON_SENSOR_GAP positions (I7 → WJ3, I16 → WJ1). */
+  gapAnchorForWaterJetId: string | null;
+}
+
+/** Approved Water Jet topology: a configuration reference, never a control handle. */
+export interface WaterJetConfiguration {
+  waterJetId: string;
+  /** Where the device is physically installed. */
+  installedWall: Wall;
+  installedRegion: Region;
+  placementKind: WaterJetPlacementKind;
+  placementAnchors: string[];
+  /** Which wall/region this device is responsible for cleaning (may be the opposite wall). */
+  targetWall: Wall;
+  targetRegion: Region;
+  /** The WJn ↔ IVn pairing, asserted in both directions. */
+  dedicatedIsolationValveId: string;
+}
+
+/** Approved Isolation Valve topology, one-to-one ordinal paired with the Water Jets. */
+export interface IsolationValveConfiguration {
+  valveId: string;
+  servedWaterJetId: string;
 }
 
 export interface SensorPresentationState {
   sensorId: string;
-  slotType: 'SENSOR';
+  positionKind: 'SENSOR';
   wall: Wall;
   logicalColumn: number;
   logicalRow: number;
@@ -84,6 +115,10 @@ export interface SensorPresentationState {
   /** Configuration-derived scan ordinal (deployment data; synthetic in fixtures). */
   scanOrder: number;
   deviceId: string;
+  /** The cleaning device assigned to this Sensor (targets this Sensor's wall; may be installed on the opposite wall). */
+  assignedWaterJetId: string;
+  /** Derived only through the WJn ↔ IVn pairing of the assigned Water Jet. */
+  assignedIsolationValveId: string;
   tcFrontChannel: string;
   tcRearChannel: string;
   dirtyScore: number | null;
@@ -368,9 +403,13 @@ export interface OperationalSnapshot {
   generatedAt: string;
   config: PublishedConfigurationRevision;
   deviceProfile: DeviceProfile;
-  /** 108 slots: 106 SENSOR + 2 CANNON. Snapshot-only; NEVER in a Delta. */
+  /** 108 slots: 106 SENSOR + 2 NON_SENSOR_GAP. Snapshot-only; NEVER in a Delta. */
   wallMap: WallMapSlot[];
   sensors: SensorPresentationState[];
+  /** Approved Water Jet topology (exactly 8). Static; Snapshot-only; NEVER in a Delta. */
+  waterJets: WaterJetConfiguration[];
+  /** Approved Isolation Valve topology (exactly 8, WJn ↔ IVn). Static; Snapshot-only; NEVER in a Delta. */
+  isolationValves: IsolationValveConfiguration[];
   walls: WallSummary[];
   activeJob: ActiveCleaningJobState | null;
   pump: PumpState;
@@ -456,7 +495,7 @@ export interface HealthReadyPayload {
  *
  * Stage 0.3A-1 correction: `tcChannels` is a structured array of EXACTLY two
  * thermocouple channel strings on SENSOR slots (index 0 = lower channel index =
- * front, index 1 = higher = rear) and is never present on CANNON slots. The earlier
+ * front, index 1 = higher = rear) and is never present on NON_SENSOR_GAP slots. The earlier
  * comma-delimited scalar string is not a valid encoding; validators must reject it
  * (not normalize it). Snapshot/delta presentation keeps its existing separate
  * `tcFrontChannel`/`tcRearChannel` fields.
@@ -465,7 +504,7 @@ export type TcChannels = readonly [string, string];
 
 export interface SensorMapSlotExample {
   slotId: string;
-  slotType: SlotType;
+  positionKind: LogicalPositionKind;
   wall: Wall;
   /** 0-17 across the matrix. */
   logicalColumn: number;
@@ -475,14 +514,15 @@ export interface SensorMapSlotExample {
   wallColumn: number;
   wallRow: number;
   sensorId: string | null;
-  equipmentId: string | null;
+  /** The Water Jet physically anchored here; non-null only for NON_SENSOR_GAP slots (I7 → WJ3, I16 → WJ1). */
+  gapAnchorForWaterJetId: string | null;
   logicalLabel?: string | null;
   scanOrderSynthetic?: number | null;
   tcChannels?: TcChannels;
 }
 
 export interface SensorMapExample {
-  schema: 'wjss.sensor-map/1';
+  schema: 'wjss.sensor-map/2';
   fixtureStatus: string;
   logicalMatrix: {
     columns: number;

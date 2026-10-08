@@ -17,11 +17,11 @@ public static class RuntimeStage
     /// Inspector that observe them. The marker moves only with the substage that
     /// actually exists, so it is never a claim of completeness.
     /// </summary>
-    public const string Marker = "STAGE_03A2C_RUNTIME_API";
+    public const string Marker = "STAGE_03A3C_RUNTIME_TOPOLOGY";
 }
 
 /// <summary>
-/// Projects one Runtime revision onto the accepted <c>wjss.snapshot/1</c>
+/// Projects one Runtime revision onto the accepted <c>wjss.snapshot/2</c>
 /// contract. The projection is the only place the Runtime produces the
 /// presentation envelope, so envelope identity (kind, schema, API version) and
 /// the diagnostics block cannot drift between callers.
@@ -64,6 +64,8 @@ public static class RuntimeSnapshotProjector
             DeviceProfile = state.DeviceProfile,
             WallMap = state.WallMap,
             Sensors = state.Sensors,
+            WaterJets = state.WaterJets,
+            IsolationValves = state.IsolationValves,
             Walls = state.Walls,
             ActiveJob = state.ActiveJob,
             Pump = state.Pump,

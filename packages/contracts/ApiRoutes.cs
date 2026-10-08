@@ -16,7 +16,7 @@ public static class ApiRoutes
     /// <summary>Readiness of the authoritative Runtime: 200 only when every readiness condition holds, else 503 with a structured machine code.</summary>
     public const string HealthReady = "/health/ready";
 
-    /// <summary>Current <c>wjss.snapshot/1</c> projection of the committed revision. Read-only.</summary>
+    /// <summary>Current <c>wjss.snapshot/2</c> projection of the committed revision. Read-only.</summary>
     public const string Snapshot = "/api/v1/snapshot";
 
     /// <summary>Small read-only Runtime status payload for operators and the development Inspector.</summary>

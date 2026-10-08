@@ -3,17 +3,13 @@ namespace Wjss.Contracts;
 /// <summary>The four boiler walls (accepted domain baseline).</summary>
 public enum Wall { LEFT, REAR, RIGHT, FRONT }
 
-/// <summary>A logical matrix position is either a Sensor slot or a Cannon equipment slot.</summary>
-public enum SlotType { SENSOR, CANNON }
-
 /// <summary>
-/// Canonical logical-position kind (ADR-0017, Owner-approved Stage 0.3A-3 Checkpoint A).
-/// NON_SENSOR_GAP positions are location anchors only: they are never Sensors, never
-/// equipment entities, and never appear in queues, selections, Cleaning Jobs, alarms, or
-/// coverage sets. The legacy runtime <c>SlotType.CANNON</c> vocabulary is a TRANSITIONAL
-/// LEGACY RUNTIME REPRESENTATION that is semantically superseded by this kind; its atomic
-/// migration is deferred to Checkpoint C and no alias connects the two vocabularies.
-/// The canonical importer emits NON_SENSOR_GAP and never a Cannon identity.
+/// Canonical logical-position kind (ADR-0017, Owner-approved Stage 0.3A-3 Checkpoint A;
+/// atomic Runtime migration delivered in Stage 0.3A-3 Checkpoint C). NON_SENSOR_GAP
+/// positions are location anchors only: they are never Sensors, never equipment entities,
+/// and never appear in queues, selections, Cleaning Jobs, alarms, or coverage sets. The
+/// formerly transitional <c>CANNON</c> slot vocabulary was migrated away atomically in
+/// Checkpoint C and no Cannon entity or alias exists anywhere in the Runtime surface.
 /// </summary>
 public enum LogicalPositionKind { SENSOR, NON_SENSOR_GAP }
 

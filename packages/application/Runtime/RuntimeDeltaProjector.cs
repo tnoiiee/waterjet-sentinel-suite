@@ -4,7 +4,7 @@ using Wjss.Time;
 namespace Wjss.Runtime.Core;
 
 /// <summary>
-/// Projects one accepted revision transition onto <c>wjss.delta/1</c>.
+/// Projects one accepted revision transition onto <c>wjss.delta/2</c>.
 ///
 /// The projector is the only place a Delta envelope is produced, so envelope
 /// identity (kind, schema, API version) and the three-state Active Job encoding

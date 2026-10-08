@@ -34,6 +34,6 @@ public sealed class StageMarkerTests
 
         Assert.Equal("Wjss.Runtime.Core", loaded.GetName().Name);
         Assert.Equal(typeof(RuntimeStateStore).Assembly, loaded);
-        Assert.Equal("STAGE_03A2C_RUNTIME_API", RuntimeStage.Marker);
+        Assert.Equal("STAGE_03A3C_RUNTIME_TOPOLOGY", RuntimeStage.Marker);
     }
 }

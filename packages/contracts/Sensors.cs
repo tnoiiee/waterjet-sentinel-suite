@@ -11,8 +11,8 @@ public sealed record SensorPresentationState
 {
     public required string SensorId { get; init; }
 
-    /// <summary>Always SENSOR for this record type. A Cannon is never a Sensor.</summary>
-    public required SlotType SlotType { get; init; }
+    /// <summary>Always SENSOR for this record type: every entry of the Sensors collection is an actual Sensor.</summary>
+    public required LogicalPositionKind PositionKind { get; init; }
 
     public required Wall Wall { get; init; }
     public required int LogicalColumn { get; init; }
@@ -25,6 +25,16 @@ public sealed record SensorPresentationState
 
     /// <summary>Configuration-derived device identity (synthetic in fixtures/tests only).</summary>
     public required string DeviceId { get; init; }
+
+    /// <summary>
+    /// The cleaning device assigned to this Sensor (legacy "cannon n" maps directly to
+    /// WJn; never remapped by wall). The assigned Water Jet may be installed on the
+    /// opposite wall: assignment describes responsibility, not location.
+    /// </summary>
+    public required string AssignedWaterJetId { get; init; }
+
+    /// <summary>Derived ONLY through the WJn ↔ IVn pairing; never independently assigned.</summary>
+    public required string AssignedIsolationValveId { get; init; }
 
     /// <summary>Folded Thermocouple source channels (identity strings; configuration-derived).</summary>
     public required string TcFrontChannel { get; init; }
