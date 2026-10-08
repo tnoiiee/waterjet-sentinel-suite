@@ -152,6 +152,25 @@ Stage 0.3A convention. Runtime CANNON migration NOT started (Checkpoint C NOT
 AUTHORIZED). No command/write path, no device access, no Production value. PR #6 remains
 OPEN — NOT MERGED.**
 
+**Owner-local validation (2026-10-08) — CHECKPOINT B OWNER-LOCALLY VALIDATED.** After the
+test-compile correction (`18f853a5`), the CA1829 count correction (`901a070`), the
+behavioural test correction (`79fa0ba5` — four test defects: sensor-level
+`assignedIsolationValveId` expectation, two policy-violating source-substring tests
+replaced with semantic output/contract-shape tests, and orderTotal-based I7-before-I16
+ordering), and the final analyzer correction (`2db853a7` — CA1865, two xUnit2029, and the
+last source-substring test replaced with compiled-public-type semantics), the Owner
+supplied the authoritative evidence at feature head `2db853a7`: SDK `10.0.401`; normal
+restore PASS; locked restore PASS; Release build **0 warnings / 0 errors**; fresh full
+.NET suite **186 total / 186 passed / 0 failed / 0 skipped**; boundary scan **0 findings
+(S1–S9 clean)**; JSON examples PASS; Owner acquisition data in the migrated example
+**NONE**; Working Tree CLEAN. An earlier "139 total / 139 passed" observation was
+non-authoritative (`--no-build` over stale binaries) and is not recorded as validation.
+The Owner's genuine lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (parent
+`2db853a7`; exactly `tests/config.tests/packages.lock.json`: the project-graph edge
+`wjss.domain → Wjss.Contracts`; valid JSON, no path, no secret, no version change) was
+adopted byte-for-byte. Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_B.md`](docs/STAGE_0.3A-3_CHECKPOINT_B.md).
+Checkpoint C remains NOT AUTHORIZED and NOT STARTED; PR #6 OPEN — NOT MERGED.
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh

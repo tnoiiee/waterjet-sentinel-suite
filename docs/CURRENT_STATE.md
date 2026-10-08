@@ -54,6 +54,7 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Stage 0.3 | **NOT AUTHORIZED** as a whole; **Stage 0.3A-1 source checkpoint** authored under the amended gate (see §11.4, §12.12) |
 | Stage 0.3A-1 .NET validation | **PASSED (Owner-local, 2026-10-07)** — Release build 0 warnings / 0 errors, full suite 61/61, TypeScript 24/24, parity 7/7, boundary S1–S9 clean; PR #4 READY FOR OWNER MERGE (not merged). See §12.22 and the [runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) verdict; Arena claims no .NET execution of its own |
 | Stage 0.3A-2 | **AUTHORIZED** — Owner instruction 2026-10-07, three checkpoints A → B → C on one branch, SIMULATOR profile only. **Checkpoint A OWNER-LOCALLY VALIDATED (2026-10-07)**: Release build 0 warnings / 0 errors, full .NET suite **101/101**, locked restore PASS, boundary scan S1–S9 clean, genuine lock-refresh commit `55d3b8b` (see §11.5, §12.23, §12.24). **Checkpoint B OWNER-LOCALLY VALIDATED (2026-10-07)** at `cfa6d4a`: Release build 0 warnings / 0 errors, full .NET suite **129/129**, locked restore PASS, lock drift NONE, boundary S1–S9 clean (see §11.6, §12.25). **Checkpoint C (read-only Runtime API + development Runtime Inspector) OWNER-LOCALLY VALIDATED (2026-10-07)** at the genuine lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d`: SDK `10.0.401`, locked restore PASS, Release build **0 warnings / 0 errors**, fresh full .NET suite **139 total / 139 passed / 0 failed / 0 skipped**, boundary scan S1–S9 clean, worktree CLEAN; Owner Function/Logic review **PASSED** and Inspector UI review **PASSED WITH MINOR PUNCHLIST** (see §11.7, §12.27). Arena compiled and executed nothing itself. **NOT MERGED** |
+| Stage 0.3A-3 (config loading pipeline) | **AUTHORIZED** — Checkpoint A (equipment topology decision + legacy parameter migration specification) reviewed to **PASS**; **ADR-0017 explicitly Owner-ACCEPTED**. **Checkpoint B OWNER-LOCALLY VALIDATED (2026-10-08)**: Release build 0 warnings / 0 errors, fresh full .NET suite **186/186**, locked restore PASS, boundary S1–S9 clean, JSON examples PASS, no Owner acquisition data in Git; validated feature head `2db853a723a74399430ddd84900c40371fe56b29`, genuine Owner lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (project graph `wjss.domain → Wjss.Contracts` only). I7/I16 are NON_SENSOR_GAP; derived `scanOrder` 1–106; direct `cannon n → WJn`. See §11.8, §12.28 and [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md). Arena compiled and executed nothing itself. **PR #6 OPEN — NOT MERGED. Checkpoint C NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
 
@@ -446,6 +447,20 @@ accepted and merged Stage 0.2.*
 | Lock handoff (2026-10-07) | `faa79145a925832baa2ac8685f7fecf7a093552d` (`chore: refresh Checkpoint C project locks`) — exactly `apps/runtime/packages.lock.json` and `tests/api.tests/packages.lock.json`, genuine Owner-local restore output (no package version changed); Arena verified it statically and adopted it byte-for-byte. Never hand-edited |
 | Status | **Checkpoint C COMPLETE for a development checkpoint** (Owner-locally validated; SUBMITTED FOR OWNER REVIEW — NOT MERGED) |
 | Next | **Final Source Review** of PR #5 (Owner-only; the Agent never merges). The Inspector is frozen for this checkpoint: no further presentation change is authorised, and the deferred optional polish (top-row vertical balance) must not trigger another change round. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |
+
+### 11.8 Stage 0.3A-3 — Equipment topology & legacy parameter migration — Checkpoints A and B
+
+| Item | Record |
+| --- | --- |
+| Gate | **Owner instruction 2026-10-08**: Stage 0.3A-3 Checkpoint A authorized (planning / decision / specification only) on the approved main base `a74db62c4a7d4d8d5d2185cfe77a4c0229b01fce` (the PR #5 merge); Checkpoint C, queue dispatch, cleaning execution, pump/valve/axis commands, Safe Return actuation, TEST_HARDWARE, PRODUCTION, ZIP, Release and Deployment all NOT AUTHORIZED |
+| Checkpoint A (specification) | Authored as [`ADR-0017`](decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md) + [`STAGE_0.3A-3_CHECKPOINT_A.md`](STAGE_0.3A-3_CHECKPOINT_A.md) on PR #6; two review rounds (CHANGES REQUESTED → scanOrder derivation + acceptance-vs-merge governance, then legacy field semantics, deferred mappings, TC scope, public boundary, transitional vocabulary scope); **final Owner review PASS; ADR-0017 explicitly Owner-ACCEPTED (2026-10-08)** |
+| Checkpoint B (implementation, AUTHORIZED) | Delivered on PR #6 exactly per the approved change set: `packages/contracts/Topology.cs` (NEW; `LogicalPositionRecord` with `LegacyRecordId` provenance, `WaterJetConfiguration`, `IsolationValveConfiguration`, `Region`, `WaterJetPlacementKind`), `Enums.cs` (+ canonical `LogicalPositionKind {SENSOR, NON_SENSOR_GAP}` only — transitional `SlotType.CANNON` wire surface untouched, Checkpoint C defers), `Config.cs` (+ `SensorConfigurationRecord`, `DeferredAcquisitionProvenance`, migration warning/refusal records, atomic `SensorParameterImportOutcome`, approved field-classification records, additive `MigrationRefusalCodes`), `packages/domain/WaterJetTopologyCatalog.cs` + `SensorParameterCsvImporter.cs` + `TopologyValidator.cs` (deterministic, atomic, fail-closed), `config/examples/sensor-parameters.migrated.example.json` (synthetic; deferred-raw and acquisition fields null), and the T1–T20 semantic test suite with a public-safe CSV builder (`tests/config.tests/`; csproj gains the required `Wjss.Domain` reference). Identifier note: `DedicatedIsolationValveId`/`ServedWaterJetId` implement the approved pairing attributes because the boundary S3 `redis` substring rule matches `Pai-red-is-olation…` — mechanical rename, semantics unchanged, recorded in the CHANGELOG |
+| Correction chain (new commits only) | `c994c26f` → `03c2d15` → `6648437f` → `3dac1a0c` → `8cb94d11` (Checkpoint A corrections; final review PASS) → `b0a5208` (Checkpoint B implementation) → `18f853a5` (Owner-local test-compile correction) → `901a070` (CA1829 count correction) → `79fa0ba5` (behavioural test correction: four test defects; source-substring tests replaced with semantic tests; orderTotal-based I7-before-I16 ordering) → `2db853a7` (CA1865 + two xUnit2029 + last source-substring test replaced with compiled-public-type semantics) → `0728df61` (**Owner-authored** genuine lock refresh). Nothing rewritten |
+| Lock handoff (2026-10-08) | `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (`chore: refresh Checkpoint B migration test lock`; parent `2db853a7`) — exactly `tests/config.tests/packages.lock.json` (+6 lines): the genuine project-graph edge `wjss.domain → { type: Project, dependencies: { Wjss.Contracts: [1.0.0, ) } }`; valid JSON; no absolute path; no credential; no package-version change; no Owner CSV or acquisition value; adopted byte-for-byte; never hand-edited |
+| Owner-local validation (2026-10-08) | **PASSED** — SDK `10.0.401`; normal restore PASS; locked restore PASS; Release build **0 warnings / 0 errors**; fresh full .NET suite **186 total / 186 passed / 0 failed / 0 skipped**; boundary scan **0 findings (S1–S9 clean)**; JSON examples PASS; Owner acquisition data in the migrated example NONE; final Owner-local Working Tree CLEAN. Validated feature head `2db853a7`. Recorded in §12.28 and [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md). An earlier "139 total / 139 passed" observation was non-authoritative (`--no-build` over stale binaries) and is not validation |
+| Validated topology | 108 LogicalPositions; 106 SensorConfigurations; 212 structural TC channel sides; Left 24 / Rear 29 / Right 24 / Front 29; I7 and I16 NON_SENSOR_GAP; `orderTotal` 0–107; derived `scanOrder` dense 1–106 over actual Sensors only; exactly 8 Water Jets; exactly 8 Isolation Valves; `WJn ↔ IVn` one-to-one; installed position separate from target coverage; legacy `cannon n → WJn` direct; acquisition bindings deferred; no Production device binding created; no command or actuation path added |
+| Status | **Checkpoint B COMPLETE — OWNER-LOCALLY VALIDATED** (SUBMITTED FOR OWNER REVIEW — PR #6 **OPEN, NOT MERGED**; only the Owner merges) |
+| Next | Owner-only final source review of PR #6. **Checkpoint C NOT AUTHORIZED and NOT STARTED** (proposed scope — atomic CANNON vocabulary migration, Runtime topology integration, Inspector overlays — is documented in [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md) §4 only). `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |
 
 ### 11.1 Process deviation record
 
@@ -1170,6 +1185,26 @@ and jsdom only), this document must not be read as claiming any test, build, dat
 hardware, or device verification. See section 9.
 
 ---
+
+### 12.28 Stage 0.3A-3 Checkpoint B — Owner-local validation record (PASSED)
+
+Owner-supplied evidence (Arena never executed .NET); recorded at the closeout commit.
+
+| Item | Evidence |
+| --- | --- |
+| SDK | `10.0.401` |
+| Validated feature head | `2db853a723a74399430ddd84900c40371fe56b29` |
+| Genuine lock refresh | `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` — parent `2db853a7`; exactly `tests/config.tests/packages.lock.json` (+6): project graph `wjss.domain → Wjss.Contracts`; valid JSON; no absolute path; no credential/secret; no package-version change; no Owner CSV or acquisition value; adopted byte-for-byte |
+| Normal restore | PASS |
+| Locked restore | PASS |
+| Release build | PASS — 0 warnings / 0 errors |
+| Fresh full .NET tests | 186 total / 186 passed / 0 failed / 0 skipped |
+| Boundary scan | 0 findings — S1–S9 clean |
+| JSON examples | PASS |
+| Owner acquisition data in the migrated example | NONE |
+| Final Owner-local Working Tree | CLEAN |
+| Non-authoritative observation excluded | "139 total / 139 passed" at the implementation head (`dotnet test --no-build` over stale binaries after a failed test-project build) is explicitly NOT recorded as validation; its four behavioural failures and all compile/analyzer diagnostics were corrected on the chain `18f853a5` → `901a070` → `79fa0ba5` → `2db853a7` before the fresh authoritative run |
+| Scope | Documentation-only closeout commit on top of the Owner handoff: CHANGELOG, this file (§2 row, §11.8, §12.28), `STAGE_0.3A_PLAN.md` §5d, `ADR-0017` implementation-evidence section, and the new [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md). Product source, contracts, importer, validator, topology catalog, tests, fixtures, JSON examples, project files, and lock files untouched |
 
 ## Related documents
 

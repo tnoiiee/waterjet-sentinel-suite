@@ -175,6 +175,46 @@ The expected lock churn materialised exactly as predicted — `apps/runtime/pack
 `tests/api.tests/packages.lock.json`, genuine restore output, no package version changed — and PR #5
 remains **OPEN — NOT MERGED**. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED.
 
+## 5d. Stage 0.3A-3 Checkpoint B record (appended 2026-10-08)
+
+Owner instruction 2026-10-08: Stage 0.3A-3 Checkpoint A reviewed to PASS (ADR-0017
+explicitly Owner-accepted), and Checkpoint B authorized on the existing PR #6 branch.
+**Checkpoint B is OWNER-LOCALLY VALIDATED.**
+
+Delivered (exact files): `packages/contracts/Topology.cs` (NEW — `LogicalPositionRecord`
+with `LegacyRecordId` provenance and canonical `LogicalId`, `WaterJetConfiguration`,
+`IsolationValveConfiguration`, `Region`, `WaterJetPlacementKind`),
+`packages/contracts/Enums.cs` (+ canonical `LogicalPositionKind {SENSOR, NON_SENSOR_GAP}`
+ONLY; the transitional `SlotType.CANNON` Runtime wire surface untouched — its atomic
+migration is Checkpoint C scope and remains NOT AUTHORIZED), `packages/contracts/Config.cs`
+(+ `SensorConfigurationRecord` with dense derived `scanOrder` 1–106 and raw deferred
+values, `DeferredAcquisitionProvenance`, migration warning/refusal records, atomic
+`SensorParameterImportOutcome`, approved field-classification records, additive
+`MigrationRefusalCodes`), `packages/domain/WaterJetTopologyCatalog.cs` +
+`SensorParameterCsvImporter.cs` + `TopologyValidator.cs` (deterministic, atomic,
+fail-closed; `id`→provenance only; `sensorname`→logicalId/sensorId validated against the
+`orderTotal`-derived label; direct `cannon n → WJn`; offset-free timestamps raw with
+UNKNOWN timezone — never UTC; unknown-unit durations raw — no TimeSpan; no unapproved
+domain derivations; acquisition columns as deferred raw provenance only; gap rows REJECT
+FOR I7/I16), `config/examples/sensor-parameters.migrated.example.json` (synthetic;
+deferred-raw and acquisition fields null), and the semantic T1–T20 test suite with a
+public-safe CSV builder in `tests/config.tests/` (csproj gains the required `Wjss.Domain`
+project reference; no package change). Identifier note: `DedicatedIsolationValveId`/
+`ServedWaterJetId` implement the approved pairing attributes because the boundary S3
+`redis` substring rule matches `Pai-red-is-olation…`; recorded in the CHANGELOG.
+
+**Owner-local validation (2026-10-08):** SDK `10.0.401`; validated feature head
+`2db853a723a74399430ddd84900c40371fe56b29`; normal restore PASS; locked restore PASS;
+Release build **0 warnings / 0 errors**; fresh full .NET suite **186 total / 186 passed /
+0 failed / 0 skipped**; boundary scan **0 findings (S1–S9 clean)**; JSON examples PASS;
+Owner acquisition data in the migrated example NONE; Working Tree CLEAN; genuine Owner
+lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (exactly
+`tests/config.tests/packages.lock.json`: the `wjss.domain → Wjss.Contracts` project-graph
+edge). An earlier "139 total / 139 passed" observation was non-authoritative
+(`--no-build` over stale binaries) and is not validation. Full record:
+[`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md) (also the proposed — NOT
+AUTHORIZED, NOT STARTED — Checkpoint C scope). PR #6 OPEN — NOT MERGED.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins

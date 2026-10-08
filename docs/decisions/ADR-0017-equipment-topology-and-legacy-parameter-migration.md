@@ -7,13 +7,14 @@
   integration and does not by itself constitute acceptance unless the Owner explicitly
   states acceptance as part of the merge decision. This record itself changes no Product
   source, contract, fixture, lock, test, or Inspector file. Checkpoint B implementation
-  was subsequently **AUTHORIZED by the same Owner final review** (2026-10-08) and is
-  delivered on PR #6 (Arena-authored; Owner-local validation pending).
+  was subsequently **AUTHORIZED by the same Owner final review** (2026-10-08), delivered
+  on PR #6 (Arena-authored), and is **OWNER-LOCALLY VALIDATED** (see the
+  implementation-evidence section below).
 - **Date:** 2026-10-08 (corrected same day by two Stage 0.3A-3 Checkpoint A Owner reviews:
   first scanOrder derivation and acceptance semantics; then legacy field semantics,
   deferred mappings, TC-channel scope, public-repository boundary, and transitional
   runtime vocabulary scope)
-- **Supersedes: the *interpretation* of logical positions I7 and I16 as **Cannon /
+- **Supersedes:** the *interpretation* of logical positions I7 and I16 as **Cannon /
   Water Jet equipment slots** (previously carried by
   [`../../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) §2.2.1, [`../../REQUIREMENTS.md`](../REQUIREMENTS.md)
   PHY-001, and the simulator map comments). The grid geometry, all counts, and the gap
@@ -260,3 +261,28 @@ decisions themselves.
   `I7`, would now contradict an accepted decision and must fail validation instead.
 - Stage 0.3A-3 (config pipeline) proceeds only on the basis of this topology;
   Checkpoint B remains unauthorized until the Owner authorizes it.
+
+
+## Implementation evidence (Stage 0.3A-3 Checkpoint B — Owner-locally validated, 2026-10-08)
+
+Checkpoint B was implemented on PR #6 exactly per decision 13 and the Checkpoint A report
+§11 (canonical records in `Topology.cs` / `Config.cs` / `Enums.cs`; catalog, importer, and
+validator in `packages/domain/`; a synthetic migrated example; the semantic T1–T20 test
+suite with a public-safe CSV builder). The Owner supplied the authoritative validation at
+feature head `2db853a723a74399430ddd84900c40371fe56b29`: SDK `10.0.401`; normal restore
+PASS; locked restore PASS; Release build 0 warnings / 0 errors; fresh full .NET suite
+186 total / 186 passed / 0 failed / 0 skipped; boundary scan 0 findings (S1–S9 clean);
+JSON examples PASS; no Owner acquisition data in the migrated example; Working Tree clean.
+The genuine Owner lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` records exactly
+the project-graph edge `wjss.domain → Wjss.Contracts`. The validated topology matches
+decisions 1–10 and the protected baseline: 108 / 106 / 212; Left 24 / Rear 29 / Right 24 /
+Front 29; I7 and I16 NON_SENSOR_GAP; `orderTotal` 0–107; derived `scanOrder` dense 1–106
+skipping I7/I16; exactly 8 Water Jets and 8 Isolation Valves in one-to-one ordinal
+pairing; installed position separate from target coverage; `cannon n → WJn` direct. One
+mechanical deviation is recorded: the pairing properties are named
+`DedicatedIsolationValveId` / `ServedWaterJetId` because the boundary scanner's `redis`
+substring rule matches the natural `PairedIsolationValveId` / `PairedWaterJetId`
+spellings; semantics are exactly as decided. Full record:
+[`../STAGE_0.3A-3_CHECKPOINT_B.md`](../STAGE_0.3A-3_CHECKPOINT_B.md). Checkpoint C
+(including the atomic Runtime CANNON vocabulary migration) remains NOT AUTHORIZED and NOT
+STARTED; PR #6 remains OPEN — NOT MERGED.
