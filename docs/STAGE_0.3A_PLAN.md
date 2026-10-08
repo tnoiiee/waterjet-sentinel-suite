@@ -6,6 +6,11 @@
   committed; SDK pinned (`global.json` → `10.0.401`); 0.3A-2 `[NOT AUTHORIZED]`.** This
   file is a working plan, not an approval; the approvals that matter are the Owner's gate
   messages and the protected ADRs.
+- **Reconciliation note (2026-10-08, Stage 0.4A CP-0):** Stage 0.3A-3 is **COMPLETE and MERGED**
+  to `main` via PR #6 (`909d028`; PR #5 merged at `a74db62`). The "config loading pipeline" label in
+  the substage table below is a superseded planning label: the delivered 0.3A-3 scope was equipment
+  topology and legacy parameter migration (ADR-0017). The configuration publication pipeline is not
+  implemented by 0.3A-3. Stage 0.4A sequencing is governed by [`MASTER_PLAN.md` §3.3](MASTER_PLAN.md).
 - **Date:** 2026-10-07
 - **Governing records:** [`decisions/README.md`](decisions/README.md) (stages 0.1/0.2 status),
   [`ROADMAP.md`](ROADMAP.md), [`MASTER_PLAN.md`](MASTER_PLAN.md), and the stage-0.3A DRAFT

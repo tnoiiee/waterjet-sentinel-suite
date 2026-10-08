@@ -57,8 +57,8 @@ REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `ME
 | 0.2 | Technology and Solution Architecture Decision | `[APPROVED]` | **OWNER ACCEPTED / MERGED** — through PR #2 (source checkpoint `5bcf1b33f924ab30590a55736676200115874fa1`, merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`); ADR-0006 to ADR-0013 **ACCEPTED** as direction, not implemented | Documentation-only technology and solution architecture decisions: UI delivery model, runtime process model, technology stack, database access and migrations, device adapter boundary, configuration and secrets, simulator-first development, offline deployment, and a documented repository structure direction — recorded as ADR candidates |
 | **0.2.1** | **UI and Runtime Technology Spike** | **`[PROPOSED]`** — **`[NOT AUTHORIZED]`** | Not started | Measured comparison of Candidate A (React + TypeScript + Vite) and Candidate B (Blazor Hybrid) inside the application-owned kiosk shell, using synthetic data only, plus validation of the live-state delivery, live-trend, and offline-restore architecture. Deliverable is a comparison report, a recommendation, and a decision-record draft — **no production code** |
 | **0.2.1A** | **React UI and Runtime Feasibility Spike** | **`[APPROVED]`** — Scope Gate and Coding Start approved | **COMPLETE FOR DEVELOPMENT CHECKPOINT** — Owner-local final Edge gate **PASS** and Owner manual review **PASS** at `114c0761` (2026-10-07); React selected as the Primary UI Framework; controlled 15- / 60-minute observations waived as merge blockers; PR #3 **OPEN — READY FOR OWNER MERGE**, **NOT MERGED** | Synthetic React feasibility spike in `spikes/ui-runtime-react/` (removable, no Product directory) plus [`docs/spikes/stage-0.2.1a-plan.md`](spikes/stage-0.2.1a-plan.md) and [`docs/spikes/stage-0.2.1a-results.md`](spikes/stage-0.2.1a-results.md). **React selected as the Primary UI Framework** (Owner decision, 2026-10-07); Blazor counter-spike **not required** unless a future material blocker is identified |
-| 0.3 | Architecture and Interface Specification | `[PROPOSED]` — **0.3A executing under the Owner's Option-C amended gate only** | 0.3A-1 source checkpoint **authored, Owner-local .NET validation PENDING** ([plan](STAGE_0.3A_PLAN.md), [runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md)); 0.3B+ not started | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic. The amended gate authorises product *foundation sources* (contracts/domain/simulator/runtime stub as source); documentation and specification discipline still governs everything else |
-| 0.4 | Offline Domain and Queue Engine Implementation | `[PROPOSED]` | Not started | First source code: pure domain logic with a simulator and automated tests; no device access |
+| 0.3 | Architecture and Interface Specification | `[PROPOSED]` — **0.3A executing under the Owner's Option-C amended gate only** | **Reconciled 2026-10-08:** 0.3A-1 Owner-local validation **PASSED**; 0.3A-2 validated; 0.3A-3 **COMPLETE — MERGED (PR #6, `909d028`)**. Historical text below (superseded): 0.3A-1 source checkpoint **authored, Owner-local .NET validation PENDING** ([plan](STAGE_0.3A_PLAN.md), [runbook](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md)); 0.3B+ not started | Component boundaries, interface contracts, error taxonomy, and a testable specification for queue and cleaning logic. The amended gate authorises product *foundation sources* (contracts/domain/simulator/runtime stub as source); documentation and specification discipline still governs everything else |
+| 0.4 | Offline Domain and Queue Engine Implementation | `[PROPOSED]` — **Stage 0.4A (Simulator Sequencing Foundation) Owner-authorised for CP-0 and CP-1 only, 2026-10-08** (see §3.3) | CP-0 status reconciliation (documentation); CP-1 pure GlobalQueue and AutoSequence gate authored in Arena, NOT COMPILED IN ARENA, OWNER-LOCAL VALIDATION REQUIRED. CP-2 to CP-4 `[NOT AUTHORIZED]` | First source code: pure domain logic with a simulator and automated tests; no device access |
 | 0.5 | Read-Only Monitoring Integration | `[PROPOSED]` | Not started | Modbus TCP read path against a simulator only; no production writes |
 | 0.6 | Supervisory Control Path with Simulator | `[PROPOSED]` | Not started | Valve, pump, and motion command paths exercised against a simulator only |
 | 0.7 | Historian, Alarm, Event, and Audit Subsystems | `[PROPOSED]` | Not started | Storage, retention, and cleanup mechanics verified against a test database |
@@ -95,6 +95,32 @@ amended gate authorises **Stage 0.3A** work in gated substages (0.3A-1 source ch
 authored; Owner-local .NET validation is its mandatory pre-merge gate — see
 [`STAGE_0.3A_PLAN.md`](STAGE_0.3A_PLAN.md)); it authorises **no** other stage, and 0.3A-2+
 stay `[NOT AUTHORIZED]` until each is explicitly approved.
+
+### 3.3 Stage 0.4A — Simulator Sequencing Foundation (Owner authorisation 2026-10-08)
+
+- **Approved base:** `main` = `909d02846febfe2383f4d712f04455447f62bab0` (PR #6 merge).
+- **Authorised:** CP-0 (status and ADR reconciliation, documentation only; commit subject
+  `docs(state): reconcile Stage 0.4A sequencing scope`) and CP-1 (pure kernel under
+  `packages/application/Runtime/Sequencing/` with Runtime.Core tests under
+  `tests/runtime.tests/Sequencing/`; commit subject `feat(runtime): add pure global queue sequencing gate`).
+- **Not authorised:** CP-2 (pure Job, Safe Return, valve and axis feedback, critical latch), CP-3
+  (SIMULATOR composition), CP-4 (read-only Inspector), any command surface, Job phase execution,
+  Pump critical action, Valve or Axis action, Safe Return execution, `TEST_HARDWARE`, and
+  `PRODUCTION` device access. No `packages/contracts`, fixture, TypeScript mirror, RuntimeStage
+  marker, or ProfileStartPolicy change is authorised.
+- **Owner rulings in force for CP-1:** scenario-prepared explicit admission only; GlobalQueue
+  capacity 8, FIFO, dispatch-ready entries only, head-only dispatch, no scan-forward, exactly one
+  Active Job; no BLOCKED, HELD, WAITING_FOR_PUMP, WAITING_FOR_EQUIPMENT or EXCLUDED Queue-entry state;
+  pump readiness is not a Queue refusal (WAITING_FOR_PUMP belongs to the Active Job/AutoSequence
+  after an atomic dispatch); head revalidation failure removes the head with REMOVED_BY_ELIGIBILITY
+  and dispatches nothing in that transition; pause is Job/AutoSequence state (PAUSE_REQUESTED →
+  PAUSED after the Job's Mandatory Safe Return; direct PAUSED with no Job).
+- **Open, not decided here:** D6 valve timing on critical events, D7 outcome vocabulary, D8 Safe
+  Return failure recovery, D9 critical reset and resume, D10 axis confirmation source, D11 POST
+  surface, D12 queue source model. Production pump-readiness semantics remain **OWNER DECISION
+  REQUIRED** (matrix row A).
+- **Stage state:** `[PROPOSED]` in the ledger, now executing for CP-0 and CP-1 only. Sources are
+  authored in Arena and are NOT COMPILED IN ARENA and NOT EXECUTED IN ARENA; OWNER-LOCAL VALIDATION REQUIRED.
 
 ### 3.1 Recorded reconciliation of the Stage 0.2 title
 

@@ -150,6 +150,28 @@ shape into the product tree as .NET records. Two problems must be settled before
   Owner action — see
   [`../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](../STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) §10.
 
+## Reconciliation note — Stage 0.4A CP-0 (2026-10-08)
+
+Appended by the Stage 0.4A CP-0 status reconciliation. The Status line above is **unchanged**
+(DRAFT); formal acceptance remains an Owner action. The original text is retained.
+
+- **Capacity 8 and FIFO are retained** from this record.
+- **Queue entries are dispatch-ready only** (Owner ruling, 2026-10-08). The GlobalQueue holds no
+  BLOCKED, HELD, WAITING_FOR_PUMP, WAITING_FOR_EQUIPMENT or EXCLUDED entry state. Pump readiness
+  and other waiting conditions belong to the Active Job or AutoSequence, not to Queue entries.
+- **Dispatch is head-only** with no scan-forward. Exactly one Active Job exists. A head that fails
+  revalidation is removed atomically with REMOVED_BY_ELIGIBILITY and nothing is dispatched in that
+  transition.
+- **Admission** is explicit synthetic scenario-prepared entries only (no DIRTY-score, threshold,
+  time, cleaning-history, or operator admission). This is the Stage 0.4A CP-1 scope.
+- **Refusal wire mapping.** The "409 QUEUE_FULL" text above is the intended API refusal for a
+  full queue. No API route exists at Stage 0.4A CP-1; the pure kernel refuses with its own
+  internal code (see `packages/application/Runtime/Sequencing/SequencingCodes.cs` when CP-1 is
+  reviewed). The HTTP mapping is `[OPEN]` until a later Owner gate authorises the command surface (D11).
+- **Not decided by this note:** the open items D6–D12 of the Stage 0.4A scope gate (valve timing on
+  critical events, outcome vocabulary, Safe Return failure recovery, critical reset and resume, axis
+  confirmation source, command surface, queue source model).
+
 ## References
 
 [`../QUEUE_MODEL.md`](../QUEUE_MODEL.md), [`../ARCHITECTURE.md`](../ARCHITECTURE.md),

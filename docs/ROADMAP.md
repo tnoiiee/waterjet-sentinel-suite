@@ -13,9 +13,14 @@ review **PASS**), **MERGED** (PR #3, merge commit `d8d28201e641e436293136d04ba7e
 **React selected as the
 Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
 `[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
-Main Development Scope Gate **PENDING** for 0.3B+; **Stage 0.3A proceeds under the Owner's
-Option-C amended gate** — 0.3A-1 product-foundation **sources authored in Arena, Owner-local
-.NET validation PENDING** ([plan](STAGE_0.3A_PLAN.md)); 0.3A-2 `[NOT AUTHORIZED]`.
+Main Development Scope Gate **PENDING** for 0.3B+. **Update 2026-10-08:** PR #5 and PR #6 are
+**MERGED** to `main` (`909d028` is the current `main`). Stage 0.3A-3 (equipment topology and
+legacy migration) is **COMPLETE**. **Stage 0.4A — Simulator Sequencing Foundation — is authorised
+for CP-0 (status reconciliation) and CP-1 (pure GlobalQueue and AutoSequence gate) ONLY**
+([MASTER_PLAN §3.3](MASTER_PLAN.md)); CP-2 to CP-4 `[NOT AUTHORIZED]`. Production device access
+`[NOT AUTHORIZED]`. The 0.3A-1 Owner-local validation and the 0.3A-2 checkpoints are recorded in
+[`CURRENT_STATE.md`](CURRENT_STATE.md) and the [plan](STAGE_0.3A_PLAN.md) (its status note
+was reconciled 2026-10-08).
 Production device access `[NOT AUTHORIZED]`. This roadmap authorises
 nothing.
 

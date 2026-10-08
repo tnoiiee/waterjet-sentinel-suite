@@ -31,6 +31,18 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.4A CP-0 — Status and ADR reconciliation for Stage 0.4A sequencing (documentation only, 2026-10-08)
+
+- Recorded that PR #5 (merge `a74db62`) and PR #6 (merge `909d028`, the Stage 0.4A approved base) are
+  MERGED to `main`, and that Stage 0.3A-3 is COMPLETE. Superseded the stale "PR OPEN", "Checkpoint C NOT
+  AUTHORIZED" and "config loading pipeline" status text with dated notes; historical text is retained.
+- Recorded the Stage 0.4A scope gate and the Owner rulings for CP-1 (ready-only FIFO queue, capacity 8,
+  head-only dispatch, single Active Job, pump waiting outside Queue entries, head-revalidation removal,
+  pause as Job/AutoSequence state). Open items D6–D12 are listed, not decided.
+- Appended a reconciliation note to ADR-0014 (status remains DRAFT). No contract, fixture, source, test,
+  or schema change. CP-2, CP-3 and CP-4 are NOT AUTHORIZED.
+- Source authored in Arena; NOT COMPILED IN ARENA; NOT EXECUTED IN ARENA.
+
 ### Stage 0.3A-3 Checkpoint A — Equipment topology decision and legacy parameter migration specification (planning only)
 
 Owner-authorized Checkpoint A (planning / decision / specification only) on verified
