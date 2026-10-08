@@ -47,7 +47,7 @@ public sealed record RuntimeWaterJetView
     public required string WaterJetId { get; init; }
     public required Wall InstalledWall { get; init; }
     public required Region InstalledRegion { get; init; }
-    public required PlacementKind PlacementKind { get; init; }
+    public required WaterJetPlacementKind PlacementKind { get; init; }
     public required IReadOnlyList<string> PlacementAnchors { get; init; }
     public required Wall TargetWall { get; init; }
     public required Region TargetRegion { get; init; }
