@@ -57,6 +57,7 @@ may record `OWNER ACCEPTED` or `MERGED`.
 | Stage 0.3A-3 (equipment topology and legacy parameter migration; the earlier "config loading pipeline" label is superseded — see the CP-0 reconciliation block) | **COMPLETE — MERGED to `main` via PR #6 (`909d028`)**. Historical record: **AUTHORIZED** — Checkpoint A (equipment topology decision + legacy parameter migration specification) reviewed to **PASS**; **ADR-0017 explicitly Owner-ACCEPTED**. **Checkpoint B OWNER-LOCALLY VALIDATED (2026-10-08)**: Release build 0 warnings / 0 errors, fresh full .NET suite **186/186**, locked restore PASS, boundary S1–S9 clean, JSON examples PASS, no Owner acquisition data in Git; validated feature head `2db853a723a74399430ddd84900c40371fe56b29`, genuine Owner lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (project graph `wjss.domain → Wjss.Contracts` only). I7/I16 are NON_SENSOR_GAP; derived `scanOrder` 1–106; direct `cannon n → WJn`. See §11.8, §12.28 and [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md). Arena compiled and executed nothing itself. **[Superseded 2026-10-08: PR #6 MERGED (`909d028`); Checkpoint C later authorised and validated, see §11.9] Historical text: PR #6 OPEN — NOT MERGED. Checkpoint C NOT AUTHORIZED** |
 | Stage 0.4A (Simulator Sequencing Foundation) | **AUTHORIZED for CP-0 and CP-1 ONLY** — Owner instruction 2026-10-08. CP-0 = status/ADR reconciliation (documentation only); CP-1 = pure GlobalQueue and AutoSequence gate in `packages/application/Runtime/Sequencing/` with Runtime.Core tests. **CP-2, CP-3, CP-4 NOT AUTHORIZED.** Source authored in Arena; NOT COMPILED IN ARENA; NOT EXECUTED IN ARENA; OWNER-LOCAL VALIDATION REQUIRED. |
 | (Superseded 2026-10-08 by the CP-1 closeout block below: CP-0 and CP-1 are **OWNER-LOCALLY VALIDATED** at feature head `2cfe648`; CP-1 Final Source Review complete. The "source authored; validation required" wording above is historical.) | |
+| Stage 0.4A CP-2 closeout (2026-10-08) | **CP-2 OWNER-LOCALLY VALIDATED** at validated head `1f94991`: full .NET 300/300, Release build 0 warnings / 0 errors, TypeScript 31/31, fixture parity 7/7, boundary S1–S9 clean (Owner-reported). **CP-2 Final Source Review PASSED** (read-only; no blocking defect). PR #8 OPEN, NOT MERGED. **CP-3 and CP-4 NOT AUTHORIZED.** See §11.10 and §12.31. |
 | (Superseded 2026-10-08 by the CP-1 FINAL EVIDENCE AMENDMENT below: CP-1 OWNER-LOCALLY VALIDATED at validated head `03144f4`; F1 blocking state-integrity defect CLOSED; CP-1 Final Source Review PASSED; CP-2 coding NOT AUTHORIZED.) | |
 | Production Device access | **NOT AUTHORIZED** |
 | Production Write | **NOT AUTHORIZED** |
@@ -545,6 +546,7 @@ This record is retained deliberately. Git history was not rewritten to remove th
 - **Open:** O-11 (mid-cleaning pump not-ready refused, not held); Owner confirmation of O-3, O-4 and O-8 (see the checkpoint report).
 - **Authority:** CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED. TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - Full record: `docs/STAGE_0.4A_CP-2_CHECKPOINT.md`.
+- **Owner-local closeout (2026-10-08, §12.31):** OWNER-LOCALLY VALIDATED at `1f94991`; CP-2 Final Source Review PASSED (read-only, no blocking defect); F2 PASSED; F3 PASSED; EXPECTED_STOP refusal during CLEANING PASSED. Non-blocking follow-ups are in checkpoint §19. PR #8 OPEN, NOT MERGED. CP-3 and CP-4 NOT AUTHORIZED.
 
 ## 12. Validation record
 
@@ -1312,6 +1314,25 @@ non-blocking, Inspector presentation frozen for this checkpoint. Historical fail
 build/test observations before the correction chain are not acceptance evidence. Full
 record: [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md) §16 and
 [`STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) §14.10.
+
+### 12.31 Stage 0.4A CP-2 — Owner-local validation record and Final Source Review (2026-10-08)
+
+Recorded from the Owner's runs (Arena executed no .NET command). Authoritative Owner-local
+head: `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c`. Base `main` @ `8323f78c7ec2480bb30cbdd1432b6caa8e32c601`.
+Environment: .NET SDK `10.0.401`; xUnit runtime .NET `10.0.12`. Results: locked restore PASS, no
+lock drift; Release build **0 warnings / 0 errors**; full .NET tests **300 total / 300 passed / 0
+failed / 0 skipped** (CP-1 validated suite 253 + CP-2 new facts 47); fixture parity **7 / 7**;
+TypeScript typecheck PASS and tests **31 / 31**; boundary scan **0 findings (S1–S9 clean)**;
+`git diff --check` PASS; final Owner-local working tree **CLEAN**; no artifact commit required.
+
+CP-2 Final Source Review (read-only, Arena, source-level, no source or test edits): **PASSED**.
+F2 single evidence sequence: **PASSED**. F3 release under the critical latch: **PASSED** (matches
+the approved behaviour). EXPECTED_STOP during CLEANING: **PASSED** as a refusal with no effect on
+lifecycle, water, Queue, QueueRevision or latch. Full answers, findings and follow-ups:
+[`STAGE_0.4A_CP-2_CHECKPOINT.md`](STAGE_0.4A_CP-2_CHECKPOINT.md) §19.
+
+Authority after this record: PR #8 OPEN, NOT MERGED. CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.
+TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 
 ## Related documents
 

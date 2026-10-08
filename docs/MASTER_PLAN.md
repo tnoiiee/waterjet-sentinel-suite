@@ -330,6 +330,15 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 
 **Contract blocker check:** none. Every lifecycle, step, pump kind, outcome and AutoSequence name required by CP-2 is either an accepted contract name (reused) or a kernel-internal name with no wire meaning. `packages/contracts` is not modified.
 
+### 3.3.3 Stage 0.4A CP-2 Owner-local validation and Final Source Review (2026-10-08)
+
+**Status: CP-2 OWNER-LOCALLY VALIDATED at `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c`; CP-2 Final Source Review PASSED (read-only, no blocking defect).** This section records the closeout only. It authorises no new coding. It does not supersede §3.3.2, which remains the coding authorisation for CP-2.
+
+- Owner-local validation (Owner-reported, not reproduced in Arena): full .NET 300/300; Release build 0 warnings / 0 errors; fixture parity 7/7; TypeScript 31/31; boundary S1–S9 clean; locked restore with no drift; working tree CLEAN; no artifact commit required.
+- Final Source Review: F2 (one evidence sequence) PASSED. F3 (release under the critical latch) PASSED. EXPECTED_STOP during CLEANING PASSED as a refusal. O-3, O-4, O-8 and O-11 remain open for Owner confirmation, as §3.3.2 records them.
+- Non-blocking follow-ups (see `docs/STAGE_0.4A_CP-2_CHECKPOINT.md` §19): validator gap for a critical latch with a RUNNING Job; `Apply` wording for an exhausted or negative evidence counter; acceptance of the CP-1 test rewrites required by O-10; valve movement during CLEANING is recorded but not gated.
+- Authority: PR #8 OPEN, NOT MERGED. **CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
+
 ### 3.1 Recorded reconciliation of the Stage 0.2 title
 
 The Stage 0.1 candidate decomposition listed Stage 0.2 as *Requirements and Configuration

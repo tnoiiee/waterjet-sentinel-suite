@@ -359,3 +359,134 @@ node tools/boundary-scan/boundary-scan.mjs .    # expect 0 findings
 - TEST_HARDWARE NOT AUTHORIZED
 - PRODUCTION DEVICE ACCESS NOT AUTHORIZED
 - PR OPEN - NOT MERGED
+
+---
+
+## 19. Owner-local validation and CP-2 Final Source Review (2026-10-08)
+
+This section supersedes the status wording in §18 for the closeout only. §1 to §18 are the
+historical delivery record and are not edited.
+
+### 19.1 Verified remote state
+
+- `origin/main` = `8323f78c7ec2480bb30cbdd1432b6caa8e32c601`.
+- `origin/arena/bba7709c-waterjet-sentinel-suite` = `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c`; PR #8 head identical; PR #8 OPEN, not draft, NOT MERGED.
+- Chain (verified in `git log`): `ef51bd8` (docs(plan) coding scope) ← `6b94508` (feat(runtime) kernel) ← `ffc2701` (test(runtime) CP-2 scenarios) ← `1f94991` (docs checkpoint). Base ancestry of `23b276f`, `03144f4` and `2cfe648` verified against `8323f78`.
+- Working tree clean before this closeout.
+
+### 19.2 Owner-local validation (authoritative, Owner-reported)
+
+Validated head `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c`. Environment: .NET SDK `10.0.401`; xUnit runtime .NET `10.0.12`.
+
+| Check | Result |
+| --- | --- |
+| Locked restore | PASS; lock drift NONE |
+| Release build | PASS; warnings 0; errors 0 |
+| Full .NET tests | 300 total; 300 passed; 0 failed; 0 skipped |
+| Test accounting | CP-1 validated suite 253 + CP-2 new facts 47 = 300 |
+| Fixture parity | 7 / 7 passed |
+| TypeScript typecheck | PASS |
+| TypeScript tests | 31 / 31 passed |
+| Boundary scan | 0 findings; S1–S9 clean |
+| `git diff --check` | PASS |
+| Owner-local working tree | CLEAN; no artifact commit required |
+
+Arena did not run `dotnet`, `npm` or the boundary scan for this closeout. The Owner-local figures above are recorded as the Owner reported them.
+
+### 19.3 Source-review scope and method
+
+Read-only review of `packages/application/Runtime/Sequencing/**`, `tests/runtime.tests/Sequencing/**`, this report, and the reused contracts (`packages/contracts/Enums.cs`, `Jobs.cs`, `SafeReturn.cs`). Review was performed on the source, not on this report. Diff check `git diff --name-only 8323f78 HEAD`: every changed path is in Sequencing source, Sequencing tests, `docs/` or `CHANGELOG.md`. No Runtime host, API, Inspector, route, contract, fixture or TypeScript file changed. No source or test was edited by this review.
+
+### 19.4 Answers to the source-review items
+
+| # | Question | Answer | Source basis |
+| --- | --- | --- | --- |
+| 1 | Normal completion always enters Safe Return? | YES | `RequestCompletion` requires RUNNING, CLEANING and P6, then calls `StartSafeReturn`. No other path records COMPLETED. |
+| 2 | Explicit abort always enters Safe Return? | YES | `RequestAbortStep` from RUNNING calls `StartSafeReturn` (ABORTED). During Safe Return an abort is noted and does not restart. |
+| 3 | Execution failure always enters Safe Return? | YES | `ReportFailure` from RUNNING calls `StartSafeReturn` (FAILED). A blank reason is REFUSED (`FAILURE_REASON_INVALID`), not bypassed. An INVALID_LIMIT_STATE valve observation also enters Safe Return. |
+| 4 | UNEXPECTED_STOP and TRIP disable water in the same transition? | YES | `CriticalPump` puts `WaterOutputOn = false` and `CleaningActive = false` in the same `StartSafeReturn` trail as the latch. |
+| 5 | UNEXPECTED_STOP and TRIP set CRITICAL_SUSPENDED? | YES | Set in all three branches: no Job, RUNNING Job, and Safe Return in progress. |
+| 6 | Paired Valve close requested immediately on a critical event? | YES | SR2 is recorded in the same transition, with the Job's `ValveId` fixed at dispatch from the topology. |
+| 7 | Can Axis return be requested before Valve CLOSED is confirmed? | NO | SR4 is only recorded in `ObserveValveWhileAwaitingClose` when the observed valve is CLOSED, in the same transition as SR3. `AxisWaitViolation` also requires `LastValveFeedback == CLOSED`. |
+| 8 | Can a successful final outcome be recorded before Axis Standby? | NO | SR6 (outcome) is recorded only in `ConfirmStandbyAndRelease`, after AT_STANDBY, and in the same trail as SR5 and SR7. |
+| 9 | Can the Active Job release before Safe Return succeeds? | NO | `ActiveJob = null` appears once, in `ConfirmStandbyAndRelease`. It is reachable only from SAFE_RETURN_VERIFY_STANDBY with AT_STANDBY. |
+| 10 | Can another Job dispatch before release? | NO | `Dispatch` refuses with `DISPATCH_REFUSED_JOB_ACTIVE` while a Job exists, and refuses under the latch. |
+| 11 | Does Safe Return failure retain the Active Job? | YES | `FailSafeReturn` sets lifecycle SAFE_RETURN_FAILED and keeps `ActiveJob`. |
+| 12 | Does Safe Return failure preserve Queue and QueueRevision? | YES | `FailSafeReturn` and `ExpireFeedback` change only `ActiveJob` (`state with { ActiveJob = ... }`). |
+| 13 | Is RECOVERY_REQUIRED evidence produced for Safe Return failure? | YES | The SR_FAILED record carries `JobOutcome = RECOVERY_REQUIRED`. `PendingOutcome` is not overwritten. RECOVERY_REQUIRED is never stored as an outcome. |
+| 14 | Is there any automatic retry, reset or resume? | NO | SAFE_RETURN_FAILED falls through to NO_OP or REFUSED in every observer. No event clears the latch or restarts a step. |
+| 15 | Can release clear the critical latch? | NO | The release writes only `ActiveJob` and, if PAUSE_REQUESTED, `Mode` to PAUSED. No code path sets `CriticalSuspended` to false. |
+| 16 | Can release under the latch dispatch the next Job? | NO | `Dispatch` checks `CriticalSuspended` first and refuses with `CRITICAL_SUSPENDED`. |
+| 17 | Is there exactly one Kernel evidence sequence? | YES | `EvidenceTrail` is the only allocator. Records of one transition share one trail. The event types carry no sequence fields. |
+| 18 | Can external completion evidence skip Safe Return? | NO | No completion event exists. `RequestNormalCompletion` enters Safe Return. |
+| 19 | Is SafeReturnReleaseEvidence removed from the active path? | YES | The file is deleted. No source or test references it. Documents refer to it only as history. |
+| 20 | Are WJn and IVn pairing invariants retained? | YES | Dispatch uses `SequencingTopology.FindAssignment`. `JOB_PAIRING_INVALID` uses `IsPairedOrdinal`. A ValveId mismatch is refused. `SequencingTopology.cs` is unchanged. |
+| 21 | Does EXPECTED_STOP during CLEANING leave a valid, usable state? | YES | The observation is refused. The state stays valid. Completion (P6), abort, execution failure and critical events all remain available. |
+| 22 | Are all new CP-2 state combinations covered by the validator? | MOSTLY | One gap, recorded as FU-1. Latch set with a RUNNING Job is not rejected. Unreachable through transitions, so non-blocking. |
+| 23 | Are CP-1 ready-only FIFO, head-only dispatch and integrity boundaries retained? | YES | Admission is ready-only. Dispatch considers only Position 1 and never scans forward. An invalid head is removed without dispatch. The internal constructor and the internal-init setters are unchanged. |
+| 24 | Was any Runtime host, API, Inspector, route, contract, fixture or TypeScript behaviour changed? | NO | Diff check (§19.3). |
+
+### 19.5 F2 — evidence sequence
+
+Queue, Job and Safe Return records all draw from one counter, `SequencingState.EvidenceSeq`, through `EvidenceTrail`. `NextEntrySeq` and `NextJobSeq` issue identifiers, and `QueueRevision` is a revision. None of these is an evidence sequence. `DispatchEvidenceSeq` and the ledger fields are references to records, not counters. No externally supplied sequence exists in any event, and none can authorise release.
+
+**F2 classification: PASSED.**
+
+### 19.6 F3 — release under the critical latch
+
+Verified in source against the approved behaviour:
+
+- Safe Return continues under the latch. `ObserveValve`, `ObserveAxis` and `ExpireFeedback` do not check `CriticalSuspended`.
+- The Active Job releases after verified Safe Return (SR5, SR6, SR7 in one transition).
+- `CriticalSuspended` remains true after release. Nothing writes it to false.
+- The Queue and QueueRevision are unchanged by release.
+- Next dispatch is forbidden. `Dispatch` refuses under the latch.
+- No automatic reset or resume exists.
+
+**F3 classification: PASSED.** Implementation matches the approved behaviour exactly.
+
+### 19.7 EXPECTED_STOP during CLEANING
+
+`ObservePump` with EXPECTED_STOP while `CleaningActive` returns REFUSED (`PUMP_EXPECTED_STOP_NOT_MODELLED`) through `Single(state, state, ...)`. Verified effects:
+
+- Job lifecycle: unchanged (RUNNING).
+- Water output: unchanged (on).
+- Queue and QueueRevision: unchanged.
+- Critical latch: not set.
+- Job remains able to complete (P6), abort, fail, or receive a critical event.
+- Only the evidence sequence advances, as for every REFUSED transition.
+
+**EXPECTED_STOP classification: PASSED** as a refusal, against the brief's criterion. Owner ruling O-3 (refusal rather than a modelled expected-stop cleaning path) remains open for Owner confirmation.
+
+### 19.8 Findings
+
+**PASS**
+
+- Items 1 to 6, 8 to 21, 23 and 24 of §19.4 pass as stated.
+- F2 PASSED. F3 PASSED. EXPECTED_STOP refusal PASSED.
+- Refused and no-op transitions keep Queue, QueueRevision, Job and mode unchanged. Only the evidence sequence advances.
+- Zero blocking defects found.
+
+**NON-BLOCKING FOLLOW-UP**
+
+- **FU-1 (validator gap).** `SequencingStateValidator` does not reject `CriticalSuspended == true` with a RUNNING Job. No transition creates this combination, because a critical event with a Job always starts Safe Return and Dispatch refuses under the latch. It can only arise from a state built inside the assembly. Recommended: add a `JOB_RUNNING_UNDER_LATCH` check in a later, separately authorised change. Not changed in this closeout.
+- **FU-2 (documentation wording).** The `Apply` XML summary says an inconsistent input state is refused with `SEQUENCING_STATE_INVALID` and changes nothing except the evidence sequence. For a negative or exhausted `EvidenceSeq`, `Apply` throws `InvalidOperationException` (`COUNTER_NOT_INCREMENTABLE`). `SequencingStateIntegrityTests` pins that throw, and it is CP-1 behaviour, carried forward unchanged. The wording should be reconciled in a later documentation change.
+- **FU-3 (Owner acceptance of CP-1 test rewrites).** Under O-10, CP-1 tests that released through the removed `ReleaseActiveJob` input were rewritten to reach release through the kernel's Safe Return (`DriveNormalCompletion` in `SequencingKernelTests`). Two CP-1 assertions about the removed external evidence (refusal of incomplete evidence and refusal of stale evidence sequence) were dropped, because that input no longer exists. The release-after-pause behaviour is kept and now reached through the kernel's own Safe Return. Critical-latch tests that used the removed `RaiseCriticalSuspension` now enter through `ObservePumpState` (D-2). The Owner should explicitly accept these rewrites and drops. This is recorded as deviation D-1 in §12.
+- **FU-4 (valve movement during CLEANING).** A valve feedback change to OPEN, TRANSIT_OR_FAULT or CLOSED during CLEANING is recorded and updates `LastValveFeedback`, but it does not change the Job. Only INVALID_LIMIT_STATE triggers a Safe Return. This follows the event list in §3.3.2, which has no valve-movement trigger during cleaning. The Owner should confirm whether a valve-movement trigger is required before CP-3 or CP-4. Not changed in this closeout.
+- **FU-5 (open Owner rulings).** O-3 (EXPECTED_STOP refused during CLEANING), O-4 (critical event during Safe Return sets the latch without restarting), O-8 (intents as data only) and O-11 (mid-cleaning not-ready refused, not held) are unconfirmed. Each still needs Owner confirmation.
+
+**BLOCKING DEFECT**
+
+- None.
+
+### 19.9 CP-2 Final Source Review result
+
+**PASSED.** No blocking defect. Per the brief, PR #8 is prepared for Final Owner Review. It is not merged. CP-3 and CP-4 remain NOT AUTHORIZED.
+
+### 19.10 Documentation-only closeout
+
+Changed by this closeout (documentation only): `CHANGELOG.md`, `docs/CURRENT_STATE.md` (§2 row, §11.10 bullet, §12.31), `docs/MASTER_PLAN.md` (§3.3.3), and this file (§19). No Product source, test, contract, fixture, TypeScript, project file, lock file, config, tool or spike file changed.
+
+### 19.11 Final status
+
+**STAGE 0.4A CP-2 OWNER-LOCALLY VALIDATED. CP-2 FINAL SOURCE REVIEW PASSED. CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED. PR #8 OPEN - NOT MERGED.**
