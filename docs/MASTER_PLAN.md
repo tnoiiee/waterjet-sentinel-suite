@@ -302,6 +302,34 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 
 **20. Can CP-2 begin after explicit Owner approval?** Yes, but not yet. CP-2 may start only after an explicit Owner message that: (a) approves this scope gate, or a revised version of it; (b) rules on every **[BLOCKING]** item (O-1, O-2, O-3, O-8, O-9, O-10, O-17); (c) names or refuses the new files in O-18; and (d) reaffirms that CP-3 and CP-4 remain NOT AUTHORIZED. CP-2 would then be a separate checkpoint on `arena/bd0a7c64-waterjet-sentinel-suite`, under PR #7, which remains open until the Owner merges it. Until then, no CP-2 code, test, contract, UI or command path may be created.
 
+### 3.3.2 Stage 0.4A CP-2 coding authorization and applied Owner rulings (2026-10-08)
+
+**Status: CP-2 OWNER-AUTHORIZED for source and tests in `packages/application/Runtime/Sequencing/**` and `tests/runtime.tests/Sequencing/**` only.** This section supersedes the "coding NOT AUTHORIZED" wording of §3.3.1 for CP-2 only. CP-3 and CP-4 remain NOT AUTHORIZED. No `packages/contracts`, fixture, API, Inspector, Runtime host, device or command surface is changed. PR #7 is not continued. The CP-2 PR is opened from the session branch `arena/bba7709c-waterjet-sentinel-suite` and is not merged.
+
+**Owner rulings applied (the §19 items this section resolves):**
+
+| Item | Applied ruling |
+| --- | --- |
+| O-1 | A Pump UNEXPECTED_STOP or TRIP during Cleaning ends in a verified Safe Return with outcome `ABORTED`. |
+| O-2 | Safe Return failure records `RECOVERY_REQUIRED` evidence, lifecycle `SAFE_RETURN_FAILED`, Job retained, no release. The approved Safe Return point is SR5 (`AT_STANDBY` confirmed). |
+| O-3 | An EXPECTED_STOP is non-critical and sets no latch. While the Job is in CLEANING it is refused as `PUMP_EXPECTED_STOP_NOT_MODELLED`. Implementation decision, flagged for Owner confirmation. |
+| O-4 | A critical event during Safe Return sets the latch, is recorded as `CRITICAL_EVENT_DURING_SAFE_RETURN`, and does not restart or alter the Safe Return steps. Implementation decision, flagged for Owner confirmation. |
+| O-5 | Timeouts are input events only (`FeedbackTimeoutExpired`). No numeric value and no timer. |
+| O-6 | OPEN or TRANSIT_OR_FAULT after a close request waits for a timeout input. INVALID_LIMIT_STATE fails immediately. A ValveId mismatch is refused. |
+| O-7 | Axis feedback is a synthetic input only. |
+| O-8 | Intents (`WATER_OUTPUT_OFF`, `VALVE_CLOSE`, `AXIS_TO_STANDBY`) are recorded as data in evidence only. They have no adapter binding and no transport. Implementation decision, flagged for Owner confirmation. |
+| O-9 | The P1 to P6 phase ordering and the valve gates are included. No motion values exist. |
+| O-10 | `SafeReturnReleaseEvidence` and the external `ReleaseActiveJob` input are removed. Release is SR6 and SR7 inside the kernel's own axis-confirmation transition. |
+| O-11 | Open. CP-2 refuses a mid-cleaning pump not-ready observation rather than holding it. Recorded as an open limitation. |
+| O-12 | `RequestAbort` is a synthetic internal input only, with no route. |
+| O-13 | Outcome names are the kernel's `COMPLETED`, `FAILED`, `ABORTED`, `RECOVERY_REQUIRED`. The contract stays opaque strings. |
+| O-14 | Accepted `JobLifecycle` contract names are reused. Stages PREPARING, READY_TO_CLEAN and CLEANING are kernel-internal sub-stages of `RUNNING`. |
+| O-15 | No reset in CP-2. `CRITICAL_SUSPENDED` persists. |
+| O-16 | In-memory only. |
+| O-17 | Satisfied (CP-1 F1). |
+
+**Contract blocker check:** none. Every lifecycle, step, pump kind, outcome and AutoSequence name required by CP-2 is either an accepted contract name (reused) or a kernel-internal name with no wire meaning. `packages/contracts` is not modified.
+
 ### 3.1 Recorded reconciliation of the Stage 0.2 title
 
 The Stage 0.1 candidate decomposition listed Stage 0.2 as *Requirements and Configuration
