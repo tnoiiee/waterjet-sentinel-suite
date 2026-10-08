@@ -71,6 +71,27 @@ delivery record now shows the real commit chain and the reviewed PR head
 `6648437f24e918d8be3a1c4ad27edb8c1bc4b0a3`, and the status classification separates
 OWNER CONFIRMED from NOT VERIFIED. Checkpoint B remains NOT STARTED.
 
+**Second Owner review correction (PR #6 — CHANGES REQUESTED, 2026-10-08; documentation
+only):** legacy `id` corrected to `legacyRecordId` provenance (never a logical-position
+identity or Sensor ID) and legacy `sensorname` corrected to the canonical
+`LogicalPosition.logicalId` / `SensorConfiguration.sensorId`, validated against the label
+derived from `orderTotal` (additive refusal `MIGRATION_LOGICAL_LABEL_MISMATCH`);
+`lastclean_timestamp` disposition changed to raw preservation with UNKNOWN source timezone
+and no UTC conversion (no `LastSuccessfulCleaningCompletedAt` in Checkpoint B);
+`min_time_allowaddtoqueue` disposition changed to raw preservation with UNKNOWN unit and
+no `HardMinimumCleaningInterval` mapping (no TimeSpan invented); the derivations of
+`UseDirtyScoreThreshold`, `HasVerifiedCleaningHistory`,
+`LastSuccessfulCleaningCompletedAt`, and `HardMinimumCleaningInterval` are removed from
+Checkpoint B pending explicit Owner decisions; the existing runtime CANNON vocabulary
+(`SlotType.CANNON`, `CanonicalSensorMap.CannonSlots`, `CannonSlotCount`,
+`CANNON_REAR`/`CANNON_FRONT`) is recorded as TRANSITIONAL LEGACY RUNTIME REPRESENTATION —
+semantically superseded — with its migration deferred to Checkpoint C, while Checkpoint B
+introduces `LogicalPositionKind { SENSOR, NON_SENSOR_GAP }` only; TC enforcement is
+structural-only (106 × 2 = 212); the public-repository boundary for `sensorparam.csv` is
+strengthened (never committed or copied; synthetic public-safe test rows only). Also
+restores the first-review §11 importer-behaviour text that had failed to persist in commit
+`3dac1a0c`. Checkpoint B remains NOT STARTED.
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh

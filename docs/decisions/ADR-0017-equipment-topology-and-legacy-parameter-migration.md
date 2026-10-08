@@ -8,8 +8,11 @@
   This ADR's status remains `PROPOSED` until explicit Owner acceptance. Planning output
   only: no Product source, contract, fixture, lock, test, or Inspector file is changed by
   this record. Checkpoint B implementation is **NOT STARTED**.
-- **Date:** 2026-10-08
-- **Supersedes:** the *interpretation* of logical positions I7 and I16 as **Cannon /
+- **Date:** 2026-10-08 (corrected same day by two Stage 0.3A-3 Checkpoint A Owner reviews:
+  first scanOrder derivation and acceptance semantics; then legacy field semantics,
+  deferred mappings, TC-channel scope, public-repository boundary, and transitional
+  runtime vocabulary scope)
+- **Supersedes: the *interpretation* of logical positions I7 and I16 as **Cannon /
   Water Jet equipment slots** (previously carried by
   [`../../DOMAIN_MODEL.md`](../DOMAIN_MODEL.md) §2.2.1, [`../../REQUIREMENTS.md`](../REQUIREMENTS.md)
   PHY-001, and the simulator map comments). The grid geometry, all counts, and the gap
@@ -53,29 +56,42 @@ decisions themselves.
 ## Decision
 
 1. **Canonical LogicalPosition model.** One record per logical matrix position — 108
-   records. Attributes: `logicalId` (legacy grid label, e.g. `I7`, `G+102`), `wall`
+   records. Attributes: `legacyRecordId` (the legacy `id` — a **database record
+   identifier**, preserved as provenance only; never a logical-position identity and
+   never a Sensor ID), `logicalId` (canonical logical-position label, e.g. `I7`, `G+102` —
+   sourced from legacy `sensorname` and validated against the label derived from
+   `orderTotal`, per rule 9), `wall`
    (`LEFT|REAR|RIGHT|FRONT`), `logicalColumn` (1–18), `logicalRow` (1–6), `wallColumn`,
    `wallRow`, `positionKind` (`SENSOR | NON_SENSOR_GAP`), `orderTotal` (legacy zero-based
    logical-position ordering, range 0–107 over all 108 rows, **including** the
    NON_SENSOR_GAP rows I7 and I16; provenance/layout ordering only — never the Sensor
    scanOrder), `orderWall`,
    and for NON_SENSOR_GAP positions only, `gapAnchorForWaterJetId` (`I7 → WJ3`,
-   `I16 → WJ1`) plus optional `legacyDisplayName` provenance. Exactly 2 positions are
-   NON_SENSOR_GAP; exactly 106 are SENSOR.
+   `I16 → WJ1`). The `sensorname` values of I7 and I16 remain their `logicalId` values as
+   NON_SENSOR_GAP positions and never create a SensorConfiguration. Exactly 2 positions
+   are NON_SENSOR_GAP; exactly 106 are SENSOR.
 
 2. **Canonical SensorConfiguration model.** One record per actual Sensor — exactly 106.
-   Identity/layout (`wall`, logical and wall coordinates, `orderWall`, and `scanOrder` —
-   derived per the rule below, never taken directly from `order_total`), dirty-score
-   settings (canonical `DiffLowerBound`/`DiffUpperBound` from
-   `min_temp_dirtyscore`/`max_temp_dirtyscore`, `DirtyScoreThreshold` +
-   `UseDirtyScoreThreshold` from `threshold_setpoint`), eligibility/history
-   (`Enabled` from `sensor_enable`, `cleaningCount`, `LastSuccessfulCleaningCompletedAt`
-   with `LastCleaningTimestampSource` provenance, `HardMinimumCleaningInterval` from
-   `min_time_allowaddtoqueue`), **exactly one `assignedWaterJetId`**, and
-   `assignedIsolationValveId` **derived** through the pairing (never independently
-   assigned) — matching the already-approved Sensor attributes in DOMAIN_MODEL §2.3.
+   Identity/layout (`sensorId` — canonical, taken from legacy `sensorname` for SENSOR rows
+   and validated per rule 9; `wall`, logical and wall coordinates, `orderWall`, and
+   `scanOrder` — derived per the rule below, never taken directly from `order_total`),
+   dirty-score settings imported as **direct recorded renames of the legacy numeric
+   values** (`DiffLowerBound`/`DiffUpperBound` from
+   `min_temp_dirtyscore`/`max_temp_dirtyscore`; `DirtyScoreThreshold` from
+   `threshold_setpoint`; values `[NOT VERIFIED]`), eligibility/history (`Enabled` from
+   `sensor_enable`; `cleaningCount` as the raw copy of `cleaning_count`), **exactly one
+   `assignedWaterJetId`**, and `assignedIsolationValveId` **derived** through the pairing
+   (never independently assigned). The already-approved DOMAIN_MODEL §2.3 attributes
+   remain the long-term Sensor model, but the Checkpoint B importer must **not** derive:
+   `UseDirtyScoreThreshold` (from `threshold_setpoint`), `HasVerifiedCleaningHistory`
+   (from `cleaning_count`), `LastSuccessfulCleaningCompletedAt` (from
+   `lastclean_timestamp`), or `HardMinimumCleaningInterval` (from
+   `min_time_allowaddtoqueue`). Those four are deferred domain interpretations requiring
+   a later explicit Owner decision; the corresponding legacy values are preserved as
+   raw/imported/deferred fields with provenance and warnings.
    Acquisition binding (`ip_modbus`, `channel_pair`, `base_modbus_address`) is preserved
-   raw and **DEFERRED**: it is not approved Production-device configuration.
+   raw and **DEFERRED**: it is not approved Production-device configuration, and no
+   Production channel identity, Modbus address, or physical binding is created or claimed.
    No NON_SENSOR_GAP position ever yields a SensorConfiguration record.
    **`scanOrder` derivation rule:** legacy `order_total` is the logical-position order
    (zero-based 0–107, including I7 and I16); it is preserved as `orderTotal`
@@ -127,10 +143,19 @@ decisions themselves.
 
 9. **Legacy CSV migration rules.** Legacy `cannon` values map **directly and only** by
    ordinal: `cannon n → assignedWaterJetId WJn`. No wall-based remapping exists. The
-   `cannon` column name survives only as provenance. All normalizations (wall tokens,
-   boolean tokens, timestamp→UTC, canonical field renames) are recorded normalization
-   actions; suspicious or placeholder values are preserved verbatim with warnings — never
-   silently normalized. The full field-by-field matrix is in the checkpoint report.
+   `cannon` column name survives only as provenance. Legacy `id` is preserved **only** as
+   `legacyRecordId` provenance; legacy `sensorname` is the canonical
+   `LogicalPosition.logicalId` and, for SENSOR rows, the canonical
+   `SensorConfiguration.sensorId`. **Deterministic logical-label validation:** derive the
+   logical row and column from `orderTotal` and the fixed 18-column matrix, derive the
+   expected logical label from that row/column, and require `sensorname` to equal it; any
+   mismatch refuses with the additive code `MIGRATION_LOGICAL_LABEL_MISMATCH`. All
+   normalizations (wall tokens, boolean tokens, canonical field renames) are recorded
+   normalization actions; **no timestamp is converted to UTC** (source timezone UNKNOWN;
+   raw string preserved) and **no duration/TimeSpan is invented** (units UNKNOWN; raw
+   values preserved); suspicious or placeholder values are preserved verbatim with
+   warnings — never silently normalized. The full field-by-field matrix is in the
+   checkpoint report.
 
 10. **I7/I16 exclusion rules.** I7 and I16 are NON_SENSOR_GAP: never Sensors, never Water
     Jets, never queue, selection, Cleaning Job, alarm, or coverage targets, and never
@@ -147,21 +172,31 @@ decisions themselves.
     `TOPO_WALL_COUNTS`, `TOPO_GAP_IDENTITY`, `TOPO_DUPLICATE_ID`, `TOPO_DUPLICATE_ORDER`,
     `TOPO_WATERJET_COUNT`, `TOPO_VALVE_COUNT`, `TOPO_PAIRING_MISMATCH`,
     `TOPO_TARGET_WALL_CONTRADICTION`, `MIGRATION_CANNON_RANGE`,
-    `MIGRATION_MISSING_ASSIGNMENT`, `MIGRATION_FIELD_TOKEN`, `MIGRATION_BOUNDS_ORDER`,
-    `MIGRATION_PLACEHOLDER_VALUE`, `MIGRATION_UNIT_UNVERIFIED` — additive, no existing code
+    `MIGRATION_MISSING_ASSIGNMENT`, `MIGRATION_LOGICAL_LABEL_MISMATCH`,
+    `MIGRATION_FIELD_TOKEN`, `MIGRATION_BOUNDS_ORDER`,
+    `MIGRATION_PLACEHOLDER_VALUE`, `MIGRATION_UNIT_UNVERIFIED`,
+    `MIGRATION_TIMEZONE_UNKNOWN` — additive, no existing code
     changed. Structural violations fail closed and abort the whole import atomically (no
-    partial import, no partial revision publication). Determinism: identical CSV bytes
+    partial import, no partial revision publication); `TOPO_DUPLICATE_ID` guards the
+    uniqueness of the legacy record identifier. Warning-level codes
+    (`MIGRATION_PLACEHOLDER_VALUE`, `MIGRATION_UNIT_UNVERIFIED`,
+    `MIGRATION_TIMEZONE_UNKNOWN`) import verbatim with recorded warnings and
+    Owner-review entries instead of failing. Determinism: identical CSV bytes
     produce identical results.
 
 12. **Migration warnings and Owner-review list.** Values that are representable but
-    suspicious (degenerate bounds or thresholds on actual Sensors, sentinel timestamps,
-    absent unit metadata for time fields, superseded "Cannon" wording in legacy names and
-    in existing documents/code identifiers, DEFER-field mapping) are preserved verbatim and
+    suspicious (degenerate bounds or thresholds on actual Sensors, offset-free sentinel
+    timestamps of unconfirmed meaning, absent/unknown unit metadata for time fields,
+    UNKNOWN source timezones, the superseded "Cannon" vocabulary in the transitional
+    runtime representation and in existing documents/code identifiers, DEFER-field
+    mapping) are preserved verbatim and
     surfaced on an explicit Owner-review list (checkpoint report §10). Nothing is silently
     normalized, defaulted, or dropped.
 
 13. **Checkpoint B expected change set** is planned (not started): contracts
-    (`Topology.cs` new; `Config.cs`, `Enums.cs` extensions), domain importer + validator
+    (`Topology.cs` new; `Config.cs` and `Enums.cs` extensions — the latter only to add the
+    canonical `LogicalPositionKind` vocabulary, never to rename the existing
+    `SlotType.CANNON` wire surface), domain importer + validator
     (`packages/domain/`), a structure-only migrated config example
     (`config/examples/`), config tests for the invariants below, and documentation
     propagation of the superseded Cannon wording. Exact file list: checkpoint report §11.
@@ -176,13 +211,48 @@ decisions themselves.
     React spike remains untouched. No Production equipment parameter is invented: every
     non-Owner value stays `[NOT VERIFIED]` / `[OPEN]`.
 
+15. **Transitional runtime vocabulary scope.** Checkpoint B introduces the canonical
+    topology vocabulary `LogicalPositionKind { SENSOR, NON_SENSOR_GAP }` and uses it in
+    all importer output, but must **NOT** rename or alter the existing Runtime/Snapshot
+    wire surface that uses `SlotType.CANNON`, `CanonicalSensorMap.CannonSlots`,
+    `CannonSlotCount`, and `CANNON_REAR`/`CANNON_FRONT` — that representation is
+    referenced by Runtime, Simulator, Snapshot, API, Inspector, fixtures, and tests, and
+    changing it atomically belongs to **Checkpoint C**, which is NOT AUTHORIZED. The
+    existing CANNON vocabulary is recorded as: **TRANSITIONAL LEGACY RUNTIME
+    REPRESENTATION — SEMANTICALLY SUPERSEDED — RUNTIME MIGRATION DEFERRED TO CHECKPOINT
+    C.** No canonical Cannon entity exists; the importer never emits `SlotType.CANNON`;
+    and no alias permits Cannon and NON_SENSOR_GAP to be used interchangeably in
+    canonical topology.
+
+16. **TC channel scope.** Checkpoint B may enforce only the structural invariant —
+    106 Sensors, exactly two expected Thermocouple channel sides per Sensor, structural
+    total 212. The acquisition fields `ip_modbus`, `channel_pair`, and
+    `base_modbus_address` remain deferred; no Production channel identity, Modbus
+    address, or physical binding is created or claimed. The existing `SYN-TC-*`
+    identities remain synthetic runtime data and are not Production migration evidence.
+
+17. **Public repository boundary.** `sensorparam.csv` is Owner working data and contains
+    non-public acquisition values. It must not be committed and must not be copied into
+    tests, fixtures, documentation, or config examples. No real IP, register base, channel
+    binding, timestamp, or plant value from the Owner CSV may enter Git (boundary S3).
+    Checkpoint B tests must use clearly synthetic public-safe rows.
+
+## Status classification
+
+| Classification | Items |
+| --- | --- |
+| **OWNER CONFIRMED** | 108 logical positions; 106 Sensors; 212 Thermocouple channels; I7 and I16 are NON_SENSOR_GAP; WJ1–WJ8 installed positions; WJ1–WJ8 target coverage; WJn paired one-to-one with IVn; legacy `cannon n` maps directly to WJn |
+| **NOT VERIFIED** | Production acquisition bindings (`ip_modbus`, `channel_pair`, `base_modbus_address` — DEFER, never approved Production-device configuration); legacy time-field units (`min_time_allowaddtoqueue` and the DEFER time fields); sentinel timestamp meaning (`lastclean_timestamp` zero/sentinel values) and its source timezone; runtime importer execution (no importer exists yet); physical device integration (no device has ever been addressed) |
+
 ## Consequences
 
 - The canonical model has **no Cannon entity**. Existing code identifiers and comments that
-  say "Cannon" (`SlotType.CANNON`, `CannonCount`, `EquipmentId`, simulator map comments,
-  and the §2.2.1 wording noted above) are now **naming debt against this decision**; the
-  rename/aliasing decision is Checkpoint B scope with an explicit Owner-review item,
-  because it touches Product source and contracts that this checkpoint must not modify.
+  say "Cannon" (`SlotType.CANNON`, `CanonicalSensorMap.CannonSlots`, `CannonSlotCount`,
+  `CANNON_REAR`/`CANNON_FRONT`, `EquipmentId`, simulator map comments,
+  and the §2.2.1 wording noted above) are now **naming debt against this decision**,
+  recorded as the TRANSITIONAL LEGACY RUNTIME REPRESENTATION — semantically superseded;
+  the atomic runtime/wire migration belongs to **Checkpoint C** (NOT AUTHORIZED), not
+  Checkpoint B (decision 15).
   The *behaviour* those names protect (two sensorless positions excluded from sensor
   runtime, queues, and jobs) is unchanged.
 - Any future importer that mapped `cannon` by wall, or represented WJ1 as `I16` / WJ3 as
