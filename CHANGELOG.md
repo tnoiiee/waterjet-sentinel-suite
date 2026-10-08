@@ -31,6 +31,13 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.4A CP-3a / CP-3b — development checkpoint submitted for review (NOT compiled or executed in Arena; not merged)
+
+- CP-3a (kernel hardening): FU-1 latch with a RUNNING Job rejected as `JOB_RUNNING_UNDER_LATCH`; FU-2 `Apply` wording; FU-3 documentation only; FU-4 valve movement away from OPEN during CLEANING enters Safe Return in the same transition; AxisStandbySeq written at SR5 and readable through `PreviewAxisStandbyLedger`.
+- CP-3b (simulator library, no host wiring): eleven-scenario catalogue on a fixed epoch; bounded retention; GlobalQueue and Sensor queue-state projection; Delta content comparison and a pure candidate path.
+- Not delivered (`[OPEN]`): the wire projection of the Active Job, Sequence, Pump and Safe Return sections, pending Owner rulings on their presentation fields.
+- Owner-local validation required (Release build with 0 warnings, full .NET suite, fixture parity, TypeScript, boundary scan). CP-3c and CP-4 NOT AUTHORIZED. Not merged.
+
 ### Stage 0.4A CP-2 — Owner-local validation and Final Source Review (documentation only, 2026-10-08)
 
 - **OWNER-LOCALLY VALIDATED** at validated head `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c` (Owner-reported; Arena did not run the toolchain). .NET SDK 10.0.401; xUnit runtime .NET 10.0.12; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests **300 total / 300 passed / 0 failed / 0 skipped** (CP-1 validated suite 253 + CP-2 new facts 47); fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan 0 findings (S1–S9 clean); `git diff --check` PASS; final Owner-local working tree CLEAN. No Owner-local artifact commit was required.
