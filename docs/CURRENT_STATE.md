@@ -105,7 +105,7 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.3A-3 Checkpoint C — atomic Runtime topology migration + read-only Inspector integration, **IMPLEMENTED (Arena-authored, 2026-10-08; NOT compiled/executed in Arena — Owner-local validation pending)** on PR #6: schema `wjss.snapshot/2` / `wjss.delta/2` (Option A atomic update, no alias), no canonical Cannon entity current-facing, 8 WJ + 8 IV read-only topology in Runtime state/Snapshot/status, per-Sensor assignments, Inspector wall map with NON_SENSOR_GAP cells + installation overlay + equipment topology table (see §11.9, [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md)). Stage 0.3A-2A Checkpoint C — read-only Runtime API + development Runtime Inspector, **OWNER-LOCALLY VALIDATED (2026-10-07)** at the lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d` (SDK `10.0.401`; locked restore PASS; Release build 0 warnings / 0 errors; fresh full .NET suite **139/139**; boundary S1–S9 clean; worktree CLEAN); Owner Function/Logic review PASSED and the Inspector UI/UX review PASSED — **final Owner visual review recorded, minor punchlist CLOSED** (one optional future polish item deferred as non-blocking; see §11.7, §12.27). Checkpoints A (`55d3b8b`) and B (`cfa6d4a`) are Owner-locally validated (A 101/101 — §12.24; B 129/129 — §12.25) |
+| Current stage | Stage 0.3A-3 Checkpoint C — atomic Runtime topology migration + read-only Inspector integration, **OWNER-LOCALLY VALIDATED (2026-10-08)** at feature head `162ad7f` / Owner artifact commit `bac36add` (SDK `10.0.401`; normal+locked restore PASS; Release build 0 warnings / 0 errors; full .NET suite **201/201**; fixture generation+parity **7/7 and 7/7**; TypeScript 31/31; boundary S1–S9 clean; JSON examples PASS; worktree CLEAN); Function / Logic / Inspector UI-UX reviews **PASSED, no critical UI blocker**; minor punchlist deferred and non-blocking, Inspector presentation frozen. Correction chain `8567a78` → `440a7fa` → `162ad7f` validated by this run (§11.9, §12.29, §12.30, [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md) §16). Stage 0.3A-2A Checkpoint C — read-only Runtime API + development Runtime Inspector, **OWNER-LOCALLY VALIDATED (2026-10-07)** schema `wjss.snapshot/2` / `wjss.delta/2` (Option A atomic update, no alias), no canonical Cannon entity current-facing, 8 WJ + 8 IV read-only topology in Runtime state/Snapshot/status, per-Sensor assignments, Inspector wall map with NON_SENSOR_GAP cells + installation overlay + equipment topology table (see §11.9, [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md)). Stage 0.3A-2A Checkpoint C — read-only Runtime API + development Runtime Inspector, **OWNER-LOCALLY VALIDATED (2026-10-07)** at the lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d` (SDK `10.0.401`; locked restore PASS; Release build 0 warnings / 0 errors; fresh full .NET suite **139/139**; boundary S1–S9 clean; worktree CLEAN); Owner Function/Logic review PASSED and the Inspector UI/UX review PASSED — **final Owner visual review recorded, minor punchlist CLOSED** (one optional future polish item deferred as non-blocking; see §11.7, §12.27). Checkpoints A (`55d3b8b`) and B (`cfa6d4a`) are Owner-locally validated (A 101/101 — §12.24; B 129/129 — §12.25) |
 | Repository contents | Documentation, repository governance, the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/`, and the Stage 0.3A-1 product foundation source skeleton (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/`) |
 | Application source code | **Validated at checkpoint scope by the Owner-local run** (Release 0/0; 61/61; fixtures and lock files genuine, transferred and verified; SDK pinned `10.0.401`). Arena itself ran no .NET and claims no compile/test success of its own. The spike remains synthetic feasibility code, not Product code |
 | Project or solution files | `WaterJetSentinelSuite.sln` (12 projects) — source-committed, **never built in the authoring environment** |
@@ -478,8 +478,11 @@ accepted and merged Stage 0.2.*
 | Arena verification | Boundary scan **0 findings (S1–S9 clean)** per slice; TS mirror **executed in Arena: npm ci + npm run check green (31/31)**; Inspector inline JS `node --check` OK + HTML balance OK; C# brace-balance over 36 changed files OK; `git diff --check` clean. **NOT COMPILED / NOT EXECUTED in Arena** (no .NET SDK) |
 | Expected lock drift | `adapters/simulator/packages.lock.json` + `tests/integration/packages.lock.json` gain the direct `wjss.domain` edge on the next Owner restore; no lock hand-edited; `tests/config.tests` lock (`0728df61`) untouched |
 | Owner-local gates | Restore; Release build; full test suite; `dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release` (fixture parity; `WJSS_UPDATE_FIXTURES=1` on diff); `npm ci && npm run check` in `packages/contracts/wjss-contracts-ts`; boundary scan; UI review |
-| Status | **Checkpoint C IMPLEMENTED — SUBMITTED FOR OWNER REVIEW** (PR #6 **OPEN, NOT MERGED**) |
-| Next | Owner-local validation and source review of PR #6. TEST_HARDWARE and PRODUCTION remain NOT AUTHORIZED |
+| Correction chain (Checkpoint C) | `d378edf2` → `27591ea1` → `f04d992d` (Arena implementation slices) → `8567a78` (Owner CS0103: `Wjss.Domain` import) → `440a7fa` (Owner CS0246: `WaterJetPlacementKind` type reference; property name unchanged) → `162ad7f` (Owner behavioural test corrections: canonical `positionKind` raw-JSON vocabulary ×2; semantic topology round-trip assertions) → `bac36add` (**Owner-authored** genuine artifact commit: five `packages.lock.json` refreshes + regenerated `sensor-map.example.json`). Nothing rewritten |
+| Owner-local validation (2026-10-08) | **PASSED — Stage 0.3A-3 Checkpoint C OWNER-LOCALLY VALIDATED**: SDK `10.0.401` / xUnit runtime .NET `10.0.12`; normal restore PASS; locked restore PASS; Release build **0 warnings / 0 errors**; fresh full .NET suite **201 total / 201 passed / 0 failed / 0 skipped**; fixture generation/update **7/7** and parity **7/7**; TypeScript typecheck PASS, **31/31**; boundary scan **0 findings (S1–S9 clean)**; JSON examples PASS; final working tree **CLEAN**. Validated feature head `162ad7f`; artifact commit `bac36add`. Artifact handoff verified: no package-version change, only the expected `Wjss.Domain` project-graph edges, no absolute path or credential; the regenerated example's only semantic drift is the corrected NON_SENSOR_GAP note (108 / 106 / 212; I7 → WJ3, I16 → WJ1). Recorded in §12.30 and [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md) §16 |
+| Owner reviews (2026-10-08) | Function review **PASSED**; Logic review **PASSED**; Inspector UI/UX review **PASSED — CRITICAL UI BLOCKER: NONE**. Minor punchlist deferred and non-blocking (gap-cell primary label in a tooltip; friendlier placement captions; vertical scrollability) — Inspector presentation FROZEN for this checkpoint |
+| Status | **Checkpoint C COMPLETE — OWNER-LOCALLY VALIDATED** (PR #6 PREPARED FOR FINAL SOURCE REVIEW — **OPEN, NOT MERGED**; only the Owner merges) |
+| Next | Owner-only final source review of PR #6. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |
 
 ### 11.1 Process deviation record
 
@@ -1237,6 +1240,30 @@ balance OK; per-file brace-depth balance over all 36 changed C# sources OK;
 `git diff --check` clean. **No .NET restore, build or test execution happened in Arena**;
 the fixture parity suite and the full xUnit suite are Owner-local gates. Full record:
 [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md).
+
+### 12.30 Stage 0.3A-3 Checkpoint C — Owner-local validation record (PASSED)
+
+Recorded from the Owner's runs (Arena executed no .NET command). Validated feature head
+`162ad7ff1e5c7bab398de6c6d1a38131f17082de`; Owner artifact commit
+`bac36add7011c72d6ab03ea5d3e3664ed82a197c` (parent `162ad7f`; exactly five genuine
+`packages.lock.json` refreshes + the regenerated `sensor-map.example.json`; all lock files
+valid JSON, zero package-version changes, only the expected `Wjss.Domain` project-graph
+edges — direct in `adapters/simulator` and `tests/integration`, transitive through
+`wjss.adapters.simulator` in `apps/runtime`, `tests/api.tests`, `tests/runtime.tests` —
+no absolute Owner-local path, no credential or secret; the regenerated example's only
+semantic drift from the prior committed example is the corrected NON_SENSOR_GAP note, with
+108 logical positions / 106 Sensors / 212 unique TC channels, I7 anchored to WJ3 and I16
+anchored to WJ1). Validation: SDK `10.0.401`, xUnit runtime .NET `10.0.12`; normal restore
+PASS; locked restore PASS; Release build **0 warnings / 0 errors**; fresh full .NET suite
+**201 total / 201 passed / 0 failed / 0 skipped**; fixture generation/update **7 / 7** and
+parity after update-mode removal **7 / 7**; TypeScript typecheck PASS and **31 / 31**;
+boundary scan **0 findings (S1–S9 clean)**; all three JSON examples parsed; final
+Owner-local working tree **CLEAN**. Owner reviews: Function **PASSED**, Logic **PASSED**,
+Inspector UI/UX **PASSED** (no critical UI blocker); minor punchlist deferred and
+non-blocking, Inspector presentation frozen for this checkpoint. Historical failed
+build/test observations before the correction chain are not acceptance evidence. Full
+record: [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md) §16 and
+[`STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) §14.10.
 
 ## Related documents
 

@@ -552,3 +552,28 @@ disambiguation), `349264a` (ambiguous Inspector route removed), `40284b4` (Delta
 `e6a5a6c` (Runtime state layout width), `faa79145a925832baa2ac8685f7fecf7a093552d` (genuine lock refresh). Checkpoint C is complete
 for a development checkpoint and **not merged**; `TEST_HARDWARE` and `PRODUCTION` remain NOT
 AUTHORIZED.
+
+### 14.10 Stage 0.3A-3 Checkpoint C Owner-local result (2026-10-08) — PASSED
+
+Recorded from the Owner's runs; Arena did not execute any .NET command. Full record:
+[`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md) §16.
+
+| Item | Observed |
+| --- | --- |
+| Validated feature head | `162ad7ff1e5c7bab398de6c6d1a38131f17082de` |
+| Owner artifact commit | `bac36add7011c72d6ab03ea5d3e3664ed82a197c` (parent `162ad7f`; five genuine `packages.lock.json` refreshes + the regenerated `sensor-map.example.json`; no package version changed; no absolute path; no credential; the example's only semantic drift is the corrected NON_SENSOR_GAP note; 108 / 106 / 212; I7 → WJ3, I16 → WJ1) |
+| Correction chain validated | `8567a78` (CS0103 namespace import), `440a7fa` (CS0246 placement enum type), `162ad7f` (raw-JSON `positionKind` vocabulary ×2 + semantic topology round-trip assertions) |
+| .NET SDK / test runtime | `10.0.401` / .NET `10.0.12` |
+| Normal + locked restore | **PASS** |
+| Release build | **PASS — 0 warnings, 0 errors** |
+| Fresh full .NET tests | **201 total / 201 passed / 0 failed / 0 skipped** |
+| Fixture generation/update + parity | **7 / 7 and 7 / 7 passed** |
+| TypeScript | **typecheck PASS; 31 total / 31 passed** |
+| Boundary scan (S1–S9) | **0 findings** |
+| JSON examples | all three parsed successfully |
+| Working tree after artifact push | **CLEAN** |
+| Checkpoint C Function review | **PASSED** — SIMULATOR; READY / `RUNTIME_READY`; EVOLUTION RUNNING; `STAGE_03A3C_RUNTIME_TOPOLOGY`; revisions and accepted ticks advance; rejected transitions 0; 108 / 106 / 212; exactly two NON_SENSOR_GAP positions (I7 → WJ3, I16 → WJ1) with no Sensor value, score, classification, quality or TC channel on gap cells; Delta chain continuous and clean; Snapshot `wjss.snapshot/2` with 8 Water Jets and 8 Isolation Valves |
+| Checkpoint C Logic review | **PASSED** — WJn paired one-to-one with IVn; installed position separate from target coverage (WJ1 installs FRONT lower at the I16 gap, targets REAR lower; WJ3 installs REAR lower at the I7 gap, targets FRONT lower); Equipment Topology table shows all eight installed positions, anchors, opposite-wall targets and paired valves; Sensor Assigned WJ / Assigned IV follow target coverage, not the installed wall (FRONT upper → WJ7/IV7, LEFT upper → WJ8/IV8, REAR upper → WJ5/IV5, RIGHT upper → WJ6/IV6) |
+| Checkpoint C Inspector UI/UX review | **PASSED — CRITICAL UI BLOCKER: NONE**; synthetic GOOD / STALE / BAD / UNCERTAIN paths with reasons; Inspector read-only with no Pump, Valve, Axis, Queue dispatch, Cleaning or Safe Return command |
+| Minor punchlist | **DEFERRED AND NON-BLOCKING** (gap-cell primary label with slot id in tooltip; friendlier placement captions; vertical scrollability of the diagnostic page). Inspector presentation FROZEN for this checkpoint |
+| Status | **Stage 0.3A-3 Checkpoint C OWNER-LOCALLY VALIDATED**; PR #6 PREPARED FOR FINAL SOURCE REVIEW — OPEN, NOT MERGED; `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |

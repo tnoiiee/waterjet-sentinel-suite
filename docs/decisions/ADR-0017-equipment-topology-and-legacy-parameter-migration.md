@@ -307,6 +307,13 @@ deprecated alias (the only consumers — Inspector, TS mirror, fixtures, tests �
 in the same commits; no deployed `/1` consumer exists). Arena executed no .NET command
 (source-authored, statically reviewed, NOT COMPILED / NOT EXECUTED in Arena); the
 TypeScript mirror check was executed in Arena and passes (31/31); boundary scan 0
-findings (S1–S9 clean). Full record:
-[`../STAGE_0.3A-3_CHECKPOINT_C.md`](../STAGE_0.3A-3_CHECKPOINT_C.md). PR #6 remains
-OPEN — NOT MERGED; TEST_HARDWARE and PRODUCTION device access remain NOT AUTHORIZED.
+findings (S1–S9 clean). **Owner-local validation (2026-10-08): PASSED** at feature head
+`162ad7f` after the correction chain `8567a78` (CS0103 namespace import), `440a7fa`
+(CS0246 placement enum type) and `162ad7f` (behavioural test corrections), with the Owner
+artifact commit `bac36add` (five genuine lock refreshes + the regenerated sensor-map
+example): Release build 0 warnings / 0 errors; full .NET suite 201/201; fixture generation
+and parity 7/7 each; TypeScript 31/31; boundary scan clean; Function, Logic and Inspector
+UI/UX reviews PASSED. Full record:
+[`../STAGE_0.3A-3_CHECKPOINT_C.md`](../STAGE_0.3A-3_CHECKPOINT_C.md) §16. PR #6 remains
+OPEN — NOT MERGED (prepared for final source review); TEST_HARDWARE and PRODUCTION device
+access remain NOT AUTHORIZED.

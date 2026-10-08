@@ -229,6 +229,31 @@ Inspector commit). PR #6 remains OPEN — NOT MERGED.**
 
 Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_C.md`](docs/STAGE_0.3A-3_CHECKPOINT_C.md).
 
+### Stage 0.3A-3 Checkpoint C — Owner-local validation recorded
+
+**Stage 0.3A-3 CHECKPOINT C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-08) — Function
+Review PASSED, Logic Review PASSED, Inspector UI/UX Review PASSED (no critical UI blocker);
+minor punchlist deferred and non-blocking, Inspector presentation frozen. PR #6 PREPARED FOR
+FINAL SOURCE REVIEW — OPEN, NOT MERGED.**
+
+| Item | Observed |
+| --- | --- |
+| Validated feature head | `162ad7ff1e5c7bab398de6c6d1a38131f17082de` (correction chain `8567a78` CS0103 `Wjss.Domain` import → `440a7fa` CS0246 `WaterJetPlacementKind` type → `162ad7f` behavioural test corrections: canonical `positionKind` raw-JSON vocabulary ×2 + semantic topology round-trip assertions) |
+| Owner artifact commit | `bac36add7011c72d6ab03ea5d3e3664ed82a197c` (parent `162ad7f`): five genuine `packages.lock.json` refreshes + the regenerated `sensor-map.example.json` — valid JSON, zero package-version changes, only the expected `Wjss.Domain` project-graph edges, no absolute path, no credential; the example's only semantic drift is the corrected NON_SENSOR_GAP note (108 / 106 / 212; I7 → WJ3, I16 → WJ1) |
+| Environment | .NET SDK `10.0.401`; xUnit runtime .NET `10.0.12` |
+| Restore / build | normal restore **PASS**; locked restore **PASS**; Release build **PASS — 0 warnings, 0 errors** |
+| Full .NET tests | **201 total / 201 passed / 0 failed / 0 skipped** |
+| Fixtures | generation/update run **7 / 7**; parity after update-mode removal **7 / 7** |
+| TypeScript | typecheck **PASS**; tests **31 / 31** |
+| Boundary scan | **0 findings (S1–S9 clean)** |
+| JSON examples | all three parsed successfully |
+| Working tree | **CLEAN** after the artifact push |
+| Deferred non-blocking polish | gap-cell primary label with slot id in tooltip; friendlier placement captions; vertical scrollability of the diagnostic page. Inspector presentation FROZEN for this checkpoint |
+
+Historical failed build/test observations before the correction chain are not acceptance
+evidence. Full record:
+[`docs/STAGE_0.3A-3_CHECKPOINT_C.md`](docs/STAGE_0.3A-3_CHECKPOINT_C.md) §16.
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh

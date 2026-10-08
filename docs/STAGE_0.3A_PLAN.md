@@ -255,6 +255,27 @@ Owner-local gates: restore, Release build, full test suite, fixture parity
 `npm ci && npm run check`, boundary scan, UI review. PR #6 **OPEN — NOT MERGED**;
 TEST_HARDWARE and PRODUCTION remain NOT AUTHORIZED.
 
+## 5f. Stage 0.3A-3 Checkpoint C Owner-local validation record (appended 2026-10-08)
+
+**Stage 0.3A-3 Checkpoint C is OWNER-LOCALLY VALIDATED** (Owner's runs; Arena executed no
+.NET command). Validated feature head `162ad7ff1e5c7bab398de6c6d1a38131f17082de`; Owner
+artifact commit `bac36add7011c72d6ab03ea5d3e3664ed82a197c` (parent `162ad7f`; five genuine
+`packages.lock.json` refreshes + the regenerated `sensor-map.example.json`; zero package
+version changes; only the expected `Wjss.Domain` project-graph edges; no absolute path or
+credential; the example's only semantic drift is the corrected NON_SENSOR_GAP note, with
+108 / 106 / 212 and I7 → WJ3, I16 → WJ1). Correction chain validated: `8567a78` (CS0103
+namespace import), `440a7fa` (CS0246 placement enum type), `162ad7f` (raw-JSON
+`positionKind` vocabulary ×2; semantic topology round-trip assertions). Evidence: SDK
+`10.0.401` / xUnit runtime .NET `10.0.12`; normal restore PASS; locked restore PASS;
+Release build **0 warnings / 0 errors**; full .NET suite **201/201**; fixture
+generation/update **7/7** and parity **7/7**; TypeScript typecheck PASS, **31/31**;
+boundary scan **0 findings (S1–S9 clean)**; JSON examples PASS; final working tree CLEAN.
+Owner reviews: **Function PASSED, Logic PASSED, Inspector UI/UX PASSED (no critical UI
+blocker)**; minor punchlist deferred and non-blocking, Inspector presentation frozen for
+this checkpoint. Status: PR #6 PREPARED FOR FINAL SOURCE REVIEW — OPEN, NOT MERGED;
+`TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED. Full record:
+[`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md) §16.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins
