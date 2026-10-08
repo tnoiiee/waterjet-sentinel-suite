@@ -156,34 +156,77 @@ public sealed class SequencingCp3aHardeningTests
         Assert.Equal(JobLifecycle.RUNNING, RequireJob(transit.State).Lifecycle);
     }
 
-    // ---- AxisStandbySeq: written at SR5, readable through the pure preview ----
+    // ---- Latch with Safe Return jobs (accepted states) ----
 
     [Fact]
-    public void Axis_Standby_Ledger_Preview_Matches_The_SR5_Evidence_Of_The_Release()
+    public void Latch_With_A_Safe_Return_Job_Is_Accepted_And_Projects_Critical()
     {
-        var aborting = Expect(SequencingKernel.Apply(Cleaning(Running(), 4), new RequestAbort(At(7))));
-        var awaitingStandby = Expect(SequencingKernel.Apply(aborting, Valve(8, upper: false, lower: true)));
-        var axis = new AxisFeedbackObserved(At(9), AxisFeedbackState.AT_STANDBY);
+        var critical = SequencingKernel.Apply(Running(), new ObservePumpState(At(4), PumpObservation.UNEXPECTED_STOP));
 
-        var preview = SequencingKernel.PreviewAxisStandbyLedger(awaitingStandby, axis);
-        Assert.NotNull(preview);
-        Assert.NotNull(preview.AxisStandbySeq);
-        Assert.True(preview.AxisReturnRequestSeq < preview.AxisStandbySeq);
-
-        var released = SequencingKernel.Apply(awaitingStandby, axis);
-        Assert.Equal(preview.AxisStandbySeq, (int?)Find(released, SafeReturnStep.SR5).Seq);
+        Assert.Equal(SequencingOutcome.APPLIED, critical.Outcome);
+        Assert.Equal(AutoSequenceState.CRITICAL_SUSPENDED, SequencingKernel.ProjectAutoSequenceState(critical.State));
+        Assert.Equal(JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED, SequencingKernel.ProjectJobLifecycle(critical.State));
     }
 
     [Fact]
-    public void Axis_Standby_Preview_Is_Null_Outside_Verify_Standby_And_Never_Mutates()
+    public void Latch_With_A_Failed_Safe_Return_Job_Is_Accepted_And_Projects_Critical()
     {
-        var running = Running();
-        var evidenceBefore = running.EvidenceSeq;
-        var axis = new AxisFeedbackObserved(At(9), AxisFeedbackState.AT_STANDBY);
+        var latched = Expect(SequencingKernel.Apply(Running(), new ObservePumpState(At(4), PumpObservation.TRIP)));
 
-        Assert.Null(SequencingKernel.PreviewAxisStandbyLedger(running, axis));
-        Assert.Null(SequencingKernel.PreviewAxisStandbyLedger(SequencingKernel.Initial(), axis));
-        Assert.Equal(evidenceBefore, running.EvidenceSeq);
+        var failed = SequencingKernel.Apply(latched, new FeedbackTimeoutExpired(At(5), FeedbackTarget.VALVE_CLOSED));
+
+        Assert.Equal(SequencingOutcome.APPLIED, failed.Outcome);
+        Assert.Equal(AutoSequenceState.CRITICAL_SUSPENDED, SequencingKernel.ProjectAutoSequenceState(failed.State));
+        Assert.Equal(JobLifecycle.SAFE_RETURN_FAILED, SequencingKernel.ProjectJobLifecycle(failed.State));
+    }
+
+    // ---- INVALID_LIMIT_STATE during CLEANING and failed Safe Return evidence ----
+
+    [Fact]
+    public void Invalid_Limit_State_During_Cleaning_Enters_Failure_Safe_Return_In_The_Same_Transition()
+    {
+        var transition = SequencingKernel.Apply(Cleaning(Running(), 4), Valve(7, upper: true, lower: true));
+
+        Assert.Equal(SequencingOutcome.APPLIED, transition.Outcome);
+        Assert.Equal(Of("VALVE_FEEDBACK_OBSERVED", "SR1", "SR2"), Codes(transition));
+        var job = RequireJob(transition.State);
+        Assert.Equal(JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED, job.Lifecycle);
+        Assert.Equal(CleaningJobOutcome.FAILED, job.PendingOutcome);
+        Assert.Equal("VALVE_INVALID_LIMIT_STATE", job.TriggerReason);
+        Assert.False(job.WaterOutputOn);
+        Assert.False(transition.State.CriticalSuspended);
+    }
+
+    [Fact]
+    public void Failed_Safe_Return_Carries_Recovery_Required_And_Retains_The_Job()
+    {
+        var aborting = Expect(SequencingKernel.Apply(Cleaning(Running(), 4), new RequestAbort(At(7))));
+
+        var failed = SequencingKernel.Apply(aborting, new FeedbackTimeoutExpired(At(8), FeedbackTarget.VALVE_CLOSED));
+
+        Assert.Equal(SequencingOutcome.APPLIED, failed.Outcome);
+        Assert.Equal(CleaningJobOutcome.RECOVERY_REQUIRED, Find(failed, SafeReturnStep.SR_FAILED).JobOutcome);
+        Assert.Equal(JobLifecycle.SAFE_RETURN_FAILED, RequireJob(failed.State).Lifecycle);
+        Assert.DoesNotContain(failed.Records, record => record.JobOutcome is CleaningJobOutcome.COMPLETED or CleaningJobOutcome.ABORTED or CleaningJobOutcome.FAILED);
+    }
+
+    // ---- Axis Standby confirmation is SR5, between the valve confirmation and the outcome ----
+
+    [Fact]
+    public void Axis_Standby_Confirmation_Is_Recorded_As_SR5_Before_The_Outcome_And_Release()
+    {
+        var closed = SequencingKernel.Apply(Expect(SequencingKernel.Apply(Cleaning(Running(), 4), new RequestAbort(At(7)))), Valve(8, upper: false, lower: true));
+        var released = SequencingKernel.Apply(Expect(closed), new AxisFeedbackObserved(At(9), AxisFeedbackState.AT_STANDBY));
+
+        Assert.Equal(Of("SR5", "SR6", "JOB_RELEASED"), Codes(released));
+        var sr4 = Find(closed, SafeReturnStep.SR4).Seq;
+        var sr5 = Find(released, SafeReturnStep.SR5).Seq;
+        var sr6 = Find(released, SafeReturnStep.SR6).Seq;
+        var sr7 = released.Records.Single(record => record.Code == SequencingCodes.JobReleased).Seq;
+        Assert.True(sr4 < sr5);
+        Assert.True(sr5 < sr6);
+        Assert.True(sr6 < sr7);
+        Assert.Null(released.State.ActiveJob);
     }
 
     // ---- helpers (synthetic only) ----

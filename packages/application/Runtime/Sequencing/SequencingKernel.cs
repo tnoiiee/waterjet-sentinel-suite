@@ -824,7 +824,8 @@ public static class SequencingKernel
 
     /// <summary>
     /// Records SR5 (Standby confirmed) and returns the Job with AxisStandbySeq set to that record's evidence
-    /// sequence. The release path and <see cref="PreviewAxisStandbyLedger"/> both use this one step.
+    /// sequence. The release path is the only caller. The released Job is not retained, so the value is observed
+    /// through the SR5 evidence record of the release transition.
     /// </summary>
     private static SequencingActiveJob WriteAxisStandby(EvidenceTrail trail, SequencingActiveJob job, AxisFeedbackObserved e)
     {
@@ -832,29 +833,6 @@ public static class SequencingKernel
         const JobLifecycle awaiting = JobLifecycle.SAFE_RETURN_VERIFY_STANDBY;
         var standbySeq = trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR5), job, awaiting, awaiting, step: SafeReturnStep.SR5, axis: AxisFeedbackState.AT_STANDBY));
         return job with { Ledger = job.Ledger with { AxisStandbySeq = standbySeq } };
-    }
-
-    /// <summary>
-    /// Pure preview of the Safe Return ledger that an AT_STANDBY confirmation writes. It returns null when the
-    /// input would not confirm Standby, and it never changes the state. The Job is released in the same
-    /// transition, so this preview is the only place the written AxisStandbySeq can be read.
-    /// </summary>
-    public static SafeReturnLedger? PreviewAxisStandbyLedger(SequencingState state, AxisFeedbackObserved e)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        ArgumentNullException.ThrowIfNull(e);
-        if (state.ActiveJob is not { } job)
-        {
-            return null;
-        }
-
-        if (job.Lifecycle != JobLifecycle.SAFE_RETURN_VERIFY_STANDBY || e.Feedback != AxisFeedbackState.AT_STANDBY)
-        {
-            return null;
-        }
-
-        var trail = new EvidenceTrail(state.EvidenceSeq);
-        return WriteAxisStandby(trail, job, e).Ledger;
     }
 
     private static SequencingTransition ExpireFeedback(SequencingState state, FeedbackTimeoutExpired e)
