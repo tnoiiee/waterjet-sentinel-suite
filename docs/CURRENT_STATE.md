@@ -537,6 +537,15 @@ accepted and merged Stage 0.2.*
 
 This record is retained deliberately. Git history was not rewritten to remove the deviation.
 
+### 11.10 Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel (source authored)
+
+- **Status:** SOURCE AUTHORED; STATICALLY REVIEWED; NOT COMPILED IN ARENA; NOT EXECUTED IN ARENA; **OWNER-LOCAL VALIDATION REQUIRED**. Branch `arena/bba7709c-waterjet-sentinel-suite`, base `8323f78`. PR open, not merged.
+- **Delivered (pure `Runtime.Core` kernel, no host, API, Inspector, device or route):** single Active Job with lifecycle and abstract Pump and feedback inputs; Mandatory Safe Return SR1 to SR7 in the Owner order; outcome recorded only after SR5, in the same transition as SR6 and SR7 (release); Safe Return failure retains the Job with RECOVERY_REQUIRED evidence; critical latch persists after release; one evidence sequence; `SafeReturnReleaseEvidence` removed.
+- **Not implemented:** Runtime host integration, API projection, Inspector or UI, command or write routes, Pump, Valve or Axis hardware commands, Modbus, PLC, DCS, Galil or KMotion, coordinates, speeds, homing, timers, TempQueue, TimeQueue, persistence, SSE, TEST_HARDWARE, PRODUCTION.
+- **Open:** O-11 (mid-cleaning pump not-ready refused, not held); Owner confirmation of O-3, O-4 and O-8 (see the checkpoint report).
+- **Authority:** CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED. TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
+- Full record: `docs/STAGE_0.4A_CP-2_CHECKPOINT.md`.
+
 ## 12. Validation record
 
 Documentation-only validation, performed for the Stage 0.1 review-correction checkpoint.
