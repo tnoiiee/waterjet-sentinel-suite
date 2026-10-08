@@ -99,7 +99,7 @@ public static class SimulatorScenarioCatalogue
         {
             Sensors = Array.AsReadOnly(ordered),
             Topology = topology,
-            Scenarios = BuildAll(plan),
+            Scenarios = BuildAll(plan).AsReadOnly(),
         };
     }
 
@@ -133,7 +133,7 @@ public static class SimulatorScenarioCatalogue
         public string ValveId => Primary.AssignedIsolationValveId;
     }
 
-    private static IReadOnlyList<SimulatorScenario> BuildAll(Plan plan) => new List<SimulatorScenario>
+    private static List<SimulatorScenario> BuildAll(Plan plan) => new()
     {
         new(SimulatorScenarioId.IDLE, "No events. Initial OFF state, empty queue, revision 0.", new List<SimulatorScenarioStep>().AsReadOnly()),
         new(SimulatorScenarioId.NORMAL_COMPLETION, "Dispatch, clean, verify P1 to P6, complete, close, return to standby, release.", NormalCompletion(plan).AsReadOnly()),

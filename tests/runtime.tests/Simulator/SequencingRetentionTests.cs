@@ -295,7 +295,7 @@ public sealed class SequencingRetentionTests
         Assert.Equal(10, next.EvidenceLog.Count);
     }
 
-    private static IReadOnlyList<SequencingEvidence> Records(int firstSeq, int count) =>
+    private static SequencingEvidence[] Records(int firstSeq, int count) =>
         Enumerable.Range(firstSeq, count).Select(seq => Record(seq, "TEST_RECORD")).ToArray();
 
     private static SequencingEvidence Record(int seq, string code, SafeReturnStep? step = null) =>
