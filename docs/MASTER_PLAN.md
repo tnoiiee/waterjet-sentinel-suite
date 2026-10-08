@@ -339,6 +339,30 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 - Non-blocking follow-ups (see `docs/STAGE_0.4A_CP-2_CHECKPOINT.md` §19): validator gap for a critical latch with a RUNNING Job; `Apply` wording for an exhausted or negative evidence counter; acceptance of the CP-1 test rewrites required by O-10; valve movement during CLEANING is recorded but not gated.
 - Authority: PR #8 OPEN, NOT MERGED. **CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 
+### 3.3.4 Stage 0.4A CP-3a and CP-3b coding scope record (2026-10-08)
+
+**Status: CP-3a and CP-3b source and tests are scope-locked to the files below, on the session branch `arena/9aa1746c-waterjet-sentinel-suite`, from approved base `d884a541163c2d567ab4ba2882a981431a14bfe7` (`origin/main`; PR #8 merged; CP-2 §19 present).** The coding request comes from the user's instruction in this Arena session. No Owner ruling in this repository records it yet, so the request is `[OPEN]` for Owner confirmation before merge. The agent never merges. **CP-3c and CP-4 remain NOT AUTHORIZED.** No Inspector UI, `apps/runtime` host, route, contract, fixture, TypeScript, device, PLC, Modbus, Galil, KMotion, DCS, command, POST/PUT/PATCH/DELETE, SSE, database or system-clock change is authorized.
+
+**1. CP-3a files (kernel hardening).** `packages/application/Runtime/Sequencing/SequencingKernel.cs`, `SequencingStateValidator.cs`; tests in `tests/runtime.tests/Sequencing/SequencingCp3aHardeningTests.cs`. `SequencingSafeReturn.cs` is not changed unless a STOP is recorded. `SequencingTransition.cs`, `SequencingCodes.cs` and `SequencingState.cs` are not changed.
+
+**2. CP-2 follow-up dispositions (CP-2 §19.8).**
+
+| Item | Disposition in CP-3a |
+| --- | --- |
+| FU-1 latch with a RUNNING Job | Implemented: `JOB_RUNNING_UNDER_LATCH`, checked last in `RunningJobViolation`, so every earlier RUNNING identity is unchanged. |
+| FU-2 `Apply` wording | Implemented as XML documentation only. No behaviour change. |
+| FU-3 CP-1 test rewrites | Documentation only. No CP-1 test is restored or rewritten. Owner acceptance remains `[OPEN]`. |
+| FU-4 valve movement during CLEANING | Implemented for the case the brief names: an OPEN reading during CLEANING followed by CLOSED or TRANSIT_OR_FAULT enters Safe Return in the same transition (SR1, SR2, pending FAILED, reason `VALVE_LOST_DURING_CLEANING`). Queue and latch unchanged. INVALID_LIMIT_STATE keeps its CP-2 path. CP-2 §19.8 asked for Owner confirmation of this trigger; that confirmation is `[OPEN]`. Source enumeration found no existing test that pins the recorded-only behaviour, so no existing test is changed. Valve movement before any OPEN reading in CLEANING stays recorded-only; this residual is `[OPEN]`. |
+| FU-5 O-3, O-4, O-8, O-11 | Unchanged. Still `[OPEN]` for Owner confirmation. |
+
+**3. AxisStandbySeq decision.** The SR5 evidence sequence is written into `AxisStandbySeq` inside the AT_STANDBY confirmation path. The released Job does not survive, so the value is readable only through the pure helper `SequencingKernel.PreviewAxisStandbyLedger`. The release transition's own SR5 record carries the same sequence, so the Owner-facing outcome record can be sourced from evidence without a new transition receipt. `SequencingTransition` is not changed.
+
+**4. CP-3b scope (simulator composition, library only).** Allowed: `packages/application/Runtime/Simulator/` (scenario catalogue, scenario-to-kernel schedules, bounded retention, queue and Sensor queue-state projection) and `RuntimeDeltaProjector.cs` (content comparison and a pure candidate path). Tests in `tests/runtime.tests/Simulator/`. Scenario selection is a pure name match with no clock, no randomness and no operator surface. **Not authorized in CP-3b and recorded `[OPEN]`:** the wire projection of the Active Job, Safe Return, Sequence, Pump, critical event and last outcome sections. These need Owner rulings on presentation fields the repository does not define (`PhaseIndex`, `PhaseProgress` and `PhaseLabel` for P2 to P6, the Pump run-state mapping, and the `Command` and `Feedback` strings in the Safe Return legs). The brief's P1 pending labels, SCENARIO_PREPARED dispatch origin and synthetic critical fields are recorded as the rules for that later step.
+
+**5. Equipment intents.** Intents remain pure evidence data. CP-3 adds no command-like vocabulary. The contract's existing `Command` fields are not renamed. O-8 stays `[OPEN]`.
+
+**6. Protected behaviour.** Snapshot schema `wjss.snapshot/2`, Delta schema `wjss.delta/2`, the single-writer revision model, the gapless Delta chain, Queue capacity 8 with FIFO head-only dispatch, the three-state `activeJob` encoding, WJn paired with IVn, the `RuntimeStage.Marker` value, and the CP-2 release and latch rules are all unchanged.
+
 ### 3.1 Recorded reconciliation of the Stage 0.2 title
 
 The Stage 0.1 candidate decomposition listed Stage 0.2 as *Requirements and Configuration
