@@ -31,6 +31,12 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.4A CP-0 / CP-1 — Owner-local validation recorded and CP-1 Final Source Review (documentation only, 2026-10-08)
+
+- **OWNER-LOCALLY VALIDATED** at feature head `2cfe648d512241d9fef459cd91c663b9780753f9` (CP-1; parent `1f76da8` = CP-0; base `909d028`). Owner-reported: .NET SDK 10.0.401; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests 217/217 passed; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean; `git diff --check` PASS; working tree clean. No artifact commit was required.
+- **CP-1 Final Source Review (read-only):** no blocking public-boundary defect. FOLLOW-UP RECOMMENDED BEFORE MERGE for the public `SequencingState` constructor (a caller can bypass the critical latch or construct an over-capacity or inconsistent state; the kernel does not validate its input). CP-2 precondition: a single evidence sequence (the CP-1 release check currently compares a separate Safe Return sequence). No Runtime, API, Inspector, contract, schema or fixture change.
+- The Stage 0.4A CP-2 scope gate is **proposed** (MASTER_PLAN §3.3.1). CP-2, CP-3 and CP-4 are NOT AUTHORIZED. PR #7 remains OPEN and NOT MERGED.
+
 ### Stage 0.4A CP-0 — Status and ADR reconciliation for Stage 0.4A sequencing (documentation only, 2026-10-08)
 
 - Recorded that PR #5 (merge `a74db62`) and PR #6 (merge `909d028`, the Stage 0.4A approved base) are
