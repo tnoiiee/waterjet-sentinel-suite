@@ -551,3 +551,6 @@ has been submitted and re-review has been requested.
 - [`REQUIREMENTS.md`](REQUIREMENTS.md) — requirement register
 - [`TEST_STRATEGY.md`](TEST_STRATEGY.md) — planned verification approach
 - [`decisions/README.md`](decisions/README.md) — decision records
+
+### Stage 0.4A CP-3c-1 development scope
+Owner-authorized library-only atomic Runtime publication foundation on approved main `6b0ff7e`. State, matching Delta and bounded history must be one reader-visible generation. Existing Host composition is unchanged; CP-3c-2 and CP-4 are not authorized. See `STAGE_0.4A_CP-3C-1_CHECKPOINT.md` for development status; Owner-local validation remains required.

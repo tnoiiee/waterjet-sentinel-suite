@@ -1365,3 +1365,6 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - [`ROADMAP.md`](ROADMAP.md) — forward view
 - [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) — current prohibition on control writes
 - [`TEST_STRATEGY.md`](TEST_STRATEGY.md) — verification levels and what has not been tested
+
+### CP-3c-1 development scope
+Atomic Runtime publication is authorized as a library foundation only. The existing Host remains on its legacy stores; no scenario integration or GET behavior changes. See `STAGE_0.4A_CP-3C-1_CHECKPOINT.md`. Owner-local validation required.

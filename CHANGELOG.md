@@ -1507,3 +1507,5 @@ package, or archive was created.
   see `docs/PUBLIC_REPOSITORY_BOUNDARY.md`.
 - No runtime, database, or hardware test was executed. Only documentation validation was
   performed. See `docs/CURRENT_STATE.md` for the validation record.
+
+- Stage 0.4A CP-3c-1: scope limited to atomic in-memory Runtime State/Delta publication foundation and bounded trend append projection. No Host or API integration; Owner-local validation required.
