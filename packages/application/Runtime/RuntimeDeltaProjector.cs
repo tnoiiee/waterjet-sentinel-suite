@@ -153,9 +153,9 @@ public static class RuntimeDeltaProjector
     }
 
     /// <summary>
-    /// Carries exactly one appended candidate trend point. An unchanged window carries nothing. Any other change is
-    /// refused explicitly: a changed window identity, changed history, a removal, more than one appended point, or an
-    /// append beyond the window capacity (an eviction is a removal).
+    /// Carries one appended candidate trend point: below capacity, one append with the existing history intact;
+    /// at capacity, exactly one oldest eviction followed by one append with the retained suffix intact.
+    /// An unchanged window carries nothing. All other changes are refused.
     /// </summary>
     private static TrendPoint? AppendedTrendPoint(TrendWindow previous, TrendWindow candidate)
     {
@@ -166,14 +166,9 @@ public static class RuntimeDeltaProjector
 
         var before = previous.Points.Count;
         var after = candidate.Points.Count;
-        if (after == before)
+        if (after == before && SameContent(previous.Points, candidate.Points))
         {
-            if (SameContent(previous.Points, candidate.Points))
-            {
-                return null;
-            }
-
-            throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
+            return null;
         }
 
         if (before < candidate.Capacity)

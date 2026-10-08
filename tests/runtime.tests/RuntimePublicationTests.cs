@@ -108,4 +108,84 @@ public sealed class RuntimePublicationTests
         Assert.Throws<InvalidOperationException>(() => RuntimeDeltaProjector.ProjectCandidate(previous, candidate with { Trend = candidate.Trend with { Capacity = 3 } }));
         Assert.Throws<InvalidOperationException>(() => RuntimeDeltaProjector.ProjectCandidate(previous, candidate with { Trend = candidate.Trend with { Points = new[] { Point(3) } } }));
     }
+
+    private static TrendPoint Point(long time) => new()
+    {
+        T = time,
+        Series = new double?[] { time, time, time, time },
+        Setpoint = 0,
+        JobActive = false,
+        AlarmActive = false,
+    };
+
+    private static (RuntimeState Previous, RuntimeState Next) FullWindow(int capacity, params TrendPoint[] points)
+    {
+        var initial = SimulatorRunHarness.InitialState();
+        var previous = initial with { Trend = initial.Trend with { Capacity = capacity, Points = points } };
+        var next = previous with
+        {
+            Revision = previous.Revision + 1,
+            GeneratedAtUtc = previous.GeneratedAtUtc.AddSeconds(1),
+        };
+        return (previous, next);
+    }
+
+    [Fact]
+    public void Unchanged_Full_Window_Has_No_Trend_Point()
+    {
+        var (previous, next) = FullWindow(2, Point(1), Point(2));
+        // Independently constructed, semantically identical points: array reference equality is irrelevant.
+        var candidate = next with { Trend = next.Trend with { Points = new[] { Point(1), Point(2) } } };
+        Assert.Null(RuntimeDeltaProjector.ProjectCandidate(previous, candidate).TrendPoint);
+    }
+
+    [Fact]
+    public void Full_Window_Rejects_Incorrect_Shift_Historical_Mutation_Reorder_Removal_And_Capacity_Change()
+    {
+        var (previous, next) = FullWindow(3, Point(1), Point(2), Point(3));
+        void Refuse(TrendWindow trend) =>
+            Assert.Throws<InvalidOperationException>(() => RuntimeDeltaProjector.ProjectCandidate(previous, next with { Trend = trend }));
+        Refuse(previous.Trend with { Points = new[] { Point(1), Point(2), Point(4) } }); // wrong shift
+        Refuse(previous.Trend with { Points = new[] { Point(2) with { Setpoint = 42 }, Point(3), Point(4) } }); // history
+        Refuse(previous.Trend with { Points = new[] { Point(3), Point(2), Point(4) } }); // reorder
+        Refuse(previous.Trend with { Points = new[] { Point(2), Point(3) } }); // removal
+        Refuse(previous.Trend with { Capacity = 4, Points = new[] { Point(2), Point(3), Point(4) } });
+    }
+
+    [Fact]
+    public void Single_Slot_Full_Window_Evicts_And_Appends_One_Point()
+    {
+        var (previous, next) = FullWindow(1, Point(1));
+        var candidate = next with { Trend = next.Trend with { Points = new[] { Point(2) } } };
+        var delta = RuntimeDeltaProjector.ProjectCandidate(previous, candidate);
+        RuntimeTestFixture.AssertTrendPointsEquivalent(new[] { Point(2) }, new[] { Assert.IsType<TrendPoint>(delta.TrendPoint) });
+        var applied = RuntimeDeltaApply.Apply(previous, delta);
+        Assert.True(applied.Applied, applied.Reason);
+        RuntimeTestFixture.AssertTrendPointsEquivalent(candidate.Trend.Points, Assert.IsType<RuntimeState>(applied.State).Trend.Points);
+    }
+
+    [Fact]
+    public void Refused_Full_Window_Publication_Preserves_State_History_And_Generation()
+    {
+        var (previous, next) = FullWindow(2, Point(1), Point(2));
+        var candidate = next with { Trend = next.Trend with { Points = new[] { Point(2), Point(3) } } };
+        var delta = RuntimeDeltaProjector.ProjectCandidate(previous, candidate);
+        var store = RuntimePublicationStore.Create(previous);
+        var writer = store.CreateWriter();
+        Assert.True(writer.Publish(previous.Revision, candidate, delta).Accepted);
+        var committed = store.Snapshot;
+        var invalid = candidate with
+        {
+            Revision = candidate.Revision + 1,
+            GeneratedAtUtc = candidate.GeneratedAtUtc.AddSeconds(1),
+            Trend = candidate.Trend with { Points = new[] { Point(2), Point(4) } },
+        };
+        // Reusing the earlier Delta cannot link to the new revision.
+        Assert.False(writer.Publish(candidate.Revision, invalid, delta).Accepted);
+        Assert.Same(committed, store.Snapshot);
+        Assert.Equal(committed.Current.Revision, store.Snapshot.Current.Revision);
+        Assert.Equal(committed.Generation, store.Snapshot.Generation);
+        Assert.Equal(Json(committed.Deltas), Json(store.Snapshot.Deltas));
+    }
+
 }
