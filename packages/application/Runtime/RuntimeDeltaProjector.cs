@@ -176,21 +176,36 @@ public static class RuntimeDeltaProjector
             throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
         }
 
-        if (after != before + 1 || after > candidate.Capacity)
+        if (before < candidate.Capacity)
         {
-            throw new InvalidOperationException(
-                "Refused to project a Delta: the trend changed by a removal or by more than one appended point. Nothing was projected.");
+            if (after != before + 1)
+            {
+                throw new InvalidOperationException("Refused to project a Delta: expected exactly one trend append.");
+            }
+            for (var index = 0; index < before; index++)
+            {
+                if (!SameContent(previous.Points[index], candidate.Points[index]))
+                {
+                    throw new InvalidOperationException("Refused to project a Delta: trend history changed.");
+                }
+            }
+            return candidate.Points[before];
         }
 
-        for (var index = 0; index < before; index++)
+        if (after != before)
         {
-            if (!SameContent(previous.Points[index], candidate.Points[index]))
+            throw new InvalidOperationException("Refused to project a Delta: full trend window requires one eviction and one append.");
+        }
+        for (var index = 1; index < before; index++)
+        {
+            if (!SameContent(previous.Points[index], candidate.Points[index - 1]))
             {
-                throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
+                throw new InvalidOperationException("Refused to project a Delta: full trend window did not shift exactly once.");
             }
         }
-
-        return candidate.Points[before];
+        // A full window can be unchanged; that case returned above. A single-slot window
+        // has no retained predecessor to compare, but its replacement is still one append.
+        return candidate.Points[after - 1];
     }
 
     private static void RequireNextStep(RuntimeState previous, RuntimeState candidate)
