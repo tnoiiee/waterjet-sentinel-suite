@@ -302,13 +302,13 @@ equipment parameters (all non-Owner values remain `[NOT VERIFIED]` / `[OPEN]`).
 | --- | --- |
 | Verified base SHA | `a74db62c4a7d4d8d5d2185cfe77a4c0229b01fce` (remote `main`, verified via `git ls-remote`) |
 | New branch | `arena/ca9c94c4-waterjet-sentinel-suite` (from the approved base) |
-| Commit 1 (specification) | `c994c26303340cbe1fcafe0d2baf60a253549ece` — `docs(topology): define Water Jet and legacy parameter migration` |
+| Commit 1 (specification) | `c994c26f621b49b01a1e437f8207651add126035` — `docs(topology): define Water Jet and legacy parameter migration` |
 | Commit 2 (delivery record) | appends PR number and head references (this commit) |
 | Changed | `docs/decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md` (NEW); `docs/STAGE_0.3A-3_CHECKPOINT_A.md` (NEW); `docs/decisions/README.md` (index row); `CHANGELOG.md` (Unreleased entry) |
 | Unchanged | All Product source, contracts, fixtures, locks, tests, Inspector, simulator, config examples, README/CURRENT_STATE stage rows, the React spike |
 | Not Verified | All values inherited from Owner data (`[OWNER CONFIRMED]` / Owner-provided CSV facts); the canonical models are specified, not implemented; no .NET, no importer, no device, no runtime was executed or exercised here |
 | PR | **[#6](https://github.com/tnoiiee/waterjet-sentinel-suite/pull/6)** — created from this branch against `main` — **OPEN, NOT MERGED** |
-| Spec head (commit 1) | `c994c26303340cbe1fcafe0d2baf60a253549ece` — full specification above |
+| Spec head (commit 1) | `c994c26f621b49b01a1e437f8207651add126035` — full specification above |
 | PR head (commit 2) | recorded authoritatively in the PR header (GitHub, PR #6) and in the Checkpoint A report chat status; this commit appends only this delivery record |
 
 **FINAL STATUS**
