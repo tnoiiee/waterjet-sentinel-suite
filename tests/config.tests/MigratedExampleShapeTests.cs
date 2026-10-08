@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Wjss.Config.Examples.Tests; // ConfigTestPaths — shared repository-root discovery
 using Wjss.Contracts;
@@ -14,6 +15,12 @@ namespace Wjss.Config.Tests;
 /// (public-repository boundary: the Owner CSV and every real acquisition value stay
 /// outside Git). Directory-wide vocabulary and profile scans in
 /// <see cref="ExampleConfigTests"/> cover this file automatically.
+///
+/// Nullable flow (Owner-local compile correction, 2026-10-08): every JSON access is
+/// captured through <see cref="JsonNodeExtensions.RequireString"/>/
+/// <see cref="JsonNodeExtensions.RequireInt"/>/<see cref="JsonNodeExtensions.RequireArray"/>
+/// into validated non-null locals — explicit throw guards instead of scattered
+/// null-forgiving operators, with all test meanings and expected values preserved.
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA.
 /// </summary>
 public sealed class MigratedExampleShapeTests
@@ -26,13 +33,13 @@ public sealed class MigratedExampleShapeTests
     {
         var node = JsonNodeExtensions.ParseExample();
 
-        Assert.Contains("SYNTHETIC", (string?)node["_label"], StringComparison.Ordinal);
-        Assert.Contains("NOT FOR DEPLOYMENT", (string?)node["_label"], StringComparison.Ordinal);
-        Assert.Equal(108, node["logicalPositions"]!.AsArray().Count);
-        Assert.Equal(106, node["sensors"]!.AsArray().Count);
-        Assert.Equal(8, node["waterJets"]!.AsArray().Count);
-        Assert.Equal(8, node["isolationValves"]!.AsArray().Count);
-        Assert.Equal(0, node["warnings"]!.AsArray().Count);
+        Assert.Contains("SYNTHETIC", JsonNodeExtensions.RequireString(node, "_label"), StringComparison.Ordinal);
+        Assert.Contains("NOT FOR DEPLOYMENT", JsonNodeExtensions.RequireString(node, "_label"), StringComparison.Ordinal);
+        Assert.Equal(108, JsonNodeExtensions.RequireArray(node, "logicalPositions").Count());
+        Assert.Equal(106, JsonNodeExtensions.RequireArray(node, "sensors").Count());
+        Assert.Equal(8, JsonNodeExtensions.RequireArray(node, "waterJets").Count());
+        Assert.Equal(8, JsonNodeExtensions.RequireArray(node, "isolationValves").Count());
+        Assert.Empty(JsonNodeExtensions.RequireArray(node, "warnings"));
     }
 
     [Fact]
@@ -40,34 +47,38 @@ public sealed class MigratedExampleShapeTests
     {
         var node = JsonNodeExtensions.ParseExample();
 
-        var positions = node["logicalPositions"]!.AsArray();
+        var positions = JsonNodeExtensions.RequireArray(node, "logicalPositions");
         Assert.Equal(
             Enumerable.Range(0, 108).ToArray(),
-            positions.Select(p => (int)p!["orderTotal"]!).ToArray());
+            positions.Select(p => JsonNodeExtensions.RequireInt(p, "orderTotal")).ToArray());
 
-        var gaps = positions.Where(p => (string?)p!["positionKind"] == "NON_SENSOR_GAP").ToArray();
+        var gaps = positions
+            .Where(p => JsonNodeExtensions.RequireString(p, "positionKind") == "NON_SENSOR_GAP")
+            .ToArray();
         Assert.Equal(2, gaps.Length);
-        Assert.Equal("I7", (string?)gaps[0]["logicalId"]);
-        Assert.Equal("WJ3", (string?)gaps[0]["gapAnchorForWaterJetId"]);
-        Assert.Equal("I16", (string?)gaps[1]["logicalId"]);
-        Assert.Equal("WJ1", (string?)gaps[1]["gapAnchorForWaterJetId"]);
+        Assert.Equal("I7", JsonNodeExtensions.RequireString(gaps[0], "logicalId"));
+        Assert.Equal("WJ3", JsonNodeExtensions.RequireString(gaps[0], "gapAnchorForWaterJetId"));
+        Assert.Equal("I16", JsonNodeExtensions.RequireString(gaps[1], "logicalId"));
+        Assert.Equal("WJ1", JsonNodeExtensions.RequireString(gaps[1], "gapAnchorForWaterJetId"));
 
-        var sensors = node["sensors"]!.AsArray();
+        var sensors = JsonNodeExtensions.RequireArray(node, "sensors");
         Assert.Equal(
             Enumerable.Range(1, 106).ToArray(),
-            sensors.Select(s => (int)s!["scanOrder"]!).ToArray());
+            sensors.Select(s => JsonNodeExtensions.RequireInt(s, "scanOrder")).ToArray());
         Assert.DoesNotContain(sensors, s =>
         {
-            var id = (string?)s!["sensorId"];
+            var id = JsonNodeExtensions.RequireString(s, "sensorId");
             return id == "I7" || id == "I16";
         });
 
         foreach (var n in Enumerable.Range(1, 8))
         {
-            var waterJet = node["waterJets"]!.AsArray().Single(w => (string?)w!["waterJetId"] == $"WJ{n}");
-            Assert.Equal($"IV{n}", (string?)waterJet["dedicatedIsolationValveId"]);
-            var valve = node["isolationValves"]!.AsArray().Single(v => (string?)v!["valveId"] == $"IV{n}");
-            Assert.Equal($"WJ{n}", (string?)valve["servedWaterJetId"]);
+            var waterJet = JsonNodeExtensions.RequireArray(node, "waterJets")
+                .Single(w => JsonNodeExtensions.RequireString(w, "waterJetId") == $"WJ{n}");
+            Assert.Equal($"IV{n}", JsonNodeExtensions.RequireString(waterJet, "dedicatedIsolationValveId"));
+            var valve = JsonNodeExtensions.RequireArray(node, "isolationValves")
+                .Single(v => JsonNodeExtensions.RequireString(v, "valveId") == $"IV{n}");
+            Assert.Equal($"WJ{n}", JsonNodeExtensions.RequireString(valve, "servedWaterJetId"));
         }
     }
 
@@ -76,11 +87,11 @@ public sealed class MigratedExampleShapeTests
     {
         var node = JsonNodeExtensions.ParseExample();
 
-        foreach (var sensor in node["sensors"]!.AsArray())
+        foreach (var sensor in JsonNodeExtensions.RequireArray(node, "sensors"))
         {
-            var logicalRow = (int)sensor!["logicalRow"]!;
+            var logicalRow = JsonNodeExtensions.RequireInt(sensor, "logicalRow");
             var region = logicalRow <= 2 ? "UPPER" : "LOWER";
-            var wall = (string?)sensor["wall"];
+            var wall = JsonNodeExtensions.RequireString(sensor, "wall");
             var expectedOrdinal = (wall, region) switch
             {
                 ("REAR", "LOWER") => 1,
@@ -93,19 +104,21 @@ public sealed class MigratedExampleShapeTests
                 ("LEFT", "UPPER") => 8,
                 _ => throw new InvalidOperationException("synthetic example left the canonical grid"),
             };
-            Assert.Equal($"WJ{expectedOrdinal}", (string?)sensor["assignedWaterJetId"]);
-            Assert.Equal($"IV{expectedOrdinal}", (string?)sensor["assignedIsolationValveId"]);
+            Assert.Equal($"WJ{expectedOrdinal}", JsonNodeExtensions.RequireString(sensor, "assignedWaterJetId"));
+            Assert.Equal($"IV{expectedOrdinal}", JsonNodeExtensions.RequireString(sensor, "dedicatedIsolationValveId"));
         }
 
         var opposite = new Dictionary<string, string>
         {
             ["LEFT"] = "RIGHT", ["RIGHT"] = "LEFT", ["FRONT"] = "REAR", ["REAR"] = "FRONT",
         };
-        foreach (var waterJet in node["waterJets"]!.AsArray())
+        foreach (var waterJet in JsonNodeExtensions.RequireArray(node, "waterJets"))
         {
-            var installed = (string?)waterJet["installedWall"];
-            Assert.Equal(opposite[installed!], (string?)waterJet["targetWall"]);
-            Assert.Equal((string?)waterJet["installedRegion"], (string?)waterJet["targetRegion"]);
+            var installed = JsonNodeExtensions.RequireString(waterJet, "installedWall");
+            Assert.Equal(opposite[installed], JsonNodeExtensions.RequireString(waterJet, "targetWall"));
+            Assert.Equal(
+                JsonNodeExtensions.RequireString(waterJet, "installedRegion"),
+                JsonNodeExtensions.RequireString(waterJet, "targetRegion"));
         }
     }
 
@@ -131,8 +144,17 @@ public sealed class MigratedExampleShapeTests
         Assert.False(Regex.IsMatch(text, @"\b(?:\d{1,3}\.){3}\d{1,3}\b"), "no address-shaped literal may appear");
 
         // Record identifiers stay obviously synthetic.
-        Assert.All(root.GetProperty("logicalPositions").EnumerateArray().ToArray(), position =>
-            Assert.Matches("^SYN-REC-\\d{3}$", position.GetProperty("legacyRecordId").GetString()!));
+        foreach (var position in root.GetProperty("logicalPositions").EnumerateArray())
+        {
+            var recordId = position.GetProperty("legacyRecordId").GetString();
+            if (recordId is null)
+            {
+                throw new InvalidOperationException(
+                    "expected property 'legacyRecordId' to be a non-null JSON string");
+            }
+
+            Assert.Matches("^SYN-REC-\\d{3}$", recordId);
+        }
     }
 
     [Fact]
@@ -140,26 +162,58 @@ public sealed class MigratedExampleShapeTests
     {
         var node = JsonNodeExtensions.ParseExample();
 
-        foreach (var position in node["logicalPositions"]!.AsArray())
+        foreach (var position in JsonNodeExtensions.RequireArray(node, "logicalPositions"))
         {
-            var orderTotal = (int)position!["orderTotal"]!;
+            var orderTotal = JsonNodeExtensions.RequireInt(position, "orderTotal");
             var row = (orderTotal / 18) + 1;
             var column = (orderTotal % 18) + 1;
-            Assert.Equal(CanonicalSensorMap.SensorIdFor(row, column), (string?)position["logicalId"]);
-            Assert.Equal(CanonicalSensorMap.WallForColumn(column), Enum.Parse<Wall>((string?)position["wall"]!, false));
-            var wall = Enum.Parse<Wall>((string?)position["wall"]!, false);
-            Assert.Equal(column - CanonicalSensorMap.WallColumns[wall].FirstColumn + 1, (int)position["wallColumn"]!);
+            var logicalId = JsonNodeExtensions.RequireString(position, "logicalId");
+            var wall = Enum.Parse<Wall>(JsonNodeExtensions.RequireString(position, "wall"), ignoreCase: false);
+            var wallColumn = JsonNodeExtensions.RequireInt(position, "wallColumn");
+
+            Assert.Equal(CanonicalSensorMap.SensorIdFor(row, column), logicalId);
+            Assert.Equal(CanonicalSensorMap.WallForColumn(column), wall);
+            Assert.Equal(column - CanonicalSensorMap.WallColumns[wall].FirstColumn + 1, wallColumn);
         }
     }
 }
 
-/// <summary>Small local helper keeping the JSON access in these tests explicit.</summary>
+/// <summary>
+/// Small local helpers keeping the JSON access in these tests explicit and
+/// nullable-safe: each helper validates presence and kind with an explicit throw guard
+/// and returns a non-null value, so no null-forgiving operator is needed at the call
+/// sites and the compiler's nullable flow stays satisfied.
+/// </summary>
 internal static class JsonNodeExtensions
 {
-    internal static System.Text.Json.Nodes.JsonNode ParseExample()
+    internal static JsonNode ParseExample()
     {
         var path = Path.Combine(
             ConfigTestPaths.RepoRoot(), "config", "examples", "sensor-parameters.migrated.example.json");
-        return System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+        return JsonNode.Parse(File.ReadAllText(path))
+            ?? throw new InvalidOperationException("the migrated example must parse to a JSON document");
+    }
+
+    /// <summary>Returns a non-null string property value, or throws an explicit guard failure.</summary>
+    internal static string RequireString(JsonNode? parent, string field)
+    {
+        var value = parent?[field]?.GetValue<string>();
+        return value
+            ?? throw new InvalidOperationException($"expected property '{field}' to be a non-null JSON string");
+    }
+
+    /// <summary>Returns an int property value, or throws an explicit guard failure.</summary>
+    internal static int RequireInt(JsonNode? parent, string field)
+    {
+        var node = parent?[field]
+            ?? throw new InvalidOperationException($"expected property '{field}' to exist");
+        return node.GetValue<int>();
+    }
+
+    /// <summary>Returns a JSON array property, or throws an explicit guard failure.</summary>
+    internal static JsonArray RequireArray(JsonNode parent, string field)
+    {
+        return parent[field]?.AsArray()
+            ?? throw new InvalidOperationException($"expected property '{field}' to be a JSON array");
     }
 }

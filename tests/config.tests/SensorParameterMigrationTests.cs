@@ -19,6 +19,16 @@ public sealed class SensorParameterMigrationTests
     private const int ExpectedUnitWarnings = 35;     // scanOrder divisible by 3
     private const int ExpectedDisabledSensors = 6;   // scanOrder divisible by 17
 
+    // Semantically distinct expected sequences (CA1861: never inline constant arrays as
+    // arguments; never consolidate arrays with different meanings).
+    private static readonly string[] ExpectedWaterJetIdOrder =
+        ["WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8"];
+
+    private static readonly string[] ExpectedIsolationValveIdOrder =
+        ["IV1", "IV2", "IV3", "IV4", "IV5", "IV6", "IV7", "IV8"];
+
+    private static readonly string[] ExpectedNonSensorGapLogicalIds = ["I7", "I16"];
+
     private static SensorParameterImportOutcome Import(string csv) =>
         SensorParameterCsvImporter.Import(csv);
 
@@ -108,10 +118,10 @@ public sealed class SensorParameterMigrationTests
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
         Assert.Equal(
-            new[] { "WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8" },
+            ExpectedWaterJetIdOrder,
             result.WaterJets.Select(w => w.WaterJetId).ToArray());
         Assert.Equal(
-            new[] { "IV1", "IV2", "IV3", "IV4", "IV5", "IV6", "IV7", "IV8" },
+            ExpectedIsolationValveIdOrder,
             result.IsolationValves.Select(v => v.ValveId).ToArray());
 
         foreach (var n in Enumerable.Range(1, 8))
@@ -380,7 +390,7 @@ public sealed class SensorParameterMigrationTests
         // The gap rows' sensorname values remain the logicalId values of NON_SENSOR_GAP
         // positions and never create a SensorConfiguration.
         Assert.Equal(
-            new[] { "I7", "I16" },
+            ExpectedNonSensorGapLogicalIds,
             result.LogicalPositions
                 .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
                 .Select(p => p.LogicalId)
