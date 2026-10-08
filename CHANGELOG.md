@@ -31,6 +31,35 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.3A-3 Checkpoint A — Equipment topology decision and legacy parameter migration specification (planning only)
+
+Owner-authorized Checkpoint A (planning / decision / specification only) on verified
+remote-main base `a74db62c4a7d4d8d5d2185cfe77a4c0229b01fce` (PR #5 foundation). New
+[`ADR-0017`](docs/decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md)
+(`PROPOSED`) and companion report
+[`docs/STAGE_0.3A-3_CHECKPOINT_A.md`](docs/STAGE_0.3A-3_CHECKPOINT_A.md) record:
+
+- The **corrected sensor topology**, superseding the I7/I16 "Cannon equipment slot"
+  interpretation: I7 and I16 are **NON_SENSOR_GAP** positions — location anchors only
+  (I7 → WJ3, I16 → WJ1); sensor sequence skips them (I6→I8, I15→I17). Protected counts
+  stand: 108 logical positions / 106 Sensors / 212 TC channels / Left 24, Rear 29,
+  Right 24, Front 29.
+- **WJ1–WJ8** installed positions (wall, region, placement kind, anchors) and target
+  coverage (opposite wall, matching region) as separate concepts; **IV1–IV8** with
+  mandatory one-to-one ordinal pairing `WJn ↔ IVn`.
+- The **legacy `sensorparam.csv` migration specification**: `cannon` = Assigned Cleaning
+  Device ID mapping **directly** `cannon n → WJn` (never remapped by wall); the full
+  CSV field-classification matrix (19 fields across five classes; dispositions IMPORT /
+  IMPORT WITH NORMALIZATION / PRESERVE WITH WARNING / DEFER / REJECT FOR I7/I16);
+  deterministic atomic fail-closed validation with a proposed refusal-code family;
+  and the migration warnings / Owner-review list (including the Checkpoint-B deferral of
+  the superseded "Cannon" wording in docs and code identifiers).
+
+**No Product source, contract, fixture, lock, test, or Inspector file was changed; no
+hardware or Production device was accessed; no runtime, queue, pump, valve, axis, or
+Mandatory Safe Return action was taken or specified as authorized. Checkpoint B
+implementation NOT STARTED. PR OPEN — NOT MERGED.**
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh
