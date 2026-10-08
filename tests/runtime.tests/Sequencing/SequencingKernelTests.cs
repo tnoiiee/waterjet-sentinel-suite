@@ -336,25 +336,19 @@ public sealed class SequencingKernelTests
     }
 
     [Fact]
-    public void Release_Needs_Complete_Safe_Return_Evidence_And_Then_Completes_A_Pending_Pause()
+    public void Release_Happens_Only_Through_Kernel_Safe_Return_And_Then_Completes_A_Pending_Pause()
     {
         var state = Start(SequencingKernel.Initial(), 0).State;
         state = Admit(state, "SYN-S01", 1).State;
         state = Admit(state, "SYN-S02", 2).State;
         state = Dispatch(state, 3).State;
         state = Pause(state, 4).State;
-        var job = RequireJob(state);
+        Assert.NotNull(state.ActiveJob);
+        Assert.Equal(AutoSequenceMode.PAUSE_REQUESTED, SequencingKernel.ProjectAutoSequenceMode(state));
 
-        var incomplete = Release(state, 5, new SafeReturnReleaseEvidence(job.JobId, job.DispatchEvidenceSeq + 1, OutcomeRecorded: true, SafeReturnComplete: false));
-        Assert.Equal(SequencingOutcome.REFUSED, incomplete.Outcome);
-        Assert.Equal(SequencingCodes.SafeReturnNotComplete, incomplete.Evidence.Code);
-        Assert.NotNull(incomplete.State.ActiveJob);
+        var driven = DriveNormalCompletion(state, 5);
+        var released = driven[^1];
 
-        var stale = Release(incomplete.State, 6, new SafeReturnReleaseEvidence(job.JobId, job.DispatchEvidenceSeq, OutcomeRecorded: true, SafeReturnComplete: true));
-        Assert.Equal(SequencingOutcome.REFUSED, stale.Outcome);
-        Assert.Equal(SequencingCodes.ReleaseSeqNotAfterDispatch, stale.Evidence.Code);
-
-        var released = Release(stale.State, 7, new SafeReturnReleaseEvidence(job.JobId, job.DispatchEvidenceSeq + 1, OutcomeRecorded: true, SafeReturnComplete: true));
         Assert.Equal(SequencingOutcome.APPLIED, released.Outcome);
         Assert.Equal(SequencingCodes.JobReleased, released.Evidence.Code);
         Assert.Null(released.State.ActiveJob);
@@ -405,13 +399,50 @@ public sealed class SequencingKernelTests
         SequencingKernel.Apply(state, new ObservePumpReadiness(At(second), ready));
 
     private static SequencingTransition Critical(SequencingState state, int second) =>
-        SequencingKernel.Apply(state, new RaiseCriticalSuspension(At(second)));
+        SequencingKernel.Apply(state, new ObservePumpState(At(second), PumpObservation.UNEXPECTED_STOP));
 
     private static SequencingTransition Pause(SequencingState state, int second) =>
         SequencingKernel.Apply(state, new RequestPause(At(second)));
 
-    private static SequencingTransition Release(SequencingState state, int second, SafeReturnReleaseEvidence evidence) =>
-        SequencingKernel.Apply(state, new ReleaseActiveJob(At(second), evidence));
+    /// <summary>
+    /// Drives the Active Job through the full normal path (valve, preparation, cleaning,
+    /// P1 to P6, completion, Safe Return) to release. Returns every transition, in order.
+    /// </summary>
+    private static List<SequencingTransition> DriveNormalCompletion(SequencingState state, int second)
+    {
+        var events = new List<SequencingEvent>
+        {
+            new ValveLimitObserved(At(second), "IV1", UpperLimit: false, LowerLimit: true),
+            new AdvanceJobPreparation(At(second + 1)),
+            new BeginCleaning(At(second + 2)),
+            new ExecutionPhaseVerified(At(second + 3), JobPhase.P1),
+            new ValveLimitObserved(At(second + 4), "IV1", UpperLimit: true, LowerLimit: false),
+        };
+
+        var tick = second + 5;
+        foreach (var phase in new[] { JobPhase.P2, JobPhase.P3, JobPhase.P4, JobPhase.P5, JobPhase.P6 })
+        {
+            events.Add(new ExecutionPhaseVerified(At(tick), phase));
+            tick++;
+        }
+
+        events.Add(new RequestNormalCompletion(At(tick)));
+        tick++;
+        events.Add(new ValveLimitObserved(At(tick), "IV1", UpperLimit: false, LowerLimit: true));
+        tick++;
+        events.Add(new AxisFeedbackObserved(At(tick), AxisFeedbackState.AT_STANDBY));
+
+        var transitions = new List<SequencingTransition>(events.Count);
+        foreach (var sequencingEvent in events)
+        {
+            var transition = SequencingKernel.Apply(state, sequencingEvent);
+            Assert.Equal(SequencingOutcome.APPLIED, transition.Outcome);
+            transitions.Add(transition);
+            state = transition.State;
+        }
+
+        return transitions;
+    }
 
     private static SequencingActiveJob RequireJob(SequencingState state) =>
         state.ActiveJob ?? throw new InvalidOperationException("An Active Job was expected.");
@@ -436,18 +467,21 @@ public sealed class SequencingKernelTests
         state = Step(log, Pause(state, 10));
         state = Step(log, Dispatch(state, 11));
 
-        var job = RequireJob(state);
-        state = Step(log, Release(state, 12, new SafeReturnReleaseEvidence(job.JobId, job.DispatchEvidenceSeq + 1, OutcomeRecorded: true, SafeReturnComplete: true)));
-        state = Step(log, Dispatch(state, 13));
-        state = Step(log, Critical(state, 14));
-        state = Step(log, Admit(state, "SYN-S03", 15));
+        foreach (var transition in DriveNormalCompletion(state, 12))
+        {
+            state = Step(log, transition);
+        }
+
+        state = Step(log, Dispatch(state, 30));
+        state = Step(log, Critical(state, 31));
+        state = Step(log, Admit(state, "SYN-S03", 32));
 
         return (JsonSerializer.Serialize(log, ContractJson.Options), JsonSerializer.Serialize(state, ContractJson.Options));
     }
 
     private static SequencingState Step(List<SequencingEvidence> log, SequencingTransition transition)
     {
-        log.Add(transition.Evidence);
+        log.AddRange(transition.Records);
         return transition.State;
     }
 }

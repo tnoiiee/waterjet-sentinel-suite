@@ -3,14 +3,22 @@ using Wjss.Contracts;
 namespace Wjss.Runtime.Core.Sequencing;
 
 /// <summary>
-/// The single Stage 0.4A CP-1 state-integrity guard. It is pure and deterministic:
-/// it returns the first violation in a fixed order, so identical malformed input
-/// always yields the same violation identity. It never normalizes a state.
+/// The single Stage 0.4A state-integrity guard, extended for CP-2. It is pure and
+/// deterministic: it returns the first violation in a fixed order, so identical
+/// malformed input always yields the same violation identity. It never normalizes
+/// a state.
 ///
 /// <para>
-/// Used by <see cref="SequencingKernel.Apply"/> (refusal with
-/// SEQUENCING_STATE_INVALID) and by every projection (InvalidOperationException).
-/// Equipment topology is an event input, not state, so it is not checked here.
+/// Used by <see cref="SequencingKernel.Apply"/> (refusal with SEQUENCING_STATE_INVALID)
+/// and by every projection (InvalidOperationException). Equipment topology is an
+/// event input, not state, so it is not checked here.
+/// </para>
+///
+/// <para>
+/// CP-2 combinations checked: lifecycle against sub-stage, cleaning and water flags;
+/// the Safe Return ledger against lifecycle and step; trigger against pending
+/// outcome; the critical latch against a Pump trigger; the failure code against the
+/// wait that failed; and the ledger order against the evidence sequence.
 /// </para>
 /// </summary>
 internal static class SequencingStateValidator
@@ -36,6 +44,33 @@ internal static class SequencingStateValidator
     internal const string JobRevisionInvalid = "JOB_REVISION_INVALID";
     internal const string JobDispatchSeqInvalid = "JOB_DISPATCH_SEQ_INVALID";
     internal const string JobTargetStillQueued = "JOB_TARGET_STILL_QUEUED";
+
+    // CP-2 Job violations.
+    internal const string JobLifecycleUndefined = "JOB_LIFECYCLE_UNDEFINED";
+    internal const string JobStageUndefined = "JOB_STAGE_UNDEFINED";
+    internal const string JobPhaseUndefined = "JOB_PHASE_UNDEFINED";
+    internal const string JobValveFeedbackUndefined = "JOB_VALVE_FEEDBACK_UNDEFINED";
+    internal const string JobOutcomeUndefined = "JOB_OUTCOME_UNDEFINED";
+    internal const string JobStepUndefined = "JOB_STEP_UNDEFINED";
+    internal const string JobTriggerUnknown = "JOB_TRIGGER_UNKNOWN";
+    internal const string JobTriggerReasonBlank = "JOB_TRIGGER_REASON_BLANK";
+    internal const string JobFailureCodeBlank = "JOB_FAILURE_CODE_BLANK";
+    internal const string JobRunningHasSafeReturn = "JOB_RUNNING_HAS_SAFE_RETURN";
+    internal const string JobCleaningStageMismatch = "JOB_CLEANING_STAGE_MISMATCH";
+    internal const string JobWaterOutputMismatch = "JOB_WATER_OUTPUT_MISMATCH";
+    internal const string JobPhaseStageMismatch = "JOB_PHASE_STAGE_MISMATCH";
+    internal const string JobValveGateInvalid = "JOB_VALVE_GATE_INVALID";
+    internal const string JobPumpGateInvalid = "JOB_PUMP_GATE_INVALID";
+    internal const string JobLifecycleTransient = "JOB_LIFECYCLE_TRANSIENT";
+    internal const string JobSafeReturnWaterOn = "JOB_SAFE_RETURN_WATER_ON";
+    internal const string JobSafeReturnIncomplete = "JOB_SAFE_RETURN_INCOMPLETE";
+    internal const string JobTriggerOutcomeMismatch = "JOB_TRIGGER_OUTCOME_MISMATCH";
+    internal const string JobTriggerReasonMismatch = "JOB_TRIGGER_REASON_MISMATCH";
+    internal const string JobCriticalLatchMissing = "JOB_CRITICAL_LATCH_MISSING";
+    internal const string JobLedgerIncomplete = "JOB_LEDGER_INCOMPLETE";
+    internal const string JobLedgerInvalid = "JOB_LEDGER_INVALID";
+    internal const string JobStepMismatch = "JOB_STEP_MISMATCH";
+    internal const string JobFailureInvalid = "JOB_FAILURE_INVALID";
 
     /// <summary>Returns the first violation identity, or null when the state is consistent.</summary>
     internal static string? FirstViolation(SequencingState state)
@@ -179,8 +214,283 @@ internal static class SequencingStateValidator
             }
         }
 
+        return CleaningJobViolation(state, job);
+    }
+
+    private static string? CleaningJobViolation(SequencingState state, SequencingActiveJob job)
+    {
+        if (!Enum.IsDefined(job.Lifecycle))
+        {
+            return JobLifecycleUndefined;
+        }
+
+        if (!Enum.IsDefined(job.Stage))
+        {
+            return JobStageUndefined;
+        }
+
+        if (job.VerifiedPhase is { } phase && !Enum.IsDefined(phase))
+        {
+            return JobPhaseUndefined;
+        }
+
+        if (job.LastValveFeedback is { } valve && !Enum.IsDefined(valve))
+        {
+            return JobValveFeedbackUndefined;
+        }
+
+        if (job.PendingOutcome is { } pending && !Enum.IsDefined(pending))
+        {
+            return JobOutcomeUndefined;
+        }
+
+        if (job.Step is { } step && !Enum.IsDefined(step))
+        {
+            return JobStepUndefined;
+        }
+
+        if (job.Trigger is not null && !SequencingCodes.IsKnownTrigger(job.Trigger))
+        {
+            return JobTriggerUnknown;
+        }
+
+        if (job.TriggerReason is not null && IsBlank(job.TriggerReason))
+        {
+            return JobTriggerReasonBlank;
+        }
+
+        if (job.FailureCode is not null && IsBlank(job.FailureCode))
+        {
+            return JobFailureCodeBlank;
+        }
+
+        return job.Lifecycle == JobLifecycle.RUNNING
+            ? RunningJobViolation(job)
+            : SafeReturnJobViolation(state, job);
+    }
+
+    private static string? RunningJobViolation(SequencingActiveJob job)
+    {
+        if (job.Trigger is not null
+            || job.TriggerReason is not null
+            || job.PendingOutcome is not null
+            || job.Step is not null
+            || job.FailureCode is not null
+            || !job.Ledger.IsEmpty)
+        {
+            return JobRunningHasSafeReturn;
+        }
+
+        var cleaning = job.Stage == CleaningStage.CLEANING;
+        if (job.CleaningActive != cleaning)
+        {
+            return JobCleaningStageMismatch;
+        }
+
+        if (job.WaterOutputOn != job.CleaningActive)
+        {
+            return JobWaterOutputMismatch;
+        }
+
+        if (job.VerifiedPhase is not null && !cleaning)
+        {
+            return JobPhaseStageMismatch;
+        }
+
+        if (job.LastValveFeedback == ValveFeedbackState.INVALID_LIMIT_STATE)
+        {
+            // An invalid limit state always leaves RUNNING through Safe Return.
+            return JobValveGateInvalid;
+        }
+
+        if (job.Stage == CleaningStage.READY_TO_CLEAN && job.LastValveFeedback != ValveFeedbackState.CLOSED)
+        {
+            return JobValveGateInvalid;
+        }
+
+        if (cleaning && job.LastValveFeedback is null)
+        {
+            return JobValveGateInvalid;
+        }
+
+        if (cleaning && !job.PumpReady)
+        {
+            return JobPumpGateInvalid;
+        }
+
         return null;
     }
+
+    private static string? SafeReturnJobViolation(SequencingState state, SequencingActiveJob job)
+    {
+        if (job.CleaningActive || job.WaterOutputOn)
+        {
+            return JobSafeReturnWaterOn;
+        }
+
+        if (job.Trigger is null || job.PendingOutcome is null || job.Step is null)
+        {
+            return JobSafeReturnIncomplete;
+        }
+
+        if (!TriggerMatchesOutcome(job.Trigger, job.PendingOutcome.Value))
+        {
+            return JobTriggerOutcomeMismatch;
+        }
+
+        if (job.Trigger == SequencingCodes.TriggerExecutionFailure)
+        {
+            if (job.TriggerReason is null)
+            {
+                return JobTriggerReasonMismatch;
+            }
+        }
+        else if (job.TriggerReason is not null)
+        {
+            return JobTriggerReasonMismatch;
+        }
+
+        if (SequencingCodes.IsPumpTrigger(job.Trigger) && !state.CriticalSuspended)
+        {
+            return JobCriticalLatchMissing;
+        }
+
+        var ledger = job.Ledger;
+        if (ledger.WaterOffSeq is null || ledger.ValveCloseRequestSeq is null)
+        {
+            return JobLedgerIncomplete;
+        }
+
+        if (!LedgerOrdered(ledger, job.DispatchEvidenceSeq, state.EvidenceSeq))
+        {
+            return JobLedgerInvalid;
+        }
+
+        return job.Lifecycle switch
+        {
+            JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED => ValveWaitViolation(job),
+            JobLifecycle.SAFE_RETURN_VERIFY_STANDBY => AxisWaitViolation(job),
+            JobLifecycle.SAFE_RETURN_FAILED => FailedViolation(job),
+            _ => JobLifecycleTransient,
+        };
+    }
+
+    private static string? ValveWaitViolation(SequencingActiveJob job)
+    {
+        var ledger = job.Ledger;
+        if (job.Step != SafeReturnStep.SR2)
+        {
+            return JobStepMismatch;
+        }
+
+        if (ledger.ValveClosedSeq is not null
+            || ledger.AxisReturnRequestSeq is not null
+            || ledger.AxisStandbySeq is not null
+            || ledger.FailureSeq is not null
+            || job.FailureCode is not null)
+        {
+            return JobLedgerInvalid;
+        }
+
+        return null;
+    }
+
+    private static string? AxisWaitViolation(SequencingActiveJob job)
+    {
+        var ledger = job.Ledger;
+        if (job.Step != SafeReturnStep.SR4)
+        {
+            return JobStepMismatch;
+        }
+
+        if (ledger.ValveClosedSeq is null
+            || ledger.AxisReturnRequestSeq is null
+            || ledger.AxisStandbySeq is not null
+            || ledger.FailureSeq is not null
+            || job.FailureCode is not null)
+        {
+            return JobLedgerInvalid;
+        }
+
+        return job.LastValveFeedback == ValveFeedbackState.CLOSED ? null : JobValveGateInvalid;
+    }
+
+    private static string? FailedViolation(SequencingActiveJob job)
+    {
+        var ledger = job.Ledger;
+        if (job.Step != SafeReturnStep.SR_FAILED)
+        {
+            return JobStepMismatch;
+        }
+
+        if (job.FailureCode is null)
+        {
+            return JobFailureInvalid;
+        }
+
+        if (ledger.FailureSeq is null || ledger.AxisStandbySeq is not null)
+        {
+            return JobLedgerInvalid;
+        }
+
+        var valveFailure = job.FailureCode is SequencingCodes.ValveInvalidLimitState or SequencingCodes.ValveCloseNotConfirmed;
+        var axisFailure = job.FailureCode is SequencingCodes.AxisFault or SequencingCodes.AxisStandbyNotConfirmedFailure;
+        if (!valveFailure && !axisFailure)
+        {
+            return JobFailureInvalid;
+        }
+
+        if (valveFailure)
+        {
+            return ledger.ValveClosedSeq is null && ledger.AxisReturnRequestSeq is null ? null : JobFailureInvalid;
+        }
+
+        return ledger.ValveClosedSeq is not null && ledger.AxisReturnRequestSeq is not null ? null : JobFailureInvalid;
+    }
+
+    private static bool LedgerOrdered(SafeReturnLedger ledger, int dispatchSeq, int evidenceSeq)
+    {
+        int? previous = null;
+        foreach (var seq in new int?[]
+                 {
+                     ledger.WaterOffSeq,
+                     ledger.ValveCloseRequestSeq,
+                     ledger.ValveClosedSeq,
+                     ledger.AxisReturnRequestSeq,
+                     ledger.AxisStandbySeq,
+                     ledger.FailureSeq,
+                 })
+        {
+            if (seq is not { } value)
+            {
+                continue;
+            }
+
+            if (value <= dispatchSeq || value > evidenceSeq)
+            {
+                return false;
+            }
+
+            if (previous is { } before && value <= before)
+            {
+                return false;
+            }
+
+            previous = value;
+        }
+
+        return true;
+    }
+
+    private static bool TriggerMatchesOutcome(string trigger, CleaningJobOutcome outcome) => trigger switch
+    {
+        SequencingCodes.TriggerNormalCompletion => outcome == CleaningJobOutcome.COMPLETED,
+        SequencingCodes.TriggerAbort => outcome == CleaningJobOutcome.ABORTED,
+        SequencingCodes.TriggerExecutionFailure => outcome == CleaningJobOutcome.FAILED,
+        SequencingCodes.TriggerPumpUnexpectedStop => outcome == CleaningJobOutcome.ABORTED,
+        SequencingCodes.TriggerPumpTrip => outcome == CleaningJobOutcome.ABORTED,
+        _ => false,
+    };
 
     private static bool IsBlank(string? value) => string.IsNullOrWhiteSpace(value);
 }

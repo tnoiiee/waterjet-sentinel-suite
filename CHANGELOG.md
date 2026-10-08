@@ -31,6 +31,21 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
+### Stage 0.4A CP-2 — Owner-local validation and Final Source Review (documentation only, 2026-10-08)
+
+- **OWNER-LOCALLY VALIDATED** at validated head `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c` (Owner-reported; Arena did not run the toolchain). .NET SDK 10.0.401; xUnit runtime .NET 10.0.12; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests **300 total / 300 passed / 0 failed / 0 skipped** (CP-1 validated suite 253 + CP-2 new facts 47); fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan 0 findings (S1–S9 clean); `git diff --check` PASS; final Owner-local working tree CLEAN. No Owner-local artifact commit was required.
+- **CP-2 Final Source Review (read-only, Arena): PASSED.** No blocking defect. Non-blocking follow-ups are recorded in `docs/STAGE_0.4A_CP-2_CHECKPOINT.md` §19. Source and tests were not changed by this review.
+- **F2 (one evidence sequence): PASSED.** **F3 (release under the critical latch): PASSED**, matching the approved behaviour exactly. **EXPECTED_STOP during CLEANING: PASSED** as a refusal that changes no Job lifecycle, water state, Queue or QueueRevision, and does not set the latch. Owner ruling O-3 remains open for confirmation.
+- PR #8 remains OPEN and NOT MERGED. **CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
+
+### Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel (source authored; NOT compiled or executed in Arena; PR open, not merged)
+
+- **Owner-authorized CP-2 scope** recorded in `docs/MASTER_PLAN.md` §3.3.2 (`ef51bd8`).
+- **Kernel** (`packages/application/Runtime/Sequencing/**`, `6b94508`): one Active Job with a lifecycle (accepted `JobLifecycle` names), abstract Pump classification (READY, EXPECTED_STOP, UNEXPECTED_STOP, TRIP), Mandatory Safe Return in the Owner order (SR1 to SR7), abstract Isolation Valve and Axis feedback, and outcome recorded only after Safe Return is verified. Safe Return failure retains the Job with RECOVERY_REQUIRED evidence. The external `SafeReturnReleaseEvidence` and `ReleaseActiveJob` input are removed; release is the kernel's own SR7. One evidence sequence.
+- **Tests** (`tests/runtime.tests/Sequencing/**`, `ffc2701`): 47 new facts for the CP-2 scenario list, plus CP-1 tests adjusted to the changed kernel API.
+- **Contracts:** unchanged. No contract blocker.
+- Checkpoint report: `docs/STAGE_0.4A_CP-2_CHECKPOINT.md`. CP-3 and CP-4 NOT AUTHORIZED. Owner-local .NET validation REQUIRED.
+
 ### Stage 0.4A CP-1 — Final evidence amendment, F1 closed, CP-1 Final Source Review passed (documentation only, 2026-10-08)
 
 - **OWNER-LOCALLY VALIDATED** at head `03144f43122bed2bd011b26886f663c2b46b79c4` (Owner-reported; Arena did not run the toolchain). .NET SDK 10.0.401; xUnit runtime .NET 10.0.12; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests 253/253 passed; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean; `git diff --check` PASS; working tree clean. No artifact commit was required.

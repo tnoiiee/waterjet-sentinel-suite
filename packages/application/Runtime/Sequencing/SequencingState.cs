@@ -14,9 +14,11 @@ public sealed record SequencingEntry(
     int SecondsSinceLastClean);
 
 /// <summary>
-/// The single Active Job. Stage 0.4A CP-1 carries no phase execution: the Job
-/// stays in phase P1 with lifecycle RUNNING, and <see cref="PumpReady"/> is the
-/// only waiting gate (WAITING_FOR_PUMP is projected as AutoSequence PUMP_NOT_READY).
+/// The single Active Job, with its Stage 0.4A CP-2 execution and Safe Return
+/// state. The accepted <see cref="JobLifecycle"/> names are reused. The kernel
+/// sub-stage <see cref="CleaningStage"/> refines RUNNING only. The Job keeps its
+/// WJ/IV assignment from dispatch. <see cref="PumpReady"/> is the waiting gate
+/// before Cleaning and is never a Queue state.
 /// </summary>
 public sealed record SequencingActiveJob(
     string JobId,
@@ -29,7 +31,19 @@ public sealed record SequencingActiveJob(
     bool PumpReady,
     DateTimeOffset StartedAt,
     int QueueRevisionBefore,
-    int QueueRevisionAfter);
+    int QueueRevisionAfter,
+    JobLifecycle Lifecycle,
+    CleaningStage Stage,
+    JobPhase? VerifiedPhase,
+    bool CleaningActive,
+    bool WaterOutputOn,
+    ValveFeedbackState? LastValveFeedback,
+    CleaningJobOutcome? PendingOutcome,
+    string? Trigger,
+    string? TriggerReason,
+    SafeReturnStep? Step,
+    string? FailureCode,
+    SafeReturnLedger Ledger);
 
 /// <summary>
 /// Immutable sequencing state with a single writer: the kernel. Every transition
