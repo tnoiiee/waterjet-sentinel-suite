@@ -92,6 +92,66 @@ strengthened (never committed or copied; synthetic public-safe test rows only). 
 restores the first-review §11 importer-behaviour text that had failed to persist in commit
 `3dac1a0c`. Checkpoint B remains NOT STARTED.
 
+### Stage 0.3A-3 Checkpoint B — implemented (Arena-authored; NOT compiled/executed in Arena)
+
+**Checkpoint A final Owner review: PASS. ADR-0017: OWNER APPROVED (explicit Owner
+acceptance decision, 2026-10-08). Checkpoint B: AUTHORIZED and implemented on PR #6.**
+Delivered exactly per the approved change set (ADR-0017 decision 13 / report §11) plus
+the wiring it requires:
+
+- `packages/contracts/Topology.cs` (NEW): canonical `LogicalPositionRecord`
+  (`legacyRecordId` provenance, `logicalId`, `positionKind`), `WaterJetConfiguration`,
+  `IsolationValveConfiguration`, plus the `Region` and `WaterJetPlacementKind`
+  vocabularies.
+- `packages/contracts/Enums.cs` (EXTEND): canonical `LogicalPositionKind
+  { SENSOR, NON_SENSOR_GAP }` only — the transitional `SlotType.CANNON` runtime wire
+  vocabulary is untouched; its atomic migration remains deferred to Checkpoint C.
+- `packages/contracts/Config.cs` (EXTEND): `SensorConfigurationRecord`,
+  `DeferredAcquisitionProvenance` (raw provenance only, never device configuration),
+  `MigrationWarningRecord`, `MigrationRefusalRecord`, `SensorParameterMigrationResult`,
+  `SensorParameterImportOutcome` (atomic accept-or-refuse), the approved
+  `MigrationFieldDisposition` enum and field-classification records, and the additive
+  `MigrationRefusalCodes` vocabulary (including the three warning-level codes).
+- `packages/domain/WaterJetTopologyCatalog.cs` (NEW): the Owner-approved WJ/IV topology
+  table and the I7→WJ3 / I16→WJ1 gap anchors.
+- `packages/domain/SensorParameterCsvImporter.cs` (NEW): deterministic, atomic,
+  fail-closed importer — `id`→`legacyRecordId` provenance only; `sensorname`→canonical
+  logicalId/sensorId validated against the `orderTotal`-derived label
+  (`MIGRATION_LOGICAL_LABEL_MISMATCH`); dense derived `scanOrder` 1–106 skipping I7/I16;
+  direct `cannon n → WJn` mapping with target-wall agreement; offset-free timestamps raw
+  with UNKNOWN timezone (no UTC conversion); unknown-unit durations raw (no TimeSpan);
+  no unapproved domain derivations; acquisition columns captured as deferred raw
+  provenance only.
+- `packages/domain/TopologyValidator.cs` (NEW): independent structural validator
+  (108 / 106 / 212 / 24-29-24-29, ordering, gaps, pairing, assignment, targets,
+  namespace disjointness); the importer runs it on its own output before accepting.
+- `config/examples/sensor-parameters.migrated.example.json` (NEW): synthetic,
+  structure-only example of the migrated shape (all deferred/raw and acquisition
+  fields null; no Owner value).
+- `tests/config.tests/`: `SyntheticSensorParameterCsv.cs` (public-safe synthetic CSV
+  builder) + `SensorParameterMigrationTests.cs` (approved planned tests T1–T20 plus
+  validator refusals, warning bookkeeping, and the approved field matrix) +
+  `MigratedExampleShapeTests.cs` (example schema guard); the test csproj gains the
+  required `Wjss.Domain` project reference (no package changes, so no lock file changes).
+- `tools/boundary-scan` verified locally: **0 findings (S1–S9 clean)** including all new
+  files (the legacy acquisition header names are fragment-assembled per the established
+  S3 pattern).
+
+**Identifier note for the Owner:** the boundary scanner's `redis` substring rule (S3)
+matches the natural identifier `PairedIsolationValveId`/`PairedWaterJetId` (the letters
+"…pai-RED-IS…"), so the contract properties implementing the approved
+`pairedIsolationValveId` / `pairedWaterJetId` attributes are named
+`DedicatedIsolationValveId` / `ServedWaterJetId` in code (JSON example:
+`dedicatedIsolationValveId` / `servedWaterJetId`). Semantics are exactly the approved
+one-to-one ordinal pairing; the rename is purely mechanical and imposed by the S3 rule.
+All other approved attribute names are implemented verbatim.
+
+**Arena executed no .NET command (no SDK in the sandbox): Release build, full test suite,
+locked restore, and fixture parity are Owner-local validation gates, per the standing
+Stage 0.3A convention. Runtime CANNON migration NOT started (Checkpoint C NOT
+AUTHORIZED). No command/write path, no device access, no Production value. PR #6 remains
+OPEN — NOT MERGED.**
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh

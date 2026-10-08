@@ -1,13 +1,14 @@
 # ADR-0017 — Equipment Topology Decision and Legacy Parameter Migration Specification
 
-- **Status:** PROPOSED — authored under the Stage 0.3A-3 Checkpoint A Owner authorization
-  (planning / decision / specification only). The topology facts recorded here are
-  **Owner-provided** and stated as canonical. Formal acceptance requires an explicit Owner
-  decision. PR merge records repository integration and does not by itself constitute
-  acceptance unless the Owner explicitly states acceptance as part of the merge decision.
-  This ADR's status remains `PROPOSED` until explicit Owner acceptance. Planning output
-  only: no Product source, contract, fixture, lock, test, or Inspector file is changed by
-  this record. Checkpoint B implementation is **NOT STARTED**.
+- **Status:** ACCEPTED — authored under the Stage 0.3A-3 Checkpoint A Owner authorization
+  (planning / decision / specification only), then explicitly approved by the Owner in the
+  Stage 0.3A-3 Checkpoint A final review (2026-10-08): "ADR-0017: OWNER APPROVED".
+  Formal acceptance is this explicit Owner decision; PR merge records repository
+  integration and does not by itself constitute acceptance unless the Owner explicitly
+  states acceptance as part of the merge decision. This record itself changes no Product
+  source, contract, fixture, lock, test, or Inspector file. Checkpoint B implementation
+  was subsequently **AUTHORIZED by the same Owner final review** (2026-10-08) and is
+  delivered on PR #6 (Arena-authored; Owner-local validation pending).
 - **Date:** 2026-10-08 (corrected same day by two Stage 0.3A-3 Checkpoint A Owner reviews:
   first scanOrder derivation and acceptance semantics; then legacy field semantics,
   deferred mappings, TC-channel scope, public-repository boundary, and transitional

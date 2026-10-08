@@ -7,6 +7,17 @@ public enum Wall { LEFT, REAR, RIGHT, FRONT }
 public enum SlotType { SENSOR, CANNON }
 
 /// <summary>
+/// Canonical logical-position kind (ADR-0017, Owner-approved Stage 0.3A-3 Checkpoint A).
+/// NON_SENSOR_GAP positions are location anchors only: they are never Sensors, never
+/// equipment entities, and never appear in queues, selections, Cleaning Jobs, alarms, or
+/// coverage sets. The legacy runtime <c>SlotType.CANNON</c> vocabulary is a TRANSITIONAL
+/// LEGACY RUNTIME REPRESENTATION that is semantically superseded by this kind; its atomic
+/// migration is deferred to Checkpoint C and no alias connects the two vocabularies.
+/// The canonical importer emits NON_SENSOR_GAP and never a Cannon identity.
+/// </summary>
+public enum LogicalPositionKind { SENSOR, NON_SENSOR_GAP }
+
+/// <summary>
 /// Data-quality vocabulary for a Sensor presentation record. Quality SEMANTICS are
 /// accepted (quality-aware pipeline); quality-derived QUEUE behaviour is NOT a
 /// contract concern (queue eligibility policy is an open Owner decision).
