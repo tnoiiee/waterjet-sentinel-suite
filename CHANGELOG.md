@@ -60,6 +60,17 @@ hardware or Production device was accessed; no runtime, queue, pump, valve, axis
 Mandatory Safe Return action was taken or specified as authorized. Checkpoint B
 implementation NOT STARTED. PR OPEN — NOT MERGED.**
 
+**Owner review correction (PR #6 — CHANGES REQUESTED, 2026-10-08; documentation only):**
+Sensor `scanOrder` is no longer described as taken from legacy `order_total` —
+`order_total` is the legacy logical-position order (zero-based 0–107, including the
+NON_SENSOR_GAP rows I7/I16), preserved as provenance, and canonical Sensor `scanOrder` is
+the derived dense one-based 1–106 sequence (sort by `orderTotal`, exclude NON_SENSOR_GAP);
+governance wording corrected so that formal acceptance requires an explicit Owner decision
+and PR merge alone does not constitute acceptance (ADR-0017 remains `PROPOSED`); the
+delivery record now shows the real commit chain and the reviewed PR head
+`6648437f24e918d8be3a1c4ad27edb8c1bc4b0a3`, and the status classification separates
+OWNER CONFIRMED from NOT VERIFIED. Checkpoint B remains NOT STARTED.
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh

@@ -2,9 +2,12 @@
 
 - **Status:** PROPOSED — authored under the Stage 0.3A-3 Checkpoint A Owner authorization
   (planning / decision / specification only). The topology facts recorded here are
-  **Owner-provided** and stated as canonical; formal acceptance happens at PR merge.
-  Planning output only: no Product source, contract, fixture, lock, test, or Inspector file
-  is changed by this record. Checkpoint B implementation is **NOT STARTED**.
+  **Owner-provided** and stated as canonical. Formal acceptance requires an explicit Owner
+  decision. PR merge records repository integration and does not by itself constitute
+  acceptance unless the Owner explicitly states acceptance as part of the merge decision.
+  This ADR's status remains `PROPOSED` until explicit Owner acceptance. Planning output
+  only: no Product source, contract, fixture, lock, test, or Inspector file is changed by
+  this record. Checkpoint B implementation is **NOT STARTED**.
 - **Date:** 2026-10-08
 - **Supersedes:** the *interpretation* of logical positions I7 and I16 as **Cannon /
   Water Jet equipment slots** (previously carried by
@@ -52,14 +55,18 @@ decisions themselves.
 1. **Canonical LogicalPosition model.** One record per logical matrix position — 108
    records. Attributes: `logicalId` (legacy grid label, e.g. `I7`, `G+102`), `wall`
    (`LEFT|REAR|RIGHT|FRONT`), `logicalColumn` (1–18), `logicalRow` (1–6), `wallColumn`,
-   `wallRow`, `positionKind` (`SENSOR | NON_SENSOR_GAP`), `orderTotal` (0–107), `orderWall`,
+   `wallRow`, `positionKind` (`SENSOR | NON_SENSOR_GAP`), `orderTotal` (legacy zero-based
+   logical-position ordering, range 0–107 over all 108 rows, **including** the
+   NON_SENSOR_GAP rows I7 and I16; provenance/layout ordering only — never the Sensor
+   scanOrder), `orderWall`,
    and for NON_SENSOR_GAP positions only, `gapAnchorForWaterJetId` (`I7 → WJ3`,
    `I16 → WJ1`) plus optional `legacyDisplayName` provenance. Exactly 2 positions are
    NON_SENSOR_GAP; exactly 106 are SENSOR.
 
 2. **Canonical SensorConfiguration model.** One record per actual Sensor — exactly 106.
-   Identity/layout (`wall`, logical and wall coordinates, `scanOrder` from `order_total`,
-   `orderWall`), dirty-score settings (canonical `DiffLowerBound`/`DiffUpperBound` from
+   Identity/layout (`wall`, logical and wall coordinates, `orderWall`, and `scanOrder` —
+   derived per the rule below, never taken directly from `order_total`), dirty-score
+   settings (canonical `DiffLowerBound`/`DiffUpperBound` from
    `min_temp_dirtyscore`/`max_temp_dirtyscore`, `DirtyScoreThreshold` +
    `UseDirtyScoreThreshold` from `threshold_setpoint`), eligibility/history
    (`Enabled` from `sensor_enable`, `cleaningCount`, `LastSuccessfulCleaningCompletedAt`
@@ -70,6 +77,13 @@ decisions themselves.
    Acquisition binding (`ip_modbus`, `channel_pair`, `base_modbus_address`) is preserved
    raw and **DEFERRED**: it is not approved Production-device configuration.
    No NON_SENSOR_GAP position ever yields a SensorConfiguration record.
+   **`scanOrder` derivation rule:** legacy `order_total` is the logical-position order
+   (zero-based 0–107, including I7 and I16); it is preserved as `orderTotal`
+   provenance/layout ordering and is never itself the Sensor scanOrder. Canonical
+   `scanOrder` is derived deterministically: sort all 108 logical positions by
+   `orderTotal`, exclude `positionKind = NON_SENSOR_GAP` (I7, I16), then assign the dense
+   one-based range 1–106 to the 106 actual Sensors, gapless, no duplicates. I7 and I16
+   receive no SensorConfiguration and no scanOrder.
 
 3. **Canonical WaterJetConfiguration model.** Exactly 8 records: `WJ1`–`WJ8`. Attributes:
    `waterJetId`, `installedWall`, `installedRegion` (`UPPER | LOWER`), `placementKind`
@@ -122,7 +136,9 @@ decisions themselves.
     Jets, never queue, selection, Cleaning Job, alarm, or coverage targets, and never
     SensorConfiguration records. They exist in LogicalPosition only, as the physical
     placement anchors of WJ3 and WJ1 respectively. The sensor sequence skips them
-    (I6→I8, I15→I17). Their zero-valued dirty-score CSV fields are placeholder-like
+    (I6→I8, I15→I17), and they receive no Sensor `scanOrder` — they carry only their
+    legacy `orderTotal` positions in the 0–107 logical ordering. Their zero-valued
+    dirty-score CSV fields are placeholder-like
     logical-position data, rejected from sensor import (disposition
     **REJECT FOR I7/I16**) and preserved only as gap provenance.
 

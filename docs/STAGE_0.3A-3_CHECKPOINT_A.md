@@ -168,7 +168,7 @@ with their placeholder values preserved as gap provenance (no silent normalizati
 | 2 | `sensorname` | A | legacy display name | provenance `legacyDisplayName` | IMPORT | PRESERVE WITH WARNING if it carries superseded "Cannon" equipment wording (W5); never used to derive identity |
 | 3 | `wall` | A | wall token | `Wall` enum (`LEFT/REAR/RIGHT/FRONT`) | IMPORT WITH NORMALIZATION | token→enum mapping recorded as a normalization action; unrecognized token fails closed (`MIGRATION_FIELD_TOKEN`) |
 | 4 | `order_wall` | A | wall-local scan order | `orderWall` | IMPORT | preserved as authoritative wall-local ordinal |
-| 5 | `order_total` | A | global scan order | `scanOrder` basis | IMPORT | unique 0–107; duplicates or out-of-range fail closed (`TOPO_DUPLICATE_ORDER`) |
+| 5 | `order_total` | A | legacy logical-position order — zero-based, range 0–107, **includes** the NON_SENSOR_GAP rows I7 and I16 | `LogicalPosition.orderTotal` (provenance/layout ordering) | IMPORT | unique 0–107; duplicates or out-of-range fail closed (`TOPO_DUPLICATE_ORDER`). **NOT the Sensor scanOrder**: canonical `scanOrder` is derived afterwards — sort all logical positions by `orderTotal`, exclude NON_SENSOR_GAP, assign the dense one-based range 1–106 to the 106 actual Sensors (see §8) |
 | 6 | `cannon` | A | **Assigned Cleaning Device ID** | `assignedWaterJetId` (`cannon n → WJn`) | IMPORT WITH NORMALIZATION | semantic rename only; **no value remap**. Outside 1–8 fails closed (`MIGRATION_CANNON_RANGE`); wall/region contradiction with approved topology fails closed (`TOPO_TARGET_WALL_CONTRADICTION`) |
 | 7 | `max_temp_dirtyscore` | B. Dirty-score settings | dirty-score mapping upper bound | `DiffUpperBound` | IMPORT WITH NORMALIZATION | canonical rename recorded. Zero/degenerate on an **actual Sensor** → PRESERVE WITH WARNING (`MIGRATION_PLACEHOLDER_VALUE`), Owner review; on I7/I16 → REJECT FOR I7/I16 |
 | 8 | `min_temp_dirtyscore` | B | dirty-score mapping lower bound | `DiffLowerBound` | IMPORT WITH NORMALIZATION | as above; `min ≥ max` on an actual Sensor fails closed (`MIGRATION_BOUNDS_ORDER`) |
@@ -194,7 +194,14 @@ refusal aborts the entire import (no partial import, no partial revision publica
 2. They produce **no** `SensorConfiguration`, no Thermocouple channels, no Dirty Score,
    no classification, no quality, no queue entry, no selection, no Cleaning Job target, no
    alarm, and no coverage membership.
-3. Sensor sequence skips them: I6 → I8 and I15 → I17.
+3. Sensor sequence skips them: I6 → I8 and I15 → I17. They carry only their legacy
+   `orderTotal` positions in the zero-based 0–107 logical ordering; they receive **no**
+   Sensor `scanOrder`.
+3a. `scanOrder` derivation (deterministic, performed after import of the 108 layout
+   rows): sort all logical positions by `orderTotal`, exclude `positionKind =
+   NON_SENSOR_GAP`, assign the dense one-based range **1–106** to the 106 actual Sensors —
+   gapless, no duplicates, sequence skipping I7 and I16 (e.g. the Sensors at I6 and I8
+   receive consecutive scanOrder values).
 4. I7 is the physical placement anchor of WJ3; I16 is the physical placement anchor of WJ1.
    The Water Jets are separate `WaterJetConfiguration` records — never identified *as*
    I7/I16.
@@ -269,14 +276,15 @@ spike. No behaviour beyond configuration loading; nothing device-facing.
 | --- | --- | --- |
 | T1 | 108 logical positions / 106 Sensors / 212 TC channels / 24-29-24-29 wall totals on a migrated configuration | count regressions |
 | T2 | I7 and I16 appear only as NON_SENSOR_GAP LogicalPositions; no SensorConfiguration exists for them | gap leakage into runtime |
-| T3 | exactly 8 Water Jets; exactly 8 Isolation Valves | identity-set drift |
-| T4 | WJn paired with IVn exactly, ordinals matching, one-to-one both directions | pairing corruption |
-| T5 | every WJ's target wall is the opposite wall of its installed wall; target wall/region equal the approved table (§3) | coverage inferred from the wrong wall |
-| T6 | legacy `cannon n` maps directly to `WJn` (including Rear-lower `cannon = 1` → WJ1 / FRONT-lower installation) | wall-based remapping |
-| T7 | every actual Sensor carries exactly one assigned Water Jet resolving to a real WJ; paired IV derived | dangling/missing assignment |
-| T8 | no Water Jet or Valve identity appears as a Sensor id; namespace disjointness | identity collision |
-| T9 | importer runs twice on identical bytes ⇒ identical results (records, warnings, refusal codes) | nondeterministic import |
-| T10 | each refusal code from §9 fires on its malformed fixture and aborts atomically with no partial import | ambiguous topology not failing closed |
+| T3 | imported Sensor `scanOrder` is exactly the dense one-based range 1–106 (no gaps, no duplicates); the sequence skips I7 and I16; `orderTotal` remains 0–107 over all 108 LogicalPositions; no NON_SENSOR_GAP row receives a scanOrder | ordering conflated with legacy layout order; scanOrder derived from the wrong field |
+| T4 | exactly 8 Water Jets; exactly 8 Isolation Valves | identity-set drift |
+| T5 | WJn paired with IVn exactly, ordinals matching, one-to-one both directions | pairing corruption |
+| T6 | every WJ's target wall is the opposite wall of its installed wall; target wall/region equal the approved table (§3) | coverage inferred from the wrong wall |
+| T7 | legacy `cannon n` maps directly to `WJn` (including Rear-lower `cannon = 1` → WJ1 / FRONT-lower installation) | wall-based remapping |
+| T8 | every actual Sensor carries exactly one assigned Water Jet resolving to a real WJ; paired IV derived | dangling/missing assignment |
+| T9 | no Water Jet or Valve identity appears as a Sensor id; namespace disjointness | identity collision |
+| T10 | importer runs twice on identical bytes ⇒ identical results (records, warnings, refusal codes) | nondeterministic import |
+| T11 | each refusal code from §9 fires on its malformed fixture and aborts atomically with no partial import | ambiguous topology not failing closed |
 
 No tests for syntax, wording, whitespace, private helpers, or tests of tests.
 
@@ -303,13 +311,44 @@ equipment parameters (all non-Owner values remain `[NOT VERIFIED]` / `[OPEN]`).
 | Verified base SHA | `a74db62c4a7d4d8d5d2185cfe77a4c0229b01fce` (remote `main`, verified via `git ls-remote`) |
 | New branch | `arena/ca9c94c4-waterjet-sentinel-suite` (from the approved base) |
 | Commit 1 (specification) | `c994c26f621b49b01a1e437f8207651add126035` — `docs(topology): define Water Jet and legacy parameter migration` |
-| Commit 2 (delivery record) | appends PR number and head references (this commit) |
-| Changed | `docs/decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md` (NEW); `docs/STAGE_0.3A-3_CHECKPOINT_A.md` (NEW); `docs/decisions/README.md` (index row); `CHANGELOG.md` (Unreleased entry) |
+| Commit 2 (delivery record) | `03c2d15493afd713b9dde2adf3e4ff78ba2ffef6` — `docs(topology): record Checkpoint A PR number and delivery record` |
+| Commit 3 (SHA correction) | `6648437f24e918d8be3a1c4ad27edb8c1bc4b0a3` — `docs(topology): correct specification commit SHA in Checkpoint A delivery record` |
+| PR head at Owner review | `6648437f24e918d8be3a1c4ad27edb8c1bc4b0a3` — the head on which the Checkpoint A Owner review returned CHANGES REQUESTED |
+| Commit 4 (review correction) | `docs(topology): correct migration ordering and acceptance semantics` — created by the Owner-review correction task (2026-10-08); **this commit becomes the new PR head** (authoritative value in the PR #6 header) |
+| Changed | `docs/decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md` (NEW); `docs/STAGE_0.3A-3_CHECKPOINT_A.md` (NEW); `docs/decisions/README.md` (index row); `CHANGELOG.md` (Unreleased entry + review-correction note) |
 | Unchanged | All Product source, contracts, fixtures, locks, tests, Inspector, simulator, config examples, README/CURRENT_STATE stage rows, the React spike |
-| Not Verified | All values inherited from Owner data (`[OWNER CONFIRMED]` / Owner-provided CSV facts); the canonical models are specified, not implemented; no .NET, no importer, no device, no runtime was executed or exercised here |
+| Not Verified | Per the status classification in §15: Production acquisition bindings; legacy time-field units; sentinel timestamp meaning; runtime importer execution; physical device integration. The canonical models are specified, not implemented; no .NET, no importer, no device, no runtime was executed or exercised here |
 | PR | **[#6](https://github.com/tnoiiee/waterjet-sentinel-suite/pull/6)** — created from this branch against `main` — **OPEN, NOT MERGED** |
-| Spec head (commit 1) | `c994c26f621b49b01a1e437f8207651add126035` — full specification above |
-| PR head (commit 2) | recorded authoritatively in the PR header (GitHub, PR #6) and in the Checkpoint A report chat status; this commit appends only this delivery record |
+
+## 15. Owner review correction record (2026-10-08 — CHANGES REQUESTED on PR #6)
+
+### Correction 1 — order_total vs scanOrder
+
+The original specification stated or implied that Sensor `scanOrder` is taken from legacy
+`order_total`. That was **incorrect** and is corrected:
+
+| | Rule |
+| --- | --- |
+| Old (incorrect) | `scanOrder` taken from / based on legacy `order_total` |
+| New (corrected) | `order_total` is the **legacy logical-position order** — zero-based, range 0–107, **including** the NON_SENSOR_GAP rows I7 and I16 — preserved as `orderTotal` provenance/layout ordering only. Canonical Sensor `scanOrder` applies **only** to the 106 actual Sensors, is **one-based** and **gapless** (range 1–106), and is **derived deterministically**: (1) preserve `order_total` as provenance/layout ordering; (2) sort all logical positions by `orderTotal`; (3) exclude `positionKind = NON_SENSOR_GAP`; (4) assign dense `scanOrder` 1…106; (5) I7 and I16 receive no SensorConfiguration and no scanOrder. |
+
+Updated in: ADR-0017 (§1, §2, §10); this report (§7 matrix row 5, §8); Checkpoint B planned
+importer behaviour (§11); Checkpoint B proposed test list (new T3, §12). The importer is
+**not implemented** in this correction.
+
+### Correction 2 — acceptance vs merge
+
+| | Wording |
+| --- | --- |
+| Old (incorrect) | "formal acceptance happens at PR merge" (ADR-0017 header) |
+| New (required governance) | Formal acceptance requires an explicit Owner decision. PR merge records repository integration and does not by itself constitute acceptance unless the Owner explicitly states acceptance as part of the merge decision. ADR-0017 status remains `PROPOSED` until explicit Owner acceptance. |
+
+### Status classification
+
+| Classification | Items |
+| --- | --- |
+| **OWNER CONFIRMED** | 108 logical positions; 106 Sensors; 212 TC channels; I7 and I16 are NON_SENSOR_GAP; WJ1–WJ8 installed positions; WJ1–WJ8 target coverage; WJn paired one-to-one with IVn; legacy `cannon n` maps directly to WJn |
+| **NOT VERIFIED** | Production acquisition bindings; legacy time-field units; sentinel timestamp meaning; runtime importer execution; physical device integration |
 
 **FINAL STATUS**
 
