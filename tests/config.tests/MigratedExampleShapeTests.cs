@@ -35,11 +35,25 @@ public sealed class MigratedExampleShapeTests
 
         Assert.Contains("SYNTHETIC", JsonNodeExtensions.RequireString(node, "_label"), StringComparison.Ordinal);
         Assert.Contains("NOT FOR DEPLOYMENT", JsonNodeExtensions.RequireString(node, "_label"), StringComparison.Ordinal);
-        Assert.Equal(108, JsonNodeExtensions.RequireArray(node, "logicalPositions").Count());
-        Assert.Equal(106, JsonNodeExtensions.RequireArray(node, "sensors").Count());
-        Assert.Equal(8, JsonNodeExtensions.RequireArray(node, "waterJets").Count());
-        Assert.Equal(8, JsonNodeExtensions.RequireArray(node, "isolationValves").Count());
-        Assert.Empty(JsonNodeExtensions.RequireArray(node, "warnings"));
+
+        var logicalPositions = JsonNodeExtensions.RequireArray(node, "logicalPositions");
+        var logicalPositionCount = logicalPositions.Count;
+        Assert.Equal(108, logicalPositionCount);
+
+        var sensorConfigurations = JsonNodeExtensions.RequireArray(node, "sensors");
+        var sensorConfigurationCount = sensorConfigurations.Count;
+        Assert.Equal(106, sensorConfigurationCount);
+
+        var waterJets = JsonNodeExtensions.RequireArray(node, "waterJets");
+        var waterJetCount = waterJets.Count;
+        Assert.Equal(8, waterJetCount);
+
+        var isolationValves = JsonNodeExtensions.RequireArray(node, "isolationValves");
+        var isolationValveCount = isolationValves.Count;
+        Assert.Equal(8, isolationValveCount);
+
+        var warnings = JsonNodeExtensions.RequireArray(node, "warnings");
+        Assert.Empty(warnings);
     }
 
     [Fact]
