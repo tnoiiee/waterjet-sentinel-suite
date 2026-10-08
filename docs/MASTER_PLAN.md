@@ -121,6 +121,187 @@ stay `[NOT AUTHORIZED]` until each is explicitly approved.
   REQUIRED** (matrix row A).
 - **Stage state (updated 2026-10-08, CP-1 closeout):** CP-0 and CP-1 are **OWNER-LOCALLY VALIDATED** at `2cfe648`; CP-1 Final Source Review complete (FOLLOW-UP RECOMMENDED BEFORE MERGE, not blocking). CP-2 scope gate **PROPOSED** in §3.3.1; **CP-2 coding NOT AUTHORIZED**. CP-3 and CP-4 NOT AUTHORIZED. The earlier "Sources are authored in Arena / NOT COMPILED IN ARENA / OWNER-LOCAL VALIDATION REQUIRED" wording is superseded. PR #7 OPEN, NOT MERGED.
 
+### 3.3.1 Stage 0.4A CP-2 scope gate — PROPOSAL (2026-10-08, not authorized)
+
+**Status: PROPOSAL ONLY. CP-2 coding is NOT AUTHORIZED.** This section does not authorize any source, test, contract, schema, fixture or runtime change. It is ready for Owner ruling. Items marked **[BLOCKING]** in §19 must be ruled before CP-2 coding may start. Vocabulary is taken from the accepted contracts (`packages/contracts/Enums.cs`, `Jobs.cs`, `SafeReturn.cs`, `Sequence.cs`, `Pump.cs`) and from the accepted [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §§1–7. Spike behaviour is an oracle only; it is cited, not adopted.
+
+**1. Name and objective.** *Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel.* Extend the pure `SequencingKernel` so that exactly one Active Job executes an abstract, SIMULATOR-oriented phase path. Every end of a Job (normal completion, abort, execution failure, Pump-critical stop) passes through Mandatory Safe Return in the Owner order. A Pump STOP or TRIP disables synthetic water output in the same transition. The kernel stays pure and deterministic, with no I/O, no host, no API and no Inspector.
+
+**2. Existing CP-1 types reused.** `SequencingState`, `SequencingEntry`, `SequencingActiveJob` (extended), `SequencingEvent` (extended), `SequencingTransition`, `SequencingEvidence`, `SequencingTopology` (WJn↔IVn pairing), `SequencingCodes`, `SequencingKernel.Apply` and the projections. `SafeReturnReleaseEvidence` is proposed for retirement as an external input (§19, O-10). Reused accepted contract enums, with no contract change: `JobPhase` (P1–P6), `JobLifecycle`, `SafeReturnStep` (SR1–SR8, SR_FAILED), `CriticalPumpKind`, `AutoSequenceState`, `AutoSequenceMode`. `CriticalPumpEvent`, `SafeReturnState` and `JobOutcomeRecord` are projection targets only, in CP-3/CP-4.
+
+**3. New types (proposed, internal unless stated; each new file needs Owner naming, §19 O-18).**
+- `ValveFeedbackState` = `CLOSED` | `OPEN` | `TRANSIT_OR_FAULT` | `INVALID_LIMIT_STATE`, derived by a pure function from the upper and lower limit observations (§5 below).
+- `AxisFeedbackState` = `AT_STANDBY` | `NOT_AT_STANDBY` | `UNKNOWN` | `FAULT` (abstract only).
+- `CleaningJobOutcome` = `COMPLETED` | `FAILED` | `ABORTED` | `RECOVERY_REQUIRED` (internal enum; the wire `Outcome` field stays an opaque string per the contract comment, §19 O-13).
+- `SequencingIntent` (data only): `VALVE_CLOSE(valveId)`, `AXIS_TO_STANDBY(jetId)`, `WATER_OUTPUT_OFF`. No adapter binding, no transport (§19 O-8).
+- `FeedbackTarget` = `VALVE_CLOSED` | `AXIS_STANDBY` (names the timeout input that applies).
+- A Safe Return ledger recording the SR1–SR8 steps and their evidence sequence numbers.
+
+**4. Exact Job lifecycle and phases.**
+- `JobLifecycle` (accepted contract names, reused): `RUNNING`, `ABORTING`, `SAFE_RETURN_CLOSE_VALVE`, `SAFE_RETURN_VERIFY_VALVE_CLOSED`, `SAFE_RETURN_TO_STANDBY`, `SAFE_RETURN_VERIFY_STANDBY`, `SAFE_RETURN_FAILED`.
+- Phases within `RUNNING`: `P1` → `P2` → … → `P6`, strictly in order (`ExecutionPhaseVerified` events). Gates per [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §3: entry to P1 requires valve `CLOSED` observed (step 5); the transition from P1 to P2 requires valve `OPEN` observed (steps 9–10); P6 completion starts Safe Return. Motion values are never present; each phase is a verified synthetic event.
+- The §4.1 pre-execution states (`PENDING`, `REVALIDATING`, `RESERVED`) are not separate CP-2 states. CP-1 atomic dispatch already performs revalidation and reservation (§19 O-9).
+- The CP-1 pump-waiting gate (`PUMP_NOT_READY`) remains a Job-level flag after dispatch. A mid-run pump-not-ready is an open question (§19 O-11).
+
+**5. Exact Safe Return states.** `SafeReturnStep` values, in order: **SR1** stop cleaning activity and disable synthetic water output (same transition as the trigger); **SR2** request the paired Isolation Valve close (intent emitted; lifecycle `SAFE_RETURN_CLOSE_VALVE`, then `SAFE_RETURN_VERIFY_VALVE_CLOSED`); **SR3** confirm valve `CLOSED`, observed after the SR2 intent (an earlier observation is not reused); **SR4** request the axis return to Standby (intent emitted only after SR3, same transition as SR3 confirmation; lifecycle `SAFE_RETURN_TO_STANDBY`, then `SAFE_RETURN_VERIFY_STANDBY`); **SR5** confirm axis `AT_STANDBY`, observed after SR4; **SR6** record the outcome (§11); **SR7** release the Active Job; **SR8** later sequencing may be considered (no kernel action; the next `DispatchHead` is a separate transition). Failure: `SR_FAILED` with lifecycle `SAFE_RETURN_FAILED`.
+
+**6. Exact valve feedback states** (derived from the accepted matrix, [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §5.2; columns as in that table):
+
+| Upper limit | Lower limit | Derived `ValveFeedbackState` | Safe Return meaning |
+| --- | --- | --- | --- |
+| 0 | 1 | `CLOSED` | Satisfies SR3 when observed after SR2 |
+| 1 | 0 | `OPEN` | Does not satisfy SR3; waits; a timeout input fails the step (§19 O-6) |
+| 0 | 0 | `TRANSIT_OR_FAULT` | Legitimate during bounded travel; waits until a timeout input, then failure |
+| 1 | 1 | `INVALID_LIMIT_STATE` | Always a fault: immediate `SAFE_RETURN_FAILED` |
+
+Feedback carries the `ValveId`. A mismatched identity is refused (§19 O-6). Valve timeouts are input events only (§9).
+
+**7. Exact axis feedback states** (abstract only). `AT_STANDBY` satisfies SR5. `NOT_AT_STANDBY` and `UNKNOWN` do not satisfy SR5 and wait until a `FeedbackTimeoutExpired(AXIS_STANDBY)` input, which fails the step. `FAULT` fails the step immediately. No coordinate, speed, homing or positioning value exists anywhere in CP-2. The confirmation source is open (decision D10, §19 O-7). No axis command is ever issued before SR3 is confirmed.
+
+**8. Exact Pump-critical input states.**
+- Accepted critical inputs: `CriticalPumpKind.MAIN_PUMP_UNEXPECTED_STOP` (class B) and `CriticalPumpKind.MAIN_PUMP_TRIP` (class C). Each raises the critical condition.
+- Class A (expected commanded stop) is not accepted in CP-2 and is refused with `PUMP_EXPECTED_STOP_NOT_MODELLED` (§19 O-3).
+- `PumpRunState` (`STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `TRIPPED`) is **not** a kernel input. The accepted derivation has no direct motor-running feedback ([`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §7). CP-2 accepts only the critical event.
+- Effect in one transition, with no delay and no timer: `CriticalSuspended = true`; AutoSequence projects `CRITICAL_SUSPENDED`; if a Job is active, `WATER_OUTPUT_OFF` and SR1 are recorded, the lifecycle moves to `SAFE_RETURN_CLOSE_VALVE`, and the SR2 intent is emitted in that same transition. The queue and queue revision are unchanged. No dispatch. The spike's `1.5 s` value is a minimum-step constant and is not used. The Owner rule that no delay precedes the valve-close request is honoured.
+
+**9. Pure event model** (every event carries an explicit `At`; no clock, no timer, no transport):
+- `PumpCriticalObserved(At, CriticalPumpKind)`.
+- `ExecutionPhaseVerified(At, JobPhase)`, in strict order.
+- `ExecutionFailureObserved(At, reasonCode)`.
+- `AbortRequested(At)`: a synthetic internal trigger only, with no route (§19 O-12).
+- `ValveLimitObserved(At, ValveId, upperLimit, lowerLimit)`.
+- `AxisFeedbackObserved(At, AxisFeedbackState)`.
+- `FeedbackTimeoutExpired(At, FeedbackTarget)`: the timeout is an input, not a kernel timer (§19 O-5).
+- Retained from CP-1: `StartAutoSequence`, `AdmitQueueEntry`, `DispatchHead`, `ObservePumpReadiness`, `RequestPause`. `RaiseCriticalSuspension` is retained for tests only, and the Pump source uses `PumpCriticalObserved`. `ReleaseActiveJob` is removed as an external input, because release becomes SR7 (§19 O-10).
+
+**10. Transition table** (CP-2 additions; CP-1 rules otherwise unchanged):
+
+| From | Event | Guard | To | Same-transition effects | Evidence |
+| --- | --- | --- | --- | --- | --- |
+| `RUNNING`, P*k* | `ExecutionPhaseVerified(P*k+1*)` | In order; P1 entry needs valve `CLOSED`; P1→P2 needs valve `OPEN` | `RUNNING`, P*k+1* | none | `PHASE_VERIFIED` |
+| `RUNNING`, P6 | `ExecutionPhaseVerified(P6)` | Final phase | `SAFE_RETURN_CLOSE_VALVE`, pending `COMPLETED` | SR1 (water off); SR2 intent | `SR1`, `SR2` |
+| `RUNNING` (any phase) | `ExecutionFailureObserved` | none | `SAFE_RETURN_CLOSE_VALVE`, pending `FAILED` | SR1; SR2 intent | `SR1`, `SR2` |
+| `RUNNING` (any phase) | `AbortRequested` | none | `ABORTING` → `SAFE_RETURN_CLOSE_VALVE`, pending `ABORTED` | SR1; SR2 intent (same transition) | `SR1`, `SR2` |
+| `RUNNING` (any phase) | `PumpCriticalObserved` (B or C) | none | `SAFE_RETURN_CLOSE_VALVE`, pending per O-1; `CriticalSuspended = true` | SR1; SR2 intent; no dispatch | `CRITICAL_SUSPENSION_RAISED`, `SR1`, `SR2` |
+| `SAFE_RETURN_VERIFY_VALVE_CLOSED` | `ValveLimitObserved(CLOSED)`, observed after SR2 | none | `SAFE_RETURN_VERIFY_STANDBY` | SR3 confirmed; SR4 intent | `SR3`, `SR4` |
+| `SAFE_RETURN_VERIFY_VALVE_CLOSED` | `ValveLimitObserved(OPEN` or `TRANSIT_OR_FAULT)` | none | unchanged | observation recorded | `VALVE_NOT_CONFIRMED` |
+| `SAFE_RETURN_VERIFY_VALVE_CLOSED` | `ValveLimitObserved(INVALID_LIMIT_STATE)` or `FeedbackTimeoutExpired(VALVE_CLOSED)` | none | `SAFE_RETURN_FAILED` | Job retained; no release; no dispatch | `SR_FAILED` |
+| `SAFE_RETURN_VERIFY_STANDBY` | `AxisFeedbackObserved(AT_STANDBY)` | none | Job cleared after SR6 and SR7 | SR5 confirmed; outcome recorded; release | `SR5`, `OUTCOME_RECORDED`, `JOB_RELEASED` |
+| `SAFE_RETURN_VERIFY_STANDBY` | `AxisFeedbackObserved(NOT_AT_STANDBY` or `UNKNOWN)` | none | unchanged | observation recorded | `STANDBY_NOT_CONFIRMED` |
+| `SAFE_RETURN_VERIFY_STANDBY` | `AxisFeedbackObserved(FAULT)` or `FeedbackTimeoutExpired(AXIS_STANDBY)` | none | `SAFE_RETURN_FAILED` | Job retained; no release; no dispatch | `SR_FAILED` |
+| `SAFE_RETURN_FAILED` | any Job-advancing event | none | unchanged | refused; no retry, reset or resume | `SAFE_RETURN_FAILED_RETAINED` |
+| any state with an Active Job | `DispatchHead` | none | unchanged | refused (CP-1 `DISPATCH_REFUSED_JOB_ACTIVE`) | CP-1 code |
+| any state with an Active Job | `RequestPause` | none | `PAUSE_REQUESTED` (CP-1) | the Job continues through Safe Return | CP-1 code |
+| Job released (SR8) | `DispatchHead` | CP-1 rules | next Job | separate transition only | CP-1 codes |
+
+**11. Outcome timing.** The outcome is recorded at SR6 only, after SR5 (`AT_STANDBY` confirmed) on the success path. Release (SR7) is an ordered record in the same transition as SR6. The next dispatch is always a separate transition. Outcome mapping (proposal):
+
+| Trigger | Safe Return verified | Outcome |
+| --- | --- | --- |
+| Normal completion (P6) | yes | `COMPLETED` |
+| Explicit abort | yes | `ABORTED` |
+| Execution failure | yes | `FAILED` |
+| Pump-critical stop (B or C) | yes | **Open, §19 O-1.** The spike uses `ABORTED`. The Owner rulings define the four terminal outcomes but do not map a Pump-critical stop to one. |
+| Any trigger | cannot be verified (`SAFE_RETURN_FAILED`) | `RECOVERY_REQUIRED`, **timing open (§19 O-2)** |
+
+**12. Failure and retention.**
+- On `SAFE_RETURN_FAILED`: the Active Job is retained (`ActiveJob` non-null) with lifecycle `SAFE_RETURN_FAILED`; the critical condition is retained at high severity; the queue and queue revision are unchanged; no release; no dispatch; water output remains off.
+- No automatic retry: SR2 and SR4 are never re-issued by the kernel after a failure.
+- No automatic reset: no event clears `CriticalSuspended` (D9 remains open).
+- No automatic resume: no transition leaves `SAFE_RETURN_FAILED`; Start is refused.
+- Feedback that arrives after `SAFE_RETURN_FAILED` is recorded as evidence only and advances nothing.
+- A second critical event, or a critical event during Safe Return, is refused and recorded (`CRITICAL_EVENT_DURING_SAFE_RETURN` is the spike name; §19 O-4). An additional abort during Safe Return is noted and not restarted.
+
+**13. Deterministic evidence ledger changes.**
+- One evidence sequence (`EvidenceSeq`) across queue, Job and Safe Return. This retires the two-sequence design (§19 O-10).
+- Evidence records gain optional fields: lifecycle, phase, SR step, valve feedback, axis feedback, internal outcome, and intent. Field order is fixed by the record declaration.
+- Ordering invariant (checked by test; mirrors the spike ordering invariant): water-output-off seq ≤ valve-close intent seq < valve-CLOSED confirmed seq < axis-return intent seq < AT_STANDBY confirmed seq < outcome seq < release seq.
+- New codes are listed in the test plan (§15).
+- Identical input produces byte-identical state and evidence serialization (the CP-1 Q13 pattern is extended).
+- Wire projection of Job state (`ActiveCleaningJobState`, `SafeReturnState`, `JobOutcomeRecord`) is deferred to CP-3 and CP-4.
+
+**14. Expected files to change** (only if CP-2 is authorized):
+- `packages/application/Runtime/Sequencing/SequencingState.cs`: extended Job fields; internal constructor (§19 O-17).
+- `.../SequencingEvent.cs`: new events; `ReleaseActiveJob` removed as an external input (O-10).
+- `.../SequencingKernel.cs`: Job execution and Safe Return transitions.
+- `.../SequencingCodes.cs`: new codes.
+- `.../SequencingTransition.cs`: evidence field additions.
+- `.../SafeReturnReleaseEvidence.cs`: retired or made internal (O-10).
+- `.../SequencingTopology.cs`: no change expected; WJn↔IVn reused.
+- New source files, **not yet named**: `SequencingFeedback.cs` (valve and axis feedback derivation) and `SequencingSafeReturn.cs` (Safe Return ledger). Alternative: keep them in existing files, with no new file (§19 O-18).
+- `tests/runtime.tests/Sequencing/SequencingKernelTests.cs`: only the CP-1 tests whose behaviour changes intentionally (the release path and the critical-raise path).
+- New test file, **not yet named**: `tests/runtime.tests/Sequencing/SequencingJobSafeReturnTests.cs`.
+- Documentation (CURRENT_STATE, CHANGELOG, MASTER_PLAN): after approval only.
+
+**15. Tests proposed** (Runtime.Core only; no source-text, import, formatting, private-method or analyzer tests):
+- T-01 a second Job cannot start while one is active.
+- T-02 normal completion enters Safe Return.
+- T-03 abort enters Safe Return.
+- T-04 execution failure enters Safe Return.
+- T-05 Pump STOP (class B) disables synthetic water output in the trigger transition.
+- T-06 Pump TRIP (class C) disables it in the same way.
+- T-07 Pump critical sets `CRITICAL_SUSPENDED`.
+- T-08 the paired valve-close intent precedes any axis-return intent.
+- T-09 an axis-return intent is never emitted before a valve `CLOSED` observation that follows SR2.
+- T-10 Safe Return evidence sequence numbers strictly increase.
+- T-11 no outcome is recorded before SR5 on the success path.
+- T-12 the Job is not released before Safe Return succeeds.
+- T-13 the next dispatch is impossible before release.
+- T-14 successful normal Safe Return produces `COMPLETED`.
+- T-15 successful abort Safe Return produces `ABORTED`.
+- T-16 successful execution-failure Safe Return produces `FAILED`.
+- T-17 failed valve close produces `SAFE_RETURN_FAILED` (outcome per O-2).
+- T-18 failed Standby confirmation produces `SAFE_RETURN_FAILED` (outcome per O-2).
+- T-19 failure retains the Active Job.
+- T-20 failure preserves the queue and queue revision.
+- T-21 no automatic retry.
+- T-22 no automatic reset.
+- T-23 no automatic resume.
+- T-24 paired device references are WJn↔IVn; mismatched pairs are refused.
+- T-25 identical input produces byte-identical state and evidence.
+- T-26 `INVALID_LIMIT_STATE` produces an immediate failure.
+- T-27 `TRANSIT_OR_FAULT` waits, and a timeout input fails the step.
+- T-28 a class A stop is refused with `PUMP_EXPECTED_STOP_NOT_MODELLED`.
+- T-29 a second critical event during Safe Return is refused and recorded.
+
+Boundary items (no POST, write, API, UI or control path added; boundaries clean) are verified by review and by `tools/boundary-scan`, not by source-text tests, consistent with the CP-1 rule.
+
+**16. Protected files and behaviour.** Protected files: `packages/contracts/**`, fixtures, the TypeScript mirror, the RuntimeStage marker and `StageMarkerTests`, `ProfileStartPolicy`, `FixtureParityTests`, `RuntimeStartGateSourceTests`, `apps/**`, `adapters/**`, `config/**`, `tools/**`, `spikes/**`, and project and lock files (a lock change would mean a project-graph change and must stop the checkpoint). Protected behaviour: one Active Job; ready-only FIFO with head-only dispatch and no scan-forward; pump waiting outside Queue entries; critical freeze of the queue and revision; WJn↔IVn pairing; I7 and I16 are neither Sensors nor Water Jets; no Production device access.
+
+**17. Explicit exclusions.** No Runtime host integration. No API, POST route, command route or SSE. No Inspector or UI. No physical device access, and no TEST_HARDWARE or PRODUCTION use. No commands or actuation: intents are data only and are never bound to an adapter (§19 O-8). No timers, clocks or numeric timeout, speed, homing or coordinate values. No persistence or restart recovery during Safe Return (§19 O-16). No operator reset, resume or abort route. No outcome enum in the contracts, and no Production approval of outcome names. Spike constants (20 s timeout, 3 s feedback, 1.5 s minimum step) are not adopted.
+
+**18. Owner-local validation plan** (for CP-2, if authorized):
+1. `git ls-remote origin refs/heads/main` equals the approved base; the PR head is the CP-2 head.
+2. `dotnet restore WaterJetSentinelSuite.sln` with locked restore; no lock drift.
+3. `dotnet build WaterJetSentinelSuite.sln -c Release --no-restore`: 0 warnings, 0 errors.
+4. `dotnet test WaterJetSentinelSuite.sln -c Release --no-build`: 0 failed, 0 skipped; the total is the 217 baseline plus the new CP-2 tests, reported exactly.
+5. Fixture parity 7/7; TypeScript typecheck and tests unchanged in result.
+6. `node tools/boundary-scan/boundary-scan.mjs .`: 0 findings.
+7. `git diff --check`; working tree clean; no contract, fixture or project file changed.
+8. Review checklist: no route, POST or SSE added; no `apps/**` or `adapters/**` change; intents have no adapter reference.
+
+**19. Open decisions requiring Owner ruling.** Items marked **[BLOCKING]** must be ruled before CP-2 coding.
+- **O-1 [BLOCKING]** Outcome of a Pump-critical stop when Safe Return is verified: `ABORTED` (spike), `FAILED`, or another approved name. The Owner rulings define the four terminal outcomes but do not map a Pump-critical stop to one.
+- **O-2 [BLOCKING]** Outcome on Safe Return failure. (a) Record `RECOVERY_REQUIRED` at the moment of failure, with the Job retained and not released (proposal). (b) Record nothing until an approved Owner route exists. Also define the "approved Safe Return point": the proposal is SR5 (`AT_STANDBY` confirmed).
+- **O-3 [BLOCKING]** Expected commanded stop (class A) with an Active Job: refuse (proposal), model, or define an outcome.
+- **O-4** A second critical event, or a critical event during Safe Return: refuse and record (proposal), or the spike's `CRITICAL_EVENT_DURING_SAFE_RETURN` with unchanged steps.
+- **O-5** Feedback timeouts: proposal is input events only, with no numeric value in CP-2. The value and the timer owner are for an Owner-approved later checkpoint.
+- **O-6** Contradictory or wrong-identity valve feedback. Proposal: OPEN after a close command waits until the timeout input. INVALID_LIMIT_STATE fails immediately. A feedback `ValveId` mismatch is refused.
+- **O-7** Axis `AT_STANDBY` source (decision D10). Proposal: synthetic input only in CP-2.
+- **O-8 [BLOCKING]** Intents as pure data (`VALVE_CLOSE`, `AXIS_TO_STANDBY`, `WATER_OUTPUT_OFF`) returned from the kernel, with no adapter binding. Proposal: permitted. This is a command-adjacent surface and needs explicit approval.
+- **O-9 [BLOCKING]** Normal phase path P1→P6 with valve gates in CP-2, or Safe Return path only. Proposal: the phase ordering and valve gates are included, with no motion values.
+- **O-10 [BLOCKING]** Retire the external `SafeReturnReleaseEvidence` and use one evidence sequence, with release as an internal SR7. Proposal: yes.
+- **O-11** Pump not ready mid-run, after P1 has begun: hold (proposal), critical, or failure.
+- **O-12** The abort trigger exists as a synthetic internal input only, with no route. Proposal: yes.
+- **O-13** Outcome names. Proposal: the kernel uses `COMPLETED` / `FAILED` / `ABORTED` / `RECOVERY_REQUIRED` internally. The contract stays opaque strings. The CP-2 ruling is not Production approval (matrix E).
+- **O-14** Lifecycle names. Proposal: the accepted contract `JobLifecycle` names are used (they match the spike string values). Confirm.
+- **O-15** Critical latch permanence. Proposal: no reset in CP-2; `CRITICAL_SUSPENDED` persists until a future decision (D9 open). Confirm.
+- **O-16** Persistence and restart during Safe Return: in-memory only (matrix D). Confirm.
+- **O-17 [BLOCKING]** The CP-1 F1 fix (see the CP-1 closeout in CURRENT_STATE §2): an internal `SequencingState` constructor, and `Apply` validates its input state and refuses with `STATE_INVALID`. This must land before CP-2 or as the first CP-2 commit. The Owner chooses which.
+- **O-18** Naming and approval of the new source and test files in §14, or an instruction to keep them in existing files.
+
+**20. Can CP-2 begin after explicit Owner approval?** Yes, but not yet. CP-2 may start only after an explicit Owner message that: (a) approves this scope gate, or a revised version of it; (b) rules on every **[BLOCKING]** item (O-1, O-2, O-3, O-8, O-9, O-10, O-17); (c) names or refuses the new files in O-18; and (d) reaffirms that CP-3 and CP-4 remain NOT AUTHORIZED. CP-2 would then be a separate checkpoint on `arena/bd0a7c64-waterjet-sentinel-suite`, under PR #7, which remains open until the Owner merges it. Until then, no CP-2 code, test, contract, UI or command path may be created.
+
 ### 3.1 Recorded reconciliation of the Stage 0.2 title
 
 The Stage 0.1 candidate decomposition listed Stage 0.2 as *Requirements and Configuration
