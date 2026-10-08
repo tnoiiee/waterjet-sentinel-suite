@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using Wjss.Config.Examples.Tests; // ConfigTestPaths — shared repository-root discovery
 using Wjss.Contracts;
 using Wjss.Domain;
 using Xunit;
@@ -490,7 +489,7 @@ public sealed class SensorParameterMigrationTests
             if (sensor.LastCleanTimestampRaw is not null)
             {
                 Assert.False(
-                    sensor.LastCleanTimestampRaw.EndsWith("Z", StringComparison.Ordinal),
+                    sensor.LastCleanTimestampRaw.EndsWith('Z'),
                     "the raw last-clean value must remain the offset-free legacy string");
                 Assert.False(
                     sensor.LastCleanTimestampRaw.EndsWith("+00:00", StringComparison.Ordinal),
@@ -511,13 +510,15 @@ public sealed class SensorParameterMigrationTests
             .ToArray();
         Assert.Equal(ExpectedBooleanPropertyNames, booleanProperties);
 
-        Assert.Empty(typeof(SensorConfigurationRecord).GetProperties().Where(p =>
+        // No canonical temporal or duration type is invented anywhere on the record.
+        var sensorRecordProperties = typeof(SensorConfigurationRecord).GetProperties();
+        Assert.DoesNotContain(sensorRecordProperties, p =>
             p.PropertyType == typeof(DateTimeOffset)
             || p.PropertyType == typeof(DateTimeOffset?)
             || p.PropertyType == typeof(DateTime)
             || p.PropertyType == typeof(DateTime?)
             || p.PropertyType == typeof(TimeSpan)
-            || p.PropertyType == typeof(TimeSpan?)));
+            || p.PropertyType == typeof(TimeSpan?));
     }
 
     // ---- T18 -----------------------------------------------------------------
@@ -561,14 +562,14 @@ public sealed class SensorParameterMigrationTests
             Enum.GetNames<LogicalPositionKind>());
 
         // No canonical record carries a property of the transitional slot vocabulary.
-        Assert.Empty(new[]
+        var canonicalRecordProperties = new[]
         {
             typeof(LogicalPositionRecord),
             typeof(SensorConfigurationRecord),
             typeof(WaterJetConfiguration),
             typeof(IsolationValveConfiguration),
-        }.SelectMany(type => type.GetProperties())
-            .Where(p => p.PropertyType == typeof(SlotType)));
+        }.SelectMany(type => type.GetProperties()).ToArray();
+        Assert.DoesNotContain(canonicalRecordProperties, p => p.PropertyType == typeof(SlotType));
 
         // No Cannon entity or identity exists anywhere in the imported output.
         var allIdentities = result.LogicalPositions.Select(p => p.LogicalId)
@@ -583,27 +584,27 @@ public sealed class SensorParameterMigrationTests
     }
 
 
-    // ---- T20 -----------------------------------------------------------------
+    // ---- T20 (semantic replacement: compiled public types, no source text) ----
 
     [Fact]
     public void Runtime_Cannon_Vocabulary_Remains_Transitional_And_Untouched()
     {
-        var repoRoot = ConfigTestPaths.RepoRoot();
-        var enums = File.ReadAllText(Path.Combine(repoRoot, "packages", "contracts", "Enums.cs"));
-        var wallMap = File.ReadAllText(Path.Combine(repoRoot, "packages", "contracts", "WallMap.cs"));
-
-        // The transitional legacy runtime representation is still present, byte-for-byte
-        // in its declaration, and its atomic migration stays deferred to Checkpoint C.
-        Assert.Contains("public enum SlotType { SENSOR, CANNON }", enums, StringComparison.Ordinal);
-        Assert.Contains("public enum LogicalPositionKind { SENSOR, NON_SENSOR_GAP }", enums, StringComparison.Ordinal);
-        Assert.Contains("CANNON_REAR", wallMap, StringComparison.Ordinal);
-        Assert.Contains("CannonSlotCount = 2", wallMap, StringComparison.Ordinal);
+        // The transitional Runtime vocabulary still exists as compiled public surface,
+        // and its atomic migration stays deferred to Checkpoint C.
+        Assert.Contains("CANNON", Enum.GetNames<SlotType>());
         Assert.Equal(2, CanonicalSensorMap.CannonSlotCount);
+        Assert.Contains(CanonicalSensorMap.CannonSlots, slot =>
+            slot.EquipmentId == "CANNON_REAR" && slot.Row == 5 && slot.Column == 7);
+        Assert.Contains(CanonicalSensorMap.CannonSlots, slot =>
+            slot.EquipmentId == "CANNON_FRONT" && slot.Row == 5 && slot.Column == 16);
 
-        // No alias connects the vocabularies: the LogicalPositionKind declaration lists
-        // no Cannon member.
-        var kindLine = enums.Split('\n').Single(line => line.Contains("enum LogicalPositionKind", StringComparison.Ordinal));
-        Assert.DoesNotContain("CANNON", kindLine, StringComparison.OrdinalIgnoreCase);
+        // The canonical vocabulary is exactly SENSOR and NON_SENSOR_GAP and contains no
+        // Cannon member: no alias connects the two vocabularies. (No canonical topology
+        // Contract uses SlotType — asserted by
+        // Canonical_Output_Contains_Only_Sensor_And_NonSensorGap_Positions.)
+        Assert.Equal(ExpectedLogicalPositionKindNames, Enum.GetNames<LogicalPositionKind>());
+        Assert.DoesNotContain(Enum.GetNames<LogicalPositionKind>(), name =>
+            name.Contains("CANN", StringComparison.Ordinal));
     }
 
     // ---- warning bookkeeping ---------------------------------------------------
