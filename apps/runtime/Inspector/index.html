@@ -146,6 +146,19 @@
   td.gap { color: var(--warn); font-weight: 600; }
   td.clean { color: var(--ok); }
   code { color: var(--accent); }
+  /* Wall map: sensor cells stay quiet; NON_SENSOR_GAP cells are visually distinct
+     (dashed outline, warning tone) and never carry Sensor values or equipment ids. */
+  .wallmap { display: flex; flex-direction: column; gap: 10px; }
+  .wallmap .wm-head { display: flex; gap: 12px; align-items: baseline; margin-top: 4px; }
+  .wallmap .wm-head h3 { margin: 0; font-size: 12px; letter-spacing: .08em; }
+  .wallmap .wm-overlay { color: var(--muted); font-size: 11px; }
+  .slotgrid { display: grid; gap: 3px; }
+  .slot { font-size: 10px; line-height: 1.2; padding: 3px 2px; border: 1px solid var(--line);
+          border-radius: 4px; color: var(--muted); text-align: center; overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap; }
+  .slot.gap { border-style: dashed; border-color: var(--warn); color: var(--warn);
+              background: transparent; font-weight: 700; }
+  .topo-status { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -194,6 +207,44 @@
       <h2>Runtime state</h2>
       <div class="kv split" id="kv-runtime"></div>
       <p class="note">Queue dispatch, Pump commands, Cleaning Jobs and Safe Return actuation are not implemented in this checkpoint. The queue and Pump blocks above are placeholders of the foundation, labelled as such in the API.</p>
+    </section>
+
+    <section class="card wide">
+      <h2>Wall map &mdash; logical positions and installation overlay</h2>
+      <div class="wallmap" id="wallmap"></div>
+      <p class="note">106 Sensor positions render their canonical id. I7 and I16 are
+        <strong>NON_SENSOR_GAP</strong> positions: placement anchors only &mdash; never Sensors,
+        never Water Jet identities &mdash; with no Sensor value, quality or thermocouple channel.
+        The installation overlay lists, per wall, the Water Jets physically installed there; each
+        one sprays the opposite wall (installed position and target coverage are separate).
+        Devices are read-only topology references: nothing here is controllable and acquisition
+        is deferred.</p>
+    </section>
+
+    <section class="card wide">
+      <h2>Equipment topology &mdash; Water Jets and Isolation Valves (read-only)</h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Water Jet</th>
+              <th>Paired valve</th>
+              <th>Installed</th>
+              <th>Placement</th>
+              <th>Anchors</th>
+              <th>Cleans (target)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="topo-body">
+            <tr><td colspan="7">Waiting for the first poll&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note" id="note-topo">Static configuration topology from the Snapshot (never in a Delta).
+        WJn is paired one-to-one with IVn. These are references, not device handles: no start, stop,
+        valve, pump, axis or dispatch action exists on this page, and acquisition is
+        DEFERRED_NO_ACQUISITION_BINDING.</p>
     </section>
 
     <section class="card wide">
@@ -252,14 +303,16 @@
               <th>Quality</th>
               <th>Reason</th>
               <th>Source time</th>
+              <th>Assigned WJ</th>
+              <th>Assigned IV</th>
             </tr>
           </thead>
           <tbody id="sensors-body">
-            <tr><td colspan="11">Waiting for the first poll&hellip;</td></tr>
+            <tr><td colspan="13">Waiting for the first poll&hellip;</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="note">Full Product U-map presentation is <strong>not part of this development Inspector</strong>; this compact wall-grouped table proves that synthetic values, classification and quality are evolving.</p>
+      <p class="note">Full Product U-map presentation is <strong>not part of this development Inspector</strong>; this compact wall-grouped table proves that synthetic values, classification and quality are evolving. The assigned Water Jet is the cleaning device <em>responsible</em> for this Sensor's wall: it may be installed on the opposite wall, its Isolation Valve is derived only through the WJn &harr; IVn pairing, and acquisition is deferred.</p>
     </section>
 
     <section class="card wide">
@@ -273,7 +326,9 @@
     <strong>Development Inspector &mdash; read-only, SIMULATOR only.</strong>
     TEST_HARDWARE is not authorized. PRODUCTION device access is not authorized.
     Control commands are not implemented: nothing on this page starts, stops, dispatches, commands or changes Runtime state,
-    and every control here affects this browser page only.
+    and every control here affects this browser page only. Water Jets and Isolation Valves appear as read-only
+    topology references only: no device command, valve movement, pump, axis or cleaning action exists, and device
+    acquisition is deferred.
   </footer>
 </div>
 
@@ -364,11 +419,12 @@
       { k: "Sensors", v: counts.sensorLocations.count, s: "sensor locations", title: counts.sensorLocations.label },
       { k: "Thermocouple channels", v: counts.thermocoupleChannels.count, s: "validated channels", title: counts.thermocoupleChannels.label },
       {
-        k: "Cannons",
-        v: counts.cannonSlots.map(function (c) { return c.logicalLabel; }).join(" \u00b7 "),
-        s: counts.cannons.count + " slots \u00b7 " + counts.cannonSlots.map(function (c) { return c.equipmentId; }).join(", "),
-        title: counts.cannonSlots.map(function (c) {
-          return c.logicalLabel + " = " + c.equipmentId + " (logical row " + c.logicalRow + ", column " + c.logicalColumn + ")";
+        k: "Non-sensor gaps",
+        v: counts.nonSensorGapSlots.map(function (c) { return c.logicalLabel; }).join(" \u00b7 "),
+        s: counts.nonSensorGaps.count + " anchors \u00b7 not Sensors, not devices",
+        title: counts.nonSensorGapSlots.map(function (c) {
+          return c.logicalLabel + " is a NON_SENSOR_GAP placement anchor (logical row " + c.logicalRow +
+            ", column " + c.logicalColumn + "); the Water Jet mounted there is listed in the equipment topology";
         }).join(" | ")
       },
       { k: "Tick interval", v: status.tickIntervalMilliseconds + " ms", s: "configured" },
@@ -433,6 +489,104 @@
       { k: "Server time", v: timeOf(status.serverTimeUtc) }
     ];
     rows.forEach(function (row) { addPair(host, row.k, row.v, row.s); });
+  }
+
+  // Wall map: one block per wall. Sensor positions render their canonical id;
+  // the two NON_SENSOR_GAP positions render visually distinct (dashed) with their
+  // logical label only - never a Sensor value and never a Water Jet identity.
+  // The installation overlay is a separate line per wall listing the Water Jets
+  // physically installed there and the opposite wall they clean.
+  function renderWallMap(snapshot) {
+    var host = el("wallmap");
+    host.textContent = "";
+
+    var wallOrder = ["LEFT", "REAR", "RIGHT", "FRONT"];
+    var columnsPerWall = { LEFT: 4, REAR: 5, RIGHT: 4, FRONT: 5 };
+    var slots = snapshot.wallMap || [];
+    var waterJets = snapshot.waterJets || [];
+    var valves = snapshot.isolationValves || [];
+    var valveById = {};
+    valves.forEach(function (v) { valveById[v.valveId] = v; });
+
+    wallOrder.forEach(function (wall) {
+      var block = document.createElement("div");
+      var head = document.createElement("div");
+      head.className = "wm-head";
+      var title = document.createElement("h3");
+      text(title, wall);
+      head.appendChild(title);
+
+      var installed = waterJets.filter(function (w) { return w.installedWall === wall; });
+      if (installed.length > 0) {
+        var overlay = document.createElement("span");
+        overlay.className = "wm-overlay";
+        overlay.textContent = "Installed here: " + installed.map(function (w) {
+          return w.waterJetId + " (" + w.placementKind.toLowerCase().replace(/_/g, " ") +
+            " at " + w.placementAnchors.join(" + ") + ") + " + w.dedicatedIsolationValveId +
+            " \u2192 sprays the opposite wall: " + w.targetWall + " " + w.targetRegion.toLowerCase();
+        }).join(" \u00b7 ");
+        head.appendChild(overlay);
+      }
+      block.appendChild(head);
+
+      var wallSlots = slots.filter(function (s) { return s.wall === wall; })
+        .sort(function (a, b) { return a.logicalRow - b.logicalRow || a.logicalColumn - b.logicalColumn; });
+      var grid = document.createElement("div");
+      grid.className = "slotgrid";
+      grid.style.gridTemplateColumns = "repeat(" + columnsPerWall[wall] + ", minmax(0, 1fr))";
+      wallSlots.forEach(function (slot) {
+        var cellNode = document.createElement("div");
+        if (slot.positionKind === "NON_SENSOR_GAP") {
+          cellNode.className = "slot gap";
+          text(cellNode, (slot.logicalLabel || slot.slotId) + " \u00b7 GAP");
+          cellNode.title = "NON_SENSOR_GAP placement anchor: no Sensor value, no quality, no thermocouple channel, and never a Water Jet identity. The device mounted here appears in the equipment topology.";
+        } else {
+          cellNode.className = "slot";
+          text(cellNode, slot.sensorId || slot.slotId);
+          cellNode.title = slot.sensorId + " (logical row " + slot.logicalRow + ", column " + slot.logicalColumn + ")";
+        }
+        grid.appendChild(cellNode);
+      });
+      block.appendChild(grid);
+      host.appendChild(block);
+    });
+  }
+
+  // Equipment topology: one row per Water Jet with its paired Isolation Valve.
+  // Read-only references only - no control affordance exists anywhere in this table.
+  function renderTopology(snapshot) {
+    var body = el("topo-body");
+    body.textContent = "";
+
+    var waterJets = snapshot.waterJets || [];
+    if (waterJets.length === 0) {
+      var empty = document.createElement("tr");
+      var cellNode = document.createElement("td");
+      cellNode.colSpan = 7;
+      text(cellNode, "No topology in the Snapshot.");
+      empty.appendChild(cellNode);
+      body.appendChild(empty);
+      return;
+    }
+
+    waterJets.forEach(function (w) {
+      var tr = document.createElement("tr");
+      function cell(value, className) {
+        var td = document.createElement("td");
+        if (className) { td.className = className; }
+        text(td, value);
+        tr.appendChild(td);
+        return td;
+      }
+      cell(w.waterJetId);
+      cell(w.dedicatedIsolationValveId);
+      cell(w.installedWall + " " + w.installedRegion.toLowerCase());
+      cell(w.placementKind);
+      cell(w.placementAnchors.join(" + "));
+      cell(w.targetWall + " " + w.targetRegion.toLowerCase() + " (opposite wall)");
+      cell("topology reference \u00b7 control not authorized \u00b7 acquisition deferred", "topo-status");
+      body.appendChild(tr);
+    });
   }
 
   function renderWalls(walls) {
@@ -546,6 +700,8 @@
         cell(sensor.quality, "pill " + sensor.quality);
         cell(sensor.qualityReason || "");
         cell(sensor.sourceTimestamp ? timeOf(sensor.sourceTimestamp) : "");
+        cell(sensor.assignedWaterJetId);
+        cell(sensor.assignedIsolationValveId);
         body.appendChild(tr);
       });
     }
@@ -565,6 +721,7 @@
       ["Device profile", snapshot.deviceProfile],
       ["Wall map slots", snapshot.wallMap.length],
       ["Sensors", snapshot.sensors.length],
+      ["Water Jets / Isolation Valves", snapshot.waterJets.length + " / " + snapshot.isolationValves.length + " (WJn paired with IVn)"],
       ["Wall summaries", snapshot.walls.length],
       ["Active job", snapshot.activeJob ? snapshot.activeJob.jobId : "none"],
       ["Trend points", snapshot.trend.points.length + " / capacity " + snapshot.trend.capacity],
@@ -582,6 +739,8 @@
     renderHeading(status);
     renderFoundation(status);
     renderRuntimeState(status);
+    renderWallMap(snapshot);
+    renderTopology(snapshot);
     renderWalls(snapshot.walls || []);
     renderDeltas(feed);
     renderSensors(snapshot);

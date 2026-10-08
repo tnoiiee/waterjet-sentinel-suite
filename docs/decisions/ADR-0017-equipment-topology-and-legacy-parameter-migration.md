@@ -1,6 +1,8 @@
 # ADR-0017 — Equipment Topology Decision and Legacy Parameter Migration Specification
 
-- **Status:** ACCEPTED — authored under the Stage 0.3A-3 Checkpoint A Owner authorization
+- **Status:** ACCEPTED — authored under the Stage 0.3A-3 Checkpoint A Owner authorization;
+  IMPLEMENTED current-facing by Stage 0.3A-3 Checkpoint C (atomic runtime migration,
+  2026-10-08)
   (planning / decision / specification only), then explicitly approved by the Owner in the
   Stage 0.3A-3 Checkpoint A final review (2026-10-08): "ADR-0017: OWNER APPROVED".
   Formal acceptance is this explicit Owner decision; PR merge records repository
@@ -286,3 +288,25 @@ spellings; semantics are exactly as decided. Full record:
 [`../STAGE_0.3A-3_CHECKPOINT_B.md`](../STAGE_0.3A-3_CHECKPOINT_B.md). Checkpoint C
 (including the atomic Runtime CANNON vocabulary migration) remains NOT AUTHORIZED and NOT
 STARTED; PR #6 remains OPEN — NOT MERGED.
+
+## Implementation evidence (Stage 0.3A-3 Checkpoint C — implemented, 2026-10-08)
+
+Checkpoint C (Owner authorization 2026-10-08, PR head `0c3dcea` verified) migrated the
+runtime to this ADR's vocabulary atomically: the transitional `SlotType.CANNON` wire
+vocabulary is DELETED (`LogicalPositionKind {SENSOR, NON_SENSOR_GAP}` is the only position
+vocabulary); the wall map carries `gapAnchorForWaterJetId` (I7 → WJ3, I16 → WJ1); every
+Sensor record carries `assignedWaterJetId` + `assignedIsolationValveId` derived only
+through the WJn ↔ IVn pairing with target coverage matching the Sensor's wall/region
+(rear-lower ⇒ WJ1/IV1, responsibility separate from the installed position); the Runtime
+state, Snapshot (`wjss.snapshot/2`), Delta (`wjss.delta/2`, never carrying topology) and
+the read-only status expose the 8 WJ + 8 IV topology with acquisition
+DEFERRED_NO_ACQUISITION_BINDING; the development Inspector renders the NON_SENSOR_GAP
+positions distinctly, the per-wall installation overlay and the read-only equipment
+topology table. Schema compatibility decision: Option A — atomic in-`/2` update, no
+deprecated alias (the only consumers — Inspector, TS mirror, fixtures, tests — migrated
+in the same commits; no deployed `/1` consumer exists). Arena executed no .NET command
+(source-authored, statically reviewed, NOT COMPILED / NOT EXECUTED in Arena); the
+TypeScript mirror check was executed in Arena and passes (31/31); boundary scan 0
+findings (S1–S9 clean). Full record:
+[`../STAGE_0.3A-3_CHECKPOINT_C.md`](../STAGE_0.3A-3_CHECKPOINT_C.md). PR #6 remains
+OPEN — NOT MERGED; TEST_HARDWARE and PRODUCTION device access remain NOT AUTHORIZED.

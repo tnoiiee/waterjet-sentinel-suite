@@ -215,6 +215,46 @@ edge). An earlier "139 total / 139 passed" observation was non-authoritative
 [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md) (also the proposed — NOT
 AUTHORIZED, NOT STARTED — Checkpoint C scope). PR #6 OPEN — NOT MERGED.
 
+## 5e. Stage 0.3A-3 Checkpoint C record (appended 2026-10-08)
+
+Owner instruction 2026-10-08: Checkpoint C AUTHORIZED FOR IMPLEMENTATION on the existing
+PR #6 branch (Checkpoint A OWNER APPROVED; ADR-0017 ACCEPTED; Checkpoint B
+OWNER-LOCALLY VALIDATED). **Checkpoint C IMPLEMENTED (Arena-authored; NOT compiled or
+executed in Arena — Owner-local validation is the gate).**
+
+Delivered in three slices on PR #6:
+
+- **C1 `d378edf2` — atomic migration.** `SlotType` deleted; `LogicalPositionKind` the only
+  position vocabulary; `WallMapSlot.PositionKind` + `GapAnchorForWaterJetId` (I7 → WJ3,
+  I16 → WJ1); `CanonicalSensorMap.NonSensorGapCount` / `NonSensorGapSlots`;
+  `SensorPresentationState.PositionKind` + `AssignedWaterJetId` / `AssignedIsolationValveId`;
+  `OperationalSnapshot.WaterJets` / `IsolationValves` (Snapshot-only); `SchemaIds` →
+  `wjss.snapshot/2` / `wjss.delta/2`; Runtime state/invariants/projectors/Delta-apply
+  migrated and extended (8+8 ordinal topology, WJn ↔ IVn both directions, per-Sensor
+  target-coverage assignment via `WaterJetTopologyCatalog.TryRequireAssignment`, refusal
+  codes `WALL_MAP_NON_SENSOR_GAPS` / `TOPOLOGY_*` / `SENSOR_ASSIGNMENT`); simulator
+  assigns from the catalog; status gains gap references, 8+8 counts and
+  `equipmentTopology` with `DEFERRED_NO_ACQUISITION_BINDING`; TS mirror, fixtures and
+  example migrated atomically; tests migrated; NEW `RuntimeTopologyTests`.
+- **C2 `27591ea1` — API projection tests.** NEW `RuntimeApiTopologyTests` (counts,
+  gap references in orderTotal order, gap labels never WJ identities, topology pairing +
+  installed ≠ target + acquisition DEFERRED, composed-state assignment agreement, route
+  registry read-only).
+- **C3 — Inspector + documentation.** Wall map with visually distinct `I7 · GAP` /
+  `I16 · GAP` cells (no Sensor values, never WJ labels), per-wall installation overlay
+  ("sprays the opposite wall"), read-only equipment topology table, Assigned WJ / IV
+  columns, extended safety footer; CHANGELOG, CURRENT_STATE (§2, §11.9, §12.29), this
+  plan §5e, ADR-0017 evidence, and [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md).
+
+Compatibility: **Option A — atomic schema update (`/1` → `/2`), no deprecated alias**;
+no deployed `/1` consumer; ApiVersion `1` unchanged. Expected lock drift:
+`adapters/simulator/packages.lock.json` and `tests/integration/packages.lock.json` gain
+the direct `wjss.domain` edge on the next Owner restore (no lock hand-edited).
+Owner-local gates: restore, Release build, full test suite, fixture parity
+(`tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release`),
+`npm ci && npm run check`, boundary scan, UI review. PR #6 **OPEN — NOT MERGED**;
+TEST_HARDWARE and PRODUCTION remain NOT AUTHORIZED.
+
 ## 6. Contract boundary rules
 
 - Records live only in `packages/contracts/Wjss.Contracts`; UI mirror is structural, C# wins

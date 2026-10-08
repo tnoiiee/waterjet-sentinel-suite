@@ -105,7 +105,7 @@ No governance rule requires a documentation stage to advance a version number.
 
 | Item | State |
 | --- | --- |
-| Current stage | Stage 0.3A-2A Checkpoint C — read-only Runtime API + development Runtime Inspector, **OWNER-LOCALLY VALIDATED (2026-10-07)** at the lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d` (SDK `10.0.401`; locked restore PASS; Release build 0 warnings / 0 errors; fresh full .NET suite **139/139**; boundary S1–S9 clean; worktree CLEAN); Owner Function/Logic review PASSED and the Inspector UI/UX review PASSED — **final Owner visual review recorded, minor punchlist CLOSED** (one optional future polish item deferred as non-blocking; see §11.7, §12.27). Checkpoints A (`55d3b8b`) and B (`cfa6d4a`) are Owner-locally validated (A 101/101 — §12.24; B 129/129 — §12.25) |
+| Current stage | Stage 0.3A-3 Checkpoint C — atomic Runtime topology migration + read-only Inspector integration, **IMPLEMENTED (Arena-authored, 2026-10-08; NOT compiled/executed in Arena — Owner-local validation pending)** on PR #6: schema `wjss.snapshot/2` / `wjss.delta/2` (Option A atomic update, no alias), no canonical Cannon entity current-facing, 8 WJ + 8 IV read-only topology in Runtime state/Snapshot/status, per-Sensor assignments, Inspector wall map with NON_SENSOR_GAP cells + installation overlay + equipment topology table (see §11.9, [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md)). Stage 0.3A-2A Checkpoint C — read-only Runtime API + development Runtime Inspector, **OWNER-LOCALLY VALIDATED (2026-10-07)** at the lock-refresh commit `faa79145a925832baa2ac8685f7fecf7a093552d` (SDK `10.0.401`; locked restore PASS; Release build 0 warnings / 0 errors; fresh full .NET suite **139/139**; boundary S1–S9 clean; worktree CLEAN); Owner Function/Logic review PASSED and the Inspector UI/UX review PASSED — **final Owner visual review recorded, minor punchlist CLOSED** (one optional future polish item deferred as non-blocking; see §11.7, §12.27). Checkpoints A (`55d3b8b`) and B (`cfa6d4a`) are Owner-locally validated (A 101/101 — §12.24; B 129/129 — §12.25) |
 | Repository contents | Documentation, repository governance, the Stage 0.2.1A synthetic spike in `spikes/ui-runtime-react/`, and the Stage 0.3A-1 product foundation source skeleton (`WaterJetSentinelSuite.sln`, `packages/`, `apps/`, `adapters/`, `tests/`, `config/examples/`, `tools/`) |
 | Application source code | **Validated at checkpoint scope by the Owner-local run** (Release 0/0; 61/61; fixtures and lock files genuine, transferred and verified; SDK pinned `10.0.401`). Arena itself ran no .NET and claims no compile/test success of its own. The spike remains synthetic feasibility code, not Product code |
 | Project or solution files | `WaterJetSentinelSuite.sln` (12 projects) — source-committed, **never built in the authoring environment** |
@@ -461,6 +461,25 @@ accepted and merged Stage 0.2.*
 | Validated topology | 108 LogicalPositions; 106 SensorConfigurations; 212 structural TC channel sides; Left 24 / Rear 29 / Right 24 / Front 29; I7 and I16 NON_SENSOR_GAP; `orderTotal` 0–107; derived `scanOrder` dense 1–106 over actual Sensors only; exactly 8 Water Jets; exactly 8 Isolation Valves; `WJn ↔ IVn` one-to-one; installed position separate from target coverage; legacy `cannon n → WJn` direct; acquisition bindings deferred; no Production device binding created; no command or actuation path added |
 | Status | **Checkpoint B COMPLETE — OWNER-LOCALLY VALIDATED** (SUBMITTED FOR OWNER REVIEW — PR #6 **OPEN, NOT MERGED**; only the Owner merges) |
 | Next | Owner-only final source review of PR #6. **Checkpoint C NOT AUTHORIZED and NOT STARTED** (proposed scope — atomic CANNON vocabulary migration, Runtime topology integration, Inspector overlays — is documented in [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md) §4 only). `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |
+
+### 11.9 Stage 0.3A-3 Checkpoint C — atomic Runtime topology migration and read-only Inspector integration
+
+| Item | Record |
+| --- | --- |
+| Gate | **Owner instruction 2026-10-08**: Checkpoint C AUTHORIZED FOR IMPLEMENTATION on the existing PR #6 branch (required head `0c3dcea`, verified; base `a74db62c` unmoved; `2db853a` and `0728df61` proven in ancestry). Merge, TEST_HARDWARE, PRODUCTION, ZIP, Release, Deployment, SSE, and every write/command path remain NOT AUTHORIZED |
+| Schema decision | **Option A — atomic update in this checkpoint, no deprecated alias**: `wjss.snapshot/2` / `wjss.delta/2` / `wjss.sensor-map/2`; structural break documented (slot kind vocabulary, `gapAnchorForWaterJetId`, per-Sensor assignment fields, Snapshot topology collections); no deployed `/1` consumer; ApiVersion `1` unchanged; impact stated here and in the CHANGELOG |
+| Terminology | `SlotType` enum deleted; `LogicalPositionKind {SENSOR, NON_SENSOR_GAP}` only; `NonSensorGapCount`/`NonSensorGapSlots` (I7→WJ3 at 5/7, I16→WJ1 at 5/16); refusal code `WALL_MAP_NON_SENSOR_GAPS`; API `RuntimeGapReference`; no canonical Cannon entity current-facing (the importer's legacy `"cannon"` source header and `MIGRATION_CANNON_RANGE` remain as legacy provenance; dated historical records keep their original wording) |
+| Runtime state | `RuntimeState` gains frozen `WaterJets` (8) + `IsolationValves` (8), process-lifetime immutable, validated (8+8 ordinal, WJn ↔ IVn both directions, per-Sensor target-coverage assignment via `WaterJetTopologyCatalog.TryRequireAssignment`, rear-lower ⇒ WJ1/IV1); refusals `TOPOLOGY_*`, `SENSOR_ASSIGNMENT`; no command state |
+| Snapshot/Delta | Snapshot carries `waterJets`/`isolationValves` (Snapshot-only); Deltas never emit topology (typed absence + tests + TS validator); application preserves it unchanged; three-state `activeJob`, revision/gap semantics, determinism unchanged; no `activeJobCleared` |
+| API | Routes unchanged and GET-only; status gains gap references (orderTotal order), 8+8 counts, `equipmentTopology` with `DEFERRED_NO_ACQUISITION_BINDING`; sensor views gain `assignedWaterJetId`/`assignedIsolationValveId`; health/readiness untouched |
+| Inspector | "Non-sensor gaps" tile; wall map: 106 sensor id cells + visually distinct `I7 · GAP`/`I16 · GAP` (no values, never WJ labels); per-wall installation overlay ("sprays the opposite wall"); equipment topology table (read-only, control not authorized, acquisition deferred); Sensor table Assigned WJ/IV columns; footer extended; no actuation affordance |
+| Synthetic | Seed/ticks/counts/determinism unchanged; topology static; never simulates valve/flow/nozzle/pump/axis/cleaning |
+| Slices | C1 `d378edf2` (atomic contracts/domain/runtime/TS/fixtures/tests) → C2 `27591ea1` (API projection tests) → C3 (Inspector + docs, this record) |
+| Arena verification | Boundary scan **0 findings (S1–S9 clean)** per slice; TS mirror **executed in Arena: npm ci + npm run check green (31/31)**; Inspector inline JS `node --check` OK + HTML balance OK; C# brace-balance over 36 changed files OK; `git diff --check` clean. **NOT COMPILED / NOT EXECUTED in Arena** (no .NET SDK) |
+| Expected lock drift | `adapters/simulator/packages.lock.json` + `tests/integration/packages.lock.json` gain the direct `wjss.domain` edge on the next Owner restore; no lock hand-edited; `tests/config.tests` lock (`0728df61`) untouched |
+| Owner-local gates | Restore; Release build; full test suite; `dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release` (fixture parity; `WJSS_UPDATE_FIXTURES=1` on diff); `npm ci && npm run check` in `packages/contracts/wjss-contracts-ts`; boundary scan; UI review |
+| Status | **Checkpoint C IMPLEMENTED — SUBMITTED FOR OWNER REVIEW** (PR #6 **OPEN, NOT MERGED**) |
+| Next | Owner-local validation and source review of PR #6. TEST_HARDWARE and PRODUCTION remain NOT AUTHORIZED |
 
 ### 11.1 Process deviation record
 
@@ -1205,6 +1224,19 @@ Owner-supplied evidence (Arena never executed .NET); recorded at the closeout co
 | Final Owner-local Working Tree | CLEAN |
 | Non-authoritative observation excluded | "139 total / 139 passed" at the implementation head (`dotnet test --no-build` over stale binaries after a failed test-project build) is explicitly NOT recorded as validation; its four behavioural failures and all compile/analyzer diagnostics were corrected on the chain `18f853a5` → `901a070` → `79fa0ba5` → `2db853a7` before the fresh authoritative run |
 | Scope | Documentation-only closeout commit on top of the Owner handoff: CHANGELOG, this file (§2 row, §11.8, §12.28), `STAGE_0.3A_PLAN.md` §5d, `ADR-0017` implementation-evidence section, and the new [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md). Product source, contracts, importer, validator, topology catalog, tests, fixtures, JSON examples, project files, and lock files untouched |
+
+### 12.29 Stage 0.3A-3 Checkpoint C — Arena validation record (source-only)
+
+Implementation record of the atomic Runtime topology migration (Owner authorization
+2026-10-08; PR head `0c3dcea` verified before authoring). Slices C1 `d378edf2` and
+C2 `27591ea1` plus the C3 Inspector/docs commit. **Arena verification:** boundary scan
+0 findings (S1–S9 clean) after every slice; TypeScript mirror executed in Arena
+(`npm ci` + `npm run check`: tsc clean, **31 total / 31 passed / 0 failed**) against the
+migrated fixtures and example; Inspector inline script `node --check` OK and HTML tag
+balance OK; per-file brace-depth balance over all 36 changed C# sources OK;
+`git diff --check` clean. **No .NET restore, build or test execution happened in Arena**;
+the fixture parity suite and the full xUnit suite are Owner-local gates. Full record:
+[`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md).
 
 ## Related documents
 

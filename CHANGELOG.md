@@ -171,6 +171,64 @@ The Owner's genuine lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (par
 adopted byte-for-byte. Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_B.md`](docs/STAGE_0.3A-3_CHECKPOINT_B.md).
 Checkpoint C remains NOT AUTHORIZED and NOT STARTED; PR #6 OPEN — NOT MERGED.
 
+### Stage 0.3A-3 Checkpoint C — implemented (Arena-authored; NOT compiled/executed in Arena)
+
+**Owner instruction 2026-10-08: Checkpoint C AUTHORIZED FOR IMPLEMENTATION on the existing
+PR #6 branch (required head `0c3dcea`, verified). Checkpoint C: implemented in three slices
+— C1 `d378edf` (atomic migration), C2 `27591ea` (API projection tests), C3 (this docs +
+Inspector commit). PR #6 remains OPEN — NOT MERGED.**
+
+- **Schema compatibility decision: Option A — atomic schema update, no deprecated alias.**
+  `wjss.snapshot/1` → `wjss.snapshot/2`, `wjss.delta/1` → `wjss.delta/2` (structural
+  break: the slot-kind vocabulary became the canonical NON_SENSOR_GAP, `equipmentId`
+  became `gapAnchorForWaterJetId`, Sensor records gained `assignedWaterJetId` /
+  `assignedIsolationValveId`, and the Snapshot gained the static `waterJets` /
+  `isolationValves` topology collections). The only consumers (development Inspector,
+  TypeScript mirror, fixtures/examples/tests) migrated in the same commits; no deployed
+  `/1` consumer exists. ApiVersion stays `1`.
+- `packages/contracts/`: `SlotType` enum DELETED (no canonical Cannon entity remains);
+  `WallMapSlot` → `PositionKind` + `GapAnchorForWaterJetId` (I7 → WJ3, I16 → WJ1);
+  `CanonicalSensorMap.NonSensorGapCount` / `NonSensorGapSlots`;
+  `SensorPresentationState` → `PositionKind` + assigned device fields;
+  `OperationalSnapshot` gains `WaterJets` / `IsolationValves` (Snapshot-only, never in a
+  Delta); `TcChannelRules` gap vocabulary; `SchemaIds` `/2`.
+- `packages/domain/WaterJetTopologyCatalog.cs` (+ `TryRequireAssignment`): the single
+  assignment rule — target coverage must match the Sensor wall/region and the Isolation
+  Valve must derive from the WJn ↔ IVn pairing (rear-lower Sensor ⇒ WJ1/IV1 even though
+  WJ1 installs front-lower).
+- Runtime: state carries the approved topology through every revision (frozen, immutable,
+  process-lifetime); invariants validate gaps, 8+8 ordinal topology, both-direction
+  pairing and per-Sensor assignment coverage (new refusal codes `WALL_MAP_NON_SENSOR_GAPS`,
+  `TOPOLOGY_WATER_JETS`, `TOPOLOGY_ISOLATION_VALVES`, `TOPOLOGY_PAIRING`,
+  `SENSOR_ASSIGNMENT`); Delta application preserves the topology and never emits it;
+  simulator assigns every Sensor from the catalog; stage marker
+  `STAGE_03A3C_RUNTIME_TOPOLOGY`.
+- Read-only status gains the gap references (orderTotal order), 8+8 counts and the full
+  equipment topology with `acquisition: DEFERRED_NO_ACQUISITION_BINDING`; sensor views
+  gain the assigned device fields. Routes unchanged; every mapping GET; no write/command/
+  dispatch/equipment-control route; no SSE; health/readiness untouched.
+- Development Inspector: "Non-sensor gaps" tile; NEW wall map with visually distinct
+  `I7 · GAP` / `I16 · GAP` cells (no Sensor value/quality/TC, never labelled WJ) and a
+  visually separate per-wall installation overlay ("sprays the opposite wall"); NEW
+  read-only equipment topology table; Sensor table gains Assigned WJ / Assigned IV
+  columns; safety footer extended. No actuation affordance exists.
+- Fixtures/examples hand-mirrored to the updated generators (`snapshot.seed0.json`,
+  `delta.basic.json`, `delta.gap.json`, `config/examples/sensor-map.example.json`);
+  Owner-local `dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release`
+  is the parity gate.
+- Tests migrated to the canonical vocabulary; NEW `RuntimeTopologyTests` (runtime) and
+  `RuntimeApiTopologyTests` (API); T20 rewritten as the migration-completeness proof.
+- Arena verification: boundary scan **0 findings (S1–S9 clean)**; TypeScript mirror
+  **executed in Arena: `npm ci` + `npm run check` green (tsc clean, 31/31)**; inline
+  Inspector JS `node --check` OK; HTML balance OK; brace-balance over 36 changed C#
+  files OK; `git diff --check` clean. **No .NET command ran in Arena** (no SDK):
+  restore/build/tests/parity are Owner-local gates. Expected lock drift:
+  `adapters/simulator/packages.lock.json` + `tests/integration/packages.lock.json` gain
+  the new direct `wjss.domain` edge on the next Owner restore (never hand-edited).
+  `spikes/**` untouched; no sensorparam CSV in Git; no Production value.
+
+Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_C.md`](docs/STAGE_0.3A-3_CHECKPOINT_C.md).
+
 ### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh
