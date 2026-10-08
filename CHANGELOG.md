@@ -31,11 +31,10 @@ evidence is authoritative for the checkpoint.**
 
 ## [Unreleased]
 
-### Stage 0.4A CP-3a / CP-3b — development checkpoint submitted for review (NOT compiled or executed in Arena; not merged)
+### Stage 0.4A CP-3a / CP-3b — completion correction (Owner-authorized; NOT compiled or executed in Arena; NOT VALIDATED until Owner-local gates pass; not merged)
 
-- CP-3a (kernel hardening): FU-1 latch with a RUNNING Job rejected as `JOB_RUNNING_UNDER_LATCH`; FU-2 `Apply` wording; FU-3 documentation only; FU-4 valve movement away from OPEN during CLEANING enters Safe Return in the same transition; AxisStandbySeq written at SR5 and readable through `PreviewAxisStandbyLedger`.
-- CP-3b (simulator library, no host wiring): eleven-scenario catalogue on a fixed epoch; bounded retention; GlobalQueue and Sensor queue-state projection; Delta content comparison and a pure candidate path.
-- Not delivered (`[OPEN]`): the wire projection of the Active Job, Sequence, Pump and Safe Return sections, pending Owner rulings on their presentation fields.
+- CP-3a (kernel): the public `PreviewAxisStandbyLedger` is removed. AxisStandbySeq is written at SR5 and is observable only through the release SR5 record. FU-1, FU-2 and FU-4 are unchanged. Thirteen facts and one two-row theory.
+- CP-3b (simulator library, no host wiring): the scenario catalogue is bound to the canonical Runtime Sensor set. Five-scope bounded retention: evidence log of 256, current-Job Safe Return tail of 16, last dispatch, last Job outcome, first critical. Pure projection of the GlobalQueue, Sensor queue state, Active Job, Safe Return, Sequence, critical event and last Job outcome. The Delta candidate path carries one appended trend point and refuses other trend changes. Planned tests: 236 cases in `tests/runtime.tests/Simulator/`.
 - Owner-local validation required (Release build with 0 warnings, full .NET suite, fixture parity, TypeScript, boundary scan). CP-3c and CP-4 NOT AUTHORIZED. Not merged.
 
 ### Stage 0.4A CP-2 — Owner-local validation and Final Source Review (documentation only, 2026-10-08)
