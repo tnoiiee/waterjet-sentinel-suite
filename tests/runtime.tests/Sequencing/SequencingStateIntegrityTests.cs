@@ -360,10 +360,8 @@ public sealed class SequencingStateIntegrityTests
         state = Step(states, Dispatch(state, 4, pumpReady: false));
         state = Step(states, Pump(state, 5, ready: true));
         state = Step(states, Pause(state, 6));
-        var job = state.ActiveJob ?? throw new InvalidOperationException("An Active Job was expected.");
-        state = Step(states, Release(state, 7, job.DispatchEvidenceSeq + 1));
-        state = Step(states, Critical(state, 8));
-        state = Step(states, Start(state, 9));
+        state = Step(states, Critical(state, 7));
+        state = Step(states, Start(state, 8));
         states.Add(Raw(Array.Empty<SequencingEntry>(), mode: AutoSequenceMode.PAUSED, critical: true, evidenceSeq: 0));
 
         foreach (var accepted in states)
@@ -498,7 +496,19 @@ public sealed class SequencingStateIntegrityTests
             true,
             Instant,
             revisionBefore,
-            revisionAfter);
+            revisionAfter,
+            Lifecycle: JobLifecycle.RUNNING,
+            Stage: CleaningStage.PREPARING,
+            VerifiedPhase: null,
+            CleaningActive: false,
+            WaterOutputOn: false,
+            LastValveFeedback: null,
+            PendingOutcome: null,
+            Trigger: null,
+            TriggerReason: null,
+            Step: null,
+            FailureCode: null,
+            Ledger: SafeReturnLedger.Empty);
 
     private static SequencingEntry Entry(int index) =>
         new(
@@ -536,17 +546,10 @@ public sealed class SequencingStateIntegrityTests
         SequencingKernel.Apply(state, new ObservePumpReadiness(At(second), ready));
 
     private static SequencingTransition Critical(SequencingState state, int second) =>
-        SequencingKernel.Apply(state, new RaiseCriticalSuspension(At(second)));
+        SequencingKernel.Apply(state, new ObservePumpState(At(second), PumpObservation.UNEXPECTED_STOP));
 
     private static SequencingTransition Pause(SequencingState state, int second) =>
         SequencingKernel.Apply(state, new RequestPause(At(second)));
-
-    private static SequencingTransition Release(SequencingState state, int second, int releaseSeq)
-    {
-        var job = state.ActiveJob ?? throw new InvalidOperationException("An Active Job was expected.");
-        var evidence = new SafeReturnReleaseEvidence(job.JobId, releaseSeq, OutcomeRecorded: true, SafeReturnComplete: true);
-        return SequencingKernel.Apply(state, new ReleaseActiveJob(At(second), evidence));
-    }
 
     private static SequencingState Step(List<SequencingState> states, SequencingTransition transition)
     {
