@@ -114,7 +114,7 @@ public static class RuntimeDeltaProjector
             Sequence = SameContent(candidate.Sequence, previous.Sequence) ? null : candidate.Sequence,
             Alarms = SameContent(candidate.Alarms, previous.Alarms) ? null : candidate.Alarms,
             Communication = SameContent(candidate.Communication, previous.Communication) ? null : candidate.Communication,
-            TrendPoint = null,
+            TrendPoint = AppendedTrendPoint(previous.Trend, candidate.Trend),
             ActiveJob = EncodeActiveJob(previous.ActiveJob, candidate.ActiveJob),
         };
     }
@@ -150,6 +150,47 @@ public static class RuntimeDeltaProjector
             Runtime = null,
             TrendPoint = delta.TrendPoint,
         };
+    }
+
+    /// <summary>
+    /// Carries exactly one appended candidate trend point. An unchanged window carries nothing. Any other change is
+    /// refused explicitly: a changed window identity, changed history, a removal, more than one appended point, or an
+    /// append beyond the window capacity (an eviction is a removal).
+    /// </summary>
+    private static TrendPoint? AppendedTrendPoint(TrendWindow previous, TrendWindow candidate)
+    {
+        if (previous.Capacity != candidate.Capacity || !SameContent(previous.SeriesNames, candidate.SeriesNames))
+        {
+            throw new InvalidOperationException("Refused to project a Delta: the trend window identity changed. Nothing was projected.");
+        }
+
+        var before = previous.Points.Count;
+        var after = candidate.Points.Count;
+        if (after == before)
+        {
+            if (SameContent(previous.Points, candidate.Points))
+            {
+                return null;
+            }
+
+            throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
+        }
+
+        if (after != before + 1 || after > candidate.Capacity)
+        {
+            throw new InvalidOperationException(
+                "Refused to project a Delta: the trend changed by a removal or by more than one appended point. Nothing was projected.");
+        }
+
+        for (var index = 0; index < before; index++)
+        {
+            if (!SameContent(previous.Points[index], candidate.Points[index]))
+            {
+                throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
+            }
+        }
+
+        return candidate.Points[before];
     }
 
     private static void RequireNextStep(RuntimeState previous, RuntimeState candidate)
