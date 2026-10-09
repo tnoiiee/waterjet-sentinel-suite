@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Wjss.Contracts;
 using Wjss.Runtime.Core.Sequencing;
 
@@ -155,7 +156,7 @@ public static class SimulatorScenarioCatalogue
 
     // Preserve strictly increasing ticks. The legacy dispatch bool never stands in for
     // a measured Pump outlet: inject a separate synthetic transmitter observation.
-    private static IReadOnlyList<SimulatorScenarioStep> Normalize(Plan plan, IReadOnlyList<SimulatorScenarioStep> steps)
+    private static ReadOnlyCollection<SimulatorScenarioStep> Normalize(Plan plan, IReadOnlyList<SimulatorScenarioStep> steps)
     {
         var normalized = new List<SimulatorScenarioStep>();
         var offset = 0;

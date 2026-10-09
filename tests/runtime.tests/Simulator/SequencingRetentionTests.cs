@@ -8,7 +8,7 @@ namespace Wjss.Runtime.Core.Tests;
 /// <summary>Frozen outcome and read-only equipment-fault retention for either feedback order.</summary>
 public sealed class SequencingRetentionTests
 {
-    private static IReadOnlyList<SimulatorScenarioStep> StandbyFirst(SimulatorScenarioId scenario)
+    private static List<SimulatorScenarioStep> StandbyFirst(SimulatorScenarioId scenario)
     {
         var steps = SimulatorRunHarness.ScenarioSet().Get(scenario).Steps.ToList();
         var closeIndex = steps.FindIndex(s => s.Event is ValveSupervisionObserved { LowerDetected: true } or

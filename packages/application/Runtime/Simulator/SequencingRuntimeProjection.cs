@@ -138,7 +138,7 @@ public static class SequencingRuntimeProjection
             ValvePressureInputValid = SequencingPressure.Valid(job.ValvePressure)
                 && job.ValvePressure?.SourceId == PressureSample.ValveOutletSource(job.ValveId),
             ValveOpenResolution = job.OpenResolution?.ToString(),
-            ValveDiagnosis = job.ValveDiagnosis?.ToString(),
+            ValveDiagnosis = job.ValveDiagnosis.ToString(),
             Dispatch = dispatch,
             SafeReturn = job.Lifecycle == JobLifecycle.RUNNING ? null : ProjectSafeReturn(job, retention),
         };
