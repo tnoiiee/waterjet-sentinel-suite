@@ -235,6 +235,270 @@ public sealed class SimulatorFastTrackTests
     }
 
     [Fact]
+    public async Task Two_Jobs_Complete_Sequentially_With_An_Automatic_Second_Dispatch()
+    {
+        var runtime = Create(SimulatorScenarioId.TWO_JOB_SEQUENTIAL_COMPLETION);
+        try
+        {
+            var scenario = SimulatorScenarioCatalogue.Create(runtime.State.Sensors, runtime.Options.PressureThresholds)
+                .Get(runtime.ScenarioId);
+            Assert.Single(scenario.Steps, step => step.Event is DispatchHead);
+            var firstSensor = runtime.State.Sensors[0];
+            var secondSensor = runtime.State.Sensors[1];
+            var firstCloseTick = scenario.Steps.First(
+                step => step.Event is ValveSupervisionObserved { LowerDetected: true }).Tick;
+            var firstReleaseRevision = 0;
+            var secondDispatchRevision = 0;
+            string? secondEntryId = null;
+            var dispatchCount = 0;
+            for (var ordinal = 0; ordinal <= scenario.Steps[^1].Tick + 2; ordinal++)
+            {
+                var before = runtime.Publication;
+                var priorDispatchId = before.Current.Queue.LastDispatch?.DispatchId;
+                Tick(runtime);
+                var after = runtime.Publication;
+                var snapshot = runtime.ProjectSnapshot(after);
+                Assert.Equal(before.Current.Revision + 1, after.Current.Revision);
+                Assert.Equal(before.Current.Revision, after.Deltas[0].PreviousRevision);
+                Assert.Equal(after.Current.Revision, after.Deltas[0].Revision);
+                Assert.Equal(ordinal + 1, runtime.AcceptedTicks);
+                Assert.InRange(after.Current.Sensors.Count(sensor => sensor.IsActiveJobTarget), 0, 1);
+                Assert.Equal(snapshot.ActiveJob?.TargetSensorId,
+                    after.Current.Sensors.SingleOrDefault(sensor => sensor.IsActiveJobTarget)?.SensorId);
+
+                var dispatch = snapshot.Queue.LastDispatch;
+                if (dispatch?.DispatchId != priorDispatchId)
+                {
+                    dispatchCount++;
+                    Assert.Equal($"SYN-JOB-{dispatchCount}", dispatch!.JobId);
+                    Assert.Equal(1, dispatch!.PositionBefore);
+                    Assert.Equal(before.Current.Queue.Entries[0].EntryId, dispatch.QueueEntryId);
+                    Assert.Equal(before.Current.Queue.Entries[0].SensorId, dispatch.SensorId);
+                    Assert.Equal(before.Current.Queue.Revision + 1, snapshot.Queue.Revision);
+                    if (dispatchCount == 2)
+                    {
+                        secondDispatchRevision = snapshot.Revision;
+                        Assert.True(firstReleaseRevision > 0);
+                        Assert.True(secondDispatchRevision > firstReleaseRevision);
+                        Assert.Equal(secondEntryId, dispatch.QueueEntryId);
+                        Assert.Equal("SYN-JOB-2", snapshot.ActiveJob?.JobId);
+                        Assert.Null(snapshot.ActiveJob?.SafeReturn);
+                    }
+                }
+
+                if (ordinal == 2)
+                {
+                    Assert.Collection(snapshot.Queue.Entries,
+                        head => Assert.Equal(firstSensor.SensorId, head.SensorId),
+                        next => { Assert.Equal(secondSensor.SensorId, next.SensorId); secondEntryId = next.EntryId; });
+                }
+                if (snapshot.ActiveJob is { JobId: "SYN-JOB-1" } first)
+                {
+                    Assert.Equal(secondEntryId, Assert.Single(snapshot.Queue.Entries).EntryId);
+                    Assert.Equal(firstSensor.SensorId, first.TargetSensorId);
+                    Assert.Equal(firstSensor.AssignedWaterJetId, first.JetId);
+                    Assert.Equal(firstSensor.AssignedIsolationValveId, first.ValveId);
+                    Assert.Equal("SYN-JOB-1", dispatch?.JobId);
+                    if (first.SafeReturn is not null)
+                    {
+                        Assert.Equal("CLOSE_COMMANDED", first.SafeReturn.Valve.Command);
+                        Assert.Equal("RETURN_COMMANDED", first.SafeReturn.Axis.Command);
+                    }
+                }
+                if (ordinal == firstCloseTick)
+                {
+                    Assert.Equal("SYN-JOB-1", snapshot.ActiveJob?.JobId);
+                    Assert.NotNull(snapshot.ActiveJob?.SafeReturn?.Valve.Resolution);
+                    Assert.Equal("ABSENT", snapshot.ActiveJob?.SafeReturn?.Axis.Standby);
+                    Assert.Equal(1, dispatchCount);
+                }
+                if (snapshot.ActiveJob is { JobId: "SYN-JOB-2" } second)
+                {
+                    Assert.Equal(secondSensor.SensorId, second.TargetSensorId);
+                    Assert.Equal(secondSensor.AssignedWaterJetId, second.JetId);
+                    Assert.Equal(secondSensor.AssignedIsolationValveId, second.ValveId);
+                    Assert.Empty(snapshot.Queue.Entries);
+                }
+                if (snapshot.Sequence.LastJobOutcome is { JobId: "SYN-JOB-1" }
+                    && firstReleaseRevision == 0)
+                {
+                    firstReleaseRevision = snapshot.Revision;
+                    Assert.Null(snapshot.ActiveJob);
+                    Assert.Equal(secondEntryId, Assert.Single(snapshot.Queue.Entries).EntryId);
+                    Assert.Equal(1, dispatchCount);
+                }
+            }
+            Assert.Equal(2, dispatchCount);
+            Assert.True(secondDispatchRevision > firstReleaseRevision);
+            Assert.Equal(firstReleaseRevision + 1, secondDispatchRevision);
+            var final = runtime.ProjectSnapshot(runtime.Publication);
+            Assert.Empty(final.Queue.Entries);
+            Assert.Null(final.ActiveJob);
+            Assert.Equal("SYN-JOB-2", final.Sequence.LastJobOutcome?.JobId);
+            Assert.Equal("COMPLETED", final.Sequence.LastJobOutcome?.Outcome);
+            Assert.Empty(Assert.IsAssignableFrom<IReadOnlyList<EquipmentFaultState>>(final.Sequence.EquipmentFaults));
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Theory]
+    [InlineData(SimulatorScenarioId.VALVE_CLOSE_LOW, "LOWER_LIMIT_SENSOR_FAULT")]
+    [InlineData(SimulatorScenarioId.VALVE_CLOSE_FAILURE, "VALVE_LEAK_SUSPECTED")]
+    [InlineData(SimulatorScenarioId.VALVE_CLOSE_HIGH, "VALVE_NOT_FULLY_CLOSED")]
+    [InlineData(SimulatorScenarioId.PUMP_TRIP, null)]
+    [InlineData(SimulatorScenarioId.PAUSE_AFTER_CURRENT_JOB, null)]
+    [InlineData(SimulatorScenarioId.AXIS_STANDBY_FAILURE, null)]
+    public async Task Blocking_Return_Or_Mode_Never_Auto_Dispatches_The_Queued_Head(
+        SimulatorScenarioId id, string? faultCode)
+    {
+        var runtime = Create(id);
+        try
+        {
+            var steps = SimulatorScenarioCatalogue.Create(runtime.State.Sensors, runtime.Options.PressureThresholds).Get(id).Steps;
+            for (var ordinal = 0; ordinal <= steps[^1].Tick + 3; ordinal++) Tick(runtime);
+            var snapshot = runtime.ProjectSnapshot(runtime.Publication);
+            Assert.Equal("SYN-JOB-1", snapshot.Queue.LastDispatch?.JobId);
+            Assert.Equal(runtime.State.Sensors[1].SensorId, Assert.Single(snapshot.Queue.Entries).SensorId);
+            if (faultCode is not null)
+                Assert.Contains(snapshot.Sequence.EquipmentFaults!, fault => fault.Diagnosis == faultCode && fault.NextDispatchBlocked);
+            if (id == SimulatorScenarioId.VALVE_CLOSE_LOW)
+                Assert.Equal("COMPLETE_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT", snapshot.Sequence.LastJobOutcome?.QualifiedCompletion);
+            if (id == SimulatorScenarioId.PUMP_TRIP)
+                Assert.NotNull(snapshot.Sequence.Critical);
+            if (id == SimulatorScenarioId.PAUSE_AFTER_CURRENT_JOB)
+                Assert.Equal(AutoSequenceMode.PAUSED, snapshot.Sequence.Mode);
+            if (id is SimulatorScenarioId.VALVE_CLOSE_FAILURE or SimulatorScenarioId.VALVE_CLOSE_HIGH or SimulatorScenarioId.AXIS_STANDBY_FAILURE)
+                Assert.Equal("SYN-JOB-1", snapshot.ActiveJob?.JobId);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    // Test-only replacement of one scheduled observation; the Runtime still processes
+    // it through ExecuteTick and the atomic publication writer.
+    private static void ReplaceScenarioObservation(SimulatorRuntime runtime,
+        Func<SequencingEvent, bool> match, Func<SequencingEvent, SequencingEvent> replace)
+    {
+        var field = typeof(SimulatorRuntime).GetField("_scenario", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var scenario = Assert.IsType<SimulatorScenario>(field.GetValue(runtime));
+        var steps = scenario.Steps.ToArray();
+        var index = Array.FindIndex(steps, step => match(step.Event));
+        Assert.True(index >= 0);
+        steps[index] = steps[index] with { Event = replace(steps[index].Event) };
+        field.SetValue(runtime, scenario with { Steps = Array.AsReadOnly(steps) });
+    }
+
+    [Theory]
+    [InlineData("UPPER_LIMIT_SENSOR_FAULT")]
+    [InlineData("COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS")]
+    [InlineData("VALVE_PRESSURE_INPUT_INVALID")]
+    public async Task Faulted_First_Job_Cannot_Auto_Dispatch_Second_Job(string faultCase)
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION);
+        try
+        {
+            if (faultCase is "UPPER_LIMIT_SENSOR_FAULT" or "COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS")
+                ReplaceScenarioObservation(runtime,
+                    e => e is ValveSupervisionObserved { UpperDetected: true },
+                    e => ((ValveSupervisionObserved)e) with { UpperDetected = false, TimedOut = true });
+            if (faultCase == "COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS")
+                ReplaceScenarioObservation(runtime,
+                    e => e is ValveSupervisionObserved { LowerDetected: true },
+                    e => ((ValveSupervisionObserved)e) with { LowerDetected = false, TimedOut = true });
+            if (faultCase == "VALVE_PRESSURE_INPUT_INVALID")
+                ReplaceScenarioObservation(runtime,
+                    e => e is ValveSupervisionObserved { LowerDetected: true },
+                    e => ((ValveSupervisionObserved)e) with
+                    { Pressure = ((ValveSupervisionObserved)e).Pressure! with { Quality = PressureQuality.BAD } });
+
+            var steps = SimulatorScenarioCatalogue.Create(runtime.State.Sensors, runtime.Options.PressureThresholds)
+                .Get(runtime.ScenarioId).Steps;
+            for (var ordinal = 0; ordinal <= steps[^1].Tick + 3; ordinal++) Tick(runtime);
+            var snapshot = runtime.ProjectSnapshot(runtime.Publication);
+            Assert.Equal("SYN-JOB-1", snapshot.Queue.LastDispatch?.JobId);
+            Assert.Equal(runtime.State.Sensors[1].SensorId, Assert.Single(snapshot.Queue.Entries).SensorId);
+            var faults = Assert.IsAssignableFrom<IReadOnlyList<EquipmentFaultState>>(snapshot.Sequence.EquipmentFaults);
+            Assert.NotEmpty(faults);
+            Assert.All(faults, fault => Assert.True(fault.NextDispatchBlocked));
+            if (faultCase == "COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS")
+            {
+                Assert.Equal(2, snapshot.Sequence.EquipmentFaults?.Count);
+                Assert.Equal(faultCase, snapshot.Sequence.LastJobOutcome?.QualifiedCompletion);
+            }
+            else
+                Assert.Contains(faults, fault => fault.Diagnosis == faultCase);
+            if (faultCase == "VALVE_PRESSURE_INPUT_INVALID")
+                Assert.Equal("SYN-JOB-1", snapshot.ActiveJob?.JobId);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task Axis_Standby_Before_Valve_Resolution_Still_Blocks_The_Next_Job()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION);
+        try
+        {
+            var field = typeof(SimulatorRuntime).GetField("_scenario", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var scenario = Assert.IsType<SimulatorScenario>(field.GetValue(runtime));
+            var steps = scenario.Steps.ToArray();
+            var valveIndex = Array.FindIndex(steps, step => step.Event is ValveSupervisionObserved { LowerDetected: true });
+            var axisIndex = Array.FindIndex(steps, step => step.Event is AxisFeedbackObserved { Feedback: AxisFeedbackState.AT_STANDBY });
+            Assert.True(valveIndex >= 0 && axisIndex > valveIndex);
+            var valve = (ValveSupervisionObserved)steps[valveIndex].Event;
+            var axis = (AxisFeedbackObserved)steps[axisIndex].Event;
+            steps[valveIndex] = steps[valveIndex] with { Event = axis with { At = SimulatorScenarioCatalogue.AtTick(steps[valveIndex].Tick) } };
+            steps[axisIndex] = steps[axisIndex] with { Event = valve with
+                { At = SimulatorScenarioCatalogue.AtTick(steps[axisIndex].Tick),
+                  Pressure = valve.Pressure! with { At = SimulatorScenarioCatalogue.AtTick(steps[axisIndex].Tick) } } };
+            field.SetValue(runtime, scenario with { Steps = Array.AsReadOnly(steps) });
+            for (var ordinal = 0; ordinal <= steps[valveIndex].Tick; ordinal++) Tick(runtime);
+            var pending = runtime.ProjectSnapshot(runtime.Publication);
+            Assert.Equal("SYN-JOB-1", pending.ActiveJob?.JobId);
+            Assert.Equal("STANDBY_CONFIRMED", pending.ActiveJob?.SafeReturn?.Axis.Standby);
+            Assert.Null(pending.ActiveJob?.SafeReturn?.Valve.Resolution);
+            Assert.Equal(runtime.State.Sensors[1].SensorId, Assert.Single(pending.Queue.Entries).SensorId);
+            Tick(runtime);
+            var released = runtime.ProjectSnapshot(runtime.Publication);
+            Assert.Null(released.ActiveJob);
+            Assert.Equal("SYN-JOB-1", released.Sequence.LastJobOutcome?.JobId);
+            Assert.Equal(runtime.State.Sensors[1].SensorId, Assert.Single(released.Queue.Entries).SensorId);
+            Tick(runtime);
+            Assert.Equal("SYN-JOB-2", runtime.ProjectSnapshot(runtime.Publication).ActiveJob?.JobId);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task Auto_Dispatch_Leaves_A_Structurally_Invalid_Head_In_Place()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION);
+        try
+        {
+            var steps = SimulatorScenarioCatalogue.Create(runtime.State.Sensors, runtime.Options.PressureThresholds)
+                .Get(runtime.ScenarioId).Steps;
+            for (var ordinal = 0; ordinal <= steps[^1].Tick; ordinal++) Tick(runtime);
+            var released = runtime.ProjectSnapshot(runtime.Publication);
+            Assert.Null(released.ActiveJob);
+            var head = Assert.Single(released.Queue.Entries);
+            var field = typeof(SimulatorRuntime).GetField("_scenarioTopology", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var topology = Assert.IsType<SequencingTopology>(field.GetValue(runtime));
+            field.SetValue(runtime, new SequencingTopology(
+                topology.SensorAssignments.Where(assignment => assignment.SensorId != head.SensorId).ToArray(),
+                topology.NonSensorPositionIds));
+            for (var extraTick = 0; extraTick < 3; extraTick++)
+            {
+                Tick(runtime);
+                var snapshot = runtime.ProjectSnapshot(runtime.Publication);
+                Assert.Null(snapshot.ActiveJob);
+                Assert.Equal(head.EntryId, Assert.Single(snapshot.Queue.Entries).EntryId);
+                Assert.Equal(released.Queue.Revision, snapshot.Queue.Revision);
+                Assert.Equal("SYN-JOB-1", snapshot.Queue.LastDispatch?.JobId);
+            }
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
     public void Inspector_And_Host_Keep_Get_Only_Read_Only_Targets()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
