@@ -156,7 +156,10 @@ public sealed class RuntimePublicationStore
         LastJobOutcome = sequence.LastJobOutcome is null ? null : sequence.LastJobOutcome with
         {
             Events = RuntimeCollections.Freeze(sequence.LastJobOutcome.Events),
+            QualifiedRemarks = sequence.LastJobOutcome.QualifiedRemarks is null ? null : RuntimeCollections.Freeze(sequence.LastJobOutcome.QualifiedRemarks),
+            EquipmentFaults = sequence.LastJobOutcome.EquipmentFaults is null ? null : RuntimeCollections.Freeze(sequence.LastJobOutcome.EquipmentFaults),
         },
+        EquipmentFaults = sequence.EquipmentFaults is null ? null : RuntimeCollections.Freeze(sequence.EquipmentFaults),
     };
 
     private static RuntimeState FreezeState(RuntimeState state)

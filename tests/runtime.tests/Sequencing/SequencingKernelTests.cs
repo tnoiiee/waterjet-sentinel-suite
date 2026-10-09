@@ -111,7 +111,7 @@ public sealed class SequencingKernelTests
         Assert.Equal(3, job.QueueRevisionBefore);
         Assert.Equal(4, job.QueueRevisionAfter);
         Assert.Equal(dispatched.Evidence.Seq, job.DispatchEvidenceSeq);
-        Assert.True(job.PumpReady);
+        Assert.False(job.PumpReady); // dispatch boolean is not a measured Pump outlet
         Assert.Equal("WJ1", job.JetId);
         Assert.Equal("IV1", job.ValveId);
 
@@ -228,7 +228,9 @@ public sealed class SequencingKernelTests
         Assert.Equal(SequencingCodes.PumpReadinessUnchanged, stillWaiting.Evidence.Code);
         Assert.Equal(AutoSequenceState.PUMP_NOT_READY, SequencingKernel.ProjectAutoSequenceState(stillWaiting.State));
 
-        var ready = Pump(stillWaiting.State, 5, ready: true);
+        var booleanOnly = Pump(stillWaiting.State, 5, ready: true);
+        Assert.Equal(SequencingOutcome.REFUSED, booleanOnly.Outcome);
+        var ready = SequencingKernel.Apply(booleanOnly.State, PumpSample(6));
         Assert.Equal(SequencingOutcome.APPLIED, ready.Outcome);
         Assert.Equal(AutoSequenceState.JOB_ACTIVE, SequencingKernel.ProjectAutoSequenceState(ready.State));
     }
@@ -398,6 +400,9 @@ public sealed class SequencingKernelTests
     private static SequencingTransition Pump(SequencingState state, int second, bool ready) =>
         SequencingKernel.Apply(state, new ObservePumpReadiness(At(second), ready));
 
+    private static PumpPressureObserved PumpSample(int second) =>
+        new(At(second), new PressureSample(16, PressureQuality.GOOD, false, At(second), PressureSample.PumpOutletSource), new());
+
     private static SequencingTransition Critical(SequencingState state, int second) =>
         SequencingKernel.Apply(state, new ObservePumpState(At(second), PumpObservation.UNEXPECTED_STOP));
 
@@ -412,11 +417,13 @@ public sealed class SequencingKernelTests
     {
         var events = new List<SequencingEvent>
         {
+            PumpSample(second),
             new ValveLimitObserved(At(second), "IV1", UpperLimit: false, LowerLimit: true),
             new AdvanceJobPreparation(At(second + 1)),
             new BeginCleaning(At(second + 2)),
             new ExecutionPhaseVerified(At(second + 3), JobPhase.P1),
-            new ValveLimitObserved(At(second + 4), "IV1", UpperLimit: true, LowerLimit: false),
+            new ValveSupervisionObserved(At(second + 4), "IV1", true, false, false,
+                new PressureSample(15, PressureQuality.GOOD, false, At(second + 4), PressureSample.ValveOutletSource("IV1")), new()),
         };
 
         var tick = second + 5;
@@ -428,7 +435,8 @@ public sealed class SequencingKernelTests
 
         events.Add(new RequestNormalCompletion(At(tick)));
         tick++;
-        events.Add(new ValveLimitObserved(At(tick), "IV1", UpperLimit: false, LowerLimit: true));
+        events.Add(new ValveSupervisionObserved(At(tick), "IV1", false, true, false,
+            new PressureSample(0.5, PressureQuality.GOOD, false, At(tick), PressureSample.ValveOutletSource("IV1")), new()));
         tick++;
         events.Add(new AxisFeedbackObserved(At(tick), AxisFeedbackState.AT_STANDBY));
 
@@ -462,7 +470,8 @@ public sealed class SequencingKernelTests
         state = Step(log, Admit(state, "SYN-G01", 5));
         state = Step(log, Dispatch(state, 6, pumpReady: false));
         state = Step(log, Pump(state, 7, ready: false));
-        state = Step(log, Pump(state, 8, ready: true));
+        state = Step(log, Pump(state, 8, ready: true)); // refused: boolean cannot replace a sample
+        state = Step(log, SequencingKernel.Apply(state, PumpSample(8)));
         state = Step(log, Dispatch(state, 9));
         state = Step(log, Pause(state, 10));
         state = Step(log, Dispatch(state, 11));

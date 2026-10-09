@@ -17,8 +17,8 @@ namespace Wjss.Runtime.Core.Simulator;
 /// </para>
 ///
 /// <para>
-/// Not projected here: the Pump section (carried unchanged from the previous revision), the Sequence controls
-/// (carried unchanged, still disabled), and every Alarm or Communication field (carried unchanged).
+/// The Pump section receives only its own measured Pump outlet sample; Valve pressure never substitutes for it.
+/// Sequence controls remain disabled; Alarm and Communication fields are carried unchanged.
 /// </para>
 /// </summary>
 public static class SequencingRuntimeProjection
@@ -126,6 +126,19 @@ public static class SequencingRuntimeProjection
             PhaseProgress = progress,
             Lifecycle = job.Lifecycle,
             CleaningPhase = CleaningPhaseInProgress,
+            PumpOutletPressureBar = FiniteBar(job.PumpPressure),
+            PumpPressureQuality = job.PumpPressure?.Quality.ToString(),
+            PumpPressureSourceId = job.PumpPressure?.SourceId,
+            PumpPressureInputValid = SequencingPressure.Valid(job.PumpPressure)
+                && job.PumpPressure?.SourceId == PressureSample.PumpOutletSource,
+            PumpReadySetpointBar = job.PressureThresholds.PumpReadySetpointBar,
+            ValveOutletPressureBar = FiniteBar(job.ValvePressure),
+            ValvePressureQuality = job.ValvePressure?.Quality.ToString(),
+            ValvePressureSourceId = job.ValvePressure?.SourceId,
+            ValvePressureInputValid = SequencingPressure.Valid(job.ValvePressure)
+                && job.ValvePressure?.SourceId == PressureSample.ValveOutletSource(job.ValveId),
+            ValveOpenResolution = job.OpenResolution?.ToString(),
+            ValveDiagnosis = job.ValveDiagnosis?.ToString(),
             Dispatch = dispatch,
             SafeReturn = job.Lifecycle == JobLifecycle.RUNNING ? null : ProjectSafeReturn(job, retention),
         };
@@ -149,6 +162,7 @@ public static class SequencingRuntimeProjection
             Controls = controls,
             Critical = ProjectCritical(state, retention),
             LastJobOutcome = retention.LastJobOutcome,
+            EquipmentFaults = state.EquipmentFaults,
         };
     }
 
@@ -180,11 +194,17 @@ public static class SequencingRuntimeProjection
             ActiveJob = ProjectActiveJob(state, retention),
             Queue = ProjectQueue(state, retention),
             Sequence = ProjectSequence(state, retention, previous.Sequence.Controls),
+            Pump = state.ActiveJob is { PumpPressure: { } measured } active
+                ? previous.Pump with { Pressure = FiniteBar(measured), Ready = active.PumpReady }
+                : previous.Pump,
         };
 
         RuntimeStateInvariants.RequireValid(candidate);
         return candidate;
     }
+
+    private static double? FiniteBar(PressureSample? sample) =>
+        sample?.Bar is { } bar && double.IsFinite(bar) && bar >= 0 ? bar : null;
 
     private static (JobPhase Phase, int Index, double Progress, string Label) PresentationOf(SequencingActiveJob job) => job.Stage switch
     {
@@ -227,13 +247,20 @@ public static class SequencingRuntimeProjection
                 ValveId = job.ValveId,
                 Command = SequenceOf(tail, SafeReturnStep.SR2) is null ? "NOT_COMMANDED" : "CLOSE_COMMANDED",
                 CommandSeq = SequenceOf(tail, SafeReturnStep.SR2),
-                Feedback = retention.CurrentValveFeedback?.ValveFeedback switch
-                {
-                    null => UnobservedValveFeedback,
-                    ValveFeedbackState.CLOSED => "CLOSED_CONFIRMED",
-                    _ => "NOT_CONFIRMED",
-                },
-                FeedbackSeq = retention.CurrentValveFeedback?.Seq,
+                UpperLimitDetected = job.UpperLimitDetected,
+                LowerLimitDetected = job.LowerLimitDetected,
+                PressureBar = FiniteBar(job.ValvePressure),
+                PressureQuality = job.ValvePressure?.Quality.ToString(),
+                LowPressureThresholdBar = job.PressureThresholds.LowPressureThresholdBar,
+                HighPressureThresholdBar = job.PressureThresholds.HighPressureThresholdBar,
+                PressureInputValid = SequencingPressure.Valid(job.ValvePressure)
+                    && job.ValvePressure?.SourceId == PressureSample.ValveOutletSource(job.ValveId),
+                Resolution = job.CloseResolution?.ToString(),
+                Diagnosis = job.CloseResolution is null ? null : job.ValveDiagnosis.ToString(),
+                Feedback = job.CloseResolution == ValveCloseResolution.LOWER_LIMIT_CONFIRMED
+                    ? "CLOSED_CONFIRMED" : job.CloseResolution is not null ? "NOT_CONFIRMED" : UnobservedValveFeedback,
+                FeedbackSeq = job.CloseResolution == ValveCloseResolution.LOWER_LIMIT_CONFIRMED
+                    ? SequenceOf(tail, SafeReturnStep.SR3) : null,
             },
             Axis = new SafeReturnAxisLeg
             {

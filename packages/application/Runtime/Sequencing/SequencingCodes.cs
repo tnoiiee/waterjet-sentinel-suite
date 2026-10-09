@@ -46,6 +46,7 @@ public static class SequencingCodes
     public const string RemovedByEligibility = "REMOVED_BY_ELIGIBILITY";
     public const string DispatchRefusedQueueEmpty = "DISPATCH_REFUSED_QUEUE_EMPTY";
     public const string DispatchRefusedJobActive = "DISPATCH_REFUSED_JOB_ACTIVE";
+    public const string DispatchRefusedEquipmentFault = "DISPATCH_REFUSED_EQUIPMENT_FAULT";
     public const string DispatchRefusedPauseRequested = "DISPATCH_REFUSED_PAUSE_REQUESTED";
     public const string DispatchRefusedNotRunning = "DISPATCH_REFUSED_NOT_RUNNING";
 
@@ -120,6 +121,11 @@ public static class SequencingCodes
     public const string IntentWaterOutputOn = "WATER_OUTPUT_ON";
     public const string IntentWaterOutputOff = "WATER_OUTPUT_OFF";
     public const string IntentValveClose = "VALVE_CLOSE";
+    public const string IntentValveOpen = "VALVE_OPEN";
+    public const string KindPumpPressureObserved = "PUMP_PRESSURE_OBSERVED";
+    public const string KindValveSupervisionObserved = "VALVE_SUPERVISION_OBSERVED";
+    public const string PumpPressureInputInvalid = "PUMP_PRESSURE_INPUT_INVALID";
+    public const string ValvePressureInputInvalid = "VALVE_PRESSURE_INPUT_INVALID";
     public const string IntentAxisToStandby = "AXIS_TO_STANDBY";
 
     // Job release and dispatch-time state.

@@ -23,11 +23,12 @@ namespace Wjss.Runtime.Core.Sequencing;
 /// Mandatory Safe Return (CP-2): every terminal intent (normal completion, abort,
 /// execution failure, Pump UNEXPECTED_STOP or TRIP) enters SR1 to SR2 in one
 /// transition. SR1 turns cleaning and synthetic water off, and SR2 requests the
-/// paired valve close. SR3 needs a valve observation CLOSED that arrives after
-/// SR2. Only then is the axis return requested (SR4). SR5 needs AT_STANDBY. SR6
-/// records the pending outcome and SR7 releases the Job, both in the same
-/// transition as SR5. No outcome is recorded before SR5. Release is never an
-/// external input.
+/// paired valve CLOSE (SR2), then commands Axis return (SR4) without waiting
+/// for Valve resolution. SR3 records the independent Valve-close assessment;
+/// SR5 records independent Axis Standby. Either may arrive first. SR6 records
+/// the pending outcome and SR7 releases the Job as soon as both exist and the
+/// close resolution is safe. Pressure inference is never a Lower confirmation.
+/// Release is never an external input.
 /// </para>
 ///
 /// <para>
@@ -79,6 +80,8 @@ public static class SequencingKernel
             DispatchHead e => Dispatch(state, e),
             ObservePumpReadiness e => ObservePumpReadinessGate(state, e),
             ObservePumpState e => ObservePump(state, e),
+            PumpPressureObserved e => ObservePumpPressure(state, e),
+            ValveSupervisionObserved e => SuperviseValve(state, e),
             RequestPause e => ApplyPause(state, e),
             AdvanceJobPreparation e => AdvancePreparation(state, e),
             BeginCleaning e => BeginCleaningStep(state, e),
@@ -261,6 +264,11 @@ public static class SequencingKernel
             return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.CriticalSuspended, null, null);
         }
 
+        if (state.EquipmentFaults.Any(fault => fault.NextDispatchBlocked))
+        {
+            return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.DispatchRefusedEquipmentFault, null, null);
+        }
+
         if (state.Mode == AutoSequenceMode.PAUSE_REQUESTED)
         {
             return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.DispatchRefusedPauseRequested, null, null);
@@ -318,7 +326,7 @@ public static class SequencingKernel
             ValveId: assignment.ValveId,
             SourceEntryId: head.EntryId,
             DispatchEvidenceSeq: evidenceSeq,
-            PumpReady: e.PumpReady,
+            PumpReady: false, // legacy boolean is not a measured Pump outlet sample
             StartedAt: e.At,
             QueueRevisionBefore: state.QueueRevision,
             QueueRevisionAfter: dispatchRevision,
@@ -363,7 +371,7 @@ public static class SequencingKernel
             return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.SafeReturnInProgress, job, job.Lifecycle, job.Lifecycle));
         }
 
-        if (job.CleaningActive && !e.Ready)
+        if (job.Stage == CleaningStage.CLEANING && !e.Ready)
         {
             return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PumpStopRequiresClassification, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING));
         }
@@ -373,6 +381,10 @@ public static class SequencingKernel
             return Single(state, state, SequencingOutcome.NO_OP, JobRecord(kind, e.At, SequencingOutcome.NO_OP, SequencingCodes.PumpReadinessUnchanged, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING));
         }
 
+        if (e.Ready && !SequencingPressure.PumpReady(job.PumpPressure, job.PressureThresholds))
+            return Single(state, state, SequencingOutcome.REFUSED,
+                JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PumpPressureInputInvalid,
+                    job, JobLifecycle.RUNNING, JobLifecycle.RUNNING));
         var next = state with { ActiveJob = job with { PumpReady = e.Ready } };
         return Single(state, next, SequencingOutcome.APPLIED, JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.PumpReadinessChanged, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING));
     }
@@ -401,7 +413,7 @@ public static class SequencingKernel
         {
             // An expected stop is non-critical. It is refused while cleaning, because no
             // expected-stop cleaning path is modelled in CP-2 (O-3).
-            if (job.CleaningActive)
+            if (job.Stage == CleaningStage.CLEANING)
             {
                 return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PumpExpectedStopNotModelled, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING) with { Pump = observation });
             }
@@ -421,6 +433,10 @@ public static class SequencingKernel
             return Single(state, state, SequencingOutcome.NO_OP, JobRecord(kind, e.At, SequencingOutcome.NO_OP, SequencingCodes.PumpReadinessUnchanged, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING) with { Pump = observation });
         }
 
+        if (!SequencingPressure.PumpReady(job.PumpPressure, job.PressureThresholds))
+            return Single(state, state, SequencingOutcome.REFUSED,
+                JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PumpPressureInputInvalid,
+                    job, JobLifecycle.RUNNING, JobLifecycle.RUNNING) with { Pump = observation });
         var ready = state with { ActiveJob = job with { PumpReady = true } };
         return Single(state, ready, SequencingOutcome.APPLIED, JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.PumpReadinessChanged, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING) with { Pump = observation });
     }
@@ -545,7 +561,8 @@ public static class SequencingKernel
             return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PreparationNotComplete, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING));
         }
 
-        if (!job.PumpReady)
+        if (!job.PumpReady || !job.PumpPressureVerified ||
+            !SequencingPressure.PumpReady(job.PumpPressure, job.PressureThresholds))
         {
             return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PumpNotReady, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING));
         }
@@ -555,8 +572,8 @@ public static class SequencingKernel
             return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.ValveNotClosed, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING, valve: job.LastValveFeedback));
         }
 
-        var cleaning = job with { Stage = CleaningStage.CLEANING, CleaningActive = true, WaterOutputOn = true };
-        var started = JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.CleaningStarted, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING) with { Intent = SequencingCodes.IntentWaterOutputOn };
+        var cleaning = job with { Stage = CleaningStage.CLEANING, CleaningActive = false, WaterOutputOn = false };
+        var started = JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.CleaningStarted, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING);
         return Single(state, state with { ActiveJob = cleaning }, SequencingOutcome.APPLIED, started);
     }
 
@@ -585,12 +602,16 @@ public static class SequencingKernel
             return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PhaseOutOfOrder, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING, phase: e.Phase));
         }
 
-        if (e.Phase == JobPhase.P1 && job.LastValveFeedback != ValveFeedbackState.CLOSED)
+        if (e.Phase == JobPhase.P1)
         {
-            return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.ValveNotClosed, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING, phase: e.Phase, valve: job.LastValveFeedback));
+            if (!job.PumpPressureVerified || !job.PumpReady || !SequencingPressure.PumpReady(job.PumpPressure, job.PressureThresholds) || job.ValveOpenCommanded)
+                return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.PumpNotReady, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING));
+            return Single(state, state with { ActiveJob = job with { ValveOpenCommanded = true } }, SequencingOutcome.APPLIED,
+                JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.IntentValveOpen, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING,
+                    intent: SequencingCodes.IntentValveOpen));
         }
 
-        if (e.Phase == JobPhase.P2 && job.LastValveFeedback != ValveFeedbackState.OPEN)
+        if (e.Phase == JobPhase.P2 && job.OpenResolution is not (ValveOpenResolution.OPEN_CONFIRMED or ValveOpenResolution.OPEN_BY_PRESSURE))
         {
             return Single(state, state, SequencingOutcome.REFUSED, JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.ValveNotOpen, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING, phase: e.Phase, valve: job.LastValveFeedback));
         }
@@ -692,7 +713,7 @@ public static class SequencingKernel
         return job.Lifecycle switch
         {
             JobLifecycle.RUNNING => ObserveValveWhileRunning(state, job, e, observed),
-            JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED => ObserveValveWhileAwaitingClose(state, job, e, observed),
+            JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED or JobLifecycle.SAFE_RETURN_VERIFY_STANDBY => ObserveValveWhileAwaitingClose(state, job, e, observed),
             _ => Single(state, state, SequencingOutcome.NO_OP, JobRecord(kind, e.At, SequencingOutcome.NO_OP, SequencingCodes.ValveFeedbackNoEffect, job, job.Lifecycle, job.Lifecycle, valve: observed)),
         };
     }
@@ -731,40 +752,120 @@ public static class SequencingKernel
         return Single(state, updated, outcome, JobRecord(kind, e.At, outcome, code, job, JobLifecycle.RUNNING, JobLifecycle.RUNNING, valve: observed));
     }
 
-    private static SequencingTransition ObserveValveWhileAwaitingClose(SequencingState state, SequencingActiveJob job, ValveLimitObserved e, ValveFeedbackState observed)
+    private static SequencingTransition ObserveValveWhileAwaitingClose(SequencingState state, SequencingActiveJob job, ValveLimitObserved e, ValveFeedbackState observed) =>
+        Single(state, state, SequencingOutcome.REFUSED,
+            JobRecord(SequencingCodes.KindValveLimitObserved, e.At, SequencingOutcome.REFUSED,
+                SequencingCodes.ValvePressureInputInvalid, job, job.Lifecycle, job.Lifecycle, valve: observed));
+
+    private static SequencingTransition ObservePumpPressure(SequencingState state, PumpPressureObserved e)
     {
-        const string kind = SequencingCodes.KindValveLimitObserved;
-        const JobLifecycle waiting = JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED;
-        var trail = new EvidenceTrail(state.EvidenceSeq);
-
-        // Only this observation (made after SR2) can confirm SR3. An earlier reading is never reused.
-        if (observed == ValveFeedbackState.CLOSED)
-        {
-            trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.ValveFeedbackObserved, job, waiting, waiting, valve: observed));
-            var closed = trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR3), job, waiting, JobLifecycle.SAFE_RETURN_TO_STANDBY, step: SafeReturnStep.SR3, valve: observed));
-            // SR4 is requested only after SR3 is confirmed, in the same transition.
-            var request = trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR4), job, JobLifecycle.SAFE_RETURN_TO_STANDBY, JobLifecycle.SAFE_RETURN_VERIFY_STANDBY, step: SafeReturnStep.SR4, intent: SequencingCodes.IntentAxisToStandby));
-            var advanced = job with
-            {
-                Lifecycle = JobLifecycle.SAFE_RETURN_VERIFY_STANDBY,
-                Step = SafeReturnStep.SR4,
-                LastValveFeedback = ValveFeedbackState.CLOSED,
-                Ledger = job.Ledger with { ValveClosedSeq = closed, AxisReturnRequestSeq = request },
-            };
-            return trail.Finish(state with { ActiveJob = advanced }, SequencingOutcome.APPLIED);
-        }
-
-        if (observed == ValveFeedbackState.INVALID_LIMIT_STATE)
-        {
-            trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.ValveFeedbackObserved, job, waiting, waiting, valve: observed));
-            var failed = FailSafeReturn(trail, job with { LastValveFeedback = observed }, kind, e.At, SequencingCodes.ValveInvalidLimitState, observed, null);
-            return trail.Finish(state with { ActiveJob = failed }, SequencingOutcome.APPLIED);
-        }
-
-        // OPEN or TRANSIT_OR_FAULT: the close is not confirmed. The wait continues until a timeout input (O-6).
-        trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.ValveNotConfirmed, job, waiting, waiting, valve: observed));
-        return trail.Finish(state with { ActiveJob = job with { LastValveFeedback = observed } }, SequencingOutcome.APPLIED);
+        if (state.ActiveJob is not { Lifecycle: JobLifecycle.RUNNING } job)
+            return Commit(state, state, SequencingOutcome.REFUSED, SequencingCodes.KindPumpPressureObserved, e.At, SequencingCodes.NoActiveJob, null, null);
+        if (job.Stage == CleaningStage.CLEANING)
+            return Single(state, state, SequencingOutcome.REFUSED,
+                JobRecord(SequencingCodes.KindPumpPressureObserved, e.At, SequencingOutcome.REFUSED,
+                    SequencingCodes.PumpStopRequiresClassification, job, job.Lifecycle, job.Lifecycle));
+        // Reject other transmitters before retaining a Pump measurement. An IVn
+        // outlet is never copied into the Pump outlet, even as a bad sample.
+        var sample = e.Pressure is { SourceId: PressureSample.PumpOutletSource } measured
+            ? measured.At > e.At ? measured with { Stale = true } : measured : null;
+        var ready = e.Thresholds.Valid && SequencingPressure.PumpReady(sample, e.Thresholds);
+        return Single(state, state with { ActiveJob = job with { PumpReady = ready, PumpPressureVerified = ready, PumpPressure = sample,
+            PressureThresholds = e.Thresholds } }, SequencingOutcome.APPLIED,
+            JobRecord(SequencingCodes.KindPumpPressureObserved, e.At, SequencingOutcome.APPLIED,
+                ready ? SequencingCodes.KindPumpPressureObserved : SequencingCodes.PumpPressureInputInvalid,
+                job, job.Lifecycle, job.Lifecycle));
     }
+
+    private static SequencingTransition SuperviseValve(SequencingState state, ValveSupervisionObserved e)
+    {
+        const string kind = SequencingCodes.KindValveSupervisionObserved;
+        if (state.ActiveJob is not { } job || !string.Equals(job.ValveId, e.ValveId, StringComparison.Ordinal) || !e.Thresholds.Valid)
+            return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.ValveIdMismatch, null, null);
+        var trail = new EvidenceTrail(state.EvidenceSeq);
+        if (job.Lifecycle == JobLifecycle.RUNNING && job.ValveOpenCommanded && job.VerifiedPhase is null)
+        {
+            var sample = e.Pressure is { } measured
+                && measured.SourceId == PressureSample.ValveOutletSource(job.ValveId) && measured.At <= e.At
+                ? measured : null;
+            var result = SequencingPressure.Open(sample, e.UpperDetected, e.TimedOut, e.Thresholds);
+            if (result.Open is null)
+                return Single(state, state with { ActiveJob = job with { ValvePressure = sample, UpperLimitDetected = e.UpperDetected } },
+                    SequencingOutcome.APPLIED, JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.ValveNotConfirmed,
+                        job, job.Lifecycle, job.Lifecycle));
+            trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, result.Diagnosis.ToString(), job, job.Lifecycle, job.Lifecycle));
+            var observed = job with
+            {
+                ValvePressure = sample, UpperLimitDetected = e.UpperDetected,
+                OpenResolution = result.Open, ValveDiagnosis = result.Diagnosis, UpperLimitFault = result.Diagnosis == ValveDiagnosis.UPPER_LIMIT_SENSOR_FAULT,
+                PressureThresholds = e.Thresholds,
+                LastValveFeedback = e.UpperDetected ? ValveFeedbackState.OPEN : job.LastValveFeedback,
+            };
+            if (result.Open == ValveOpenResolution.BLOCKED)
+            {
+                var failed = StartSafeReturn(trail, observed, kind, e.At, SequencingCodes.TriggerExecutionFailure,
+                    CleaningJobOutcome.FAILED, result.Diagnosis.ToString(), JobLifecycle.RUNNING);
+                return trail.Finish(state with { ActiveJob = failed }, SequencingOutcome.APPLIED);
+            }
+            var faults = result.Diagnosis == ValveDiagnosis.UPPER_LIMIT_SENSOR_FAULT
+                ? AddFault(state, EquipmentFault(observed, result.Diagnosis, e.At)) : state.EquipmentFaults;
+            trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.PhaseVerified, observed,
+                JobLifecycle.RUNNING, JobLifecycle.RUNNING, phase: JobPhase.P1,
+                intent: SequencingCodes.IntentWaterOutputOn));
+            return trail.Finish(state with { ActiveJob = observed with
+                { VerifiedPhase = JobPhase.P1, CleaningActive = true, WaterOutputOn = true }, EquipmentFaults = faults }, SequencingOutcome.APPLIED);
+        }
+        if (job.Lifecycle == JobLifecycle.SAFE_RETURN_VERIFY_STANDBY)
+        {
+            if (job.CloseResolution is not null)
+                return Single(state, state, SequencingOutcome.NO_OP,
+                    JobRecord(kind, e.At, SequencingOutcome.NO_OP, SequencingCodes.ValveFeedbackNoEffect, job, job.Lifecycle, job.Lifecycle));
+            var sample = e.Pressure is { } measured
+                && measured.SourceId == PressureSample.ValveOutletSource(job.ValveId) && measured.At <= e.At
+                ? measured : null;
+            var result = SequencingPressure.Close(sample, e.LowerDetected, e.TimedOut, e.Thresholds);
+            if (result.Close is null)
+                return Single(state, state, SequencingOutcome.NO_OP,
+                    JobRecord(kind, e.At, SequencingOutcome.NO_OP, SequencingCodes.ValveNotConfirmed, job, job.Lifecycle, job.Lifecycle));
+            var closed = result.Close is ValveCloseResolution.LOWER_LIMIT_CONFIRMED or ValveCloseResolution.CLOSED_BY_PRESSURE;
+            // SR3 records the Valve close RESOLUTION, not necessarily a Lower-limit confirmation.
+            // Only LOWER_LIMIT_CONFIRMED carries actual confirmation evidence.
+            var resolutionSeq = trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, result.Close.Value.ToString(), job,
+                job.Lifecycle, job.Lifecycle, step: SafeReturnStep.SR3,
+                valve: result.Close == ValveCloseResolution.LOWER_LIMIT_CONFIRMED ? ValveFeedbackState.CLOSED : null)
+                with { CloseResolution = result.Close, Diagnosis = result.Diagnosis });
+            int? confirmed = result.Close == ValveCloseResolution.LOWER_LIMIT_CONFIRMED ? resolutionSeq : null;
+            var updated = job with
+            {
+                ValvePressure = sample, UpperLimitDetected = e.UpperDetected, LowerLimitDetected = e.LowerDetected,
+                CloseResolution = result.Close, ValveDiagnosis = result.Diagnosis, PressureThresholds = e.Thresholds,
+                Step = SafeReturnStep.SR3,
+                LastValveFeedback = confirmed is not null ? ValveFeedbackState.CLOSED : job.LastValveFeedback,
+                Ledger = job.Ledger with { ValveClosedSeq = confirmed },
+            };
+            var faults = result.Diagnosis != ValveDiagnosis.NONE
+                ? AddFault(state, EquipmentFault(job with { ValvePressure = sample, UpperLimitDetected = e.UpperDetected,
+                    LowerLimitDetected = e.LowerDetected }, result.Diagnosis, e.At)) : state.EquipmentFaults;
+            if (closed && updated.AxisStandbyConfirmed)
+                return ReleaseAfterBoth(state with { EquipmentFaults = faults }, updated, e.At, kind, trail);
+            return trail.Finish(state with { ActiveJob = updated, EquipmentFaults = faults }, SequencingOutcome.APPLIED);
+        }
+        return Single(state, state, SequencingOutcome.REFUSED,
+            JobRecord(kind, e.At, SequencingOutcome.REFUSED, SequencingCodes.ValveFeedbackNoEffect, job, job.Lifecycle, job.Lifecycle));
+    }
+
+    private static IReadOnlyList<EquipmentFaultState> AddFault(SequencingState state, EquipmentFaultState fault) =>
+        state.EquipmentFaults.Any(existing => existing.Diagnosis == fault.Diagnosis && existing.ValveId == fault.ValveId)
+            ? state.EquipmentFaults : Array.AsReadOnly(state.EquipmentFaults.Append(fault).ToArray());
+
+    private static EquipmentFaultState EquipmentFault(SequencingActiveJob job, ValveDiagnosis diagnosis, DateTimeOffset at) => new()
+    {
+        Diagnosis = diagnosis.ToString(), ValveId = job.ValveId, RaisedAt = Wjss.Time.UtcTimestamps.Format(at),
+        ModalOpen = true, NextDispatchBlocked = true,
+        PressureBar = job.ValvePressure?.Bar is { } bar && double.IsFinite(bar) && bar >= 0 ? bar : null,
+        PressureQuality = job.ValvePressure?.Quality.ToString(),
+        UpperLimitDetected = job.UpperLimitDetected, LowerLimitDetected = job.LowerLimitDetected,
+    };
 
     private static SequencingTransition ObserveAxis(SequencingState state, AxisFeedbackObserved e)
     {
@@ -775,8 +876,8 @@ public static class SequencingKernel
             return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.NoActiveJob, null, null);
         }
 
-        // Axis feedback has an effect only while awaiting Standby. Anywhere else it is recorded only.
-        // This is what prevents any axis confirmation from releasing a Job that has not been through SR3.
+        // Axis and Valve supervision are independent after the ordered commands.
+        // An early Standby is retained until the Valve result is known.
         if (job.Lifecycle != JobLifecycle.SAFE_RETURN_VERIFY_STANDBY)
         {
             return Single(state, state, SequencingOutcome.NO_OP, JobRecord(kind, e.At, SequencingOutcome.NO_OP, SequencingCodes.AxisFeedbackNoEffect, job, job.Lifecycle, job.Lifecycle, axis: e.Feedback));
@@ -800,39 +901,35 @@ public static class SequencingKernel
     }
 
     /// <summary>
-    /// SR5 (Standby confirmed), SR6 (pending outcome recorded) and SR7 (Job
-    /// released) in one transition. The outcome is recorded only here, after
-    /// SR3 and SR5. Release is the kernel's own step and needs no external input.
+    /// SR5 records Standby independently. SR6/SR7 join both branches when the
+    /// second releasable result arrives; SR3 is close resolution, never an SR4 gate.
     /// </summary>
     private static SequencingTransition ConfirmStandbyAndRelease(SequencingState state, SequencingActiveJob job, AxisFeedbackObserved e)
     {
-        const string kind = SequencingCodes.KindAxisFeedbackObserved;
-        const JobLifecycle awaiting = JobLifecycle.SAFE_RETURN_VERIFY_STANDBY;
+        if (job.AxisStandbyConfirmed)
+            return Single(state, state, SequencingOutcome.NO_OP,
+                JobRecord(SequencingCodes.KindAxisFeedbackObserved, e.At, SequencingOutcome.NO_OP,
+                    SequencingCodes.StandbyNotConfirmed, job, job.Lifecycle, job.Lifecycle));
         var trail = new EvidenceTrail(state.EvidenceSeq);
-
-        var standby = WriteAxisStandby(trail, job, e);
-        trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR6), standby, awaiting, awaiting, step: SafeReturnStep.SR6, jobOutcome: standby.PendingOutcome));
-        trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, SequencingCodes.JobReleased, job, awaiting, null, step: SafeReturnStep.SR7));
-
-        var released = state with
-        {
-            ActiveJob = null,
-            Mode = state.Mode == AutoSequenceMode.PAUSE_REQUESTED ? AutoSequenceMode.PAUSED : state.Mode,
-        };
-        return trail.Finish(released, SequencingOutcome.APPLIED);
+        var standbySeq = trail.Add(JobRecord(SequencingCodes.KindAxisFeedbackObserved, e.At, SequencingOutcome.APPLIED,
+            StepCode(SafeReturnStep.SR5), job, job.Lifecycle, job.Lifecycle, step: SafeReturnStep.SR5, axis: AxisFeedbackState.AT_STANDBY));
+        var updated = job with { AxisStandbyConfirmed = true, Step = SafeReturnStep.SR5,
+            Ledger = job.Ledger with { AxisStandbySeq = standbySeq } };
+        return updated.CloseResolution is ValveCloseResolution.LOWER_LIMIT_CONFIRMED or ValveCloseResolution.CLOSED_BY_PRESSURE
+            ? ReleaseAfterBoth(state, updated, e.At, SequencingCodes.KindAxisFeedbackObserved, trail)
+            : trail.Finish(state with { ActiveJob = updated }, SequencingOutcome.APPLIED);
     }
 
-    /// <summary>
-    /// Records SR5 (Standby confirmed) and returns the Job with AxisStandbySeq set to that record's evidence
-    /// sequence. The release path is the only caller. The released Job is not retained, so the value is observed
-    /// through the SR5 evidence record of the release transition.
-    /// </summary>
-    private static SequencingActiveJob WriteAxisStandby(EvidenceTrail trail, SequencingActiveJob job, AxisFeedbackObserved e)
+    private static SequencingTransition ReleaseAfterBoth(SequencingState state, SequencingActiveJob job, DateTimeOffset at,
+        string kind, EvidenceTrail trail)
     {
-        const string kind = SequencingCodes.KindAxisFeedbackObserved;
-        const JobLifecycle awaiting = JobLifecycle.SAFE_RETURN_VERIFY_STANDBY;
-        var standbySeq = trail.Add(JobRecord(kind, e.At, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR5), job, awaiting, awaiting, step: SafeReturnStep.SR5, axis: AxisFeedbackState.AT_STANDBY));
-        return job with { Ledger = job.Ledger with { AxisStandbySeq = standbySeq } };
+        trail.Add(JobRecord(kind, at, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR6), job,
+            job.Lifecycle, job.Lifecycle, step: SafeReturnStep.SR6, jobOutcome: job.PendingOutcome)
+            with { CloseResolution = job.CloseResolution, Diagnosis = job.ValveDiagnosis });
+        trail.Add(JobRecord(kind, at, SequencingOutcome.APPLIED, SequencingCodes.JobReleased, job,
+            job.Lifecycle, null, step: SafeReturnStep.SR7));
+        return trail.Finish(state with { ActiveJob = null,
+            Mode = state.Mode == AutoSequenceMode.PAUSE_REQUESTED ? AutoSequenceMode.PAUSED : state.Mode }, SequencingOutcome.APPLIED);
     }
 
     private static SequencingTransition ExpireFeedback(SequencingState state, FeedbackTimeoutExpired e)
@@ -845,13 +942,15 @@ public static class SequencingKernel
         }
 
         var trail = new EvidenceTrail(state.EvidenceSeq);
-        if (e.Target == FeedbackTarget.VALVE_CLOSED && job.Lifecycle == JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED)
+        if (e.Target == FeedbackTarget.VALVE_CLOSED && job.Lifecycle == JobLifecycle.SAFE_RETURN_VERIFY_STANDBY
+            && job.CloseResolution is null)
         {
             var failedValve = FailSafeReturn(trail, job, kind, e.At, SequencingCodes.ValveCloseNotConfirmed, null, null);
             return trail.Finish(state with { ActiveJob = failedValve }, SequencingOutcome.APPLIED);
         }
 
-        if (e.Target == FeedbackTarget.AXIS_STANDBY && job.Lifecycle == JobLifecycle.SAFE_RETURN_VERIFY_STANDBY)
+        if (e.Target == FeedbackTarget.AXIS_STANDBY && job.Lifecycle == JobLifecycle.SAFE_RETURN_VERIFY_STANDBY
+            && !job.AxisStandbyConfirmed)
         {
             var failedAxis = FailSafeReturn(trail, job, kind, e.At, SequencingCodes.AxisStandbyNotConfirmedFailure, null, null);
             return trail.Finish(state with { ActiveJob = failedAxis }, SequencingOutcome.APPLIED);
@@ -861,9 +960,8 @@ public static class SequencingKernel
     }
 
     /// <summary>
-    /// Records SR1 (cleaning and synthetic water off) and SR2 (paired valve close
-    /// requested) as two ordered evidence records, with no delay. Returns the Job
-    /// now waiting for the valve close.
+    /// Records SR1 (water off), SR2 (paired valve CLOSE) and SR4 (Axis return)
+    /// in command order, without waiting for valve confirmation.
     /// </summary>
     private static SequencingActiveJob StartSafeReturn(
         EvidenceTrail trail,
@@ -878,16 +976,24 @@ public static class SequencingKernel
         var water = trail.Add(JobRecord(kind, at, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR1), job, lifecycleBefore, JobLifecycle.SAFE_RETURN_CLOSE_VALVE, step: SafeReturnStep.SR1, intent: SequencingCodes.IntentWaterOutputOff));
         var close = trail.Add(JobRecord(kind, at, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR2), job, JobLifecycle.SAFE_RETURN_CLOSE_VALVE, JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED, step: SafeReturnStep.SR2, intent: SequencingCodes.IntentValveClose));
 
+        var axis = trail.Add(JobRecord(kind, at, SequencingOutcome.APPLIED, StepCode(SafeReturnStep.SR4), job,
+            JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED, JobLifecycle.SAFE_RETURN_VERIFY_STANDBY,
+            step: SafeReturnStep.SR4, intent: SequencingCodes.IntentAxisToStandby));
         return job with
         {
-            Lifecycle = JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED,
+            Lifecycle = JobLifecycle.SAFE_RETURN_VERIFY_STANDBY,
             CleaningActive = false,
             WaterOutputOn = false,
             PendingOutcome = pendingOutcome,
             Trigger = trigger,
             TriggerReason = triggerReason,
-            Step = SafeReturnStep.SR2,
-            Ledger = new SafeReturnLedger(water, close, null, null, null, null),
+            Step = SafeReturnStep.SR4,
+            // P1's opening sample is not a CLOSE reading. Wait for a fresh IVn outlet sample.
+            ValvePressure = null,
+            UpperLimitDetected = null,
+            LowerLimitDetected = null,
+            CloseResolution = null,
+            Ledger = new SafeReturnLedger(water, close, null, axis, null, null),
         };
     }
 
@@ -947,6 +1053,8 @@ public static class SequencingKernel
         DispatchHead e => (SequencingCodes.KindDispatchHead, e.At),
         ObservePumpReadiness e => (SequencingCodes.KindObservePumpReadiness, e.At),
         ObservePumpState e => (SequencingCodes.KindObservePumpState, e.At),
+        PumpPressureObserved e => (SequencingCodes.KindPumpPressureObserved, e.At),
+        ValveSupervisionObserved e => (SequencingCodes.KindValveSupervisionObserved, e.At),
         RequestPause e => (SequencingCodes.KindRequestPause, e.At),
         AdvanceJobPreparation e => (SequencingCodes.KindAdvanceJobPreparation, e.At),
         BeginCleaning e => (SequencingCodes.KindBeginCleaning, e.At),

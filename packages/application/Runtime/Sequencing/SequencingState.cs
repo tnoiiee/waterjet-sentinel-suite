@@ -43,7 +43,21 @@ public sealed record SequencingActiveJob(
     string? TriggerReason,
     SafeReturnStep? Step,
     string? FailureCode,
-    SafeReturnLedger Ledger);
+    SafeReturnLedger Ledger)
+{
+    public bool ValveOpenCommanded { get; init; }
+    public ValveOpenResolution? OpenResolution { get; init; }
+    public ValveCloseResolution? CloseResolution { get; init; }
+    public ValveDiagnosis ValveDiagnosis { get; init; } = ValveDiagnosis.NONE;
+    public PressureSample? ValvePressure { get; init; }
+    public bool? UpperLimitDetected { get; init; }
+    public bool? LowerLimitDetected { get; init; }
+    public bool AxisStandbyConfirmed { get; init; }
+    public bool UpperLimitFault { get; init; }
+    public PressureSample? PumpPressure { get; init; }
+    public bool PumpPressureVerified { get; init; }
+    public SequencingPressureThresholds PressureThresholds { get; init; } = new();
+}
 
 /// <summary>
 /// Immutable sequencing state with a single writer: the kernel. Every transition
@@ -111,6 +125,9 @@ public sealed record SequencingState
 
     /// <summary>The critical suspension latch. While true, the queue and queue revision are frozen.</summary>
     public bool CriticalSuspended { get; internal init; }
+
+    /// <summary>Latched read-only equipment fault. No clear/reset input is present.</summary>
+    public IReadOnlyList<EquipmentFaultState> EquipmentFaults { get; internal init; } = Array.Empty<EquipmentFaultState>();
 
     /// <summary>The evidence sequence of the most recent evidence record (0 before any transition).</summary>
     public int EvidenceSeq { get; internal init; }

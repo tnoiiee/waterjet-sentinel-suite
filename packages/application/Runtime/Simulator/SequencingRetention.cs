@@ -134,9 +134,8 @@ public sealed record SequencingRetention
                 phaseStartedAt = evidence.At;
             }
 
-            // Only an actual Valve observation is retained. AdvanceJobPreparation carries ValveFeedback as prerequisite
-            // context, and the Safe Return step SR3 (or SR_FAILED) of the same observation repeats the observed value.
-            // Neither may replace the observation identity, so a step record is excluded.
+            // Preparation limits are retained separately from SR3 close resolution.
+            // SR3 may represent a pressure inference without any Lower-limit observation.
             if (evidence.Outcome == SequencingOutcome.APPLIED
                 && evidence.EventKind == SequencingCodes.KindValveLimitObserved
                 && evidence.ValveFeedback is not null
@@ -220,7 +219,28 @@ public sealed record SequencingRetention
         Outcome = (job.PendingOutcome ?? throw new InvalidOperationException("A released Job has no pending outcome.")).ToString(),
         ValveId = job.ValveId,
         ValveCloseCommandSeq = RequireSeq(tail, SafeReturnStep.SR2),
-        ValveClosedConfirmedSeq = RequireSeq(tail, SafeReturnStep.SR3),
+        ValveClosedConfirmedSeq = tail.LastOrDefault(e => e.Step == SafeReturnStep.SR3
+            && e.CloseResolution == ValveCloseResolution.LOWER_LIMIT_CONFIRMED)?.Seq,
+        ValveCloseResolution = tail.LastOrDefault(e => e.CloseResolution is not null)?.CloseResolution?.ToString(),
+        ValveDiagnosis = tail.LastOrDefault(e => e.CloseResolution is not null)?.Diagnosis?.ToString(),
+        QualifiedCompletion = job.PendingOutcome == CleaningJobOutcome.COMPLETED
+            && releasedState.EquipmentFaults.Any(f => f.Diagnosis == ValveDiagnosis.UPPER_LIMIT_SENSOR_FAULT.ToString())
+            && releasedState.EquipmentFaults.Any(f => f.Diagnosis == ValveDiagnosis.LOWER_LIMIT_SENSOR_FAULT.ToString())
+            ? "COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS"
+            : job.PendingOutcome == CleaningJobOutcome.COMPLETED
+                && releasedState.EquipmentFaults.Any(f => f.Diagnosis == ValveDiagnosis.LOWER_LIMIT_SENSOR_FAULT.ToString())
+                ? "COMPLETE_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT"
+                : job.PendingOutcome == CleaningJobOutcome.COMPLETED
+                    && releasedState.EquipmentFaults.Any(f => f.Diagnosis == ValveDiagnosis.UPPER_LIMIT_SENSOR_FAULT.ToString())
+                    ? "COMPLETE_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT" : null,
+        QualifiedRemarks = job.PendingOutcome == CleaningJobOutcome.COMPLETED
+            ? releasedState.EquipmentFaults.Select(f => f.Diagnosis switch
+        {
+            "UPPER_LIMIT_SENSOR_FAULT" => "COMPLETED_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT",
+            "LOWER_LIMIT_SENSOR_FAULT" => "COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT",
+            _ => f.Diagnosis,
+        }).ToArray() : Array.Empty<string>(),
+        EquipmentFaults = releasedState.EquipmentFaults,
         AxisReturnCommandSeq = RequireSeq(tail, SafeReturnStep.SR4),
         StandbyConfirmedSeq = RequireSeq(tail, SafeReturnStep.SR5),
         OutcomeSeq = RequireSeq(tail, SafeReturnStep.SR6),
