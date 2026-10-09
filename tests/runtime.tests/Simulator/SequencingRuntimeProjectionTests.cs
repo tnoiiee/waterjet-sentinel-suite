@@ -304,13 +304,13 @@ public sealed class SequencingRuntimeProjectionTests
         Assert.Equal(UtcTimestamps.Format(SimulatorRunHarness.At(7)), sr.StartedAt);
         Assert.Equal(SafeReturnStep.SR2, sr.Step);
         Assert.Equal(job.ValveId, sr.Valve.ValveId);
-        Assert.Equal("SR2", sr.Valve.Command);
+        Assert.Equal("CLOSE_COMMANDED", sr.Valve.Command);
         Assert.Equal(SimulatorRunHarness.RecordWithCode(run.TransitionAt(7), "SR2").Seq, sr.Valve.CommandSeq);
-        Assert.Equal("CLOSED", sr.Valve.Feedback);
+        Assert.Equal("CLOSED_CONFIRMED", sr.Valve.Feedback);
         Assert.Equal(closedSeq, sr.Valve.FeedbackSeq);
-        Assert.Equal("SR4", sr.Axis.Command);
+        Assert.Equal("NOT_COMMANDED", sr.Axis.Command);
         Assert.Null(sr.Axis.CommandSeq);
-        Assert.Equal("UNKNOWN", sr.Axis.Standby);
+        Assert.Equal("ABSENT", sr.Axis.Standby);
         Assert.Null(sr.Axis.StandbySeq);
         Assert.Null(sr.Failure);
         Assert.Equal(
@@ -322,7 +322,7 @@ public sealed class SequencingRuntimeProjectionTests
         var valveObserved = SimulatorRunHarness.RecordWithCode(run.TransitionAt(8), SequencingCodes.ValveFeedbackObserved);
 
         Assert.Equal(SafeReturnStep.SR4, later.Step);
-        Assert.Equal("CLOSED", later.Valve.Feedback);
+        Assert.Equal("CLOSED_CONFIRMED", later.Valve.Feedback);
         Assert.Equal(valveObserved.Seq, later.Valve.FeedbackSeq);
         Assert.Equal(SimulatorRunHarness.RecordWithCode(run.TransitionAt(8), "SR4").Seq, later.Axis.CommandSeq);
         Assert.Equal(
@@ -366,7 +366,7 @@ public sealed class SequencingRuntimeProjectionTests
         Assert.Equal(SequencingCodes.AxisFault, failure.Reason);
         Assert.Equal(JobLifecycle.SAFE_RETURN_VERIFY_STANDBY, failure.AtLifecycle);
         Assert.Equal(run.TransitionAt(9).Evidence.Seq, failure.Seq);
-        Assert.Equal("FAULT", sr.Axis.Standby);
+        Assert.Equal("NOT_CONFIRMED", sr.Axis.Standby);
         Assert.Null(sr.Axis.StandbySeq);
     }
 
