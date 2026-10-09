@@ -95,16 +95,20 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
   - Hardware inversion remains UNVERIFIED. TEST_HARDWARE activation remains blocked.
 - **Outputs.** Output rows are classified `NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE`. No output
   tag can be bound, and there is no write provider.
-- **Provider.** SIMULATOR only (the constant in code; the spec's "SIMULATION" is the same provider; name not yet reconciled). The package performs no I/O and holds no credentials. It has no
-  Modbus, TCP or device code. Draft state does not feed Runtime or RuntimePublication.
+- **Provider.** Canonical provider identity is `SIMULATOR` (Owner decision, 2026-10-10). The provider
+  constant, the provider policy and the UI provider chip all use it. The display label "Simulation"
+  ("SIMULATION ONLY") is human-readable only. It is not a provider identity and is not serialized. The
+  package performs no I/O and holds no credentials. It has no Modbus, TCP or device code. Draft state does
+  not feed Runtime or RuntimePublication.
 - **Revisions.** Deterministic. Independent of timestamps, object key order, array order of bindings,
   and UI state. Verified by tests.
 - **Impact preview.** Classification precedence: BINDING_INVALID > BLOCKED > ADDRESS_CHANGED > MOVED >
   ADDRESS_UNRESOLVED > UNCHANGED.
 - **Workbook import.** Reports sheet, rows, counts (USED/SPARE), slots, models, channels, duplicates,
   blank or malformed values, ambiguous inputs, placeholder rows and model-profile gaps. It never repairs
-  silently. Placeholder rows stay USED, are never bound, and raise `SIGNAL_IDENTITY_UNRESOLVED` and
-  `OWNER_INPUT_PENDING`. Output placeholders are classified as outputs first, so their output
+  silently. Placeholder rows (DI-037, DO-031, AI-020 to AI-035) stay USED / RESERVED with
+  SignalIdentity = UNRESOLVED, TagBinding = UNBOUND and OwnerInputStatus = OWNER_INPUT_PENDING. They are
+  not FREE, are never auto-bound, and raise `SIGNAL_IDENTITY_UNRESOLVED` and `OWNER_INPUT_PENDING`. Output placeholders are classified as outputs first, so their output
   classification takes precedence over the reserved-row count.
 - **UI.** Header, rack layout (Draft drag-and-drop, plus Alt+Arrow keyboard reorder), Undo, Redo, Reset,
   tag mapping (read-only), validation, impact preview and revisions. Controls are limited to Undo, Redo
@@ -152,16 +156,28 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
    > Upper inputs must remain bound only to IVn. Hardware inversion remains UNVERIFIED. TEST_HARDWARE
    > activation remains blocked.
 
+5. **Provider identity (resolved 2026-10-10).** `SIMULATOR` stays canonical in serialization, validation,
+   Draft bindings and provider identity. It is not renamed to SIMULATION in Stage 0.4B-1. "Simulation" is a
+   display label only.
+6. **Boundary S6 and preview (resolved 2026-10-10).** The server binds to 127.0.0.1 only. No 0.0.0.0, no
+   `::`, and no preview bypass is added. Platform preview unavailability is accepted. Owner-local browser
+   review is authoritative.
+7. **Placeholder rows (resolved 2026-10-10).** DI-037, DO-031 and AI-020 to AI-035 stay USED / RESERVED,
+   SignalIdentity UNRESOLVED, TagBinding UNBOUND, OwnerInputStatus OWNER_INPUT_PENDING. They are not
+   re-requested unless new Owner identity data is supplied.
+
 ## Known limitations
 
 - No verified process-image rule. Every address is unresolved by design until the 750-362 process-image
   rule and each module's process-data profile are verified from primary evidence or a WAGO-IO-CHECK export.
 - Analog status-byte setting is not verified.
 - Engineering ranges are UNCONFIGURED except the pump range (0–40 bar, Owner domain information).
-- The browser UI has not been run in a real browser.
-- The local preview is not published. The repository boundary rule S6 forbids any-interface bind
-  instructions in the Product tree, so the server binds to loopback only. A preview that needs an
-  all-interface bind conflicts with that rule and needs the Owner's decision.
+- The browser UI has not been run in a real browser by the agent. Owner-local browser review is
+  authoritative (Owner decision 6).
+- The platform live preview is unavailable for this checkpoint by decision (S6). The server binds to
+  127.0.0.1 only. The `MAPPING_UI_HOST` environment variable can change the bind host. The default is
+  127.0.0.1 and no test or documented launch path sets it. Whether that variable should be removed is an
+  open review point for the Owner.
 - Hardware RawInputInversion is UNVERIFIED. Limit detection is therefore a logical mapping only.
   TEST_HARDWARE activation remains blocked.
 
