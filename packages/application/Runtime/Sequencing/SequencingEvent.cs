@@ -85,6 +85,13 @@ public sealed record ValveLimitObserved(
     bool UpperLimit,
     bool LowerLimit) : SequencingEvent;
 
+/// <summary>Separate quality-checked synthetic Pump pressure input.</summary>
+public sealed record PumpPressureObserved(DateTimeOffset At, PressureSample? Pressure, SequencingPressureThresholds Thresholds) : SequencingEvent;
+
+/// <summary>Quality-checked Valve observation; TimedOut identifies absence of a limit after the test timeout input.</summary>
+public sealed record ValveSupervisionObserved(DateTimeOffset At, string ValveId, bool UpperDetected, bool LowerDetected,
+    bool TimedOut, PressureSample? Pressure, SequencingPressureThresholds Thresholds) : SequencingEvent;
+
 /// <summary>Observes abstract Axis Standby feedback.</summary>
 public sealed record AxisFeedbackObserved(DateTimeOffset At, AxisFeedbackState Feedback) : SequencingEvent;
 

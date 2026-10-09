@@ -69,7 +69,7 @@ internal static class SimulatorRunHarness
 
     /// <summary>
     /// The standard lead-in used by the custom schedules: start, admit the primary and the second Sensor, dispatch the
-    /// primary with a ready pump, observe its valve CLOSED, prepare it at tick 5, and begin cleaning at tick 6.
+    /// primary, sample the measured Pump outlet, observe its valve CLOSED and prepare it at tick 6.
     /// </summary>
     internal static List<SimulatorScenarioStep> LeadIn(SimulatorScenarioSet set) =>
         new()
@@ -78,9 +78,9 @@ internal static class SimulatorRunHarness
             AdmitSensor(set, 1, 0),
             AdmitSensor(set, 2, 1),
             Dispatch(set, 3),
-            ValveClosed(set, 4),
-            Step(5, new AdvanceJobPreparation(At(5))),
-            Step(6, new BeginCleaning(At(6))),
+            Step(4, new PumpPressureObserved(At(4), new PressureSample(16, PressureQuality.GOOD, false, At(4), PressureSample.PumpOutletSource), new())),
+            ValveClosed(set, 5),
+            Step(6, new AdvanceJobPreparation(At(6))),
         };
 
     /// <summary>

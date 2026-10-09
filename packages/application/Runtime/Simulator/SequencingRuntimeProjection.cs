@@ -12,13 +12,13 @@ namespace Wjss.Runtime.Core.Simulator;
 /// <para>
 /// Presentation convention (synthetic, not physical progress): <c>PhaseProgress</c> is the 0..1 unit of the existing
 /// contract field, so verified phase Pn is presented as n/6. Before the first verified phase, the Job is presented as
-/// the next phase, P1, with <c>PhaseIndex</c> 0 and <c>PhaseProgress</c> 0. The P1 pending labels for PREPARING and
+/// the next phase, P1, with <c>PhaseIndex</c> 0 and <c>PhaseProgress</c> 0. The pre-P1 P1 values are Contract fallbacks, not verified facts. The P1 pending labels for PREPARING and
 /// READY_TO_CLEAN come from the brief. The label for CLEANING before any verified phase is an [OPEN] convention.
 /// </para>
 ///
 /// <para>
-/// Not projected here: the Pump section (carried unchanged from the previous revision), the Sequence controls
-/// (carried unchanged, still disabled), and every Alarm or Communication field (carried unchanged).
+/// The Pump section receives only its own measured Pump outlet sample; Valve pressure never substitutes for it.
+/// Sequence controls remain disabled; Alarm and Communication fields are carried unchanged.
 /// </para>
 /// </summary>
 public static class SequencingRuntimeProjection
@@ -33,7 +33,7 @@ public static class SequencingRuntimeProjection
     public const string CleaningPhaseInProgress = "IN_PROGRESS";
 
     /// <summary>The fallback feedback identity for a valve that has not been observed. No valve enum identity exists for it ([OPEN]).</summary>
-    public const string UnobservedValveFeedback = "UNKNOWN";
+    public const string UnobservedValveFeedback = "ABSENT";
 
     /// <summary>
     /// Projects the GlobalQueue summary. Entries are in FIFO order with position 1 at the head. DirtyScore is never set.
@@ -126,6 +126,19 @@ public static class SequencingRuntimeProjection
             PhaseProgress = progress,
             Lifecycle = job.Lifecycle,
             CleaningPhase = CleaningPhaseInProgress,
+            PumpOutletPressureBar = FiniteBar(job.PumpPressure),
+            PumpPressureQuality = job.PumpPressure?.Quality.ToString(),
+            PumpPressureSourceId = job.PumpPressure?.SourceId,
+            PumpPressureInputValid = SequencingPressure.Valid(job.PumpPressure)
+                && job.PumpPressure?.SourceId == PressureSample.PumpOutletSource,
+            PumpReadySetpointBar = job.PressureThresholds.PumpReadySetpointBar,
+            ValveOutletPressureBar = FiniteBar(job.ValvePressure),
+            ValvePressureQuality = job.ValvePressure?.Quality.ToString(),
+            ValvePressureSourceId = job.ValvePressure?.SourceId,
+            ValvePressureInputValid = SequencingPressure.Valid(job.ValvePressure)
+                && job.ValvePressure?.SourceId == PressureSample.ValveOutletSource(job.ValveId),
+            ValveOpenResolution = job.OpenResolution?.ToString(),
+            ValveDiagnosis = job.ValveDiagnosis.ToString(),
             Dispatch = dispatch,
             SafeReturn = job.Lifecycle == JobLifecycle.RUNNING ? null : ProjectSafeReturn(job, retention),
         };
@@ -149,6 +162,7 @@ public static class SequencingRuntimeProjection
             Controls = controls,
             Critical = ProjectCritical(state, retention),
             LastJobOutcome = retention.LastJobOutcome,
+            EquipmentFaults = state.EquipmentFaults,
         };
     }
 
@@ -180,11 +194,17 @@ public static class SequencingRuntimeProjection
             ActiveJob = ProjectActiveJob(state, retention),
             Queue = ProjectQueue(state, retention),
             Sequence = ProjectSequence(state, retention, previous.Sequence.Controls),
+            Pump = state.ActiveJob is { PumpPressure: { } measured } active
+                ? previous.Pump with { Pressure = FiniteBar(measured), Ready = active.PumpReady }
+                : previous.Pump,
         };
 
         RuntimeStateInvariants.RequireValid(candidate);
         return candidate;
     }
+
+    private static double? FiniteBar(PressureSample? sample) =>
+        sample?.Bar is { } bar && double.IsFinite(bar) && bar >= 0 ? bar : null;
 
     private static (JobPhase Phase, int Index, double Progress, string Label) PresentationOf(SequencingActiveJob job) => job.Stage switch
     {
@@ -225,16 +245,33 @@ public static class SequencingRuntimeProjection
             Valve = new SafeReturnValveLeg
             {
                 ValveId = job.ValveId,
-                Command = SafeReturnStep.SR2.ToString(),
+                Command = SequenceOf(tail, SafeReturnStep.SR2) is null ? "NOT_COMMANDED" : "CLOSE_COMMANDED",
                 CommandSeq = SequenceOf(tail, SafeReturnStep.SR2),
-                Feedback = job.LastValveFeedback?.ToString() ?? UnobservedValveFeedback,
-                FeedbackSeq = retention.CurrentValveFeedback?.Seq,
+                UpperLimitDetected = job.UpperLimitDetected,
+                LowerLimitDetected = job.LowerLimitDetected,
+                PressureBar = FiniteBar(job.ValvePressure),
+                PressureQuality = job.ValvePressure?.Quality.ToString(),
+                LowPressureThresholdBar = job.PressureThresholds.LowPressureThresholdBar,
+                HighPressureThresholdBar = job.PressureThresholds.HighPressureThresholdBar,
+                PressureInputValid = SequencingPressure.Valid(job.ValvePressure)
+                    && job.ValvePressure?.SourceId == PressureSample.ValveOutletSource(job.ValveId),
+                Resolution = job.CloseResolution?.ToString(),
+                Diagnosis = job.CloseResolution is null ? null : job.ValveDiagnosis.ToString(),
+                Feedback = job.CloseResolution == ValveCloseResolution.LOWER_LIMIT_CONFIRMED
+                    ? "CLOSED_CONFIRMED" : job.CloseResolution is not null ? "NOT_CONFIRMED" : UnobservedValveFeedback,
+                FeedbackSeq = job.CloseResolution == ValveCloseResolution.LOWER_LIMIT_CONFIRMED
+                    ? SequenceOf(tail, SafeReturnStep.SR3) : null,
             },
             Axis = new SafeReturnAxisLeg
             {
-                Command = SafeReturnStep.SR4.ToString(),
+                Command = SequenceOf(tail, SafeReturnStep.SR4) is null ? "NOT_COMMANDED" : "RETURN_COMMANDED",
                 CommandSeq = SequenceOf(tail, SafeReturnStep.SR4),
-                Standby = retention.CurrentAxisFeedback?.AxisFeedback?.ToString() ?? AxisFeedbackState.UNKNOWN.ToString(),
+                Standby = retention.CurrentAxisFeedback?.AxisFeedback switch
+                {
+                    null => "ABSENT",
+                    AxisFeedbackState.AT_STANDBY => "STANDBY_CONFIRMED",
+                    _ => "NOT_CONFIRMED",
+                },
                 StandbySeq = SequenceOf(tail, SafeReturnStep.SR5),
             },
             Failure = failure is null

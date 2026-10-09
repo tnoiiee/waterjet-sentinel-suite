@@ -215,20 +215,23 @@ public sealed record RuntimeStatusSensorCounts
 /// <summary>
 /// Read-only Runtime status (the <c>GET /api/v1/runtime</c> body). It reports
 /// observation, never control: no command, no setpoint write, no dispatch. The
-/// queue, Pump and Active Job blocks are placeholders of the current foundation
-/// (no dispatch path and no pump command path exists yet) and are labelled as
-/// such so no review mistakes them for implemented Product behaviour.
+/// Queue and Active Job report SIMULATOR sequencing observations. The Pump
+/// command block remains a disabled foundation placeholder; nothing is actuated.
 /// </summary>
 public sealed record RuntimeStatus
 {
-    /// <summary>Placeholder label of the queue block: no dispatch path exists in this checkpoint.</summary>
-    public const string QueuePlaceholderLabel = "foundation placeholder - no queue dispatch path in this checkpoint";
+    /// <summary>Read-only SIMULATOR sequencing status label.</summary>
+    public const string QueuePlaceholderLabel = "SIMULATOR sequencing state is available for read-only observation";
 
     /// <summary>Placeholder label of the Pump block: no pump command path exists in this checkpoint.</summary>
     public const string PumpPlaceholderLabel = "foundation placeholder - no pump command path in this checkpoint";
 
     /// <summary>True only when every readiness condition holds; the codes are <see cref="RuntimeReadinessCodes"/>.</summary>
     public required bool Ready { get; init; }
+    public required string Scenario { get; init; }
+    public required double LowPressureThresholdBar { get; init; }
+    public required double HighPressureThresholdBar { get; init; }
+    public required double PumpReadySetpointBar { get; init; }
 
     public required string ReadinessCode { get; init; }
     public required string ReadinessDetail { get; init; }
@@ -262,7 +265,7 @@ public sealed record RuntimeStatus
 
     public required int QueueCapacity { get; init; }
 
-    /// <summary>Placeholder label: queue dispatch is not implemented in this checkpoint.</summary>
+    /// <summary>Read-only SIMULATOR sequencing status label.</summary>
     public required string QueuePlaceholder { get; init; }
 
     public required bool ActiveJobPresent { get; init; }
@@ -407,6 +410,29 @@ public sealed record RuntimeDeltaFeed
     public required bool NewestFirst { get; init; }
 
     public required IReadOnlyList<RuntimeDeltaFeedItem> Items { get; init; }
+
+    /// <summary>Metadata from one atomic publication; not a full Delta wire body.</summary>
+    public static RuntimeDeltaFeed From(RuntimePublication publication)
+    {
+        ArgumentNullException.ThrowIfNull(publication);
+        var items = new List<RuntimeDeltaFeedItem>(publication.Deltas.Count);
+        int? expectedRevision = null;
+        foreach (var delta in publication.Deltas)
+        {
+            var gap = expectedRevision is not null && delta.Revision != expectedRevision;
+            items.Add(ToItem(delta, gap));
+            expectedRevision = delta.PreviousRevision;
+        }
+        return new RuntimeDeltaFeed
+        {
+            Capacity = publication.HistoryCapacity,
+            Count = items.Count,
+            CurrentRevision = publication.Current.Revision,
+            NewestDeltaRevision = publication.NewestDeltaRevision,
+            NewestFirst = true,
+            Items = items,
+        };
+    }
 
     /// <summary>Projects the bounded history into the feed view.</summary>
     public static RuntimeDeltaFeed From(RuntimeDeltaHistory history, int? currentRevision)

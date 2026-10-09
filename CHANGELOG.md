@@ -1,3 +1,14 @@
+## 2026-10-10 — Stage 0.4A CP-3c-2 / CP-4A Owner validation and final source review
+
+- **Owner-locally validated** at exact code head `fd053fde07c96163b073fc9cb4c0383f31eafe3c` (not compiled or executed in Arena): cleared environment; locked restore PASS with no lock drift; Release build PASS with TreatWarningsAsErrors, 0 warnings / 0 errors; full .NET **414/414**; fixture parity **7/7**; TypeScript typecheck PASS and tests **34/34**; boundary scan **0 findings (S1–S9 clean)**; `git diff --check` PASS; no source drift and clean Owner-local tree. No artifact commit required.
+- Owner browser review **PASSED**: normal and Valve-close fault scenarios, independent Pump/paired-IVn pressure and thresholds, parallel Valve CLOSE then Axis RETURN, cumulative faults, qualified lower-limit completion, leak/not-fully-closed retention, read-only fault modal, blocked next dispatch, two FIFO Jobs sequentially without overlap, final empty Queue and completed Job 2, and truthful Pump control/readiness labels. Screenshots are Owner-observed, not Arena-executed. Static Final Source Review: **PASSED, no blocking defect**. See [checkpoint](docs/STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md).
+- **NON-BLOCKING UI CONTEXT-LABEL PUNCHLIST:** future wording should distinguish Current Active Job from last released Job outcome and Valve-close resolution; not implemented in this closeout. CP-4 full UI refinement is not delivered. No operator control, device command/write path or MODBUS; TEST_HARDWARE and PRODUCTION not authorized. PR #11 **READY FOR OWNER MERGE REVIEW — OPEN, NOT MERGED**. The dated development/pending entry below is superseded as a current-status statement.
+
+## 2026-10-09 — Stage 0.4A CP-3c-2 / CP-4A fast-track development checkpoint
+
+- Owner-authorized SIMULATOR scenario startup, single-writer atomic State/Delta host composition and existing GET-only observation; minimal read-only Inspector sequencing display. No device access, writes, SSE or contract changes.
+- Arena static boundary scan and JS/TypeScript checks passed; .NET SDK unavailable in Arena, so Owner-local Release build, tests, fixture parity and manual observation are **pending**. See [checkpoint](docs/STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md). PR open, not merged; CP-4 full UI not authorized.
+
 # Changelog
 
 All notable changes to this repository are recorded in this file.

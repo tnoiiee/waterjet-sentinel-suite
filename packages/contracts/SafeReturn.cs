@@ -3,7 +3,7 @@ namespace Wjss.Contracts;
 /// <summary>
 /// One ordered evidence entry of the Mandatory Safe Return ledger. Every Job,
 /// whatever the outcome, produces this ledger. Ordering is enforced by
-/// increasing <see cref="Seq"/> (command &lt; confirm &lt; return &lt; standby &lt;
+/// increasing <see cref="Seq"/> (close command &lt; axis command; feedback may arrive in either order before
 /// outcome &lt; release). Transient evidence for presentation/diagnostics;
 /// Production audit content is a later stage and an open decision.
 /// </summary>
@@ -20,7 +20,7 @@ public sealed record SafeReturnEvent
 
 /// <summary>
 /// Valve leg of the Safe Return ledger. The Isolation Valve close is COMMANDED
-/// AND CONFIRMED before the axis return is commanded (accepted baseline).
+/// before the axis return is commanded. Confirmation may arrive after axis feedback.
 /// </summary>
 public sealed record SafeReturnValveLeg
 {
@@ -30,6 +30,15 @@ public sealed record SafeReturnValveLeg
     public int? CommandSeq { get; init; }
 
     public required string Feedback { get; init; }
+    public bool? UpperLimitDetected { get; init; }
+    public bool? LowerLimitDetected { get; init; }
+    public double? PressureBar { get; init; }
+    public string? PressureQuality { get; init; }
+    public double? LowPressureThresholdBar { get; init; }
+    public double? HighPressureThresholdBar { get; init; }
+    public bool PressureInputValid { get; init; }
+    public string? Resolution { get; init; }
+    public string? Diagnosis { get; init; }
     public int? FeedbackSeq { get; init; }
 }
 

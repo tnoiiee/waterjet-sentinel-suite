@@ -226,8 +226,14 @@ function validateSafeReturn(sr, path, issues) {
   if (v.commandSeq !== null && v.feedbackSeq !== null && !(v.commandSeq < v.feedbackSeq)) {
     issues.push(`${path}: valve close command must precede closed confirmation`);
   }
-  if (a.commandSeq !== null && v.commandSeq !== null && !(v.feedbackSeq !== null && v.feedbackSeq < a.commandSeq)) {
-    issues.push(`${path}: valve must be CONFIRMED closed before the axis return is commanded`);
+  if (a.commandSeq !== null && v.commandSeq !== null && !(v.commandSeq < a.commandSeq)) {
+    issues.push(`${path}: valve close command must precede axis return command`);
+  }
+  if (v.resolution === 'CLOSED_BY_PRESSURE' && v.feedback === 'CLOSED_CONFIRMED') {
+    issues.push(`${path}: pressure-inferred closure is not a Lower limit confirmation`);
+  }
+  if (v.pressureInputValid === false && (v.resolution === 'LOWER_LIMIT_CONFIRMED' || v.resolution === 'CLOSED_BY_PRESSURE')) {
+    issues.push(`${path}: invalid pressure cannot confirm closure`);
   }
   if (a.commandSeq !== null && a.standbySeq !== null && !(a.commandSeq < a.standbySeq)) {
     issues.push(`${path}: axis return command must precede Standby confirmation`);
@@ -247,6 +253,16 @@ function validateActiveJob(job, path, issues) {
   }
   if (!isStr(job.jobId) || !isStr(job.targetSensorId)) issues.push(`${path}: identity missing`);
   if (!SENSOR_ID_SET.has(job.targetSensorId)) issues.push(`${path}: Active Job target must be a canonical Sensor`);
+  for (const field of ['pumpOutletPressureBar', 'valveOutletPressureBar', 'pumpPressureQuality', 'valvePressureQuality',
+    'pumpPressureSourceId', 'valvePressureSourceId', 'valveOpenResolution', 'valveDiagnosis']) {
+    if (!(field in job)) issues.push(`${path}: ${field} required (null if absent)`);
+  }
+  if (!Number.isFinite(job.pumpReadySetpointBar) || job.pumpReadySetpointBar < 0) issues.push(`${path}: invalid Pump readiness setpoint`);
+  if (typeof job.pumpPressureInputValid !== 'boolean' || typeof job.valvePressureInputValid !== 'boolean') issues.push(`${path}: pressure validity flags required`);
+  if (job.pumpOutletPressureBar != null && (!Number.isFinite(job.pumpOutletPressureBar) || job.pumpOutletPressureBar < 0)) issues.push(`${path}: invalid Pump pressure`);
+  if (job.valveOutletPressureBar != null && (!Number.isFinite(job.valveOutletPressureBar) || job.valveOutletPressureBar < 0)) issues.push(`${path}: invalid Valve pressure`);
+  if (job.pumpPressureInputValid && (job.pumpPressureSourceId !== 'PUMP_OUTLET' || job.pumpPressureQuality !== 'GOOD' || job.pumpOutletPressureBar === null)) issues.push(`${path}: valid Pump reading requires its own measured outlet`);
+  if (job.valvePressureInputValid && (job.valvePressureSourceId !== `${job.valveId}_OUTLET` || job.valvePressureQuality !== 'GOOD' || job.valveOutletPressureBar === null)) issues.push(`${path}: valid Valve reading requires the paired IVn outlet`);
   validateDispatch(job.dispatch ?? {}, `${path}.dispatch`, issues);
   if (job.safeReturn !== null) validateSafeReturn(job.safeReturn, `${path}.safeReturn`, issues);
 }
@@ -277,11 +293,25 @@ function validateSharedBody(obj, path, issues) {
   }
   if (obj.sequence?.lastJobOutcome) {
     const o = obj.sequence.lastJobOutcome;
-    if (!(o.valveCloseCommandSeq < o.valveClosedConfirmedSeq)) issues.push(`${path}: outcome: valve command < confirm required`);
-    if (!(o.valveClosedConfirmedSeq < o.axisReturnCommandSeq)) issues.push(`${path}: outcome: valve confirm < axis command required`);
+    if (!(o.valveCloseCommandSeq < o.axisReturnCommandSeq)) issues.push(`${path}: outcome: valve close command < axis command required`);
+    if (o.valveClosedConfirmedSeq != null && !(o.valveCloseCommandSeq < o.valveClosedConfirmedSeq)) issues.push(`${path}: outcome: valve confirmation must follow close command`);
+    if (o.valveCloseResolution === 'LOWER_LIMIT_CONFIRMED' && !isInt(o.valveClosedConfirmedSeq)) issues.push(`${path}: Lower limit confirmation requires its evidence sequence`);
+    if (o.valveCloseResolution === 'CLOSED_BY_PRESSURE' && o.valveClosedConfirmedSeq !== null) issues.push(`${path}: pressure-inferred closure has no Lower confirmation sequence`);
+    const resolution = (o.events ?? []).find(e => e.step === 'SR3' && (e.event === o.valveCloseResolution || e.seq === o.valveClosedConfirmedSeq));
+    if (!resolution || !(o.axisReturnCommandSeq < resolution.seq && resolution.seq < o.outcomeSeq)) issues.push(`${path}: outcome needs post-command Valve resolution before SR6`);
     if (!(o.axisReturnCommandSeq < o.standbyConfirmedSeq)) issues.push(`${path}: outcome: axis command < standby confirm required`);
     if (!(o.standbyConfirmedSeq < o.outcomeSeq)) issues.push(`${path}: outcome: standby confirm < outcome required`);
     if (!(o.outcomeSeq < o.releaseSeq)) issues.push(`${path}: outcome: outcome < release required`);
+    if (o.qualifiedCompletion === 'COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS') {
+      const diagnoses = (o.equipmentFaults ?? []).map(f => f.diagnosis);
+      for (const [diagnosis, remark] of [
+        ['UPPER_LIMIT_SENSOR_FAULT', 'COMPLETED_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT'],
+        ['LOWER_LIMIT_SENSOR_FAULT', 'COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT'],
+      ]) {
+        if (!diagnoses.includes(diagnosis) || !(o.qualifiedRemarks ?? []).includes(remark)) issues.push(`${path}: dual limit faults need both distinct diagnoses and remarks`);
+      }
+      if (o.outcome !== 'COMPLETED') issues.push(`${path}: dual-fault qualification requires COMPLETED`);
+    }
   }
 }
 

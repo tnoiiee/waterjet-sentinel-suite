@@ -2,6 +2,8 @@ using System.Globalization;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime.Core;
+using Wjss.Runtime.Core.Simulator;
+using Wjss.Runtime.Core.Sequencing;
 using SimulatorSeed = Wjss.Adapters.Simulator.SyntheticSeed;
 
 namespace Wjss.Runtime;
@@ -20,6 +22,13 @@ public sealed record RuntimeHostOptions
 {
     /// <summary>Device-profile variable (SIMULATOR default; TEST_HARDWARE and PRODUCTION are refused).</summary>
     public const string ProfileVariable = "WJSS_DEVICE_PROFILE";
+
+    /// <summary>Startup-only exact scenario identity.</summary>
+    public const string ScenarioVariable = "WJSS_SIMULATOR_SCENARIO";
+    public const string LowPressureVariable = "WJSS_LOW_PRESSURE_THRESHOLD_BAR";
+    public const string HighPressureVariable = "WJSS_HIGH_PRESSURE_THRESHOLD_BAR";
+    public const string PumpReadyVariable = "WJSS_PUMP_READY_SETPOINT_BAR";
+    public const string InvalidSimulatorScenario = "INVALID_SIMULATOR_SCENARIO";
 
     /// <summary>Loopback API port variable.</summary>
     public const string PortVariable = "WJSS_API_PORT";
@@ -60,6 +69,10 @@ public sealed record RuntimeHostOptions
     /// <summary>Delta-history capacity outside the accepted bounds.</summary>
     public const string InvalidDeltaHistoryCapacity = "INVALID_DELTA_HISTORY_CAPACITY";
 
+    public SimulatorScenarioId Scenario { get; init; } = SimulatorScenarioId.IDLE;
+
+    public SequencingPressureThresholds PressureThresholds { get; init; } = new();
+
     public required DeviceProfile Profile { get; init; }
 
     public required int Port { get; init; }
@@ -94,6 +107,36 @@ public sealed record RuntimeHostOptions
         options = null!;
         refusalCode = string.Empty;
         refusalDetail = string.Empty;
+
+        // Profile gate first, even for callers bypassing Program. Read the scenario exactly once.
+        if (!ProfileStartPolicy.TryRequireStartable(profile, out refusalCode, out refusalDetail))
+            return false;
+        var scenarioLabel = readEnvironment(ScenarioVariable);
+        var scenario = SimulatorScenarioId.IDLE;
+        if (scenarioLabel is not null && !SimulatorScenarioCatalogue.TryParse(scenarioLabel, out scenario))
+        {
+            refusalCode = InvalidSimulatorScenario;
+            refusalDetail = $"{ScenarioVariable} must be an exact scenario name; got '{scenarioLabel}'.";
+            return false;
+        }
+
+        // All pressure settings are read once and validated before the listener.
+        static double ReadPressure(Func<string, string?> read, string key, double fallback)
+        {
+            var raw = read(key);
+            return raw is null ? fallback : double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed : double.NaN;
+        }
+        var thresholds = new SequencingPressureThresholds(
+            ReadPressure(readEnvironment, LowPressureVariable, 1.0),
+            ReadPressure(readEnvironment, HighPressureVariable, 15.0),
+            ReadPressure(readEnvironment, PumpReadyVariable, 15.0));
+        if (!thresholds.Valid)
+        {
+            refusalCode = SequencingPressureThresholds.InvalidCode;
+            refusalDetail = "SIMULATOR pressure thresholds must be finite; Low >= 0, High > Low, PumpReady >= 0.";
+            return false;
+        }
 
         var syntheticSeed = SimulatorSeed.DefaultSeed.Value;
         var seedLabel = readEnvironment(SeedVariable);
@@ -156,6 +199,8 @@ public sealed record RuntimeHostOptions
         options = new RuntimeHostOptions
         {
             Profile = profile,
+            Scenario = scenario,
+            PressureThresholds = thresholds,
             Port = port,
             SyntheticSeed = syntheticSeed,
             TickIntervalMilliseconds = tickInterval,
@@ -174,6 +219,20 @@ public sealed record RuntimeHostOptions
     {
         if (!ProfileStartPolicy.TryRequireStartable(Profile, out refusalCode, out refusalDetail))
         {
+            return false;
+        }
+
+        if (!SimulatorScenarioCatalogue.TryParse(Scenario.ToString(), out var parsedScenario) || parsedScenario != Scenario)
+        {
+            refusalCode = InvalidSimulatorScenario;
+            refusalDetail = $"Unknown scenario {Scenario}.";
+            return false;
+        }
+
+        if (PressureThresholds is null || !PressureThresholds.Valid)
+        {
+            refusalCode = SequencingPressureThresholds.InvalidCode;
+            refusalDetail = "Invalid SIMULATOR pressure thresholds.";
             return false;
         }
 

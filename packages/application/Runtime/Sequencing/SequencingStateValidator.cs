@@ -284,7 +284,8 @@ internal static class SequencingStateValidator
         }
 
         var cleaning = job.Stage == CleaningStage.CLEANING;
-        if (job.CleaningActive != cleaning)
+        // P1 can be pending in CLEANING while the Valve OPEN command is supervised.
+        if (job.CleaningActive && !cleaning)
         {
             return JobCleaningStageMismatch;
         }
@@ -314,6 +315,9 @@ internal static class SequencingStateValidator
         {
             return JobValveGateInvalid;
         }
+
+        if (cleaning && job.VerifiedPhase is not null && !job.CleaningActive)
+            return JobCleaningStageMismatch;
 
         if (cleaning && !job.PumpReady)
         {
@@ -372,51 +376,31 @@ internal static class SequencingStateValidator
 
         return job.Lifecycle switch
         {
-            JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED => ValveWaitViolation(job),
+            JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED => JobLifecycleTransient,
             JobLifecycle.SAFE_RETURN_VERIFY_STANDBY => AxisWaitViolation(job),
             JobLifecycle.SAFE_RETURN_FAILED => FailedViolation(job),
             _ => JobLifecycleTransient,
         };
     }
 
-    private static string? ValveWaitViolation(SequencingActiveJob job)
-    {
-        var ledger = job.Ledger;
-        if (job.Step != SafeReturnStep.SR2)
-        {
-            return JobStepMismatch;
-        }
-
-        if (ledger.ValveClosedSeq is not null
-            || ledger.AxisReturnRequestSeq is not null
-            || ledger.AxisStandbySeq is not null
-            || ledger.FailureSeq is not null
-            || job.FailureCode is not null)
-        {
-            return JobLedgerInvalid;
-        }
-
-        return null;
-    }
-
     private static string? AxisWaitViolation(SequencingActiveJob job)
     {
         var ledger = job.Ledger;
-        if (job.Step != SafeReturnStep.SR4)
-        {
-            return JobStepMismatch;
-        }
-
-        if (ledger.ValveClosedSeq is null
-            || ledger.AxisReturnRequestSeq is null
-            || ledger.AxisStandbySeq is not null
-            || ledger.FailureSeq is not null
-            || job.FailureCode is not null)
-        {
+        // SR4 commands both branches; SR3 and SR5 may then occur in either order.
+        // With an unsafe Valve result both branches may be present but cannot release;
+        // Step is whichever independent result arrived last.
+        var expectedStep = job.CloseResolution is not null ? SafeReturnStep.SR3
+            : job.AxisStandbyConfirmed ? SafeReturnStep.SR5 : SafeReturnStep.SR4;
+        if (job.Step != expectedStep && !(job.AxisStandbyConfirmed && job.CloseResolution is not null
+            && job.Step == SafeReturnStep.SR5)) return JobStepMismatch;
+        if (ledger.AxisReturnRequestSeq is null || ledger.FailureSeq is not null || job.FailureCode is not null)
             return JobLedgerInvalid;
-        }
-
-        return job.LastValveFeedback == ValveFeedbackState.CLOSED ? null : JobValveGateInvalid;
+        if ((ledger.AxisStandbySeq is not null) != job.AxisStandbyConfirmed) return JobLedgerInvalid;
+        if ((ledger.ValveClosedSeq is not null) != (job.CloseResolution == ValveCloseResolution.LOWER_LIMIT_CONFIRMED))
+            return JobLedgerInvalid;
+        if (job.AxisStandbyConfirmed && job.CloseResolution is (ValveCloseResolution.LOWER_LIMIT_CONFIRMED or ValveCloseResolution.CLOSED_BY_PRESSURE))
+            return JobLedgerInvalid; // both results must have released in the completing transition
+        return null;
     }
 
     private static string? FailedViolation(SequencingActiveJob job)
@@ -432,7 +416,7 @@ internal static class SequencingStateValidator
             return JobFailureInvalid;
         }
 
-        if (ledger.FailureSeq is null || ledger.AxisStandbySeq is not null)
+        if (ledger.FailureSeq is null)
         {
             return JobLedgerInvalid;
         }
@@ -446,43 +430,23 @@ internal static class SequencingStateValidator
 
         if (valveFailure)
         {
-            return ledger.ValveClosedSeq is null && ledger.AxisReturnRequestSeq is null ? null : JobFailureInvalid;
+            return ledger.ValveClosedSeq is null && ledger.AxisReturnRequestSeq is not null ? null : JobFailureInvalid;
         }
 
-        return ledger.ValveClosedSeq is not null && ledger.AxisReturnRequestSeq is not null ? null : JobFailureInvalid;
+        return ledger.AxisReturnRequestSeq is not null ? null : JobFailureInvalid;
     }
 
     private static bool LedgerOrdered(SafeReturnLedger ledger, int dispatchSeq, int evidenceSeq)
     {
-        int? previous = null;
-        foreach (var seq in new int?[]
-                 {
-                     ledger.WaterOffSeq,
-                     ledger.ValveCloseRequestSeq,
-                     ledger.ValveClosedSeq,
-                     ledger.AxisReturnRequestSeq,
-                     ledger.AxisStandbySeq,
-                     ledger.FailureSeq,
-                 })
-        {
-            if (seq is not { } value)
-            {
-                continue;
-            }
-
-            if (value <= dispatchSeq || value > evidenceSeq)
-            {
-                return false;
-            }
-
-            if (previous is { } before && value <= before)
-            {
-                return false;
-            }
-
-            previous = value;
-        }
-
+        var water = ledger.WaterOffSeq;
+        var close = ledger.ValveCloseRequestSeq;
+        var axis = ledger.AxisReturnRequestSeq;
+        if (water is null || close is null || axis is null || water <= dispatchSeq || water >= close || close >= axis || axis > evidenceSeq)
+            return false;
+        // Confirmation branches may arrive in either order. Both must follow their own commands.
+        if (ledger.ValveClosedSeq is { } valve && (valve <= close || valve > evidenceSeq)) return false;
+        if (ledger.AxisStandbySeq is { } standby && (standby <= axis || standby > evidenceSeq)) return false;
+        if (ledger.FailureSeq is { } failure && (failure <= axis || failure > evidenceSeq)) return false;
         return true;
     }
 

@@ -52,4 +52,6 @@ public sealed record SequencingEvidence(
     AxisFeedbackState? AxisFeedback = null,
     PumpObservation? Pump = null,
     CleaningJobOutcome? JobOutcome = null,
-    string? Intent = null);
+    string? Intent = null,
+    ValveCloseResolution? CloseResolution = null,
+    ValveDiagnosis? Diagnosis = null);

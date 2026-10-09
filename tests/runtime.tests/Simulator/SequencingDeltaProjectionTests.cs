@@ -56,7 +56,7 @@ public sealed class SequencingDeltaProjectionTests
     }
 
     [Fact]
-    public void Active_Job_Is_Replaced_At_Dispatch_Unchanged_On_Plain_Valve_Feedback_And_Cleared_At_Release()
+    public void Active_Job_Is_Replaced_At_Dispatch_And_Measured_Pump_Then_Cleared_At_Release()
     {
         var run = SimulatorRunHarness.RunScenario(SimulatorScenarioId.NORMAL_COMPLETION);
 
@@ -64,11 +64,11 @@ public sealed class SequencingDeltaProjectionTests
             DeltaJobEncoding.Present,
             RuntimeDeltaProjector.ProjectCandidate(run.PreviousTo(3), run.CandidateAt(3)).ActiveJob.Encoding);
         Assert.Equal(
-            DeltaJobEncoding.Absent,
+            DeltaJobEncoding.Present,
             RuntimeDeltaProjector.ProjectCandidate(run.PreviousTo(4), run.CandidateAt(4)).ActiveJob.Encoding);
         Assert.Equal(
             DeltaJobEncoding.Cleared,
-            RuntimeDeltaProjector.ProjectCandidate(run.PreviousTo(16), run.CandidateAt(16)).ActiveJob.Encoding);
+            RuntimeDeltaProjector.ProjectCandidate(run.PreviousTo(17), run.CandidateAt(17)).ActiveJob.Encoding);
     }
 
     [Fact]
