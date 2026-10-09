@@ -170,6 +170,7 @@
     </div>
     <div class="badges">
       <span class="badge info" id="badge-profile">SIMULATOR</span>
+      <span class="badge info">SIMULATOR / READ ONLY</span>
       <span class="badge" id="badge-ready">READINESS UNKNOWN</span>
       <span class="badge" id="badge-evolution">EVOLUTION UNKNOWN</span>
       <span class="badge" id="badge-stage">-</span>
@@ -206,7 +207,16 @@
     <section class="card">
       <h2>Runtime state</h2>
       <div class="kv split" id="kv-runtime"></div>
-      <p class="note">Queue dispatch, Pump commands, Cleaning Jobs and Safe Return actuation are not implemented in this checkpoint. The queue and Pump blocks above are placeholders of the foundation, labelled as such in the API.</p>
+      <p class="note">SIMULATOR sequencing is available for read-only observation. No hardware acquisition or Pump command path exists.</p>
+    </section>
+
+    <section class="card wide">
+      <h2>Scenario sequencing &mdash; read-only</h2>
+      <div class="kv split" id="kv-sequencing"></div>
+      <h2>Ordered queue entries</h2>
+      <div class="scroll"><table><thead><tr><th>Position</th><th>Entry</th><th>Sensor</th><th>Source</th></tr></thead>
+      <tbody id="queue-body"></tbody></table></div>
+      <p class="note">Pre-P1 P1 values are Contract fallbacks, not verified facts. Sequence controls and Pump commands remain disabled.</p>
     </section>
 
     <section class="card wide">
@@ -325,9 +335,9 @@
   <footer class="safety">
     <strong>Development Inspector &mdash; read-only, SIMULATOR only.</strong>
     TEST_HARDWARE is not authorized. PRODUCTION device access is not authorized.
-    Control commands are not implemented: nothing on this page starts, stops, dispatches, commands or changes Runtime state,
-    and every control here affects this browser page only. Water Jets and Isolation Valves appear as read-only
-    topology references only: no device command, valve movement, pump, axis or cleaning action exists, and device
+    This page cannot start, stop, dispatch, command or change Runtime state; the SIMULATOR scenario evolves automatically.
+    Every display control here affects this browser page only. Water Jets and Isolation Valves appear as read-only
+    topology references only: no physical device command, valve movement, pump, axis or cleaning action exists, and device
     acquisition is deferred.
   </footer>
 </div>
@@ -378,7 +388,7 @@
     // Every request is a GET. The Inspector never issues a write request.
     return fetch(path, { method: "GET", cache: "no-store", headers: { "Accept": "application/json" } })
       .then(function (response) {
-        if (!response.ok && response.status !== 503) {
+        if (!response.ok) {
           throw new Error(path + " returned " + response.status);
         }
         return response.json();
@@ -734,11 +744,48 @@
       snapshot.revision + " (poll of " + timeOf(status.serverTimeUtc) + ").");
   }
 
+  function renderSequencing(status, snapshot) {
+    var host = el("kv-sequencing");
+    host.textContent = "";
+    var job = snapshot.activeJob;
+    var safeReturn = job && job.safeReturn;
+    var critical = snapshot.sequence && snapshot.sequence.critical;
+    var outcome = snapshot.sequence && snapshot.sequence.lastJobOutcome;
+    [
+      ["Scenario", status.scenario],
+      ["Runtime revision", snapshot.revision],
+      ["Queue count", snapshot.queue.totalQueued + " / " + snapshot.queue.capacity],
+      ["Active Job / target Sensor", job ? job.jobId + " / " + job.targetSensorId : "none"],
+      ["Phase / progress", job ? job.phaseLabel + " (" + job.phaseIndex + "/6; " + num(job.phaseProgress * 100, 1) + "%)" : "none"],
+      ["Safe Return trigger / step", safeReturn ? safeReturn.trigger + " / " + safeReturn.step : "none"],
+      ["Valve command / feedback", safeReturn ? safeReturn.valve.command + " / " + safeReturn.valve.feedback : "none"],
+      ["Axis command / standby", safeReturn ? safeReturn.axis.command + " / " + safeReturn.axis.standby : "none"],
+      ["Critical Pump condition / modal", critical ? critical.kind + " / " + (critical.modalOpen ? "OPEN" : "CLOSED") : "none"],
+      ["Last Job Outcome", outcome ? outcome.outcome + " (" + outcome.jobId + ")" : "none"],
+      ["Data refreshed", timeOf(new Date(lastSuccessAt).toISOString())]
+    ].forEach(function (row) { addPair(host, row[0], row[1]); });
+    var body = el("queue-body");
+    body.textContent = "";
+    (snapshot.queue.entries || []).forEach(function (entry) {
+      var tr = document.createElement("tr");
+      [entry.position, entry.entryId, entry.sensorId, entry.sourceReason].forEach(function (value) {
+        var td = document.createElement("td"); text(td, value); tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    });
+    if (!snapshot.queue.entries.length) {
+      var row = document.createElement("tr");
+      var empty = document.createElement("td"); empty.colSpan = 4;
+      text(empty, "Queue empty"); row.appendChild(empty); body.appendChild(row);
+    }
+  }
+
   function render(status, feed, snapshot) {
     latestSnapshot = snapshot;
     renderHeading(status);
     renderFoundation(status);
     renderRuntimeState(status);
+    renderSequencing(status, snapshot);
     renderWallMap(snapshot);
     renderTopology(snapshot);
     renderWalls(snapshot.walls || []);
@@ -758,9 +805,11 @@
     ]).then(function (results) {
       lastSuccessAt = Date.now();
       setStale(false);
+      text(el("banner-stale"), "Updates stopped or the API is unreachable: the values below are the last successfully received data.");
       render(results[0], results[1], results[2]);
-    }).catch(function () {
+    }).catch(function (error) {
       setStale(true);
+      text(el("banner-stale"), "GET observation failed: " + error.message + ". Values below are stale; no control is available.");
     }).then(function () {
       inFlight = false;
     });
