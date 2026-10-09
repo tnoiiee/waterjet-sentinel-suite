@@ -47,6 +47,8 @@ described anywhere else remains `[PROPOSED]` until a later gate approves it.
 
 ## 3. Stage ledger
 
+**Latest Stage 0.4A CP-3c-1 status (2026-10-09):** Owner-local validation PASSED at `29f133ce6598bc2eb489273a2f2d40f8827deb5f`; static Final Source Review PASSED with no blocking defect. PR #10 OPEN, NOT MERGED; CP-3c-2 and CP-4 NOT AUTHORIZED. Earlier CP-3c-1 validation-pending and blanket CP-3c-not-authorized entries are dated history, superseded only for the authorized CP-3c-1 library foundation. See the CP-3c-1 checkpoint report.
+
 Status vocabulary: `[APPROVED]`, `[OWNER CONFIRMED]`, `[PROPOSED]`, `[OPEN]`,
 `[NOT AUTHORIZED]`, `[NOT VERIFIED]`, plus implementation status: `SUBMITTED FOR OWNER
 REVIEW`, `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `MERGED`.
@@ -554,3 +556,9 @@ has been submitted and re-review has been requested.
 
 ### Stage 0.4A CP-3c-1 development scope
 Owner-authorized library-only atomic Runtime publication foundation on approved main `6b0ff7e`. State, matching Delta and bounded history must be one reader-visible generation. Existing Host composition is unchanged; CP-3c-2 and CP-4 are not authorized. See `STAGE_0.4A_CP-3C-1_CHECKPOINT.md` for development status; Owner-local validation remains required.
+
+### Stage 0.4A CP-3c-1 Owner-local validation and Final Source Review
+
+Owner-reported validation at code head `29f133ce6598bc2eb489273a2f2d40f8827deb5f` (.NET SDK 10.0.401; not run in Arena): locked restore PASS, lock drift NONE; Release build PASS, 0 warnings, 0 errors; RuntimePublicationTests **20/20**, Runtime.Core **450/450**, full .NET **572/572**, fixture parity **7/7**, TypeScript typecheck PASS and tests **31/31** (0 failed); boundary scan **0 findings, S1–S9 clean**; `git diff --check` PASS; final Owner-local working tree CLEAN. Failed 0, skipped 0 in each reported .NET suite; no Owner-local artifact commit required.
+
+Final Source Review (static, exact validated code head): **PASS, no blocking defect**. CP-3c-1 delivers the library-only atomic State/Delta publication aggregate with one writer, bounded contiguous history and detached reader/result snapshots. The full-window trend failure was fixed by checking equal-count *unchanged content* before testing the exact oldest-eviction-plus-append shift. The internal-Delta JSON fingerprint failure was a test defect: fingerprints now serialize `ProjectWire(delta)` and previous Sensors, never raw `RuntimeDelta`. The reader-facing mutable `TrendPoint.Series` alias was corrected with a defensive-copy reader boundary and nested typed freeze, without changing the contract. Analyzer corrections CA1861 and xUnit1031 are closed at the validated code head. No Host integration, Runtime API integration, Inspector change, contract, fixture or TypeScript change is included. CP-3c-2 and CP-4 are NOT AUTHORIZED; TEST_HARDWARE and PRODUCTION device access are NOT AUTHORIZED. PR #10 remains OPEN, NOT MERGED, for Owner merge review.
