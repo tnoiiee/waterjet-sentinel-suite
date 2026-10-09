@@ -153,9 +153,9 @@ public static class RuntimeDeltaProjector
     }
 
     /// <summary>
-    /// Carries exactly one appended candidate trend point. An unchanged window carries nothing. Any other change is
-    /// refused explicitly: a changed window identity, changed history, a removal, more than one appended point, or an
-    /// append beyond the window capacity (an eviction is a removal).
+    /// Carries one appended candidate trend point: below capacity, one append with the existing history intact;
+    /// at capacity, exactly one oldest eviction followed by one append with the retained suffix intact.
+    /// An unchanged window carries nothing. All other changes are refused.
     /// </summary>
     private static TrendPoint? AppendedTrendPoint(TrendWindow previous, TrendWindow candidate)
     {
@@ -166,31 +166,41 @@ public static class RuntimeDeltaProjector
 
         var before = previous.Points.Count;
         var after = candidate.Points.Count;
-        if (after == before)
+        if (after == before && SameContent(previous.Points, candidate.Points))
         {
-            if (SameContent(previous.Points, candidate.Points))
+            return null;
+        }
+
+        if (before < candidate.Capacity)
+        {
+            if (after != before + 1)
             {
-                return null;
+                throw new InvalidOperationException("Refused to project a Delta: expected exactly one trend append.");
             }
-
-            throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
-        }
-
-        if (after != before + 1 || after > candidate.Capacity)
-        {
-            throw new InvalidOperationException(
-                "Refused to project a Delta: the trend changed by a removal or by more than one appended point. Nothing was projected.");
-        }
-
-        for (var index = 0; index < before; index++)
-        {
-            if (!SameContent(previous.Points[index], candidate.Points[index]))
+            for (var index = 0; index < before; index++)
             {
-                throw new InvalidOperationException("Refused to project a Delta: the trend history changed. Nothing was projected.");
+                if (!SameContent(previous.Points[index], candidate.Points[index]))
+                {
+                    throw new InvalidOperationException("Refused to project a Delta: trend history changed.");
+                }
             }
+            return candidate.Points[before];
         }
 
-        return candidate.Points[before];
+        if (after != before)
+        {
+            throw new InvalidOperationException("Refused to project a Delta: full trend window requires one eviction and one append.");
+        }
+        for (var index = 1; index < before; index++)
+        {
+            if (!SameContent(previous.Points[index], candidate.Points[index - 1]))
+            {
+                throw new InvalidOperationException("Refused to project a Delta: full trend window did not shift exactly once.");
+            }
+        }
+        // A full window can be unchanged; that case returned above. A single-slot window
+        // has no retained predecessor to compare, but its replacement is still one append.
+        return candidate.Points[after - 1];
     }
 
     private static void RequireNextStep(RuntimeState previous, RuntimeState candidate)
