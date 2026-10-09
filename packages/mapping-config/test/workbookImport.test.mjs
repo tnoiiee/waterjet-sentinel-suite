@@ -149,6 +149,27 @@ test('a seed entry that points at a missing workbook tag is reported', () => {
   assert.ok(r.issues.some((i) => i.code === 'SEED_TAG_NOT_FOUND'));
 });
 
+test('all 16 IVn limits bind when each workbook row labels the same IV index and group', () => {
+  const r = importExample();
+  const limits = r.bindings.filter((b) => /^IV[1-8]_(LOWER|UPPER)_LIMIT$/.test(b.tagName));
+  assert.equal(limits.length, 16);
+  assert.equal(r.issues.some((i) => i.code === 'LIMIT_IV_LABEL_MISMATCH'), false);
+});
+
+test('an IVn limit bound to a row labelled for another IV is refused and not bound', () => {
+  const bad = { ...seed, IV1_LOWER_LIMIT: { ...seed.IV1_LOWER_LIMIT, source: 'EX-DI-02' } };
+  const r = importWorkbook(buildWorkbook({ rows: exampleRows() }), { bindingSeed: bad });
+  assert.ok(r.issues.some((i) => i.code === 'LIMIT_IV_LABEL_MISMATCH' && i.tagName === 'IV1_LOWER_LIMIT'));
+  assert.equal(r.bindings.some((b) => b.tagName === 'IV1_LOWER_LIMIT'), false);
+});
+
+test('an IVn upper limit bound to a lower-limit row is refused (the group must match)', () => {
+  const bad = { ...seed, IV1_UPPER_LIMIT: { ...seed.IV1_UPPER_LIMIT, source: 'EX-DI-01' } };
+  const r = importWorkbook(buildWorkbook({ rows: exampleRows() }), { bindingSeed: bad });
+  assert.ok(r.issues.some((i) => i.code === 'LIMIT_IV_LABEL_MISMATCH' && i.tagName === 'IV1_UPPER_LIMIT'));
+  assert.equal(r.bindings.some((b) => b.tagName === 'IV1_UPPER_LIMIT'), false);
+});
+
 test('source details are reported (hash, size, dimension, formula and merge counts)', () => {
   const r = importExample();
   assert.match(r.source.sha256, /^[0-9a-f]{64}$/);

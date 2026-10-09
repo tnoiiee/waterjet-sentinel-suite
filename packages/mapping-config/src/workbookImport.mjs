@@ -347,6 +347,20 @@ export function importWorkbook(buf, options = {}) {
       seedIssues.push({ code: 'SEED_TAG_NOT_FOUND', severity: SEVERITY.ERROR, tagName: runtimeTag, message: `seed source for ${runtimeTag} is not a channel row in the workbook` });
       continue;
     }
+    // An IVn limit may bind only to a workbook row that labels the same IV index and group
+    // ('#n' and 'Lower' or 'Upper' in the description). A mismatch is refused, not repaired.
+    const limitName = /^IV([1-8])_(LOWER|UPPER)_LIMIT$/.exec(runtimeTag);
+    if (limitName) {
+      const label = /#\s*(\d+)/.exec(row.signal ?? '');
+      const group = /\b(lower|upper)\b/i.exec(row.signal ?? '');
+      const labelled = label !== null && Number(label[1]) === Number(limitName[1]);
+      const sameGroup = group !== null && group[1].toUpperCase() === limitName[2];
+      if (!labelled || !sameGroup) {
+        seedIssues.push({ code: 'LIMIT_IV_LABEL_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: its workbook row does not carry the same IV index and group` });
+        continue;
+      }
+    }
     const slot = Number(row.slot);
     // A limit with no polarity in the seed takes the Owner rule, recorded explicitly with its basis.
     // Pressures never take a polarity. An explicit seed value is kept as written.

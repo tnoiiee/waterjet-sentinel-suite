@@ -75,15 +75,27 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 - **Pressure identities.** PUMP_OUTLET_PRESSURE and IV1–IV8_OUTLET_PRESSURE are separate. No aliasing,
   averaging or cross-fallback. WJn uses the IVn pressure (`pressureTagForWj`).
 - **Limits.** Digital limit tags bind to DI channels and require an explicit polarity. Owner rule: all
-  16 IVn lower- and upper-limit inputs are `ACTIVE_WHEN_CLOSED` (contact open = not detected; closed =
-  detected). The import records this with `polarityBasis: OWNER_RULE`. An explicit seed value is kept as
-  written and recorded as `EXPLICIT_SEED`. Validation requires one ContactPolarity across all limits
-  unless a channel records `polarityOverride`. ContactPolarity is separate from RawInputInversion. The
-  inversion is NOT_CONFIGURED by default (UNVERIFIED). A verified inversion, when configured, is applied
-  exactly once. A wire break is never claimed from a normally open contact alone.
+  16 IVn lower- and upper-limit inputs marked NO are `ACTIVE_WHEN_CLOSED`. The import records this with
+  `polarityBasis: OWNER_RULE`. An explicit seed value is kept as written and recorded as `EXPLICIT_SEED`.
+  Validation requires one ContactPolarity across all limits unless a channel records `polarityOverride`.
+  - Interpretation before any verified hardware inversion: contact open = `LimitDetected` false; contact
+    closed = `LimitDetected` true.
+  - ContactPolarity is kept separate from: WAGO module inversion, coupler/process-image inversion,
+    field-wiring inversion, and software acquisition-profile inversion. RawInputInversion is
+    NOT_CONFIGURED by default and UNVERIFIED. A verified inversion, when configured, is applied exactly
+    once (`normalizeLimit`).
+  - A wire break is never claimed from an NO contact alone (`wireBreakDetectable` is always false).
+  - Pump pressure and Valve pressure are never a substitute for a limit input. A digital limit bound to
+    an analog channel is refused (`LIMIT_TO_ANALOG_REFUSED`).
+  - IVn lower and upper inputs stay bound only to their own IVn. A limit binding must declare its own
+    identity (`SOURCE_IDENTITY_MISMATCH` otherwise). On import, the workbook row must carry the same IV
+    index (`#n`) and the same group word (Lower or Upper) as the tag, or the binding is refused with
+    `LIMIT_IV_LABEL_MISMATCH` and is not made. Mismatches are reported, never repaired. The Owner-local
+    workbook passes this check for all 16 limits.
+  - Hardware inversion remains UNVERIFIED. TEST_HARDWARE activation remains blocked.
 - **Outputs.** Output rows are classified `NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE`. No output
   tag can be bound, and there is no write provider.
-- **Provider.** SIMULATOR only. The package performs no I/O and holds no credentials. It has no
+- **Provider.** SIMULATOR only (the constant in code; the spec's "SIMULATION" is the same provider; name not yet reconciled). The package performs no I/O and holds no credentials. It has no
   Modbus, TCP or device code. Draft state does not feed Runtime or RuntimePublication.
 - **Revisions.** Deterministic. Independent of timestamps, object key order, array order of bindings,
   and UI state. Verified by tests.
@@ -102,7 +114,7 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 
 | Gate | Result | Evidence |
 |---|---|---|
-| Mapping package tests | **VERIFIED** | `npm test` in `packages/mapping-config`: 110 tests, 109 pass, 1 skipped (Owner-local check below). |
+| Mapping package tests | **VERIFIED** | `npm test` in `packages/mapping-config`: 113 tests, 112 pass, 1 skipped (Owner-local check below). Includes the IVn label checks and the limit polarity tests. |
 | UI shell tests | **VERIFIED** | `npm test` in `apps/mapping-config`: 17 pass. Includes a stub-DOM run of the real `app.mjs` against the real server. |
 | Syntax checks | **VERIFIED** | `node --check` on every mapping module, `server.mjs` and `public/app.mjs`. |
 | Boundary scan (S1–S9) | **VERIFIED** | `node tools/boundary-scan/boundary-scan.mjs`: 0 findings. |
@@ -115,7 +127,7 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 | Fixture parity | **NOT VERIFIED** | No fixture changed. The parity run needs the .NET generator. |
 | TypeScript checks | **NOT VERIFIED** | The TS package has no installed dependencies here. No TS file is changed. Installing them needs a STOP. |
 | Browser rendering and layout | **NOT VERIFIED** | No browser in the sandbox. Verified only through the stub DOM and server tests. |
-| `git diff --check` and clean tree | **NOT VERIFIED AS CLEAN** | The tree is intentionally uncommitted under Boundary Hold. |
+| `git diff --check` and clean tree | **VERIFIED AT COMMIT** | `git diff --check` clean and no uncommitted change before the commit that carries this document. The tree is committed; see the commit log. |
 
 ## Owner decisions
 
@@ -126,9 +138,19 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
    per-IVn binding are implemented and pass.
 3. **Remaining Owner decisions 1–5 of the Stage brief** (input, addresses, ProcessModulePosition, IV
    mapping, placeholder rows) are applied as written.
-4. **OPEN, to confirm.** The Owner polarity answer was cut off in its final bullet ("...- no"). Its remainder
-   is unknown. The implemented items are complete and stated above. The remainder must be confirmed by the
-   Owner before it is treated as a requirement.
+4. **Digital limit polarity (final bullet), resolved.** The Owner restated the full text on 2026-10-10. It is
+   recorded verbatim below. Items it adds beyond the earlier answer are implemented as stated in the Limits
+   bullet above.
+
+   > All IV1-IV8 Lower-limit and Upper-limit inputs marked NO in the authoritative workbook use:
+   > ContactPolarity = ACTIVE_WHEN_CLOSED
+   > Interpretation before any verified hardware inversion: contact open = LimitDetected false; contact
+   > closed = LimitDetected true. Keep contact polarity separate from WAGO module inversion,
+   > coupler/process-image inversion, field-wiring inversion and software acquisition-profile inversion.
+   > Apply any later verified inversion exactly once. Do not claim wire-break detection from an NO contact
+   > alone. Do not use Pump pressure or Valve pressure as a substitute for a limit input. IVn Lower and
+   > Upper inputs must remain bound only to IVn. Hardware inversion remains UNVERIFIED. TEST_HARDWARE
+   > activation remains blocked.
 
 ## Known limitations
 
@@ -150,6 +172,8 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 3. `feat(mapping): read-only mapping configuration UI shell`
 4. `test(mapping): reorder, addressing, validation, polarity and boundary`
 5. `docs(checkpoint): stage 0.4B-1 development checkpoint`
+6. Follow-up (this revision): the IVn label check, its tests, the synthetic label convention, and the resolved
+   polarity bullet. The workbook is not touched.
 
 The workbook is not added by any of these commits. It arrived in `6ff9e4a` under the exception above.
 The PR targets `main`, is not merged, and does not reuse PR #11's branch.

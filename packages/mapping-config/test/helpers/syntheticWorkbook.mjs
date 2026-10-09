@@ -102,8 +102,8 @@ export function exampleRows({ placeholder = false, ambiguous = false } = {}) {
   const rows = [HEADER];
   rows.push(r(1, '750-362', '-', '-', 'Example coupler', 'Coupler', 'USED'));
   rows.push(r(2, '750-601', '-', '-', 'Example supply', 'Supply', 'USED'));
-  for (let c = 1; c <= 8; c += 1) rows.push(r(3, '750-430', c, `EX-DI-${String(c).padStart(2, '0')}`, `Example limit ${c} (NO)`, 'DI (24 VDC.)', 'USED'));
-  for (let c = 1; c <= 8; c += 1) rows.push(r(4, '750-430', c, `EX-DI-${String(c + 8).padStart(2, '0')}`, `Example limit ${c + 8} (NO)`, 'DI (24 VDC.)', 'USED'));
+  for (let c = 1; c <= 8; c += 1) rows.push(r(3, '750-430', c, `EX-DI-${String(c).padStart(2, '0')}`, `Example lower limit #${c} (NO)`, 'DI (24 VDC.)', 'USED'));
+  for (let c = 1; c <= 8; c += 1) rows.push(r(4, '750-430', c, `EX-DI-${String(c + 8).padStart(2, '0')}`, `Example upper limit #${c} (NO)`, 'DI (24 VDC.)', 'USED'));
   for (let c = 1; c <= 8; c += 1) rows.push(r(5, '750-530', c, `EX-DO-${String(c).padStart(2, '0')}`, `Example output ${c}`, 'DO (24 VDC.)', 'USED'));
   for (let i = 0; i < 12; i += 1) {
     const slot = 6 + Math.floor(i / 4);
