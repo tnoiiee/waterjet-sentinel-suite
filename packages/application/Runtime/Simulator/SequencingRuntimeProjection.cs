@@ -12,7 +12,7 @@ namespace Wjss.Runtime.Core.Simulator;
 /// <para>
 /// Presentation convention (synthetic, not physical progress): <c>PhaseProgress</c> is the 0..1 unit of the existing
 /// contract field, so verified phase Pn is presented as n/6. Before the first verified phase, the Job is presented as
-/// the next phase, P1, with <c>PhaseIndex</c> 0 and <c>PhaseProgress</c> 0. The P1 pending labels for PREPARING and
+/// the next phase, P1, with <c>PhaseIndex</c> 0 and <c>PhaseProgress</c> 0. The pre-P1 P1 values are Contract fallbacks, not verified facts. The P1 pending labels for PREPARING and
 /// READY_TO_CLEAN come from the brief. The label for CLEANING before any verified phase is an [OPEN] convention.
 /// </para>
 ///
@@ -33,7 +33,7 @@ public static class SequencingRuntimeProjection
     public const string CleaningPhaseInProgress = "IN_PROGRESS";
 
     /// <summary>The fallback feedback identity for a valve that has not been observed. No valve enum identity exists for it ([OPEN]).</summary>
-    public const string UnobservedValveFeedback = "UNKNOWN";
+    public const string UnobservedValveFeedback = "ABSENT";
 
     /// <summary>
     /// Projects the GlobalQueue summary. Entries are in FIFO order with position 1 at the head. DirtyScore is never set.
@@ -225,16 +225,26 @@ public static class SequencingRuntimeProjection
             Valve = new SafeReturnValveLeg
             {
                 ValveId = job.ValveId,
-                Command = SafeReturnStep.SR2.ToString(),
+                Command = SequenceOf(tail, SafeReturnStep.SR2) is null ? "NOT_COMMANDED" : "CLOSE_COMMANDED",
                 CommandSeq = SequenceOf(tail, SafeReturnStep.SR2),
-                Feedback = job.LastValveFeedback?.ToString() ?? UnobservedValveFeedback,
+                Feedback = retention.CurrentValveFeedback?.ValveFeedback switch
+                {
+                    null => UnobservedValveFeedback,
+                    ValveFeedbackState.CLOSED => "CLOSED_CONFIRMED",
+                    _ => "NOT_CONFIRMED",
+                },
                 FeedbackSeq = retention.CurrentValveFeedback?.Seq,
             },
             Axis = new SafeReturnAxisLeg
             {
-                Command = SafeReturnStep.SR4.ToString(),
+                Command = SequenceOf(tail, SafeReturnStep.SR4) is null ? "NOT_COMMANDED" : "RETURN_COMMANDED",
                 CommandSeq = SequenceOf(tail, SafeReturnStep.SR4),
-                Standby = retention.CurrentAxisFeedback?.AxisFeedback?.ToString() ?? AxisFeedbackState.UNKNOWN.ToString(),
+                Standby = retention.CurrentAxisFeedback?.AxisFeedback switch
+                {
+                    null => "ABSENT",
+                    AxisFeedbackState.AT_STANDBY => "STANDBY_CONFIRMED",
+                    _ => "NOT_CONFIRMED",
+                },
                 StandbySeq = SequenceOf(tail, SafeReturnStep.SR5),
             },
             Failure = failure is null

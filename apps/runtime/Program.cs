@@ -129,7 +129,7 @@ IResult RuntimeUnavailable(string code, string detail) => Results.Json(
     statusCode: StatusCodes.Status503ServiceUnavailable);
 
 IResult SnapshotEndpoint() => runtime.IsInitialized
-    ? Results.Json(runtime.ProjectSnapshot(), ContractJson.Options)
+    ? Results.Json(runtime.ProjectSnapshot(runtime.Publication), ContractJson.Options)
     : RuntimeUnavailable(
         RuntimeReadinessCodes.StoreNotInitialized,
         "The Runtime State Store is not initialized, so there is no authoritative Snapshot to serve.");
@@ -137,7 +137,7 @@ IResult SnapshotEndpoint() => runtime.IsInitialized
 IResult RuntimeEndpoint() => Results.Json(BuildStatus(), ContractJson.Options);
 
 IResult DeltasEndpoint() => Results.Json(
-    RuntimeDeltaFeed.From(runtime.Deltas, runtime.IsInitialized ? runtime.State.Revision : null),
+    runtime.IsInitialized ? RuntimeDeltaFeed.From(runtime.Publication) : RuntimeDeltaFeed.From(runtime.Deltas, null),
     ContractJson.Options);
 
 IResult InspectorEndpoint() => File.Exists(inspectorPagePath)
@@ -188,15 +188,16 @@ app.MapGet(ApiRoutes.Inspector, InspectorEndpoint);
 
 RuntimeStatus BuildStatus()
 {
-    var readiness = runtime.Readiness();
+    var publication = runtime.IsInitialized ? runtime.Publication : null;
+    var readiness = runtime.Readiness(publication);
     var counts = RuntimeStatusSensorCounts.Canonical();
-    var deltaHistory = runtime.Deltas;
 
     if (!runtime.IsInitialized)
     {
         return new RuntimeStatus
         {
             Ready = readiness.Ready,
+            Scenario = options.Scenario.ToString(),
             ReadinessCode = readiness.Code,
             ReadinessDetail = readiness.Detail,
             Profile = options.Profile,
@@ -222,9 +223,9 @@ RuntimeStatus BuildStatus()
             RejectedTransitions = runtime.RejectedTransitions,
             StateHistoryDepth = 0,
             StateHistoryCapacity = options.StateHistoryCapacity,
-            DeltaHistoryDepth = deltaHistory.Count,
-            DeltaHistoryCapacity = deltaHistory.Capacity,
-            NewestDeltaRevision = deltaHistory.NewestRevision,
+            DeltaHistoryDepth = publication?.Deltas.Count ?? 0,
+            DeltaHistoryCapacity = publication?.HistoryCapacity ?? options.DeltaHistoryCapacity,
+            NewestDeltaRevision = publication?.NewestDeltaRevision,
             UptimeSeconds = runtime.UptimeSeconds,
             ServerTimeUtc = UtcTimestamps.Format(clock.UtcNow),
             LastFaultCode = runtime.LastFaultCode,
@@ -233,13 +234,14 @@ RuntimeStatus BuildStatus()
         };
     }
 
-    var state = runtime.State;
-    var counters = runtime.Counters;
+    var state = publication!.Current;
+    var counters = runtime.CountersFor(publication);
     var generatedAt = UtcTimestamps.Format(state.GeneratedAtUtc);
 
     return new RuntimeStatus
     {
         Ready = readiness.Ready,
+        Scenario = options.Scenario.ToString(),
         ReadinessCode = readiness.Code,
         ReadinessDetail = readiness.Detail,
         Profile = state.DeviceProfile,
@@ -261,13 +263,13 @@ RuntimeStatus BuildStatus()
         PumpPlaceholder = RuntimeStatus.PumpPlaceholderLabel,
         ActiveAlarmCount = state.Alarms.ActiveUnack + state.Alarms.ActiveAck,
         ClearedAlarmCount = state.Alarms.ClearedUnack,
-        AcceptedTicks = runtime.AcceptedTicks,
+        AcceptedTicks = publication.Generation,
         RejectedTransitions = runtime.RejectedTransitions,
         StateHistoryDepth = counters.HistoryDepth,
         StateHistoryCapacity = counters.HistoryCapacity,
-        DeltaHistoryDepth = deltaHistory.Count,
-        DeltaHistoryCapacity = deltaHistory.Capacity,
-        NewestDeltaRevision = deltaHistory.NewestRevision,
+        DeltaHistoryDepth = publication.Deltas.Count,
+        DeltaHistoryCapacity = publication.HistoryCapacity,
+        NewestDeltaRevision = publication.NewestDeltaRevision,
         UptimeSeconds = runtime.UptimeSeconds,
         ServerTimeUtc = UtcTimestamps.Format(clock.UtcNow),
         LastFaultCode = runtime.LastFaultCode,

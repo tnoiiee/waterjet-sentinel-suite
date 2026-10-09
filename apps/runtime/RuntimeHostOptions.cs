@@ -2,6 +2,7 @@ using System.Globalization;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime.Core;
+using Wjss.Runtime.Core.Simulator;
 using SimulatorSeed = Wjss.Adapters.Simulator.SyntheticSeed;
 
 namespace Wjss.Runtime;
@@ -20,6 +21,10 @@ public sealed record RuntimeHostOptions
 {
     /// <summary>Device-profile variable (SIMULATOR default; TEST_HARDWARE and PRODUCTION are refused).</summary>
     public const string ProfileVariable = "WJSS_DEVICE_PROFILE";
+
+    /// <summary>Startup-only exact scenario identity.</summary>
+    public const string ScenarioVariable = "WJSS_SIMULATOR_SCENARIO";
+    public const string InvalidSimulatorScenario = "INVALID_SIMULATOR_SCENARIO";
 
     /// <summary>Loopback API port variable.</summary>
     public const string PortVariable = "WJSS_API_PORT";
@@ -60,6 +65,8 @@ public sealed record RuntimeHostOptions
     /// <summary>Delta-history capacity outside the accepted bounds.</summary>
     public const string InvalidDeltaHistoryCapacity = "INVALID_DELTA_HISTORY_CAPACITY";
 
+    public SimulatorScenarioId Scenario { get; init; } = SimulatorScenarioId.IDLE;
+
     public required DeviceProfile Profile { get; init; }
 
     public required int Port { get; init; }
@@ -94,6 +101,18 @@ public sealed record RuntimeHostOptions
         options = null!;
         refusalCode = string.Empty;
         refusalDetail = string.Empty;
+
+        // Profile gate first, even for callers bypassing Program. Read the scenario exactly once.
+        if (!ProfileStartPolicy.TryRequireStartable(profile, out refusalCode, out refusalDetail))
+            return false;
+        var scenarioLabel = readEnvironment(ScenarioVariable);
+        var scenario = SimulatorScenarioId.IDLE;
+        if (scenarioLabel is not null && !SimulatorScenarioCatalogue.TryParse(scenarioLabel, out scenario))
+        {
+            refusalCode = InvalidSimulatorScenario;
+            refusalDetail = $"{ScenarioVariable} must be an exact scenario name; got '{scenarioLabel}'.";
+            return false;
+        }
 
         var syntheticSeed = SimulatorSeed.DefaultSeed.Value;
         var seedLabel = readEnvironment(SeedVariable);
@@ -156,6 +175,7 @@ public sealed record RuntimeHostOptions
         options = new RuntimeHostOptions
         {
             Profile = profile,
+            Scenario = scenario,
             Port = port,
             SyntheticSeed = syntheticSeed,
             TickIntervalMilliseconds = tickInterval,
@@ -174,6 +194,13 @@ public sealed record RuntimeHostOptions
     {
         if (!ProfileStartPolicy.TryRequireStartable(Profile, out refusalCode, out refusalDetail))
         {
+            return false;
+        }
+
+        if (!SimulatorScenarioCatalogue.TryParse(Scenario.ToString(), out var parsedScenario) || parsedScenario != Scenario)
+        {
+            refusalCode = InvalidSimulatorScenario;
+            refusalDetail = $"Unknown scenario {Scenario}.";
             return false;
         }
 

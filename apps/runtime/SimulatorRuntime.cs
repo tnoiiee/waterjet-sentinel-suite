@@ -2,6 +2,8 @@ using Wjss.Adapters.Simulator;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime.Core;
+using Wjss.Runtime.Core.Sequencing;
+using Wjss.Runtime.Core.Simulator;
 using Wjss.Time;
 
 namespace Wjss.Runtime;
@@ -94,8 +96,9 @@ public sealed record RuntimeReadiness
 ///   <c>503</c> with a structured reason code.</item>
 /// </list>
 ///
-/// Scope honesty: this type carries synthetic presentation values only. It holds
-/// no control path, dispatches nothing, commands nothing, and persists nothing.
+/// Scope honesty: this type carries synthetic presentation values only. Kernel
+/// dispatch is simulated in memory; there is no external control path, physical
+/// device command, operator command, or persistence.
 /// </summary>
 public sealed class SimulatorRuntime : IAsyncDisposable
 {
@@ -116,9 +119,12 @@ public sealed class SimulatorRuntime : IAsyncDisposable
 
     private readonly RuntimeHostOptions _options;
     private readonly IClock _clock;
-    private readonly RuntimeStateStore? _store;
-    private readonly RuntimeStateWriter? _writer;
-    private readonly RuntimeDeltaHistory _deltaHistory;
+    private readonly RuntimePublicationStore? _store;
+    private readonly RuntimePublicationWriter? _writer;
+    private readonly SimulatorScenario? _scenario;
+    private SequencingState _sequencing = SequencingKernel.Initial();
+    private SequencingRetention _retention = SequencingRetention.Empty;
+    private int _scenarioCursor;
     private readonly Action<string, string>? _faultObserver;
     private readonly CancellationTokenSource _loopCts = new();
     private readonly object _faultGate = new();
@@ -140,9 +146,9 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     private SimulatorRuntime(
         RuntimeHostOptions options,
         IClock clock,
-        RuntimeStateStore? store,
-        RuntimeStateWriter? writer,
-        RuntimeDeltaHistory deltaHistory,
+        RuntimePublicationStore? store,
+        RuntimePublicationWriter? writer,
+        SimulatorScenario? scenario,
         Action<string, string>? faultObserver,
         DateTimeOffset composedAtUtc,
         string? startupFaultCode,
@@ -152,7 +158,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         _clock = clock;
         _store = store;
         _writer = writer;
-        _deltaHistory = deltaHistory;
+        _scenario = scenario;
         _faultObserver = faultObserver;
         _startupFaultCode = startupFaultCode;
         _startupFaultDetail = startupFaultDetail;
@@ -169,20 +175,40 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     /// <summary>True when the state store exists: the runtime can project a Snapshot and evolve.</summary>
     public bool IsInitialized => _store is not null && _writer is not null;
 
-    /// <summary>The current committed revision. Only valid when <see cref="IsInitialized"/> is true.</summary>
-    public RuntimeState State => _store is not null
-        ? _store.Current
-        : throw new InvalidOperationException(
-            $"[{RuntimeReadinessCodes.StoreNotInitialized}] The Runtime State Store was not initialized; no state exists.");
+    /// <summary>One detached reader generation; acquire once per response.</summary>
+    public RuntimePublication Publication => _store?.Snapshot ?? throw new InvalidOperationException(
+        $"[{RuntimeReadinessCodes.StoreNotInitialized}] No Runtime publication exists.");
 
-    /// <summary>Store diagnostics counters.</summary>
-    public RuntimeStoreCounters Counters => _store is not null
-        ? _store.Counters
-        : throw new InvalidOperationException(
-            $"[{RuntimeReadinessCodes.StoreNotInitialized}] The Runtime State Store was not initialized; no counters exist.");
+    public RuntimeState State => Publication.Current;
 
-    /// <summary>Bounded Delta history (newest first).</summary>
-    public RuntimeDeltaHistory Deltas => _deltaHistory;
+    // Compatibility diagnostics are calculated from the publication; neither is a live store.
+    public RuntimeStoreCounters Counters => CountersFor(Publication);
+    public RuntimeDeltaHistory Deltas
+    {
+        get
+        {
+            if (_store is null) return new RuntimeDeltaHistory(_options.DeltaHistoryCapacity);
+            var publication = Publication;
+            var history = new RuntimeDeltaHistory(publication.HistoryCapacity);
+            foreach (var delta in publication.Deltas.Reverse()) history.Append(delta);
+            return history;
+        }
+    }
+
+    public SimulatorScenarioId ScenarioId => _options.Scenario;
+    public int ScenarioCursor => _scenarioCursor;
+    public SequencingState Sequencing => _sequencing;
+    public SequencingRetention Retention => _retention;
+
+    public RuntimeStoreCounters CountersFor(RuntimePublication publication) => new()
+    {
+        CommittedRevisions = publication.Current.Revision,
+        RefusedCommits = checked((int)RejectedTransitions),
+        RevisionRefusals = 0,
+        InvalidStateRefusals = 0,
+        HistoryDepth = Math.Min(publication.Current.Revision, _options.StateHistoryCapacity),
+        HistoryCapacity = _options.StateHistoryCapacity,
+    };
 
     /// <summary>Accepted ticks since the lifecycle started.</summary>
     public long AcceptedTicks => Interlocked.Read(ref _acceptedTicks);
@@ -283,18 +309,22 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             WaterJetTopologyCatalog.IsolationValves,
             composedAtUtc);
 
-        var store = RuntimeStateStore.Create(initialState, options.StateHistoryCapacity);
+        var scenarioSet = SimulatorScenarioCatalogue.Create(initialState.Sensors);
+        var scenario = scenarioSet.Get(options.Scenario);
+        var store = RuntimePublicationStore.Create(initialState, options.DeltaHistoryCapacity);
 
         // Establish the initial projection NOW: readiness later reports the fact
         // that was established, it never claims a projection that was never made.
-        _ = RuntimeSnapshotProjector.Project(store.Current, store.Counters, 0.0);
+        _ = RuntimeSnapshotProjector.Project(store.Snapshot.Current, new RuntimeStoreCounters
+        { CommittedRevisions = 1, RefusedCommits = 0, RevisionRefusals = 0, InvalidStateRefusals = 0,
+          HistoryDepth = 1, HistoryCapacity = options.StateHistoryCapacity }, 0.0);
 
         var runtime = new SimulatorRuntime(
             options,
             clock,
             store,
             store.CreateWriter(),
-            new RuntimeDeltaHistory(options.DeltaHistoryCapacity),
+            scenario,
             faultObserver,
             composedAtUtc,
             startupFaultCode: null,
@@ -327,7 +357,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             clock,
             store: null,
             writer: null,
-            new RuntimeDeltaHistory(options.DeltaHistoryCapacity),
+            scenario: null,
             faultObserver,
             composedAtUtc,
             faultCode,
@@ -343,7 +373,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     }
 
     /// <summary>Current readiness answer with its machine code.</summary>
-    public RuntimeReadiness Readiness()
+    public RuntimeReadiness Readiness(RuntimePublication? publication = null)
     {
         if (!_options.TryValidate(out var validationCode, out var validationDetail))
         {
@@ -382,11 +412,12 @@ public sealed class SimulatorRuntime : IAsyncDisposable
                 "The Runtime State Store was not initialized.");
         }
 
-        if (_store!.Current.Revision < RuntimeStateComposer.InitialRevision)
+        publication ??= Publication;
+        if (publication.Current.Revision < RuntimeStateComposer.InitialRevision)
         {
             return RuntimeReadiness.NotReady(
                 RuntimeReadinessCodes.RevisionNotInitialized,
-                $"The revision system reports revision {_store.Current.Revision}, which is not an initialized revision.");
+                $"The revision system reports revision {publication.Current.Revision}, which is not an initialized revision.");
         }
 
         if (!_started)
@@ -400,23 +431,25 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         // about to claim instead of trusting that the composition-time projection
         // still matches the committed revision.
         var projection = RuntimeSnapshotProjector.Project(
-            _store!.Current, _store.Counters, UptimeSeconds);
+            publication.Current, CountersFor(publication), UptimeSeconds);
 
-        if (projection.Revision != _store.Current.Revision)
+        if (projection.Revision != publication.Current.Revision)
         {
             return RuntimeReadiness.NotReady(
                 RuntimeReadinessCodes.InitialSnapshotUnavailable,
                 $"The Snapshot projection reports revision {projection.Revision}, "
-                + $"not the committed revision {_store.Current.Revision}.");
+                + $"not the committed revision {publication.Current.Revision}.");
         }
 
         return RuntimeReadiness.IsReady(
-            $"SIMULATOR runtime ready at revision {_store.Current.Revision} (tick interval {_options.TickIntervalMilliseconds} ms).");
+            $"SIMULATOR runtime ready at revision {publication.Current.Revision} (tick interval {_options.TickIntervalMilliseconds} ms).");
     }
 
     /// <summary>Projects the current committed revision as the accepted Snapshot contract.</summary>
-    public OperationalSnapshot ProjectSnapshot() =>
-        RuntimeSnapshotProjector.Project(State, Counters, UptimeSeconds);
+    public OperationalSnapshot ProjectSnapshot() => ProjectSnapshot(Publication);
+
+    public OperationalSnapshot ProjectSnapshot(RuntimePublication publication) =>
+        RuntimeSnapshotProjector.Project(publication.Current, CountersFor(publication), UptimeSeconds);
 
     /// <summary>
     /// Starts the deterministic evolution lifecycle. One non-overlapping loop owns
@@ -440,7 +473,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
 
             _started = true;
             _startedAtUtc = _clock.UtcNow;
-            _nextTickInstant = _store!.Current.GeneratedAtUtc + _options.TickInterval;
+            _nextTickInstant = _store!.Snapshot.Current.GeneratedAtUtc + _options.TickInterval;
         }
 
         _loopTask = Task.Run(() => RunLoopAsync(_loopCts.Token));
@@ -534,74 +567,70 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     /// One accepted tick: derive the candidate, commit it through the single writer,
     /// project and retain its Delta. Refusals are recorded and change nothing.
     /// </summary>
+    // First accepted ordinal is zero: catalogue tick 0 is published at Runtime revision 2.
+    // Invoked only by the non-overlapping lifecycle (tests can invoke the same path).
     private void ExecuteTick()
     {
-        var store = _store!;
-        var writer = _writer!;
-        var previous = store.Current;
-        var tickNumber = previous.Revision;
+        var previousPublication = Publication;
+        var previous = previousPublication.Current;
         var tickInstant = _nextTickInstant;
-
         var outcome = RuntimeSyntheticEvolution.Tick(
-            previous, _options.SyntheticSeed, tickNumber, tickInstant);
+            previous, _options.SyntheticSeed, previous.Revision, tickInstant);
 
         if (!outcome.Accepted)
         {
             Interlocked.Increment(ref _rejectedTransitions);
-            RecordFault(
-                outcome.RefusalCode ?? RuntimeHostFaultCodes.CommitRefused,
+            RecordFault(outcome.RefusalCode ?? RuntimeHostFaultCodes.CommitRefused,
                 outcome.RefusalReason ?? "The synthetic tick was refused.");
-
-            // The refused instant must not be reused: tick instants advance
-            // monotonically whether or not a tick was accepted, so one refusal can
-            // never make every later tick refuse for the same reason.
             _nextTickInstant = tickInstant + _options.TickInterval;
             return;
         }
 
-        var evolution = outcome.Result!;
-
-        RuntimeState committed;
         try
         {
-            committed = writer.Commit(evolution.State);
+            var nextSequencing = _sequencing;
+            var nextRetention = _retention;
+            var due = _scenario is not null && _scenarioCursor < _scenario.Steps.Count
+                && _scenario.Steps[_scenarioCursor].Tick <= _acceptedTicks;
+            if (due)
+            {
+                var transition = SequencingKernel.Apply(_sequencing, _scenario!.Steps[_scenarioCursor].Event);
+                nextSequencing = transition.State;
+                nextRetention = SequencingRetention.Retain(_retention, _sequencing, transition);
+            }
+
+            var synthetic = outcome.Result!.State;
+            var candidate = synthetic with
+            {
+                Sensors = SequencingRuntimeProjection.ProjectSensorQueueStates(nextSequencing, synthetic.Sensors),
+                Queue = SequencingRuntimeProjection.ProjectQueue(nextSequencing, nextRetention),
+                ActiveJob = SequencingRuntimeProjection.ProjectActiveJob(nextSequencing, nextRetention),
+                Sequence = SequencingRuntimeProjection.ProjectSequence(nextSequencing, nextRetention, synthetic.Sequence.Controls),
+            };
+            RuntimeStateInvariants.RequireValid(candidate);
+            var delta = RuntimeDeltaProjector.ProjectCandidate(previous, candidate);
+            var published = _writer!.Publish(previous.Revision, candidate, delta);
+            if (!published.Accepted)
+            {
+                Interlocked.Increment(ref _rejectedTransitions);
+                RecordFault(published.Code ?? RuntimeHostFaultCodes.CommitRefused, "Runtime publication refused.");
+                _nextTickInstant = tickInstant + _options.TickInterval;
+                return;
+            }
+
+            // Adoption is strictly after the atomic State/Delta publication.
+            _sequencing = nextSequencing;
+            _retention = nextRetention;
+            if (due) _scenarioCursor++;
+            Interlocked.Increment(ref _acceptedTicks);
+            _nextTickInstant = published.Publication.Current.GeneratedAtUtc + _options.TickInterval;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
             Interlocked.Increment(ref _rejectedTransitions);
-            RecordFault(ExtractRefusalCode(ex.Message), ex.Message);
             _nextTickInstant = tickInstant + _options.TickInterval;
-            return;
+            throw;
         }
-
-        Interlocked.Increment(ref _acceptedTicks);
-        _nextTickInstant = committed.GeneratedAtUtc + _options.TickInterval;
-
-        try
-        {
-            _deltaHistory.Append(RuntimeDeltaProjector.Project(previous, evolution));
-        }
-        catch (InvalidOperationException ex)
-        {
-            // The revision is committed, so the Delta history now reports a gap;
-            // the feed shows it and the fault is observable here.
-            RecordFault(RuntimeHostFaultCodes.DeltaHistoryGap, ex.Message);
-        }
-    }
-
-    /// <summary>Extracts the machine code the state store prefixes to its refusals.</summary>
-    private static string ExtractRefusalCode(string message)
-    {
-        if (message.Length > 2 && message[0] == '[')
-        {
-            var end = message.IndexOf(']', 1);
-            if (end > 1)
-            {
-                return message[1..end];
-            }
-        }
-
-        return RuntimeHostFaultCodes.CommitRefused;
     }
 
     private void RecordFault(string code, string detail)
