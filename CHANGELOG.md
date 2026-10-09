@@ -1,3 +1,8 @@
+## 2026-10-09 — Stage 0.4A CP-3c-2 / CP-4A fast-track development checkpoint
+
+- Owner-authorized SIMULATOR scenario startup, single-writer atomic State/Delta host composition and existing GET-only observation; minimal read-only Inspector sequencing display. No device access, writes, SSE or contract changes.
+- Arena static boundary scan and JS/TypeScript checks passed; .NET SDK unavailable in Arena, so Owner-local Release build, tests, fixture parity and manual observation are **pending**. See [checkpoint](docs/STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md). PR open, not merged; CP-4 full UI not authorized.
+
 # Changelog
 
 All notable changes to this repository are recorded in this file.

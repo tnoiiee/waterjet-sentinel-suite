@@ -47,6 +47,9 @@ described anywhere else remains `[PROPOSED]` until a later gate approves it.
 
 ## 3. Stage ledger
 
+**Latest Stage 0.4A fast-track gate (2026-10-09):** On approved main `dfc2c02c550c1cc2367fa5ca6271dd3b2510557b` (PR #10 merged), CP-3c-2 Runtime composition and CP-4A **minimal read-only** Inspector are OWNER-AUTHORIZED and source-delivered for Owner-local validation. CP-4 full UI, operator control, MODBUS, TEST_HARDWARE and PRODUCTION are **NOT AUTHORIZED**. This supersedes the earlier CP-3c-2/CP-4 blanket NOT AUTHORIZED wording below; past validation results remain historical. See [checkpoint](STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md). The new PR remains open, not merged; .NET validation and Owner acceptance pending.
+
+
 **Latest Stage 0.4A CP-3c-1 status (2026-10-09):** Owner-local validation PASSED at `29f133ce6598bc2eb489273a2f2d40f8827deb5f`; static Final Source Review PASSED with no blocking defect. PR #10 OPEN, NOT MERGED; CP-3c-2 and CP-4 NOT AUTHORIZED. Earlier CP-3c-1 validation-pending and blanket CP-3c-not-authorized entries are dated history, superseded only for the authorized CP-3c-1 library foundation. See the CP-3c-1 checkpoint report.
 
 Status vocabulary: `[APPROVED]`, `[OWNER CONFIRMED]`, `[PROPOSED]`, `[OPEN]`,

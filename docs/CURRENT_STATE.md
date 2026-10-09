@@ -1,5 +1,7 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+**Latest fast-track checkpoint (2026-10-09):** CP-3c-2 Runtime composition and CP-4A minimal read-only Inspector are Owner-authorized and source-delivered from approved main `dfc2c02c550c1cc2367fa5ca6271dd3b2510557b` (PR #10 merged in ancestry). .NET build/tests and Owner-local GET/UI observation are **NOT VERIFIED**; do not infer Owner acceptance. PR for this checkpoint is open, not merged. CP-4 full UI, write routes, MODBUS, TEST_HARDWARE and PRODUCTION remain unauthorized. See [development checkpoint](STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md). Older PR #10 OPEN/CP-3c-2 NOT AUTHORIZED statements below are historical, superseded by this gate, not contemporary status.
+
 **Document status:** The verified state below is `[APPROVED]` as a factual record.
 Stage status wording and the open-item list were corrected by the Owner-confirmed Stage 0.1
 documentation review punchlist, updated by the approved Stage 0.2 Scope Gate — *Technology and
