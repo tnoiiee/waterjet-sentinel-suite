@@ -229,6 +229,9 @@ public sealed record RuntimeStatus
     /// <summary>True only when every readiness condition holds; the codes are <see cref="RuntimeReadinessCodes"/>.</summary>
     public required bool Ready { get; init; }
     public required string Scenario { get; init; }
+    public required double LowPressureThresholdBar { get; init; }
+    public required double HighPressureThresholdBar { get; init; }
+    public required double PumpReadySetpointBar { get; init; }
 
     public required string ReadinessCode { get; init; }
     public required string ReadinessDetail { get; init; }

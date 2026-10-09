@@ -1,5 +1,12 @@
 # Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel — Checkpoint Report
 
+> **CP-3c-2 correction:** This CP-2 document records the prior checkpoint. Where a legacy
+> row still describes limit-only P1 or sequential Safe Return, it is superseded by
+> `docs/MASTER_PLAN.md` §19 CP-3c-2: a measured Pump outlet (strictly above its
+> setpoint) gates P1, IVn outlet pressure supervises the paired Valve, SR2 CLOSE
+> precedes SR4 Axis-return **command** without waiting for SR3; SR3 resolution and
+> SR5 Standby independently join and can arrive in either order.
+
 **Status: SOURCE AUTHORED. STATICALLY REVIEWED. NOT COMPILED IN ARENA. NOT EXECUTED IN ARENA. OWNER-LOCAL VALIDATION REQUIRED.**
 
 **Scope:** `packages/application/Runtime/Sequencing/**` and `tests/runtime.tests/Sequencing/**`, plus documentation. Pure `Runtime.Core` kernel logic only.
@@ -104,7 +111,7 @@ Product source changes are confined to `packages/application/Runtime/Sequencing/
 | RUNNING (any stage) | `ReportExecutionFailure(reason)` | reason non-blank | SAFE_RETURN_VERIFY_VALVE_CLOSED, pending `FAILED` | SR1, SR2 | `SR1`, `SR2` |
 | RUNNING (any stage) | `ValveLimitObserved` INVALID_LIMIT_STATE | — | SAFE_RETURN_VERIFY_VALVE_CLOSED, pending `FAILED`, reason `VALVE_INVALID_LIMIT_STATE` | observation, SR1, SR2 | `VALVE_FEEDBACK_OBSERVED`, `SR1`, `SR2` |
 | RUNNING (any stage) | `ObservePumpState` UNEXPECTED_STOP or TRIP | — | SAFE_RETURN_VERIFY_VALVE_CLOSED, pending `ABORTED`, latch set | latch record, SR1, SR2, no dispatch | `CRITICAL_SUSPENSION_RAISED`, `SR1`, `SR2` |
-| SAFE_RETURN_VERIFY_VALVE_CLOSED | `ValveLimitObserved` CLOSED (observed after SR2) | — | SAFE_RETURN_VERIFY_STANDBY | SR3 confirmed, SR4 axis-return requested in the same transition | `VALVE_FEEDBACK_OBSERVED`, `SR3`, `SR4` |
+| SAFE_RETURN_VERIFY_STANDBY | `ValveSupervisionObserved` paired IVn | valid measured source | release if SR5 exists and the result is safe; otherwise retain | SR3 Valve-close resolution; SR4 already commanded | `SR3` (possibly `SR6`, `JOB_RELEASED`) |
 | SAFE_RETURN_VERIFY_VALVE_CLOSED | `ValveLimitObserved` OPEN or TRANSIT_OR_FAULT | — | unchanged (wait) | waits for timeout | `VALVE_NOT_CONFIRMED` |
 | SAFE_RETURN_VERIFY_VALVE_CLOSED | `ValveLimitObserved` INVALID_LIMIT_STATE | — | SAFE_RETURN_FAILED | none | `VALVE_FEEDBACK_OBSERVED`, `SR_FAILED` (`VALVE_INVALID_LIMIT_STATE`, RECOVERY_REQUIRED) |
 | SAFE_RETURN_VERIFY_VALVE_CLOSED | `FeedbackTimeoutExpired(VALVE_CLOSED)` | pending wait | SAFE_RETURN_FAILED | none | `SR_FAILED` (`VALVE_CLOSE_NOT_CONFIRMED`, RECOVERY_REQUIRED) |
@@ -131,14 +138,14 @@ No transition has a timer, clock, delay or random value. The Safe Return from a 
 | --- | --- | --- | --- | --- | --- | --- |
 | SR1 | 1. cleaning activity false | Any terminal intent | RUNNING (or ABORTING) → SAFE_RETURN_CLOSE_VALVE | `WATER_OUTPUT_OFF` | `SR1` | cleaning and synthetic water off |
 | SR2 | 2–3. synthetic water off, paired valve close requested | same transition, no delay | SAFE_RETURN_CLOSE_VALVE → SAFE_RETURN_VERIFY_VALVE_CLOSED | `VALVE_CLOSE` | `SR2` | valve close intent |
-| SR3 | 4. paired valve closed confirmed | valve `CLOSED` observed after SR2 | SAFE_RETURN_VERIFY_VALVE_CLOSED → SAFE_RETURN_TO_STANDBY | — | `SR3` | valve confirmed; earlier readings are not reused |
-| SR4 | 5. axis Standby return requested | same transition as SR3 | SAFE_RETURN_TO_STANDBY → SAFE_RETURN_VERIFY_STANDBY | `AXIS_TO_STANDBY` | `SR4` | axis return intent (never before SR3) |
-| SR5 | 6. axis at Standby confirmed | `AT_STANDBY` observed after SR4 | SAFE_RETURN_VERIFY_STANDBY (same) | — | `SR5` | Standby confirmed |
-| SR6 | 7. final outcome recorded | same transition as SR5 | (same) | — | `SR6` (JobOutcome = pending outcome) | outcome recorded only here |
-| SR7 | 8. Active Job released | same transition as SR5 | → released | — | `JOB_RELEASED` | Job cleared; Queue unchanged; latch unchanged |
+| SR3 | independent Valve close resolution | paired IVn pressure/limit assessed after SR2 | SAFE_RETURN_VERIFY_STANDBY | — | `SR3` | pressure-only inference does not create Lower confirmation evidence |
+| SR4 | Axis Standby return requested | same terminal-trigger transition as SR2, after CLOSE command | SAFE_RETURN_CLOSE_VALVE → SAFE_RETURN_VERIFY_STANDBY | `AXIS_TO_STANDBY` | `SR4` | never waits for SR3 |
+| SR5 | independent Axis Standby confirmation | `AT_STANDBY` observed after SR4 | SAFE_RETURN_VERIFY_STANDBY (same) | — | `SR5` | may precede or follow SR3 |
+| SR6 | final outcome recorded | second safe close/Standby result arrives | (same) | — | `SR6` (JobOutcome = pending outcome) | outcome recorded only here |
+| SR7 | Active Job released | same transition as SR6 | → released | — | `JOB_RELEASED` | Job cleared; Queue unchanged; faults remain latched |
 | SR_FAILED | failure | valve close or Standby not verified | → SAFE_RETURN_FAILED | — | failure reason, JobOutcome `RECOVERY_REQUIRED` | Job retained; no outcome; no release; no dispatch |
 
-Ordering invariant (checked by test T11 and by the validator): water-off < valve-close request < valve-CLOSED confirmed < axis-return request < AT_STANDBY confirmed < outcome < release.
+Ordering invariant: water-off < valve-CLOSE command < Axis-return command. SR3 follows CLOSE; SR5 follows Axis command. Either feedback may precede the other; both precede SR6 < SR7. Inferred closure has no `ValveClosedConfirmedSeq`.
 
 ---
 
@@ -161,8 +168,8 @@ Expected stop is not critical. It sets no latch and no High-severity condition. 
 
 | Upper | Lower | Derived state | RUNNING | After close requested (SR2) | In Safe Return after SR3 |
 | --- | --- | --- | --- | --- | --- |
-| 0 | 1 | `CLOSED` | Recorded; enables PREPARING → READY and P1 | Satisfies SR3 (fresh observation only) | No effect |
-| 1 | 0 | `OPEN` | Recorded; enables P2 | Does not satisfy SR3; waits for timeout (O-6) | No effect |
+| 0 | 1 | `CLOSED` | Recorded for preparation | SR3 Lower confirmation only with valid paired IVn pressure below Low | No effect |
+| 1 | 0 | `OPEN` | P1 requires valid paired IVn outlet pressure | Does not confirm close | No effect |
 | 0 | 0 | `TRANSIT_OR_FAULT` | Recorded | Waits for timeout | No effect |
 | 1 | 1 | `INVALID_LIMIT_STATE` | Immediate execution failure → Safe Return | Immediate SAFE_RETURN_FAILED | No effect |
 
@@ -172,7 +179,7 @@ A `ValveId` that does not match the Job's valve is refused (`VALVE_ID_MISMATCH`)
 
 | Feedback | Effect in VERIFY_STANDBY | Effect elsewhere |
 | --- | --- | --- |
-| `AT_STANDBY` | SR5, SR6, SR7 (release) | NO_OP (never releases a Job that has not passed SR3) |
+| `AT_STANDBY` | SR5; SR6/SR7 only if safe Valve resolution already exists | NO_OP outside the parallel return |
 | `NOT_AT_STANDBY` | Waits (NO_OP) until the timeout input | NO_OP |
 | `UNKNOWN` | Waits (NO_OP) until the timeout input | NO_OP |
 | `FAULT` | Immediate SAFE_RETURN_FAILED | NO_OP |
@@ -181,7 +188,7 @@ A `ValveId` that does not match the Job's valve is refused (`VALVE_ID_MISMATCH`)
 
 ## 9. Outcome timing
 
-- No outcome is recorded before SR5 (`AT_STANDBY` confirmed) on the success path. The outcome is recorded at SR6, in the same transition as SR5 and SR7.
+- No outcome is recorded before both independent results are available. SR6 and SR7 run in the transition that completes the join, whether it is SR3 or SR5.
 - The pending outcome is fixed at the trigger: normal completion `COMPLETED`; abort `ABORTED`; execution failure `FAILED`; Pump UNEXPECTED_STOP or TRIP `ABORTED`.
 - Safe Return failure records `RECOVERY_REQUIRED` as evidence only (SR_FAILED). No final outcome is written, and no release occurs.
 - A pending outcome is never `RECOVERY_REQUIRED`, and the validator rejects any mismatch between trigger and pending outcome.
@@ -260,7 +267,7 @@ Mapping of the required scenario list (§14 of the brief):
 | 7 | Pump critical sets CRITICAL_SUSPENDED | T07 |
 | 8 | Critical requests paired valve close in the same transition | T08 |
 | 9 | Valve close request precedes Axis return | T09 |
-| 10 | Axis return cannot be requested before valve closed confirmation | T10 |
+| 10 | Axis return is commanded after CLOSE but before either independent feedback (CP-3c-2 replacement) | Parallel-return tests |
 | 11 | Safe Return evidence sequence strictly increases | T11 |
 | 12 | Final outcome absent before valve and axis confirmations | T12 |
 | 13 | Active Job retained until verified Safe Return | T13 |
@@ -313,7 +320,7 @@ Verification performed in Arena: C# syntax parse of all 12 changed or new sequen
 ## 16. Known limitations and open items
 
 - O-11 is open (see §13).
-- Valve readings during Safe Return after SR5 (VERIFY_STANDBY) are recorded as no-effect evidence. No cross-check between the valve and axis is made after release.
+- A paired-IVn close assessment after SR5 is retained and immediately completes the join only when safely closed; leak, not-fully-closed or invalid pressure retains the Job. Readings after release cannot operate on the released Job.
 - The stored state never carries `SAFE_RETURN_CLOSE_VALVE`, `SAFE_RETURN_TO_STANDBY` or `ABORTING`. They appear only as `LifecycleAfter`/`LifecycleBefore` evidence values, because the same transition continues to the next step. The validator rejects them as stored state.
 - The Job's `PendingOutcome` is internal and is not projected to the wire (`JobOutcomeRecord` remains a CP-3/CP-4 projection target).
 - No persistence; in-memory only (O-16).
@@ -407,9 +414,9 @@ Read-only review of `packages/application/Runtime/Sequencing/**`, `tests/runtime
 | 4 | UNEXPECTED_STOP and TRIP disable water in the same transition? | YES | `CriticalPump` puts `WaterOutputOn = false` and `CleaningActive = false` in the same `StartSafeReturn` trail as the latch. |
 | 5 | UNEXPECTED_STOP and TRIP set CRITICAL_SUSPENDED? | YES | Set in all three branches: no Job, RUNNING Job, and Safe Return in progress. |
 | 6 | Paired Valve close requested immediately on a critical event? | YES | SR2 is recorded in the same transition, with the Job's `ValveId` fixed at dispatch from the topology. |
-| 7 | Can Axis return be requested before Valve CLOSED is confirmed? | NO | SR4 is only recorded in `ObserveValveWhileAwaitingClose` when the observed valve is CLOSED, in the same transition as SR3. `AxisWaitViolation` also requires `LastValveFeedback == CLOSED`. |
-| 8 | Can a successful final outcome be recorded before Axis Standby? | NO | SR6 (outcome) is recorded only in `ConfirmStandbyAndRelease`, after AT_STANDBY, and in the same trail as SR5 and SR7. |
-| 9 | Can the Active Job release before Safe Return succeeds? | NO | `ActiveJob = null` appears once, in `ConfirmStandbyAndRelease`. It is reachable only from SAFE_RETURN_VERIFY_STANDBY with AT_STANDBY. |
+| 7 | Can Axis return be requested before Valve CLOSED is confirmed? | YES (CP-3c-2 correction) | SR2 CLOSE command precedes SR4 Axis-return command in the trigger transition. SR3 and SR5 independently arrive in either order; release joins both only on a safe Valve resolution. |
+| 8 | Can a successful final outcome be recorded before Axis Standby? | NO | SR6 runs after both independent results, in the transition that receives the second valid result (SR3 or SR5). |
+| 9 | Can the Active Job release before Safe Return succeeds? | NO | `ReleaseAfterBoth` requires a safe close result plus AT_STANDBY. |
 | 10 | Can another Job dispatch before release? | NO | `Dispatch` refuses with `DISPATCH_REFUSED_JOB_ACTIVE` while a Job exists, and refuses under the latch. |
 | 11 | Does Safe Return failure retain the Active Job? | YES | `FailSafeReturn` sets lifecycle SAFE_RETURN_FAILED and keeps `ActiveJob`. |
 | 12 | Does Safe Return failure preserve Queue and QueueRevision? | YES | `FailSafeReturn` and `ExpireFeedback` change only `ActiveJob` (`state with { ActiveJob = ... }`). |
@@ -437,7 +444,7 @@ Queue, Job and Safe Return records all draw from one counter, `SequencingState.E
 Verified in source against the approved behaviour:
 
 - Safe Return continues under the latch. `ObserveValve`, `ObserveAxis` and `ExpireFeedback` do not check `CriticalSuspended`.
-- The Active Job releases after verified Safe Return (SR5, SR6, SR7 in one transition).
+- The Active Job releases after both safe return branches; SR6 and SR7 run in the second branch's transition, SR3 or SR5.
 - `CriticalSuspended` remains true after release. Nothing writes it to false.
 - The Queue and QueueRevision are unchanged by release.
 - Next dispatch is forbidden. `Dispatch` refuses under the latch.

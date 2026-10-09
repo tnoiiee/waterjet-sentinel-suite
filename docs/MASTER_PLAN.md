@@ -148,20 +148,20 @@ stay `[NOT AUTHORIZED]` until each is explicitly approved.
 - The §4.1 pre-execution states (`PENDING`, `REVALIDATING`, `RESERVED`) are not separate CP-2 states. CP-1 atomic dispatch already performs revalidation and reservation (§19 O-9).
 - The CP-1 pump-waiting gate (`PUMP_NOT_READY`) remains a Job-level flag after dispatch. A mid-run pump-not-ready is an open question (§19 O-11).
 
-**5. Exact Safe Return states.** `SafeReturnStep` values, in order: **SR1** stop cleaning activity and disable synthetic water output (same transition as the trigger); **SR2** request the paired Isolation Valve close (intent emitted; lifecycle `SAFE_RETURN_CLOSE_VALVE`, then `SAFE_RETURN_VERIFY_VALVE_CLOSED`); **SR3** confirm valve `CLOSED`, observed after the SR2 intent (an earlier observation is not reused); **SR4** request the axis return to Standby (intent emitted only after SR3, same transition as SR3 confirmation; lifecycle `SAFE_RETURN_TO_STANDBY`, then `SAFE_RETURN_VERIFY_STANDBY`); **SR5** confirm axis `AT_STANDBY`, observed after SR4; **SR6** record the outcome (§11); **SR7** release the Active Job; **SR8** later sequencing may be considered (no kernel action; the next `DispatchHead` is a separate transition). Failure: `SR_FAILED` with lifecycle `SAFE_RETURN_FAILED`.
+**5. Exact Safe Return states (CP-3c-2 correction).** SR1 disables synthetic water; SR2 commands the paired Isolation Valve CLOSE; SR4 commands Axis return immediately afterward, without waiting for Valve feedback. `ValveCloseCommandSeq < AxisReturnCommandSeq`. SR3 is the independently observed Valve-close **resolution**, not an Axis gate: a verified Lower limit gives `LOWER_LIMIT_CONFIRMED`, while pressure-only inference gives `CLOSED_BY_PRESSURE` and no Lower confirmation sequence. SR5 independently records Axis `AT_STANDBY` after SR4. SR3 and SR5 may arrive in either order. SR6 records the pending outcome and SR7 releases the Active Job immediately on the second valid result, only for `LOWER_LIMIT_CONFIRMED` or `CLOSED_BY_PRESSURE`. Leak, not-fully-closed and invalid pressure retain the Job. SR8 is not a kernel action; a later dispatch is a separate transition and is blocked by latched equipment faults. Failure: `SR_FAILED` retains the Job. Measured Pump outlet readiness is strictly above the configurable Pump setpoint (default 15 bar), independently of the paired IVn Low/High thresholds (defaults 1/15 bar).
 
 **6. Exact valve feedback states** (derived from the accepted matrix, [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §5.2; columns as in that table):
 
 | Upper limit | Lower limit | Derived `ValveFeedbackState` | Safe Return meaning |
 | --- | --- | --- | --- |
-| 0 | 1 | `CLOSED` | Satisfies SR3 when observed after SR2 |
-| 1 | 0 | `OPEN` | Does not satisfy SR3; waits; a timeout input fails the step (§19 O-6) |
+| 0 | 1 | `CLOSED` | Lower limit contributes to SR3 only with valid IVn outlet pressure below Low; SR4 is already commanded |
+| 1 | 0 | `OPEN` | Does not confirm close; pressure classification remains independent of Axis feedback |
 | 0 | 0 | `TRANSIT_OR_FAULT` | Legitimate during bounded travel; waits until a timeout input, then failure |
 | 1 | 1 | `INVALID_LIMIT_STATE` | Always a fault: immediate `SAFE_RETURN_FAILED` |
 
 Feedback carries the `ValveId`. A mismatched identity is refused (§19 O-6). Valve timeouts are input events only (§9).
 
-**7. Exact axis feedback states** (abstract only). `AT_STANDBY` satisfies SR5. `NOT_AT_STANDBY` and `UNKNOWN` do not satisfy SR5 and wait until a `FeedbackTimeoutExpired(AXIS_STANDBY)` input, which fails the step. `FAULT` fails the step immediately. No coordinate, speed, homing or positioning value exists anywhere in CP-2. The confirmation source is open (decision D10, §19 O-7). No axis command is ever issued before SR3 is confirmed.
+**7. Exact axis feedback states** (abstract only). `AT_STANDBY` satisfies SR5. `NOT_AT_STANDBY` and `UNKNOWN` do not satisfy SR5 and wait until a `FeedbackTimeoutExpired(AXIS_STANDBY)` input, which fails the step. `FAULT` fails the step immediately. No coordinate, speed, homing or positioning value exists anywhere in CP-2. The confirmation source is open (decision D10, §19 O-7). Axis return is commanded after Valve CLOSE and does not wait for SR3.
 
 **8. Exact Pump-critical input states.**
 - Accepted critical inputs: `CriticalPumpKind.MAIN_PUMP_UNEXPECTED_STOP` (class B) and `CriticalPumpKind.MAIN_PUMP_TRIP` (class C). Each raises the critical condition.
@@ -188,10 +188,10 @@ Feedback carries the `ValveId`. A mismatched identity is refused (§19 O-6). Val
 | `RUNNING` (any phase) | `ExecutionFailureObserved` | none | `SAFE_RETURN_CLOSE_VALVE`, pending `FAILED` | SR1; SR2 intent | `SR1`, `SR2` |
 | `RUNNING` (any phase) | `AbortRequested` | none | `ABORTING` → `SAFE_RETURN_CLOSE_VALVE`, pending `ABORTED` | SR1; SR2 intent (same transition) | `SR1`, `SR2` |
 | `RUNNING` (any phase) | `PumpCriticalObserved` (B or C) | none | `SAFE_RETURN_CLOSE_VALVE`, pending per O-1; `CriticalSuspended = true` | SR1; SR2 intent; no dispatch | `CRITICAL_SUSPENSION_RAISED`, `SR1`, `SR2` |
-| `SAFE_RETURN_VERIFY_VALVE_CLOSED` | `ValveLimitObserved(CLOSED)`, observed after SR2 | none | `SAFE_RETURN_VERIFY_STANDBY` | SR3 confirmed; SR4 intent | `SR3`, `SR4` |
-| `SAFE_RETURN_VERIFY_VALVE_CLOSED` | `ValveLimitObserved(OPEN` or `TRANSIT_OR_FAULT)` | none | unchanged | observation recorded | `VALVE_NOT_CONFIRMED` |
-| `SAFE_RETURN_VERIFY_VALVE_CLOSED` | `ValveLimitObserved(INVALID_LIMIT_STATE)` or `FeedbackTimeoutExpired(VALVE_CLOSED)` | none | `SAFE_RETURN_FAILED` | Job retained; no release; no dispatch | `SR_FAILED` |
-| `SAFE_RETURN_VERIFY_STANDBY` | `AxisFeedbackObserved(AT_STANDBY)` | none | Job cleared after SR6 and SR7 | SR5 confirmed; outcome recorded; release | `SR5`, `OUTCOME_RECORDED`, `JOB_RELEASED` |
+| `SAFE_RETURN_VERIFY_STANDBY` | `ValveSupervisionObserved` for the paired IVn | valid quality/source and a completed close assessment | release if SR5 exists and close is safe; otherwise retain | SR3 resolution; SR4 was already commanded | `SR3` (possibly `SR6`, `SR7`) |
+| `SAFE_RETURN_VERIFY_STANDBY` | Unsafe Valve resolution | leak, not-fully-closed or invalid pressure | retained with fault | SR3; no SR6/SR7 | `SR3` |
+| `SAFE_RETURN_VERIFY_STANDBY` | `FeedbackTimeoutExpired(VALVE_CLOSED)` | no Valve result | `SAFE_RETURN_FAILED` | Job retained; no release; no dispatch | `SR_FAILED` |
+| `SAFE_RETURN_VERIFY_STANDBY` | `AxisFeedbackObserved(AT_STANDBY)` | after SR4 | release only if a safe SR3 resolution exists; otherwise retain | SR5 then optional SR6/SR7 | `SR5` (possibly `SR6`, `JOB_RELEASED`) |
 | `SAFE_RETURN_VERIFY_STANDBY` | `AxisFeedbackObserved(NOT_AT_STANDBY` or `UNKNOWN)` | none | unchanged | observation recorded | `STANDBY_NOT_CONFIRMED` |
 | `SAFE_RETURN_VERIFY_STANDBY` | `AxisFeedbackObserved(FAULT)` or `FeedbackTimeoutExpired(AXIS_STANDBY)` | none | `SAFE_RETURN_FAILED` | Job retained; no release; no dispatch | `SR_FAILED` |
 | `SAFE_RETURN_FAILED` | any Job-advancing event | none | unchanged | refused; no retry, reset or resume | `SAFE_RETURN_FAILED_RETAINED` |
@@ -199,7 +199,7 @@ Feedback carries the `ValveId`. A mismatched identity is refused (§19 O-6). Val
 | any state with an Active Job | `RequestPause` | none | `PAUSE_REQUESTED` (CP-1) | the Job continues through Safe Return | CP-1 code |
 | Job released (SR8) | `DispatchHead` | CP-1 rules | next Job | separate transition only | CP-1 codes |
 
-**11. Outcome timing.** The outcome is recorded at SR6 only, after SR5 (`AT_STANDBY` confirmed) on the success path. Release (SR7) is an ordered record in the same transition as SR6. The next dispatch is always a separate transition. Outcome mapping (proposal):
+**11. Outcome timing.** The outcome is recorded at SR6 only after both SR3 safe Valve resolution and SR5 Standby, in the same transition as the second independent result. Release (SR7) is an ordered record in the same transition as SR6. The next dispatch is always a separate transition. Outcome mapping (proposal):
 
 | Trigger | Safe Return verified | Outcome |
 | --- | --- | --- |
@@ -247,7 +247,7 @@ Feedback carries the `ValveId`. A mismatched identity is refused (§19 O-6). Val
 - T-06 Pump TRIP (class C) disables it in the same way.
 - T-07 Pump critical sets `CRITICAL_SUSPENDED`.
 - T-08 the paired valve-close intent precedes any axis-return intent.
-- T-09 an axis-return intent is never emitted before a valve `CLOSED` observation that follows SR2.
+- T-09 Axis-return intent follows CLOSE command without waiting for a Valve confirmation; SR3 and SR5 may occur in either order.
 - T-10 Safe Return evidence sequence numbers strictly increase.
 - T-11 no outcome is recorded before SR5 on the success path.
 - T-12 the Job is not released before Safe Return succeeds.
@@ -363,7 +363,7 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 
 **3. AxisStandbySeq decision.** The SR5 evidence sequence is written into `AxisStandbySeq` inside the AT_STANDBY confirmation path. The released Job does not survive, so the value is observable only through the SR5 evidence record of the release transition. The public preview `SequencingKernel.PreviewAxisStandbyLedger` is removed by the completion correction. The release transition's own SR5 record carries the same sequence, so the Owner-facing outcome record can be sourced from evidence without a new transition receipt. `SequencingTransition` is not changed.
 
-**4. CP-3b scope (simulator composition, library only; completion correction).** Allowed: `packages/application/Runtime/Simulator/` (scenario catalogue bound to the canonical Runtime Sensor set, scenario-to-kernel schedules, five-scope bounded retention, and the pure wire projection of the GlobalQueue, Sensor queue state, Active Job, Safe Return, Sequence, critical event and last Job outcome) and `RuntimeDeltaProjector.cs` (content comparison, and a pure candidate path that carries one appended trend point and refuses other trend changes explicitly). Tests in `tests/runtime.tests/Simulator/`. Scenario selection is a pure name match with no clock, no randomness and no operator surface. The Pump section and the Sequence controls are carried unchanged from the previous revision. Presentation rules applied for Owner review (these are rulings requested, not authority questions): `PhaseProgress` is the contract's 0..1 unit, so verified phase Pn is presented as n/6 (the brief's integer table does not apply); before the first verified phase the Job is presented as `P1 PENDING - PREPARING` or `P1 PENDING - READY_TO_CLEAN`, and CLEANING before any verified phase as `P1 PENDING - CLEANING` (a flagged convention); `CleaningPhase` is `IN_PROGRESS` (the contract defines only running and frozen-at-trigger); a valve Feedback before any observation is `UNKNOWN` (no valve feedback identity exists for it); Safe Return `Command` fields carry the SR2 and SR4 step codes only. The Host composition that supplies the canonical Sensor set is CP-3c and is NOT AUTHORIZED.
+**4. CP-3b scope (simulator composition, library only; completion correction; historical baseline superseded by CP-3c-2 pressure projection).** Allowed: `packages/application/Runtime/Simulator/` (scenario catalogue bound to the canonical Runtime Sensor set, scenario-to-kernel schedules, five-scope bounded retention, and the pure wire projection of the GlobalQueue, Sensor queue state, Active Job, Safe Return, Sequence, critical event and last Job outcome) and `RuntimeDeltaProjector.cs` (content comparison, and a pure candidate path that carries one appended trend point and refuses other trend changes explicitly). Tests in `tests/runtime.tests/Simulator/`. Scenario selection is a pure name match with no clock, no randomness and no operator surface. The historical CP-3b projection carried the Pump section unchanged; CP-3c-2 projects a separate measured Pump outlet (never the Valve outlet). Sequence controls remain disabled. Presentation rules applied for Owner review (these are rulings requested, not authority questions): `PhaseProgress` is the contract's 0..1 unit, so verified phase Pn is presented as n/6 (the brief's integer table does not apply); before the first verified phase the Job is presented as `P1 PENDING - PREPARING` or `P1 PENDING - READY_TO_CLEAN`, and CLEANING before any verified phase as `P1 PENDING - CLEANING` (a flagged convention); `CleaningPhase` is `IN_PROGRESS` (the contract defines only running and frozen-at-trigger); a valve Feedback before any observation is `UNKNOWN` (no valve feedback identity exists for it); Safe Return `Command` fields carry the SR2 and SR4 step codes only. The Host composition that supplies the canonical Sensor set is CP-3c and is NOT AUTHORIZED.
 
 **5. Equipment intents.** Intents remain pure evidence data. CP-3 adds no command-like vocabulary. The contract's existing `Command` fields are not renamed. O-8 stays `[OPEN]`.
 

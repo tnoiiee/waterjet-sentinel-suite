@@ -198,6 +198,9 @@ RuntimeStatus BuildStatus()
         {
             Ready = readiness.Ready,
             Scenario = options.Scenario.ToString(),
+            LowPressureThresholdBar = options.PressureThresholds.LowPressureThresholdBar,
+            HighPressureThresholdBar = options.PressureThresholds.HighPressureThresholdBar,
+            PumpReadySetpointBar = options.PressureThresholds.PumpReadySetpointBar,
             ReadinessCode = readiness.Code,
             ReadinessDetail = readiness.Detail,
             Profile = options.Profile,
@@ -242,6 +245,9 @@ RuntimeStatus BuildStatus()
     {
         Ready = readiness.Ready,
         Scenario = options.Scenario.ToString(),
+        LowPressureThresholdBar = options.PressureThresholds.LowPressureThresholdBar,
+        HighPressureThresholdBar = options.PressureThresholds.HighPressureThresholdBar,
+        PumpReadySetpointBar = options.PressureThresholds.PumpReadySetpointBar,
         ReadinessCode = readiness.Code,
         ReadinessDetail = readiness.Detail,
         Profile = state.DeviceProfile,

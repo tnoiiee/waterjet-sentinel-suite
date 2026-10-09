@@ -63,6 +63,10 @@
     border: 1px solid var(--warn); color: #1c1503; background: var(--warn); font-weight: 600;
   }
   .banner.show { display: block; }
+  .equipment-fault-modal { display: none; border: 4px solid var(--bad); background: #341012;
+    color: #fff; padding: 22px; margin: 12px 0; border-radius: 8px; font-size: 21px;
+    font-weight: 800; overflow-wrap: anywhere; }
+  .equipment-fault-modal.show { display: block; }
   /*
     Two explicit columns. The previous track list
     (repeat(auto-fit, minmax(330px, 1fr))) produced five equal 1fr tracks, and the
@@ -196,6 +200,8 @@
   </header>
 
   <div class="banner" id="banner-stale">Updates stopped or the API is unreachable: the values below are the last successfully received data.</div>
+
+  <div id="equipment-fault-modal" class="equipment-fault-modal" role="alert" aria-live="assertive"></div>
 
   <main class="grid" id="grid">
     <section class="card">
@@ -751,6 +757,13 @@
     var safeReturn = job && job.safeReturn;
     var critical = snapshot.sequence && snapshot.sequence.critical;
     var outcome = snapshot.sequence && snapshot.sequence.lastJobOutcome;
+    var faults = snapshot.sequence && snapshot.sequence.equipmentFaults || [];
+    var fault = faults.length ? faults[faults.length - 1] : null;
+    var modal = el("equipment-fault-modal");
+    modal.classList.toggle("show", Boolean(fault && fault.modalOpen));
+    text(modal, fault && fault.modalOpen ? "HIGH SEVERITY — LATCHED EQUIPMENT FAULTS: " +
+      faults.map(function (item) { return item.diagnosis + " (" + item.valveId + ")"; }).join("; ") +
+      ". NEXT DISPATCH BLOCKED. Operator decision pending. READ ONLY." : "");
     [
       ["Scenario", status.scenario],
       ["Runtime revision", snapshot.revision],
@@ -759,6 +772,16 @@
       ["Phase / progress", job ? job.phaseLabel + " (" + job.phaseIndex + "/6; " + num(job.phaseProgress * 100, 1) + "%)" : "none"],
       ["Safe Return trigger / step", safeReturn ? safeReturn.trigger + " / " + safeReturn.step : "none"],
       ["Valve command / feedback", safeReturn ? safeReturn.valve.command + " / " + safeReturn.valve.feedback : "none"],
+      ["Pump outlet / quality / source", job ? String(job.pumpOutletPressureBar ?? "unavailable") + " bar / " + (job.pumpPressureQuality || "unknown") + " / " + (job.pumpPressureSourceId || "absent") : "none"],
+      ["Pump ready > setpoint", job ? String(job.pumpPressureInputValid && job.pumpOutletPressureBar > job.pumpReadySetpointBar) + " / " + job.pumpReadySetpointBar + " bar" : status.pumpReadySetpointBar + " bar setpoint"],
+      ["Paired " + (job ? job.valveId : "Valve") + " outlet / quality / source", job ? String(job.valveOutletPressureBar ?? "unavailable") + " bar / " + (job.valvePressureQuality || "unknown") + " / " + (job.valvePressureSourceId || "absent") : (fault ? fault.pressureBar + " bar / " + fault.pressureQuality : "none")],
+      ["Valve OPEN result / diagnosis", job ? (job.valveOpenResolution || "pending") + " / " + (job.valveDiagnosis || "none") : "none"],
+      ["Pressure input valid", safeReturn ? String(safeReturn.valve.pressureInputValid) : "none"],
+      ["Low / High thresholds", status.lowPressureThresholdBar + " / " + status.highPressureThresholdBar + " bar"],
+      ["Upper / Lower limits", safeReturn ? String(safeReturn.valve.upperLimitDetected) + " / " + String(safeReturn.valve.lowerLimitDetected) : (fault ? String(fault.upperLimitDetected) + " / " + String(fault.lowerLimitDetected) : "none")],
+      ["Inferred Valve / diagnosis", safeReturn ? safeReturn.valve.resolution + " / " + safeReturn.valve.diagnosis : (outcome ? outcome.valveCloseResolution + " / " + outcome.valveDiagnosis : "none")],
+      ["Cleaning outcome / qualified completion", outcome ? outcome.outcome + " / " + (outcome.qualifiedCompletion || "none") + " / " + (outcome.qualifiedRemarks || []).join(", ") : (safeReturn ? safeReturn.pendingOutcome + " / pending" : "none")],
+      ["Next dispatch blocked", fault && fault.nextDispatchBlocked ? "YES" : "NO"],
       ["Axis command / standby", safeReturn ? safeReturn.axis.command + " / " + safeReturn.axis.standby : "none"],
       ["Critical Pump condition / modal", critical ? critical.kind + " / " + (critical.modalOpen ? "OPEN" : "CLOSED") : "none"],
       ["Last Job Outcome", outcome ? outcome.outcome + " (" + outcome.jobId + ")" : "none"],

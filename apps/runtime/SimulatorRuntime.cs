@@ -309,7 +309,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             WaterJetTopologyCatalog.IsolationValves,
             composedAtUtc);
 
-        var scenarioSet = SimulatorScenarioCatalogue.Create(initialState.Sensors);
+        var scenarioSet = SimulatorScenarioCatalogue.Create(initialState.Sensors, options.PressureThresholds);
         var scenario = scenarioSet.Get(options.Scenario);
         var store = RuntimePublicationStore.Create(initialState, options.DeltaHistoryCapacity);
 
