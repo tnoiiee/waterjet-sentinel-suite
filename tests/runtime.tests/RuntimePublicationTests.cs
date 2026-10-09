@@ -8,6 +8,14 @@ namespace Wjss.Runtime.Core.Tests;
 
 public sealed class RuntimePublicationTests
 {
+    private static readonly string[] ChangedSeriesNames =
+    [
+        "A",
+        "B",
+        "C",
+        "D",
+    ];
+
     private static string Json<T>(T value) => JsonSerializer.Serialize(value, ContractJson.Options);
 
     [Fact]
@@ -158,7 +166,7 @@ public sealed class RuntimePublicationTests
         Refuse(previous.Trend with { Points = new[] { Point(3), Point(2), Point(4) } }); // reorder
         Refuse(previous.Trend with { Points = new[] { Point(2), Point(3) } }); // removal
         Refuse(previous.Trend with { Capacity = 4, Points = new[] { Point(2), Point(3), Point(4) } });
-        Refuse(previous.Trend with { SeriesNames = new[] { "A", "B", "C", "D" }, Points = new[] { Point(2), Point(3), Point(4) } });
+        Refuse(previous.Trend with { SeriesNames = ChangedSeriesNames, Points = new[] { Point(2), Point(3), Point(4) } });
         Refuse(previous.Trend with { Points = new[] { Point(2), Point(3), Point(4), Point(5) } });
     }
 
@@ -230,7 +238,7 @@ public sealed class RuntimePublicationTests
     });
 
     [Fact]
-    public void Concurrent_Calls_Through_One_Writer_Publish_Exactly_Once()
+    public async Task Concurrent_Calls_Through_One_Writer_Publish_Exactly_Once()
     {
         var run = SimulatorRunHarness.RunScenario(SimulatorScenarioId.NORMAL_COMPLETION);
         var store = RuntimePublicationStore.Create(run.Initial);
@@ -241,8 +249,9 @@ public sealed class RuntimePublicationTests
         var first = Task.Run(() => { if (!gate.Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("Start gate timed out."); return writer.Publish(run.Initial.Revision, candidate, delta); });
         var second = Task.Run(() => { if (!gate.Wait(TimeSpan.FromSeconds(30))) throw new TimeoutException("Start gate timed out."); return writer.Publish(run.Initial.Revision, candidate, delta); });
         gate.Set();
-        Assert.True(Task.WaitAll(new Task[] { first, second }, TimeSpan.FromSeconds(30)));
-        var results = new[] { first.Result, second.Result };
+        var results = await Task
+            .WhenAll(first, second)
+            .WaitAsync(TimeSpan.FromSeconds(30));
         Assert.Single(results, result => result.Accepted);
         Assert.Single(results, result => !result.Accepted && result.Code == "PUBLICATION_STALE_REVISION");
         Assert.Equal(1, store.Snapshot.Generation);
@@ -251,7 +260,7 @@ public sealed class RuntimePublicationTests
     }
 
     [Fact]
-    public void Acquired_Snapshots_Are_Generation_Consistent_While_Writer_Publishes()
+    public async Task Acquired_Snapshots_Are_Generation_Consistent_While_Writer_Publishes()
     {
         var run = SimulatorRunHarness.RunScenario(SimulatorScenarioId.NORMAL_COMPLETION);
         var store = RuntimePublicationStore.Create(run.Initial, 2);
@@ -272,7 +281,7 @@ public sealed class RuntimePublicationTests
         gate.Set();
         for (var index = 0; index < 100; index++)
             AssertConsistent(store.Snapshot, run.Initial.Revision);
-        Assert.True(publish.Wait(TimeSpan.FromSeconds(30)));
+        await publish.WaitAsync(TimeSpan.FromSeconds(30));
         AssertConsistent(store.Snapshot, run.Initial.Revision);
     }
 
