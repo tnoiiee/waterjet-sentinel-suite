@@ -33,6 +33,20 @@ public sealed record ActiveCleaningJobState
     /// <summary>The dispatch evidence this Job was created from (atomic head removal).</summary>
     public required DispatchRecord Dispatch { get; init; }
 
+    /// <summary>Dedicated measured Pump outlet; never inferred from the active Valve outlet.</summary>
+    public double? PumpOutletPressureBar { get; init; }
+    public string? PumpPressureQuality { get; init; }
+    public string? PumpPressureSourceId { get; init; }
+    public bool PumpPressureInputValid { get; init; }
+    public double PumpReadySetpointBar { get; init; }
+    /// <summary>Measured outlet of this Job's paired IVn only; never the Pump outlet.</summary>
+    public double? ValveOutletPressureBar { get; init; }
+    public string? ValvePressureQuality { get; init; }
+    public string? ValvePressureSourceId { get; init; }
+    public bool ValvePressureInputValid { get; init; }
+    public string? ValveOpenResolution { get; init; }
+    public string? ValveDiagnosis { get; init; }
+
     /// <summary>Present from SR1 until the Job is released.</summary>
     public SafeReturnState? SafeReturn { get; init; }
 }
@@ -61,7 +75,13 @@ public sealed record JobOutcomeRecord
 
     public required string ValveId { get; init; }
     public required int ValveCloseCommandSeq { get; init; }
-    public required int ValveClosedConfirmedSeq { get; init; }
+    /// <summary>Null when closure is pressure-inferred without a Lower limit observation.</summary>
+    public int? ValveClosedConfirmedSeq { get; init; }
+    public string? ValveCloseResolution { get; init; }
+    public string? ValveDiagnosis { get; init; }
+    public string? QualifiedCompletion { get; init; }
+    public IReadOnlyList<string>? QualifiedRemarks { get; init; }
+    public IReadOnlyList<EquipmentFaultState>? EquipmentFaults { get; init; }
     public required int AxisReturnCommandSeq { get; init; }
     public required int StandbyConfirmedSeq { get; init; }
     public required int OutcomeSeq { get; init; }

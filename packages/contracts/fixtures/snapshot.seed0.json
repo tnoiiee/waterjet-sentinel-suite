@@ -4260,6 +4260,17 @@
     "phaseProgress": 0.5,
     "lifecycle": "SAFE_RETURN_TO_STANDBY",
     "cleaningPhase": "CLEANING_STOPPED",
+    "pumpOutletPressureBar": 16.0,
+    "pumpPressureQuality": "GOOD",
+    "pumpPressureSourceId": "PUMP_OUTLET",
+    "pumpPressureInputValid": true,
+    "pumpReadySetpointBar": 15.0,
+    "valveOutletPressureBar": 0.5,
+    "valvePressureQuality": "GOOD",
+    "valvePressureSourceId": "SYN-VLV-05_OUTLET",
+    "valvePressureInputValid": true,
+    "valveOpenResolution": "OPEN_CONFIRMED",
+    "valveDiagnosis": "NONE",
     "dispatch": {
       "dispatchId": "D-100",
       "queueRevisionBefore": 4,
@@ -4283,11 +4294,20 @@
         "command": "CLOSE_COMMANDED",
         "commandSeq": 11,
         "feedback": "CLOSED_CONFIRMED",
-        "feedbackSeq": 12
+        "upperLimitDetected": false,
+        "lowerLimitDetected": true,
+        "pressureBar": 0.5,
+        "pressureQuality": "GOOD",
+        "lowPressureThresholdBar": 1,
+        "highPressureThresholdBar": 15,
+        "pressureInputValid": true,
+        "resolution": "LOWER_LIMIT_CONFIRMED",
+        "diagnosis": "NONE",
+        "feedbackSeq": 13
       },
       "axis": {
         "command": "RETURN_COMMANDED",
-        "commandSeq": 13,
+        "commandSeq": 12,
         "standby": "NOT_CONFIRMED",
         "standbySeq": null
       },
@@ -4313,14 +4333,14 @@
         },
         {
           "seq": 12,
-          "step": "SR3",
-          "event": "VALVE_CLOSED_CONFIRMED",
+          "step": "SR4",
+          "event": "AXIS_RETURN_COMMANDED",
           "at": "2026-10-07T00:00:00.000Z"
         },
         {
           "seq": 13,
-          "step": "SR4",
-          "event": "AXIS_RETURN_COMMANDED",
+          "step": "SR3",
+          "event": "VALVE_CLOSED_CONFIRMED",
           "at": "2026-10-07T00:00:00.000Z"
         }
       ]
@@ -4410,7 +4430,8 @@
       }
     },
     "critical": null,
-    "lastJobOutcome": null
+    "lastJobOutcome": null,
+    "equipmentFaults": null
   },
   "alarms": {
     "activeUnack": 1,

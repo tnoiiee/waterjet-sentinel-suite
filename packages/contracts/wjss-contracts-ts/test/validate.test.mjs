@@ -289,3 +289,55 @@ test('validateEnvelope dispatches the sensor-map kind', () => {
   assert.equal(result.kind, 'sensor-map');
   assert.deepEqual(result.issues, []);
 });
+
+test('concurrent valve and axis commands accept either feedback order without invented confirmation', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const sr = snapshot.activeJob.safeReturn;
+  assert.ok(sr.valve.commandSeq < sr.axis.commandSeq);
+  assert.ok(sr.axis.commandSeq < sr.valve.feedbackSeq);
+  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+  sr.valve.commandSeq = sr.axis.commandSeq;
+  assert.ok(validateEnvelope(snapshot).issues.some((issue) => issue.includes('close command must precede axis')));
+  sr.valve.commandSeq = 11;
+  sr.valve.resolution = 'CLOSED_BY_PRESSURE';
+  sr.valve.feedback = 'NOT_CONFIRMED';
+  sr.valve.feedbackSeq = null;
+  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+});
+
+
+test('Pump and paired IVn outlets are separate sources with a strict Pump setpoint', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const job = snapshot.activeJob;
+  assert.equal(job.pumpPressureSourceId, 'PUMP_OUTLET');
+  assert.equal(job.valvePressureSourceId, `${job.valveId}_OUTLET`);
+  assert.ok(job.pumpOutletPressureBar > job.pumpReadySetpointBar);
+  job.pumpPressureSourceId = job.valvePressureSourceId;
+  assert.ok(validateEnvelope(snapshot).issues.some(i => i.includes('own measured outlet')));
+  job.pumpPressureSourceId = 'PUMP_OUTLET';
+  job.valvePressureSourceId = 'IV8_OUTLET';
+  assert.ok(validateEnvelope(snapshot).issues.some(i => i.includes('paired IVn outlet')));
+});
+
+test('released dual-fault Job needs both remarks and a post-command SR3 in either feedback order', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const o = {
+    outcome: 'COMPLETED', valveCloseCommandSeq: 11, axisReturnCommandSeq: 12,
+    valveClosedConfirmedSeq: null, valveCloseResolution: 'CLOSED_BY_PRESSURE',
+    standbyConfirmedSeq: 15, outcomeSeq: 16, releaseSeq: 17,
+    qualifiedCompletion: 'COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS',
+    qualifiedRemarks: ['COMPLETED_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT', 'COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT'],
+    equipmentFaults: [{ diagnosis: 'UPPER_LIMIT_SENSOR_FAULT' }, { diagnosis: 'LOWER_LIMIT_SENSOR_FAULT' }],
+    events: [{ seq: 14, step: 'SR3', event: 'CLOSED_BY_PRESSURE' }],
+  };
+  snapshot.sequence.lastJobOutcome = o;
+  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+  o.events = [{ seq: 15, step: 'SR3', event: 'CLOSED_BY_PRESSURE' }];
+  o.standbyConfirmedSeq = 14;
+  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+  o.qualifiedRemarks = ['COMPLETED_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT'];
+  assert.ok(validateEnvelope(snapshot).issues.some(i => i.includes('both distinct diagnoses and remarks')));
+  o.qualifiedRemarks.push('COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT');
+  o.valveClosedConfirmedSeq = 15;
+  assert.ok(validateEnvelope(snapshot).issues.some(i => i.includes('no Lower confirmation')));
+});

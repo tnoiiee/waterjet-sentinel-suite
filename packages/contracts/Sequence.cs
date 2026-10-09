@@ -69,4 +69,20 @@ public sealed record SequenceState
 
     /// <summary>Frozen record of the last released Job, or null.</summary>
     public JobOutcomeRecord? LastJobOutcome { get; init; }
+
+    /// <summary>Latched SIMULATOR equipment fault; observation only, with no clear authority.</summary>
+    public IReadOnlyList<EquipmentFaultState>? EquipmentFaults { get; init; }
+}
+
+public sealed record EquipmentFaultState
+{
+    public required string Diagnosis { get; init; }
+    public required string ValveId { get; init; }
+    public required string RaisedAt { get; init; }
+    public required bool ModalOpen { get; init; }
+    public required bool NextDispatchBlocked { get; init; }
+    public double? PressureBar { get; init; }
+    public string? PressureQuality { get; init; }
+    public bool? UpperLimitDetected { get; init; }
+    public bool? LowerLimitDetected { get; init; }
 }

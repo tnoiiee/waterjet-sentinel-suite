@@ -158,6 +158,15 @@ export interface SafeReturnValveLeg {
   command: ValveCommandLabel;
   commandSeq: number | null;
   feedback: ValveFeedbackLabel;
+  upperLimitDetected?: boolean | null;
+  lowerLimitDetected?: boolean | null;
+  pressureBar?: number | null;
+  pressureQuality?: 'GOOD' | 'BAD' | 'STALE' | null;
+  lowPressureThresholdBar?: number | null;
+  highPressureThresholdBar?: number | null;
+  pressureInputValid?: boolean;
+  resolution?: 'LOWER_LIMIT_CONFIRMED' | 'CLOSED_BY_PRESSURE' | 'LEAK_SUSPECTED' | 'NOT_FULLY_CLOSED' | 'PRESSURE_INPUT_INVALID' | null;
+  diagnosis?: string | null;
   feedbackSeq: number | null;
 }
 
@@ -216,6 +225,17 @@ export interface ActiveCleaningJobState {
   phaseProgress: number;
   lifecycle: JobLifecycle;
   cleaningPhase: string;
+  pumpOutletPressureBar: number | null;
+  pumpPressureQuality: 'GOOD' | 'BAD' | 'STALE' | null;
+  pumpPressureSourceId: string | null;
+  pumpPressureInputValid: boolean;
+  pumpReadySetpointBar: number;
+  valveOutletPressureBar: number | null;
+  valvePressureQuality: 'GOOD' | 'BAD' | 'STALE' | null;
+  valvePressureSourceId: string | null;
+  valvePressureInputValid: boolean;
+  valveOpenResolution: 'OPEN_CONFIRMED' | 'OPEN_BY_PRESSURE' | 'BLOCKED' | null;
+  valveDiagnosis: string | null;
   dispatch: DispatchRecord;
   safeReturn: SafeReturnState | null;
 }
@@ -234,7 +254,12 @@ export interface JobOutcomeRecord {
   outcome: string;
   valveId: string;
   valveCloseCommandSeq: number;
-  valveClosedConfirmedSeq: number;
+  valveClosedConfirmedSeq: number | null;
+  valveCloseResolution?: string | null;
+  valveDiagnosis?: string | null;
+  qualifiedCompletion?: string | null;
+  qualifiedRemarks?: string[] | null;
+  equipmentFaults?: EquipmentFaultState[] | null;
   axisReturnCommandSeq: number;
   standbyConfirmedSeq: number;
   outcomeSeq: number;
@@ -285,6 +310,7 @@ export interface SequenceState {
   controls: SequenceControls;
   critical: CriticalPumpEvent | null;
   lastJobOutcome: JobOutcomeRecord | null;
+  equipmentFaults?: EquipmentFaultState[] | null;
 }
 
 export interface PumpState {
@@ -533,3 +559,5 @@ export interface SensorMapExample {
     slots: SensorMapSlotExample[];
   };
 }
+
+export interface EquipmentFaultState { diagnosis: string; valveId: string; raisedAt: string; modalOpen: boolean; nextDispatchBlocked: boolean; pressureBar?: number | null; pressureQuality?: string | null; upperLimitDetected?: boolean | null; lowerLimitDetected?: boolean | null }
