@@ -490,13 +490,29 @@
     host.appendChild(v);
   }
 
-  function renderRuntimeState(status) {
+  // Measured readiness is an observation of the active Job's Pump outlet, not
+  // evidence of a physical run/stop command. Never use status.pumpState here.
+  function pumpObservation(job) {
+    if (!job) { return "NO ACTIVE JOB OBSERVATION"; }
+    if (!job.pumpPressureInputValid) {
+      return job.pumpPressureQuality || job.pumpPressureSourceId || job.pumpOutletPressureBar != null
+        ? "PRESSURE INPUT INVALID" : "PRESSURE NOT OBSERVED";
+    }
+    if (typeof job.pumpOutletPressureBar !== "number" || !Number.isFinite(job.pumpOutletPressureBar)) {
+      return "PRESSURE INPUT INVALID";
+    }
+    return job.pumpOutletPressureBar > job.pumpReadySetpointBar
+      ? "READY BY PRESSURE" : "NOT READY BY PRESSURE";
+  }
+
+  function renderRuntimeState(status, snapshot) {
     var host = el("kv-runtime");
     host.textContent = "";
     var rows = [
       { k: "Queue", v: status.queueCount + " / " + status.queueCapacity, s: status.queuePlaceholder },
       { k: "Active job", v: status.activeJobPresent ? ("present: " + status.activeJobId) : "none" },
-      { k: "Pump", v: status.pumpState, s: status.pumpPlaceholder },
+      { k: "Pump control", v: "NOT AUTHORIZED / READ ONLY", s: "No Pump command path; pressure readiness is observation only." },
+      { k: "Pump observation", v: pumpObservation(snapshot.activeJob) },
       { k: "Alarms", v: status.activeAlarmCount + " active, " + status.clearedAlarmCount + " cleared" },
       { k: "Newest Delta revision", v: status.newestDeltaRevision === null ? "none" : status.newestDeltaRevision },
       { k: "Current revision", v: status.currentRevision === null ? "-" : status.currentRevision },
@@ -773,8 +789,11 @@
       ["Phase / progress", job ? job.phaseLabel + " (" + job.phaseIndex + "/6; " + num(job.phaseProgress * 100, 1) + "%)" : "none"],
       ["Safe Return trigger / step", safeReturn ? safeReturn.trigger + " / " + safeReturn.step : "none"],
       ["Valve command / feedback", safeReturn ? safeReturn.valve.command + " / " + safeReturn.valve.feedback : "none"],
-      ["Pump outlet / quality / source", job ? String(job.pumpOutletPressureBar ?? "unavailable") + " bar / " + (job.pumpPressureQuality || "unknown") + " / " + (job.pumpPressureSourceId || "absent") : "none"],
-      ["Pump ready > setpoint", job ? String(job.pumpPressureInputValid && job.pumpOutletPressureBar > job.pumpReadySetpointBar) + " / " + job.pumpReadySetpointBar + " bar" : status.pumpReadySetpointBar + " bar setpoint"],
+      ["Pump Outlet Pressure", job && job.pumpOutletPressureBar != null ? job.pumpOutletPressureBar + " bar" : "unavailable"],
+      ["Pump pressure quality", job ? (job.pumpPressureQuality || "unavailable") : "no active Job observation"],
+      ["Pump pressure source", job ? (job.pumpPressureSourceId || "unavailable") : "no active Job observation"],
+      ["Pump-ready setpoint", status.pumpReadySetpointBar + " bar"],
+      ["Pump readiness", pumpObservation(job)],
       ["Paired " + (job ? job.valveId : "Valve") + " outlet / quality / source", job ? String(job.valveOutletPressureBar ?? "unavailable") + " bar / " + (job.valvePressureQuality || "unknown") + " / " + (job.valvePressureSourceId || "absent") : (fault ? fault.pressureBar + " bar / " + fault.pressureQuality : "none")],
       ["Valve OPEN result / diagnosis", job ? (job.valveOpenResolution || "pending") + " / " + (job.valveDiagnosis || "none") : "none"],
       ["Pressure input valid", safeReturn ? String(safeReturn.valve.pressureInputValid) : "none"],
@@ -808,7 +827,7 @@
     latestSnapshot = snapshot;
     renderHeading(status);
     renderFoundation(status);
-    renderRuntimeState(status);
+    renderRuntimeState(status, snapshot);
     renderSequencing(status, snapshot);
     renderWallMap(snapshot);
     renderTopology(snapshot);
