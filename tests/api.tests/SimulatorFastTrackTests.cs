@@ -79,7 +79,7 @@ public sealed class SimulatorFastTrackTests
             // Ordinal zero is the first tick: step tick 0 is visible at Runtime revision 2.
             Assert.Equal(1, runtime.Publication.Current.Revision);
             Assert.Equal(0, runtime.ScenarioCursor);
-            var steps = SimulatorScenarioCatalogue.Create(runtime.State.Sensors).Get(id).Steps;
+            var steps = SimulatorScenarioCatalogue.Create(runtime.State.Sensors, runtime.Options.PressureThresholds).Get(id).Steps;
             for (var ordinal = 0; ordinal < steps.Count + 3; ordinal++)
             {
                 var before = runtime.Publication;
@@ -187,7 +187,7 @@ public sealed class SimulatorFastTrackTests
         var runtime = Create(SimulatorScenarioId.QUEUE_CAPACITY_AND_FIFO);
         try
         {
-            var steps = SimulatorScenarioCatalogue.Create(runtime.State.Sensors).Get(runtime.ScenarioId).Steps;
+            var steps = SimulatorScenarioCatalogue.Create(runtime.State.Sensors, runtime.Options.PressureThresholds).Get(runtime.ScenarioId).Steps;
             foreach (var _ in steps) Tick(runtime);
             Assert.Equal(steps.Count, runtime.ScenarioCursor);
             Assert.Contains(runtime.Retention.EvidenceLog, e => e.Outcome == Wjss.Runtime.Core.Sequencing.SequencingOutcome.REFUSED);
@@ -201,7 +201,23 @@ public sealed class SimulatorFastTrackTests
         var runtime = Create(SimulatorScenarioId.PUMP_TRIP);
         try
         {
-            for (var i = 0; i <= 7; i++) Tick(runtime);
+            var scenario = SimulatorScenarioCatalogue
+                .Create(runtime.State.Sensors, runtime.Options.PressureThresholds)
+                .Get(runtime.ScenarioId);
+            var criticalStep = Assert.Single(
+                scenario.Steps,
+                step => step.Event is ObservePumpState
+                {
+                    Observation: PumpObservation.TRIP,
+                });
+
+            for (var acceptedOrdinal = 0;
+                 acceptedOrdinal <= criticalStep.Tick;
+                 acceptedOrdinal++)
+            {
+                Tick(runtime);
+            }
+
             var publication = runtime.Publication;
             var snapshot = runtime.ProjectSnapshot(publication);
             var feed = RuntimeDeltaFeed.From(publication);
@@ -211,7 +227,7 @@ public sealed class SimulatorFastTrackTests
             var job = Assert.IsType<ActiveCleaningJobState>(snapshot.ActiveJob);
             var safeReturn = Assert.IsType<SafeReturnState>(job.SafeReturn);
             Assert.Equal("CLOSE_COMMANDED", safeReturn.Valve.Command);
-            Assert.Equal("NOT_COMMANDED", safeReturn.Axis.Command);
+            Assert.Equal("RETURN_COMMANDED", safeReturn.Axis.Command);
             var critical = Assert.IsType<CriticalPumpEvent>(snapshot.Sequence.Critical);
             Assert.True(critical.ModalOpen);
         }
