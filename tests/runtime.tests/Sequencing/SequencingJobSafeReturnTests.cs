@@ -7,6 +7,16 @@ namespace Wjss.Runtime.Core.Tests;
 /// <summary>CP-3c-2 measured-pressure and parallel Safe Return contract (SIMULATOR only).</summary>
 public sealed class SequencingJobSafeReturnTests
 {
+    private static readonly string[] ExpectedSecondQueuedSensorIds =
+    [
+        "SYN-S02",
+    ];
+    private static readonly string[] ExpectedUpperAndLowerLimitFaults =
+    [
+        "UPPER_LIMIT_SENSOR_FAULT",
+        "LOWER_LIMIT_SENSOR_FAULT",
+    ];
+
     private static readonly DateTimeOffset Epoch = new(2026, 10, 9, 0, 0, 0, TimeSpan.Zero);
     private static DateTimeOffset At(int tick) => Epoch.AddSeconds(tick);
     private static readonly SequencingTopology Topology = new(
@@ -121,7 +131,7 @@ public sealed class SequencingJobSafeReturnTests
         Assert.True(resolutionSeq < Seq(second, SafeReturnStep.SR6));
         Assert.True(standbySeq < Seq(second, SafeReturnStep.SR6));
         Assert.Equal(CleaningJobOutcome.COMPLETED, Assert.Single(second.Records, e => e.Step == SafeReturnStep.SR6).JobOutcome);
-        Assert.Equal(new[] { "SYN-S02" }, second.State.Queue.Select(e => e.SensorId));
+        Assert.Equal(ExpectedSecondQueuedSensorIds, second.State.Queue.Select(e => e.SensorId));
     }
 
     [Theory]
@@ -165,9 +175,9 @@ public sealed class SequencingJobSafeReturnTests
         var released = Apply(state, new AxisFeedbackObserved(At(17), AxisFeedbackState.AT_STANDBY));
         Assert.Null(released.State.ActiveJob);
         Assert.Equal(2, released.State.EquipmentFaults.Count);
-        Assert.Equal(new[] { "UPPER_LIMIT_SENSOR_FAULT", "LOWER_LIMIT_SENSOR_FAULT" },
+        Assert.Equal(ExpectedUpperAndLowerLimitFaults,
             released.State.EquipmentFaults.Select(f => f.Diagnosis));
-        Assert.Equal(new[] { "SYN-S02" }, released.State.Queue.Select(e => e.SensorId));
+        Assert.Equal(ExpectedSecondQueuedSensorIds, released.State.Queue.Select(e => e.SensorId));
         var blocked = Apply(released.State, new DispatchHead(At(18), Topology, true));
         Assert.Equal(SequencingOutcome.REFUSED, blocked.Outcome);
         Assert.Equal(released.State.QueueRevision, blocked.State.QueueRevision);

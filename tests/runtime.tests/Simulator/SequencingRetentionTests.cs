@@ -8,6 +8,12 @@ namespace Wjss.Runtime.Core.Tests;
 /// <summary>Frozen outcome and read-only equipment-fault retention for either feedback order.</summary>
 public sealed class SequencingRetentionTests
 {
+    private static readonly string[] ExpectedMultipleLimitFaultRemarks =
+    [
+        "COMPLETED_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT",
+        "COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT",
+    ];
+
     private static List<SimulatorScenarioStep> StandbyFirst(SimulatorScenarioId scenario)
     {
         var steps = SimulatorRunHarness.ScenarioSet().Get(scenario).Steps.ToList();
@@ -88,7 +94,7 @@ public sealed class SequencingRetentionTests
         var outcome = Assert.IsType<JobOutcomeRecord>(run.FinalRetention.LastJobOutcome);
         Assert.Equal("COMPLETED", outcome.Outcome);
         Assert.Equal("COMPLETE_WITH_MULTIPLE_VALVE_LIMIT_FAULTS", outcome.QualifiedCompletion);
-        Assert.Equal(new[] { "COMPLETED_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT", "COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT" }, outcome.QualifiedRemarks);
+        Assert.Equal(ExpectedMultipleLimitFaultRemarks, outcome.QualifiedRemarks);
         Assert.Equal(2, outcome.EquipmentFaults?.Count);
         Assert.All(outcome.EquipmentFaults!, f => { Assert.True(f.ModalOpen); Assert.True(f.NextDispatchBlocked); });
         Assert.Equal(2, run.FinalState.EquipmentFaults.Count);

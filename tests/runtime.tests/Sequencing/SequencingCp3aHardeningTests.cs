@@ -14,7 +14,8 @@ public sealed class SequencingCp3aHardeningTests
     public void Critical_Pump_Disables_Water_And_Latch_Survives_Independent_Release(SimulatorScenarioId scenario)
     {
         var run = SimulatorRunHarness.RunScenario(scenario);
-        var critical = Assert.Single(run.Transitions.Where(t => t.Records.Any(r => r.Code == SequencingCodes.CriticalSuspensionRaised)));
+        var critical = Assert.Single(run.Transitions,
+            t => t.Records.Any(r => r.Code == SequencingCodes.CriticalSuspensionRaised));
         Assert.False(critical.State.ActiveJob?.WaterOutputOn ?? true);
         Assert.True(critical.State.CriticalSuspended);
         Assert.True(run.FinalState.CriticalSuspended);
