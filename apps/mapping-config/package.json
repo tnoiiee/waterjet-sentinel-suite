@@ -1,0 +1,15 @@
+{
+  "name": "@wjss/mapping-config-ui",
+  "version": "0.0.0-0.4b-1-simulation",
+  "private": true,
+  "description": "Stage 0.4B-1 read-only Mapping Configuration UI shell. Loopback only. No device access.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "check": "node --check server.mjs && node --check public/app.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

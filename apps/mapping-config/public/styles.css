@@ -1,0 +1,36 @@
+:root { color-scheme: light; --ink:#18212b; --muted:#5b6876; --line:#d7dde4; --bg:#f6f8fa; --ok:#1d6b3a; --warn:#8a5a00; --err:#a11d1d; --info:#1f4f8a; }
+* { box-sizing: border-box; }
+body { margin:0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:var(--bg); }
+.banner { display:flex; flex-wrap:wrap; gap:12px 24px; align-items:center; justify-content:space-between; padding:14px 20px; background:#15202b; color:#f2f5f8; }
+.banner h1 { margin:0; font-size:18px; }
+.banner .sub { margin:2px 0 0; color:#b8c4d0; font-size:12px; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; }
+.chip { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; background:#34414f; color:#f2f5f8; }
+.chip.ok { background:#1d6b3a; } .chip.err { background:#8c1f1f; } .chip.warn { background:#7a5200; } .chip.info { background:#1f4f8a; } .chip.draft { background:#4b3a7a; }
+main { padding:16px 20px 8px; display:grid; gap:16px; max-width:1400px; margin:0 auto; }
+section { background:#fff; border:1px solid var(--line); border-radius:8px; padding:14px 16px; }
+h2 { margin:0 0 10px; font-size:16px; }
+h3 { margin:14px 0 6px; font-size:14px; }
+.hint { font-weight:400; color:var(--muted); font-size:12px; margin-left:8px; }
+.note { color:var(--muted); font-size:12px; margin:8px 0 0; }
+.toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+button { font:inherit; padding:5px 12px; border:1px solid #8a96a3; border-radius:6px; background:#fff; cursor:pointer; }
+button:disabled { color:#9aa4ae; border-color:var(--line); cursor:not-allowed; }
+button:focus-visible, tr:focus-visible { outline:2px solid var(--info); outline-offset:2px; }
+.refusal { color:var(--err); font-weight:600; }
+.table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:6px; }
+table { border-collapse:collapse; width:100%; font-size:13px; }
+th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { background:#eef2f6; font-weight:600; white-space:nowrap; }
+tbody tr.movable { cursor:grab; }
+tbody tr.movable:hover { background:#f2f7ff; }
+tbody tr.dragging { opacity:.5; }
+tbody tr.fixed td { color:var(--muted); }
+.issues { padding-left:18px; margin:6px 0; }
+.sev-error strong { color:var(--err); } .sev-warning strong { color:var(--warn); } .sev-info strong { color:var(--info); }
+.rev { display:grid; grid-template-columns: 260px 180px 1fr; gap:8px; align-items:baseline; padding:4px 0; }
+.rev-label { font-weight:600; }
+.rev-full { display:none; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:12px; }
+footer { padding:14px 20px 24px; color:var(--muted); font-size:12px; text-align:center; }
+@media (max-width: 800px) { .rev { grid-template-columns: 1fr; } }
