@@ -157,4 +157,3 @@ function finish(entries, ruleId) {
 export function isDerived(entry) {
   return entry.state === ADDRESS_STATE.DERIVED;
 }
-

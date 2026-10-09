@@ -464,4 +464,3 @@ function countStatus(records) {
   }
   return out;
 }
-

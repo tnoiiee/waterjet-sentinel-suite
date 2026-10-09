@@ -274,4 +274,3 @@ export class DraftSession {
     return { text: canonicalJson(document), revisions };
   }
 }
-
