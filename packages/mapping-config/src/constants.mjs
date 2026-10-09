@@ -1,0 +1,89 @@
+// Stage 0.4B-1 — shared vocabulary for the simulation-only Mapping Configuration domain.
+// Pure data: no I/O, no device access, no provider switches.
+
+export const STAGE = 'Stage 0.4B-1';
+
+export const PROVIDER = Object.freeze({ SIMULATOR: 'SIMULATOR' });
+
+export const LABEL = Object.freeze({
+  DEFAULT_FROM_EXCEL: 'DEFAULT FROM EXCEL',
+  DRAFT: 'DRAFT',
+  SIMULATION_ONLY: 'SIMULATION ONLY',
+  NO_HARDWARE_ACCESS: 'NO HARDWARE ACCESS',
+  NO_WRITE_CONTROL: 'NO WRITE CONTROL',
+  NOT_HARDWARE_VERIFIED: 'NOT HARDWARE VERIFIED',
+  VALID: 'VALID',
+  INVALID: 'INVALID',
+  ADDRESS_UNRESOLVED: 'ADDRESS UNRESOLVED',
+  ACTIVATION_NOT_AUTHORIZED: 'ACTIVATION NOT AUTHORIZED',
+});
+
+export const CATEGORY = Object.freeze({
+  COUPLER: 'COUPLER',
+  SUPPLY: 'SUPPLY',
+  DIGITAL_INPUT: 'DIGITAL_INPUT',
+  DIGITAL_OUTPUT: 'DIGITAL_OUTPUT',
+  ANALOG_INPUT: 'ANALOG_INPUT',
+  ANALOG_OUTPUT: 'ANALOG_OUTPUT',
+  END: 'END',
+});
+
+export const DIRECTION = Object.freeze({ NONE: 'NONE', INPUT: 'INPUT', OUTPUT: 'OUTPUT' });
+
+export const CHANNEL_TYPE = Object.freeze({ ANALOG: 'ANALOG', DIGITAL: 'DIGITAL' });
+
+export const SIGNAL = Object.freeze({
+  CURRENT_4_20_MA: 'CURRENT_4_20_MA',
+  CURRENT_0_20_MA: 'CURRENT_0_20_MA',
+  DIGITAL_24_VDC: 'DIGITAL_24_VDC',
+});
+
+export const POLARITY = Object.freeze({
+  ACTIVE_WHEN_CLOSED: 'ACTIVE_WHEN_CLOSED',
+  ACTIVE_WHEN_OPEN: 'ACTIVE_WHEN_OPEN',
+});
+
+export const CONTACT = Object.freeze({ NO: 'NO', NC: 'NC' });
+
+// Owner rule (Stage 0.4B-1): every IVn lower- and upper-limit input is ACTIVE_WHEN_CLOSED
+// (contact open = limit not detected; contact closed = limit detected). This is ContactPolarity.
+// It is separate from RawInputInversion, which is UNVERIFIED and not configured by default.
+export const OWNER_LIMIT_CONTACT_POLARITY = 'ACTIVE_WHEN_CLOSED';
+export const POLARITY_BASIS = Object.freeze({ OWNER_RULE: 'OWNER_RULE', EXPLICIT_SEED: 'EXPLICIT_SEED' });
+export const RAW_INPUT_INVERSION = Object.freeze({ NOT_CONFIGURED: 'NOT_CONFIGURED', APPLIED_ONCE: 'APPLIED_ONCE', NOT_INVERTED: 'NOT_INVERTED' });
+
+export const ADDRESS_STATE = Object.freeze({
+  UNRESOLVED: 'ADDRESS_UNRESOLVED',
+  DERIVED: 'DERIVED',
+});
+
+// Reason codes attached to every unresolved address. They are explanations,
+// never a numeric fallback.
+export const REASON = Object.freeze({
+  HEAD_STATION_PROFILE_NOT_VERIFIED: 'HEAD_STATION_PROFILE_NOT_VERIFIED',
+  MODULE_PROCESS_DATA_PROFILE_NOT_VERIFIED: 'MODULE_PROCESS_DATA_PROFILE_NOT_VERIFIED',
+  MODULE_STATUS_BYTE_SETTING_NOT_VERIFIED: 'MODULE_STATUS_BYTE_SETTING_NOT_VERIFIED',
+  ENGINEERING_RANGE_UNCONFIGURED: 'ENGINEERING_RANGE_UNCONFIGURED',
+  SIGNAL_IDENTITY_UNRESOLVED: 'SIGNAL_IDENTITY_UNRESOLVED',
+  OWNER_INPUT_PENDING: 'OWNER_INPUT_PENDING',
+  PROCESS_IMAGE_SIZE_EXCEEDED: 'PROCESS_IMAGE_SIZE_EXCEEDED',
+  NO_VERIFIED_PROCESS_IMAGE_RULE: 'NO_VERIFIED_PROCESS_IMAGE_RULE',
+});
+
+export const IMPACT = Object.freeze({
+  UNCHANGED: 'UNCHANGED',
+  MOVED: 'MOVED',
+  ADDRESS_CHANGED: 'ADDRESS_CHANGED',
+  BINDING_INVALID: 'BINDING_INVALID',
+  ADDRESS_UNRESOLVED: 'ADDRESS_UNRESOLVED',
+  BLOCKED: 'BLOCKED',
+});
+
+export const SEVERITY = Object.freeze({ ERROR: 'ERROR', WARNING: 'WARNING', INFO: 'INFO' });
+
+// Forbidden binding keys: a canonical or display address is never user input.
+export const FORBIDDEN_BINDING_KEYS = Object.freeze([
+  'address', 'canonicalAddress', 'displayAddress', 'byteOffset', 'wordOffset',
+  'bitOffset', 'absoluteBitOffset', 'processImageOffset',
+  'bitOffsetAbsolute', 'bitIndex', 'displayNotation', 'channelOffset', 'wordCount',
+]);
