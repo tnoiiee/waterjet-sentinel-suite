@@ -45,7 +45,29 @@ public sealed class RuntimePublicationStore
     }
 
     /// <summary>Acquire ONCE and read both state and history from this generation.</summary>
-    public RuntimePublication Snapshot => Volatile.Read(ref _published);
+    public RuntimePublication Snapshot
+    {
+        get
+        {
+            // Exactly one acquire: both State and history come from this generation.
+            var acquired = Volatile.Read(ref _published);
+            return CopyForReader(acquired);
+        }
+    }
+
+    private static RuntimePublication CopyForReader(RuntimePublication publication)
+    {
+        var history = new RuntimeDelta[publication.Deltas.Count];
+        for (var index = 0; index < history.Length; index++)
+            history[index] = FreezeDelta(publication.Deltas[index]);
+        return new RuntimePublication
+        {
+            Current = FreezeState(publication.Current),
+            Deltas = Array.AsReadOnly(history),
+            HistoryCapacity = publication.HistoryCapacity,
+            Generation = publication.Generation,
+        };
+    }
 
     public RuntimePublicationWriter CreateWriter()
     {
@@ -66,8 +88,8 @@ public sealed class RuntimePublicationStore
     {
         // The sole writer serializes calls. Never change the published reference until
         // every check and copy has succeeded. Exceptions also leave it unchanged.
-        var before = Snapshot;
-        RuntimePublicationResult Refuse(string code) => new(false, code, before);
+        var before = Volatile.Read(ref _published);
+        RuntimePublicationResult Refuse(string code) => new(false, code, CopyForReader(before));
         if (expectedRevision != before.Current.Revision) return Refuse("PUBLICATION_STALE_REVISION");
         if (candidate is null || delta is null) return Refuse("PUBLICATION_NULL_CANDIDATE");
         if (candidate.Revision != expectedRevision + 1 || delta.PreviousRevision != expectedRevision || delta.Revision != candidate.Revision)
@@ -105,8 +127,11 @@ public sealed class RuntimePublicationStore
                 HistoryCapacity = before.HistoryCapacity,
                 Generation = checked(before.Generation + 1),
             };
+            // Prepare the detached result before publication: no copy failure may
+            // turn an already-published generation into a reported refusal.
+            var readerResult = CopyForReader(next);
             Volatile.Write(ref _published, next);
-            return new RuntimePublicationResult(true, null, next);
+            return new RuntimePublicationResult(true, null, readerResult);
         }
         catch (InvalidOperationException)
         {
@@ -141,6 +166,9 @@ public sealed class RuntimePublicationStore
         {
             ActiveJob = FreezeJob(state.ActiveJob),
             Sequence = FreezeSequence(state.Sequence),
+            WaterJets = RuntimeCollections.Freeze(state.WaterJets
+                .Select(jet => jet with { PlacementAnchors = RuntimeCollections.Freeze(jet.PlacementAnchors) })
+                .ToArray()),
         };
     }
 
@@ -153,7 +181,13 @@ public sealed class RuntimePublicationStore
         Sequence = delta.Sequence is null ? null : FreezeSequence(delta.Sequence),
         Alarms = delta.Alarms is null ? null : delta.Alarms with { Items = RuntimeCollections.Freeze(delta.Alarms.Items) },
         Communication = delta.Communication is null ? null : delta.Communication with { Devices = RuntimeCollections.Freeze(delta.Communication.Devices) },
-        ActiveJob = delta.ActiveJob with { Value = FreezeJob(delta.ActiveJob.Value) },
+        ActiveJob = delta.ActiveJob.Encoding switch
+        {
+            DeltaJobEncoding.Absent => DeltaJobState.Unchanged(),
+            DeltaJobEncoding.Present => DeltaJobState.Replaced(FreezeJob(delta.ActiveJob.Present) ?? throw new InvalidOperationException("Present ActiveJob has no value.")),
+            DeltaJobEncoding.Cleared => DeltaJobState.Cleared(),
+            _ => throw new InvalidOperationException("Unknown ActiveJob encoding."),
+        },
         TrendPoint = delta.TrendPoint is null ? null : delta.TrendPoint with { Series = (double?[])delta.TrendPoint.Series.Clone() },
     };
 }
