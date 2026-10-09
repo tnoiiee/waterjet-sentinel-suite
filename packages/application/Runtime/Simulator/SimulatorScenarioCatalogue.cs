@@ -5,7 +5,7 @@ using Wjss.Runtime.Core.Sequencing;
 namespace Wjss.Runtime.Core.Simulator;
 
 /// <summary>
-/// The eleven Stage 0.4A SIMULATOR scenarios. Selection is by exact name only (see
+/// The Stage 0.4A SIMULATOR scenarios. Selection is by exact name only (see
 /// <see cref="SimulatorScenarioCatalogue.TryParse"/>). There is no random choice and no operator command surface.
 /// </summary>
 public enum SimulatorScenarioId
@@ -23,6 +23,7 @@ public enum SimulatorScenarioId
     AXIS_STANDBY_FAILURE,
     PAUSE_AFTER_CURRENT_JOB,
     QUEUE_CAPACITY_AND_FIFO,
+    TWO_JOB_SEQUENTIAL_COMPLETION,
 }
 
 /// <summary>One kernel event scheduled at a deterministic tick: its instant is the fixed epoch plus the tick in seconds.</summary>
@@ -44,7 +45,7 @@ public sealed record SimulatorScenarioSet
     /// <summary>The kernel topology derived from <see cref="Sensors"/>: each Sensor with its assigned WJn and IVn.</summary>
     public required SequencingTopology Topology { get; init; }
 
-    /// <summary>The eleven scenarios, in catalogue order.</summary>
+    /// <summary>The scenarios, in catalogue order.</summary>
     public required IReadOnlyList<SimulatorScenario> Scenarios { get; init; }
 
     /// <summary>Returns the scenario with the given identity.</summary>
@@ -152,6 +153,7 @@ public static class SimulatorScenarioCatalogue
         new(SimulatorScenarioId.AXIS_STANDBY_FAILURE, "Axis reports FAULT while awaiting Standby; Safe Return FAILED; Job retained.", AxisStandbyFailure(plan).AsReadOnly()),
         new(SimulatorScenarioId.PAUSE_AFTER_CURRENT_JOB, "Pause requested with a Job; the Job completes; release to PAUSED; queue kept.", PauseAfterCurrentJob(plan).AsReadOnly()),
         new(SimulatorScenarioId.QUEUE_CAPACITY_AND_FIFO, "Eight admissions fill the queue; the ninth is refused; head-only FIFO dispatch.", QueueCapacityAndFifo(plan).AsReadOnly()),
+        new(SimulatorScenarioId.TWO_JOB_SEQUENTIAL_COMPLETION, "Two FIFO Jobs complete sequentially; only the first dispatch is scripted.", TwoJobSequentialCompletion(plan).AsReadOnly()),
     };
 
     // Preserve strictly increasing ticks. The legacy dispatch bool never stands in for
@@ -196,6 +198,7 @@ public static class SimulatorScenarioCatalogue
         ValveLimitObserved x => x with { At = AtTick(tick) },
         ValveSupervisionObserved x => x with { At = AtTick(tick), Pressure = x.Pressure is null ? null : x.Pressure with { At = AtTick(tick) } },
         AxisFeedbackObserved x => x with { At = AtTick(tick) },
+        PumpPressureObserved x => x with { At = AtTick(tick), Pressure = x.Pressure is null ? null : x.Pressure with { At = AtTick(tick) } },
         FeedbackTimeoutExpired x => x with { At = AtTick(tick) },
         _ => throw new InvalidOperationException("Unknown scenario event."),
     };
@@ -204,13 +207,19 @@ public static class SimulatorScenarioCatalogue
         new(tick, new PumpPressureObserved(AtTick(tick),
             new PressureSample(plan.Thresholds.PumpReadySetpointBar + 1.0, PressureQuality.GOOD, false, AtTick(tick), PressureSample.PumpOutletSource), plan.Thresholds));
 
-    private static SimulatorScenarioStep OpenPressure(Plan plan, int tick) =>
-        new(tick, new ValveSupervisionObserved(AtTick(tick), plan.ValveId, true, false, false,
-            new PressureSample(plan.Thresholds.HighPressureThresholdBar, PressureQuality.GOOD, false, AtTick(tick), PressureSample.ValveOutletSource(plan.ValveId)), plan.Thresholds));
+    private static SimulatorScenarioStep OpenPressure(Plan plan, int tick, string? targetValveId = null)
+    {
+        var valveId = targetValveId ?? plan.ValveId;
+        return new(tick, new ValveSupervisionObserved(AtTick(tick), valveId, true, false, false,
+            new PressureSample(plan.Thresholds.HighPressureThresholdBar, PressureQuality.GOOD, false, AtTick(tick), PressureSample.ValveOutletSource(valveId)), plan.Thresholds));
+    }
 
-    private static SimulatorScenarioStep ClosePressure(Plan plan, int tick, double pressure, bool lowerDetected, bool timedOut) =>
-        new(tick, new ValveSupervisionObserved(AtTick(tick), plan.ValveId, false, lowerDetected, timedOut,
-            new PressureSample(pressure, PressureQuality.GOOD, false, AtTick(tick), PressureSample.ValveOutletSource(plan.ValveId)), plan.Thresholds));
+    private static SimulatorScenarioStep ClosePressure(Plan plan, int tick, double pressure, bool lowerDetected, bool timedOut, string? targetValveId = null)
+    {
+        var valveId = targetValveId ?? plan.ValveId;
+        return new(tick, new ValveSupervisionObserved(AtTick(tick), valveId, false, lowerDetected, timedOut,
+            new PressureSample(pressure, PressureQuality.GOOD, false, AtTick(tick), PressureSample.ValveOutletSource(valveId)), plan.Thresholds));
+    }
 
     private static List<SimulatorScenarioStep> NormalCompletion(Plan plan) =>
         new()
@@ -220,6 +229,26 @@ public static class SimulatorScenarioCatalogue
             Phase(9, JobPhase.P2), Phase(10, JobPhase.P3), Phase(11, JobPhase.P4), Phase(12, JobPhase.P5), Phase(13, JobPhase.P6),
             Complete(14), ClosePressure(plan, 15, plan.Thresholds.LowPressureThresholdBar / 2.0, true, false), Standby(16),
         };
+
+    // The first dispatch is the existing scripted transition. After the first SR7
+    // (normalized tick 17), tick 18 is reserved for the Runtime coordinator's
+    // automatic dispatch. The second Job's observations begin at tick 19.
+    // There is deliberately no second DispatchHead in this schedule.
+    private static List<SimulatorScenarioStep> TwoJobSequentialCompletion(Plan plan)
+    {
+        var steps = NormalCompletion(plan);
+        var valveId = plan.Second.AssignedIsolationValveId;
+        steps.AddRange(new[]
+        {
+            PumpPressure(plan, 18), Closed(plan, 19, valveId), Advance(20), Begin(21),
+            Phase(22, JobPhase.P1), OpenPressure(plan, 23, valveId),
+            Phase(24, JobPhase.P2), Phase(25, JobPhase.P3), Phase(26, JobPhase.P4),
+            Phase(27, JobPhase.P5), Phase(28, JobPhase.P6), Complete(29),
+            ClosePressure(plan, 30, plan.Thresholds.LowPressureThresholdBar / 2.0, true, false, valveId),
+            Standby(31),
+        });
+        return steps;
+    }
 
     private static List<SimulatorScenarioStep> PumpWaitThenReady(Plan plan) =>
         new()
@@ -322,8 +351,8 @@ public static class SimulatorScenarioCatalogue
     private static SimulatorScenarioStep Open(Plan plan, int tick) =>
         new(tick, new ValveLimitObserved(AtTick(tick), plan.ValveId, UpperLimit: true, LowerLimit: false));
 
-    private static SimulatorScenarioStep Closed(Plan plan, int tick) =>
-        new(tick, new ValveLimitObserved(AtTick(tick), plan.ValveId, UpperLimit: false, LowerLimit: true));
+    private static SimulatorScenarioStep Closed(Plan plan, int tick, string? targetValveId = null) =>
+        new(tick, new ValveLimitObserved(AtTick(tick), targetValveId ?? plan.ValveId, UpperLimit: false, LowerLimit: true));
 
     private static SimulatorScenarioStep Standby(int tick) => new(tick, new AxisFeedbackObserved(AtTick(tick), AxisFeedbackState.AT_STANDBY));
 

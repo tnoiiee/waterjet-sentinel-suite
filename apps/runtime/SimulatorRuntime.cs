@@ -122,6 +122,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     private readonly RuntimePublicationStore? _store;
     private readonly RuntimePublicationWriter? _writer;
     private readonly SimulatorScenario? _scenario;
+    private readonly SequencingTopology? _scenarioTopology;
     private SequencingState _sequencing = SequencingKernel.Initial();
     private SequencingRetention _retention = SequencingRetention.Empty;
     private int _scenarioCursor;
@@ -149,6 +150,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         RuntimePublicationStore? store,
         RuntimePublicationWriter? writer,
         SimulatorScenario? scenario,
+        SequencingTopology? scenarioTopology,
         Action<string, string>? faultObserver,
         DateTimeOffset composedAtUtc,
         string? startupFaultCode,
@@ -159,6 +161,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         _store = store;
         _writer = writer;
         _scenario = scenario;
+        _scenarioTopology = scenarioTopology;
         _faultObserver = faultObserver;
         _startupFaultCode = startupFaultCode;
         _startupFaultDetail = startupFaultDetail;
@@ -325,6 +328,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             store,
             store.CreateWriter(),
             scenario,
+            scenarioSet.Topology,
             faultObserver,
             composedAtUtc,
             startupFaultCode: null,
@@ -358,6 +362,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             store: null,
             writer: null,
             scenario: null,
+            scenarioTopology: null,
             faultObserver,
             composedAtUtc,
             faultCode,
@@ -599,6 +604,21 @@ public sealed class SimulatorRuntime : IAsyncDisposable
                 nextRetention = SequencingRetention.Retain(_retention, _sequencing, transition);
             }
 
+            // Narrow transition: the first dispatch remains a catalogue event. Only
+            // after that Job has released does this single-writer coordinator issue
+            // subsequent dispatches. Never combine a scripted event (including SR7)
+            // with an automatic dispatch; the release is published first.
+            if (CanDispatchNext(_sequencing, nextSequencing, due))
+            {
+                var dispatch = SequencingKernel.Apply(nextSequencing,
+                    new DispatchHead(SimulatorScenarioCatalogue.AtTick(checked((int)_acceptedTicks)),
+                        _scenarioTopology!, PumpReady: false));
+                if (dispatch.Outcome != SequencingOutcome.APPLIED || dispatch.State.ActiveJob is null)
+                    throw new InvalidOperationException("AutoSequence dispatch refused after head eligibility check.");
+                nextRetention = SequencingRetention.Retain(nextRetention, nextSequencing, dispatch);
+                nextSequencing = dispatch.State;
+            }
+
             var synthetic = outcome.Result!.State;
             var candidate = synthetic with
             {
@@ -631,6 +651,23 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             _nextTickInstant = tickInstant + _options.TickInterval;
             throw;
         }
+    }
+
+    // Only the ready, structurally valid head can progress. An invalid head stays
+    // in place: neither scanning forward nor a removal is an auto-dispatch.
+    private bool CanDispatchNext(SequencingState before, SequencingState candidate, bool due)
+    {
+        if (due || _scenarioTopology is null || before.NextJobSeq <= 1
+            || before.ActiveJob is not null || candidate.ActiveJob is not null
+            || candidate.Mode != AutoSequenceMode.RUNNING || candidate.CriticalSuspended
+            || candidate.EquipmentFaults.Any(fault => fault.NextDispatchBlocked)
+            || candidate.Queue.Count == 0)
+            return false;
+
+        var head = candidate.Queue[0];
+        return !string.IsNullOrWhiteSpace(head.SourceReason)
+            && head.SecondsSinceLastClean >= 0
+            && SequencingTopology.StructuralRefusal(_scenarioTopology, head.SensorId) is null;
     }
 
     private void RecordFault(string code, string detail)

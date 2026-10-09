@@ -769,6 +769,7 @@
       ["Runtime revision", snapshot.revision],
       ["Queue count", snapshot.queue.totalQueued + " / " + snapshot.queue.capacity],
       ["Active Job / target Sensor", job ? job.jobId + " / " + job.targetSensorId : "none"],
+      ["Paired Water Jet / Valve", job ? job.jetId + " / " + job.valveId : "none"],
       ["Phase / progress", job ? job.phaseLabel + " (" + job.phaseIndex + "/6; " + num(job.phaseProgress * 100, 1) + "%)" : "none"],
       ["Safe Return trigger / step", safeReturn ? safeReturn.trigger + " / " + safeReturn.step : "none"],
       ["Valve command / feedback", safeReturn ? safeReturn.valve.command + " / " + safeReturn.valve.feedback : "none"],
