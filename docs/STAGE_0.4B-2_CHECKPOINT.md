@@ -1,7 +1,9 @@
 # Stage 0.4B-2 — Verified Process-Image Evidence Foundation and Mapping UI Readability Refinement (Development Checkpoint)
 
-Status: **DEVELOPMENT CHECKPOINT. SOURCE AUTHORED AND AUTOMATED CHECKS PASSED IN ARENA. NOT VALIDATED IN A BROWSER. NOT VALIDATED OWNER-LOCALLY. PR OPEN - NOT MERGED.**
+Status: **DEVELOPMENT CHECKPOINT. FINAL EXACT-SOURCE REVIEW PASSED (static; blocking defects none). OWNER BROWSER REVIEW PASSED WITH NON-BLOCKING PUNCHLIST (Owner-reported). Validated source head `fe38322d55acb7c565a9984b0eceb82c74b33bb5`; documentation closeout on the same branch. PR #14 OPEN - NOT MERGED.**
 Stop point: this checkpoint. Nothing is merged.
+
+**Honesty lines:** PRIMARY MANUFACTURER PROCESS-IMAGE EVIDENCE NOT PROVIDED. REAL PROFILES REMAIN INCOMPLETE. ADDRESSES REMAIN ADDRESS_UNRESOLVED. OWNER BROWSER REVIEW PASSED WITH NON-BLOCKING PUNCHLIST. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #14 OPEN - NOT MERGED.
 
 | Item | Value |
 |---|---|
@@ -9,7 +11,8 @@ Stop point: this checkpoint. Nothing is merged.
 | Branch | `arena/72d57c31-waterjet-sentinel-suite` |
 | Base | `main` `dbbf34cfe49f4db6c524a675dadb8a24d5ef497f` (PR #12 merge; remote `main` was equal to this SHA at the start) |
 | Authoritative workbook | `T8_IO_Card_Mapping.xlsx`, SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`. Unchanged. |
-| Commits | `62a4443` evidence profiles; `fe155b4` UI readability; `90401e4` tests (with two source fixes); this docs commit |
+| Commits | `62a4443` evidence profiles; `fe155b4` UI readability; `90401e4` tests (with two source fixes); `354e42e` checkpoint docs; `38742ba` Stage subtitle and header-comment correction; `fe38322` stage-neutral missing-evidence note; this documentation-only closeout commit |
+| PR | #14, base `main`, OPEN - NOT MERGED |
 
 ## Statements
 
@@ -63,7 +66,7 @@ MODBUS setting or file upload.
 |---|---|
 | Package `npm test`, `packages/mapping-config` | 241 tests; **234 pass, 0 fail, 7 skipped** (the Owner-local tests need `MAPPING_EXCEL_DEFAULT_PATH`) |
 | Package with an out-of-repo copy of the workbook as `MAPPING_EXCEL_DEFAULT_PATH` | **241 pass, 0 fail, 0 skipped** |
-| UI `npm test`, `apps/mapping-config` | **73 pass, 0 fail** |
+| UI `npm test`, `apps/mapping-config` | **73 pass, 0 fail** at `354e42e`; **74 pass, 0 fail** at `fe38322` (one subtitle test added) |
 | `npm run check` (both packages) | OK |
 | Boundary scan S1–S9 | 0 findings |
 | Baseline before edits | package 217 (210 pass, 7 skipped); UI 56 pass; scan clean |
@@ -71,9 +74,22 @@ MODBUS setting or file upload.
 Tests authored: evidence E1–E13 plus source-handling tests (`processImageEvidence.test.mjs`); presentation U1–U8 (`presentation.test.mjs`); UI stub-DOM and server tests U9–U25
 (`review.render`, `review.hostile.render`, `review.server`). No stress or soak tests.
 
+## Owner review and corrections after the checkpoint
+
+- **Owner Browser Review: PASS WITH NON-BLOCKING PUNCHLIST.** One required correction: the Stage subtitle. Done in `38742ba`; it now reads `Stage 0.4B-2 · Evidence and read-only mapping review`, which does not imply that any WAGO profile is verified (a source-text test, `ui.test.mjs`, pins it). The same commit changed the `moduleProfiles.mjs` header comment to Stage 0.4B-2.
+- **Stale evidence data string.** The `NONE` profile source note was bound to Stage 0.4B-1. It is profile data (`sourceNote`), included in the module profile revision, so it is not only a comment. `fe38322` replaced it with `No primary manufacturer process-image evidence has been reviewed for this model.` The `ModuleProfileRevision` value changes as the expected consequence. No test pinned the old string or the old value. Other `Stage 0.4B-1` source headers are historical provenance notes, not exposed as evidence data, and are unchanged.
+- **Carry-forward (not implemented, no scope expansion):** slightly larger Comfortable table text; improved filter-toolbar grouping; expandable Evidence summary rows.
+
+## Final exact-source review (static, head `fe38322`)
+
+- Range `origin/main...HEAD` is 6 commits, 32 files, all under `packages/mapping-config`, `apps/mapping-config`, `docs/STAGE_0.4B-2_CHECKPOINT.md`, `docs/CURRENT_STATE.md` and `CHANGELOG.md`. No workbook, .NET, lock file, contract, fixture, Inspector or scanner path is in the diff.
+- `app.mjs` contains no markup-assignment API. The only synthetic-rule name in browser-served code is the source-type constant; the rule itself is test-only.
+- Final-head results: package check OK; package tests 241 (234 pass, 7 skipped; 241 pass with the Owner-local workbook copy); UI check OK; UI tests 74 pass, 0 fail; boundary scan S1–S9 0 findings; `git diff --check origin/main...HEAD` clean; working tree clean; workbook SHA-256 unchanged.
+- **Blocking defects: none.** The workbook SHA-256 is `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`.
+
 ## NOT VERIFIED
 
-- **Browser rendering.** No browser exists in the Arena sandbox. Layout, the 1920x1080 fit, absence of page-level horizontal scroll, sticky headers, density appearance and colour contrast on a real screen are NOT VERIFIED. The stub-DOM tests prove structure and behaviour only.
+- **Browser rendering in Arena.** No browser exists in the Arena sandbox, so Arena did not verify layout. The Owner reviewed PR #14 in a browser and reported PASS WITH NON-BLOCKING PUNCHLIST (see below). That result is Owner-reported, not reproduced in Arena.
 - **Acceptance of a real primary document.** No primary document (coupler or module manual, or an I/O-check export) was provided. The path "verified evidence derives a real address" is tested only with the SYNTHETIC TEST RULE.
   Source-validation paths are tested as demotions. Real-evidence acceptance is NOT TESTED.
 - **.NET.** No .NET code was touched, so no new .NET validation is claimed. The Owner-reported predecessor result (Release build PASS, 414/414 at `8847cfc`) is regression evidence only.
@@ -83,7 +99,6 @@ Tests authored: evidence E1–E13 plus source-handling tests (`processImageEvide
 
 - **Boundary scanner S3 forbids vendor and transport words in Product source.** The evidence state is therefore named `VERIFIED_IO_CHECK_EXPORT`, source types are generic, and the manufacturer field is null in the authoritative set.
   UI and test text uses "fieldbus address". The scanner was not changed; the Owner may decide whether the rule needs an exception for evidence labels.
-- `moduleProfiles.mjs` still carries a stage comment from Stage 0.4B-1 (comment only).
 - Byte order and word order are module-level cells only.
 
 ## Owner-local commands (PowerShell, from the repository root)

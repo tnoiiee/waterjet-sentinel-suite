@@ -1,3 +1,11 @@
+## 2026-10-10 — Stage 0.4B-2: Owner browser review, final narrow corrections and final source review (documentation only)
+
+- **Owner Browser Review: PASS WITH NON-BLOCKING PUNCHLIST** (Owner-reported; not run in Arena). Carry-forward only: slightly larger Comfortable table text; improved filter-toolbar grouping; expandable Evidence summary rows.
+- Corrections on PR #14: Stage subtitle now `Stage 0.4B-2 · Evidence and read-only mapping review` and header comment (`38742ba`); missing-evidence profile note made stage-neutral, `No primary manufacturer process-image evidence has been reviewed for this model.` (`fe38322`; `ModuleProfileRevision` changes as the expected consequence).
+- **Validated source head `fe38322d55acb7c565a9984b0eceb82c74b33bb5`.** Final exact-source review PASSED (static), blocking defects none. Arena results: package 241 tests (234 pass, 7 skipped; 241 pass with the Owner-local workbook copy), UI 74 pass, boundary S1–S9 clean, PR-range diff check clean, workbook unchanged.
+- PRIMARY MANUFACTURER PROCESS-IMAGE EVIDENCE NOT PROVIDED; real profiles remain incomplete; addresses remain ADDRESS_UNRESOLVED. No MODBUS; TEST_HARDWARE NOT AUTHORIZED; PRODUCTION NOT AUTHORIZED. PR #14 OPEN - NOT MERGED.
+- Record: [STAGE_0.4B-2_CHECKPOINT.md](docs/STAGE_0.4B-2_CHECKPOINT.md).
+
 ## 2026-10-10 — Stage 0.4B-2 Verified Process-Image Evidence Foundation and Mapping UI Readability Refinement: development checkpoint
 
 - New session, branch `arena/72d57c31-waterjet-sentinel-suite`, base `main` `dbbf34cfe49f4db6c524a675dadb8a24d5ef497f` (PR #12 merge). Workbook unchanged (SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`).
