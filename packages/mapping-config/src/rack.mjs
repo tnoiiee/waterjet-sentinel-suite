@@ -1,15 +1,19 @@
-// Stage 0.4B-1 — rack model: stable module instance identity, RackSlot,
+// Stage 0.4B-3 — rack model: stable module instance identity, RackSlot,
 // ProcessModulePosition, rack validation and reorder.
 //
-// RackSlot is the physical slot (1-based index in the rack order).
-// ProcessModulePosition is the one-based Slot-order ordinal among physical rack
-// modules that contribute process data (channelCount > 0). It is for topology
-// display, stable physical ordering, reorder preview and diagnostics. It is NOT
-// a ProcessImageOrder, byte offset, word offset or register number, and it is
-// never used as a process-image offset or address (Stage 0.4B-2).
+// RackSlot is the physical slot (1-based index in the rack order). It includes every physical module, Power Supply
+// and End modules included. There is no RackSlot 0.
+// ProcessModulePosition is the one-based Slot-order ordinal among physical rack modules that contribute Application
+// Process I/O data. The head station, the Power Supply modules and the End Module are excluded: they contribute no
+// process data, so they have no ProcessModulePosition. It is for topology display, stable physical ordering, reorder
+// preview and diagnostics. It is NOT a ProcessImageOrder, byte offset, word offset or register number, and it is
+// never used as a process-image offset or address.
+// ioCheckPosition is the position of the same physical module in the actual-rack configuration-tool sequence. It is
+// actual-rack evidence, it belongs to the ModuleInstance, and it is never aliased to RackSlot or to
+// ProcessModulePosition.
 // ModuleInstanceId is independent of position and survives reorder.
 
-import { CATEGORY, SEVERITY } from './constants.mjs';
+import { ACTUAL_RACK_EVIDENCE_STATE, ADDRESS_STATE, CATEGORY, PROCESS_DATA_CONTRIBUTION, REASON, SEVERITY } from './constants.mjs';
 import { getProfile } from './moduleProfiles.mjs';
 
 const ID_PREFIX = Object.freeze({
@@ -40,27 +44,62 @@ export function buildModuleInstances(modelNumbers) {
 }
 
 /**
- * Derived, read-only view of an ordered rack. Each entry carries RackSlot,
- * ProcessModulePosition, category and address status. Nothing here is editable.
+ * Derived, read-only view of an ordered rack. Each entry carries RackSlot, ProcessModulePosition, the configuration
+ * -tool position (ioCheckPosition), role, process-data contribution and address status, each in its own field. The
+ * four position/address concepts are never aliased to each other. Nothing here is editable.
+ *
+ * @param modules     ordered module instances
+ * @param actualRack  optional actual-rack evidence as returned by actualRackEvidenceFor(). The evidence belongs to
+ *                    the ModuleInstance, so it follows the instance and never the current RackSlot.
  */
-export function deriveRackView(modules) {
+export function deriveRackView(modules, actualRack = null) {
+  const actual = actualRack ?? { applicable: false, byInstance: new Map() };
+  const applicable = actual.applicable === true;
   let processOrdinal = 0;
   return modules.map((m, index) => {
     const profile = getProfile(m.modelNumber);
     const hasChannels = profile ? profile.channelCount > 0 : false;
-    if (hasChannels) processOrdinal += 1;
+    // A role, not a channel count, decides process-data membership. A Power Supply, a System Power Supply, the End
+    // Module and the head station contribute no Application Process I/O data, so they receive no
+    // ProcessModulePosition and their address is NOT_APPLICABLE — they are not waiting for an address.
+    const nonProcessData = profile ? profile.processData.contribution === PROCESS_DATA_CONTRIBUTION.NONE : true;
+    if (hasChannels && !nonProcessData) processOrdinal += 1;
+    const contributes = hasChannels && !nonProcessData;
+    const observed = applicable ? actual.byInstance.get(m.moduleInstanceId) ?? null : null;
+    const addressStatus = !contributes
+      ? ADDRESS_STATE.NOT_APPLICABLE
+      : profile.processData.addressStatus;
     return Object.freeze({
       moduleInstanceId: m.moduleInstanceId,
       modelNumber: m.modelNumber,
       rackSlot: index + 1,
-      processModulePosition: hasChannels ? processOrdinal : null,
-      processModulePositionStatus: hasChannels ? 'PROVISIONAL_SLOT_ORDER' : 'NOT_A_CHANNEL_MODULE',
+      role: profile ? profile.role : null,
+      processDataContribution: profile ? profile.processData.contribution : PROCESS_DATA_CONTRIBUTION.NONE,
+      processInputWidthBits: contributes ? profile.processData.inputWidthBits : 0,
+      processOutputWidthBits: contributes ? profile.processData.outputWidthBits : 0,
+      processModulePosition: contributes ? processOrdinal : null,
+      processModulePositionStatus: contributes
+        ? 'PROVISIONAL_SLOT_ORDER'
+        : profile ? 'NON_PROCESS_DATA_MODULE' : 'UNKNOWN_MODEL_PROFILE',
+      // Configuration-tool position: a separate field, never copied from RackSlot or ProcessModulePosition.
+      ioCheckPosition: observed ? observed.ioCheckPosition : null,
+      ioCheckPositionState: observed
+        ? observed.ioCheckPositionState
+        : applicable ? ACTUAL_RACK_EVIDENCE_STATE.NOT_PROVIDED : 'NOT_APPLICABLE_TO_THIS_RACK',
+      actualRackApplicable: applicable,
+      actualRackEvidenceState: observed
+        ? observed.evidenceState
+        : applicable ? ACTUAL_RACK_EVIDENCE_STATE.NOT_PROVIDED : 'NOT_APPLICABLE_TO_THIS_RACK',
+      actualRackEvidenceNote: observed ? observed.evidenceNote : null,
       category: profile ? profile.category : null,
       displayName: profile ? profile.displayName : null,
       channelCapacity: profile ? profile.channelCount : 0,
       profileStatus: profile ? profile.profileStatus : 'UNKNOWN_MODEL',
-      addressStatus: hasChannels ? 'ADDRESS_UNRESOLVED' : 'NOT_APPLICABLE',
-      addressReasons: hasChannels ? (profile ? [...profile.missing] : ['UNKNOWN_MODEL_PROFILE']) : [],
+      addressStatus,
+      addressReason: addressStatus === ADDRESS_STATE.NOT_APPLICABLE
+        ? REASON.NON_PROCESS_DATA_MODULE
+        : profile?.processData.addressReason ?? null,
+      addressReasons: contributes ? (profile ? [...profile.missing] : ['UNKNOWN_MODEL_PROFILE']) : [REASON.NON_PROCESS_DATA_MODULE],
     });
   });
 }
@@ -95,7 +134,10 @@ export function validateRack(modules, declaredChannelCounts = {}) {
         `module ${m.moduleInstanceId} has no Module Profile`, { moduleInstanceId: m.moduleInstanceId }));
       continue;
     }
-    if (profile.profileStatus !== 'COMPLETE') {
+    // Only a module that contributes Application Process I/O data has process-data cells that could still become
+    // verified. A Power Supply, a System Power Supply, the End Module and the head station are not waiting for
+    // anything, so they produce no "addresses stay ADDRESS_UNRESOLVED" warning: their address is NOT_APPLICABLE.
+    if (profile.profileStatus !== 'COMPLETE' && profile.processData.contribution !== PROCESS_DATA_CONTRIBUTION.NONE) {
       issues.push(issue('MODULE_PROFILE_INCOMPLETE', SEVERITY.WARNING,
         `Module Profile for ${m.modelNumber} is INCOMPLETE; addresses stay ADDRESS_UNRESOLVED`,
         { moduleInstanceId: m.moduleInstanceId, reasons: [...profile.missing] }));

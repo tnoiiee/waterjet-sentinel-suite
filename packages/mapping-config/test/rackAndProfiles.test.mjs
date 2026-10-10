@@ -15,7 +15,23 @@ test('every Module Profile is INCOMPLETE with no address rule', () => {
   for (const p of listProfiles()) {
     assert.equal(p.profileStatus, 'INCOMPLETE', p.modelNumber);
     assert.equal(p.addressRule, null, p.modelNumber);
-    assert.ok(p.missing.length > 0, `${p.modelNumber} must list what is unverified`);
+    if (p.processData.contribution === 'NONE') {
+      if (p.role === 'FIELDBUS_COUPLER') {
+        // The head station contributes no process data, but its exact revisions, its I/O Config and the actual
+        // mapping are still missing: that evidence is what the process-image rule needs.
+        assert.ok(p.missing.length > 0, 'the head station still lists unverified head-station evidence');
+      } else {
+        // A Power Supply or End module has no process-data cell that could become verified, so nothing is pending.
+        assert.deepEqual(p.missing, [], `${p.modelNumber} is not waiting for anything`);
+      }
+      assert.equal(p.processData.addressStatus, 'NOT_APPLICABLE', p.modelNumber);
+      assert.equal(p.processData.addressReason, 'NON_PROCESS_DATA_MODULE', p.modelNumber);
+      assert.equal(p.processData.inputWidthBits, 0, p.modelNumber);
+      assert.equal(p.processData.outputWidthBits, 0, p.modelNumber);
+    } else {
+      assert.ok(p.missing.length > 0, `${p.modelNumber} must list what is unverified`);
+      assert.equal(p.processData.addressStatus, 'ADDRESS_UNRESOLVED', p.modelNumber);
+    }
   }
 });
 
@@ -56,7 +72,7 @@ test('the derived rack view is frozen and carries no numeric address field', () 
   assert.ok(Object.isFrozen(view[0]));
   for (const r of view) {
     for (const key of Object.keys(r)) {
-      assert.doesNotMatch(key, /offset|address(?!Status|Reasons)/i, key);
+      assert.doesNotMatch(key, /offset|address(?!Status|Reason)/i, key);
     }
   }
 });

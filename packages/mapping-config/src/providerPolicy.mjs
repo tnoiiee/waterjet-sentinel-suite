@@ -4,7 +4,7 @@
 // including the hardware test and production names. Selecting a provider
 // opens no connection and performs no I/O.
 
-import { PROVIDER } from './constants.mjs';
+import { PROVIDER, STAGE } from './constants.mjs';
 
 // Named refusals. Any other name is refused as PROVIDER_UNKNOWN_REFUSED, so the list is not the only guard.
 const REFUSED = Object.freeze(['TEST_HARDWARE', 'PRODUCTION', 'HARDWARE', 'DEVICE']);
@@ -22,7 +22,7 @@ export function selectProvider(name) {
   return Object.freeze({
     ok: false,
     provider: PROVIDER.SIMULATOR,
-    refusal: Object.freeze({ code, message: `provider '${name}' is not authorised in Stage 0.4B-1; SIMULATOR remains active` }),
+    refusal: Object.freeze({ code, message: `provider '${name}' is not authorised in ${STAGE}; SIMULATOR remains active` }),
   });
 }
 
