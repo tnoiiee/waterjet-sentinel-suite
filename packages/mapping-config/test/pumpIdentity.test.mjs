@@ -23,18 +23,10 @@ import {
 } from '../src/tagCatalogue.mjs';
 import { SIGNAL, CHANNEL_TYPE, DIRECTION } from '../src/constants.mjs';
 import { buildWorkbook, exampleRows, exampleSeed } from './helpers/syntheticWorkbook.mjs';
+import { SYNTHETIC_TEST_EVIDENCE } from './helpers/syntheticEvidence.mjs';
 
-// Same arithmetic-only rule as addressing.test.mjs. It is a SYNTHETIC TEST RULE, not a verified process-image rule.
-const SYNTHETIC_TEST_RULE = Object.freeze({
-  ruleId: 'SYNTHETIC-TEST-RULE-ARITHMETIC-ONLY',
-  moduleBits: Object.freeze({
-    '750-471': Object.freeze({ kind: 'ANALOG' }),
-    '750-554': Object.freeze({ kind: 'ANALOG' }),
-    '750-430': Object.freeze({ kind: 'DIGITAL' }),
-    '750-530': Object.freeze({ kind: 'DIGITAL' }),
-  }),
-  maxWordsByArea: Object.freeze({ INPUT: 64, OUTPUT: 64 }),
-});
+// Same arithmetic-only evidence as addressing.test.mjs. It is a SYNTHETIC TEST RULE, not verified process-image evidence.
+const SYNTHETIC_TEST_RULE = SYNTHETIC_TEST_EVIDENCE;
 
 const seed = exampleSeed();
 const errorCodes = (issues) => issues.filter((i) => i.severity === 'ERROR').map((i) => i.code).sort();
@@ -317,7 +309,7 @@ test('validation: without a pump outlet binding, the gate is missing and nothing
 // ---------------------------------------------------------------- Draft (location editable, identity locked)
 
 test('Draft: the Pump Inlet Slot/Channel can be changed to a compatible free channel, and the derived address follows', () => {
-  const session = new DraftSession(syntheticExampleConfiguration(), { rules: SYNTHETIC_TEST_RULE });
+  const session = new DraftSession(syntheticExampleConfiguration(), { evidence: SYNTHETIC_TEST_RULE });
   const before = session.impactPreview().tags.find((t) => t.tagName === 'PUMP_INLET_PRESSURE');
   assert.equal(before.oldAddress, 0);
   const moved = session.setBinding('PUMP_INLET_PRESSURE', { moduleInstanceId: 'AI-MODULE-03', channel: 3 });

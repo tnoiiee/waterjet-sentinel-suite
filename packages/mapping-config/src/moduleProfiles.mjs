@@ -1,4 +1,4 @@
-// Stage 0.4B-1 — Module Profile catalogue (I/O module models 750-xxx).
+// Stage 0.4B-2 — Module Profile catalogue (I/O module models 750-xxx).
 //
 // Each profile records only the facts that were verified from manufacturer
 // datasheet excerpts, plus the facts that are structurally fixed by the
@@ -15,7 +15,7 @@ const PROFILE_SOURCES = Object.freeze({
   ANALOG_INPUT_DATASHEET: 'Analog input datasheet: 4 x 16-bit data; 4 x 8-bit control/status (optional)',
   ANALOG_OUTPUT_DATASHEET: 'Analog output datasheet: 2 x 16-bit data; 2 x 8-bit control/status (optional)',
   DIGITAL_MODULE_PRODUCT_PAGE: 'Digital module product page: channel count and 24 VDC rating only; bit width not verified',
-  NONE: 'No datasheet excerpt reviewed for this model in Stage 0.4B-1',
+  NONE: 'No primary manufacturer process-image evidence has been reviewed for this model.',
 });
 
 function profile(fields) {

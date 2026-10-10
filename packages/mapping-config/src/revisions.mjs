@@ -12,6 +12,7 @@
 
 import { fingerprintOf } from './canonical.mjs';
 import { listProfiles } from './moduleProfiles.mjs';
+import { AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE, evidenceSetFingerprint } from './processImageEvidence.mjs';
 
 export function rackTopologyRevision(modules) {
   return fingerprintOf({
@@ -40,12 +41,18 @@ export function moduleProfileRevision() {
   return fingerprintOf({ kind: 'ModuleProfiles', profiles: listProfiles() });
 }
 
-export function derivedAddressManifestFingerprint({ rackRevision, mappingRevision, profileRevision, addresses }) {
+/** ProcessImageEvidenceRevision: fingerprint of the evidence content (sources, observations, notes). */
+export function processImageEvidenceRevision(evidence = AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE) {
+  return evidenceSetFingerprint(evidence);
+}
+
+export function derivedAddressManifestFingerprint({ rackRevision, mappingRevision, profileRevision, evidenceRevision, addresses }) {
   return fingerprintOf({
     kind: 'DerivedAddressManifest',
     rackRevision,
     mappingRevision,
     profileRevision,
+    evidenceRevision,
     ruleId: addresses.ruleId,
     entries: addresses.entries.map((e) => ({
       tagName: e.tagName,
@@ -59,6 +66,8 @@ export function derivedAddressManifestFingerprint({ rackRevision, mappingRevisio
       bitIndex: e.bitIndex,
       wordCount: e.wordCount,
       channelOffset: e.channelOffset,
+      bitWidth: e.bitWidth,
+      processImageOrder: e.processImageOrder,
       reasons: [...e.reasons],
     })),
   });

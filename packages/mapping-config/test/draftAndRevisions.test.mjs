@@ -5,17 +5,9 @@ import { DraftSession, createConfiguration } from '../src/draftSession.mjs';
 import { syntheticExampleConfiguration } from '../src/syntheticExample.mjs';
 import { canonicalJson } from '../src/canonical.mjs';
 import { tagMappingRevision, rackTopologyRevision, derivedAddressManifestFingerprint, moduleProfileRevision } from '../src/revisions.mjs';
+import { SYNTHETIC_TEST_EVIDENCE } from './helpers/syntheticEvidence.mjs';
 
-const SYNTHETIC_TEST_RULE = Object.freeze({
-  ruleId: 'SYNTHETIC-TEST-RULE-ARITHMETIC-ONLY',
-  moduleBits: Object.freeze({
-    '750-471': Object.freeze({ kind: 'ANALOG' }),
-    '750-554': Object.freeze({ kind: 'ANALOG' }),
-    '750-430': Object.freeze({ kind: 'DIGITAL' }),
-    '750-530': Object.freeze({ kind: 'DIGITAL' }),
-  }),
-  maxWordsByArea: Object.freeze({ INPUT: 64, OUTPUT: 64 }),
-});
+const SYNTHETIC_TEST_RULE = SYNTHETIC_TEST_EVIDENCE;
 
 const order = (s) => s.snapshot().modules.map((m) => m.moduleInstanceId).join(',');
 const DEFAULT_ORDER = 'COUPLER-01,SUPPLY-01,DI-MODULE-01,DI-MODULE-02,DO-MODULE-01,AI-MODULE-01,AI-MODULE-02,AI-MODULE-03,AO-MODULE-01,END-MODULE-01';
@@ -138,7 +130,7 @@ test('a binding change alters TagMappingRevision and the derived address manifes
 
 test('the derived address manifest changes when a verified rule is applied', () => {
   const plain = new DraftSession(syntheticExampleConfiguration()).revisions();
-  const withRule = new DraftSession(syntheticExampleConfiguration(), { rules: SYNTHETIC_TEST_RULE }).revisions();
+  const withRule = new DraftSession(syntheticExampleConfiguration(), { evidence: SYNTHETIC_TEST_RULE }).revisions();
   assert.notEqual(withRule.derivedAddressManifestFingerprint, plain.derivedAddressManifestFingerprint);
   assert.equal(withRule.rackTopologyRevision, plain.rackTopologyRevision);
 });
@@ -218,7 +210,7 @@ test('impact preview: a tag whose binding became invalid is BINDING_INVALID and 
 });
 
 test('impact preview with a verified rule reports ADDRESS_CHANGED with old and new positions', () => {
-  const session = new DraftSession(syntheticExampleConfiguration(), { rules: SYNTHETIC_TEST_RULE });
+  const session = new DraftSession(syntheticExampleConfiguration(), { evidence: SYNTHETIC_TEST_RULE });
   session.moveModule('AI-MODULE-03', 5);
   const iv8 = session.impactPreview().tags.find((t) => t.tagName === 'IV8_OUTLET_PRESSURE');
   assert.equal(iv8.classification, 'ADDRESS_CHANGED');

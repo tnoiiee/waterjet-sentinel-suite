@@ -33,6 +33,8 @@ class FakeText extends FakeNode {
 const allText = (node) => (node instanceof FakeText ? node.textContent
   : node.childNodes.map(allText).join(' '));
 const rowsOf = (id) => byId[id].childNodes;
+// Tag rows exclude the equipment group header rows.
+const dataRowsOf = (id) => rowsOf(id).filter((r) => r.className.split(' ').includes('data-row'));
 const cellText = (row) => row.childNodes.map((td) => allText(td));
 const fire = (node, type, evt = {}) => { for (const f of node.listeners[type] ?? []) f({ preventDefault() {}, ...evt }); };
 
@@ -67,7 +69,7 @@ after(() => {
 
 test('the UI renders every section from the real configuration', () => {
   assert.equal(rowsOf('rack-body').length, 10, 'rack rows');
-  assert.equal(rowsOf('tags-body').length, 26, 'tag rows: pump inlet, pump outlet, IV1-8, 16 limits (no Main Valve row)');
+  assert.equal(dataRowsOf('tags-body').length, 26, 'tag rows: pump inlet, pump outlet, IV1-8, 16 limits (no Main Valve row)');
   assert.match(allText(byId.chips), /SIMULATION ONLY/);
   assert.match(allText(byId.chips), /NO HARDWARE ACCESS/);
   assert.match(allText(byId.chips), /ACTIVATION NOT AUTHORIZED/);
@@ -82,7 +84,7 @@ test('RackSlot and ProcessModulePosition are both shown; addresses are shown as 
   assert.equal(first[0], '3');
   assert.equal(first[1], 'DI-MODULE-01');
   assert.equal(first[4], '1');
-  const tagRow = cellText(rowsOf('tags-body')[0]);
+  const tagRow = cellText(dataRowsOf('tags-body')[0]);
   assert.match(tagRow[7], /^ADDRESS UNRESOLVED/);
   assert.doesNotMatch(tagRow.join(' '), /\b\d+\.\d\b|offset \d/i);
 });

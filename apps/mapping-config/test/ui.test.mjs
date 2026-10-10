@@ -117,9 +117,9 @@ test('a seed override is applied only with the workbook, and a refused override 
   assert.doesNotMatch(JSON.stringify(loaded.importReport), /"records"|"rowNumber"/);
 });
 
-test('the browser assets expose only the Undo, Redo and Reset controls', () => {
+test('the browser assets expose only the Draft controls and the presentation-only controls', () => {
   const buttons = [...html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1].trim());
-  assert.deepEqual(buttons, ['Undo', 'Redo', 'Reset']);
+  assert.deepEqual(buttons, ['Comfortable', 'Compact', 'Undo', 'Redo', 'Reset', 'Grouped by equipment', 'Flat list']);
   for (const tag of ['input', 'select', 'textarea', 'form']) {
     assert.doesNotMatch(html, new RegExp(`<${tag}\\b`, 'i'), tag);
   }
@@ -149,4 +149,11 @@ test('every element id that app.mjs looks up exists exactly once in index.html',
 
 test('the UI never renders values as HTML: app.mjs writes text, not markup, from data', () => {
   assert.doesNotMatch(appSrc, /innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
+});
+
+test('the Stage subtitle names Stage 0.4B-2 evidence review and does not claim verified evidence or a Draft stage', () => {
+  const m = /<p class="sub">([^<]*)<\/p>/.exec(html);
+  assert.ok(m, 'subtitle element present');
+  assert.equal(m[1], 'Stage 0.4B-2 · Evidence and read-only mapping review');
+  assert.doesNotMatch(m[1], /0\.4B-1|verified|Draft/i);
 });

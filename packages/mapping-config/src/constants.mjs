@@ -1,7 +1,7 @@
 // Stage 0.4B-1 — shared vocabulary for the simulation-only Mapping Configuration domain.
 // Pure data: no I/O, no device access, no provider switches.
 
-export const STAGE = 'Stage 0.4B-1';
+export const STAGE = 'Stage 0.4B-2';
 
 export const PROVIDER = Object.freeze({ SIMULATOR: 'SIMULATOR' });
 
@@ -68,6 +68,30 @@ export const REASON = Object.freeze({
   OWNER_INPUT_PENDING: 'OWNER_INPUT_PENDING',
   PROCESS_IMAGE_SIZE_EXCEEDED: 'PROCESS_IMAGE_SIZE_EXCEEDED',
   NO_VERIFIED_PROCESS_IMAGE_RULE: 'NO_VERIFIED_PROCESS_IMAGE_RULE',
+  PROCESS_IMAGE_ORDER_NOT_VERIFIED: 'PROCESS_IMAGE_ORDER_NOT_VERIFIED',
+  BYTE_ORDER_NOT_VERIFIED: 'BYTE_ORDER_NOT_VERIFIED',
+  WORD_ORDER_NOT_VERIFIED: 'WORD_ORDER_NOT_VERIFIED',
+  CONFLICTING_PROCESS_IMAGE_EVIDENCE: 'CONFLICTING_PROCESS_IMAGE_EVIDENCE',
+});
+
+// Stage 0.4B-2 — process-image evidence vocabulary. An evidence state describes what is known about ONE
+// evidence value. Only the two VERIFIED_* states can ever support a derived address.
+export const EVIDENCE_STATE = Object.freeze({
+  NOT_PROVIDED: 'NOT_PROVIDED',
+  PROVIDED_UNVERIFIED: 'PROVIDED_UNVERIFIED',
+  VERIFIED_PRIMARY_SOURCE: 'VERIFIED_PRIMARY_SOURCE',
+  VERIFIED_IO_CHECK_EXPORT: 'VERIFIED_IO_CHECK_EXPORT',
+  CONFLICTING_EVIDENCE: 'CONFLICTING_EVIDENCE',
+  INCOMPLETE_PROFILE: 'INCOMPLETE_PROFILE',
+});
+// Profile-level only: every required value is verified, but from more than one kind of source.
+export const VERIFIED_MIXED_SOURCES = 'VERIFIED_MIXED_SOURCES';
+
+export const EVIDENCE_TYPE = Object.freeze({
+  OWNER_WORKBOOK_FACT: 'OWNER_WORKBOOK_FACT',
+  PRIMARY_DOCUMENT: 'PRIMARY_DOCUMENT',
+  IO_CHECK_EXPORT: 'IO_CHECK_EXPORT',
+  SYNTHETIC_TEST_RULE: 'SYNTHETIC_TEST_RULE',
 });
 
 export const IMPACT = Object.freeze({
@@ -85,5 +109,5 @@ export const SEVERITY = Object.freeze({ ERROR: 'ERROR', WARNING: 'WARNING', INFO
 export const FORBIDDEN_BINDING_KEYS = Object.freeze([
   'address', 'canonicalAddress', 'displayAddress', 'byteOffset', 'wordOffset',
   'bitOffset', 'absoluteBitOffset', 'processImageOffset',
-  'bitOffsetAbsolute', 'bitIndex', 'displayNotation', 'channelOffset', 'wordCount',
+  'bitOffsetAbsolute', 'bitIndex', 'displayNotation', 'channelOffset', 'wordCount', 'bitWidth',
 ]);

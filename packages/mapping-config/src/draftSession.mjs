@@ -10,13 +10,16 @@
 // There is no activation method in this module. ACTIVATION NOT AUTHORIZED is
 // returned for every draft, whatever its validation state.
 
-import { FORBIDDEN_BINDING_KEYS, SEVERITY, LABEL, ADDRESS_STATE, IMPACT, REASON } from './constants.mjs';
+import { FORBIDDEN_BINDING_KEYS, SEVERITY, LABEL, ADDRESS_STATE, IMPACT, REASON, STAGE } from './constants.mjs';
 import { canonicalJson } from './canonical.mjs';
 import { deriveRackView, moveModule, validateRack } from './rack.mjs';
 import { validateMapping, summariseIssues } from './mappingValidation.mjs';
 import { deriveAddresses } from './addressDerivation.mjs';
+import { AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE } from './processImageEvidence.mjs';
+import { buildEvidenceReport } from './evidenceReport.mjs';
 import {
-  rackTopologyRevision, tagMappingRevision, moduleProfileRevision, derivedAddressManifestFingerprint,
+  rackTopologyRevision, tagMappingRevision, moduleProfileRevision, processImageEvidenceRevision,
+  derivedAddressManifestFingerprint,
 } from './revisions.mjs';
 
 const EDITABLE_FIELDS = Object.freeze(['moduleInstanceId', 'channel', 'enabled', 'engineering', 'activePolarity', 'contactType']);
@@ -62,11 +65,13 @@ export function createConfiguration(input) {
 export class DraftSession {
   /**
    * @param defaultConfig  a configuration created by createConfiguration
-   * @param options.rules  optional address rule (verified sources only; tests use a synthetic rule)
+   * @param options.evidence  optional process-image evidence set. The default is the authoritative set, which
+   *                          holds no verified evidence, so every address stays ADDRESS_UNRESOLVED. Tests may pass a
+   *                          SYNTHETIC TEST RULE set; it is never verified and never activation-ready.
    */
   constructor(defaultConfig, options = {}) {
     this.defaultConfig = createConfiguration(defaultConfig);
-    this.rules = options.rules ?? null;
+    this.evidence = options.evidence ?? AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE;
     this.draft = clone({ modules: this.defaultConfig.modules, bindings: this.defaultConfig.bindings });
     this.undoStack = [];
     this.redoStack = [];
@@ -156,7 +161,7 @@ export class DraftSession {
     const rackIssues = validateRack(state.modules, config.declaredChannelCounts);
     const mappingIssues = validateMapping(state.modules, state.bindings, config.additionalTags);
     const rackView = deriveRackView(state.modules);
-    const addresses = deriveAddresses(rackView, state.bindings, this.rules);
+    const addresses = deriveAddresses(rackView, state.bindings, this.evidence);
     return { rackIssues, mappingIssues, rackView, addresses };
   }
 
@@ -171,7 +176,8 @@ export class DraftSession {
     const valid = errors.length === 0;
     return {
       status: valid ? LABEL.VALID : LABEL.INVALID,
-      activationReady: valid && enabledUnresolved.length === 0,
+      // A synthetic rule can derive numbers, but it is never verified, so it can never make a Draft ready.
+      activationReady: valid && enabledUnresolved.length === 0 && ev.addresses.verified === true,
       activationAuthorized: false,
       activationLabel: LABEL.ACTIVATION_NOT_AUTHORIZED,
       blockingReasons: [...new Set(blocking)].sort(),
@@ -189,14 +195,25 @@ export class DraftSession {
     const rackRevision = rackTopologyRevision(state.modules);
     const mappingRevision = tagMappingRevision(state.bindings);
     const profileRevision = moduleProfileRevision();
+    const evidenceRevision = processImageEvidenceRevision(this.evidence);
     return {
       rackTopologyRevision: rackRevision,
       tagMappingRevision: mappingRevision,
       moduleProfileRevision: profileRevision,
+      processImageEvidenceRevision: evidenceRevision,
       derivedAddressManifestFingerprint: derivedAddressManifestFingerprint({
-        rackRevision, mappingRevision, profileRevision, addresses: ev.addresses,
+        rackRevision, mappingRevision, profileRevision, evidenceRevision, addresses: ev.addresses,
       }),
     };
+  }
+
+  /**
+   * Read-only evidence review for the current Draft rack: per module profile state, sources, widths, order and
+   * address state with reasons. Recomputed from the Draft order, so a reorder is reflected. Nothing is editable.
+   */
+  evidenceReport() {
+    const rackView = deriveRackView(this.draft.modules);
+    return buildEvidenceReport(this.evidence, rackView);
   }
 
   /**
@@ -277,7 +294,7 @@ export class DraftSession {
     const revisions = this.revisions();
     const document = {
       kind: 'WJSS_MAPPING_DRAFT_REVISION',
-      stage: 'Stage 0.4B-1',
+      stage: STAGE,
       label: LABEL.DRAFT,
       simulationOnly: true,
       activationAuthorized: false,
