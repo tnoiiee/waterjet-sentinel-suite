@@ -77,7 +77,7 @@ test('the reserved heading shows the count 18 and all 18 rows are rendered', () 
 });
 
 test('each reserved row has the 11 required columns, in the order of the reserved table header', () => {
-  const section = html.slice(html.indexOf('id="reserved"'), html.indexOf('id="validation"'));
+  const section = html.slice(html.indexOf('id="reserved"'), html.indexOf('id="evidence"'));
   const headers = [...section.matchAll(/<th scope="col">([^<]+)<\/th>/g)].map((m) => m[1]);
   assert.deepEqual(headers, ['Workbook I/O Tag', 'ModuleInstanceId', 'Channel', 'Direction', 'Physical Status', 'Signal Identity',
     'Binding Status', 'Owner Input Status', 'Auto-binding Eligibility', 'Address Status', 'Mapping Authorization']);

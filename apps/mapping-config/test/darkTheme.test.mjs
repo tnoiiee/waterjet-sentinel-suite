@@ -18,7 +18,7 @@ const PACKAGE_SRC = join(APP, '..', '..', 'packages', 'mapping-config', 'src');
 
 // ---- helpers (WCAG 2.x relative luminance and contrast ratio)
 const rootBlock = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')));
-const VARS = Object.fromEntries([...rootBlock.matchAll(/--([a-z-]+):\s*(#[0-9a-fA-F]{3,6})/g)].map((m) => [m[1], m[2]]));
+const VARS = Object.fromEntries([...rootBlock.matchAll(/--([a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
 const hexToRgb = (hex) => {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;

@@ -21,3 +21,7 @@ export {
   STATUS_BEHAVIOR, STATUS_PLACEMENT, BYTE_ORDER, WORD_ORDER, SUPPORTED_GROUPING, ADDRESS_ENTRY_STATE,
 } from './processImageEvidence.mjs';
 export { buildEvidenceReport } from './evidenceReport.mjs';
+export {
+  DENSITY, DEFAULT_DENSITY, TAG_FILTERS, GROUP_ORDER, VALIDATION_GROUPS, buildTagRows, filterRows, filterCounts,
+  groupRows, compactAddressSummary, issueStatusText, placeholderSummary, groupValidation, equipmentGroupOf,
+} from './presentation.mjs';

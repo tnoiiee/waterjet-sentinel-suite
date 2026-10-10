@@ -117,9 +117,9 @@ test('a seed override is applied only with the workbook, and a refused override 
   assert.doesNotMatch(JSON.stringify(loaded.importReport), /"records"|"rowNumber"/);
 });
 
-test('the browser assets expose only the Undo, Redo and Reset controls', () => {
+test('the browser assets expose only the Draft controls and the presentation-only controls', () => {
   const buttons = [...html.matchAll(/<button\b[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1].trim());
-  assert.deepEqual(buttons, ['Undo', 'Redo', 'Reset']);
+  assert.deepEqual(buttons, ['Comfortable', 'Compact', 'Undo', 'Redo', 'Reset', 'Grouped by equipment', 'Flat list']);
   for (const tag of ['input', 'select', 'textarea', 'form']) {
     assert.doesNotMatch(html, new RegExp(`<${tag}\\b`, 'i'), tag);
   }

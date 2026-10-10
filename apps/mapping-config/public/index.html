@@ -7,14 +7,32 @@
   <title>WaterJet Sentinel — Mapping Configuration (SIMULATION ONLY)</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body id="app-root" data-density="comfortable">
   <header class="banner" id="header">
     <div class="title">
       <h1>Mapping Configuration</h1>
-      <p class="sub">Stage 0.4B-1 · Draft and read-only review</p>
+      <p class="sub">Stage 0.4B-2 · Draft and read-only review</p>
     </div>
     <div class="chips" id="chips" aria-live="polite"></div>
   </header>
+
+  <nav class="viewbar" id="viewbar" aria-label="Sections and presentation">
+    <ul class="sections" id="section-nav">
+      <li><a href="#source">Source</a></li>
+      <li><a href="#rack">Rack</a></li>
+      <li><a href="#tags">Tag mapping</a></li>
+      <li><a href="#reserved">Reserved</a></li>
+      <li><a href="#evidence">Evidence</a></li>
+      <li><a href="#validation">Validation</a></li>
+      <li><a href="#impact">Impact</a></li>
+      <li><a href="#revisions">Revisions</a></li>
+    </ul>
+    <div class="view-controls" role="group" aria-label="Presentation only: does not change the Mapping">
+      <span class="view-label">Density</span>
+      <button type="button" class="toggle" id="density-comfortable" aria-pressed="true">Comfortable</button>
+      <button type="button" class="toggle" id="density-compact" aria-pressed="false">Compact</button>
+    </div>
+  </nav>
 
   <main>
     <section id="source" aria-labelledby="source-h">
@@ -51,8 +69,17 @@
     </section>
 
     <section id="tags" aria-labelledby="tags-h">
-      <h2 id="tags-h">Tag mapping <span class="hint">read-only · derived fields</span></h2>
-      <div class="table-wrap">
+      <h2 id="tags-h">Tag mapping <span class="hint">read-only · derived fields · filters change the view only</span></h2>
+      <div class="toolbar">
+        <div class="filters" id="tag-filters" role="group" aria-label="Row filters (presentation only)"></div>
+        <div class="view-controls" role="group" aria-label="Row grouping (presentation only)">
+          <span class="view-label">View</span>
+          <button type="button" class="toggle" id="view-grouped" aria-pressed="true">Grouped by equipment</button>
+          <button type="button" class="toggle" id="view-flat" aria-pressed="false">Flat list</button>
+        </div>
+      </div>
+      <p class="note" id="tags-count" role="status"></p>
+      <div class="table-wrap scroll">
         <table>
           <thead>
             <tr>
@@ -64,6 +91,7 @@
               <th scope="col">Polarity</th>
               <th scope="col">Contact</th>
               <th scope="col">Address</th>
+              <th scope="col">Issues</th>
             </tr>
           </thead>
           <tbody id="tags-body"></tbody>
@@ -82,8 +110,9 @@
 
     <section id="reserved" aria-labelledby="reserved-h">
       <h2 id="reserved-h"><span id="reserved-title">Reserved channels awaiting Owner identity (loading)</span> <span class="hint">read-only · not bindings · not spare</span></h2>
+      <p class="summary-line" id="placeholder-summary"></p>
       <p class="note" id="reserved-note">These rows are USED / RESERVED. They are not enabled bindings and are not SPARE or FREE. They are never auto-bound and have no address. Identity is requested only with new Owner data.</p>
-      <div class="table-wrap">
+      <div class="table-wrap scroll">
         <table>
           <thead>
             <tr>
@@ -103,6 +132,32 @@
           <tbody id="reserved-body"></tbody>
         </table>
       </div>
+    </section>
+
+    <section id="evidence" aria-labelledby="evidence-h">
+      <h2 id="evidence-h">Process-image evidence review <span class="hint">read-only · no address is entered or overridden here</span></h2>
+      <div id="evidence-summary"></div>
+      <div class="table-wrap scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Model</th>
+              <th scope="col">Slot</th>
+              <th scope="col">ProcessModulePosition</th>
+              <th scope="col">Profile state</th>
+              <th scope="col">Evidence source</th>
+              <th scope="col">Process width (in / out)</th>
+              <th scope="col">Diagnostic / status byte</th>
+              <th scope="col">ProcessImageOrder</th>
+              <th scope="col">Address state</th>
+              <th scope="col">Profile fingerprint</th>
+            </tr>
+          </thead>
+          <tbody id="evidence-body"></tbody>
+        </table>
+      </div>
+      <div id="evidence-sources"></div>
+      <p class="note">ProcessModulePosition is a topology ordinal. It is never a ProcessImageOrder, offset or register number. A numeric address is derived only from verified evidence; otherwise the address stays ADDRESS_UNRESOLVED.</p>
     </section>
 
     <section id="validation" aria-labelledby="validation-h">
