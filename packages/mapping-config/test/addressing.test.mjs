@@ -9,17 +9,10 @@ import { validateMapping } from '../src/mappingValidation.mjs';
 import { DraftSession } from '../src/draftSession.mjs';
 import { syntheticExampleConfiguration } from '../src/syntheticExample.mjs';
 import { pressureTagForWj } from '../src/tagCatalogue.mjs';
+import { createEvidenceSet } from '../src/processImageEvidence.mjs';
+import { SYNTHETIC_TEST_EVIDENCE, syntheticEvidenceInput, withoutCell } from './helpers/syntheticEvidence.mjs';
 
-const SYNTHETIC_TEST_RULE = Object.freeze({
-  ruleId: 'SYNTHETIC-TEST-RULE-ARITHMETIC-ONLY',
-  moduleBits: Object.freeze({
-    '750-471': Object.freeze({ kind: 'ANALOG' }),
-    '750-554': Object.freeze({ kind: 'ANALOG' }),
-    '750-430': Object.freeze({ kind: 'DIGITAL' }),
-    '750-530': Object.freeze({ kind: 'DIGITAL' }),
-  }),
-  maxWordsByArea: Object.freeze({ INPUT: 64, OUTPUT: 64 }),
-});
+const SYNTHETIC_TEST_RULE = SYNTHETIC_TEST_EVIDENCE;
 
 const cfg = () => syntheticExampleConfiguration();
 const byTag = (result) => new Map(result.entries.map((e) => [e.tagName, e]));
@@ -104,7 +97,7 @@ test('the derived placements never overlap', () => {
 
 test('a process image that exceeds the verified limit yields PROCESS_IMAGE_SIZE_EXCEEDED, not a truncated address', () => {
   const c = cfg();
-  const tight = { ...SYNTHETIC_TEST_RULE, maxWordsByArea: { INPUT: 4, OUTPUT: 64 } };
+  const tight = createEvidenceSet(syntheticEvidenceInput({ maxWords: { input: 4, output: 64 } }));
   const map = byTag(deriveAddresses(deriveRackView(c.modules), c.bindings, tight));
   const pump = map.get('PUMP_OUTLET_PRESSURE');
   assert.equal(pump.state, 'ADDRESS_UNRESOLVED');
@@ -114,7 +107,7 @@ test('a process image that exceeds the verified limit yields PROCESS_IMAGE_SIZE_
 
 test('a rule that leaves a module unmapped marks its bindings ADDRESS_UNRESOLVED', () => {
   const c = cfg();
-  const partial = { ...SYNTHETIC_TEST_RULE, moduleBits: { ...SYNTHETIC_TEST_RULE.moduleBits, '750-471': undefined } };
+  const partial = withoutCell('750-471', 'processWidthBits');
   const map = byTag(deriveAddresses(deriveRackView(c.modules), c.bindings, partial));
   assert.equal(map.get('PUMP_OUTLET_PRESSURE').state, 'ADDRESS_UNRESOLVED');
   assert.ok(map.get('PUMP_OUTLET_PRESSURE').reasons.includes('MODULE_PROCESS_DATA_PROFILE_NOT_VERIFIED'));
@@ -138,7 +131,7 @@ test('a manual address key that reaches validation directly is an ERROR', () => 
 });
 
 test('a reorder moves derived addresses and the Draft reports ADDRESS_CHANGED for the affected tag', () => {
-  const session = new DraftSession(cfg(), { rules: SYNTHETIC_TEST_RULE });
+  const session = new DraftSession(cfg(), { evidence: SYNTHETIC_TEST_RULE });
   const r = session.moveModule('AI-MODULE-03', 5);
   assert.equal(r.ok, true);
   const impact = session.impactPreview();

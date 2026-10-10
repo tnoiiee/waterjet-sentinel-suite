@@ -8,9 +8,16 @@ export { validateMapping, summariseIssues } from './mappingValidation.mjs';
 export { deriveAddresses } from './addressDerivation.mjs';
 export { canonicalJson, fingerprintOf } from './canonical.mjs';
 export {
-  rackTopologyRevision, tagMappingRevision, derivedAddressManifestFingerprint, shortRevision,
+  rackTopologyRevision, tagMappingRevision, moduleProfileRevision, processImageEvidenceRevision,
+  derivedAddressManifestFingerprint, shortRevision,
 } from './revisions.mjs';
 export { createConfiguration, DraftSession } from './draftSession.mjs';
 export { activeProvider, selectProvider, REFUSED_PROVIDER_NAMES } from './providerPolicy.mjs';
 export { syntheticExampleConfiguration } from './syntheticExample.mjs';
 export { normalizeLimit } from './limitNormalization.mjs';
+export {
+  AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE, createEvidenceSet, validateEvidenceSet, evidenceSetFingerprint,
+  resolveProcessImage, requiredModuleCells, HEAD_CELLS, MODULE_CELLS, GROUPING, MAPPING_ORDER,
+  STATUS_BEHAVIOR, STATUS_PLACEMENT, BYTE_ORDER, WORD_ORDER, SUPPORTED_GROUPING, ADDRESS_ENTRY_STATE,
+} from './processImageEvidence.mjs';
+export { buildEvidenceReport } from './evidenceReport.mjs';

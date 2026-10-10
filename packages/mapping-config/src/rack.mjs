@@ -2,9 +2,11 @@
 // ProcessModulePosition, rack validation and reorder.
 //
 // RackSlot is the physical slot (1-based index in the rack order).
-// ProcessModulePosition is the Slot-order ordinal among modules that have
-// channels (channelCount > 0). It is PROVISIONAL and is never used as a
-// process-image offset or address.
+// ProcessModulePosition is the one-based Slot-order ordinal among physical rack
+// modules that contribute process data (channelCount > 0). It is for topology
+// display, stable physical ordering, reorder preview and diagnostics. It is NOT
+// a ProcessImageOrder, byte offset, word offset or register number, and it is
+// never used as a process-image offset or address (Stage 0.4B-2).
 // ModuleInstanceId is independent of position and survives reorder.
 
 import { CATEGORY, SEVERITY } from './constants.mjs';
