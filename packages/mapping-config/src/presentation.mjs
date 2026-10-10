@@ -198,10 +198,9 @@ export const VALIDATION_GROUPS = Object.freeze([
  * every ERROR is in `errors`; every warning is in exactly one warning group.
  *   issues           rack + mapping issues
  *   addressEntries   derived address entries
- *   reservedSummary  reservedInventory.summary (or null)
- *   importIssues     workbook-import findings about pending Owner identities (never errors)
+ *   reservedRows     reservedInventory.rows: one Owner-identity-pending finding per placeholder row
  */
-export function groupValidation({ issues, addressEntries, reservedSummary = null, importIssues = [] }) {
+export function groupValidation({ issues, addressEntries, reservedRows = [] }) {
   const sorted = [...issues].sort((a, b) => `${a.code}|${a.tagName ?? a.moduleInstanceId ?? ''}`.localeCompare(`${b.code}|${b.tagName ?? b.moduleInstanceId ?? ''}`));
   const bucket = { errors: [], profiles: [], ranges: [], owner: [], addresses: [], other: [] };
   for (const i of sorted) {
@@ -211,18 +210,22 @@ export function groupValidation({ issues, addressEntries, reservedSummary = null
     else if (i.code === 'SIGNAL_IDENTITY_UNRESOLVED' || i.code === 'OWNER_INPUT_PENDING') bucket.owner.push(describeIssue(i));
     else bucket.other.push(describeIssue(i));
   }
-  for (const i of importIssues) bucket.owner.push(describeIssue(i));
+  for (const x of reservedRows) {
+    bucket.owner.push({
+      code: 'OWNER_INPUT_PENDING',
+      severity: SEVERITY.WARNING,
+      text: `${x.workbookTag}: identity ${x.signalIdentity} · ${x.ownerInputStatus}${x.direction === 'OUTPUT' ? ' · output not authorized' : ''}`,
+    });
+  }
   for (const e of addressEntries) {
     if (e.state === 'ADDRESS_UNRESOLVED') {
       bucket.addresses.push({ code: 'ADDRESS_UNRESOLVED', severity: SEVERITY.WARNING, text: `${e.tagName}: ${e.reasons.length} ${e.reasons.length === 1 ? 'reason' : 'reasons'}` });
     }
   }
-  const pending = reservedSummary ? reservedSummary.total : 0;
   return VALIDATION_GROUPS.map((g) => ({
     key: g.key,
     label: g.label,
-    // The Owner-identity count is the number of reserved placeholder rows; the detail list holds issue records, if any.
-    count: g.key === 'owner' ? Math.max(pending, bucket.owner.length) : bucket[g.key].length,
+    count: bucket[g.key].length,
     severity: g.key === 'errors' ? SEVERITY.ERROR : SEVERITY.WARNING,
     items: bucket[g.key],
   }));

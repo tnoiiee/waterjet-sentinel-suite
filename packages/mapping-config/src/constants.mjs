@@ -109,5 +109,5 @@ export const SEVERITY = Object.freeze({ ERROR: 'ERROR', WARNING: 'WARNING', INFO
 export const FORBIDDEN_BINDING_KEYS = Object.freeze([
   'address', 'canonicalAddress', 'displayAddress', 'byteOffset', 'wordOffset',
   'bitOffset', 'absoluteBitOffset', 'processImageOffset',
-  'bitOffsetAbsolute', 'bitIndex', 'displayNotation', 'channelOffset', 'wordCount',
+  'bitOffsetAbsolute', 'bitIndex', 'displayNotation', 'channelOffset', 'wordCount', 'bitWidth',
 ]);

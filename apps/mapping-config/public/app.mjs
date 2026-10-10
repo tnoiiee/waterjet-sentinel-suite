@@ -301,13 +301,10 @@ function renderValidation(v) {
     acc[e.state] = (acc[e.state] ?? 0) + 1;
     return acc;
   }, {});
-  const importOwnerIssues = (state.importReport ? state.importReport.issues : [])
-    .filter((i) => (i.code === 'SIGNAL_IDENTITY_UNRESOLVED' || i.code === 'OWNER_INPUT_PENDING') && i.severity !== 'ERROR');
   const groups = groupValidation({
     issues,
     addressEntries: v.addresses.entries,
-    reservedSummary: state.reservedInventory ? state.reservedInventory.summary : null,
-    importIssues: importOwnerIssues,
+    reservedRows: state.reservedInventory ? state.reservedInventory.rows : [],
   });
   const groupNodes = groups.map((g) => {
     const sev = g.severity === 'ERROR' ? 'sev-error' : 'sev-warning';
@@ -318,7 +315,7 @@ function renderValidation(v) {
       summary: [el('span', { class: 'count' }, String(g.count)), g.label],
       buildList: () => (g.items.length
         ? el('ul', {}, g.items.map((i) => el('li', { class: `sev-${i.severity.toLowerCase()}` }, i.text)))
-        : el('p', { class: 'note' }, g.count > 0 ? 'Counted from the Owner placeholder inventory above; see Reserved channels.' : 'None.')),
+        : el('p', { class: 'note' }, 'None.')),
       open,
     });
   });

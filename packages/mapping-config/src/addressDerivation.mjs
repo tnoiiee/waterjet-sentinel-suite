@@ -29,6 +29,7 @@ function entryBase(binding, module, profile) {
     wordOffset: null,
     bitIndex: null,
     wordCount: null,
+    bitWidth: null,
     channelOffset: null,
     displayNotation: null,
     rackSlot: module ? module.rackSlot : null,
@@ -93,6 +94,7 @@ export function deriveAddresses(rackView, bindings, evidence = null) {
       wordOffset,
       bitIndex,
       wordCount: Math.max(1, Math.ceil(m.channelDataBits / wordBits)),
+      bitWidth: m.channelDataBits,
       channelOffset: b.channel - 1,
       displayNotation: bitIndex === null ? `${profile.direction}-W${wordOffset}` : `${profile.direction}-W${wordOffset}.${bitIndex}`,
       processImageOrder: m.processImageOrder.value,
@@ -107,7 +109,7 @@ export function deriveAddresses(rackView, bindings, evidence = null) {
   const occupied = new Set();
   for (const e of entries.values()) {
     if (e.state !== ADDRESS_STATE.DERIVED) continue;
-    const width = e.bitIndex === null ? e.wordCount * image.wordBits : 1;
+    const width = e.bitWidth;
     for (let k = 0; k < width; k += 1) {
       const key = `${e.area}:${e.bitOffsetAbsolute + k}`;
       if (occupied.has(key)) throw new Error(`internal: overlapping process-image span at ${key}`);

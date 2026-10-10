@@ -66,6 +66,7 @@ export function derivedAddressManifestFingerprint({ rackRevision, mappingRevisio
       bitIndex: e.bitIndex,
       wordCount: e.wordCount,
       channelOffset: e.channelOffset,
+      bitWidth: e.bitWidth,
       processImageOrder: e.processImageOrder,
       reasons: [...e.reasons],
     })),
