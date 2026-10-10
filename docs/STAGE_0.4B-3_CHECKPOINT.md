@@ -122,7 +122,7 @@ Power supplies and the End module display `NOT APPLICABLE` with reason `NON_PROC
 
 ## 9. Tests
 
-* `packages/mapping-config` — **268 tests, 261 pass, 0 fail, 7 skipped** (the 7 skips are the pre-existing Owner-local workbook-environment tests). New file `test/moduleRolesAndRackEvidence.test.mjs`: R1–R23 plus the defect sweep S-R1…S-R4, covering every numbered requirement of §16 of the Stage task.
+* `packages/mapping-config` — **268 tests, 261 pass, 0 fail, 7 skipped** without the workbook environment variable, and **268 / 268 / 0 / 0** with `MAPPING_EXCEL_DEFAULT_PATH` pointing at a verified copy outside the repository (the 7 skips are the pre-existing Owner-local workbook tests). New file `test/moduleRolesAndRackEvidence.test.mjs`: R1–R23 plus the defect sweep S-R1…S-R4, covering every numbered requirement of §16 of the Stage task.
 * `apps/mapping-config` — **82 tests, 82 pass, 0 fail, 0 skipped**. New file `test/actualRack.render.test.mjs`: A1–A8, rendering the real UI against the authoritative 23-module rack (workbook copied outside the repository, as the server requires). Updated: U17 (new columns) and the Stage subtitle test.
 * No generic stress or soak coverage was added.
 
@@ -131,7 +131,8 @@ Power supplies and the End module display `NOT APPLICABLE` with reason `NON_PROC
 | Check | Command | Result |
 |---|---|---|
 | Mapping package check | `npm run check` in `packages/mapping-config` | PASS |
-| Mapping package tests | `npm test` in `packages/mapping-config` | 268 / 261 / 0 / 7 |
+| Mapping package tests | `npm test` in `packages/mapping-config` | 268 / 261 / 0 / 7 (the 7 skips are the pre-existing Owner-local workbook tests) |
+| Mapping package tests with the workbook | `MAPPING_EXCEL_DEFAULT_PATH=<copy outside the repository> npm test` | 268 / 268 / 0 / 0 (copy SHA-256 verified first) |
 | Mapping UI check | `npm run check` in `apps/mapping-config` | PASS |
 | Mapping UI tests | `npm test` in `apps/mapping-config` | 82 / 82 / 0 / 0 |
 | Boundary scan S1–S9 | `node tools/boundary-scan/boundary-scan.mjs .` | 0 findings, exit 0 |
