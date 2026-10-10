@@ -18,18 +18,7 @@ Primary UI Framework** (Owner decision, 2026-10-07; Production transport and cha
 subsequently authorised and **MERGED** (PR #4 to PR #11); Stage 0.4B-1 (PR #12) and Stage 0.4B-2
 (PR #14) are **MERGED**. Those statements are superseded by the current position below.
 
-**Stage 0.4B-3 — Primary Manufacturer Evidence Ingestion and Read-Only Process-Image Preview** —
-development checkpoint `abe7e023eb7b5e3f976d8fbc5c9a5b17079058ed` on branch
-`arena/00483ae4-waterjet-sentinel-suite`, base `main`
-`3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6` (**PR #14 MERGED**). Arena validation PASSED for the
-JavaScript scope (Mapping package 268 tests; Mapping UI 82/82; boundary scan S1–S9 clean).
-**Owner-local validation PASSED** and **Owner Browser Review PASSED** — both Owner-confirmed; the
-Browser Review rests on Owner-provided screenshots and does not claim exhaustive browser
-interaction or responsive coverage. **PR #15 OPEN — NOT MERGED.** Candidate process-image
-information is **NOT AUTHORITATIVE** (`CANDIDATE_UNVERIFIED`; every byte / word / bit offset
-remains UNRESOLVED) and grants no address, no hardware readiness and no write authority.
-**NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE
-OR CONTROL AUTHORIZED.** Production device access **NOT AUTHORIZED**.
+**Stage 0.4C-0 — Physical Sensor Readiness, Loop-Test Requirements and Actual I/O Evidence Gate** — **CURRENT EVIDENCE GATE**. Development checkpoint with Owner decisions OQ-01 to OQ-08 recorded, on branch `arena/fecda529-waterjet-sentinel-suite`. Documentation and evidence planning only. Base `main` `29ee137c1df617a1aa3321c3c891161d5a5bb41a` (**PR #15 MERGED**; merge commit `29ee137c1df617a1aa3321c3c891161d5a5bb41a`). Checkpoint `4babdce`; Owner-decision successor `ff28d06`. **PR #16 OPEN — NOT MERGED.** Physical TC acquisition **BLOCKED** because the TC acquisition topology and the Sensor-to-TC-channel schedule are not provided (`TC_ACQUISITION_TOPOLOGY` and `SENSOR_TO_TC_CHANNEL_SCHEDULE`: NOT_PROVIDED; `STAGE_0.4C-1_TC_ACQUISITION`: BLOCKED). Physical Sensor acquisition **NOT IMPLEMENTED**. Wire-break decoding **NOT IMPLEMENTED**. Sensor Commissioning Monitor **NOT IMPLEMENTED**. Actual process-image offsets **NOT VERIFIED**. Candidate process-image information remains **NOT AUTHORITATIVE** (`CANDIDATE_UNVERIFIED`) and grants no address, no hardware readiness and no write authority. Predecessor Stage 0.4B-3 evidence (Mapping 268/268, Mapping UI 82/82, Owner Browser Review passed) is cited only and was not re-run at this head. **NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. DEVICE WRITE/CONTROL NOT AUTHORIZED.** Production device access **NOT AUTHORIZED**.
 
 WJSS is a monitoring and supervisory control system. It is **not** a Safety Instrumented
 System, and no statement in this document should be read as a safety certification or as

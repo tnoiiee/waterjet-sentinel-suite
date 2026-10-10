@@ -1,3 +1,25 @@
+## 2026-10-10 — Stage 0.4C-0: Owner decisions resolved (documentation only; successor to checkpoint `4babdce`)
+
+- **Successor commit** `docs: resolve Stage 0.4C-0 owner decisions` on the same branch and the same open **PR #16**. Base `main` `29ee137c1df617a1aa3321c3c891161d5a5bb41a` (PR #15 MERGED). No second branch or PR. Not merged.
+- **Owner decisions OQ-01 to OQ-08 recorded** in `docs/STAGE_0.4C-0_CHECKPOINT.md` §0.1: TC gap confirmed (`TC_ACQUISITION_TOPOLOGY: NOT_PROVIDED`, `SENSOR_TO_TC_CHANNEL_SCHEDULE: NOT_PROVIDED`, `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED`); two separate domains (Process Instrument and Temperature Sensor); AI-003 remains Pump Outlet Pressure; `Quality` unchanged with separate `DiagnosticReason` and `CommissioningState`; pilot roles only; timing values `CONFIGURABLE / OWNER_INPUT_PENDING`; Sensor verdict rules; procedure and approval roles.
+- **Link consistency (two links).** `docs/CURRENT_STATE.md` and `docs/MASTER_PLAN.md` moved the `DOMAIN_MODEL.md` §2.2.1 link from the legacy anchor (retained in the target) to the canonical anchor. Not a broken-link fix.
+- **README.** Three current-status rows (current stage, identifiers, scope gate) narrowly updated. No other README content changed.
+- **Predecessor evidence cited only, not re-run at this documentation head:** Stage 0.4B-3 Mapping 268/268 (Owner-local), Mapping UI 82/82, Owner Browser Review passed.
+- **Not implemented or authorised.** Physical Sensor acquisition, wire-break decoding, Sensor commissioning monitor, MODBUS, TEST_HARDWARE, PRODUCTION and device write or control. Actual process-image offsets NOT VERIFIED.
+- **Changed:** `docs/STAGE_0.4C-0_CHECKPOINT.md`, `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`, `CHANGELOG.md`, `README.md`. **Unchanged:** Product source, tests, workbook, dependencies, lock files, fixtures, configuration, Runtime, Mapping implementation, Galil and MODBUS code.
+- Record: [STAGE_0.4C-0_CHECKPOINT.md](docs/STAGE_0.4C-0_CHECKPOINT.md).
+
+## 2026-10-10 — Stage 0.4C-0: Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (development checkpoint, documentation only)
+
+- New session after **PR #15 MERGED** (merge commit `29ee137c1df617a1aa3321c3c891161d5a5bb41a`; parents `3a73dfce1d2c7c1dc4d3b0274ea10f97406088f6` and `8b479772d4fbef63b8f8eb34f59a1f2eba69618e`, verified). Branch `arena/fecda529-waterjet-sentinel-suite`. Workbook unchanged (SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`).
+- **STOP-1 recorded (CF-01).** The authoritative workbook lists 23 rack modules and no thermocouple input module, while the product model requires 212 thermocouple Channels for 106 Sensors. No module, TC type or Sensor-to-Channel mapping was invented. Thermocouple Channel binding, pilot and rollout are **BLOCKED**; Stage 0.4C-1 is **PROPOSED and BLOCKED**.
+- **Added** `docs/STAGE_0.4C-0_CHECKPOINT.md`: evidence inventory and gap register; conflict register; commissioning identity model; quality and diagnostic contract proposal; invalid-value safety rules; 22-step Loop-Test workflow; Commissioning Monitor and record-schema proposals; read-only acquisition architecture; pilot Loop-Test plan; 106 Sensor / 212 Channel rollout plan; Galil G1–G5 readiness checklist; Stage 0.4C-1 scope proposal.
+- **Wire-break representation NOT VERIFIED** for any model. A WIRE_BREAK is only ever explicit; an inferred open circuit is `SUSPECTED_WIRE_BREAK`. Wire-break decoding is NOT IMPLEMENTED.
+- **Recorded conflicts, not resolved here:** the required 11-value quality taxonomy versus the existing `Quality` enum (CF-04); the AI-003 workbook label "Main Valve Outlet" versus the Owner ruling "Pump Outlet" (CF-03); the Owner-ruled WSB-to-IV label interpretation (CF-05); the README status block now stale (CF-06).
+- **Only Channel-level settings evidence** (Pos. 10 / RackSlot 13 / Channel 3) is recorded as scoped to that Channel and sits at the AI-003 workbook location: a location coincidence, not a tag verification (RISK-01).
+- **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Sensor commissioning monitor NOT IMPLEMENTED. Actual process-image offsets NOT VERIFIED. AI-002 Runtime publication NOT IMPLEMENTED. NO MODBUS. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. No device write or control. No physical Sensor tested. Documentation-only: no executable test was run or changed. **PR open — NOT MERGED.**
+- Record: [STAGE_0.4C-0_CHECKPOINT.md](docs/STAGE_0.4C-0_CHECKPOINT.md).
+
 ## 2026-10-10 — Stage 0.4B-3 documentation truth alignment (documentation only; review-correction on PR #15)
 
 - **Documentation-only review-correction** on the same branch and the same open **PR #15** — one narrow commit. **No Product source, workbook, test, package manifest, lock file, solution or project file was changed.** Checkpoint under review `abe7e023eb7b5e3f976d8fbc5c9a5b17079058ed`; base `main` `3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6` (**PR #14 MERGED**).
