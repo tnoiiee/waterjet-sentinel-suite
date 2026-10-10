@@ -133,9 +133,12 @@ test('digital limits read ACTIVE_WHEN_CLOSED and NO', () => {
   }
 });
 
-test('NOT SET and UNKNOWN never appear on an analog row', () => {
-  for (const cells of rowsOf('tags-body').map(cellText)) {
-    if (cells[5] === 'NOT APPLICABLE') assert.doesNotMatch(cells.join(' '), /NOT SET|UNKNOWN/);
+test('NOT SET and UNKNOWN never appear on an analog row, checked by name for every analog pressure row', () => {
+  const analog = ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE', ...Array.from({ length: 8 }, (_, i) => `IV${i + 1}_OUTLET_PRESSURE`)];
+  for (const tag of analog) {
+    const cells = tagRow(tag);
+    assert.ok(cells, tag);
+    assert.doesNotMatch(cells[5] + ' ' + cells[6], /NOT SET|UNKNOWN/, tag);
   }
 });
 

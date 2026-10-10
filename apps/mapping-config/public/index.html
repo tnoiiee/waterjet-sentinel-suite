@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
   <title>WaterJet Sentinel — Mapping Configuration (SIMULATION ONLY)</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -69,6 +70,14 @@
         </table>
       </div>
       <p class="note" id="outputs-note"></p>
+      <ul class="legend" aria-label="Row states">
+        <li><span class="swatch sw-enabled"></span>Enabled binding</li>
+        <li><span class="swatch sw-disabled"></span>Listed, not enabled (read-only)</li>
+        <li><span class="swatch sw-reserved"></span>Reserved, awaiting Owner identity</li>
+        <li><span class="swatch sw-unauthorized"></span>Output NOT AUTHORIZED in read-only stage</li>
+        <li><span class="swatch sw-spare"></span>SPARE: counted in the source summary, not listed as a row</li>
+        <li><span class="addr-sample">ADDRESS UNRESOLVED</span>no numeric address yet (a warning, not success)</li>
+      </ul>
     </section>
 
     <section id="reserved" aria-labelledby="reserved-h">
