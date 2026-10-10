@@ -72,7 +72,7 @@ test('the configuration endpoint returns the SYNTHETIC EXAMPLE by default, witho
   assert.equal(body.importReport, null);
   assert.equal(body.configuration.label, 'SYNTHETIC EXAMPLE');
   assert.equal(body.configuration.modules.length, 10);
-  assert.equal(body.configuration.bindings.length, 27);
+  assert.equal(body.configuration.bindings.length, 26); // pump inlet, pump outlet, IV1-8, 16 limits
   assert.doesNotMatch(JSON.stringify(body), /"records"|"rowNumber"/);
 });
 

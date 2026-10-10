@@ -34,7 +34,7 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 | `packages/mapping-config/src/constants.mjs` | Shared vocabulary; forbidden address keys for bindings. |
 | `packages/mapping-config/src/moduleProfiles.mjs` | Profiles for the eight models. All INCOMPLETE; no address rule. |
 | `packages/mapping-config/src/rack.mjs` | ModuleInstanceId, RackSlot, ProcessModulePosition (provisional slot-order ordinal), validation, reorder. |
-| `packages/mapping-config/src/tagCatalogue.mjs` | Simulation/Runtime tag identities; pump range only; `pressureTagForWj(n)` returns IVn only. |
+| `packages/mapping-config/src/tagCatalogue.mjs` | Simulation/Runtime tag identities; pump outlet range only; `pressureTagForWj(n)` returns IVn only. |
 | `packages/mapping-config/src/mappingValidation.mjs` | Binding validation; polarity explicit; no aliasing; output refusal. |
 | `packages/mapping-config/src/addressDerivation.mjs` | Derived address states; canonical zero-based arithmetic only with a verified rule object. |
 | `packages/mapping-config/src/revisions.mjs` | RackTopologyRevision, TagMappingRevision, ModuleProfileRevision, DerivedAddressManifestFingerprint. |
@@ -72,15 +72,30 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
   `MODULE_PROCESS_DATA_PROFILE_NOT_VERIFIED` and, for analog channels,
   `MODULE_STATUS_BYTE_SETTING_NOT_VERIFIED`. No numeric address is produced from the catalogue.
   The arithmetic is tested only with a clearly labelled SYNTHETIC TEST RULE.
-- **Pressure identities (Owner clarification, 2026-10-10).** Four pressure groups are distinct physical
-  measurements: AI-002 = Pump Inlet Pressure (`PumpInletPressureBar`, `PUMP_INLET_PRESSURE`, suction before
-  the Pump, diagnostic only); AI-003 = Pump Outlet Pressure (`PumpOutletPressureBar`, `PUMP_OUTLET_PRESSURE`,
-  discharge before the Main Valve, the only pre-P1 Pump-ready source); AI-004–AI-011 = IV1–IV8 outlet
-  pressure (`IVn_OUTLET_PRESSURE`, ordinal `#n = IVn`). The Main Valve Outlet Pressure has no workbook row and
-  is not aliased to AI-003. No aliasing, averaging, derivation or cross-fallback across these groups. WJn
-  uses only its paired IVn pressure (`pressureTagForWj`). Validation refuses the cases listed in
-  `pressureBoundaryIssues`. The workbook text for AI-002 and AI-003 is reported as
-  `PUMP_SOURCE_LABEL_UNCONFIRMED` until the Owner confirms it.
+- **Pressure identities (Owner clarification, 2026-10-10, corrective review).** Pump Inlet, Pump Outlet and
+  IVn outlet pressure are distinct physical measurements. AI-002 = Pump Inlet Pressure (`PumpInletPressureBar`,
+  `PUMP_INLET_PRESSURE`): Header Tank / suction-side pressure before the Pump, diagnostic only. AI-003 = Pump
+  Outlet Pressure (`PumpOutletPressureBar`, `PUMP_OUTLET_PRESSURE`): Pump discharge pressure, the only pre-P1
+  Pump-ready source. AI-004–AI-011 = IV1–IV8 outlet pressure (`IVn_OUTLET_PRESSURE`, ordinal `#n = IVn`).
+  No Main Valve I/O tag is defined. The workbook has no Main Valve row, so none is required and none is
+  aliased to AI-003. No aliasing, averaging, derivation or cross-fallback exists across these groups. WJn uses
+  only its paired IVn pressure (`pressureTagForWj`).
+- **Pump location is editable; pump identity is locked.** The workbook gives the default module, Slot and
+  Channel. The Draft may change them when the change is compatible. Validation enforces channel capacity,
+  signal type, physical duplicate binding, pump and valve separation, and ordinal consistency. The workbook
+  identifier, source identity and canonical identity are never editable, so AI-002 cannot become AI-003 or an IV.
+- **Source description is evidence, not identity.** A pump binding keeps the trimmed workbook text as
+  `sourceDescription`. A description that differs from the Owner display name is accepted when the identifier
+  matches the Owner table and the text names no other pump side and no IV ordinal. Otherwise the row is refused
+  with `PUMP_PRESSURE_LABEL_CONFLICT`.
+- **AI-002 Runtime publication: NOT IMPLEMENTED.** The approved Stage 0.4B-1 boundary keeps the Runtime,
+  Inspector and shared contracts unchanged, and the Draft does not feed Runtime. Publishing AI-002 as a
+  read-only Runtime measurement would change the Runtime kernel, the shared contracts, the fixtures and the
+  Inspector. That is outside this boundary, and it cannot be compiled or tested in this sandbox. Its successor
+  scope is in the correction report. Until that scope is approved, AI-002 is a Mapping Configuration binding
+  only.
+- **PumpReady.** Reads the Pump Outlet (`PUMP_OUTLET`, AI-003) only. The Runtime names no inlet source.
+  The mapping gate refuses AI-002 and any IV pressure.
 - **Limits.** Digital limit tags bind to DI channels and require an explicit polarity. Owner rule: all
   16 IVn lower- and upper-limit inputs marked NO are `ACTIVE_WHEN_CLOSED`. The import records this with
   `polarityBasis: OWNER_RULE`. An explicit seed value is kept as written and recorded as `EXPLICIT_SEED`.
@@ -178,7 +193,7 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 - No verified process-image rule. Every address is unresolved by design until the 750-362 process-image
   rule and each module's process-data profile are verified from primary evidence or a WAGO-IO-CHECK export.
 - Analog status-byte setting is not verified.
-- Engineering ranges are UNCONFIGURED except the pump range (0–40 bar, Owner domain information).
+- Engineering ranges are UNCONFIGURED except the pump outlet range (0–40 bar, Owner domain information). The pump inlet range is UNCONFIGURED.
 - The browser UI has not been run in a real browser by the agent. Owner-local browser review is
   authoritative (Owner decision 6).
 - The platform live preview is unavailable for this checkpoint by decision (S6). The server binds to

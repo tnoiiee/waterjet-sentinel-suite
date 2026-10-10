@@ -18,12 +18,13 @@ export function syntheticExampleConfiguration() {
   const byCategory = (prefix) => modules.filter((m) => m.moduleInstanceId.startsWith(prefix));
   const ai = byCategory('AI-MODULE');
   const di = byCategory('DI-MODULE');
-  // Pressure channels: pump inlet, pump outlet, main valve, IV1..IV8 across the three AI modules (4 channels each).
-  // Every pressure measurement is a separate channel. Pump and IV identities are never shared.
+  // Pressure channels: pump inlet, pump outlet, IV1..IV8 across the three AI modules (4 channels each).
+  // Every pressure measurement is a separate channel. Pump and IV identities are never shared. No Main Valve
+  // pressure is synthesised: no workbook measurement exists for it.
   const pressureSlots = [];
   for (const m of ai) for (let c = 1; c <= 4; c += 1) pressureSlots.push({ moduleInstanceId: m.moduleInstanceId, channel: c });
   const bindings = [];
-  const pressureNames = ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE', 'MAIN_VALVE_OUTLET_PRESSURE',
+  const pressureNames = ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE',
     ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `IV${n}_OUTLET_PRESSURE`)];
   pressureNames.forEach((name, i) => {
     const at = pressureSlots[i];

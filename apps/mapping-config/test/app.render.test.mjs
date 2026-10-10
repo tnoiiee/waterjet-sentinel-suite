@@ -66,7 +66,7 @@ after(() => {
 
 test('the UI renders every section from the real configuration', () => {
   assert.equal(rowsOf('rack-body').length, 10, 'rack rows');
-  assert.equal(rowsOf('tags-body').length, 27, 'tag rows: pump inlet, pump outlet, main valve, IV1-8, 16 limits');
+  assert.equal(rowsOf('tags-body').length, 26, 'tag rows: pump inlet, pump outlet, IV1-8, 16 limits (no Main Valve row)');
   assert.match(allText(byId.chips), /SIMULATION ONLY/);
   assert.match(allText(byId.chips), /NO HARDWARE ACCESS/);
   assert.match(allText(byId.chips), /ACTIVATION NOT AUTHORIZED/);

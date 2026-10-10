@@ -97,7 +97,7 @@ export function validateMapping(modules, bindings, additionalTags = {}) {
     }
 
     if (b.declaredSourceIdentity !== undefined && b.declaredSourceIdentity !== def.sourceIdentity) {
-      const code = isPumpRole(def.role) || def.role === 'MAIN_VALVE_PRESSURE' || def.role === 'VALVE_OUTLET_PRESSURE'
+      const code = isPumpRole(def.role) || def.role === 'VALVE_OUTLET_PRESSURE'
         ? 'PAIRED_IV_IDENTITY_MISMATCH' : 'SOURCE_IDENTITY_MISMATCH';
       issues.push(issue(code, SEVERITY.ERROR,
         `tag ${b.tagName} declares source ${b.declaredSourceIdentity}; expected ${def.sourceIdentity}`, where));
@@ -143,7 +143,7 @@ export function validateMapping(modules, bindings, additionalTags = {}) {
     const [moduleInstanceId, channel] = key.split('#');
     const roles = entries.map((e) => e.def.role);
     const pump = roles.some((r) => isPumpRole(r));
-    const valve = roles.some((r) => r === 'MAIN_VALVE_PRESSURE' || r === 'VALVE_OUTLET_PRESSURE');
+    const valve = roles.some((r) => r === 'VALVE_OUTLET_PRESSURE');
     const where = { moduleInstanceId, channel: Number(channel), tagName: entries.map((e) => e.b.tagName).join(' + ') };
     if (pump && valve) {
       issues.push(issue('PUMP_VALVE_CHANNEL_SHARED', SEVERITY.ERROR, 'Pump pressure and Valve pressure cannot share a Channel', where));
@@ -249,7 +249,7 @@ function pressureBoundaryIssues(bindings, defFor) {
     }
   }
 
-  // 4. IVn pressure pairs with WJn by ordinal and source identity. Pump and Main Valve never pair with a WJ.
+  // 4. IVn pressure pairs with WJn by ordinal and source identity. Pump pressures never pair with a WJ.
   for (const { b, def } of live) {
     if (def.role !== 'VALVE_OUTLET_PRESSURE') continue;
     const n = Number(/^IV([1-8])_OUTLET_PRESSURE$/.exec(def.tagName)?.[1]);

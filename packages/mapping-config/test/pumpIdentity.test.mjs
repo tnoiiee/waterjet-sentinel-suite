@@ -1,14 +1,21 @@
-// Stage 0.4B-1 — pump and pressure boundary tests (Owner clarification, 2026-10-10).
+// Stage 0.4B-1 — pump and pressure boundary tests (Owner clarification 2026-10-10, corrective review).
 //
-// AI-002 = Pump Inlet Pressure (PumpInletPressureBar), AI-003 = Pump Outlet Pressure (PumpOutletPressureBar).
-// AI-004..AI-011 = IV1..IV8 outlet pressure. These are distinct physical measurements. The pre-P1 Pump-ready
-// gate reads AI-003 only. Synthetic workbook only, plus one Owner-local check gated on an env path.
+// AI-002 = Pump Inlet Pressure (PumpInletPressureBar), suction side before the Pump. Diagnostic only.
+// AI-003 = Pump Outlet Pressure (PumpOutletPressureBar), Pump discharge. The only pre-P1 Pump-ready source.
+// AI-004..AI-011 = IV1..IV8 outlet pressure, ordinal by '#n'. Valve diagnostics only.
+//
+// Identity is locked: the workbook identifier, source identity and canonical identity cannot be changed or aliased.
+// Location is not locked: the Pump Slot/Channel is a workbook default that the Draft may change when compatible.
+// No Main Valve I/O tag exists. Synthetic workbook tests run everywhere. Owner-local tests need a real workbook
+// copy outside the repository (MAPPING_EXCEL_DEFAULT_PATH) and are skipped otherwise.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { importWorkbook } from '../src/workbookImport.mjs';
 import { validateMapping } from '../src/mappingValidation.mjs';
 import { DraftSession } from '../src/draftSession.mjs';
+import { deriveAddresses } from '../src/addressDerivation.mjs';
+import { deriveRackView } from '../src/rack.mjs';
 import { syntheticExampleConfiguration } from '../src/syntheticExample.mjs';
 import {
   listSimulationTags, getTagDef, pressureTagForWj, duplicateCanonicalIdentities, REQUIRED_TAG_NAMES,
@@ -17,45 +24,90 @@ import {
 import { SIGNAL, CHANNEL_TYPE, DIRECTION } from '../src/constants.mjs';
 import { buildWorkbook, exampleRows, exampleSeed } from './helpers/syntheticWorkbook.mjs';
 
+// Same arithmetic-only rule as addressing.test.mjs. It is a SYNTHETIC TEST RULE, not a verified process-image rule.
+const SYNTHETIC_TEST_RULE = Object.freeze({
+  ruleId: 'SYNTHETIC-TEST-RULE-ARITHMETIC-ONLY',
+  moduleBits: Object.freeze({
+    '750-471': Object.freeze({ kind: 'ANALOG' }),
+    '750-554': Object.freeze({ kind: 'ANALOG' }),
+    '750-430': Object.freeze({ kind: 'DIGITAL' }),
+    '750-530': Object.freeze({ kind: 'DIGITAL' }),
+  }),
+  maxWordsByArea: Object.freeze({ INPUT: 64, OUTPUT: 64 }),
+});
+
 const seed = exampleSeed();
 const errorCodes = (issues) => issues.filter((i) => i.severity === 'ERROR').map((i) => i.code).sort();
+// Pump identity and label issues. The UNCONFIGURED inlet range is a range warning, not an identity issue, and the
+// Owner rule is that a range never blocks semantic mapping, so it is excluded here.
+const pumpIssues = (issues) => issues.filter((i) => (/PUMP/.test(i.tagName ?? '') || /PUMP/.test(i.code))
+  && i.code !== 'ENGINEERING_RANGE_UNCONFIGURED');
 const importRows = (rows, options = { bindingSeed: seed }) => importWorkbook(buildWorkbook({ rows }), options);
+const replaceRow = (rows, tag, patch) => rows.map((row) => {
+  if (row[3] !== tag) return row;
+  const copy = row.slice();
+  if (patch.signal !== undefined) copy[4] = patch.signal;
+  if (patch.ioType !== undefined) copy[5] = patch.ioType;
+  return copy;
+});
+const cfgBindings = () => syntheticExampleConfiguration().bindings;
+const cfgModules = () => syntheticExampleConfiguration().modules;
+const withPatch = (tagName, patch) => cfgBindings().map((b) => (b.tagName === tagName ? { ...b, ...patch } : b));
+const bindingOf = (bindings, tagName) => bindings.find((b) => b.tagName === tagName);
 
 // ---------------------------------------------------------------- catalogue
 
-test('catalogue: AI-002 is the Pump Inlet and AI-003 the Pump Outlet, with the Owner canonical identities', () => {
+test('catalogue: AI-002 is the Pump Inlet and AI-003 the Pump Outlet, with the Owner canonical identities and meanings', () => {
   const inlet = getTagDef('PUMP_INLET_PRESSURE');
   const outlet = getTagDef('PUMP_OUTLET_PRESSURE');
+  assert.equal(inlet.workbookTag, 'AI-002');
   assert.equal(inlet.displayName, 'Pump Inlet Pressure');
   assert.equal(inlet.canonicalIdentity, 'PumpInletPressureBar');
-  assert.equal(inlet.workbookTag, 'AI-002');
   assert.equal(inlet.sourceIdentity, 'PUMP_INLET');
   assert.equal(inlet.readinessRole, 'PUMP_INLET_DIAGNOSTIC', 'the inlet is a diagnostic, never the Pump-ready gate');
+  assert.equal(inlet.engineeringMeaning, 'Header Tank / suction-side pressure before the Pump. Diagnostic only. Not Pump-ready evidence.');
   assert.equal(inlet.confirmedEngineeringRange, null, 'the inlet range is UNCONFIGURED');
+  assert.equal(outlet.workbookTag, 'AI-003');
   assert.equal(outlet.displayName, 'Pump Outlet Pressure');
   assert.equal(outlet.canonicalIdentity, 'PumpOutletPressureBar');
-  assert.equal(outlet.workbookTag, 'AI-003');
   assert.equal(outlet.sourceIdentity, 'PUMP_OUTLET');
   assert.equal(outlet.readinessRole, 'PUMP_READY_GATE');
-  assert.deepEqual([outlet.confirmedEngineeringRange.min, outlet.confirmedEngineeringRange.max, outlet.confirmedEngineeringRange.unit], [0, 40, 'bar']);
+  assert.equal(outlet.engineeringMeaning, 'Pump discharge pressure used by the pre-P1 Pump-ready gate. The only Pump-ready input.');
 });
 
-test('catalogue: the Pump-ready gate is the Pump Outlet only, and is not configurable', () => {
+test('catalogue: the 0–40 bar range is the pump outlet range carried from the pre-clarification Owner-confirmed value', () => {
+  const outlet = getTagDef('PUMP_OUTLET_PRESSURE');
+  assert.deepEqual([outlet.confirmedEngineeringRange.min, outlet.confirmedEngineeringRange.max, outlet.confirmedEngineeringRange.unit], [0, 40, 'bar']);
+  assert.equal(outlet.confirmedEngineeringRange.basis, 'OWNER_CONFIRMED_DOMAIN_INFORMATION');
+  for (const t of listSimulationTags()) {
+    if (t.tagName === 'PUMP_OUTLET_PRESSURE') continue;
+    assert.equal(t.confirmedEngineeringRange, null, `${t.tagName} range is UNCONFIGURED`);
+  }
+});
+
+test('catalogue: the Pump-ready gate is the Pump Outlet only, and the workbook identifiers are fixed', () => {
   assert.equal(PUMP_READY_GATE_TAG, 'PUMP_OUTLET_PRESSURE');
   assert.equal(PUMP_READY_SOURCE_IDENTITY, 'PUMP_OUTLET');
-  assert.equal(getTagDef(PUMP_READY_GATE_TAG).workbookTag, OWNER_PUMP_SOURCE_TAGS.PUMP_OUTLET_PRESSURE);
-  assert.equal(OWNER_PUMP_SOURCE_TAGS.PUMP_INLET_PRESSURE, 'AI-002');
-  assert.equal(OWNER_PUMP_SOURCE_TAGS.PUMP_OUTLET_PRESSURE, 'AI-003');
+  assert.equal(getTagDef(PUMP_READY_GATE_TAG).workbookTag, 'AI-003');
+  assert.deepEqual({ ...OWNER_PUMP_SOURCE_TAGS }, { PUMP_INLET_PRESSURE: 'AI-002', PUMP_OUTLET_PRESSURE: 'AI-003' });
   assert.equal(Object.isFrozen(OWNER_PUMP_SOURCE_TAGS), true);
 });
 
-test('catalogue: canonical identities are unique, and no pump or main-valve entry carries an IV pair index', () => {
+test('catalogue: no Main Valve I/O tag exists, so none is required and none can be aliased to AI-003', () => {
+  for (const t of listSimulationTags()) {
+    assert.equal(/MAIN_VALVE/.test(t.tagName) || /MAIN_VALVE/.test(t.sourceIdentity) || /MAIN_VALVE/.test(t.role), false, t.tagName);
+  }
+  assert.equal(getTagDef('MAIN_VALVE_OUTLET_PRESSURE'), null);
+  assert.equal(REQUIRED_TAG_NAMES.includes('MAIN_VALVE_OUTLET_PRESSURE'), false);
+  assert.equal(REQUIRED_TAG_NAMES.length, 26, '2 pump pressures + 8 IVn pressures + 16 IVn limits');
+});
+
+test('catalogue: canonical identities are unique, and no pump entry carries an IV pair index', () => {
   const all = listSimulationTags();
   assert.deepEqual(duplicateCanonicalIdentities(all), []);
   for (const t of all) {
-    if (isPumpRole(t.role) || t.role === 'MAIN_VALVE_PRESSURE') assert.equal(t.pairIndex, null, t.tagName);
+    if (isPumpRole(t.role)) assert.equal(t.pairIndex, null, t.tagName);
   }
-  assert.equal(getTagDef('MAIN_VALVE_OUTLET_PRESSURE').workbookTag, null, 'the main valve has no workbook measurement');
 });
 
 test('catalogue: each IVn outlet pressure pairs with WJn by ordinal and source identity', () => {
@@ -68,20 +120,25 @@ test('catalogue: each IVn outlet pressure pairs with WJn by ordinal and source i
   for (const n of [0, 9, 1.5]) assert.throws(() => pressureTagForWj(n), /WJ/, `WJ${n} has no IV pairing`);
 });
 
-test('parity: PumpReady compares the sample source to PressureSample.PumpOutletSource (= mapping PUMP_OUTLET), and the Runtime names no inlet source', () => {
-  const src = readFileSync(new URL('../../application/Runtime/Sequencing/SequencingPressure.cs', import.meta.url), 'utf8');
-  const outletSource = /PumpOutletSource\s*=\s*"([A-Z_]+)"/.exec(src)?.[1];
-  assert.equal(outletSource, PUMP_READY_SOURCE_IDENTITY);
-  assert.match(src, /PumpReady\(.*\)\s*=>\s*\s*Valid\(sample\) && sample!\.SourceId == PressureSample\.PumpOutletSource/s);
-  assert.equal(src.includes('PUMP_INLET'), false, 'the Runtime pressure gate names no inlet source');
+test('parity: PumpReady compares the sample source to PumpOutletSource (= PUMP_OUTLET), and the Runtime names no inlet source', () => {
+  const pressure = readFileSync(new URL('../../application/Runtime/Sequencing/SequencingPressure.cs', import.meta.url), 'utf8');
+  assert.equal(/PumpOutletSource\s*=\s*"([A-Z_]+)"/.exec(pressure)?.[1], PUMP_READY_SOURCE_IDENTITY);
+  assert.match(pressure, /PumpReady\(.*\)\s*=>\s*\s*Valid\(sample\) && sample!\.SourceId == PressureSample\.PumpOutletSource/s);
+  assert.equal(pressure.includes('PUMP_INLET'), false, 'the Runtime pressure gate names no inlet source');
+  assert.equal(pressure.includes('PumpInletSource'), false, 'no inlet source constant exists in the Runtime');
+});
+
+test('parity: the Runtime kernel admits only PUMP_OUTLET samples as pump pressure (AI-002 never enters the gate)', () => {
+  const kernel = readFileSync(new URL('../../application/Runtime/Sequencing/SequencingKernel.cs', import.meta.url), 'utf8');
+  assert.match(kernel, /e\.Pressure is \{ SourceId: PressureSample\.PumpOutletSource \} measured/);
 });
 
 // ---------------------------------------------------------------- import
 
-test('import: AI-002 binds Pump Inlet and AI-003 binds Pump Outlet, on distinct channels, from the Owner table', () => {
+test('import: AI-002 and AI-003 bind to their own channels at the workbook default, with the exact source text kept', () => {
   const r = importRows(exampleRows(), { bindingSeed: {} });
-  const inlet = r.bindings.find((b) => b.tagName === 'PUMP_INLET_PRESSURE');
-  const outlet = r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
+  const inlet = bindingOf(r.bindings, 'PUMP_INLET_PRESSURE');
+  const outlet = bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE');
   assert.equal(inlet.sourceWorkbookTag, 'AI-002');
   assert.equal(outlet.sourceWorkbookTag, 'AI-003');
   assert.deepEqual([inlet.moduleInstanceId, inlet.channel], ['AI-MODULE-01', 1]);
@@ -90,112 +147,133 @@ test('import: AI-002 binds Pump Inlet and AI-003 binds Pump Outlet, on distinct 
   assert.equal(outlet.declaredSourceIdentity, 'PUMP_OUTLET');
   assert.equal(inlet.engineering, null, 'inlet range UNCONFIGURED');
   assert.deepEqual(outlet.engineering, { min: 0, max: 40, unit: 'bar' });
+  assert.equal(inlet.sourceDescription, 'Example pressure transmitter - pump inlet', 'workbook text kept as evidence');
+  assert.equal(outlet.sourceDescription, 'Example pressure transmitter - pump outlet');
 });
 
-test('import: the pump measurements bind even with no seed, and the outlet is never the inlet row', () => {
+test('import: the pump measurements bind from the Owner table even with no seed, and never to each other', () => {
   const r = importRows(exampleRows(), { bindingSeed: {} });
-  assert.ok(r.bindings.some((b) => b.tagName === 'PUMP_INLET_PRESSURE'));
-  assert.ok(r.bindings.some((b) => b.tagName === 'PUMP_OUTLET_PRESSURE'));
   assert.equal(r.bindings.filter((b) => b.sourceWorkbookTag === 'AI-002').length, 1);
   assert.equal(r.bindings.filter((b) => b.sourceWorkbookTag === 'AI-003').length, 1);
 });
 
-test('import: the synthetic workbook gives no ERROR other than the main valve, which has no source', () => {
+test('import: the synthetic workbook gives no ERROR at all, because no invented Main Valve row is required', () => {
   const r = importRows(exampleRows());
-  const errors = r.issues.filter((i) => i.severity === 'ERROR');
-  assert.deepEqual(errors.map((i) => `${i.code}:${i.tagName}`), ['REQUIRED_TAG_MISSING:MAIN_VALVE_OUTLET_PRESSURE']);
-  assert.equal(r.bindings.some((b) => b.tagName === 'MAIN_VALVE_OUTLET_PRESSURE'), false, 'the main valve is not aliased to AI-003');
+  assert.deepEqual(errorCodes(r.issues), []);
+});
+
+test('import: no PUMP warning is raised when the description differs from the display name and the identifier matches the Owner table', () => {
+  const rows = replaceRow(replaceRow(exampleRows(), 'AI-002', { signal: 'Pressure Transmitter' }), 'AI-003',
+    { signal: 'Pressure Transmitter Main Valve Outlet' });
+  const r = importRows(rows);
+  assert.deepEqual(pumpIssues(r.issues), [], 'no pump issue of any severity');
+  assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE').sourceWorkbookTag, 'AI-002');
+  assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
+  assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE').sourceDescription, 'Pressure Transmitter', 'exact text kept');
+  assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceDescription, 'Pressure Transmitter Main Valve Outlet');
+});
+
+test('import: a description that names the other pump side is refused, because it conflicts with the Owner mapping', () => {
+  const inletNamedOutlet = importRows(replaceRow(exampleRows(), 'AI-002', { signal: 'Example pressure transmitter - pump outlet' }));
+  assert.ok(inletNamedOutlet.issues.some((i) => i.code === 'PUMP_PRESSURE_LABEL_CONFLICT' && i.tagName === 'PUMP_INLET_PRESSURE'));
+  assert.equal(bindingOf(inletNamedOutlet.bindings, 'PUMP_INLET_PRESSURE'), undefined);
+  const outletNamedInlet = importRows(replaceRow(exampleRows(), 'AI-003', { signal: 'Example pressure transmitter - pump inlet' }));
+  assert.ok(outletNamedInlet.issues.some((i) => i.code === 'PUMP_PRESSURE_LABEL_CONFLICT' && i.tagName === 'PUMP_OUTLET_PRESSURE'));
+  assert.equal(bindingOf(outletNamedInlet.bindings, 'PUMP_OUTLET_PRESSURE'), undefined);
+});
+
+test('import: a pump row whose text carries an IV ordinal (#n) is refused, so it can never resolve to an IV', () => {
+  const r = importRows(replaceRow(exampleRows(), 'AI-003', { signal: 'Pressure transmitter - pump outlet #3' }));
+  assert.ok(r.issues.some((i) => i.code === 'PUMP_PRESSURE_LABEL_CONFLICT' && i.tagName === 'PUMP_OUTLET_PRESSURE'));
+  assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE'), undefined);
+});
+
+test('import: a pump row that is not an analog pressure row is refused, with no binding', () => {
+  const r = importRows(replaceRow(exampleRows(), 'AI-002', { ioType: 'DI (24 VDC.)' }));
+  assert.ok(r.issues.some((i) => i.code === 'PUMP_PRESSURE_LABEL_CONFLICT' && i.tagName === 'PUMP_INLET_PRESSURE'));
+  assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE'), undefined);
 });
 
 test('import: a seed that gives the pump outlet the inlet source is refused, and no binding is created for it', () => {
   const bad = { ...seed, PUMP_OUTLET_PRESSURE: { source: 'AI-002', declaredSourceIdentity: 'PUMP_OUTLET' } };
   const r = importRows(exampleRows(), { bindingSeed: bad });
   assert.ok(r.issues.some((i) => i.code === 'PUMP_SOURCE_MISMATCH' && i.tagName === 'PUMP_OUTLET_PRESSURE'));
-  const outlet = r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
-  assert.equal(outlet, undefined, 'no partial or substituted pump binding');
-  assert.equal(r.bindings.find((b) => b.tagName === 'PUMP_INLET_PRESSURE').sourceWorkbookTag, 'AI-002', 'the inlet keeps its own row');
+  assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE'), undefined, 'no partial or substituted pump binding');
+  assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE').sourceWorkbookTag, 'AI-002', 'the inlet keeps its own row');
 });
 
 test('import: a seed that swaps the inlet to the outlet row is refused, with no alias', () => {
   const bad = { ...seed, PUMP_INLET_PRESSURE: { source: 'AI-003', declaredSourceIdentity: 'PUMP_INLET' } };
   const r = importRows(exampleRows(), { bindingSeed: bad });
   assert.ok(r.issues.some((i) => i.code === 'PUMP_SOURCE_MISMATCH' && i.tagName === 'PUMP_INLET_PRESSURE'));
-  assert.equal(r.bindings.some((b) => b.tagName === 'PUMP_INLET_PRESSURE'), false);
-  assert.equal(r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
-});
-
-test('import: a pump row whose text carries an IV ordinal (#n) is refused, so it can never resolve to an IV', () => {
-  const r = importRows(exampleRows().map((row) => {
-    if (row[3] !== 'AI-003') return row;
-    const copy = row.slice(); copy[4] = 'Pressure transmitter - pump outlet #3'; return copy;
-  }));
-  assert.ok(r.issues.some((i) => i.code === 'PUMP_PRESSURE_LABEL_CONFLICT' && i.tagName === 'PUMP_OUTLET_PRESSURE'));
-  assert.equal(r.bindings.some((b) => b.tagName === 'PUMP_OUTLET_PRESSURE'), false);
-});
-
-test('import: a pump row that is not an analog pressure transmitter is refused, with no binding', () => {
-  const r = importRows(exampleRows().map((row) => {
-    if (row[3] !== 'AI-002') return row;
-    const copy = row.slice(); copy[5] = 'DI (24 VDC.)'; return copy;
-  }));
-  assert.ok(r.issues.some((i) => i.code === 'PUMP_PRESSURE_LABEL_CONFLICT' && i.tagName === 'PUMP_INLET_PRESSURE'));
-  assert.equal(r.bindings.some((b) => b.tagName === 'PUMP_INLET_PRESSURE'), false);
+  assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE'), undefined);
+  assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
 });
 
 test('import: a missing AI-002 row is refused and the outlet is NOT used as a fallback for the inlet', () => {
-  const rows = exampleRows().filter((row) => row[3] !== 'AI-002');
-  const r = importRows(rows);
+  const r = importRows(exampleRows().filter((row) => row[3] !== 'AI-002'));
   assert.ok(r.issues.some((i) => i.code === 'PUMP_SOURCE_NOT_FOUND' && i.tagName === 'PUMP_INLET_PRESSURE'));
-  assert.equal(r.bindings.some((b) => b.tagName === 'PUMP_INLET_PRESSURE'), false);
-  assert.equal(r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
+  assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE'), undefined);
+  assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
 });
 
-test('import: a workbook text that differs from the Owner wording is a WARNING for the Owner to confirm, not a silent change', () => {
-  const r = importRows(exampleRows().map((row) => {
-    if (row[3] === 'AI-003') { const c = row.slice(); c[4] = 'Pressure Transmitter Main Valve Outlet'; return c; }
-    if (row[3] === 'AI-002') { const c = row.slice(); c[4] = 'Pressure Transmitter'; return c; }
-    return row;
-  }));
-  const warnings = r.issues.filter((i) => i.code === 'PUMP_SOURCE_LABEL_UNCONFIRMED').map((i) => i.tagName).sort();
-  assert.deepEqual(warnings, ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE']);
-  assert.ok(r.bindings.some((b) => b.tagName === 'PUMP_OUTLET_PRESSURE'), 'the binding still follows the Owner table');
+test('import: a seeded Main Valve key is refused by validation as an unknown tag, and is not aliased to AI-003', () => {
+  const r = importRows(exampleRows(), { bindingSeed: { ...seed, MAIN_VALVE_OUTLET_PRESSURE: { source: 'AI-003', declaredSourceIdentity: 'MAIN_VALVE_OUTLET' } } });
+  const issues = validateMapping(r.modules, r.bindings, r.additionalTags);
+  assert.ok(issues.some((i) => i.code === 'UNKNOWN_TAG' && i.tagName === 'MAIN_VALVE_OUTLET_PRESSURE'));
 });
 
-// ---------------------------------------------------------------- validation (boundaries)
+// ---------------------------------------------------------------- validation (semantic boundaries)
 
-const cfgBindings = () => syntheticExampleConfiguration().bindings;
-const withPatch = (tagName, patch) => cfgBindings().map((b) => (b.tagName === tagName ? { ...b, ...patch } : b));
-const cfgModules = () => syntheticExampleConfiguration().modules;
+test('validation: the synthetic example is valid with no ERROR and carries no pressure-boundary error', () => {
+  const issues = validateMapping(cfgModules(), cfgBindings());
+  assert.deepEqual(errorCodes(issues), []);
+});
 
 test('validation: a Pump Outlet bound to the AI-002 measurement is refused, and the gate reads the wrong source', () => {
-  const issues = validateMapping(cfgModules(), withPatch('PUMP_OUTLET_PRESSURE', { sourceWorkbookTag: 'AI-002' }));
-  const codes = errorCodes(issues);
+  const codes = errorCodes(validateMapping(cfgModules(), withPatch('PUMP_OUTLET_PRESSURE', { sourceWorkbookTag: 'AI-002' })));
   assert.ok(codes.includes('PUMP_SOURCE_MISMATCH'));
   assert.ok(codes.includes('PUMP_READY_GATE_SOURCE_INVALID'), 'the Pump-ready gate must read AI-003 only');
-  assert.ok(codes.includes('PUMP_INLET_OUTLET_ALIAS'), 'AI-002 and AI-003 must not resolve to one physical binding');
+  assert.ok(codes.includes('PUMP_INLET_OUTLET_ALIAS'), 'AI-002 and AI-003 must not resolve to one physical measurement');
 });
 
-test('validation: the Pump-ready gate that resolves to an IV pressure measurement is refused', () => {
-  const issues = validateMapping(cfgModules(), withPatch('PUMP_OUTLET_PRESSURE', { sourceWorkbookTag: 'EX-AI-03' }));
-  const codes = errorCodes(issues);
+test('validation: the Pump-ready gate bound to an IV pressure measurement is refused', () => {
+  const codes = errorCodes(validateMapping(cfgModules(), withPatch('PUMP_OUTLET_PRESSURE', { sourceWorkbookTag: 'EX-AI-03' })));
   assert.ok(codes.includes('PUMP_READY_GATE_SOURCE_INVALID'));
-  assert.ok(codes.includes('PUMP_IV_CROSS_BINDING'), 'a pump tag may not share an IV pressure measurement');
+  assert.ok(codes.includes('PUMP_IV_CROSS_BINDING'));
 });
 
 test('validation: an IVn pressure that resolves to the Pump Outlet measurement is refused', () => {
-  const issues = validateMapping(cfgModules(), withPatch('IV1_OUTLET_PRESSURE', { sourceWorkbookTag: 'AI-003' }));
-  assert.ok(errorCodes(issues).includes('PUMP_IV_CROSS_BINDING'));
+  assert.ok(errorCodes(validateMapping(cfgModules(), withPatch('IV1_OUTLET_PRESSURE', { sourceWorkbookTag: 'AI-003' }))).includes('PUMP_IV_CROSS_BINDING'));
 });
 
 test('validation: a pump tag that declares an IV identity is refused (PAIRED_IV_IDENTITY_MISMATCH)', () => {
-  const issues = validateMapping(cfgModules(), withPatch('PUMP_INLET_PRESSURE', { declaredSourceIdentity: 'IV1_OUTLET' }));
-  assert.ok(errorCodes(issues).includes('PAIRED_IV_IDENTITY_MISMATCH'));
+  assert.ok(errorCodes(validateMapping(cfgModules(), withPatch('PUMP_INLET_PRESSURE', { declaredSourceIdentity: 'IV1_OUTLET' })))
+    .includes('PAIRED_IV_IDENTITY_MISMATCH'));
 });
 
-test('validation: a pump inlet on the outlet channel is refused as a shared channel', () => {
+test('validation: a pump tag on the same enabled Channel as the other pump tag is refused', () => {
   const outlet = cfgBindings().find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
-  const issues = validateMapping(cfgModules(), withPatch('PUMP_INLET_PRESSURE', { moduleInstanceId: outlet.moduleInstanceId, channel: outlet.channel }));
-  assert.ok(errorCodes(issues).includes('DUPLICATE_CHANNEL_BINDING'));
+  const codes = errorCodes(validateMapping(cfgModules(), withPatch('PUMP_INLET_PRESSURE', { moduleInstanceId: outlet.moduleInstanceId, channel: outlet.channel })));
+  assert.ok(codes.includes('DUPLICATE_CHANNEL_BINDING'));
+});
+
+test('validation: a pump tag on the same enabled Channel as an IV pressure is refused (pump and valve never share)', () => {
+  const pump = cfgBindings().find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
+  const codes = errorCodes(validateMapping(cfgModules(), withPatch('IV1_OUTLET_PRESSURE', { moduleInstanceId: pump.moduleInstanceId, channel: pump.channel })));
+  assert.ok(codes.includes('PUMP_VALVE_CHANNEL_SHARED'));
+  assert.ok(codes.includes('DUPLICATE_CHANNEL_BINDING'));
+});
+
+test('validation: a pump tag on a digital channel is refused as a type mismatch', () => {
+  const di = cfgBindings().find((b) => b.tagName === 'IV1_UPPER_LIMIT');
+  const codes = errorCodes(validateMapping(cfgModules(), withPatch('PUMP_INLET_PRESSURE', { moduleInstanceId: di.moduleInstanceId, channel: di.channel })));
+  assert.ok(codes.includes('PRESSURE_TO_DIGITAL_REFUSED'));
+});
+
+test('validation: a pump tag beyond the module channel capacity is refused', () => {
+  const codes = errorCodes(validateMapping(cfgModules(), withPatch('PUMP_INLET_PRESSURE', { channel: 5 })));
+  assert.ok(codes.includes('CHANNEL_OUT_OF_RANGE'));
 });
 
 test('validation: a duplicated canonical runtime identity is refused', () => {
@@ -207,47 +285,131 @@ test('validation: a duplicated canonical runtime identity is refused', () => {
     tagName: 'EXTRA_PRESSURE', moduleInstanceId: 'AI-MODULE-03', channel: 4, enabled: true, engineering: null,
     activePolarity: null, contactType: null, declaredSourceIdentity: 'EXTRA',
   }];
-  const issues = validateMapping(cfgModules(), bindings, { EXTRA_PRESSURE: extra });
-  assert.ok(errorCodes(issues).includes('CANONICAL_IDENTITY_DUPLICATED'));
+  assert.ok(errorCodes(validateMapping(cfgModules(), bindings, { EXTRA_PRESSURE: extra })).includes('CANONICAL_IDENTITY_DUPLICATED'));
 });
 
 test('validation: without a pump inlet binding, no other tag fills in for it (no fallback)', () => {
   const issues = validateMapping(cfgModules(), cfgBindings().filter((b) => b.tagName !== 'PUMP_INLET_PRESSURE'));
   assert.ok(issues.some((i) => i.code === 'REQUIRED_TAG_MISSING' && i.tagName === 'PUMP_INLET_PRESSURE'));
-  const outlet = issues.some((i) => i.code === 'PUMP_READY_GATE_SOURCE_INVALID');
-  assert.equal(outlet, false, 'the Pump-ready gate is unaffected by a missing inlet');
+  assert.equal(issues.some((i) => i.code === 'PUMP_READY_GATE_SOURCE_INVALID'), false, 'the gate is unaffected by a missing inlet');
 });
 
-test('validation: the synthetic example is clean of pressure-boundary errors', () => {
-  const issues = validateMapping(cfgModules(), cfgBindings());
-  const boundary = ['PUMP_SOURCE_MISMATCH', 'PUMP_READY_GATE_SOURCE_INVALID', 'PUMP_IV_CROSS_BINDING', 'PUMP_INLET_OUTLET_ALIAS',
-    'PHYSICAL_SOURCE_ALIAS', 'PAIRED_IV_IDENTITY_MISMATCH', 'CANONICAL_IDENTITY_DUPLICATED', 'PUMP_READY_GATE_MISCONFIGURED'];
-  assert.deepEqual(errorCodes(issues).filter((c) => boundary.includes(c)), []);
+test('validation: without a pump outlet binding, the gate is missing and nothing is substituted from AI-002 or an IV', () => {
+  const remaining = cfgBindings().filter((b) => b.tagName !== 'PUMP_OUTLET_PRESSURE');
+  const issues = validateMapping(cfgModules(), remaining);
+  assert.ok(issues.some((i) => i.code === 'REQUIRED_TAG_MISSING' && i.tagName === 'PUMP_OUTLET_PRESSURE'));
+  assert.equal(remaining.some((b) => b.sourceWorkbookTag === 'AI-003'), false, 'AI-003 is not re-bound under another name');
 });
 
-// ---------------------------------------------------------------- Draft
+// ---------------------------------------------------------------- Draft (location editable, identity locked)
 
-test('Draft: the Pump Inlet and Pump Outlet channels are fixed; enabling is still editable', () => {
+test('Draft: the Pump Inlet Slot/Channel can be changed to a compatible free channel, and the derived address follows', () => {
+  const session = new DraftSession(syntheticExampleConfiguration(), { rules: SYNTHETIC_TEST_RULE });
+  const before = session.impactPreview().tags.find((t) => t.tagName === 'PUMP_INLET_PRESSURE');
+  assert.equal(before.oldAddress, 0);
+  const moved = session.setBinding('PUMP_INLET_PRESSURE', { moduleInstanceId: 'AI-MODULE-03', channel: 3 });
+  assert.equal(moved.ok, true);
+  const b = bindingOf(session.snapshot().bindings, 'PUMP_INLET_PRESSURE');
+  assert.deepEqual([b.moduleInstanceId, b.channel, b.sourceWorkbookTag], ['AI-MODULE-03', 3, 'AI-002']);
+  const impact = session.impactPreview().tags.find((t) => t.tagName === 'PUMP_INLET_PRESSURE');
+  assert.equal(impact.classification, 'ADDRESS_CHANGED');
+  // AI-MODULE-03 is the third analog module, words 8..11; channel 3 is word 10, bit 160.
+  assert.equal(impact.newAddress, 160);
+  const derived = deriveAddresses(deriveRackView(session.snapshot().modules), session.snapshot().bindings, SYNTHETIC_TEST_RULE)
+    .entries.find((e) => e.tagName === 'PUMP_INLET_PRESSURE');
+  assert.equal(derived.bitOffsetAbsolute, 160);
+  assert.equal(session.validate().status, 'VALID', 'a compatible move stays valid');
+});
+
+test('Draft: moving the Pump Inlet onto the Pump Outlet Channel is rejected by validation (physical duplicate)', () => {
   const session = new DraftSession(syntheticExampleConfiguration());
-  for (const tag of ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE']) {
-    const moved = session.setBinding(tag, { moduleInstanceId: 'AI-MODULE-02' });
-    assert.equal(moved.refusal.code, 'WORKBOOK_IDENTITY_FIXED', tag);
-  }
-  assert.equal(session.setBinding('PUMP_INLET_PRESSURE', { enabled: false }).ok, true);
-  assert.equal(session.undoStack.length, 1, 'only the accepted edit enters history');
+  const outlet = bindingOf(session.snapshot().bindings, 'PUMP_OUTLET_PRESSURE');
+  assert.equal(session.setBinding('PUMP_INLET_PRESSURE', { moduleInstanceId: outlet.moduleInstanceId, channel: outlet.channel }).ok, true);
+  const v = session.validate();
+  assert.equal(v.status, 'INVALID');
+  assert.ok(errorCodes(v.mappingIssues).includes('DUPLICATE_CHANNEL_BINDING'));
 });
 
-// ---------------------------------------------------------------- Owner-local
+test('Draft: moving a pump onto an IV pressure Channel is rejected by validation (pump and valve never share)', () => {
+  const session = new DraftSession(syntheticExampleConfiguration());
+  const iv1 = bindingOf(session.snapshot().bindings, 'IV1_OUTLET_PRESSURE');
+  session.setBinding('PUMP_OUTLET_PRESSURE', { moduleInstanceId: iv1.moduleInstanceId, channel: iv1.channel });
+  assert.ok(errorCodes(session.validate().mappingIssues).includes('PUMP_VALVE_CHANNEL_SHARED'));
+});
 
-test('Owner-local: the authoritative workbook binds AI-002 and AI-003 to the pump measurements, with no alias',
-  { skip: process.env.MAPPING_EXCEL_DEFAULT_PATH ? false : 'NOT VERIFIED IN ARENA: set MAPPING_EXCEL_DEFAULT_PATH to a workbook outside the repository' },
+test('Draft: a pump moved to an incompatible channel type or beyond capacity is rejected by validation', () => {
+  const session = new DraftSession(syntheticExampleConfiguration());
+  const di = bindingOf(session.snapshot().bindings, 'IV1_UPPER_LIMIT');
+  session.setBinding('PUMP_INLET_PRESSURE', { moduleInstanceId: di.moduleInstanceId, channel: di.channel });
+  assert.ok(errorCodes(session.validate().mappingIssues).includes('PRESSURE_TO_DIGITAL_REFUSED'));
+  session.undo();
+  session.setBinding('PUMP_INLET_PRESSURE', { channel: 5 });
+  assert.ok(errorCodes(session.validate().mappingIssues).includes('CHANNEL_OUT_OF_RANGE'));
+});
+
+test('Draft: the pump source identity cannot be edited, so AI-002 and AI-003 cannot be swapped or aliased', () => {
+  const session = new DraftSession(syntheticExampleConfiguration());
+  const before = JSON.stringify(session.snapshot());
+  for (const patch of [{ sourceWorkbookTag: 'AI-003' }, { declaredSourceIdentity: 'PUMP_OUTLET' }]) {
+    const r = session.setBinding('PUMP_INLET_PRESSURE', patch);
+    assert.equal(r.ok, false);
+    assert.equal(r.refusal.code, 'FIELD_NOT_EDITABLE');
+  }
+  assert.equal(JSON.stringify(session.snapshot()), before, 'a refused edit leaves the Draft unchanged');
+});
+
+test('Draft: a pump Slot/Channel change is undoable', () => {
+  const session = new DraftSession(syntheticExampleConfiguration());
+  session.setBinding('PUMP_INLET_PRESSURE', { moduleInstanceId: 'AI-MODULE-03', channel: 3 });
+  session.undo();
+  const b = bindingOf(session.snapshot().bindings, 'PUMP_INLET_PRESSURE');
+  assert.deepEqual([b.moduleInstanceId, b.channel], ['AI-MODULE-01', 1]);
+});
+
+// ---------------------------------------------------------------- Owner-local (real workbook, outside the repository)
+
+const OWNER_LOCAL = process.env.MAPPING_EXCEL_DEFAULT_PATH
+  ? false
+  : 'NOT VERIFIED IN ARENA: set MAPPING_EXCEL_DEFAULT_PATH to a copy of the workbook outside the repository';
+
+test('Owner-local: the authoritative workbook binds AI-002 and AI-003 independently, with no Main Valve and no pump warning',
+  { skip: OWNER_LOCAL },
   () => {
     const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH), { bindingSeed: {} });
-    const inlet = r.bindings.find((b) => b.tagName === 'PUMP_INLET_PRESSURE');
-    const outlet = r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
-    assert.equal(inlet.sourceWorkbookTag, 'AI-002');
-    assert.equal(outlet.sourceWorkbookTag, 'AI-003');
-    assert.equal(r.bindings.some((b) => b.tagName === 'MAIN_VALVE_OUTLET_PRESSURE'), false);
-    assert.equal(r.issues.some((i) => i.code === 'PUMP_PRESSURE_LABEL_CONFLICT' || i.code === 'PUMP_SOURCE_NOT_FOUND'), false);
-    assert.ok(REQUIRED_TAG_NAMES.includes('PUMP_INLET_PRESSURE'));
+    assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE').sourceWorkbookTag, 'AI-002');
+    assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
+    assert.equal(r.bindings.some((b) => /MAIN_VALVE/.test(b.tagName)), false);
+    assert.deepEqual(pumpIssues(r.issues), [], 'no pump issue of any severity');
+  });
+
+test('Owner-local: with no seed, the missing required tags are exactly the 8 IVn pressures and the 16 IVn limits',
+  { skip: OWNER_LOCAL },
+  () => {
+    const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH), { bindingSeed: {} });
+    const missing = r.issues.filter((i) => i.code === 'REQUIRED_TAG_MISSING').map((i) => i.tagName).sort();
+    const expected = [];
+    for (let n = 1; n <= 8; n += 1) expected.push(`IV${n}_LOWER_LIMIT`, `IV${n}_OUTLET_PRESSURE`, `IV${n}_UPPER_LIMIT`);
+    assert.deepEqual(missing, expected.sort());
+  });
+
+test('Owner-local: the workbook carries the Owner ordinal rules for AI-004..AI-011 and DI-021..DI-036 (read-only check)',
+  { skip: OWNER_LOCAL },
+  () => {
+    const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH), { bindingSeed: {} });
+    const byTag = new Map(r.records.filter((x) => x.tag).map((x) => [x.tag, x]));
+    const ordinal = (rec) => { const hits = [...(rec?.signal ?? '').matchAll(/#/g)].length; const m = /#\s*(\d+)(?!\d)/.exec(rec?.signal ?? ''); return { hits, n: m ? Number(m[1]) : null }; };
+    for (let n = 1; n <= 8; n += 1) {
+      const tag = `AI-${String(n + 3).padStart(3, '0')}`;
+      const rec = byTag.get(tag);
+      assert.ok(rec && /^AI\b/i.test(rec.ioType) && /pressure\s+transmitter/i.test(rec.signal), `${tag} is an AI pressure transmitter`);
+      assert.deepEqual(ordinal(rec), { hits: 1, n }, `${tag} carries #${n}`);
+    }
+    for (let n = 1; n <= 8; n += 1) {
+      for (const [group, base] of [['LOWER', 20], ['UPPER', 28]]) {
+        const tag = `DI-${String(base + n).padStart(3, '0')}`;
+        const rec = byTag.get(tag);
+        assert.equal(ordinal(rec).n, n, `${tag} carries #${n}`);
+        assert.equal(new RegExp(`\\b${group}\\b`, 'i').test(rec.signal), true, `${tag} is ${group}`);
+      }
+    }
   });

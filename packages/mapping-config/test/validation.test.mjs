@@ -20,11 +20,12 @@ test('the synthetic example is VALID with no ERROR, and is never activation-read
   assert.equal(v.activationAuthorized, false);
   assert.equal(v.activationLabel, 'ACTIVATION NOT AUTHORIZED');
   assert.ok(v.blockingReasons.includes('NO_VERIFIED_PROCESS_IMAGE_RULE'));
-  assert.equal(v.unresolvedAddressCount, 27);
+  assert.equal(v.unresolvedAddressCount, 26);
 });
 
-test('the required Runtime tag set is exactly the pressure identities and the IVn limits', () => {
-  assert.equal(REQUIRED_TAG_NAMES.length, 27);
+test('the required Runtime tag set is exactly the pump pressures, the IVn pressures and the IVn limits', () => {
+  // 2 pump pressures + 8 IVn pressures + 16 IVn limits. No Main Valve I/O tag is required (none exists in the workbook).
+  assert.equal(REQUIRED_TAG_NAMES.length, 26);
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
     assert.ok(REQUIRED_TAG_NAMES.includes(`IV${n}_OUTLET_PRESSURE`));
     assert.ok(REQUIRED_TAG_NAMES.includes(`IV${n}_LOWER_LIMIT`));
@@ -32,7 +33,8 @@ test('the required Runtime tag set is exactly the pressure identities and the IV
   }
   assert.ok(REQUIRED_TAG_NAMES.includes('PUMP_INLET_PRESSURE'));
   assert.ok(REQUIRED_TAG_NAMES.includes('PUMP_OUTLET_PRESSURE'));
-  assert.ok(REQUIRED_TAG_NAMES.includes('MAIN_VALVE_OUTLET_PRESSURE'));
+  assert.equal(REQUIRED_TAG_NAMES.includes('MAIN_VALVE_OUTLET_PRESSURE'), false, 'no invented Main Valve required tag');
+  assert.equal(getTagDef('MAIN_VALVE_OUTLET_PRESSURE'), null, 'no Main Valve catalogue entry');
 });
 
 test('the pump range is the only confirmed engineering range; every other range is unconfigured', () => {
@@ -55,7 +57,7 @@ test('the source identities for pump and valve pressure are distinct and never a
   const ids = listSimulationTags().filter((t) => /PRESSURE/.test(t.tagName)).map((t) => t.sourceIdentity);
   assert.equal(new Set(ids).size, ids.length);
   assert.equal(getTagDef('PUMP_OUTLET_PRESSURE').sourceIdentity, 'PUMP_OUTLET');
-  assert.equal(getTagDef('MAIN_VALVE_OUTLET_PRESSURE').sourceIdentity, 'MAIN_VALVE_OUTLET');
+  assert.equal(listSimulationTags().some((t) => /MAIN_VALVE/.test(t.tagName) || /MAIN_VALVE/.test(t.sourceIdentity)), false);
 });
 
 test('an output tag bound through the import is refused and never mapped', () => {
@@ -145,7 +147,7 @@ test('an unknown tag, a missing module and an out-of-range channel are each refu
 test('two enabled tags on one Channel are refused; pump and valve pressure never share a Channel', () => {
   const c = cfg();
   const pump = c.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
-  const shared = withBinding('MAIN_VALVE_OUTLET_PRESSURE', { moduleInstanceId: pump.moduleInstanceId, channel: pump.channel });
+  const shared = withBinding('IV1_OUTLET_PRESSURE', { moduleInstanceId: pump.moduleInstanceId, channel: pump.channel });
   const codes = codesOf(validateMapping(c.modules, shared, c.additionalTags), 'ERROR');
   assert.ok(codes.includes('PUMP_VALVE_CHANNEL_SHARED'));
   assert.ok(codes.includes('DUPLICATE_CHANNEL_BINDING'));

@@ -369,22 +369,19 @@ export function importWorkbook(buf, options = {}) {
         message: `seed source for ${runtimeTag} is not a channel row in the workbook` });
       continue;
     }
-    // A pump measurement must be an analog pressure transmitter row with no IV '#n' ordinal, so it can never
-    // resolve to an IV pressure. Its workbook text is compared with the Owner wording; a mismatch is a warning
-    // for the Owner to confirm, not a silent correction.
+    // A pump measurement must be an analog pressure row with no IV '#n' ordinal, and its text must not name
+    // the other pump side. The workbook text is evidence, not identity: a description that differs from the Owner
+    // display name (for example "Pressure Transmitter" for AI-002) is accepted when the identifier matches the
+    // Owner table. Nothing is repaired or silently relabelled.
     if (isPump) {
       const text = row.signal ?? '';
-      const ok = /pressure/i.test(text) && /^AI\b/i.test(row.ioType ?? '') && !/#\s*\d/.test(text);
+      const isInlet = runtimeTag === 'PUMP_INLET_PRESSURE';
+      const otherSide = isInlet ? /outlet|discharge/i : /inlet|suction/i;
+      const ok = /pressure/i.test(text) && /^AI\b/i.test(row.ioType ?? '') && !/#\s*\d/.test(text) && !otherSide.test(text);
       if (!ok) {
         seedIssues.push({ code: 'PUMP_PRESSURE_LABEL_CONFLICT', severity: SEVERITY.ERROR, tagName: runtimeTag,
-          message: `${runtimeTag} is not bound: ${spec.source} is not a pump pressure transmitter row (or carries an IV ordinal)` });
+          message: `${runtimeTag} is not bound: ${spec.source} is not a pump pressure row for this side (wrong text, an IV ordinal, or the other pump side)` });
         continue;
-      }
-      const isInlet = runtimeTag === 'PUMP_INLET_PRESSURE';
-      const labelAgrees = isInlet ? /inlet/i.test(text) : (/outlet/i.test(text) && !/main\s+valve/i.test(text));
-      if (!labelAgrees) {
-        seedIssues.push({ code: 'PUMP_SOURCE_LABEL_UNCONFIRMED', severity: SEVERITY.WARNING, tagName: runtimeTag,
-          message: `${spec.source} reads '${text}'; the Owner clarification assigns it to ${isInlet ? 'Pump Inlet Pressure' : 'Pump Outlet Pressure'}. The Owner should confirm the workbook text.` });
       }
     }
     // An IVn limit may bind only to a workbook row that labels the same IV index and group
@@ -443,6 +440,8 @@ export function importWorkbook(buf, options = {}) {
       contactType: /\(NO\)/.test(row.signal) ? CONTACT.NO : null,
       declaredSourceIdentity: spec.declaredSourceIdentity,
       sourceWorkbookTag: spec.source,
+      // Pump bindings keep the exact workbook description as source evidence. It is not used as identity.
+      ...(isPump ? { sourceDescription: row.signal } : {}),
     });
   }
 

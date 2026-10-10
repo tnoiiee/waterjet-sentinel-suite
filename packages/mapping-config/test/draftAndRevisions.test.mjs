@@ -222,8 +222,8 @@ test('impact preview with a verified rule reports ADDRESS_CHANGED with old and n
   session.moveModule('AI-MODULE-03', 5);
   const iv8 = session.impactPreview().tags.find((t) => t.tagName === 'IV8_OUTLET_PRESSURE');
   assert.equal(iv8.classification, 'ADDRESS_CHANGED');
-  assert.equal(iv8.oldAddress, 160);
-  assert.equal(iv8.newAddress, 32);
+  assert.equal(iv8.oldAddress, 144);
+  assert.equal(iv8.newAddress, 16);
 });
 
 test('a createConfiguration without the required fields is refused', () => {
@@ -243,10 +243,6 @@ test('B2: the Draft cannot move an IVn pressure or limit to another module or Ch
   assert.equal(canonicalJson(session.snapshot()), before, 'a refused edit creates no partial change');
   // Polarity and enablement stay editable; the rule is scoped to module and Channel.
   assert.equal(session.setBinding('IV1_UPPER_LIMIT', { activePolarity: 'ACTIVE_WHEN_CLOSED' }).ok, true);
-  // The pump inlet and outlet identities are fixed by the Owner clarification (AI-002 / AI-003) and are refused too.
-  for (const tag of ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE']) {
-    const r = session.setBinding(tag, { channel: 4 });
-    assert.equal(r.ok, false, tag);
-    assert.equal(r.refusal.code, 'WORKBOOK_IDENTITY_FIXED', tag);
-  }
+  // The pump inlet and outlet are NOT locked by module or Channel (Owner decision, 2026-10-10). Their Draft
+  // Slot/Channel behaviour, and the refusals that still apply, are tested in pumpIdentity.test.mjs.
 });

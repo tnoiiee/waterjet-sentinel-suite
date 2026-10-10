@@ -1,21 +1,28 @@
 // Stage 0.4B-1 — Simulation/Runtime Tag catalogue (transport-independent).
 //
-// These identities are Runtime names, not hardware addresses. Source identities
-// (PUMP_INLET, PUMP_OUTLET, MAIN_VALVE_OUTLET, IVn_OUTLET) are the identities used
-// by the Runtime. Owner clarification (2026-10-10), authoritative for meaning:
-//   AI-002  Pressure Transmitter - Pump inlet pressure   -> PumpInletPressureBar
-//           Pressure in the Header Tank / suction piping before the Pump. NOT Pump-ready.
-//   AI-003  Pressure Transmitter - Pump outlet pressure  -> PumpOutletPressureBar
-//           Pressure after the Pump, before the Main Valve. The ONLY pre-P1 Pump-ready input.
+// These identities are Runtime names, not hardware addresses. Source identities (PUMP_INLET, PUMP_OUTLET,
+// IVn_OUTLET) are the identities used by the Runtime. Owner clarification (2026-10-10), authoritative for meaning:
+//   AI-002  canonical PumpInletPressureBar  - Pump Inlet Pressure.
+//           Header Tank / suction-side pressure before the Pump. Diagnostic only. NOT Pump-ready.
+//   AI-003  canonical PumpOutletPressureBar - Pump Outlet Pressure.
+//           Pump discharge pressure used by the pre-P1 Pump-ready gate. The ONLY Pump-ready input.
 //   AI-004..AI-011  IV1..IV8 outlet pressure, ordinal by '#n' (valve diagnostics only).
-// Pump inlet, pump outlet, main valve and IVn pressure are distinct physical measurements.
-// There is no alias, fallback, averaging or derivation between them.
 //
-// tagName is the Draft and seed key and is kept unchanged. canonicalIdentity is the runtime
-// identity named by the Owner and must be unique across the catalogue.
+// Identity and location are separate. The Owner decides the workbook identifier (AI-002, AI-003) and the
+// canonical identity. The physical module, Slot and Channel are a default from the workbook and may be changed
+// in the Draft when the change is compatible. The workbook description is kept as source evidence on the binding
+// and is never used as the identity.
 //
-// No engineering range is assumed for any tag except the pump outlet range, which the Owner
-// confirmed as domain information. Every other range is UNCONFIGURED.
+// No Main Valve I/O tag is defined. The Owner's mention of a Main Valve describes the water path, not an I/O point.
+// Nothing here is a Main Valve command, feedback, pressure measurement or required row.
+//
+// Pump inlet, pump outlet and IVn pressure are distinct physical measurements. There is no alias, fallback,
+// averaging or derivation between them.
+//
+// tagName is the Draft and seed key and is kept unchanged. canonicalIdentity is the runtime identity named by the
+// Owner and must be unique across the catalogue. The only confirmed engineering range is the pump outlet range
+// (0–40 bar), carried from the pre-clarification catalogue as Owner-confirmed domain information. Every other
+// range, including the pump inlet range, is UNCONFIGURED.
 
 import { CHANNEL_TYPE, DIRECTION, SIGNAL } from './constants.mjs';
 
@@ -44,7 +51,6 @@ function analogPressure(tagName, role, sourceIdentity, pairIndex, meta = {}) {
     displayName: meta.displayName ?? tagName,
     canonicalIdentity: meta.canonicalIdentity ?? tagName,
     workbookTag: meta.workbookTag ?? null,
-    physicalDescription: meta.physicalDescription ?? null,
     engineeringMeaning: meta.engineeringMeaning ?? null,
     readinessRole: meta.readinessRole ?? 'NONE',
     confirmedEngineeringRange: meta.confirmedEngineeringRange ?? null,
@@ -73,22 +79,16 @@ const PRESSURE_TAGS = Object.freeze([
     displayName: 'Pump Inlet Pressure',
     canonicalIdentity: 'PumpInletPressureBar',
     workbookTag: OWNER_PUMP_SOURCE_TAGS.PUMP_INLET_PRESSURE,
-    physicalDescription: 'Pressure Transmitter - Pump inlet pressure',
-    engineeringMeaning: 'Pressure in the Header Tank / suction piping before water enters the Pump. Not the Pump-ready pressure.',
+    engineeringMeaning: 'Header Tank / suction-side pressure before the Pump. Diagnostic only. Not Pump-ready evidence.',
     readinessRole: 'PUMP_INLET_DIAGNOSTIC',
   }),
   analogPressure('PUMP_OUTLET_PRESSURE', 'PUMP_OUTLET_PRESSURE', 'PUMP_OUTLET', null, {
     displayName: 'Pump Outlet Pressure',
     canonicalIdentity: 'PumpOutletPressureBar',
     workbookTag: OWNER_PUMP_SOURCE_TAGS.PUMP_OUTLET_PRESSURE,
-    physicalDescription: 'Pressure Transmitter - Pump outlet pressure',
-    engineeringMeaning: 'Pressure after the Pump on the main discharge piping, before the Main Valve / distribution toward the Water Jets.',
+    engineeringMeaning: 'Pump discharge pressure used by the pre-P1 Pump-ready gate. The only Pump-ready input.',
     readinessRole: 'PUMP_READY_GATE',
     confirmedEngineeringRange: Object.freeze({ min: 0, max: 40, unit: 'bar', basis: 'OWNER_CONFIRMED_DOMAIN_INFORMATION' }),
-  }),
-  analogPressure('MAIN_VALVE_OUTLET_PRESSURE', 'MAIN_VALVE_PRESSURE', 'MAIN_VALVE_OUTLET', null, {
-    displayName: 'Main Valve Outlet Pressure',
-    engineeringMeaning: 'No workbook measurement is assigned. It is NOT aliased to AI-003 (the Pump Outlet).',
   }),
   ...IV_IDS.map((n) => analogPressure(`IV${n}_OUTLET_PRESSURE`, 'VALVE_OUTLET_PRESSURE', `IV${n}_OUTLET`, n, {
     displayName: `IV${n} Outlet Pressure`,
@@ -111,8 +111,7 @@ export function isPumpRole(role) {
 
 /**
  * WJn uses the pressure of IVn. This is a naming relation only: it returns the
- * Runtime tag name and never a channel, address or fallback. Pump and Main Valve
- * pressures are never returned here.
+ * Runtime tag name and never a channel, address or fallback. Pump pressures are never returned here.
  */
 export function pressureTagForWj(n) {
   if (!IV_IDS.includes(n)) throw new Error(`no WJ${n}: pressure relation is defined for WJ1..WJ8 only`);
@@ -138,5 +137,5 @@ export function getTagDef(tagName) {
 }
 
 export function isPressureRole(role) {
-  return isPumpRole(role) || role === 'MAIN_VALVE_PRESSURE' || role === 'VALVE_OUTLET_PRESSURE';
+  return isPumpRole(role) || role === 'VALVE_OUTLET_PRESSURE';
 }
