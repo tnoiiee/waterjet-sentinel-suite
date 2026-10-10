@@ -55,7 +55,9 @@ before(async () => {
   writeFileSync(xlsx, buildWorkbook({ rows: authoritativeShapedRows() }));
   server = createUiServer({ loader: () => loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: xlsx }) });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const base = `http://127.0.0.1:${server.address().port}`;
+  const origin = new URL('http://127.0.0.1');
+  origin.port = String(server.address().port);
+  const base = origin.origin;
   globalThis.fetch = (path, opts) => realFetch(`${base}${path}`, opts);
   await import('../public/app.mjs');
   for (let i = 0; i < 200 && byId['reserved-body'].childNodes.length === 0; i += 1) {

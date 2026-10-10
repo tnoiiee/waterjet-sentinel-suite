@@ -7,6 +7,38 @@ Stop point: this checkpoint. Nothing is merged.
 one commit after `8847cfc` on the same branch and PR #12. Source statically reviewed in Arena. **OWNER-LOCAL SUCCESSOR
 VALIDATION REQUIRED. OWNER BROWSER REVIEW PENDING. PR #12 OPEN - NOT MERGED.** See the section *Owner ruling 2026-10-10 - final mapping* below.
 
+## Correction: authoritative defaults, reserved inventory and fixed Dark UI (2026-10-10)
+
+Stage 0.4B-1 correction on the same branch and PR #12, after the successor `5f9f437`. No new scope gate, branch or PR.
+Not merged. No force-push. Commits: `438cfd2` complete authoritative workbook defaults; `09608bb` expose reserved
+unresolved inventory (with analog presentation); `64204e9` apply fixed dark presentation; and this docs commit.
+
+- **Defaults.** 26 authoritative bindings load from the workbook alone. No seed. Pump: AI-002 is PUMP_INLET_PRESSURE and
+  AI-003 is PUMP_OUTLET_PRESSURE. IV1–8 outlet pressure from AI-004–011, Lower from DI-021–028 and Upper from
+  DI-029–036, with `#n = IVn`. A limit row with two `#n` labels or two Lower/Upper words is refused.
+- **Seeded Main Valve.** A seed entry for `MAIN_VALVE_OUTLET_PRESSURE` is refused as `UNKNOWN_TAG` at import, and no
+  binding is created.
+- **Count of 17 (root cause).** The classification tested for OUTPUT before the placeholder marker. DO-031 is an OUTPUT,
+  so it was counted as `outputNotAuthorised` and the placeholder count stopped at 17. The reserved test now runs first,
+  so each row is counted once: `reservedUnresolved` is 18, and `outputNotAuthorised` is 31 (the other outputs). DO-031 is
+  shown in the inventory as OUTPUT with NOT_AUTHORIZED_IN_READ_ONLY_STAGE, as a factual overlay, not as a second count.
+- **Reserved inventory.** A read-only section, *Reserved channels awaiting Owner identity (18)*, shows all 18 rows with
+  the 11 Owner columns. Each row is USED / RESERVED, SignalIdentity UNRESOLVED, BindingStatus UNBOUND,
+  OwnerInputStatus OWNER_INPUT_PENDING, AutomaticBinding PROHIBITED, AvailableAsSpare false, ADDRESS_UNRESOLVED.
+- **Analog presentation.** Analog pressure rows show Polarity NOT APPLICABLE and Contact NOT APPLICABLE. This is
+  presentation only. Digital limits keep ACTIVE_WHEN_CLOSED and NO.
+- **Fixed Dark theme.** One Dark presentation only: no selector, no SYSTEM or LIGHT option, no theme storage, no theme API
+  and no theme state in the Draft or any revision. No external CSS and no network request beyond the configuration read.
+- **Tests.** Default bindings D01–D15 (`defaultBindings.acceptance.test.mjs`), placeholder inventory P01–P20
+  (`placeholderInventory.acceptance.test.mjs`), dark presentation T01–T19 (`darkTheme.test.mjs`) and reserved UI
+  (`reserved.render.test.mjs`, 11 items). Pre-fix and mutant runs were made in `/tmp` copies only; no mutant file is committed.
+
+Honesty lines for this correction: AI-002 RANGE OWNER-CONFIRMED. AI-002 DIAGNOSTIC/TREND ONLY. AI-003 PUMP-READY ONLY.
+AUTHORITATIVE DEFAULT HAS 26 BINDINGS. AUTHORITATIVE DEFAULT REQUIRES NO SEED. RESERVED PLACEHOLDER INVENTORY HAS 18 ROWS.
+FIXED DARK THEME ONLY. AI-002 RUNTIME PUBLICATION NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. OWNER BROWSER
+REVIEW PENDING. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
+Source statically reviewed. Owner-local successor validation required.
+
 ## Owner exception (Boundary Hold, AGENTS §11.5 / PUBLIC_REPOSITORY_BOUNDARY §7)
 
 The Owner granted a **documented exception**, limited to this workbook and Stage 0.4B-1. It does not
@@ -144,8 +176,8 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
   blank or malformed values, ambiguous inputs, placeholder rows and model-profile gaps. It never repairs
   silently. Placeholder rows (DI-037, DO-031, AI-020 to AI-035) stay USED / RESERVED with
   SignalIdentity = UNRESOLVED, TagBinding = UNBOUND and OwnerInputStatus = OWNER_INPUT_PENDING. They are
-  not FREE, are never auto-bound, and raise `SIGNAL_IDENTITY_UNRESOLVED` and `OWNER_INPUT_PENDING`. Output placeholders are classified as outputs first, so their output
-  classification takes precedence over the reserved-row count.
+  not FREE, are never auto-bound, and raise `SIGNAL_IDENTITY_UNRESOLVED` and `OWNER_INPUT_PENDING`. Reserved placeholders are classified before the output test, so each row is
+  counted once (DO-031 is reserved, and its output fact is an overlay in the inventory).
 - **UI.** Header, rack layout (Draft drag-and-drop, plus Alt+Arrow keyboard reorder), Undo, Redo, Reset,
   tag mapping (read-only), validation, impact preview and revisions. Controls are limited to Undo, Redo
   and Reset. There is no Connect, Poll, Read, Write, Force, command, Activate, TEST_HARDWARE or Production control.
@@ -154,8 +186,8 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 
 | Gate | Result | Evidence |
 |---|---|---|
-| Mapping package tests (successor) | **VERIFIED IN ARENA** | `npm test` in `packages/mapping-config`, no workbook env: 182 tests, 175 pass, 0 fail, 7 skipped (Owner-local only). With `MAPPING_EXCEL_DEFAULT_PATH` set to a byte-identical copy outside the repository and no seed variable: 182 pass, 0 fail, 0 skipped. |
-| UI shell tests (successor) | **VERIFIED IN ARENA** | `npm test` in `apps/mapping-config`: 25 pass, 0 fail, with and without the workbook env. The UI test servers use an explicit empty environment, so the synthetic-default tests do not depend on Owner-local variables. |
+| Mapping package tests (correction head) | **VERIFIED IN ARENA** | `npm test` in `packages/mapping-config`, no workbook env: 217 tests, 210 pass, 0 fail, 7 skipped (Owner-local only). With `MAPPING_EXCEL_DEFAULT_PATH` set to a byte-identical copy outside the repository and no seed variable: 217 pass, 0 fail, 0 skipped. The predecessor 182-test figure belongs to the predecessor head. |
+| UI shell tests (correction head) | **VERIFIED IN ARENA** | `npm test` in `apps/mapping-config`: 56 pass, 0 fail, with and without the workbook env (including reserved 11 and dark 19). The UI test servers use an explicit empty environment, so the synthetic-default tests do not depend on Owner-local variables. |
 | Syntax checks | **VERIFIED IN ARENA** | `npm --prefix packages/mapping-config run check` and `npm --prefix apps/mapping-config run check`: exit 0. |
 | Boundary scan (S1–S9) | **VERIFIED IN ARENA** | `node tools/boundary-scan/boundary-scan.mjs .`: 0 findings. |
 | Whitespace in new files | **VERIFIED** | Grep for trailing whitespace and tabs: none. `git diff --check` on tracked files: empty. |
@@ -167,7 +199,7 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 | Locked restore, Release build, Runtime.Core and API tests, full .NET suite | **NOT VERIFIED** | The .NET SDK is absent in this sandbox. No .NET file is changed. |
 | Fixture parity | **NOT VERIFIED** | No fixture changed. The parity run needs the .NET generator. |
 | TypeScript checks | **NOT VERIFIED** | The TS package has no installed dependencies here. No TS file is changed. Installing them needs a STOP. |
-| Browser rendering and layout | **NOT VERIFIED** | No browser in the sandbox. Verified only through the stub DOM and server tests. |
+| Browser rendering and layout | **NOT VERIFIED — OWNER BROWSER REVIEW PENDING** | No browser in the sandbox. Verified only through the stub DOM and server tests. The Owner review is the 38-item checklist below. |
 | `git diff --check` and clean tree | **VERIFIED AT COMMIT** | `git diff --check` clean and no uncommitted change before the commit that carries this document. The tree is committed; see the commit log. |
 | Full .NET regression (successor) | **NOT RUN** | No .NET file is changed by the successor, and the shared boundary is not changed. The predecessor evidence (414/414) is unchanged and is not re-claimed by this successor. |
 
@@ -277,25 +309,78 @@ correct signal. The derived address is read-only and follows the change. Locked:
 moved onto an IVn source, and a shared channel are refused. The workbook description is source evidence and is not
 identity. A description mismatch with a matching identifier raises no warning. An identifier conflict is still refused.
 
-**Owner-local browser command (successor head, after the Owner's own checkout is updated):**
+**Owner-local browser handoff (PowerShell, Windows, correction head).** The server binds the constant `127.0.0.1`
+and reads the port from `MAPPING_UI_PORT` (default 5186). It takes the authoritative workbook from a byte-identical copy
+outside the repository. No seed is created, and `MAPPING_BINDING_SEED_PATH` is unset. Run from the repository root.
 
+```powershell
+git status --porcelain                      # expect no output before you start
+git fetch origin
+git checkout arena/1b92c50a-waterjet-sentinel-suite
+git pull --ff-only origin arena/1b92c50a-waterjet-sentinel-suite
+git rev-parse HEAD                          # expect the correction head reported by Arena
+node --version                              # expect v22.22.x or newer
+
+$repo = (Get-Location).Path
+$work = Join-Path $env:TEMP 'wjss-owner-review'
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+$copy = Join-Path $work 'T8_IO_Card_Mapping.xlsx'
+Copy-Item -LiteralPath (Join-Path $repo 'T8_IO_Card_Mapping.xlsx') -Destination $copy -Force
+$hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $copy).Hash
+if ($hash -ne '4E0337E25C8377C01559F264653BAAB25BCFA23F4D3E071FDC8C80896F422E8E') { throw "SHA-256 mismatch: $hash" }
+(Get-Item -LiteralPath $copy).Length        # expect 16648
+
+if (Test-Path Env:MAPPING_BINDING_SEED_PATH) { Remove-Item Env:MAPPING_BINDING_SEED_PATH }
+$env:MAPPING_EXCEL_DEFAULT_PATH = $copy
+$env:MAPPING_UI_PORT = '5186'
+node apps/mapping-config/server.mjs
+# Open http://127.0.0.1:5186 in your browser. Loopback only.
+# When the review is finished, press Ctrl+C in the server window, then run:
+Remove-Item Env:MAPPING_EXCEL_DEFAULT_PATH -ErrorAction SilentlyContinue
+Remove-Item Env:MAPPING_UI_PORT -ErrorAction SilentlyContinue
+Remove-Item -LiteralPath $copy -Force
+git status --porcelain                      # expect no output
 ```
-MAPPING_EXCEL_DEFAULT_PATH=/absolute/path/outside/the/repository/T8_IO_Card_Mapping.xlsx node apps/mapping-config/server.mjs
-```
 
-Then open `http://127.0.0.1:5186`. Do not set `MAPPING_BINDING_SEED_PATH` for the authoritative default. The server
-binds to 127.0.0.1 only.
+**Owner browser acceptance (38 items).** Classify the review as PASS, PASS WITH NON-BLOCKING PUNCHLIST, or FAIL/BLOCKING.
+Report the result to Arena. Do not create an Owner UI closeout until the Owner reports.
 
-**Owner-local browser checklist (23 items).** Report the result to Arena. Do not create an Owner UI closeout until the Owner reports.
+*Dark theme*
+1. The whole page is dark, with no light surface or text. 2. There is no theme selector, toggle, SYSTEM or LIGHT option.
+3. A reload keeps the Dark appearance, and localStorage holds no key for this page (DevTools, Application).
+4. DevTools Network shows one request at load (`/api/configuration`) and none on any click, Undo, Redo, Reset, drag or Alt+Arrow.
+5. Body and table text are legible at 100% zoom. 6. Keyboard Tab shows a visible focus outline on buttons and rows.
+7. At load, Undo, Redo and Reset are visibly disabled. 8. A refused move shows its message in the error colour.
 
-1. The workbook default is shown. 2. Coupler and End are fixed. 3. Drag and drop reorders through the Draft.
-4. Keyboard reorder (Alt+Arrow) reorders through the Draft. 5. Undo works. 6. Redo works. 7. Reset works.
-8. RackSlot and ProcessModulePosition are shown and distinct. 9. Every address shows ADDRESS_UNRESOLVED.
-10. No numeric-address entry exists. 11. Pump and IV1–8 pressure are distinct. 12. The 16 limits map `#n` to IVn, ACTIVE_WHEN_CLOSED.
-13. The 18 placeholders show USED / RESERVED / UNBOUND. 14. A duplicate binding is refused. 15. A wrong-type binding is refused.
-16. A wrong IV ordinal is refused. 17. A wrong IV group is refused. 18. Nothing activates to hardware.
-19. No MODBUS control is present. 20. No write control is present. 21. Loopback only (127.0.0.1).
-22. The Pump Slot/Channel can be changed in the Draft, and identity is locked. 23. AI-002 is shown as diagnostic and trend only, never Pump-ready.
+*Topology*
+9. The rack shows 23 modules in the expected sequence (RackSlot 1–23). 10. Coupler and End are fixed (not draggable).
+11. Drag and drop reorders a movable module through the Draft. 12. Alt+Arrow reorders a movable module through the Draft.
+13. Undo, Redo and Reset restore the expected order. 14. RackSlot and ProcessModulePosition are both shown, and differ where expected.
+15. No rack row shows a numeric address. Each derived address reads ADDRESS UNRESOLVED.
+
+*Enabled bindings*
+16. The tag table shows 26 rows with Enabled = yes. The 29 listed read-only inputs show Enabled = no. 17. PUMP_INLET_PRESSURE (AI-002) is on AI-MODULE-01 channel 2, analog.
+18. PUMP_OUTLET_PRESSURE (AI-003) is on AI-MODULE-01 channel 3, analog.
+19. IV1–IV8 outlet pressure rows each show their module and channel, with NOT APPLICABLE polarity and contact.
+20. The 8 Lower limits show ACTIVE_WHEN_CLOSED and NO. 21. The 8 Upper limits show ACTIVE_WHEN_CLOSED and NO.
+22. No MAIN_VALVE_OUTLET_PRESSURE row exists. 23. Every enabled address reads ADDRESS UNRESOLVED.
+24. Validation reads VALID, Activation ready: no, with NO_VERIFIED_PROCESS_IMAGE_RULE among the blocking reasons.
+
+*Placeholders*
+25. The heading reads "Reserved channels awaiting Owner identity (18)". 26. All 18 rows are rendered.
+27. AI-020, AI-035, DI-037 and DO-031 are present. 28. DO-031 reads OUTPUT · NOT AUTHORIZED and NOT_AUTHORIZED_IN_READ_ONLY_STAGE.
+29. Every row reads UNBOUND, OWNER_INPUT_PENDING, PROHIBITED and ADDRESS_UNRESOLVED.
+30. Reserved rows, enabled rows, listed-not-enabled rows and the output row look different, as the legend describes.
+
+*Presentation*
+31. No analog row shows NOT SET or UNKNOWN. 32. ADDRESS UNRESOLVED is shown in the warning colour, never green.
+33. The source summary reads 18 reserved placeholder rows, of them 1 an output (DO-031). 34. The legend matches what is shown.
+
+*Boundary*
+35. The URL is http://127.0.0.1:5186, and `Get-NetTCPConnection -LocalPort 5186` shows LocalAddress 127.0.0.1 only.
+36. No connect, poll, read, write, force, command, activate, TEST_HARDWARE or production control is present.
+37. The server was started with no `MAPPING_BINDING_SEED_PATH`, and no seed file was used.
+38. After shutdown, the out-of-repository copy is deleted, the variables are unset, and `git status --porcelain` is empty.
 
 **Seed-generation handoff (optional override, not required for defaults).** No seed generator is implemented in this
 PR, and no new local script is added. If an authorised override is needed later, the handoff is: a deterministic
@@ -306,4 +391,4 @@ requires a STOP and a report of its file and scope first.
 
 **Known limits of this successor.** The workbook is unchanged and remains the authoritative input. .NET and TypeScript
 were not run here. No browser run was made here. The Owner-local successor validation has not been run by the Owner.
-The predecessor evidence (414/414) is not re-claimed by this successor.
+The predecessor evidence (414/414) is not re-claimed by this successor or by the correction head. No .NET run was made for the correction.
