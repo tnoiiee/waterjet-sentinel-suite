@@ -1,4 +1,4 @@
-// Stage 0.4B-1 — Module Profile catalogue (I/O module models 750-xxx).
+// Stage 0.4B-2 — Module Profile catalogue (I/O module models 750-xxx).
 //
 // Each profile records only the facts that were verified from manufacturer
 // datasheet excerpts, plus the facts that are structurally fixed by the
