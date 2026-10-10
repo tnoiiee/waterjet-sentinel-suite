@@ -1388,6 +1388,14 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - **Final Source Review (static):** PASSED. Blocking defects: none. Boundary scanner: authorised B1 regression protection, in scope. Runtime Inspector wording: owner-approved narrow presentation exception, non-blocking. Non-blocking follow-ups: A (Pump Slot/Channel is a Draft-model API capability, not a browser editor), B (SPARE-versus-placeholder ordering), C (Draft API create-on-missing), D (UI readability).
 - **Stated status.** AI-002 Runtime publication NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. ACTIVATION NOT READY. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
 
+### 12.33 Stage 0.4B-3 — Arena development-checkpoint validation record (2026-10-10)
+
+- **Base gate (Arena-verified).** `git ls-remote origin refs/heads/main` = `3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6`; local `HEAD` and branch `arena/00483ae4-waterjet-sentinel-suite` equal to it; index and worktree clean (0 entries); PR #14 `MERGED` with merge commit `3a73dfce` and parents `dbbf34cf` / `a811f6ff` (both proven ancestors); Stage 0.4B-2 head `fe38322d` proven an ancestor; no conflicting open PR.
+- **Arena results at this checkpoint:** Mapping package check PASS; Mapping package 268 tests / 261 pass / 0 fail / 7 skipped (pre-existing Owner-local workbook skips); Mapping UI check PASS; Mapping UI 82 / 82 / 0 / 0; boundary scan 0 findings (S1–S9 clean); PR-range `git diff --check` clean; workbook SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` unchanged; working tree clean.
+- **Not run in Arena:** Owner-local runs with the workbook environment variable; any browser review (layout NOT VERIFIED); any .NET build or test — no .NET file was touched by this Stage, so no .NET result is claimed and none is requested.
+- **Evidence status.** Primary manuals for all eight models and the two actual-rack screens are Owner-provided outside the repository and are not present in the sandbox; they are recorded as `OWNER_PROVIDED_OUTSIDE_REPOSITORY` with no SHA-256. Actual Process Data image and actual field-network mapping NOT PROVIDED. Candidate addresses NOT AUTHORITATIVE.
+- **Stated status.** 750-601, 750-613 and 750-600 HAVE NO PROCESS I/O ADDRESS (`NOT_APPLICABLE` / `NON_PROCESS_DATA_MODULE`). AI-002 Runtime publication NOT IMPLEMENTED. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. PR OPEN - NOT MERGED.
+
 ## Related documents
 
 - [`../AGENTS.md`](../AGENTS.md) — working contract and stop conditions
