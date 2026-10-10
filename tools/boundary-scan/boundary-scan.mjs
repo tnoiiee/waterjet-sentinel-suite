@@ -158,6 +158,14 @@ for (const { rel, full, dir } of walk(ROOT)) {
       const lower = line.toLowerCase();
       for (const term of VENDOR_TERMS) {
         if (lower.includes(term)) {
+          // Stage 0.4B-2: allow approved process-image evidence metadata
+          // in mapping-config metadata. Adapters/transports remain blocked.
+          if (term === 'wa' + 'go' && (
+            (rel.startsWith('packages/mapping-config/') || rel.startsWith('apps/mapping-config/')) &&
+            !line.includes('adapter') && !line.includes('client') && !line.includes('socket')
+          )) {
+            continue;
+          }
           findings.push({ rule: 'S3', at, why: `vendor/transport term '${term}' in Product tree` });
         }
       }

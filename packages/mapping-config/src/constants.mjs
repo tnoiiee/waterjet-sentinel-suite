@@ -1,7 +1,7 @@
-// Stage 0.4B-1 — shared vocabulary for the simulation-only Mapping Configuration domain.
+// Stage 0.4B-2 — shared vocabulary for the simulation-only Mapping Configuration domain.
 // Pure data: no I/O, no device access, no provider switches.
 
-export const STAGE = 'Stage 0.4B-1';
+export const STAGE = 'Stage 0.4B-2';
 
 export const PROVIDER = Object.freeze({ SIMULATOR: 'SIMULATOR' });
 
@@ -45,7 +45,7 @@ export const POLARITY = Object.freeze({
 
 export const CONTACT = Object.freeze({ NO: 'NO', NC: 'NC' });
 
-// Owner rule (Stage 0.4B-1): every IVn lower- and upper-limit input is ACTIVE_WHEN_CLOSED
+// Owner rule: every IVn lower- and upper-limit input is ACTIVE_WHEN_CLOSED
 // (contact open = limit not detected; contact closed = limit detected). This is ContactPolarity.
 // It is separate from RawInputInversion, which is UNVERIFIED and not configured by default.
 export const OWNER_LIMIT_CONTACT_POLARITY = 'ACTIVE_WHEN_CLOSED';
@@ -57,12 +57,26 @@ export const ADDRESS_STATE = Object.freeze({
   DERIVED: 'DERIVED',
 });
 
+// Explicit Evidence States (Stage 0.4B-2)
+export const EVIDENCE_STATE = Object.freeze({
+  NOT_PROVIDED: 'NOT_PROVIDED',
+  PROVIDED_UNVERIFIED: 'PROVIDED_UNVERIFIED',
+  VERIFIED_PRIMARY_SOURCE: 'VERIFIED_PRIMARY_SOURCE',
+  VERIFIED_WAGO_IO_CHECK_EXPORT: 'VERIFIED_WAGO_IO_CHECK_EXPORT',
+  CONFLICTING_EVIDENCE: 'CONFLICTING_EVIDENCE',
+  INCOMPLETE_PROFILE: 'INCOMPLETE_PROFILE',
+});
+
 // Reason codes attached to every unresolved address. They are explanations,
 // never a numeric fallback.
 export const REASON = Object.freeze({
   HEAD_STATION_PROFILE_NOT_VERIFIED: 'HEAD_STATION_PROFILE_NOT_VERIFIED',
   MODULE_PROCESS_DATA_PROFILE_NOT_VERIFIED: 'MODULE_PROCESS_DATA_PROFILE_NOT_VERIFIED',
   MODULE_STATUS_BYTE_SETTING_NOT_VERIFIED: 'MODULE_STATUS_BYTE_SETTING_NOT_VERIFIED',
+  PROCESS_IMAGE_ORDER_NOT_VERIFIED: 'PROCESS_IMAGE_ORDER_NOT_VERIFIED',
+  BYTE_ORDER_NOT_VERIFIED: 'BYTE_ORDER_NOT_VERIFIED',
+  WORD_ORDER_NOT_VERIFIED: 'WORD_ORDER_NOT_VERIFIED',
+  CONFLICTING_PROCESS_IMAGE_EVIDENCE: 'CONFLICTING_PROCESS_IMAGE_EVIDENCE',
   ENGINEERING_RANGE_UNCONFIGURED: 'ENGINEERING_RANGE_UNCONFIGURED',
   SIGNAL_IDENTITY_UNRESOLVED: 'SIGNAL_IDENTITY_UNRESOLVED',
   OWNER_INPUT_PENDING: 'OWNER_INPUT_PENDING',
