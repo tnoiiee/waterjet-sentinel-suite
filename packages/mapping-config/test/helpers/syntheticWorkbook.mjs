@@ -108,9 +108,13 @@ export function exampleRows({ placeholder = false, ambiguous = false } = {}) {
   for (let i = 0; i < 12; i += 1) {
     const slot = 6 + Math.floor(i / 4);
     const channel = (i % 4) + 1;
-    const tag = `EX-AI-${String(i + 1).padStart(2, '0')}`;
+    // AI-002 and AI-003 are the Owner identifiers of the pump inlet and pump outlet, fixed by the import.
     // The IVn outlet pressure rows (EX-AI-03 to EX-AI-10) carry the authoritative '#n' label.
-    let signal = i >= 2 && i <= 9 ? `Example pressure transmitter #${i - 1}` : `Example pressure ${i + 1}`;
+    const tag = i === 0 ? 'AI-002' : i === 1 ? 'AI-003' : `EX-AI-${String(i + 1).padStart(2, '0')}`;
+    let signal = i >= 2 && i <= 9 ? `Example pressure transmitter #${i - 1}`
+      : i === 0 ? 'Example pressure transmitter - pump inlet'
+        : i === 1 ? 'Example pressure transmitter - pump outlet'
+          : `Example pressure ${i + 1}`;
     let ioType = 'AI (4-20 mA. HART5)';
     if (i === 10) { signal = 'Example current input'; ioType = 'AI (0-20 mA.)'; }
     if (i === 11) { signal = placeholder ? 'XXX awaiting reply' : 'Example spare-like input'; ioType = 'AI (4-20 mA.)'; }
@@ -123,12 +127,12 @@ export function exampleRows({ placeholder = false, ambiguous = false } = {}) {
   return rows;
 }
 
-/** Binding seed that maps runtime tag names to the synthetic workbook tag ids. */
+/**
+ * Binding seed for the IV pressures and limits. The pump inlet and outlet are not in the seed: the import binds
+ * them from the Owner table (AI-002, AI-003). The synthetic workbook has no main valve pressure row.
+ */
 export function exampleSeed({ polarity = null } = {}) {
-  const seed = {
-    PUMP_OUTLET_PRESSURE: { source: 'EX-AI-01', declaredSourceIdentity: 'PUMP_OUTLET', engineering: { min: 0, max: 40, unit: 'bar' } },
-    MAIN_VALVE_OUTLET_PRESSURE: { source: 'EX-AI-02', declaredSourceIdentity: 'MAIN_VALVE_OUTLET' },
-  };
+  const seed = {};
   for (let n = 1; n <= 8; n += 1) {
     seed[`IV${n}_OUTLET_PRESSURE`] = { source: `EX-AI-${String(n + 2).padStart(2, '0')}`, declaredSourceIdentity: `IV${n}_OUTLET` };
     seed[`IV${n}_LOWER_LIMIT`] = { source: `EX-DI-${String(n).padStart(2, '0')}`, declaredSourceIdentity: `IV${n}_LOWER_LIMIT`, activePolarity: polarity };

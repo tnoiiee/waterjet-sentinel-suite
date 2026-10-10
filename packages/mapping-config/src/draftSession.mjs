@@ -20,9 +20,10 @@ import {
 } from './revisions.mjs';
 
 const EDITABLE_FIELDS = Object.freeze(['moduleInstanceId', 'channel', 'enabled', 'engineering', 'activePolarity', 'contactType']);
-// IVn pressure and limit identities are fixed by the workbook, where the '#n' label equals IVn. The Draft may not
-// move them to another module or Channel, because that would bypass the ordinal check made at import.
-const WORKBOOK_FIXED_TAG_RE = /^IV[1-8]_(OUTLET_PRESSURE|LOWER_LIMIT|UPPER_LIMIT)$/;
+// IVn pressure and limit identities are fixed by the workbook, where the '#n' label equals IVn. The Pump Inlet
+// (AI-002) and Pump Outlet (AI-003) identities are fixed by the Owner clarification. The Draft may not move any of
+// them to another module or Channel, because that would bypass the import checks.
+const WORKBOOK_FIXED_TAG_RE = /^(IV[1-8]_(OUTLET_PRESSURE|LOWER_LIMIT|UPPER_LIMIT)|PUMP_(INLET|OUTLET)_PRESSURE)$/;
 const WORKBOOK_FIXED_FIELDS = Object.freeze(['moduleInstanceId', 'channel']);
 
 function clone(value) {

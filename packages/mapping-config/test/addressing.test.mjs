@@ -59,16 +59,21 @@ test('a disabled binding is NOT_ACTIVE and carries no reasons', () => {
 test('the SYNTHETIC TEST RULE gives zero-based analog-then-digital positions', () => {
   const c = cfg();
   const map = byTag(deriveAddresses(deriveRackView(c.modules), c.bindings, SYNTHETIC_TEST_RULE));
+  // Analog order: pump inlet (word 0), pump outlet (word 1), main valve (word 2), IV1..IV8 (words 3..10).
+  const inlet = map.get('PUMP_INLET_PRESSURE');
+  assert.equal(inlet.state, 'DERIVED');
+  assert.equal(inlet.wordOffset, 0);
+  assert.equal(inlet.bitOffsetAbsolute, 0);
+  assert.equal(inlet.bitIndex, null);
+  assert.equal(inlet.displayNotation, 'INPUT-W0');
   const pump = map.get('PUMP_OUTLET_PRESSURE');
-  assert.equal(pump.state, 'DERIVED');
-  assert.equal(pump.wordOffset, 0);
-  assert.equal(pump.bitOffsetAbsolute, 0);
-  assert.equal(pump.bitIndex, null);
-  assert.equal(pump.displayNotation, 'INPUT-W0');
+  assert.equal(pump.wordOffset, 1);
+  assert.equal(pump.bitOffsetAbsolute, 16);
+  assert.equal(pump.displayNotation, 'INPUT-W1');
   // Three analog modules x 4 channels = 12 words, so the first digital bit is 12 x 16 = 192.
   const iv8 = map.get('IV8_OUTLET_PRESSURE');
-  assert.equal(iv8.wordOffset, 9);
-  assert.equal(iv8.bitOffsetAbsolute, 144);
+  assert.equal(iv8.wordOffset, 10);
+  assert.equal(iv8.bitOffsetAbsolute, 160);
   // The synthetic example binds IVn UPPER to DI channel 1 and LOWER to DI channel 2 (catalogue order).
   const upper1 = map.get('IV1_UPPER_LIMIT');
   assert.equal(upper1.bitOffsetAbsolute, 192);
@@ -137,12 +142,12 @@ test('a reorder moves derived addresses and the Draft reports ADDRESS_CHANGED fo
   const impact = session.impactPreview();
   const iv8 = impact.tags.find((t) => t.tagName === 'IV8_OUTLET_PRESSURE');
   assert.equal(iv8.classification, 'ADDRESS_CHANGED');
-  assert.equal(iv8.oldAddress, 144);
-  assert.equal(iv8.newAddress, 16);
+  assert.equal(iv8.oldAddress, 160);
+  assert.equal(iv8.newAddress, 32);
   const pump = impact.tags.find((t) => t.tagName === 'PUMP_OUTLET_PRESSURE');
-  // AI-MODULE-03 now occupies analog words 0..3, so AI-MODULE-01 channel 1 moves to word 4 (bit 64).
-  assert.equal(pump.oldAddress, 0);
-  assert.equal(pump.newAddress, 64);
+  // AI-MODULE-03 now occupies analog words 0..3, so AI-MODULE-01 channel 2 (pump outlet) moves from word 1 to word 5.
+  assert.equal(pump.oldAddress, 16);
+  assert.equal(pump.newAddress, 80);
   assert.equal(pump.classification, 'ADDRESS_CHANGED');
 });
 

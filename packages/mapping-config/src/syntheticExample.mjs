@@ -8,7 +8,7 @@
 
 import { createConfiguration } from './draftSession.mjs';
 import { buildModuleInstances } from './rack.mjs';
-import { listSimulationTags } from './tagCatalogue.mjs';
+import { listSimulationTags, getTagDef } from './tagCatalogue.mjs';
 import { POLARITY, CONTACT } from './constants.mjs';
 
 const MODELS = ['750-362', '750-601', '750-430', '750-430', '750-530', '750-471', '750-471', '750-471', '750-554', '750-600'];
@@ -18,25 +18,29 @@ export function syntheticExampleConfiguration() {
   const byCategory = (prefix) => modules.filter((m) => m.moduleInstanceId.startsWith(prefix));
   const ai = byCategory('AI-MODULE');
   const di = byCategory('DI-MODULE');
-  // Pressure channels: pump, main valve, IV1..IV8 across the three AI modules (4 channels each).
+  // Pressure channels: pump inlet, pump outlet, main valve, IV1..IV8 across the three AI modules (4 channels each).
+  // Every pressure measurement is a separate channel. Pump and IV identities are never shared.
   const pressureSlots = [];
   for (const m of ai) for (let c = 1; c <= 4; c += 1) pressureSlots.push({ moduleInstanceId: m.moduleInstanceId, channel: c });
   const bindings = [];
-  const pressureNames = ['PUMP_OUTLET_PRESSURE', 'MAIN_VALVE_OUTLET_PRESSURE',
+  const pressureNames = ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE', 'MAIN_VALVE_OUTLET_PRESSURE',
     ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => `IV${n}_OUTLET_PRESSURE`)];
-  const sourceFor = (name) => (name === 'PUMP_OUTLET_PRESSURE' ? 'PUMP_OUTLET'
-    : name === 'MAIN_VALVE_OUTLET_PRESSURE' ? 'MAIN_VALVE_OUTLET' : name.replace('_PRESSURE', ''));
   pressureNames.forEach((name, i) => {
     const at = pressureSlots[i];
+    const def = getTagDef(name);
+    const range = def.confirmedEngineeringRange;
+    // The synthetic workbook tag of each pressure row: the pump identifiers are the Owner's; IVn is EX-AI-(n+2).
+    const n = /^IV([1-8])_/.exec(name)?.[1];
     bindings.push({
       tagName: name,
       moduleInstanceId: at.moduleInstanceId,
       channel: at.channel,
       enabled: true,
-      engineering: name === 'PUMP_OUTLET_PRESSURE' ? { min: 0, max: 40, unit: 'bar' } : null,
+      engineering: range ? { min: range.min, max: range.max, unit: range.unit } : null,
       activePolarity: null,
       contactType: null,
-      declaredSourceIdentity: sourceFor(name),
+      declaredSourceIdentity: def.sourceIdentity,
+      sourceWorkbookTag: def.workbookTag ?? (n ? `EX-AI-${String(Number(n) + 2).padStart(2, '0')}` : undefined),
     });
   });
   // Digital limits: 16 channels across two DI modules.
@@ -44,6 +48,7 @@ export function syntheticExampleConfiguration() {
   for (const m of di) for (let c = 1; c <= 8; c += 1) digitalSlots.push({ moduleInstanceId: m.moduleInstanceId, channel: c });
   listSimulationTags().filter((t) => t.channelType === 'DIGITAL').forEach((t, i) => {
     const at = digitalSlots[i];
+    const [, n, group] = /^IV([1-8])_(LOWER|UPPER)_LIMIT$/.exec(t.tagName);
     bindings.push({
       tagName: t.tagName,
       moduleInstanceId: at.moduleInstanceId,
@@ -53,6 +58,7 @@ export function syntheticExampleConfiguration() {
       activePolarity: POLARITY.ACTIVE_WHEN_CLOSED,
       contactType: CONTACT.NO,
       declaredSourceIdentity: t.tagName,
+      sourceWorkbookTag: `EX-DI-${String(group === 'LOWER' ? Number(n) : Number(n) + 8).padStart(2, '0')}`,
     });
   });
   bindings.sort((a, b) => a.tagName.localeCompare(b.tagName));

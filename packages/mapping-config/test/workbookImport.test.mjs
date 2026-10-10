@@ -54,8 +54,9 @@ test('output rows are classified NOT AUTHORIZED and never bound', () => {
 
 test('the seeded bindings resolve to the expected module instances and channels', () => {
   const r = importExample();
+  // Synthetic AI-002 (pump inlet) is channel 1 and AI-003 (pump outlet) is channel 2 of AI-MODULE-01.
   const pump = r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
-  assert.deepEqual([pump.moduleInstanceId, pump.channel], ['AI-MODULE-01', 1]);
+  assert.deepEqual([pump.moduleInstanceId, pump.channel], ['AI-MODULE-01', 2]);
   const iv8 = r.bindings.find((b) => b.tagName === 'IV8_OUTLET_PRESSURE');
   assert.deepEqual([iv8.moduleInstanceId, iv8.channel], ['AI-MODULE-03', 2]);
   const lower1 = r.bindings.find((b) => b.tagName === 'IV1_LOWER_LIMIT');
@@ -125,7 +126,7 @@ test('an unknown model in the middle of the rack does not shift later module ide
   assert.ok(r.issues.some((i) => i.code === 'UNKNOWN_MODEL_PROFILE'));
   assert.equal(r.modules.some((m) => m.modelNumber === '750-530'), false);
   const pump = r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
-  assert.deepEqual([pump.moduleInstanceId, pump.channel], ['AI-MODULE-01', 1]);
+  assert.deepEqual([pump.moduleInstanceId, pump.channel], ['AI-MODULE-01', 2]);
   const iv8 = r.bindings.find((b) => b.tagName === 'IV8_OUTLET_PRESSURE');
   assert.deepEqual([iv8.moduleInstanceId, iv8.channel], ['AI-MODULE-03', 2]);
 });
@@ -275,7 +276,7 @@ test('B2: a non-pressure row cannot satisfy a pressure binding merely because #n
 test('B2: pump pressure is not subject to the IV ordinal rule', () => {
   const r = importExample();
   const pump = r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
-  assert.deepEqual([pump.moduleInstanceId, pump.channel], ['AI-MODULE-01', 1]);
+  assert.deepEqual([pump.moduleInstanceId, pump.channel], ['AI-MODULE-01', 2]);
   assert.equal(r.issues.some((i) => i.code === 'PRESSURE_IV_LABEL_MISMATCH' && /PUMP|MAIN_VALVE/.test(i.tagName)), false);
 });
 

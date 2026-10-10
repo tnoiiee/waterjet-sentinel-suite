@@ -13,6 +13,7 @@ import { CHANNEL_TYPE, DIRECTION, CONTACT, SIGNAL, SEVERITY, OWNER_LIMIT_CONTACT
 import { getProfile } from './moduleProfiles.mjs';
 import { buildModuleInstances, validateRack } from './rack.mjs';
 import { validateMapping } from './mappingValidation.mjs';
+import { getTagDef, OWNER_PUMP_SOURCE_TAGS } from './tagCatalogue.mjs';
 
 const MAX_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
 const EXPECTED_COLUMNS = Object.freeze([
@@ -338,14 +339,53 @@ export function importWorkbook(buf, options = {}) {
     if (id) declaredChannelCounts[id] = bySlot.get(s).channels.size;
   }
 
-  const seed = options.bindingSeed ?? {};
+  // Pump measurements are fixed by the Owner clarification: AI-002 is the Pump Inlet, AI-003 the Pump Outlet.
+  // When the seed omits them, they are bound from the Owner table. When the seed carries a different source,
+  // the entry is refused (no substitution) and no binding is created for it.
+  const seed = { ...(options.bindingSeed ?? {}) };
+  for (const pumpTag of Object.keys(OWNER_PUMP_SOURCE_TAGS)) {
+    if (seed[pumpTag] !== undefined) continue;
+    const def = getTagDef(pumpTag);
+    seed[pumpTag] = {
+      source: OWNER_PUMP_SOURCE_TAGS[pumpTag],
+      declaredSourceIdentity: def.sourceIdentity,
+      engineering: def.confirmedEngineeringRange
+        ? { min: def.confirmedEngineeringRange.min, max: def.confirmedEngineeringRange.max, unit: def.confirmedEngineeringRange.unit }
+        : null,
+    };
+  }
   const bindings = [];
   const seedIssues = [];
   for (const [runtimeTag, spec] of Object.entries(seed).sort(([a], [b]) => a.localeCompare(b))) {
+    const isPump = Object.prototype.hasOwnProperty.call(OWNER_PUMP_SOURCE_TAGS, runtimeTag);
+    if (isPump && spec.source !== OWNER_PUMP_SOURCE_TAGS[runtimeTag]) {
+      seedIssues.push({ code: 'PUMP_SOURCE_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `${runtimeTag} is bound only to ${OWNER_PUMP_SOURCE_TAGS[runtimeTag]} by the Owner clarification; seed source ${spec.source} is refused` });
+      continue;
+    }
     const row = records.find((r) => r.tag === spec.source);
     if (!row || row.channel === null) {
-      seedIssues.push({ code: 'SEED_TAG_NOT_FOUND', severity: SEVERITY.ERROR, tagName: runtimeTag, message: `seed source for ${runtimeTag} is not a channel row in the workbook` });
+      seedIssues.push({ code: isPump ? 'PUMP_SOURCE_NOT_FOUND' : 'SEED_TAG_NOT_FOUND', severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `seed source for ${runtimeTag} is not a channel row in the workbook` });
       continue;
+    }
+    // A pump measurement must be an analog pressure transmitter row with no IV '#n' ordinal, so it can never
+    // resolve to an IV pressure. Its workbook text is compared with the Owner wording; a mismatch is a warning
+    // for the Owner to confirm, not a silent correction.
+    if (isPump) {
+      const text = row.signal ?? '';
+      const ok = /pressure/i.test(text) && /^AI\b/i.test(row.ioType ?? '') && !/#\s*\d/.test(text);
+      if (!ok) {
+        seedIssues.push({ code: 'PUMP_PRESSURE_LABEL_CONFLICT', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: ${spec.source} is not a pump pressure transmitter row (or carries an IV ordinal)` });
+        continue;
+      }
+      const isInlet = runtimeTag === 'PUMP_INLET_PRESSURE';
+      const labelAgrees = isInlet ? /inlet/i.test(text) : (/outlet/i.test(text) && !/main\s+valve/i.test(text));
+      if (!labelAgrees) {
+        seedIssues.push({ code: 'PUMP_SOURCE_LABEL_UNCONFIRMED', severity: SEVERITY.WARNING, tagName: runtimeTag,
+          message: `${spec.source} reads '${text}'; the Owner clarification assigns it to ${isInlet ? 'Pump Inlet Pressure' : 'Pump Outlet Pressure'}. The Owner should confirm the workbook text.` });
+      }
     }
     // An IVn limit may bind only to a workbook row that labels the same IV index and group
     // ('#n' and 'Lower' or 'Upper' in the description). A mismatch is refused, not repaired.
@@ -470,7 +510,7 @@ export function importWorkbook(buf, options = {}) {
     classifications,
     issues: allIssues.slice().sort((a, b) => a.code.localeCompare(b.code) || String(a.row ?? a.slot ?? '').localeCompare(String(b.row ?? b.slot ?? ''))),
     records,
-    seedIssueCount: seedIssues.length,
+    seedIssueCount: seedIssues.filter((i) => i.severity === SEVERITY.ERROR).length,
     counts: countStatus(records),
   });
 }

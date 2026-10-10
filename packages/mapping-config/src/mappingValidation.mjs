@@ -6,7 +6,10 @@
 
 import { CHANNEL_TYPE, DIRECTION, FORBIDDEN_BINDING_KEYS, POLARITY, CONTACT, SEVERITY } from './constants.mjs';
 import { getProfile } from './moduleProfiles.mjs';
-import { getTagDef, REQUIRED_TAG_NAMES, isPressureRole } from './tagCatalogue.mjs';
+import {
+  getTagDef, REQUIRED_TAG_NAMES, isPressureRole, isPumpRole, duplicateCanonicalIdentities,
+  PUMP_READY_GATE_TAG, PUMP_READY_SOURCE_IDENTITY, OWNER_PUMP_SOURCE_TAGS,
+} from './tagCatalogue.mjs';
 
 function issue(code, severity, message, where = {}) {
   return Object.freeze({ code, severity, message, ...where });
@@ -94,7 +97,7 @@ export function validateMapping(modules, bindings, additionalTags = {}) {
     }
 
     if (b.declaredSourceIdentity !== undefined && b.declaredSourceIdentity !== def.sourceIdentity) {
-      const code = def.role === 'PUMP_PRESSURE' || def.role === 'MAIN_VALVE_PRESSURE' || def.role === 'VALVE_OUTLET_PRESSURE'
+      const code = isPumpRole(def.role) || def.role === 'MAIN_VALVE_PRESSURE' || def.role === 'VALVE_OUTLET_PRESSURE'
         ? 'PAIRED_IV_IDENTITY_MISMATCH' : 'SOURCE_IDENTITY_MISMATCH';
       issues.push(issue(code, SEVERITY.ERROR,
         `tag ${b.tagName} declares source ${b.declaredSourceIdentity}; expected ${def.sourceIdentity}`, where));
@@ -139,7 +142,7 @@ export function validateMapping(modules, bindings, additionalTags = {}) {
     if (entries.length < 2) continue;
     const [moduleInstanceId, channel] = key.split('#');
     const roles = entries.map((e) => e.def.role);
-    const pump = roles.includes('PUMP_PRESSURE');
+    const pump = roles.some((r) => isPumpRole(r));
     const valve = roles.some((r) => r === 'MAIN_VALVE_PRESSURE' || r === 'VALVE_OUTLET_PRESSURE');
     const where = { moduleInstanceId, channel: Number(channel), tagName: entries.map((e) => e.b.tagName).join(' + ') };
     if (pump && valve) {
@@ -172,6 +175,8 @@ export function validateMapping(modules, bindings, additionalTags = {}) {
     pressureSources.set(def.sourceIdentity, b.tagName);
   }
 
+  issues.push(...pressureBoundaryIssues(bindings, defFor));
+
   const boundNames = new Set(bindings.map((b) => b.tagName));
   for (const name of REQUIRED_TAG_NAMES) {
     if (!boundNames.has(name)) {
@@ -185,6 +190,83 @@ export function validateMapping(modules, bindings, additionalTags = {}) {
   }
 
   return sortIssues(issues);
+}
+
+/**
+ * Pressure boundary rules (Owner clarification, 2026-10-10). AI-002 (Pump Inlet), AI-003 (Pump Outlet) and
+ * AI-004..AI-011 (IV1..IV8 outlet) are distinct physical measurements. No alias, fallback or derivation may cross them.
+ * Only enabled bindings are compared, as in the existing alias check.
+ */
+function pressureBoundaryIssues(bindings, defFor) {
+  const out = [];
+  const live = bindings
+    .filter((b) => b.enabled !== false)
+    .map((b) => ({ b, def: defFor(b.tagName) }))
+    .filter((x) => x.def && isPressureRole(x.def.role));
+
+  // 1. Each pump measurement keeps its Owner-assigned workbook identifier.
+  for (const { b, def } of live) {
+    if (!isPumpRole(def.role) || b.sourceWorkbookTag === undefined) continue;
+    const expected = OWNER_PUMP_SOURCE_TAGS[def.tagName];
+    if (b.sourceWorkbookTag !== expected) {
+      out.push(issue('PUMP_SOURCE_MISMATCH', SEVERITY.ERROR,
+        `${b.tagName} is bound to ${b.sourceWorkbookTag}; the Owner clarification assigns ${expected}`, { tagName: b.tagName }));
+    }
+  }
+
+  // 2. One physical measurement serves at most one pressure identity.
+  const bySource = new Map();
+  for (const x of live) {
+    if (x.b.sourceWorkbookTag === undefined || x.b.sourceWorkbookTag === null) continue;
+    if (!bySource.has(x.b.sourceWorkbookTag)) bySource.set(x.b.sourceWorkbookTag, []);
+    bySource.get(x.b.sourceWorkbookTag).push(x);
+  }
+  for (const [source, group] of bySource) {
+    if (group.length < 2) continue;
+    const pumps = group.filter((g) => isPumpRole(g.def.role));
+    const ivs = group.filter((g) => g.def.role === 'VALVE_OUTLET_PRESSURE');
+    let code = 'PHYSICAL_SOURCE_ALIAS';
+    if (pumps.length > 0 && ivs.length > 0) code = 'PUMP_IV_CROSS_BINDING';
+    else if (pumps.length > 1) code = 'PUMP_INLET_OUTLET_ALIAS';
+    out.push(issue(code, SEVERITY.ERROR,
+      `workbook measurement ${source} resolves to ${group.map((g) => g.b.tagName).join(' and ')}; each measurement serves one pressure identity`,
+      { tagName: group.map((g) => g.b.tagName).join(' + ') }));
+  }
+
+  // 3. The Pump-ready gate reads the Pump Outlet (AI-003 / PUMP_OUTLET) only. It never reads AI-002 or an IV.
+  const gateDef = getTagDef(PUMP_READY_GATE_TAG);
+  if (!gateDef || gateDef.role !== 'PUMP_OUTLET_PRESSURE' || gateDef.sourceIdentity !== PUMP_READY_SOURCE_IDENTITY) {
+    out.push(issue('PUMP_READY_GATE_MISCONFIGURED', SEVERITY.ERROR,
+      'the Pump-ready gate must read the Pump Outlet catalogue entry only', { tagName: PUMP_READY_GATE_TAG }));
+  }
+  for (const { b } of live) {
+    if (b.tagName !== PUMP_READY_GATE_TAG) continue;
+    const gateWrong = (b.sourceWorkbookTag !== undefined && b.sourceWorkbookTag !== OWNER_PUMP_SOURCE_TAGS.PUMP_OUTLET_PRESSURE)
+      || (b.declaredSourceIdentity !== undefined && b.declaredSourceIdentity !== PUMP_READY_SOURCE_IDENTITY);
+    if (gateWrong) {
+      out.push(issue('PUMP_READY_GATE_SOURCE_INVALID', SEVERITY.ERROR,
+        `the Pump-ready gate reads ${b.sourceWorkbookTag ?? b.declaredSourceIdentity}; it must read AI-003 / PUMP_OUTLET only`, { tagName: b.tagName }));
+    }
+  }
+
+  // 4. IVn pressure pairs with WJn by ordinal and source identity. Pump and Main Valve never pair with a WJ.
+  for (const { b, def } of live) {
+    if (def.role !== 'VALVE_OUTLET_PRESSURE') continue;
+    const n = Number(/^IV([1-8])_OUTLET_PRESSURE$/.exec(def.tagName)?.[1]);
+    if (def.pairIndex !== n || def.sourceIdentity !== `IV${n}_OUTLET`) {
+      out.push(issue('PAIRED_IV_IDENTITY_MISMATCH', SEVERITY.ERROR,
+        `${b.tagName} is not the paired IV${n} pressure`, { tagName: b.tagName }));
+    }
+  }
+
+  // 5. Canonical runtime identities are unique across the bound definitions.
+  const defs = [...new Map(bindings.map((b) => [b.tagName, defFor(b.tagName)]).filter(([, d]) => d))
+    .values()].filter((d) => typeof d.canonicalIdentity === 'string');
+  for (const id of duplicateCanonicalIdentities(defs)) {
+    out.push(issue('CANONICAL_IDENTITY_DUPLICATED', SEVERITY.ERROR, `canonical identity ${id} is used by more than one tag`));
+  }
+
+  return out;
 }
 
 function sortIssues(list) {

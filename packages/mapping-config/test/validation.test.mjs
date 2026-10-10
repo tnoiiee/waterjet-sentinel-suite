@@ -20,16 +20,17 @@ test('the synthetic example is VALID with no ERROR, and is never activation-read
   assert.equal(v.activationAuthorized, false);
   assert.equal(v.activationLabel, 'ACTIVATION NOT AUTHORIZED');
   assert.ok(v.blockingReasons.includes('NO_VERIFIED_PROCESS_IMAGE_RULE'));
-  assert.equal(v.unresolvedAddressCount, 26);
+  assert.equal(v.unresolvedAddressCount, 27);
 });
 
 test('the required Runtime tag set is exactly the pressure identities and the IVn limits', () => {
-  assert.equal(REQUIRED_TAG_NAMES.length, 26);
+  assert.equal(REQUIRED_TAG_NAMES.length, 27);
   for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) {
     assert.ok(REQUIRED_TAG_NAMES.includes(`IV${n}_OUTLET_PRESSURE`));
     assert.ok(REQUIRED_TAG_NAMES.includes(`IV${n}_LOWER_LIMIT`));
     assert.ok(REQUIRED_TAG_NAMES.includes(`IV${n}_UPPER_LIMIT`));
   }
+  assert.ok(REQUIRED_TAG_NAMES.includes('PUMP_INLET_PRESSURE'));
   assert.ok(REQUIRED_TAG_NAMES.includes('PUMP_OUTLET_PRESSURE'));
   assert.ok(REQUIRED_TAG_NAMES.includes('MAIN_VALVE_OUTLET_PRESSURE'));
 });

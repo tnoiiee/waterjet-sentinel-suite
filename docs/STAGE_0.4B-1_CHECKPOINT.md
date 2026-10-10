@@ -72,8 +72,15 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
   `MODULE_PROCESS_DATA_PROFILE_NOT_VERIFIED` and, for analog channels,
   `MODULE_STATUS_BYTE_SETTING_NOT_VERIFIED`. No numeric address is produced from the catalogue.
   The arithmetic is tested only with a clearly labelled SYNTHETIC TEST RULE.
-- **Pressure identities.** PUMP_OUTLET_PRESSURE and IV1–IV8_OUTLET_PRESSURE are separate. No aliasing,
-  averaging or cross-fallback. WJn uses the IVn pressure (`pressureTagForWj`).
+- **Pressure identities (Owner clarification, 2026-10-10).** Four pressure groups are distinct physical
+  measurements: AI-002 = Pump Inlet Pressure (`PumpInletPressureBar`, `PUMP_INLET_PRESSURE`, suction before
+  the Pump, diagnostic only); AI-003 = Pump Outlet Pressure (`PumpOutletPressureBar`, `PUMP_OUTLET_PRESSURE`,
+  discharge before the Main Valve, the only pre-P1 Pump-ready source); AI-004–AI-011 = IV1–IV8 outlet
+  pressure (`IVn_OUTLET_PRESSURE`, ordinal `#n = IVn`). The Main Valve Outlet Pressure has no workbook row and
+  is not aliased to AI-003. No aliasing, averaging, derivation or cross-fallback across these groups. WJn
+  uses only its paired IVn pressure (`pressureTagForWj`). Validation refuses the cases listed in
+  `pressureBoundaryIssues`. The workbook text for AI-002 and AI-003 is reported as
+  `PUMP_SOURCE_LABEL_UNCONFIRMED` until the Owner confirms it.
 - **Limits.** Digital limit tags bind to DI channels and require an explicit polarity. Owner rule: all
   16 IVn lower- and upper-limit inputs marked NO are `ACTIVE_WHEN_CLOSED`. The import records this with
   `polarityBasis: OWNER_RULE`. An explicit seed value is kept as written and recorded as `EXPLICIT_SEED`.
