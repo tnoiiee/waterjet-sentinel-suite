@@ -135,3 +135,9 @@ test('drag and drop onto a row moves the module through the same Draft path', ()
   fire(rowsOf('rack-body')[5], 'drop', { dataTransfer: transfer });
   assert.equal(rowsOf('rack-body')[5].attributes['data-id'], id);
 });
+
+test('the reserved section is always present: the synthetic example shows the count 0 and no placeholder rows', () => {
+  assert.equal(byId['reserved-title'].textContent, 'Reserved channels awaiting Owner identity (0)');
+  assert.equal(rowsOf('reserved-body').length, 0);
+  assert.match(byId['reserved-note'].textContent, /not enabled bindings/);
+});

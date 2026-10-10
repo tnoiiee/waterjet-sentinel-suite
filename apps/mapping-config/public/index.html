@@ -71,6 +71,31 @@
       <p class="note" id="outputs-note"></p>
     </section>
 
+    <section id="reserved" aria-labelledby="reserved-h">
+      <h2 id="reserved-h"><span id="reserved-title">Reserved channels awaiting Owner identity (loading)</span> <span class="hint">read-only · not bindings · not spare</span></h2>
+      <p class="note" id="reserved-note">These rows are USED / RESERVED. They are not enabled bindings and are not SPARE or FREE. They are never auto-bound and have no address. Identity is requested only with new Owner data.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Workbook I/O Tag</th>
+              <th scope="col">ModuleInstanceId</th>
+              <th scope="col">Channel</th>
+              <th scope="col">Direction</th>
+              <th scope="col">Physical Status</th>
+              <th scope="col">Signal Identity</th>
+              <th scope="col">Binding Status</th>
+              <th scope="col">Owner Input Status</th>
+              <th scope="col">Auto-binding Eligibility</th>
+              <th scope="col">Address Status</th>
+              <th scope="col">Mapping Authorization</th>
+            </tr>
+          </thead>
+          <tbody id="reserved-body"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="validation" aria-labelledby="validation-h">
       <h2 id="validation-h">Validation</h2>
       <div id="validation-body"></div>

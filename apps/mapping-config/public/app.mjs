@@ -3,7 +3,7 @@
 // writes a device, and nothing activates a configuration. Addresses are derived
 // and are shown as read-only text; no control accepts an address.
 
-import { DraftSession, createConfiguration, getProfile, getTagDef } from '/pkg/index.mjs';
+import { CHANNEL_TYPE, DraftSession, createConfiguration, getProfile, getTagDef } from '/pkg/index.mjs';
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,6 +37,8 @@ const state = {
   session: null,
   mode: null,
   importReport: null,
+  reservedInventory: null,
+  additionalTags: {},
   defaultOrderKey: null,
   refusal: '',
 };
@@ -81,7 +83,7 @@ function renderSource() {
   const issues = Object.entries(r.issueSummary).map(([code, n]) => el('li', {}, `${code} × ${n}`));
   body.replaceChildren(
     el('p', {}, `Excel default · sheet ${r.source.sheetName} · ${r.source.dataRowCount} data rows · USED ${c.USED} · SPARE ${c.SPARE} · modules ${r.modelCount}`),
-    el('p', {}, `Inputs: ${r.classifications.inputUnambiguous} unambiguous read-only inputs · ${r.classifications.inputAmbiguous} ambiguous · ${r.classifications.outputNotAuthorised} outputs NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE · ${r.classifications.reservedUnresolved} placeholder rows (SIGNAL_IDENTITY_UNRESOLVED, no binding)`),
+    el('p', {}, `Inputs: ${r.classifications.inputUnambiguous} unambiguous read-only inputs · ${r.classifications.inputAmbiguous} ambiguous · ${r.classifications.outputNotAuthorised} other outputs NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE · ${r.classifications.reservedUnresolved} reserved placeholder rows (${state.reservedInventory?.summary.overlays.outputNotAuthorised ?? 0} of them an output, DO-031), listed under Reserved channels`),
     issues.length ? el('details', {}, [el('summary', {}, `Import issues (${r.issues.length})`), el('ul', {}, issues)]) : el('p', {}, 'No import issues.'),
   );
 }
@@ -152,6 +154,14 @@ function moveTo(moduleInstanceId, toIndex, focusId) {
   if (row && document.activeElement !== row) row.focus();
 }
 
+// Analog rows have no contact polarity or contact type. They read NOT APPLICABLE (presentation only), never NOT SET
+// or UNKNOWN. Digital limits read their workbook values (ACTIVE_WHEN_CLOSED, NO).
+function isAnalogTag(tagName) {
+  const def = getTagDef(tagName);
+  if (def) return def.channelType === CHANNEL_TYPE.ANALOG;
+  return state.additionalTags?.[tagName]?.channelType === CHANNEL_TYPE.ANALOG;
+}
+
 function renderTags(v) {
   const s = state.session;
   const snap = s.snapshot();
@@ -161,30 +171,67 @@ function renderTags(v) {
     const b = bindingByTag.get(e.tagName) ?? {};
     const def = getTagDef(e.tagName);
     const role = def ? def.role : 'READ-ONLY WORKBOOK INPUT';
+    const analog = isAnalogTag(e.tagName);
+    const enabled = b.enabled !== false;
     let address;
+    let addressClass = '';
     if (e.state === 'DERIVED') {
       address = `${e.displayNotation} (zero-based bit ${e.bitOffsetAbsolute})`;
     } else if (e.state === 'NOT_ACTIVE') {
       address = 'not active';
     } else {
       address = `ADDRESS UNRESOLVED · ${e.reasons.join(', ')}`;
+      addressClass = 'addr-unresolved';
     }
-    return [
-      e.tagName,
-      role,
-      e.moduleInstanceId ?? '—',
-      e.channel === null || e.channel === undefined ? '—' : String(e.channel),
-      b.enabled === false ? 'no' : 'yes',
-      b.activePolarity ?? 'NOT SET',
-      b.contactType ?? 'UNKNOWN',
-      address,
-    ];
+    return {
+      cls: enabled ? 'st-enabled' : 'st-disabled',
+      cells: [
+        e.tagName,
+        role,
+        e.moduleInstanceId ?? '—',
+        e.channel === null || e.channel === undefined ? '—' : String(e.channel),
+        enabled ? 'yes' : 'no',
+        analog ? 'NOT APPLICABLE' : (b.activePolarity ?? 'NOT SET'),
+        analog ? 'NOT APPLICABLE' : (b.contactType ?? 'UNKNOWN'),
+        address,
+      ],
+      addressClass,
+    };
   });
-  $('tags-body').replaceChildren(...rows.map((cells) => el('tr', {}, cells.map((c) => el('td', {}, c)))));
+  $('tags-body').replaceChildren(...rows.map((row) => el('tr', { class: row.cls }, row.cells.map((c, i) => el('td', i === 7 && row.addressClass ? { class: row.addressClass } : {}, c)))));
   const r = state.importReport;
   $('outputs-note').textContent = r
-    ? `${r.classifications.outputNotAuthorised} output rows are NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE and carry no binding. Addresses are derived from verified Module Profiles only; none is verified in this stage.`
+    ? `${r.classifications.outputNotAuthorised} other output rows are NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE and carry no binding. Reserved output DO-031 is listed under Reserved channels. Addresses are derived from verified Module Profiles only; none is verified in this stage.`
     : 'Addresses are derived from verified Module Profiles only; none is verified in this stage. Addresses cannot be entered here.';
+}
+
+// The reserved inventory is read-only, comes from the workbook import only, and is never part of the Draft or any revision.
+const RESERVED_HEADERS = ['Workbook I/O Tag', 'ModuleInstanceId', 'Channel', 'Direction', 'Physical Status', 'Signal Identity',
+  'Binding Status', 'Owner Input Status', 'Auto-binding Eligibility', 'Address Status', 'Mapping Authorization'];
+
+function renderReserved() {
+  const inv = state.reservedInventory;
+  const total = inv ? inv.summary.total : 0;
+  $('reserved-title').textContent = `Reserved channels awaiting Owner identity (${total})`;
+  const rows = inv ? inv.rows : [];
+  $('reserved-body').replaceChildren(...rows.map((x) => {
+    const output = x.direction === 'OUTPUT';
+    return el('tr', { class: output ? 'st-reserved st-unauthorized' : 'st-reserved', 'data-tag': x.workbookTag }, [
+      el('td', {}, x.workbookTag),
+      el('td', {}, x.moduleInstanceId ?? '—'),
+      el('td', {}, String(x.channel)),
+      el('td', { class: output ? 'st-unauthorized' : '' }, output ? 'OUTPUT · NOT AUTHORIZED' : 'INPUT'),
+      el('td', {}, x.physicalStatus),
+      el('td', {}, x.signalIdentity),
+      el('td', {}, x.bindingStatus),
+      el('td', {}, x.ownerInputStatus),
+      el('td', {}, x.autoBindingEligibility),
+      el('td', { class: 'addr-unresolved' }, x.addressStatus),
+      el('td', {}, x.mappingAuthorization),
+    ]);
+  }));
+  const byDir = inv ? inv.summary.byDirection : { INPUT: 0, OUTPUT: 0 };
+  $('reserved-note').textContent = `Read-only. ${total} rows are USED / RESERVED: INPUT ${byDir.INPUT} · OUTPUT ${byDir.OUTPUT} (NOT AUTHORIZED IN READ-ONLY STAGE). They are not enabled bindings and are not SPARE or FREE. They are never auto-bound and have no address. Identity is requested only with new Owner data.`;
 }
 
 function renderValidation(v) {
@@ -275,6 +322,9 @@ async function boot() {
   const data = await res.json();
   state.mode = data.mode;
   state.importReport = data.importReport;
+  state.reservedInventory = data.reservedInventory ?? null;
+  state.additionalTags = data.configuration.additionalTags ?? {};
+  renderReserved();
   const config = createConfiguration(data.configuration);
   state.session = new DraftSession(config);
   state.defaultOrderKey = modulesKey(config.modules);
