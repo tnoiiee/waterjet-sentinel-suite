@@ -109,7 +109,8 @@ export function exampleRows({ placeholder = false, ambiguous = false } = {}) {
     const slot = 6 + Math.floor(i / 4);
     const channel = (i % 4) + 1;
     const tag = `EX-AI-${String(i + 1).padStart(2, '0')}`;
-    let signal = `Example pressure ${i + 1}`;
+    // The IVn outlet pressure rows (EX-AI-03 to EX-AI-10) carry the authoritative '#n' label.
+    let signal = i >= 2 && i <= 9 ? `Example pressure transmitter #${i - 1}` : `Example pressure ${i + 1}`;
     let ioType = 'AI (4-20 mA. HART5)';
     if (i === 10) { signal = 'Example current input'; ioType = 'AI (0-20 mA.)'; }
     if (i === 11) { signal = placeholder ? 'XXX awaiting reply' : 'Example spare-like input'; ioType = 'AI (4-20 mA.)'; }

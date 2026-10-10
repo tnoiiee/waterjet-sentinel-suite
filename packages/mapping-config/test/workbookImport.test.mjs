@@ -207,3 +207,88 @@ test('Owner-local: the attached workbook imports to the expected default topolog
     assert.equal(r.modules.length, 23);
     assert.deepEqual(Object.keys(r.counts).sort(), ['SPARE', 'USED', 'total']);
   });
+
+// ---- B2: IVn outlet pressure ordinal identity (WSB Pressure transmitter #n = IVn) ----
+const PRESSURE = (n) => `IV${n}_OUTLET_PRESSURE`;
+const pressureBindings = (r) => r.bindings.filter((b) => /^IV[1-8]_OUTLET_PRESSURE$/.test(b.tagName));
+const pressureMismatch = (r, tag) => r.issues.some((i) => i.code === 'PRESSURE_IV_LABEL_MISMATCH' && i.tagName === tag);
+const withRowLabel = (tag, { signal, ioType }) => exampleRows().map((row) => {
+  if (row[3] !== tag) return row;
+  const copy = row.slice();
+  if (signal !== undefined) copy[4] = signal;
+  if (ioType !== undefined) copy[5] = ioType;
+  return copy;
+});
+const importWith = (rows, seedPatch = {}) => importWorkbook(buildWorkbook({ rows }), { bindingSeed: { ...seed, ...seedPatch } });
+
+test('B2: all eight pressure rows bind when #n equals IVn, with no ordinal mismatch', () => {
+  const r = importExample();
+  assert.equal(pressureBindings(r).length, 8);
+  for (let n = 1; n <= 8; n += 1) {
+    const b = r.bindings.find((x) => x.tagName === PRESSURE(n));
+    assert.equal(b.sourceWorkbookTag, `EX-AI-${String(n + 2).padStart(2, '0')}`);
+  }
+  assert.equal(r.issues.some((i) => i.code === 'PRESSURE_IV_LABEL_MISMATCH'), false);
+});
+
+test('B2: IV1 pressure cannot bind to a row marked #2, and creates no partial binding', () => {
+  const r = importWith(exampleRows(), { [PRESSURE(1)]: { ...seed[PRESSURE(1)], source: 'EX-AI-04' } });
+  assert.ok(pressureMismatch(r, PRESSURE(1)));
+  assert.equal(r.bindings.some((b) => b.tagName === PRESSURE(1)), false);
+  assert.equal(pressureBindings(r).length, 7, 'the other seven IV pressures still bind');
+});
+
+test('B2: IV8 pressure cannot bind to a row marked #7', () => {
+  const r = importWith(exampleRows(), { [PRESSURE(8)]: { ...seed[PRESSURE(8)], source: 'EX-AI-09' } });
+  assert.ok(pressureMismatch(r, PRESSURE(8)));
+  assert.equal(r.bindings.some((b) => b.tagName === PRESSURE(8)), false);
+});
+
+test('B2: an out-of-range ordinal (#0, #9, #10) is refused', () => {
+  for (const signal of ['Example pressure transmitter #0', 'Example pressure transmitter #9', 'Example pressure transmitter #10']) {
+    const r = importWorkbook(buildWorkbook({ rows: withRowLabel('EX-AI-03', { signal }) }), { bindingSeed: seed });
+    assert.ok(pressureMismatch(r, PRESSURE(1)), signal);
+    assert.equal(r.bindings.some((b) => b.tagName === PRESSURE(1)), false, signal);
+  }
+});
+
+test('B2: a missing, malformed or conflicting ordinal label is refused', () => {
+  for (const signal of ['Example pressure transmitter', 'Example pressure transmitter #x', 'Example pressure transmitter #1 #2', 'Example pressure transmitter #1 and #2']) {
+    const r = importWorkbook(buildWorkbook({ rows: withRowLabel('EX-AI-03', { signal }) }), { bindingSeed: seed });
+    assert.ok(pressureMismatch(r, PRESSURE(1)), signal);
+    assert.equal(r.bindings.some((b) => b.tagName === PRESSURE(1)), false, signal);
+  }
+});
+
+test('B2: a non-pressure row cannot satisfy a pressure binding merely because #n matches', () => {
+  // A digital lower-limit row labelled #1 is refused for IV1 pressure.
+  const limitRow = importWith(exampleRows(), { [PRESSURE(1)]: { ...seed[PRESSURE(1)], source: 'EX-DI-01' } });
+  assert.ok(pressureMismatch(limitRow, PRESSURE(1)));
+  // A row that is labelled #1 and says pressure transmitter, but is not an analog input, is refused.
+  const notAnalog = importWorkbook(buildWorkbook({ rows: withRowLabel('EX-AI-03', { ioType: 'DI (24 VDC.)' }) }), { bindingSeed: seed });
+  assert.ok(pressureMismatch(notAnalog, PRESSURE(1)));
+  // A current input labelled #1 is not in the pressure-transmitter group.
+  const notPressure = importWorkbook(buildWorkbook({ rows: withRowLabel('EX-AI-03', { signal: 'Example current input #1' }) }), { bindingSeed: seed });
+  assert.ok(pressureMismatch(notPressure, PRESSURE(1)));
+});
+
+test('B2: pump pressure is not subject to the IV ordinal rule', () => {
+  const r = importExample();
+  const pump = r.bindings.find((b) => b.tagName === 'PUMP_OUTLET_PRESSURE');
+  assert.deepEqual([pump.moduleInstanceId, pump.channel], ['AI-MODULE-01', 1]);
+  assert.equal(r.issues.some((i) => i.code === 'PRESSURE_IV_LABEL_MISMATCH' && /PUMP|MAIN_VALVE/.test(i.tagName)), false);
+});
+
+test('B2: the limit ordinal enforcement is unchanged', () => {
+  const r = importWith(exampleRows(), { IV1_LOWER_LIMIT: { ...seed.IV1_LOWER_LIMIT, source: 'EX-DI-02' } });
+  assert.ok(r.issues.some((i) => i.code === 'LIMIT_IV_LABEL_MISMATCH' && i.tagName === 'IV1_LOWER_LIMIT'));
+});
+
+test('B2 Owner-local: the authoritative workbook produces no pressure ordinal mismatch',
+  { skip: (LOCAL && process.env.MAPPING_BINDING_SEED_PATH) ? false : 'NOT VERIFIED IN ARENA: set MAPPING_EXCEL_DEFAULT_PATH and MAPPING_BINDING_SEED_PATH to files outside the repository' },
+  () => {
+    const localSeed = JSON.parse(readFileSync(process.env.MAPPING_BINDING_SEED_PATH, 'utf8'));
+    const r = importWorkbook(readFileSync(LOCAL), { bindingSeed: localSeed });
+    assert.equal(r.issues.filter((i) => i.code === 'PRESSURE_IV_LABEL_MISMATCH').length, 0);
+    assert.equal(pressureBindings(r).length, 8);
+  });

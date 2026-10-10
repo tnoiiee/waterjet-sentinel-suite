@@ -20,6 +20,10 @@ import {
 } from './revisions.mjs';
 
 const EDITABLE_FIELDS = Object.freeze(['moduleInstanceId', 'channel', 'enabled', 'engineering', 'activePolarity', 'contactType']);
+// IVn pressure and limit identities are fixed by the workbook, where the '#n' label equals IVn. The Draft may not
+// move them to another module or Channel, because that would bypass the ordinal check made at import.
+const WORKBOOK_FIXED_TAG_RE = /^IV[1-8]_(OUTLET_PRESSURE|LOWER_LIMIT|UPPER_LIMIT)$/;
+const WORKBOOK_FIXED_FIELDS = Object.freeze(['moduleInstanceId', 'channel']);
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -105,6 +109,13 @@ export class DraftSession {
       }
       if (!EDITABLE_FIELDS.includes(key)) {
         return { ok: false, refusal: { code: 'FIELD_NOT_EDITABLE', message: `'${key}' cannot be edited in the Draft` } };
+      }
+    }
+    if (WORKBOOK_FIXED_TAG_RE.test(tagName)) {
+      for (const key of Object.keys(patch)) {
+        if (WORKBOOK_FIXED_FIELDS.includes(key)) {
+          return { ok: false, refusal: { code: 'WORKBOOK_IDENTITY_FIXED', message: `'${key}' of ${tagName} is fixed by the workbook import and cannot be changed in the Draft` } };
+        }
       }
     }
     const next = clone(this.draft);

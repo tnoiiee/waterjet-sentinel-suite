@@ -229,3 +229,19 @@ test('impact preview with a verified rule reports ADDRESS_CHANGED with old and n
 test('a createConfiguration without the required fields is refused', () => {
   assert.throws(() => createConfiguration({ label: 'X', modules: [] }), /needs label, modules and bindings/);
 });
+
+test('B2: the Draft cannot move an IVn pressure or limit to another module or Channel', () => {
+  const session = new DraftSession(syntheticExampleConfiguration());
+  const before = canonicalJson(session.snapshot());
+  for (const tag of ['IV1_OUTLET_PRESSURE', 'IV8_OUTLET_PRESSURE', 'IV3_LOWER_LIMIT', 'IV5_UPPER_LIMIT']) {
+    const byChannel = session.setBinding(tag, { channel: 4 });
+    assert.equal(byChannel.ok, false, tag);
+    assert.equal(byChannel.refusal.code, 'WORKBOOK_IDENTITY_FIXED', tag);
+    const byModule = session.setBinding(tag, { moduleInstanceId: 'AI-MODULE-02' });
+    assert.equal(byModule.refusal.code, 'WORKBOOK_IDENTITY_FIXED', tag);
+  }
+  assert.equal(canonicalJson(session.snapshot()), before, 'a refused edit creates no partial change');
+  // Polarity and enablement stay editable; the rule is scoped to module and Channel.
+  assert.equal(session.setBinding('IV1_UPPER_LIMIT', { activePolarity: 'ACTIVE_WHEN_CLOSED' }).ok, true);
+  assert.equal(session.setBinding('PUMP_OUTLET_PRESSURE', { channel: 4 }).ok, true);
+});

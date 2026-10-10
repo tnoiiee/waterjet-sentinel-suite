@@ -362,6 +362,25 @@ export function importWorkbook(buf, options = {}) {
       }
     }
     const slot = Number(row.slot);
+    // An IVn outlet pressure may bind only to a pressure-transmitter analog row whose explicit '#n'
+    // label is the same IV index. Missing, malformed, out-of-range or conflicting labels are refused.
+    // Location, wall, channel order and physical position are never used.
+    const pressureName = /^IV([1-8])_OUTLET_PRESSURE$/.exec(runtimeTag);
+    if (pressureName) {
+      const text = row.signal ?? '';
+      const hashCount = [...text.matchAll(/#/g)].length;
+      const ordinal = /#\s*(\d+)(?!\d)/.exec(text);
+      const n = ordinal ? Number(ordinal[1]) : NaN;
+      const pressureTransmitter = /pressure\s+transmitter/i.test(text);
+      const analogInput = /^AI\b/i.test(row.ioType ?? '');
+      const ok = hashCount === 1 && ordinal !== null && n >= 1 && n <= 8
+        && n === Number(pressureName[1]) && pressureTransmitter && analogInput;
+      if (!ok) {
+        seedIssues.push({ code: 'PRESSURE_IV_LABEL_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: its workbook row does not carry the same IV ordinal in the pressure-transmitter group` });
+        continue;
+      }
+    }
     // A limit with no polarity in the seed takes the Owner rule, recorded explicitly with its basis.
     // Pressures never take a polarity. An explicit seed value is kept as written.
     const isLimit = /^IV[1-8]_(LOWER|UPPER)_LIMIT$/.test(runtimeTag);
