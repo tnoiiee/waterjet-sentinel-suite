@@ -1,4 +1,4 @@
-// Stage 0.4B-2 — Mapping Configuration UI (read-only except the Draft rack).
+// Stage 0.4B-3 — Mapping Configuration UI (read-only except the Draft rack).
 // Every value is written with textContent. Nothing here connects, polls, reads or
 // writes a device, and nothing activates a configuration. Addresses are derived
 // and are shown as read-only text; no control accepts an address.
@@ -332,8 +332,20 @@ function shortId(digest) {
   return digest.slice(0, 12);
 }
 
-function renderEvidence() {
-  const rep = state.session.evidenceReport();
+// Readable text for a missing configuration-tool position. "n/a" means the actual-rack evidence does not describe
+// this rack at all; "not in the supplied sequence" means the rack is the real one and this module has no visible
+// position entry, which does not remove it from the physical topology.
+function ioCheckNone(ioCheckPositionState) {
+  if (ioCheckPositionState === null || ioCheckPositionState === undefined) return '—';
+  return ioCheckPositionState === 'NOT_APPLICABLE_TO_THIS_RACK' ? 'n/a (not the authoritative rack)' : 'not in the supplied sequence';
+}
+
+function actualRackText(actualRackEvidenceState) {
+  if (actualRackEvidenceState === null || actualRackEvidenceState === undefined) return '—';
+  return actualRackEvidenceState === 'NOT_APPLICABLE_TO_THIS_RACK' ? 'NOT APPLICABLE (not the authoritative rack)' : actualRackEvidenceState;
+}
+
+function renderEvidence(rep) {
   const head = rep.head;
   const kind = rep.synthetic ? 'SYNTHETIC TEST RULE (not vendor evidence)' : rep.authoritative ? 'AUTHORITATIVE' : 'NOT AUTHORITATIVE';
   $('evidence-summary').replaceChildren(
@@ -342,13 +354,17 @@ function renderEvidence() {
     lazyDetails({
       cls: 'reasons', summary: `Head-station reasons · ${head.reasons.length}`, buildList: reasonList(head.reasons),
     }),
-    el('p', {}, `Module profiles: ${rep.summary.completeProfiles} complete · ${rep.summary.incompleteProfiles} incomplete of ${rep.summary.modules} · addresses derived ${rep.summary.derivedModules} · unresolved ${rep.summary.unresolvedModules}`),
+    el('p', {}, `Module profiles: ${rep.summary.completeProfiles} complete · ${rep.summary.incompleteProfiles} incomplete · ${rep.summary.notApplicableModules} not applicable (no process data) of ${rep.summary.modules} · addresses derived ${rep.summary.derivedModules} · unresolved ${rep.summary.unresolvedModules}`),
     el('p', { class: 'note' }, `Evidence revision ${shortId(rep.fingerprint)} · head-station fingerprint ${shortId(head.fingerprint)}`),
   );
   $('evidence-body').replaceChildren(...rep.modules.map((m) => {
+    // Widths: the verified evidence width, or 0 bit for a module that contributes no process data. A manual
+    // capability is never shown as a verified width.
     const widths = m.processInputWidth === null && m.processOutputWidth === null
       ? 'NOT VERIFIED' : `${m.processInputWidth ?? 'NOT VERIFIED'} / ${m.processOutputWidth ?? 'NOT VERIFIED'}`;
     const order = m.processImageOrder.value === null ? m.processImageOrder.state : `${m.processImageOrder.state} · ${m.processImageOrder.value}`;
+    // IO-CHECK Pos. is its own column: it is never shown as a RackSlot or as a ProcessModulePosition.
+    const ioCheck = m.ioCheckPosition === null ? ioCheckNone(m.ioCheckPositionState) : `Pos. ${String(m.ioCheckPosition).padStart(2, '0')}`;
     let address;
     if (m.addressState === 'ADDRESS_UNRESOLVED') {
       const n = m.reasons.length;
@@ -356,16 +372,24 @@ function renderEvidence() {
     } else {
       address = m.addressState === 'DERIVED' ? 'DERIVED (read-only)' : 'NOT APPLICABLE';
     }
+    const reason = m.addressState === 'NOT_APPLICABLE'
+      ? (m.addressReason ?? 'NON_PROCESS_DATA_MODULE')
+      : m.addressState === 'DERIVED' ? '—' : m.reasons.join(', ');
     return el('tr', { 'data-id': m.moduleInstanceId }, [
       el('td', {}, `${m.modelNumber} · ${m.moduleInstanceId}`),
       el('td', {}, String(m.rackSlot)),
+      el('td', {}, ioCheck),
       el('td', {}, m.processModulePosition === null ? '—' : String(m.processModulePosition)),
+      el('td', { class: 'cell-secondary' }, m.role ?? '—'),
+      el('td', {}, m.processDataContribution === 'NONE' ? 'NONE (no process data)' : m.processDataContribution),
+      el('td', {}, widths),
       el('td', {}, `${m.evidenceState} · ${m.completeness}`),
       el('td', { class: 'cell-secondary' }, m.sourceIds.length ? m.sourceIds.join(', ') : 'NONE PROVIDED'),
-      el('td', {}, widths),
       el('td', { class: 'cell-secondary' }, `diagnostic ${m.diagnosticState} · status byte ${m.statusByteState} · byte/word order ${m.byteWordOrderState}`),
+      el('td', { class: 'cell-secondary' }, actualRackText(m.actualRackEvidenceState)),
       el('td', {}, order),
       el('td', m.addressState === 'ADDRESS_UNRESOLVED' ? { class: 'addr-unresolved' } : {}, address),
+      el('td', m.addressState === 'ADDRESS_UNRESOLVED' ? { class: 'addr-unresolved cell-secondary' } : { class: 'cell-secondary' }, reason),
       el('td', {}, el('code', { title: m.fingerprint }, shortId(m.fingerprint))),
     ]);
   }));
@@ -375,6 +399,47 @@ function renderEvidence() {
     el('h3', {}, `Evidence sources (${rep.sources.length})`),
     el('ul', {}, srcNodes.length ? srcNodes : [el('li', {}, 'No source provided.')]),
     ...(issueNodes.length ? [el('h3', {}, `Evidence issues (${issueNodes.length})`), el('ul', {}, issueNodes)] : []),
+  );
+}
+
+/**
+ * Actual-rack evidence: instance- and Channel-scoped, partial, read-only. It states its own scope, lists the
+ * evidence still missing, and never offers a Hardware, Polling or Write control.
+ */
+function renderActualRack(rep) {
+  const candidate = state.session.candidateProcessImage();
+  const applicable = rep.modules.some((m) => m.actualRackEvidenceState !== null && m.actualRackEvidenceState !== 'NOT_APPLICABLE_TO_THIS_RACK');
+  const positions = rep.modules.filter((m) => m.ioCheckPosition !== null).map((m) => m.ioCheckPosition);
+  const endModule = rep.modules.find((m) => m.role === 'END_MODULE');
+  const supplies = rep.modules.filter((m) => m.role === 'POWER_SUPPLY' || m.role === 'SYSTEM_POWER_SUPPLY');
+  $('actual-rack-summary').replaceChildren(
+    el('p', { class: 'summary-line' }, applicable
+      ? `Partial actual-rack evidence applies to this rack · visible configuration-tool positions ${positions.length ? `Pos. ${String(Math.min(...positions)).padStart(2, '0')} to Pos. ${String(Math.max(...positions)).padStart(2, '0')}` : 'none'} · instance-level only`
+      : 'No actual-rack evidence applies to this rack. Actual-rack evidence describes the authoritative 23-module rack only.'),
+    el('p', {}, `${supplies.length} Power Supply modules are physical rack modules but are not position entries in the supplied visible sequence, and they contribute no process data. Address: NOT APPLICABLE · Reason: NON_PROCESS_DATA_MODULE.`),
+    el('p', {}, endModule
+      ? `The End Module has IO-CHECK Pos. ${endModule.ioCheckPosition === null ? '—' : String(endModule.ioCheckPosition).padStart(2, '0')} while contributing no process data: a configuration-tool position is not process data and is not an address.`
+      : 'No End Module in this rack.'),
+    el('p', { class: 'note' }, `Candidate process image: ${candidate.status} · authoritative: ${candidate.authoritative ? 'yes' : 'no'} · verified: ${candidate.verified ? 'yes' : 'no'} · hardware-ready: ${candidate.hardwareReady ? 'yes' : 'no'} · write authority: ${candidate.writeAuthority ? 'yes' : 'no'} · all byte, word and bit offsets unresolved.`),
+  );
+  $('actual-rack-body').replaceChildren(...(rep.channelEvidence.length ? rep.channelEvidence : []).map((c) => {
+    const settings = Object.entries(c.settings).map(([k, v]) => `${k}=${v}`).join(' · ');
+    return el('tr', { 'data-id': `${c.moduleInstanceId}-ch${c.channel}` }, [
+      el('td', {}, c.moduleInstanceId),
+      el('td', {}, c.modelNumber),
+      el('td', {}, String(c.rackSlot)),
+      el('td', {}, `Pos. ${String(c.ioCheckPosition).padStart(2, '0')}`),
+      el('td', {}, `Channel ${c.channel}`),
+      el('td', {}, c.evidenceState),
+      el('td', { class: 'cell-secondary' }, `${c.displayedType} · ${c.displayedVersion}`),
+      el('td', { class: 'cell-secondary' }, settings),
+      el('td', {}, 'this instance and this Channel only'),
+    ]);
+  }), ...(rep.channelEvidence.length ? [] : [el('tr', {}, [el('td', { colspan: 9 }, 'No Channel-level actual-rack setting evidence applies to this rack.')])]));
+  $('actual-rack-missing').replaceChildren(
+    el('h3', {}, `Actual-rack evidence still required (${candidate.missingEvidence.length})`),
+    el('ul', {}, candidate.missingEvidence.map((m) => el('li', {}, `${m.request}. ${m.subject} — required to show: ${m.requiredToShow.join('; ')}`))),
+    el('p', { class: 'note' }, candidate.unverifiedUntilSupplied.join(' ')),
   );
 }
 
@@ -433,7 +498,9 @@ function refresh() {
   renderSource();
   renderRack(v);
   renderTags(v);
-  renderEvidence();
+  const rep = state.session.evidenceReport();
+  renderEvidence(rep);
+  renderActualRack(rep);
   renderValidation(v);
   renderImpact(impact);
   renderRevisions(rev);

@@ -14,9 +14,22 @@ Feasibility Spike — Scope Gate **APPROVED**, Coding Start **APPROVED**, implem
 review **PASS**), **PR #3 MERGED** (merge commit `d8d28201e641e436293136d04ba7ee553802d4e5`). **React selected as the
 Primary UI Framework** (Owner decision, 2026-10-07; Production transport and chart library remain
 `[OPEN]`). Blazor counter-spike **NOT REQUIRED** unless a future material blocker is identified.
-Main Development Scope Gate **PENDING** (0.3B+). **Stage 0.3A Scope Gate APPROVED** (Owner Option-C amended gate).
-**Stage 0.3A-1 SOURCE CHECKPOINT AUTHORED** — **Owner-local .NET validation PENDING** — **PR #4 OPEN — NOT READY FOR MERGE**.
-**Stage 0.3A-2 NOT AUTHORIZED**. Production device access **NOT AUTHORIZED**.
+*Historical:* the Stage 0.3A gate and the Stage 0.3A-1 / 0.3A-2 / 0.3A-3 and Stage 0.4A substages were
+subsequently authorised and **MERGED** (PR #4 to PR #11); Stage 0.4B-1 (PR #12) and Stage 0.4B-2
+(PR #14) are **MERGED**. Those statements are superseded by the current position below.
+
+**Stage 0.4B-3 — Primary Manufacturer Evidence Ingestion and Read-Only Process-Image Preview** —
+development checkpoint `abe7e023eb7b5e3f976d8fbc5c9a5b17079058ed` on branch
+`arena/00483ae4-waterjet-sentinel-suite`, base `main`
+`3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6` (**PR #14 MERGED**). Arena validation PASSED for the
+JavaScript scope (Mapping package 268 tests; Mapping UI 82/82; boundary scan S1–S9 clean).
+**Owner-local validation PASSED** and **Owner Browser Review PASSED** — both Owner-confirmed; the
+Browser Review rests on Owner-provided screenshots and does not claim exhaustive browser
+interaction or responsive coverage. **PR #15 OPEN — NOT MERGED.** Candidate process-image
+information is **NOT AUTHORITATIVE** (`CANDIDATE_UNVERIFIED`; every byte / word / bit offset
+remains UNRESOLVED) and grants no address, no hardware readiness and no write authority.
+**NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE
+OR CONTROL AUTHORIZED.** Production device access **NOT AUTHORIZED**.
 
 WJSS is a monitoring and supervisory control system. It is **not** a Safety Instrumented
 System, and no statement in this document should be read as a safety certification or as

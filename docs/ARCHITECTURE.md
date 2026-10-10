@@ -831,9 +831,14 @@ The selected UI technology must support, at minimum:
 - **106 live Sensor cells** and **212 Thermocouple channels**, with a **one-second operational
   update target** (Owner domain correction during Stage 0.2.1A; supersedes 104 / 208).
 - Wall layouts matching the Owner-confirmed logical matrix: **Left 24, Rear 29, Right 24,
-  Front 29**, each wall six logical rows deep, with the two **Cannon equipment slots** (logical
-  I7 Rear, logical I16 Front) shown as neutral equipment, never as Sensors — see
-  [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-cannon-slots-owner-confirmed).
+  Front 29** — **106 Sensor cells inside 108 logical positions**, each wall six logical rows deep,
+  with the two **`NON_SENSOR_GAP` positions** (logical **I7** on the Rear wall, logical **I16** on
+  the Front wall) rendered as neutral non-Sensor positions. A gap is **never a Sensor and never a
+  Water Jet**: the U-shaped map may show the Water Jet that each gap physically anchors (**I7 →
+  WJ3**, **I16 → WJ1**) as a *reference only*, while the Water Jet itself stays a separate
+  equipment entity with an **Installed Position** that is distinct from its **Target Coverage**
+  (WJ1 installed FRONT/LOWER, targets REAR/LOWER; WJ3 installed REAR/LOWER, targets FRONT/LOWER) —
+  see [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-the-two-non_sensor_gap-positions-owner-confirmed).
 - Wall-level **Dirty and Cleaner counts** (section 26).
 - **Sensor detail drill-down.**
 - **Active Cleaning Job visibility.**

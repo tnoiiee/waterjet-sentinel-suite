@@ -25,8 +25,8 @@
 // Pure data and arithmetic. No I/O, no Node built-ins, no device access.
 
 import {
-  CATEGORY, CHANNEL_TYPE, DIRECTION, EVIDENCE_STATE, EVIDENCE_TYPE, FORBIDDEN_BINDING_KEYS, REASON,
-  SEVERITY, VERIFIED_MIXED_SOURCES,
+  CATEGORY, CHANNEL_TYPE, DIRECTION, EVIDENCE_AVAILABILITY, EVIDENCE_STATE, EVIDENCE_TYPE, FORBIDDEN_BINDING_KEYS,
+  NOT_APPLICABLE, PROCESS_DATA_CONTRIBUTION, REASON, SEVERITY, VERIFIED_MIXED_SOURCES,
 } from './constants.mjs';
 import { canonicalJson, fingerprintOf } from './canonical.mjs';
 import { getProfile } from './moduleProfiles.mjs';
@@ -159,19 +159,66 @@ const OWNER_WORKBOOK_SOURCE = Object.freeze({
 const AUTHORITATIVE_MODELS = Object.freeze(['750-362', '750-430', '750-530', '750-601', '750-613', '750-471', '750-554', '750-600']);
 const NO_EVIDENCE_NOTE = 'No primary document or export has been provided. Nothing is verified.';
 
+// Stage 0.4B-3 — the Owner supplied the primary product manuals for all eight models. The manuals are NOT committed
+// to this repository and are not present in this workspace, so they are recorded as
+// OWNER_PROVIDED_OUTSIDE_REPOSITORY with no SHA-256 (an unavailable file is never hashed and a hash is never
+// invented) and with no document revision. A source that cannot be identified cannot support a VERIFIED_* claim, so
+// every manual observation below is PROVIDED_UNVERIFIED: it is recorded, it is visible in the review, and it is
+// never exposed to address derivation. The module-local facts they state are the facts of the Owner ruling.
+function manualSource(modelNumber) {
+  return Object.freeze({
+    sourceId: `OWNER-PRIMARY-MANUAL-${modelNumber}`,
+    evidenceType: EVIDENCE_TYPE.PRIMARY_DOCUMENT,
+    documentTitle: `Primary product manual ${modelNumber} (Owner-supplied; not committed to the repository)`,
+    documentSha256: null,
+    documentRevision: null,
+    effectiveDate: null,
+    manufacturer: null,
+    availability: EVIDENCE_AVAILABILITY.OWNER_PROVIDED_OUTSIDE_REPOSITORY,
+  });
+}
+
+const MANUAL_SOURCES = Object.freeze(AUTHORITATIVE_MODELS.map(manualSource));
+
+const MANUAL_NOTE = 'Primary-manual fact recorded from the Owner-supplied manual. The document is outside the '
+  + 'repository and is not hashed here, so the fact is PROVIDED_UNVERIFIED: it is a model capability, not an '
+  + 'actual-rack setting, and it does not place the module in the process image.';
+
+/** A PROVIDED_UNVERIFIED observation citing the primary manual of one model. */
+const manual = (modelNumber, value) => [{
+  value, state: EVIDENCE_STATE.PROVIDED_UNVERIFIED, sourceId: `OWNER-PRIMARY-MANUAL-${modelNumber}`, note: MANUAL_NOTE,
+}];
+
+// Model-level manual facts for the four Process I/O models only. Filler bits, diagnostic bytes, the status-byte
+// setting, byte order and word order stay NOT_PROVIDED: the manuals do not state them for the installed rack, and
+// nothing is invented to fill them in.
+const MANUAL_MODULE_CELLS = Object.freeze({
+  '750-430': { processWidthBits: manual('750-430', { input: 8, output: 0 }), channelDataBits: manual('750-430', 1) },
+  '750-530': { processWidthBits: manual('750-530', { input: 0, output: 8 }), channelDataBits: manual('750-530', 1) },
+  '750-471': { processWidthBits: manual('750-471', { input: 64, output: 0 }), channelDataBits: manual('750-471', 16) },
+  '750-554': { processWidthBits: manual('750-554', { input: 0, output: 32 }), channelDataBits: manual('750-554', 16) },
+});
+
 /**
  * The authoritative rack evidence: what the repository can honestly say today. The Owner workbook identifies the
- * rack, but it holds no process-image data, and no primary document has been provided. Every cell is therefore
- * NOT_PROVIDED and every address stays ADDRESS_UNRESOLVED. Manufacturer is not recorded until a source states it.
+ * rack but holds no process-image data. The primary manuals are available for all eight models and state the
+ * module-local process-data facts, but they are outside the repository, unhashed and unverified, so every manual
+ * observation is PROVIDED_UNVERIFIED and no cell is verified. The head station carries no evidence at all: its exact
+ * firmware and hardware revision, its I/O Config and the actual field-network mapping are still missing. Every
+ * address therefore stays ADDRESS_UNRESOLVED, and a Power Supply or End module is NOT_APPLICABLE.
  */
 export const AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE = createEvidenceSet({
   evidenceSetId: 'WJSS-PROCESS-IMAGE-EVIDENCE-AUTHORITATIVE',
-  label: 'NO PRIMARY PROCESS-IMAGE EVIDENCE PROVIDED',
+  label: 'PRIMARY MANUALS PROVIDED (UNVERIFIED) · NO VERIFIED PROCESS-IMAGE EVIDENCE',
   synthetic: false,
-  sources: [OWNER_WORKBOOK_SOURCE],
+  sources: [OWNER_WORKBOOK_SOURCE, ...MANUAL_SOURCES],
   headStation: { modelNumber: '750-362', manufacturer: null, evidenceNote: NO_EVIDENCE_NOTE, cells: {} },
-  modules: AUTHORITATIVE_MODELS
-    .map((modelNumber) => ({ modelNumber, manufacturer: null, evidenceNote: NO_EVIDENCE_NOTE, cells: {} })),
+  modules: AUTHORITATIVE_MODELS.map((modelNumber) => ({
+    modelNumber,
+    manufacturer: null,
+    evidenceNote: MANUAL_MODULE_CELLS[modelNumber] ? MANUAL_NOTE : NO_EVIDENCE_NOTE,
+    cells: MANUAL_MODULE_CELLS[modelNumber] ?? {},
+  })),
 });
 
 // ------------------------------------------------------------------ evidence preparation (rack independent)
@@ -373,6 +420,52 @@ function evaluateHead(set, prep, rackView) {
 function evaluateModule(set, prep, view) {
   const profile = getProfile(view.modelNumber);
   const entry = prep.modules.get(view.modelNumber) ?? null;
+  const nonProcessData = Boolean(profile) && profile.processData.contribution === PROCESS_DATA_CONTRIBUTION.NONE;
+  const sourceIdsOf = () => [...new Set(MODULE_CELLS.flatMap((n) => (entry ? entry.cells[n].sourceIds : [])))].sort();
+
+  // Owner ruling (Stage 0.4B-3): the head station, the Power Supply modules and the End Module contribute no
+  // Application Process I/O data. They have no required evidence cell, no ProcessModulePosition, no
+  // ProcessImageOrder and no Process I/O address. Their address is NOT_APPLICABLE with reason
+  // NON_PROCESS_DATA_MODULE — never ADDRESS_UNRESOLVED, because they are not waiting for an address.
+  if (nonProcessData) {
+    return {
+      moduleInstanceId: view.moduleInstanceId,
+      modelNumber: view.modelNumber,
+      rackSlot: view.rackSlot,
+      ioCheckPosition: view.ioCheckPosition ?? null,
+      ioCheckPositionState: view.ioCheckPositionState ?? null,
+      actualRackEvidenceState: view.actualRackEvidenceState ?? null,
+      role: profile.role,
+      processDataContribution: PROCESS_DATA_CONTRIBUTION.NONE,
+      processInputWidthBits: 0,
+      processOutputWidthBits: 0,
+      processModulePosition: null,
+      channelModule: false,
+      analog: false,
+      area: null,
+      manufacturer: entry?.record.manufacturer ?? null,
+      evidenceNote: entry?.record.evidenceNote ?? null,
+      manualFacts: profile.manualFacts,
+      evidenceState: NOT_APPLICABLE,
+      applicable: false,
+      complete: false,
+      cells: entry ? entry.cells : Object.fromEntries(MODULE_CELLS.map((n) => [n, Object.freeze({ name: n, state: EVIDENCE_STATE.NOT_PROVIDED, value: null, sourceIds: [] })])),
+      requiredCells: [],
+      layoutReasons: [],
+      orderReasons: [],
+      conflict: false,
+      spans: null,
+      sourceIds: sourceIdsOf(),
+      channelDataBits: null,
+      byteOrder: null,
+      wordOrder: null,
+      fingerprint: recordFingerprint(set, entry?.record ?? { modelNumber: view.modelNumber, cells: {} }),
+      processImageOrder: { state: NOT_APPLICABLE, value: null },
+      start: null,
+      address: { state: ADDRESS_ENTRY_STATE.NOT_APPLICABLE, reasons: [REASON.NON_PROCESS_DATA_MODULE], startBit: null },
+    };
+  }
+
   const required = requiredModuleCells(profile);
   const cells = entry ? entry.cells : Object.fromEntries(MODULE_CELLS.map((n) => [n, Object.freeze({ name: n, state: EVIDENCE_STATE.NOT_PROVIDED, value: null, sourceIds: [] })]));
   const layoutReasons = new Set();
@@ -427,12 +520,21 @@ function evaluateModule(set, prep, view) {
     moduleInstanceId: view.moduleInstanceId,
     modelNumber: view.modelNumber,
     rackSlot: view.rackSlot,
+    ioCheckPosition: view.ioCheckPosition ?? null,
+    ioCheckPositionState: view.ioCheckPositionState ?? null,
+    actualRackEvidenceState: view.actualRackEvidenceState ?? null,
+    role: profile ? profile.role : null,
+    processDataContribution: profile ? profile.processData.contribution : PROCESS_DATA_CONTRIBUTION.NONE,
+    processInputWidthBits: isVerified(cells.processWidthBits.state) ? cells.processWidthBits.value.input : null,
+    processOutputWidthBits: isVerified(cells.processWidthBits.state) ? cells.processWidthBits.value.output : null,
     processModulePosition: view.processModulePosition,
     channelModule,
     analog,
     area: channelModule ? profile.direction : null,
     manufacturer: entry?.record.manufacturer ?? null,
     evidenceNote: entry?.record.evidenceNote ?? null,
+    manualFacts: profile ? profile.manualFacts : null,
+    applicable: true,
     evidenceState: state,
     complete: layoutReasons.size === 0 && orderReasons.size === 0 && spans !== null,
     cells,
@@ -464,7 +566,8 @@ export function resolveProcessImage(evidenceSet, rackView) {
   const mods = rackView.map((v) => evaluateModule(set, prep, v));
   const byId = new Map(mods.map((m) => [m.moduleInstanceId, m]));
 
-  const globalBlockers = mods.filter((m) => !m.channelModule && m.layoutReasons.length > 0);
+  // A module that contributes no Application Process I/O data is not a blocker: it is not part of any image area.
+  const globalBlockers = [];
   const areas = {};
   for (const area of [DIRECTION.INPUT, DIRECTION.OUTPUT]) {
     const key = area === DIRECTION.INPUT ? 'input' : 'output';
@@ -505,7 +608,10 @@ export function resolveProcessImage(evidenceSet, rackView) {
   }
 
   for (const m of mods) {
-    if (!m.channelModule) { m.address = { state: ADDRESS_ENTRY_STATE.NOT_APPLICABLE, reasons: [], startBit: null }; continue; }
+    if (!m.applicable || !m.channelModule) {
+      m.address = { state: ADDRESS_ENTRY_STATE.NOT_APPLICABLE, reasons: [REASON.NON_PROCESS_DATA_MODULE], startBit: null };
+      continue;
+    }
     const info = areas[m.area];
     const reasons = new Set([...m.layoutReasons, ...m.orderReasons]);
     if (!head.verified) {
@@ -538,6 +644,8 @@ export function resolveProcessImage(evidenceSet, rackView) {
     modules: mods,
     byInstance: byId,
     areas,
+    // Modules that contribute no Application Process I/O data. They are not unresolved: nothing applies to them.
+    notApplicable: Object.freeze(mods.filter((m) => !m.applicable).map((m) => m.moduleInstanceId)),
     addressCapable,
     issues: prep.issues,
     sources: set.sources,

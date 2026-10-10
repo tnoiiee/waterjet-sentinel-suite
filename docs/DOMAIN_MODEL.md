@@ -65,11 +65,22 @@ An enumerated wall: `LEFT`, `REAR`, `RIGHT`, `FRONT`. Each wall has:
 | Owns one TempQueue | yes — four TempQueues in total across all walls | `[APPROVED]` |
 | Owns one TimeQueue | yes — four TimeQueues in total across all walls | `[APPROVED]` |
 
-#### 2.2.1 Logical Sensor matrix and Cannon slots `[OWNER CONFIRMED]`
+#### 2.2.1 Logical Sensor matrix and the two `NON_SENSOR_GAP` positions `[OWNER CONFIRMED]`
+
+<a id="221-logical-sensor-matrix-and-cannon-slots-owner-confirmed"></a>
+
+*The legacy anchor above is retained so that links authored before this correction keep
+resolving to this section. The section title no longer uses the superseded "Cannon slots"
+wording (ADR-0017).*
 
 The Owner domain correction made during Stage 0.2.1A defines one logical matrix of
-**18 logical columns × 6 logical rows = 108 logical positions**. Two positions are **Cannon
-equipment slots**, so the matrix holds **106 Sensor locations**.
+**18 logical columns × 6 logical rows = 108 logical positions**. **Two of those positions are
+`NON_SENSOR_GAP` positions**, so the matrix holds **106 Sensor locations**. The gap *positions*
+remain `[OWNER CONFIRMED]`; their *meaning* was corrected by
+[ADR-0017](decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md)
+(Owner-approved 2026-10-08, implemented at Stage 0.3A-3 Checkpoint C): **I7 and I16 are not
+equipment of any kind** — there are no Cannon entities in the canonical model. Each gap records
+*where a Water Jet is physically mounted* and is therefore a presentation/topology anchor only.
 
 | Logical row (top to bottom) | Logical labels |
 | --- | --- |
@@ -77,24 +88,47 @@ equipment slots**, so the matrix holds **106 Sensor locations**.
 | 2 | G+101 … G+118 |
 | 3 | G1 … G18 |
 | 4 | H1 … H18 |
-| 5 | I1 … I18, except logical I7 = **Rear Cannon** and logical I16 = **Front Cannon** |
+| 5 | I1 … I18, except logical **I7** and logical **I16**, which are `NON_SENSOR_GAP` positions |
 | 6 | J1 … J18 |
 
 | Wall | Logical columns | Wall grid | Sensor locations |
 | --- | --- | --- | --- |
 | Left | 1–4 | 4 columns × 6 rows | 24 |
-| Rear | 5–9 | 5 columns × 6 rows | 29 (+ Rear Cannon at logical I7) |
+| Rear | 5–9 | 5 columns × 6 rows | 29 (+ the `NON_SENSOR_GAP` position at logical I7, the placement anchor of WJ3) |
 | Right | 10–13 | 4 columns × 6 rows | 24 |
-| Front | 14–18 | 5 columns × 6 rows | 29 (+ Front Cannon at logical I16) |
+| Front | 14–18 | 5 columns × 6 rows | 29 (+ the `NON_SENSOR_GAP` position at logical I16, the placement anchor of WJ1) |
 
-- I7 and I16 are **not** Sensors. Cannon slots are equipment: they have no Sensor ID, no
-  Thermocouple channels, no Dirty Score or classification, no quality, and are never a
-  TempQueue, TimeQueue, GlobalQueue, selection, or Cleaning Job target.
+- **I7 and I16 are neither Sensors nor Water Jets.** They have no Sensor ID, no Thermocouple
+  channels, no Dirty Score or classification, no quality and no scan order, and they are never a
+  TempQueue, TimeQueue, GlobalQueue, selection, or Cleaning Job target. The Sensor sequence
+  skips them (I6 → I8, and I15 → I17).
+- **A gap anchor does not convert a matrix position into equipment.** The implementation records
+  `GapAnchorForWaterJetId` — **I7 → WJ3** and **I16 → WJ1** (`CanonicalSensorMap.NonSensorGapSlots`
+  in `packages/contracts/WallMap.cs`; `WaterJetTopologyCatalog.GapAnchors`). The anchor is a
+  *reference to* a separate equipment entity; it is never a Water Jet identity belonging to the
+  position, and the position never becomes a Water Jet slot, a Cannon slot, or an equipment slot.
+- **Water Jets are separate domain entities (WJ1–WJ8)** — see §2.6 — each paired 1:1 with a
+  dedicated Isolation Valve **IV1–IV8 by ordinal** (§2.8). Nothing in the matrix owns, contains,
+  or is a Water Jet.
+- **Installed Position and Target Coverage are separate concepts.** A Water Jet is installed on
+  one wall and covers the *opposite* wall in the matching region: **WJ1 is installed FRONT/LOWER
+  at the I16 gap anchor, targets REAR/LOWER and pairs with IV1**; **WJ3 is installed REAR/LOWER
+  at the I7 gap anchor, targets FRONT/LOWER and pairs with IV3**.
+- **Assigned Cleaning Device identity is ordinal and is never inferred from the wall a Sensor is
+  located on.** The legacy `cannon` column of `sensorparam.csv` means **Assigned Cleaning Device
+  ID** — a direct ordinal reference to WJ1–WJ8, *not* a grid position, *not* an installed wall,
+  and *not* a "nearest or same-wall Water Jet". Assignment follows responsibility for the
+  **target** wall and region (`WaterJetTopologyCatalog.TryRequireAssignment`), so a Rear-lower
+  Sensor is assigned WJ1 even though WJ1 is installed on the Front-lower wall.
 - Wall rows are the logical rows; there is no rotation or reversal. The question of row
   alignment across walls of unequal height is resolved by this matrix.
 - The labels are a logical reference. They do **not** define Modbus addresses, register maps,
   physical coordinates, Water Jet assignments, or any Production mapping, all of which remain
   confidential deployment values and `[NOT VERIFIED]`.
+- *Superseded wording (historical):* Stage 0.2.1A labelled these two positions "Cannon equipment
+  slots" (logical I7 "Rear Cannon", logical I16 "Front Cannon"). That label is superseded by
+  ADR-0017 and is preserved only inside dated historical records and in that ADR's own
+  supersession history.
 
 ### 2.3 Sensor
 
@@ -113,7 +147,7 @@ A single cleaning point on a wall. Each Sensor has:
 | `LastSuccessfulCleaningCompletedAt` | Explicit UTC timestamp; never null | `[APPROVED]` |
 | `LastCleaningTimestampSource` | Provenance of the last timestamp | `[APPROVED]` |
 | `HasVerifiedCleaningHistory` | Whether verified cleaning history exists | `[APPROVED]` |
-| `AssignedWaterJet` | The Water Jet that cleans this sensor | `[APPROVED]` — mapping `[NOT VERIFIED]` |
+| `AssignedWaterJet` | The Water Jet that cleans this sensor — the **Assigned Cleaning Device**, an ordinal reference to one of WJ1–WJ8 (the legacy `cannon` column). Resolved by responsibility for the **target** wall and region, never inferred from the wall the Sensor sits on (§2.2.1) | `[APPROVED]` — mapping `[NOT VERIFIED]` |
 | `AssignedIsolationValve` | The Isolation Valve serving this sensor | `[OWNER CONFIRMED]` — **derived from `AssignedWaterJet`**, not independently assigned |
 | `PathCoordinatesP1..P6` | Six configurable path coordinates | `[APPROVED]` — values `[NOT VERIFIED]` |
 | `Inhibited` | Whether the sensor is inhibited | `[APPROVED]` as a concept; semantics `[OPEN]` |
@@ -141,9 +175,25 @@ temperatures. Defined in section 5.
 
 ### 2.6 WaterJet
 
-One of eight cleaning assemblies. Each has a horizontal X axis and a vertical Y axis, and
-each has **exactly one dedicated Isolation Valve**. A Water Jet is reserved for the duration
-of a Cleaning Job. `[OWNER CONFIRMED]`
+One of eight cleaning assemblies — **WJ1 to WJ8**, separate equipment entities that are never
+Sensor-matrix positions. Each has a horizontal X axis and a vertical Y axis, and
+each has **exactly one dedicated Isolation Valve** (IV*n* by ordinal, §2.8). A Water Jet is
+reserved for the duration of a Cleaning Job. `[OWNER CONFIRMED]`
+
+**Installed Position and Target Coverage are separate attributes.** A Water Jet is installed on
+one wall and covers the *opposite* wall in the matching region:
+
+| Water Jet | Installed Position | Target Coverage | Dedicated Isolation Valve |
+| --- | --- | --- | --- |
+| WJ1 | FRONT / LOWER — at the `NON_SENSOR_GAP` anchor **I16** | REAR / LOWER | IV1 |
+| WJ3 | REAR / LOWER — at the `NON_SENSOR_GAP` anchor **I7** | FRONT / LOWER | IV3 |
+| WJ2, WJ4 | LEFT / LOWER, RIGHT / LOWER (between horizontal Sensors) | RIGHT / LOWER, LEFT / LOWER | IV2, IV4 |
+| WJ5, WJ7 | FRONT / UPPER, REAR / UPPER (between vertical Sensors) | REAR / UPPER, FRONT / UPPER | IV5, IV7 |
+| WJ6, WJ8 | LEFT / UPPER, RIGHT / UPPER (Sensor junctions) | RIGHT / UPPER, LEFT / UPPER | IV6, IV8 |
+
+The two gap anchors (I7 → WJ3, I16 → WJ1, §2.2.1) record where a Water Jet is physically
+mounted; they do **not** make the matrix position a Water Jet or any other equipment. The full
+approved table is `packages/domain/WaterJetTopologyCatalog.cs` (ADR-0017 decisions 5 and 7).
 
 ### 2.7 GalilController
 

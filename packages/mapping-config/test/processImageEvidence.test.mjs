@@ -36,7 +36,7 @@ const enabledEntries = (result) => result.entries.filter((e) => e.state !== 'NOT
 
 // ----------------------------------------------------------------------------- E1, E2
 
-test('E1 profiles start incomplete: the authoritative evidence set has no verified value and no manufacturer', () => {
+test('E1 nothing is verified in the authoritative set: manuals are recorded unverified, non-process modules are not applicable', () => {
   const rackView = deriveRackView(cfg().modules);
   const report = buildEvidenceReport(AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE, rackView);
   assert.equal(report.synthetic, false);
@@ -44,21 +44,59 @@ test('E1 profiles start incomplete: the authoritative evidence set has no verifi
   assert.equal(report.addressCapable, false);
   assert.equal(report.head.evidenceState, 'NOT_PROVIDED');
   assert.equal(report.head.completeness, 'INCOMPLETE');
+  const NON_PROCESS = ['750-362', '750-601', '750-613', '750-600'];
   for (const m of report.modules) {
-    assert.equal(m.evidenceState, 'NOT_PROVIDED', m.moduleInstanceId);
-    assert.equal(m.completeness, 'INCOMPLETE', m.moduleInstanceId);
     assert.equal(m.manufacturer, null, 'no manufacturer is recorded without a source');
-    assert.equal(m.processInputWidth, null);
-    assert.equal(m.processOutputWidth, null);
-    assert.deepEqual(m.processImageOrder, { state: 'NOT_VERIFIED', value: null });
+    if (NON_PROCESS.includes(m.modelNumber)) {
+      // A module with no process data has no width to verify: it is 0 bit in both directions.
+      assert.equal(m.processInputWidth, '0 bit', m.moduleInstanceId);
+      assert.equal(m.processOutputWidth, '0 bit', m.moduleInstanceId);
+      assert.equal(m.processInputWidthBits, 0, m.moduleInstanceId);
+      assert.equal(m.processOutputWidthBits, 0, m.moduleInstanceId);
+    } else {
+      assert.equal(m.processInputWidth, null, 'no verified input width');
+      assert.equal(m.processOutputWidth, null, 'no verified output width');
+    }
+    if (NON_PROCESS.includes(m.modelNumber)) {
+      // A module that contributes no Application Process I/O data is not waiting for evidence.
+      assert.equal(m.evidenceState, 'NOT_APPLICABLE', m.moduleInstanceId);
+      assert.equal(m.completeness, 'NOT_APPLICABLE', m.moduleInstanceId);
+      assert.equal(m.processDataContribution, 'NONE', m.moduleInstanceId);
+      assert.equal(m.addressState, 'NOT_APPLICABLE', m.moduleInstanceId);
+      assert.equal(m.addressReason, 'NON_PROCESS_DATA_MODULE', m.moduleInstanceId);
+      assert.equal(m.processModulePosition, null, m.moduleInstanceId);
+      assert.deepEqual(m.processImageOrder, { state: 'NOT_APPLICABLE', value: null }, m.moduleInstanceId);
+    } else {
+      // The Owner supplied the primary manuals, but they are outside the repository and unhashed, so the facts they
+      // state are recorded and stay PROVIDED_UNVERIFIED. They never become a verified width.
+      assert.equal(m.evidenceState, 'PROVIDED_UNVERIFIED', m.moduleInstanceId);
+      assert.equal(m.completeness, 'INCOMPLETE', m.moduleInstanceId);
+      assert.ok(m.sourceIds.some((s) => s.startsWith('OWNER-PRIMARY-MANUAL-')), m.moduleInstanceId);
+      assert.deepEqual(m.processImageOrder, { state: 'NOT_VERIFIED', value: null }, m.moduleInstanceId);
+    }
   }
-  // The eight target identities each have a record, and none carries an observation.
+  // The eight target identities each have a record.
   assert.deepEqual(
     [AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE.headStation.modelNumber, ...AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE.modules.map((m) => m.modelNumber)].sort(),
     ['750-362', '750-430', '750-471', '750-530', '750-554', '750-600', '750-601', '750-613', '750-362'].sort(),
   );
+  // Only the four Process I/O models carry an observation, and it is an unverified manual fact. The head station and
+  // the three non-process modules carry none: there is nothing for them to observe.
   for (const rec of [AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE.headStation, ...AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE.modules]) {
-    assert.deepEqual(rec.cells, {}, `${rec.modelNumber} has no observation`);
+    const cells = Object.values(rec.cells);
+    if (NON_PROCESS.includes(rec.modelNumber)) {
+      assert.deepEqual(rec.cells, {}, `${rec.modelNumber} has no observation`);
+    } else {
+      assert.deepEqual(Object.keys(rec.cells).sort(), ['channelDataBits', 'processWidthBits'], rec.modelNumber);
+      for (const obs of cells) for (const o of obs) assert.equal(o.state, 'PROVIDED_UNVERIFIED', rec.modelNumber);
+    }
+  }
+  // Every manual source is recorded as outside the repository with no SHA-256: no hash is invented.
+  for (const src of AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE.sources.filter((s) => s.sourceId.startsWith('OWNER-PRIMARY-MANUAL-'))) {
+    assert.equal(src.evidenceType, 'PRIMARY_DOCUMENT');
+    assert.equal(src.availability, 'OWNER_PROVIDED_OUTSIDE_REPOSITORY');
+    assert.equal(src.documentSha256, null);
+    assert.equal(src.documentRevision, null);
   }
   assert.equal(validateEvidenceSet(AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE).length, 0);
   // Every catalogue model has an evidence record, so a missing record cannot hide an unverified model.

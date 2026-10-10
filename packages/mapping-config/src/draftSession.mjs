@@ -16,7 +16,9 @@ import { deriveRackView, moveModule, validateRack } from './rack.mjs';
 import { validateMapping, summariseIssues } from './mappingValidation.mjs';
 import { deriveAddresses } from './addressDerivation.mjs';
 import { AUTHORITATIVE_PROCESS_IMAGE_EVIDENCE } from './processImageEvidence.mjs';
+import { actualRackEvidenceFor } from './actualRackEvidence.mjs';
 import { buildEvidenceReport } from './evidenceReport.mjs';
+import { buildCandidateProcessImage } from './candidateProcessImage.mjs';
 import {
   rackTopologyRevision, tagMappingRevision, moduleProfileRevision, processImageEvidenceRevision,
   derivedAddressManifestFingerprint,
@@ -160,7 +162,8 @@ export class DraftSession {
   _evaluate(state, config) {
     const rackIssues = validateRack(state.modules, config.declaredChannelCounts);
     const mappingIssues = validateMapping(state.modules, state.bindings, config.additionalTags);
-    const rackView = deriveRackView(state.modules);
+    // Actual-rack evidence belongs to the ModuleInstance, so a reorder never changes what the real rack shows.
+    const rackView = deriveRackView(state.modules, actualRackEvidenceFor(state.modules));
     const addresses = deriveAddresses(rackView, state.bindings, this.evidence);
     return { rackIssues, mappingIssues, rackView, addresses };
   }
@@ -212,8 +215,18 @@ export class DraftSession {
    * address state with reasons. Recomputed from the Draft order, so a reorder is reflected. Nothing is editable.
    */
   evidenceReport() {
-    const rackView = deriveRackView(this.draft.modules);
+    const rackView = deriveRackView(this.draft.modules, actualRackEvidenceFor(this.draft.modules));
     return buildEvidenceReport(this.evidence, rackView);
+  }
+
+  /**
+   * Read-only CANDIDATE process image for the current Draft rack. It is never authoritative, never verified and
+   * never a basis for a write. Every offset in it is unresolved until the actual Process Data image and the
+   * head-station I/O Config are supplied.
+   */
+  candidateProcessImage() {
+    const rackView = deriveRackView(this.draft.modules, actualRackEvidenceFor(this.draft.modules));
+    return buildCandidateProcessImage(rackView);
   }
 
   /**

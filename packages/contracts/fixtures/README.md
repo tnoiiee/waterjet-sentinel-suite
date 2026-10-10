@@ -32,8 +32,13 @@
 
 ## Rules the fixtures demonstrate (and the validator enforces)
 
-- 106 Sensors / 212 unique thermocouple channel identities / 108 wall slots.
-- Cannon slots at logical I7 / I16 are equipment, never Sensors.
+- 108 logical positions = 106 Sensors + 2 `NON_SENSOR_GAP` positions, with 212 unique
+  thermocouple channel identities (two per Sensor).
+- The `NON_SENSOR_GAP` positions at logical **I7** / **I16** are **neither Sensors nor
+  equipment**: each is a placement anchor only, carrying `GapAnchorForWaterJetId`
+  (**I7 → WJ3**, **I16 → WJ1**) and no `SensorId`. A fixture that names a Water Jet at a gap
+  references a separate equipment entity; it never turns the gap into a Sensor slot, a Cannon
+  slot, or a Water Jet slot.
 - GlobalQueue: capacity 8, contiguous positions from 1, no hidden overflow,
   head-only dispatch (`positionBefore` always 1, revision +1).
 - Mandatory Safe Return evidence ordering: valve command < valve confirmed <

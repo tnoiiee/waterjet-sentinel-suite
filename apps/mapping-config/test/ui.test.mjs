@@ -151,9 +151,9 @@ test('the UI never renders values as HTML: app.mjs writes text, not markup, from
   assert.doesNotMatch(appSrc, /innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
 });
 
-test('the Stage subtitle names Stage 0.4B-2 evidence review and does not claim verified evidence or a Draft stage', () => {
+test('the Stage subtitle names Stage 0.4B-3 evidence review and does not claim verified evidence or a Draft stage', () => {
   const m = /<p class="sub">([^<]*)<\/p>/.exec(html);
   assert.ok(m, 'subtitle element present');
-  assert.equal(m[1], 'Stage 0.4B-2 · Evidence and read-only mapping review');
-  assert.doesNotMatch(m[1], /0\.4B-1|verified|Draft/i);
+  assert.equal(m[1], 'Stage 0.4B-3 · Manufacturer evidence and read-only process-image preview');
+  assert.doesNotMatch(m[1], /0\.4B-1|0\.4B-2|verified|Draft/i);
 });

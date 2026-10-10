@@ -11,7 +11,7 @@
   <header class="banner" id="header">
     <div class="title">
       <h1>Mapping Configuration</h1>
-      <p class="sub">Stage 0.4B-2 · Evidence and read-only mapping review</p>
+      <p class="sub">Stage 0.4B-3 · Manufacturer evidence and read-only process-image preview</p>
     </div>
     <div class="chips" id="chips" aria-live="polite"></div>
   </header>
@@ -23,6 +23,7 @@
       <li><a href="#tags">Tag mapping</a></li>
       <li><a href="#reserved">Reserved</a></li>
       <li><a href="#evidence">Evidence</a></li>
+      <li><a href="#actual-rack">Actual rack</a></li>
       <li><a href="#validation">Validation</a></li>
       <li><a href="#impact">Impact</a></li>
       <li><a href="#revisions">Revisions</a></li>
@@ -142,14 +143,19 @@
           <thead>
             <tr>
               <th scope="col">Model</th>
-              <th scope="col">Slot</th>
+              <th scope="col">RackSlot</th>
+              <th scope="col">IO-CHECK Pos.</th>
               <th scope="col">ProcessModulePosition</th>
+              <th scope="col">Role</th>
+              <th scope="col">Process data</th>
+              <th scope="col">Width in / out (verified)</th>
               <th scope="col">Profile state</th>
               <th scope="col">Evidence source</th>
-              <th scope="col">Process width (in / out)</th>
               <th scope="col">Diagnostic / status byte</th>
+              <th scope="col">Actual-rack evidence</th>
               <th scope="col">ProcessImageOrder</th>
               <th scope="col">Address state</th>
+              <th scope="col">Reason</th>
               <th scope="col">Profile fingerprint</th>
             </tr>
           </thead>
@@ -157,7 +163,32 @@
         </table>
       </div>
       <div id="evidence-sources"></div>
-      <p class="note">ProcessModulePosition is a topology ordinal. It is never a ProcessImageOrder, offset or register number. A numeric address is derived only from verified evidence; otherwise the address stays ADDRESS_UNRESOLVED.</p>
+      <p class="note">Four different things are kept in separate columns and are never used for each other: <strong>RackSlot</strong> is the physical slot from the authoritative workbook and includes the Power Supply and End modules; <strong>IO-CHECK Pos.</strong> is the position of the same physical module in the actual-rack configuration-tool sequence; <strong>ProcessModulePosition</strong> is the ordinal among modules that contribute Application Process I/O data only; <strong>ProcessImageOrder</strong> is the order used by the process-image rule and is NOT_VERIFIED in this Stage. A Power Supply, the System Power Supply and the End Module contribute no process data: their address reads NOT APPLICABLE with reason NON_PROCESS_DATA_MODULE, and they are not waiting for an address. A numeric address is derived only from verified evidence; otherwise it stays ADDRESS_UNRESOLVED.</p>
+    </section>
+
+    <section id="actual-rack" aria-labelledby="actual-rack-h">
+      <h2 id="actual-rack-h">Actual-rack evidence <span class="hint">read-only · partial · instance and Channel scoped</span></h2>
+      <div id="actual-rack-summary"></div>
+      <div class="table-wrap scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Instance</th>
+              <th scope="col">Model</th>
+              <th scope="col">RackSlot</th>
+              <th scope="col">IO-CHECK Pos.</th>
+              <th scope="col">Channel</th>
+              <th scope="col">Evidence state</th>
+              <th scope="col">Displayed type / version</th>
+              <th scope="col">Visible settings</th>
+              <th scope="col">Applies to</th>
+            </tr>
+          </thead>
+          <tbody id="actual-rack-body"></tbody>
+        </table>
+      </div>
+      <div id="actual-rack-missing"></div>
+      <p class="note">Actual-rack evidence is instance-level. A setting verified for one Channel of one module is not evidence for another Channel, another instance of the same model, or another model. It never feeds address derivation: the actual Process Data image and the head-station I/O Config are still missing, so every address stays ADDRESS_UNRESOLVED and the derived candidate stays CANDIDATE_UNVERIFIED. No Hardware, Polling or Write control exists here.</p>
     </section>
 
     <section id="validation" aria-labelledby="validation-h">

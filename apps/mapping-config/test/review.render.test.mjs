@@ -176,25 +176,49 @@ test('U16 validation shows grouped counts first, in a fixed order, with unresolv
   assert.match(allText(by()['validation-body']), /Activation ready: no · Activation: ACTIVATION NOT AUTHORIZED/);
 });
 
-test('U17 the evidence review lists every rack module and keeps addresses unresolved with ProcessModulePosition separate', () => {
+test('U17 the evidence review lists every rack module, keeps the position concepts in separate columns and keeps addresses unresolved', () => {
   const rack = rows('rack-body').length;
   assert.equal(rows('evidence-body').length, rack, 'one evidence row per rack module');
   const text = allText(by()['evidence-summary']);
   assert.match(text, /NOT AUTHORITATIVE · address-capable: no/);
-  assert.match(text, /0 complete · \d+ incomplete of \d+/);
-  const ai = rows('evidence-body').map(cells).find((c) => /750-471 · AI-MODULE-01/.test(c[0]));
-  assert.equal(ai[3], 'NOT_PROVIDED · INCOMPLETE');
-  assert.equal(ai[4], 'NONE PROVIDED');
-  assert.equal(ai[5], 'NOT VERIFIED');
-  assert.match(ai[8], /^ADDRESS UNRESOLVED · \d+ reasons$/);
-  assert.equal(ai[7], 'NOT_VERIFIED', 'ProcessImageOrder is not derived');
-  assert.notEqual(ai[2], '—', 'ProcessModulePosition is still shown');
-  const coupler = rows('evidence-body').map(cells).find((c) => /750-362/.test(c[0]));
-  assert.equal(coupler[2], '—');
-  assert.equal(coupler[8], 'NOT APPLICABLE');
+  assert.match(text, /0 complete · \d+ incomplete · \d+ not applicable \(no process data\) of \d+/);
+  const all = rows('evidence-body').map(cells);
+  const ai = all.find((c) => /750-471 · AI-MODULE-01/.test(c[0]));
+  // This rack is the Excel-shaped demonstration rack, not the authoritative 23-module rack, so no actual-rack
+  // evidence applies to it. The column still exists and says so instead of borrowing a RackSlot value.
+  assert.equal(ai[2], 'n/a (not the authoritative rack)', 'the configuration-tool position has its own column');
+  assert.notEqual(ai[3], '—', 'ProcessModulePosition is still shown');
+  assert.equal(ai[4], 'ANALOG_INPUT_MODULE', 'role');
+  assert.equal(ai[5], 'INPUT', 'process-data contribution');
+  assert.equal(ai[6], 'NOT VERIFIED', 'no verified width: a manual capability is not a verified width');
+  assert.equal(ai[7], 'PROVIDED_UNVERIFIED · INCOMPLETE', 'the manual is recorded but unverified');
+  assert.match(ai[8], /OWNER-PRIMARY-MANUAL-750-471/);
+  assert.equal(ai[10], 'NOT APPLICABLE (not the authoritative rack)');
+  assert.equal(ai[11], 'NOT_VERIFIED', 'ProcessImageOrder is not derived');
+  assert.match(ai[12], /^ADDRESS UNRESOLVED · \d+ reasons$/);
+  assert.match(ai[13], /BYTE_ORDER_NOT_VERIFIED/);
+  // The head station contributes no process data: NOT APPLICABLE, never ADDRESS UNRESOLVED.
+  const coupler = all.find((c) => /750-362/.test(c[0]));
+  assert.equal(coupler[3], '—', 'no ProcessModulePosition for the head station');
+  assert.equal(coupler[5], 'NONE (no process data)');
+  assert.equal(coupler[6], '0 bit / 0 bit');
+  assert.equal(coupler[7], 'NOT_APPLICABLE · NOT_APPLICABLE');
+  assert.equal(coupler[12], 'NOT APPLICABLE');
+  assert.equal(coupler[13], 'NON_PROCESS_DATA_MODULE');
+  const supply = all.find((c) => /750-601/.test(c[0]));
+  assert.equal(supply[4], 'POWER_SUPPLY');
+  assert.equal(supply[12], 'NOT APPLICABLE', 'a Power Supply is never ADDRESS UNRESOLVED');
+  assert.equal(supply[13], 'NON_PROCESS_DATA_MODULE');
+  assert.doesNotMatch(cells(supply && rows('evidence-body')[all.indexOf(supply)]).join(' | '), /ADDRESS UNRESOLVED/);
   const sources = allText(by()['evidence-sources']);
   assert.match(sources, /OWNER-WORKBOOK · OWNER_WORKBOOK_FACT · T8_IO_Card_Mapping\.xlsx · SHA-256 4e0337e25c8377c0/);
+  assert.match(sources, /OWNER-PRIMARY-MANUAL-750-471 · PRIMARY_DOCUMENT/, 'the supplied manuals are listed as sources');
+  assert.match(sources, /no SHA-256/, 'a manual outside the repository is not hashed here');
   assert.match(allText(by()['revisions-body']), /ProcessImageEvidenceRevision/);
+  // The actual-rack section exists, states that no evidence applies to this rack, and offers no device control.
+  assert.match(allText(by()['actual-rack-summary']), /No actual-rack evidence applies to this rack/);
+  assert.match(allText(by()['actual-rack-summary']), /CANDIDATE_UNVERIFIED/);
+  assert.match(allText(by()['actual-rack-missing']), /Actual-rack evidence still required \(5\)/);
 });
 
 test('U18 every control rendered is a Draft control or a presentation control; none names a device action', () => {
