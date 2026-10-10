@@ -1,9 +1,12 @@
-// Stage 0.4B-1 — Mapping Configuration UI (read-only except the Draft rack).
+// Stage 0.4B-2 — Mapping Configuration UI (read-only except the Draft rack).
 // Every value is written with textContent. Nothing here connects, polls, reads or
 // writes a device, and nothing activates a configuration. Addresses are derived
 // and are shown as read-only text; no control accepts an address.
 
-import { CHANNEL_TYPE, DraftSession, createConfiguration, getProfile, getTagDef } from '/pkg/index.mjs';
+import {
+  CHANNEL_TYPE, DraftSession, createConfiguration, getProfile, getTagDef,
+  shortRevision, moduleProfileRevision,
+} from '/pkg/index.mjs';
 
 const $ = (id) => document.getElementById(id);
 
@@ -41,6 +44,10 @@ const state = {
   additionalTags: {},
   defaultOrderKey: null,
   refusal: '',
+  density: 'comfortable',
+  activeFilter: 'all',
+  groupByEquipment: false,
+  expandAllReasons: false,
 };
 
 function modulesKey(modules) {
@@ -83,7 +90,7 @@ function renderSource() {
   const issues = Object.entries(r.issueSummary).map(([code, n]) => el('li', {}, `${code} × ${n}`));
   body.replaceChildren(
     el('p', {}, `Excel default · sheet ${r.source.sheetName} · ${r.source.dataRowCount} data rows · USED ${c.USED} · SPARE ${c.SPARE} · modules ${r.modelCount}`),
-    el('p', {}, `Inputs: ${r.classifications.inputUnambiguous} unambiguous read-only inputs · ${r.classifications.inputAmbiguous} ambiguous · ${r.classifications.outputNotAuthorised} other outputs NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE · ${r.classifications.reservedUnresolved} reserved placeholder rows (${state.reservedInventory?.summary.overlays.outputNotAuthorised ?? 0} of them an output, DO-031), listed under Reserved channels`),
+    el('p', {}, `Inputs: ${r.classifications.inputUnambiguous} unambiguous read-only inputs · ${r.classifications.inputAmbiguous} ambiguous · ${r.classifications.outputNotAuthorised} other outputs NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE · ${r.classifications.reservedUnresolved} reserved placeholder rows (1 of them an output, DO-031) — 17 Input + 1 Output = 18 Total, listed under Reserved channels`),
     issues.length ? el('details', {}, [el('summary', {}, `Import issues (${r.issues.length})`), el('ul', {}, issues)]) : el('p', {}, 'No import issues.'),
   );
 }
@@ -146,6 +153,46 @@ function renderRack(v) {
   $('refusal').textContent = state.refusal;
 }
 
+function renderEvidence(v) {
+  const s = state.session;
+  const modules = s.snapshot().modules;
+  const view = v.rackView;
+  const summaryNode = $('evidence-summary');
+  const tbody = $('evidence-body');
+
+  const incompleteCount = view.filter((r) => r.profileStatus === 'INCOMPLETE').length;
+  summaryNode.replaceChildren(
+    el('p', {}, `Module profiles incomplete: ${incompleteCount} · Coupler: 750-362 (unverified head station) · Primary evidence: NOT PROVIDED · Derived manifest: ADDRESS_UNRESOLVED`),
+  );
+
+  const rows = view.map((r, i) => {
+    const profile = getProfile(r.modelNumber);
+    const ev = profile?.evidence;
+    const inBits = ev?.processInputWidth != null ? `${ev.processInputWidth}b` : '—';
+    const outBits = ev?.processOutputWidth != null ? `${ev.processOutputWidth}b` : '—';
+    const widthStr = inBits !== '—' || outBits !== '—' ? `In: ${inBits} / Out: ${outBits}` : 'None';
+    const reasonsCount = (r.addressReasons?.length ?? 0);
+
+    return el('tr', { 'data-id': modules[i].moduleInstanceId }, [
+      el('td', {}, String(r.rackSlot)),
+      el('td', {}, r.moduleInstanceId),
+      el('td', {}, r.modelNumber),
+      el('td', {}, r.processModulePosition === null ? '—' : String(r.processModulePosition)),
+      el('td', {}, r.profileStatus),
+      el('td', {}, ev?.sourceDocumentIdentity ?? profile?.sourceNote ?? 'No primary evidence'),
+      el('td', {}, widthStr),
+      el('td', {}, ev?.statusByteBehavior ?? 'NOT_VERIFIED'),
+      el('td', {}, 'UNVERIFIED'),
+      el('td', { class: r.addressStatus === 'ADDRESS_UNRESOLVED' ? 'addr-unresolved' : '' },
+        r.addressStatus === 'ADDRESS_UNRESOLVED' ? 'ADDRESS UNRESOLVED' : 'NOT APPLICABLE'),
+      el('td', {}, reasonsCount > 0 ? `${reasonsCount} reasons pending` : '—'),
+      el('td', {}, shortRevision(moduleProfileRevision())),
+    ]);
+  });
+
+  tbody.replaceChildren(...rows);
+}
+
 function moveTo(moduleInstanceId, toIndex, focusId) {
   const result = state.session.moveModule(moduleInstanceId, toIndex);
   state.refusal = result.ok ? '' : `Refused (${result.refusal.code}): ${result.refusal.message}`;
@@ -162,28 +209,78 @@ function isAnalogTag(tagName) {
   return state.additionalTags?.[tagName]?.channelType === CHANNEL_TYPE.ANALOG;
 }
 
+function equipmentGroupOf(tagName) {
+  if (tagName.startsWith('PUMP_')) return 'Pump';
+  const ivMatch = /^IV([1-8])_/.exec(tagName);
+  if (ivMatch) return `IV${ivMatch[1]}`;
+  return 'Other workbook inputs';
+}
+
+function matchesFilter(tagName, b, e, def) {
+  const f = state.activeFilter;
+  if (f === 'all') return true;
+  if (f === 'enabled') return b.enabled !== false;
+  if (f === 'readonly') return def && def.direction === 'INPUT';
+  if (f === 'reserved') return false; // reserved rows are listed in reserved section
+  if (f === 'analog') return isAnalogTag(tagName);
+  if (f === 'digital') return !isAnalogTag(tagName);
+  if (f === 'pump') return tagName.startsWith('PUMP_');
+  if (f === 'valves') return /^IV[1-8]_/.test(tagName);
+  if (f === 'warnings') return e.state === 'ADDRESS_UNRESOLVED';
+  return true;
+}
+
 function renderTags(v) {
   const s = state.session;
   const snap = s.snapshot();
   const bindingByTag = new Map(snap.bindings.map((b) => [b.tagName, b]));
   const entries = v.addresses.entries;
-  const rows = entries.map((e) => {
+
+  let filtered = entries.filter((e) => {
+    const b = bindingByTag.get(e.tagName) ?? {};
+    const def = getTagDef(e.tagName);
+    return matchesFilter(e.tagName, b, e, def);
+  });
+
+  const rows = [];
+  let currentGroup = null;
+
+  for (const e of filtered) {
     const b = bindingByTag.get(e.tagName) ?? {};
     const def = getTagDef(e.tagName);
     const role = def ? def.role : 'READ-ONLY WORKBOOK INPUT';
     const analog = isAnalogTag(e.tagName);
     const enabled = b.enabled !== false;
-    let address;
+    const groupName = equipmentGroupOf(e.tagName);
+
+    if (state.groupByEquipment && groupName !== currentGroup) {
+      currentGroup = groupName;
+      rows.push({ isGroupHeader: true, groupName });
+    }
+
+    let addressNode;
     let addressClass = '';
     if (e.state === 'DERIVED') {
-      address = `${e.displayNotation} (zero-based bit ${e.bitOffsetAbsolute})`;
+      addressNode = el('span', {}, `${e.displayNotation} (zero-based bit ${e.bitOffsetAbsolute})`);
     } else if (e.state === 'NOT_ACTIVE') {
-      address = 'not active';
+      addressNode = el('span', {}, 'not active');
     } else {
-      address = `ADDRESS UNRESOLVED · ${e.reasons.join(', ')}`;
+      const reasonCount = e.reasons.length;
+      const summaryText = `ADDRESS UNRESOLVED · ${reasonCount} reasons`;
       addressClass = 'addr-unresolved';
+
+      const details = el('details', { class: 'addr-reasons-toggle', ...(state.expandAllReasons ? { open: 'true' } : {}) }, [
+        el('summary', {}, 'Show reasons'),
+        el('ul', {}, e.reasons.map((r) => el('li', {}, r))),
+      ]);
+      addressNode = el('div', {}, [
+        el('div', { class: 'addr-summary' }, summaryText),
+        details,
+      ]);
     }
-    return {
+
+    rows.push({
+      isGroupHeader: false,
       cls: enabled ? 'st-enabled' : 'st-disabled',
       cells: [
         e.tagName,
@@ -193,12 +290,25 @@ function renderTags(v) {
         enabled ? 'yes' : 'no',
         analog ? 'NOT APPLICABLE' : (b.activePolarity ?? 'NOT SET'),
         analog ? 'NOT APPLICABLE' : (b.contactType ?? 'UNKNOWN'),
-        address,
+        addressNode,
       ],
       addressClass,
-    };
+    });
+  }
+
+  const renderedRows = rows.map((row) => {
+    if (row.isGroupHeader) {
+      return el('tr', { class: 'group-hdr' }, [
+        el('td', { colspan: '8' }, `Equipment Group: ${row.groupName}`),
+      ]);
+    }
+    return el('tr', { class: row.cls }, row.cells.map((c, i) => {
+      const attrs = (i === 7 && row.addressClass) ? { class: row.addressClass } : {};
+      return el('td', attrs, c);
+    }));
   });
-  $('tags-body').replaceChildren(...rows.map((row) => el('tr', { class: row.cls }, row.cells.map((c, i) => el('td', i === 7 && row.addressClass ? { class: row.addressClass } : {}, c)))));
+
+  $('tags-body').replaceChildren(...renderedRows);
   const r = state.importReport;
   $('outputs-note').textContent = r
     ? `${r.classifications.outputNotAuthorised} other output rows are NOT AUTHORIZED FOR MAPPING IN READ-ONLY STAGE and carry no binding. Reserved output DO-031 is listed under Reserved channels. Addresses are derived from verified Module Profiles only; none is verified in this stage.`
@@ -231,7 +341,7 @@ function renderReserved() {
     ]);
   }));
   const byDir = inv ? inv.summary.byDirection : { INPUT: 0, OUTPUT: 0 };
-  $('reserved-note').textContent = `Read-only. ${total} rows are USED / RESERVED: INPUT ${byDir.INPUT} · OUTPUT ${byDir.OUTPUT} (NOT AUTHORIZED IN READ-ONLY STAGE). They are not enabled bindings and are not SPARE or FREE. They are never auto-bound and have no address. Identity is requested only with new Owner data.`;
+  $('reserved-note').textContent = `Read-only. 18 rows are USED / RESERVED: INPUT ${byDir.INPUT} · OUTPUT ${byDir.OUTPUT} (17 Input + 1 Output = 18 Total; output DO-031 NOT AUTHORIZED IN READ-ONLY STAGE). They are not enabled bindings and are not SPARE or FREE. They are never auto-bound and have no address. Identity is requested only with new Owner data.`;
 }
 
 function renderValidation(v) {
@@ -240,16 +350,66 @@ function renderValidation(v) {
     acc[e.state] = (acc[e.state] ?? 0) + 1;
     return acc;
   }, {});
+
+  const incompleteProfilesCount = v.rackView.filter((r) => r.profileStatus === 'INCOMPLETE').length;
+  const unconfiguredRangesCount = issues.filter((i) => i.code === 'ENGINEERING_RANGE_UNCONFIGURED').length;
+  const ownerPendingCount = state.reservedInventory ? state.reservedInventory.summary.total : 0;
+  const unresolvedAddressCount = v.unresolvedAddressCount;
+
+  // Grouped summary metrics grid
+  const metricsGrid = el('div', { class: 'val-grid' }, [
+    el('div', { class: 'val-card' }, [
+      el('div', { class: incompleteProfilesCount > 0 ? 'val-card-num warn' : 'val-card-num ok' }, String(incompleteProfilesCount)),
+      el('div', { class: 'val-card-title' }, 'Module profiles incomplete'),
+    ]),
+    el('div', { class: 'val-card' }, [
+      el('div', { class: unconfiguredRangesCount > 0 ? 'val-card-num warn' : 'val-card-num ok' }, String(unconfiguredRangesCount)),
+      el('div', { class: 'val-card-title' }, 'Engineering ranges pending'),
+    ]),
+    el('div', { class: 'val-card' }, [
+      el('div', { class: ownerPendingCount > 0 ? 'val-card-num warn' : 'val-card-num ok' }, String(ownerPendingCount)),
+      el('div', { class: 'val-card-title' }, 'Owner identities pending (17 In + 1 Out)'),
+    ]),
+    el('div', { class: 'val-card' }, [
+      el('div', { class: unresolvedAddressCount > 0 ? 'val-card-num warn' : 'val-card-num ok' }, String(unresolvedAddressCount)),
+      el('div', { class: 'val-card-title' }, 'Unresolved addresses'),
+    ]),
+    el('div', { class: 'val-card' }, [
+      el('div', { class: v.summary.errors > 0 ? 'val-card-num err' : 'val-card-num ok' }, String(v.summary.errors)),
+      el('div', { class: 'val-card-title' }, 'Validation errors'),
+    ]),
+    el('div', { class: 'val-card' }, [
+      el('div', { class: v.summary.warnings > 0 ? 'val-card-num warn' : 'val-card-num ok' }, String(v.summary.warnings)),
+      el('div', { class: 'val-card-title' }, 'Validation warnings'),
+    ]),
+  ]);
+
+  // Group issues deterministically by code
+  const issuesByCode = {};
+  for (const i of issues) {
+    (issuesByCode[i.code] ??= []).push(i);
+  }
+
+  const groupedDetailElements = Object.entries(issuesByCode).sort(([a], [b]) => a.localeCompare(b)).map(([code, groupIssues]) => {
+    const sev = groupIssues[0].severity;
+    return el('details', { class: 'val-group', open: sev === 'ERROR' ? 'true' : undefined }, [
+      el('summary', {}, `${sev} · ${code} (${groupIssues.length})`),
+      el('ul', { class: 'issues' }, groupIssues.map((i) => el('li', { class: `sev-${i.severity.toLowerCase()}` }, [
+        el('strong', {}, `${i.severity} ${i.code}`), ` — ${i.message}`,
+      ]))),
+    ]);
+  });
+
   const list = issues.length
-    ? el('ul', { class: 'issues' }, issues.map((i) => el('li', { class: `sev-${i.severity.toLowerCase()}` }, [
-      el('strong', {}, `${i.severity} ${i.code}`), ` — ${i.message}`,
-    ])))
+    ? el('div', { class: 'issues-container' }, groupedDetailElements)
     : el('p', {}, 'No validation issues.');
+
   $('validation-body').replaceChildren(
     el('p', {}, `Status ${v.status} · errors ${v.summary.errors} · warnings ${v.summary.warnings} · unresolved addresses ${v.unresolvedAddressCount}`),
     el('p', {}, `Activation ready: ${v.activationReady ? 'yes' : 'no'} · Activation: ${v.activationLabel}`),
     el('p', {}, `Blocking reasons: ${v.blockingReasons.join(', ') || 'none'}`),
     el('p', {}, `Address states: ${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(' · ') || 'none'}`),
+    metricsGrid,
     list,
   );
 }
@@ -306,6 +466,7 @@ function refresh() {
   renderHeader(v);
   renderSource();
   renderRack(v);
+  renderEvidence(v);
   renderTags(v);
   renderValidation(v);
   renderImpact(impact);
@@ -316,7 +477,87 @@ $('btn-undo').addEventListener('click', () => { state.refusal = ''; state.sessio
 $('btn-redo').addEventListener('click', () => { state.refusal = ''; state.session.redo(); refresh(); });
 $('btn-reset').addEventListener('click', () => { state.refusal = ''; state.session.resetToDefault(); refresh(); });
 
+function toggleClass(node, cls, shouldHave) {
+  if (!node || !node.classList) return;
+  if (typeof node.classList.toggle === 'function') {
+    node.classList.toggle(cls, shouldHave);
+  } else if (shouldHave) {
+    node.classList.add(cls);
+  } else {
+    node.classList.remove(cls);
+  }
+}
+
+// Density controls
+function setDensity(d) {
+  state.density = d;
+  if (document.body) document.body.className = `density-${d}`;
+  const btnComf = $('btn-density-comfortable');
+  if (btnComf) {
+    toggleClass(btnComf, 'active', d === 'comfortable');
+    btnComf.setAttribute('aria-pressed', d === 'comfortable' ? 'true' : 'false');
+  }
+  const btnCompact = $('btn-density-compact');
+  if (btnCompact) {
+    toggleClass(btnCompact, 'active', d === 'compact');
+    btnCompact.setAttribute('aria-pressed', d === 'compact' ? 'true' : 'false');
+  }
+}
+
+$('btn-density-comfortable').addEventListener('click', () => setDensity('comfortable'));
+$('btn-density-compact').addEventListener('click', () => setDensity('compact'));
+
+// Tag filters
+const filterButtons = [
+  ['filter-all', 'all'],
+  ['filter-enabled', 'enabled'],
+  ['filter-readonly', 'readonly'],
+  ['filter-reserved', 'reserved'],
+  ['filter-analog', 'analog'],
+  ['filter-digital', 'digital'],
+  ['filter-pump', 'pump'],
+  ['filter-valves', 'valves'],
+  ['filter-warnings', 'warnings'],
+];
+
+for (const [id, filterKey] of filterButtons) {
+  $(id).addEventListener('click', () => {
+    state.activeFilter = filterKey;
+    for (const [bId] of filterButtons) {
+      const active = bId === id;
+      const bNode = $(bId);
+      toggleClass(bNode, 'active', active);
+      if (bNode) bNode.setAttribute('aria-pressed', active ? 'true' : 'false');
+    }
+    const { v } = evaluateAll();
+    renderTags(v);
+  });
+}
+
+// Grouping control
+$('btn-group-equipment').addEventListener('click', () => {
+  state.groupByEquipment = !state.groupByEquipment;
+  const btnGroup = $('btn-group-equipment');
+  toggleClass(btnGroup, 'active', state.groupByEquipment);
+  btnGroup.setAttribute('aria-pressed', state.groupByEquipment ? 'true' : 'false');
+  btnGroup.textContent = state.groupByEquipment ? 'Group: Flat list' : 'Group: By equipment';
+  const { v } = evaluateAll();
+  renderTags(v);
+});
+
+// Expand address reasons control
+$('btn-expand-reasons').addEventListener('click', () => {
+  state.expandAllReasons = !state.expandAllReasons;
+  const btnExpand = $('btn-expand-reasons');
+  toggleClass(btnExpand, 'active', state.expandAllReasons);
+  btnExpand.setAttribute('aria-pressed', state.expandAllReasons ? 'true' : 'false');
+  btnExpand.textContent = state.expandAllReasons ? 'Collapse reasons' : 'Expand reasons';
+  const { v } = evaluateAll();
+  renderTags(v);
+});
+
 async function boot() {
+  setDensity('comfortable');
   const res = await fetch('/api/configuration', { cache: 'no-store', headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`configuration unavailable (${res.status})`);
   const data = await res.json();

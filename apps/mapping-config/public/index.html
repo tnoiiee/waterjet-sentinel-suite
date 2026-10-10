@@ -7,14 +7,33 @@
   <title>WaterJet Sentinel — Mapping Configuration (SIMULATION ONLY)</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="density-comfortable">
   <header class="banner" id="header">
     <div class="title">
       <h1>Mapping Configuration</h1>
-      <p class="sub">Stage 0.4B-1 · Draft and read-only review</p>
+      <p class="sub">Stage 0.4B-2 · Draft and read-only hardware review</p>
     </div>
-    <div class="chips" id="chips" aria-live="polite"></div>
+    <div class="header-controls">
+      <div class="density-switch" role="group" aria-label="Display density">
+        <span class="ctrl-label">Density:</span>
+        <button type="button" id="btn-density-comfortable" class="btn-ctrl active" aria-pressed="true">Comfortable</button>
+        <button type="button" id="btn-density-compact" class="btn-ctrl" aria-pressed="false">Compact</button>
+      </div>
+      <div class="chips" id="chips" aria-live="polite"></div>
+    </div>
   </header>
+
+  <nav class="section-nav" id="section-nav" aria-label="Section navigation">
+    <span class="nav-label">Jump to:</span>
+    <a href="#source">Source</a>
+    <a href="#rack">Rack layout</a>
+    <a href="#evidence">Evidence foundation</a>
+    <a href="#tags">Tag mapping</a>
+    <a href="#reserved">Reserved channels</a>
+    <a href="#validation">Validation</a>
+    <a href="#impact">Impact preview</a>
+    <a href="#revisions">Revisions</a>
+  </nav>
 
   <main>
     <section id="source" aria-labelledby="source-h">
@@ -50,8 +69,50 @@
       <p class="note">RackSlot is the physical position. ProcessModulePosition is a provisional slot-order ordinal for channel modules. It is display only and is not an address or offset.</p>
     </section>
 
+    <section id="evidence" aria-labelledby="evidence-h">
+      <h2 id="evidence-h">Process-image evidence foundation <span class="hint">read-only · evidence completeness review</span></h2>
+      <div id="evidence-summary" class="evidence-summary"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">RackSlot</th>
+              <th scope="col">ModuleInstanceId</th>
+              <th scope="col">Model</th>
+              <th scope="col">ProcessModulePosition</th>
+              <th scope="col">Profile State</th>
+              <th scope="col">Evidence Source</th>
+              <th scope="col">Input/Output Width</th>
+              <th scope="col">Status Byte State</th>
+              <th scope="col">ProcessImageOrder</th>
+              <th scope="col">Address State</th>
+              <th scope="col">Unresolved Reasons</th>
+              <th scope="col">Profile Fingerprint</th>
+            </tr>
+          </thead>
+          <tbody id="evidence-body"></tbody>
+        </table>
+      </div>
+      <p class="note">Verified evidence foundation distinguishes Owner workbook facts, primary vendor evidence, head-station process-image rules, and module process-data profiles. Addresses remain ADDRESS_UNRESOLVED until primary evidence is verified.</p>
+    </section>
+
     <section id="tags" aria-labelledby="tags-h">
       <h2 id="tags-h">Tag mapping <span class="hint">read-only · derived fields</span></h2>
+      <div class="filter-toolbar" role="toolbar" aria-label="Tag mapping filters">
+        <span class="ctrl-label">Filter:</span>
+        <button type="button" id="filter-all" class="btn-filter active" aria-pressed="true">All</button>
+        <button type="button" id="filter-enabled" class="btn-filter" aria-pressed="false">Enabled bindings</button>
+        <button type="button" id="filter-readonly" class="btn-filter" aria-pressed="false">Read-only inputs</button>
+        <button type="button" id="filter-reserved" class="btn-filter" aria-pressed="false">Reserved rows</button>
+        <button type="button" id="filter-analog" class="btn-filter" aria-pressed="false">Analog inputs</button>
+        <button type="button" id="filter-digital" class="btn-filter" aria-pressed="false">Digital inputs</button>
+        <button type="button" id="filter-pump" class="btn-filter" aria-pressed="false">Pump</button>
+        <button type="button" id="filter-valves" class="btn-filter" aria-pressed="false">IV1–IV8</button>
+        <button type="button" id="filter-warnings" class="btn-filter" aria-pressed="false">Warnings / Unresolved</button>
+        <span class="ctrl-sep" aria-hidden="true">|</span>
+        <button type="button" id="btn-group-equipment" class="btn-ctrl" aria-pressed="false">Group: By equipment</button>
+        <button type="button" id="btn-expand-reasons" class="btn-ctrl" aria-pressed="false">Expand reasons</button>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
