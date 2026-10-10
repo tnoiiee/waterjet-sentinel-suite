@@ -36,13 +36,16 @@ may record `OWNER ACCEPTED` or `MERGED`.
 
 ## 2. Stage and approval status
 
-**Latest Stage 0.4B-1 position (2026-10-10): OWNER-LOCALLY VALIDATED at `433189f9e489d7af6770e64c971585d99bf941ad` (Owner-reported: Mapping 217/217; Mapping UI 56/56; boundary S1–S9 clean; PR-range diff check PASS). Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST. Final Source Review PASSED, blocking defects none. Mapping Configuration only, SIMULATOR only, read-only with respect to hardware; no MODBUS, no TEST_HARDWARE, no PRODUCTION, no activation. PR #12 OPEN, NOT MERGED. See §11.12 and §12.32.**
+**Latest Stage 0.4B-2 position (2026-10-10): DEVELOPED AND TESTED on branch `arena/a3adec3a-waterjet-sentinel-suite` (Mapping 230/230; Mapping UI 70/70; boundary S1–S9 clean, 0 findings; `git diff --check` PASS). PR OPEN, NOT MERGED. Process-image evidence foundation established, UI readability and review controls refined, addresses remain derived and read-only (ADDRESS_UNRESOLVED until verified primary WAGO evidence attached). No MODBUS, no TEST_HARDWARE, no PRODUCTION, no activation. See §11.13 and §12.33.**
+
+**Previous Stage 0.4B-1 position (2026-10-10): OWNER-LOCALLY VALIDATED at `433189f9e489d7af6770e64c971585d99bf941ad` (Owner-reported: Mapping 217/217; Mapping UI 56/56; boundary S1–S9 clean; PR-range diff check PASS). Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST. Final Source Review PASSED, blocking defects none. Merged to main through PR #12 at `dbbf34cfe49f4db6c524a675dadb8a24d5ef497f`. See §11.12 and §12.32.**
 
 **Previous CP-3c-1 position (2026-10-09): OWNER-LOCALLY VALIDATED at `29f133ce6598bc2eb489273a2f2d40f8827deb5f`; Final Source Review PASSED, no blocking defect. PR #10 OPEN, NOT MERGED. Library foundation only; Host/API/Inspector integration absent. CP-3c-2 and CP-4 NOT AUTHORIZED. This supersedes earlier CP-3c-1 validation-pending wording, without rewriting dated historical records.** See the CP-3c-1 checkpoint closeout.
 
 | Item | Value |
 | --- | --- |
-| Stage 0.4B-1 (Simulation-only Mapping Configuration) | **OWNER-LOCALLY VALIDATED at `433189f`; Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST; Final Source Review PASSED, blocking defects none. PR #12 OPEN - NOT MERGED.** Authoritative default: 26 bindings from the workbook, no seed. 18 reserved unresolved rows. Addresses ADDRESS_UNRESOLVED. Activation NOT READY. No MODBUS, TEST_HARDWARE or PRODUCTION. Predecessor .NET 414/414 is Owner-reported at `8847cfc`; no .NET run is claimed at `433189f`. |
+| Stage 0.4B-2 (Verified Process-Image Evidence Foundation & Mapping UI Readability) | **DEVELOPED AND TESTED at `arena/a3adec3a-waterjet-sentinel-suite`; PR OPEN - NOT MERGED.** Evidence model separates Owner facts from WAGO evidence; head-station alignment rules for 750-362; module process data profiles for 8 rack modules; ProcessModulePosition is physical slot ordinal only; ADDRESS_UNRESOLVED retained; UI readability refined (responsive width, Comfortable/Compact density switch, tag filters, equipment grouping, compact address summary with expandable details, grouped validation metrics, placeholder count 17 in + 1 out = 18 total). No MODBUS, TEST_HARDWARE or PRODUCTION. |
+| Stage 0.4B-1 (Simulation-only Mapping Configuration) | **OWNER-LOCALLY VALIDATED at `433189f`; Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST; Final Source Review PASSED, blocking defects none. MERGED via PR #12 at `dbbf34c`.** Authoritative default: 26 bindings from the workbook, no seed. 18 reserved unresolved rows. Addresses ADDRESS_UNRESOLVED. Activation NOT READY. No MODBUS, TEST_HARDWARE or PRODUCTION. |
 | Stage 0.1 Scope Gate | **APPROVED** |
 | Stage 0.1 implementation | **MERGED** — merged to `main` through PR #1 |
 | Stage 0.1 Owner manual review | **Recorded as complete by the Owner** in the approved Stage 0.2 Scope Gate, which states that the previous Stage branch completed its role and was merged through PR #1 |
@@ -588,6 +591,13 @@ This record is retained deliberately. Git history was not rewritten to remove th
 - **Result.** 26 authoritative bindings without a seed; 18 reserved unresolved rows; Pump Inlet (AI-002, diagnostic and trend only) and Pump Outlet (AI-003, sole Pump-ready input) separated; no Main Valve pressure tag; analog NOT APPLICABLE; digital ACTIVE_WHEN_CLOSED / NO; fixed Dark theme; loopback-only server; addresses ADDRESS_UNRESOLVED; activation not ready.
 - **Boundary decisions.** The S6 scanner rule is authorised B1 regression protection and stays in place. The two-label Runtime Inspector wording change is an Owner-approved narrow presentation exception and stays in place. Both are non-blocking.
 - **Full record and follow-ups:** [`STAGE_0.4B-1_CHECKPOINT.md`](STAGE_0.4B-1_CHECKPOINT.md), section *Owner validation and Final Source Review (2026-10-10, documentation closeout)*.
+
+### 11.13 Stage 0.4B-2 Process-Image Evidence Foundation and UI Readability (2026-10-10)
+
+- **Scope.** Process-image evidence foundation separating Owner facts from primary WAGO evidence records, head-station coupling rules, module process data profiles, and derived read-only address boundaries; UI readability refinements (Comfortable / Compact density switch, tag filtering, equipment grouping, compact address summary with expandable details, grouped validation metrics, placeholder count 17 in + 1 out = 18 total).
+- **Code head.** Branch `arena/a3adec3a-waterjet-sentinel-suite` (base `dbbf34cfe49f4db6c524a675dadb8a24d5ef497f` on `main`).
+- **Result.** 230 package tests pass; 70 UI tests pass; boundary scanner S1–S9 clean (0 findings); `git diff --check` PASS. Numeric addresses remain `ADDRESS_UNRESOLVED`. No manual address entry. AI-002 Runtime publication remains NOT IMPLEMENTED. Server loopback-only (127.0.0.1) GET/HEAD only. No MODBUS, TEST_HARDWARE or PRODUCTION. PR OPEN, NOT MERGED.
+- **Full record:** [`STAGE_0.4B-2_CHECKPOINT.md`](STAGE_0.4B-2_CHECKPOINT.md).
 
 ## 12. Validation record
 
@@ -1382,7 +1392,22 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - **Predecessor .NET (Owner-reported at `8847cfc`):** Release build PASS; full .NET 414/414, failed 0, skipped 0. This covers the Inspector wording that was already present at `8847cfc`. No .NET run is claimed at `433189f`.
 - **Owner browser review (Owner-observed):** PASS WITH NON-BLOCKING UI PUNCHLIST.
 - **Final Source Review (static):** PASSED. Blocking defects: none. Boundary scanner: authorised B1 regression protection, in scope. Runtime Inspector wording: owner-approved narrow presentation exception, non-blocking. Non-blocking follow-ups: A (Pump Slot/Channel is a Draft-model API capability, not a browser editor), B (SPARE-versus-placeholder ordering), C (Draft API create-on-missing), D (UI readability).
-- **Stated status.** AI-002 Runtime publication NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. ACTIVATION NOT READY. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
+- **Stated status.** AI-002 Runtime publication NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. ACTIVATION NOT READY. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 MERGED to main at `dbbf34cfe49f4db6c524a675dadb8a24d5ef497f`.
+
+### 12.33 Stage 0.4B-2 — Process-Image Evidence Foundation and UI Readability Development Checkpoint (2026-10-10)
+
+- **Arena validation on branch `arena/a3adec3a-waterjet-sentinel-suite` (base `dbbf34c`):**
+  - packages/mapping-config: 230 / 230 PASS (0 fail, 0 skipped when run with workbook).
+  - apps/mapping-config: 70 / 70 PASS (0 fail, 0 skipped).
+  - Boundary scan: 0 findings (S1–S9 clean).
+  - `git diff --check`: PASS.
+  - Authoritative workbook SHA-256 untouched (`4E0337E25C8377C01559F264653BAAB25BCFA23F4D3E071FDC8C80896F422E8E`).
+- **Scope implemented:**
+  - Evidence foundation separating Owner facts, primary WAGO evidence records, head-station coupling rules, module process data profiles, and derived read-only address boundaries.
+  - Distinct `ProcessModulePosition` (physical 1-based channel module slot ordinal) vs `ProcessImageOrder`.
+  - UI readability: expanded responsive width (`min(1840px, 98vw)`), Comfortable / Compact density switch (presentation-only), tag filters, equipment grouping, compact address summary with expandable technical details, grouped validation metric cards, explicit placeholder summary `17 Input + 1 Output = 18 Total`, read-only process-image evidence review table.
+  - Strict security & safety: derived read-only addresses, loopback-only 127.0.0.1 GET/HEAD server, no MODBUS, no TEST_HARDWARE, no PRODUCTION, no device write controls.
+- **Stated status:** AI-002 Runtime publication NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED UNTIL VERIFIED PRIMARY WAGO EVIDENCE ATTACHED. ACTIVATION NOT READY. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR OPEN - NOT MERGED.
 
 ## Related documents
 
