@@ -175,9 +175,9 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 - The browser UI has not been run in a real browser by the agent. Owner-local browser review is
   authoritative (Owner decision 6).
 - The platform live preview is unavailable for this checkpoint by decision (S6). The server binds to
-  127.0.0.1 only. The `MAPPING_UI_HOST` environment variable can change the bind host. The default is
-  127.0.0.1 and no test or documented launch path sets it. Whether that variable should be removed is an
-  open review point for the Owner.
+  127.0.0.1 only, through the constant `UI_BIND_HOST`. Product code does not read `MAPPING_UI_HOST` or any
+  other environment variable for the bind host. Regression tests are in `apps/mapping-config/test/loopback.test.mjs`,
+  and boundary rule S6 flags any environment-controlled bind host.
 - Hardware RawInputInversion is UNVERIFIED. Limit detection is therefore a logical mapping only.
   TEST_HARDWARE activation remains blocked.
 
@@ -190,6 +190,12 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 5. `docs(checkpoint): stage 0.4B-1 development checkpoint`
 6. Follow-up (this revision): the IVn label check, its tests, the synthetic label convention, and the resolved
    polarity bullet. The workbook is not touched.
+7. Blocker correction (B1, B2), on the same branch and PR, with no new scope gate, branch or PR:
+   - `fix(mapping): enforce loopback-only server binding`. The bind host is the constant `127.0.0.1`.
+     `MAPPING_UI_HOST` is removed from Product code. Regression tests and boundary rule S6 cover it.
+   - `fix(mapping): enforce IV pressure ordinal identity`. `WSB Pressure transmitter #n = IVn` is enforced for
+     AI-004 to AI-011 to IV1 to IV8 outlet pressure. A mismatch is refused with `PRESSURE_IV_LABEL_MISMATCH`
+     and creates no Binding. The Draft path refuses a module or Channel change for IVn pressure and limit tags.
 
 The workbook is not added by any of these commits. It arrived in `6ff9e4a` under the exception above.
 The PR targets `main`, is not merged, and does not reuse PR #11's branch.
