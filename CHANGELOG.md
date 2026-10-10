@@ -1,3 +1,14 @@
+## 2026-10-10 — Stage 0.4C-0: Owner decisions resolved (documentation only; successor to checkpoint `4babdce`)
+
+- **Successor commit** `docs: resolve Stage 0.4C-0 owner decisions` on the same branch and the same open **PR #16**. Base `main` `29ee137c1df617a1aa3321c3c891161d5a5bb41a` (PR #15 MERGED). No second branch or PR. Not merged.
+- **Owner decisions OQ-01 to OQ-08 recorded** in `docs/STAGE_0.4C-0_CHECKPOINT.md` §0.1: TC gap confirmed (`TC_ACQUISITION_TOPOLOGY: NOT_PROVIDED`, `SENSOR_TO_TC_CHANNEL_SCHEDULE: NOT_PROVIDED`, `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED`); two separate domains (Process Instrument and Temperature Sensor); AI-003 remains Pump Outlet Pressure; `Quality` unchanged with separate `DiagnosticReason` and `CommissioningState`; pilot roles only; timing values `CONFIGURABLE / OWNER_INPUT_PENDING`; Sensor verdict rules; procedure and approval roles.
+- **Link consistency (two links).** `docs/CURRENT_STATE.md` and `docs/MASTER_PLAN.md` moved the `DOMAIN_MODEL.md` §2.2.1 link from the legacy anchor (retained in the target) to the canonical anchor. Not a broken-link fix.
+- **README.** Three current-status rows (current stage, identifiers, scope gate) narrowly updated. No other README content changed.
+- **Predecessor evidence cited only, not re-run at this documentation head:** Stage 0.4B-3 Mapping 268/268 (Owner-local), Mapping UI 82/82, Owner Browser Review passed.
+- **Not implemented or authorised.** Physical Sensor acquisition, wire-break decoding, Sensor commissioning monitor, MODBUS, TEST_HARDWARE, PRODUCTION and device write or control. Actual process-image offsets NOT VERIFIED.
+- **Changed:** `docs/STAGE_0.4C-0_CHECKPOINT.md`, `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`, `CHANGELOG.md`, `README.md`. **Unchanged:** Product source, tests, workbook, dependencies, lock files, fixtures, configuration, Runtime, Mapping implementation, Galil and MODBUS code.
+- Record: [STAGE_0.4C-0_CHECKPOINT.md](docs/STAGE_0.4C-0_CHECKPOINT.md).
+
 ## 2026-10-10 — Stage 0.4C-0: Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (development checkpoint, documentation only)
 
 - New session after **PR #15 MERGED** (merge commit `29ee137c1df617a1aa3321c3c891161d5a5bb41a`; parents `3a73dfce1d2c7c1dc4d3b0274ea10f97406088f6` and `8b479772d4fbef63b8f8eb34f59a1f2eba69618e`, verified). Branch `arena/fecda529-waterjet-sentinel-suite`. Workbook unchanged (SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`).
