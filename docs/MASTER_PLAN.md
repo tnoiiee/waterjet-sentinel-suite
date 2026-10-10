@@ -47,6 +47,8 @@ described anywhere else remains `[PROPOSED]` until a later gate approves it.
 
 ## 3. Stage ledger
 
+**Stage 0.4B-1 Mapping Configuration (2026-10-10; Owner validation and Final Source Review, documentation closeout):** Owner-local automated validation **PASSED** at exact code head `433189f9e489d7af6770e64c971585d99bf941ad` (Owner-reported: Mapping 217/217; Mapping UI 56/56; boundary S1–S9 clean). Owner browser review **PASSED WITH NON-BLOCKING UI PUNCHLIST**. Final Source Review **PASSED, blocking defects none**. PR #12 OPEN, NOT MERGED. Mapping Configuration only, SIMULATOR only, read-only with respect to hardware. No MODBUS, no TEST_HARDWARE, no PRODUCTION, no activation. See §3.4.
+
 **Stage 0.4A CP-3c-2 / CP-4A final closeout (2026-10-10; supersedes the dated pending gate below):** Owner-reported automated validation **PASSED** at exact code head `fd053fde07c96163b073fc9cb4c0383f31eafe3c` (base `dfc2c02c550c1cc2367fa5ca6271dd3b2510557b`): cleared environment; locked restore PASS, no lock drift; Release build with TreatWarningsAsErrors PASS, 0 warnings / 0 errors; full .NET **414/414** (0 failed, 0 skipped); fixture parity **7/7** (0 failed, 0 skipped); TypeScript typecheck PASS, tests **34/34** (0 failed); boundary scan 0 findings S1–S9; `git diff --check` PASS; no source drift, clean Owner-local tree, no artifact commit. Arena did **not** compile or execute .NET. Owner manual browser review **PASSED** for the Valve pressure matrices, independent Pump and paired-IVn pressure sources and thresholds, parallel Valve CLOSE / Axis RETURN, cumulative faults and qualified completion, blocked next dispatch, sequential FIFO two-Job AutoSequence (one Active Job; final Queue empty, Job 2 completed), read-only modal and truthful Pump wording. Screenshots are Owner-observed evidence, not Arena-executed evidence. Exact-source static Final Source Review **PASSED; blocking defects NONE**. [Checkpoint and numbered review](STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md). **NON-BLOCKING UI CONTEXT-LABEL PUNCHLIST:** distinguish Current Active Job from last released Job outcome and last released Valve-close resolution in future UI wording; not implemented here. CP-3c-2 Runtime Host integration and CP-4A minimal read-only observation are ready for Owner merge review; **PR #11 OPEN, NOT MERGED**. CP-4 full UI refinement is not delivered; no operator control, write route or device command; **MODBUS NOT IMPLEMENTED, TEST_HARDWARE NOT AUTHORIZED, PRODUCTION NOT AUTHORIZED**.
 
 *The following 2026-10-09 fast-track gate statement is retained as historical development status, not current validation status.*
@@ -452,6 +454,23 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 - **Not verified in Arena.** Compilation and every test result: the figures above are Owner-reported. Arena has no .NET SDK.
 - **Carried decisions (unchanged by this section).** O-3, O-4, O-8, O-11, FU-3 and FU-5 remain `[OPEN]`. The FU-4 trigger confirmation remains `[OPEN]`. The NB-1 vocabulary decision belongs to the Owner.
 - **Status block (PASSED form).** CP-3a and CP-3b Final Source Review: **PASSED.** Blocking defects: none. Non-blocking follow-ups: NB-1 to NB-8. Valve feedback retention defect: CLOSED. CP-3c NOT AUTHORIZED. CP-4 NOT AUTHORIZED. PR #9 OPEN, NOT MERGED.
+
+### 3.4 Stage 0.4B-1 — Simulation-only Mapping Configuration: Owner validation and Final Source Review (2026-10-10, documentation only)
+
+**Status: OWNER-LOCALLY VALIDATED at `433189f9e489d7af6770e64c971585d99bf941ad` (Owner-reported). Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST (Owner-observed). Final Source Review PASSED, blocking defects none (static). PR #12 OPEN - NOT MERGED.**
+
+- **Lineage.** Base `a5540057ab668708a6129c3647685f82f1c5f08d` (`main`). Branch `arena/1b92c50a-waterjet-sentinel-suite`. Predecessor `8847cfc`; successor `5f9f437`; correction commits `438cfd2`, `09608bb`, `64204e9`, `433189f`. One PR, no new branch and no new PR.
+- **Scope.** Mapping Configuration, SIMULATOR provider only, Draft editing, authoritative workbook default. Read-only with respect to hardware.
+- **Defaults.** 26 authoritative bindings from the workbook alone, with no seed. AI-002 is PUMP_INLET_PRESSURE (diagnostic and trend only). AI-003 is PUMP_OUTLET_PRESSURE (the sole Pump-ready source). IV1–8 outlet pressure, Lower and Upper follow `#n = IVn`. No Main Valve pressure tag.
+- **Reserved inventory.** 18 read-only rows, all USED / RESERVED, UNBOUND, OWNER_INPUT_PENDING, ADDRESS_UNRESOLVED. DO-031 is an OUTPUT with NOT_AUTHORIZED_IN_READ_ONLY_STAGE.
+- **Presentation.** Fixed Dark theme only. Analog pressure polarity and contact show NOT APPLICABLE. Digital limits show ACTIVE_WHEN_CLOSED / NO.
+- **Boundary.** Server bound to `127.0.0.1` only. GET and HEAD only. No CORS. No device-action control. Scanner rule S6 covers environment-controlled bind hosts (authorised B1 regression protection, in scope).
+- **Accepted presentation exception.** `apps/runtime/Inspector/index.html`: two labels changed to "Pump Outlet pressure", presentation only, non-blocking (Owner-approved). The label was already present at `8847cfc`.
+- **Predecessor .NET evidence.** Owner-reported at `8847cfc`: Release build PASS; full .NET 414/414, failed 0, skipped 0. Not re-executed at `433189f`. The Runtime graph and Runtime Inspector have not changed since `8847cfc`.
+- **Non-blocking follow-ups.** (A) Pump Slot/Channel is a Draft model API capability, not a browser editor control, in Stage 0.4B-1. (B) SPARE-versus-placeholder ordering in the importer (no such row in the current workbook). (C) Draft API create-on-missing for an unknown tag name, not reachable from the browser. (D) UI readability punchlist.
+- **Not authorised or not implemented.** AI-002 Runtime publication NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. ACTIVATION NOT READY. NO MODBUS. NO TEST_HARDWARE. NO PRODUCTION. No device write or control.
+
+Record: [`docs/STAGE_0.4B-1_CHECKPOINT.md`](STAGE_0.4B-1_CHECKPOINT.md), section *Owner validation and Final Source Review (2026-10-10, documentation closeout)*.
 
 ### 3.1 Recorded reconciliation of the Stage 0.2 title
 

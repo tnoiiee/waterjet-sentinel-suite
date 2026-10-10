@@ -36,10 +36,13 @@ may record `OWNER ACCEPTED` or `MERGED`.
 
 ## 2. Stage and approval status
 
-**Latest CP-3c-1 position (2026-10-09): OWNER-LOCALLY VALIDATED at `29f133ce6598bc2eb489273a2f2d40f8827deb5f`; Final Source Review PASSED, no blocking defect. PR #10 OPEN, NOT MERGED. Library foundation only; Host/API/Inspector integration absent. CP-3c-2 and CP-4 NOT AUTHORIZED. This supersedes earlier CP-3c-1 validation-pending wording, without rewriting dated historical records.** See the CP-3c-1 checkpoint closeout.
+**Latest Stage 0.4B-1 position (2026-10-10): OWNER-LOCALLY VALIDATED at `433189f9e489d7af6770e64c971585d99bf941ad` (Owner-reported: Mapping 217/217; Mapping UI 56/56; boundary S1–S9 clean; PR-range diff check PASS). Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST. Final Source Review PASSED, blocking defects none. Mapping Configuration only, SIMULATOR only, read-only with respect to hardware; no MODBUS, no TEST_HARDWARE, no PRODUCTION, no activation. PR #12 OPEN, NOT MERGED. See §11.12 and §12.32.**
+
+**Previous CP-3c-1 position (2026-10-09): OWNER-LOCALLY VALIDATED at `29f133ce6598bc2eb489273a2f2d40f8827deb5f`; Final Source Review PASSED, no blocking defect. PR #10 OPEN, NOT MERGED. Library foundation only; Host/API/Inspector integration absent. CP-3c-2 and CP-4 NOT AUTHORIZED. This supersedes earlier CP-3c-1 validation-pending wording, without rewriting dated historical records.** See the CP-3c-1 checkpoint closeout.
 
 | Item | Value |
 | --- | --- |
+| Stage 0.4B-1 (Simulation-only Mapping Configuration) | **OWNER-LOCALLY VALIDATED at `433189f`; Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST; Final Source Review PASSED, blocking defects none. PR #12 OPEN - NOT MERGED.** Authoritative default: 26 bindings from the workbook, no seed. 18 reserved unresolved rows. Addresses ADDRESS_UNRESOLVED. Activation NOT READY. No MODBUS, TEST_HARDWARE or PRODUCTION. Predecessor .NET 414/414 is Owner-reported at `8847cfc`; no .NET run is claimed at `433189f`. |
 | Stage 0.1 Scope Gate | **APPROVED** |
 | Stage 0.1 implementation | **MERGED** — merged to `main` through PR #1 |
 | Stage 0.1 Owner manual review | **Recorded as complete by the Owner** in the approved Stage 0.2 Scope Gate, which states that the previous Stage branch completed its role and was merged through PR #1 |
@@ -577,6 +580,14 @@ This record is retained deliberately. Git history was not rewritten to remove th
 - **Final Source Review: PASSED.** Blocking defects: none. The eighteen questions, the presentation classifications, the non-blocking follow-ups NB-1 to NB-8 and the governance supersession index are in MASTER_PLAN §3.3.5.
 - **Contract vocabulary disclosure (NB-1).** The 'Contract change: None' statement above is accurate for this branch. However, the projection's Safe Return `command`, `feedback` and `standby` values (`SR2`, `SR4`, kernel names and `UNKNOWN`) do not match the accepted TypeScript label unions in `packages/contracts/wjss-contracts-ts/types.ts` or the golden fixture (`CLOSE_COMMANDED`, `RETURN_COMMANDED`, `CLOSED_CONFIRMED`, `NOT_CONFIRMED`). The projection tests pin the kernel names. This is recorded as an Owner contract decision, with two options proposed and none applied. No wire emission of Safe Return legs is authorized until it is resolved.
 - **Authority.** CP-3a and CP-3b: Owner-authorized, delivered and Owner-locally validated. **CP-3c NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** PR #9 is OPEN and NOT MERGED. This closeout does not authorise Host integration, API fields or routes, Inspector changes, environment-variable scenario selection, runtime execution of scenarios, TEST_HARDWARE or PRODUCTION access.
+
+### 11.12 Stage 0.4B-1 Mapping Configuration record (2026-10-10)
+
+- **Scope.** Mapping Configuration only, SIMULATOR provider only, Draft editing, authoritative workbook default `T8_IO_Card_Mapping.xlsx` (Owner commit `6ff9e4a`, SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`, 16,648 bytes, byte-identical). Read-only with respect to hardware.
+- **Validated code head.** `433189f9e489d7af6770e64c971585d99bf941ad`. Base `a5540057` (`main`). Predecessor `8847cfc`. Successor `5f9f437`. Correction commits `438cfd2`, `09608bb`, `64204e9`, `433189f`.
+- **Result.** 26 authoritative bindings without a seed; 18 reserved unresolved rows; Pump Inlet (AI-002, diagnostic and trend only) and Pump Outlet (AI-003, sole Pump-ready input) separated; no Main Valve pressure tag; analog NOT APPLICABLE; digital ACTIVE_WHEN_CLOSED / NO; fixed Dark theme; loopback-only server; addresses ADDRESS_UNRESOLVED; activation not ready.
+- **Boundary decisions.** The S6 scanner rule is authorised B1 regression protection and stays in place. The two-label Runtime Inspector wording change is an Owner-approved narrow presentation exception and stays in place. Both are non-blocking.
+- **Full record and follow-ups:** [`STAGE_0.4B-1_CHECKPOINT.md`](STAGE_0.4B-1_CHECKPOINT.md), section *Owner validation and Final Source Review (2026-10-10, documentation closeout)*.
 
 ## 12. Validation record
 
@@ -1363,6 +1374,15 @@ lifecycle, water, Queue, QueueRevision or latch. Full answers, findings and foll
 
 Authority after this record: PR #8 OPEN, NOT MERGED. CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.
 TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
+
+### 12.32 Stage 0.4B-1 — Owner-local validation and Final Source Review (2026-10-10)
+
+- **Owner-local (Owner-reported, not executed by Arena):** Mapping 217 total / 217 pass / 0 fail / 0 skipped; Mapping UI 56 / 56 / 0 / 0; boundary 0 findings (S1–S9 clean); `git diff --check origin/main...HEAD` PASS; authoritative workbook copied out of the repository, SHA-256 verified, no seed.
+- **Arena re-run at `433189f`** (not Owner evidence): mapping 217 / 210 / 0 / 7 without the workbook path and 217 / 217 / 0 / 0 with it; UI 56 / 56 / 0 / 0; boundary 0 findings; diff-check exit 0; workbook SHA unchanged; working tree clean.
+- **Predecessor .NET (Owner-reported at `8847cfc`):** Release build PASS; full .NET 414/414, failed 0, skipped 0. This covers the Inspector wording that was already present at `8847cfc`. No .NET run is claimed at `433189f`.
+- **Owner browser review (Owner-observed):** PASS WITH NON-BLOCKING UI PUNCHLIST.
+- **Final Source Review (static):** PASSED. Blocking defects: none. Boundary scanner: authorised B1 regression protection, in scope. Runtime Inspector wording: owner-approved narrow presentation exception, non-blocking. Non-blocking follow-ups: A (Pump Slot/Channel is a Draft-model API capability, not a browser editor), B (SPARE-versus-placeholder ordering), C (Draft API create-on-missing), D (UI readability).
+- **Stated status.** AI-002 Runtime publication NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. ACTIVATION NOT READY. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
 
 ## Related documents
 

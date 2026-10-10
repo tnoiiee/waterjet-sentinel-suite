@@ -1,11 +1,11 @@
 # Stage 0.4B-1 — Simulation-Only Mapping Configuration (Development Checkpoint)
 
-Status: **DEVELOPMENT CHECKPOINT. Committed and pushed to the session branch; a PR targeting `main` is opened, not merged.**
+Status: **STAGE 0.4B-1 FINAL SOURCE REVIEW PASSED. OWNER-LOCAL AUTOMATED VALIDATION PASSED. OWNER BROWSER REVIEW PASSED WITH NON-BLOCKING UI PUNCHLIST. Validated code head `433189f9e489d7af6770e64c971585d99bf941ad`. Documentation closeout on the same branch and PR #12. Not merged.**
 Stop point: this checkpoint. Nothing is merged.
 
 **Successor (Owner ruling 2026-10-10, final mapping):** `fix(mapping): confirm pump inlet range and workbook defaults`,
-one commit after `8847cfc` on the same branch and PR #12. Source statically reviewed in Arena. **OWNER-LOCAL SUCCESSOR
-VALIDATION REQUIRED. OWNER BROWSER REVIEW PENDING. PR #12 OPEN - NOT MERGED.** See the section *Owner ruling 2026-10-10 - final mapping* below.
+one commit after `8847cfc` on the same branch and PR #12. Source statically reviewed in Arena. **OWNER-LOCAL VALIDATION PASSED at `433189f` (Owner-reported: Mapping 217/217, Mapping UI 56/56). OWNER BROWSER REVIEW
+PASSED WITH NON-BLOCKING UI PUNCHLIST. Source review: no blocking defect. PR #12 OPEN - NOT MERGED.** See the section *Owner ruling 2026-10-10 - final mapping* below.
 
 ## Correction: authoritative defaults, reserved inventory and fixed Dark UI (2026-10-10)
 
@@ -36,8 +36,8 @@ unresolved inventory (with analog presentation); `64204e9` apply fixed dark pres
 Honesty lines for this correction: AI-002 RANGE OWNER-CONFIRMED. AI-002 DIAGNOSTIC/TREND ONLY. AI-003 PUMP-READY ONLY.
 AUTHORITATIVE DEFAULT HAS 26 BINDINGS. AUTHORITATIVE DEFAULT REQUIRES NO SEED. RESERVED PLACEHOLDER INVENTORY HAS 18 ROWS.
 FIXED DARK THEME ONLY. AI-002 RUNTIME PUBLICATION NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. OWNER BROWSER
-REVIEW PENDING. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
-Source statically reviewed. Owner-local successor validation required.
+REVIEW PASSED WITH NON-BLOCKING UI PUNCHLIST (Owner-reported; see the Owner validation section). NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
+Source statically reviewed. Owner-local successor validation PASSED (Owner-reported at `433189f`).
 
 ## Owner exception (Boundary Hold, AGENTS §11.5 / PUBLIC_REPOSITORY_BOUNDARY §7)
 
@@ -62,7 +62,7 @@ The workbook is already in `6ff9e4a`, so it appears in the PR diff against `main
 Scope boundary: no MODBUS, no TEST_HARDWARE, no PRODUCTION, no physical device read or write,
 no Pump/Valve/Axis command authority, no device credentials, no external dependency.
 
-## CHANGED (uncommitted, in the working tree)
+## CHANGED (cumulative, committed on the branch, against `main` `a5540057`)
 
 | Path | Purpose |
 |---|---|
@@ -87,15 +87,25 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 | `apps/mapping-config/public/{index.html,app.mjs,styles.css}` | Read-only UI with a Draft rack. Only Undo, Redo, Reset controls. |
 | `apps/mapping-config/test/*.test.mjs`, `test/helpers/*` | UI shell tests and a stub-DOM render test. |
 | `packages/mapping-config/src/limitNormalization.mjs` | Pure normalization: ContactPolarity, then verified RawInputInversion (applied once), then LimitDetected. Not wired to Runtime. |
+| `apps/runtime/Inspector/index.html` | **Owner-approved narrow presentation exception.** Two labels changed from the generic 'Pump pressure' wording to 'Pump Outlet pressure' (commit `a0642d4`). Presentation wording only: no Runtime state, Delta, contract, sequencing, alarm, interlock, control or device access. Does not publish AI-002. |
+| `tools/boundary-scan/boundary-scan.mjs` | **Authorised B1 regression protection.** Rule S6 also flags an environment-controlled bind host (commit `156657d`). Scanner tooling only, not Product code. Owner-classified as in scope. |
 | `docs/STAGE_0.4B-1_CHECKPOINT.md` | This document. |
 
 ## UNCHANGED
 
-- Runtime (.NET), Inspector (GET-only), AutoSequence (FIFO, one active job), Pump/Valve separation,
-  WJn/IVn pairing, Runtime atomic publication, existing tests and fixtures. No tracked file is modified
-  (`git diff --stat` against the base is empty; all work is in new untracked paths).
-- Workbook `T8_IO_Card_Mapping.xlsx` (Owner commit `6ff9e4a`). Not modified, not re-committed, not removed.
-- Existing TypeScript contract package and the boundary scanner rules.
+- Runtime (.NET) source, Runtime State and Delta, shared contracts and fixtures, FixtureGenerator, Simulator
+  scenarios, MODBUS adapters, device profiles, dependencies and lock files: **not modified** by any Stage 0.4B-1
+  commit. `git diff --name-only 8847cfc 433189f` lists no such path.
+- Inspector (`apps/runtime/Inspector/index.html`): **changed by two presentation labels only** (accepted exception,
+  see the CHANGED table). Its GET-only behaviour is unchanged.
+- Boundary scanner (`tools/boundary-scan/boundary-scan.mjs`): **changed by the authorised S6 environment-bind-host
+  rule only.** No other rule is changed.
+- Workbook `T8_IO_Card_Mapping.xlsx` (Owner commit `6ff9e4a`): not modified, not re-committed, not removed.
+- Existing TypeScript contract package: not modified.
+
+An earlier Arena report stated that the Inspector and scanner changes were uncommitted and that the Runtime Inspector
+was unchanged. That was incorrect. Both changes are committed (`a0642d4`, `156657d`), and they are classified in the
+Owner validation section below.
 
 ## Behaviour delivered
 
@@ -117,8 +127,9 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
   No Main Valve I/O tag is defined. The workbook has no Main Valve row, so none is required and none is aliased to
   AI-003. No aliasing, averaging, derivation or cross-fallback exists across these groups. WJn uses only its paired
   IVn pressure (`pressureTagForWj`). Pump pressure is never used for IVn diagnosis.
-- **Pump location is editable; pump identity is locked.** The workbook gives the default module, Slot and
-  Channel. The Draft may change them when the change is compatible. Validation enforces channel capacity,
+- **Pump identity is locked; pump Slot and Channel are supported by the Draft model API.** The workbook gives the default
+  module, Slot and Channel. `DraftSession.setBinding` may change them when the change is compatible. This is supported by
+  the Draft model API and focused tests, but is not exposed as a browser editor control in Stage 0.4B-1. Validation enforces channel capacity,
   signal type, physical duplicate binding, pump and valve separation, and ordinal consistency. The workbook
   identifier, source identity and canonical identity are never editable, so AI-002 cannot become AI-003 or an IV.
 - **Source description is evidence, not identity.** A pump binding keeps the trimmed workbook text as
@@ -194,14 +205,14 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
 | Read-only and control scan | **VERIFIED** | UI test: button whitelist is exactly Undo, Redo, Reset. No non-GET request, no network API, no HTML injection sink. |
 | Owner-local workbook topology | **VERIFIED IN ARENA AGAINST AN OUT-OF-REPO COPY** | Byte-identical copy (SHA-256 `4e0337e2…f422e8e`) outside the repository, removed afterwards. 23 modules in the expected sequence. Aggregate output only. |
 | Authoritative default import (successor, no seed) | **VERIFIED IN ARENA AGAINST AN OUT-OF-REPO COPY** | Status VALID, 0 rack errors, 0 mapping errors. 26 enabled defaults with 0 `REQUIRED_TAG_MISSING`. 16 limits ACTIVE_WHEN_CLOSED (OWNER_RULE). AI-002 and AI-003 both 4-20 mA, 0–40 bar. 26 addresses ADDRESS_UNRESOLVED. Activation NOT AUTHORIZED, blocking reason `NO_VERIFIED_PROCESS_IMAGE_RULE`. 29 disabled read-only input listings. 18 placeholders unbound. Warnings only (profiles incomplete, IVn ranges unconfigured, placeholders pending). |
-| Owner-local successor validation | **REQUIRED — NOT RUN BY THE OWNER** | The Owner runs the commands in the section below on the successor head. |
+| Owner-local successor validation | **PASSED — Owner-reported at `433189f`** | Mapping 217/217 PASS; Mapping UI 56/56 PASS; boundary S1–S9 clean; PR-range `git diff --check` PASS. Arena re-ran the same commands at `433189f` and obtained the same totals, recorded separately and not claimed as the Owner's run. |
 | Credentials audit of the workbook and repo diff | **VERIFIED** | See the Owner exception table above. |
 | Locked restore, Release build, Runtime.Core and API tests, full .NET suite | **NOT VERIFIED** | The .NET SDK is absent in this sandbox. No .NET file is changed. |
 | Fixture parity | **NOT VERIFIED** | No fixture changed. The parity run needs the .NET generator. |
 | TypeScript checks | **NOT VERIFIED** | The TS package has no installed dependencies here. No TS file is changed. Installing them needs a STOP. |
-| Browser rendering and layout | **NOT VERIFIED — OWNER BROWSER REVIEW PENDING** | No browser in the sandbox. Verified only through the stub DOM and server tests. The Owner review is the 38-item checklist below. |
+| Browser rendering and layout | **OWNER BROWSER REVIEW PASSED WITH NON-BLOCKING UI PUNCHLIST (Owner-reported)** | There is no browser in the sandbox, so these are Owner-observed results, not Arena observations. Arena verified only through the stub DOM and server tests. |
 | `git diff --check` and clean tree | **VERIFIED AT COMMIT** | `git diff --check` clean and no uncommitted change before the commit that carries this document. The tree is committed; see the commit log. |
-| Full .NET regression (successor) | **NOT RUN** | No .NET file is changed by the successor, and the shared boundary is not changed. The predecessor evidence (414/414) is unchanged and is not re-claimed by this successor. |
+| Full .NET regression | **NOT RUN AT `433189f`. Predecessor exact-head evidence only** | Owner-reported at predecessor `8847cfc`: Release build PASS; full .NET 414/414 PASS, failed 0, skipped 0. The Runtime graph and the Runtime Inspector have not changed since `8847cfc`: no .NET, Runtime, contract, fixture, Inspector or tools path differs between `8847cfc` and `433189f`. No .NET execution is claimed at `433189f`. |
 
 ## Owner decisions
 
@@ -279,6 +290,13 @@ no Pump/Valve/Axis command authority, no device credentials, no external depende
    `fix(mapping): confirm pump inlet range and workbook defaults`. AI-002 and AI-003 are 4-20 mA, 0–40 bar.
    The 26 authoritative defaults load without a seed. The seed is an optional override. Placeholders are refused
    as sources. AI-002 Runtime publication is deferred. See the section *Owner ruling 2026-10-10 - final mapping*.
+9. `fix(mapping): complete authoritative workbook defaults` (`438cfd2`). 26 authoritative defaults from the workbook
+   alone. Seeded `MAIN_VALVE_OUTLET_PRESSURE` refused as `UNKNOWN_TAG`. Reserved rows classified before the output test.
+10. `fix(mapping): expose reserved unresolved inventory` (`09608bb`). Read-only reserved section, 18 rows. Analog rows
+    show NOT APPLICABLE for polarity and contact.
+11. `style(mapping): apply fixed dark presentation` (`64204e9`). Fixed Dark presentation and the dark-theme tests.
+12. `docs(checkpoint): record mapping and UI correction` (`433189f`). Correction record. The loopback URL form in the
+    reserved render test (boundary S1).
 
 The workbook is not added by any of these commits. It arrived in `6ff9e4a` under the exception above.
 The PR targets `main`, is not merged, and does not reuse PR #11's branch.
@@ -299,11 +317,13 @@ on `arena/1b92c50a-waterjet-sentinel-suite`, PR #12, with no new Scope Gate, bra
 - No Main Valve pressure tag. `MAIN_VALVE_OUTLET_PRESSURE` is absent from the catalogue and the required set. AI-003 is never Main Valve.
 - AI-002 RUNTIME PUBLICATION NOT IMPLEMENTED. Deferred. The future candidate is listed under Pressure identities above.
 - ADDRESSES REMAIN ADDRESS_UNRESOLVED. Every address status code is non-numeric. No numeric address is entered or overridden.
-- OWNER BROWSER REVIEW PENDING. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED.
+- OWNER BROWSER REVIEW PASSED WITH NON-BLOCKING UI PUNCHLIST (Owner-reported). NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED.
   PR #12 OPEN - NOT MERGED.
 
-**Pump identity and source are locked; Slot and Channel are editable.** Pump Slot/Channel is Draft-editable when the
-change is compatible, has a valid capacity, has no physical duplicate, is not shared with an IVn pressure, and has the
+**Pump identity and source are locked; Slot and Channel are a Draft model API capability.** Pump Slot/Channel is supported by
+the Draft model API and focused tests, but is not exposed as a browser editor control in Stage 0.4B-1. The browser
+supports module reorder (drag/drop and keyboard), Undo, Redo and Reset only. Where the Draft API is used, a change is
+accepted when the change is compatible, has a valid capacity, has no physical duplicate, is not shared with an IVn pressure, and has the
 correct signal. The derived address is read-only and follows the change. Locked: `tagName`, canonical identity,
 `sourceWorkbookTag`, `declaredSourceIdentity`, and the Pump-ready role. Swaps, AI-002 to Outlet, AI-003 to Inlet, a pump
 moved onto an IVn source, and a shared channel are refused. The workbook description is source evidence and is not
@@ -389,6 +409,93 @@ address. The Owner must not hand-edit seed JSON. The command, output path, schem
 cleanup command and proof that no repository file changed are reported before any Owner-run step. A new local script
 requires a STOP and a report of its file and scope first.
 
-**Known limits of this successor.** The workbook is unchanged and remains the authoritative input. .NET and TypeScript
-were not run here. No browser run was made here. The Owner-local successor validation has not been run by the Owner.
-The predecessor evidence (414/414) is not re-claimed by this successor or by the correction head. No .NET run was made for the correction.
+**Known limits of the validated head.** The workbook is unchanged and remains the authoritative input. Arena did not run
+.NET or TypeScript at `433189f`, and Arena made no browser run. The predecessor evidence (414/414, Owner-reported at
+`8847cfc`) is not re-claimed for `433189f`. The Owner-local results recorded here are Owner-reported.
+
+## Owner validation and Final Source Review (2026-10-10, documentation closeout)
+
+**Validated code head:** `433189f9e489d7af6770e64c971585d99bf941ad`. **Parent of this record:** `433189f`. Branch
+`arena/1b92c50a-waterjet-sentinel-suite`, base `a5540057ab668708a6129c3647685f82f1c5f08d` (`main`). PR #12 OPEN, NOT MERGED.
+
+**Owner-local automated evidence (Owner-reported, not executed by Arena):**
+
+| Gate | Result |
+|---|---|
+| Authoritative workbook | Copied byte-for-byte outside the repository; SHA-256 verified; no `MAPPING_BINDING_SEED_PATH`; the default loaded directly from the workbook. |
+| Mapping syntax check | PASS |
+| Mapping tests | **217 total, 217 passed, 0 failed, 0 skipped** |
+| Mapping UI syntax check | PASS |
+| Mapping UI tests | **56 total, 56 passed, 0 failed, 0 skipped** |
+| Boundary scan | 0 findings; S1–S9 clean |
+| PR-range whitespace, `git diff --check origin/main...HEAD` | PASS |
+| Repository | No local source drift; final working tree CLEAN; no Owner-local artifact commit required |
+
+Arena re-ran the same commands at `433189f` (not Owner evidence): mapping 217 total / 210 pass / 0 fail / 7 skipped without
+the workbook path, and 217 / 217 / 0 / 0 with an out-of-repo byte-identical copy and no seed; UI 56 / 56 / 0 / 0 with and
+without the workbook path; boundary 0 findings; `git diff --check origin/main...HEAD` exit 0; mapping and UI syntax checks
+exit 0.
+
+**Predecessor .NET evidence (Owner-reported at `8847cfc`, not re-executed):** Release build PASS; full .NET 414/414 PASS,
+failed 0, skipped 0. This exact-head evidence covers the accepted Runtime Inspector wording, which was already present at
+`8847cfc` (Arena verified the label is present there and is unchanged at `433189f`). No .NET execution is claimed at
+`433189f`, and no new .NET run is required for this closeout.
+
+**Owner browser review (Owner-reported, Owner-observed, not Arena-observed): PASS WITH NON-BLOCKING UI PUNCHLIST.**
+Fixed Dark theme PASS. No theme selector or Light/System mode PASS. Authoritative workbook loaded as DEFAULT FROM EXCEL
+PASS. Topology of 23 physical rack Slots PASS. RackSlot and ProcessModulePosition displayed separately PASS. Coupler and
+End Module shown as fixed topology boundaries PASS. 26 enabled authoritative default bindings PASS. AI-002 Pump Inlet
+Pressure shown separately PASS. AI-003 Pump Outlet Pressure shown separately PASS. No Main Valve pressure tag PASS. Pump
+and IV pressure identities separate PASS. IV1–IV8 pressure, Lower and Upper ordinal mapping PASS. Analog polarity and
+contact NOT APPLICABLE PASS. Digital limits ACTIVE_WHEN_CLOSED / NO PASS. 18 reserved channels visible PASS. AI-020, AI-035,
+DI-037 and DO-031 visible PASS. DO-031 remains OUTPUT and NOT_AUTHORIZED_IN_READ_ONLY_STAGE PASS. Placeholder rows
+UNRESOLVED / UNBOUND / OWNER_INPUT_PENDING PASS, and not auto-bindable PASS. No numeric address displayed PASS. Every address
+ADDRESS_UNRESOLVED PASS. Module-profile and engineering-range warnings visible PASS. Activation NOT AUTHORIZED PASS. No
+MODBUS control, no hardware activation, no write control PASS. Loopback-only browser path used PASS.
+
+**Boundary scanner (`tools/boundary-scan/boundary-scan.mjs`): PASS. AUTHORIZED B1 REGRESSION PROTECTION. IN SCOPE.** The
+narrow S6 rule detects Product code that reads an environment variable for a bind host. The Owner records that it detected
+the earlier `MAPPING_UI_HOST` defect, avoids unrelated environment-variable false positives, preserves S6, and gives 0
+findings on the corrected Product tree. The rule stays in place and is not restored to `main`.
+
+**Runtime Inspector wording (`apps/runtime/Inspector/index.html`): PASS. OWNER-APPROVED NARROW PRESENTATION EXCEPTION.
+NON-BLOCKING.** The two-line change labels the pump pressures "Pump Outlet pressure" in place of the generic "Pump pressure"
+wording, aligned with AI-002 Pump Inlet Pressure, AI-003 Pump Outlet Pressure, and Pump-ready AI-003 / PUMP_OUTLET only. It
+changes presentation only. It does not publish AI-002, change Runtime state or Delta or contracts or sequencing, add alarm,
+interlock or control behaviour, or add device access or write authority. It is not restored to `main`.
+
+**Final Source Review verdict: STAGE 0.4B-1 FINAL SOURCE REVIEW PASSED. BLOCKING DEFECTS NONE.** The review was static.
+Item 66 (no Runtime, contract or fixture behaviour changed) is now PASS: no Runtime, contract or fixture path changed, and the
+Inspector change is presentation only. Earlier, item 66 was BLOCKING on scope; the Owner decision above resolved it.
+
+**Non-blocking follow-ups (recorded, not implemented):**
+
+- **A. Pump Slot/Channel wording: NON-BLOCKING CAPABILITY/PRESENTATION CLARIFICATION.** `DraftSession.setBinding` supports
+  compatible Pump Slot/Channel editing and focused tests cover it. The browser UI has no Slot/Channel binding editor. The
+  browser supports module reorder (drag/drop and keyboard), Undo, Redo and Reset only. This wording is corrected in this
+  record and in the PR body.
+- **B. SPARE-versus-placeholder ordering: NON-BLOCKING FUTURE HARDENING.** The import checks `SPARE` before the placeholder
+  test. A placeholder row marked SPARE would be counted as spare rather than reserved. The current authoritative workbook
+  has no such row; all 18 reserved rows classify correctly. The importer is not changed in this closeout.
+- **C. Draft API create-on-missing: NON-BLOCKING FUTURE API HARDENING.** `DraftSession.setBinding` creates a binding when the
+  tag name is not found. The browser does not call this path, and catalogue and validation rules refuse unknown identities.
+  Product code is not changed in this closeout.
+- **D. UI readability: NON-BLOCKING UI READABILITY PUNCHLIST.** Dense tables, long unresolved-address reasons, and an import
+  summary that could be easier to scan. Not implemented.
+
+**Stated scope and status:**
+
+- AI-002 Runtime publication is **NOT IMPLEMENTED**.
+- Addresses remain **ADDRESS_UNRESOLVED**. Process-image profiles remain unverified.
+- Activation is **NOT READY**. Activation is not authorized. `NO_VERIFIED_PROCESS_IMAGE_RULE` remains a blocking reason.
+- **NO MODBUS** is implemented. No polling, device read, device write or device control.
+- **TEST_HARDWARE is NOT AUTHORIZED.** **PRODUCTION is NOT AUTHORIZED.** No device write or control exists.
+- The workbook `T8_IO_Card_Mapping.xlsx` is unchanged: SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`,
+  16,648 bytes, blob `53bfd7abf1d6965d1f118f8d2003854e846097cf`.
+- The working tree is clean at this record's commit.
+
+**Honesty lines:** OWNER-LOCAL MAPPING 217/217 PASSED. OWNER-LOCAL MAPPING UI 56/56 PASSED. OWNER BROWSER REVIEW PASSED WITH
+NON-BLOCKING PUNCHLIST. BOUNDARY SCANNER CHANGE AUTHORIZED IN B1 SCOPE. RUNTIME INSPECTOR WORDING ACCEPTED AS NARROW
+PRESENTATION EXCEPTION. FINAL SOURCE REVIEW STATICALLY PERFORMED. BLOCKING DEFECTS NONE. AI-002 RUNTIME PUBLICATION NOT
+IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. ACTIVATION NOT READY. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED.
+NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
