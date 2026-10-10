@@ -14,7 +14,8 @@
  *      (physical device names, DB access names, production artefact names).
  *   S4 No credential-shaped literals anywhere (pwd/secret/key style assignments).
  *   S5 No product file references spikes/** (import/project reference/path).
- *   S6 No all-interface bind instructions in the Product tree.
+ *   S6 No all-interface bind instructions in the Product tree, and no bind host
+ *      read from the environment (an environment variable whose name contains HOST).
  *   S8 XML well-formedness across *.csproj/*.props/*.targets/*.manifest/*.resx/*.config.
  *   S9 Kiosk DPI configuration: no DPI elements in app.manifest; ProjectProperty
  *      ApplicationHighDpiMode=PerMonitorV2 exactly once; generated-bootstrap entry point.
@@ -69,6 +70,9 @@ const PROD_ARTEFACT_TERMS = [
   'permis' + 'sive definition',
 ];
 const SECRET_RE = /\b(pass|pwd|secret|api[_-]?key|access[_-]?token)[a-z0-9_-]*\s*[:=]\s*["'][^"']{3,}["']/i;
+// S6 (environment-controlled bind host): an environment read of a *HOST* variable.
+// Narrow on purpose: unrelated environment variables are not matched.
+const ENV_BIND_HOST_RE = /\b(?:process\.)?env\s*(?:\.|\[\s*['"`])\s*[A-Za-z0-9_]*HOST[A-Za-z0-9_]*/i;
 const ANY_BIND_RE = new RegExp(
   ['0' + '\\.0\\.0\\.0', 'Listen' + 'Any', 'Use' + 'AllI'].join('|'),
   'i',
@@ -164,6 +168,9 @@ for (const { rel, full, dir } of walk(ROOT)) {
       }
       if (!manifestIdentity && ANY_BIND_RE.test(line)) {
         findings.push({ rule: 'S6', at, why: 'any-interface bind instruction in Product tree' });
+      }
+      if (ENV_BIND_HOST_RE.test(line)) {
+        findings.push({ rule: 'S6', at, why: 'environment-controlled bind host in Product tree' });
       }
     }
 

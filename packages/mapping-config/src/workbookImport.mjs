@@ -1,0 +1,602 @@
+// Stage 0.4B-1 — Excel-default import pipeline (generic).
+//
+// Reads an .xlsx workbook with Node built-ins only (zlib, crypto). It parses the
+// complete sheet, preserves cell values as stored, and reports every issue
+// instead of repairing it. Nothing in this module carries plant data: the
+// workbook is supplied by path at run time. The 26 authoritative default
+// bindings are derived from explicit workbook identifiers and Owner ordinal
+// rules, so no seed is needed. An optional local seed may override a default
+// through the same checks. Both files must live outside the Git working tree.
+
+import { createHash } from 'node:crypto';
+import { inflateRawSync } from 'node:zlib';
+import { CHANNEL_TYPE, DIRECTION, CONTACT, SIGNAL, SEVERITY, OWNER_LIMIT_CONTACT_POLARITY, POLARITY_BASIS } from './constants.mjs';
+import { getProfile } from './moduleProfiles.mjs';
+import { buildModuleInstances, validateRack } from './rack.mjs';
+import { validateMapping } from './mappingValidation.mjs';
+import { getTagDef, OWNER_PUMP_SOURCE_TAGS, OWNER_DEFAULT_TAG_NAMES, ownerDefaultSourceFor } from './tagCatalogue.mjs';
+
+const MAX_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
+const EXPECTED_COLUMNS = Object.freeze([
+  { key: 'slot', label: 'Slot', pattern: /^slot$/i },
+  { key: 'module', label: 'Module', pattern: /module$/i },
+  { key: 'channel', label: 'Channel', pattern: /^channel$/i },
+  { key: 'tag', label: 'I/O Tag', pattern: /^i\/o tag$/i },
+  { key: 'signal', label: 'Signal / Description', pattern: /^signal/i },
+  { key: 'ioType', label: 'I/O Type', pattern: /^i\/o type$/i },
+  { key: 'ref', label: 'Ref.', pattern: /^ref\.?$/i },
+  { key: 'location', label: 'Location', pattern: /^location$/i },
+  { key: 'note', label: 'Contact / Note', pattern: /^contact|^note/i },
+  { key: 'status', label: 'Status', pattern: /^status$/i },
+]);
+
+function xmlDecode(s) {
+  return s
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&amp;/g, '&');
+}
+
+/** Minimal ZIP reader (stored and deflated entries). Refuses oversized output. */
+export function readZipEntries(buf) {
+  const EOCD = 0x06054b50;
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i -= 1) {
+    if (buf.readUInt32LE(i) === EOCD) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('not a ZIP container (end of central directory not found)');
+  const count = buf.readUInt16LE(eocd + 10);
+  let p = buf.readUInt32LE(eocd + 16);
+  const entries = new Map();
+  let total = 0;
+  for (let n = 0; n < count; n += 1) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) throw new Error('corrupt central directory');
+    const method = buf.readUInt16LE(p + 10);
+    const compSize = buf.readUInt32LE(p + 20);
+    const nameLen = buf.readUInt16LE(p + 28);
+    const extraLen = buf.readUInt16LE(p + 30);
+    const commentLen = buf.readUInt16LE(p + 32);
+    const localOffset = buf.readUInt32LE(p + 42);
+    const name = buf.toString('utf8', p + 46, p + 46 + nameLen);
+    p += 46 + nameLen + extraLen + commentLen;
+
+    if (buf.readUInt32LE(localOffset) !== 0x04034b50) throw new Error(`corrupt local header for ${name}`);
+    const lNameLen = buf.readUInt16LE(localOffset + 26);
+    const lExtraLen = buf.readUInt16LE(localOffset + 28);
+    const start = localOffset + 30 + lNameLen + lExtraLen;
+    const raw = buf.subarray(start, start + compSize);
+    let data;
+    if (method === 0) data = raw;
+    else if (method === 8) data = inflateRawSync(raw, { maxOutputLength: MAX_UNCOMPRESSED_BYTES });
+    else throw new Error(`unsupported ZIP method ${method} for ${name}`);
+    total += data.length;
+    if (total > MAX_UNCOMPRESSED_BYTES) throw new Error('uncompressed workbook exceeds the import limit');
+    entries.set(name, data);
+  }
+  return entries;
+}
+
+export function parseSharedStrings(xml) {
+  const out = [];
+  const siRe = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
+  let m;
+  while ((m = siRe.exec(xml)) !== null) {
+    const parts = [];
+    const tRe = /<t\b[^>]*>([\s\S]*?)<\/t>/g;
+    let t;
+    while ((t = tRe.exec(m[1])) !== null) parts.push(xmlDecode(t[1]));
+    out.push(parts.join(''));
+  }
+  return out;
+}
+
+function colLetters(ref) {
+  return /^([A-Z]+)/.exec(ref)[1];
+}
+
+/** Parses one worksheet into rows of raw cell text (null for empty cells). */
+export function parseSheet(xml, sharedStrings) {
+  const rows = [];
+  let formulaCount = 0;
+  const rowRe = /<row\b([^>]*)>([\s\S]*?)<\/row>/g;
+  let rm;
+  while ((rm = rowRe.exec(xml)) !== null) {
+    const rowNumber = Number(/\br="(\d+)"/.exec(rm[1])?.[1]);
+    const hidden = /\bhidden="1"/.test(rm[1]);
+    const cells = {};
+    const cellRe = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+    let cm;
+    while ((cm = cellRe.exec(rm[2])) !== null) {
+      const attrs = cm[1];
+      const ref = /\br="([A-Z]+\d+)"/.exec(attrs)?.[1];
+      const type = /\bt="([^"]+)"/.exec(attrs)?.[1];
+      const body = cm[2] ?? '';
+      if (/<f\b/.test(body)) formulaCount += 1;
+      let value = null;
+      if (type === 'inlineStr') {
+        value = [...body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map((x) => xmlDecode(x[1])).join('');
+      } else {
+        const v = /<v>([\s\S]*?)<\/v>/.exec(body)?.[1];
+        if (v !== undefined) {
+          if (type === 's') value = sharedStrings[Number(v)] ?? null;
+          else value = xmlDecode(v);
+        }
+      }
+      if (ref) cells[colLetters(ref)] = value;
+    }
+    rows.push({ rowNumber, hidden, cells });
+  }
+  return { rows, formulaCount };
+}
+
+function workbookSheets(entries) {
+  const wb = entries.get('xl/workbook.xml')?.toString('utf8') ?? '';
+  const rels = entries.get('xl/_rels/workbook.xml.rels')?.toString('utf8') ?? '';
+  const relTarget = new Map();
+  for (const m of rels.matchAll(/<Relationship\b[^>]*>/g)) {
+    const id = /\bId="([^"]+)"/.exec(m[0])?.[1];
+    const target = /\bTarget="([^"]+)"/.exec(m[0])?.[1];
+    if (id && target) relTarget.set(id, target);
+  }
+  return [...wb.matchAll(/<sheet\b[^>]*>/g)].map((m) => {
+    const name = xmlDecode(/\bname="([^"]+)"/.exec(m[0])?.[1] ?? '');
+    const rid = /\br:id="([^"]+)"/.exec(m[0])?.[1];
+    const target = relTarget.get(rid) ?? '';
+    const path = target.startsWith('/') ? target.slice(1) : `xl/${target}`;
+    const state = /\bstate="([^"]+)"/.exec(m[0])?.[1] ?? 'visible';
+    return { name, path, state };
+  });
+}
+
+function text(v) {
+  return v == null ? '' : String(v).trim();
+}
+
+function dash(v) {
+  const t = text(v);
+  return t === '' || t === '-' ? null : t;
+}
+
+/** The Owner-confirmed engineering range of a catalogue tag, or null (every other range is UNCONFIGURED). */
+function defaultEngineering(tagName) {
+  const range = getTagDef(tagName)?.confirmedEngineeringRange;
+  return range ? { min: range.min, max: range.max, unit: range.unit } : null;
+}
+
+function parseIoType(ioType, channelType) {
+  const t = text(ioType);
+  if (/4\s*-\s*20/.test(t)) return { signal: SIGNAL.CURRENT_4_20_MA, channelType: CHANNEL_TYPE.ANALOG };
+  if (/0\s*-\s*20/.test(t)) return { signal: SIGNAL.CURRENT_0_20_MA, channelType: CHANNEL_TYPE.ANALOG };
+  if (/DI\s*\(24|DO\s*\(24/i.test(t)) return { signal: SIGNAL.DIGITAL_24_VDC, channelType: CHANNEL_TYPE.DIGITAL };
+  return { signal: null, channelType };
+}
+
+/**
+ * Imports the default configuration.
+ *   buf          workbook bytes
+ *   options.sheetName   required when the workbook has more than one visible sheet
+ *   options.bindingSeed optional authorised override: { runtimeTagName: { source: workbookTagId, engineering?, activePolarity?, declaredSourceIdentity? } }.
+ *                       It replaces the authoritative default for the same runtime tag. It is never required.
+ */
+export function importWorkbook(buf, options = {}) {
+  const issues = [];
+  const entries = readZipEntries(buf);
+  const sheets = workbookSheets(entries).filter((s) => s.state === 'visible');
+  if (sheets.length === 0) throw new Error('workbook has no visible sheet');
+  let sheet;
+  if (options.sheetName) {
+    sheet = sheets.find((s) => s.name === options.sheetName);
+    if (!sheet) throw new Error(`sheet '${options.sheetName}' not found`);
+  } else if (sheets.length === 1) {
+    [sheet] = sheets;
+  } else {
+    throw new Error('workbook has several visible sheets; sheetName is required');
+  }
+
+  const shared = entries.has('xl/sharedStrings.xml')
+    ? parseSharedStrings(entries.get('xl/sharedStrings.xml').toString('utf8'))
+    : [];
+  const sheetXml = entries.get(sheet.path)?.toString('utf8');
+  if (sheetXml === undefined) throw new Error(`sheet part ${sheet.path} missing`);
+  const { rows, formulaCount } = parseSheet(sheetXml, shared);
+  const dimension = /<dimension ref="([^"]+)"/.exec(sheetXml)?.[1] ?? null;
+  const mergeCount = (sheetXml.match(/<mergeCell\b/g) ?? []).length;
+  const hiddenRows = rows.filter((r) => r.hidden).length;
+  const hiddenCols = (sheetXml.match(/<col\b[^>]*hidden="1"/g) ?? []).length;
+
+  const header = rows[0];
+  const headerMismatch = [];
+  const cols = {};
+  EXPECTED_COLUMNS.forEach((c, i) => {
+    const letter = String.fromCharCode(65 + i);
+    const observed = text(header?.cells[letter]);
+    cols[c.key] = letter;
+    if (!c.pattern.test(observed)) headerMismatch.push({ column: letter, expected: c.label, observed });
+  });
+  if (headerMismatch.length > 0) {
+    throw new Error(`header mismatch: ${JSON.stringify(headerMismatch)}`);
+  }
+
+  const dataRows = rows.slice(1).filter((r) => EXPECTED_COLUMNS.some((c) => text(r.cells[cols[c.key]]) !== ''));
+  const records = [];
+  const seenRowKeys = new Map();
+  for (const r of dataRows) {
+    const get = (key) => r.cells[cols[key]] ?? null;
+    const rec = {
+      rowNumber: r.rowNumber,
+      slot: text(get('slot')),
+      modelNumber: text(get('module')),
+      channel: dash(get('channel')),
+      tag: dash(get('tag')),
+      signal: text(get('signal')),
+      ioType: text(get('ioType')),
+      ref: dash(get('ref')),
+      location: dash(get('location')),
+      note: dash(get('note')),
+      status: text(get('status')),
+    };
+    const rowKey = JSON.stringify([rec.slot, rec.modelNumber, rec.channel, rec.tag, rec.signal, rec.ioType, rec.ref, rec.location, rec.note, rec.status]);
+    if (seenRowKeys.has(rowKey)) {
+      issues.push({ code: 'DUPLICATE_COMPLETE_ROW', severity: SEVERITY.ERROR, row: rec.rowNumber, message: `row ${rec.rowNumber} duplicates row ${seenRowKeys.get(rowKey)}` });
+    } else {
+      seenRowKeys.set(rowKey, rec.rowNumber);
+    }
+    records.push(rec);
+  }
+
+  // ----- structural checks -----
+  for (const rec of records) {
+    if (!/^\d+$/.test(rec.slot)) {
+      issues.push({ code: 'MALFORMED_SLOT', severity: SEVERITY.ERROR, row: rec.rowNumber, message: `Slot '${rec.slot}' is not an integer` });
+    }
+    if (rec.modelNumber === '') {
+      issues.push({ code: 'BLANK_MODULE', severity: SEVERITY.ERROR, row: rec.rowNumber, message: 'Module is blank' });
+    } else if (!/^\d{3}-\d{3}$/.test(rec.modelNumber)) {
+      issues.push({ code: 'MALFORMED_MODULE', severity: SEVERITY.ERROR, row: rec.rowNumber, message: `Module '${rec.modelNumber}' is not a model number` });
+    } else if (!getProfile(rec.modelNumber)) {
+      issues.push({ code: 'UNKNOWN_MODEL_PROFILE', severity: SEVERITY.ERROR, row: rec.rowNumber, message: `Module '${rec.modelNumber}' has no Module Profile` });
+    }
+    if (rec.channel !== null && !/^\d+$/.test(rec.channel)) {
+      issues.push({ code: 'MALFORMED_CHANNEL', severity: SEVERITY.ERROR, row: rec.rowNumber, message: `Channel '${rec.channel}' is not an integer` });
+    }
+    if (!['USED', 'SPARE'].includes(rec.status)) {
+      issues.push({ code: 'STATUS_UNRECOGNISED', severity: SEVERITY.ERROR, row: rec.rowNumber, message: `Status '${rec.status}' is not USED or SPARE` });
+    }
+    if (rec.status === 'USED' && rec.channel === null) {
+      const p = getProfile(rec.modelNumber);
+      if (p && p.channelCount > 0) {
+        issues.push({ code: 'BLANK_CHANNEL', severity: SEVERITY.ERROR, row: rec.rowNumber, message: 'Channel is blank on a channel module' });
+      }
+    }
+    if (rec.status === 'USED' && rec.channel !== null && rec.tag === null) {
+      issues.push({ code: 'BLANK_IO_TAG', severity: SEVERITY.ERROR, row: rec.rowNumber, message: 'USED channel has no I/O Tag' });
+    }
+    if (rec.signal === '' ) {
+      issues.push({ code: 'BLANK_SIGNAL', severity: SEVERITY.WARNING, row: rec.rowNumber, message: 'Signal / Description is blank' });
+    }
+    if (/XXX/.test(rec.signal)) {
+      // Placeholder row: kept as USED, never bound, never renamed or reordered.
+      issues.push({ code: 'SIGNAL_IDENTITY_UNRESOLVED', severity: SEVERITY.WARNING, row: rec.rowNumber, message: 'placeholder signal identity; kept USED, no Tag binding' });
+      issues.push({ code: 'OWNER_INPUT_PENDING', severity: SEVERITY.WARNING, row: rec.rowNumber, message: 'Owner must supply the signal identity for this row' });
+    }
+  }
+
+  const tagRows = new Map();
+  for (const rec of records) {
+    if (rec.tag === null) continue;
+    if (!tagRows.has(rec.tag)) tagRows.set(rec.tag, []);
+    tagRows.get(rec.tag).push(rec.rowNumber);
+  }
+  for (const [tag, list] of tagRows) {
+    if (list.length > 1) issues.push({ code: 'DUPLICATE_IO_TAG', severity: SEVERITY.ERROR, tag, rows: list, message: `I/O Tag ${tag} appears more than once` });
+  }
+
+  const bySlot = new Map();
+  for (const rec of records) {
+    if (!/^\d+$/.test(rec.slot)) continue;
+    const s = Number(rec.slot);
+    if (!bySlot.has(s)) bySlot.set(s, { models: new Set(), channels: new Map(), rows: [] });
+    const entry = bySlot.get(s);
+    entry.models.add(rec.modelNumber);
+    entry.rows.push(rec);
+    if (rec.channel !== null && /^\d+$/.test(rec.channel)) {
+      const c = Number(rec.channel);
+      if (entry.channels.has(c)) {
+        issues.push({ code: 'DUPLICATE_SLOT_CHANNEL', severity: SEVERITY.ERROR, slot: s, channel: c, message: `Slot ${s} Channel ${c} assigned twice` });
+      }
+      entry.channels.set(c, rec);
+    }
+  }
+  const slotNumbers = [...bySlot.keys()].sort((a, b) => a - b);
+  slotNumbers.forEach((s, i) => {
+    if (s !== i + 1) issues.push({ code: 'RACK_SLOT_GAP', severity: SEVERITY.ERROR, slot: s, message: `expected slot ${i + 1}, found ${s}` });
+  });
+  for (const s of slotNumbers) {
+    const e = bySlot.get(s);
+    if (e.models.size !== 1) {
+      issues.push({ code: 'SLOT_MODEL_CONFLICT', severity: SEVERITY.ERROR, slot: s, message: `slot ${s} lists ${e.models.size} models` });
+      continue;
+    }
+    const modelNumber = [...e.models][0];
+    const profile = getProfile(modelNumber);
+    if (!profile) continue;
+    const declared = e.channels.size;
+    if (profile.channelCount > 0) {
+      if (declared !== profile.channelCount) {
+        issues.push({ code: 'CHANNEL_COUNT_MISMATCH', severity: SEVERITY.ERROR, slot: s, message: `slot ${s} lists ${declared} channels; profile has ${profile.channelCount}` });
+      }
+      for (let c = 1; c <= profile.channelCount; c += 1) {
+        if (!e.channels.has(c)) {
+          issues.push({ code: 'CHANNEL_MISSING', severity: SEVERITY.ERROR, slot: s, channel: c, message: `slot ${s} channel ${c} is not listed` });
+        }
+      }
+    }
+  }
+
+  // ----- deterministic model -----
+  const knownSlots = slotNumbers.filter((s) => {
+    const e = bySlot.get(s);
+    return e.models.size === 1 && getProfile([...e.models][0]) !== null;
+  });
+  const modules = buildModuleInstances(knownSlots.map((s) => [...bySlot.get(s).models][0]));
+  const instanceBySlot = new Map(knownSlots.map((s, i) => [s, modules[i].moduleInstanceId]));
+  const declaredChannelCounts = {};
+  for (const s of slotNumbers) {
+    const id = instanceBySlot.get(s);
+    if (id) declaredChannelCounts[id] = bySlot.get(s).channels.size;
+  }
+
+  // Authoritative defaults (Owner ruling 2026-10-10). The 26 bindings come from explicit workbook identifiers and
+  // Owner ordinal rules, so the import loads without a seed. The optional bindingSeed replaces a default for the
+  // same runtime tag and goes through the same checks. Nothing is substituted or repaired.
+  const overrides = options.bindingSeed ?? {};
+  const seed = {};
+  const defaulted = new Set();
+  for (const tagName of OWNER_DEFAULT_TAG_NAMES) {
+    seed[tagName] = { source: ownerDefaultSourceFor(tagName), declaredSourceIdentity: getTagDef(tagName).sourceIdentity };
+    defaulted.add(tagName);
+  }
+  for (const [tagName, spec] of Object.entries(overrides)) {
+    seed[tagName] = spec;
+    defaulted.delete(tagName);
+  }
+  const bindings = [];
+  const seedIssues = [];
+  for (const [runtimeTag, spec] of Object.entries(seed).sort(([a], [b]) => a.localeCompare(b))) {
+    // A tag outside the Simulation/Runtime catalogue (for example MAIN_VALVE_OUTLET_PRESSURE, which does not exist) is
+    // refused before any binding is built. It is never created and then flagged.
+    if (getTagDef(runtimeTag) === null) {
+      seedIssues.push({ code: 'UNKNOWN_TAG', severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `${runtimeTag} is not in the Simulation/Runtime catalogue; the seed entry is refused and no binding is created` });
+      continue;
+    }
+    const isPump = Object.prototype.hasOwnProperty.call(OWNER_PUMP_SOURCE_TAGS, runtimeTag);
+    if (isPump && spec.source !== OWNER_PUMP_SOURCE_TAGS[runtimeTag]) {
+      seedIssues.push({ code: 'PUMP_SOURCE_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `${runtimeTag} is bound only to ${OWNER_PUMP_SOURCE_TAGS[runtimeTag]} by the Owner ruling; source ${spec.source} is refused` });
+      continue;
+    }
+    const row = records.find((r) => r.tag === spec.source);
+    if (!row || row.channel === null) {
+      const code = isPump ? 'PUMP_SOURCE_NOT_FOUND' : defaulted.has(runtimeTag) ? 'DEFAULT_SOURCE_NOT_FOUND' : 'SEED_TAG_NOT_FOUND';
+      seedIssues.push({ code, severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `source ${spec.source} for ${runtimeTag} is not a channel row in the workbook` });
+      continue;
+    }
+    // A reserved placeholder row (its signal carries XXX) is never a binding source, whether it comes from a
+    // default or an override. Placeholders stay USED / RESERVED, UNBOUND and OWNER_INPUT_PENDING.
+    if (/XXX/.test(row.signal ?? '')) {
+      seedIssues.push({ code: 'PLACEHOLDER_ROW_REFUSED', severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `${spec.source} is a reserved placeholder row (OWNER_INPUT_PENDING, UNBOUND); it cannot be bound to ${runtimeTag}` });
+      continue;
+    }
+    // A pump measurement must be an analog pressure row with no IV '#n' ordinal, and its text must not name
+    // the other pump side. The workbook text is evidence, not identity: a description that differs from the Owner
+    // display name (for example "Pressure Transmitter" for AI-002) is accepted when the identifier matches the
+    // Owner table. Nothing is repaired or silently relabelled.
+    if (isPump) {
+      const text = row.signal ?? '';
+      const isInlet = runtimeTag === 'PUMP_INLET_PRESSURE';
+      const otherSide = isInlet ? /outlet|discharge/i : /inlet|suction/i;
+      const ok = /pressure/i.test(text) && /^AI\b/i.test(row.ioType ?? '') && !/#\s*\d/.test(text) && !otherSide.test(text);
+      if (!ok) {
+        seedIssues.push({ code: 'PUMP_PRESSURE_LABEL_CONFLICT', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: ${spec.source} is not a pump pressure row for this side (wrong text, an IV ordinal, or the other pump side)` });
+        continue;
+      }
+      // Both pump transmitters are 4-20 mA (Owner ruling 2026-10-10). Any other signal is refused, not repaired.
+      if (parseIoType(row.ioType, CHANNEL_TYPE.ANALOG).signal !== SIGNAL.CURRENT_4_20_MA) {
+        seedIssues.push({ code: 'PUMP_SIGNAL_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: ${spec.source} is not a 4-20 mA input` });
+        continue;
+      }
+    }
+    // An IVn limit may bind only to a workbook row that labels the same IV index and group
+    // ('#n' and 'Lower' or 'Upper' in the description). A mismatch is refused, not repaired.
+    const limitName = /^IV([1-8])_(LOWER|UPPER)_LIMIT$/.exec(runtimeTag);
+    if (limitName) {
+      // Exactly one '#n' and exactly one group word: a row with two labels or two groups is a conflict, not a choice.
+      const text = row.signal ?? '';
+      const hashCount = [...text.matchAll(/#/g)].length;
+      const label = /#\s*(\d+)(?!\d)/.exec(text);
+      const groups = [...text.matchAll(/\b(lower|upper)\b/gi)].map((m) => m[1].toUpperCase());
+      const labelled = hashCount === 1 && label !== null && Number(label[1]) === Number(limitName[1]);
+      const sameGroup = groups.length === 1 && groups[0] === limitName[2];
+      if (!labelled || !sameGroup) {
+        seedIssues.push({ code: 'LIMIT_IV_LABEL_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: its workbook row does not carry the same IV index and group` });
+        continue;
+      }
+    }
+    const slot = Number(row.slot);
+    // An IVn outlet pressure may bind only to a pressure-transmitter analog row whose explicit '#n'
+    // label is the same IV index. Missing, malformed, out-of-range or conflicting labels are refused.
+    // Location, wall, channel order and physical position are never used.
+    const pressureName = /^IV([1-8])_OUTLET_PRESSURE$/.exec(runtimeTag);
+    if (pressureName) {
+      const text = row.signal ?? '';
+      const hashCount = [...text.matchAll(/#/g)].length;
+      const ordinal = /#\s*(\d+)(?!\d)/.exec(text);
+      const n = ordinal ? Number(ordinal[1]) : NaN;
+      const pressureTransmitter = /pressure\s+transmitter/i.test(text);
+      const analogInput = /^AI\b/i.test(row.ioType ?? '');
+      const ok = hashCount === 1 && ordinal !== null && n >= 1 && n <= 8
+        && n === Number(pressureName[1]) && pressureTransmitter && analogInput;
+      if (!ok) {
+        seedIssues.push({ code: 'PRESSURE_IV_LABEL_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: its workbook row does not carry the same IV ordinal in the pressure-transmitter group` });
+        continue;
+      }
+    }
+    // A limit with no polarity in the seed takes the Owner rule, recorded explicitly with its basis.
+    // Pressures never take a polarity. An explicit seed value is kept as written.
+    const isLimit = /^IV[1-8]_(LOWER|UPPER)_LIMIT$/.test(runtimeTag);
+    let activePolarity = spec.activePolarity ?? null;
+    let polarityBasis = null;
+    if (isLimit && activePolarity === null) {
+      activePolarity = options.limitContactPolarity ?? OWNER_LIMIT_CONTACT_POLARITY;
+      polarityBasis = POLARITY_BASIS.OWNER_RULE;
+    } else if (isLimit) {
+      polarityBasis = POLARITY_BASIS.EXPLICIT_SEED;
+    }
+    bindings.push({
+      tagName: runtimeTag,
+      moduleInstanceId: instanceBySlot.get(slot),
+      channel: Number(row.channel),
+      enabled: spec.enabled !== false,
+      engineering: spec.engineering ?? defaultEngineering(runtimeTag),
+      activePolarity,
+      polarityBasis,
+      contactType: /\(NO\)/.test(row.signal) ? CONTACT.NO : null,
+      declaredSourceIdentity: spec.declaredSourceIdentity,
+      sourceWorkbookTag: spec.source,
+      // Pump bindings keep the exact workbook description as source evidence. It is not used as identity.
+      ...(isPump ? { sourceDescription: row.signal } : {}),
+    });
+  }
+
+  // Read-only additional input tags: only unambiguous input rows. They are
+  // listed but disabled until an authorised mapping update enables them.
+  const additionalTags = {};
+  const boundSources = new Set(bindings.map((b) => b.sourceWorkbookTag));
+  const classifications = { inputUnambiguous: 0, inputAmbiguous: 0, outputNotAuthorised: 0, reservedUnresolved: 0, nonChannel: 0, spare: 0, boundByMappingRule: 0 };
+  const placeholderRecs = [];
+  for (const rec of records) {
+    if (rec.status === 'SPARE') { classifications.spare += 1; continue; }
+    if (rec.tag !== null && boundSources.has(rec.tag)) { classifications.boundByMappingRule += 1; continue; }
+    if (rec.channel === null) { classifications.nonChannel += 1; continue; }
+    // Exclusive accounting: a reserved placeholder is counted once, here, before the output test. DO-031 is an
+    // OUTPUT; its output fact is carried as an overlay in reservedInventory.summary, not as a second count.
+    if (isPlaceholderRecord(rec)) { classifications.reservedUnresolved += 1; placeholderRecs.push(rec); continue; }
+    const profile = getProfile(rec.modelNumber);
+    if (!profile) continue;
+    if (profile.direction === DIRECTION.OUTPUT) { classifications.outputNotAuthorised += 1; continue; }
+    const io = parseIoType(rec.ioType, profile.channelType);
+    const ambiguous = rec.tag === null || rec.signal === '' || io.signal === null || io.channelType !== profile.channelType
+      || !profile.supportedSignals.includes(io.signal) || /^(DI|AI)$/i.test(rec.ioType);
+    if (ambiguous) {
+      classifications.inputAmbiguous += 1;
+      seedIssues.push({ code: 'AMBIGUOUS_INPUT_DESCRIPTION', severity: SEVERITY.WARNING, row: rec.rowNumber, message: 'input row is not unambiguous; not offered as a read-only tag' });
+      continue;
+    }
+    classifications.inputUnambiguous += 1;
+    additionalTags[rec.tag] = Object.freeze({
+      tagName: rec.tag,
+      role: 'READ_ONLY_WORKBOOK_INPUT',
+      direction: DIRECTION.INPUT,
+      channelType: profile.channelType,
+      signal: io.signal,
+      sourceIdentity: rec.tag,
+      pairIndex: null,
+      readOnlyStage: true,
+      confirmedEngineeringRange: null,
+    });
+    const slot = Number(rec.slot);
+    bindings.push({
+      tagName: rec.tag,
+      moduleInstanceId: instanceBySlot.get(slot),
+      channel: Number(rec.channel),
+      enabled: false,
+      engineering: null,
+      activePolarity: null,
+      contactType: /\(NO\)/.test(rec.signal) ? CONTACT.NO : null,
+      sourceWorkbookTag: rec.tag,
+    });
+  }
+  // Output and reserved rows are never bound (see classifications).
+
+  bindings.sort((a, b) => a.tagName.localeCompare(b.tagName));
+  const mappingIssues = validateMapping(modules, bindings, additionalTags);
+  const rackIssues = validateRack(modules, declaredChannelCounts);
+  const allIssues = [...issues, ...seedIssues, ...rackIssues, ...mappingIssues];
+
+  const sha256 = createHash('sha256').update(buf).digest('hex');
+  const reservedInventory = buildReservedInventory(placeholderRecs, instanceBySlot);
+
+  return Object.freeze({
+    reservedInventory,
+    source: Object.freeze({ sha256, sizeBytes: buf.length, sheetName: sheet.name, dimension, dataRowCount: records.length,
+      headerRowCount: 1, formulaCount, mergedCellCount: mergeCount, hiddenRowCount: hiddenRows, hiddenColumnCount: hiddenCols }),
+    label: 'DEFAULT FROM EXCEL',
+    modules,
+    bindings,
+    declaredChannelCounts,
+    additionalTags,
+    classifications,
+    issues: allIssues.slice().sort((a, b) => a.code.localeCompare(b.code) || String(a.row ?? a.slot ?? '').localeCompare(String(b.row ?? b.slot ?? ''))),
+    records,
+    seedIssueCount: seedIssues.filter((i) => i.severity === SEVERITY.ERROR).length,
+    counts: countStatus(records),
+  });
+}
+
+function isPlaceholderRecord(rec) {
+  return rec.tag !== null && /XXX/.test(rec.signal ?? '');
+}
+
+/**
+ * The 18 reserved placeholder rows, for the read-only inventory. Identifiers and fixed Owner states only; no raw
+ * workbook text, no row numbers and no numeric address. A placeholder is never a binding and never a spare.
+ * Output placeholders (DO-031) keep their OUTPUT direction and NOT_AUTHORIZED_IN_READ_ONLY_STAGE state.
+ */
+function buildReservedInventory(recs, instanceBySlot) {
+  const rows = recs.map((rec) => {
+    const profile = getProfile(rec.modelNumber);
+    const isOutput = profile !== null && profile.direction === DIRECTION.OUTPUT;
+    return Object.freeze({
+      workbookTag: rec.tag,
+      moduleInstanceId: instanceBySlot.get(Number(rec.slot)) ?? null,
+      rackSlot: Number(rec.slot),
+      channel: Number(rec.channel),
+      direction: isOutput ? DIRECTION.OUTPUT : DIRECTION.INPUT,
+      physicalStatus: 'USED / RESERVED',
+      signalIdentity: 'UNRESOLVED',
+      bindingStatus: 'UNBOUND',
+      ownerInputStatus: 'OWNER_INPUT_PENDING',
+      autoBindingEligibility: 'PROHIBITED',
+      availableAsSpare: false,
+      addressStatus: 'ADDRESS_UNRESOLVED',
+      mappingAuthorization: isOutput ? 'NOT_AUTHORIZED_IN_READ_ONLY_STAGE' : 'NOT_AUTHORIZED_UNTIL_OWNER_IDENTITY',
+    });
+  }).sort((a, b) => a.rackSlot - b.rackSlot || a.channel - b.channel || a.workbookTag.localeCompare(b.workbookTag));
+  const byDirection = { INPUT: 0, OUTPUT: 0 };
+  for (const r of rows) byDirection[r.direction] += 1;
+  return Object.freeze({
+    summary: Object.freeze({
+      total: rows.length,
+      byDirection: Object.freeze(byDirection),
+      overlays: Object.freeze({ outputNotAuthorised: byDirection.OUTPUT }),
+    }),
+    rows: Object.freeze(rows),
+  });
+}
+
+function countStatus(records) {
+  const out = { USED: 0, SPARE: 0, total: records.length };
+  for (const r of records) {
+    if (r.status === 'USED') out.USED += 1;
+    else if (r.status === 'SPARE') out.SPARE += 1;
+  }
+  return out;
+}
