@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { register } from 'node:module';
-import { createUiServer } from '../server.mjs';
+import { createUiServer, loadConfiguration } from '../server.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(HERE, '..', 'public', 'index.html'), 'utf8');
@@ -47,7 +47,8 @@ before(async () => {
     querySelector: () => null,
     activeElement: null,
   };
-  server = createUiServer();
+  // Synthetic default by an explicit empty environment, independent of any Owner-local MAPPING_* variables.
+  server = createUiServer({ loader: () => loadConfiguration({}) });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = new URL('http://127.0.0.1');
   origin.port = String(server.address().port);

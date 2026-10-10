@@ -4,7 +4,7 @@
 // tests. It is NOT the Excel default, NOT plant data and NOT a production
 // configuration. Its arrangement is invented for demonstration and is not
 // derived from any workbook. Engineering ranges are UNCONFIGURED except the
-// pump range, which is the Owner-confirmed domain value.
+// two pump pressure ranges (0–40 bar), which are the Owner-confirmed domain values.
 
 import { createConfiguration } from './draftSession.mjs';
 import { buildModuleInstances } from './rack.mjs';

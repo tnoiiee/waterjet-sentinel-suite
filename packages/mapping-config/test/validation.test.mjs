@@ -37,11 +37,13 @@ test('the required Runtime tag set is exactly the pump pressures, the IVn pressu
   assert.equal(getTagDef('MAIN_VALVE_OUTLET_PRESSURE'), null, 'no Main Valve catalogue entry');
 });
 
-test('the pump range is the only confirmed engineering range; every other range is unconfigured', () => {
-  const pump = getTagDef('PUMP_OUTLET_PRESSURE');
-  assert.deepEqual([pump.confirmedEngineeringRange.min, pump.confirmedEngineeringRange.max, pump.confirmedEngineeringRange.unit], [0, 40, 'bar']);
+test('the two pump transmitters are the only confirmed engineering ranges (0–40 bar); every other range is unconfigured', () => {
+  for (const name of ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE']) {
+    const pump = getTagDef(name);
+    assert.deepEqual([pump.confirmedEngineeringRange.min, pump.confirmedEngineeringRange.max, pump.confirmedEngineeringRange.unit], [0, 40, 'bar'], name);
+  }
   for (const t of listSimulationTags()) {
-    if (t.tagName === 'PUMP_OUTLET_PRESSURE') continue;
+    if (t.tagName === 'PUMP_INLET_PRESSURE' || t.tagName === 'PUMP_OUTLET_PRESSURE') continue;
     assert.equal(t.confirmedEngineeringRange, null, t.tagName);
   }
 });

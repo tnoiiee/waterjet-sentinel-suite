@@ -140,3 +140,52 @@ export function exampleSeed({ polarity = null } = {}) {
   }
   return seed;
 }
+
+/**
+ * A synthetic workbook shaped like the authoritative workbook: it uses the Owner's explicit identifiers, so the
+ * 26 authoritative defaults bind with NO seed. It is not the plant workbook and carries no plant data.
+ *   AI-002 / AI-003        pump inlet / pump outlet, 4-20 mA
+ *   AI-004..AI-011         IV1..IV8 outlet pressure, '#n' = IVn
+ *   DI-021..DI-028         IV1..IV8 Lower limit, '#n' = IVn, NO
+ *   DI-029..DI-036         IV1..IV8 Upper limit, '#n' = IVn, NO
+ *   DI-037, DO-031, AI-020..AI-035   the 18 placeholder rows, all 'XXX' (USED / RESERVED, unbound)
+ * With { omit: [...] } the named identifiers are left out, for the missing-source proofs.
+ */
+export function authoritativeShapedRows({ omit = [] } = {}) {
+  const rows = [HEADER];
+  const keep = (row) => (omit.includes(row[3]) ? null : row);
+  const push = (...args) => { const row = keep(r(...args)); if (row) rows.push(row); };
+  push(1, '750-362', '-', '-', 'Example coupler', 'Coupler', 'USED');
+  push(2, '750-601', '-', '-', 'Example supply', 'Supply', 'USED');
+  const analog = (tag, signal) => ['AI (4-20 mA. HART5)', signal, tag];
+  const pressure = (n) => `Example pressure transmitter #${n}`;
+  const aiRows = [
+    ['AI-002', 'Example pressure transmitter - pump inlet'],
+    ['AI-003', 'Example pressure transmitter - pump outlet'],
+    ...Array.from({ length: 8 }, (_, i) => [`AI-${String(i + 4).padStart(3, '0')}`, pressure(i + 1)]),
+  ];
+  aiRows.forEach(([tag, signal], i) => {
+    const [ioType, sig] = analog(tag, signal);
+    push(3 + Math.floor(i / 4), '750-471', (i % 4) + 1, tag, sig, ioType, 'USED');
+  });
+  // Placeholder analogue rows AI-020..AI-035 occupy the remaining analogue channels.
+  for (let i = 0; i < 16; i += 1) {
+    const slot = 5 + Math.floor((i + 2) / 4);
+    const channel = ((i + 2) % 4) + 1;
+    push(slot, '750-471', channel, `AI-${String(20 + i).padStart(3, '0')}`, 'XXX awaiting Owner identity', 'AI (4-20 mA.)', 'USED');
+  }
+  push(9, '750-471', 3, null, 'SPARE CHANNEL', 'AI', 'SPARE');
+  push(9, '750-471', 4, null, 'SPARE CHANNEL', 'AI', 'SPARE');
+  for (let n = 1; n <= 8; n += 1) {
+    push(10, '750-430', n, `DI-${String(20 + n).padStart(3, '0')}`, `Example lower limit #${n} (NO)`, 'DI (24 VDC.)', 'USED');
+  }
+  for (let n = 1; n <= 8; n += 1) {
+    push(11, '750-430', n, `DI-${String(28 + n).padStart(3, '0')}`, `Example upper limit #${n} (NO)`, 'DI (24 VDC.)', 'USED');
+  }
+  push(12, '750-430', 1, 'DI-037', 'XXX awaiting Owner identity', 'DI (24 VDC.)', 'USED');
+  for (let c = 2; c <= 8; c += 1) push(12, '750-430', c, null, 'SPARE CHANNEL', 'DI', 'SPARE');
+  push(13, '750-530', 1, 'DO-031', 'XXX awaiting Owner identity', 'DO (24 VDC.)', 'USED');
+  for (let c = 2; c <= 8; c += 1) push(13, '750-530', c, null, 'SPARE CHANNEL', 'DO', 'SPARE');
+  push(14, '750-600', '-', '-', 'Example end module', 'End', 'USED');
+  return rows;
+}

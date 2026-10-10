@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createUiServer, loadConfiguration } from '../server.mjs';
-import { buildWorkbook, exampleRows, exampleSeed } from '../../../packages/mapping-config/test/helpers/syntheticWorkbook.mjs';
+import { buildWorkbook, exampleRows, exampleSeed, authoritativeShapedRows } from '../../../packages/mapping-config/test/helpers/syntheticWorkbook.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, '..', 'public');
@@ -20,7 +20,9 @@ let tmp;
 
 before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'wjss-mapping-ui-'));
-  server = createUiServer();
+  // The shell tests check the synthetic default. An empty environment keeps them independent of any Owner-local
+  // MAPPING_* variables; the Excel path is tested directly through loadConfiguration below.
+  server = createUiServer({ loader: () => loadConfiguration({}) });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = new URL('http://127.0.0.1');
   origin.port = String(server.address().port);
@@ -76,26 +78,42 @@ test('the configuration endpoint returns the SYNTHETIC EXAMPLE by default, witho
   assert.doesNotMatch(JSON.stringify(body), /"records"|"rowNumber"/);
 });
 
-test('the Excel path is refused unless both local inputs are set, and refused inside the repository', async () => {
+test('the seed is an optional override: it is refused without the workbook, and both local inputs are refused inside the repository', async () => {
   const seedPath = join(tmp, 'seed.json');
   writeFileSync(seedPath, JSON.stringify(exampleSeed()));
-  await assert.rejects(loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: join(tmp, 'x.xlsx') }), /must be set together/);
-  await assert.rejects(loadConfiguration({ MAPPING_BINDING_SEED_PATH: seedPath }), /must be set together/);
+  await assert.rejects(loadConfiguration({ MAPPING_BINDING_SEED_PATH: seedPath }), /requires MAPPING_EXCEL_DEFAULT_PATH/);
   const inRepo = join(HERE, '..', '..', '..', 'no-such-local-input.xlsx');
-  await assert.rejects(loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: inRepo, MAPPING_BINDING_SEED_PATH: seedPath }), /outside the repository/);
+  await assert.rejects(loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: inRepo }), /outside the repository/);
+  await assert.rejects(loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: join(tmp, 'x.xlsx'), MAPPING_BINDING_SEED_PATH: inRepo }), /outside the repository/);
 });
 
-test('a local workbook outside the repository loads as DEFAULT FROM EXCEL with a count-only report', async () => {
+test('a local authoritative-shaped workbook loads its 26 defaults with NO seed, as DEFAULT FROM EXCEL, with a count-only report', async () => {
   const xlsxPath = join(tmp, 'local.xlsx');
-  const seedPath = join(tmp, 'seed-local.json');
-  writeFileSync(xlsxPath, buildWorkbook({ rows: exampleRows({ placeholder: true }) }));
-  writeFileSync(seedPath, JSON.stringify(exampleSeed()));
-  const loaded = await loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: xlsxPath, MAPPING_BINDING_SEED_PATH: seedPath });
+  const rows = authoritativeShapedRows();
+  writeFileSync(xlsxPath, buildWorkbook({ rows }));
+  const loaded = await loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: xlsxPath });
   assert.equal(loaded.mode, 'DEFAULT FROM EXCEL');
-  assert.equal(loaded.importReport.counts.USED, 40);
-  assert.equal(loaded.importReport.counts.SPARE, 1);
+  assert.equal(loaded.importReport.seedOverride, false, 'no seed was used');
   assert.equal(loaded.configuration.label, 'DEFAULT FROM EXCEL');
-  assert.equal(loaded.importReport.issueSummary.SIGNAL_IDENTITY_UNRESOLVED, 1);
+  assert.equal(loaded.configuration.bindings.length, 26);
+  assert.equal(loaded.importReport.counts.USED, rows.filter((row) => row[9] === 'USED').length);
+  assert.equal(loaded.importReport.counts.SPARE, rows.filter((row) => row[9] === 'SPARE').length);
+  assert.equal(loaded.importReport.issueSummary.SIGNAL_IDENTITY_UNRESOLVED, 18, 'the 18 placeholders stay unresolved');
+  assert.equal(loaded.importReport.issueSummary.REQUIRED_TAG_MISSING, undefined, 'no required tag is missing');
+  assert.doesNotMatch(JSON.stringify(loaded.importReport), /"records"|"rowNumber"/);
+});
+
+test('a seed override is applied only with the workbook, and a refused override leaves the default out', async () => {
+  const xlsxPath = join(tmp, 'local-override.xlsx');
+  const seedPath = join(tmp, 'seed-override.json');
+  writeFileSync(xlsxPath, buildWorkbook({ rows: authoritativeShapedRows() }));
+  // IV1 outlet pressure pointed at AI-005 (labelled #2): refused with PRESSURE_IV_LABEL_MISMATCH, no alias.
+  writeFileSync(seedPath, JSON.stringify({ IV1_OUTLET_PRESSURE: { source: 'AI-005', declaredSourceIdentity: 'IV1_OUTLET' } }));
+  const loaded = await loadConfiguration({ MAPPING_EXCEL_DEFAULT_PATH: xlsxPath, MAPPING_BINDING_SEED_PATH: seedPath });
+  assert.equal(loaded.importReport.seedOverride, true);
+  assert.equal(loaded.importReport.issueSummary.PRESSURE_IV_LABEL_MISMATCH, 1);
+  assert.equal(loaded.configuration.bindings.filter((b) => b.enabled).length, 25, 'the refused override creates no enabled binding');
+  assert.equal(loaded.configuration.bindings.some((b) => b.tagName === 'IV1_OUTLET_PRESSURE'), false);
   assert.doesNotMatch(JSON.stringify(loaded.importReport), /"records"|"rowNumber"/);
 });
 

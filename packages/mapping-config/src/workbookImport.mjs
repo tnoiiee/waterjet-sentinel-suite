@@ -3,9 +3,10 @@
 // Reads an .xlsx workbook with Node built-ins only (zlib, crypto). It parses the
 // complete sheet, preserves cell values as stored, and reports every issue
 // instead of repairing it. Nothing in this module carries plant data: the
-// workbook is supplied by path at run time, and the runtime-tag bindings are
-// supplied by a separate local seed. Both files must live outside the Git
-// working tree.
+// workbook is supplied by path at run time. The 26 authoritative default
+// bindings are derived from explicit workbook identifiers and Owner ordinal
+// rules, so no seed is needed. An optional local seed may override a default
+// through the same checks. Both files must live outside the Git working tree.
 
 import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
@@ -13,7 +14,7 @@ import { CHANNEL_TYPE, DIRECTION, CONTACT, SIGNAL, SEVERITY, OWNER_LIMIT_CONTACT
 import { getProfile } from './moduleProfiles.mjs';
 import { buildModuleInstances, validateRack } from './rack.mjs';
 import { validateMapping } from './mappingValidation.mjs';
-import { getTagDef, OWNER_PUMP_SOURCE_TAGS } from './tagCatalogue.mjs';
+import { getTagDef, OWNER_PUMP_SOURCE_TAGS, OWNER_DEFAULT_TAG_NAMES, ownerDefaultSourceFor } from './tagCatalogue.mjs';
 
 const MAX_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
 const EXPECTED_COLUMNS = Object.freeze([
@@ -157,6 +158,12 @@ function dash(v) {
   return t === '' || t === '-' ? null : t;
 }
 
+/** The Owner-confirmed engineering range of a catalogue tag, or null (every other range is UNCONFIGURED). */
+function defaultEngineering(tagName) {
+  const range = getTagDef(tagName)?.confirmedEngineeringRange;
+  return range ? { min: range.min, max: range.max, unit: range.unit } : null;
+}
+
 function parseIoType(ioType, channelType) {
   const t = text(ioType);
   if (/4\s*-\s*20/.test(t)) return { signal: SIGNAL.CURRENT_4_20_MA, channelType: CHANNEL_TYPE.ANALOG };
@@ -169,7 +176,8 @@ function parseIoType(ioType, channelType) {
  * Imports the default configuration.
  *   buf          workbook bytes
  *   options.sheetName   required when the workbook has more than one visible sheet
- *   options.bindingSeed local seed: { runtimeTagName: { source: workbookTagId, engineering?, activePolarity?, declaredSourceIdentity? } }
+ *   options.bindingSeed optional authorised override: { runtimeTagName: { source: workbookTagId, engineering?, activePolarity?, declaredSourceIdentity? } }.
+ *                       It replaces the authoritative default for the same runtime tag. It is never required.
  */
 export function importWorkbook(buf, options = {}) {
   const issues = [];
@@ -339,20 +347,19 @@ export function importWorkbook(buf, options = {}) {
     if (id) declaredChannelCounts[id] = bySlot.get(s).channels.size;
   }
 
-  // Pump measurements are fixed by the Owner clarification: AI-002 is the Pump Inlet, AI-003 the Pump Outlet.
-  // When the seed omits them, they are bound from the Owner table. When the seed carries a different source,
-  // the entry is refused (no substitution) and no binding is created for it.
-  const seed = { ...(options.bindingSeed ?? {}) };
-  for (const pumpTag of Object.keys(OWNER_PUMP_SOURCE_TAGS)) {
-    if (seed[pumpTag] !== undefined) continue;
-    const def = getTagDef(pumpTag);
-    seed[pumpTag] = {
-      source: OWNER_PUMP_SOURCE_TAGS[pumpTag],
-      declaredSourceIdentity: def.sourceIdentity,
-      engineering: def.confirmedEngineeringRange
-        ? { min: def.confirmedEngineeringRange.min, max: def.confirmedEngineeringRange.max, unit: def.confirmedEngineeringRange.unit }
-        : null,
-    };
+  // Authoritative defaults (Owner ruling 2026-10-10). The 26 bindings come from explicit workbook identifiers and
+  // Owner ordinal rules, so the import loads without a seed. The optional bindingSeed replaces a default for the
+  // same runtime tag and goes through the same checks. Nothing is substituted or repaired.
+  const overrides = options.bindingSeed ?? {};
+  const seed = {};
+  const defaulted = new Set();
+  for (const tagName of OWNER_DEFAULT_TAG_NAMES) {
+    seed[tagName] = { source: ownerDefaultSourceFor(tagName), declaredSourceIdentity: getTagDef(tagName).sourceIdentity };
+    defaulted.add(tagName);
+  }
+  for (const [tagName, spec] of Object.entries(overrides)) {
+    seed[tagName] = spec;
+    defaulted.delete(tagName);
   }
   const bindings = [];
   const seedIssues = [];
@@ -360,13 +367,21 @@ export function importWorkbook(buf, options = {}) {
     const isPump = Object.prototype.hasOwnProperty.call(OWNER_PUMP_SOURCE_TAGS, runtimeTag);
     if (isPump && spec.source !== OWNER_PUMP_SOURCE_TAGS[runtimeTag]) {
       seedIssues.push({ code: 'PUMP_SOURCE_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
-        message: `${runtimeTag} is bound only to ${OWNER_PUMP_SOURCE_TAGS[runtimeTag]} by the Owner clarification; seed source ${spec.source} is refused` });
+        message: `${runtimeTag} is bound only to ${OWNER_PUMP_SOURCE_TAGS[runtimeTag]} by the Owner ruling; source ${spec.source} is refused` });
       continue;
     }
     const row = records.find((r) => r.tag === spec.source);
     if (!row || row.channel === null) {
-      seedIssues.push({ code: isPump ? 'PUMP_SOURCE_NOT_FOUND' : 'SEED_TAG_NOT_FOUND', severity: SEVERITY.ERROR, tagName: runtimeTag,
-        message: `seed source for ${runtimeTag} is not a channel row in the workbook` });
+      const code = isPump ? 'PUMP_SOURCE_NOT_FOUND' : defaulted.has(runtimeTag) ? 'DEFAULT_SOURCE_NOT_FOUND' : 'SEED_TAG_NOT_FOUND';
+      seedIssues.push({ code, severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `source ${spec.source} for ${runtimeTag} is not a channel row in the workbook` });
+      continue;
+    }
+    // A reserved placeholder row (its signal carries XXX) is never a binding source, whether it comes from a
+    // default or an override. Placeholders stay USED / RESERVED, UNBOUND and OWNER_INPUT_PENDING.
+    if (/XXX/.test(row.signal ?? '')) {
+      seedIssues.push({ code: 'PLACEHOLDER_ROW_REFUSED', severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `${spec.source} is a reserved placeholder row (OWNER_INPUT_PENDING, UNBOUND); it cannot be bound to ${runtimeTag}` });
       continue;
     }
     // A pump measurement must be an analog pressure row with no IV '#n' ordinal, and its text must not name
@@ -381,6 +396,12 @@ export function importWorkbook(buf, options = {}) {
       if (!ok) {
         seedIssues.push({ code: 'PUMP_PRESSURE_LABEL_CONFLICT', severity: SEVERITY.ERROR, tagName: runtimeTag,
           message: `${runtimeTag} is not bound: ${spec.source} is not a pump pressure row for this side (wrong text, an IV ordinal, or the other pump side)` });
+        continue;
+      }
+      // Both pump transmitters are 4-20 mA (Owner ruling 2026-10-10). Any other signal is refused, not repaired.
+      if (parseIoType(row.ioType, CHANNEL_TYPE.ANALOG).signal !== SIGNAL.CURRENT_4_20_MA) {
+        seedIssues.push({ code: 'PUMP_SIGNAL_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
+          message: `${runtimeTag} is not bound: ${spec.source} is not a 4-20 mA input` });
         continue;
       }
     }
@@ -434,7 +455,7 @@ export function importWorkbook(buf, options = {}) {
       moduleInstanceId: instanceBySlot.get(slot),
       channel: Number(row.channel),
       enabled: spec.enabled !== false,
-      engineering: spec.engineering ?? null,
+      engineering: spec.engineering ?? defaultEngineering(runtimeTag),
       activePolarity,
       polarityBasis,
       contactType: /\(NO\)/.test(row.signal) ? CONTACT.NO : null,
@@ -448,11 +469,11 @@ export function importWorkbook(buf, options = {}) {
   // Read-only additional input tags: only unambiguous input rows. They are
   // listed but disabled until an authorised mapping update enables them.
   const additionalTags = {};
-  const seedSources = new Set(bindings.map((b) => b.sourceWorkbookTag));
-  const classifications = { inputUnambiguous: 0, inputAmbiguous: 0, outputNotAuthorised: 0, reservedUnresolved: 0, nonChannel: 0, spare: 0, boundBySeed: 0 };
+  const boundSources = new Set(bindings.map((b) => b.sourceWorkbookTag));
+  const classifications = { inputUnambiguous: 0, inputAmbiguous: 0, outputNotAuthorised: 0, reservedUnresolved: 0, nonChannel: 0, spare: 0, boundByMappingRule: 0 };
   for (const rec of records) {
     if (rec.status === 'SPARE') { classifications.spare += 1; continue; }
-    if (rec.tag !== null && seedSources.has(rec.tag)) { classifications.boundBySeed += 1; continue; }
+    if (rec.tag !== null && boundSources.has(rec.tag)) { classifications.boundByMappingRule += 1; continue; }
     if (rec.channel === null) { classifications.nonChannel += 1; continue; }
     const profile = getProfile(rec.modelNumber);
     if (!profile) continue;

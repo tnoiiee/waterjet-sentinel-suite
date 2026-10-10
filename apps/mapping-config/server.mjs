@@ -8,9 +8,10 @@
 // Every other method is refused with 405. There is no route that writes, connects,
 // polls, reads a device or activates anything. The server binds to 127.0.0.1 only:
 // the bind host is a constant, and no environment variable, argument or config can
-// change it. The Excel path is optional and local:
-// it is used only when MAPPING_EXCEL_DEFAULT_PATH and MAPPING_BINDING_SEED_PATH are
-// both set, and both files must live OUTSIDE the repository.
+// change it. The Excel path is optional and local: when MAPPING_EXCEL_DEFAULT_PATH is
+// set, the authoritative default bindings load from that workbook with no seed.
+// MAPPING_BINDING_SEED_PATH is an optional authorised override and is accepted only
+// together with MAPPING_EXCEL_DEFAULT_PATH. Both files must live OUTSIDE the repository.
 
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -48,7 +49,9 @@ function isInsideRepo(p) {
 
 /**
  * Returns { configuration, importReport, mode }. The synthetic example is the
- * default. The Excel path is loaded only when both local inputs are configured.
+ * default. MAPPING_EXCEL_DEFAULT_PATH alone loads the authoritative default bindings
+ * (26, derived from explicit workbook identifiers) with no seed. MAPPING_BINDING_SEED_PATH
+ * is an optional override that requires MAPPING_EXCEL_DEFAULT_PATH.
  * The import report carries counts and issues only; it never carries per-row records.
  */
 export async function loadConfiguration(env = process.env) {
@@ -58,15 +61,16 @@ export async function loadConfiguration(env = process.env) {
     const cfg = syntheticExampleConfiguration();
     return { mode: 'SYNTHETIC EXAMPLE', importReport: null, configuration: plain(cfg) };
   }
-  if (!xlsxPath || !seedPath) {
-    throw new Error('MAPPING_EXCEL_DEFAULT_PATH and MAPPING_BINDING_SEED_PATH must be set together');
+  if (!xlsxPath) {
+    throw new Error('MAPPING_BINDING_SEED_PATH requires MAPPING_EXCEL_DEFAULT_PATH (the seed is an optional override)');
   }
-  for (const p of [xlsxPath, seedPath]) {
+  const inputs = seedPath ? [xlsxPath, seedPath] : [xlsxPath];
+  for (const p of inputs) {
     if (isInsideRepo(p)) throw new Error('local Excel inputs must live outside the repository');
   }
   const { importWorkbook } = await import('../../packages/mapping-config/src/nodeImport.mjs');
-  const seed = JSON.parse(readFileSync(seedPath, 'utf8'));
-  const r = importWorkbook(readFileSync(xlsxPath), { bindingSeed: seed });
+  const bindingSeed = seedPath ? JSON.parse(readFileSync(seedPath, 'utf8')) : undefined;
+  const r = importWorkbook(readFileSync(xlsxPath), bindingSeed === undefined ? {} : { bindingSeed });
   const issueSummary = {};
   for (const i of r.issues) issueSummary[i.code] = (issueSummary[i.code] ?? 0) + 1;
   return {
@@ -74,6 +78,7 @@ export async function loadConfiguration(env = process.env) {
     importReport: {
       label: r.label,
       source: r.source,
+      seedOverride: seedPath !== undefined,
       counts: r.counts,
       classifications: r.classifications,
       modelCount: r.modules.length,

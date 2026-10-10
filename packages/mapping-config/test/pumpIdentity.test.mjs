@@ -38,7 +38,7 @@ const SYNTHETIC_TEST_RULE = Object.freeze({
 
 const seed = exampleSeed();
 const errorCodes = (issues) => issues.filter((i) => i.severity === 'ERROR').map((i) => i.code).sort();
-// Pump identity and label issues. The UNCONFIGURED inlet range is a range warning, not an identity issue, and the
+// Pump identity and label issues. An UNCONFIGURED range is a range warning, not an identity issue, and the
 // Owner rule is that a range never blocks semantic mapping, so it is excluded here.
 const pumpIssues = (issues) => issues.filter((i) => (/PUMP/.test(i.tagName ?? '') || /PUMP/.test(i.code))
   && i.code !== 'ENGINEERING_RANGE_UNCONFIGURED');
@@ -65,22 +65,30 @@ test('catalogue: AI-002 is the Pump Inlet and AI-003 the Pump Outlet, with the O
   assert.equal(inlet.canonicalIdentity, 'PumpInletPressureBar');
   assert.equal(inlet.sourceIdentity, 'PUMP_INLET');
   assert.equal(inlet.readinessRole, 'PUMP_INLET_DIAGNOSTIC', 'the inlet is a diagnostic, never the Pump-ready gate');
-  assert.equal(inlet.engineeringMeaning, 'Header Tank / suction-side pressure before the Pump. Diagnostic only. Not Pump-ready evidence.');
-  assert.equal(inlet.confirmedEngineeringRange, null, 'the inlet range is UNCONFIGURED');
+  assert.equal(inlet.engineeringMeaning, 'Header Tank / suction-side pressure before the Pump. Read-only diagnostic and trend only. Not Pump-ready evidence.');
+  assert.deepEqual(inlet.permittedUse, ['DIAGNOSTIC', 'TREND'], 'AI-002 is diagnostic and trend only');
+  assert.equal(inlet.pumpReadyEvidence, false, 'AI-002 is never Pump-ready evidence');
+  assert.equal(inlet.valveDiagnosticEvidence, false, 'AI-002 is never valve diagnostic evidence');
+  assert.deepEqual(inlet.automaticUse, { alarm: false, trip: false, interlock: false }, 'AI-002 is not an alarm, trip or interlock input');
+  assert.match(inlet.hardwareLimitation, /below approximately 1 bar/, 'the hardware limitation is recorded');
   assert.equal(outlet.workbookTag, 'AI-003');
   assert.equal(outlet.displayName, 'Pump Outlet Pressure');
   assert.equal(outlet.canonicalIdentity, 'PumpOutletPressureBar');
   assert.equal(outlet.sourceIdentity, 'PUMP_OUTLET');
   assert.equal(outlet.readinessRole, 'PUMP_READY_GATE');
-  assert.equal(outlet.engineeringMeaning, 'Pump discharge pressure used by the pre-P1 Pump-ready gate. The only Pump-ready input.');
+  assert.equal(outlet.engineeringMeaning, 'Pump discharge pressure on the main discharge pipe, immediately after the Pump. The only pre-P1 Pump-ready pressure gate.');
+  assert.deepEqual(outlet.permittedUse, ['PUMP_READY_GATE']);
+  assert.equal(outlet.pumpReadyEvidence, true, 'AI-003 is the Pump-ready evidence');
 });
 
-test('catalogue: the 0–40 bar range is the pump outlet range carried from the pre-clarification Owner-confirmed value', () => {
-  const outlet = getTagDef('PUMP_OUTLET_PRESSURE');
-  assert.deepEqual([outlet.confirmedEngineeringRange.min, outlet.confirmedEngineeringRange.max, outlet.confirmedEngineeringRange.unit], [0, 40, 'bar']);
-  assert.equal(outlet.confirmedEngineeringRange.basis, 'OWNER_CONFIRMED_DOMAIN_INFORMATION');
+test('catalogue: AI-002 and AI-003 are both 0–40 bar, Owner-confirmed; every other range is unconfigured', () => {
+  for (const name of ['PUMP_INLET_PRESSURE', 'PUMP_OUTLET_PRESSURE']) {
+    const range = getTagDef(name).confirmedEngineeringRange;
+    assert.deepEqual([range.min, range.max, range.unit], [0, 40, 'bar'], name);
+    assert.equal(range.basis, 'OWNER_CONFIRMED_DOMAIN_INFORMATION', name);
+  }
   for (const t of listSimulationTags()) {
-    if (t.tagName === 'PUMP_OUTLET_PRESSURE') continue;
+    if (t.tagName === 'PUMP_INLET_PRESSURE' || t.tagName === 'PUMP_OUTLET_PRESSURE') continue;
     assert.equal(t.confirmedEngineeringRange, null, `${t.tagName} range is UNCONFIGURED`);
   }
 });
@@ -136,7 +144,7 @@ test('parity: the Runtime kernel admits only PUMP_OUTLET samples as pump pressur
 // ---------------------------------------------------------------- import
 
 test('import: AI-002 and AI-003 bind to their own channels at the workbook default, with the exact source text kept', () => {
-  const r = importRows(exampleRows(), { bindingSeed: {} });
+  const r = importRows(exampleRows(), {});
   const inlet = bindingOf(r.bindings, 'PUMP_INLET_PRESSURE');
   const outlet = bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE');
   assert.equal(inlet.sourceWorkbookTag, 'AI-002');
@@ -145,14 +153,14 @@ test('import: AI-002 and AI-003 bind to their own channels at the workbook defau
   assert.deepEqual([outlet.moduleInstanceId, outlet.channel], ['AI-MODULE-01', 2]);
   assert.equal(inlet.declaredSourceIdentity, 'PUMP_INLET');
   assert.equal(outlet.declaredSourceIdentity, 'PUMP_OUTLET');
-  assert.equal(inlet.engineering, null, 'inlet range UNCONFIGURED');
+  assert.deepEqual(inlet.engineering, { min: 0, max: 40, unit: 'bar' }, 'inlet range is the Owner-confirmed 0–40 bar');
   assert.deepEqual(outlet.engineering, { min: 0, max: 40, unit: 'bar' });
   assert.equal(inlet.sourceDescription, 'Example pressure transmitter - pump inlet', 'workbook text kept as evidence');
   assert.equal(outlet.sourceDescription, 'Example pressure transmitter - pump outlet');
 });
 
 test('import: the pump measurements bind from the Owner table even with no seed, and never to each other', () => {
-  const r = importRows(exampleRows(), { bindingSeed: {} });
+  const r = importRows(exampleRows(), {});
   assert.equal(r.bindings.filter((b) => b.sourceWorkbookTag === 'AI-002').length, 1);
   assert.equal(r.bindings.filter((b) => b.sourceWorkbookTag === 'AI-003').length, 1);
 });
@@ -375,27 +383,17 @@ const OWNER_LOCAL = process.env.MAPPING_EXCEL_DEFAULT_PATH
 test('Owner-local: the authoritative workbook binds AI-002 and AI-003 independently, with no Main Valve and no pump warning',
   { skip: OWNER_LOCAL },
   () => {
-    const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH), { bindingSeed: {} });
+    const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH));
     assert.equal(bindingOf(r.bindings, 'PUMP_INLET_PRESSURE').sourceWorkbookTag, 'AI-002');
     assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
     assert.equal(r.bindings.some((b) => /MAIN_VALVE/.test(b.tagName)), false);
     assert.deepEqual(pumpIssues(r.issues), [], 'no pump issue of any severity');
   });
 
-test('Owner-local: with no seed, the missing required tags are exactly the 8 IVn pressures and the 16 IVn limits',
-  { skip: OWNER_LOCAL },
-  () => {
-    const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH), { bindingSeed: {} });
-    const missing = r.issues.filter((i) => i.code === 'REQUIRED_TAG_MISSING').map((i) => i.tagName).sort();
-    const expected = [];
-    for (let n = 1; n <= 8; n += 1) expected.push(`IV${n}_LOWER_LIMIT`, `IV${n}_OUTLET_PRESSURE`, `IV${n}_UPPER_LIMIT`);
-    assert.deepEqual(missing, expected.sort());
-  });
-
 test('Owner-local: the workbook carries the Owner ordinal rules for AI-004..AI-011 and DI-021..DI-036 (read-only check)',
   { skip: OWNER_LOCAL },
   () => {
-    const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH), { bindingSeed: {} });
+    const r = importWorkbook(readFileSync(process.env.MAPPING_EXCEL_DEFAULT_PATH));
     const byTag = new Map(r.records.filter((x) => x.tag).map((x) => [x.tag, x]));
     const ordinal = (rec) => { const hits = [...(rec?.signal ?? '').matchAll(/#/g)].length; const m = /#\s*(\d+)(?!\d)/.exec(rec?.signal ?? ''); return { hits, n: m ? Number(m[1]) : null }; };
     for (let n = 1; n <= 8; n += 1) {

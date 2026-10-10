@@ -285,11 +285,10 @@ test('B2: the limit ordinal enforcement is unchanged', () => {
   assert.ok(r.issues.some((i) => i.code === 'LIMIT_IV_LABEL_MISMATCH' && i.tagName === 'IV1_LOWER_LIMIT'));
 });
 
-test('B2 Owner-local: the authoritative workbook produces no pressure ordinal mismatch',
-  { skip: (LOCAL && process.env.MAPPING_BINDING_SEED_PATH) ? false : 'NOT VERIFIED IN ARENA: set MAPPING_EXCEL_DEFAULT_PATH and MAPPING_BINDING_SEED_PATH to files outside the repository' },
+test('B2 Owner-local: the authoritative workbook produces no pressure ordinal mismatch, with the defaults and no seed',
+  { skip: LOCAL ? false : 'NOT VERIFIED IN ARENA: set MAPPING_EXCEL_DEFAULT_PATH to a workbook outside the repository' },
   () => {
-    const localSeed = JSON.parse(readFileSync(process.env.MAPPING_BINDING_SEED_PATH, 'utf8'));
-    const r = importWorkbook(readFileSync(LOCAL), { bindingSeed: localSeed });
+    const r = importWorkbook(readFileSync(LOCAL));
     assert.equal(r.issues.filter((i) => i.code === 'PRESSURE_IV_LABEL_MISMATCH').length, 0);
     assert.equal(pressureBindings(r).length, 8);
   });
