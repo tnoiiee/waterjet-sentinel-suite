@@ -1,9 +1,9 @@
 # Stage 0.4B-3 — Primary Manufacturer Evidence Ingestion and Read-Only Process-Image Preview (Development Checkpoint)
 
-Status: **DEVELOPMENT CHECKPOINT. Arena validation PASSED for the JavaScript scope (Mapping package 268 tests / 261 pass / 0 fail / 7 skipped; Mapping UI 82 / 82 / 0 / 0; boundary scan S1–S9 clean). Owner-local validation PENDING. Owner browser review PENDING. PR OPEN - NOT MERGED.**
+Status: **DEVELOPMENT CHECKPOINT `abe7e023eb7b5e3f976d8fbc5c9a5b17079058ed`. Arena validation PASSED for the JavaScript scope (Mapping package 268 tests / 261 pass / 0 fail / 7 skipped without the workbook, and 268 / 268 / 0 / 0 with the authoritative workbook supplied; Mapping UI 82 / 82 / 0 / 0; boundary scan S1–S9 clean). Owner-local validation PASSED (Owner-confirmed: Mapping 268/268; Mapping UI 82/82; boundary S1–S9 clean; workbook SHA-256 unchanged). Owner Browser Review PASSED (Owner-confirmed from Owner-provided screenshots; no claim of exhaustive browser interaction or responsive coverage). PR #15 OPEN - NOT MERGED.**
 Stop point: this checkpoint. Nothing is merged.
 
-**Honesty lines:** 750-601 HAS NO PROCESS I/O ADDRESS. 750-613 HAS NO PROCESS I/O ADDRESS. 750-600 HAS NO PROCESS I/O ADDRESS. POWER SUPPLY AND END MODULE ADDRESSES ARE NOT APPLICABLE. PRIMARY MANUALS ARE AVAILABLE FOR ALL EIGHT MODELS (OWNER-PROVIDED OUTSIDE THE REPOSITORY; NOT HASHED HERE). ACTUAL 750-471 SETTINGS VERIFIED ONLY FOR THE SHOWN INSTANCE/CHANNEL. ACTUAL PROCESS DATA MAPPING NOT YET VERIFIED. ACTUAL FIELD-NETWORK MAPPING NOT YET VERIFIED. CANDIDATE ADDRESSES ARE NOT AUTHORITATIVE. AI-002 RUNTIME PUBLICATION NOT IMPLEMENTED. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. PR OPEN - NOT MERGED.
+**Honesty lines:** 750-601 HAS NO PROCESS I/O ADDRESS. 750-613 HAS NO PROCESS I/O ADDRESS. 750-600 HAS NO PROCESS I/O ADDRESS. POWER SUPPLY AND END MODULE ADDRESSES ARE NOT APPLICABLE. PRIMARY MANUALS ARE AVAILABLE FOR ALL EIGHT MODELS (OWNER-PROVIDED OUTSIDE THE REPOSITORY; NOT HASHED HERE). ACTUAL 750-471 SETTINGS VERIFIED ONLY FOR THE SHOWN INSTANCE/CHANNEL. ACTUAL PROCESS DATA MAPPING NOT YET VERIFIED. ACTUAL FIELD-NETWORK MAPPING NOT YET VERIFIED. CANDIDATE ADDRESSES ARE NOT AUTHORITATIVE. AI-002 RUNTIME PUBLICATION NOT IMPLEMENTED. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. PR #15 OPEN - NOT MERGED.
 
 | Item | Value |
 |---|---|
@@ -140,9 +140,27 @@ Power supplies and the End module display `NOT APPLICABLE` with reason `NON_PROC
 | Workbook SHA-256 | `sha256sum T8_IO_Card_Mapping.xlsx` | `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` — unchanged |
 | Clean tree | `git status --porcelain` | empty after the final commit |
 
-**.NET was not touched by this Stage, so no .NET result is claimed and none is requested.** No browser was run in Arena: layout and real-browser behaviour are **NOT VERIFIED** here and remain an Owner-local review item.
+**.NET was not touched by this Stage, so no .NET result is claimed and none is requested.** No browser was run in Arena, so every browser observation below is Owner-observed, not Arena-executed.
 
-### Owner-local PowerShell commands (pending)
+### Owner-local validation and Browser Review — PASSED (Owner-confirmed, 2026-10-10)
+
+**Owner-local automated validation PASSED** with the commands below: Mapping package **268 / 268 / 0 / 0** with the authoritative workbook supplied via `MAPPING_EXCEL_DEFAULT_PATH` (workbook copy verified outside the repository; SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` unchanged); Mapping UI **82 / 82 / 0 / 0**; boundary scan **S1–S9 clean, 0 findings**.
+
+**Owner Browser Review PASSED** from Owner-provided screenshots, recording exactly these observations:
+
+| Observation | Result |
+|---|---|
+| Mapping Configuration page rendered | PASSED |
+| Candidate process-image presentation visible and usable | PASSED |
+| `CANDIDATE_UNVERIFIED` clearly presented | PASSED |
+| Unverified offsets not presented as verified addresses | PASSED |
+| Non-process modules shown as not applicable | PASSED |
+| No Hardware or Modbus readiness claimed | PASSED |
+| No blocking visual defect (clipping, broken layout) | PASSED — none reported |
+
+**Scope limits of that review (explicitly not claimed):** exhaustive browser interaction, responsive or multi-resolution coverage, accessibility, and any actual process-image verification. The screenshots are Owner-observed evidence about presentation only; they do not verify addresses, offsets, firmware revisions, or field-network mapping, and they grant no write or control authority.
+
+### Owner-local PowerShell commands (executed by the Owner)
 
 ```powershell
 # 1. Exact-head proof
@@ -168,6 +186,8 @@ git diff --check origin/main...HEAD; git status --porcelain
 
 **Changed** — `packages/mapping-config/src/{constants,moduleProfiles,rack,processImageEvidence,evidenceReport,draftSession,providerPolicy,index}.mjs`; new `packages/mapping-config/src/{actualRackEvidence,candidateProcessImage}.mjs`; new `packages/mapping-config/test/moduleRolesAndRackEvidence.test.mjs`; updated `packages/mapping-config/test/{processImageEvidence,rackAndProfiles}.test.mjs`; `apps/mapping-config/public/{index.html,app.mjs}`; new `apps/mapping-config/test/actualRack.render.test.mjs`; updated `apps/mapping-config/test/{review.render,ui}.test.mjs`; both `package.json` version/description strings; `CHANGELOG.md`; `docs/CURRENT_STATE.md`; `docs/MASTER_PLAN.md`; this checkpoint.
 
+**Changed by the documentation truth-alignment review-correction (2026-10-10, same branch, one narrow commit)** — `README.md` (current-status block and physical-baseline topology wording), `SECURITY.md` (stage-status banner only; the security policy is unchanged), `adapters/simulator/README.md` (Sensor-matrix and Water Jet topology), `docs/CURRENT_STATE.md` (Stage 0.4B-3 current position; earlier blocks labelled historical), `docs/MASTER_PLAN.md` (§3 ledger line and §3.5 status), this checkpoint, and `CHANGELOG.md`. Documentation only: **no Product source, workbook, test, package manifest, lock file or solution/project file was touched.**
+
 **Unchanged** — `T8_IO_Card_Mapping.xlsx`; every .NET project, `packages/contracts`, fixtures, Runtime, Runtime Inspector, Runtime publication and sequencing; boundary scanner; no dependency, lock file or write/control route added.
 
-**Not verified** — actual Process Data image; actual field-network mapping; exact 750-362 firmware and hardware revisions; 750-471 Common settings and Scaling; 750-554 settings; any numeric address; module revisions other than the one legible screen; browser layout; Owner-local runs.
+**Not verified** — actual Process Data image; actual field-network mapping; exact 750-362 firmware and hardware revisions; 750-471 Common settings and Scaling; 750-554 settings; any numeric address; module revisions other than the one legible screen; exhaustive browser interaction, responsive and multi-resolution coverage, and accessibility (the Owner Browser Review covered only the observations recorded above); any actual process-image verification.
