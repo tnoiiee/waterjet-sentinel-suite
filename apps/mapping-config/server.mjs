@@ -6,8 +6,9 @@
 //   GET /api/configuration     the configuration the UI starts from
 //
 // Every other method is refused with 405. There is no route that writes, connects,
-// polls, reads a device or activates anything. The server binds to loopback only
-// (MAPPING_UI_HOST defaults to 127.0.0.1). The Excel path is optional and local:
+// polls, reads a device or activates anything. The server binds to 127.0.0.1 only:
+// the bind host is a constant, and no environment variable, argument or config can
+// change it. The Excel path is optional and local:
 // it is used only when MAPPING_EXCEL_DEFAULT_PATH and MAPPING_BINDING_SEED_PATH are
 // both set, and both files must live OUTSIDE the repository.
 
@@ -20,6 +21,8 @@ import { syntheticExampleConfiguration } from '../../packages/mapping-config/src
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '..', '..');
 const PUBLIC_DIR = join(HERE, 'public');
+// S6: the only bind host. A constant, never read from the environment or arguments.
+export const UI_BIND_HOST = '127.0.0.1';
 const PKG_SRC = join(REPO, 'packages', 'mapping-config', 'src');
 const NODE_ONLY = new Set(['workbookImport.mjs', 'nodeImport.mjs']);
 const PUBLIC_FILES = new Set(['index.html', 'app.mjs', 'styles.css']);
@@ -143,10 +146,11 @@ export function createUiServer({ loader = () => loadConfiguration() } = {}) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const host = process.env.MAPPING_UI_HOST ?? '127.0.0.1';
   const port = Number(process.env.MAPPING_UI_PORT ?? 5186);
   const server = createUiServer();
-  server.listen(port, host, () => {
-    console.log(`Mapping Configuration (SIMULATION ONLY) listening on ${host}:${port}`);
+  server.listen(port, UI_BIND_HOST, () => {
+    // Report the address the socket actually bound, not the requested one.
+    const bound = server.address();
+    console.log(`Mapping Configuration (SIMULATION ONLY) listening on ${bound.address}:${bound.port}`);
   });
 }
