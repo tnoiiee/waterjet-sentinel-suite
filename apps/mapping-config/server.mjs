@@ -48,7 +48,7 @@ function isInsideRepo(p) {
 }
 
 /**
- * Returns { configuration, importReport, mode }. The synthetic example is the
+ * Returns { configuration, importReport, mode, reservedInventory }. The synthetic example is the
  * default. MAPPING_EXCEL_DEFAULT_PATH alone loads the authoritative default bindings
  * (26, derived from explicit workbook identifiers) with no seed. MAPPING_BINDING_SEED_PATH
  * is an optional override that requires MAPPING_EXCEL_DEFAULT_PATH.
@@ -59,7 +59,7 @@ export async function loadConfiguration(env = process.env) {
   const seedPath = env.MAPPING_BINDING_SEED_PATH;
   if (!xlsxPath && !seedPath) {
     const cfg = syntheticExampleConfiguration();
-    return { mode: 'SYNTHETIC EXAMPLE', importReport: null, configuration: plain(cfg) };
+    return { mode: 'SYNTHETIC EXAMPLE', importReport: null, configuration: plain(cfg), reservedInventory: NO_RESERVED_INVENTORY() };
   }
   if (!xlsxPath) {
     throw new Error('MAPPING_BINDING_SEED_PATH requires MAPPING_EXCEL_DEFAULT_PATH (the seed is an optional override)');
@@ -93,7 +93,13 @@ export async function loadConfiguration(env = process.env) {
       declaredChannelCounts: r.declaredChannelCounts,
       additionalTags: r.additionalTags,
     }),
+    reservedInventory: r.reservedInventory,
   };
+}
+
+// The synthetic example has no reserved placeholder rows. The section still renders, with a visible count of 0.
+function NO_RESERVED_INVENTORY() {
+  return { summary: { total: 0, byDirection: { INPUT: 0, OUTPUT: 0 }, overlays: { outputNotAuthorised: 0 } }, rows: [] };
 }
 
 function plain(cfg) {
@@ -129,8 +135,8 @@ export function createUiServer({ loader = () => loadConfiguration() } = {}) {
         return send(res, 200, readFileSync(join(PUBLIC_DIR, 'index.html')), MIME['.html']);
       }
       if (path === '/api/configuration') {
-        const { mode, importReport, configuration } = await configOnce();
-        return send(res, 200, JSON.stringify({ mode, importReport, configuration }), MIME['.json']);
+        const { mode, importReport, configuration, reservedInventory } = await configOnce();
+        return send(res, 200, JSON.stringify({ mode, importReport, configuration, reservedInventory }), MIME['.json']);
       }
       if (path.startsWith('/pkg/')) {
         const name = path.slice('/pkg/'.length);

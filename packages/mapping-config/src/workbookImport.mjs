@@ -364,6 +364,13 @@ export function importWorkbook(buf, options = {}) {
   const bindings = [];
   const seedIssues = [];
   for (const [runtimeTag, spec] of Object.entries(seed).sort(([a], [b]) => a.localeCompare(b))) {
+    // A tag outside the Simulation/Runtime catalogue (for example MAIN_VALVE_OUTLET_PRESSURE, which does not exist) is
+    // refused before any binding is built. It is never created and then flagged.
+    if (getTagDef(runtimeTag) === null) {
+      seedIssues.push({ code: 'UNKNOWN_TAG', severity: SEVERITY.ERROR, tagName: runtimeTag,
+        message: `${runtimeTag} is not in the Simulation/Runtime catalogue; the seed entry is refused and no binding is created` });
+      continue;
+    }
     const isPump = Object.prototype.hasOwnProperty.call(OWNER_PUMP_SOURCE_TAGS, runtimeTag);
     if (isPump && spec.source !== OWNER_PUMP_SOURCE_TAGS[runtimeTag]) {
       seedIssues.push({ code: 'PUMP_SOURCE_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
@@ -409,10 +416,13 @@ export function importWorkbook(buf, options = {}) {
     // ('#n' and 'Lower' or 'Upper' in the description). A mismatch is refused, not repaired.
     const limitName = /^IV([1-8])_(LOWER|UPPER)_LIMIT$/.exec(runtimeTag);
     if (limitName) {
-      const label = /#\s*(\d+)/.exec(row.signal ?? '');
-      const group = /\b(lower|upper)\b/i.exec(row.signal ?? '');
-      const labelled = label !== null && Number(label[1]) === Number(limitName[1]);
-      const sameGroup = group !== null && group[1].toUpperCase() === limitName[2];
+      // Exactly one '#n' and exactly one group word: a row with two labels or two groups is a conflict, not a choice.
+      const text = row.signal ?? '';
+      const hashCount = [...text.matchAll(/#/g)].length;
+      const label = /#\s*(\d+)(?!\d)/.exec(text);
+      const groups = [...text.matchAll(/\b(lower|upper)\b/gi)].map((m) => m[1].toUpperCase());
+      const labelled = hashCount === 1 && label !== null && Number(label[1]) === Number(limitName[1]);
+      const sameGroup = groups.length === 1 && groups[0] === limitName[2];
       if (!labelled || !sameGroup) {
         seedIssues.push({ code: 'LIMIT_IV_LABEL_MISMATCH', severity: SEVERITY.ERROR, tagName: runtimeTag,
           message: `${runtimeTag} is not bound: its workbook row does not carry the same IV index and group` });
@@ -471,14 +481,17 @@ export function importWorkbook(buf, options = {}) {
   const additionalTags = {};
   const boundSources = new Set(bindings.map((b) => b.sourceWorkbookTag));
   const classifications = { inputUnambiguous: 0, inputAmbiguous: 0, outputNotAuthorised: 0, reservedUnresolved: 0, nonChannel: 0, spare: 0, boundByMappingRule: 0 };
+  const placeholderRecs = [];
   for (const rec of records) {
     if (rec.status === 'SPARE') { classifications.spare += 1; continue; }
     if (rec.tag !== null && boundSources.has(rec.tag)) { classifications.boundByMappingRule += 1; continue; }
     if (rec.channel === null) { classifications.nonChannel += 1; continue; }
+    // Exclusive accounting: a reserved placeholder is counted once, here, before the output test. DO-031 is an
+    // OUTPUT; its output fact is carried as an overlay in reservedInventory.summary, not as a second count.
+    if (isPlaceholderRecord(rec)) { classifications.reservedUnresolved += 1; placeholderRecs.push(rec); continue; }
     const profile = getProfile(rec.modelNumber);
     if (!profile) continue;
     if (profile.direction === DIRECTION.OUTPUT) { classifications.outputNotAuthorised += 1; continue; }
-    if (/XXX/.test(rec.signal)) { classifications.reservedUnresolved += 1; continue; }
     const io = parseIoType(rec.ioType, profile.channelType);
     const ambiguous = rec.tag === null || rec.signal === '' || io.signal === null || io.channelType !== profile.channelType
       || !profile.supportedSignals.includes(io.signal) || /^(DI|AI)$/i.test(rec.ioType);
@@ -519,7 +532,10 @@ export function importWorkbook(buf, options = {}) {
   const allIssues = [...issues, ...seedIssues, ...rackIssues, ...mappingIssues];
 
   const sha256 = createHash('sha256').update(buf).digest('hex');
+  const reservedInventory = buildReservedInventory(placeholderRecs, instanceBySlot);
+
   return Object.freeze({
+    reservedInventory,
     source: Object.freeze({ sha256, sizeBytes: buf.length, sheetName: sheet.name, dimension, dataRowCount: records.length,
       headerRowCount: 1, formulaCount, mergedCellCount: mergeCount, hiddenRowCount: hiddenRows, hiddenColumnCount: hiddenCols }),
     label: 'DEFAULT FROM EXCEL',
@@ -532,6 +548,47 @@ export function importWorkbook(buf, options = {}) {
     records,
     seedIssueCount: seedIssues.filter((i) => i.severity === SEVERITY.ERROR).length,
     counts: countStatus(records),
+  });
+}
+
+function isPlaceholderRecord(rec) {
+  return rec.tag !== null && /XXX/.test(rec.signal ?? '');
+}
+
+/**
+ * The 18 reserved placeholder rows, for the read-only inventory. Identifiers and fixed Owner states only; no raw
+ * workbook text, no row numbers and no numeric address. A placeholder is never a binding and never a spare.
+ * Output placeholders (DO-031) keep their OUTPUT direction and NOT_AUTHORIZED_IN_READ_ONLY_STAGE state.
+ */
+function buildReservedInventory(recs, instanceBySlot) {
+  const rows = recs.map((rec) => {
+    const profile = getProfile(rec.modelNumber);
+    const isOutput = profile !== null && profile.direction === DIRECTION.OUTPUT;
+    return Object.freeze({
+      workbookTag: rec.tag,
+      moduleInstanceId: instanceBySlot.get(Number(rec.slot)) ?? null,
+      rackSlot: Number(rec.slot),
+      channel: Number(rec.channel),
+      direction: isOutput ? DIRECTION.OUTPUT : DIRECTION.INPUT,
+      physicalStatus: 'USED / RESERVED',
+      signalIdentity: 'UNRESOLVED',
+      bindingStatus: 'UNBOUND',
+      ownerInputStatus: 'OWNER_INPUT_PENDING',
+      autoBindingEligibility: 'PROHIBITED',
+      availableAsSpare: false,
+      addressStatus: 'ADDRESS_UNRESOLVED',
+      mappingAuthorization: isOutput ? 'NOT_AUTHORIZED_IN_READ_ONLY_STAGE' : 'NOT_AUTHORIZED_UNTIL_OWNER_IDENTITY',
+    });
+  }).sort((a, b) => a.rackSlot - b.rackSlot || a.channel - b.channel || a.workbookTag.localeCompare(b.workbookTag));
+  const byDirection = { INPUT: 0, OUTPUT: 0 };
+  for (const r of rows) byDirection[r.direction] += 1;
+  return Object.freeze({
+    summary: Object.freeze({
+      total: rows.length,
+      byDirection: Object.freeze(byDirection),
+      overlays: Object.freeze({ outputNotAuthorised: byDirection.OUTPUT }),
+    }),
+    rows: Object.freeze(rows),
   });
 }
 

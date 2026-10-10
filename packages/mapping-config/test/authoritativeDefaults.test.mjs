@@ -97,7 +97,7 @@ test('defaults: the 18 placeholder rows (DI-037, DO-031, AI-020..AI-035) are nev
     assert.ok(rec, `${tag} is present in the workbook`);
     assert.match(rec.signal, /XXX/, `${tag} is a placeholder row`);
   }
-  assert.equal(r.classifications.reservedUnresolved, 17, 'DI-037 and AI-020..AI-035 are reserved, not bindable');
+  assert.equal(r.classifications.reservedUnresolved, 18, 'DI-037, DO-031 and AI-020..AI-035 are reserved and counted once, not bindable');
 });
 
 test('defaults: a placeholder row cannot be bound through a seed override (PLACEHOLDER_ROW_REFUSED), and nothing is substituted', () => {

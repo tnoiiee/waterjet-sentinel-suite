@@ -225,9 +225,14 @@ test('import: a missing AI-002 row is refused and the outlet is NOT used as a fa
   assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
 });
 
-test('import: a seeded Main Valve key is refused by validation as an unknown tag, and is not aliased to AI-003', () => {
+test('import: a seeded Main Valve key is refused as UNKNOWN_TAG at import, creates no binding, and is not aliased to AI-003', () => {
   const r = importRows(exampleRows(), { bindingSeed: { ...seed, MAIN_VALVE_OUTLET_PRESSURE: { source: 'AI-003', declaredSourceIdentity: 'MAIN_VALVE_OUTLET' } } });
-  const issues = validateMapping(r.modules, r.bindings, r.additionalTags);
+  assert.ok(r.issues.some((i) => i.code === 'UNKNOWN_TAG' && i.tagName === 'MAIN_VALVE_OUTLET_PRESSURE'));
+  assert.equal(r.bindings.some((x) => /MAIN_VALVE/.test(x.tagName)), false);
+  assert.equal(bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE').sourceWorkbookTag, 'AI-003');
+  // Defence in depth: validation still refuses the tag if a binding for it ever reaches the validator.
+  const forged = { ...bindingOf(r.bindings, 'PUMP_OUTLET_PRESSURE'), tagName: 'MAIN_VALVE_OUTLET_PRESSURE' };
+  const issues = validateMapping(r.modules, [...r.bindings, forged], r.additionalTags);
   assert.ok(issues.some((i) => i.code === 'UNKNOWN_TAG' && i.tagName === 'MAIN_VALVE_OUTLET_PRESSURE'));
 });
 
