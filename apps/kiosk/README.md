@@ -156,6 +156,21 @@ switches the window to the reconnecting screen within about two seconds with **n
 on screen**; restarting the host brings the route back automatically; and **Exit Kiosk Preview**
 asks for confirmation before closing.
 
+**What to verify in the Commissioning Wall Map (Stage 0.4C-K1 Wall Mapping pass):** the map shows
+108 positions and 106 Sensor cells, with I7 and I16 shown as `NON_SENSOR_GAP` — never Sensors, never
+Water Jets; each Sensor cell carries the Sensor ID, the Front and the Rear state, the current
+engineering value with its unit only when the value is valid, Quality, the Commissioning state and any
+evidence blocking; **Both / Front only / Rear only** switch the displayed measurement and Front and
+Rear are never merged into one value; the physical-schedule Previous/Next still works and is labelled
+`(schedule order)`, while the Wall-order Previous/Next walk the map order (Front before Rear, gaps
+skipped, stopped at the edges); selecting a position highlights its Overview rows and fills the Sensor
+detail, an unassigned Channel selects no Sensor, and an I7 or I16 conflict row selects the **gap**
+rather than a Sensor; the Loop-Test progress shows 106 Sensors and 212 measurements derived live; the
+filters change only what is displayed and never a count, a verdict or the selected identity; the map
+scrolls inside its own bounded frame only, the Overview table stays the only other sideways scroller,
+and the page has no horizontal overflow (`document.scrollingElement.scrollWidth === clientWidth`). A
+Preview verdict approves nothing in the field.
+
 **Stopping:** close the shell through **Exit Kiosk Preview** (confirmed), then stop the host with
 `Ctrl+C` in its terminal.
 

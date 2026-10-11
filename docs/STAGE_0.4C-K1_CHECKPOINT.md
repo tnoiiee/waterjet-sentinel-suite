@@ -11,6 +11,14 @@ and the honest verification status. No safety, authority, evidence or dependency
 changed. The checkpoint commit SHAs are recorded
 in the pull request and the final report, not inside their own commits (AGENTS §4.6).
 
+**Follow-up (Owner-authorized Commissioning Wall Mapping and Loop-Test Usability pass):** the Owner
+authorized a read-only U-shaped Commissioning Wall Map so that field loop testing no longer needs the
+manual translation wall position -> Sensor -> Front/Rear -> Node/Cabinet -> Module/Channel -> value ->
+verdict. §16 records the exact-source sweep, the canonical topology source, the selection-identity
+defect that the pass found and fixed, the changed/unchanged/not-verified split, the Arena totals at
+this head, and the consolidated 21-step Owner-local handoff. No safety, authority, evidence or
+dependency boundary changed; **no dependency was added at all** in this pass.
+
 **Stage boundary (shown on screen by the preview and by the shell, at all times):**
 `SIMULATION / PREVIEW - NO HARDWARE ACCESS - NO DEVICE WRITE - FIELD VERIFICATION PENDING`.
 
@@ -690,3 +698,234 @@ horizontal overflow (`document.scrollingElement.scrollWidth === clientWidth`); t
 the only thing that scrolls sideways; and stopping/restarting the host still shows the shell's
 reconnecting state and recovers by itself. If initialization ever fails, the banner states the category
 on screen — report that text rather than a stack trace.
+
+## 16. Owner-authorized Commissioning Wall Mapping and Loop-Test usability pass (2026-10-12)
+
+Same Stage, same branch `arena/3be5c713-waterjet-sentinel-suite`, same **PR #19 (OPEN, NOT MERGED — do
+not merge)**, same approved base `main` `48f0315ea1bcbd3f71f46a47bb4b55fc04327487`. The pass starts at
+the runtime-init checkpoint `040d322f734e528914527f1b2cfe7bf078d936a8` and adds one consolidated
+checkpoint commit whose parent is exactly that SHA. Nothing in §13–§15 is reopened or reverted: the
+zero-warning WebView2 reference isolation, the 1920x1080 fullscreen fit (Owner-reviewed **PASSED**) and
+the runtime-initialization correction (the served page now loads and executes `/app.mjs`) are all
+carried forward unchanged.
+
+### 16.1 What the pass adds
+
+- **Commissioning Wall Map (`packages/commissioning/src/wallmap.mjs`, NEW).** A read-only model of the
+  approved physical wall: **108 logical positions**, **106 Product Sensor cells** and exactly **two
+  `NON_SENSOR_GAP` cells — I7 and I16**, which are never Sensors and never Water Jets. The builder
+  **throws** rather than render a wrong wall: it asserts 108/106/2, exactly the I7+I16 gaps, every
+  Sensor exactly once, exactly one Front **and** one Rear measurement per Sensor, 212 measurements in
+  the documented order, the approved per-wall counts (LEFT 24 / REAR 29+gap / RIGHT 24 / FRONT 29+gap),
+  six rows in the approved row order (`G+201`, `G+101`, `G`, `H`, `I`, `J`) and distinct Channels per
+  position. It is dependency-free and browser-safe; it invents no Sensor identity and reads no second
+  topology source (§16.2).
+- **Selection synchronised across the whole surface, on one identity.** Wall Map position -> its two
+  measurements; Front/Rear -> exactly that measurement; Overview row -> its Sensor position; an
+  internal-conflict row -> the right Sensor **and** the blocking reason; an unassigned Channel -> no
+  false Sensor selection (`NOT_APPLICABLE`, nothing selected); an I7/I16 conflict row -> the **gap**,
+  not a Sensor. Selection never writes to evidence, observations or verdicts.
+- **Wall-order navigation.** Previous/Next in documented wall-mapping order (logical row, then column,
+  gaps skipped, Front before Rear), edge-safe (no move at an edge, reported as an edge rather than a
+  wrap). The existing physical-schedule Previous/Next **remains available and keeps its meaning**; it
+  is now explicitly labelled `(schedule order)` so the two are never confused.
+- **Loop-Test progress.** 106 Sensors and 212 measurements with `NOT_TESTED / IN_PROGRESS / PASS /
+  FAIL / PARTIAL / BLOCKED`, derived **live** from the evidence plus workflow state for the selected
+  scenario — no cached, stored or invented totals.
+- **The read-only workflow is reachable from a map selection**: BASELINE / STIMULUS / OPEN_CIRCUIT /
+  RECOVERY observations, PASS / FAIL / PARTIAL, remark, clear Preview result. All pre-existing blocking
+  rules remain authoritative: a Product-topology conflict can never PASS, an unassigned Channel has no
+  verdict, an internal conflict is FAIL/PARTIAL only, BLOCKED stays evidence-derived, and a Preview
+  verdict approves nothing in the field.
+- **Presentation.** The map is contained in its **own bounded frame** (`.wallmap-frame`, `max-height`
+  + `max-width:100%`, `min-width:0`) so it scrolls **inside** itself and can never widen the page; the
+  Overview table remains the only other sideways scroller. Cells are fixed-size tokens in both
+  densities, in the approved compact range; the page uses no viewport-relative width and no inline
+  style; quality/state are carried by text and symbols in addition to colour; the
+  `SIMULATION / PREVIEW` vs field-verification distinction and the boundary text are preserved.
+
+### 16.2 Canonical topology source (single source, no second source)
+
+The wall topology is projected from **`config/examples/sensor-map.example.json` -> `logicalMatrix.slots`
+— the protected Product topology plus committed evidence — and from nothing else.** The drawing's wall
+label is not used to infer topology; the Runtime wall summaries and the spike's wall UI were read as
+shape references only and are **not** authority. Verified at this head: 108 slots = 106 `SENSOR` + gaps
+I7 (`SLOT-R5-C07`, REAR) and I16 (`SLOT-R5-C16`, FRONT); LEFT 1–4 (24), REAR 5–9 (29 + gap), RIGHT
+10–13 (24), FRONT 14–18 (29 + gap); 18 columns x 6 rows; the matrix Sensors are identical to the 106
+schedule Sensors (zero difference) and the 212 measurements are the 106 x (Front, Rear). The four
+I7/I16 conflict rows, the twelve drawing-internal-conflict pairs and the 24 unassigned
+`SPARE_UNMAPPED` Channels are unchanged protected facts. **Water Jet identity is never derived from
+the Sensor wall**, and the served payload does not forward the gap Water-Jet anchor or any device /
+Channel assignment to the browser.
+
+### 16.3 Defect found and fixed by this pass (selection identity)
+
+The first wiring selected a Wall Map position by **measurement** identity (`H7:F`) while the Overview,
+the Sensor detail and the workflow are keyed by the **physical Channel** (`TC-NODE-03|A102.2|5`). The
+symptom was a selection the rest of the page could not resolve (`NOT_APPLICABLE`, zero highlighted
+Overview rows) — a real application defect, found by the new coverage, not a test artefact.
+`wallmap.mjs` now publishes the two sequences in the same documented order (`order` in measurement
+identity, `channelOrder` in physical-Channel identity) plus `positionByChannelKey`,
+`measurementKeyByChannelKey` and `wallMeasurementKey()`, and **the one selection identity across the
+Wall Map, the Overview, the Sensor detail and the workflow is the physical Channel key.** Navigation
+runs on Channel keys. The Front and Rear measurements of a Sensor are never merged, copied, aliased or
+made to hide one another.
+
+### 16.4 Changed / Unchanged / Not verified
+
+**Changed (this pass, 8 modified + 4 new paths):**
+
+| Path | Change |
+| --- | --- |
+| `packages/commissioning/src/wallmap.mjs` | **NEW** — the read-only wall model, its order tables and its topology invariants (throws on violation) |
+| `packages/commissioning/test/wallmap.test.mjs`, `test/helpers/wallMap.mjs` | **NEW** — 11 deterministic topology/order/selection tests over the committed public-safe sensor map |
+| `packages/commissioning/src/presentation.mjs` | adds `loopTestSummary(schedule, sessionState)` (live 106/212 loop-test counts, no cached totals) |
+| `packages/commissioning/src/index.mjs`, `package.json` | re-export the wall map and loop-test surfaces; `wallmap.mjs` added to the `check` sweep |
+| `apps/ops-preview/public/index.html` | Loop-Test progress section and Wall Map section (frame, legend, view control, wall-order controls); existing physical-schedule nav relabelled `(schedule order)` |
+| `apps/ops-preview/public/app.mjs` | wall renderers, live progress, view control, wall-order navigation, filter application, and the Channel-key selection wiring |
+| `apps/ops-preview/public/styles.css` | the bounded `.wallmap-frame` and the fixed-geometry U map (bands, hollow centre, gap cells, legend, `--wj-*` tokens in both densities) |
+| `apps/ops-preview/server.mjs` | forwards each slot's `logicalLabel` (the wall label the map prints); **does not** forward the gap Water-Jet anchor; no route, method or whitelist change |
+| `apps/ops-preview/test/wallmap.render.test.mjs` | **NEW** — 17 tests: 108/106/2 rendering, value/unit honesty, STALE-as-history, gap inertness, map<->Overview<->detail<->workflow selection, view control, Front/Rear isolation, filter inertness, wall-order navigation, CSS bounds |
+| `apps/ops-preview/test/layout.test.mjs` | the sideways-scroll pin now names the **two** bounded frames (`.table-wrap` group and `.wallmap-frame`) instead of one, and a new test pins the map's bounded/fixed-geometry contract — no assertion was deleted or weakened |
+
+**Unchanged:** the WebView2 package and version (`1.0.4258.31`) and the WinForms-only WPF-reference
+isolation; the lock files (**no dependency added, removed, refreshed or hand-edited in this pass**);
+the 1920x1080 layout strategy, the corrected boot path and its visible failure surface; loopback-only
+binding, the approved origin, the strict CSP and the absence of external assets; the read-only Preview
+boundary and every route/method restriction (no device, transport, control, queue, job, cleaning,
+pump, valve or motion route exists); the protected evidence totals and the authoritative workbook; the
+reconnecting fail-safe and the confirmed exit. **No MODBUS, no physical acquisition, no contact with
+`192.0.2.11`–`192.0.2.16`, no TEST_HARDWARE, no PRODUCTION, no device write, no cleaning or motion
+command, no queue authority, no Runtime supervision, no field-verification claim.**
+
+**Not verified / not claimed:** there is **no browser engine and no .NET SDK in Arena**, so
+**real-browser execution and the .NET build/tests are NOT RUN IN ARENA** — no pixel layout, no
+DOM-computed overflow, no DPI behaviour, no WebView2 behaviour and no Windows rendering is claimed from
+these tests. What the Arena tests prove is the model, the served bytes, the wiring and the contracts
+over the **real** routes; the 1920x1080 interaction acceptance stays open until the Owner-local run in
+§16.6 passes. A Preview verdict remains a Preview verdict and is never a field approval. Owner Manual
+Review has **not** passed for this pass and Stage 0.4C-K1 is **not** claimed complete.
+
+### 16.5 Automated validation in Arena at this head (exact totals)
+
+| Check | Command | Result |
+| --- | --- | --- |
+| Commissioning package | `npm --prefix packages/commissioning test` | **88 tests / 88 pass / 0 fail / 0 skipped** (11 wall map) |
+| Commissioning check sweep | `npm --prefix packages/commissioning run check` | pass (all source modules parse, incl. `wallmap.mjs`) |
+| Kiosk Preview host + UI | `npm --prefix apps/ops-preview test` | **77 tests / 77 pass / 0 fail / 0 skipped** |
+| Kiosk shell source contract | `node --test apps/kiosk/test/*.test.mjs` | **21 tests / 21 pass / 0 fail** |
+| Mapping UI (unchanged graph, regression) | `npm --prefix apps/mapping-config run check && npm --prefix apps/mapping-config test` | **82 tests / 82 pass / 0 fail / 0 skipped** |
+| Mapping package (unchanged graph, regression) | `npm --prefix packages/mapping-config run check && npm --prefix packages/mapping-config test` | **268 tests / 261 pass / 0 fail / 7 skipped** (skips are the Arena workbook-dependent Owner-local tests) |
+| Repository boundary scan | `node tools/boundary-scan/boundary-scan.mjs` | **0 findings (S1–S9 clean)**, exit 0 |
+| Workbook integrity | `sha256sum T8_IO_Card_Mapping.xlsx` | matches the protected value, unchanged |
+| Whitespace / conflict check | `git diff --check` | clean |
+
+The boundary scan raised one real finding in this pass (a credential-shaped literal created by a new
+enumeration in `app.mjs`); it was fixed **in the source** and the scanner was **not** weakened. The
+running host was also inspected over loopback HTTP at this head: `/` carries the Wall Map frame,
+view control, wall-order controls and progress section; `/api/sensor-map` serves LEFT 24 / REAR 30 /
+RIGHT 24 / FRONT 30 slots with `logicalLabel` forwarded and the two gaps marked `NON_SENSOR_GAP`; and
+`/`, `/app.mjs`, `/styles.css`, `/pkg/*.mjs` and every `/api/...` route answer 200 over loopback.
+
+### 16.6 Owner-local handoff — 21 steps (fast-forward from this checkpoint)
+
+```powershell
+# 1. Fast-forward to the checkpoint commit and prove where you are. Expect no local commits behind it.
+git fetch origin ; git switch arena/3be5c713-waterjet-sentinel-suite ; git pull --ff-only
+git rev-parse HEAD ; git log --oneline -3 ; git status --short
+
+# 2. Preserve/regenerate the GENUINE Kiosk lock refresh: the committed lock file is the reviewed one.
+git status --porcelain apps/kiosk/packages.lock.json
+#    If dotnet asks for a refresh, let step 4 regenerate it and commit ONLY that file, reporting the
+#    SHA-256 before and after. Never hand-edit it.
+
+# 3. Confirm the tree is clean before building (nothing uncommitted, no stray artefact).
+git diff --stat ; git diff --check
+
+# 4. Locked restore.
+dotnet restore WaterJetSentinelSuite.sln --locked-mode
+
+# 5. Zero-warning Release build.  Expect 0 warnings / 0 errors.
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+
+# 6. Full .NET test run.  Expect 414 passed / 0 failed / 0 skipped.
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build --no-restore
+
+# 7. Prove the WinForms-only WebView2 graph is still isolated.
+dotnet msbuild apps/kiosk/Wjss.Kiosk.csproj -t:KioskWebView2ReferenceProof -p:Configuration=Release
+#    Expect exactly: CORE=1 / WINFORMS=1 / WPF=0.
+
+# 8. Kiosk shell source contract.  Expect 21/21.
+node --test apps/kiosk/test/*.test.mjs
+
+# 9. Commissioning package (wall model + loop-test summary).  Expect 88/88.
+npm --prefix packages/commissioning run check ; npm --prefix packages/commissioning test
+
+# 10. Operations Preview host + UI tests (the Wall Map coverage).  Expect 77/77.
+npm --prefix apps/ops-preview run check ; npm --prefix apps/ops-preview test
+
+# 11. Mapping Configuration UI regression.  Expect 82/82.
+npm --prefix apps/mapping-config run check ; npm --prefix apps/mapping-config test
+
+# 12. Mapping package regression.  Expect 268 (261 pass / 0 fail / 7 skipped); 268/268 with the
+#     authoritative workbook supplied.
+npm --prefix packages/mapping-config run check ; npm --prefix packages/mapping-config test
+
+# 13. Static gates: boundary scan, whitespace, workbook integrity.
+node tools/boundary-scan/boundary-scan.mjs
+git diff --check
+#    Expect 0 findings (S1-S9 clean), clean, and workbook SHA-256 4e0337e2...f422e8e unchanged.
+
+# 14. Start the real Operations Preview host (loopback only, default port 5187).
+npm --prefix apps\ops-preview start
+
+# 15. Confirm the host answers before starting the shell (the shell probes it for about two seconds).
+#     Browse to http://127.0.0.1:5187/api/health and http://127.0.0.1:5187/api/boundary
+
+# 16. Start the Kiosk shell and confirm the boundary statement is visible and the host reads CONNECTED.
+dotnet run --project apps/kiosk/Wjss.Kiosk.csproj -c Release
+
+# 17. Wall Map: 108 positions, 106 Sensor cells, I7 and I16 shown as NON_SENSOR_GAP (never Sensors,
+#     never Water Jets).  Each Sensor cell shows the Sensor ID, both Front and Rear states, the
+#     current engineering value with its unit only when valid, Quality, Commissioning state and any
+#     evidence blocking.
+
+# 18. Front/Rear stay separate: switch Both / Front only / Rear only and confirm selecting the Front
+#     measurement shows exactly that measurement and never hides, copies or alters the Rear one.
+
+# 19. Selection and workflow: select a Sensor on the map and confirm its Overview rows highlight and
+#     the Sensor detail fills; record BASELINE / STIMULUS / OPEN_CIRCUIT / RECOVERY observations with
+#     PASS / FAIL / PARTIAL and a remark, then clear the Preview result.  Confirm a Product-topology
+#     conflict cannot PASS, an unassigned Channel offers no verdict, an internal conflict is
+#     FAIL/PARTIAL only, BLOCKED stays evidence-derived, and the workflow only ever affects the
+#     selected measurement.
+
+# 20. Wall-order navigation, filters and counts: Previous/Next walk wall order (Front before Rear,
+#     gaps skipped) and stop at the edges; the physical-schedule Previous/Next still works and is
+#     labelled (schedule order); the Commissioning and Measurement and Evidence filters change only
+#     what is displayed - counts, evidence and the selected identity do not move; the Loop-Test
+#     progress shows 106 Sensors and 212 measurements derived live.
+
+# 21. Screen, recovery and final state: at 1920x1080 / 100% the page has no horizontal overflow
+#     (document.scrollingElement.scrollWidth === clientWidth), the Overview table is the only other
+#     sideways scroller, the map scrolls inside its own bounded frame only, both densities are
+#     readable, and the header with Exit and Windowed/full-screen is intact.  Stop the host - the
+#     window shows the reconnecting state with no stale values; restart it - the view recovers by
+#     itself.  Finish with git status and git diff.
+git status ; git diff
+```
+
+**Report back:** the 21-step results, the exact text of any failure, and the boundary statement shown
+on screen. Do not report a Preview verdict as a field approval, and do not treat this handoff as Owner
+Manual Review.
+
+### 16.7 Honesty statement (§23) for this pass
+
+This pass is **source + tests + documentation**. In Arena it was possible to: build the wall model and
+prove its invariants, run every Node/static gate listed in §16.5, execute the served application module
+in the test DOM over the real routes, and inspect the live host over loopback. It was **not** possible
+to: compile or run the .NET solution, open a real browser (there is no browser engine in the sandbox),
+measure real pixel layout or overflow, exercise WebView2, or observe Windows DPI/rendering. Those are
+reported as **NOT RUN IN ARENA**, and the Owner-local sequence in §16.6 is the verification of record.
+**PR #19 stays OPEN and is not merged. Owner Manual Review has not passed for this pass. Stage
+0.4C-K1 is not claimed complete.**

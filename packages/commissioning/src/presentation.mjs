@@ -171,6 +171,38 @@ export function summaryCounts(schedule, viewRows) {
   });
 }
 
+/**
+ * Loop-Test progress: a concise field-review summary over the population that can actually be loop
+ * tested - the Product-compatible measurements. The four Product-topology conflict rows (the I7/I16
+ * NON_SENSOR_GAP positions) and the 24 unassigned physical Channels are NOT loop-testable and are
+ * reported separately by the evidence counts instead of being folded into a workflow state.
+ *
+ * Every number is derived from the parsed evidence and the current Preview session; nothing is
+ * cached and no total is invented. BLOCKED stays evidence-derived: it is what the Drawing says about
+ * a row, never something a person records.
+ */
+export function loopTestSummary(schedule, sessionState = null) {
+  const counts = scheduleCounts(schedule);
+  const rows = schedule.rows.filter((row) => row.productCompatible);
+  const byState = Object.fromEntries(Object.values(COMMISSIONING_STATE).map((state) => [state, 0]));
+  for (const row of rows) {
+    const state = sessionState ? sessionState.stateOf(row) : null;
+    const effective = state ?? (row.passBlockedReason ? COMMISSIONING_STATE.BLOCKED : COMMISSIONING_STATE.NOT_TESTED);
+    byState[effective] += 1;
+  }
+  return Object.freeze({
+    productSensors: counts.productSensors,
+    productCompatibleMeasurements: counts.productCompatibleMeasurements,
+    total: rows.length,
+    byState: Object.freeze(byState),
+    eligibleForPass: rows.filter((row) => !row.passBlockedReason).length,
+    blockedFromPass: rows.filter((row) => row.passBlockedReason).length,
+    notLoopTestable: schedule.rows.length - rows.length,
+    note: 'Population: the Product-compatible measurements.'
+      + ' The four Product-topology conflict rows (I7 and I16, NON_SENSOR_GAP positions) and the 24 unassigned physical Channels are not loop-testable and are excluded.',
+  });
+}
+
 /** Legend entries for the four evidence classes plus the safety states. */
 export function legend() {
   return Object.freeze([

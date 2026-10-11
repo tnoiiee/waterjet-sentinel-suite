@@ -59,7 +59,7 @@ test('the main grid column is bounded so a wide child cannot size the page', () 
   assert.match(sectionRule, /min-width\s*:\s*0/);
 });
 
-test('the stylesheet is intact and only the table frame may scroll sideways', () => {
+test('the stylesheet is intact and only the two bounded frames may scroll sideways', () => {
   assert.equal((css.match(/\{/g) ?? []).length, (css.match(/\}/g) ?? []).length, 'the stylesheet must be brace-balanced');
   if (!css.includes('.table-wrap')) {
     assert.fail('the stylesheet must still define the table frame');
@@ -68,10 +68,59 @@ test('the stylesheet is intact and only the table frame may scroll sideways', ()
     .filter(([, , body]) => /overflow(-x)?\s*:\s*(auto|scroll)/.test(body))
     .map(([, selectors]) => selectors.split(',').map((x) => x.trim()));
   const flat = sideways.flat();
-  assert.deepEqual(flat.sort(), ['.table-wrap', '.table-wrap.scroll'].sort(),
-    'the table frame must be the only element that scrolls sideways');
+  // The Overview table frame and the Commissioning Wall Map frame. Both are bounded (max-height and
+  // max-width) so a wide child can never widen the page: the map frame is the second and final
+  // bounded frame, and no other element may scroll sideways.
+  assert.deepEqual(flat.sort(), ['.table-wrap', '.table-wrap.scroll', '.wallmap-frame'].sort(),
+    'only the table frame and the Wall Map frame may scroll sideways');
   // The page itself never scrolls: it is hidden, not auto.
   assert.equal(/html\s*,[^}]*overflow(-x)?\s*:\s*(auto|scroll)/.test(css), false);
+});
+
+test('the Commissioning Wall Map is bounded, fixed-geometry and cannot widen the page', () => {
+  // The map frame is the second bounded frame: it owns any scrolling the map needs.
+  const frame = ruleBody(css, '.wallmap-frame');
+  assert.notEqual(frame, null, 'the Wall Map frame rule must exist');
+  assert.match(frame, /overflow\s*:\s*auto/);
+  assert.match(frame, /max-height\s*:/);
+  assert.match(frame, /max-width\s*:\s*100%/);
+  assert.match(frame, /min-width\s*:\s*0/);
+  // The map itself is a fixed-geometry block: max-content tracks with fixed-size cells, so it sizes
+  // to its own content and never to the viewport, and the frame above contains the excess.
+  const map = ruleBody(css, '.wallmap');
+  assert.notEqual(map, null, 'the Wall Map grid rule must exist');
+  assert.match(map, /width\s*:\s*max-content/);
+  assert.match(map, /grid-template-columns\s*:\s*max-content/);
+  assert.match(map, /grid-template-rows\s*:\s*max-content/);
+  // Cell geometry is a fixed pixel token in both densities, in the approved compact range, and no
+  // viewport-relative width is involved anywhere in the map.
+  const root = ruleBody(css, ':root');
+  assert.match(root, /--wj-cell-w\s*:\s*\d+px/);
+  assert.match(root, /--wj-cell-h\s*:\s*\d+px/);
+  const compact = ruleBody(css, '[data-density="compact"]');
+  assert.match(compact, /--wj-cell-w\s*:\s*\d+px/);
+  assert.match(compact, /--wj-cell-h\s*:\s*\d+px/);
+  assert.equal(/100vw/.test(css), false, 'no viewport-relative width may be used');
+  // The approved U geometry: Rear on top, Front at the bottom, Left and Right spanning the sides
+  // vertically centred, compact centre - the presentation of Stage 0.2.1A.
+  const placement = (selector) => ruleBody(css, selector) ?? '';
+  assert.match(placement('.wj-band-rear'), /grid-area\s*:\s*1\s*\/\s*2/);
+  assert.match(placement('.wj-band-front'), /grid-area\s*:\s*3\s*\/\s*2/);
+  for (const side of ['.wj-band-left', '.wj-band-right']) {
+    const body = placement(side);
+    assert.match(body, /grid-area\s*:\s*1\s*\/\s*[13]\s*\/\s*span\s*3/, `${side} must span the full height of the U`);
+    assert.match(body, /align-self\s*:\s*center/, `${side} must be vertically centred like the approved side walls`);
+  }
+  assert.match(ruleBody(css, '.wallmap-hollow'), /grid-area\s*:\s*2\s*\/\s*2/);
+  // Wall grids keep the approved 6-deep geometry with 4 / 4 and 5 / 5 wall columns.
+  assert.match(css, /\.wj-band\[data-wall="LEFT"\] \.wj-cells, \.wj-band\[data-wall="RIGHT"\] \.wj-cells \{ grid-template-columns:repeat\(4, var\(--wj-cell-w\)\); \}/);
+  assert.match(css, /\.wj-band\[data-wall="REAR"\] \.wj-cells, \.wj-band\[data-wall="FRONT"\] \.wj-cells \{ grid-template-columns:repeat\(5, var\(--wj-cell-w\)\); \}/);
+  // The map lives inside its frame in the served page, and nothing on the page carries an inline
+  // style (the content security policy allows none).
+  const frameIndex = html.indexOf('id="wallmap-frame"');
+  const mapIndex = html.indexOf('id="wallmap"');
+  assert.ok(frameIndex > 0 && mapIndex > frameIndex, 'the Wall Map must sit inside its bounded frame');
+  assert.equal(/style="/.test(html), false, 'the served page must contain no inline style attribute');
 });
 
 test('the Overview table is contained in its own scroll frame', () => {
@@ -113,7 +162,7 @@ test('every flex or grid container that can hold wide content may shrink and wra
     assert.notEqual(body, null, `${selector} rule must exist`);
     assert.match(body, pattern, `${selector} must wrap rather than overflow`);
   }
-  for (const selector of ['.banner .title', '.banner-actions', '.chips', '.sections', '.view-controls', '.detail-card', '.detail-grid', '.table-wrap', '.toolbar']) {
+  for (const selector of ['.banner .title', '.banner-actions', '.chips', '.sections', '.view-controls', '.detail-card', '.detail-grid', '.table-wrap', '.toolbar', '.wallmap-frame', '.wj-band', '.wallmap-legend-item', '.wj-m']) {
     const body = ruleBody(css, selector);
     assert.notEqual(body, null, `${selector} rule must exist`);
     assert.match(body, /min-width\s*:\s*0/, `${selector} must carry min-width:0`);

@@ -90,6 +90,39 @@
       <h3>Summary</h3>
       <div class="summary" id="summary-body"></div>
 
+      <h3 id="loop-progress-h">Loop-Test progress
+        <span class="hint">over the 212 Product-compatible measurements · derived from the evidence and the Preview results</span></h3>
+      <div class="summary" id="loop-progress-body"></div>
+
+      <h3 id="wallmap-h">Commissioning Wall Map
+        <span class="hint">approved U-shaped plan view · 108 logical positions · 106 Product Sensors · read-only</span></h3>
+      <p class="note">Answering a field loop test starts here: pick the wall position, then the Front or the Rear
+      measurement of that Sensor. Every value below is a synthetic Preview observation. The Wall Map is read-only and
+      approves nothing: selecting a position opens the same read-only Sensor detail and Preview workflow as the Overview.</p>
+      <div class="toolbar" role="group" aria-label="Wall Map presentation controls (presentation only)">
+        <span class="field" id="wallmap-view-label">Measurements</span>
+        <button type="button" class="toggle" id="view-both" aria-pressed="true">Both (Front and Rear)</button>
+        <button type="button" class="toggle" id="view-front" aria-pressed="false">Front only</button>
+        <button type="button" class="toggle" id="view-rear" aria-pressed="false">Rear only</button>
+        <button type="button" id="wall-prev">&#9664; Previous (Wall order)</button>
+        <button type="button" id="wall-next">Next (Wall order) &#9654;</button>
+      </div>
+      <!--
+        The Wall Map frame is the second bounded scroll frame of this page (the Overview table is the
+        first): the map keeps its cell size and scrolls inside the frame, so the map can never widen
+        the page. The frame carries the read-only selection state as data attributes.
+      -->
+      <div class="wallmap-frame" id="wallmap-frame" data-wallmap-selection="NONE" data-measurement-view="BOTH">
+        <div class="wallmap" id="wallmap"></div>
+      </div>
+      <p class="note" id="wallmap-order-note">Wall order: approved logical position order (logical row 1 to 6, then
+      logical column 1 to 18), I7 and I16 skipped as NON_SENSOR_GAP positions, Front measurement before Rear measurement.
+      Previous/Next above walk that sequence; the Previous/Next controls in Sensor detail keep their separate physical
+      schedule order (the evidence order of the 240 rows).</p>
+      <p class="note" id="wallmap-selection-note"></p>
+      <p class="note" id="wallmap-filter-note"></p>
+      <div class="wallmap-legend" id="wallmap-legend"></div>
+
       <h3>Overview <span class="hint">240 physical Channels · the table scrolls inside its own frame</span></h3>
       <div class="filters" id="filters" role="group" aria-label="Row filters (presentation only)"></div>
       <p class="note" id="monitor-count"></p>
@@ -135,8 +168,9 @@
         <input id="remark-input" type="text" size="40" placeholder="Preview remark (not Production evidence)">
         <button type="button" id="btn-record-remark">Record remark</button>
         <button type="button" id="btn-clear-result">Clear Preview result</button>
-        <button type="button" id="btn-prev">&lt; Previous measurement</button>
-        <button type="button" id="btn-next">Next measurement &gt;</button>
+        <span class="field">Physical schedule order</span>
+        <button type="button" id="btn-prev">&lt; Previous (schedule order)</button>
+        <button type="button" id="btn-next">Next (schedule order) &gt;</button>
       </div>
       <div class="legend" id="legend"></div>
     </section>

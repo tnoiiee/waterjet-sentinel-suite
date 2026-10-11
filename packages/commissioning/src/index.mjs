@@ -39,5 +39,12 @@ export {
 
 export {
   DENSITY, DEFAULT_DENSITY, ROW_CLASS_PRESENTATION, FIELD_VERIFICATION_TEXT, FILTERS, FILTER_KEYS,
-  getFilter, buildRowView, buildRowViews, filterRows, filterCounts, summaryCounts, legend,
+  getFilter, buildRowView, buildRowViews, filterRows, filterCounts, summaryCounts, loopTestSummary,
+  legend,
 } from './presentation.mjs';
+
+export {
+  WALL_ORDER, WALL_LABELS, POSITION_KIND, MEASUREMENT_SIDE, SIDE_LABELS, MEASUREMENT_VIEW,
+  MEASUREMENT_VIEW_VALUES, WALL_ROWS, WALL_MAP_EXPECTED, WALL_MAP_ORDER_TEXT, buildWallMap,
+  visibleMeasurements, wallMeasurementKey, wallOrderIndex, wallOrderStep,
+} from './wallmap.mjs';

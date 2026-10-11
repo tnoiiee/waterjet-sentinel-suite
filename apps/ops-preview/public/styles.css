@@ -23,9 +23,17 @@
   --chip-ink:#0d1117; --chip-off:#30363d; --pressed:#1f3a5f;
   /* Comfortable density (default). */
   --fs-body:16px; --fs-table:15px; --fs-small:14px; --fs-head:19px; --pad-y:8px; --pad-x:12px; --gap:18px;
+  /* Commissioning Wall Map geometry (comfortable density). The cell carries the Sensor identity and
+     BOTH measurements, so it is wider than the single-measurement Operating cell by design; the
+     height stays in the approved compact range. Fixed sizes + the bounded frame below are what keep
+     the map from ever widening the page. */
+  --wj-cell-w:120px; --wj-cell-h:52px; --wj-gap:3px; --wj-id-h:16px;
+  --wj-id-fs:13px; --wj-value-fs:13px; --wj-meta-fs:10px; --wj-state-fs:10px; --wj-band-head-h:18px;
 }
 [data-density="compact"] {
   --fs-body:15px; --fs-table:13px; --fs-small:13px; --fs-head:17px; --pad-y:3px; --pad-x:8px; --gap:12px;
+  --wj-cell-w:112px; --wj-cell-h:48px; --wj-id-h:14px;
+  --wj-id-fs:12px; --wj-value-fs:12px; --wj-meta-fs:9px; --wj-state-fs:9px;
 }
 * { box-sizing: border-box; }
 html, body { max-width:100%; overflow-x:hidden; }
@@ -116,4 +124,68 @@ tbody tr.cm-fail td:first-child { box-shadow: inset 0 -3px 0 var(--err); }
 .modal h2 { margin-top:0; }
 .modal-actions { display:flex; gap:12px; justify-content:flex-end; margin-top:14px; }
 footer { padding:14px 24px 28px; color:var(--muted); font-size:var(--fs-small); text-align:center; }
+/* ---------------------------------------------------------------------------
+   Commissioning Wall Map: the approved U-shaped plan view, read-only.
+   Rear on top, Left and Right at the sides, Front at the bottom, compact centre. Wall grids are
+   six rows deep with 5 / 4 / 4 / 5 wall columns (no rotation, no reversal). Cells are fixed-size so
+   the map geometry and the text sizes survive any window; `.wallmap-frame` is the bounded scroll
+   frame that contains the map, so the map itself can never widen the page.
+   --------------------------------------------------------------------------- */
+.wallmap-frame { max-height:80vh; overflow:auto; max-width:100%; min-width:0; border:1px solid var(--line); border-radius:6px; background:#010409; padding:10px; }
+.wallmap { width:max-content; margin:0 auto; display:grid; grid-template-columns:max-content minmax(0, max-content) max-content; grid-template-rows:max-content max-content max-content; gap:8px; }
+.wj-band { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.wj-band-rear { grid-area:1 / 2; }
+.wj-band-front { grid-area:3 / 2; }
+/* The side walls share the vertical range of the Rear and Front blocks while their horizontal
+   ranges stay disjoint - the approved U geometry of Stage 0.2.1A. */
+.wj-band-left { grid-area:1 / 1 / span 3; align-self:center; }
+.wj-band-right { grid-area:1 / 3 / span 3; align-self:center; }
+.wallmap-hollow { grid-area:2 / 2; min-height:120px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:8px 10px; border:1px dashed var(--line); border-radius:6px; background:var(--panel); color:var(--muted); font-size:var(--fs-small); text-align:center; }
+.wj-hollow-line { font-variant-numeric:tabular-nums; }
+.wj-band-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; height:var(--wj-band-head-h); font-size:var(--fs-small); color:var(--muted); white-space:nowrap; }
+.wj-band-title { font-weight:700; color:var(--ink); }
+.wj-band-counts { font-variant-numeric:tabular-nums; }
+.wj-cells { display:grid; gap:var(--wj-gap); }
+.wj-band[data-wall="LEFT"] .wj-cells, .wj-band[data-wall="RIGHT"] .wj-cells { grid-template-columns:repeat(4, var(--wj-cell-w)); }
+.wj-band[data-wall="REAR"] .wj-cells, .wj-band[data-wall="FRONT"] .wj-cells { grid-template-columns:repeat(5, var(--wj-cell-w)); }
+.wj-cell { width:var(--wj-cell-w); height:var(--wj-cell-h); padding:1px; border:1px solid rgba(0,0,0,.45); border-radius:3px; background:var(--panel-2); display:grid; grid-template-rows:var(--wj-id-h) minmax(0, 1fr) minmax(0, 1fr); overflow:hidden; }
+/* A NON_SENSOR_GAP position: visibly a gap, never a Sensor cell. */
+.wj-cell.wj-gap { border-style:dashed; border-color:var(--tc); background:#101418; }
+.wj-cell.wj-gap .wj-id { color:var(--tc); }
+.wj-cell.wj-gap .wj-class { color:var(--tc); }
+.wj-cell[data-selected="true"] { outline:2px solid var(--info); outline-offset:1px; }
+/* Filtering is presentation only: a non-matching position is dimmed, never removed from the map. */
+.wj-cell[data-filtered="false"] { opacity:.32; }
+.wj-head { display:flex; align-items:baseline; justify-content:space-between; gap:4px; height:var(--wj-id-h); overflow:hidden; }
+.wj-id { font-weight:700; font-size:var(--wj-id-fs); line-height:var(--wj-id-h); white-space:nowrap; }
+.wj-class { font-size:var(--wj-meta-fs); color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wj-m { display:flex; align-items:baseline; gap:3px; width:100%; min-width:0; padding:0 3px; border:0; border-radius:0; background:transparent; color:var(--ink); font:inherit; text-align:left; overflow:hidden; cursor:pointer; }
+.wj-m:hover { background:#232c38; }
+.wj-m.wj-inert { cursor:default; }
+.wj-m.wj-inert:hover { background:transparent; }
+.wj-m[data-selected="true"] { background:var(--pressed); box-shadow:inset 0 0 0 1px var(--info); }
+/* Evidence blocking travels with the measurement, as in the Overview (a left inset rule + text). */
+.wj-m[data-blocked="true"] { box-shadow:inset 3px 0 0 var(--ic); }
+.wj-side { flex:none; width:9px; font-size:var(--wj-state-fs); font-weight:700; color:var(--muted); }
+.wj-val { flex:none; font-size:var(--wj-value-fs); font-weight:700; font-variant-numeric:tabular-nums; }
+.wj-unit { flex:none; font-size:var(--wj-meta-fs); color:var(--muted); }
+.wj-q { flex:none; font-size:var(--wj-meta-fs); font-weight:700; }
+.wj-state { margin-left:auto; flex:none; font-size:var(--wj-state-fs); font-weight:700; color:var(--muted); }
+/* An unavailable current value is never a number and never carries a unit. */
+.wj-m[data-invalid="true"] .wj-val { color:var(--muted); font-style:italic; font-weight:400; }
+.wj-m[data-quality="GOOD"] .wj-q { color:var(--ok); }
+.wj-m[data-quality="UNCERTAIN"] .wj-q { color:var(--warn); }
+.wj-m[data-quality="BAD"] .wj-q { color:var(--err); }
+.wj-m[data-quality="STALE"] .wj-q { color:var(--stale); }
+.wj-m[data-quality="DISABLED"] .wj-q { color:var(--muted); }
+.wj-m[data-commissioning="PASS"] .wj-state { color:var(--ok); }
+.wj-m[data-commissioning="FAIL"] .wj-state { color:var(--err); }
+.wj-m[data-commissioning="PARTIAL"] .wj-state { color:var(--warn); }
+.wj-m[data-commissioning="BLOCKED"] .wj-state { color:var(--warn); }
+.wj-m[data-commissioning="IN_PROGRESS"] .wj-state { color:var(--info); }
+.wallmap-legend { display:flex; flex-wrap:wrap; gap:4px 18px; margin:10px 0 0; font-size:var(--fs-small); color:var(--muted); }
+.wallmap-legend-item { display:flex; align-items:baseline; gap:6px; max-width:min(620px, 100%); min-width:0; }
+.wallmap-legend-item .marker { flex:none; font-weight:700; color:var(--ink); }
+/* The Loop-Test note is a full-width caption of the summary grid, never a stray cell. */
+.summary > .note { grid-column:1 / -1; margin:0; }
 @media (max-width: 900px) { .viewbar { position:static; } .detail-card dl { grid-template-columns:1fr; } }

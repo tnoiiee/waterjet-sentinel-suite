@@ -8,9 +8,10 @@
 // they look; they never touch the Mapping revision, the Runtime revision or the evidence.
 
 import {
-  DENSITY, DEFAULT_DENSITY, FIELD_VERIFICATION_TEXT, FILTERS, OBSERVATION_KIND,
-  PreviewCommissioningSession, ROW_CLASS_PRESENTATION, buildRowViews, canRecordPass, filterCounts,
-  filterRows, legend, summaryCounts,
+  DENSITY, DEFAULT_DENSITY, FIELD_VERIFICATION_TEXT, FILTERS, MEASUREMENT_VIEW, OBSERVATION_KIND,
+  PreviewCommissioningSession, ROW_CLASS_PRESENTATION, SIDE_LABELS, WALL_LABELS, buildRowViews,
+  buildWallMap, canRecordPass, filterCounts, filterRows, getFilter, legend, loopTestSummary,
+  summaryCounts, visibleMeasurements, wallMeasurementKey, wallOrderStep,
 } from '/pkg/index.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -93,7 +94,37 @@ const state = {
   density: DEFAULT_DENSITY,
   selectedKey: null,
   alert: '',
+  // Wall Map: the topology view model built once from the served matrix plus the schedule rows, and
+  // the Front/Rear presentation control. The selection is NOT duplicated here - the Wall Map and the
+  // Overview share the single `selectedKey`, so they can never disagree about what is selected.
+  wallMap: null,
+  wallMapError: '',
+  measurementView: MEASUREMENT_VIEW.BOTH,
 };
+
+/**
+ * Wall Map presentation constants. The codes are abbreviations of the Product commissioning states,
+ * used only because a Sensor cell is small: the Sensor detail and the Overview always show the full
+ * words, and the Wall Map legend states every code. They are never shown as a field approval: the
+ * Stage boundary (SIMULATION / PREVIEW, FIELD VERIFICATION PENDING) sits above and beside the map.
+ */
+const commissioningCodes = (entries) => Object.freeze(Object.fromEntries(entries));
+const COMMISSIONING_CODE = commissioningCodes([
+  ['NOT_TESTED', 'NT'],
+  ['IN_PROGRESS', 'IP'],
+  ['PASS', 'PASS'],
+  ['FAIL', 'FAIL'],
+  ['PARTIAL', 'PART'],
+  ['BLOCKED', 'BLOCK'],
+]);
+
+/** The compact quality marker: the ONE package marker, with the brackets the Overview uses removed. */
+const compactMarker = (marker) => String(marker ?? '').replace(/[[\]]/g, '');
+
+/** Short label for the commissioning state, with the full word in the tooltip and the legend. */
+const commissioningCode = (state) => COMMISSIONING_CODE[state] ?? String(state ?? '-');
+
+const sideOf = (view) => SIDE_LABELS[view?.drawingSide] ?? (view?.drawingSide ?? '-');
 
 const unavailableText = () => (state.counts ? '' : 'preview data unavailable');
 
@@ -195,6 +226,271 @@ function renderProgress() {
   ]));
 }
 
+/** Loop-Test progress over the population that can actually be loop tested (the 212 measurements). */
+function renderLoopProgress() {
+  const body = $('loop-progress-body');
+  body.replaceChildren();
+  if (!state.schedule) {
+    body.append(el('p', { class: 'note' }, 'Loop-Test progress unavailable.'));
+    return;
+  }
+  const progress = loopTestSummary(state.schedule, state.session);
+  const cells = [
+    ['Product Sensors', progress.productSensors, ''],
+    ['Product-compatible measurements', progress.productCompatibleMeasurements, ''],
+    ['NOT_TESTED', progress.byState.NOT_TESTED, ''],
+    ['IN_PROGRESS', progress.byState.IN_PROGRESS, 'info'],
+    ['PASS', progress.byState.PASS, 'ok'],
+    ['FAIL', progress.byState.FAIL, 'err'],
+    ['PARTIAL', progress.byState.PARTIAL, 'warn'],
+    ['BLOCKED', progress.byState.BLOCKED, 'warn'],
+    ['Eligible for PASS', progress.eligibleForPass, ''],
+    ['Not loop-testable', progress.notLoopTestable, ''],
+  ];
+  body.append(...cells.map(([k, v, cls]) => el('div', { class: `cell ${cls}` }, [
+    el('span', { class: 'k' }, k), el('span', { class: 'v' }, String(v)),
+  ])));
+  body.append(el('p', { class: 'note' }, progress.note));
+}
+
+// ---------------------------------------------------------------------------
+// Commissioning Wall Map (read-only U-shaped plan view of the logical matrix)
+// ---------------------------------------------------------------------------
+
+/** The active filter rule, taken from the ONE package filter set the Overview uses. */
+function viewMatchesFilter(view) {
+  if (!view) return false;
+  return getFilter(state.filter).match(view);
+}
+
+/** True when any measurement block the cell renders matches the active filter. */
+function positionMatchesFilter(position, viewByKey) {
+  return visibleMeasurements(position, state.measurementView)
+    .some((block) => viewMatchesFilter(viewByKey.get(block.key)));
+}
+
+/**
+ * One measurement block of a cell: side, current value when valid, unit when a current value exists,
+ * the quality marker and the commissioning state. A Sensor cell block is a button (it selects that
+ * exact measurement); a NON_SENSOR_GAP block is inert - a gap is never selectable as a Sensor.
+ */
+function measurementBlock(block, view, position, selected) {
+  const interactive = position.positionKind === 'SENSOR' && Boolean(view);
+  const attrs = {
+    class: `wj-m wj-${block.side.toLowerCase()}${interactive ? '' : ' wj-inert'}`,
+    'data-side': block.side,
+    'data-side-label': block.sideLabel,
+    'data-measurement-key': block.key,
+    'data-channel-key': block.channelKey,
+    'data-position-kind': position.positionKind,
+  };
+  const children = [el('span', { class: 'wj-side' }, block.side)];
+  if (!view) {
+    // Defensive: a served observation is expected for every position. Saying so is honest; showing
+    // a zero, a blank or the other side's value would not be.
+    attrs['data-quality'] = 'NOT_SERVED';
+    attrs['data-invalid'] = 'true';
+    children.push(el('span', { class: 'wj-val' }, '--'), el('span', { class: 'wj-q' }, '?'), el('span', { class: 'wj-state' }, commissioningCode('NOT_TESTED')));
+    attrs.title = `${position.label} ${block.sideLabel}: no observation was served for this measurement.`;
+    return el('div', attrs, children);
+  }
+  const valid = view.currentValueValid === true;
+  const value = valid ? String(view.engineeringValue) : '--';
+  attrs['data-quality'] = String(view.quality);
+  attrs['data-invalid'] = String(!valid);
+  attrs['data-commissioning'] = String(view.commissioningState);
+  attrs['data-blocked'] = String(Boolean(view.blockingReason));
+  attrs['data-filtered'] = String(viewMatchesFilter(view));
+  attrs['data-selected'] = String(selected);
+  if (selected) attrs['aria-current'] = 'true';
+  children.push(el('span', { class: 'wj-val' }, value));
+  // A unit exists only while a current value exists: an unavailable value never carries one.
+  if (valid && view.engineeringUnit) children.push(el('span', { class: 'wj-unit' }, String(view.engineeringUnit)));
+  children.push(el('span', { class: 'wj-q' }, compactMarker(view.qualityMarker)));
+  children.push(el('span', { class: 'wj-state' }, commissioningCode(view.commissioningState)));
+  attrs.title = `${position.label} ${block.sideLabel} measurement (${view.productMeasurementIdentity ?? '-'})`
+    + ` - Quality ${view.quality} ${view.qualityMarker}; `
+    + (valid ? `${value} ${view.engineeringUnit ?? ''}`.trim() : 'no current value is presented, so no number and no unit are shown')
+    + `; Commissioning ${view.commissioningState}`
+    + (view.blockingReason ? `; blocked from PASS: ${view.blockingReason}` : '')
+    + `; synthetic Preview observation, ${FIELD_VERIFICATION_TEXT} - not a hardware reading and not a field approval.`;
+  if (!interactive) {
+    // Drawing rows of a NON_SENSOR_GAP position: present as evidence, never selectable as a Sensor.
+    attrs['data-gap-block'] = 'true';
+    return el('div', attrs, children);
+  }
+  const button = el('button', { ...attrs, type: 'button' }, children);
+  // The SELECTION identity is the physical Channel key: the same identity the Overview, Sensor detail
+  // and the Preview workflow use, so the four surfaces can never disagree about what is selected.
+  button.addEventListener('click', () => selectMeasurement(block.channelKey));
+  return button;
+}
+
+/** One wall position cell: identity, evidence class marker and the rendered measurement blocks. */
+function wallCell(position, viewByKey) {
+  const blocks = visibleMeasurements(position, state.measurementView);
+  const isGap = position.positionKind !== 'SENSOR';
+  const selectedPosition = state.selectedKey ? state.wallMap.positionByChannelKey.get(state.selectedKey) ?? null : null;
+  const selected = selectedPosition === position;
+  const visibleViews = blocks.map((block) => viewByKey.get(block.key)).filter(Boolean);
+  const classMarkers = [...new Set(visibleViews.map((view) => view.rowClassMarker).filter(Boolean))];
+  const attrs = {
+    class: `wj-cell${isGap ? ' wj-gap' : ''}${selected ? ' wj-selected' : ''}`,
+    'data-wall': position.wall,
+    'data-slot-id': position.slotId,
+    'data-position-kind': position.positionKind,
+    'data-logical-label': position.label,
+    'data-wall-row': position.wallRow,
+    'data-wall-column': position.wallColumn,
+    'data-selected': String(selected),
+    'data-filtered': String(positionMatchesFilter(position, viewByKey)),
+  };
+  // A NON_SENSOR_GAP cell never carries a Sensor identity; that is the whole point of the position.
+  if (!isGap) attrs['data-sensor-id'] = position.sensorId;
+  const head = el('div', { class: 'wj-head' }, [
+    el('span', { class: 'wj-id' }, position.label),
+    el('span', { class: 'wj-class' }, isGap ? 'NON_SENSOR_GAP' : (classMarkers.join(' ') || '[PC]')),
+  ]);
+  const children = [head];
+  for (const block of blocks) {
+    children.push(measurementBlock(block, viewByKey.get(block.key) ?? null, position, selected && state.selectedKey === block.channelKey));
+  }
+  const cell = el('div', attrs, children);
+  if (isGap) {
+    cell.title = `${position.label} - NON_SENSOR_GAP position: never a Sensor and never a Water Jet.`
+      + ' Its two drawing rows are a Product-topology conflict, so no PASS can ever be recorded for them.';
+  }
+  return cell;
+}
+
+function wallBand(entry, viewByKey) {
+  const cells = entry.rows.flat().map((position) => wallCell(position, viewByKey));
+  return el('section', {
+    class: `wj-band wj-band-${entry.wall.toLowerCase()}`,
+    'data-wall': entry.wall,
+    'data-wall-columns': entry.wallColumns,
+    'data-wall-rows': entry.rows.length,
+    'data-sensor-count': entry.sensorCount,
+    'data-gap-count': entry.gapCount,
+    'aria-label': `${WALL_LABELS[entry.wall]}: ${entry.sensorCount} Product Sensors and ${entry.gapCount} NON_SENSOR_GAP position(s)`,
+  }, [
+    el('div', { class: 'wj-band-head' }, [
+      el('span', { class: 'wj-band-title' }, WALL_LABELS[entry.wall]),
+      el('span', { class: 'wj-band-counts' }, `${entry.sensorCount} Sensors${entry.gapCount ? ` | ${entry.gapCount} NON_SENSOR_GAP` : ''}`),
+    ]),
+    el('div', { class: 'wj-cells' }, cells),
+  ]);
+}
+
+/** The hollow centre of the U: the protected counts and the Stage boundary, never a control. */
+function wallHollow(map) {
+  return el('div', { class: 'wallmap-hollow' }, [
+    el('div', { class: 'wj-hollow-line' }, `${map.counts.logicalPositions} logical positions`),
+    el('div', { class: 'wj-hollow-line' }, `${map.counts.productSensors} Product Sensors`),
+    el('div', { class: 'wj-hollow-line' }, `${map.counts.nonSensorGaps} NON_SENSOR_GAP (${map.gapPositions.map((p) => p.label).join(', ')})`),
+    el('div', { class: 'wj-hollow-line' }, `${map.counts.productCompatibleMeasurements} measurements`),
+    el('div', { class: 'wj-hollow-line sim' }, 'SIMULATION / PREVIEW'),
+    el('div', { class: 'wj-hollow-line' }, FIELD_VERIFICATION_TEXT),
+  ]);
+}
+
+function renderWallLegend() {
+  const list = $('wallmap-legend');
+  list.replaceChildren();
+  const entries = [
+    ['[PC]', 'Product-compatible measurement (a Product Sensor identity)'],
+    ['[IC]', 'Drawing internal conflict - may record FAIL or PARTIAL, never PASS'],
+    ['NON_SENSOR_GAP', 'I7 and I16: never a Sensor and never a Water Jet; no verdict exists for them'],
+    ['OK ? X ~ OFF', 'Quality GOOD, UNCERTAIN, BAD, STALE, DISABLED (the same markers as the Overview)'],
+    ['NT IP PASS FAIL PART BLOCK', 'Commissioning NOT_TESTED, IN_PROGRESS, PASS, FAIL, PARTIAL, BLOCKED (read-only state of the Preview workflow)'],
+    ['--', 'no current value is presented: never a number, never a unit (the cause is named in Sensor detail)'],
+    ['degC', 'engineering unit, shown only while a current value exists'],
+    ['Front / Rear', 'two separate measurements: nothing here merges them and no value is copied between them'],
+    ['synthetic', `every value is a synthetic Preview observation - ${FIELD_VERIFICATION_TEXT}`],
+  ];
+  list.append(...entries.map(([marker, text]) => el('div', { class: 'wallmap-legend-item' }, [
+    el('span', { class: 'marker' }, marker), el('span', {}, text),
+  ])));
+}
+
+function renderWallMap(views) {
+  const frame = $('wallmap-frame');
+  const body = $('wallmap');
+  body.replaceChildren();
+  frame.setAttribute('data-measurement-view', state.measurementView);
+  const map = state.wallMap;
+  const selectionNote = $('wallmap-selection-note');
+  const filterNote = $('wallmap-filter-note');
+  if (!map) {
+    frame.setAttribute('data-wallmap-selection', 'UNAVAILABLE');
+    selectionNote.textContent = '';
+    filterNote.textContent = '';
+    $('wallmap-legend').replaceChildren();
+    body.append(el('p', { class: 'note' }, state.wallMapError || 'Commissioning Wall Map unavailable: the approved wall topology was not served.'));
+    return;
+  }
+  // Two views of the same served rows, deliberately: the cells are addressed by measurement identity
+  // (Sensor + Front/Rear) and the SELECTION by physical Channel key, which is the one identity the
+  // Overview, Sensor detail and the Preview workflow already use. Nothing is duplicated by this.
+  const viewByKey = new Map();
+  const viewByChannelKey = new Map();
+  for (const view of views) {
+    viewByChannelKey.set(view.key, view);
+    if (view.productMeasurementIdentity) viewByKey.set(view.productMeasurementIdentity, view);
+  }
+  const selectedPosition = state.selectedKey ? map.positionByChannelKey.get(state.selectedKey) ?? null : null;
+  const notApplicable = Boolean(state.selectedKey) && !selectedPosition;
+  frame.setAttribute('data-wallmap-selection', notApplicable ? 'NOT_APPLICABLE' : (selectedPosition ? 'POSITION' : 'NONE'));
+  frame.setAttribute('data-wallmap-focus', selectedPosition ? `${selectedPosition.positionKind}:${selectedPosition.label}` : 'NONE');
+
+  const entry = (wall) => map.walls.find((w) => w.wall === wall);
+  // Approved U-shaped arrangement (Stage 0.2.1A presentation): Rear on top, Left and Right at the
+  // sides, Front at the bottom, compact centre. The DOM order follows that convention.
+  body.append(
+    wallBand(entry('REAR'), viewByKey),
+    wallBand(entry('LEFT'), viewByKey),
+    wallHollow(map),
+    wallBand(entry('RIGHT'), viewByKey),
+    wallBand(entry('FRONT'), viewByKey),
+  );
+
+  const selectedView = state.selectedKey ? viewByChannelKey.get(state.selectedKey) ?? null : null;
+  if (notApplicable) {
+    selectionNote.textContent = 'The selected Overview row is an unassigned physical Channel (or carries no Wall Map position): '
+      + 'no Wall Map position applies, and no Sensor is selected.';
+  } else if (!selectedPosition) {
+    selectionNote.textContent = 'No measurement selected yet. Select a Wall Map position (Front or Rear) or an Overview row.';
+  } else {
+    selectionNote.textContent = `Selected: ${selectedPosition.label} ${selectedView ? sideOf(selectedView) : ''}`.trim()
+      + (selectedView
+        ? ` (${selectedView.productMeasurementIdentity ?? '-'}) - Quality ${selectedView.quality} ${selectedView.qualityMarker}, `
+          + `${selectedView.currentValueValid ? `${selectedView.engineeringValue} ${selectedView.engineeringUnit ?? ''}`.trim() : 'no current value presented'}, `
+          + `Commissioning ${selectedView.commissioningState}`
+        : '')
+      + (selectedPosition.selectableAsSensor
+        ? '. Selection only: it changes no evidence, no observation and no Preview verdict.'
+        : '. NON_SENSOR_GAP position: never a Sensor, and no PASS can ever be recorded for it.');
+  }
+
+  const dimmed = map.positions.filter((position) => !positionMatchesFilter(position, viewByKey)).length;
+  if (state.filter === 'all') {
+    filterNote.textContent = `Wall Map follows the Overview filter: no filter is active, so all ${map.positions.length} positions are shown.`;
+  } else {
+    const label = FILTERS.find((f) => f.key === state.filter)?.label ?? state.filter;
+    filterNote.textContent = `Filter '${label}' is presentation only: ${dimmed} of ${map.positions.length} positions do not match and are dimmed, `
+      + 'the map shape is kept, and the evidence, the observations, the counts and the current selection are unchanged.'
+      + (dimmed === map.positions.length
+        ? ' No Wall Map position matches this filter: the 24 unassigned physical Channels have no position in the logical matrix and are listed in the Overview.'
+        : '');
+  }
+  renderWallLegend();
+}
+
+function selectMeasurement(key) {
+  state.selectedKey = key;
+  renderMonitor();
+}
+
 function renderSensorMap() {
   const body = $('sensor-map-body');
   body.replaceChildren();
@@ -221,7 +517,8 @@ function renderSensorMap() {
     })),
   ])));
   body.append(el('p', { class: 'note' },
-    `I7 and I16 are authoritative NON_SENSOR_GAP positions: they are never Sensors and never Water Jets. `
+    `The Commissioning Wall Map below renders these same 108 positions, read-only. `
+    + `I7 and I16 are authoritative NON_SENSOR_GAP positions: they are never Sensors and never Water Jets. `
     + `The logical matrix is ${map.logicalMatrix.columns} x ${map.logicalMatrix.rows} positions.`));
 }
 
@@ -528,6 +825,8 @@ function renderMonitor() {
   renderScenarios();
   renderNodeSummary();
   renderSummary(views);
+  renderLoopProgress();
+  renderWallMap(views);
   renderFilters(views);
   renderTable(views);
   renderDetail(views);
@@ -538,6 +837,9 @@ function renderMonitor() {
   }
   $('density-comfortable').setAttribute('aria-pressed', String(state.density === DENSITY.COMFORTABLE));
   $('density-compact').setAttribute('aria-pressed', String(state.density === DENSITY.COMPACT));
+  $('view-both').setAttribute('aria-pressed', String(state.measurementView === MEASUREMENT_VIEW.BOTH));
+  $('view-front').setAttribute('aria-pressed', String(state.measurementView === MEASUREMENT_VIEW.FRONT));
+  $('view-rear').setAttribute('aria-pressed', String(state.measurementView === MEASUREMENT_VIEW.REAR));
   document.body.setAttribute('data-density', state.density);
 }
 
@@ -588,6 +890,11 @@ function wireControls() {
   });
   $('density-comfortable').addEventListener('click', () => { state.density = DENSITY.COMFORTABLE; renderMonitor(); });
   $('density-compact').addEventListener('click', () => { state.density = DENSITY.COMPACT; renderMonitor(); });
+  $('view-both').addEventListener('click', () => setMeasurementView(MEASUREMENT_VIEW.BOTH));
+  $('view-front').addEventListener('click', () => setMeasurementView(MEASUREMENT_VIEW.FRONT));
+  $('view-rear').addEventListener('click', () => setMeasurementView(MEASUREMENT_VIEW.REAR));
+  $('wall-prev').addEventListener('click', () => moveWallOrder(-1));
+  $('wall-next').addEventListener('click', () => moveWallOrder(1));
   $('btn-record-remark').addEventListener('click', () => {
     const view = currentViews().find((v) => v.key === state.selectedKey);
     if (!view) {
@@ -625,9 +932,38 @@ function wireControls() {
 }
 
 function moveCursor(direction) {
+  // Physical schedule order: the evidence order of the 240 rows. Unchanged by this pass.
   if (!state.schedule) return;
   const next = state.session.moveCursor(state.schedule, state.selectedKey, direction);
   state.selectedKey = next;
+  renderMonitor();
+}
+
+/** Wall order: the approved logical position order, Sensor by Sensor, Front measurement then Rear. */
+function moveWallOrder(direction) {
+  if (!state.wallMap) {
+    setAlert('Wall order navigation is unavailable: the approved wall topology was not served.');
+    return;
+  }
+  const step = wallOrderStep(state.wallMap, state.selectedKey, direction);
+  if (!step.moved) {
+    setAlert(direction === 1
+      ? 'End of the Wall order reached: the last Product Sensor, Rear measurement.'
+      : 'Start of the Wall order reached: the first Product Sensor, Front measurement.');
+    return;
+  }
+  state.selectedKey = step.key;
+  const label = wallMeasurementKey(state.wallMap, step.key) ?? step.key;
+  setAlert(`Wall order: ${label} selected (Front before Rear; I7 and I16 are skipped as NON_SENSOR_GAP positions).`);
+  renderMonitor();
+}
+
+/** Presentation control only: which measurement blocks the Wall Map renders. */
+function setMeasurementView(view) {
+  state.measurementView = view;
+  const label = view === MEASUREMENT_VIEW.BOTH ? 'both the Front and the Rear measurement'
+    : `only the ${view === MEASUREMENT_VIEW.FRONT ? 'Front' : 'Rear'} measurement`;
+  setAlert(`Wall Map now shows ${label}. Presentation only: the two measurements stay separate and no value is copied between them.`);
   renderMonitor();
 }
 
@@ -673,6 +1009,18 @@ async function loadInitialData() {
   state.opsSummary = opsSummary;
   state.sensorMap = sensorMap;
   state.nodeId = opsSummary.nodeSummary[0].nodeId;
+  // One canonical topology path: the served logical matrix carries the positions and the Sensor
+  // identities, the schedule rows carry the Front/Rear measurement identities. The builder refuses a
+  // topology it cannot prove (a missing wall, a duplicated Sensor, a gap that is not I7 or I16, a
+  // Sensor without exactly one Front and one Rear measurement) rather than drawing a wrong wall.
+  try {
+    state.wallMap = buildWallMap(sensorMap, schedule.rows);
+    state.wallMapError = '';
+  } catch (err) {
+    state.wallMap = null;
+    state.wallMapError = 'the approved wall topology could not be built from the served matrix and the evidence rows';
+    if (typeof console !== 'undefined') console.error('ops-preview wall map:', err.message);
+  }
 }
 
 async function boot() {
@@ -707,6 +1055,8 @@ async function boot() {
     renderOperations();
     renderNodeSummary(state.opsSummary.nodeSummary);
     renderProgress();
+    renderLoopProgress();
+    renderWallMap([]);
     renderSensorMap();
     renderMapping();
     renderDiagnostics();

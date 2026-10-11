@@ -241,6 +241,10 @@ function sensorMapPayload() {
         wallColumn: s.wallColumn,
         wallRow: s.wallRow,
         sensorId: s.sensorId,
+        // The approved logical label of the position (I7 / I16 for the NON_SENSOR_GAP positions).
+        // The equipment anchor the matrix records for a gap is deliberately NOT forwarded: no Water
+        // Jet identity may ever be derived from a Sensor wall position here.
+        logicalLabel: s.logicalLabel ?? null,
         tcChannels: s.tcChannels ?? null,
       })),
     })),
