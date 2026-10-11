@@ -239,9 +239,10 @@ test('the density controls respond and the navigation targets every section', as
     assert.equal(app.byId['app-root'].attributes['data-density'], 'comfortable');
     assert.equal(app.byId['density-comfortable'].attributes['aria-pressed'], 'true');
 
-    // Navigation: six anchors (Stage 0.4C-K2 adds Node Configuration), each pointing at a section that exists.
+    // Navigation: seven anchors (Stage 0.4C-K2 added Node Configuration, Stage 0.4C-K3 adds TC Acquisition
+    // Evidence), each pointing at a section that exists.
     const anchors = [...html.matchAll(/<a href="#([a-z-]+)">([^<]+)<\/a>/g)].map((m) => ({ id: m[1], label: m[2] }));
-    assert.equal(anchors.length, 6, 'the navigation must offer six sections');
+    assert.equal(anchors.length, 7, 'the navigation must offer seven sections');
     for (const { id, label } of anchors) {
       assert.match(html, new RegExp(`id="${id}"`), `${label} must point at a section that exists`);
     }

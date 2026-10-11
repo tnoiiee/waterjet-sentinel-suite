@@ -90,6 +90,8 @@ const state = {
   opsSummary: null,
   // The read-only TC Node configuration projection from the server. It is never edited in the browser.
   tcNodeConfiguration: null,
+  // The read-only Stage 0.4C-K3 evidence projection. Evidence and contract only; never edited here.
+  tcAcquisitionEvidence: null,
   observations: new Map(),
   // The read-only paired thermal model, rebuilt from the authoritative observations on every load. It
   // is derived state: it is never written back into an observation, a row, a count or a verdict.
@@ -712,6 +714,147 @@ function renderNodeConfiguration() {
     + 'Configured identity is not verification: reachability, acquisition, hardware verification and field verification are all unverified.';
 }
 
+// ---------------------------------------------------------------------------
+// TC Acquisition Evidence (Stage 0.4C-K3) - read-only projection of the evidence gate
+// ---------------------------------------------------------------------------
+
+/** Honest words for the K3 evidence statuses. The code stays visible next to the text. */
+const EVIDENCE_STATUS_TEXT = Object.freeze({
+  CONFIGURED_NOT_TESTED: 'CONFIGURED, NOT TESTED',
+  NOT_CONFIGURED: 'NOT CONFIGURED',
+  PROCESS_IMAGE_CANDIDATE_UNVERIFIED: 'CANDIDATE, UNVERIFIED',
+  PROCESS_IMAGE_DERIVATION_BLOCKED: 'DERIVATION BLOCKED',
+  BYTE_ORDER_UNRESOLVED: 'UNRESOLVED',
+  WORD_ORDER_UNRESOLVED: 'UNRESOLVED',
+  STATUS_LOCATION_UNRESOLVED: 'UNRESOLVED',
+  ENCODING_UNRESOLVED: 'UNRESOLVED',
+  WIRE_BREAK_DECODING_BLOCKED: 'DECODING BLOCKED',
+  FIRMWARE_NOT_VERIFIED: 'NOT VERIFIED',
+  ADDRESS_UNRESOLVED: 'UNRESOLVED',
+  FRESHNESS_THRESHOLDS_UNRESOLVED: 'OWNER INPUT PENDING',
+});
+
+const evidenceStatus = (code) => {
+  if (code === null || code === undefined) return 'NOT PROVIDED';
+  const text = EVIDENCE_STATUS_TEXT[code] ?? NODE_STATUS_TEXT[code];
+  return text ? `${text} (${code})` : String(code);
+};
+
+const withCandidate = (field) => field?.candidate
+  ? `${evidenceStatus(field.status)} · candidate ${field.candidate} [${field.candidateClass}, ${field.candidateScope}]`
+  : evidenceStatus(field?.status);
+
+const TC_EVIDENCE_ROWS = Object.freeze([
+  ['Cabinet ID', (n) => n.cabinetId ?? 'NOT PROVIDED'],
+  ['Test IP', (n) => n.ipAddress ?? 'NOT PROVIDED'],
+  ['Port', (n) => evidenceStatus(n.portStatus)],
+  ['Protocol', (n) => evidenceStatus(n.protocolStatus)],
+  ['Reachability', (n) => evidenceStatus(n.reachabilityStatus)],
+  ['Acquisition', (n) => evidenceStatus(n.acquisitionStatus)],
+  ['Communication state', (n) => evidenceStatus(n.communicationState)],
+  ['Process image', (n) => evidenceStatus(n.processImageStatus)],
+  ['Byte order', (n) => evidenceStatus(n.byteOrderStatus)],
+  ['Word order', (n) => evidenceStatus(n.wordOrderStatus)],
+  ['Wire-break decoding', (n) => evidenceStatus(n.wireBreakDecodingStatus)],
+  ['Firmware', (n) => evidenceStatus(n.firmwareStatus)],
+  ['Hardware verification', (n) => evidenceStatus(n.hardwareVerificationStatus)],
+  ['Field verification', (n) => evidenceStatus(n.fieldVerificationStatus)],
+  ['Hardware access', (n) => evidenceStatus(n.hardwareAccessStatus)],
+]);
+
+function renderTcAcquisitionEvidence() {
+  const view = state.tcAcquisitionEvidence;
+  const validation = $('tc-evidence-validation');
+  const decisions = $('tc-evidence-decisions');
+  const body = $('tc-evidence-body');
+  const sources = $('tc-evidence-sources');
+  const image = $('tc-evidence-process-image');
+  const requests = $('tc-evidence-requests');
+  const authority = $('tc-evidence-authority');
+  for (const node of [decisions, body, sources, image, requests]) node.replaceChildren();
+  if (!view) {
+    validation.textContent = 'TC acquisition evidence unavailable: the evidence projection could not be read.';
+    body.append(el('p', { class: 'note' }, 'TC acquisition evidence unavailable.'));
+    return;
+  }
+
+  validation.textContent = (view.validation.valid
+    ? `Evidence validation: 0 issues · evidence set ${view.evidenceSetId} · evidence Stage ${view.evidenceStage} · mode ${view.evidenceMode}`
+    : `Evidence validation: ${view.validation.issueCount} issue(s): ${view.validation.issueCodes.join(', ')} · evidence set ${view.evidenceSetId}`)
+    + ` · Preview identity Stage ${view.stageId}`;
+
+  const p = view.decisions.protocol;
+  const port = view.decisions.port;
+  decisions.append(definitionList([
+    ['Protocol decision', p.status],
+    ['Protocol candidate', p.candidateRef ? `${p.candidateRef} (${p.candidateStatus}) - named by ${p.candidateNamedBy.join(' + ')}; applicability ${p.applicabilityToHeadStation}; session semantics ${p.sessionSemantics}` : 'none recorded'],
+    ['Approved for a Test adapter', p.approvedForTestAdapter ? 'yes' : `no - Owner approval ${p.ownerApproval}`],
+    ['Protocol activated', p.activated ? 'yes' : 'no'],
+    ['Port decision', port.status],
+    ['Port candidate', port.candidate ? `${port.candidate.value} (${port.status})` : `none - ${port.reason ?? 'no evidence'}; no default is assumed`],
+    ['Communication state model', `${view.communicationStateModel.states.length} states, contract only; current Node state ${evidenceStatus(view.communicationStateModel.currentNodeState)}`],
+    ['Freshness thresholds', `aging ${view.freshness.thresholds.agingAfterMs} · stale ${view.freshness.thresholds.staleAfterMs} · Last-Valid retention ${view.freshness.thresholds.lastValidValueRetentionMs}`],
+  ]));
+
+  const nodes = view.nodes;
+  body.append(el('table', { id: 'tc-evidence-table' }, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { scope: 'col' }, 'Attribute'),
+      ...nodes.map((n) => el('th', { scope: 'col' }, n.nodeId ?? 'NODE ID NOT PROVIDED')),
+    ])]),
+    el('tbody', {}, TC_EVIDENCE_ROWS.map(([label, pick]) => el('tr', {}, [
+      el('th', { scope: 'row' }, label),
+      ...nodes.map((n) => el('td', {}, pick(n))),
+    ]))),
+  ]));
+
+  const byClass = Object.entries(view.claimSummary.byClass).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(' · ');
+  sources.append(el('p', { class: 'note' }, `${view.totals.claims} classified claims: ${byClass}.`));
+  sources.append(el('table', { id: 'tc-evidence-sources-table' }, [
+    el('thead', {}, [el('tr', {}, ['Source', 'Kind', 'Revision', 'Availability in session', 'Hash'].map((h) => el('th', { scope: 'col' }, h)))]),
+    el('tbody', {}, view.sources.map((s) => el('tr', {}, [
+      el('td', {}, s.title), el('td', {}, s.kind), el('td', {}, s.revision ?? 'NOT PROVIDED'), el('td', {}, s.availability),
+      el('td', {}, s.hashRecorded ? `recorded (${s.hashBasis})` : 'none'),
+    ]))),
+  ]));
+  sources.append(definitionList([
+    ['Status location', withCandidate(view.statuses.statusLocation)],
+    ['Byte order', withCandidate(view.statuses.byteOrder)],
+    ['Word order', withCandidate(view.statuses.wordOrder)],
+    ['Encoding', withCandidate(view.statuses.encoding)],
+    ['Wire-break decoding', `${evidenceStatus(view.statuses.wireBreakDecoding.status)} - ${view.statuses.wireBreakDecoding.provided.length} of ${view.statuses.wireBreakDecoding.requiredEvidence.length} required evidence items provided; the Preview scenario is synthetic`],
+  ]));
+
+  const c = view.processImageCandidate;
+  if (c.state === 'CANDIDATE_DERIVED') {
+    image.append(el('p', { class: 'note' },
+      `Derived from ${c.basisClaimIds.join(', ')}: ${c.perNodeInputWords} candidate input words per Node (${c.perNodeInputBits} bits), identical for all six Nodes as drawn. `
+      + `Status ${c.candidateStatus}; address ${evidenceStatus(c.addressStatus)}; overlap ${c.overlap ? 'DETECTED' : 'none'}; authoritative no; activation possible no.`));
+    image.append(el('table', { id: 'tc-evidence-candidate-table' }, [
+      el('thead', {}, [el('tr', {}, ['Rack slot', 'Role', 'Model', 'Drawing tag', 'Process module position', 'Process image order', 'Channels', 'Candidate words'].map((h) => el('th', { scope: 'col' }, h)))]),
+      el('tbody', {}, [
+        ...c.nonProcessModules.filter((m) => m.rackSlot === 0).map((m) => el('tr', {}, [m.rackSlot, m.role, m.model, m.drawingTag, 'n/a', 'n/a', '0', 'none (no process data)'].map((v) => el('td', {}, String(v))))),
+        ...c.modules.map((m) => el('tr', {}, [m.rackSlot, m.role, m.model, m.drawingTag, m.processModulePosition, m.processImageOrder, m.channelCount, `${m.startWord}-${m.endWord} (${m.words} words, ${m.candidateStatus})`].map((v) => el('td', {}, String(v))))),
+        ...c.nonProcessModules.filter((m) => m.rackSlot !== 0).map((m) => el('tr', {}, [m.rackSlot, m.role, m.model, m.drawingTag, 'n/a', 'n/a', '0', 'none (no process data)'].map((v) => el('td', {}, String(v))))),
+      ]),
+    ]));
+    if (view.scheduleConsistency) {
+      image.append(el('p', { class: 'note' }, `Schedule consistency: ${view.scheduleConsistency.compared} rows compared, ${view.scheduleConsistency.mismatches} mismatches - ${view.scheduleConsistency.meaning}.`));
+    }
+  } else {
+    image.append(el('p', { class: 'note' }, `Derivation blocked; address ${evidenceStatus(c.addressStatus)}. Blockers: ${c.blockers.join('; ')}.`));
+  }
+  image.append(el('p', { class: 'note' }, `Verification blockers: ${c.verificationBlockers.join('; ')}.`));
+
+  requests.append(...view.missingEvidenceRequests.map((r) => el('li', {}, [
+    el('span', { class: 'marker' }, r.requestId), ` - ${r.item} (blocks: ${r.blocks.join('; ')}) - ${r.status}`,
+  ])));
+
+  authority.textContent = `${view.authority.statements.join(' / ')}. This section sends no network request, probes no address, opens no socket, `
+    + 'contacts no device, reads no process image and offers no connection, test, activation or polling control. A candidate is not an address; '
+    + 'model-level evidence does not resolve an instance; the synthetic wire-break scenario is not physical evidence.';
+}
+
 function renderDiagnostics() {
   const body = $('diagnostics-body');
   body.replaceChildren();
@@ -1224,6 +1367,12 @@ async function loadInitialData() {
   } catch {
     state.tcNodeConfiguration = null;
   }
+  // The K3 evidence projection is isolated the same way: its failure degrades only its own section.
+  try {
+    state.tcAcquisitionEvidence = await getJson('/api/tc-acquisition-evidence');
+  } catch {
+    state.tcAcquisitionEvidence = null;
+  }
   // One canonical topology path: the served logical matrix carries the positions and the Sensor
   // identities, the schedule rows carry the Front/Rear measurement identities. The builder refuses a
   // topology it cannot prove (a missing wall, a duplicated Sensor, a gap that is not I7 or I16, a
@@ -1275,6 +1424,7 @@ async function boot() {
     renderSensorMap();
     renderMapping();
     renderNodeConfiguration();
+    renderTcAcquisitionEvidence();
     renderDiagnostics();
     await loadObservations();
     setAppState(APP_STATE.READY);

@@ -68,3 +68,17 @@ export {
   validateTcNodeConfiguration, systemTotals, buildTcNodeConfigurationView, canonicalTcNodeConfigurationText,
   tcNodeConfigurationFingerprint,
 } from './tcNodeConfiguration.mjs';
+
+export {
+  TC_ACQUISITION_EVIDENCE_SCHEMA_VERSION, TC_ACQUISITION_EVIDENCE_ID, EVIDENCE_STAGE, EVIDENCE_MODE,
+  EVIDENCE_CLASS, EVIDENCE_CLASS_VALUES, EVIDENCE_SCOPE, SOURCE_KIND, SOURCE_AVAILABILITY, VERIFICATION_STATUS,
+  PROTOCOL_DECISION_STATUS, PORT_DECISION_STATUS, FORBIDDEN_DECISION_STATUSES, BYTE_ORDER, WORD_ORDER,
+  STATUS_LOCATION, DIRECTION, MODULE_ROLE, FIELD_STATUS, CANDIDATE_STATUS, DERIVATION_STATE,
+  ACQUISITION_COMMUNICATION_STATE, ACQUISITION_COMMUNICATION_STATE_VALUES, LIVE_COMMUNICATION_STATES,
+  evidenceOnlyCommunicationState, FRESHNESS_STATE, SAMPLE_TIME_FIELDS, THRESHOLD_PENDING, FRESHNESS_THRESHOLDS,
+  classifyFreshness, DECODE_STATUS, DIAGNOSTIC_CATEGORY, SAMPLE_PROVENANCE, ACQUISITION_SAMPLE_FIELDS,
+  validateAcquisitionSample, frontRearDeltaPermitted, CLAIM_TOPIC, createTcAcquisitionEvidenceSet,
+  CANONICAL_TC_ACQUISITION_EVIDENCE, validateTcAcquisitionEvidence, deriveCandidateProcessImage,
+  compareCandidateWithSchedule, buildTcAcquisitionEvidenceView, canonicalTcAcquisitionEvidenceText,
+  tcAcquisitionEvidenceFingerprint,
+} from './tcAcquisitionEvidence.mjs';

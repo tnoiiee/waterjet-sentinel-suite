@@ -530,3 +530,53 @@ cells/overview labels confirmed on 300-DPI crops, topology pages verified
 time.
 - No connection, loop test, polling or hardware interaction was performed or
   authorised.
+
+## 14. Stage 0.4C-K3 evidence classification and intake finding (2026-10-11)
+
+### 14.1 What K3 did with this register
+
+- Every source in §13.2 was carried into the canonical Product evidence set
+  (`packages/commissioning/src/tcAcquisitionEvidence.mjs`,
+  `CANONICAL_TC_ACQUISITION_EVIDENCE`) with its revision and its recorded
+  SHA-256, marked `RECORDED_IN_0B_REVIEW_NOT_RECOMPUTED_IN_K3`: the bytes were
+  not present in the K3 sandbox, so no hash was recomputed and none was invented.
+- Twenty-four claims were classified (OWNER_CONFIRMED 2, MANUFACTURER_EVIDENCE 7,
+  DRAWING_EVIDENCE 2, REPOSITORY_CONTRACT 1, CANDIDATE_UNVERIFIED 4,
+  SYNTHETIC_TEST_ONLY 1, OWNER_INPUT_PENDING 4, HARDWARE_VERIFICATION_PENDING 2,
+  CONFLICTING_EVIDENCE 1). The full table is in
+  [STAGE_0.4C-K3_CHECKPOINT.md](STAGE_0.4C-K3_CHECKPOINT.md) §3.3.
+- The protocol named by the drawing device list (§13.3, `-A101`) and by the
+  head-station manual is recorded in Product source only as the opaque reference
+  `TC-K3-PROTOCOL-CANDIDATE-01` (repository rule S3). Its status is
+  `PROTOCOL_UNRESOLVED` with a `PROTOCOL_CANDIDATE` record; it is not approved
+  for a Test adapter and not activated. The port is `PORT_UNRESOLVED`: no source
+  in this register that is readable in the repository names it.
+
+### 14.2 Intake finding: truncated committed records
+
+The two derived artefacts of §13.4 are truncated in the committed tree:
+`evidence/tc-process-image-profile-rev1.md` ends at line 115 with a literal
+`...[truncated 3101 chars]` marker (the sections after §3 — including the
+head-station field-network session facts — are lost) and
+`evidence/tc-schedule-validation-rev1.md` ends at line 42 with a similar marker.
+Both markers were introduced by the PR #18 merge `48f0315…`. K3 did **not**
+reconstruct the lost text from memory; restoration from the Owner-held manuals
+is requested (`REQ-K3-10`). The 240-row schedule CSV is complete and its derived
+word-ordinal column equals the K3 candidate for 240/240 rows.
+
+### 14.3 Intake finding: Owner-connected source
+
+The connected Google Drive holds exactly one evidence file,
+`WJSS_TC_EVIDENCE_BASELINE_REV1.zip`, 17 345 849 bytes (equal to §13.2), Drive
+MD5 `2807f158ced9a984dea288e5ab30e2d8`. The connector cannot extract text from an
+archive, no individual manual or drawing PDF exists on the Drive, and the archive
+was not transferred, so its SHA-256 was not re-verified in K3 and its members are
+`NOT_AVAILABLE_IN_SESSION` for content (`OWNER_SOURCE_LOCATED_NOT_EXTRACTED`).
+Request: place the three manuals and the drawing on the Drive as individual PDF
+files so their text can be extracted in-session (`REQ-K3-01`, `REQ-K3-02`).
+
+### 14.4 Gates unchanged by K3
+
+`STAGE_0.4C-1_TC_ACQUISITION` and `WIRE_BREAK_DECODING` stay `BLOCKED`. No
+connection, probe, name resolution, loop test, polling or hardware interaction
+was performed or authorised. Nothing in this section is a Stage-completion claim.

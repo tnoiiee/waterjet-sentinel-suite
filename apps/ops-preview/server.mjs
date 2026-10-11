@@ -14,6 +14,9 @@
 //   GET /api/sensor-map                   the public-safe synthetic sensor-map example, read-only
 //   GET /api/tc-node-configuration        the six-Node TC configuration projection, read-only (no probe,
 //                                         no socket, no device; configuration evidence only)
+//   GET /api/tc-acquisition-evidence      the Stage 0.4C-K3 evidence and contract projection, read-only
+//                                         (classification, decision status, candidate process image;
+//                                         no probe, no socket, no device, no live communication state)
 //
 // Every other method is refused with 405, and there is no route that writes, connects, polls, reads
 // a device, changes the Mapping, or commands anything. The server binds to 127.0.0.1 only: the bind
@@ -32,6 +35,8 @@ import {
   COLUMN_COUNT, PROTECTED_BASELINE, SCENARIO_KEYS,
   CANONICAL_TC_NODE_CONFIGURATION, TC_NODE_CONFIGURATION_ID, buildTcNodeConfigurationView,
   tcNodeConfigurationFingerprint,
+  CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, compareCandidateWithSchedule,
+  deriveCandidateProcessImage, tcAcquisitionEvidenceFingerprint,
 } from '../../packages/commissioning/src/index.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -277,6 +282,28 @@ export function tcNodeConfigurationPayload() {
   };
 }
 
+/**
+ * The Stage 0.4C-K3 evidence projection. Derived ONLY from the canonical evidence set, the canonical
+ * Node configuration and the committed schedule (for a record-to-record consistency check). No
+ * request input reaches it; it names no file path, environment value, port value, protocol name or
+ * credential, and no Node in it carries a live communication state. The Preview identity stays
+ * STAGE_ID (0.4C-K2) by Owner rule; the evidence Stage is reported separately.
+ */
+export function tcAcquisitionEvidencePayload() {
+  const view = buildTcAcquisitionEvidenceView(CANONICAL_TC_ACQUISITION_EVIDENCE);
+  const digest = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
+  const fingerprint = tcAcquisitionEvidenceFingerprint(CANONICAL_TC_ACQUISITION_EVIDENCE, digest);
+  const { schedule } = loadEvidence();
+  const scheduleConsistency = compareCandidateWithSchedule(deriveCandidateProcessImage(CANONICAL_TC_ACQUISITION_EVIDENCE), schedule.rows);
+  return {
+    stageId: STAGE_ID,
+    mode: PREVIEW_MODE,
+    revision: { fingerprintSha256: fingerprint, shortRevision: fingerprint.slice(0, 12) },
+    scheduleConsistency: { ...scheduleConsistency, meaning: 'record-to-record consistency between the derived candidate and the committed schedule column; not Hardware verification' },
+    ...view,
+  };
+}
+
 function send(res, status, body, type, extra = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': type, ...extra });
   res.end(body);
@@ -330,6 +357,9 @@ export function createPreviewServer() {
       }
       if (path === '/api/tc-node-configuration') {
         return send(res, 200, JSON.stringify(tcNodeConfigurationPayload()), MIME['.json']);
+      }
+      if (path === '/api/tc-acquisition-evidence') {
+        return send(res, 200, JSON.stringify(tcAcquisitionEvidencePayload()), MIME['.json']);
       }
       const asset = path.slice(1);
       if (PUBLIC_FILES.has(asset)) {
