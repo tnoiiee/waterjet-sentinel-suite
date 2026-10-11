@@ -18,7 +18,62 @@ Primary UI Framework** (Owner decision, 2026-10-07; Production transport and cha
 subsequently authorised and **MERGED** (PR #4 to PR #11); Stage 0.4B-1 (PR #12) and Stage 0.4B-2
 (PR #14) are **MERGED**. Those statements are superseded by the current position below.
 
-**Stage 0.4C-0 — Physical Sensor Readiness, Loop-Test Requirements and Actual I/O Evidence Gate** — **CURRENT EVIDENCE GATE**. Development checkpoint with Owner decisions OQ-01 to OQ-08 recorded, on branch `arena/fecda529-waterjet-sentinel-suite`. Documentation and evidence planning only. Base `main` `29ee137c1df617a1aa3321c3c891161d5a5bb41a` (**PR #15 MERGED**; merge commit `29ee137c1df617a1aa3321c3c891161d5a5bb41a`). Checkpoint `4babdce`; Owner-decision successor `ff28d06`. **PR #16 OPEN — NOT MERGED.** Physical TC acquisition **BLOCKED** because the TC acquisition topology and the Sensor-to-TC-channel schedule are not provided (`TC_ACQUISITION_TOPOLOGY` and `SENSOR_TO_TC_CHANNEL_SCHEDULE`: NOT_PROVIDED; `STAGE_0.4C-1_TC_ACQUISITION`: BLOCKED). Physical Sensor acquisition **NOT IMPLEMENTED**. Wire-break decoding **NOT IMPLEMENTED**. Sensor Commissioning Monitor **NOT IMPLEMENTED**. Actual process-image offsets **NOT VERIFIED**. Candidate process-image information remains **NOT AUTHORITATIVE** (`CANDIDATE_UNVERIFIED`) and grants no address, no hardware readiness and no write authority. Predecessor Stage 0.4B-3 evidence (Mapping 268/268, Mapping UI 82/82, Owner Browser Review passed) is cited only and was not re-run at this head. **NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. DEVICE WRITE/CONTROL NOT AUTHORIZED.** Production device access **NOT AUTHORIZED**.
+*Historical:* **Stage 0.4C-0 — Physical Sensor Readiness, Loop-Test Requirements and
+Actual I/O Evidence Gate** was the current evidence gate at its own head (development
+checkpoint with Owner decisions OQ-01 to OQ-08, branch
+`arena/fecda529-waterjet-sentinel-suite`, base `main` `29ee137c1df617a1aa3321c3c891161d5a5bb41a`
+after **PR #15 MERGED**; checkpoint `4babdce`, successor `ff28d06`; **PR #16 was OPEN —
+NOT MERGED at that date**). It recorded TC acquisition topology and Sensor-to-TC-channel
+schedule as not provided. That position is superseded in full by the current Stage 0.4C-0B
+position below. *Historical:* Stage 0.4C-0A then established the evidence-intake structure
+and was **MERGED** through PR #17 (merge commit `3e1a7fd9d28db65221c123960a0c85b62d93949a`).
+
+**Stage 0.4C-0B — Six-Node Thermocouple Topology Baseline Rev1 — CURRENT EVIDENCE
+CLOSEOUT. `EVIDENCE_REVIEW_COMPLETE`. `FIELD_VERIFICATION_PENDING`.
+`STAGE_0.4C-1_BLOCKED`.** Development checkpoint, documentation and evidence review
+only, on branch `arena/c4b63a26-waterjet-sentinel-suite`. Approved target main baseline
+for PR #18: `3e1a7fd9d28db65221c123960a0c85b62d93949a` (PR #17 already **MERGED** into
+`main`). **PR #18 is OPEN and NOT MERGED. The Owner performs the Merge. This PR is
+documentation/evidence only; PR #18 is not merged.**
+
+Drawing and schedule: `DRAWING_BASELINE_REV1` reviewed; drawing status
+`DRAWING_PENDING_REVISION`. 240 physical schedule rows: 200 drawing-verified, 12
+drawing-internal-conflict, 4 drawing/Product-topology-conflict, 24 physical Channels
+unassigned, 212 Product-compatible measurements across 106 Product Sensors, 0 unresolved
+rows. Field verification remains pending. Accepted label equivalences (unchanged): CSV
+`DRAWING_TOPOLOGY_CONFLICT` ≡ reporting term `DRAWING_PRODUCT_TOPOLOGY_CONFLICT`; CSV
+`SPARE_UNMAPPED` ≡ reporting term `RESERVED_UNASSIGNED`. I7 and I16 are not Product
+Sensors and are not Water Jets; their four Drawing rows remain topology-conflict evidence,
+raw Drawing evidence preserved, excluded from Product mapping, `NOT_COMMISSIONED`,
+requiring field reconciliation; Product topology remains 106 Sensors / 212 measurements
+with Product representation `NON_SENSOR_GAP`. The 12 Drawing internal-conflict rows remain
+unresolved with both conflicting claims and page references preserved; they require
+Owner/field review and no conflict was resolved by inference or pattern.
+
+Process image: `DOCUMENTED_FACTORY_DEFAULT_BASELINE_REV1` — six separate TC
+cabinets/nodes, each node with one 750-362, five 750-498 modules and one 750-600; 40 TC
+input values and 40 input words per node at zero-based word offsets 0–39; FC3/FC4 read
+access documented; cyclic status bytes suppressed under the reviewed 750-362 manual
+baseline. Required state: documented = true, fieldVerified = false, hardwareReady =
+false, writeAuthority = false, fieldVerificationPending = true. **Process image
+documented but not Hardware-verified; no live communication was performed or
+implemented.** Actual field offsets, installed settings, transport identities, cycle
+behaviour and live values are not verified.
+
+Wire break: 750-498 model capability is documented, but explicit Wire-break status in the
+current Modbus cyclic image is not available / not established.
+`WIRE_BREAK_DECODING: BLOCKED`. A raw special value alone is not a confirmed Wire break.
+Wire break, disabled Channel, underrange, overrange, communication loss and stale data
+remain separate future classifications. No Product enum or Product code was changed.
+
+Boundaries retained: Physical Sensor acquisition **NOT IMPLEMENTED**. Sensor
+Commissioning Monitor **NOT IMPLEMENTED**. Hardware loop test **NOT EXECUTED**. **NO
+live Modbus communication. NO `TEST_HARDWARE` AUTHORISATION. NO `PRODUCTION`
+AUTHORISATION. NO device write/control. NO Galil implementation or authorisation.**
+No installed-instance verification. No claim of LOTO completion. No claim of operational
+readiness. Predecessor Stage 0.4B-3 evidence (Mapping 268/268, Mapping UI 82/82, Owner
+Browser Review passed) is cited only and was not re-run at this head. **DEVICE
+WRITE/CONTROL NOT AUTHORIZED.** Production device access **NOT AUTHORIZED**.
 
 WJSS is a monitoring and supervisory control system. It is **not** a Safety Instrumented
 System, and no statement in this document should be read as a safety certification or as
