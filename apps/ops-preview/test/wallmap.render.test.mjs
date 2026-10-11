@@ -461,8 +461,16 @@ test('the Wall Map follows the node-scoped scenario, keeps the boundary and repo
   });
 });
 
-test('the Wall Map presentation is bounded: fixed cells in a bounded frame, never a page-width element', () => {
-  assert.match(css, /\.wallmap-frame\s*\{[^}]*max-height\s*:/);
+test('the Wall Map presentation is bounded: fixed cells in a horizontally bounded frame, never a page-width element', () => {
+  // Owner Manual Review correction: the frame is bounded HORIZONTALLY only. The vertical axis is
+  // static (no height cap, no vertical scrolling) so the U-shape stays one continuous spatial
+  // reference; the document is the single vertical scrolling surface.
+  assert.match(css, /\.wallmap-frame\s*\{[^}]*overflow-x\s*:\s*auto/);
+  assert.match(css, /\.wallmap-frame\s*\{[^}]*overflow-y\s*:\s*hidden/);
+  assert.equal(/\.wallmap-frame\s*\{[^}]*max-height\s*:/.test(css), false,
+    'the Wall Map frame must not cap its height: the document scrolls vertically, not the frame');
+  assert.equal(/\.wallmap-frame\s*\{[^}]*overflow\s*:\s*(auto|scroll)/.test(css), false,
+    'the Wall Map frame must not use the overflow shorthand: it would scroll both axes');
   assert.match(css, /\.wallmap-frame\s*\{[^}]*max-width\s*:\s*100%/);
   assert.match(css, /\.wallmap-frame\s*\{[^}]*min-width\s*:\s*0/);
   assert.match(css, /\.wallmap\s*\{[^}]*width\s*:\s*max-content/);

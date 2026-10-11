@@ -68,9 +68,10 @@ test('the stylesheet is intact and only the two bounded frames may scroll sidewa
     .filter(([, , body]) => /overflow(-x)?\s*:\s*(auto|scroll)/.test(body))
     .map(([, selectors]) => selectors.split(',').map((x) => x.trim()));
   const flat = sideways.flat();
-  // The Overview table frame and the Commissioning Wall Map frame. Both are bounded (max-height and
-  // max-width) so a wide child can never widen the page: the map frame is the second and final
-  // bounded frame, and no other element may scroll sideways.
+  // The Overview table frame and the Commissioning Wall Map frame. Both carry bounded HORIZONTAL
+  // containment (max-width:100% + min-width:0) so a wide child can never widen the page: the map
+  // frame is the second and final bounded frame, and no other element may scroll sideways. The map
+  // frame deliberately does not cap its height - see the static-vertical-view contract below.
   assert.deepEqual(flat.sort(), ['.table-wrap', '.table-wrap.scroll', '.wallmap-frame'].sort(),
     'only the table frame and the Wall Map frame may scroll sideways');
   // The page itself never scrolls: it is hidden, not auto.
@@ -78,11 +79,12 @@ test('the stylesheet is intact and only the two bounded frames may scroll sidewa
 });
 
 test('the Commissioning Wall Map is bounded, fixed-geometry and cannot widen the page', () => {
-  // The map frame is the second bounded frame: it owns any scrolling the map needs.
+  // The map frame is the second bounded frame, and it is bounded HORIZONTALLY only: the horizontal
+  // containment keeps a wide map from widening the page, while the vertical axis is static (the
+  // static-vertical-view contract is asserted separately below).
   const frame = ruleBody(css, '.wallmap-frame');
   assert.notEqual(frame, null, 'the Wall Map frame rule must exist');
-  assert.match(frame, /overflow\s*:\s*auto/);
-  assert.match(frame, /max-height\s*:/);
+  assert.match(frame, /overflow-x\s*:\s*auto/);
   assert.match(frame, /max-width\s*:\s*100%/);
   assert.match(frame, /min-width\s*:\s*0/);
   // The map itself is a fixed-geometry block: max-content tracks with fixed-size cells, so it sizes
@@ -121,6 +123,77 @@ test('the Commissioning Wall Map is bounded, fixed-geometry and cannot widen the
   const mapIndex = html.indexOf('id="wallmap"');
   assert.ok(frameIndex > 0 && mapIndex > frameIndex, 'the Wall Map must sit inside its bounded frame');
   assert.equal(/style="/.test(html), false, 'the served page must contain no inline style attribute');
+});
+
+test('the Wall Map frame is a STATIC vertical view: horizontal containment only, never a nested vertical scrollbar', () => {
+  // Owner Manual Review correction. The U-shaped map is a spatial reference and must stay visually
+  // continuous: the document vertical scroll is the single vertical scrolling surface, and the Wall
+  // Map frame must never grow a vertical scrollbar of its own. This test separates the two axes
+  // explicitly, because "contained" only ever meant HORIZONTAL containment.
+  const frame = ruleBody(css, '.wallmap-frame');
+  assert.notEqual(frame, null, 'the Wall Map frame rule must exist');
+  const decls = frame.replace(/\s+/g, ' ').toLowerCase();
+
+  // Horizontal containment is retained: it is the only axis the frame may scroll.
+  assert.match(decls, /overflow-x\s*:\s*auto/, 'the frame must keep the bounded horizontal containment');
+  assert.match(decls, /max-width\s*:\s*100%/);
+  assert.match(decls, /min-width\s*:\s*0/);
+  assert.ok(/overflow-x\s*:\s*(auto|scroll)/.test(decls), 'horizontal scrolling must be available when the map cannot fit');
+
+  // The vertical axis never scrolls, by declaration.
+  assert.equal(/overflow-y\s*:\s*(auto|scroll)/.test(decls), false,
+    'the Wall Map frame must not declare a scrolling vertical axis');
+  assert.equal(/overflow\s*:/.test(decls), false,
+    'the overflow SHORTHAND must not be used on the Wall Map frame: it would scroll both axes');
+  // `overflow-y:visible` is deliberately not used. Next to a non-visible `overflow-x` its USED value
+  // becomes `auto` (CSS Overflow 3), so the illustrative pairing would silently reintroduce the very
+  // nested vertical scrollbar this correction removes. `overflow-y:hidden` is the explicit contract.
+  assert.equal(/overflow-y\s*:\s*visible/.test(decls), false,
+    'overflow-y:visible next to overflow-x:auto computes to auto - the nested scrollbar would return');
+  assert.match(decls, /overflow-y\s*:\s*hidden/, 'the frame must state the no-vertical-scrolling behaviour explicitly');
+
+  // No height cap of any kind: the frame always expands to the map's complete natural height.
+  assert.equal(/max-height\s*:/.test(decls), false, 'no max-height may cap the Wall Map frame');
+  assert.equal(/(?:^|[;{]\s*)height\s*:/.test(decls), false, 'no fixed height may cap the Wall Map frame');
+  // No viewport-relative height either (a vh cap is the same defect in another spelling).
+  assert.equal(/\d+\s*vh/.test(decls), false, 'no viewport-relative height may cap the Wall Map frame');
+
+  // The map keeps its complete fixed geometry: nothing may be hidden to avoid the scrollbar.
+  const map = ruleBody(css, '.wallmap');
+  assert.match(map, /width\s*:\s*max-content/, 'the map must keep its intrinsic fixed geometry');
+  assert.equal(/display\s*:\s*none/.test(map), false);
+  const cells = ruleBody(css, '.wj-cell');
+  assert.match(cells, /height\s*:\s*var\(--wj-cell-h\)/, 'cells keep their approved fixed height');
+  assert.match(cells, /width\s*:\s*var\(--wj-cell-w\)/, 'cells keep their approved fixed width');
+  // All four walls stay rendered as one continuous map: no wall may be hidden, paged or collapsed.
+  assert.notEqual(ruleBody(css, '.wj-band'), null, 'the wall band rule must still exist');
+  assert.match(ruleBody(css, '.wj-band'), /display\s*:\s*flex/, 'bands must keep their block layout, never a collapsed one');
+  for (const wall of ['LEFT', 'REAR', 'RIGHT', 'FRONT']) {
+    assert.notEqual(ruleBody(css, `.wj-band[data-wall="${wall}"] .wj-cells`), null, `${wall} wall must keep its grid`);
+  }
+  assert.equal(/--wj-cell-h\s*:\s*0/.test(css), false, 'no cell compression may be used to avoid the scrollbar');
+  assert.equal(/--wj-cell-w\s*:\s*0/.test(css), false, 'no cell compression may be used to avoid the scrollbar');
+  // The map frame is the only element that gained this contract: the page itself still never scrolls
+  // horizontally, and the Overview table keeps its own bounded local scroll frame.
+  const htmlRule = ruleBody(css, 'html');
+  const bodyRule = ruleBody(css, 'body');
+  assert.ok(hasDeclaration(htmlRule, 'overflow-x:hidden'));
+  assert.ok(hasDeclaration(bodyRule, 'overflow-x:hidden'));
+  assert.match(ruleBody(css, '.table-wrap'), /overflow-x\s*:\s*auto/);
+  // Structure: only the map is inside the frame, so the controls, the notes and the legend can never
+  // be clipped or scrolled away by the frame.
+  const frameIndex = html.indexOf('id="wallmap-frame"');
+  const mapIndex = html.indexOf('id="wallmap"');
+  const noteIndex = html.indexOf('id="wallmap-selection-note"');
+  const legendIndex = html.indexOf('id="wallmap-legend"');
+  const controlsIndex = html.indexOf('id="wall-prev"');
+  assert.ok(frameIndex > 0 && mapIndex > frameIndex, 'the map must sit inside the frame');
+  assert.ok(noteIndex > mapIndex && legendIndex > mapIndex, 'the notes and the legend stay outside the frame');
+  assert.ok(controlsIndex > 0 && controlsIndex < frameIndex, 'the presentation controls stay above the frame');
+  // No second internal viewport: the frame contains the map element and nothing else, so there is no
+  // nested scroll surface to hide part of the U-shape behind and no extra wrapper to clip it.
+  assert.match(html, /<div class="wallmap-frame" id="wallmap-frame" data-wallmap-selection="NONE" data-measurement-view="BOTH">\s*<div class="wallmap" id="wallmap"><\/div>\s*<\/div>/,
+    'the frame must contain only the map element - never an extra scrolling wrapper');
 });
 
 test('the Overview table is contained in its own scroll frame', () => {

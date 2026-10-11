@@ -737,9 +737,11 @@ carried forward unchanged.
   rules remain authoritative: a Product-topology conflict can never PASS, an unassigned Channel has no
   verdict, an internal conflict is FAIL/PARTIAL only, BLOCKED stays evidence-derived, and a Preview
   verdict approves nothing in the field.
-- **Presentation.** The map is contained in its **own bounded frame** (`.wallmap-frame`, `max-height`
-  + `max-width:100%`, `min-width:0`) so it scrolls **inside** itself and can never widen the page; the
-  Overview table remains the only other sideways scroller. Cells are fixed-size tokens in both
+- **Presentation.** The map is contained in its **own bounded frame** (`.wallmap-frame`, `max-width:100%`,
+  `min-width:0`) so it can never widen the page; the Overview table remains the only other sideways
+  scroller. *(This pass originally capped the frame height as well; Owner Manual Review found that cap
+  produced a nested vertical scrollbar inside the map, and **§17 corrects it to a static vertical
+  view** — the height cap is gone and the frame is bounded horizontally only.)* Cells are fixed-size tokens in both
   densities, in the approved compact range; the page uses no viewport-relative width and no inline
   style; quality/state are carried by text and symbols in addition to colour; the
   `SIMULATION / PREVIEW` vs field-verification distinction and the boundary text are preserved.
@@ -929,3 +931,138 @@ measure real pixel layout or overflow, exercise WebView2, or observe Windows DPI
 reported as **NOT RUN IN ARENA**, and the Owner-local sequence in §16.6 is the verification of record.
 **PR #19 stays OPEN and is not merged. Owner Manual Review has not passed for this pass. Stage
 0.4C-K1 is not claimed complete.**
+
+## 17. Owner Manual Review correction: the Wall Map is a STATIC vertical view (no nested vertical scrolling)
+
+Same Stage, same branch `arena/3be5c713-waterjet-sentinel-suite`, same **PR #19 (OPEN, NOT MERGED — do
+not merge)**, same approved base `main` `48f0315ea1bcbd3f71f46a47bb4b55fc04327487`. This pass starts at
+`34d0d8c0844aef300d85b0c87bc75dc49cd519ac` and adds one narrow checkpoint commit whose parent is
+exactly that SHA. It changes **one scrolling strategy** and the layout contracts that pin it; nothing
+else is reopened.
+
+### 17.1 Owner result, recorded as received
+
+Owner Manual Review of the Commissioning Wall Map: U-shape presentation **PASS**, 108 logical positions
+**PASS**, 106 Product Sensors **PASS**, I7 and I16 shown as `NON_SENSOR_GAP` **PASS**, Front and Rear
+presentation **PASS**, complete Wall Map rendering **PASS**, native Kiosk header inside 1920x1080
+**PASS**, Operations Preview inside the viewport **PASS** — with **one usability defect: the Wall Map
+frame carried its own vertical scrollbar**. That produced nested vertical scrolling (document scroll +
+an inner scrollbar), which split one spatial reference into two scroll positions and is not suitable
+for field loop testing.
+
+### 17.2 Exact cause and the correction
+
+**Cause.** `.wallmap-frame` was `max-height:80vh; overflow:auto`. The map's complete natural height
+(three U rows of six-deep wall grids: about 1060 px at comfortable density) exceeds `80vh` at
+1080, so the frame scrolled on **both** axes — a second vertical scrolling surface inside the page.
+
+**Correction.** The frame is now `overflow-x:auto; overflow-y:hidden;` with **no `height` and no
+`max-height`**, so it always expands to the map's complete natural height and the document is the
+single vertical scrolling surface.
+
+**Why not the illustrative `overflow-x:auto; overflow-y:visible`.** CSS Overflow 3 §3.1: when one axis
+is neither `visible` nor `clip` and the other is `visible`, the used value of the `visible` axis becomes
+`auto`. That pairing would therefore still compute to a scrolling vertical axis — the exact defect being
+removed — and would silently reintroduce the nested scrollbar the moment any height constraint appeared.
+`overflow-y:hidden` is the explicit, verifiable contract, and it is spelled out in the stylesheet
+comment and pinned by a test that refuses `overflow-y:auto|scroll|visible` **and** refuses the
+`overflow` shorthand on the frame.
+
+**Clipping (requirement 4).** The frame was already a clipping scroll container (`overflow:auto` clips
+to the padding box), so `overflow-y:hidden` clips nothing that was not already clipped, and the frame is
+now exactly content-sized with its 10 px padding preserved. To keep keyboard focus fully visible inside
+the cells — which clip their own content by design — the measurement buttons now draw their focus ring
+**inside** their box (`outline-offset:-2px`). The legend, the presentation controls, the measurement
+toggle, the wall-order controls and the selection/filter notes are all **outside** the frame, so they
+can never be clipped or scrolled away; the frame contains the map element and nothing else (no second
+internal viewport). Tooltips are native `title` attributes, unaffected by overflow.
+
+**Horizontal containment retained.** The frame keeps `overflow-x:auto`, `max-width:100%` and
+`min-width:0`: a narrow window scrolls the map sideways **inside the frame only**, the map keeps its
+fixed cell geometry, and the map can never widen the page. At 1920x1080 the map is narrower than the
+available width, so neither a page-level nor a frame-level horizontal scrollbar is produced. The
+Overview table is untouched and keeps its own bounded horizontal scroll frame.
+
+### 17.3 Changed / Unchanged / Not verified
+
+**Changed**
+
+| Path | Change |
+| --- | --- |
+| `apps/ops-preview/public/styles.css` | `.wallmap-frame` is now `overflow-x:auto; overflow-y:hidden` with no `height`/`max-height`; the Wall Map block comment documents the static vertical view and why `overflow-y:visible` is wrong; the measurement buttons gained an inset focus ring so the keyboard focus indicator can never be clipped |
+| `apps/ops-preview/public/index.html` | The comment above the frame now describes horizontal containment only and the static vertical view (**no markup change**: the frame still contains the map element and nothing else) |
+| `apps/ops-preview/test/layout.test.mjs` | The Wall Map contract test no longer expects a height cap; a new focused test separates the two axes (horizontal containment retained vs vertical scrolling prohibited, no height cap, no viewport-relative height), pins "no second internal viewport", and keeps the page-level guards and the Overview frame assertions |
+| `apps/ops-preview/test/wallmap.render.test.mjs` | The bounded-frame test now asserts `overflow-x:auto` + `overflow-y:hidden`, refuses `max-height` and the `overflow` shorthand on the frame, and keeps every 108/106/2 and interaction assertion unchanged |
+| `apps/kiosk/README.md` | The Wall Map verification paragraph now states the static vertical view and that horizontal containment is local to the frame |
+| `CHANGELOG.md`, `docs/CURRENT_STATE.md`, `docs/STAGE_0.4C-K1_CHECKPOINT.md` | This correction recorded (§16.1 points here so no Stage text contradicts the source) |
+
+**Unchanged:** the canonical Wall Map topology and its single source; 108 logical positions; 106 Product
+Sensors; the I7/I16 `NON_SENSOR_GAP` identity; the approved U-shaped geometry, wall order and row
+order; Front/Rear separation and the Both / Front only / Rear only control; the physical-Channel
+selection identity and every synchronisation (Wall Map <-> Overview <-> Sensor detail <-> workflow);
+the read-only Preview workflow and every blocking rule; wall-order and schedule-order navigation;
+filters and loop-test progress; valid / BAD / STALE presentation rules; the scenario model; the
+runtime-init module-script correction; the native Kiosk header layout; the WebView2 reference isolation,
+version `1.0.4258.31` and the lock files (no dependency touched); loopback-only binding and the approved
+origin; the strict CSP with no external assets; the reconnecting fail-safe; the confirmed exit; the
+protected evidence totals and the authoritative workbook; the read-only Preview boundary (**no MODBUS,
+no physical acquisition, no contact with `192.0.2.11`-`192.0.2.16`, no TEST_HARDWARE, no PRODUCTION, no
+device write or control**). No cell was resized, no font reduced, no wall hidden, paged, tabbed,
+collapsed or accordioned, no spacing removed, no browser zoom or display scaling required, and no
+page-level horizontal scrolling introduced.
+
+**Not verified:** Owner-local Windows/WebView2 rendering; the fullscreen visual result after the
+correction; the windowed visual result; and field loop-test usability — all awaiting the Owner rerun in
+§17.4. **There is no browser engine and no .NET SDK in Arena**, so real-browser execution and the .NET
+build/tests are **NOT RUN IN ARENA**; the CSS contracts above are source-level proofs and are explicitly
+not a visual verification.
+
+### 17.4 Owner-local rerun sequence (19 steps)
+
+```powershell
+# 1. Fast-forward to this checkpoint on the existing branch.
+git fetch origin ; git switch arena/3be5c713-waterjet-sentinel-suite ; git pull --ff-only
+# 2. Preserve the GENUINE Kiosk lock refresh: the committed lock file is the reviewed one.
+git status --porcelain apps/kiosk/packages.lock.json
+#    If dotnet asks for a refresh, let step 3 regenerate it and commit ONLY that file, reporting the
+#    SHA-256 before and after. Never hand-edit it.
+# 3. Locked restore.
+dotnet restore WaterJetSentinelSuite.sln --locked-mode
+# 4. Zero-warning Release build.  Expect 0 warnings / 0 errors.
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+# 5. Full .NET test run.  Expect 414 passed / 0 failed / 0 skipped.
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build --no-restore
+# 6. Complete Node/static gates.
+node --test apps/kiosk/test/*.test.mjs
+npm --prefix packages/commissioning run check ; npm --prefix packages/commissioning test
+npm --prefix apps/ops-preview run check ; npm --prefix apps/ops-preview test
+npm --prefix apps/mapping-config run check ; npm --prefix apps/mapping-config test
+npm --prefix packages/mapping-config run check ; npm --prefix packages/mapping-config test
+node tools/boundary-scan/boundary-scan.mjs
+git diff --check
+# 7. Start the Operations Preview host (loopback only, default port 5187).
+npm --prefix apps\ops-preview start
+# 8. Start the Kiosk shell.
+dotnet run --project apps/kiosk/Wjss.Kiosk.csproj -c Release
+# 9. Open the Commissioning Wall Map (scroll the page down to it).
+# 10. Confirm the complete U-shape is vertically static: Rear, Left, Right and Front all visible in one
+#     continuous view at 100% scaling.
+# 11. Confirm there is NO vertical scrollbar inside the Wall Map frame.
+# 12. Confirm page-level vertical scrolling is the ONLY vertical scrolling surface.
+# 13. Confirm fullscreen 1920x1080 has no page-level horizontal overflow
+#     (document.scrollingElement.scrollWidth === clientWidth).
+# 14. Narrow the window: confirm only the Wall Map frame scrolls sideways, still with no vertical
+#     scrollbar inside it and no page-level horizontal overflow.
+# 15. Confirm the Overview table still scrolls only inside its own frame.
+# 16. Confirm Sensor selection, Front/Rear synchronisation, Sensor detail and the Preview workflow
+#     still behave as reviewed.
+# 17. Confirm the native Kiosk controls (Exit Kiosk Preview, Windowed / full screen) remain visible.
+# 18. Confirm stop/restart reconnect still works (host stopped -> reconnecting state, restarted ->
+#     recovers by itself).
+# 19. Confirm the final Git status and the complete diff.
+git status ; git diff
+```
+
+**Report back** the 19-step results, the exact text of any failure, the map's on-screen appearance at
+fullscreen and in a narrow window, and the boundary statement shown on screen. A Preview verdict is
+never a field approval, and this handoff is not Owner Manual Review.

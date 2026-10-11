@@ -167,9 +167,12 @@ skipped, stopped at the edges); selecting a position highlights its Overview row
 detail, an unassigned Channel selects no Sensor, and an I7 or I16 conflict row selects the **gap**
 rather than a Sensor; the Loop-Test progress shows 106 Sensors and 212 measurements derived live; the
 filters change only what is displayed and never a count, a verdict or the selected identity; the map
-scrolls inside its own bounded frame only, the Overview table stays the only other sideways scroller,
-and the page has no horizontal overflow (`document.scrollingElement.scrollWidth === clientWidth`). A
-Preview verdict approves nothing in the field.
+is vertically **static**: the complete U-shape (Rear, Left, Right, Front) is visible as one continuous
+reference, there is **no vertical scrollbar inside the map frame**, and page-level scrolling is the only
+vertical scrolling surface. A narrow window scrolls the map **sideways inside its own frame only** (still
+with no inner vertical scrollbar); the Overview table stays the only other sideways scroller; and the
+page has no horizontal overflow (`document.scrollingElement.scrollWidth === clientWidth`). A Preview
+verdict approves nothing in the field.
 
 **Stopping:** close the shell through **Exit Kiosk Preview** (confirmed), then stop the host with
 `Ctrl+C` in its terminal.
