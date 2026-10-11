@@ -1,19 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    WJSS application-owned Windows shell - COMPILE-ONLY skeleton (Stage 0.3A-1).
+    WJSS application-owned Windows shell.
 
-    Deliberately absent in this checkpoint (0.3A-5+): the WebView2 package,
-    navigation, external-link policy, close-guard wiring, and any Runtime
-    process control. The shell never holds Production control authority
-    (ADR-0006 / Owner Stage 0.3A gate).
+    Stage 0.4C-K1 (Owner-authorized product preview development): this project is
+    now the real shell, not a compile-only skeleton. It hosts the local
+    Operations route in the fixed-name embedded web-view runtime control supplied
+    by the Owner-approved package Microsoft.Web.WebView2 (pinned centrally in
+    Directory.Packages.props; EVERGREEN runtime for this development preview).
 
-    EnableWindowsTargeting=true is set solution-wide (Directory.Build.props) so
-    a Linux .NET 10 SDK can compile this Windows-targeted skeleton in a future
-    Arena environment; it adds no behaviour.
+    What the shell owns, and nothing else:
+      starts nothing, commands nothing, parses no state, stores no credential;
+      loads only the approved loopback origin, in this window, with no address
+      bar, no tab strip, no developer tools and no external navigation;
+      presents a local Runtime-unavailable / reconnecting state without showing
+      stale values as current values;
+      provides an intentional, confirmed operator exit path.
 
-    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. WebView2 and kiosk
-    behaviour remain NOT VERIFIED.
+    The shell holds NO Production control authority, never talks to a device and
+    never writes to one. No process supervision of the Runtime is implemented in
+    this Stage: the Operator starts the local host, as the Stage runbook states.
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (no .NET SDK in the Arena
+    sandbox). The Owner-local Windows build and run are the validation of record.
+    The Kiosk lock file must be refreshed Owner-locally after the package
+    reference below is added; see apps/kiosk/README.md.
+
+    EnableWindowsTargeting=true is set solution-wide (Directory.Build.props) so a
+    non-Windows .NET SDK can compile this Windows-targeted project.
   -->
 
   <PropertyGroup>
@@ -27,5 +41,10 @@
          through the WinForms project property, never the app.manifest. -->
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Version comes from the central pin in Directory.Packages.props. -->
+    <PackageReference Include="Microsoft.Web.WebView2" />
+  </ItemGroup>
 
 </Project>

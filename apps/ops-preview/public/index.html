@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>WaterJet Sentinel — Operations (Kiosk Preview, SIMULATION ONLY)</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body id="app-root" data-density="comfortable">
+  <header class="banner" id="header">
+    <div class="title">
+      <h1>WaterJet Sentinel Suite — Operations</h1>
+      <p class="sub">Stage 0.4C-K1 · Kiosk shell Preview · Sensor Commissioning Monitor</p>
+    </div>
+    <div class="chips" id="boundary-chips" aria-live="polite"></div>
+    <div class="banner-actions">
+      <button type="button" id="exit-button" class="exit">Exit Preview</button>
+    </div>
+  </header>
+
+  <nav class="viewbar" id="viewbar" aria-label="Sections and presentation">
+    <ul class="sections" id="section-nav">
+      <li><a href="#operations">Operations</a></li>
+      <li><a href="#sensor-map">Sensor Map</a></li>
+      <li><a href="#commissioning">Commissioning Monitor</a></li>
+      <li><a href="#mapping">Mapping</a></li>
+      <li><a href="#diagnostics">Diagnostics</a></li>
+    </ul>
+    <div class="view-controls" role="group" aria-label="Presentation only: does not change evidence or state">
+      <span class="view-label">Density</span>
+      <button type="button" class="toggle" id="density-comfortable" aria-pressed="true">Comfortable</button>
+      <button type="button" class="toggle" id="density-compact" aria-pressed="false">Compact</button>
+    </div>
+  </nav>
+
+  <main>
+    <section id="operations" aria-labelledby="operations-h">
+      <h2 id="operations-h">Operations <span class="hint">read-only preview · no Production control exists</span></h2>
+      <div id="operations-body"></div>
+      <h3>Node communication summary</h3>
+      <div class="table-wrap" id="node-summary-wrap">
+        <div id="node-summary-body"></div>
+      </div>
+      <h3>Commissioning progress <span class="hint">BLOCKED is derived from the evidence, never from a verdict</span></h3>
+      <div id="progress-body"></div>
+    </section>
+
+    <section id="sensor-map" aria-labelledby="sensor-map-h">
+      <h2 id="sensor-map-h">Sensor Map <span class="hint">public-safe synthetic example · read-only</span></h2>
+      <div id="sensor-map-body"></div>
+    </section>
+
+    <section id="commissioning" aria-labelledby="commissioning-h">
+      <h2 id="commissioning-h">Sensor Commissioning Monitor
+        <span class="hint">synthetic observations · summary filters change the view only</span></h2>
+
+      <div class="toolbar">
+        <label class="field" for="scenario-select">Scenario</label>
+        <select id="scenario-select"></select>
+        <label class="field" for="node-select">Node (node-scoped scenarios)</label>
+        <select id="node-select"></select>
+        <label class="field" for="tick-input">Preview tick</label>
+        <input id="tick-input" type="number" min="0" max="99" step="1" value="0">
+        <button type="button" id="scenario-apply">Apply scenario</button>
+        <button type="button" id="scenario-reset">Reset Preview results</button>
+      </div>
+      <p class="note" id="scenario-summary"></p>
+      <p class="alert" id="alert-line" role="status"></p>
+
+      <h3>Summary</h3>
+      <div class="summary" id="summary-body"></div>
+
+      <h3>Overview <span class="hint">240 physical Channels · the table scrolls inside its own frame</span></h3>
+      <div class="filters" id="filters" role="group" aria-label="Row filters (presentation only)"></div>
+      <p class="note" id="monitor-count"></p>
+      <div class="table-wrap scroll" id="monitor-wrap">
+        <table id="monitor-table">
+          <thead>
+            <tr>
+              <th scope="col">Sensor ID</th>
+              <th scope="col">Side</th>
+              <th scope="col">Measurement</th>
+              <th scope="col">Node</th>
+              <th scope="col">Module</th>
+              <th scope="col">Ch</th>
+              <th scope="col">Terminal</th>
+              <th scope="col">Drawing state</th>
+              <th scope="col">Product compat.</th>
+              <th scope="col">Raw</th>
+              <th scope="col">Engineering value</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Quality</th>
+              <th scope="col">Diagnostic</th>
+              <th scope="col">Current valid</th>
+              <th scope="col">Last valid (historical)</th>
+              <th scope="col">Last update</th>
+              <th scope="col">Value age</th>
+              <th scope="col">Commissioning</th>
+              <th scope="col">Field verification</th>
+            </tr>
+          </thead>
+          <tbody id="monitor-table-body"></tbody>
+        </table>
+      </div>
+
+      <h3>Sensor detail <span class="hint">read-only identity, synthetic observation and Preview workflow</span></h3>
+      <div class="detail-grid">
+        <div class="detail-card" id="detail-identity"></div>
+        <div class="detail-card" id="detail-observation"></div>
+        <div class="detail-card" id="detail-workflow"></div>
+      </div>
+      <div class="toolbar" id="workflow-actions"></div>
+      <div class="toolbar">
+        <label class="field" for="remark-input">Remark</label>
+        <input id="remark-input" type="text" size="40" placeholder="Preview remark (not Production evidence)">
+        <button type="button" id="btn-record-remark">Record remark</button>
+        <button type="button" id="btn-clear-result">Clear Preview result</button>
+        <button type="button" id="btn-prev">&lt; Previous measurement</button>
+        <button type="button" id="btn-next">Next measurement &gt;</button>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section id="mapping" aria-labelledby="mapping-h">
+      <h2 id="mapping-h">Mapping <span class="hint">read-only evidence summary</span></h2>
+      <div id="mapping-body"></div>
+    </section>
+
+    <section id="diagnostics" aria-labelledby="diagnostics-h">
+      <h2 id="diagnostics-h">Diagnostics <span class="hint">simulation boundary and evidence notes</span></h2>
+      <div id="diagnostics-body"></div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="exit-guard" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exit-guard-title">
+      <h2 id="exit-guard-title">Exit Preview?</h2>
+      <p id="exit-guard-text"></p>
+      <p class="note">This action closes only the Preview shell window. It does not stop, start or command any equipment, does not write to any device, and does not change the Mapping or the Runtime. Preview verdicts are not Production evidence and are discarded with the session.</p>
+      <div class="modal-actions">
+        <button type="button" id="exit-cancel">Cancel (stay in the Preview)</button>
+        <button type="button" id="exit-confirm" class="exit">Exit Preview shell</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    WaterJet Sentinel Suite — Kiosk Preview. SIMULATION / PREVIEW · NO HARDWARE ACCESS · NO DEVICE WRITE ·
+    FIELD VERIFICATION PENDING. No Production authority of any kind.
+  </footer>
+</body>
+</html>

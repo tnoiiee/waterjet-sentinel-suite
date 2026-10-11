@@ -1,0 +1,19 @@
+{
+  "name": "@wjss/commissioning",
+  "version": "0.0.0-0.4c-k1-preview",
+  "private": true,
+  "description": "Stage 0.4C-K1 simulation-only Sensor Commissioning Monitor model: the merged 240-row drawing-derived schedule, synthetic preview observations, the ten deterministic commissioning scenarios and the preview-only commissioning workflow. Zero dependencies. No hardware access, no device write, no control authority.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "check": "node --check src/index.mjs && node --check src/schedule.mjs && node --check src/quality.mjs && node --check src/scenarios.mjs && node --check src/observation.mjs && node --check src/workflow.mjs && node --check src/presentation.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
