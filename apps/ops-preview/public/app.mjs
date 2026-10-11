@@ -1,4 +1,5 @@
-// Stage 0.4C-K1 - the Kiosk Preview Operations route with the Sensor Commissioning Monitor.
+// Stage 0.4C-K2 - the Kiosk Preview Operations route with the Sensor Commissioning Monitor and the
+// read-only TC Node Configuration section (Stage 0.4C-K1 route, extended).
 //
 // Every value is written with textContent. Nothing here connects, polls, reads or writes a device,
 // opens a socket itself, or accepts an address. The Preview workflow state lives in this browser
@@ -87,6 +88,8 @@ const state = {
   scenarios: [],
   sensorMap: null,
   opsSummary: null,
+  // The read-only TC Node configuration projection from the server. It is never edited in the browser.
+  tcNodeConfiguration: null,
   observations: new Map(),
   // The read-only paired thermal model, rebuilt from the authoritative observations on every load. It
   // is derived state: it is never written back into an observation, a row, a count or a verdict.
@@ -604,6 +607,111 @@ function renderMapping() {
     + 'The Mapping Configuration surface runs as its own separate local route; this Preview never navigates to another origin.'));
 }
 
+// ---------------------------------------------------------------------------
+// TC Node Configuration (Stage 0.4C-K2) - read-only projection of the six-Node configuration
+// ---------------------------------------------------------------------------
+
+/** Honest status words. Each status is written out as text; the codes are listed in the legend. */
+const NODE_STATUS_TEXT = Object.freeze({
+  CONFIGURED: 'CONFIGURED',
+  VALIDATION_FAILED: 'VALIDATION FAILED',
+  PORT_UNRESOLVED: 'UNRESOLVED',
+  PROTOCOL_UNRESOLVED: 'UNRESOLVED',
+  REACHABILITY_NOT_TESTED: 'NOT TESTED',
+  ACQUISITION_NOT_IMPLEMENTED: 'NOT IMPLEMENTED',
+  HARDWARE_VERIFICATION_PENDING: 'PENDING',
+  FIELD_VERIFICATION_PENDING: 'PENDING',
+  HARDWARE_ACCESS_NOT_AUTHORIZED: 'NOT AUTHORIZED',
+});
+
+const statusText = (code) => NODE_STATUS_TEXT[code] ?? (code === null || code === undefined ? 'NOT PROVIDED' : String(code));
+
+const NODE_CONFIGURATION_ROWS = Object.freeze([
+  ['Cabinet ID', (n) => n.cabinetId ?? 'NOT PROVIDED'],
+  ['Test IP', (n) => n.ipAddress ?? 'NOT PROVIDED'],
+  ['Environment', (n) => n.addressEnvironment],
+  ['Configuration mode', (n) => n.configurationMode],
+  ['Head station (expected)', (n) => `${n.expectedCouplerModel} x ${n.expectedHeadStationCount}`],
+  ['TC input modules (expected)', (n) => `${n.expectedThermocoupleModuleCount} x ${n.expectedThermocoupleModuleModel}`],
+  ['Channels per module (expected)', (n) => String(n.expectedChannelsPerThermocoupleModule)],
+  ['Physical TC Channels (expected)', (n) => String(n.expectedPhysicalChannelCount)],
+  ['End module (expected)', (n) => `${n.expectedEndModuleModel} x ${n.expectedEndModuleCount}`],
+  ['Port', (n) => statusText(n.portStatus)],
+  ['Protocol', (n) => statusText(n.protocolStatus)],
+  ['Configuration', (n) => statusText(n.configurationStatus)],
+  ['Reachability', (n) => statusText(n.reachabilityStatus)],
+  ['Acquisition', (n) => statusText(n.acquisitionStatus)],
+  ['Hardware verification', (n) => statusText(n.hardwareVerificationStatus)],
+  ['Field verification', (n) => statusText(n.fieldVerificationStatus)],
+  ['Hardware access', (n) => statusText(n.hardwareAccessStatus)],
+]);
+
+const NODE_CONFIGURATION_LEGEND = Object.freeze([
+  ['CONFIGURED', 'the identity, Cabinet and Test IP validate as one atomic configuration; it is not reachability'],
+  ['NOT TESTED (REACHABILITY_NOT_TESTED)', 'no network probe exists in this Stage, so no reachability is claimed'],
+  ['NOT IMPLEMENTED (ACQUISITION_NOT_IMPLEMENTED)', 'no physical process image is read and no Channel value is acquired'],
+  ['PENDING (HARDWARE / FIELD VERIFICATION PENDING)', 'neither the hardware nor the field installation has been verified'],
+  ['NOT AUTHORIZED (HARDWARE_ACCESS_NOT_AUTHORIZED)', 'this Stage contains no Hardware access path'],
+  ['UNRESOLVED (PORT_UNRESOLVED / PROTOCOL_UNRESOLVED)', 'no network port and no protocol are approved, so none is assumed'],
+]);
+
+function renderNodeConfiguration() {
+  const view = state.tcNodeConfiguration;
+  const body = $('node-config-body');
+  const totals = $('node-config-totals');
+  const legend = $('node-config-legend');
+  const validation = $('node-config-validation');
+  const authority = $('node-config-authority');
+  body.replaceChildren();
+  totals.replaceChildren();
+  legend.replaceChildren();
+  if (!view) {
+    validation.textContent = 'Node configuration unavailable: the configuration projection could not be read.';
+    body.append(el('p', { class: 'note' }, 'Node configuration unavailable.'));
+    return;
+  }
+
+  validation.textContent = view.validation.valid
+    ? `Configuration validation: PASSED (0 issues) · Configuration status: ${statusText(view.configurationStatus)}`
+    : `Configuration validation: FAILED (${view.validation.issueCount} issue(s): ${view.validation.issueCodes.join(', ')}) · `
+      + `Configuration status: ${statusText(view.configurationStatus)}`;
+
+  const t = view.totals;
+  totals.append(...[
+    ['Nodes', t.nodes, ''],
+    ['Cabinets', t.cabinets, ''],
+    ['TC Modules', t.thermocoupleModules, ''],
+    ['Physical TC Channels', t.physicalTcChannels, ''],
+    ['Configured Test IPs', t.configuredTestIps, 'info'],
+    ['Reachability tested', t.reachabilityTested, ''],
+    ['Acquisition verified', t.acquisitionVerified, ''],
+    ['Field verified', t.fieldVerified, ''],
+  ].map(([k, v, cls]) => el('div', { class: cls ? `cell ${cls}` : 'cell' }, [
+    el('span', { class: 'k' }, k), el('span', { class: 'v' }, String(v)),
+  ])));
+
+  // Transposed presentation: one column per Node, so all six Nodes are visible together at 1920x1080.
+  const nodes = view.nodes;
+  body.append(el('table', { id: 'node-config-table' }, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { scope: 'col' }, 'Attribute'),
+      ...nodes.map((n) => el('th', { scope: 'col' }, n.nodeId ?? 'NODE ID NOT PROVIDED')),
+    ])]),
+    el('tbody', {}, NODE_CONFIGURATION_ROWS.map(([label, pick]) => el('tr', {}, [
+      el('th', { scope: 'row' }, label),
+      ...nodes.map((n) => el('td', {}, pick(n))),
+    ]))),
+  ]));
+
+  legend.append(...NODE_CONFIGURATION_LEGEND.map(([code, meaning]) => el('li', {}, [
+    el('span', { class: 'marker' }, code), ` - ${meaning}`,
+  ])));
+
+  authority.textContent = 'NO HARDWARE ACCESS / NO DEVICE WRITE. This section sends no network request, probes no address, '
+    + 'opens no socket, contacts no device, reads no process image and offers no connection, test, activation or polling control. '
+    + 'Configured identity is not verification: reachability, acquisition, hardware verification and field verification are all unverified.';
+}
+
 function renderDiagnostics() {
   const body = $('diagnostics-body');
   body.replaceChildren();
@@ -1110,6 +1218,12 @@ async function loadInitialData() {
   state.opsSummary = opsSummary;
   state.sensorMap = sensorMap;
   state.nodeId = opsSummary.nodeSummary[0].nodeId;
+  // The TC Node configuration is isolated: a failure here degrades only its own section.
+  try {
+    state.tcNodeConfiguration = await getJson('/api/tc-node-configuration');
+  } catch {
+    state.tcNodeConfiguration = null;
+  }
   // One canonical topology path: the served logical matrix carries the positions and the Sensor
   // identities, the schedule rows carry the Front/Rear measurement identities. The builder refuses a
   // topology it cannot prove (a missing wall, a duplicated Sensor, a gap that is not I7 or I16, a
@@ -1160,6 +1274,7 @@ async function boot() {
     renderWallMap([]);
     renderSensorMap();
     renderMapping();
+    renderNodeConfiguration();
     renderDiagnostics();
     await loadObservations();
     setAppState(APP_STATE.READY);

@@ -1,4 +1,4 @@
-// Stage 0.4C-K1 - Kiosk Preview UI tests (Stage task section 16, groups A, C and D, plus the
+// Stage 0.4C-K1 (re-verified at 0.4C-K2) - Kiosk Preview UI tests (Stage task section 16, groups A, C and D, plus the
 // visual-acceptance content of section 18).
 //
 // These tests run the REAL public/app.mjs against the REAL Preview server through a stub DOM. They
@@ -45,7 +45,7 @@ const hasCell = (index, needle) => () => allCells().some((c) => c[index].include
 test('the shell shows the Stage boundary on screen', () => {
   const chips = allText(id('boundary-chips'));
   assert.match(chips, /SIMULATION \/ PREVIEW/);
-  assert.match(chips, /Stage 0\.4C-K1/);
+  assert.match(chips, /Stage 0\.4C-K2/);
   assert.match(chips, /NO HARDWARE ACCESS/);
   assert.match(chips, /NO DEVICE WRITE/);
   assert.match(chips, /FIELD VERIFICATION PENDING/);

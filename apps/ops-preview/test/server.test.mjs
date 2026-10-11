@@ -1,4 +1,4 @@
-// Stage 0.4C-K1 - Preview host tests (Stage task section 16, groups A and E).
+// Stage 0.4C-K1 (re-verified at 0.4C-K2) - Preview host tests (Stage task section 16, groups A and E).
 // The host must be loopback-only, read-only, and free of any device, transport or control route.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';

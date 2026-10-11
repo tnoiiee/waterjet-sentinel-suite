@@ -1,4 +1,4 @@
-// Stage 0.4C-K1 Front/Rear thermal-pair pass - presentation and real-page contracts for the
+// Stage 0.4C-K1 (re-verified at 0.4C-K2) Front/Rear thermal-pair pass - presentation and real-page contracts for the
 // READ-ONLY paired value (FrontTemperature - RearTemperature).
 //
 // These tests run the REAL public/app.mjs through the REAL Preview server against a stub DOM. They

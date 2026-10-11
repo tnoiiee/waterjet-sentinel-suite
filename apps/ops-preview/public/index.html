@@ -11,7 +11,7 @@
   <header class="banner" id="header">
     <div class="title">
       <h1>WaterJet Sentinel Suite — Operations</h1>
-      <p class="sub">Stage 0.4C-K1 · Kiosk shell Preview · Sensor Commissioning Monitor</p>
+      <p class="sub">Stage 0.4C-K2 · Kiosk shell Preview · Sensor Commissioning Monitor · TC Node Configuration</p>
     </div>
     <div class="chips" id="boundary-chips" aria-live="polite"></div>
     <div class="banner-actions">
@@ -44,6 +44,7 @@
       <li><a href="#sensor-map">Sensor Map</a></li>
       <li><a href="#commissioning">Commissioning Monitor</a></li>
       <li><a href="#mapping">Mapping</a></li>
+      <li><a href="#node-configuration">Node Configuration</a></li>
       <li><a href="#diagnostics">Diagnostics</a></li>
     </ul>
     <div class="view-controls" role="group" aria-label="Presentation only: does not change evidence or state">
@@ -189,6 +190,23 @@
     <section id="mapping" aria-labelledby="mapping-h">
       <h2 id="mapping-h">Mapping <span class="hint">read-only evidence summary</span></h2>
       <div id="mapping-body"></div>
+    </section>
+
+    <section id="node-configuration" aria-labelledby="node-configuration-h">
+      <h2 id="node-configuration-h">Node Configuration <span class="hint">TEST_CONFIGURATION · six TC Nodes · read-only · NO HARDWARE ACCESS / NO DEVICE WRITE</span></h2>
+      <p class="note">This section shows configured identity and the approved Test IP only. CONFIGURED means the
+      configuration validates; it does not mean the endpoint is reachable, that acquisition is implemented, or that the
+      installation is field verified. The addresses are Owner-approved TEST configuration values, not Production addresses.</p>
+      <p class="alert" id="node-config-validation" role="status"></p>
+      <h3>Aggregate totals</h3>
+      <div class="summary" id="node-config-totals"></div>
+      <h3>Six TC Nodes <span class="hint">Node, Cabinet and Test IP per Node · Port and Protocol unresolved</span></h3>
+      <div class="table-wrap" id="node-config-wrap">
+        <div id="node-config-body"></div>
+      </div>
+      <h3>Status legend <span class="hint">each status is written out as text, never shown by colour alone</span></h3>
+      <ul class="legend" id="node-config-legend"></ul>
+      <p class="note" id="node-config-authority"></p>
     </section>
 
     <section id="diagnostics" aria-labelledby="diagnostics-h">

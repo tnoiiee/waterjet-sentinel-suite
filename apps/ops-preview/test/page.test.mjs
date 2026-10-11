@@ -1,4 +1,4 @@
-// Stage 0.4C-K1 - runtime wiring and application-boot contract for the served Operations Preview.
+// Stage 0.4C-K1 (re-verified at 0.4C-K2) - runtime wiring and application-boot contract for the served Operations Preview.
 //
 // WHY THIS FILE EXISTS. The Owner Manual Review found the real Preview inert: HTML and CSS rendered
 // but nothing initialized. The cause was that the SERVED PAGE contained no <script> element at all,
@@ -239,9 +239,9 @@ test('the density controls respond and the navigation targets every section', as
     assert.equal(app.byId['app-root'].attributes['data-density'], 'comfortable');
     assert.equal(app.byId['density-comfortable'].attributes['aria-pressed'], 'true');
 
-    // Navigation: five anchors, each pointing at a section that the served page really contains.
+    // Navigation: six anchors (Stage 0.4C-K2 adds Node Configuration), each pointing at a section that exists.
     const anchors = [...html.matchAll(/<a href="#([a-z-]+)">([^<]+)<\/a>/g)].map((m) => ({ id: m[1], label: m[2] }));
-    assert.equal(anchors.length, 5, 'the navigation must offer five sections');
+    assert.equal(anchors.length, 6, 'the navigation must offer six sections');
     for (const { id, label } of anchors) {
       assert.match(html, new RegExp(`id="${id}"`), `${label} must point at a section that exists`);
     }
