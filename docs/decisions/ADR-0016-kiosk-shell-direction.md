@@ -84,3 +84,26 @@ close guarding, DPI behaviour) that must not be discovered at 0.3A-5 design time
 [`ADR-0013-offline-deployment.md`](ADR-0013-offline-deployment.md),
 [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §14.1,
 [`../../apps/kiosk/README.md`](../../apps/kiosk/README.md).
+
+
+## Status update — 2026-10-12 (Stage 0.4C-K1)
+
+- **The Owner approved the embedded web-view host dependency for the development preview:**
+  `Microsoft.Web.WebView2`, pinned `1.0.4258.31`, declared centrally in `Directory.Packages.props`
+  and referenced without a version by `apps/kiosk/Wjss.Kiosk.csproj`. The approved runtime
+  distribution is the **Evergreen** WebView2 Runtime. Using Microsoft Edge in application or kiosk
+  mode as the delivered shell, the legacy web-browser control, Electron and a source-only shell that
+  remains non-building were **rejected** by the Owner.
+- **The shell is implemented** in `apps/kiosk` (window, approved-origin navigation with refusal of
+  every other destination, popup/download/permission blocking, developer tools disabled, a visible
+  Runtime-unavailable and reconnecting state, and a confirmed Operator exit). See
+  [`../STAGE_0.4C-K1_CHECKPOINT.md`](../STAGE_0.4C-K1_CHECKPOINT.md) and
+  [`../../apps/kiosk/README.md`](../../apps/kiosk/README.md).
+- **This record keeps its DRAFT status.** Nothing here is an acceptance decision, and the gating
+  statements above are not rewritten. Where this draft describes the shell starting, awaiting and
+  supervising the `Wjss.Runtime` process, **that supervision is NOT implemented in Stage 0.4C-K1**:
+  the Operator starts the local host, and the shell only probes its health route, shows the
+  unavailable/reconnecting state and reloads when the host answers again.
+- **Not verified by this update:** the Kiosk project was not compiled or run in Arena (.NET SDK and
+  NuGet are unavailable there). Compilation, Windows behaviour, DPI rendering and the 1920x1080
+  visual acceptance remain Owner-local steps.

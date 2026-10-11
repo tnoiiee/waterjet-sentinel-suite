@@ -1,0 +1,16 @@
+{
+  "name": "@wjss/ops-preview",
+  "version": "0.0.0-0.4c-k1-preview",
+  "private": true,
+  "description": "Stage 0.4C-K1 application-owned Kiosk Preview host: the local Operations route with the Sensor Commissioning Monitor, the synthetic scenario catalogue and the read-only boundary surface. Loopback only. No hardware access, no device write, no control authority.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check public/app.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

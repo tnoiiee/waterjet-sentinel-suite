@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>WaterJet Sentinel — Operations (Kiosk Preview, SIMULATION ONLY)</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body id="app-root" data-density="comfortable">
+  <header class="banner" id="header">
+    <div class="title">
+      <h1>WaterJet Sentinel Suite — Operations</h1>
+      <p class="sub">Stage 0.4C-K1 · Kiosk shell Preview · Sensor Commissioning Monitor</p>
+    </div>
+    <div class="chips" id="boundary-chips" aria-live="polite"></div>
+    <div class="banner-actions">
+      <button type="button" id="exit-button" class="exit">Exit Preview</button>
+    </div>
+  </header>
+
+  <!--
+    Visible initialization-failure surface. It stays hidden until the application reports that it
+    could not initialize, so the Operator never faces an apparently usable but empty page. The text
+    it carries is a safe error CATEGORY: no stack trace, no local path and no internal detail.
+  -->
+  <div class="boot-error" id="boot-error" role="alert" hidden>
+    <strong>Preview initialization did not complete.</strong>
+    <span id="boot-error-detail"></span>
+  </div>
+
+  <noscript>
+    <div class="boot-error">
+      <strong>Preview initialization did not complete.</strong>
+      <span>JavaScript is disabled in this window, so the commissioning data cannot be requested and no
+      Preview control can work. This window is a read-only SIMULATION / PREVIEW and needs no permission
+      beyond the local page.</span>
+    </div>
+  </noscript>
+
+  <nav class="viewbar" id="viewbar" aria-label="Sections and presentation">
+    <ul class="sections" id="section-nav">
+      <li><a href="#operations">Operations</a></li>
+      <li><a href="#sensor-map">Sensor Map</a></li>
+      <li><a href="#commissioning">Commissioning Monitor</a></li>
+      <li><a href="#mapping">Mapping</a></li>
+      <li><a href="#diagnostics">Diagnostics</a></li>
+    </ul>
+    <div class="view-controls" role="group" aria-label="Presentation only: does not change evidence or state">
+      <span class="view-label">Density</span>
+      <button type="button" class="toggle" id="density-comfortable" aria-pressed="true">Comfortable</button>
+      <button type="button" class="toggle" id="density-compact" aria-pressed="false">Compact</button>
+    </div>
+  </nav>
+
+  <main>
+    <section id="operations" aria-labelledby="operations-h">
+      <h2 id="operations-h">Operations <span class="hint">read-only preview · no Production control exists</span></h2>
+      <div id="operations-body"></div>
+      <h3>Node communication summary</h3>
+      <div class="table-wrap" id="node-summary-wrap">
+        <div id="node-summary-body"></div>
+      </div>
+      <h3>Commissioning progress <span class="hint">BLOCKED is derived from the evidence, never from a verdict</span></h3>
+      <div id="progress-body"></div>
+    </section>
+
+    <section id="sensor-map" aria-labelledby="sensor-map-h">
+      <h2 id="sensor-map-h">Sensor Map <span class="hint">public-safe synthetic example · read-only</span></h2>
+      <div id="sensor-map-body"></div>
+    </section>
+
+    <section id="commissioning" aria-labelledby="commissioning-h">
+      <h2 id="commissioning-h">Sensor Commissioning Monitor
+        <span class="hint">synthetic observations · summary filters change the view only</span></h2>
+
+      <div class="toolbar">
+        <label class="field" for="scenario-select">Scenario</label>
+        <select id="scenario-select"></select>
+        <label class="field" for="node-select">Node (node-scoped scenarios)</label>
+        <select id="node-select"></select>
+        <label class="field" for="tick-input">Preview tick</label>
+        <input id="tick-input" type="number" min="0" max="99" step="1" value="0">
+        <button type="button" id="scenario-apply">Apply scenario</button>
+        <button type="button" id="scenario-reset">Reset Preview results</button>
+      </div>
+      <p class="note" id="scenario-summary"></p>
+      <p class="alert" id="alert-line" role="status"></p>
+
+      <h3>Summary</h3>
+      <div class="summary" id="summary-body"></div>
+
+      <h3 id="loop-progress-h">Loop-Test progress
+        <span class="hint">over the 212 Product-compatible measurements · derived from the evidence and the Preview results</span></h3>
+      <div class="summary" id="loop-progress-body"></div>
+
+      <h3 id="wallmap-h">Commissioning Wall Map
+        <span class="hint">approved U-shaped plan view · 108 logical positions · 106 Product Sensors · read-only</span></h3>
+      <p class="note">Each Sensor cell also shows the read-only paired value <strong>dFR</strong> =
+      FrontTemperature - RearTemperature, with an explicit sign and the unit only while it is available. Front is the
+      furnace-facing fin measurement; Rear is the paired waterwall-tube-side reference. The paired value is a derived
+      read-only diagnostic / trend: it has no Channel, no Sensor identity, no commissioning state and no Preview verdict
+      of its own, and it can never trigger an alarm, a queue, a cleaning job or any control.</p>
+      <p class="note">Answering a field loop test starts here: pick the wall position, then the Front or the Rear
+      measurement of that Sensor. Every value below is a synthetic Preview observation. The Wall Map is read-only and
+      approves nothing: selecting a position opens the same read-only Sensor detail and Preview workflow as the Overview.</p>
+      <div class="toolbar" role="group" aria-label="Wall Map presentation controls (presentation only)">
+        <span class="field" id="wallmap-view-label">Measurements</span>
+        <button type="button" class="toggle" id="view-both" aria-pressed="true">Both (Front and Rear)</button>
+        <button type="button" class="toggle" id="view-front" aria-pressed="false">Front only</button>
+        <button type="button" class="toggle" id="view-rear" aria-pressed="false">Rear only</button>
+        <button type="button" id="wall-prev">&#9664; Previous (Wall order)</button>
+        <button type="button" id="wall-next">Next (Wall order) &#9654;</button>
+      </div>
+      <!--
+        The Wall Map frame is the second HORIZONTALLY bounded frame of this page (the Overview table is
+        the first): the map keeps its cell size and scrolls sideways inside the frame, so the map can
+        never widen the page. The frame is deliberately NOT bounded vertically and never scrolls
+        vertically - the complete U-shape stays one continuous spatial reference and the document is
+        the only vertical scrolling surface (Owner Manual Review correction). The frame carries the
+        read-only selection state as data attributes.
+      -->
+      <div class="wallmap-frame" id="wallmap-frame" data-wallmap-selection="NONE" data-measurement-view="BOTH">
+        <div class="wallmap" id="wallmap"></div>
+      </div>
+      <p class="note" id="wallmap-order-note">Wall order: approved logical position order (logical row 1 to 6, then
+      logical column 1 to 18), I7 and I16 skipped as NON_SENSOR_GAP positions, Front measurement before Rear measurement.
+      Previous/Next above walk that sequence; the Previous/Next controls in Sensor detail keep their separate physical
+      schedule order (the evidence order of the 240 rows).</p>
+      <p class="note" id="wallmap-selection-note"></p>
+      <p class="note" id="wallmap-filter-note"></p>
+      <div class="wallmap-legend" id="wallmap-legend"></div>
+
+      <h3>Overview <span class="hint">240 physical Channels · the table scrolls inside its own frame</span></h3>
+      <div class="filters" id="filters" role="group" aria-label="Row filters (presentation only)"></div>
+      <p class="note" id="monitor-count"></p>
+      <div class="table-wrap scroll" id="monitor-wrap">
+        <table id="monitor-table">
+          <thead>
+            <tr>
+              <th scope="col">Sensor ID</th>
+              <th scope="col">Side</th>
+              <th scope="col">Measurement</th>
+              <th scope="col">Node</th>
+              <th scope="col">Module</th>
+              <th scope="col">Ch</th>
+              <th scope="col">Terminal</th>
+              <th scope="col">Drawing state</th>
+              <th scope="col">Product compat.</th>
+              <th scope="col">Raw</th>
+              <th scope="col">Engineering value</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Quality</th>
+              <th scope="col">Diagnostic</th>
+              <th scope="col">Current valid</th>
+              <th scope="col">Last valid (historical)</th>
+              <th scope="col">Last update</th>
+              <th scope="col">Value age</th>
+              <th scope="col">Commissioning</th>
+              <th scope="col">Field verification</th>
+            </tr>
+          </thead>
+          <tbody id="monitor-table-body"></tbody>
+        </table>
+      </div>
+
+      <h3>Sensor detail <span class="hint">read-only identity, synthetic observation, paired thermal diagnostic and Preview workflow</span></h3>
+      <div class="detail-grid">
+        <div class="detail-card" id="detail-identity"></div>
+        <div class="detail-card" id="detail-observation"></div>
+        <!-- Read-only derived paired value. It is NOT a measurement: it has no Channel, no Sensor
+             identity of its own, no commissioning state and no Preview workflow. -->
+        <div class="detail-card" id="detail-pair" data-pair-state="DIFFERENTIAL_UNAVAILABLE"></div>
+        <div class="detail-card" id="detail-workflow"></div>
+      </div>
+      <div class="toolbar" id="workflow-actions"></div>
+      <div class="toolbar">
+        <label class="field" for="remark-input">Remark</label>
+        <input id="remark-input" type="text" size="40" placeholder="Preview remark (not Production evidence)">
+        <button type="button" id="btn-record-remark">Record remark</button>
+        <button type="button" id="btn-clear-result">Clear Preview result</button>
+        <span class="field">Physical schedule order</span>
+        <button type="button" id="btn-prev">&lt; Previous (schedule order)</button>
+        <button type="button" id="btn-next">Next (schedule order) &gt;</button>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section id="mapping" aria-labelledby="mapping-h">
+      <h2 id="mapping-h">Mapping <span class="hint">read-only evidence summary</span></h2>
+      <div id="mapping-body"></div>
+    </section>
+
+    <section id="diagnostics" aria-labelledby="diagnostics-h">
+      <h2 id="diagnostics-h">Diagnostics <span class="hint">simulation boundary and evidence notes</span></h2>
+      <div id="diagnostics-body"></div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="exit-guard" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exit-guard-title">
+      <h2 id="exit-guard-title">Exit Preview?</h2>
+      <p id="exit-guard-text"></p>
+      <p class="note">This action closes only the Preview shell window. It does not stop, start or command any equipment, does not write to any device, and does not change the Mapping or the Runtime. Preview verdicts are not Production evidence and are discarded with the session.</p>
+      <div class="modal-actions">
+        <button type="button" id="exit-cancel">Cancel (stay in the Preview)</button>
+        <button type="button" id="exit-confirm" class="exit">Exit Preview shell</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    WaterJet Sentinel Suite — Kiosk Preview. SIMULATION / PREVIEW · NO HARDWARE ACCESS · NO DEVICE WRITE ·
+    FIELD VERIFICATION PENDING. No Production authority of any kind.
+  </footer>
+
+  <!--
+    The application module. `type="module"` is required: app.mjs uses ESM imports, and this is the
+    only way the browser loads it (deferred by definition, so the DOM above exists first). Removing
+    this element leaves the page rendered but inert - see apps/ops-preview/README-free note in
+    apps/kiosk/README.md and docs/STAGE_0.4C-K1_CHECKPOINT.md section 15.
+  -->
+  <script type="module" src="/app.mjs"></script>
+</body>
+</html>

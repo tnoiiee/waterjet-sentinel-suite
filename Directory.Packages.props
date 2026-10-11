@@ -11,12 +11,15 @@
     part of the same checkpoint review; any bump must update this file in a
     review-correction commit.
 
-    Approved minimum set only (Stage 0.3A Scope Gate, Owner amendment):
-      Microsoft.NET.Test.Sdk, xunit, xunit.runner.visualstudio.
-    Explicitly not added: coverlet, the embedded web-view package, a third-party
-    logging provider, a validation library, and any database or physical-
-    transport vendor package (the S3 list in tools/boundary-scan is the machine
-    check of this rule).
+    Approved minimum set: Microsoft.NET.Test.Sdk, xunit, xunit.runner.visualstudio
+    (Stage 0.3A Scope Gate, Owner amendment), plus the embedded web-view host
+    Microsoft.Web.WebView2 (Stage 0.4C-K1 Owner dependency decision, 2026-10-12:
+    real application-owned WinForms shell, Evergreen runtime, minimum required
+    change only, no dependency refresh beyond this package).
+
+    Still not added: coverlet, a third-party logging provider, a validation
+    library, and any database or physical-transport vendor package (the S3 list
+    in tools/boundary-scan is the machine check of this rule).
   -->
 
   <PropertyGroup>
@@ -29,6 +32,12 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
     <PackageVersion Include="xunit" Version="2.9.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!--
+      Kiosk shell WebView host. Owner-approved package and exact pinned version
+      (Stage 0.4C-K1 decision). The Kiosk project references it WITHOUT a version
+      so this pin stays the single source of the version.
+    -->
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
   </ItemGroup>
 
 </Project>
