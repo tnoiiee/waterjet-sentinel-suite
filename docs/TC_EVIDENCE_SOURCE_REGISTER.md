@@ -12,6 +12,7 @@ commissioning record.
 | Created at | Approved remote-main base `bd1437586af73a33d43dfafce27b27538183a283` (PR #16 merge commit) |
 | Governing decisions | Stage 0.4C-0 Owner decisions OQ-01 to OQ-04, treated as authoritative and protected |
 | Current gate | `TC_ACQUISITION_TOPOLOGY: NOT_PROVIDED` · `SENSOR_TO_TC_CHANNEL_SCHEDULE: NOT_PROVIDED` · `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED` · `WIRE_BREAK_DECODING: BLOCKED` |
+| Stage 0.4C-0B review (2026-10-11) | Brief-stated Owner statements recorded as `PROVIDED_UNVERIFIED` (TCEV-12, TCEV-13; `REQ-TC-001`, `REQ-TC-002` at statement-only scope); drawings and manuals recorded `NOT_AVAILABLE_IN_SESSION` (TCEV-14 … TCEV-16); schedule derivation STOPPED with 0 rows — see §12 and [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md). No verified state was widened |
 | Companion record | [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHECKPOINT.md) |
 
 **Binding rule.** No entry in this register has been populated with an invented value. Where an
@@ -140,20 +141,23 @@ none is listed as favoured. Listing a favourite would be an assumption, not evid
 
 | Field | Value | State | Scope | Blocks |
 |---|---|---|---|---|
-| Controller or head station identity | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002 |
-| Rack or node name | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002 |
+| Controller or head station identity | 750-362 × 6, one per node — brief-stated, Stage 0.4C-0B §2 | `PROVIDED_UNVERIFIED` | Stated instance count, not verified (see §12) | REQ-TC-002 |
+| Rack or node name | Proposed labels `TC-NODE-01` … `TC-NODE-06` — brief-stated, Stage 0.4C-0B §2.3 | `PROVIDED_UNVERIFIED` | Proposed labels only, not locations or verified instances | REQ-TC-002 |
 | Module position | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002 |
-| Module model | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002 |
-| Channel capacity per module | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002 |
+| Module model | 750-498 × 30 (5 per node), 750-600 × 6 — brief-stated, Stage 0.4C-0B §2 | `PROVIDED_UNVERIFIED` | Stated instance count, not verified (see §12) | REQ-TC-002 |
+| Channel capacity per module | 8 TC input Channels per 750-498 — brief-stated, Stage 0.4C-0B §2 | `PROVIDED_UNVERIFIED` | `MODEL_LEVEL` | REQ-TC-002 |
 | Channel numbering basis (0-based / 1-based) | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002, REQ-TC-009 |
 | Process-data role (contributing / non-contributing) | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002 |
 | Actual configuration-tool position | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-009 |
-| Count of acquisition devices / modules | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-002 |
+| Count of acquisition devices / modules | 6 nodes; 750-362 × 6, 750-498 × 30, 750-600 × 6 — brief-stated, Stage 0.4C-0B §2 | `PROVIDED_UNVERIFIED` | Stated instance count, not verified (see §12) | REQ-TC-002 |
 | Evidence source and scope per row | `NOT_PROVIDED` | `NOT_PROVIDED` | — | REQ-TC-009 |
 
 **Not derived (binding).** No module count has been computed from 212 Channels divided by any
 assumed Channel capacity. The device count and per-device capacity are independent Owner facts
-(REQ-TC-002); deriving one from the other would invent both.
+(REQ-TC-002); deriving one from the other would invent both. The Stage 0.4C-0B counts above
+are recorded **as brief-stated Owner facts**, not computed — the 240/212/28 arithmetic in the
+checkpoint recomputes the brief's own stated totals as a consistency check, not as an
+independent derivation.
 
 **Domain A positions are not reused.** The 23 RackSlots and the configuration-tool positions
 `Pos. 01–20` recorded in Stage 0.4B-3 and Stage 0.4C-0 describe the **Domain A** rack. They are
@@ -240,6 +244,11 @@ any case.
 **No transport vocabulary is asserted.** Naming a protocol here would be an invented production
 value under AGENTS.md §2.5.
 
+**Stage 0.4C-0B:** brief-stated TEST ONLY endpoint identities (`TC-NODE-01` … `TC-NODE-06` at
+`192.0.2.11` … `192.0.2.16`) are recorded as Owner statements (TCEV-13) — they establish no
+transport, protocol, byte/word order, width or encoding. Every row of the table above therefore
+stays `NOT_PROVIDED`. See §12.
+
 ---
 
 ## 8. Category F — Evidence provenance register
@@ -260,6 +269,11 @@ and no SHA-256 appears for evidence that is not present in this sandbox.
 | TCEV-09 | Transport / network identity and read representation | — | Not supplied | Not present in sandbox — **no hash recorded, none invented** | — | — | — | `NOT_PROVIDED` | — | — | — | Blocks REQ-TC-010 |
 | TCEV-10 | Wire-break diagnostic configuration and observed raw/diagnostic behaviour | — | Not supplied | Not present in sandbox — **no hash recorded, none invented** | — | — | — | `NOT_PROVIDED` | — | — | — | Blocks REQ-TC-011 to REQ-TC-015 |
 | TCEV-11 | Ranges, cycles, thresholds, commissioning procedure, approval roles | — | Not supplied | Not present in sandbox — **no hash recorded, none invented** | — | — | — | `NOT_PROVIDED` | — | — | — | Blocks REQ-TC-016 to REQ-TC-020 |
+| TCEV-12 | Stage 0.4C-0B brief §2: six-node physical TC baseline statement (6 nodes; 750-362 × 6, 750-498 × 30, 750-600 × 6; 240/212/28 capacity; `OWNER_CONFIRMED_FACTORY_DEFAULT` basis) | Owner statement in the authorising brief | — (statement, no file) | — (no file; none invented) | — | Brief §2 as recorded in [STAGE_0.4C-0B_CHECKPOINT.md](STAGE_0.4C-0B_CHECKPOINT.md) §2 | Model facts at `MODEL_LEVEL`; instance counts stated, not verified | `PROVIDED_UNVERIFIED` | Stage 0.4C-0B | 2026-10-11 | None | Advances REQ-TC-001, REQ-TC-002 to statement-only `PROVIDED_UNVERIFIED`. Verifies no instance, no drawing, no default value |
+| TCEV-13 | Stage 0.4C-0B brief §3: six-node configurable test-IP statement (`192.0.2.11` … `192.0.2.16`, TEST ONLY) | Owner statement in the authorising brief | — (statement, no file) | — (no file; none invented) | — | Brief §3 as recorded in [STAGE_0.4C-0B_CHECKPOINT.md](STAGE_0.4C-0B_CHECKPOINT.md) §3 | Stated endpoint identities only | `PROVIDED_UNVERIFIED` | Stage 0.4C-0B | 2026-10-11 | None | Establishes no transport, protocol, encoding or production value. Does not advance REQ-TC-010 |
+| TCEV-14 | Six-cabinet TC drawings (Baseline rev1 mapping authority) | Expected: Owner-provided drawings | **No file visible in sandbox** | Not present in sandbox — **no hash recorded, none invented** | — | Filenames/sheets/revision unspecified in the brief | — | `NOT_AVAILABLE_IN_SESSION` | Stage 0.4C-0B | 2026-10-11 | None | Blocks REQ-TC-004, REQ-TC-005, REQ-TC-006. Schedule derivation STOPPED, 0 rows. See [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md) |
+| TCEV-15 | WAGO 750-498 primary manufacturer manual `m07500498_00000000_0en.pdf` | Expected: primary manufacturer manual | **No file visible in sandbox** | Not present in sandbox — **no hash recorded, none invented** | — | Exact filename from the brief; revision unknown | — | `NOT_AVAILABLE_IN_SESSION` | Stage 0.4C-0B | 2026-10-11 | None | Blocks factory-default extraction and the decoding contract (REQ-TC-007, REQ-TC-011). No section or value cited |
+| TCEV-16 | WAGO 750-362 and 750-600 primary manufacturer manuals (filenames unspecified in the brief) | Expected: primary manufacturer manuals | **No file visible in sandbox** | Not present in sandbox — **no hash recorded, none invented** | — | — | — | `NOT_AVAILABLE_IN_SESSION` | Stage 0.4C-0B | 2026-10-11 | None | Blocks the 750-362 process-image profile and offset manifest (REQ-TC-009, REQ-TC-010). No rule or width derived |
 
 ### 8.1 Domain A evidence already held (recorded, not reusable for Domain B)
 
@@ -280,10 +294,10 @@ rollout. Every request is `NOT_PROVIDED` at this head.
 
 | ID | Request | Status | Blocking stage | Evidence received | Evidence scope | Verification result | Conflict | Next action |
 |---|---|---|---|---|---|---|---|---|
-| REQ-TC-001 | Thermocouple acquisition hardware manufacturer and model | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-02) | — | Cannot verify | None | Owner supplies nameplate photo or datasheet reference |
-| REQ-TC-002 | Count of acquisition devices/modules and Channel capacity | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-02) | — | Cannot verify | None | Owner supplies device/rack list with per-device Channel count |
-| REQ-TC-003 | Physical panel, rack, cabinet or controller location | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-02) | — | Cannot verify | None | Owner supplies panel identifier and installation location |
-| REQ-TC-004 | Complete Sensor ID to Channel A/B schedule (all 106 Sensors, 212 Channels) | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-03) | — | Cannot verify | None | Owner supplies schedule; populate the template row by row with evidence per row |
+| REQ-TC-001 | Thermocouple acquisition hardware manufacturer and model | `PROVIDED_UNVERIFIED` | Stage 0.4C-1 | Owner statement in the Stage 0.4C-0B brief §2 (TCEV-12): WAGO 750-362 / 750-498 / 750-600 — no artifact | `MODEL_LEVEL` (models only; no instance) | Cannot verify — no nameplate, drawing, manual or hardware in the sandbox | None | Owner supplies nameplate photo, drawing reference or instance evidence; the statement stands as design basis only |
+| REQ-TC-002 | Count of acquisition devices/modules and Channel capacity | `PROVIDED_UNVERIFIED` | Stage 0.4C-1 | Owner statement in the Stage 0.4C-0B brief §2 (TCEV-12): 6 nodes, 750-498 × 30, 8 Channels per module — no artifact | Per-module capacity `MODEL_LEVEL`; node/module counts stated, not verified | Cannot verify — no drawing, export or hardware in the sandbox | None | Owner supplies drawings (TCEV-14) or an engineering-tool export; the statement stands as design basis only |
+| REQ-TC-003 | Physical panel, rack, cabinet or controller location | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-02). Brief-stated `TC-NODE-01` … `TC-NODE-06` are proposed labels, not locations | — | Cannot verify | None | Owner supplies panel identifier and installation location |
+| REQ-TC-004 | Complete Sensor ID to Channel A/B schedule (all 106 Sensors, 212 Channels) | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-03, TCEV-14). Stage 0.4C-0B derivation STOPPED: 0 rows, no drawing file in the sandbox | — | Cannot verify | None | Owner provides the six-cabinet drawings to a future session; populate the template row by row with evidence per row. Do not ask the Owner to transcribe the schedule manually |
 | REQ-TC-005 | Terminal schedule | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-04) | — | Cannot verify | None | Owner supplies terminal block and terminal number per Channel |
 | REQ-TC-006 | Wiring drawings | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-05) | — | Cannot verify | None | Owner supplies drawing identifiers and revision |
 | REQ-TC-007 | TC type per Channel or per approved Channel group | `NOT_PROVIDED` | Stage 0.4C-1 | None (TCEV-06) | — | Cannot verify | None | Owner supplies type per Channel, or an explicitly approved grouping rule |
@@ -353,9 +367,58 @@ this Stage and outside Domain B.
 
 ## 11. Related documents
 
-- [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHECKPOINT.md) — this Stage's checkpoint record
+- [STAGE_0.4C-0B_CHECKPOINT.md](STAGE_0.4C-0B_CHECKPOINT.md) — Stage 0.4C-0B checkpoint record (six-node baseline, STOP record, proposals)
+- [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md) — drawing intake, missing-file STOP report, revision rule
+- [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHECKPOINT.md) — predecessor checkpoint record
 - [STAGE_0.4C-0_CHECKPOINT.md](STAGE_0.4C-0_CHECKPOINT.md) — predecessor evidence gate and Owner decisions OQ-01 to OQ-08
 - [CURRENT_STATE.md](CURRENT_STATE.md) — verified state and stage status
 - [MASTER_PLAN.md](MASTER_PLAN.md) — stage ledger
 - [PUBLIC_REPOSITORY_BOUNDARY.md](PUBLIC_REPOSITORY_BOUNDARY.md) — what may be published
 - [../AGENTS.md](../AGENTS.md) — working contract and evidence-first rules
+
+---
+
+## 12. Stage 0.4C-0B evidence-availability review (2026-10-11)
+
+Reviewer: Stage 0.4C-0B session, branch `arena/c4b63a26-waterjet-sentinel-suite`, base
+`main` `3e1a7fd9d28db65221c123960a0c85b62d93949a` (PR #17 merge commit). Workbook TCEV-01
+re-verified: `T8_IO_Card_Mapping.xlsx`, 16648 bytes, SHA-256
+`4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`, unchanged.
+
+### 12.1 Vocabulary added by this review
+
+| State | Meaning |
+|---|---|
+| `NOT_AVAILABLE_IN_SESSION` | The authorising brief asserts the Owner holds this evidence, but no file was visible in this sandbox: no filename, hash, size, title, revision, scope or review status could be recorded, and none was invented or reused from memory. For gate purposes it is equivalent to `NOT_PROVIDED` |
+
+### 12.2 Statement intake (TCEV-12, TCEV-13)
+
+The Stage 0.4C-0B authorising brief — the latest explicit Owner instruction — states the
+six-node physical baseline (brief §2) and the test-IP configuration (brief §3). These are
+recorded as **Owner statements** at `PROVIDED_UNVERIFIED`: supplied by the Owner through the
+brief, with content that cannot be checked in this sandbox (no drawing, manual, nameplate,
+export or hardware is present). Statement intake advances `REQ-TC-001` and `REQ-TC-002` to
+statement-only `PROVIDED_UNVERIFIED` (model facts at `MODEL_LEVEL`; instance counts stated,
+not verified) and supersedes the Category A `Manufacturer`/`Model` cells and the Category B
+identity/count/capacity cells marked in §§3–4. It verifies no installed instance, no drawing
+content, no default value, no transport and no production value, and it widens no verified
+state: the non-propagation rule (§2.3) applies to statements exactly as to verified facts.
+
+### 12.3 Absent evidence (TCEV-14 … TCEV-16) and STOP record
+
+Workspace-wide search (all PDF, DWG/DXF, drawing-named and image formats, plus tracked-file
+review) returned **zero evidence files**. The six-cabinet drawings, the 750-498 manual
+`m07500498_00000000_0en.pdf`, and the 750-362 / 750-600 manuals (filenames unspecified in the
+brief) are therefore `NOT_AVAILABLE_IN_SESSION`. Schedule derivation STOPPED with 0 rows
+(brief §4), manual extraction STOPPED with no section or value cited (brief §§7–8), and the
+capacity STOP was recorded with 0 drawing-derived used Channels against 212 expected
+(brief §12). Full record: [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md)
+and [STAGE_0.4C-0B_CHECKPOINT.md](STAGE_0.4C-0B_CHECKPOINT.md) §4.
+
+### 12.4 What this review did not change
+
+- `REQ-TC-003` … `REQ-TC-020` keep their recorded states (all `NOT_PROVIDED`).
+- Category C–E acquisition tables keep every recorded state; the added notes point at this
+  section and change no cell.
+- No SHA-256 was recorded or reused for any absent file. No schedule row, offset, decoding
+  rule, configuration value or production value was created.
