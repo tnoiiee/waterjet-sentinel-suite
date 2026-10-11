@@ -1,4 +1,4 @@
-# Wjss.Kiosk — application-owned shell (Stage 0.4C-K1)
+# Wjss.Kiosk — application-owned shell (Stage 0.4C-K2)
 
 The full-screen, application-owned Windows window that hosts the local Operations preview route.
 It is a real shell now: WinForms (`net10.0-windows`) wrapping the fixed-name embedded web-view
@@ -11,7 +11,7 @@ The shell holds **no control authority**: it starts nothing, commands nothing, p
 state, keeps no credential and writes nothing except its own embedded-view runtime cache. The local
 preview host is a separate process that the Operator starts and stops.
 
-## What this window does (Stage 0.4C-K1)
+## What this window does (Stage 0.4C-K2)
 
 | Behaviour | How |
 | --- | --- |

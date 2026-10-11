@@ -3,7 +3,7 @@ using System.Globalization;
 namespace Wjss.Kiosk;
 
 /// <summary>
-/// Stage 0.4C-K1 shell constants: the single APPROVED LOCAL ORIGIN and the Stage boundary text.
+/// Stage 0.4C-K2 shell constants: the single APPROVED LOCAL ORIGIN and the Stage boundary text.
 ///
 /// The origin is assembled from a loopback literal and the local preview port, so the shell source
 /// contains no other host. The SCHEME and the HOST are hard constants: no environment variable, no
@@ -41,14 +41,14 @@ internal static class KioskShellOptions
     public static readonly Uri HealthUri = new(ApprovedOrigin, "api/health");
 
     /// <summary>Stage identity, shown in the shell chrome.</summary>
-    public const string StageId = "0.4C-K1";
+    public const string StageId = "0.4C-K2";
 
     /// <summary>The Stage boundary statement. Displayed on screen at all times.</summary>
     public const string BoundaryText =
         "SIMULATION / PREVIEW  -  NO HARDWARE ACCESS  -  NO DEVICE WRITE  -  FIELD VERIFICATION PENDING";
 
     /// <summary>Shell window title.</summary>
-    public const string WindowTitle = "WaterJet Sentinel Suite - Kiosk Preview (Stage 0.4C-K1)";
+    public const string WindowTitle = "WaterJet Sentinel Suite - Kiosk Preview (Stage 0.4C-K2)";
 
     /// <summary>Reconnect cadence of the local host probe, in milliseconds.</summary>
     public const int ProbeIntervalMs = 2000;

@@ -1,5 +1,5 @@
 // Stage 0.4C-K2 - the Kiosk Preview Operations route with the Sensor Commissioning Monitor and the
-// read-only TC Node Configuration section (Stage 0.4C-K1 route, extended).
+// read-only TC Node Configuration section (the route originated in Stage 0.4C-K1).
 //
 // Every value is written with textContent. Nothing here connects, polls, reads or writes a device,
 // opens a socket itself, or accepts an address. The Preview workflow state lives in this browser

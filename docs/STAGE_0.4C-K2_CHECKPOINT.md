@@ -140,10 +140,36 @@ Run on the Owner's Windows machine. Record each result. Stop and report to the a
 17. Route read-back: `Invoke-RestMethod http://127.0.0.1:5187/api/tc-node-configuration` and confirm `nodes` = 6, totals 6 / 6 / 30 / 240 / 6, and reachability, acquisition and field verified = 0.
 18. Method refusal: `Invoke-WebRequest -Method Post -Uri http://127.0.0.1:5187/api/tc-node-configuration -SkipHttpErrorCheck` and confirm status 405 with `Allow: GET, HEAD`.
 19. No contact with the Test addresses: while the host and Kiosk run, `netstat -n | Select-String "192.0.2."` must return nothing. No ping or probe may be sent.
-20. Browser and Kiosk review: open `http://127.0.0.1:5187/` and confirm the Node Configuration section shows six TC-NODE columns, the totals line, the status legend, no buttons in that section, and the Wall Map, Overview and Monitor unchanged. Then launch the Kiosk and confirm the header, the confirmed Exit, and the reconnecting fail-safe behave as in K1. Report the results to the Owner. Owner Manual Review remains an Owner decision.
+20. Browser and Kiosk review: open `http://127.0.0.1:5187/` and confirm the Node Configuration section shows six TC-NODE columns, the totals line, the status legend, no buttons in that section, and the Wall Map, Overview and Monitor unchanged. Then launch the Kiosk and confirm: the native header reads `Kiosk Preview  -  Stage 0.4C-K2`, the window title ends `(Stage 0.4C-K2)`, the embedded Preview and Diagnostics both read `Stage 0.4C-K2`, and the confirmed Exit and the reconnecting fail-safe behave as in K1. Report the results to the Owner. Owner Manual Review remains an Owner decision.
 
 ## 10. Stop conditions and Owner items
 
 - Any need for a second canonical path, a broader address range, another exception, a dependency change, or any network or hardware action must return to the Owner.
 - K2 does not claim Owner Manual Review, does not claim Stage completion, and does not authorize merging. Merge is the Owner's decision.
 - Next Stage work (reachability, acquisition, port and protocol decisions) is out of scope and requires a separate Owner decision.
+
+## 11. Correction: native Kiosk Stage identity (after Owner visual review)
+
+**Owner finding, recorded as received.** The Owner's visual review of the K2 build passed the TC Node Configuration section, the six Nodes and Test IPs, the totals, the UNRESOLVED port and protocol, the NOT TESTED and NOT IMPLEMENTED statuses, the absence of any control, and the inherited Wall Map and thermal-pair presentation. It found one blocking mismatch: the native Kiosk header read `Kiosk Preview - Stage 0.4C-K1` and the window title named K1, while the embedded Preview and Diagnostics read `Stage 0.4C-K2`.
+
+**Cause.** The native shell's identity was held in `apps/kiosk/KioskShellOptions.cs` (`StageId` and `WindowTitle`). The header label is built from `StageId`. These two constants had not been moved to K2 in the K2 checkpoint. The embedded Preview gets its identity from `STAGE_ID` in `apps/ops-preview/server.mjs`, which was already `0.4C-K2`.
+
+**Exact-source sweep before editing.** Every `K1` occurrence in the Kiosk, Preview and package sources was classified. Only current-facing identity was changed. Historical references were kept.
+
+| Changed (current-facing identity) | Kept (historical, accurate) |
+|---|---|
+| `KioskShellOptions.cs`: `StageId` = `0.4C-K2`; `WindowTitle` = `… Kiosk Preview (Stage 0.4C-K2)`; header comment | Named K1 passes in `apps/kiosk/README.md` (Wall Map, thermal-pair and zero-warning corrections, the 2026-10-12 WebView2 dependency decision) |
+| `MainForm.cs` and `Program.cs` header comments | `apps/kiosk/Wjss.Kiosk.csproj` comments that record when the shell became real and the zero-warning history |
+| `apps/kiosk/README.md` title and "What this window does" heading | `apps/ops-preview/public/index.html` link to `docs/STAGE_0.4C-K1_CHECKPOINT.md` and the layout-test docs list |
+| `apps/kiosk/test/shell.contract.test.mjs` header | `docs/STAGE_0.4C-K1_CHECKPOINT.md` and every merged PR #19 record |
+| `apps/ops-preview/package.json` and `packages/commissioning/package.json` descriptions and placeholder version `0.0.0-0.4c-k1-preview` → `0.0.0-0.4c-k2-preview` | `apps/ops-preview/public/app.mjs` and `styles.css` provenance comments |
+
+The placeholder version is a label only. No test, lock file or other manifest references the old string, and neither package has a lock file. The version is still not an established product version.
+
+**Guards added.**
+- The Kiosk contract test now asserts `StageId` is `0.4C-K2`, that the window title names K2, and that `StageId` equals the Preview's `STAGE_ID`. It also checks that no C# string literal in `KioskShellOptions.cs`, `MainForm.cs` or `Program.cs` shows a K1 identity. Doc-comment provenance is allowed. The new check was run against the pre-correction source and fails on it.
+- The Preview render test asserts the embedded header reads K2, that Diagnostics reads K2 and not K1, and that the served page has no K1 identity other than the documentation link.
+
+**Unchanged by this correction.** The approved origin (`http`, `127.0.0.1`, port 5187, with the port-only override), the WebView2 pin `1.0.4258.31`, the lock file (`apps/kiosk/packages.lock.json` and all others), the Kiosk layout and DPI settings, the reconnecting fail-safe, the confirmed exit, the TC Node configuration, the S2 exception and every authority boundary. No dependency and no lock file changed. Only two C# string constants and comments changed in the Kiosk source.
+
+**NOT RUN IN ARENA.** The .NET build and the native header and window title were not compiled or rendered, because the sandbox has no .NET SDK. The Kiosk-side change is verified at source-contract level only. The Owner must rerun the Kiosk (handoff step 20) before the header is confirmed. Owner Manual Review has NOT passed for this correction.

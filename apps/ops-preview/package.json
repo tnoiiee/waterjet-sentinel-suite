@@ -1,8 +1,8 @@
 {
   "name": "@wjss/ops-preview",
-  "version": "0.0.0-0.4c-k1-preview",
+  "version": "0.0.0-0.4c-k2-preview",
   "private": true,
-  "description": "Stage 0.4C-K1 application-owned Kiosk Preview host: the local Operations route with the Sensor Commissioning Monitor, the synthetic scenario catalogue and the read-only boundary surface. Loopback only. No hardware access, no device write, no control authority.",
+  "description": "Stage 0.4C-K2 application-owned Kiosk Preview host (Stage 0.4C-K1 Preview, extended by the TC Node Configuration projection): the local Operations route with the Sensor Commissioning Monitor, the synthetic scenario catalogue and the read-only boundary surface. Loopback only. No hardware access, no device write, no control authority.",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {

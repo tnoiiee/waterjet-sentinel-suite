@@ -1,3 +1,12 @@
+## 2026-10-12 — Stage 0.4C-K2 native Kiosk Stage identity correction (PR #20, same branch — OPEN, NOT MERGED, do not merge)
+
+- **Owner visual review finding, recorded as received.** The native Kiosk header read `Kiosk Preview - Stage 0.4C-K1` and the window title named K1, while the embedded Preview and Diagnostics read `Stage 0.4C-K2`. This was the only blocking mismatch.
+- **Corrected at the source.** `apps/kiosk/KioskShellOptions.cs` now sets `StageId` to `0.4C-K2` and `WindowTitle` to `WaterJet Sentinel Suite - Kiosk Preview (Stage 0.4C-K2)`. The header label is built from `StageId`. Current-facing comments in `MainForm.cs`, `Program.cs` and the Kiosk README were relabelled. The placeholder package version `0.0.0-0.4c-k1-preview` became `0.0.0-0.4c-k2-preview` in the two packages, and their descriptions now open with K2.
+- **Historical K1 references kept.** Named K1 passes, the WebView2 dependency decision, the csproj history comments, the K1 checkpoint document and the merged PR #19 records are unchanged.
+- **Guards.** The Kiosk contract test asserts the native identity and its match with the Preview `STAGE_ID`, and it rejects a K1 identity in any C# string literal. The Preview render test asserts the embedded header and Diagnostics read K2.
+- **Unchanged.** The approved origin, WebView2 `1.0.4258.31`, the lock files, layout, reconnecting behaviour, confirmed exit, TC Node configuration, the S2 exception and every authority boundary. No dependency change.
+- **NOT RUN IN ARENA.** The .NET build and rendering of the native header. The Owner must rerun the Kiosk. Owner Manual Review has NOT passed.
+
 ## 2026-10-12 — Stage 0.4C-K2 TC Node/IP Configuration Foundation (branch `arena/699da2a5-waterjet-sentinel-suite`, based on `main` a7d739bb — PR to `main` OPEN, NOT MERGED, do not merge)
 
 - **Canonical six-node model.** `packages/commissioning/src/tcNodeConfiguration.mjs` holds `TC-NODE-01`…`06` ↔ `CAB1`…`CAB6` (one-to-one by ordinal) and the six Test addresses `192.0.2.11`–`.16`, the only Product file that holds them. Topology per Node is 750-362 x 1, 5 x 750-498, 40 physical TC Channels and 750-600 x 1. Totals are derived: 6 Nodes, 6 Cabinets, 30 TC modules, 240 channels and 6 configured Test IPs.

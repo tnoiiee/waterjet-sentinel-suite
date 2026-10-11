@@ -110,6 +110,15 @@ test('G: the Wall Map, the Overview and the inherited Preview still render (no r
   assert.match(html, /id="monitor-wrap"/);
 });
 
+test('G: the embedded header and Diagnostics identify Stage 0.4C-K2, with no current K1 identity in the served page', () => {
+  assert.match(html, /<p class="sub">Stage 0\.4C-K2 · /);
+  // The only K1 reference left in the served page is the documentation link to the historical K1 checkpoint.
+  const withoutHistoricalLink = html.split('docs/STAGE_0.4C-K1_CHECKPOINT.md').join('');
+  assert.equal(/0\.4C-K1/.test(withoutHistoricalLink), false, 'no current K1 identity in the served page');
+  assert.match(allText(app.byId['diagnostics-body']), /Stage 0\.4C-K2/);
+  assert.equal(/0\.4C-K1/.test(allText(app.byId['diagnostics-body'])), false);
+});
+
 test('G: the section is wrapped in the bounded table frame, so it cannot widen the page', () => {
   assert.match(section(), /<div class="table-wrap" id="node-config-wrap">/);
 });
