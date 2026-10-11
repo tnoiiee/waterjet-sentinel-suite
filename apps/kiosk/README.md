@@ -82,8 +82,54 @@ asks for confirmation before closing.
 **Stopping:** close the shell through **Exit Kiosk Preview** (confirmed), then stop the host with
 `Ctrl+C` in its terminal.
 
-## Lock file note (Owner-local, required)
+## WinForms-only WebView2 reference isolation (Stage 0.4C-K1 zero-warning correction)
 
+The package's build targets add **three** assemblies to a `net10.0-windows` project: `...Core`,
+`...WinForms` and `...Wpf`. Only the first two are used here — this shell is WinForms-only and does
+not enable WPF — but the WPF assembly was still being added to the compile/reference graph, and it is
+compiled against a WindowsBase major version that the .NET 10 reference pack does not provide. The
+Owner-local Release build therefore emitted exactly one warning, **MSB3277** (conflicting WindowsBase
+assembly versions), in an otherwise clean build.
+
+`Wjss.Kiosk.csproj` now carries one narrow, project-local correction, the target
+`RemoveWebView2WpfReference`. It runs after the package references exist (`AfterTargets="ResolvePackageAssets"`)
+and before assembly resolution (`BeforeTargets="ResolveAssemblyReferences"`), and removes **only** the
+reference item whose file name is `Microsoft.Web.WebView2.Wpf`.
+
+What it deliberately does **not** do:
+
+- it does not enable WPF and does not turn the shell into a mixed WinForms/WPF application;
+- it does not suppress MSB3277: no `NoWarn`, no warning-severity change, no `TreatWarningsAsErrors`
+  change, no binding redirect and no manual WindowsBase reference — the conflicting reference itself is
+  removed instead;
+- it does not read, write or modify any package file, the global package folder or the lock file, and
+  it hard-codes no user profile, cache path or absolute path (the match is by file name only);
+- it does not exclude `...Core`, `...WinForms` or the WebView2 loader/runtime assets;
+- it does not change the package pin (`1.0.4258.31`), Central Package Management, locked restore, the
+  target framework, the source-generated WinForms bootstrap or the DPI project property.
+
+If a future package or project change reintroduces the WPF reference, the same target **fails the
+build** with an actionable error instead of a warning, and the source-contract tests in
+`test/shell.contract.test.mjs` fail as well. Three of those tests now assert exactly this: the project
+stays WinForms-only, the correction removes only the WPF assembly and runs at the right point, Core and
+WinForms are kept and positively proved, and no warning suppression exists.
+
+Reference-graph proof (run it after a restore; it does not restore by itself):
+
+```powershell
+dotnet msbuild apps/kiosk/Wjss.Kiosk.csproj -t:KioskWebView2ReferenceProof -p:Configuration=Release
+# expected, and the target fails unless it is exactly this:
+#   WJSS-KIOSK-WEBVIEW2 CORE=1
+#   WJSS-KIOSK-WEBVIEW2 WINFORMS=1
+#   WJSS-KIOSK-WEBVIEW2 WPF=0
+```
+
+**Not verified in Arena:** this correction was authored from the Owner-local diagnostic evidence, but
+the Arena sandbox has no .NET SDK and no reachable package feed, so the target itself has **not** been
+executed there and no build result is claimed. The Owner-local zero-warning Release build is the
+verification of record.
+
+## Lock file note (Owner-local, required)
 The repository sets `RestorePackagesWithLockFile=true`. Adding the approved package changes the Kiosk
 dependency graph, so **`apps/kiosk/packages.lock.json` must be regenerated Owner-locally**
 (`dotnet restore apps/kiosk/Wjss.Kiosk.csproj`) and the refreshed file committed after review. It

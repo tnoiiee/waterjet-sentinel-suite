@@ -47,4 +47,87 @@
     <PackageReference Include="Microsoft.Web.WebView2" />
   </ItemGroup>
 
+  <!--
+    Stage 0.4C-K1 zero-warning correction (Owner-local evidence, 2026-10-12).
+
+    The package's buildTransitive targets add THREE assemblies on the "regular .NET 5+"
+    branch, which is the branch taken for net10.0-windows:
+
+      Microsoft.Web.WebView2.Core
+      Microsoft.Web.WebView2.WinForms
+      Microsoft.Web.WebView2.Wpf
+
+    This project is WinForms-only (UseWindowsForms=true; WPF is not enabled and must not
+    be enabled). The WPF assembly is not used here, but it is compiled against a
+    WindowsBase major version that the .NET 10 reference pack does not provide, so its
+    presence in the compile/reference graph produces MSB3277 even though nothing in this
+    project uses WPF. The exact conflicting assembly identities are recorded in the
+    Stage checkpoint document (this file is scanned for address-like literals, so the
+    version numbers are quoted there instead).
+
+    The target below removes ONLY Microsoft.Web.WebView2.Wpf from the Reference item graph,
+    after the package references exist and before assembly resolution runs. It is
+    deliberately narrow:
+
+      - matching is by FILE NAME only, so it never depends on the Owner's user profile, on
+        the global packages folder, on an absolute cache path or on the assembly version;
+      - no package file, cache entry or lock file is read, written or modified;
+      - Core, WinForms and the WebView2 loader/runtime assets are untouched;
+      - the central pin (1.0.4258.31), Central Package Management, locked restore, the
+        WinForms-only configuration, the source-generated WinForms bootstrap and the
+        ApplicationHighDpiMode property are all untouched;
+      - MSB3277 is NOT suppressed: no NoWarn, no warning-severity change, no binding
+        redirect and no manual WindowsBase reference is added - the conflicting reference
+        itself is removed instead.
+
+    The same target FAILS the build if a WPF-only WebView2 reference survives the removal,
+    so a silent regression becomes a loud, actionable error rather than a warning.
+
+    Invoke the proof target explicitly to check the resulting graph:
+
+      dotnet msbuild apps/kiosk/Wjss.Kiosk.csproj -t:KioskWebView2ReferenceProof -p:Configuration=Release
+  -->
+  <Target Name="RemoveWebView2WpfReference"
+          AfterTargets="ResolvePackageAssets"
+          BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <_WebView2WpfReference Include="@(Reference)"
+                             Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+      <Reference Remove="@(_WebView2WpfReference)" />
+      <_WebView2WpfReferenceRemaining Include="@(Reference)"
+                             Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+    <Message Importance="high"
+             Condition="'@(_WebView2WpfReference)' != ''"
+             Text="WJSS kiosk: removed the WPF-only WebView2 assembly from the reference graph (@(_WebView2WpfReference->'%(Filename)%(Extension)', ' ')); the project is WinForms-only." />
+    <Error Condition="'@(_WebView2WpfReferenceRemaining)' != ''"
+           Text="WJSS kiosk: the WPF-only WebView2 assembly is STILL in the reference graph (@(_WebView2WpfReferenceRemaining->'%(Identity)', ' ')). The WinForms-only correction did not apply. Do not silence MSB3277 and do not enable WPF: report this instead (apps/kiosk/README.md, Stage 0.4C-K1)." />
+  </Target>
+
+  <!--
+    Deterministic, machine-checkable proof of the reference graph for the Owner-local
+    handoff. Not part of the default build; invoke it explicitly (see above). It fails if a
+    required assembly is missing or if the WPF-only assembly is present, so the proof can
+    never pass by accident. Requires a restored project (it does not restore by itself).
+  -->
+  <Target Name="KioskWebView2ReferenceProof" DependsOnTargets="RemoveWebView2WpfReference">
+    <ItemGroup>
+      <_KioskProofCore Include="@(Reference)"
+                       Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Core'" />
+      <_KioskProofWinForms Include="@(Reference)"
+                           Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.WinForms'" />
+      <_KioskProofWpf Include="@(Reference)"
+                      Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+    <Message Importance="high" Text="WJSS-KIOSK-WEBVIEW2 CORE=@(_KioskProofCore->Count())" />
+    <Message Importance="high" Text="WJSS-KIOSK-WEBVIEW2 WINFORMS=@(_KioskProofWinForms->Count())" />
+    <Message Importance="high" Text="WJSS-KIOSK-WEBVIEW2 WPF=@(_KioskProofWpf->Count())" />
+    <Error Condition="'@(_KioskProofCore)' == ''"
+           Text="WJSS kiosk: the WebView2 Core reference is missing. Restore the project first (dotnet restore apps/kiosk/Wjss.Kiosk.csproj); if it is present after a restore, the package is not feeding the reference graph and the package version pin must be reviewed." />
+    <Error Condition="'@(_KioskProofWinForms)' == ''"
+           Text="WJSS kiosk: the WebView2 WinForms reference is missing. Restore the project first (dotnet restore apps/kiosk/Wjss.Kiosk.csproj); WinForms is the only view control this project uses and it must never be excluded." />
+    <Error Condition="'@(_KioskProofWpf)' != ''"
+           Text="WJSS kiosk: the WebView2 WPF reference is present in the WinForms-only kiosk. Do not enable WPF and do not suppress MSB3277: report this instead (apps/kiosk/README.md, Stage 0.4C-K1)." />
+  </Target>
+
 </Project>

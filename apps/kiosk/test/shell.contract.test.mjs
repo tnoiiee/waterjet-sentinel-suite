@@ -9,7 +9,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -163,4 +163,97 @@ test('the runbook documents the dependency, the lock refresh and the honest vali
   assert.match(source.readme, /node apps\/ops-preview\/server\.mjs/);
   assert.match(source.readme, /dotnet build\s+apps\/kiosk\/Wjss\.Kiosk\.csproj -c Release/);
   assert.match(source.readme, /Not verified in Arena/);
+});
+
+// ---------------------------------------------------------------------------
+// Stage 0.4C-K1 zero-warning correction: the kiosk stays a WinForms-only project
+// and the WPF-only WebView2 assembly is isolated from the reference graph.
+// ---------------------------------------------------------------------------
+
+const csprojTarget = (name) => {
+  const match = new RegExp(`<Target Name="${name}"[^>]*>([\\s\\S]*?)</Target>`).exec(source.csproj);
+  return match?.[0] ?? null;
+};
+const buildProps = readFileSync(join(REPO, 'Directory.Build.props'), 'utf8');
+
+test('the kiosk remains a WinForms-only project and never enables WPF', () => {
+  assert.match(source.csproj, /<UseWindowsForms>true<\/UseWindowsForms>/);
+  assert.equal(
+    /<UseWPF[^>]*>\s*true/i.test(source.csproj),
+    false,
+    'the WinForms-only kiosk must never enable WPF',
+  );
+  assert.match(source.csproj, /<TargetFramework>net10\.0-windows<\/TargetFramework>/);
+  assert.match(source.csproj, /<OutputType>WinExe<\/OutputType>/);
+});
+
+test('the correction removes only the WPF-only assembly, before assembly resolution', () => {
+  const target = csprojTarget('RemoveWebView2WpfReference');
+  assert.notEqual(target, null, 'the correction target must exist in the kiosk project');
+  assert.match(target, /AfterTargets="ResolvePackageAssets"/);
+  assert.match(target, /BeforeTargets="ResolveAssemblyReferences"/);
+  assert.match(target, /Condition="'%\(Reference\.Filename\)' == 'Microsoft\.Web\.WebView2\.Wpf'"/);
+  assert.match(target, /<Reference Remove="@\(_WebView2WpfReference\)" \/>/);
+  // The remaining-reference guard turns a silent regression into a loud build failure.
+  assert.match(target, /<_WebView2WpfReferenceRemaining/);
+  assert.match(target, /<Error Condition="'@\(_WebView2WpfReferenceRemaining\)' != ''"/);
+  // Scope: the ONLY reference the project removes is the WPF-only one.
+  const removals = [...source.csproj.matchAll(/<Reference Remove="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(removals, ['@(_WebView2WpfReference)']);
+  assert.equal(/Remove="[^"]*(WebView2\.Core|WebView2\.WinForms)/.test(source.csproj), false);
+  // No hand-written WebView2 or WindowsBase reference: the package supplies the graph.
+  assert.equal(/<Reference Include="Microsoft\.Web\.WebView2/i.test(source.csproj), false);
+  assert.equal(/<Reference Include="WindowsBase/i.test(source.csproj), false);
+  // No path or cache assumption anywhere in the project file.
+  assert.equal(source.csproj.includes('.nuget'), false);
+  assert.equal(/USERPROFILE/i.test(source.csproj), false);
+  assert.equal(/[A-Za-z]:\\/.test(source.csproj), false);
+  // No assembly path is ever hand-written: the package supplies every HintPath.
+  assert.equal(/HintPath/i.test(source.csproj), false);
+});
+
+test('the correction keeps Core and WinForms and proves it in the build', () => {
+  const proof = csprojTarget('KioskWebView2ReferenceProof');
+  assert.notEqual(proof, null, 'the reference proof target must exist in the kiosk project');
+  assert.match(proof, /_KioskProofCore/);
+  assert.match(proof, /_KioskProofWinForms/);
+  assert.match(proof, /_KioskProofWpf/);
+  assert.match(proof, /WJSS-KIOSK-WEBVIEW2 CORE=/);
+  assert.match(proof, /WJSS-KIOSK-WEBVIEW2 WINFORMS=/);
+  assert.match(proof, /WJSS-KIOSK-WEBVIEW2 WPF=/);
+  // A missing Core or WinForms reference fails the proof; it can never pass vacuously.
+  assert.match(proof, /<Error Condition="'@\(_KioskProofCore\)' == ''"/);
+  assert.match(proof, /<Error Condition="'@\(_KioskProofWinForms\)' == ''"/);
+  assert.match(proof, /<Error Condition="'@\(_KioskProofWpf\)' != ''"/);
+});
+
+test('the correction suppresses nothing and touches no warning setting', () => {
+  // Comments are stripped first: the correction's own explanation names the warning it removes,
+  // and explaining a warning is not suppressing it.
+  const csprojCode = source.csproj.replace(/<!--[\s\S]*?-->/g, '');
+  assert.equal(
+    /NoWarn|WarningsNotAsErrors|WarningsAsErrors|MSBuildWarningsAsMessages|TreatWarningsAsErrors/i.test(csprojCode),
+    false,
+    'the correction must not suppress, downgrade or reconfigure any warning',
+  );
+  assert.equal(/AutoGenerateBindingRedirects|bindingRedirect/i.test(csprojCode), false);
+  // The warning code may appear only in explanatory text that FORBIDS silencing it, never in a setting.
+  assert.equal(
+    /<(NoWarn|WarningsNotAsErrors|WarningsAsErrors|MSBuildWarningsAsMessages|TreatWarningsAsErrors)[^>]*3277/i.test(source.csproj),
+    false,
+  );
+  assert.equal(existsSync(join(KIOSK, 'App.config')), false, 'no binding-redirect configuration file exists');
+  assert.equal(existsSync(join(KIOSK, 'packages.config')), false, 'Central Package Management stays in force');
+  // The shared build properties still fail the build on a warning, and no suppression names the code.
+  assert.match(buildProps, /<TreatWarningsAsErrors>true<\/TreatWarningsAsErrors>/);
+  assert.equal(/3277/.test(buildProps), false);
+  assert.equal(/MSB3277/.test(buildProps), false);
+});
+
+test('the runbook explains the isolation and its honest verification status', () => {
+  assert.match(source.readme, /WinForms-only/);
+  assert.match(source.readme, /MSB3277/);
+  assert.match(source.readme, /RemoveWebView2WpfReference/);
+  assert.match(source.readme, /KioskWebView2ReferenceProof/);
+  assert.match(source.readme, /not verified in Arena/i);
 });

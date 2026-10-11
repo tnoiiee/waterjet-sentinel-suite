@@ -1,7 +1,14 @@
 # Stage 0.4C-K1 — Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview (Development Checkpoint)
 
 **Status: DEVELOPMENT CHECKPOINT, submitted for Owner review in a NEW PR against `main` — OPEN, NOT
-MERGED (do not merge). Merge authority is the Owner only.** The checkpoint commit SHAs are recorded
+MERGED (do not merge). Merge authority is the Owner only.**
+
+**Follow-up (Owner-authorized zero-warning correction pass):** the Owner-local validation reported in
+§12 passed everything except exactly one Release-build warning, `MSB3277` (conflicting WindowsBase
+assembly versions) caused by the package adding its WPF-only assembly to this WinForms-only project.
+§13 records the exact root cause, the narrow project-local correction, the new source-contract coverage
+and the honest verification status. No safety, authority, evidence or dependency-version boundary
+changed. The checkpoint commit SHAs are recorded
 in the pull request and the final report, not inside their own commits (AGENTS §4.6).
 
 **Stage boundary (shown on screen by the preview and by the shell, at all times):**
@@ -284,3 +291,125 @@ alone, the Kiosk dependency change still requires the Owner-local lock-file refr
 build, and the visual acceptance of the shell has not been performed. The recommended review order is
 §4 (dependency record), §7 (what was and was not checked), §8 (Owner-local run) and §9 (changed
 files).
+
+
+## 12. Owner-local validation received (Owner-reported, 2026-10-12)
+
+Recorded as received from the Owner-local Windows workstation. These are **Owner-local** results, not
+Arena results.
+
+| Check | Owner-local result |
+| --- | --- |
+| Kiosk shell contract | 12/12 passed |
+| Commissioning `check` / tests | passed / 77/77 |
+| Operations Preview `check` / tests | passed / 40/40 |
+| Mapping Configuration `check` / tests | passed / 82/82 |
+| Normal solution restore | passed |
+| Locked solution restore | passed |
+| Full .NET tests | **414/414 passed** |
+| Boundary scan S1–S9 | clean, 0 findings |
+| Working tree after the Owner-local restore | `M apps/kiosk/packages.lock.json` — the genuine Owner-local lock refresh, containing the direct package `Microsoft.Web.WebView2` requested/resolved `1.0.4258.31` |
+| Release build | succeeded **with exactly one warning: `MSB3277`** — WindowsBase 4.0.0.0 versus WindowsBase 5.0.0.0 |
+
+Owner-local evaluated properties (the project is WinForms-only, and WPF is not enabled by this
+repository): `TargetFramework = net10.0-windows`, `UseWindowsForms = true`, `UseWPF = ` (empty),
+`EnableWindowsTargeting = true`, `OutputType = WinExe`.
+
+## 13. Zero-warning correction: WinForms-only WebView2 reference isolation
+
+**Exact root cause (from the Owner-local package evidence, replacing every earlier hypothesis, including
+any suggestion that this repository enabled both WinForms and WPF — it does not).** The installed package
+file `microsoft.web.webview2\1.0.4258.31\buildTransitive\Microsoft.Web.WebView2.targets` contains a
+"regular .NET 5+" branch, which is the branch selected for `net10.0-windows`, and that branch
+unconditionally adds three assemblies to the reference graph:
+
+- `Microsoft.Web.WebView2.Core.dll`
+- `Microsoft.Web.WebView2.WinForms.dll`
+- `Microsoft.Web.WebView2.Wpf.dll`
+
+`Microsoft.Web.WebView2.Wpf.dll` is compiled against `WindowsBase, Version=5.0.0.0`, while the .NET 10
+reference pack provides the `WindowsBase, Version=4.0.0.0` facade. That conflict produces `MSB3277`
+even though this project uses no WPF type at all.
+
+**Correction (project-local, narrow, in `apps/kiosk/Wjss.Kiosk.csproj`).** A target
+`RemoveWebView2WpfReference` runs after the package references exist
+(`AfterTargets="ResolvePackageAssets"`) and before assembly resolution
+(`BeforeTargets="ResolveAssemblyReferences"`) and removes **only** the reference item whose file name is
+`Microsoft.Web.WebView2.Wpf`. The match is by file name only, so it is independent of the Owner's user
+profile, the global packages folder, any absolute cache path and the assembly version. It reads, writes
+and modifies no package file, no cache entry and no lock file. `...Core`, `...WinForms` and the WebView2
+loader/runtime assets are untouched.
+
+Explicitly **not** done, per the Owner's prohibitions: no `UseWPF=true` and no mixed WinForms/WPF
+application; no `MSB3277` suppression; no `NoWarn`; no warning-severity change; no binding redirect; no
+manual WindowsBase reference; no edit of the global package cache; no vendored or copied WebView2
+assembly; no package upgrade, downgrade or refresh; no target-framework change; no database, transport,
+hardware, vendor-transport or device package; no change to the central pin `1.0.4258.31`; no
+hand-editing of `apps/kiosk/packages.lock.json`.
+
+A second target, `KioskWebView2ReferenceProof`, provides the deterministic Owner-local proof and **fails**
+if `...Core` or `...WinForms` is missing or if `...Wpf` is present. The removal target itself also fails
+the build if a WPF-only reference survives the removal, so a silent regression becomes a loud, actionable
+error rather than a warning.
+
+**New source-contract coverage (five added tests; `apps/kiosk/test/shell.contract.test.mjs` is now
+17/17).** They assert that the project stays `UseWindowsForms=true` and never enables WPF; that the
+correction exists with the required target wiring, removes only the WPF-only assembly, and contains no
+user-profile, cache or absolute path; that Core and WinForms are kept and positively proved by the proof
+target; and that no warning suppression, severity change or binding redirect is introduced (with the
+shared build properties still failing the build on a warning).
+
+**Arena re-run after the correction:** kiosk contract **17/17**; commissioning `check` OK and
+**77/77**; Operations Preview `check` OK and **40/40**; Mapping Configuration `check` OK and **82/82**;
+`packages/mapping-config` `check` OK and **268 (261 pass, 0 fail, 7 skipped)**; boundary scan
+**`0 findings (S1–S9 clean)`**; `git diff --check` clean.
+
+**Not verified.** The correction has **not** been executed in Arena: the sandbox has no .NET SDK and no
+reachable package feed, so no restore, build, `msbuild -t:` invocation or .NET test was run there and no
+build result is claimed. The Owner-local zero-warning Release build, the reference-graph proof output and
+the manual kiosk visual review remain the verification of record.
+
+### 13.1 Owner-local handoff commands
+
+```powershell
+# 1. Normal restore (refreshes the genuine kiosk lock file if the graph changed).
+dotnet restore apps/kiosk/Wjss.Kiosk.csproj
+
+# 2. Locked restore (must succeed; the lock file is the Owner-local artifact).
+dotnet restore WaterJetSentinelSuite.sln --locked-mode
+
+# 3. Evaluated property proof (expect UseWindowsForms=true and UseWPF empty).
+dotnet msbuild apps/kiosk/Wjss.Kiosk.csproj -p:Configuration=Release `
+  -getProperty:TargetFramework,UseWindowsForms,UseWPF,EnableWindowsTargeting,OutputType
+
+# 4. Evaluated reference proof (expect CORE=1, WINFORMS=1, WPF=0; the target fails otherwise).
+dotnet msbuild apps/kiosk/Wjss.Kiosk.csproj -t:KioskWebView2ReferenceProof -p:Configuration=Release
+
+# 5. Release solution build on the restored graph (expect: Build succeeded. 0 Warning(s)).
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+
+# 6. Full .NET tests without rebuilding (expect the legitimate total, 414/414 or updated).
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build --no-restore
+
+# 7. Node gates.
+node --test apps/kiosk/test/shell.contract.test.mjs
+npm --prefix packages/commissioning run check ; npm --prefix packages/commissioning test
+npm --prefix apps/ops-preview run check      ; npm --prefix apps/ops-preview test
+npm --prefix apps/mapping-config run check   ; npm --prefix apps/mapping-config test
+
+# 8. Boundary scan (expect: 0 findings (S1-S9 clean)).
+node tools/boundary-scan/boundary-scan.mjs
+
+# 9. Runtime/output asset inspection: the loader must be present, the WPF assembly need not be.
+Get-ChildItem -Recurse apps/kiosk/bin/Release/net10.0-windows |
+  Where-Object { $_.Name -match 'WebView2' } | Select-Object Name, Length
+
+# 10. Final proof: no unexpected working-tree changes (only the genuine lock-file refresh).
+git status --porcelain
+git diff --stat
+```
+
+Acceptance for this correction: **Build succeeded with 0 warning(s)**, full .NET tests at the legitimate
+total, kiosk contract all pass, commissioning all pass, Operations Preview all pass, Mapping
+Configuration all pass, boundary S1–S9 clean, WebView2 Core and WinForms references present, WebView2 WPF
+reference absent, the required loader/runtime asset present, and no unexpected working-tree changes.
