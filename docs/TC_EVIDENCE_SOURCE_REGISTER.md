@@ -338,12 +338,12 @@ rollout. Every request is `NOT_PROVIDED` at this head.
 
 ### 9.4 Register summary at this head
 
-| Priority | Count | `NOT_PROVIDED` | Blocking |
-|---|---|---|---|
-| P0 | 10 | 10 | Stage 0.4C-1 TC acquisition — **BLOCKED** |
-| P1 | 5 | 5 | Wire-break decoding — **BLOCKED** |
-| P2 | 5 | 5 | Rollout — **BLOCKED** |
-| **Total** | **20** | **20** | — |
+| Priority | Count | `NOT_PROVIDED` | Advanced (§13) | Blocking |
+|---|---|---|---|---|
+| P0 | 10 | 3 (`REQ-TC-008/009/010`) | 7 (`REQ-TC-001` … `REQ-TC-007` → drawing/manufacturer-verified) | Stage 0.4C-1 TC acquisition — **BLOCKED** |
+| P1 | 5 | 5 | 0 (model-level encodings documented; nothing configured/observed) | Wire-break decoding — **BLOCKED** |
+| P2 | 5 | 5 | 0 | Rollout — **BLOCKED** |
+| **Total** | **20** | **13** | **7** | — |
 
 ---
 

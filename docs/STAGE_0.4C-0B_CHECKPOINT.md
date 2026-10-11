@@ -1,5 +1,13 @@
 # Stage 0.4C-0B — Six-Node Thermocouple Topology Baseline Rev1, Drawing-Derived Channel Schedule and Documented Process-Image Profile (Development Checkpoint)
 
+> **Closeout note (2026-10-12).** Sections 0–15 below are the 2026-10-11
+> zero-evidence checkpoint record, preserved unchanged as audit history
+> (initial PR #18 run: `EVIDENCE_NOT_AVAILABLE_IN_SESSION`). The evidence
+> arrived afterwards and was fully reviewed; the current completion record is
+> **§16**, which supersedes the §§4–5/7–8/10/12 STOP positions for current
+> status only. Current Stage 0.4C-0B state: `EVIDENCE_REVIEW_COMPLETE`,
+> `FIELD_VERIFICATION_PENDING`, `STAGE_0.4C-1_BLOCKED`. PR #18 OPEN — NOT MERGED.
+
 Status: **DEVELOPMENT CHECKPOINT — documentation and evidence-intake record only, SUBMITTED FOR OWNER REVIEW.** Nothing is implemented, tested on hardware, commissioned or merged. **SCHEDULE DERIVATION STOPPED: NO DRAWING FILE IS PRESENT IN THIS SANDBOX (brief §4 STOP). MANUAL EVIDENCE EXTRACTION STOPPED: NO MANUAL FILE IS PRESENT (brief §§7–8).** `SENSOR_TO_TC_CHANNEL_SCHEDULE: NOT_PROVIDED`. `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED`. `WIRE_BREAK_DECODING: BLOCKED`. **NEW PR OPEN — NOT MERGED.**
 
 Stop point: this checkpoint. The Owner merges; the agent does not.
@@ -522,12 +530,20 @@ No Owner authorisation for a narrow README correction exists for this Stage. The
 is therefore reported here rather than repaired silently, extending conflict **CF-07**
 (Stage 0.4C-0A §10), which remains open awaiting the same Owner decision.
 
+*Closeout addendum (2026-10-12): the above was the 2026-10-11 position. The
+closeout instruction then explicitly authorised a narrow README current-status
+update, which is the only README change made (see §16). Formal closure of CF-07
+is left to the Owner at merge review.*
+
 ---
 
 ## 15. Related documents
 
-- [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md) — drawing intake, missing-file STOP report, revision rule
-- [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md) — the evidence register and `REQ-TC` register
+- [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md) — drawing intake, missing-file STOP report, revision rule, review completion (§7)
+- [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md) — the evidence register and `REQ-TC` register (completion review §13, TCEV-17 … TCEV-20)
+- [evidence/tc-drawing-schedule-rev1.csv](evidence/tc-drawing-schedule-rev1.csv) — derived 240-row REV1 schedule
+- [evidence/tc-process-image-profile-rev1.md](evidence/tc-process-image-profile-rev1.md) — process-image profile + decoding contract
+- [evidence/tc-schedule-validation-rev1.md](evidence/tc-schedule-validation-rev1.md) — narrow validation summary
 - [templates/sensor-to-tc-channel-schedule.template.csv](templates/sensor-to-tc-channel-schedule.template.csv) — schedule template (unchanged)
 - [templates/tc-commissioning-record.template.csv](templates/tc-commissioning-record.template.csv) — commissioning-record template (unchanged)
 - [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHECKPOINT.md) — predecessor checkpoint (template policy, decision tree, entry criteria)
@@ -537,3 +553,101 @@ is therefore reported here rather than repaired silently, extending conflict **C
 - [PUBLIC_REPOSITORY_BOUNDARY.md](PUBLIC_REPOSITORY_BOUNDARY.md) — what may be published
 - [SAFETY_BOUNDARY.md](SAFETY_BOUNDARY.md) — hardware safety boundary
 - [../AGENTS.md](../AGENTS.md) — working contract, evidence-first rules, stop conditions
+
+---
+
+## 16. Evidence-review completion successor record (2026-10-12 closeout)
+
+This section is the current completion record. Sections 0–15 remain the
+preserved 2026-10-11 zero-evidence history. Same branch
+`arena/c4b63a26-waterjet-sentinel-suite`, same base `main` `3e1a7fd9…`; PR #18
+OPEN — NOT MERGED (do not merge).
+
+### 16.1 Evidence-retrieval history (exact, preserved — not rewritten)
+
+| Run | Result |
+|---|---|
+| Initial PR #18 run | `EVIDENCE_NOT_AVAILABLE_IN_SESSION` |
+| SharePoint attempt | `SANDBOX_SHAREPOINT_TLS_EGRESS_BLOCKED`, `ZERO_BYTES_DOWNLOADED` |
+| Google Drive public-link attempt | `GOOGLE_DRIVE_TLS_EGRESS_BLOCKED`, `ZERO_BYTES_DOWNLOADED` |
+| Google Drive connector run | `OWNER_GOOGLE_DRIVE_CONNECTOR`, `FILE_BYTES_VERIFIED`, `DRAWING_REVIEWED`, `PRIMARY_MANUALS_REVIEWED`, `SCHEDULE_DERIVED`, `PROCESS_IMAGE_PROFILE_DOCUMENTED` |
+
+Evidence package: `WJSS_TC_EVIDENCE_BASELINE_REV1.zip`, exactly 17345849 bytes,
+SHA-256 `7B886950D7F5F665416241E4CB502CD1A5787E3581788C799077C062786AA23E`.
+Drawing `T8_SDS_Cabinet_-Draft-7E.pdf`: `DRAWING_PENDING_REVISION`, baseline
+`REV1`. Ephemeral bytes removed after review; archive and PDFs not committed.
+No Connector IDs, Drive details or evidence-access metadata are recorded
+anywhere in Git.
+
+### 16.2 Accepted drawing-schedule totals (recalculated, not copied)
+
+240 physical Channel rows: 200 verified, 12 `DRAWING_INTERNAL_CONFLICT`, 4
+`DRAWING_PRODUCT_TOPOLOGY_CONFLICT`, 24 `RESERVED_UNASSIGNED`, 0 unresolved.
+212 Product-compatible measurements across 106 Product-compatible Sensors.
+216 mapped + 24 unmapped = 240.
+
+Label-equivalence note (committed artefact vocabulary is preserved, not
+rewritten): the schedule CSV's `DRAWING_TOPOLOGY_CONFLICT` ≡ the brief's
+`DRAWING_PRODUCT_TOPOLOGY_CONFLICT`, and the CSV's `SPARE_UNMAPPED` ≡ the
+brief's `RESERVED_UNASSIGNED`. Counts are identical; no calculation defect was
+found, so the derived CSV, profile and validation summary are unchanged by this
+closeout.
+
+### 16.3 Owner ruling on I7 and I16 (binding)
+
+I7-F, I7-R, I16-F, I16-R remain `DRAWING_PRODUCT_TOPOLOGY_CONFLICT`. They are
+not valid Product Sensors: preserved as raw Drawing evidence, excluded from
+Product-compatible mapping, `NOT_COMMISSIONED`,
+`FIELD_RECONCILIATION_REQUIRED`. They are not restored as Sensors, not remapped,
+not classified as Spare, not published into Runtime, and not used for Queue or
+Cleaning logic. Product topology stays 106 Sensors / 212 measurement identities
+with I7 and I16 as `NON_SENSOR_GAP`.
+
+### 16.4 Drawing internal conflicts (binding)
+
+The 12 internal-conflict rows remain `DRAWING_INTERNAL_CONFLICT`,
+`OWNER_REVIEW_REQUIRED`, `FIELD_VERIFICATION_PENDING`. Both visible Drawing
+claims and the page/sheet references are preserved per-row in the schedule CSV;
+nothing was resolved from sequence, pattern or assumption.
+
+### 16.5 Process-image ruling (Manual-supported)
+
+Profile state: `DOCUMENTED_FACTORY_DEFAULT_BASELINE_REV1`. Per node: 5 ×
+750-498, 40 TC input values, 40 input words, zero-based offsets 0–39, network
+cyclic status bytes suppressed per the reviewed 750-362 primary manual, read
+access documented through FC3/FC4.
+
+Required state: documented = true, fieldVerified = false, hardwareReady =
+false, writeAuthority = false, fieldVerificationPending = true. The offsets are
+not Hardware-verified. No live communication is implemented.
+
+### 16.6 Wire-break ruling (binding)
+
+`WIRE_BREAK_MODEL_CAPABILITY`: `DOCUMENTED` (750-498 complete local-bus
+representation). `WIRE_BREAK_EXPLICIT_STATUS_IN_CURRENT_MODBUS_CYCLIC_IMAGE`:
+NOT AVAILABLE / NOT ESTABLISHED (750-362 cyclic profile suppresses status
+bytes). `WIRE_BREAK_DECODING`: `BLOCKED`. A raw special value alone is never a
+confirmed WIRE_BREAK. Explicit Wire Break, disabled Channel, underrange,
+overrange, communication loss and stale data stay separate future
+classifications. No Product enum or Product code was modified.
+
+### 16.7 Current Stage 0.4C-0B state
+
+`EVIDENCE_REVIEW_COMPLETE`. `FIELD_VERIFICATION_PENDING`.
+`STAGE_0.4C-1_BLOCKED`.
+
+Entry-criteria consequence: criteria satisfied by drawing/manufacturer evidence
+advance only as documented in the source register (§13; `REQ-TC-001` … `REQ-TC-007`
+drawing/manufacturer-verified, `REQ-TC-008` … `REQ-TC-020` stay `NOT_PROVIDED`);
+no criterion is satisfied by configuration, observation or hardware. Stage
+0.4C-1 remains BLOCKED. Physical Sensor acquisition NOT IMPLEMENTED. Hardware
+loop test NOT EXECUTED. No live Modbus. No TEST_HARDWARE. No Production. No
+device write/control.
+
+### 16.8 Artefact pointers
+
+- [evidence/tc-drawing-schedule-rev1.csv](evidence/tc-drawing-schedule-rev1.csv)
+- [evidence/tc-process-image-profile-rev1.md](evidence/tc-process-image-profile-rev1.md)
+- [evidence/tc-schedule-validation-rev1.md](evidence/tc-schedule-validation-rev1.md)
+- [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md)
+- [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md)
