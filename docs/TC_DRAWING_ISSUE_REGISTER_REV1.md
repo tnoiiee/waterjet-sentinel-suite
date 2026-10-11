@@ -1,9 +1,13 @@
 # TC Drawing Schedule Issue Register — Baseline REV1 (Stage 0.4C-0B)
 
 Status: **DEVELOPMENT CHECKPOINT record, SUBMITTED FOR OWNER REVIEW.** This register
-records the drawing-evidence intake for the six-node thermocouple topology baseline,
-the exact missing files, and why no Sensor-to-Channel schedule was derived in
-Stage 0.4C-0B. It authorises nothing. It contains no mapping.
+records the drawing-evidence intake for the six-node thermocouple topology baseline.
+Sections 1–5 record the 2026-10-11 position (evidence absent in-session, derivation
+STOPPED with 0 rows) and are preserved unchanged as audit history. Section 7 records
+the 2026-10-12 completion: the Baseline REV1 evidence arrived via the
+Owner-connected source, was integrity-verified, and the 240-row schedule was derived
+from it. It authorises nothing. It contains no mapping beyond the derived schedule
+it points at.
 
 | Item | Value |
 |---|---|
@@ -125,6 +129,104 @@ or authorised by this register.
 ## 6. Related documents
 
 - [STAGE_0.4C-0B_CHECKPOINT.md](STAGE_0.4C-0B_CHECKPOINT.md) — this Stage's checkpoint record
-- [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md) — evidence ledger (TCEV-12 … TCEV-16 record this intake)
+- [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md) — evidence ledger (TCEV-12 … TCEV-16 record the absent-evidence intake; TCEV-17 … TCEV-20 record the completed review — see §7)
 - [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHECKPOINT.md) — predecessor checkpoint (template policy, decision tree)
 - [templates/sensor-to-tc-channel-schedule.template.csv](templates/sensor-to-tc-channel-schedule.template.csv) — the 212-row intake template (unchanged; still no mapping)
+- [evidence/tc-drawing-schedule-rev1.csv](evidence/tc-drawing-schedule-rev1.csv) — the derived 240-row REV1 schedule (see §7)
+- [evidence/tc-process-image-profile-rev1.md](evidence/tc-process-image-profile-rev1.md) — process-image profile + decoding contract (see §7)
+- [evidence/tc-schedule-validation-rev1.md](evidence/tc-schedule-validation-rev1.md) — narrow validation summary (see §7)
+
+---
+
+## 7. Evidence-review completion (2026-10-12 — supersedes the §2 STOP for REV1)
+
+The Baseline REV1 evidence arrived after the §2 STOP was recorded, was
+integrity-verified in-session, and was fully reviewed. This section records the
+completion; §§1–5 above are preserved unchanged as the absence-position audit
+trail. No new drawing revision arrived, so no REV2 was opened: this is the same
+`BASELINE_REV1`, now present and reviewed. The §4 revision rule still binds any
+*future* revised drawing.
+
+### 7.1 Evidence received and integrity
+
+Delivery: `OWNER_GOOGLE_DRIVE_CONNECTOR` (Owner-connected source; no link, ID or
+token is recorded). Archive `WJSS_TC_EVIDENCE_BASELINE_REV1.zip`, exactly
+17345849 bytes, SHA-256 `7B886950D7F5F665416241E4CB502CD1A5787E3581788C799077C062786AA23E`,
+ZIP-signed, central directory valid, 4 listable members, extracted with
+traversal/symlink/encryption guards to an ephemeral directory (removed after
+review; the archive itself is **not** committed to the repository):
+
+| Member | Size (bytes) | SHA-256 | Content |
+|---|---|---|---|
+| `T8_SDS_Cabinet_-Draft-7E.pdf` | 7539526 | `08db6f2a…1d6b98` (full hash in the source register TCEV-17) | Combined six-cabinet drawing, 32 pages, REV 1A, 16 MAR 2026, DXN Engineering and Supply Co., Ltd., MAE MOH THERMAL POWER PLANT UNIT 8 |
+| `m07500498_00000000_0en.pdf` | 5041172 | `ed66534d…1fe83` (TCEV-18) | WAGO 750-498 manual v1.0.0, 96 pages, Nov 2019 |
+| `m07500362-xxxxxxxx-0en.pdf` | 4224370 | `85e72f83…27bb` (TCEV-19) | WAGO 750-362 manual v1.1.1, 296 pages, Apr 2022 |
+| `m07500600-xxxxxxxx-0en.pdf` | 1751049 | `c390260c…04b46` (TCEV-20) | WAGO 750-600 manual v1.3.0, 38 pages, 2015 |
+
+### 7.2 Drawing identity and topology (visually verified on-render)
+
+- `WIRING DIAGRAM OF SLAG DEPOSITION SENSOR CABINET`, REVISION 1A, document
+  number blank — hence `DRAWING_PENDING_REVISION` is retained: the review
+  approves nothing.
+- Six cabinets `+SDSCAB1` … `+SDSCAB6` (elevations EL.40.000 / EL.40.000 /
+  EL.36.500 / EL.36.500 / EL.26.670 / EL.26.670). Per cabinet: `-A101` = WAGO
+  750-362, `-A102.1` … `-A102.5` = WAGO 750-498, `-A110` = WAGO 750-600,
+  `-X110` = WDU 2.5/TC TYP K, `-X111` = UT 2.5-PE (p32 rows 7–11; p14; p19).
+- A101 takes LAN from `-FBOCAB` (CAT6); field cable `T/C type K PVC Mylar`;
+  all channels Type K. No topology conflict with the Stage baseline.
+
+### 7.3 Schedule derivation (240 rows)
+
+[evidence/tc-drawing-schedule-rev1.csv](evidence/tc-drawing-schedule-rev1.csv):
+216 mapped + 24 spare (`SPARE_UNMAPPED`: A102.5 ch5–8 × 6) = 240. Per-row states:
+200 `DRAWING_VERIFIED`, 12 `DRAWING_INTERNAL_CONFLICT`, 4
+`DRAWING_TOPOLOGY_CONFLICT`, 0 unresolved. Template compatibility: 212
+`MATCHED` (106/106 sensors), 4 `GAP_CONFLICT`, 24 `NO_COUNTERPART_SPARE`.
+Visual verification: all 240 table cells read on-render (pp20/22/24/26/28/30);
+all 6 X110 diagram SDS sequences follow the table conductor order
+(pp21/23/25/27/29/31); all 6 A102.2 conflict zones, the I7/I16 cells and the
+p6/p7 overview labels confirmed on 300-DPI crops. Full record:
+[evidence/tc-schedule-validation-rev1.md](evidence/tc-schedule-validation-rev1.md).
+
+### 7.4 Issue inventory (all recorded per-row in the CSV; nothing discarded)
+
+| Issue | Rows / pages | Finding | Schedule treatment |
+|---|---|---|---|
+| ISS-REV1-01 — sheath/conductor mismatch | 12 rows: every cabinet A102.2 ch6 (sheath X-F, conductor X-R) + ch7 (sheath Y-R, conductor Y-F); tables pp20/22/24/26/28/30 | `DRAWING_INTERNAL_CONFLICT`: the sheath column contradicts the conductor column; the X110 diagram agrees with the conductor on all 6 cabinets (visually verified) | Follows conductor+X110 (2-of-3 sources); both claims preserved per-row |
+| ISS-REV1-02 — live channels on gap positions | 4 rows: CAB5 A102.4 ch7/8 = I7-F/R (X110.31/32), CAB6 A102.4 ch7/8 = I16-F/R (X110.31/32); table+diagram agree | `DRAWING_TOPOLOGY_CONFLICT`: drawing assigns live channels to the authoritative `NON_SENSOR_GAP` positions I7/I16 | Rows kept with conflict state; excluded from the compatible set; **no position is commissioned, redefined or silently dropped** |
+| ISS-REV1-03 — swapped overview sensor groups | Overview p6 (+SDSCAB1 page shows CAB2's groups G+110–118/G+210–218) and p7 (+SDSCAB2 page shows CAB1's groups G+101–109/G+201–209); pp8–11 match their cabinets | `DRAWING_INTERNAL_CONFLICT` (overview vs wiring tables+X110, both cabinets) | Overviews are not a schedule source; wiring tables+X110 govern; Owner revision requested (§5 item 5) |
+| SPARE-REV1 | 24 rows: A102.5 ch5–8 × 6 | `SPARE_UNMAPPED`: spare zone, no field wiring; words 36–39 still occupied | Carried as spares, not commissioned; the 28-remaining arithmetic is unchanged (24 spares + 4 gap-conflict rows) |
+
+### 7.5 Manual extraction (drawn only from the reviewed manuals)
+
+- 750-498: Type K = ID3, −200…+1370 °C, 0.1 °C/digit two's complement;
+  wire break `0x7FFF`/status `0x60`; factory defaults Type K + internal CJC +
+  diagnostics on (§2 of the profile). Full section/page table in
+  [evidence/tc-process-image-profile-rev1.md](evidence/tc-process-image-profile-rev1.md) §2.
+- 750-362: analog-first physical-order mapping; Modbus sees 16-bit words only
+  (Intel format), **no status bytes**; 40 words per node at FC3/FC4 addresses
+  0–39; 750-498-not-enumerated gap explicitly recorded (profile §3–§4).
+- 750-600: passive bus termination, no process data (profile §1).
+- Configured per-instance values remain unevidenced (§7.6).
+
+### 7.6 What review did NOT establish (still blocked)
+
+- Configured sensor type / CJC / diagnostics / scaling / channel-enable per
+  instance (no engineering export) — `REQ-TC-008`, `REQ-TC-009`, `REQ-TC-011`
+  stay `NOT_PROVIDED`.
+- Node transport identities (no IP plan in evidence) — `REQ-TC-010` stays
+  `NOT_PROVIDED` (read representation at `MODEL_LEVEL` only).
+- Observed wire-break/normal/recovery behaviour — `REQ-TC-012` … `REQ-TC-015`
+  stay `NOT_PROVIDED`.
+- Wall/slot/matrix NAMESPACE cross-check — `NOT_VERIFIED` (no drawing counterpart).
+- `+SDSCABn` ↔ `TC-NODE-0n` equated by ordinal assumption only
+  (`ASSUMED_ORDINAL_CORRESPONDENCE`).
+- No loop test, no connection, no hardware observation of any kind.
+
+### 7.7 Owner next actions (extends §5)
+
+| # | Action | Needed for |
+|---|---|---|
+| 5 | Revise the drawing (REV 1B or later): correct the A102.2 ch6/ch7 sheath labels on all six cabinets (or confirm the conductor+X110 reading), un-swap the p6/p7 overview sensor groups, and rule on the I7/I16 live channels (remove, re-label, or grant a topology deviation) | Clearing ISS-REV1-01/02/03; a revised drawing opens REV2 per §4 |
+| 6 | Supply per-instance configuration evidence (engineering-tool export or complete screenshots) if any instance differs from factory default | Clearing the §7.6 configuration gaps |
+| 7 | Supply the node transport plan (cabinet→node→address assignment) | Clearing `REQ-TC-010` and the ordinal-correspondence assumption |
