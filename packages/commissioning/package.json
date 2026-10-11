@@ -1,8 +1,8 @@
 {
   "name": "@wjss/commissioning",
-  "version": "0.0.0-0.4c-k1-preview",
+  "version": "0.0.0-0.4c-k2-preview",
   "private": true,
-  "description": "Stage 0.4C-K1 simulation-only Sensor Commissioning Monitor model: the merged 240-row drawing-derived schedule, synthetic preview observations, the thirteen deterministic commissioning scenarios (including the three read-only paired Front/Rear thermal diagnostic demonstrations) and the preview-only commissioning workflow. Zero dependencies. No hardware access, no device write, no control authority.",
+  "description": "Stage 0.4C-K2 (carries the Stage 0.4C-K1 simulation-only Sensor Commissioning Monitor model; adds the TC Node Configuration foundation): the merged 240-row drawing-derived schedule, synthetic preview observations, the thirteen deterministic commissioning scenarios (including the three read-only paired Front/Rear thermal diagnostic demonstrations) and the preview-only commissioning workflow. Zero dependencies. No hardware access, no device write, no control authority.",
   "license": "UNLICENSED",
   "type": "module",
   "main": "src/index.mjs",
@@ -13,7 +13,7 @@
     "node": ">=22.22.2"
   },
   "scripts": {
-    "check": "node --check src/index.mjs && node --check src/schedule.mjs && node --check src/quality.mjs && node --check src/scenarios.mjs && node --check src/observation.mjs && node --check src/workflow.mjs && node --check src/presentation.mjs && node --check src/wallmap.mjs && node --check src/thermalpair.mjs",
+    "check": "node --check src/index.mjs && node --check src/schedule.mjs && node --check src/quality.mjs && node --check src/scenarios.mjs && node --check src/observation.mjs && node --check src/workflow.mjs && node --check src/presentation.mjs && node --check src/wallmap.mjs && node --check src/thermalpair.mjs && node --check src/tcNodeConfiguration.mjs",
     "test": "node --test test/*.test.mjs"
   }
 }

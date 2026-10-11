@@ -1,3 +1,23 @@
+## 2026-10-12 — Stage 0.4C-K2 native Kiosk Stage identity correction (PR #20, same branch — OPEN, NOT MERGED, do not merge)
+
+- **Owner visual review finding, recorded as received.** The native Kiosk header read `Kiosk Preview - Stage 0.4C-K1` and the window title named K1, while the embedded Preview and Diagnostics read `Stage 0.4C-K2`. This was the only blocking mismatch.
+- **Corrected at the source.** `apps/kiosk/KioskShellOptions.cs` now sets `StageId` to `0.4C-K2` and `WindowTitle` to `WaterJet Sentinel Suite - Kiosk Preview (Stage 0.4C-K2)`. The header label is built from `StageId`. Current-facing comments in `MainForm.cs`, `Program.cs` and the Kiosk README were relabelled. The placeholder package version `0.0.0-0.4c-k1-preview` became `0.0.0-0.4c-k2-preview` in the two packages, and their descriptions now open with K2.
+- **Historical K1 references kept.** Named K1 passes, the WebView2 dependency decision, the csproj history comments, the K1 checkpoint document and the merged PR #19 records are unchanged.
+- **Guards.** The Kiosk contract test asserts the native identity and its match with the Preview `STAGE_ID`, and it rejects a K1 identity in any C# string literal. The Preview render test asserts the embedded header and Diagnostics read K2.
+- **Unchanged.** The approved origin, WebView2 `1.0.4258.31`, the lock files, layout, reconnecting behaviour, confirmed exit, TC Node configuration, the S2 exception and every authority boundary. No dependency change.
+- **NOT RUN IN ARENA.** The .NET build and rendering of the native header. The Owner must rerun the Kiosk. Owner Manual Review has NOT passed.
+
+## 2026-10-12 — Stage 0.4C-K2 TC Node/IP Configuration Foundation (branch `arena/699da2a5-waterjet-sentinel-suite`, based on `main` a7d739bb — PR to `main` OPEN, NOT MERGED, do not merge)
+
+- **Canonical six-node model.** `packages/commissioning/src/tcNodeConfiguration.mjs` holds `TC-NODE-01`…`06` ↔ `CAB1`…`CAB6` (one-to-one by ordinal) and the six Test addresses `192.0.2.11`–`.16`, the only Product file that holds them. Topology per Node is 750-362 x 1, 5 x 750-498, 40 physical TC Channels and 750-600 x 1. Totals are derived: 6 Nodes, 6 Cabinets, 30 TC modules, 240 channels and 6 configured Test IPs.
+- **Atomic validation.** Identity, topology, IP and duplicate rules are checked together. Leading-zero and malformed IPv4 forms are refused, and a wrong Node-to-address pairing, an invented port or protocol, or any reachability or hardware claim is refused with a named code. Nothing is repaired silently and there is no fallback address.
+- **Honest status separation.** `CONFIGURED`, `REACHABILITY_NOT_TESTED`, `ACQUISITION_NOT_IMPLEMENTED`, `HARDWARE_VERIFICATION_PENDING`, `FIELD_VERIFICATION_PENDING` and `HARDWARE_ACCESS_NOT_AUTHORIZED`. Port and protocol stay `PORT_UNRESOLVED` and `PROTOCOL_UNRESOLVED`. Port 502 is not assumed.
+- **Owner-approved scoped S2 exception.** `tools/boundary-scan/s2Exception.mjs` permits exactly the six addresses in exactly one canonical path. It holds no address literal, and it is covered by 14 scanner self-tests. S1 and S3–S9 are unchanged.
+- **Read-only Preview.** `GET /api/tc-node-configuration` (GET and HEAD only, 405 with `Allow: GET, HEAD` otherwise). The `#node-configuration` section shows six TC-NODE columns and the totals inside a bounded frame. It has no controls. A failed projection is isolated to that section.
+- **Tests.** Commissioning 144/144 (39 new), Ops Preview 109/109 (21 new), Kiosk 21/21, Mapping UI 82/82, mapping package 261 pass / 7 skipped / 0 fail, boundary scan 0 findings and `git diff --check` clean. Two focused tests were corrected after an arithmetic check and a regex that matched `RegExp.exec`. The S2 gate found literal addresses and a `password` word in my own tests, and those were moved to runtime derivation.
+- **NOT RUN IN ARENA.** The .NET build and tests, and any real-browser execution. The Owner-local handoff is in `docs/STAGE_0.4C-K2_CHECKPOINT.md` §9.
+- **Unchanged.** No dependency and no lock file. No device contact of any kind. No Kiosk or Wall Map logic. Owner Manual Review has NOT passed and Stage 0.4C-K2 is NOT claimed complete.
+
 ## 2026-10-12 — Stage 0.4C-K1 PR #19 Owner-authorized Front/Rear thermal-pair semantics and synthetic diagnostic pass (same PR — OPEN, NOT MERGED, do not merge)
 
 - **Owner finding, recorded as received.** The Synthetic Preview systematically rendered **Rear above Front** for every Product Sensor pair (the Owner's example: Front 29.4 / Rear 35.1). Front is the furnace-facing fin / heat-collection measurement and Rear is the paired waterwall-tube-side reference, so the inverted reading trained the Operator to read the pair backwards.

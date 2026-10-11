@@ -1,4 +1,5 @@
-// Stage 0.4C-K1 - the local, read-only host of the Kiosk Preview route.
+// Stage 0.4C-K2 - the local, read-only host of the Kiosk Preview route (Stage 0.4C-K1 Preview
+// plus the Stage 0.4C-K2 TC Node configuration projection).
 //
 //   GET /                                 the Operations route shell (with the Commissioning Monitor)
 //   GET /app.mjs, /styles.css             UI assets (fixed whitelist)
@@ -11,12 +12,15 @@
 //   GET /api/commissioning/observations   one scenario's synthetic observations (never a device read)
 //   GET /api/operations/summary           node communication and commissioning progress summary
 //   GET /api/sensor-map                   the public-safe synthetic sensor-map example, read-only
+//   GET /api/tc-node-configuration        the six-Node TC configuration projection, read-only (no probe,
+//                                         no socket, no device; configuration evidence only)
 //
 // Every other method is refused with 405, and there is no route that writes, connects, polls, reads
 // a device, changes the Mapping, or commands anything. The server binds to 127.0.0.1 only: the bind
 // host is a constant and no environment variable, argument or configuration can change it. The
 // Preview workflow state lives in the browser session and is never persisted here.
 
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, extname, join } from 'node:path';
@@ -26,6 +30,8 @@ import {
   PreviewCommissioningSession, buildObservations, buildRowViews, commissioningProgress,
   nodeCommunicationSummary, parseSchedule, scheduleCounts, scenarioCatalogue, summariseObservations,
   COLUMN_COUNT, PROTECTED_BASELINE, SCENARIO_KEYS,
+  CANONICAL_TC_NODE_CONFIGURATION, TC_NODE_CONFIGURATION_ID, buildTcNodeConfigurationView,
+  tcNodeConfigurationFingerprint,
 } from '../../packages/commissioning/src/index.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +42,7 @@ const SCHEDULE_PATH = join(REPO, 'docs', 'evidence', 'tc-drawing-schedule-rev1.c
 const SENSOR_MAP_PATH = join(REPO, 'config', 'examples', 'sensor-map.example.json');
 
 /** Stage identity of this Preview. Displayed on every screen and returned by every API route. */
-export const STAGE_ID = '0.4C-K1';
+export const STAGE_ID = '0.4C-K2';
 export const PREVIEW_MODE = 'SIMULATION / PREVIEW';
 
 /** S6: the only bind host. A constant, never read from the environment or from arguments. */
@@ -253,6 +259,24 @@ function sensorMapPayload() {
   };
 }
 
+/**
+ * The six-Node TC configuration projection. It is derived ONLY from the canonical configuration and
+ * its validation: no request input reaches it, and it names no file path, environment value, port,
+ * protocol, credential or Production address. Its statuses are honest facts of this Stage.
+ */
+export function tcNodeConfigurationPayload() {
+  const view = buildTcNodeConfigurationView(CANONICAL_TC_NODE_CONFIGURATION);
+  const digest = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
+  const fingerprint = tcNodeConfigurationFingerprint(CANONICAL_TC_NODE_CONFIGURATION, digest);
+  return {
+    stageId: STAGE_ID,
+    mode: PREVIEW_MODE,
+    configurationId: TC_NODE_CONFIGURATION_ID,
+    revision: { fingerprintSha256: fingerprint, shortRevision: fingerprint.slice(0, 12) },
+    ...view,
+  };
+}
+
 function send(res, status, body, type, extra = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': type, ...extra });
   res.end(body);
@@ -303,6 +327,9 @@ export function createPreviewServer() {
       }
       if (path === '/api/sensor-map') {
         return send(res, 200, JSON.stringify(sensorMapPayload()), MIME['.json']);
+      }
+      if (path === '/api/tc-node-configuration') {
+        return send(res, 200, JSON.stringify(tcNodeConfigurationPayload()), MIME['.json']);
       }
       const asset = path.slice(1);
       if (PUBLIC_FILES.has(asset)) {

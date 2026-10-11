@@ -5,7 +5,7 @@ using Microsoft.Web.WebView2.WinForms;
 namespace Wjss.Kiosk;
 
 /// <summary>
-/// Stage 0.4C-K1: the application-owned Kiosk shell.
+/// Stage 0.4C-K2: the application-owned Kiosk shell (originated in Stage 0.4C-K1).
 ///
 /// This window hosts the local Operations preview route in the fixed-name embedded web-view control
 /// supplied by the Owner-approved package. It presents one chromeless window with no address bar, no

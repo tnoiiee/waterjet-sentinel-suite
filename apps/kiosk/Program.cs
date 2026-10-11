@@ -1,7 +1,7 @@
 namespace Wjss.Kiosk;
 
 /// <summary>
-/// Entry point of the application-owned shell (Stage 0.4C-K1).
+/// Entry point of the application-owned shell (Stage 0.4C-K2).
 ///
 /// The shell owns exactly one thing: a guarded window onto the approved local preview route. It
 /// starts no other process, reads no configuration, keeps no credential and holds no control

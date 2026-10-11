@@ -5,7 +5,7 @@
  * Machine-checks the PUBLIC_REPOSITORY_BOUNDARY.md rules and the Stage 0.3A
  * product-tree rules. Exit code 0 = clean; 1 = findings (build-blocking).
  *
- * Rules
+ * Rules (S2 carries one narrow exception: see s2Exception.mjs)
  *   S1 Product tree (apps/, packages/, adapters/, tests/, tools/, config/,
  *      root build files) contains NO http(s) URL and no non-loopback IPv4.
  *   S2 Repository-wide (excluding spikes/** reference material): no
@@ -25,6 +25,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, posix, relative } from 'node:path';
+import { isS2ExceptionAddress } from './s2Exception.mjs';
 
 const ROOT = process.argv[2] ?? process.cwd();
 
@@ -138,6 +139,8 @@ for (const { rel, full, dir } of walk(ROOT)) {
       for (const m of line.matchAll(IPV4)) {
         if (!validIpv4(m[0]) || isLoopback(m[0])) continue;
         if (!product) continue;
+        // Stage 0.4C-K2 Owner-approved S2 exception: exactly six TEST addresses in exactly one file.
+        if (isS2ExceptionAddress(rel, m[0])) continue;
         findings.push({ rule: 'S2', at, why: `non-loopback IPv4 '${m[0]}' in Product tree` });
       }
     }

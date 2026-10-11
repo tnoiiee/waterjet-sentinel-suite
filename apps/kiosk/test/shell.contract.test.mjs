@@ -1,4 +1,4 @@
-// Stage 0.4C-K1 - source contract of the application-owned Kiosk shell.
+// Stage 0.4C-K2 - source contract of the application-owned Kiosk shell (originated in Stage 0.4C-K1).
 //
 // The Arena sandbox has no .NET SDK, so this project cannot be compiled or run here. These tests do
 // not pretend to replace that: they read the shell SOURCE and assert the protected behaviours the
@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { STAGE_ID } from '../../ops-preview/server.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const KIOSK = join(HERE, '..');
@@ -329,6 +330,20 @@ test('the left status content cannot force the action area outside the client wi
   // The old single-line, non-wrapping layout is gone.
   assert.equal(/WrapContents = false;/.test(source.main), true, 'the action zone stays on one line');
   assert.equal(/_stageLabel\.AutoSize = true|_policyState\.AutoSize = true/.test(source.main), false);
+});
+
+test('the native identity is Stage 0.4C-K2 in the shell constants and the window title, and matches the Preview', () => {
+  const stageId = /public const string StageId = "([^"]+)";/.exec(source.options)?.[1];
+  assert.equal(stageId, '0.4C-K2');
+  assert.equal(stageId, STAGE_ID, 'the native shell and the embedded Preview must name the same Stage');
+  assert.match(source.options, /public const string WindowTitle = "WaterJet Sentinel Suite - Kiosk Preview \(Stage 0\.4C-K2\)";/);
+  assert.match(source.main, /Text = KioskShellOptions\.WindowTitle;/);
+  // No K1 identity in any displayed or identity string literal of the shell. Doc comments may keep
+  // provenance ("originated in Stage 0.4C-K1"); the window title and header label must not.
+  for (const [name, text] of [['KioskShellOptions.cs', source.options], ['MainForm.cs', source.main], ['Program.cs', source.program]]) {
+    const literals = text.match(/"[^"\n]*"/g) ?? [];
+    assert.equal(literals.some((l) => /0\.4C-K1/.test(l)), false, `${name} must not show a K1 identity in a string literal`);
+  }
 });
 
 test('the header keeps the Stage boundary, the host state and the policy counters on screen', () => {

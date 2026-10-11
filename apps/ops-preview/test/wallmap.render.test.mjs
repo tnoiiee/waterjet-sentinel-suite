@@ -1,4 +1,4 @@
-// Stage 0.4C-K1 - Commissioning Wall Map rendering, selection synchronisation, Front/Rear
+// Stage 0.4C-K1 (re-verified at 0.4C-K2) - Commissioning Wall Map rendering, selection synchronisation, Front/Rear
 // separation, Preview workflow isolation, filters and Wall-order navigation.
 //
 // These tests run the REAL public/app.mjs through the REAL Preview server against a stub DOM. They
