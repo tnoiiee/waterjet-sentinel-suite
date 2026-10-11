@@ -52,13 +52,32 @@ public sealed class MainForm : Form
         "KioskPreview",
         "ViewData");
 
+    /// <summary>Padding and gaps of the shell header. Kept small so the header stays compact.</summary>
+    private const int BarPadX = 16;
+    private const int BarPadY = 8;
+    private const int BarGapX = 20;
+
+    /// <summary>Vertical slack added to every measured text row, so a wrapped line never clips.</summary>
+    private const int RowSlackY = 4;
+
     private readonly WebView2 _view = new() { Dock = DockStyle.Fill, Visible = false };
     private readonly Panel _content = new() { Dock = DockStyle.Fill, BackColor = ShellBack };
+    private readonly TableLayoutPanel _statusBar = new();
     private readonly TableLayoutPanel _overlay = new();
     private readonly Label _overlayHeadline = new();
     private readonly Label _overlayDetail = new();
+
+    // Header text rows. Every one is AutoSize=false and Dock=Fill: a label must never contribute a
+    // preferred width, because that is what pushed the Exit action off the right edge of a 1920x1080
+    // fullscreen client area (Owner Manual Review, 2026-10-12).
+    private readonly Label _stageLabel = new();
     private readonly Label _connectionState = new();
+    private readonly Label _boundaryLabel = new();
     private readonly Label _policyState = new();
+
+    /// <summary>Action zone: the ONLY part of the header that keeps its preferred width.</summary>
+    private readonly FlowLayoutPanel _actionZone = new();
+
     private readonly Button _exitButton = new();
     private readonly Button _windowModeButton = new();
     private readonly System.Windows.Forms.Timer _probeTimer = new();
@@ -90,59 +109,16 @@ public sealed class MainForm : Form
         _probeTimer.Interval = KioskShellOptions.ProbeIntervalMs;
         _probeTimer.Tick += OnProbeTick;
 
+        // The header is re-measured on a monitor DPI change as well as on resize.
+        DpiChanged += (_, _) => LayoutStatusBar();
+
         UpdateShellState();
         _probeTimer.Start();
     }
 
     private void BuildLayout()
     {
-        var statusBar = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 2,
-            RowCount = 1,
-            BackColor = ShellBar,
-            Padding = new Padding(16, 8, 16, 8),
-            Margin = Padding.Empty,
-        };
-        statusBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        statusBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-
-        var left = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = false,
-            FlowDirection = FlowDirection.LeftToRight,
-            Margin = Padding.Empty,
-        };
-        left.Controls.Add(Chrome("Kiosk Preview  -  Stage " + KioskShellOptions.StageId, Ink, 10F, FontStyle.Bold));
-        left.Controls.Add(Chrome(KioskShellOptions.BoundaryText, Warn, 9.5F, FontStyle.Bold));
-        left.Controls.Add(_connectionState);
-        left.Controls.Add(_policyState);
-        ConfigureChrome(_connectionState, Ink, 9F, FontStyle.Regular);
-        ConfigureChrome(_policyState, Muted, 9F, FontStyle.Regular);
-
-        var right = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            WrapContents = false,
-            FlowDirection = FlowDirection.LeftToRight,
-            Margin = Padding.Empty,
-        };
-        ConfigureButton(_windowModeButton, "Windowed / full screen", Info);
-        ConfigureButton(_exitButton, "Exit Kiosk Preview", Err);
-        right.Controls.Add(_windowModeButton);
-        right.Controls.Add(_exitButton);
-        _windowModeButton.Click += (_, _) => ToggleWindowMode();
-        _exitButton.Click += (_, _) => RequestConfirmedExit();
-
-        statusBar.Controls.Add(left, 0, 0);
-        statusBar.Controls.Add(right, 1, 0);
-
+        BuildStatusBar();
         BuildOverlay();
 
         _content.Controls.Add(_view);
@@ -155,12 +131,162 @@ public sealed class MainForm : Form
             RowCount = 2,
             BackColor = ShellBack,
             Margin = Padding.Empty,
+            AutoSize = false,
         };
+
+        // The single column is EXPLICITLY bounded. TableLayoutPanel defaults an unstyled column to
+        // AutoSize, which sizes the column to its children's preferred width: the header would then
+        // be wider than the form, and the content cell - and with it the embedded view, and with it
+        // the web page viewport - would be stretched past the screen edge. Owner Manual Review
+        // defect 1 (native header) and defect 2 (clipped embedded page) share this one root cause.
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-        layout.Controls.Add(statusBar, 0, 0);
+        layout.Controls.Add(_statusBar, 0, 0);
         layout.Controls.Add(_content, 0, 1);
         Controls.Add(layout);
+    }
+
+    /// <summary>
+    /// The shell header: two columns and four rows, with explicit priority.
+    ///
+    ///  - Column 1 is AutoSize and holds the action zone (the two buttons) - the ONLY header content
+    ///    that keeps its preferred width, so the actions can never be pushed off the right edge.
+    ///  - Column 0 is the remaining width and holds the text rows; every text label is
+    ///    AutoSize=false with Dock=Fill, so no text can demand width from the form.
+    ///  - Row 0 carries the action zone beside the short Stage identity; the long Stage boundary,
+    ///    the connection state and the approved-origin policy each get their own full-width row and
+    ///    WRAP instead of competing for a single line.
+    ///
+    /// Row heights are measured (see LayoutStatusBar), which is what makes the result deterministic:
+    /// nothing depends on WinForms AutoSize guesswork, and the header is complete at 1024x600 as
+    /// well as at 1920x1080.
+    /// </summary>
+    private void BuildStatusBar()
+    {
+        _statusBar.Dock = DockStyle.Fill;
+        _statusBar.AutoSize = true;
+        _statusBar.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _statusBar.ColumnCount = 2;
+        _statusBar.RowCount = 4;
+        _statusBar.BackColor = ShellBar;
+        _statusBar.Padding = new Padding(BarPadX, BarPadY, BarPadX, BarPadY);
+        _statusBar.Margin = Padding.Empty;
+        _statusBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        _statusBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        for (var row = 0; row < _statusBar.RowCount; row++)
+        {
+            _statusBar.RowStyles.Add(new RowStyle(SizeType.Absolute, 0F));
+        }
+
+        _stageLabel.Text = "Kiosk Preview  -  Stage " + KioskShellOptions.StageId;
+        _boundaryLabel.Text = KioskShellOptions.BoundaryText;
+        ConfigureTextRow(_stageLabel, Ink, 10F, FontStyle.Bold);
+        ConfigureTextRow(_connectionState, Ink, 9F, FontStyle.Regular);
+        ConfigureTextRow(_boundaryLabel, Warn, 9.5F, FontStyle.Bold);
+        ConfigureTextRow(_policyState, Muted, 9F, FontStyle.Regular);
+
+        ConfigureButton(_windowModeButton, "Windowed / full screen", Info);
+        ConfigureButton(_exitButton, "Exit Kiosk Preview", Err);
+        _windowModeButton.Click += (_, _) => ToggleWindowMode();
+        _exitButton.Click += (_, _) => RequestConfirmedExit();
+
+        _actionZone.AutoSize = true;
+        _actionZone.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _actionZone.WrapContents = false;
+        _actionZone.FlowDirection = FlowDirection.LeftToRight;
+        _actionZone.Margin = Padding.Empty;
+        _actionZone.Anchor = AnchorStyles.Right;
+        _actionZone.Controls.Add(_windowModeButton);
+        _actionZone.Controls.Add(_exitButton);
+
+        _statusBar.Controls.Add(_stageLabel, 0, 0);
+        _statusBar.Controls.Add(_actionZone, 1, 0);
+        _statusBar.Controls.Add(_connectionState, 0, 1);
+        _statusBar.SetColumnSpan(_connectionState, 2);
+        _statusBar.Controls.Add(_boundaryLabel, 0, 2);
+        _statusBar.SetColumnSpan(_boundaryLabel, 2);
+        _statusBar.Controls.Add(_policyState, 0, 3);
+        _statusBar.SetColumnSpan(_policyState, 2);
+
+        LayoutStatusBar();
+    }
+
+    /// <summary>
+    /// Measures every header row for the width it actually gets and applies the heights, so the
+    /// header always fits the client area and always stays complete. Re-run on resize, on DPI change
+    /// and whenever a header text changes (connection state, policy counters, window-mode label).
+    ///
+    /// The header must stay complete and usable from the form's existing 1024x600 minimum upwards;
+    /// nothing here raises that minimum, and no scrollbar is introduced.
+    /// </summary>
+    private void LayoutStatusBar()
+    {
+        if (_statusBar.IsDisposed || _statusBar.RowStyles.Count < 4)
+        {
+            return;
+        }
+
+        var clientWidth = ClientSize.Width;
+        if (clientWidth <= 0)
+        {
+            return;
+        }
+
+        var inner = Math.Max(240, clientWidth - (BarPadX * 2));
+
+        // Priority 1: the action zone keeps its preferred width, and it is reserved BEFORE any text.
+        // The width is the sum of the two auto-sized buttons plus their margins - a value this code
+        // owns, so nothing here depends on how a container measures a proposed size.
+        var actionsWidth = _windowModeButton.PreferredSize.Width + _windowModeButton.Margin.Horizontal
+            + _exitButton.PreferredSize.Width + _exitButton.Margin.Horizontal
+            + _actionZone.Padding.Horizontal;
+        var actionsHeight = Math.Max(
+            _windowModeButton.PreferredSize.Height + _windowModeButton.Margin.Vertical,
+            _exitButton.PreferredSize.Height + _exitButton.Margin.Vertical) + _actionZone.Padding.Vertical;
+
+        // Priority 2: the identity line may use what is left (minus a safety margin), and wraps
+        // inside it if it ever needs to.
+        var identityWidth = Math.Max(120, inner - actionsWidth - BarGapX - 8);
+
+        var row0 = Math.Max(MeasureTextRow(_stageLabel.Text, _stageLabel.Font, identityWidth), actionsHeight);
+        var row1 = MeasureTextRow(_connectionState.Text, _connectionState.Font, inner);
+        var row2 = MeasureTextRow(_boundaryLabel.Text, _boundaryLabel.Font, inner);
+        var row3 = MeasureTextRow(_policyState.Text, _policyState.Font, inner);
+
+        SetRowHeight(0, row0);
+        SetRowHeight(1, row1);
+        SetRowHeight(2, row2);
+        SetRowHeight(3, row3);
+
+        _statusBar.PerformLayout();
+    }
+
+    private void SetRowHeight(int row, int height)
+    {
+        var style = _statusBar.RowStyles[row];
+        style.SizeType = SizeType.Absolute;
+        style.Height = Math.Max(1F, height);
+    }
+
+    /// <summary>
+    /// Wrapped height of one text block inside the given width, plus a small vertical slack. Uses
+    /// TextRenderer directly so the header does not depend on any control's own auto-sizing rules.
+    /// </summary>
+    private static int MeasureTextRow(string? text, Font font, int width)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 0;
+        }
+
+        var proposed = new Size(Math.Max(1, width), int.MaxValue);
+        var measured = TextRenderer.MeasureText(
+            text,
+            font,
+            proposed,
+            TextFormatFlags.WordBreak | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+        return measured.Height + RowSlackY;
     }
 
     private void BuildOverlay()
@@ -190,20 +316,28 @@ public sealed class MainForm : Form
         _overlay.Controls.Add(_overlayDetail, 0, 2);
     }
 
-    private static Label Chrome(string text, Color colour, float size, FontStyle style)
-    {
-        var label = new Label();
-        ConfigureChrome(label, colour, size, style);
-        label.Text = text;
-        return label;
-    }
-
     private static void ConfigureChrome(Label label, Color colour, float size, FontStyle style)
     {
         label.ForeColor = colour;
         label.Font = new Font("Segoe UI", size, style, GraphicsUnit.Point);
         label.AutoSize = true;
         label.Margin = new Padding(0, 4, 24, 4);
+    }
+
+    /// <summary>
+    /// A header text row. AutoSize is FALSE on purpose: the label then contributes no preferred
+    /// width to the layout, it wraps inside the width it is given, and the row height is set from the
+    /// measurement in LayoutStatusBar. This is what keeps the Exit action inside the client area at
+    /// 1920x1080 and at the 1024x600 minimum.
+    /// </summary>
+    private static void ConfigureTextRow(Label label, Color colour, float size, FontStyle style)
+    {
+        label.AutoSize = false;
+        label.Dock = DockStyle.Fill;
+        label.TextAlign = ContentAlignment.MiddleLeft;
+        label.ForeColor = colour;
+        label.Font = new Font("Segoe UI", size, style, GraphicsUnit.Point);
+        label.Margin = new Padding(0, 0, 0, 2);
     }
 
     private static void ConfigureButton(Button button, string text, Color colour)
@@ -239,6 +373,15 @@ public sealed class MainForm : Form
             WindowState = FormWindowState.Maximized;
             _windowModeButton.Text = "Windowed / full screen";
         }
+
+        // The toggle label is part of the action zone, so its width is re-measured here.
+        LayoutStatusBar();
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+        LayoutStatusBar();
     }
 
     protected override async void OnShown(EventArgs e)
@@ -471,6 +614,9 @@ public sealed class MainForm : Form
             _blockedPopups,
             _cancelledDownloads,
             _deniedPermissions);
+
+        // The counters are part of the header text, so the header is re-measured when they change.
+        LayoutStatusBar();
     }
 
     private static Uri? ParseUri(string value) =>

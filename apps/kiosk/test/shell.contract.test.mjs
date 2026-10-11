@@ -27,7 +27,6 @@ const source = {
   readme: read('README.md'),
 };
 const centralPins = readFileSync(join(REPO, 'Directory.Packages.props'), 'utf8');
-const shellSources = [source.options, source.main, source.program];
 
 const IPV4 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 // Assembled from fragments so this test file itself contains no browsable URL literal.
@@ -256,4 +255,89 @@ test('the runbook explains the isolation and its honest verification status', ()
   assert.match(source.readme, /RemoveWebView2WpfReference/);
   assert.match(source.readme, /KioskWebView2ReferenceProof/);
   assert.match(source.readme, /not verified in Arena/i);
+});
+
+// ---------------------------------------------------------------------------
+// Owner Manual Review correction (2026-10-12): the fullscreen 1920x1080 header fit.
+// The header was wider than the client area, which pushed the Exit action off the right edge
+// and stretched the content cell - and with it the embedded page viewport - past the screen.
+// ---------------------------------------------------------------------------
+
+test('both header actions stay present, usable and never hidden', () => {
+  assert.match(source.main, /ConfigureButton\(_exitButton, "Exit Kiosk Preview", Err\)/);
+  assert.match(source.main, /ConfigureButton\(_windowModeButton, "Windowed \/ full screen", Info\)/);
+  assert.match(source.main, /_actionZone\.Controls\.Add\(_windowModeButton\);/);
+  assert.match(source.main, /_actionZone\.Controls\.Add\(_exitButton\);/);
+  assert.match(source.main, /_exitButton\.Click \+= \(_, _\) => RequestConfirmedExit\(\);/);
+  assert.match(source.main, /_windowModeButton\.Click \+= \(_, _\) => ToggleWindowMode\(\);/);
+  // Keyboard reachable, and never hidden, disabled or removed by any code path.
+  assert.match(source.main, /button\.TabStop = true;/);
+  assert.equal(/_exitButton\.Visible\s*=\s*false/.test(source.main), false);
+  assert.equal(/_exitButton\.Enabled\s*=\s*false/.test(source.main), false);
+  assert.equal(/_windowModeButton\.Visible\s*=\s*false/.test(source.main), false);
+  assert.equal(/_actionZone\.Controls\.Remove|Controls\.Remove\(/.test(source.main), false);
+  // The two actions share one bounded zone, so neither can be dropped to make room.
+  assert.match(source.main, /private readonly FlowLayoutPanel _actionZone = new\(\);/);
+});
+
+test('the header is measured, bounded and responsive instead of content-sized', () => {
+  // Two columns: the action column is AutoSize, the text column takes the remainder.
+  assert.match(source.main, /_statusBar\.ColumnStyles\.Add\(new ColumnStyle\(SizeType\.Percent, 100F\)\);/);
+  assert.match(source.main, /_statusBar\.ColumnStyles\.Add\(new ColumnStyle\(SizeType\.AutoSize\)\);/);
+  // The outer layout's single column is explicitly bounded (the unstated AutoSize default here is
+  // what stretched the content cell and the embedded page past the screen edge).
+  assert.match(source.main, /layout\.ColumnStyles\.Add\(new ColumnStyle\(SizeType\.Percent, 100F\)\);/);
+  const buildLayout = source.main.slice(
+    source.main.indexOf('private void BuildLayout()'),
+    source.main.indexOf('/// <summary>', source.main.indexOf('private void BuildLayout()')),
+  );
+  assert.match(buildLayout, /AutoSize = false,/, 'the outer layout must not be content-sized');
+  // Four measured rows, applied as absolute heights from a real text measurement.
+  assert.match(source.main, /_statusBar\.RowCount = 4;/);
+  assert.match(source.main, /style\.SizeType = SizeType\.Absolute;/);
+  assert.match(source.main, /TextRenderer\.MeasureText\(/);
+  assert.match(source.main, /TextFormatFlags\.WordBreak \| TextFormatFlags\.NoPadding \| TextFormatFlags\.NoPrefix/);
+  // Re-layout on client-size change, on a monitor DPI change, and whenever a header text changes.
+  assert.match(source.main, /protected override void OnResize\(EventArgs e\)/);
+  assert.match(source.main, /base\.OnResize\(e\);\s*\n\s*LayoutStatusBar\(\);/);
+  assert.match(source.main, /DpiChanged \+= \(_, _\) => LayoutStatusBar\(\);/);
+  assert.equal(/OnDpiChangedAfterParent/.test(source.main), false, 'one DPI mechanism only: the Form DpiChanged event plus OnResize');
+  assert.match(source.main, /LayoutStatusBar\(\);/);
+  // No scrollbar is ever introduced for the header, and no minimum width above the Owner's display.
+  assert.equal(/AutoScroll/.test(source.main), false);
+  const minimums = source.main.match(/MinimumSize = new Size\((\d+), (\d+)\)/g) ?? [];
+  assert.deepEqual(minimums, ['MinimumSize = new Size(1024, 600)'], 'the only minimum size is the existing 1024x600, so no larger display is required');
+});
+
+test('the left status content cannot force the action area outside the client width', () => {
+  // Every text row has no preferred width of its own: AutoSize=false and Dock=Fill.
+  assert.match(source.main, /private static void ConfigureTextRow\(Label label, Color colour, float size, FontStyle style\)/);
+  const textRow = source.main.slice(source.main.indexOf('private static void ConfigureTextRow'));
+  assert.match(textRow.slice(0, 600), /label\.AutoSize = false;/);
+  assert.match(textRow.slice(0, 600), /label\.Dock = DockStyle\.Fill;/);
+  for (const label of ['_stageLabel', '_connectionState', '_boundaryLabel', '_policyState']) {
+    assert.match(source.main, new RegExp(`ConfigureTextRow\\(${label},`), `${label} must be a measured text row`);
+  }
+  // The action width is reserved FIRST and the identity line gets only the remainder.
+  assert.match(source.main, /_windowModeButton\.PreferredSize\.Width \+ _windowModeButton\.Margin\.Horizontal/);
+  assert.match(source.main, /\+ _exitButton\.PreferredSize\.Width \+ _exitButton\.Margin\.Horizontal/);
+  assert.match(source.main, /var identityWidth = Math\.Max\(120, inner - actionsWidth - BarGapX - 8\);/);
+  // The long texts own full-width rows rather than competing for one line.
+  assert.match(source.main, /_statusBar\.SetColumnSpan\(_boundaryLabel, 2\);/);
+  assert.match(source.main, /_statusBar\.SetColumnSpan\(_policyState, 2\);/);
+  assert.match(source.main, /_statusBar\.SetColumnSpan\(_connectionState, 2\);/);
+  // The old single-line, non-wrapping layout is gone.
+  assert.equal(/WrapContents = false;/.test(source.main), true, 'the action zone stays on one line');
+  assert.equal(/_stageLabel\.AutoSize = true|_policyState\.AutoSize = true/.test(source.main), false);
+});
+
+test('the header keeps the Stage boundary, the host state and the policy counters on screen', () => {
+  assert.match(source.main, /_boundaryLabel\.Text = KioskShellOptions\.BoundaryText;/);
+  assert.match(source.main, /_stageLabel\.Text = "Kiosk Preview  -  Stage " \+ KioskShellOptions\.StageId;/);
+  assert.match(source.main, /_connectionState\.Text = "LOCAL HOST: CONNECTED \(READ-ONLY PREVIEW\)";/);
+  assert.match(source.main, /_connectionState\.Text = "LOCAL HOST: UNAVAILABLE - RECONNECTING";/);
+  assert.match(source.main, /APPROVED ORIGIN ONLY  \|  blocked: \{0\} navigation, \{1\} popup, \{2\} download, \{3\} permission/);
+  // The counters are re-measured when they change, so the header never clips them.
+  const policy = source.main.slice(source.main.indexOf('private void UpdatePolicyState'));
+  assert.match(policy.slice(0, 600), /LayoutStatusBar\(\);/);
 });

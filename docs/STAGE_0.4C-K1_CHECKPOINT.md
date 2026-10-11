@@ -413,3 +413,154 @@ Acceptance for this correction: **Build succeeded with 0 warning(s)**, full .NET
 total, kiosk contract all pass, commissioning all pass, Operations Preview all pass, Mapping
 Configuration all pass, boundary S1–S9 clean, WebView2 Core and WinForms references present, WebView2 WPF
 reference absent, the required loader/runtime asset present, and no unexpected working-tree changes.
+
+
+## 14. Owner Manual Review result and the fullscreen-fit correction (2026-10-12)
+
+**Owner Manual Review: FAILED — and the failure is recorded here as received.** The Owner ran the real
+local host (`node apps/ops-preview/server.mjs`; the host reported `listening on 127.0.0.1:5187`), the
+Kiosk connected and displayed `LOCAL HOST: CONNECTED (READ-ONLY PREVIEW)` — so this was **not** a
+host-start, transport or reconnect failure. At fullscreen 1920×1080 the application was **wider than the
+screen**:
+
+1. **Native header.** `Windowed / full screen` remained visible while **`Exit Kiosk Preview` sat
+   completely outside the right edge**; no wrap, compact mode or width adaptation occurred, so the
+   required visible exit action could not be reached.
+2. **Embedded Operations Preview.** The **Density control was clipped** at the right edge, `Comfortable`
+   was only partly visible, and other right-side content extended beyond the 1920 px viewport.
+
+**Root cause — one cause, two symptoms.** The header was a two-column grid whose left
+`FlowLayoutPanel` was `AutoSize = true` with `WrapContents = false` and carried the long Stage boundary
+string plus the state and policy text, so it insisted on its full preferred width, and the right action
+panel did the same. The outer layout's single column carried **no explicit style**, and an unstyled
+`TableLayoutPanel` column defaults to `AutoSize`, so the column grew to the header's preferred width.
+That (a) pushed the action area past the right edge of the client area, and (b) stretched the content
+cell — and therefore the embedded view control, and therefore the **web page viewport** — past the
+screen edge, which is what clipped the page's own right-hand controls. The README's claim that 1920×1080
+presentation was already DPI-safe and correct was **not supported by the Owner's screenshot** and has
+been replaced by an explicit acceptance target.
+
+**Correction A — native shell header (`apps/kiosk/MainForm.cs`).** The header is now a two-column,
+four-row grid with explicit priority:
+
+- column 1 is `AutoSize` and holds the action zone (both buttons) — the **only** header content that
+  keeps its preferred width, so the actions can never be pushed off the right edge;
+- column 0 takes the remainder and holds the text rows; **every text label is `AutoSize = false` with
+  `Dock = Fill`**, so no text can demand width from the form;
+- row 0 places the action zone beside the short Stage identity; the **host state**, the **Stage
+  boundary** and the **approved-origin policy counters** each get their own full-width row and **wrap**;
+- row heights are **measured** with `TextRenderer.MeasureText(..., WordBreak)` and applied as
+  `SizeType.Absolute`, so layout is deterministic rather than dependent on WinForms auto-sizing;
+- the measured layout is re-applied on client-size change (`OnResize`), on a monitor DPI change
+  (`DpiChanged` and `OnDpiChangedAfterParent`) and whenever a header text changes (connection state,
+  policy counters, window-mode label);
+- the outer layout's single column is now explicitly `SizeType.Percent, 100F` with `AutoSize = false`,
+  which bounds the content cell, the embedded view and the page viewport to the client width — the fix
+  for defect 2 as well as defect 1;
+- **unchanged:** the 1024×600 minimum window size, the text sizes, the confirmed-exit behaviour, the
+  reconnecting fail-safe, the approved loopback origin, and both header actions (never hidden, never
+  removed, keyboard reachable, `TabStop = true`). No scrollbar is introduced.
+
+**Correction B — Operations Preview width fit (`apps/ops-preview/public/styles.css`).** Page-level
+overflow sources were removed and containment was made explicit: `overflow-x: hidden` and
+`max-width: 100%` as the page-level guard; `main` bounded to `grid-template-columns: minmax(0, 1fr)`;
+`min-width: 0` on every flex/grid child that can hold wide content (`.banner .title`, `.banner-actions`,
+`.chips`, `.sections`, `.view-controls`, `.toolbar`, `.detail-card`, `.detail-grid`, `.table-wrap`);
+the 20-column Overview table contained in `.table-wrap.scroll` (`overflow: auto`, `max-width: 100%`),
+which owns the only horizontal scrollbar on the page; `minmax(min(...), 100%)` for the auto-fit summary
+and detail grids; `minmax(0, 180px) minmax(0, 1fr)` for the detail definition lists; the modal bounded
+by `min(620px, calc(100% - 32px))`; and **no `100vw` or other viewport-relative width anywhere**.
+
+**Correction C — launch commands.** `apps/ops-preview/package.json` now has a `start` script
+(`node server.mjs`) alongside `check` and `test`, so the documented forms are both real:
+`node apps/ops-preview/server.mjs` and `npm --prefix apps/ops-preview start`. The runbook and this
+document now only show commands that exist, and
+`apps/ops-preview/test/layout.test.mjs` parses the documented `node`/`npm` lines in both files and
+asserts every referenced path and npm script exists (a `start` script must also name a file that
+exists). There is no root `package.json`, so no root `npm start` is documented.
+
+**Correction D — new contract coverage.** `apps/kiosk/test/shell.contract.test.mjs` gained four tests
+(**21/21**): both header actions stay present, never hidden and never removed; the header is measured,
+bounded and responsive (explicit percent column, four measured absolute rows, re-layout on resize/DPI/
+text change, no `AutoScroll`, minimum size still exactly 1024×600); the left status content cannot force
+the action area outside the client width (auto-size-free text rows, action width reserved first,
+full-width spanning rows); and the boundary/host state/policy counters remain on screen and re-measured
+when they change. `apps/ops-preview/test/layout.test.mjs` is a new 9-test source/structure contract for
+the page-width rules, the bounded table frame, the wrapping containers and the documented launch
+commands.
+
+**Arena gates after the correction:** kiosk contract **21/21**; Operations Preview `check` OK and
+**49/49** (was 40; +9 layout tests); commissioning `check` OK and **77/77**; Mapping Configuration
+`check` OK and **82/82**; `packages/mapping-config` `check` OK and **268 (261 pass, 0 fail, 7 skipped)**;
+boundary scan **`0 findings (S1–S9 clean)`**; `git diff --check` clean.
+
+**NOT verified in Arena, and not claimed.** The WinForms header was **not compiled and not rendered**
+(there is no .NET SDK in the Arena sandbox) and no browser was opened against the page, so **no layout,
+scaling or 1920×1080 visual result is claimed from these source and structure contracts**. They prove the
+intent and the absence of the defect's source shape; they do not prove pixels. The Owner-local fullscreen
+rerun and the manual acceptance list below are the validation of record.
+
+### 14.1 Owner-local handoff commands
+
+```powershell
+# 1. Preserve or regenerate the genuine kiosk lock refresh (it is the Owner-local artifact).
+git status --porcelain apps/kiosk/packages.lock.json
+dotnet restore apps/kiosk/Wjss.Kiosk.csproj
+
+# 2. Locked restore must succeed.
+dotnet restore WaterJetSentinelSuite.sln --locked-mode
+
+# 3. Zero-warning Release build on the restored graph.
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+
+# 4. Full .NET tests without rebuilding.
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build --no-restore
+
+# 5. All Node/static gates.
+node --test apps/kiosk/test/shell.contract.test.mjs
+npm --prefix packages/commissioning run check ; npm --prefix packages/commissioning test
+npm --prefix apps/ops-preview run check      ; npm --prefix apps/ops-preview test
+npm --prefix apps/mapping-config run check   ; npm --prefix apps/mapping-config test
+npm --prefix packages/mapping-config run check ; npm --prefix packages/mapping-config test
+node tools/boundary-scan/boundary-scan.mjs
+
+# 6. Start the host (either form; the second is the package script).
+node apps/ops-preview/server.mjs
+npm --prefix apps/ops-preview start
+
+# 7. Run the Kiosk.
+dotnet run --project apps/kiosk/Wjss.Kiosk.csproj -c Release
+
+# 8. Fullscreen check at 1920x1080: the complete header, BOTH actions, the Stage boundary, the host
+#    state and the policy counters must all be visible; Exit Kiosk Preview must be reachable.
+
+# 9. Windowed check: the Windowed / full screen toggle must produce a usable resizable window, and the
+#    header must stay complete when the window is resized down to the 1024x600 minimum.
+
+# 10. Exit check: Exit Kiosk Preview must ask for confirmation and then close only this window.
+
+# 11. Overflow check in the embedded page (open DevTools outside the Kiosk, or measure in the window):
+#     document.scrollingElement.scrollWidth must equal clientWidth; no page-level horizontal scrollbar.
+
+# 12. Table check: scrolling the Overview table to its last column must move ONLY the table frame
+#     (.table-wrap.scroll); the page, the Density control and the navigation must not move.
+
+# 13. Reconnect check: stop the host, confirm the reconnecting screen appears with nothing stale left on
+#     screen, restart the host, confirm the route returns by itself.
+
+# 14. Final proof: no unexpected working-tree changes (only the genuine lock refresh).
+git status --porcelain
+git diff --stat
+```
+
+**Manual acceptance for this correction (Owner):** the complete native header fits inside fullscreen
+1920×1080 · `Exit Kiosk Preview` fully visible · `Windowed / full screen` fully visible · Stage boundary
+and host state still visible · Operations Preview does not extend outside the viewport · Density control
+fully visible · Overview table scrolls only inside its own bounded frame · no page-level horizontal
+scrollbar or overflow · windowed mode still usable · reconnection still fail-safe · all automated gates
+still green. **The Stage is not complete until the Owner confirms this list.**
+
+Two notes for step 11: use the built-in measurement above rather than `-getItem:Reference` for the
+WebView2 graph — `-getItem` reports evaluation-time items, i.e. *before* `RemoveWebView2WpfReference`
+runs — and the reference proof target `KioskWebView2ReferenceProof` (§13) is the supported way to check
+that graph.
