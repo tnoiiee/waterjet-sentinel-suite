@@ -77,8 +77,22 @@ what clipped the page's own right-hand controls.
   `.table-wrap.scroll` frame, `minmax(min(..., 100%), 1fr)` for the auto-fit grids, and no `100vw`
   anywhere. See `apps/ops-preview/test/layout.test.mjs`.
 
+**Runtime-init correction (2026-10-12, after the Owner's interaction findings).** The width correction
+passed the Owner's visual review, but the embedded Preview was inert: the served page
+(`apps/ops-preview/public/index.html`) contained **no script element**, so the browser never requested
+`app.mjs` and nothing was populated or wired. The page now loads the module
+(`<script type="module" src="/app.mjs"></script>` — the only script element, same origin, no inline
+script, so the content security policy is unchanged), the application reports its state on the page body
+(`data-app-state` = `booting` / `ready` / `failed`), and an initialization failure raises a **visible**
+banner carrying a safe error category with no stack trace, local path or internal detail, so an empty but
+apparently usable page can no longer occur. Runtime coverage now resolves the application **through the
+server** (module graph over the real routes, boot to `ready`, ten scenarios, 240 rows, wired controls,
+visible failure state) in `apps/ops-preview/test/page.test.mjs`.
+
 **Not verified in Arena:** the WinForms header was **not compiled and not rendered** — the Arena sandbox
-has no .NET SDK — and no browser was used. The header correction is asserted at source-contract level
+has no .NET SDK — and **no browser exists there, so real-browser execution is NOT RUN**: the Preview was
+never executed by a browser engine and no pixel layout, overflow measurement or WebView2 behaviour is
+claimed from the Node tests. The header correction is asserted at source-contract level
 only, and the page correction at source/structure level only. The Owner-local fullscreen rerun and the
 manual acceptance below are the validation of record.
 

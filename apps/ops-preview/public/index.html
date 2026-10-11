@@ -19,6 +19,25 @@
     </div>
   </header>
 
+  <!--
+    Visible initialization-failure surface. It stays hidden until the application reports that it
+    could not initialize, so the Operator never faces an apparently usable but empty page. The text
+    it carries is a safe error CATEGORY: no stack trace, no local path and no internal detail.
+  -->
+  <div class="boot-error" id="boot-error" role="alert" hidden>
+    <strong>Preview initialization did not complete.</strong>
+    <span id="boot-error-detail"></span>
+  </div>
+
+  <noscript>
+    <div class="boot-error">
+      <strong>Preview initialization did not complete.</strong>
+      <span>JavaScript is disabled in this window, so the commissioning data cannot be requested and no
+      Preview control can work. This window is a read-only SIMULATION / PREVIEW and needs no permission
+      beyond the local page.</span>
+    </div>
+  </noscript>
+
   <nav class="viewbar" id="viewbar" aria-label="Sections and presentation">
     <ul class="sections" id="section-nav">
       <li><a href="#operations">Operations</a></li>
@@ -149,5 +168,13 @@
     WaterJet Sentinel Suite — Kiosk Preview. SIMULATION / PREVIEW · NO HARDWARE ACCESS · NO DEVICE WRITE ·
     FIELD VERIFICATION PENDING. No Production authority of any kind.
   </footer>
+
+  <!--
+    The application module. `type="module"` is required: app.mjs uses ESM imports, and this is the
+    only way the browser loads it (deferred by definition, so the DOM above exists first). Removing
+    this element leaves the page rendered but inert - see apps/ops-preview/README-free note in
+    apps/kiosk/README.md and docs/STAGE_0.4C-K1_CHECKPOINT.md section 15.
+  -->
+  <script type="module" src="/app.mjs"></script>
 </body>
 </html>

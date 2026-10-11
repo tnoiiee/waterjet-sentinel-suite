@@ -10,6 +10,10 @@ import { createPreviewServer } from '../../server.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const html = readFileSync(join(HERE, '..', '..', 'public', 'index.html'), 'utf8');
 
+/** Boot counter: guarantees each `bootApp` call re-executes the application instead of hitting the
+ *  module cache, so a test can never pass on a module that never booted. */
+let bootCount = 0;
+
 export class FakeNode {
   constructor(tag) {
     this.tagName = tag; this.attributes = {}; this.childNodes = []; this.listeners = {};
@@ -19,7 +23,16 @@ export class FakeNode {
   }
   setAttribute(k, v) { this.attributes[k] = String(v); }
   getAttribute(k) { return this.attributes[k] ?? null; }
-  append(...nodes) { this.childNodes.push(...nodes); }
+  append(...nodes) {
+    this.childNodes.push(...nodes);
+    // A browser selects the first option appended to an empty <select>, and reads it back as
+    // `select.value`. The stub mirrors that, otherwise the application would see an empty value and
+    // the tests would diverge from what the Operator's window actually does.
+    if (this.tagName === 'select' && !this.value) {
+      const first = nodes.find((n) => n?.attributes?.value);
+      if (first) this.value = first.attributes.value;
+    }
+  }
   replaceChildren(...nodes) { this.childNodes = nodes; this.textContent = ''; }
   addEventListener(t, f) { (this.listeners[t] ??= []).push(f); }
   focus() {}
@@ -79,31 +92,52 @@ export function columnIndex(headerLabels, label) {
  * Boots the real application against a real Preview server on an ephemeral loopback port.
  * Returns { byId, requests, close }, where `requests` records every request the app made.
  */
-export async function bootApp({ waitId = 'monitor-table-body', extraWindow = null } = {}) {
+export async function bootApp({ waitId = 'monitor-table-body', extraWindow = null, failPath = null } = {}) {
   const realFetch = globalThis.fetch;
   const byId = {};
   const requests = [];
   register(new URL('./pkgResolveHook.mjs', import.meta.url));
-  for (const m of html.matchAll(/\bid="([^"]+)"/g)) byId[m[1]] = new FakeNode(m[1]);
+  for (const m of html.matchAll(/<[^>]*\bid="([^"]+)"[^>]*>/g)) {
+    const node = new FakeNode(m[1]);
+    // The served markup's boolean attributes are part of what the application relies on, so the stub
+    // seeds them instead of defaulting every element to visible.
+    node.hidden = /\shidden(\s|>|\/)/.test(m[0]);
+    byId[m[1]] = node;
+  }
   globalThis.Node = FakeNode;
+  const body = byId['app-root'] ?? new FakeNode('body');
   globalThis.document = {
     getElementById: (id) => (byId[id] ??= new FakeNode(id)),
     createElement: (tag) => new FakeNode(tag),
     createTextNode: (t) => new FakeText(t),
     querySelector: () => null,
-    body: new FakeNode('body'),
+    // In the served page the body IS the element carrying id="app-root": the stub mirrors that, or
+    // body-level state (data-density, data-app-state) would be written to an object no test can see.
+    body,
     activeElement: null,
   };
   const server = createPreviewServer();
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = new URL('http://127.0.0.1');
   origin.port = String(server.address().port);
-  globalThis.fetch = (path, opts = {}) => {
-    requests.push({ path: String(path), method: opts.method ?? 'GET' });
-    return realFetch(`${origin.origin}${path}`, opts);
+  globalThis.fetch = async (path, opts = {}) => {
+    const requested = String(path);
+    // `failPath` simulates the local host answering one route with a failure, so the application's
+    // visible failure state can be exercised without pretending the data exists.
+    if (failPath && requested.includes(failPath)) {
+      requests.push({ path: requested, method: opts.method ?? 'GET', status: 503 });
+      return { ok: false, status: 503, json: async () => ({}) };
+    }
+    const response = await realFetch(`${origin.origin}${path}`, opts);
+    requests.push({ path: requested, method: opts.method ?? 'GET', status: response.status });
+    return response;
   };
   if (extraWindow) globalThis.window = extraWindow;
-  await import('../../public/app.mjs');
+  // Each boot gets a fresh module instance: an ES module is cached, so importing the same URL twice
+  // would silently skip the application's boot and leave the fresh DOM empty. The query string makes
+  // every call a genuine boot, which is what a browser does on every page load.
+  bootCount += 1;
+  await import(`../../public/app.mjs?previewBoot=${bootCount}`);
   for (let i = 0; i < 400 && byId[waitId].childNodes.length === 0; i += 1) {
     await new Promise((r) => setTimeout(r, 10));
   }

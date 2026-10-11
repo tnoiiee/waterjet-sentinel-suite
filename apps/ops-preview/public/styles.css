@@ -106,6 +106,10 @@ tbody tr.cm-fail td:first-child { box-shadow: inset 0 -3px 0 var(--err); }
 .legend { list-style:none; display:flex; flex-wrap:wrap; gap:6px 20px; padding:0; margin:14px 0 0; font-size:var(--fs-small); color:var(--muted); }
 .legend li { display:flex; align-items:center; gap:6px; }
 .legend .marker { font-weight:700; color:var(--ink); }
+.boot-error { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; min-width:0; padding:10px 24px; background:#3d1013; border-bottom:1px solid var(--err); color:var(--ink); font-size:var(--fs-small); }
+.boot-error strong { color:var(--err); }
+/* `hidden` must win over the flex display above, or a hidden banner would still be visible. */
+.boot-error[hidden] { display:none; }
 .modal-backdrop { position:fixed; inset:0; background:#000000cc; display:flex; align-items:center; justify-content:center; z-index:20; }
 .modal-backdrop[hidden] { display:none; }
 .modal { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:20px 24px; max-width:min(620px, calc(100% - 32px)); max-height:90vh; overflow-y:auto; overflow-x:hidden; }

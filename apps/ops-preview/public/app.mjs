@@ -15,6 +15,43 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
+// Boot state. `data-app-state` on the body is the single machine-readable signal that the Preview
+// initialized: 'booting' while the first data request is in flight, 'ready' when the monitor is
+// live, 'failed' when initialization did not complete. It exists because an inert page used to look
+// the same as an initialized one.
+const APP_STATE = Object.freeze({
+  BOOTING: 'booting',
+  READY: 'ready',
+  FAILED: 'failed',
+});
+
+/** Safe, non-sensitive failure categories. No stack trace, path or internal detail reaches the UI. */
+const BOOT_FAILURE = Object.freeze({
+  DATA_REQUEST: 'the local commissioning data could not be requested',
+  MODULE_LOAD: 'the application module did not load',
+  RUNTIME: 'an unexpected error stopped the application',
+});
+
+function setAppState(value) {
+  document.body.setAttribute('data-app-state', value);
+}
+
+/** Shows the visible initialization-failure surface with a safe category, never a raw error. */
+function showBootFailure(category, detail = '') {
+  setAppState(APP_STATE.FAILED);
+  const box = $('boot-error');
+  const text = $('boot-error-detail');
+  if (text) {
+    text.textContent = detail
+      ? `${category}. ${detail} The Kiosk shell keeps its own reconnect state while the local host is unavailable.`
+      : `${category}. The Kiosk shell keeps its own reconnect state while the local host is unavailable.`;
+  }
+  if (box) box.hidden = false;
+
+  // The local console keeps the actionable text; the Operator screen does not show it.
+  if (typeof console !== 'undefined') console.error('ops-preview boot failure:', category, detail);
+}
+
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
@@ -534,8 +571,10 @@ async function loadObservations(overrides = {}) {
 
 function wireControls() {
   $('scenario-apply').addEventListener('click', () => {
-    const scenario = $('scenario-select').value ?? state.scenarioKey;
-    const node = $('node-select').value ?? state.nodeId;
+    // `||` not `??`: an empty control value (a not-yet-populated selector) must fall back to the
+    // current state, never be sent to the host as an empty scenario or node identity.
+    const scenario = $('scenario-select').value || state.scenarioKey;
+    const node = $('node-select').value || state.nodeId;
     const tickRaw = Number.parseInt($('tick-input').value ?? '0', 10);
     state.scenarioKey = scenario;
     state.nodeId = node;
@@ -593,6 +632,23 @@ function moveCursor(direction) {
 }
 
 // ---------------------------------------------------------------------------
+// Uncaught-failure surface (so a broken interaction can never look like an idle screen)
+// ---------------------------------------------------------------------------
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('error', () => {
+    if (document.body.getAttribute('data-app-state') === APP_STATE.READY) {
+      showBootFailure(BOOT_FAILURE.RUNTIME);
+    }
+  });
+  window.addEventListener('unhandledrejection', () => {
+    if (document.body.getAttribute('data-app-state') === APP_STATE.READY) {
+      showBootFailure(BOOT_FAILURE.RUNTIME);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
@@ -602,38 +658,67 @@ async function getJson(path) {
   return response.json();
 }
 
+async function loadInitialData() {
+  const [boundary, schedule, scenarios, opsSummary, sensorMap] = await Promise.all([
+    getJson('/api/boundary'),
+    getJson('/api/commissioning/schedule'),
+    getJson('/api/commissioning/scenarios'),
+    getJson('/api/operations/summary'),
+    getJson('/api/sensor-map'),
+  ]);
+  state.boundary = boundary;
+  state.schedule = schedule;
+  state.counts = schedule.counts;
+  state.scenarios = scenarios.scenarios;
+  state.opsSummary = opsSummary;
+  state.sensorMap = sensorMap;
+  state.nodeId = opsSummary.nodeSummary[0].nodeId;
+}
+
 async function boot() {
+  setAppState(APP_STATE.BOOTING);
   $('exit-guard').hidden = true;
-  wireControls();
-  setAlert('');
+  // A previous failure surface (or a reload) must never leave the banner visible on a healthy boot.
+  $('boot-error').hidden = true;
   try {
-    const [boundary, schedule, scenarios, opsSummary, sensorMap] = await Promise.all([
-      getJson('/api/boundary'),
-      getJson('/api/commissioning/schedule'),
-      getJson('/api/commissioning/scenarios'),
-      getJson('/api/operations/summary'),
-      getJson('/api/sensor-map'),
-    ]);
-    state.boundary = boundary;
-    state.schedule = schedule;
-    state.counts = schedule.counts;
-    state.scenarios = scenarios.scenarios;
-    state.opsSummary = opsSummary;
-    state.sensorMap = sensorMap;
-    state.nodeId = opsSummary.nodeSummary[0].nodeId;
+    wireControls();
+  } catch {
+    // A missing element or a wiring failure must never leave an empty page behind.
+    showBootFailure(BOOT_FAILURE.MODULE_LOAD);
+    throw new Error('control wiring failed');
+  }
+
+  setAlert('');
+
+  // Stage 1 - request the read-only data. A failure here is a local-host/data problem.
+  try {
+    await loadInitialData();
+  } catch {
+    setAlert('Preview data unavailable. The Kiosk shell shows its reconnect state while the local host is down.');
+    showBootFailure(BOOT_FAILURE.DATA_REQUEST);
+    try { renderBoundary(); renderOperations(); } catch { /* the failure surface is already visible */ }
+    return;
+  }
+
+  // Stage 2 - render. A failure here is an application defect, not a data problem, and saying so is
+  // the difference between a diagnosable screen and a silently empty one.
+  try {
     renderBoundary();
     renderOperations();
-    renderNodeSummary(opsSummary.nodeSummary);
+    renderNodeSummary(state.opsSummary.nodeSummary);
     renderProgress();
     renderSensorMap();
     renderMapping();
     renderDiagnostics();
     await loadObservations();
-  } catch (err) {
-    setAlert(`Preview data unavailable: ${err.message}. The Kiosk shell shows its reconnect state while the local host is down.`);
-    renderBoundary();
-    renderOperations();
+    setAppState(APP_STATE.READY);
+  } catch {
+    showBootFailure(BOOT_FAILURE.RUNTIME);
   }
 }
 
-await boot();
+try {
+  await boot();
+} catch {
+  showBootFailure(BOOT_FAILURE.RUNTIME);
+}

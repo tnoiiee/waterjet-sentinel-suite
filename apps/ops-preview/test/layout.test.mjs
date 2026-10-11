@@ -181,7 +181,10 @@ test('every documented node/npm command in the runbook and checkpoint exists and
       .filter(Boolean);
     assert.ok(commands.length > 0, `${doc} must document runnable commands`);
     for (const command of commands) {
-      const tokens = command.split(/\s+/);
+      // The Owner handoff is documented for PowerShell, so a documented path may use Windows
+      // separators; both forms must resolve to the same real file.
+      const asPosix = (p) => p.split('\\').join('/');
+      const tokens = command.split(/\s+/).map((t) => (t.startsWith('-') ? t : asPosix(t)));
       const tool = tokens[0];
       if (tool === 'node') {
         const args = tokens.slice(1);

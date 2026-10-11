@@ -564,3 +564,129 @@ Two notes for step 11: use the built-in measurement above rather than `-getItem:
 WebView2 graph — `-getItem` reports evaluation-time items, i.e. *before* `RemoveWebView2WpfReference`
 runs — and the reference proof target `KioskWebView2ReferenceProof` (§13) is the supported way to check
 that graph.
+
+
+## 15. Owner Manual Review correction: Operations Preview runtime initialization (2026-10-12)
+
+**Owner-local result, recorded as received.** The width correction **passed** visual review: the
+complete native header fits, `Windowed / full screen` and `Exit Kiosk Preview` are both visible, the
+Operations Preview stays inside the screen, the Density controls are visible, and the Overview table is
+contained in its own horizontal-scroll frame.
+
+**But the interaction review FAILED.** With the host started through the real package command
+(`npm --prefix .\apps\ops-preview start`, listening on `127.0.0.1:5187`) and the Kiosk reporting
+`LOCAL HOST: CONNECTED (READ-ONLY PREVIEW)`, the HTML and CSS rendered while the application did
+nothing: the Density controls and the Sensor Map / Diagnostics navigation did not respond, the Scenario
+selector was empty, the Node selector was empty, the Node communication summary and the Commissioning
+progress were empty, the Overview showed its header but **no rows**, and the Sensor detail fields were
+empty.
+
+**Exact root cause — the served page contained no `script` element at all.** `apps/ops-preview/public/index.html`
+loaded `/styles.css` and nothing else, so the browser **never requested `app.mjs`**: no module executed,
+no API was called, no data was rendered and no control was wired. Every symptom follows from that one
+omission, including "the navigation does not respond" — the anchors scroll to sections that exist but
+whose content was never filled in.
+
+**Why the existing tests passed.** `test/render.test.mjs`, `test/layout.test.mjs` and the boot helper
+import `public/app.mjs` **directly** and seed a stub DOM from `index.html`; they exercise the module, but
+nothing in the suite ever checked that the **served page references** that module. A directly-imported
+module is exactly the thing the browser never sees, so a test suite built on direct imports cannot catch
+this defect class. That is now fixed at the level where the defect lived (see §15.2).
+
+**15.1 Correction.** `index.html` now ends with `<script type="module" src="/app.mjs"></script>` — the
+only script element in the page, same-origin, no inline script (so the existing
+`script-src 'self'` CSP needs no relaxation, and `unsafe-inline`/`unsafe-eval` are still refused). Two
+further changes make an inert page impossible to mistake for a healthy one:
+
+- **A visible initialization-failure surface.** `<div class="boot-error" id="boot-error" role="alert" hidden>`
+  sits directly under the banner, plus a `<noscript>` note for a window with JavaScript disabled. The
+  application unhides it with a **safe category only** (data request / module load / runtime) — no stack
+  trace, no local path, no internal detail; the actionable text stays in the local console.
+- **A machine-readable boot sentinel.** `app.mjs` writes `data-app-state` on the page body: `booting`,
+  then `ready` on a completed boot, or `failed` when initialization did not complete. Boot is split into
+  a data stage and a render stage so the failure category distinguishes "the local host did not answer"
+  from "the application failed to render", and uncaught errors/rejections after a successful boot also
+  raise the visible failure state instead of leaving a half-empty screen.
+- An empty control value now falls back to the current state (`||` rather than `??`), so a
+  not-yet-populated selector can never send an empty scenario or node identity to the host.
+
+Nothing else changed: the loopback-only bind, the approved origin, the no-external-asset rule, the
+1920x1080 layout strategy, the read-only boundary, the reconnecting fail-safe, the confirmed exit and
+the protected evidence totals are untouched.
+
+**15.2 New runtime coverage (`apps/ops-preview/test/page.test.mjs`, 10 tests).** These resolve the
+application the way a browser does — **through the server** — and then execute it over the served bytes:
+
+1. the served page contains exactly one `<script type="module" src="/app.mjs">`, no inline script and no
+   external script or stylesheet, and `/app.mjs` is served byte-identical to the file the tests execute;
+2. the CSP permits that module (`script-src 'self'`, no `unsafe-inline`, no `unsafe-eval`) and the page
+   contains nothing the policy would block;
+3. **the whole served module graph resolves over the real routes** — every `import`/`export ... from`
+   specifier is followed recursively from the served bytes (`/app.mjs` → `/pkg/index.mjs` →
+   `/pkg/{schedule,quality,scenarios,observation,workflow,presentation}.mjs`), each answering 200 with a
+   JavaScript MIME type and no `node:` or remote specifier anywhere;
+4. boot completes and reports `ready`, with the failure surface hidden and **every** boot request a
+   successful local GET (a failed asset, module or API request can no longer hide behind a passing test);
+5. the Scenario selector carries the ten protected scenarios, the Node selector the six nodes, and the
+   Node communication summary and Commissioning progress are populated;
+6. the Overview renders exactly 240 physical Channels with 20 columns each, and selecting a row fills the
+   identity, observation and Preview-workflow cards;
+7. **Compact and Comfortable respond** (body density attribute plus `aria-pressed`), and all five
+   navigation anchors point at sections the served page really contains;
+8. applying a scenario reaches the rendered rows while the boot state stays `ready`;
+9. a **failed boot becomes a visible, safe failure state** — `data-app-state="failed"`, the banner
+   unhidden, the text carrying the safe category and containing no `.mjs`, no `apps/`, no path, no stack
+   and no `undefined`;
+10. the failure surface exists in the served markup and the stylesheet lets `hidden` win.
+
+The boot helper now also gives **every** `bootApp` call a fresh module instance (an ES module is cached,
+so a second import used to skip the application's boot entirely) and mirrors two browser behaviours the
+stub previously got wrong: the first `<option>` appended to an empty `<select>` becomes its value, and
+`document.body` **is** the `app-root` element. Both were stub-fidelity gaps that could have hidden or
+fabricated behaviour.
+
+**15.3 Arena gates after this correction.** kiosk contract **21/21**; Operations Preview `check` OK and
+**59/59** (was 49; +10 page tests); commissioning `check` OK and **77/77**; Mapping Configuration
+`check` OK and **82/82**; `packages/mapping-config` `check` OK and **268 (261 pass, 0 fail, 7 skipped)**;
+boundary scan **`0 findings (S1–S9 clean)`**; `git diff --check` clean. The running local host was also
+inspected directly over loopback HTTP: `/` now carries the module script element, and `/app.mjs` plus all
+seven package modules answer `200 text/javascript`.
+
+**15.4 NOT verified in Arena, and not claimed.** There is **no browser in the Arena sandbox**, so the
+served page was never executed by a real browser engine and **real-browser execution is NOT RUN**: no
+pixel layout, no DOM-computed overflow and no WebView2 behaviour is claimed from these tests. What they
+prove is the wiring (the page loads the module, the graph resolves, the boot reaches `ready`, the
+controls are wired, a failure is visible) over the **served** bytes and the **real** routes. The
+Owner-local Kiosk rerun in §15.5 remains the verification of record, and the 1920x1080 interaction
+acceptance stays open until it passes.
+
+### 15.5 Owner-local rerun sequence
+
+```powershell
+# 1. Lock file stays as the genuine refresh; then locked restore and a zero-warning Release build.
+git status --porcelain apps/kiosk/packages.lock.json
+dotnet restore WaterJetSentinelSuite.sln --locked-mode
+dotnet build   WaterJetSentinelSuite.sln -c Release --no-restore
+dotnet test    WaterJetSentinelSuite.sln -c Release --no-build --no-restore
+
+# 2. Node/static gates.
+node --test apps/kiosk/test/shell.contract.test.mjs
+npm --prefix packages/commissioning run check ; npm --prefix packages/commissioning test
+npm --prefix apps/ops-preview run check      ; npm --prefix apps/ops-preview test
+npm --prefix apps/mapping-config run check   ; npm --prefix apps/mapping-config test
+npm --prefix packages/mapping-config run check ; npm --prefix packages/mapping-config test
+node tools/boundary-scan/boundary-scan.mjs
+
+# 3. Start the host through the real package start command, then run the Kiosk.
+npm --prefix .\apps\ops-preview start
+dotnet run --project apps/kiosk/Wjss.Kiosk.csproj -c Release
+```
+
+Then confirm in the window: the Scenario selector offers ten scenarios; Compact and Comfortable change
+the density; Sensor Map and Diagnostics navigate; the Overview shows 240 rows; selecting a row fills the
+Sensor detail; the Node communication summary and Commissioning progress are populated; `Apply scenario`
+changes the rendered rows; **no initialization error banner is visible**; there is no page-level
+horizontal overflow (`document.scrollingElement.scrollWidth === clientWidth`); the Overview table remains
+the only thing that scrolls sideways; and stopping/restarting the host still shows the shell's
+reconnecting state and recovers by itself. If initialization ever fails, the banner states the category
+on screen — report that text rather than a stack trace.
