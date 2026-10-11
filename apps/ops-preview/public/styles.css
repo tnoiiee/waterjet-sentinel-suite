@@ -27,13 +27,14 @@
      BOTH measurements, so it is wider than the single-measurement Operating cell by design; the
      height stays in the approved compact range. Fixed sizes + the bounded frame below are what keep
      the map from ever widening the page. */
-  --wj-cell-w:120px; --wj-cell-h:52px; --wj-gap:3px; --wj-id-h:16px;
-  --wj-id-fs:13px; --wj-value-fs:13px; --wj-meta-fs:10px; --wj-state-fs:10px; --wj-band-head-h:18px;
+  --wj-cell-w:120px; --wj-cell-h:66px; --wj-gap:3px; --wj-id-h:16px; --wj-m-h:16px; --wj-dfr-h:14px;
+  --wj-id-fs:13px; --wj-value-fs:13px; --wj-meta-fs:10px; --wj-state-fs:10px; --wj-dfr-fs:12px;
+  --wj-band-head-h:18px;
 }
 [data-density="compact"] {
   --fs-body:15px; --fs-table:13px; --fs-small:13px; --fs-head:17px; --pad-y:3px; --pad-x:8px; --gap:12px;
-  --wj-cell-w:112px; --wj-cell-h:48px; --wj-id-h:14px;
-  --wj-id-fs:12px; --wj-value-fs:12px; --wj-meta-fs:9px; --wj-state-fs:9px;
+  --wj-cell-w:112px; --wj-cell-h:61px; --wj-id-h:14px; --wj-m-h:15px; --wj-dfr-h:13px;
+  --wj-id-fs:12px; --wj-value-fs:12px; --wj-meta-fs:9px; --wj-state-fs:9px; --wj-dfr-fs:11px;
 }
 * { box-sizing: border-box; }
 html, body { max-width:100%; overflow-x:hidden; }
@@ -162,7 +163,30 @@ footer { padding:14px 24px 28px; color:var(--muted); font-size:var(--fs-small); 
 .wj-cells { display:grid; gap:var(--wj-gap); }
 .wj-band[data-wall="LEFT"] .wj-cells, .wj-band[data-wall="RIGHT"] .wj-cells { grid-template-columns:repeat(4, var(--wj-cell-w)); }
 .wj-band[data-wall="REAR"] .wj-cells, .wj-band[data-wall="FRONT"] .wj-cells { grid-template-columns:repeat(5, var(--wj-cell-w)); }
-.wj-cell { width:var(--wj-cell-w); height:var(--wj-cell-h); padding:1px; border:1px solid rgba(0,0,0,.45); border-radius:3px; background:var(--panel-2); display:grid; grid-template-rows:var(--wj-id-h) minmax(0, 1fr) minmax(0, 1fr); overflow:hidden; }
+.wj-cell { width:var(--wj-cell-w); height:var(--wj-cell-h); padding:1px; border:1px solid rgba(0,0,0,.45); border-radius:3px; background:var(--panel-2); display:grid; grid-template-rows:var(--wj-id-h) var(--wj-m-h) var(--wj-m-h) var(--wj-dfr-h); overflow:hidden; }
+/* The read-only paired row: label, signed value, unit only while available, and a text marker. A cell
+   with ONE measurement selected keeps its geometry (the unused row stays reserved, so nothing shifts). */
+.wj-dfr { display:flex; align-items:baseline; gap:3px; min-width:0; padding:0 3px; font-size:var(--wj-dfr-fs); color:var(--muted); white-space:nowrap; overflow:hidden; }
+.wj-dfr-label { flex:none; font-weight:700; }
+.wj-dfr-val { flex:none; font-weight:700; font-variant-numeric:tabular-nums; }
+.wj-dfr-unit { flex:none; font-size:var(--wj-meta-fs); color:var(--muted); }
+.wj-dfr-sym { margin-left:auto; flex:none; font-weight:700; }
+.wj-cell[data-delta-state="EXPECTED_POSITIVE"] .wj-dfr-val, .wj-cell[data-delta-state="EXPECTED_POSITIVE"] .wj-dfr-sym { color:var(--ok); }
+.wj-cell[data-delta-state="REDUCED_POSITIVE_CANDIDATE"] .wj-dfr-val, .wj-cell[data-delta-state="REDUCED_POSITIVE_CANDIDATE"] .wj-dfr-sym { color:var(--warn); }
+.wj-cell[data-delta-state="NEAR_ZERO_CANDIDATE"] .wj-dfr-val, .wj-cell[data-delta-state="NEAR_ZERO_CANDIDATE"] .wj-dfr-sym { color:var(--draft); }
+.wj-cell[data-delta-state="REVERSED_CONTRADICTION"] .wj-dfr-val, .wj-cell[data-delta-state="REVERSED_CONTRADICTION"] .wj-dfr-sym { color:var(--err); }
+/* An unavailable paired value is never a number and never carries a unit. */
+.wj-cell[data-delta-state="DIFFERENTIAL_UNAVAILABLE"] .wj-dfr-val { font-style:italic; font-weight:400; }
+
+/* The paired diagnostic card in Sensor detail: the state is carried by text AND a colour accent. */
+.detail-card[data-pair-state] { border-left:4px solid var(--muted); }
+.detail-card[data-pair-state="EXPECTED_POSITIVE"] { border-left-color:var(--ok); }
+.detail-card[data-pair-state="REDUCED_POSITIVE_CANDIDATE"] { border-left-color:var(--warn); }
+.detail-card[data-pair-state="NEAR_ZERO_CANDIDATE"] { border-left-color:var(--draft); }
+.detail-card[data-pair-state="REVERSED_CONTRADICTION"] { border-left-color:var(--err); }
+.detail-card[data-pair-state="DIFFERENTIAL_UNAVAILABLE"] { border-left-color:var(--un); }
+.pair-state { font-weight:700; }
+.pair-effect { color:var(--muted); font-size:var(--fs-small); margin:8px 0 0; }
 /* A NON_SENSOR_GAP position: visibly a gap, never a Sensor cell. */
 .wj-cell.wj-gap { border-style:dashed; border-color:var(--tc); background:#101418; }
 .wj-cell.wj-gap .wj-id { color:var(--tc); }

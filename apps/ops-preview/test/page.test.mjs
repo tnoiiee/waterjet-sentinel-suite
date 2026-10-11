@@ -141,10 +141,11 @@ test('every module in the served graph resolves over the real routes', async () 
 
     // The commissioning model is reached through the package entry point and its own relative imports.
     for (const expected of ['/app.mjs', '/pkg/index.mjs', '/pkg/schedule.mjs', '/pkg/quality.mjs',
-      '/pkg/scenarios.mjs', '/pkg/observation.mjs', '/pkg/workflow.mjs', '/pkg/presentation.mjs']) {
+      '/pkg/scenarios.mjs', '/pkg/observation.mjs', '/pkg/workflow.mjs', '/pkg/presentation.mjs',
+      '/pkg/wallmap.mjs', '/pkg/thermalpair.mjs']) {
       assert.ok(fetched.includes(expected), `${expected} must be part of the served module graph`);
     }
-    assert.ok(fetched.length >= 8, `expected the full module graph, fetched ${fetched.length}`);
+    assert.ok(fetched.length >= 10, `expected the full module graph, fetched ${fetched.length}`);
   });
 });
 
@@ -177,14 +178,16 @@ test('the scenario selector, node selector and progress areas are populated', as
   const app = await bootApp({});
   try {
     const options = app.byId['scenario-select'].childNodes;
-    assert.equal(options.length, 10, 'the Scenario selector must contain the ten protected scenarios');
+    assert.equal(options.length, 13,
+      'the Scenario selector must contain the ten protected scenarios plus the three paired demonstrations');
     // `<option value=…>` carries its value as an attribute; the browser reflects it into `.value`.
     const keys = options.map((o) => o.attributes.value);
     for (const option of options) {
       assert.match(allText(option), /\w/, 'every scenario option must carry a readable label');
     }
     for (const key of ['NORMAL_GOOD', 'UNCERTAIN_TRANSIENT', 'OUT_OF_RANGE', 'STALE', 'COMMUNICATION_LOSS_NODE',
-      'SIMULATED_WIRE_BREAK', 'RECOVERY', 'DRAWING_CONFLICT', 'PRODUCT_TOPOLOGY_CONFLICT', 'UNASSIGNED_CHANNEL']) {
+      'SIMULATED_WIRE_BREAK', 'RECOVERY', 'DRAWING_CONFLICT', 'PRODUCT_TOPOLOGY_CONFLICT', 'UNASSIGNED_CHANNEL',
+      'REDUCED_FRONT_REAR_DIFFERENTIAL', 'NEAR_ZERO_FRONT_REAR_DIFFERENTIAL', 'REVERSED_FRONT_REAR_DIFFERENTIAL']) {
       assert.ok(keys.includes(key), `the Scenario selector must offer ${key}`);
     }
     const nodeOptions = app.byId['node-select'].childNodes;
@@ -248,7 +251,7 @@ test('the density controls respond and the navigation targets every section', as
   }
 });
 
-test('the ten scenarios can be applied and the Preview workflow records in memory only', async () => {
+test('a scenario can be applied and the Preview workflow records in memory only', async () => {
   const app = await bootApp({});
   try {
     app.byId['scenario-select'].value = 'COMMUNICATION_LOSS_NODE';

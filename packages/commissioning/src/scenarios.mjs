@@ -17,16 +17,112 @@ import {
   COMMISSIONING_STATE, DIAGNOSTIC_REASON, FIELD_VERIFICATION_STATE, NODE_COMMUNICATION_STATE,
   OBSERVATION_PROVENANCE, PREVIEW_STALE_THRESHOLD_MS, QUALITY,
 } from './quality.mjs';
+import { PAIRED_DIFFERENTIAL_MODE } from './thermalpair.mjs';
 
-/** Deterministic Type-K-plausible temperature: a function of the physical identity only. */
-export function syntheticEngineeringValue(row) {
+// -----------------------------------------------------------------------------------------------
+// Synthetic paired-temperature generation (Owner Manual Review correction, 2026-10-12).
+//
+// The generator previously biased the Rear side UP by a fixed offset (`sideBias = side === 'F' ? 0
+// : 4`), so the Preview systematically rendered Rear above Front and taught the Operator to read the
+// pair backwards. That is corrected here at the SOURCE of the values, not in the rendered text:
+//
+//   RearTemperature  = deterministic paired REFERENCE (the waterwall-tube-side sample)
+//   FrontTemperature = RearTemperature + deterministic POSITIVE differential
+//
+// The reference and the differential are pure functions of the stable Sensor identity (FNV-1a over
+// the identity, no random source, no clock, no environment) and deliberately do NOT depend on the
+// preview tick: deterministic, finite, plausible, varied across Sensors (never one universal delta),
+// independent of wall rendering order and independent of browser timing. A Temperature pair is generated ONLY for a Product-compatible row that
+// carries a Sensor identity; a NON_SENSOR_GAP position, an unassigned Channel and any non-Product row
+// keep an identity-based value of their own and can never form a pair.
+// -----------------------------------------------------------------------------------------------
+
+/** FNV-1a over a short text - deterministic, no random source, no clock, no environment. */
+function stableHash(text) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+const round1 = (value) => Math.round(value * 10) / 10;
+
+/** The stable numeric part of a Sensor identity ('G+201' -> 201), used only for zone variation. */
+function sensorOrdinal(sensorId) {
+  const digits = String(sensorId ?? '').match(/\d+/);
+  return digits ? Number.parseInt(digits[0], 10) : 1;
+}
+
+/** True when this row is one of the two measurements of a Product Sensor pair. */
+export function isPairedTemperatureRow(row) {
+  return row.productCompatible === true
+    && row.sensorId !== null && row.sensorId !== undefined
+    && !isNonSensorGapSensorId(row.sensorId)
+    && (row.side === 'F' || row.side === 'R');
+}
+
+/**
+ * The deterministic paired thermal REFERENCE: the Rear (waterwall-tube-side) sample. It is
+ * comparatively stable under comparable operation, but it is NOT a constant: it varies per Sensor
+ * (the whole point of a per-Sensor baseline) and per physical zone.
+ *
+ * `tick` is accepted for call-site symmetry with the observation contract but deliberately does NOT
+ * enter the value: a row's engineering value stays a pure function of the physical identity, so the
+ * same Sensor renders the same sample at every tick while the observation timestamp and the value
+ * age move with the deterministic preview clock.
+ */
+export function syntheticPairedReference(sensorId, tick = 0) {
+  void tick;
+  const hash = stableHash(`${sensorId}|rear-wall-reference`);
+  return round1(26 + (sensorOrdinal(sensorId) % 9) * 1.2 + (hash % 400) / 100);
+}
+
+/** The NORMAL_GOOD paired differential: positive, bounded, varied per Sensor - never one fixed delta. */
+export function syntheticExpectedDifferential(sensorId, tick = 0) {
+  void tick;
+  const hash = stableHash(`${sensorId}|paired-differential`);
+  return round1(3.2 + (hash % 37) / 10);
+}
+
+/**
+ * The differential the SELECTED scenario declares for this Sensor and tick. Only the explicit
+ * Synthetic paired scenarios move it; no threshold is applied to any value at run time.
+ */
+export function syntheticPairedDifferential(sensorId, tick = 0, mode = PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE) {
+  const expected = syntheticExpectedDifferential(sensorId, tick);
+  const hash = stableHash(`${sensorId}|paired-differential-mode`);
+  if (mode === PAIRED_DIFFERENTIAL_MODE.REDUCED_POSITIVE) return round1(Math.max(0.6, expected * 0.25));
+  if (mode === PAIRED_DIFFERENTIAL_MODE.NEAR_ZERO) return round1(0.1 + (hash % 2) * 0.1);
+  if (mode === PAIRED_DIFFERENTIAL_MODE.REVERSED) return -round1(1.0 + (hash % 25) / 10);
+  return expected;
+}
+
+/** The deterministic paired FRONT temperature: the reference plus the scenario's differential. */
+export function syntheticPairedFrontTemperature(sensorId, tick = 0, mode = PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE) {
+  return round1(syntheticPairedReference(sensorId, tick) + syntheticPairedDifferential(sensorId, tick, mode));
+}
+
+/** Identity-based deterministic value for a row that cannot form a Product Sensor pair. */
+function syntheticUnpairedEngineeringValue(row) {
   const channel = (row.channel - 1) % 8;
   const moduleIndex = Number.parseInt(row.moduleInstance.split('.')[1] ?? '1', 10) - 1;
   const nodeIndex = Number.parseInt(row.nodeId.split('-')[2] ?? '1', 10) - 1;
-  const sideBias = row.side === 'F' ? 0 : 4;
-  const base = 20 + nodeIndex * 3 + moduleIndex * 1.5 + channel * 2 + sideBias;
+  const base = 20 + nodeIndex * 3 + moduleIndex * 1.5 + channel * 2;
   const fraction = ((row.scheduleRow * 7) % 10) / 10;
   return Math.round((base + fraction) * 10) / 10;
+}
+
+/**
+ * Deterministic Type-K-plausible temperature for one row. For a Product Sensor pair the Rear row
+ * returns the paired reference and the Front row returns the reference PLUS the scenario's positive
+ * differential, so Front is above Rear for every complete pair under NORMAL_GOOD.
+ */
+export function syntheticEngineeringValue(row, tick = 0, pairedMode = PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE) {
+  if (!isPairedTemperatureRow(row)) return syntheticUnpairedEngineeringValue(row);
+  if (row.side === 'R') return syntheticPairedReference(row.sensorId, tick);
+  return syntheticPairedFrontTemperature(row.sensorId, tick, pairedMode);
 }
 
 /** Deterministic raw word for a 0.1 unit-per-digit scaling: value x 10 as a 16-bit two's complement word. */
@@ -45,16 +141,30 @@ function assertDeterministicScenario(name) {
  * Scenario definitions. `appliesTo` decides which rows the scenario's condition covers; rows outside
  * the condition stay valid, which is how node scoping is expressed for COMMUNICATION_LOSS_NODE.
  */
-export const SCENARIOS = Object.freeze([
+const DEFAULT_PAIRED = Object.freeze({
+  mode: PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE,
+  note: 'The paired synthetic physics: Rear is the waterwall-tube-side reference and Front is the '
+    + 'furnace-facing fin measurement, so Front is expected above Rear under a valid, stable and '
+    + 'comparable operating condition.',
+});
+
+const SCENARIO_DEFINITIONS = [
   Object.freeze({
     key: 'NORMAL_GOOD',
     label: 'NORMAL_GOOD - plausible Type K sample',
-    summary: 'Quality GOOD, current value valid, no diagnostic.',
+    summary: 'Quality GOOD, current value valid, no diagnostic. Every complete Product Sensor pair shows Front above Rear: '
+      + 'Rear is the paired waterwall-tube-side reference and Front is the furnace-facing measurement plus a deterministic '
+      + 'positive differential.',
     provenance: OBSERVATION_PROVENANCE.SYNTHETIC_PREVIEW,
+    paired: Object.freeze({
+      mode: PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE,
+      note: 'Front above Rear for every complete Product Sensor pair: the expected paired heat-flow direction.',
+    }),
     appliesTo: () => true,
-    observation: (row, tick) => baseObservation(row, tick, {
+    observation: (row, tick, ctx) => baseObservation(row, tick, {
       quality: QUALITY.GOOD,
       diagnosticReason: DIAGNOSTIC_REASON.NONE,
+      pairedMode: ctx?.pairedMode,
     }),
   }),
   Object.freeze({
@@ -186,7 +296,82 @@ export const SCENARIOS = Object.freeze([
     appliesTo: (row) => row.rowClass === ROW_CLASS.UNASSIGNED,
     observation: unassignedObservation,
   }),
-]);
+
+  // ---------------------------------------------------------------------------------------------
+  // Explicit Synthetic PAIRED-THERMAL diagnostic demonstrations. They are the ONLY source of the
+  // REDUCED_POSITIVE_CANDIDATE / NEAR_ZERO_CANDIDATE / REVERSED_CONTRADICTION classifications: no
+  // threshold, deadband or persistence is applied to any value at run time, and none of them is an
+  // alarm, a Cleaning Queue trigger, a WaterJet dispatch request or a field conclusion.
+  // ---------------------------------------------------------------------------------------------
+  Object.freeze({
+    key: 'REDUCED_FRONT_REAR_DIFFERENTIAL',
+    label: 'REDUCED_FRONT_REAR_DIFFERENTIAL - synthetic reduced positive gradient',
+    summary: 'Synthetic paired demonstration: Front stays above Rear but the differential is deliberately reduced - '
+      + 'possible reduced local heat transfer / possible slag insulation (slag candidate). Synthetic diagnostic only: '
+      + 'no field confirmation, no approved threshold and no alarm or control effect.',
+    provenance: OBSERVATION_PROVENANCE.SIMULATED_DIAGNOSTIC_SCENARIO,
+    paired: Object.freeze({
+      mode: PAIRED_DIFFERENTIAL_MODE.REDUCED_POSITIVE,
+      note: 'Reduced positive paired gradient: a reduced local heat-transfer / possible slag-insulation CANDIDATE, '
+        + 'never a confirmed result.',
+    }),
+    appliesTo: () => true,
+    observation: (row, tick, ctx) => baseObservation(row, tick, {
+      quality: QUALITY.GOOD,
+      diagnosticReason: DIAGNOSTIC_REASON.NONE,
+      pairedMode: ctx?.pairedMode,
+      uncertaintyNote: 'synthetic reduced paired gradient - candidate wording only, no threshold and no automatic action',
+    }),
+  }),
+  Object.freeze({
+    key: 'NEAR_ZERO_FRONT_REAR_DIFFERENTIAL',
+    label: 'NEAR_ZERO_FRONT_REAR_DIFFERENTIAL - synthetic near-zero gradient',
+    summary: 'Synthetic paired demonstration: Front and Rear stay finite and valid while the paired gradient is near zero - '
+      + 'an abnormal paired thermal response that requires investigation. No Product deadband and no automatic action exist.',
+    provenance: OBSERVATION_PROVENANCE.SIMULATED_DIAGNOSTIC_SCENARIO,
+    paired: Object.freeze({
+      mode: PAIRED_DIFFERENTIAL_MODE.NEAR_ZERO,
+      note: 'Near-zero paired gradient: an abnormal paired response requiring investigation - it proves neither slag nor a '
+        + 'Sensor failure.',
+    }),
+    appliesTo: () => true,
+    observation: (row, tick, ctx) => baseObservation(row, tick, {
+      quality: QUALITY.GOOD,
+      diagnosticReason: DIAGNOSTIC_REASON.NONE,
+      pairedMode: ctx?.pairedMode,
+      uncertaintyNote: 'synthetic near-zero paired gradient - no Product deadband is defined, no automatic action exists',
+    }),
+  }),
+  Object.freeze({
+    key: 'REVERSED_FRONT_REAR_DIFFERENTIAL',
+    label: 'REVERSED_FRONT_REAR_DIFFERENTIAL - synthetic reversed pair',
+    summary: 'Synthetic paired demonstration: Front is below Rear, which is a paired-measurement contradiction. Check the '
+      + 'Front/Rear mapping, the Sensor health, the installation and the process transient: this is never classified as '
+      + 'slag by itself and creates no automatic effect.',
+    provenance: OBSERVATION_PROVENANCE.SIMULATED_DIAGNOSTIC_SCENARIO,
+    paired: Object.freeze({
+      mode: PAIRED_DIFFERENTIAL_MODE.REVERSED,
+      note: 'Reversed pair: mapping / Sensor health / installation / process transient must be checked first, and the '
+        + 'condition is never classified as slag by itself.',
+    }),
+    appliesTo: () => true,
+    observation: (row, tick, ctx) => baseObservation(row, tick, {
+      quality: QUALITY.GOOD,
+      diagnosticReason: DIAGNOSTIC_REASON.NONE,
+      pairedMode: ctx?.pairedMode,
+      uncertaintyNote: 'synthetic reversed pair - check mapping, Sensor health, installation and the process transient first',
+    }),
+  }),
+];
+
+/**
+ * The scenario catalogue, with the paired diagnostic declaration normalised in ONE place so no
+ * scenario can forget it: a scenario that does not declare a paired mode is EXPECTED_POSITIVE.
+ */
+export const SCENARIOS = Object.freeze(SCENARIO_DEFINITIONS.map((definition) => Object.freeze({
+  ...definition,
+  paired: definition.paired ?? DEFAULT_PAIRED,
+})));
 
 /**
  * An unassigned physical Channel has no measurement at all: no raw word, no engineering value, no
@@ -231,6 +416,9 @@ export function scenarioCatalogue() {
     provenance: s.provenance,
     simulatedDiagnostic: s.provenance === OBSERVATION_PROVENANCE.SIMULATED_DIAGNOSTIC_SCENARIO,
     requiresNode: s.requiresNode === true,
+    pairedMode: s.paired.mode,
+    pairedDiagnostic: s.paired.mode !== PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE,
+    pairedNote: s.paired.note,
   })));
 }
 
@@ -252,8 +440,11 @@ function baseIdentity(row, tick) {
   };
 }
 
-function baseObservation(row, tick, { quality, diagnosticReason, uncertaintyNote, stabilisation }) {
-  const engineeringValue = syntheticEngineeringValue(row);
+function baseObservation(row, tick, {
+  quality, diagnosticReason, uncertaintyNote, stabilisation,
+  pairedMode = PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE,
+}) {
+  const engineeringValue = syntheticEngineeringValue(row, tick, pairedMode);
   return Object.freeze({
     ...baseIdentity(row, tick),
     rawValue: syntheticRawValue(engineeringValue),
@@ -274,7 +465,10 @@ function baseObservation(row, tick, { quality, diagnosticReason, uncertaintyNote
   });
 }
 
-function invalidObservation(row, tick, { quality, diagnosticReason, rawValue, ageMs, commissioningState, blockingReason, nodeCommunicationState, note }) {
+function invalidObservation(row, tick, {
+  quality, diagnosticReason, rawValue, ageMs, commissioningState, blockingReason, nodeCommunicationState, note,
+  pairedMode = PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE,
+}) {
   return Object.freeze({
     ...baseIdentity(row, tick),
     rawValue: rawValue === undefined ? null : rawValue,
@@ -283,7 +477,7 @@ function invalidObservation(row, tick, { quality, diagnosticReason, rawValue, ag
     quality,
     diagnosticReason,
     isCurrentValueValid: false,
-    lastValidValue: syntheticEngineeringValue(row),
+    lastValidValue: syntheticEngineeringValue(row, tick, pairedMode),
     lastValidTimestamp: previewTimestamp(Math.max(0, tick - 1)),
     valueAgeMs: ageMs ?? 5000 + (tick % 3) * 500,
     nodeCommunicationState: nodeCommunicationState ?? NODE_COMMUNICATION_STATE.ONLINE,
@@ -316,24 +510,32 @@ export function buildObservations(schedule, { scenarioKey, tick = 0, nodeId = nu
     throw new Error(`scenario '${scenarioKey}' requires an explicit nodeId (its scope is one node)`);
   }
   const observations = new Map();
+  const pairedMode = scenario.paired.mode;
   for (const row of schedule.rows) {
-    const applies = scenario.appliesTo(row, { nodeId });
+    const applies = scenario.appliesTo(row, { nodeId, pairedMode });
     let raw;
     if (row.rowClass === ROW_CLASS.UNASSIGNED) {
       // No measurement exists at an unassigned position, whatever scenario is selected.
       raw = unassignedObservation(row, tick);
     } else if (applies) {
-      raw = scenario.observation(row, tick);
+      raw = scenario.observation(row, tick, { nodeId, pairedMode });
     } else {
-      raw = baseObservation(row, tick, { quality: QUALITY.GOOD, diagnosticReason: DIAGNOSTIC_REASON.NONE });
+      raw = baseObservation(row, tick, {
+        quality: QUALITY.GOOD, diagnosticReason: DIAGNOSTIC_REASON.NONE, pairedMode,
+      });
     }
     // Only the rows the scenario actually covers carry the scenario's provenance. A row outside the
     // scenario condition is an ordinary synthetic preview sample, so a simulated diagnostic label
     // can never bleed onto a healthy row (and vice versa).
     const provenance = applies ? scenario.provenance : OBSERVATION_PROVENANCE.SYNTHETIC_PREVIEW;
     const nodeState = applies && scenario.nodeState ? scenario.nodeState : raw.nodeCommunicationState;
+    // The scenario identity and its declared paired-differential mode travel with EVERY observation of
+    // the set, so the paired model derives its classification from the explicit scenario (never from a
+    // threshold) and can refuse a pair whose two sides came from different observation sets.
     observations.set(row.physicalChannelKey, Object.freeze({
       ...raw, provenance, nodeCommunicationState: nodeState,
+      scenarioKey: scenario.key,
+      pairedDifferentialMode: pairedMode,
     }));
   }
   return observations;

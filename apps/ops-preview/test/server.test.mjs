@@ -125,10 +125,13 @@ test('the schedule payload reproduces the protected baseline exactly', async () 
 
 test('the scenario catalogue is served without observations', async () => {
   const body = await (await fetch(`${base}/api/commissioning/scenarios`)).json();
-  assert.equal(body.scenarios.length, 10);
+  // Ten PROTECTED scenarios (never removed, never renamed) plus the three explicit paired thermal
+  // demonstrations added by the Front/Rear thermal-pair pass.
+  assert.equal(body.scenarios.length, 13);
   assert.deepEqual(body.scenarios.map((s) => s.key), [
     'NORMAL_GOOD', 'UNCERTAIN_TRANSIENT', 'OUT_OF_RANGE', 'STALE', 'COMMUNICATION_LOSS_NODE',
     'SIMULATED_WIRE_BREAK', 'RECOVERY', 'DRAWING_CONFLICT', 'PRODUCT_TOPOLOGY_CONFLICT', 'UNASSIGNED_CHANNEL',
+    'REDUCED_FRONT_REAR_DIFFERENTIAL', 'NEAR_ZERO_FRONT_REAR_DIFFERENTIAL', 'REVERSED_FRONT_REAR_DIFFERENTIAL',
   ]);
   const wireBreak = body.scenarios.find((s) => s.key === 'SIMULATED_WIRE_BREAK');
   assert.equal(wireBreak.simulatedDiagnostic, true);

@@ -23,8 +23,18 @@ export {
 
 export {
   SCENARIOS, SCENARIO_KEYS, getScenario, scenarioCatalogue, buildObservations, syntheticEngineeringValue,
-  syntheticRawValue, previewTimestamp, PREVIEW_EPOCH_MS, PREVIEW_TICK_MS,
+  syntheticRawValue, previewTimestamp, PREVIEW_EPOCH_MS, PREVIEW_TICK_MS, isPairedTemperatureRow,
+  syntheticPairedReference, syntheticExpectedDifferential, syntheticPairedDifferential,
+  syntheticPairedFrontTemperature,
 } from './scenarios.mjs';
+
+export {
+  PAIRED_THERMAL_STATE, PAIRED_THERMAL_STATE_VALUES, DIFFERENTIAL_UNAVAILABLE_REASON,
+  DIFFERENTIAL_UNAVAILABLE_REASON_VALUES, PAIRED_DIFFERENTIAL_MODE, PAIRED_DIFFERENTIAL_MODE_VALUES,
+  FRONT_REAR_DELTA_LABEL, PAIRED_THERMAL_MARKER, PAIRED_THERMAL_GUIDANCE, PAIRED_THERMAL_EFFECT,
+  THERMAL_SIDE, formatFrontRearDelta, buildThermalPair, buildThermalPairs, pairForRow,
+  describeUnpairedMeasurement,
+} from './thermalpair.mjs';
 
 export {
   REQUIRED_OBSERVATION_FIELDS, requireObservationContract, summariseObservations, nodeCommunicationSummary,

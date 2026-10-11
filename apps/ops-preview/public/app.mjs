@@ -8,10 +8,12 @@
 // they look; they never touch the Mapping revision, the Runtime revision or the evidence.
 
 import {
-  DENSITY, DEFAULT_DENSITY, FIELD_VERIFICATION_TEXT, FILTERS, MEASUREMENT_VIEW, OBSERVATION_KIND,
-  PreviewCommissioningSession, ROW_CLASS_PRESENTATION, SIDE_LABELS, WALL_LABELS, buildRowViews,
-  buildWallMap, canRecordPass, filterCounts, filterRows, getFilter, legend, loopTestSummary,
-  summaryCounts, visibleMeasurements, wallMeasurementKey, wallOrderStep,
+  DENSITY, DEFAULT_DENSITY, FIELD_VERIFICATION_TEXT, FILTERS, FRONT_REAR_DELTA_LABEL, MEASUREMENT_VIEW,
+  OBSERVATION_KIND, PAIRED_THERMAL_EFFECT, PAIRED_THERMAL_GUIDANCE, PAIRED_THERMAL_MARKER,
+  PAIRED_THERMAL_STATE, PreviewCommissioningSession, ROW_CLASS_PRESENTATION, SIDE_LABELS, WALL_LABELS,
+  buildRowViews, buildThermalPairs, buildWallMap, canRecordPass, filterCounts, filterRows, getFilter,
+  legend, loopTestSummary, pairForRow, summaryCounts, visibleMeasurements, wallMeasurementKey,
+  wallOrderStep,
 } from '/pkg/index.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -86,6 +88,9 @@ const state = {
   sensorMap: null,
   opsSummary: null,
   observations: new Map(),
+  // The read-only paired thermal model, rebuilt from the authoritative observations on every load. It
+  // is derived state: it is never written back into an observation, a row, a count or a verdict.
+  pairs: null,
   session: new PreviewCommissioningSession({ sessionIndex: 0 }),
   scenarioKey: 'NORMAL_GOOD',
   nodeId: 'TC-NODE-01',
@@ -270,6 +275,43 @@ function positionMatchesFilter(position, viewByKey) {
 }
 
 /**
+ * The read-only paired row of a cell: the label, the signed value, the unit only while the value is
+ * available, and a text marker. It is DERIVED - it has no Channel, no Sensor identity of its own, no
+ * commissioning state and no Preview workflow, and it can never be selected as a measurement.
+ */
+function deltaRow(pair) {
+  const state_ = pair?.state ?? PAIRED_THERMAL_STATE.DIFFERENTIAL_UNAVAILABLE;
+  const attrs = {
+    class: 'wj-dfr',
+    'data-delta-state': String(state_),
+    'data-delta-available': String(Boolean(pair?.deltaAvailable)),
+  };
+  const children = [el('span', { class: 'wj-dfr-label' }, FRONT_REAR_DELTA_LABEL)];
+  if (pair?.deltaAvailable) {
+    children.push(el('span', { class: 'wj-dfr-val' }, pair.deltaText));
+    if (pair.unit) children.push(el('span', { class: 'wj-dfr-unit' }, String(pair.unit)));
+  } else {
+    // No current paired value means NO number and NO unit: the token says so and the reason travels
+    // with it (in the Sensor detail and in the title), never as an invented value.
+    children.push(el('span', { class: 'wj-dfr-val' }, '--'));
+  }
+  children.push(el('span', { class: 'wj-dfr-sym' }, pair?.marker ?? PAIRED_THERMAL_MARKER.DIFFERENTIAL_UNAVAILABLE));
+  const derived = `${FRONT_REAR_DELTA_LABEL} ${pair?.deltaText ?? ''} ${pair?.unit ?? ''}`.trim();
+  const sides = `Front ${pair?.frontValuePresented ?? '-'} ${pair?.frontUnit ?? ''} minus Rear ${pair?.rearValuePresented ?? '-'} ${pair?.rearUnit ?? ''}`.trim();
+  attrs.title = pair?.deltaAvailable
+    ? `${derived} - ${sides}; paired state ${pair.state}. ${pair.guidance} ${pair.effect}`
+    : `${FRONT_REAR_DELTA_LABEL} unavailable (${pair?.reason ?? 'PAIR_IDENTITY_INCOMPLETE'}): no paired value is calculated and no value is substituted. `
+      + `${PAIRED_THERMAL_GUIDANCE.DIFFERENTIAL_UNAVAILABLE} ${pair?.effect ?? PAIRED_THERMAL_EFFECT}`;
+  return el('div', attrs, children);
+}
+
+/** The paired descriptor of a wall position, resolved from the served views (never re-derived). */
+function pairForPosition(position, viewByKey) {
+  const view = viewByKey.get(position.frontKey) ?? viewByKey.get(position.rearKey) ?? null;
+  return pairForRow(state.pairs, view?.row ?? null);
+}
+
+/**
  * One measurement block of a cell: side, current value when valid, unit when a current value exists,
  * the quality marker and the commissioning state. A Sensor cell block is a button (it selects that
  * exact measurement); a NON_SENSOR_GAP block is inert - a gap is never selectable as a Sensor.
@@ -351,10 +393,16 @@ function wallCell(position, viewByKey) {
     el('span', { class: 'wj-id' }, position.label),
     el('span', { class: 'wj-class' }, isGap ? 'NON_SENSOR_GAP' : (classMarkers.join(' ') || '[PC]')),
   ]);
+  // The paired state travels on the cell as well, so the row's styling and the tests can read it
+  // without re-deriving anything.
+  const pair = pairForPosition(position, viewByKey);
+  attrs['data-delta-state'] = String(pair.state);
+  attrs['data-delta-available'] = String(Boolean(pair.deltaAvailable));
   const children = [head];
   for (const block of blocks) {
     children.push(measurementBlock(block, viewByKey.get(block.key) ?? null, position, selected && state.selectedKey === block.channelKey));
   }
+  children.push(deltaRow(pair));
   const cell = el('div', attrs, children);
   if (isGap) {
     cell.title = `${position.label} - NON_SENSOR_GAP position: never a Sensor and never a Water Jet.`
@@ -406,6 +454,13 @@ function renderWallLegend() {
     ['--', 'no current value is presented: never a number, never a unit (the cause is named in Sensor detail)'],
     ['degC', 'engineering unit, shown only while a current value exists'],
     ['Front / Rear', 'two separate measurements: nothing here merges them and no value is copied between them'],
+    ['dFR', 'FrontTemperature - RearTemperature for this Sensor pair: a signed read-only derived value, unit shown only while it is available'],
+    ['dFR +4.3', 'Front above Rear: the expected paired heat-flow direction (the sign is always visible)'],
+    ['[v]', 'reduced positive gradient: a possible reduced local heat-transfer / possible slag-insulation candidate - synthetic demonstration only, never a confirmed result'],
+    ['[~]', 'near-zero paired gradient: an abnormal paired response requiring investigation - no Product deadband is approved'],
+    ['[!]', 'Front below Rear: a paired-measurement contradiction - check mapping, Sensor health, installation and the process transient; never classified as slag by itself'],
+    ['dFR --', 'no paired value is calculated: never a number, never a unit, and the cause is named in Sensor detail'],
+    ['no effect', 'the paired value is read-only diagnostic / trend: no alarm, queue, cleaning or control effect and no field approval'],
     ['synthetic', `every value is a synthetic Preview observation - ${FIELD_VERIFICATION_TEXT}`],
   ];
   list.append(...entries.map(([marker, text]) => el('div', { class: 'wallmap-legend-item' }, [
@@ -597,7 +652,11 @@ function renderScenarios() {
     nodeSelect.append(el('option', { value: node.nodeId }, node.nodeId));
   }
   const scenario = state.scenarios.find((s) => s.key === state.scenarioKey);
-  $('scenario-summary').textContent = scenario ? `${scenario.key}: ${scenario.summary}` : '';
+  const paired = scenario?.pairedDiagnostic
+    ? ` Paired diagnostic demonstration: ${scenario.pairedMode} - ${scenario.pairedNote}`
+    : '';
+  $('scenario-summary').textContent = scenario ? `${scenario.key}: ${scenario.summary}${paired}` : '';
+  $('scenario-summary').setAttribute('data-paired-mode', String(scenario?.pairedMode ?? ''));
 }
 
 function renderSummary(views) {
@@ -703,18 +762,54 @@ function renderTable(views) {
     `Showing ${rows.length} of ${views.length} physical Channels - filter '${state.filter}' changes the view only.`;
 }
 
+/**
+ * The read-only paired thermal card. It shows both authoritative side values, the derived signed
+ * delta (never a bare number, never a fabricated one), the paired diagnostic state, its guidance, the
+ * Synthetic provenance, the field-verification state and the explicit no-effect statement.
+ */
+function renderDetailPair(view) {
+  const card = $('detail-pair');
+  card.replaceChildren();
+  if (!view) {
+    card.setAttribute('data-pair-state', PAIRED_THERMAL_STATE.DIFFERENTIAL_UNAVAILABLE);
+    card.append(el('p', { class: 'note' },
+      'Select a measurement in the Overview or the Commissioning Wall Map to review its read-only paired thermal diagnostic.'));
+    return;
+  }
+  const pair = pairForRow(state.pairs, view.row);
+  card.setAttribute('data-pair-state', String(pair.state));
+  card.append(el('h4', {}, 'Paired thermal diagnostic (read-only, derived)'));
+  const sideValue = (presented, unit) => (presented === null ? 'UNAVAILABLE' : `${presented}${unit ? ` ${unit}` : ''}`);
+  card.append(definitionList([
+    ['Sensor pair', pair.sensorId ?? 'no Product Sensor pair'],
+    ['Front measurement', `${pair.frontMeasurementIdentity ?? '-'} (${SIDE_LABELS.F})`],
+    ['Front current value', sideValue(pair.frontValuePresented, pair.frontUnit)],
+    ['Rear measurement', `${pair.rearMeasurementIdentity ?? '-'} (${SIDE_LABELS.R})`],
+    ['Rear current value', sideValue(pair.rearValuePresented, pair.rearUnit)],
+    [`${FRONT_REAR_DELTA_LABEL} = Front - Rear`, pair.deltaAvailable ? `${pair.deltaText} ${pair.unit}` : `-- (${pair.reason})`],
+    ['Paired diagnostic state', `${pair.marker} ${pair.state}`],
+    ['Guidance', pair.guidance],
+    ['Synthetic scenario', `${pair.scenarioKey ?? '-'} (paired mode ${pair.pairedDifferentialMode})`],
+    ['Observation provenance', pair.provenance ?? 'SYNTHETIC_PREVIEW'],
+    ['Field verification', FIELD_VERIFICATION_TEXT],
+  ]));
+  card.append(el('p', { class: 'pair-effect' }, pair.effect));
+}
+
 function renderDetail(views) {
   const identity = $('detail-identity');
   const observation = $('detail-observation');
   const workflow = $('detail-workflow');
   identity.replaceChildren();
   observation.replaceChildren();
+  renderDetailPair(null);
   workflow.replaceChildren();
   clear('workflow-actions');
 
   const view = state.selectedKey ? views.find((v) => v.key === state.selectedKey) : null;
   if (!view) {
     identity.append(el('p', { class: 'note' }, 'Select a measurement in the Overview to review its identity, its synthetic observation and its Preview workflow.'));
+    renderDetailPair(null);
     return;
   }
   const row = view.row;
@@ -754,6 +849,9 @@ function renderDetail(views) {
   if (view.simulatedDiagnostic) {
     observation.append(el('p', { class: 'sim' }, view.simulatedDiagnosticLabel));
   }
+
+  // The read-only paired Front/Rear diagnostic of the selected measurement's Sensor.
+  renderDetailPair(view);
 
   const record = state.session.recordOf(row);
   workflow.append(el('h4', {}, 'Preview workflow (approves nothing)'));
@@ -860,6 +958,9 @@ async function loadObservations(overrides = {}) {
   state.tick = payload.tick;
   state.nodeId = payload.nodeId ?? state.nodeId;
   state.observations = new Map(Object.entries(payload.observations));
+  // Paired Front/Rear values are DERIVED here, from the observations that were just served: no paired
+  // value is stored on the host, in the evidence or in any verdict.
+  state.pairs = buildThermalPairs(state.schedule, state.observations);
   state.summary = payload.summary;
   state.nodeSummary = payload.nodeSummary;
   state.scenarioProgress = payload.commissioningProgress;

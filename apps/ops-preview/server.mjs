@@ -6,7 +6,8 @@
 //   GET /api/health                       local liveness for the Kiosk shell reconnect logic
 //   GET /api/boundary                     the Stage boundary statement shown on screen
 //   GET /api/commissioning/schedule       the merged 240-row drawing-derived schedule, read-only
-//   GET /api/commissioning/scenarios      the ten deterministic synthetic scenarios
+//   GET /api/commissioning/scenarios      the thirteen deterministic synthetic scenarios
+//                                         (ten protected + three paired thermal demonstrations)
 //   GET /api/commissioning/observations   one scenario's synthetic observations (never a device read)
 //   GET /api/operations/summary           node communication and commissioning progress summary
 //   GET /api/sensor-map                   the public-safe synthetic sensor-map example, read-only

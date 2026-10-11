@@ -19,6 +19,18 @@ defect that the pass found and fixed, the changed/unchanged/not-verified split, 
 this head, and the consolidated 21-step Owner-local handoff. No safety, authority, evidence or
 dependency boundary changed; **no dependency was added at all** in this pass.
 
+**Follow-up (Owner-authorized Front/Rear thermal-pair semantics and synthetic diagnostic pass):** the
+Owner found that the Synthetic Preview systematically rendered **Rear above Front** (for example Front
+29.4 / Rear 35.1), which contradicts the approved Sensor geometry and would train the Operator to read
+the pair backwards. §18 records the corrected domain rule, the defect at its **source** (the synthetic
+generator, not a rendered label), the read-only paired presentation model, the three new explicit
+paired scenarios (catalogue total **13**), the changed/unchanged/not-verified split, the Arena totals at
+this head and the consolidated **28-step** Owner-local handoff. `FrontRearDelta` is **READ-ONLY
+DIAGNOSTIC / TREND ONLY** until field baselines and operating regimes are approved: no alarm, trip,
+interlock, cleaning queue, GlobalQueue, WaterJet dispatch, cleaning job, AutoSequence, pump, isolation
+valve, axis motion or automatic-control effect, and no field approval. No safety, authority, evidence or
+dependency boundary changed; **no dependency was added at all** in this pass.
+
 **Stage boundary (shown on screen by the preview and by the shell, at all times):**
 `SIMULATION / PREVIEW - NO HARDWARE ACCESS - NO DEVICE WRITE - FIELD VERIFICATION PENDING`.
 
@@ -183,6 +195,12 @@ summary counts, an operator-readable detail panel, and a Preview-only workflow t
 verdict and a remark **in memory only** — clearly labelled as a preview record that approves nothing.
 
 ### 5.4 The ten deterministic scenarios (§10)
+
+> The catalogue this section describes was the ten **protected** scenarios of this checkpoint. The
+> Owner-authorized Front/Rear thermal-pair pass (§18) **appended** three explicit paired
+> demonstrations (`REDUCED_FRONT_REAR_DIFFERENTIAL`, `NEAR_ZERO_FRONT_REAR_DIFFERENTIAL`,
+> `REVERSED_FRONT_REAR_DIFFERENTIAL`), so the current catalogue is **thirteen** scenarios. **No**
+> protected scenario was removed or renamed and every statement below still holds for those ten.
 
 `NORMAL_GOOD`, `UNCERTAIN_TRANSIENT`, `OUT_OF_RANGE`, `STALE`, `COMMUNICATION_LOSS_NODE` (exactly one
 node), `SIMULATED_WIRE_BREAK` (labelled `SIMULATED_DIAGNOSTIC_SCENARIO`, raw `0x7FFF` shown as
@@ -635,7 +653,8 @@ application the way a browser does — **through the server** — and then execu
    JavaScript MIME type and no `node:` or remote specifier anywhere;
 4. boot completes and reports `ready`, with the failure surface hidden and **every** boot request a
    successful local GET (a failed asset, module or API request can no longer hide behind a passing test);
-5. the Scenario selector carries the ten protected scenarios, the Node selector the six nodes, and the
+5. the Scenario selector carries the thirteen scenarios (the ten protected plus the three paired thermal
+   demonstrations added in §18), the Node selector the six nodes, and the
    Node communication summary and Commissioning progress are populated;
 6. the Overview renders exactly 240 physical Channels with 20 columns each, and selecting a row fills the
    identity, observation and Preview-workflow cards;
@@ -690,7 +709,8 @@ npm --prefix .\apps\ops-preview start
 dotnet run --project apps/kiosk/Wjss.Kiosk.csproj -c Release
 ```
 
-Then confirm in the window: the Scenario selector offers ten scenarios; Compact and Comfortable change
+Then confirm in the window: the Scenario selector offers thirteen scenarios (the ten protected scenarios
+plus the three paired thermal demonstrations added in §18); Compact and Comfortable change
 the density; Sensor Map and Diagnostics navigate; the Overview shows 240 rows; selecting a row fills the
 Sensor detail; the Node communication summary and Commissioning progress are populated; `Apply scenario`
 changes the rendered rows; **no initialization error banner is visible**; there is no page-level
@@ -1066,3 +1086,240 @@ git status ; git diff
 **Report back** the 19-step results, the exact text of any failure, the map's on-screen appearance at
 fullscreen and in a narrow window, and the boundary statement shown on screen. A Preview verdict is
 never a field approval, and this handoff is not Owner Manual Review.
+
+## 18. Owner-authorized Front/Rear thermal-pair semantics and synthetic diagnostic pass
+
+Same Stage, same branch `arena/3be5c713-waterjet-sentinel-suite`, same **PR #19 (OPEN, NOT MERGED — do
+not merge)**, same approved base `main` `48f0315ea1bcbd3f71f46a47bb4b55fc04327487`. This pass starts at
+`4d177f614a82f226054e613631c60d37d71c8349` and adds one narrow checkpoint commit whose parent is exactly
+that SHA. It changes the **synthetic paired generation**, adds a **read-only paired presentation model**
+and its presentation, and adds focused tests; nothing else is reopened.
+
+### 18.1 Owner finding, recorded as received
+
+The Synthetic Preview systematically rendered **Rear above Front** for every Product Sensor pair (the
+Owner's example: Front 29.4 / Rear 35.1). Because Front is the furnace-facing fin / heat-collection
+measurement and Rear is the paired waterwall-tube-side reference, that inverted the physical reading and
+would train the Operator to read the pair backwards. The defect was in the **source**, not in the
+rendering: no screen may compensate for a wrong value, so the generator was corrected and the rendered
+text was left alone.
+
+### 18.2 Corrected domain rule (Owner-approved)
+
+- `FrontTemperature` is the **furnace-facing fin / heat-collection** measurement of the pair.
+- `RearTemperature` is the paired **waterwall-tube-side reference**: comparatively stable under
+  comparable operation, and **not a constant** (it varies per Sensor and per physical zone).
+- Under a **valid, stable, comparable** condition **Front > Rear**.
+- **`FrontRearDelta` = `FrontTemperature` − `RearTemperature`**, in the same compatible unit.
+- Interpretation: a healthy **positive** value is the expected gradient; a **reducing positive** value is
+  a *candidate* reduced local heat transfer (possible slag insulation); a low positive value does **not**
+  prove slag; **near zero** is an abnormal paired response; **reversed** (Front below Rear) is a
+  paired-measurement contradiction to be investigated **first** for mapping, Sensor health, installation
+  and process transient — never classified as slag by itself.
+- Until field baselines and operating regimes are approved, `FrontRearDelta` is **READ-ONLY DIAGNOSTIC /
+  TREND ONLY**. No threshold, alarm, trip, interlock, persistence, deadband, hysteresis or automatic slag
+  classification is approved or implemented, and the value has **no** Cleaning Queue, GlobalQueue, WaterJet
+  dispatch, cleaning job, AutoSequence, pump, isolation-valve, axis-motion, automatic-control or
+  field-approval effect.
+
+### 18.3 Exact cause at the source and the corrected generation rule
+
+**Cause.** `syntheticEngineeringValue` (in `packages/commissioning/src/scenarios.mjs`) carried
+`const sideBias = row.side === 'F' ? 0 : 4;`, which biased **every** Rear sample about +4 °C above its
+Front partner — the Owner's Front 29.4 / Rear 35.1 pair. It was a generation bug, not a rendering bug.
+
+**Correction (deterministic, no RNG, no clock, no rendering-order dependence).** For a Product Sensor
+pair, Rear is now the deterministic paired reference
+`round1(26 + (sensorOrdinal % 9) · 1.2 + (stableHash(sensorId|rear-wall-reference) % 400)/100)` and Front
+is `Rear + differential`, where the differential is the scenario's declared value
+(`NORMAL_GOOD`: `round1(3.2 + (hash % 37)/10)`), so **Front > Rear for every complete pair**. Non-pair
+rows keep their previous identity-based value. Both sides are **pure functions of the physical identity**
+(the FNV-1a hash of the Sensor identity), so the same Sensor renders the same sample at every tick while
+the observation timestamp and the value age keep moving with the deterministic Preview clock — the
+pre-existing "value is a function of identity" contract is preserved, not weakened. Verified at tick 0
+with 106/106 pairs available: `NORMAL_GOOD` deltas **3.2 … 6.8 °C in 34 distinct values** (never one
+universal delta for all 106), `REDUCED_FRONT_REAR_DIFFERENTIAL` **0.8 … 1.7**, `NEAR_ZERO…` **0.1 …
+0.2**, `REVERSED…` **−3.4 … −1.0**; samples `G+101` Front 38.0 / Rear 31.9 = `+6.1`, `G+205` Front 41.8 /
+Rear 37.9 = `+3.9`, `H7` Front 40.3 / Rear 34.9 = `+5.4`; repeat runs are deep-equal and a reversed
+schedule order produces identical per-Sensor values.
+
+**Existing scenarios are untouched in behaviour:** they keep their Quality and Diagnostic result and
+simply make the delta **unavailable** where a side is invalid. No delta is ever fabricated to keep the UI
+populated.
+
+### 18.4 The read-only paired model (`packages/commissioning/src/thermalpair.mjs`, new)
+
+`buildThermalPairs(schedule, observations)` derives one read-only descriptor per Product Sensor (plus a
+descriptor per Front/Rear measurement, an unassigned Channel or an I7/I16 conflict row) **from the
+authoritative observations on every render**. It never mutates an observation, never becomes a second
+source of truth and is never persisted. It exposes: Sensor identity, Front/Rear measurement identity and
+current value with validity, `FrontRearDelta`, delta validity, paired diagnostic state, paired diagnostic
+reason, synthetic scenario provenance and the field-verification state.
+
+- **States (five, kept strictly separate from Quality, DiagnosticReason, CommissioningState, evidence
+  blocking and the Preview verdict — no `INVALID` was added to Quality):** `EXPECTED_POSITIVE` (with no
+  clean-wall / no-slag / field-verification claim), `REDUCED_POSITIVE_CANDIDATE`, `NEAR_ZERO_CANDIDATE`,
+  `REVERSED_CONTRADICTION`, `DIFFERENTIAL_UNAVAILABLE`.
+- **Availability rule:** the delta exists only when both sides belong to one Product Sensor with exactly
+  one Front and one Rear measurement, both current values valid, the same compatible unit, neither side
+  BAD / STALE / DISABLED / communication-loss / wire-break, both values finite and the identity complete.
+  It is never derived from one current plus one Last Valid value, from two historical values, from a
+  BAD/STALE/disabled/unassigned value, from an I7/I16 conflict row or from a copied/substituted
+  measurement, and there is no fallback, aliasing or derivation across Front and Rear.
+- **Fourteen named blocking categories** (FRONT_/REAR_ × current-value-unavailable, quality-not-valid,
+  stale, communication-loss, wire-break, plus `UNIT_MISMATCH`, `PAIR_IDENTITY_INCOMPLETE`,
+  `NON_SENSOR_GAP`, `UNASSIGNED_CHANNEL`) so an unavailable value always states **which side** broke the
+  pair and why.
+- **Sign wins over the label:** `delta < 0` is always `REVERSED_CONTRADICTION` and `delta === 0` is always
+  `NEAR_ZERO_CANDIDATE`, whatever a scenario declares. `REDUCED_POSITIVE` / `NEAR_ZERO` are assigned by the
+  **explicit Synthetic scenario** they declare; no runtime threshold, deadband or inference exists.
+
+**Presentation.** Each Wall Map cell carries one compact read-only paired row (`dFR +6.1 degC[+]`), with
+the unit only while the value is available and `dFR -- [?]` with the named reason when it is not — never a
+number, never a unit, never a substituted value. The Sensor detail gained a fourth read-only card showing
+Sensor pair, Front measurement and current value, Rear measurement and current value,
+`dFR = Front − Rear`, paired state with marker, guidance, synthetic scenario provenance,
+`FIELD VERIFICATION PENDING` and the explicit no-automatic-effect statement. The Wall Map legend documents
+the paired markers, the wall-order note states the read-only nature, and the scenario panel names the
+declared paired mode. One render path builds the pairs, so the cell and the detail can never disagree.
+
+### 18.5 Changed / Unchanged / Not verified
+
+**Changed**
+
+| Path | Change |
+| --- | --- |
+| `packages/commissioning/src/thermalpair.mjs` | **New.** Read-only paired model: five states, fourteen blocking categories, four declared paired modes, marker/guidance/effect vocabularies, `formatFrontRearDelta`, `buildThermalPair`, `buildThermalPairs`, `pairForRow`, `describeUnpairedMeasurement`. No I/O, no clock, no state, never mutates an observation |
+| `packages/commissioning/src/scenarios.mjs` | Removed the Rear-up `sideBias`; added the deterministic paired helpers (`syntheticPairedReference`, `syntheticExpectedDifferential`, `syntheticPairedDifferential`, `syntheticPairedFrontTemperature`); added the three explicit paired scenarios; stamped every observation with `scenarioKey` and `pairedDifferentialMode`; `scenarioCatalogue()` now carries `pairedMode` / `pairedDiagnostic` / `pairedNote` |
+| `packages/commissioning/src/index.mjs`, `package.json` | Export the new module and helpers; `check` also syntax-checks `src/thermalpair.mjs`; description states thirteen scenarios |
+| `packages/commissioning/test/thermalpair.test.mjs` | **New.** 16 focused tests (A1–A4 physics/determinism/generator scope, B1–B2 identity/isolation, C1–C4 delta validity, D1–D4 the three paired scenarios and the no-effect vocabulary, E1–E2 totals/workflow separation) |
+| `packages/commissioning/test/scenarios.test.mjs` | The catalogue contract is now "the ten protected scenarios plus the three paired demonstrations" (13), with the protected ten asserted unre­moved and unre­named, and the paired scenarios' mode/honesty assertions added |
+| `apps/ops-preview/public/index.html` | The Sensor-detail grid carries the new read-only paired card `#detail-pair`; the Wall Map section states the paired rule and that the value has no Channel, no Sensor identity, no commissioning state and no Preview verdict of its own |
+| `apps/ops-preview/public/styles.css` | The cell gains a fixed read-only paired row (cell height 52 → 66 px comfortable, 48 → 61 px compact) with state-coloured text; the paired detail card carries a state accent. Geometry, fonts, wall order and the static vertical scrolling contract are otherwise untouched |
+| `apps/ops-preview/public/app.mjs` | Builds the pairs per render from the served observations, renders the cell delta row, the Sensor-detail paired card, the legend entries and the scenario paired line. The Overview gains **no** row and **no** column for the delta |
+| `apps/ops-preview/test/thermalpair.render.test.mjs` | **New.** 10 focused presentation/real-page tests (E1–E4 presentation, F1–F2 workflow preservation, G1–G4 served module graph, all-scenario initialization, bounded wording, invalid-side unavailability) |
+| `apps/ops-preview/test/page.test.mjs`, `test/server.test.mjs` | Scenario contracts updated to thirteen keys; the served module graph assertion now also requires `/pkg/wallmap.mjs` and `/pkg/thermalpair.mjs` |
+| `apps/kiosk/README.md`, `CHANGELOG.md`, `docs/CURRENT_STATE.md`, this checkpoint | This pass recorded; the Wall Map verification paragraph now includes the paired checks and the bounded slag wording |
+
+**Unchanged:** the 240 physical Channels / 216 mapped + 24 unassigned / 212 Product-compatible
+measurements / 106 Product Sensors / I7 + I16 `NON_SENSOR_GAP` topology and its single canonical source;
+the U-shape geometry, wall order, row order and the static vertical scrolling contract (§17); the
+physical-Channel selection identity and every synchronisation; Front/Rear separation and the
+Both / Front only / Rear only control; the read-only Preview workflow, its evidence blocking and the
+"an internal conflict may record FAIL or PARTIAL but never PASS" rule; loop-test progress; filters;
+navigation; the Kiosk shell, the native header layout, WebView2 `1.0.4258.31` and the WinForms-only
+reference isolation; every lock file; loopback-only hosting, the approved origin and the strict CSP with
+no external assets; the reconnecting fail-safe and the confirmed exit; the protected evidence and the
+authoritative workbook. The delta is **not** a physical Channel, a Product-compatible measurement, a
+Sensor, a Commissioning measurement or an independent loop-test target — the protected totals stay
+240 / 106 / 212 — and it receives no BASELINE / STIMULUS / OPEN_CIRCUIT / RECOVERY observation, no
+PASS / FAIL / PARTIAL, no remark and no independent Preview result. Recording or clearing a Front result
+does not mutate the Rear result or either source value, and the reverse. **No MODBUS, no physical
+acquisition, no contact with `192.0.2.11`-`192.0.2.16`, no TEST_HARDWARE, no PRODUCTION, no device
+write, no cleaning or motion command, no queue authority.**
+
+**Not verified:** the field baseline, the real operating delta, the load-normalized relationship, the
+Burner-pattern normalization, any threshold, persistence, deadband or hysteresis, the pre/post-cleaning
+response, the physical Sensor mapping, hardware acquisition and field verification — all outstanding, and
+none of them is claimed. **There is no browser engine and no .NET SDK in Arena**, so **real-browser
+execution and the .NET build/tests are NOT RUN IN ARENA**; the tests above are source-level and
+stub-DOM proofs, and they are explicitly not a visual verification.
+
+### 18.6 Arena validation at this head
+
+| Gate | Result |
+| --- | --- |
+| `npm --prefix packages/commissioning run check` | OK (now also syntax-checks `src/thermalpair.mjs`) |
+| `npm --prefix packages/commissioning test` | **105 tests — 105 pass / 0 fail** (was 88; +16 focused paired tests, +1 catalogue test) |
+| `node --test packages/commissioning/test/thermalpair.test.mjs` | **16 / 16** |
+| `npm --prefix apps/ops-preview run check` | OK |
+| `npm --prefix apps/ops-preview test` | **88 tests — 88 pass / 0 fail** (was 78; +10 focused paired page/presentation tests) |
+| `npm --prefix apps/mapping-config run check` / `test` | OK / 82 pass |
+| `npm --prefix packages/mapping-config run check` / `test` | OK / 268 (261 pass / 0 fail / 7 pre-existing Owner-local skips) |
+| `node --test apps/kiosk/test/*.test.mjs` | 21 / 21 |
+| `node tools/boundary-scan/boundary-scan.mjs` | `0 findings (S1–S9 clean)` |
+| `git diff --check` | clean |
+| Authoritative workbook SHA-256 | `4e0337e2…f422e8e` unchanged |
+
+**Focused paired-thermal tests: 26** (16 package + 10 page/presentation). **Scenario catalogue: 13**
+(ten protected + three paired demonstrations).
+
+### 18.7 Owner-local rerun sequence (28 steps)
+
+```powershell
+# 1. Fast-forward to this checkpoint on the existing branch (no branch switch, no reset).
+git fetch origin ; git switch arena/3be5c713-waterjet-sentinel-suite ; git pull --ff-only
+git log --oneline -3
+# 2. Preserve the GENUINE Kiosk lock refresh: the committed lock file is the reviewed one.
+git status --porcelain apps/kiosk/packages.lock.json
+#    If dotnet asks for a refresh, let step 3 regenerate it and commit ONLY that file, reporting the
+#    SHA-256 before and after. Never hand-edit it.
+# 3. Locked restore.
+dotnet restore WaterJetSentinelSuite.sln --locked-mode
+# 4. Zero-warning Release build.  Expect 0 warnings / 0 errors.
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+# 5. Full .NET test run.  Expect 414 passed / 0 failed / 0 skipped.
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build --no-restore
+# 6. Complete Node/static gates.
+node --test apps/kiosk/test/*.test.mjs
+npm --prefix packages/commissioning run check ; npm --prefix packages/commissioning test
+npm --prefix apps/ops-preview run check ; npm --prefix apps/ops-preview test
+npm --prefix apps/mapping-config run check ; npm --prefix apps/mapping-config test
+npm --prefix packages/mapping-config run check ; npm --prefix packages/mapping-config test
+node tools/boundary-scan/boundary-scan.mjs
+git diff --check
+# 7. Start the Operations Preview host (loopback only, default port 5187).
+npm --prefix apps\ops-preview start
+# 8. Start the Kiosk shell.
+dotnet run --project apps/kiosk/Wjss.Kiosk.csproj -c Release
+# 9. Apply NORMAL_GOOD.  For every one of the 106 pairs confirm Front is ABOVE Rear and the paired row
+#    shows a POSITIVE, deterministic, per-Sensor-varying value (about +3 to +7 degC) - never one delta
+#    for all Sensors.
+# 10. Re-apply the same tick and confirm the same values (determinism), then a different tick and confirm
+#     the same values with a moved timestamp and value age.
+# 11. Apply REDUCED_FRONT_REAR_DIFFERENTIAL: every pair stays positive and the gradient drops; the state
+#     reads REDUCED_POSITIVE_CANDIDATE with "possible reduced local heat transfer / possible slag
+#     insulation (slag candidate)" and no confirmed-slag wording.
+# 12. Apply NEAR_ZERO_FRONT_REAR_DIFFERENTIAL: the gradient is near zero and the state reads
+#     NEAR_ZERO_CANDIDATE (abnormal paired response requiring investigation, no approved Product deadband).
+# 13. Apply REVERSED_FRONT_REAR_DIFFERENTIAL: Front is below Rear and the state reads
+#     REVERSED_CONTRADICTION with mapping / Sensor health / installation / process-transient guidance and
+#     "never classified as slag by itself".
+# 14. For each of steps 11-13 confirm NO automatic effect: no alarm, no queue entry, no cleaning job, no
+#     WaterJet dispatch, no pump or valve action, no motion, no field approval.
+# 15. Apply OUT_OF_RANGE, STALE, SIMULATED_WIRE_BREAK and COMMUNICATION_LOSS_NODE: the affected pairs show
+#     `dFR --` with the named side and reason, the value has NO number and NO unit, and no Last Valid
+#     Value is substituted. Confirm the pair returns to a value only when BOTH sides are valid again.
+# 16. Confirm the Wall Map and the Sensor detail agree: selecting a Wall Map position (Front or Rear) and
+#     selecting the matching Overview row show the same Front value, Rear value, delta, state and reason.
+# 17. Confirm selection identity and synchronisation are unchanged: unassigned Channel selects no Sensor,
+#     an I7 or I16 conflict row selects the gap, and the Sensor cell highlights with its exact side.
+# 18. Confirm the protected totals are unchanged: 240 physical Channels in the Overview, 212
+#     Product-compatible measurements, 106 Product Sensors, 108 Wall Map positions, I7 and I16 as
+#     NON_SENSOR_GAP - the paired value adds none of them and appears in no Overview row.
+# 19. Confirm the delta is not a loop-test target: it has no BASELINE / STIMULUS / OPEN_CIRCUIT / RECOVERY
+#     observation, no PASS / FAIL / PARTIAL, no remark and no independent Preview result.
+# 20. Record a Front PASS and confirm the Rear observation, the Rear verdict and the paired value are
+#     unchanged; clear the Front result and confirm the same isolation in the other direction.
+# 21. Confirm the Wall Map is still a STATIC vertical view (no inner vertical scrollbar) and the paired
+#     row did not widen the U-shape or shrink the text illegibly.
+# 22. Confirm there is no page-level horizontal overflow at 1920x1080
+#     (document.scrollingElement.scrollWidth === clientWidth) and that the Overview table is still the
+#     only other sideways scroller.
+# 23. Confirm every paired cell is readable at 1920x1080 and in the compact density, and that the unit is
+#     visible only while a value exists.
+# 24. Confirm the Sensor detail shows Front value, Rear value, dFR = Front - Rear, paired state,
+#     reason/guidance, synthetic provenance, FIELD VERIFICATION PENDING and the no-automatic-effect
+#     statement.
+# 25. Confirm the native Kiosk controls (Exit Kiosk Preview, Windowed / full screen) remain visible.
+# 26. Confirm stop/restart reconnect still works (host stopped -> reconnecting state, restarted ->
+#     recovers by itself).
+# 27. Confirm no uncaught page error appears in any scenario (the failure banner stays hidden).
+# 28. Confirm the final Git status and the complete diff.
+git status ; git diff
+```
+
+**Report back** the 28-step results, the exact text of any failure, the observed Front/Rear values and
+deltas for a few named Sensors, the on-screen paired wording for each scenario, and the boundary statement
+shown on screen. **A Preview verdict is never a field approval, no paired state is a field verification,
+and this handoff is not Owner Manual Review.**

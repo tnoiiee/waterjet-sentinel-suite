@@ -96,6 +96,11 @@
 
       <h3 id="wallmap-h">Commissioning Wall Map
         <span class="hint">approved U-shaped plan view · 108 logical positions · 106 Product Sensors · read-only</span></h3>
+      <p class="note">Each Sensor cell also shows the read-only paired value <strong>dFR</strong> =
+      FrontTemperature - RearTemperature, with an explicit sign and the unit only while it is available. Front is the
+      furnace-facing fin measurement; Rear is the paired waterwall-tube-side reference. The paired value is a derived
+      read-only diagnostic / trend: it has no Channel, no Sensor identity, no commissioning state and no Preview verdict
+      of its own, and it can never trigger an alarm, a queue, a cleaning job or any control.</p>
       <p class="note">Answering a field loop test starts here: pick the wall position, then the Front or the Rear
       measurement of that Sensor. Every value below is a synthetic Preview observation. The Wall Map is read-only and
       approves nothing: selecting a position opens the same read-only Sensor detail and Preview workflow as the Overview.</p>
@@ -159,10 +164,13 @@
         </table>
       </div>
 
-      <h3>Sensor detail <span class="hint">read-only identity, synthetic observation and Preview workflow</span></h3>
+      <h3>Sensor detail <span class="hint">read-only identity, synthetic observation, paired thermal diagnostic and Preview workflow</span></h3>
       <div class="detail-grid">
         <div class="detail-card" id="detail-identity"></div>
         <div class="detail-card" id="detail-observation"></div>
+        <!-- Read-only derived paired value. It is NOT a measurement: it has no Channel, no Sensor
+             identity of its own, no commissioning state and no Preview workflow. -->
+        <div class="detail-card" id="detail-pair" data-pair-state="DIFFERENTIAL_UNAVAILABLE"></div>
         <div class="detail-card" id="detail-workflow"></div>
       </div>
       <div class="toolbar" id="workflow-actions"></div>

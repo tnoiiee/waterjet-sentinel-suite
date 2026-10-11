@@ -86,7 +86,7 @@ script, so the content security policy is unchanged), the application reports it
 (`data-app-state` = `booting` / `ready` / `failed`), and an initialization failure raises a **visible**
 banner carrying a safe error category with no stack trace, local path or internal detail, so an empty but
 apparently usable page can no longer occur. Runtime coverage now resolves the application **through the
-server** (module graph over the real routes, boot to `ready`, ten scenarios, 240 rows, wired controls,
+server** (module graph over the real routes, boot to `ready`, thirteen scenarios, 240 rows, wired controls,
 visible failure state) in `apps/ops-preview/test/page.test.mjs`.
 
 **Not verified in Arena:** the WinForms header was **not compiled and not rendered** — the Arena sandbox
@@ -173,6 +173,26 @@ vertical scrolling surface. A narrow window scrolls the map **sideways inside it
 with no inner vertical scrollbar); the Overview table stays the only other sideways scroller; and the
 page has no horizontal overflow (`document.scrollingElement.scrollWidth === clientWidth`). A Preview
 verdict approves nothing in the field.
+
+**What to verify in the paired Front/Rear thermal diagnostic (Stage 0.4C-K1 thermal-pair pass):** with
+`NORMAL_GOOD` applied, **Front is above Rear for every one of the 106 pairs** and each Wall Map cell shows
+a compact read-only `dFR` row (`dFR +6.1 degC [+]`) whose value is positive, deterministic for the same
+scenario tick and Sensor, and different between Sensors — never one delta for all 106. `REDUCED_FRONT_REAR_DIFFERENTIAL`
+keeps Front above Rear with a reduced gradient and reads `REDUCED_POSITIVE_CANDIDATE` (a *candidate*: possible
+reduced local heat transfer / possible slag insulation, never a confirmed result); `NEAR_ZERO_FRONT_REAR_DIFFERENTIAL`
+reads `NEAR_ZERO_CANDIDATE` (an abnormal paired response that requires investigation, with no approved
+Product deadband); `REVERSED_FRONT_REAR_DIFFERENTIAL` puts Front below Rear and reads `REVERSED_CONTRADICTION`,
+which is a paired-measurement contradiction to check first for mapping, Sensor health, installation and
+process transient — never a slag classification by itself. Every one of those states is **read-only
+diagnostic / trend only**: no alarm, no queue entry, no cleaning job, no WaterJet dispatch, no pump or valve
+action, no motion and no field approval. In `BAD`, `STALE`, wire-break and communication-loss scenarios the
+paired value disappears to `dFR --` with the failing side named, **no number and no unit are shown, and no
+Last Valid Value is substituted**. The Sensor detail additionally lists the Front value, the Rear value,
+`dFR = Front - Rear`, the paired state, the guidance, the synthetic provenance and `FIELD VERIFICATION PENDING`.
+The paired value has no Channel, no Sensor identity, no commissioning state and no Preview verdict of its
+own: the Overview stays at 240 rows, the totals stay 212 measurements / 106 Sensors / 108 positions, and the
+loop-test workflow (observations, verdicts, remarks) applies to the selected measurement only — recording or
+clearing a Front result never changes the Rear result.
 
 **Stopping:** close the shell through **Exit Kiosk Preview** (confirmed), then stop the host with
 `Ctrl+C` in its terminal.

@@ -4,23 +4,67 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   COMMISSIONING_STATE, DIAGNOSTIC_REASON, FIELD_VERIFICATION_STATE, NODE_COMMUNICATION_STATE,
-  OBSERVATION_PROVENANCE, PREVIEW_STALE_THRESHOLD_MS, QUALITY, ROW_CLASS, SCENARIOS, SCENARIO_KEYS,
-  buildObservations as buildFromSchedule, communicationLossIsNodeScoped, getScenario, nodeCommunicationSummary,
-  presentMeasurement, requireObservationContract, scenarioCatalogue,
+  OBSERVATION_PROVENANCE, PAIRED_DIFFERENTIAL_MODE, PREVIEW_STALE_THRESHOLD_MS, QUALITY, ROW_CLASS,
+  SCENARIOS, SCENARIO_KEYS, buildObservations as buildFromSchedule, communicationLossIsNodeScoped,
+  getScenario, nodeCommunicationSummary, presentMeasurement, requireObservationContract, scenarioCatalogue,
 } from '../src/index.mjs';
 import { schedule } from './helpers/schedule.mjs';
 import { buildObservations, observedChannels, scenarioRows } from './helpers/scenarios.mjs';
 
+/**
+ * The ten PROTECTED scenarios of this Stage. They are never removed and never renamed: the paired
+ * thermal pass only APPENDED three explicit paired diagnostic demonstrations to the catalogue.
+ */
 const REQUIRED_SCENARIOS = [
   'NORMAL_GOOD', 'UNCERTAIN_TRANSIENT', 'OUT_OF_RANGE', 'STALE', 'COMMUNICATION_LOSS_NODE',
   'SIMULATED_WIRE_BREAK', 'RECOVERY', 'DRAWING_CONFLICT', 'PRODUCT_TOPOLOGY_CONFLICT', 'UNASSIGNED_CHANNEL',
 ];
 
-test('the ten required scenarios exist with the required keys', () => {
-  assert.deepEqual([...SCENARIO_KEYS].sort(), [...REQUIRED_SCENARIOS].sort());
-  assert.equal(SCENARIOS.length, 10);
+/** The three paired demonstrations added by the Owner-approved Front/Rear thermal-pair pass. */
+const PAIRED_SCENARIOS = [
+  'REDUCED_FRONT_REAR_DIFFERENTIAL', 'NEAR_ZERO_FRONT_REAR_DIFFERENTIAL', 'REVERSED_FRONT_REAR_DIFFERENTIAL',
+];
+
+test('the catalogue is the ten protected scenarios plus the three explicit paired demonstrations', () => {
+  // Every protected scenario still exists with its exact key: nothing was removed or renamed.
+  for (const key of REQUIRED_SCENARIOS) {
+    assert.equal(SCENARIO_KEYS.includes(key), true, `${key} must still exist`);
+  }
+  for (const key of PAIRED_SCENARIOS) assert.equal(SCENARIO_KEYS.includes(key), true, key);
+  assert.equal(SCENARIOS.length, 13, 'ten protected scenarios plus three paired demonstrations');
+  assert.equal(SCENARIO_KEYS.length, 13);
+  assert.equal(new Set(SCENARIO_KEYS).size, 13, 'no duplicated scenario key');
+  // The protected ten keep their original relative order at the head of the catalogue.
+  assert.deepEqual(SCENARIO_KEYS.slice(0, 10), REQUIRED_SCENARIOS);
+  assert.deepEqual(SCENARIO_KEYS.slice(10), PAIRED_SCENARIOS);
   assert.equal(getScenario('NORMAL_GOOD').key, 'NORMAL_GOOD');
   assert.throws(() => getScenario('MADE_UP'), /unknown scenario/);
+});
+
+test('the three paired demonstrations declare their paired mode and their honesty text', () => {
+  const catalogue = scenarioCatalogue();
+  assert.equal(catalogue.length, 13);
+  for (const entry of catalogue.filter((s) => PAIRED_SCENARIOS.includes(s.key))) {
+    assert.equal(entry.pairedDiagnostic, true, entry.key);
+    assert.equal(entry.provenance, OBSERVATION_PROVENANCE.SIMULATED_DIAGNOSTIC_SCENARIO, entry.key);
+    assert.equal(entry.simulatedDiagnostic, true, entry.key);
+    assert.equal(entry.requiresNode, false, entry.key);
+    assert.notEqual(entry.pairedMode, PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE, entry.key);
+    assert.match(entry.summary, /Synthetic/i, entry.key);
+    assert.match(entry.summary,
+      /no (?:field confirmation|alarm|automatic action|automatic effect|approved threshold|Product deadband)/i, entry.key);
+  }
+  // Every protected scenario keeps the expected-positive paired physics.
+  for (const entry of catalogue.filter((s) => REQUIRED_SCENARIOS.includes(s.key))) {
+    assert.equal(entry.pairedMode, PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE, entry.key);
+    assert.equal(entry.pairedDiagnostic, false, entry.key);
+  }
+  // The observations of a paired scenario carry the declared mode and the scenario key.
+  const observations = buildObservations('REVERSED_FRONT_REAR_DIFFERENTIAL');
+  for (const observation of observations.values()) {
+    assert.equal(observation.scenarioKey, 'REVERSED_FRONT_REAR_DIFFERENTIAL');
+    assert.equal(observation.pairedDifferentialMode, PAIRED_DIFFERENTIAL_MODE.REVERSED);
+  }
 });
 
 test('every scenario is deterministic: identical inputs give deep-equal output', () => {
