@@ -199,8 +199,8 @@ test('the scenario selector, node selector and progress areas are populated', as
       'the Node communication summary must be populated');
     // These areas are built from elements, so their text lives in child text nodes.
     assert.match(allText(app.byId['progress-body']), /BLOCKED/, 'the Commissioning progress must be populated');
-    assert.match(allText(app.byId['progress-body']), /\b40\b/, 'the blocked count must be rendered');
-    assert.match(allText(app.byId['operations-body']), /212/, 'the Operations area must carry the evidence counts');
+    assert.match(allText(app.byId['progress-body']), /\b36\b/, 'the blocked count must be rendered');
+    assert.match(allText(app.byId['operations-body']), /216/, 'the Operations area must carry the evidence counts');
   } finally {
     app.close();
   }
@@ -239,9 +239,10 @@ test('the density controls respond and the navigation targets every section', as
     assert.equal(app.byId['app-root'].attributes['data-density'], 'comfortable');
     assert.equal(app.byId['density-comfortable'].attributes['aria-pressed'], 'true');
 
-    // Navigation: six anchors (Stage 0.4C-K2 adds Node Configuration), each pointing at a section that exists.
+    // Navigation: seven anchors (Stage 0.4C-K2 added Node Configuration, Stage 0.4C-K3 adds TC Acquisition
+    // Evidence), each pointing at a section that exists.
     const anchors = [...html.matchAll(/<a href="#([a-z-]+)">([^<]+)<\/a>/g)].map((m) => ({ id: m[1], label: m[2] }));
-    assert.equal(anchors.length, 6, 'the navigation must offer six sections');
+    assert.equal(anchors.length, 7, 'the navigation must offer seven sections');
     for (const { id, label } of anchors) {
       assert.match(html, new RegExp(`id="${id}"`), `${label} must point at a section that exists`);
     }

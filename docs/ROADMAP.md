@@ -131,7 +131,7 @@ The following remain out of scope unless a future gate states otherwise:
 | Scope growth | Determinism and recoverability suffer | Stage gates; owner-only merge; priorities list applied in order |
 | Unmodelled storage growth | Historian could exhaust local storage | Produce a capacity model before committing to retention defaults; keep retention configurable per category |
 | Communication health judged by value change | A static value could mask a lost link | Evaluate health from transport evidence, never from value change alone |
-| UI framework chosen without measurement | A dense 106-cell page with one-second updates could repeat the legacy lag, freeze, and CPU problems | Framework remains `[OPEN]`; selection only through the proposed Stage 0.2.1 spike with measured acceptance criteria |
+| UI framework chosen without measurement | A dense 108-cell page (106 as believed at the time of this risk entry; Owner critical topology correction) with one-second updates could repeat the legacy lag, freeze, and CPU problems | Framework remains `[OPEN]`; selection only through the proposed Stage 0.2.1 spike with measured acceptance criteria |
 | Acquisition path not batched and not isolated per device | One slow coupler delays unrelated devices, lengthening the whole cycle | Per-device serialized command queue, bounded concurrent pollers, compiled Poll Plan, Fast/Medium/Slow groups |
 
 ---

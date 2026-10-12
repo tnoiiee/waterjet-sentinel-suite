@@ -242,23 +242,25 @@ test('8 DRAWING_CONFLICT shows exactly the internal-conflict rows and blocks PAS
   }
 });
 
-test('9 PRODUCT_TOPOLOGY_CONFLICT shows I7 / I16 evidence and is never a Product Sensor', () => {
+test('9 PRODUCT_TOPOLOGY_CONFLICT applies to no row: I7 and I16 are normal Product Sensors and fully selectable', () => {
   const rows = scenarioRows('PRODUCT_TOPOLOGY_CONFLICT');
-  assert.equal(rows.length, 4);
-  assert.deepEqual([...new Set(rows.map((r) => r.sensorId))].sort(), ['I16', 'I7']);
+  assert.equal(rows.length, 0);
   const observations = buildObservations('PRODUCT_TOPOLOGY_CONFLICT');
-  for (const row of rows) {
+  assert.equal(observations.size, 240);
+  const corrected = schedule.rows.filter((r) => r.sensorId === 'I7' || r.sensorId === 'I16');
+  assert.equal(corrected.length, 4);
+  for (const row of corrected) {
     const observation = observations.get(row.physicalChannelKey);
-    assert.equal(observation.commissioningState, COMMISSIONING_STATE.BLOCKED);
-    assert.equal(observation.diagnosticReason, DIAGNOSTIC_REASON.NOT_MAPPED);
-    assert.equal(observation.selectableAsProductSensor, false);
-    assert.match(observation.blockingReason, /PRODUCT_TOPOLOGY_CONFLICT/);
-    assert.match(observation.note, /never a Sensor, never a Water Jet/);
+    assert.notEqual(observation.commissioningState, COMMISSIONING_STATE.BLOCKED);
+    assert.equal(observation.selectableAsProductSensor, true);
+    assert.equal(observation.blockingReason ?? null, null);
+    assert.equal(observation.isCurrentValueValid, true, row.physicalChannelKey);
   }
-  // Every other row remains selectable, so the exclusion is precisely scoped.
+  // Every Product-compatible row with a Sensor identity is selectable; no exclusion exists.
   for (const [key, observation] of observations.entries()) {
-    if (rows.some((r) => r.physicalChannelKey === key)) continue;
-    if (observation.sensorId) assert.equal(observation.selectableAsProductSensor, true, key);
+    if (observation.sensorId && observation.rowClass === 'PRODUCT_COMPATIBLE') {
+      assert.equal(observation.selectableAsProductSensor, true, key);
+    }
   }
 });
 
@@ -281,10 +283,13 @@ test('10 UNASSIGNED_CHANNEL has no Sensor identity, no value and no field-verifi
     const presented = presentMeasurement(observation);
     assert.equal(presented.current.valid, false);
     assert.equal(presented.invalidPresentation, false);
-    // No measurement exists here, so the value age is stated as not applicable rather than as a
-    // fresh sample, and the last valid value is explicitly absent.
+    // No current measurement is available here, so the value age is stated as not applicable
+    // rather than as a fresh sample, and the last valid value is explicitly absent. The wording
+    // names measurement availability only - never Sensor non-existence or operational Disable.
     assert.equal(presented.age.milliseconds, null);
-    assert.match(presented.age.text, /no measurement exists/);
+    assert.match(presented.age.text, /no current measurement available/);
+    assert.doesNotMatch(presented.age.text, /exists/);
+    assert.match(presented.age.note, /does not indicate Sensor operational Disable/);
     assert.equal(presented.lastValid.kind, 'NONE');
   }
 });

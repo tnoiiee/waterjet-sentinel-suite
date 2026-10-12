@@ -9,6 +9,13 @@ Owner-connected source, was integrity-verified, and the 240-row schedule was der
 from it. It authorises nothing. It contains no mapping beyond the derived schedule
 it points at.
 
+> **Section 8 (2026-10-12, Owner critical topology correction) supersedes the I7/I16 findings
+> of §7:** I7 and I16 are normal Product Sensors; ISS-REV1-02 is **closed as superseded** and the
+> four rows are used Product assignments. The authoritative current baseline is 108 Sensors and
+> 216 assigned Product TC measurements (240 physical, 24 unassigned). Sections 1–7 are preserved
+> as audit history; every "106 / 212 / 28 / 4 topology-conflict / gap" figure in them is
+> historical. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
+
 | Item | Value |
 |---|---|
 | Project / Stage | WaterJet Sentinel Suite (WJSS) — Stage 0.4C-0B |
@@ -193,7 +200,7 @@ p6/p7 overview labels confirmed on 300-DPI crops. Full record:
 | Issue | Rows / pages | Finding | Schedule treatment |
 |---|---|---|---|
 | ISS-REV1-01 — sheath/conductor mismatch | 12 rows: every cabinet A102.2 ch6 (sheath X-F, conductor X-R) + ch7 (sheath Y-R, conductor Y-F); tables pp20/22/24/26/28/30 | `DRAWING_INTERNAL_CONFLICT`: the sheath column contradicts the conductor column; the X110 diagram agrees with the conductor on all 6 cabinets (visually verified) | Follows conductor+X110 (2-of-3 sources); both claims preserved per-row |
-| ISS-REV1-02 — live channels on gap positions | 4 rows: CAB5 A102.4 ch7/8 = I7-F/R (X110.31/32), CAB6 A102.4 ch7/8 = I16-F/R (X110.31/32); table+diagram agree | `DRAWING_TOPOLOGY_CONFLICT`: drawing assigns live channels to the authoritative `NON_SENSOR_GAP` positions I7/I16 | Rows kept with conflict state; excluded from the compatible set; **no position is commissioned, redefined or silently dropped** |
+| ISS-REV1-02 — live channels on gap positions (**CLOSED AS SUPERSEDED, see §8**) | 4 rows: CAB5 A102.4 ch7/8 = I7-F/R (X110.31/32), CAB6 A102.4 ch7/8 = I16-F/R (X110.31/32); table+diagram agree | Historical finding: `DRAWING_TOPOLOGY_CONFLICT`: drawing assigns live channels to the then-authoritative `NON_SENSOR_GAP` positions I7/I16. **Superseded:** I7 and I16 are Product Sensors; the drawing was right | Historical treatment: rows kept with conflict state, excluded from the compatible set. **Current (§8):** the four rows are `DRAWING_VERIFIED` / `MATCHED` Product assignments (I7 Front/Rear, I16 Front/Rear) |
 | ISS-REV1-03 — swapped overview sensor groups | Overview p6 (+SDSCAB1 page shows CAB2's groups G+110–118/G+210–218) and p7 (+SDSCAB2 page shows CAB1's groups G+101–109/G+201–209); pp8–11 match their cabinets | `DRAWING_INTERNAL_CONFLICT` (overview vs wiring tables+X110, both cabinets) | Overviews are not a schedule source; wiring tables+X110 govern; Owner revision requested (§5 item 5) |
 | SPARE-REV1 | 24 rows: A102.5 ch5–8 × 6 | `SPARE_UNMAPPED`: spare zone, no field wiring; words 36–39 still occupied | Carried as spares, not commissioned; the 28-remaining arithmetic is unchanged (24 spares + 4 gap-conflict rows) |
 
@@ -227,6 +234,22 @@ p6/p7 overview labels confirmed on 300-DPI crops. Full record:
 
 | # | Action | Needed for |
 |---|---|---|
-| 5 | Revise the drawing (REV 1B or later): correct the A102.2 ch6/ch7 sheath labels on all six cabinets (or confirm the conductor+X110 reading), un-swap the p6/p7 overview sensor groups, and rule on the I7/I16 live channels (remove, re-label, or grant a topology deviation) | Clearing ISS-REV1-01/02/03; a revised drawing opens REV2 per §4 |
+| 5 | Revise the drawing (REV 1B or later): correct the A102.2 ch6/ch7 sheath labels on all six cabinets (or confirm the conductor+X110 reading) and un-swap the p6/p7 overview sensor groups. (The former request to "rule on the I7/I16 live channels" is withdrawn: the Owner critical topology correction confirms them as Product Sensors, §8.) | Clearing ISS-REV1-01/03; a revised drawing opens REV2 per §4 |
 | 6 | Supply per-instance configuration evidence (engineering-tool export or complete screenshots) if any instance differs from factory default | Clearing the §7.6 configuration gaps |
 | 7 | Supply the node transport plan (cabinet→node→address assignment) | Clearing `REQ-TC-010` and the ordinal-correspondence assumption |
+
+---
+
+## 8. Owner critical topology correction (2026-10-12) — I7 and I16 are Product Sensors
+
+| Item | Value |
+|---|---|
+| Authority | Owner critical topology correction (final; the question whether I7/I16 are Sensors is not reopened) |
+| Revoked baseline | 106 Sensors / 212 channels / I7, I16 `NON_SENSOR_GAP` / I7, I16 drawing rows as `DRAWING_TOPOLOGY_CONFLICT` |
+| Authoritative baseline | **108 Product Sensors** (sequence G+201–G+218, G+101–G+118, G1–G18, H1–H18, I1–I18, J1–J18; I7 and I16 once each in ordinal position); **216 assigned Product TC channels** (108 × 2); **240 physical** (6 × 40); **24 unassigned** (240 − 216) |
+| Schedule effect (`evidence/tc-drawing-schedule-rev1.csv`) | 4 rows re-stated from the committed drawing evidence, no channel invented: I7-F `TC-NODE-05 / A102.4 / ch7` (-X110.31/-X111.31), I7-R `TC-NODE-05 / A102.4 / ch8` (-X110.32/-X111.32), I16-F `TC-NODE-06 / A102.4 / ch7`, I16-R `TC-NODE-06 / A102.4 / ch8`; all 750-498, `DRAWING_VERIFIED` / `MATCHED` |
+| Per-row states now | 204 `DRAWING_VERIFIED`, 12 `DRAWING_INTERNAL_CONFLICT` (ISS-REV1-01, unchanged and unresolved), 0 `DRAWING_TOPOLOGY_CONFLICT`, 24 `SPARE_UNMAPPED`; template compatibility 216 `MATCHED` (108/108 Sensors), 0 `GAP_CONFLICT`, 24 `NO_COUNTERPART_SPARE` |
+| Template (`templates/sensor-to-tc-channel-schedule.template.csv`) | 216 rows (I7:F, I7:R, I16:F, I16:R added in deterministic order) |
+| ISS-REV1-02 | **Closed as superseded.** ISS-REV1-01 and ISS-REV1-03 are unaffected and remain open |
+| Not changed | Six Node identities and statuses, cabinet topology (1 × 750-362 + 5 × 750-498 + 1 × 750-600), factory-default basis, `PROTOCOL_UNRESOLVED` / `PORT_UNRESOLVED`, `DERIVATION_BLOCKED`, `WIRE_BREAK_DECODING_BLOCKED`, field verification pending |
+| Validation | Central invariant check `packages/commissioning/src/topologyInvariants.mjs` (108 / 108 / 108 / 108 / 216 / 240 / 24; I7 = 1, I16 = 1; I7F/I7R/I16F/I16R = 1 each; `NON_SENSOR_GAP` = 0) enforced in the commissioning package and in the Ops Preview evidence load; see `STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md` |

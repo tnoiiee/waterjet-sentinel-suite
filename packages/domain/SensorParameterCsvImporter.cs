@@ -13,17 +13,21 @@ namespace Wjss.Domain;
 /// - legacy `sensorname` IS the canonical logicalId (and the Sensor ID for SENSOR rows)
 ///   and must equal the logical label derived from `order_total` via the fixed
 ///   18-column matrix, else the import refuses (MIGRATION_LOGICAL_LABEL_MISMATCH);
-/// - `order_total` is the legacy zero-based logical-position ordering (0–107, including
-///   the NON_SENSOR_GAP rows I7 and I16); the canonical Sensor ScanOrder is DERIVED:
-///   sort SENSOR positions by OrderTotal, exclude NON_SENSOR_GAP, assign dense 1–106;
+/// - `order_total` is the legacy zero-based logical-position ordering (0–107 over all 108
+///   rows); the canonical Sensor ScanOrder is DERIVED: sort the 108 Sensor positions by
+///   OrderTotal and assign dense 1–108 (I7 and I16 in their normal ordinal position);
 /// - the legacy cleaning-device ordinal maps DIRECTLY to WJn (never remapped by wall);
 /// - offset-free timestamps are preserved raw with UNKNOWN timezone and are NEVER
 ///   converted to UTC; unknown-unit durations are preserved raw and no TimeSpan is
 ///   invented; no UseDirtyScoreThreshold, HasVerifiedCleaningHistory,
 ///   LastSuccessfulCleaningCompletedAt, or HardMinimumCleaningInterval is derived;
-/// - I7 and I16 are NON_SENSOR_GAP logical positions (anchors of WJ3 and WJ1): their rows
-///   are rejected from sensor import (REJECT FOR I7/I16) and no canonical Cannon entity,
-///   vocabulary, or alias exists anywhere in this importer's output;
+/// - Owner critical topology correction (Stage 0.4C-K3): I7 and I16 are normal Product
+///   Sensors — their rows import with the same parameter schema, validation and
+///   dispositions as every other Sensor row; no row is excluded by identity, no
+///   NON_SENSOR_GAP vocabulary and no Cannon entity or alias exists in this importer's output;
+/// - the legacy enable token canonicalizes to Enabled / Disabled; an EMPTY token resolves
+///   to Enabled by the Owner default-enable rule and is recorded as a
+///   MIGRATION_ENABLE_DEFAULTED warning (an unrecognized token still refuses the import);
 /// - acquisition columns are captured as deferred raw provenance only and are never
 ///   Production-device configuration;
 /// - any structural violation refuses the WHOLE import atomically; identical input bytes
@@ -54,11 +58,8 @@ public static class SensorParameterCsvImporter
     private const int CellCount = 19;
     private const int ColumnCount = CanonicalSensorMap.LogicalColumnCount; // 18
     private const int ExpectedRows = CanonicalSensorMap.MatrixSlots;       // 108
-    private const int ExpectedSensors = CanonicalSensorMap.SensorLocations; // 106
-    private const int ExpectedChannels = CanonicalSensorMap.ThermocoupleChannelCount; // 212
-
-    private const string GapRearLabel = "I7";
-    private const string GapFrontLabel = "I16";
+    private const int ExpectedSensors = CanonicalSensorMap.SensorLocations; // 108
+    private const int ExpectedChannels = CanonicalSensorMap.ThermocoupleChannelCount; // 216
 
     private static readonly string[] AcceptedTrueTokens = ["TRUE", "1", "YES", "ENABLED"];
     private static readonly string[] AcceptedFalseTokens = ["FALSE", "0", "NO", "DISABLED"];
@@ -219,14 +220,11 @@ public static class SensorParameterCsvImporter
                     $"{at}: 'order_wall' value '{cells[3].Trim()}' is not a non-negative integer.");
             }
 
-            var positionKind = WaterJetTopologyCatalog.GapAnchors.ContainsKey(logicalId)
-                ? LogicalPositionKind.NON_SENSOR_GAP
-                : LogicalPositionKind.SENSOR;
-
+            // Every logical position is a Product Sensor (I7 and I16 included).
             var position = new LogicalPositionRecord
             {
                 LogicalId = logicalId,
-                PositionKind = positionKind,
+                PositionKind = LogicalPositionKind.SENSOR,
                 Wall = wall,
                 LogicalColumn = logicalColumn,
                 LogicalRow = logicalRow,
@@ -235,21 +233,10 @@ public static class SensorParameterCsvImporter
                 OrderTotal = orderTotal,
                 OrderWall = orderWall,
                 LegacyRecordId = recordId,
-                GapAnchorForWaterJetId = positionKind == LogicalPositionKind.NON_SENSOR_GAP
-                    ? WaterJetTopologyCatalog.GapAnchors[logicalId]
-                    : null,
             };
             positions.Add(position);
 
-            if (positionKind == LogicalPositionKind.NON_SENSOR_GAP)
-            {
-                // REJECT FOR I7/I16: the row still supplies the NON_SENSOR_GAP
-                // LogicalPosition record; every sensor-shaped field is skipped, nothing
-                // is normalized, and no warning is produced for placeholder values.
-                continue;
-            }
-
-            // ---- SENSOR-row fields (approved dispositions only) ----
+            // ---- Sensor-row fields (approved dispositions only; identical for all 108 rows) ----
 
             if (!TryParseInt32(cells[5].Trim(), out var deviceOrdinal))
             {
@@ -323,7 +310,20 @@ public static class SensorParameterCsvImporter
             }
 
             var enableToken = cells[10].Trim();
-            if (!TryParseBooleanToken(enableToken, out var enabled))
+            bool enabled;
+            if (enableToken.Length == 0)
+            {
+                // Owner default-enable rule: a Sensor without an explicit state resolves to
+                // Enabled. Recorded, never silent; applies to I7 and I16 like any other Sensor.
+                enabled = true;
+                warnings.Add(new WarningEntry(
+                    orderTotal,
+                    recordId,
+                    MigrationRefusalCodes.MigrationEnableDefaulted,
+                    "sensor_enable",
+                    $"empty enable token for record '{recordId}' (logical {logicalId}) resolves to Enabled by the Owner default-enable rule; listed for review."));
+            }
+            else if (!TryParseBooleanToken(enableToken, out enabled))
             {
                 return SensorParameterImportOutcome.Refused(
                     MigrationRefusalCodes.MigrationFieldToken,
@@ -379,34 +379,27 @@ public static class SensorParameterCsvImporter
 
         // ---- structural validation of the assembled whole (fail-closed) ----
 
-        var gapPositions = positions
-            .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
-            .ToArray();
-        if (gapPositions.Length != 2
-            || gapPositions.Any(p => p.LogicalId != GapRearLabel && p.LogicalId != GapFrontLabel)
-            || gapPositions.Any(p => p.GapAnchorForWaterJetId is null
-                || !string.Equals(
-                    WaterJetTopologyCatalog.GapAnchors[p.LogicalId],
-                    p.GapAnchorForWaterJetId,
-                    StringComparison.Ordinal)))
+        foreach (var correctedId in CanonicalSensorMap.CorrectedSensorIds)
         {
-            return SensorParameterImportOutcome.Refused(
-                MigrationRefusalCodes.TopoGapIdentity,
-                "the NON_SENSOR_GAP positions must be exactly I7 (anchoring WJ3) and I16 (anchoring WJ1).");
+            if (sensorDrafts.Count(d => string.Equals(d.LogicalId, correctedId, StringComparison.Ordinal)) != 1)
+            {
+                return SensorParameterImportOutcome.Refused(
+                    MigrationRefusalCodes.TopoSensorIdentity,
+                    $"Sensor '{correctedId}' must be imported exactly once as a normal Product Sensor.");
+            }
         }
 
         if (sensorDrafts.Count != ExpectedSensors)
         {
             return SensorParameterImportOutcome.Refused(
                 MigrationRefusalCodes.TopoSensorCount,
-                $"expected {ExpectedSensors} Sensor rows after excluding the NON_SENSOR_GAP positions, found {sensorDrafts.Count}.");
+                $"expected {ExpectedSensors} Sensor rows (one per logical position), found {sensorDrafts.Count}.");
         }
 
         var orderedPositions = positions.OrderBy(p => p.OrderTotal).ToArray();
 
-        // Dense one-based scanOrder 1..106: sort SENSOR positions by OrderTotal and
-        // exclude the NON_SENSOR_GAP positions. The sequence skips I7 and I16; gap rows
-        // receive no SensorConfiguration and no scanOrder.
+        // Dense one-based scanOrder 1..108: all Sensor positions sorted by OrderTotal. I7 and
+        // I16 take their normal ordinal position; no position is skipped or renumbered.
         var orderedSensors = new List<SensorConfigurationRecord>(ExpectedSensors);
         foreach (var (draft, scanOrder) in sensorDrafts
                      .OrderBy(d => d.OrderTotal)

@@ -37,10 +37,10 @@ public sealed record RuntimeState
     /// <summary>Published Configuration revision the Runtime is applying.</summary>
     public required PublishedConfigurationRevision Config { get; init; }
 
-    /// <summary>108 logical slots (106 SENSOR + 2 NON_SENSOR_GAP), canonical row-major order.</summary>
+    /// <summary>108 logical slots, all SENSOR (I7 and I16 included), canonical row-major order.</summary>
     public required IReadOnlyList<WallMapSlot> WallMap { get; init; }
 
-    /// <summary>106 Sensor projections, ordered by ScanOrder 1..106.</summary>
+    /// <summary>108 Sensor projections, ordered by ScanOrder 1..108.</summary>
     public required IReadOnlyList<SensorPresentationState> Sensors { get; init; }
 
     /// <summary>

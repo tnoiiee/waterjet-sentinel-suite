@@ -814,7 +814,7 @@ kiosk stability.
 | Single ecosystem | Blazor reduces the number of build ecosystems, but that advantage does not by itself prove UI performance, graph quality, camera integration, or long-running kiosk stability |
 | Exclusion grounds | Neither candidate may be excluded for assumed Internet access, ease of closing a window, language preference, or ecosystem size alone |
 
-The dimension-by-dimension comparison (106 live Sensor cells, one-second update target,
+The dimension-by-dimension comparison (106 live Sensor cells as then believed — now 108, Owner critical topology correction; one-second update target,
 partial updates, visual states, trends, camera, grids, alarms, layout, shell integration, crash
 and reconnect, memory stability, component and visual regression testing, accessibility,
 offline build and restore, licensing, footprint, development effort, maintainability,
@@ -828,17 +828,19 @@ in that comparison is a measurement to be taken, not a result.
 
 The selected UI technology must support, at minimum:
 
-- **106 live Sensor cells** and **212 Thermocouple channels**, with a **one-second operational
-  update target** (Owner domain correction during Stage 0.2.1A; supersedes 104 / 208).
-- Wall layouts matching the Owner-confirmed logical matrix: **Left 24, Rear 29, Right 24,
-  Front 29** — **106 Sensor cells inside 108 logical positions**, each wall six logical rows deep,
-  with the two **`NON_SENSOR_GAP` positions** (logical **I7** on the Rear wall, logical **I16** on
-  the Front wall) rendered as neutral non-Sensor positions. A gap is **never a Sensor and never a
-  Water Jet**: the U-shaped map may show the Water Jet that each gap physically anchors (**I7 →
-  WJ3**, **I16 → WJ1**) as a *reference only*, while the Water Jet itself stays a separate
-  equipment entity with an **Installed Position** that is distinct from its **Target Coverage**
-  (WJ1 installed FRONT/LOWER, targets REAR/LOWER; WJ3 installed REAR/LOWER, targets FRONT/LOWER) —
-  see [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-the-two-non_sensor_gap-positions-owner-confirmed).
+- **108 live Sensor cells** and **216 Thermocouple channels** (240 physical, 24 unassigned),
+  with a **one-second operational update target** (Owner critical topology correction,
+  2026-10-12; supersedes 106 / 212 and the earlier 104 / 208).
+- Wall layouts matching the Owner-confirmed logical matrix: **Left 24, Rear 30, Right 24,
+  Front 30** — **108 Sensor cells in 108 logical positions**, each wall six logical rows deep,
+  the U-shaped layout unchanged except that logical **I7** (Rear wall) and **I16** (Front wall)
+  are populated as ordinary Sensor cells. No position is rendered as a non-Sensor gap. A Water
+  Jet stays a separate equipment entity with an **Installed Position** that is distinct from its
+  **Target Coverage** (WJ1 installed FRONT/LOWER, targets REAR/LOWER; WJ3 installed REAR/LOWER,
+  targets FRONT/LOWER; the replacement placement description of WJ1/WJ3 is an open Owner
+  decision) — see [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-the-two-non_sensor_gap-positions-owner-confirmed).
+  Historical: "106 Sensor cells inside 108 logical positions with two `NON_SENSOR_GAP` positions
+  (I7 → WJ3, I16 → WJ1)". Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 - Wall-level **Dirty and Cleaner counts** (section 26).
 - **Sensor detail drill-down.**
 - **Active Cleaning Job visibility.**
@@ -1116,8 +1118,8 @@ implemented in disposable spike code, not in the repository structure of section
 
 ### 33.2 Minimum synthetic workload
 
-10 simulated Modbus devices; 106 Sensor locations; 212 Thermocouple channels (corrected from the
-superseded 104 / 208 baseline); one-second update;
+10 simulated Modbus devices; 108 Sensor locations; 216 Thermocouple channels (Owner critical
+topology correction; corrected from the superseded 106 / 212 and 104 / 208 baselines); one-second update;
 Dirty/Cleaner classification; Dirty Score intensity; Good/Uncertain/Bad/Stale quality; queue
 badges; a selected Sensor; an Active Cleaning Job marker; an alarm marker; wall summary counts;
 a GlobalQueue preview; a pressure trend; a camera placeholder; UI disconnect/reconnect; one

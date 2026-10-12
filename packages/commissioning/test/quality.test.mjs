@@ -222,3 +222,50 @@ test('every scenario observation satisfies the presentation rules it is rendered
   assert.equal(presented.current.valid, false);
   assert.equal(scenarioObservationOf(observations, channel).engineeringValue, null);
 });
+
+// ---------------------------------------------------------------------------------------------
+// Owner Manual Review correction (Stage 0.4C-K3): measurement-quality DISABLED versus Sensor
+// operational Disable. The internal quality value stays `DISABLED`; only the human-facing wording
+// was corrected so that it never says a Sensor does not exist and never implies the canonical
+// Runtime Enabled/Disabled state (Cleaning Candidate / GlobalQueue / SENSOR_DISABLED).
+// ---------------------------------------------------------------------------------------------
+
+const notCommissioned = () => base({
+  quality: QUALITY.DISABLED,
+  diagnosticReason: DIAGNOSTIC_REASON.NOT_COMMISSIONED,
+  isCurrentValueValid: false,
+  engineeringValue: null,
+  lastValidValue: null,
+  valueAgeMs: null,
+});
+
+test('MQ1 the internal measurement-quality value DISABLED remains supported and presented with [OFF]', () => {
+  assert.equal(QUALITY.DISABLED, 'DISABLED');
+  assert.ok(QUALITY_VALUES.includes('DISABLED'));
+  const presented = presentMeasurement(notCommissioned());
+  assert.equal(presented.quality.text, 'DISABLED');
+  assert.equal(presented.quality.marker, '[OFF]');
+  assert.equal(presented.quality.severity, 'off');
+});
+
+test('MQ2 measurement-quality wording never says that no Sensor or no measurement exists at the position', () => {
+  const presented = presentMeasurement(notCommissioned());
+  const texts = [presented.age.text, presented.age.note];
+  for (const text of texts) {
+    assert.doesNotMatch(text, /no measurement exists/i);
+    assert.doesNotMatch(text, /no sensor/i);
+    assert.doesNotMatch(text, /does not exist|doesn't exist|exists at this position/i);
+    assert.doesNotMatch(text, /NON_SENSOR_GAP|gap/i);
+  }
+  assert.equal(presented.age.text, 'n/a - no current measurement available');
+  assert.equal(presented.age.milliseconds, null);
+});
+
+test('MQ3 measurement-quality wording distinguishes itself from Sensor operational Disable instead of implying it', () => {
+  const presented = presentMeasurement(notCommissioned());
+  assert.match(presented.age.note, /does not indicate Sensor operational Disable/);
+  // The note names availability, not an operational decision: no Queue or Candidate vocabulary.
+  assert.doesNotMatch(presented.age.note, /queue|candidate|dispatch|SENSOR_DISABLED/i);
+  // The DiagnosticReason stays the measurement cause.
+  assert.equal(presented.diagnostic.text, 'Not commissioned');
+});

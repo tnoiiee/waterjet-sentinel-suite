@@ -42,7 +42,7 @@ public sealed class MigratedExampleShapeTests
 
         var sensorConfigurations = JsonNodeExtensions.RequireArray(node, "sensors");
         var sensorConfigurationCount = sensorConfigurations.Count;
-        Assert.Equal(106, sensorConfigurationCount);
+        Assert.Equal(108, sensorConfigurationCount);
 
         var waterJets = JsonNodeExtensions.RequireArray(node, "waterJets");
         var waterJetCount = waterJets.Count;
@@ -57,7 +57,7 @@ public sealed class MigratedExampleShapeTests
     }
 
     [Fact]
-    public void Migrated_Example_Satisfies_Ordering_Gaps_And_Pairing()
+    public void Migrated_Example_Satisfies_Ordering_Corrected_Sensors_And_Pairing()
     {
         var node = JsonNodeExtensions.ParseExample();
 
@@ -66,24 +66,38 @@ public sealed class MigratedExampleShapeTests
             Enumerable.Range(0, 108).ToArray(),
             positions.Select(p => JsonNodeExtensions.RequireInt(p, "orderTotal")).ToArray());
 
-        var gaps = positions
-            .Where(p => JsonNodeExtensions.RequireString(p, "positionKind") == "NON_SENSOR_GAP")
-            .ToArray();
-        Assert.Equal(2, gaps.Length);
-        Assert.Equal("I7", JsonNodeExtensions.RequireString(gaps[0], "logicalId"));
-        Assert.Equal("WJ3", JsonNodeExtensions.RequireString(gaps[0], "gapAnchorForWaterJetId"));
-        Assert.Equal("I16", JsonNodeExtensions.RequireString(gaps[1], "logicalId"));
-        Assert.Equal("WJ1", JsonNodeExtensions.RequireString(gaps[1], "gapAnchorForWaterJetId"));
+        // Owner critical topology correction: every position is a SENSOR position; the
+        // superseded NON_SENSOR_GAP kind and gapAnchorForWaterJetId key must not appear.
+        Assert.All(positions, p => Assert.Equal("SENSOR", JsonNodeExtensions.RequireString(p, "positionKind")));
+        Assert.All(positions, p => Assert.Null(p!["gapAnchorForWaterJetId"]));
 
         var sensors = JsonNodeExtensions.RequireArray(node, "sensors");
         Assert.Equal(
-            Enumerable.Range(1, 106).ToArray(),
+            Enumerable.Range(1, 108).ToArray(),
             sensors.Select(s => JsonNodeExtensions.RequireInt(s, "scanOrder")).ToArray());
-        Assert.DoesNotContain(sensors, s =>
+        Assert.Equal(
+            CanonicalSensorMap.SensorSequence.ToArray(),
+            sensors.Select(s => JsonNodeExtensions.RequireString(s, "sensorId")).ToArray());
+
+        // I7 and I16 are normal Product Sensors in ordinal position.
+        var i7 = sensors.Single(s => JsonNodeExtensions.RequireString(s, "sensorId") == "I7");
+        Assert.Equal(79, JsonNodeExtensions.RequireInt(i7, "scanOrder"));
+        Assert.Equal("REAR", JsonNodeExtensions.RequireString(i7, "wall"));
+        Assert.Equal("WJ1", JsonNodeExtensions.RequireString(i7, "assignedWaterJetId"));
+        var i16 = sensors.Single(s => JsonNodeExtensions.RequireString(s, "sensorId") == "I16");
+        Assert.Equal(88, JsonNodeExtensions.RequireInt(i16, "scanOrder"));
+        Assert.Equal("FRONT", JsonNodeExtensions.RequireString(i16, "wall"));
+        Assert.Equal("WJ3", JsonNodeExtensions.RequireString(i16, "assignedWaterJetId"));
+
+        // WJ1 / WJ3 installed position is UNRESOLVED with no anchors (nothing inferred from
+        // a former gap); Target Coverage is unchanged.
+        foreach (var unresolvedId in new[] { "WJ1", "WJ3" })
         {
-            var id = JsonNodeExtensions.RequireString(s, "sensorId");
-            return id == "I7" || id == "I16";
-        });
+            var waterJet = JsonNodeExtensions.RequireArray(node, "waterJets")
+                .Single(w => JsonNodeExtensions.RequireString(w, "waterJetId") == unresolvedId);
+            Assert.Equal("UNRESOLVED", JsonNodeExtensions.RequireString(waterJet, "placementKind"));
+            Assert.Empty(JsonNodeExtensions.RequireArray(waterJet!, "placementAnchors"));
+        }
 
         foreach (var n in Enumerable.Range(1, 8))
         {

@@ -14,6 +14,14 @@ namespace Wjss.Contracts;
 /// Isolation Valve topology collections. The only consumers (development Inspector,
 /// TypeScript mirror, fixtures and tests) were migrated in the same checkpoint; no
 /// deployed consumer of <c>/1</c> exists.
+///
+/// Owner critical topology correction (Stage 0.4C-K3, 2026-10-12), still within <c>/2</c>:
+/// the slot kind vocabulary shrank to <c>SENSOR</c> only (I7 and I16 are Product Sensors;
+/// 108 Sensors / 216 channels), <c>gapAnchorForWaterJetId</c> is no longer emitted, and
+/// <c>WaterJetPlacementKind</c> gained <c>UNRESOLVED</c> for the two placements that depended
+/// on the revoked gap positions. No deployed consumer exists; the in-repository consumers
+/// were migrated in the same pass. Whether the Owner contract gate assigns <c>/3</c> to this
+/// change is an Owner decision recorded in <c>docs/STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md</c>.
 /// </summary>
 public static class SchemaIds
 {

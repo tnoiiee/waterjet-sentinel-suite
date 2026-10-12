@@ -7,10 +7,11 @@ namespace Wjss.Runtime.Core;
 /// Structural invariants of one Runtime revision, enforced at the single ingest
 /// point of the Runtime State Store. Anything that fails validation is refused
 /// before it is published, so a reader never observes a state that breaks the
-/// protected domain baseline: 108 logical slots, 106 Sensor locations, 212
-/// Thermocouple channels, Cannon slots at logical I7 and I16 only, wall counts
-/// 24 / 29 / 24 / 29, one bounded queue, one bounded trend window, and at most
-/// one Active Cleaning Job.
+/// protected domain baseline (Owner critical topology correction, Stage 0.4C-K3):
+/// 108 logical slots that are all Sensor positions (I7 and I16 included), 108 Sensor
+/// projections, 216 Thermocouple channels, wall counts 24 / 30 / 24 / 30, the central
+/// cross-layer <see cref="TopologyInvariants"/> agreement, one bounded queue, one
+/// bounded trend window, and at most one Active Cleaning Job.
 ///
 /// Validation is the runtime-side mirror of the accepted contract, not a new
 /// policy: it adds no eligibility rule, no alarm rule, no pump rule and no
@@ -153,7 +154,6 @@ public static class RuntimeStateInvariants
         var seenSlotIds = new HashSet<string>(StringComparer.Ordinal);
         var seenSensorIds = new HashSet<string>(StringComparer.Ordinal);
         var sensorSlots = 0;
-        var nonSensorGapSlots = 0;
 
         for (var index = 0; index < wallMap.Count; index++)
         {
@@ -202,45 +202,27 @@ public static class RuntimeStateInvariants
                     out detail);
             }
 
-            if (slot.PositionKind == LogicalPositionKind.SENSOR)
+            if (slot.PositionKind != LogicalPositionKind.SENSOR)
             {
-                sensorSlots++;
-                var expectedSensorId = CanonicalSensorMap.SensorIdFor(expectedRow, expectedColumn);
-                if (slot.GapAnchorForWaterJetId is not null
-                    || !string.Equals(slot.SensorId, expectedSensorId, StringComparison.Ordinal)
-                    || !seenSensorIds.Add(expectedSensorId))
-                {
-                    return Refuse(
-                        RuntimeRefusalCodes.WallMapSensorBinding,
-                        $"Sensor slot '{slot.SlotId}' must carry the unique canonical Sensor identity "
-                        + $"'{expectedSensorId}' and no gap-anchor identity; got Sensor '{slot.SensorId ?? "<none>"}' "
-                        + $"and gap anchor '{slot.GapAnchorForWaterJetId ?? "<none>"}'.",
-                        out reasonCode,
-                        out detail);
-                }
+                // Owner critical topology correction: no logical position is a gap. I7 and
+                // I16 are Product Sensors; a superseded gap classification is refused.
+                return Refuse(
+                    RuntimeRefusalCodes.WallMapNonSensorPosition,
+                    $"Slot '{slot.SlotId}' declares position kind '{slot.PositionKind}'; every one of the "
+                    + $"{CanonicalSensorMap.MatrixSlots} logical positions is a Product Sensor (I7 and I16 included).",
+                    out reasonCode,
+                    out detail);
             }
-            else if (slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
-            {
-                nonSensorGapSlots++;
-                var expectedAnchor = ExpectedGapAnchor(expectedRow, expectedColumn);
-                if (expectedAnchor is null
-                    || !string.Equals(slot.GapAnchorForWaterJetId, expectedAnchor, StringComparison.Ordinal)
-                    || slot.SensorId is not null)
-                {
-                    return Refuse(
-                        RuntimeRefusalCodes.WallMapNonSensorGaps,
-                        $"A NON_SENSOR_GAP slot is valid only at logical I7 (row 5, column 7, anchoring WJ3) and I16 "
-                        + $"(row 5, column 16, anchoring WJ1); slot '{slot.SlotId}' is at row {expectedRow}, column {expectedColumn} "
-                        + $"and carries anchor '{slot.GapAnchorForWaterJetId ?? "<none>"}'.",
-                        out reasonCode,
-                        out detail);
-                }
-            }
-            else
+
+            sensorSlots++;
+            var expectedSensorId = CanonicalSensorMap.SensorIdFor(expectedRow, expectedColumn);
+            if (!string.Equals(slot.SensorId, expectedSensorId, StringComparison.Ordinal)
+                || !seenSensorIds.Add(expectedSensorId))
             {
                 return Refuse(
-                    RuntimeRefusalCodes.WallMapSlotIdentity,
-                    $"Slot '{slot.SlotId}' declares unsupported position kind '{slot.PositionKind}'.",
+                    RuntimeRefusalCodes.WallMapSensorBinding,
+                    $"Sensor slot '{slot.SlotId}' must carry the unique canonical Sensor identity "
+                    + $"'{expectedSensorId}'; got Sensor '{slot.SensorId ?? "<none>"}'.",
                     out reasonCode,
                     out detail);
             }
@@ -255,29 +237,7 @@ public static class RuntimeStateInvariants
                 out detail);
         }
 
-        if (nonSensorGapSlots != CanonicalSensorMap.NonSensorGapCount)
-        {
-            return Refuse(
-                RuntimeRefusalCodes.WallMapNonSensorGaps,
-                $"The wall map must hold exactly {CanonicalSensorMap.NonSensorGapCount} NON_SENSOR_GAP slots; got {nonSensorGapSlots}.",
-                out reasonCode,
-                out detail);
-        }
-
         return true;
-    }
-
-    private static string? ExpectedGapAnchor(int row, int column)
-    {
-        foreach (var (_, anchorWaterJetId, gapRow, gapColumn) in CanonicalSensorMap.NonSensorGapSlots)
-        {
-            if (gapRow == row && gapColumn == column)
-            {
-                return anchorWaterJetId;
-            }
-        }
-
-        return null;
     }
 
     private static bool TryValidateSensors(
@@ -452,6 +412,32 @@ public static class RuntimeStateInvariants
                     out reasonCode,
                     out detail);
             }
+        }
+
+        // Central cross-layer agreement: the published Sensor sequence, the Front / Rear
+        // measurement sides, the assigned / physical / unassigned channel arithmetic, the
+        // wall-map (UI) count and the runtime catalogue count must all agree with the
+        // authoritative 108 / 216 / 240 / 24 identity. Fails closed on any disagreement.
+        var violation = TopologyInvariants.FirstViolation(new TopologyObservation
+        {
+            SensorSequence = sensors.Select(s => s.SensorId).ToArray(),
+            FrontMeasurementSensorIds = sensors.Where(s => !string.IsNullOrWhiteSpace(s.TcFrontChannel)).Select(s => s.SensorId).ToArray(),
+            RearMeasurementSensorIds = sensors.Where(s => !string.IsNullOrWhiteSpace(s.TcRearChannel)).Select(s => s.SensorId).ToArray(),
+            AssignedMeasurementCount = channels.Count,
+            PhysicalChannelCount = CanonicalSensorMap.PhysicalThermocoupleChannelCount,
+            UnassignedChannelCount = CanonicalSensorMap.PhysicalThermocoupleChannelCount - channels.Count,
+            NonSensorGapCount = wallMap.Count(s => s.PositionKind != LogicalPositionKind.SENSOR),
+            SensorsPerWall = wallCounts,
+            UiMapSensorCount = wallMap.Count(s => s.PositionKind == LogicalPositionKind.SENSOR),
+            RuntimeSensorCount = sensors.Count,
+        });
+        if (violation is not null)
+        {
+            return Refuse(
+                RuntimeRefusalCodes.TopologyInvariant,
+                $"{violation.Code}: {violation.Detail}",
+                out reasonCode,
+                out detail);
         }
 
         return true;

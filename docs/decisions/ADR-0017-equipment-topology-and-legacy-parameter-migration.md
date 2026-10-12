@@ -1,6 +1,20 @@
 # ADR-0017 — Equipment Topology Decision and Legacy Parameter Migration Specification
 
-- **Status:** ACCEPTED — authored under the Stage 0.3A-3 Checkpoint A Owner authorization;
+> **Superseded topology note (Owner critical topology correction, 2026-10-12).** This document predates the correction and retains, as a dated historical record, the belief that logical positions I7 and I16 were `NON_SENSOR_GAP` positions (106 Sensors / 212 channels; Sensor sequence skipping I7 and I16; WJ3 / WJ1 "at the I7 / I16 gap anchor"). Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements. 108 × 2 = 216; 240 physical TC channels − 216 = 24 unassigned. The text below is retained unedited and must not be used as a current baseline; the current record is [`STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`](../STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md).
+
+- **Status:** ACCEPTED — **SUPERSEDED IN PART by the Owner critical topology correction
+  (2026-10-12):** every decision, count, rule and change-set item in this ADR that treats
+  logical I7 and I16 as `NON_SENSOR_GAP` positions is superseded — the 106-Sensor / 212-channel
+  counts, the "Sensor sequence skips I7 and I16" rule, `GapAnchorForWaterJetId` (I7 → WJ3,
+  I16 → WJ1), the I7/I16 exclusion and refusal rules for the `sensorparam.csv` migration, and
+  the `NON_SENSOR_GAP` placement kind of WJ1/WJ3 (replacement placement vocabulary: open Owner
+  decision). I7 and I16 are normal Product Sensors; the authoritative baseline is 108 Sensors,
+  216 assigned Product TC measurements, 240 physical channels, 24 unassigned. **Still in
+  force:** Water Jets as separate equipment entities WJ1–WJ8, WJn ↔ IVn pairing, Installed
+  Position ≠ Target Coverage, the legacy `cannon` column as Assigned Cleaning Device ID with
+  `cannon n → WJn` and no wall-position inference, the parameter schema and validation, and the
+  deferred-field / public-boundary rules. See `../STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`.
+  Original status text follows. — authored under the Stage 0.3A-3 Checkpoint A Owner authorization;
   IMPLEMENTED current-facing by Stage 0.3A-3 Checkpoint C (atomic runtime migration,
   2026-10-08)
   (planning / decision / specification only), then explicitly approved by the Owner in the

@@ -156,16 +156,18 @@ switches the window to the reconnecting screen within about two seconds with **n
 on screen**; restarting the host brings the route back automatically; and **Exit Kiosk Preview**
 asks for confirmation before closing.
 
-**What to verify in the Commissioning Wall Map (Stage 0.4C-K1 Wall Mapping pass):** the map shows
-108 positions and 106 Sensor cells, with I7 and I16 shown as `NON_SENSOR_GAP` — never Sensors, never
-Water Jets; each Sensor cell carries the Sensor ID, the Front and the Rear state, the current
+**What to verify in the Commissioning Wall Map (Stage 0.4C-K1 Wall Mapping pass, as corrected by the
+Owner critical topology correction):** the map shows 108 positions and **108 Sensor cells — I7 and I16
+are ordinary Sensor cells** in their normal ordinal position (no position is a `NON_SENSOR_GAP`); the
+Sensor Map summary reads "Topology invariants AGREE (108 / 216 / 240 / 24)"; each Sensor cell carries the Sensor ID, the Front and the Rear state, the current
 engineering value with its unit only when the value is valid, Quality, the Commissioning state and any
 evidence blocking; **Both / Front only / Rear only** switch the displayed measurement and Front and
 Rear are never merged into one value; the physical-schedule Previous/Next still works and is labelled
-`(schedule order)`, while the Wall-order Previous/Next walk the map order (Front before Rear, gaps
-skipped, stopped at the edges); selecting a position highlights its Overview rows and fills the Sensor
-detail, an unassigned Channel selects no Sensor, and an I7 or I16 conflict row selects the **gap**
-rather than a Sensor; the Loop-Test progress shows 106 Sensors and 212 measurements derived live; the
+`(schedule order)`, while the Wall-order Previous/Next walk the map order over all 108 Sensors (Front
+before Rear, I6:R → I7:F → I7:R → I8:F, stopped at the edges); selecting a position highlights its
+Overview rows and fills the Sensor detail, an unassigned Channel selects no Sensor, and an I7 or I16
+row selects that Sensor's cell exactly like any other Sensor; the Loop-Test progress shows 108 Sensors
+and 216 measurements derived live (204 `NOT_TESTED`, 12 `BLOCKED` by Drawing internal conflicts); the
 filters change only what is displayed and never a count, a verdict or the selected identity; the map
 is vertically **static**: the complete U-shape (Rear, Left, Right, Front) is visible as one continuous
 reference, there is **no vertical scrollbar inside the map frame**, and page-level scrolling is the only
@@ -175,9 +177,9 @@ page has no horizontal overflow (`document.scrollingElement.scrollWidth === clie
 verdict approves nothing in the field.
 
 **What to verify in the paired Front/Rear thermal diagnostic (Stage 0.4C-K1 thermal-pair pass):** with
-`NORMAL_GOOD` applied, **Front is above Rear for every one of the 106 pairs** and each Wall Map cell shows
+`NORMAL_GOOD` applied, **Front is above Rear for every one of the 108 pairs** and each Wall Map cell shows
 a compact read-only `dFR` row (`dFR +6.1 degC [+]`) whose value is positive, deterministic for the same
-scenario tick and Sensor, and different between Sensors — never one delta for all 106. `REDUCED_FRONT_REAR_DIFFERENTIAL`
+scenario tick and Sensor, and different between Sensors — never one delta for all 108. `REDUCED_FRONT_REAR_DIFFERENTIAL`
 keeps Front above Rear with a reduced gradient and reads `REDUCED_POSITIVE_CANDIDATE` (a *candidate*: possible
 reduced local heat transfer / possible slag insulation, never a confirmed result); `NEAR_ZERO_FRONT_REAR_DIFFERENTIAL`
 reads `NEAR_ZERO_CANDIDATE` (an abnormal paired response that requires investigation, with no approved
@@ -190,9 +192,12 @@ paired value disappears to `dFR --` with the failing side named, **no number and
 Last Valid Value is substituted**. The Sensor detail additionally lists the Front value, the Rear value,
 `dFR = Front - Rear`, the paired state, the guidance, the synthetic provenance and `FIELD VERIFICATION PENDING`.
 The paired value has no Channel, no Sensor identity, no commissioning state and no Preview verdict of its
-own: the Overview stays at 240 rows, the totals stay 212 measurements / 106 Sensors / 108 positions, and the
+own: the Overview stays at 240 rows, the totals stay 216 measurements / 108 Sensors / 108 positions, and the
 loop-test workflow (observations, verdicts, remarks) applies to the selected measurement only — recording or
 clearing a Front result never changes the Rear result.
+
+*Historical note:* the K1 text of these two paragraphs originally read "106 Sensor cells, I7 and I16 shown
+as `NON_SENSOR_GAP`, gaps skipped, 106 pairs, 212 measurements / 106 Sensors". Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 
 **Stopping:** close the shell through **Exit Kiosk Preview** (confirmed), then stop the host with
 `Ctrl+C` in its terminal.

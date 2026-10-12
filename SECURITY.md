@@ -37,18 +37,19 @@ for PR #18: `3e1a7fd9d28db65221c123960a0c85b62d93949a` (PR #17 already **MERGED*
 documentation/evidence only; PR #18 is not merged.**
 
 Drawing and schedule: `DRAWING_BASELINE_REV1` reviewed; drawing status
-`DRAWING_PENDING_REVISION`. 240 physical schedule rows: 200 drawing-verified, 12
-drawing-internal-conflict, 4 drawing/Product-topology-conflict, 24 physical Channels
-unassigned, 212 Product-compatible measurements across 106 Product Sensors, 0 unresolved
-rows. Field verification remains pending. Accepted label equivalences (unchanged): CSV
+`DRAWING_PENDING_REVISION`. **Owner critical topology correction (2026-10-12):** 240
+physical schedule rows: 204 drawing-verified, 12 drawing-internal-conflict, 0
+drawing/Product-topology-conflict, 24 physical Channels unassigned, 216 Product-compatible
+measurements across 108 Product Sensors, 0 unresolved rows. I7 and I16 are normal Product
+Sensors; their four Drawing rows (I7 Front, I7 Rear, I16 Front, I16 Rear) are used Product
+assignments taken from the committed schedule and the existing mapping records, not invented
+channels. Field verification remains pending. Accepted label equivalences (unchanged): CSV
 `DRAWING_TOPOLOGY_CONFLICT` ≡ reporting term `DRAWING_PRODUCT_TOPOLOGY_CONFLICT`; CSV
-`SPARE_UNMAPPED` ≡ reporting term `RESERVED_UNASSIGNED`. I7 and I16 are not Product
-Sensors and are not Water Jets; their four Drawing rows remain topology-conflict evidence,
-raw Drawing evidence preserved, excluded from Product mapping, `NOT_COMMISSIONED`,
-requiring field reconciliation; Product topology remains 106 Sensors / 212 measurements
-with Product representation `NON_SENSOR_GAP`. The 12 Drawing internal-conflict rows remain
-unresolved with both conflicting claims and page references preserved; they require
-Owner/field review and no conflict was resolved by inference or pattern.
+`SPARE_UNMAPPED` ≡ reporting term `RESERVED_UNASSIGNED`. The 12 Drawing internal-conflict
+rows remain unresolved with both conflicting claims and page references preserved; they
+require Owner/field review and no conflict was resolved by inference or pattern.
+Historical (Stage 0.4C-0B record): "200 drawing-verified, 4 topology-conflict, 212
+measurements across 106 Product Sensors, I7 and I16 `NON_SENSOR_GAP`". Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 
 Process image: `DOCUMENTED_FACTORY_DEFAULT_BASELINE_REV1` — six separate TC
 cabinets/nodes, each node with one 750-362, five 750-498 modules and one 750-600; 40 TC

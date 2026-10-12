@@ -22,8 +22,6 @@ public sealed class SequencingStateIntegrityTests
     private static readonly string[] SensorIds =
         ["SYN-S01", "SYN-S02", "SYN-S03", "SYN-S04", "SYN-S05", "SYN-S06", "SYN-S07", "SYN-S08", "SYN-S09", "SYN-S10"];
 
-    private static readonly string[] NonSensorIds = ["SYN-G01"];
-
     // The single internal constructor takes eight parameters; the record copy constructor takes one.
     private static readonly ConstructorInfo RawConstructor = typeof(SequencingState)
         .GetConstructors(BindingFlags.Instance | BindingFlags.NonPublic)
@@ -117,6 +115,53 @@ public sealed class SequencingStateIntegrityTests
             nextEntrySeq: 10);
 
         AssertRefusedAndUnprojectable(state, "QUEUE_SENSOR_DUPLICATE");
+    }
+
+    // ---- Owner Sensor Disable ruling (Stage 0.4C-K3): state-level integrity ----
+
+    [Fact]
+    public void Queue_Entry_For_A_Disabled_Sensor_Is_Rejected()
+    {
+        var state = WithDisabledSensorIds(
+            Raw(new[] { Entry(0), Entry(1) }, queueRevision: 2, evidenceSeq: 0, nextEntrySeq: 2),
+            [SensorIds[1]]);
+
+        AssertRefusedAndUnprojectable(state, "QUEUE_ENTRY_SENSOR_DISABLED");
+    }
+
+    [Fact]
+    public void Blank_Disabled_Sensor_Identity_Is_Rejected()
+    {
+        var state = WithDisabledSensorIds(Raw(Array.Empty<SequencingEntry>()), [" "]);
+
+        AssertRefusedAndUnprojectable(state, "DISABLED_SENSOR_ID_BLANK");
+    }
+
+    [Fact]
+    public void Duplicate_Disabled_Sensor_Identity_Is_Rejected()
+    {
+        var state = WithDisabledSensorIds(Raw(Array.Empty<SequencingEntry>()), ["I7", "I7"]);
+
+        AssertRefusedAndUnprojectable(state, "DISABLED_SENSOR_ID_DUPLICATE");
+    }
+
+    [Fact]
+    public void Disabled_Sensors_Absent_From_The_Queue_Are_A_Valid_State_And_Project_Read_Only()
+    {
+        var state = WithDisabledSensorIds(
+            Raw(new[] { Entry(0) }, queueRevision: 1, evidenceSeq: 0, nextEntrySeq: 1),
+            ["I16", "I7"]);
+
+        // A valid state: projection succeeds (an invalid state would throw / refuse).
+        Assert.Equal(AutoSequenceState.OFF, SequencingKernel.ProjectAutoSequenceState(state));
+        Assert.Single(SequencingKernel.ProjectQueueEntries(state));
+        Assert.Equal(["I16", "I7"], SequencingKernel.ProjectDisabledSensorIds(state).ToArray()); // ordinal order, read-only view
+        Assert.True(state.IsSensorDisabled("I7"));
+        Assert.False(state.IsSensorDisabled(SensorIds[0]));
+        Assert.IsAssignableFrom<IReadOnlyList<string>>(SequencingKernel.ProjectDisabledSensorIds(state));
+        Assert.DoesNotContain(
+            typeof(SequencingState).GetProperties(BindingFlags.Instance | BindingFlags.Public),
+            property => property.Name == nameof(SequencingState.DisabledSensorIds) && property.SetMethod is { IsPublic: true });
     }
 
     [Fact]
@@ -475,6 +520,18 @@ public sealed class SequencingStateIntegrityTests
         return (SequencingState)built!;
     }
 
+    /// <summary>
+    /// Sets the internal-init Disabled list through reflection (the only outside path; the
+    /// kernel is the sole writer in Product code).
+    /// </summary>
+    private static SequencingState WithDisabledSensorIds(SequencingState state, string[] disabledSensorIds)
+    {
+        typeof(SequencingState)
+            .GetProperty(nameof(SequencingState.DisabledSensorIds), BindingFlags.Instance | BindingFlags.Public)!
+            .SetValue(state, disabledSensorIds);
+        return state;
+    }
+
     private static SequencingState ValidRunningWithJob() =>
         Raw(Array.Empty<SequencingEntry>(), queueRevision: 1, job: Job(), mode: AutoSequenceMode.RUNNING, evidenceSeq: 1);
 
@@ -526,7 +583,7 @@ public sealed class SequencingStateIntegrityTests
             assignments.Add(new SequencingSensorAssignment(SensorIds[index], "WJ" + ordinal, "IV" + ordinal));
         }
 
-        return new SequencingTopology(assignments, NonSensorIds);
+        return new SequencingTopology(assignments);
     }
 
     private static DateTimeOffset At(int second) => Instant.AddSeconds(second);

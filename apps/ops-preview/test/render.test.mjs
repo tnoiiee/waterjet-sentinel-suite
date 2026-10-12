@@ -79,10 +79,11 @@ test('the summary counts are the evidence totals, and filtering never changes th
   assert.match(summaryBefore, /Physical Channels 240/);
   assert.match(summaryBefore, /Mapped 216/);
   assert.match(summaryBefore, /Unassigned 24/);
-  assert.match(summaryBefore, /Product-compatible measurements 212/);
-  assert.match(summaryBefore, /Conflict rows 16/);
-  assert.match(summaryBefore, /BLOCKED 40/);
-  assert.match(summaryBefore, /NOT_TESTED 200/);
+  assert.match(summaryBefore, /Product-compatible measurements 216/);
+  assert.match(summaryBefore, /Product Sensors 108/);
+  assert.match(summaryBefore, /Conflict rows 12/);
+  assert.match(summaryBefore, /BLOCKED 36/);
+  assert.match(summaryBefore, /NOT_TESTED 204/);
   assert.match(summaryBefore, /PASS 0/);
   filter('quality-bad');
   assert.equal(tableRows().length, 0, 'no BAD row exists in the default NORMAL_GOOD scenario');
@@ -93,20 +94,23 @@ test('the summary counts are the evidence totals, and filtering never changes th
 
 test('the required filters are present with their counts', () => {
   const filters = allText(id('filters'));
-  for (const label of ['All (240)', 'Product-compatible (212)', 'Drawing verified (200)',
-    'Drawing internal conflict (12)', 'Product-topology conflict (4)', 'Unassigned (24)',
+  for (const label of ['All (240)', 'Product-compatible (216)', 'Drawing verified (204)',
+    'Drawing internal conflict (12)', 'Product-topology conflict (0)', 'Unassigned (24)',
     // GOOD is 216 because the 24 unassigned physical Channels carry no measurement at all.
     'GOOD (216)', 'UNCERTAIN (0)', 'BAD (0)', 'STALE (0)', 'COMMUNICATION_LOSS (0)', 'Simulated wire break (0)',
-    'NOT_TESTED (200)', 'IN_PROGRESS (0)', 'PASS (0)', 'FAIL (0)', 'PARTIAL (0)', 'BLOCKED (40)']) {
+    'NOT_TESTED (204)', 'IN_PROGRESS (0)', 'PASS (0)', 'FAIL (0)', 'PARTIAL (0)', 'BLOCKED (36)']) {
     assert.match(filters, new RegExp(label.replace(/[()]/g, '\\$&')), label);
   }
 });
 
 test('filtering is presentation only and the counts stay identical', () => {
-  for (const key of ['product-compatible', 'drawing-internal-conflict', 'product-topology-conflict', 'unassigned', 'commissioning-blocked']) {
+  for (const key of ['product-compatible', 'drawing-internal-conflict', 'unassigned', 'commissioning-blocked']) {
     filter(key);
     assert.equal(tableRows().length > 0, true, key);
   }
+  // The Product-topology conflict filter is retained but empty: I7 and I16 are normal Sensors.
+  filter('product-topology-conflict');
+  assert.equal(tableRows().length, 0, 'no Product-topology conflict rows remain');
   filter('all');
   assert.match(text('monitor-count'), /Showing 240 of 240 physical Channels/);
   assert.match(text('monitor-count'), /changes the view only/);
@@ -195,14 +199,19 @@ test('the two conflict scenarios present their own blocking evidence and cannot 
   click(action('begin-BASELINE'));
   assert.match(detailText(), /DRAWING_INTERNAL_CONFLICT_BLOCKED|sheath and conductor disagree/);
 
-  await applyScenario('PRODUCT_TOPOLOGY_CONFLICT', { until: hasCell(13, 'Not mapped') });
+  // Owner critical topology correction: no Product-topology conflict row exists. The former I7 / I16
+  // rows are used Product assignments and behave like every other Product-compatible row.
+  await applyScenario('PRODUCT_TOPOLOGY_CONFLICT');
   filter('product-topology-conflict');
-  assert.equal(tableRows().length, 4);
-  click(tableRows()[0]);
+  assert.equal(tableRows().length, 0);
+  filter('all');
+  const i7Row = tableRows().find((row) => /\bI7\b/.test(allText(row)) && /\bF\b/.test(allText(row)));
+  assert.ok(i7Row, 'the I7 Front row is an ordinary Overview row');
+  click(i7Row);
   const detail = detailText();
-  assert.match(detail, /never a Sensor, never a Water Jet/);
-  assert.match(detail, /PRODUCT_TOPOLOGY_CONFLICT_BLOCKED/);
-  assert.equal(action('verdict-PASS').disabled, true);
+  assert.doesNotMatch(detail, /NON_SENSOR_GAP|never a Sensor/);
+  assert.doesNotMatch(detail, /PRODUCT_TOPOLOGY_CONFLICT_BLOCKED/);
+  assert.equal(action('verdict-PASS').disabled, false, 'I7 may receive a Preview PASS like any other Sensor');
   filter('all');
 });
 
@@ -213,7 +222,8 @@ test('an unassigned physical Channel offers no verdict at all', () => {
   assert.equal(c[0], '-', 'no Sensor identity');
   assert.equal(c[2], '-', 'no measurement identity');
   assert.match(c[10], /UNAVAILABLE/);
-  assert.match(c[17], /no measurement exists/);
+  assert.match(c[17], /no current measurement available/);
+  assert.doesNotMatch(c[17], /no measurement exists/);
   assert.equal(action('verdict-PASS').disabled, true);
   assert.equal(action('verdict-FAIL').disabled, true);
   filter('all');
@@ -261,9 +271,9 @@ test('next and previous measurement navigation moves the selection without chang
 test('resetting the Preview clears workflow results but leaves evidence BLOCKED intact', () => {
   click(id('scenario-reset'));
   assert.match(text('alert-line'), /cleared/);
-  assert.match(allText(id('summary-body')), /BLOCKED 40/);
+  assert.match(allText(id('summary-body')), /BLOCKED 36/);
   assert.match(allText(id('summary-body')), /PASS 0/);
-  assert.match(allText(id('summary-body')), /NOT_TESTED 200/);
+  assert.match(allText(id('summary-body')), /NOT_TESTED 204/);
 });
 
 test('the exit action opens a close guard that explains what closing does', () => {
@@ -309,13 +319,16 @@ test('the Operations area states that no control or command path exists', () => 
   assert.match(operations, /Device write authority none/);
 });
 
-test('the Sensor Map area shows 108 positions, 106 Sensors and the gap positions as never-Sensors', () => {
+test('the Sensor Map area shows 108 positions, 108 Sensors, 216 channels and the agreeing topology invariants', () => {
   const sensorMap = allText(id('sensor-map-body'));
   assert.match(sensorMap, /Logical positions 108/);
-  assert.match(sensorMap, /Product Sensors 106/);
-  assert.match(sensorMap, /Thermocouple channels 212/);
-  assert.match(sensorMap, /NON_SENSOR_GAP positions 2/);
-  assert.match(sensorMap, /never Sensors and never Water Jets/);
+  assert.match(sensorMap, /Product Sensors 108/);
+  assert.match(sensorMap, /Thermocouple channels 216/);
+  assert.match(sensorMap, /Topology invariants AGREE \(108 \/ 216 \/ 240 \/ 24\)/);
+  assert.match(sensorMap, /I7 and I16 are normal Sensors/);
+  assert.doesNotMatch(sensorMap, /NON_SENSOR_GAP/);
+  assert.match(sensorMap, /REAR 30 30 60/);
+  assert.match(sensorMap, /FRONT 30 30 60/);
 });
 
 test('the app requested only loopback GET routes and issued no write of any kind', () => {

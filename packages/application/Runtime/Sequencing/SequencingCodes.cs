@@ -26,6 +26,7 @@ public static class SequencingCodes
     public const string KindValveLimitObserved = "VALVE_LIMIT_OBSERVED";
     public const string KindAxisFeedbackObserved = "AXIS_FEEDBACK_OBSERVED";
     public const string KindFeedbackTimeoutExpired = "FEEDBACK_TIMEOUT_EXPIRED";
+    public const string KindSetSensorEnablement = "SET_SENSOR_ENABLEMENT";
 
     // AutoSequence start.
     public const string AutoSequenceStarted = "AUTOSEQUENCE_STARTED";
@@ -38,8 +39,16 @@ public static class SequencingCodes
     public const string TargetActive = "TARGET_ACTIVE";
     public const string AdmissionSourceNotScenario = "ADMISSION_SOURCE_NOT_SCENARIO";
     public const string SensorUnknown = "SENSOR_UNKNOWN";
-    public const string NotASensor = "NOT_A_SENSOR";
     public const string EntryInvalid = "ENTRY_INVALID";
+
+    // Sensor Enable / Disable (Owner Sensor Disable ruling, Stage 0.4C-K3). SENSOR_DISABLED is
+    // the admission refusal for a disabled Sensor, the applied code of a disable transition and
+    // the removal reason of a queued non-active entry removed by that transition. Owner
+    // critical topology correction: the former NOT_A_SENSOR code is withdrawn (every logical
+    // position is a Product Sensor; I7 and I16 included).
+    public const string SensorDisabled = "SENSOR_DISABLED";
+    public const string SensorEnabled = "SENSOR_ENABLED";
+    public const string SensorEnablementUnchanged = "SENSOR_ENABLEMENT_UNCHANGED";
 
     // Head dispatch and head revalidation.
     public const string Dispatched = "DISPATCHED";

@@ -187,10 +187,6 @@ footer { padding:14px 24px 28px; color:var(--muted); font-size:var(--fs-small); 
 .detail-card[data-pair-state="DIFFERENTIAL_UNAVAILABLE"] { border-left-color:var(--un); }
 .pair-state { font-weight:700; }
 .pair-effect { color:var(--muted); font-size:var(--fs-small); margin:8px 0 0; }
-/* A NON_SENSOR_GAP position: visibly a gap, never a Sensor cell. */
-.wj-cell.wj-gap { border-style:dashed; border-color:var(--tc); background:#101418; }
-.wj-cell.wj-gap .wj-id { color:var(--tc); }
-.wj-cell.wj-gap .wj-class { color:var(--tc); }
 .wj-cell[data-selected="true"] { outline:2px solid var(--info); outline-offset:1px; }
 /* Filtering is presentation only: a non-matching position is dimmed, never removed from the map. */
 .wj-cell[data-filtered="false"] { opacity:.32; }

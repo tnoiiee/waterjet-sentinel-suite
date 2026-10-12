@@ -15,7 +15,7 @@ export const DEFAULT_DENSITY = DENSITY.COMFORTABLE;
 export const ROW_CLASS_PRESENTATION = Object.freeze({
   PRODUCT_COMPATIBLE: Object.freeze({ text: 'Product-compatible measurement', marker: '[PC]', className: 'pc' }),
   DRAWING_INTERNAL_CONFLICT: Object.freeze({ text: 'Drawing internal conflict', marker: '[IC]', className: 'ic' }),
-  PRODUCT_TOPOLOGY_CONFLICT: Object.freeze({ text: 'Product-topology conflict (NON_SENSOR_GAP)', marker: '[TC]', className: 'tc' }),
+  PRODUCT_TOPOLOGY_CONFLICT: Object.freeze({ text: 'Product-topology conflict', marker: '[TC]', className: 'tc' }),
   UNASSIGNED: Object.freeze({ text: 'Unassigned physical Channel', marker: '[UN]', className: 'un' }),
 });
 
@@ -173,9 +173,9 @@ export function summaryCounts(schedule, viewRows) {
 
 /**
  * Loop-Test progress: a concise field-review summary over the population that can actually be loop
- * tested - the Product-compatible measurements. The four Product-topology conflict rows (the I7/I16
- * NON_SENSOR_GAP positions) and the 24 unassigned physical Channels are NOT loop-testable and are
- * reported separately by the evidence counts instead of being folded into a workflow state.
+ * tested - the 216 Product-compatible measurements of the 108 Product Sensors (I7 and I16 included).
+ * The 24 unassigned physical Channels are NOT loop-testable and are reported separately by the
+ * evidence counts instead of being folded into a workflow state.
  *
  * Every number is derived from the parsed evidence and the current Preview session; nothing is
  * cached and no total is invented. BLOCKED stays evidence-derived: it is what the Drawing says about
@@ -199,7 +199,7 @@ export function loopTestSummary(schedule, sessionState = null) {
     blockedFromPass: rows.filter((row) => row.passBlockedReason).length,
     notLoopTestable: schedule.rows.length - rows.length,
     note: 'Population: the Product-compatible measurements.'
-      + ' The four Product-topology conflict rows (I7 and I16, NON_SENSOR_GAP positions) and the 24 unassigned physical Channels are not loop-testable and are excluded.',
+      + ' The 24 unassigned physical Channels are not loop-testable and are excluded.',
   });
 }
 
@@ -208,12 +208,12 @@ export function legend() {
   return Object.freeze([
     { marker: '[PC]', text: 'Product-compatible measurement (Product Sensor identity)' },
     { marker: '[IC]', text: 'Drawing internal conflict - BLOCKED, no PASS permitted' },
-    { marker: '[TC]', text: 'Product-topology conflict (I7 / I16 NON_SENSOR_GAP) - never a Sensor' },
+    { marker: '[TC]', text: 'Product-topology conflict - none in the corrected baseline (I7 and I16 are normal Product Sensors)' },
     { marker: '[UN]', text: 'Unassigned physical Channel - not a commissioned spare' },
     { marker: '[X]', text: 'BAD - current value unavailable, cause named' },
     { marker: '[~]', text: 'STALE - age beyond the Preview threshold, not shown as current' },
     { marker: '[?]', text: 'UNCERTAIN - presented and marked, no automatic action' },
     { marker: '[OK]', text: 'GOOD - current value valid' },
-    { marker: '[OFF]', text: 'DISABLED - no measurement exists at this position' },
+    { marker: '[OFF]', text: 'DISABLED (measurement quality) - MEASUREMENT UNAVAILABLE: channel not commissioned; Sensor operational Enabled/Disabled state is separate' },
   ]);
 }

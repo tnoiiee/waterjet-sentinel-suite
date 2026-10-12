@@ -90,6 +90,8 @@ const state = {
   opsSummary: null,
   // The read-only TC Node configuration projection from the server. It is never edited in the browser.
   tcNodeConfiguration: null,
+  // The read-only Stage 0.4C-K3 evidence projection. Evidence and contract only; never edited here.
+  tcAcquisitionEvidence: null,
   observations: new Map(),
   // The read-only paired thermal model, rebuilt from the authoritative observations on every load. It
   // is derived state: it is never written back into an observation, a row, a count or a verdict.
@@ -234,7 +236,7 @@ function renderProgress() {
   ]));
 }
 
-/** Loop-Test progress over the population that can actually be loop tested (the 212 measurements). */
+/** Loop-Test progress over the population that can actually be loop tested (the 216 Product-compatible measurements). */
 function renderLoopProgress() {
   const body = $('loop-progress-body');
   body.replaceChildren();
@@ -317,7 +319,7 @@ function pairForPosition(position, viewByKey) {
 /**
  * One measurement block of a cell: side, current value when valid, unit when a current value exists,
  * the quality marker and the commissioning state. A Sensor cell block is a button (it selects that
- * exact measurement); a NON_SENSOR_GAP block is inert - a gap is never selectable as a Sensor.
+ * exact measurement). Every position is a Sensor (I7 and I16 included); a block without a view is inert.
  */
 function measurementBlock(block, view, position, selected) {
   const interactive = position.positionKind === 'SENSOR' && Boolean(view);
@@ -360,8 +362,8 @@ function measurementBlock(block, view, position, selected) {
     + (view.blockingReason ? `; blocked from PASS: ${view.blockingReason}` : '')
     + `; synthetic Preview observation, ${FIELD_VERIFICATION_TEXT} - not a hardware reading and not a field approval.`;
   if (!interactive) {
-    // Drawing rows of a NON_SENSOR_GAP position: present as evidence, never selectable as a Sensor.
-    attrs['data-gap-block'] = 'true';
+    // A block without an observation view is presented but not selectable.
+    attrs['data-inert-block'] = 'true';
     return el('div', attrs, children);
   }
   const button = el('button', { ...attrs, type: 'button' }, children);
@@ -374,13 +376,12 @@ function measurementBlock(block, view, position, selected) {
 /** One wall position cell: identity, evidence class marker and the rendered measurement blocks. */
 function wallCell(position, viewByKey) {
   const blocks = visibleMeasurements(position, state.measurementView);
-  const isGap = position.positionKind !== 'SENSOR';
   const selectedPosition = state.selectedKey ? state.wallMap.positionByChannelKey.get(state.selectedKey) ?? null : null;
   const selected = selectedPosition === position;
   const visibleViews = blocks.map((block) => viewByKey.get(block.key)).filter(Boolean);
   const classMarkers = [...new Set(visibleViews.map((view) => view.rowClassMarker).filter(Boolean))];
   const attrs = {
-    class: `wj-cell${isGap ? ' wj-gap' : ''}${selected ? ' wj-selected' : ''}`,
+    class: `wj-cell${selected ? ' wj-selected' : ''}`,
     'data-wall': position.wall,
     'data-slot-id': position.slotId,
     'data-position-kind': position.positionKind,
@@ -390,11 +391,11 @@ function wallCell(position, viewByKey) {
     'data-selected': String(selected),
     'data-filtered': String(positionMatchesFilter(position, viewByKey)),
   };
-  // A NON_SENSOR_GAP cell never carries a Sensor identity; that is the whole point of the position.
-  if (!isGap) attrs['data-sensor-id'] = position.sensorId;
+  // Every cell is a Product Sensor cell and carries its Sensor identity (I7 and I16 included).
+  attrs['data-sensor-id'] = position.sensorId;
   const head = el('div', { class: 'wj-head' }, [
     el('span', { class: 'wj-id' }, position.label),
-    el('span', { class: 'wj-class' }, isGap ? 'NON_SENSOR_GAP' : (classMarkers.join(' ') || '[PC]')),
+    el('span', { class: 'wj-class' }, classMarkers.join(' ') || '[PC]'),
   ]);
   // The paired state travels on the cell as well, so the row's styling and the tests can read it
   // without re-deriving anything.
@@ -406,12 +407,7 @@ function wallCell(position, viewByKey) {
     children.push(measurementBlock(block, viewByKey.get(block.key) ?? null, position, selected && state.selectedKey === block.channelKey));
   }
   children.push(deltaRow(pair));
-  const cell = el('div', attrs, children);
-  if (isGap) {
-    cell.title = `${position.label} - NON_SENSOR_GAP position: never a Sensor and never a Water Jet.`
-      + ' Its two drawing rows are a Product-topology conflict, so no PASS can ever be recorded for them.';
-  }
-  return cell;
+  return el('div', attrs, children);
 }
 
 function wallBand(entry, viewByKey) {
@@ -422,12 +418,11 @@ function wallBand(entry, viewByKey) {
     'data-wall-columns': entry.wallColumns,
     'data-wall-rows': entry.rows.length,
     'data-sensor-count': entry.sensorCount,
-    'data-gap-count': entry.gapCount,
-    'aria-label': `${WALL_LABELS[entry.wall]}: ${entry.sensorCount} Product Sensors and ${entry.gapCount} NON_SENSOR_GAP position(s)`,
+    'aria-label': `${WALL_LABELS[entry.wall]}: ${entry.sensorCount} Product Sensors`,
   }, [
     el('div', { class: 'wj-band-head' }, [
       el('span', { class: 'wj-band-title' }, WALL_LABELS[entry.wall]),
-      el('span', { class: 'wj-band-counts' }, `${entry.sensorCount} Sensors${entry.gapCount ? ` | ${entry.gapCount} NON_SENSOR_GAP` : ''}`),
+      el('span', { class: 'wj-band-counts' }, `${entry.sensorCount} Sensors`),
     ]),
     el('div', { class: 'wj-cells' }, cells),
   ]);
@@ -438,8 +433,7 @@ function wallHollow(map) {
   return el('div', { class: 'wallmap-hollow' }, [
     el('div', { class: 'wj-hollow-line' }, `${map.counts.logicalPositions} logical positions`),
     el('div', { class: 'wj-hollow-line' }, `${map.counts.productSensors} Product Sensors`),
-    el('div', { class: 'wj-hollow-line' }, `${map.counts.nonSensorGaps} NON_SENSOR_GAP (${map.gapPositions.map((p) => p.label).join(', ')})`),
-    el('div', { class: 'wj-hollow-line' }, `${map.counts.productCompatibleMeasurements} measurements`),
+    el('div', { class: 'wj-hollow-line' }, `${map.counts.productCompatibleMeasurements} measurements (Front and Rear)`),
     el('div', { class: 'wj-hollow-line sim' }, 'SIMULATION / PREVIEW'),
     el('div', { class: 'wj-hollow-line' }, FIELD_VERIFICATION_TEXT),
   ]);
@@ -451,8 +445,7 @@ function renderWallLegend() {
   const entries = [
     ['[PC]', 'Product-compatible measurement (a Product Sensor identity)'],
     ['[IC]', 'Drawing internal conflict - may record FAIL or PARTIAL, never PASS'],
-    ['NON_SENSOR_GAP', 'I7 and I16: never a Sensor and never a Water Jet; no verdict exists for them'],
-    ['OK ? X ~ OFF', 'Quality GOOD, UNCERTAIN, BAD, STALE, DISABLED (the same markers as the Overview)'],
+    ['OK ? X ~ OFF', 'Measurement Quality GOOD, UNCERTAIN, BAD, STALE, DISABLED (the same markers as the Overview; DISABLED = measurement unavailable, channel not commissioned - not the Sensor operational Enabled/Disabled state)'],
     ['NT IP PASS FAIL PART BLOCK', 'Commissioning NOT_TESTED, IN_PROGRESS, PASS, FAIL, PARTIAL, BLOCKED (read-only state of the Preview workflow)'],
     ['--', 'no current value is presented: never a number, never a unit (the cause is named in Sensor detail)'],
     ['degC', 'engineering unit, shown only while a current value exists'],
@@ -525,9 +518,7 @@ function renderWallMap(views) {
           + `${selectedView.currentValueValid ? `${selectedView.engineeringValue} ${selectedView.engineeringUnit ?? ''}`.trim() : 'no current value presented'}, `
           + `Commissioning ${selectedView.commissioningState}`
         : '')
-      + (selectedPosition.selectableAsSensor
-        ? '. Selection only: it changes no evidence, no observation and no Preview verdict.'
-        : '. NON_SENSOR_GAP position: never a Sensor, and no PASS can ever be recorded for it.');
+      + '. Selection only: it changes no evidence, no observation and no Preview verdict.';
   }
 
   const dimmed = map.positions.filter((position) => !positionMatchesFilter(position, viewByKey)).length;
@@ -562,21 +553,20 @@ function renderSensorMap() {
     el('div', { class: 'cell' }, [el('span', { class: 'k' }, 'Logical positions'), el('span', { class: 'v' }, String(map.slotCount))]),
     el('div', { class: 'cell' }, [el('span', { class: 'k' }, 'Product Sensors'), el('span', { class: 'v' }, String(map.sensorSlotCount))]),
     el('div', { class: 'cell' }, [el('span', { class: 'k' }, 'Thermocouple channels'), el('span', { class: 'v' }, String(map.logicalMatrix.thermocoupleChannels))]),
-    el('div', { class: 'cell' }, [el('span', { class: 'k' }, 'NON_SENSOR_GAP positions'), el('span', { class: 'v' }, String(map.nonSensorGapSlots.length))]),
+    el('div', { class: 'cell' }, [el('span', { class: 'k' }, 'Topology invariants'), el('span', { class: 'v' }, map.topologyInvariants?.ok ? 'AGREE (108 / 216 / 240 / 24)' : 'DISAGREEMENT - refused')]),
   ]));
   body.append(el('div', { class: 'table-wrap' }, el('table', {}, [
-    el('thead', {}, [el('tr', {}, ['Wall', 'Positions', 'Sensor positions', 'NON_SENSOR_GAP positions', 'Thermocouple channels']
+    el('thead', {}, [el('tr', {}, ['Wall', 'Positions', 'Sensor positions', 'Thermocouple channels']
       .map((h) => el('th', { scope: 'col' }, h)))]),
     el('tbody', {}, map.walls.map((wall) => {
       const sensors = wall.slots.filter((s) => s.positionKind === 'SENSOR');
-      const gaps = wall.slots.filter((s) => s.positionKind === 'NON_SENSOR_GAP');
       const channels = sensors.reduce((n, s) => n + (s.tcChannels?.length ?? 0), 0);
-      return el('tr', {}, [wall.wall, String(wall.slots.length), String(sensors.length), String(gaps.length), String(channels)].map((v, i) => el('td', { class: i === 0 ? '' : 'num' }, String(v))));
+      return el('tr', {}, [wall.wall, String(wall.slots.length), String(sensors.length), String(channels)].map((v, i) => el('td', { class: i === 0 ? '' : 'num' }, String(v))));
     })),
   ])));
   body.append(el('p', { class: 'note' },
     `The Commissioning Wall Map below renders these same 108 positions, read-only. `
-    + `I7 and I16 are authoritative NON_SENSOR_GAP positions: they are never Sensors and never Water Jets. `
+    + `Every position is a Product Sensor; I7 and I16 are normal Sensors (Owner critical topology correction). `
     + `The logical matrix is ${map.logicalMatrix.columns} x ${map.logicalMatrix.rows} positions.`));
 }
 
@@ -710,6 +700,152 @@ function renderNodeConfiguration() {
   authority.textContent = 'NO HARDWARE ACCESS / NO DEVICE WRITE. This section sends no network request, probes no address, '
     + 'opens no socket, contacts no device, reads no process image and offers no connection, test, activation or polling control. '
     + 'Configured identity is not verification: reachability, acquisition, hardware verification and field verification are all unverified.';
+}
+
+// ---------------------------------------------------------------------------
+// TC Acquisition Evidence (Stage 0.4C-K3) - read-only projection of the evidence gate
+// ---------------------------------------------------------------------------
+
+/** Honest words for the K3 evidence statuses. The code stays visible next to the text. */
+const EVIDENCE_STATUS_TEXT = Object.freeze({
+  CONFIGURED_NOT_TESTED: 'CONFIGURED, NOT TESTED',
+  NOT_CONFIGURED: 'NOT CONFIGURED',
+  PROCESS_IMAGE_CANDIDATE_UNVERIFIED: 'CANDIDATE, UNVERIFIED',
+  PROCESS_IMAGE_DERIVATION_BLOCKED: 'DERIVATION BLOCKED',
+  BYTE_ORDER_UNRESOLVED: 'UNRESOLVED',
+  WORD_ORDER_UNRESOLVED: 'UNRESOLVED',
+  STATUS_LOCATION_UNRESOLVED: 'UNRESOLVED',
+  ENCODING_UNRESOLVED: 'UNRESOLVED',
+  WIRE_BREAK_DECODING_BLOCKED: 'DECODING BLOCKED',
+  FIRMWARE_NOT_VERIFIED: 'NOT VERIFIED',
+  ADDRESS_UNRESOLVED: 'UNRESOLVED',
+  FRESHNESS_THRESHOLDS_UNRESOLVED: 'OWNER INPUT PENDING',
+});
+
+const evidenceStatus = (code) => {
+  if (code === null || code === undefined) return 'NOT PROVIDED';
+  const text = EVIDENCE_STATUS_TEXT[code] ?? NODE_STATUS_TEXT[code];
+  return text ? `${text} (${code})` : String(code);
+};
+
+const withCandidate = (field) => field?.candidate
+  ? `${evidenceStatus(field.status)} · candidate ${field.candidate} [${field.candidateClass}, ${field.candidateScope}]`
+  : evidenceStatus(field?.status);
+
+const TC_EVIDENCE_ROWS = Object.freeze([
+  ['Cabinet ID', (n) => n.cabinetId ?? 'NOT PROVIDED'],
+  ['Test IP', (n) => n.ipAddress ?? 'NOT PROVIDED'],
+  ['Port', (n) => evidenceStatus(n.portStatus)],
+  ['Protocol', (n) => evidenceStatus(n.protocolStatus)],
+  ['Reachability', (n) => evidenceStatus(n.reachabilityStatus)],
+  ['Acquisition', (n) => evidenceStatus(n.acquisitionStatus)],
+  ['Communication state', (n) => evidenceStatus(n.communicationState)],
+  ['Process image', (n) => evidenceStatus(n.processImageStatus)],
+  ['Byte order', (n) => evidenceStatus(n.byteOrderStatus)],
+  ['Word order', (n) => evidenceStatus(n.wordOrderStatus)],
+  ['Wire-break decoding', (n) => evidenceStatus(n.wireBreakDecodingStatus)],
+  ['Firmware', (n) => evidenceStatus(n.firmwareStatus)],
+  ['Hardware verification', (n) => evidenceStatus(n.hardwareVerificationStatus)],
+  ['Field verification', (n) => evidenceStatus(n.fieldVerificationStatus)],
+  ['Hardware access', (n) => evidenceStatus(n.hardwareAccessStatus)],
+]);
+
+function renderTcAcquisitionEvidence() {
+  const view = state.tcAcquisitionEvidence;
+  const validation = $('tc-evidence-validation');
+  const decisions = $('tc-evidence-decisions');
+  const body = $('tc-evidence-body');
+  const sources = $('tc-evidence-sources');
+  const image = $('tc-evidence-process-image');
+  const requests = $('tc-evidence-requests');
+  const authority = $('tc-evidence-authority');
+  for (const node of [decisions, body, sources, image, requests]) node.replaceChildren();
+  if (!view) {
+    validation.textContent = 'TC acquisition evidence unavailable: the evidence projection could not be read.';
+    body.append(el('p', { class: 'note' }, 'TC acquisition evidence unavailable.'));
+    return;
+  }
+
+  validation.textContent = (view.validation.valid
+    ? `Evidence validation: 0 issues · evidence set ${view.evidenceSetId} · evidence Stage ${view.evidenceStage} · mode ${view.evidenceMode}`
+    : `Evidence validation: ${view.validation.issueCount} issue(s): ${view.validation.issueCodes.join(', ')} · evidence set ${view.evidenceSetId}`)
+    + ` · Preview identity Stage ${view.stageId}`;
+
+  const p = view.decisions.protocol;
+  const port = view.decisions.port;
+  const note = p.evidenceNote;
+  decisions.append(definitionList([
+    ['Protocol decision', p.status],
+    ['Protocol evidence status', p.evidenceStatus],
+    ['Protocol candidate status', `${p.candidateStatus}${p.candidateRetained ? '' : ' - no candidate is retained; no protocol is inferred from the device family'}`],
+    ['Protocol source completeness', p.sourceCompleteness],
+    ['Non-authoritative evidence note', note
+      ? `${note.reference} Original document readable in this review: ${note.originalDocumentReadableInCurrentReview ? 'yes' : 'no'}; committed profile section truncated: ${note.committedProfileSectionTruncated ? 'yes' : 'no'}; `
+        + `as-installed applicability verified: ${note.asInstalledApplicabilityVerified ? 'yes' : 'no'}; firmware verified: ${note.firmwareVerified ? 'yes' : 'no'}; configuration verified: ${note.configurationVerified ? 'yes' : 'no'}; `
+        + `port resolved: ${note.portResolved ? 'yes' : 'no'}; candidate retained: ${note.protocolCandidateRetained ? 'yes' : 'no'}; adapter authorized: ${note.adapterAuthorized ? 'yes' : 'no'}; acquisition authorized: ${note.acquisitionAuthorized ? 'yes' : 'no'}.`
+      : 'none'],
+    ['Approved for a Test adapter', p.approvedForTestAdapter ? 'yes' : `no - Owner approval ${p.ownerApproval}`],
+    ['Protocol activated', p.activated ? 'yes' : 'no'],
+    ['Port decision', port.status],
+    ['Port candidate', port.candidate ? `${port.candidate.value} (${port.status})` : `none - ${port.reason ?? 'no evidence'}; no default is assumed`],
+    ['Communication state model', `${view.communicationStateModel.states.length} states, contract only; current Node state ${evidenceStatus(view.communicationStateModel.currentNodeState)}`],
+    ['Freshness thresholds', `aging ${view.freshness.thresholds.agingAfterMs} · stale ${view.freshness.thresholds.staleAfterMs} · Last-Valid retention ${view.freshness.thresholds.lastValidValueRetentionMs}`],
+  ]));
+
+  const nodes = view.nodes;
+  body.append(el('table', { id: 'tc-evidence-table' }, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { scope: 'col' }, 'Attribute'),
+      ...nodes.map((n) => el('th', { scope: 'col' }, n.nodeId ?? 'NODE ID NOT PROVIDED')),
+    ])]),
+    el('tbody', {}, TC_EVIDENCE_ROWS.map(([label, pick]) => el('tr', {}, [
+      el('th', { scope: 'row' }, label),
+      ...nodes.map((n) => el('td', {}, pick(n))),
+    ]))),
+  ]));
+
+  const byClass = Object.entries(view.claimSummary.byClass).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(' · ');
+  sources.append(el('p', { class: 'note' }, `${view.totals.claims} classified claims: ${byClass}.`));
+  sources.append(el('table', { id: 'tc-evidence-sources-table' }, [
+    el('thead', {}, [el('tr', {}, ['Source', 'Kind', 'Revision', 'Availability in session', 'Connected storage', 'Content', 'Evidence status', 'Readable in this review', 'Hash'].map((h) => el('th', { scope: 'col' }, h)))]),
+    el('tbody', {}, view.sources.map((s) => el('tr', {}, [
+      el('td', {}, s.title), el('td', {}, s.kind), el('td', {}, s.revision ?? 'NOT PROVIDED'), el('td', {}, s.availability),
+      el('td', {}, s.storageAccess ?? 'n/a'), el('td', {}, s.contentRetrieval ?? 'n/a'), el('td', {}, s.evidenceStatus ?? 'n/a'),
+      el('td', {}, s.readableInCurrentReview === true ? 'yes' : s.readableInCurrentReview === 'TRUNCATED' ? 'TRUNCATED' : 'no'),
+      el('td', {}, s.hashRecorded ? `recorded (${s.hashBasis})` : 'none'),
+    ]))),
+  ]));
+  sources.append(definitionList([
+    ['Status location', withCandidate(view.statuses.statusLocation)],
+    ['Byte order', withCandidate(view.statuses.byteOrder)],
+    ['Word order', withCandidate(view.statuses.wordOrder)],
+    ['Encoding', withCandidate(view.statuses.encoding)],
+    ['Wire-break decoding', `${evidenceStatus(view.statuses.wireBreakDecoding.status)} - evidence classification ${view.statuses.wireBreakDecoding.evidenceClassification}; source completeness ${view.statuses.wireBreakDecoding.sourceCompleteness}; `
+      + `Hardware observation ${view.statuses.wireBreakDecoding.hardwareObservationStatus}; physical decoder implemented: ${view.statuses.wireBreakDecoding.physicalDecoderImplemented ? 'yes' : 'no'}; `
+      + `${view.statuses.wireBreakDecoding.provided.length} of ${view.statuses.wireBreakDecoding.requiredEvidence.length} required evidence items provided`],
+    ['Wire-break evidence record', view.statuses.wireBreakDecoding.evidenceRecord
+      ? `Manufacturer document transcription (Stage 0B): ${view.statuses.wireBreakDecoding.evidenceRecord.manufacturerDocumentTranscription.join('; ')}. Reviewer paraphrase: ${view.statuses.wireBreakDecoding.evidenceRecord.reviewerParaphrase.join('; ')}. `
+        + `As-installed configuration: ${view.statuses.wireBreakDecoding.evidenceRecord.asInstalledConfiguration}. Field observation: ${view.statuses.wireBreakDecoding.evidenceRecord.fieldObservation}. Ambiguity: ${view.statuses.wireBreakDecoding.evidenceRecord.ambiguity}.`
+      : 'none'],
+  ]));
+
+  const c = view.processImageCandidate;
+  // Owner ruling (PR #21): while derivation is blocked, no module, word, start, end, offset or range is
+  // rendered. The only arithmetic shown is RECORD_TO_RECORD_CONSISTENCY_ONLY, classified literally.
+  image.append(el('p', { class: 'note' }, `Process image: DERIVATION BLOCKED (${c.state}); address ${evidenceStatus(c.addressStatus)}; authoritative no; activation possible no. Blockers: ${c.blockers.join('; ')}.`));
+  const rr = view.recordToRecordConsistency;
+  if (rr) {
+    image.append(el('p', { class: 'note' }, `${rr.classification}: ${rr.compared} schedule rows compared with the repository profile numbers, ${rr.mismatches} mismatches. Meaning: ${rr.meaning.join('; ')}.`));
+  }
+  image.append(el('p', { class: 'note' }, `Verification blockers: ${c.verificationBlockers.join('; ')}.`));
+
+  requests.append(...view.missingEvidenceRequests.map((r) => el('li', {}, [
+    el('span', { class: 'marker' }, r.requestId), ` - ${r.item} (blocks: ${r.blocks.join('; ')}) - ${r.status}`,
+  ])));
+
+  authority.textContent = `${view.authority.statements.join(' / ')}. This section sends no network request, probes no address, opens no socket, `
+    + 'contacts no device, reads no process image and offers no connection, test, activation or polling control. A candidate is not an address; '
+    + 'model-level evidence does not resolve an instance; the synthetic wire-break scenario is not physical evidence.';
 }
 
 function renderDiagnostics() {
@@ -1163,7 +1299,7 @@ function moveWallOrder(direction) {
   }
   state.selectedKey = step.key;
   const label = wallMeasurementKey(state.wallMap, step.key) ?? step.key;
-  setAlert(`Wall order: ${label} selected (Front before Rear; I7 and I16 are skipped as NON_SENSOR_GAP positions).`);
+  setAlert(`Wall order: ${label} selected (approved logical order over all 108 Sensors, Front before Rear).`);
   renderMonitor();
 }
 
@@ -1224,9 +1360,15 @@ async function loadInitialData() {
   } catch {
     state.tcNodeConfiguration = null;
   }
+  // The K3 evidence projection is isolated the same way: its failure degrades only its own section.
+  try {
+    state.tcAcquisitionEvidence = await getJson('/api/tc-acquisition-evidence');
+  } catch {
+    state.tcAcquisitionEvidence = null;
+  }
   // One canonical topology path: the served logical matrix carries the positions and the Sensor
   // identities, the schedule rows carry the Front/Rear measurement identities. The builder refuses a
-  // topology it cannot prove (a missing wall, a duplicated Sensor, a gap that is not I7 or I16, a
+  // topology it cannot prove (a missing wall, a duplicated Sensor, any non-Sensor position, a
   // Sensor without exactly one Front and one Rear measurement) rather than drawing a wrong wall.
   try {
     state.wallMap = buildWallMap(sensorMap, schedule.rows);
@@ -1275,6 +1417,7 @@ async function boot() {
     renderSensorMap();
     renderMapping();
     renderNodeConfiguration();
+    renderTcAcquisitionEvidence();
     renderDiagnostics();
     await loadObservations();
     setAppState(APP_STATE.READY);

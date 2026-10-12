@@ -1,5 +1,7 @@
 # Stage 0.4C-0 — Physical Sensor Readiness, Loop-Test Requirements and Actual I/O Evidence Gate (Development Checkpoint)
 
+> **Superseded topology note (Owner critical topology correction, 2026-10-12).** This document predates the correction and retains, as a dated historical record, the belief that logical positions I7 and I16 were `NON_SENSOR_GAP` positions (106 Sensors / 212 channels; Sensor sequence skipping I7 and I16; WJ3 / WJ1 "at the I7 / I16 gap anchor"). Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements. 108 × 2 = 216; 240 physical TC channels − 216 = 24 unassigned. The text below is retained unedited and must not be used as a current baseline; the current record is [`STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`](STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md).
+
 Status: **DEVELOPMENT CHECKPOINT — documentation and contract proposal only, SUBMITTED FOR OWNER REVIEW, with Owner decisions OQ-01 to OQ-08 recorded in this successor revision (§0.1).** Nothing is implemented, tested on hardware, commissioned or merged. **Physical TC acquisition: BLOCKED BY MISSING TC TOPOLOGY AND SENSOR-TO-CHANNEL SCHEDULE.** Stage 0.4C-1 TC acquisition: **BLOCKED.** **PR #16 OPEN — NOT MERGED.**
 
 Stop point: this checkpoint. The Owner merges; the agent does not.

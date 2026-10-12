@@ -99,8 +99,10 @@ public sealed class RuntimeSnapshotProjectionTests
 
         var sensorSlots = snapshot.WallMap.Where(slot => slot.PositionKind == LogicalPositionKind.SENSOR).ToArray();
         Assert.Equal(snapshot.Sensors.Count, sensorSlots.Length);
-        Assert.DoesNotContain(sensorSlots, slot => slot.GapAnchorForWaterJetId is not null);
-        Assert.DoesNotContain(snapshot.WallMap, slot => slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP && slot.SensorId is not null);
+        Assert.Equal(CanonicalSensorMap.SensorLocations, sensorSlots.Length); // 108: every slot is a Sensor slot
+        Assert.Equal(snapshot.WallMap.Count, sensorSlots.Length);
+        Assert.Contains(snapshot.Sensors, sensor => sensor.SensorId == "I7");
+        Assert.Contains(snapshot.Sensors, sensor => sensor.SensorId == "I16");
     }
 
     [Fact]

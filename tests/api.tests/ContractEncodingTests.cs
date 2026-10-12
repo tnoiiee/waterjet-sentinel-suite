@@ -69,26 +69,34 @@ public sealed class ContractEncodingTests
     [Fact]
     public void Wall_Map_Slot_Serializes_CamelCase_And_Explicit_Nulls()
     {
+        // Owner critical topology correction: SLOT-R5-C07 is the normal Product Sensor I7
+        // (REAR wall, wall column 3), never a NON_SENSOR_GAP. The contract record carries no
+        // gap-anchor key at all.
         var slot = new WallMapSlot
         {
             SlotId = "SLOT-R5-C07",
-            PositionKind = LogicalPositionKind.NON_SENSOR_GAP,
+            PositionKind = LogicalPositionKind.SENSOR,
             Wall = Wall.REAR,
             LogicalColumn = 7,
             LogicalRow = 5,
             WallColumn = 3,
             WallRow = 5,
-            SensorId = null,
-            GapAnchorForWaterJetId = "WJ3",
+            SensorId = "I7",
         };
 
         using var doc = SerializeToDocument(slot);
         var root = doc.RootElement;
         Assert.Equal("SLOT-R5-C07", root.GetProperty("slotId").GetString());
-        Assert.Equal("NON_SENSOR_GAP", root.GetProperty("positionKind").GetString());
+        Assert.Equal("SENSOR", root.GetProperty("positionKind").GetString());
         Assert.Equal("REAR", root.GetProperty("wall").GetString());
-        // (B) explicit null: key present, token kind Null - no JsonNode dereference.
-        Assert.True(root.TryGetProperty("sensorId", out var sensorId));
+        Assert.Equal("I7", root.GetProperty("sensorId").GetString());
+        Assert.False(root.TryGetProperty("gapAnchorForWaterJetId", out _));
+
+        // (B) explicit null: a malformed slot without a Sensor identity serializes the key
+        // present with token kind Null (never omitted) so that validators can refuse it —
+        // no JsonNode dereference.
+        using var malformed = SerializeToDocument(slot with { SensorId = null });
+        Assert.True(malformed.RootElement.TryGetProperty("sensorId", out var sensorId));
         Assert.Equal(JsonValueKind.Null, sensorId.ValueKind);
     }
 

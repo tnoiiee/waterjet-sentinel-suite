@@ -10,6 +10,17 @@ namespace Wjss.Domain;
 /// on one wall and sprays the OPPOSITE wall (LEFT↔RIGHT, FRONT↔REAR) in the matching
 /// region. The pairing is mandatory one-to-one with matching ordinals: WJn ↔ IVn.
 ///
+/// Owner Water Jet installed-position ruling (Stage 0.4C-K3, with the Owner critical
+/// topology correction): logical I7 and I16 are Product Sensors, so the former "mounted at
+/// the I16 / I7 gap" placements of WJ1 / WJ3 are revoked. Their placement is
+/// <see cref="WaterJetPlacementKind.UNRESOLVED"/> ("Installed position pending authoritative
+/// layout") with NO placement anchors: nothing is inferred from I7, I16, a former gap, a
+/// Sensor wall, the target wall, a target Sensor, the legacy cannon value or the Assigned
+/// Cleaning Device ID. The Owner-approved installed wall / region and the proven target
+/// coverage of every Water Jet are retained unchanged; no target was modified to fill the
+/// unresolved placement. Legacy <c>cannon n</c> still maps directly to WJn, and WJn remains
+/// paired one-to-one with IVn.
+///
 /// This catalog is the single source of the approved table for the migration importer and
 /// the topology validator. It contains no Production equipment parameter: walls, regions,
 /// placement kinds, logical anchor labels, and identities are Owner-approved layout
@@ -17,12 +28,11 @@ namespace Wjss.Domain;
 /// </summary>
 public static class WaterJetTopologyCatalog
 {
-    /// <summary>The two NON_SENSOR_GAP logical positions and the Water Jets they anchor (I7 → WJ3, I16 → WJ1). They are location anchors only — never equipment identities.</summary>
-    public static readonly IReadOnlyDictionary<string, string> GapAnchors = new Dictionary<string, string>
-    {
-        ["I7"] = "WJ3",
-        ["I16"] = "WJ1",
-    };
+    /// <summary>Operator-facing wording for an <see cref="WaterJetPlacementKind.UNRESOLVED"/> placement.</summary>
+    public const string UnresolvedPlacementWording = "Installed position pending authoritative layout";
+
+    /// <summary>The Water Jets whose placement is UNRESOLVED because it depended on a revoked gap position (WJ1 formerly "at I16", WJ3 formerly "at I7").</summary>
+    public static readonly IReadOnlyList<string> UnresolvedPlacementWaterJetIds = ["WJ1", "WJ3"];
 
     /// <summary>The approved Water Jet topology table, in ordinal order WJ1–WJ8.</summary>
     public static IReadOnlyList<WaterJetConfiguration> WaterJets { get; } =
@@ -32,8 +42,8 @@ public static class WaterJetTopologyCatalog
             WaterJetId = "WJ1",
             InstalledWall = Wall.FRONT,
             InstalledRegion = Region.LOWER,
-            PlacementKind = WaterJetPlacementKind.NON_SENSOR_GAP,
-            PlacementAnchors = ["I15", "I17"],
+            PlacementKind = WaterJetPlacementKind.UNRESOLVED,
+            PlacementAnchors = [],
             TargetWall = Wall.REAR,
             TargetRegion = Region.LOWER,
             DedicatedIsolationValveId = "IV1",
@@ -54,8 +64,8 @@ public static class WaterJetTopologyCatalog
             WaterJetId = "WJ3",
             InstalledWall = Wall.REAR,
             InstalledRegion = Region.LOWER,
-            PlacementKind = WaterJetPlacementKind.NON_SENSOR_GAP,
-            PlacementAnchors = ["I6", "I8"],
+            PlacementKind = WaterJetPlacementKind.UNRESOLVED,
+            PlacementAnchors = [],
             TargetWall = Wall.FRONT,
             TargetRegion = Region.LOWER,
             DedicatedIsolationValveId = "IV3",

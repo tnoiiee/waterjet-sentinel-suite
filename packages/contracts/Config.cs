@@ -44,10 +44,11 @@ public enum MigrationFieldDisposition
 
     /// <summary>Retained raw for a later explicit Owner decision; consumed by nothing.</summary>
     DEFER,
-
-    /// <summary>Excluded from sensor import because the row is a NON_SENSOR_GAP logical-position record (I7, I16).</summary>
-    REJECT_FOR_I7_I16,
 }
+
+// Owner critical topology correction (Stage 0.4C-K3): the former REJECT_FOR_I7_I16
+// disposition is withdrawn. I7 and I16 are normal Product Sensors; their rows import
+// exactly like every other Sensor row and no row is excluded by identity.
 
 /// <summary>The approved classification of one legacy CSV field (documents the matrix; data only, no behaviour).</summary>
 public sealed record MigrationFieldClassification
@@ -79,8 +80,9 @@ public sealed record DeferredAcquisitionProvenance
 }
 
 /// <summary>
-/// Canonical configuration of one actual Sensor — exactly 106 records after a successful
-/// import, never one for a NON_SENSOR_GAP position. Approved imports only: dirty-score
+/// Canonical configuration of one actual Sensor — exactly 108 records after a successful
+/// import, one per logical position (I7 and I16 included; Owner critical topology
+/// correction). Approved imports only: dirty-score
 /// settings are direct recorded renames of the legacy numeric values (values remain
 /// [NOT VERIFIED]); Enabled comes from the legacy enable token; CleaningCount is the raw
 /// copy of the legacy count. Four domain derivations are PROHIBITED pending an explicit
@@ -102,7 +104,7 @@ public sealed record SensorConfigurationRecord
     /// <summary>Wall-local scan order preserved from the legacy record.</summary>
     public required int OrderWall { get; init; }
 
-    /// <summary>Dense one-based scan ordinal 1–106, derived deterministically by sorting the SENSOR logical positions by OrderTotal and excluding the NON_SENSOR_GAP positions; the sequence skips I7 and I16.</summary>
+    /// <summary>Dense one-based scan ordinal 1–108, derived deterministically by sorting the 108 Sensor logical positions by OrderTotal (I7 and I16 in their normal ordinal position; no position is skipped).</summary>
     public required int ScanOrder { get; init; }
 
     /// <summary>Direct recorded rename of the legacy min temperature dirty-score bound. Value [NOT VERIFIED].</summary>
@@ -114,7 +116,16 @@ public sealed record SensorConfigurationRecord
     /// <summary>Direct recorded rename of the legacy threshold setpoint. Value [NOT VERIFIED]. Whether it gates eligibility (UseDirtyScoreThreshold) is a deferred Owner decision.</summary>
     public required double DirtyScoreThreshold { get; init; }
 
-    /// <summary>Canonicalized from the legacy enable token. No other domain boolean is derived.</summary>
+    /// <summary>
+    /// Canonicalized from the legacy enable token. No other domain boolean is derived. This is
+    /// the configured Sensor Enabled / Disabled state (Owner Sensor Disable ruling): a Sensor
+    /// whose legacy record carries an EMPTY enable token resolves to Enabled at import (recorded
+    /// as a <see cref="MigrationRefusalCodes.MigrationEnableDefaulted"/> warning, never silently);
+    /// an unrecognized token still refuses the import. I7 and I16 follow the same rule as every
+    /// other Sensor. The Runtime queue layer consumes this state
+    /// through <c>SequencingTopology</c> / <c>SetSensorEnablement</c>; a Disabled Sensor can
+    /// generate no Cleaning Candidate and enter no GlobalQueue entry.
+    /// </summary>
     public required bool Enabled { get; init; }
 
     /// <summary>Raw copy of the legacy cleaning count. Whether it implies verified history is a deferred Owner decision.</summary>
@@ -181,7 +192,7 @@ public sealed record SensorParameterMigrationResult
     /// <summary>All 108 logical positions, ordered strictly ascending by OrderTotal.</summary>
     public required IReadOnlyList<LogicalPositionRecord> LogicalPositions { get; init; }
 
-    /// <summary>The 106 actual Sensors, ordered strictly ascending by ScanOrder (1–106).</summary>
+    /// <summary>The 108 Sensors, ordered strictly ascending by ScanOrder (1–108).</summary>
     public required IReadOnlyList<SensorConfigurationRecord> Sensors { get; init; }
 
     /// <summary>The 8 Water Jets, in ordinal order WJ1–WJ8.</summary>
@@ -223,10 +234,10 @@ public sealed record SensorParameterImportOutcome
 /// <summary>
 /// Machine refusal/warning code vocabulary for the legacy sensor-parameter migration
 /// (ADR-0017 decision 11). Additive only; no existing Runtime refusal code is changed.
-/// Structural codes fail the whole import; the three WARNING-level codes
+/// Structural codes fail the whole import; the WARNING-level codes
 /// (<see cref="MigrationPlaceholderValue"/>, <see cref="MigrationUnitUnverified"/>,
-/// <see cref="MigrationTimezoneUnknown"/>) preserve the value verbatim and record a
-/// warning instead.
+/// <see cref="MigrationTimezoneUnknown"/>, <see cref="MigrationEnableDefaulted"/>) preserve
+/// the value and record a warning instead.
 /// </summary>
 public static class MigrationRefusalCodes
 {
@@ -234,7 +245,12 @@ public static class MigrationRefusalCodes
     public const string TopoSensorCount = "TOPO_SENSOR_COUNT";
     public const string TopoChannelCount = "TOPO_CHANNEL_COUNT";
     public const string TopoWallCounts = "TOPO_WALL_COUNTS";
-    public const string TopoGapIdentity = "TOPO_GAP_IDENTITY";
+
+    /// <summary>A Sensor identity, position kind or identity set disagrees with the authoritative 108-Sensor catalogue (I7 and I16 included).</summary>
+    public const string TopoSensorIdentity = "TOPO_SENSOR_IDENTITY";
+
+    /// <summary>The assembled result fails the central cross-layer <see cref="TopologyInvariants"/> check; the detail carries the TOPOLOGY_* code.</summary>
+    public const string TopoInvariantViolation = "TOPO_INVARIANT_VIOLATION";
     public const string TopoDuplicateId = "TOPO_DUPLICATE_ID";
     public const string TopoDuplicateOrder = "TOPO_DUPLICATE_ORDER";
     public const string TopoWaterJetCount = "TOPO_WATERJET_COUNT";
@@ -255,4 +271,7 @@ public static class MigrationRefusalCodes
 
     /// <summary>WARNING-level: offset-free timestamp imported; source timezone UNKNOWN; the raw string is preserved and NO UTC conversion is performed.</summary>
     public const string MigrationTimezoneUnknown = "MIGRATION_TIMEZONE_UNKNOWN";
+
+    /// <summary>WARNING-level: the legacy enable token was empty; the Sensor resolves to Enabled by the Owner default-enable rule and is listed for review.</summary>
+    public const string MigrationEnableDefaulted = "MIGRATION_ENABLE_DEFAULTED";
 }

@@ -8,8 +8,15 @@
 export {
   COLUMN, COLUMN_COUNT, ROW_STATE, TEMPLATE_COMPATIBILITY, ROW_CLASS, PASS_BLOCKED, PROTECTED_BASELINE,
   parseCsv, requireHeaderContract, parseSchedule, classifyRow, passBlockedReason, scheduleCounts,
-  matchesProtectedBaseline, nodeInventory, measurementsOfSensor, isNonSensorGapSensorId,
+  matchesProtectedBaseline, nodeInventory, measurementsOfSensor, isProductSensorId,
+  PRODUCT_SENSOR_SEQUENCE,
 } from './schedule.mjs';
+
+export {
+  AUTHORITATIVE_TOPOLOGY, TOPOLOGY_REFUSAL, validateSensorSequence, validateSensorCatalogue,
+  validateSchedule, validateWallMapCounts, validateRuntimeCounts, validateTopologyInvariants,
+  requireTopologyInvariants,
+} from './topologyInvariants.mjs';
 
 export {
   QUALITY, QUALITY_VALUES, DIAGNOSTIC_REASON, DIAGNOSTIC_REASON_VALUES, COMMISSIONING_STATE,
@@ -68,3 +75,19 @@ export {
   validateTcNodeConfiguration, systemTotals, buildTcNodeConfigurationView, canonicalTcNodeConfigurationText,
   tcNodeConfigurationFingerprint,
 } from './tcNodeConfiguration.mjs';
+
+export {
+  TC_ACQUISITION_EVIDENCE_SCHEMA_VERSION, TC_ACQUISITION_EVIDENCE_ID, EVIDENCE_STAGE, EVIDENCE_MODE,
+  EVIDENCE_CLASS, EVIDENCE_CLASS_VALUES, EVIDENCE_SCOPE, SOURCE_KIND, SOURCE_AVAILABILITY, VERIFICATION_STATUS,
+  PROTOCOL_DECISION_STATUS, PORT_DECISION_STATUS, FORBIDDEN_DECISION_STATUSES, BYTE_ORDER, WORD_ORDER,
+  STATUS_LOCATION, DIRECTION, MODULE_ROLE, FIELD_STATUS, CANDIDATE_STATUS, DERIVATION_STATE,
+  ACQUISITION_COMMUNICATION_STATE, ACQUISITION_COMMUNICATION_STATE_VALUES, LIVE_COMMUNICATION_STATES,
+  evidenceOnlyCommunicationState, FRESHNESS_STATE, SAMPLE_TIME_FIELDS, THRESHOLD_PENDING, FRESHNESS_THRESHOLDS,
+  classifyFreshness, DECODE_STATUS, DIAGNOSTIC_CATEGORY, SAMPLE_PROVENANCE, ACQUISITION_SAMPLE_FIELDS,
+  validateAcquisitionSample, frontRearDeltaPermitted, CLAIM_TOPIC, createTcAcquisitionEvidenceSet,
+  CANONICAL_TC_ACQUISITION_EVIDENCE, validateTcAcquisitionEvidence, deriveCandidateProcessImage,
+  recordToRecordConsistency, buildTcAcquisitionEvidenceView, canonicalTcAcquisitionEvidenceText,
+  SOURCE_COMPLETENESS, SOURCE_BASIS, PROTOCOL_CANDIDATE_STATUS, OWNER_EVIDENCE_PENDING, CONNECTED_STORAGE_NOT_AUTHORIZED,
+  CONTENT_NOT_RETRIEVED, NOT_PROVIDED, RECORD_TO_RECORD_CONSISTENCY_ONLY, RECORD_TO_RECORD_CONSISTENCY_MEANING,
+  tcAcquisitionEvidenceFingerprint,
+} from './tcAcquisitionEvidence.mjs';

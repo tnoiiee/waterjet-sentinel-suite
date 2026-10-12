@@ -18,29 +18,6 @@ public sealed record RuntimeUnavailablePayload
     public required string StageMarker { get; init; }
 }
 
-/// <summary>
-/// One NON_SENSOR_GAP position as the read-only API presents it: the Owner-facing
-/// logical reference (I7, I16) together with the Water Jet it physically anchors,
-/// which is never replaced or re-derived. The logical label is a display
-/// projection of the slot's logical column (the accepted labelling
-/// <c>I&lt;logicalColumn&gt;</c>). A gap position is a location anchor only — it is
-/// never a Sensor and never a Water Jet identity.
-/// </summary>
-public sealed record RuntimeGapReference
-{
-    /// <summary>Owner-facing logical reference: I7 (Rear, anchors WJ3) and I16 (Front, anchors WJ1).</summary>
-    public required string LogicalLabel { get; init; }
-
-    /// <summary>The Water Jet physically anchored at this gap position (I7 → WJ3, I16 → WJ1).</summary>
-    public required string GapAnchorForWaterJetId { get; init; }
-
-    /// <summary>Logical matrix row of the position (5 for both gaps).</summary>
-    public required int LogicalRow { get; init; }
-
-    /// <summary>Logical matrix column of the position (7 Rear, 16 Front).</summary>
-    public required int LogicalColumn { get; init; }
-}
-
 /// <summary>One approved Water Jet as the read-only status presents it: a configuration topology reference, never a control handle.</summary>
 public sealed record RuntimeWaterJetView
 {
@@ -49,6 +26,14 @@ public sealed record RuntimeWaterJetView
     public required Region InstalledRegion { get; init; }
     public required WaterJetPlacementKind PlacementKind { get; init; }
     public required IReadOnlyList<string> PlacementAnchors { get; init; }
+
+    /// <summary>
+    /// Read-only operator wording for an UNRESOLVED installed position (Owner ruling:
+    /// WJ1 / WJ3 installed position is pending authoritative layout evidence; nothing is
+    /// inferred from the former I7 / I16 gaps). Null for every resolved placement.
+    /// </summary>
+    public string? InstalledPositionNote { get; init; }
+
     public required Wall TargetWall { get; init; }
     public required Region TargetRegion { get; init; }
 
@@ -62,6 +47,9 @@ public sealed record RuntimeWaterJetView
         InstalledRegion = waterJet.InstalledRegion,
         PlacementKind = waterJet.PlacementKind,
         PlacementAnchors = waterJet.PlacementAnchors,
+        InstalledPositionNote = waterJet.PlacementKind == WaterJetPlacementKind.UNRESOLVED
+            ? WaterJetTopologyCatalog.UnresolvedPlacementWording
+            : null,
         TargetWall = waterJet.TargetWall,
         TargetRegion = waterJet.TargetRegion,
         DedicatedIsolationValveId = waterJet.DedicatedIsolationValveId,
@@ -140,23 +128,23 @@ public sealed record RuntimeWallSummaryView
 /// <summary>Protected-baseline counts carried by the Runtime status payload.</summary>
 public sealed record RuntimeStatusSensorCounts
 {
-    /// <summary>108 logical slots (106 Sensors + 2 NON_SENSOR_GAP positions).</summary>
+    /// <summary>108 logical slots (all Sensor positions; I7 and I16 included — Owner critical topology correction).</summary>
     public required RuntimeSensorCount LogicalSlots { get; init; }
 
-    /// <summary>106 Sensor locations (the adapter's own count, so drift is visible).</summary>
+    /// <summary>108 Sensor locations (the adapter's own count, so drift is visible).</summary>
     public required RuntimeSensorCount SensorLocations { get; init; }
 
-    /// <summary>212 Thermocouple channels.</summary>
+    /// <summary>216 assigned Thermocouple channels (108 × 2).</summary>
     public required RuntimeSensorCount ThermocoupleChannels { get; init; }
 
-    /// <summary>2 NON_SENSOR_GAP positions (not Sensors, not equipment).</summary>
-    public required RuntimeSensorCount NonSensorGaps { get; init; }
+    /// <summary>240 physical Thermocouple channels (6 cabinets × 40).</summary>
+    public required RuntimeSensorCount PhysicalThermocoupleChannels { get; init; }
 
-    /// <summary>
-    /// The two NON_SENSOR_GAP positions in canonical orderTotal order (I7 Rear, I16 Front), each
-    /// carrying its Owner-facing logical reference and the Water Jet it anchors.
-    /// </summary>
-    public required IReadOnlyList<RuntimeGapReference> NonSensorGapSlots { get; init; }
+    /// <summary>24 physical Thermocouple channels with no Product assignment.</summary>
+    public required RuntimeSensorCount UnassignedThermocoupleChannels { get; init; }
+
+    /// <summary>The Sensor identities corrected to normal Product Sensors by the Owner critical topology correction (I7, I16). Reference only.</summary>
+    public required IReadOnlyList<string> CorrectedSensorIds { get; init; }
 
     /// <summary>8 approved Water Jets (paired one-to-one with the Isolation Valves).</summary>
     public required RuntimeSensorCount WaterJets { get; init; }
@@ -185,19 +173,17 @@ public sealed record RuntimeStatusSensorCounts
             Label = nameof(CanonicalSensorMap.ThermocoupleChannelCount),
             Count = CanonicalSensorMap.ThermocoupleChannelCount,
         },
-        NonSensorGaps = new RuntimeSensorCount
+        PhysicalThermocoupleChannels = new RuntimeSensorCount
         {
-            Label = nameof(CanonicalSensorMap.NonSensorGapCount),
-            Count = CanonicalSensorMap.NonSensorGapCount,
+            Label = nameof(CanonicalSensorMap.PhysicalThermocoupleChannelCount),
+            Count = CanonicalSensorMap.PhysicalThermocoupleChannelCount,
         },
-        NonSensorGapSlots = [.. CanonicalSensorMap.NonSensorGapSlots
-            .Select(slot => new RuntimeGapReference
-            {
-                LogicalLabel = slot.LogicalId,
-                GapAnchorForWaterJetId = slot.AnchorWaterJetId,
-                LogicalRow = slot.Row,
-                LogicalColumn = slot.Column,
-            })],
+        UnassignedThermocoupleChannels = new RuntimeSensorCount
+        {
+            Label = nameof(CanonicalSensorMap.UnassignedThermocoupleChannelCount),
+            Count = CanonicalSensorMap.UnassignedThermocoupleChannelCount,
+        },
+        CorrectedSensorIds = CanonicalSensorMap.CorrectedSensorIds,
         WaterJets = new RuntimeSensorCount
         {
             Label = nameof(WaterJetTopologyCatalog.WaterJets),
@@ -270,6 +256,13 @@ public sealed record RuntimeStatus
 
     public required bool ActiveJobPresent { get; init; }
     public required string? ActiveJobId { get; init; }
+
+    /// <summary>
+    /// Read-only Sensor Enable / Disable state of the sequencing kernel (Owner Sensor Disable
+    /// ruling): the Disabled Sensor identities in ordinal order. Every Sensor not listed is
+    /// Enabled (default; I7 and I16 included). No mutation route exists in this host.
+    /// </summary>
+    public required IReadOnlyList<string> DisabledSensorIds { get; init; }
 
     public required PumpRunState PumpState { get; init; }
 

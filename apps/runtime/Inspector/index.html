@@ -150,8 +150,9 @@
   td.gap { color: var(--warn); font-weight: 600; }
   td.clean { color: var(--ok); }
   code { color: var(--accent); }
-  /* Wall map: sensor cells stay quiet; NON_SENSOR_GAP cells are visually distinct
-     (dashed outline, warning tone) and never carry Sensor values or equipment ids. */
+  /* Wall map: every logical position is a Product Sensor cell (108; I7 and I16 included).
+     A slot the Runtime API still publishes with the superseded NON_SENSOR_GAP kind renders
+     as an explicit STALE TOPOLOGY cell (dashed outline, warning tone), never as a gap. */
   .wallmap { display: flex; flex-direction: column; gap: 10px; }
   .wallmap .wm-head { display: flex; gap: 12px; align-items: baseline; margin-top: 4px; }
   .wallmap .wm-head h3 { margin: 0; font-size: 12px; letter-spacing: .08em; }
@@ -228,9 +229,13 @@
     <section class="card wide">
       <h2>Wall map &mdash; logical positions and installation overlay</h2>
       <div class="wallmap" id="wallmap"></div>
-      <p class="note">106 Sensor positions render their canonical id. I7 and I16 are
-        <strong>NON_SENSOR_GAP</strong> positions: placement anchors only &mdash; never Sensors,
-        never Water Jet identities &mdash; with no Sensor value, quality or thermocouple channel.
+      <p class="note">All 108 logical positions are Product Sensors and render their canonical
+        id; <strong>I7 and I16 are normal Sensors</strong> in their ordinal position (Owner
+        critical topology correction: 108 Sensors, 216 assigned Product TC measurements, 240
+        physical channels, 24 unassigned). A position the Runtime API still publishes with the
+        superseded <code>NON_SENSOR_GAP</code> kind is shown as <strong>STALE TOPOLOGY</strong>,
+        never as a gap: the API has not yet adopted the correction and the disagreement is
+        surfaced rather than hidden.
         The installation overlay lists, per wall, the Water Jets physically installed there; each
         one sprays the opposite wall (installed position and target coverage are separate).
         Devices are read-only topology references: nothing here is controllable and acquisition
@@ -434,15 +439,7 @@
       { k: "Logical slots", v: counts.logicalSlots.count, s: "logical map", title: counts.logicalSlots.label },
       { k: "Sensors", v: counts.sensorLocations.count, s: "sensor locations", title: counts.sensorLocations.label },
       { k: "Thermocouple channels", v: counts.thermocoupleChannels.count, s: "validated channels", title: counts.thermocoupleChannels.label },
-      {
-        k: "Non-sensor gaps",
-        v: counts.nonSensorGapSlots.map(function (c) { return c.logicalLabel; }).join(" \u00b7 "),
-        s: counts.nonSensorGaps.count + " anchors \u00b7 not Sensors, not devices",
-        title: counts.nonSensorGapSlots.map(function (c) {
-          return c.logicalLabel + " is a NON_SENSOR_GAP placement anchor (logical row " + c.logicalRow +
-            ", column " + c.logicalColumn + "); the Water Jet mounted there is listed in the equipment topology";
-        }).join(" | ")
-      },
+      topologyBaselineTile(counts),
       { k: "Tick interval", v: status.tickIntervalMilliseconds + " ms", s: "configured" },
       { k: "Synthetic seed", v: status.syntheticSeed, s: "determinism identity" },
       { k: "State history", v: status.stateHistoryDepth + " / " + status.stateHistoryCapacity, s: "depth / capacity" },
@@ -511,6 +508,11 @@
     var rows = [
       { k: "Queue", v: status.queueCount + " / " + status.queueCapacity, s: status.queuePlaceholder },
       { k: "Active job", v: status.activeJobPresent ? ("present: " + status.activeJobId) : "none" },
+      // Owner Sensor Disable ruling: read-only exposure only. A disabled Sensor is never a
+      // Cleaning Candidate and never enters the GlobalQueue; no mutation control exists here.
+      { k: "Disabled Sensors", v: (status.disabledSensorIds && status.disabledSensorIds.length > 0)
+          ? status.disabledSensorIds.join(", ") : "none (all 108 Sensors Enabled)",
+        s: "read only \u00b7 excluded from the GlobalQueue \u00b7 no enable/disable control in this Inspector" },
       { k: "Pump control", v: "NOT AUTHORIZED / READ ONLY", s: "No Pump command path; pressure readiness is observation only." },
       { k: "Pump observation", v: pumpObservation(snapshot.activeJob) },
       { k: "Alarms", v: status.activeAlarmCount + " active, " + status.clearedAlarmCount + " cleared" },
@@ -523,9 +525,47 @@
     rows.forEach(function (row) { addPair(host, row.k, row.v, row.s); });
   }
 
-  // Wall map: one block per wall. Sensor positions render their canonical id;
-  // the two NON_SENSOR_GAP positions render visually distinct (dashed) with their
-  // logical label only - never a Sensor value and never a Water Jet identity.
+  // Owner critical topology correction: the authoritative baseline is 108 Product Sensors
+  // (I7 and I16 are normal Sensors), 216 assigned Product TC measurements, 240 physical
+  // channels, 24 unassigned. The Inspector never derives these numbers from the API; it
+  // compares what the API publishes against them and surfaces any disagreement.
+  var TOPOLOGY_BASELINE = {
+    productSensors: 108, assignedProductTcChannels: 216, logicalPositions: 108,
+    physicalTcChannels: 240, unassignedTcChannels: 24, nonSensorGapPositions: 0
+  };
+
+  function topologyBaselineTile(counts) {
+    var sensors = counts.sensorLocations ? counts.sensorLocations.count : null;
+    var channels = counts.thermocoupleChannels ? counts.thermocoupleChannels.count : null;
+    var physical = counts.physicalThermocoupleChannels ? counts.physicalThermocoupleChannels.count : null;
+    var unassigned = counts.unassignedThermocoupleChannels ? counts.unassignedThermocoupleChannels.count : null;
+    // A superseded API build would still publish a nonSensorGaps count; the corrected API has none.
+    var gaps = counts.nonSensorGaps ? counts.nonSensorGaps.count : 0;
+    var agrees = sensors === TOPOLOGY_BASELINE.productSensors &&
+      channels === TOPOLOGY_BASELINE.assignedProductTcChannels &&
+      physical === TOPOLOGY_BASELINE.physicalTcChannels &&
+      unassigned === TOPOLOGY_BASELINE.unassignedTcChannels &&
+      gaps === TOPOLOGY_BASELINE.nonSensorGapPositions;
+    if (agrees) {
+      return {
+        k: "Topology baseline", v: "AGREES", s: "108 Sensors \u00b7 216 of 240 channels assigned \u00b7 24 unassigned \u00b7 I7 and I16 are Sensors",
+        title: "The Runtime API publishes the Owner critical topology correction baseline (108 / 216 / 240 / 24; no gap position)."
+      };
+    }
+    return {
+      k: "Topology baseline", v: "STALE",
+      s: "API " + sensors + " Sensors / " + channels + " assigned / " + physical + " physical / " + unassigned +
+        " unassigned / " + gaps + " gap(s) \u00b7 expected 108 / 216 / 240 / 24 / 0",
+      title: "The Runtime API publishes a topology that disagrees with the Owner critical topology correction " +
+        "(authoritative current baseline: 108 Sensors, 216 assigned Product TC measurements, 240 physical, 24 unassigned; " +
+        "I7 and I16 are normal Product Sensors). A 106 / 212 reading is the superseded belief and must not be trusted."
+    };
+  }
+
+  // Wall map: one block per wall. Every position is a Product Sensor and renders its
+  // canonical id (I7 and I16 included). A slot still published with the superseded
+  // NON_SENSOR_GAP kind renders as an explicit STALE TOPOLOGY cell - never as a gap,
+  // never silently as a Sensor value.
   // The installation overlay is a separate line per wall listing the Water Jets
   // physically installed there and the opposite wall they clean.
   function renderWallMap(snapshot) {
@@ -553,8 +593,12 @@
         var overlay = document.createElement("span");
         overlay.className = "wm-overlay";
         overlay.textContent = "Installed here: " + installed.map(function (w) {
-          return w.waterJetId + " (" + w.placementKind.toLowerCase().replace(/_/g, " ") +
-            " at " + w.placementAnchors.join(" + ") + ") + " + w.dedicatedIsolationValveId +
+          // Owner ruling: an UNRESOLVED installed position (WJ1, WJ3) is shown as pending
+          // authoritative layout and never anchored to I7 / I16 or any former gap.
+          var placement = w.placementKind === "UNRESOLVED"
+            ? (w.installedPositionNote || "installed position pending authoritative layout")
+            : w.placementKind.toLowerCase().replace(/_/g, " ") + " at " + w.placementAnchors.join(" + ");
+          return w.waterJetId + " (" + placement + ") + " + w.dedicatedIsolationValveId +
             " \u2192 sprays the opposite wall: " + w.targetWall + " " + w.targetRegion.toLowerCase();
         }).join(" \u00b7 ");
         head.appendChild(overlay);
@@ -568,10 +612,12 @@
       grid.style.gridTemplateColumns = "repeat(" + columnsPerWall[wall] + ", minmax(0, 1fr))";
       wallSlots.forEach(function (slot) {
         var cellNode = document.createElement("div");
-        if (slot.positionKind === "NON_SENSOR_GAP") {
+        if (slot.positionKind !== "SENSOR") {
           cellNode.className = "slot gap";
-          text(cellNode, (slot.logicalLabel || slot.slotId) + " \u00b7 GAP");
-          cellNode.title = "NON_SENSOR_GAP placement anchor: no Sensor value, no quality, no thermocouple channel, and never a Water Jet identity. The device mounted here appears in the equipment topology.";
+          text(cellNode, (slot.logicalLabel || slot.slotId) + " \u00b7 STALE TOPOLOGY");
+          cellNode.title = "The Runtime API published this position with the superseded kind '" + slot.positionKind +
+            "'. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors " +
+            "(108 Sensors, 216 assigned Product TC measurements). No Sensor value is shown until the API publishes the Sensor.";
         } else {
           cellNode.className = "slot";
           text(cellNode, slot.sensorId || slot.slotId);
@@ -614,7 +660,9 @@
       cell(w.dedicatedIsolationValveId);
       cell(w.installedWall + " " + w.installedRegion.toLowerCase());
       cell(w.placementKind);
-      cell(w.placementAnchors.join(" + "));
+      cell(w.placementKind === "UNRESOLVED"
+        ? (w.installedPositionNote || "Installed position pending authoritative layout")
+        : w.placementAnchors.join(" + "));
       cell(w.targetWall + " " + w.targetRegion.toLowerCase() + " (opposite wall)");
       cell("topology reference \u00b7 control not authorized \u00b7 acquisition deferred", "topo-status");
       body.appendChild(tr);

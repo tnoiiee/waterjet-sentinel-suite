@@ -101,6 +101,22 @@ public sealed record AxisFeedbackObserved(DateTimeOffset At, AxisFeedbackState F
 /// </summary>
 public sealed record FeedbackTimeoutExpired(DateTimeOffset At, FeedbackTarget Target) : SequencingEvent;
 
+/// <summary>
+/// Sets the Enabled / Disabled state of one Sensor (Owner Sensor Disable ruling,
+/// Stage 0.4C-K3). The identity must exist in <paramref name="Topology"/>; an
+/// unknown identity is refused as SENSOR_UNKNOWN and never enters the state. A
+/// disable removes the Sensor's queued non-active entry immediately with reason
+/// SENSOR_DISABLED, leaves an Active Job targeting the Sensor untouched, and keeps
+/// the Sensor out of the GlobalQueue until re-enabled. An enable only clears the
+/// state: it never resurrects a removed entry and never reuses a stale
+/// classification; a new admission with new valid evidence is required.
+/// </summary>
+public sealed record SetSensorEnablement(
+    DateTimeOffset At,
+    string SensorId,
+    bool Enabled,
+    SequencingTopology Topology) : SequencingEvent;
+
 /// <summary>The only admission source in Stage 0.4A: explicit scenario-prepared entries.</summary>
 public enum SequencingAdmissionSource
 {

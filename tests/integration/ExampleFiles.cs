@@ -43,55 +43,47 @@ internal static class ExampleFiles
     public static string SensorMap()
     {
         var slots = new JsonArray();
-        var positions = FixtureGenerator.SensorPositions();
         var scan = 0;
 
+        // Owner critical topology correction (Stage 0.4C-K3): every one of the 108 logical
+        // positions is a Product Sensor (I7 and I16 included); no gap slot, no gap-anchor key.
+        // tools/sensor-map-example/generate.mjs is the byte-identical Node mirror of this method.
         for (var row = 1; row <= CanonicalSensorMap.LogicalRowCount; row++)
         {
             for (var col = 1; col <= CanonicalSensorMap.LogicalColumnCount; col++)
             {
-                var gap = CanonicalSensorMap.NonSensorGapSlots.FirstOrDefault(c => c.Row == row && c.Column == col);
                 var wall = CanonicalSensorMap.WallForColumn(col);
                 var (first, _) = CanonicalSensorMap.WallColumns[wall];
 
+                scan++;
+                var deviceId = FixtureGenerator.DeviceIdFor(scan);
+                var idx = FixtureGenerator.IndexOnDevice(scan);
                 var slot = new JsonObject
                 {
                     ["slotId"] = $"SLOT-R{row}-C{col:D2}",
-                    ["positionKind"] = gap.Item1 is null ? "SENSOR" : "NON_SENSOR_GAP",
+                    ["positionKind"] = "SENSOR",
                     ["wall"] = wall.ToString(),
                     ["logicalColumn"] = col,
                     ["logicalRow"] = row,
                     ["wallColumn"] = col - first + 1,
                     ["wallRow"] = row,
-                    ["sensorId"] = gap.Item1 is null ? CanonicalSensorMap.SensorIdFor(row, col) : null,
-                    ["gapAnchorForWaterJetId"] = gap.Item2,
-                };
-
-                if (gap.Item1 is not null)
-                {
-                    slot["logicalLabel"] = $"I{col}";
-                }
-                else
-                {
-                    scan++;
-                    slot["scanOrderSynthetic"] = scan;
-                    var deviceId = FixtureGenerator.DeviceIdFor(scan);
-                    var idx = FixtureGenerator.IndexOnDevice(scan);
+                    ["sensorId"] = CanonicalSensorMap.SensorIdFor(row, col),
+                    ["scanOrderSynthetic"] = scan,
                     // tcChannels: structured JSON array of EXACTLY two channel strings — never
                     // a comma-delimited scalar. Index 0 = lower channel index (front),
                     // index 1 = higher (rear).
-                    slot["tcChannels"] = new JsonArray(
+                    ["tcChannels"] = new JsonArray(
                         JsonValue.Create($"{deviceId}:CH{2 * idx:D2}"),
-                        JsonValue.Create($"{deviceId}:CH{2 * idx + 1:D2}"));
-                }
+                        JsonValue.Create($"{deviceId}:CH{2 * idx + 1:D2}")),
+                };
 
                 slots.Add(slot);
             }
         }
 
         // Pre-serialization self-validation (Owner round 6): the generated mapping must pass
-        // the same TcChannelRules the example tests enforce — 108 slots / 106 sensors /
-        // 2 NON_SENSOR_GAP slots / exactly 2 channels per sensor / 212 globally unique channels.
+        // the same TcChannelRules the example tests enforce — 108 slots / 108 sensors /
+        // exactly 2 channels per sensor / 216 globally unique channels / central topology invariants.
         TcChannelRules.RequireValidMapping(slots
             .Select(s => JsonSerializer.Deserialize<SensorMapSlotExample>(s!.ToJsonString(), ContractJson.Options)!)
             .ToArray());
@@ -117,8 +109,8 @@ internal static class ExampleFiles
             ["notes"] = new JsonArray
             {
                 "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution); tcChannels is an exact two-entry array (front = lower channel index, rear = higher), not Production data.",
-                "NON_SENSOR_GAP slots (I7, I16) are placement anchors, not Sensors; they carry no sensorId, no thermocouple channels, and only the Water Jet each physically anchors.",
-                "The logical matrix and wall distribution are the Owner-confirmed structure (106 locations, 212 channels).",
+                "Owner critical topology correction: I7 and I16 are normal Product Sensors. Every one of the 108 logical positions is a Sensor with exactly two thermocouple channels; no position is a gap or a placement anchor.",
+                "The logical matrix and wall distribution are the Owner-confirmed structure (108 locations, 216 channels).",
             },
             ["fixtureStatus"] = FixtureGenerator.FixtureStatus,
         };

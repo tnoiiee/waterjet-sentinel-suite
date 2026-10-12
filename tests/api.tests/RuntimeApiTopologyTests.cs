@@ -10,12 +10,13 @@ using Xunit;
 namespace Wjss.Runtime.Api.Tests;
 
 /// <summary>
-/// Read-only API projections of the approved equipment topology (Stage 0.3A-3
-/// Checkpoint C): the status counts (108 / 106 / 212 / 2 gaps / 8 WJ / 8 IV),
-/// the two NON_SENSOR_GAP references I7 and I16 (never presented as Water Jet
-/// identities), the paired WJ/IV topology views with installed position separate
-/// from target coverage and acquisition explicitly DEFERRED, and per-Sensor
-/// assigned device references. No control surface is asserted to exist: the
+/// Read-only API projections of the approved equipment topology, corrected to the Owner
+/// critical topology correction (Stage 0.4C-K3): the status counts (108 slots / 108
+/// Sensors / 216 assigned / 240 physical / 24 unassigned / 8 WJ / 8 IV), the corrected
+/// Sensor references I7 and I16 (normal Product Sensors, never presented as Water Jet
+/// identities, never gaps), the paired WJ/IV topology views with installed position
+/// separate from target coverage (WJ1 / WJ3 UNRESOLVED, no anchors) and acquisition
+/// explicitly DEFERRED, and per-Sensor assigned device references. No control surface is asserted to exist: the
 /// route registry carries the read-only routes only, every host mapping is a
 /// GET, and no write/command/dispatch route constant exists to map.
 /// Everything here is synthetic; nothing commands or actuates anything.
@@ -24,7 +25,7 @@ public sealed class RuntimeApiTopologyTests
 {
     private static readonly DateTimeOffset Instant = new(2026, 10, 7, 0, 0, 0, TimeSpan.Zero);
 
-    private static readonly string[] ExpectedGapLabels = ["I7", "I16"];
+    private static readonly string[] ExpectedCorrectedSensorIds = ["I7", "I16"];
 
     private static readonly string[] ExpectedWaterJetIds =
         ["WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8"];
@@ -37,49 +38,70 @@ public sealed class RuntimeApiTopologyTests
         var counts = RuntimeStatusSensorCounts.Canonical();
 
         Assert.Equal(108, counts.LogicalSlots.Count);
-        Assert.Equal(106, counts.SensorLocations.Count);
-        Assert.Equal(212, counts.ThermocoupleChannels.Count);
+        Assert.Equal(108, counts.SensorLocations.Count);
+        Assert.Equal(216, counts.ThermocoupleChannels.Count);
+        Assert.Equal(240, counts.PhysicalThermocoupleChannels.Count);
+        Assert.Equal(24, counts.UnassignedThermocoupleChannels.Count);
 
-        var nonSensorGapCount = counts.NonSensorGaps.Count;
         var waterJetCount = counts.WaterJets.Count;
         var isolationValveCount = counts.IsolationValves.Count;
-        Assert.Equal(2, nonSensorGapCount);
         Assert.Equal(8, waterJetCount);
         Assert.Equal(8, isolationValveCount);
+
+        // The former gap projection is gone from the API surface (no NonSensorGaps /
+        // NonSensorGapSlots members exist to publish a 106 / 212 reading).
+        Assert.DoesNotContain(typeof(RuntimeStatusSensorCounts).GetProperties(), p => p.Name.Contains("Gap", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Gap_References_Are_I7_Anchoring_WJ3_And_I16_Anchoring_WJ1_In_Canonical_Order()
+    public void Corrected_Sensor_References_Are_I7_And_I16_In_Canonical_Order()
     {
         var counts = RuntimeStatusSensorCounts.Canonical();
 
-        var gapSlotCount = counts.NonSensorGapSlots.Count;
-        Assert.Equal(2, gapSlotCount);
-        Assert.Equal(ExpectedGapLabels, counts.NonSensorGapSlots.Select(g => g.LogicalLabel).ToArray());
-        Assert.Equal(("I7", "WJ3", 5, 7),
-            (counts.NonSensorGapSlots[0].LogicalLabel,
-             counts.NonSensorGapSlots[0].GapAnchorForWaterJetId,
-             counts.NonSensorGapSlots[0].LogicalRow,
-             counts.NonSensorGapSlots[0].LogicalColumn));
-        Assert.Equal(("I16", "WJ1", 5, 16),
-            (counts.NonSensorGapSlots[1].LogicalLabel,
-             counts.NonSensorGapSlots[1].GapAnchorForWaterJetId,
-             counts.NonSensorGapSlots[1].LogicalRow,
-             counts.NonSensorGapSlots[1].LogicalColumn));
+        Assert.Equal(ExpectedCorrectedSensorIds, counts.CorrectedSensorIds.ToArray());
+        Assert.All(counts.CorrectedSensorIds, id => Assert.True(CanonicalSensorMap.IsProductSensorId(id)));
+        Assert.Equal(78, CanonicalSensorMap.SensorSequence.ToList().IndexOf("I7"));  // scanOrder 79
+        Assert.Equal(87, CanonicalSensorMap.SensorSequence.ToList().IndexOf("I16")); // scanOrder 88
     }
 
     [Fact]
-    public void Gap_Positions_Are_Never_Presented_As_Water_Jet_Identities()
+    public void Corrected_Sensors_Are_Never_Presented_As_Water_Jet_Identities_Or_Anchors()
     {
         var topology = RuntimeEquipmentTopology.Canonical();
 
         var waterJetIds = topology.WaterJets.Select(w => w.WaterJetId).ToArray();
         Assert.Equal(ExpectedWaterJetIds, waterJetIds);
-        var gapLabels = RuntimeStatusSensorCounts.Canonical().NonSensorGapSlots
-            .Select(g => g.LogicalLabel)
-            .ToArray();
-        Assert.All(gapLabels, label => Assert.DoesNotContain(label, waterJetIds));
-        Assert.All(topology.WaterJets, w => Assert.DoesNotContain(w.WaterJetId, gapLabels));
+        Assert.All(ExpectedCorrectedSensorIds, id => Assert.DoesNotContain(id, waterJetIds));
+        Assert.All(topology.WaterJets, w => Assert.DoesNotContain(w.WaterJetId, ExpectedCorrectedSensorIds));
+        Assert.All(topology.WaterJets, w => Assert.DoesNotContain(w.PlacementAnchors, a => a is "I7" or "I16"));
+    }
+
+    [Fact]
+    public void WJ1_And_WJ3_Installed_Position_Is_Unresolved_With_No_Anchor_And_Unchanged_Target_Coverage()
+    {
+        var topology = RuntimeEquipmentTopology.Canonical();
+
+        var wj1 = topology.WaterJets.Single(w => w.WaterJetId == "WJ1");
+        Assert.Equal(WaterJetPlacementKind.UNRESOLVED, wj1.PlacementKind);
+        Assert.Empty(wj1.PlacementAnchors);
+        Assert.Equal(WaterJetTopologyCatalog.UnresolvedPlacementWording, wj1.InstalledPositionNote);
+        Assert.Equal(Wall.REAR, wj1.TargetWall);
+        Assert.Equal(Region.LOWER, wj1.TargetRegion);
+        Assert.Equal("IV1", wj1.DedicatedIsolationValveId);
+
+        var wj3 = topology.WaterJets.Single(w => w.WaterJetId == "WJ3");
+        Assert.Equal(WaterJetPlacementKind.UNRESOLVED, wj3.PlacementKind);
+        Assert.Empty(wj3.PlacementAnchors);
+        Assert.Equal(WaterJetTopologyCatalog.UnresolvedPlacementWording, wj3.InstalledPositionNote);
+        Assert.Equal(Wall.FRONT, wj3.TargetWall);
+        Assert.Equal(Region.LOWER, wj3.TargetRegion);
+        Assert.Equal("IV3", wj3.DedicatedIsolationValveId);
+
+        Assert.All(topology.WaterJets.Where(w => w.PlacementKind != WaterJetPlacementKind.UNRESOLVED), w =>
+        {
+            Assert.Null(w.InstalledPositionNote);
+            Assert.True(w.PlacementAnchors.Count > 0);
+        });
     }
 
     [Fact]
@@ -104,7 +126,10 @@ public sealed class RuntimeApiTopologyTests
             Assert.Equal($"IV{ordinal + 1}", valve.ValveId);
             Assert.Equal($"WJ{ordinal + 1}", valve.ServedWaterJetId);
             Assert.NotEqual(waterJet.InstalledWall, waterJet.TargetWall);
-            Assert.True(waterJet.PlacementAnchors.Count > 0);
+            Assert.Equal(waterJet.InstalledRegion, waterJet.TargetRegion);
+            Assert.Equal(
+                waterJet.PlacementKind == WaterJetPlacementKind.UNRESOLVED,
+                waterJet.PlacementAnchors.Count == 0);
         }
     }
 

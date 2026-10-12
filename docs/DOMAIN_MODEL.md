@@ -60,27 +60,25 @@ An enumerated wall: `LEFT`, `REAR`, `RIGHT`, `FRONT`. Each wall has:
 
 | Attribute | Value | Status |
 | --- | --- | --- |
-| Sensor count | Left 24, Rear 29, Right 24, Front 29 | `[OWNER CONFIRMED]` — Owner domain correction during Stage 0.2.1A (supersedes the earlier Rear 28 / Front 28) |
-| Total sensor locations | 106 | `[OWNER CONFIRMED]` — supersedes the earlier 104 baseline |
+| Sensor count | Left 24, Rear 30, Right 24, Front 30 | `[OWNER CONFIRMED]` — Owner critical topology correction (2026-10-12): I7 and I16 are normal Product Sensors. Historical: Rear 29 / Front 29 (Stage 0.2.1A) and the earlier Rear 28 / Front 28. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements. |
+| Total Product Sensors | **108** | `[OWNER CONFIRMED]` — Owner critical topology correction. Historical: 106 (Stage 0.2.1A–0.4C-K3) and the earlier 104. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements. |
 | Owns one TempQueue | yes — four TempQueues in total across all walls | `[APPROVED]` |
 | Owns one TimeQueue | yes — four TimeQueues in total across all walls | `[APPROVED]` |
 
-#### 2.2.1 Logical Sensor matrix and the two `NON_SENSOR_GAP` positions `[OWNER CONFIRMED]`
+#### 2.2.1 Logical Sensor matrix (Owner critical topology correction) `[OWNER CONFIRMED]`
 
 <a id="221-logical-sensor-matrix-and-cannon-slots-owner-confirmed"></a>
+<a id="221-logical-sensor-matrix-and-the-two-non_sensor_gap-positions-owner-confirmed"></a>
 
-*The legacy anchor above is retained so that links authored before this correction keep
+*The legacy anchors above are retained so that links authored before the corrections keep
 resolving to this section. The section title no longer uses the superseded "Cannon slots"
-wording (ADR-0017).*
+wording (ADR-0017) nor the superseded "two `NON_SENSOR_GAP` positions" wording (Owner critical
+topology correction, 2026-10-12; see
+[`STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`](STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md)).*
 
-The Owner domain correction made during Stage 0.2.1A defines one logical matrix of
-**18 logical columns × 6 logical rows = 108 logical positions**. **Two of those positions are
-`NON_SENSOR_GAP` positions**, so the matrix holds **106 Sensor locations**. The gap *positions*
-remain `[OWNER CONFIRMED]`; their *meaning* was corrected by
-[ADR-0017](decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md)
-(Owner-approved 2026-10-08, implemented at Stage 0.3A-3 Checkpoint C): **I7 and I16 are not
-equipment of any kind** — there are no Cannon entities in the canonical model. Each gap records
-*where a Water Jet is physically mounted* and is therefore a presentation/topology anchor only.
+One logical matrix of **18 logical columns × 6 logical rows = 108 logical positions**. **Every
+logical position is a Product Sensor: the matrix holds 108 Product Sensors.** The Sensor
+sequence is exactly, in this order and with no holes, replacement identities or renumbering:
 
 | Logical row (top to bottom) | Logical labels |
 | --- | --- |
@@ -88,47 +86,63 @@ equipment of any kind** — there are no Cannon entities in the canonical model.
 | 2 | G+101 … G+118 |
 | 3 | G1 … G18 |
 | 4 | H1 … H18 |
-| 5 | I1 … I18, except logical **I7** and logical **I16**, which are `NON_SENSOR_GAP` positions |
+| 5 | I1 … I18 — **I7 and I16 included, once each, in their normal ordinal position** |
 | 6 | J1 … J18 |
 
-| Wall | Logical columns | Wall grid | Sensor locations |
+| Wall | Logical columns | Wall grid | Product Sensors |
 | --- | --- | --- | --- |
 | Left | 1–4 | 4 columns × 6 rows | 24 |
-| Rear | 5–9 | 5 columns × 6 rows | 29 (+ the `NON_SENSOR_GAP` position at logical I7, the placement anchor of WJ3) |
+| Rear | 5–9 | 5 columns × 6 rows | 30 (I7 is an ordinary Sensor at wall row 5, wall column 3) |
 | Right | 10–13 | 4 columns × 6 rows | 24 |
-| Front | 14–18 | 5 columns × 6 rows | 29 (+ the `NON_SENSOR_GAP` position at logical I16, the placement anchor of WJ1) |
+| Front | 14–18 | 5 columns × 6 rows | 30 (I16 is an ordinary Sensor at wall row 5, wall column 3) |
 
-- **I7 and I16 are neither Sensors nor Water Jets.** They have no Sensor ID, no Thermocouple
-  channels, no Dirty Score or classification, no quality and no scan order, and they are never a
-  TempQueue, TimeQueue, GlobalQueue, selection, or Cleaning Job target. The Sensor sequence
-  skips them (I6 → I8, and I15 → I17).
-- **A gap anchor does not convert a matrix position into equipment.** The implementation records
-  `GapAnchorForWaterJetId` — **I7 → WJ3** and **I16 → WJ1** (`CanonicalSensorMap.NonSensorGapSlots`
-  in `packages/contracts/WallMap.cs`; `WaterJetTopologyCatalog.GapAnchors`). The anchor is a
-  *reference to* a separate equipment entity; it is never a Water Jet identity belonging to the
-  position, and the position never becomes a Water Jet slot, a Cannon slot, or an equipment slot.
+- **I7 and I16 are normal Product Sensors.** They have a Sensor ID, two Thermocouple channels
+  (Front and Rear), a Dirty Score and classification, quality, a scan order, the same parameter
+  schema and validation as every other Sensor, the same Enabled/Disabled behaviour, and they
+  are eligible for TempQueue, TimeQueue, GlobalQueue, selection and Cleaning Job targeting
+  exactly like any other Sensor. The Sensor sequence runs I6 → I7 → I8 and I15 → I16 → I17.
+- **No `NON_SENSOR_GAP` position exists.** The arithmetic identity is 108 Sensors × 2
+  measurements = **216 assigned Product TC channels**; six TC Nodes × 40 channels = **240
+  physical TC channels**; 240 − 216 = **24 unassigned physical channels**. The central
+  invariant check (`packages/commissioning/src/topologyInvariants.mjs`) refuses any layer —
+  catalogue, sequence, unique IDs, Front/Rear pairing, physical schedule, UI map, runtime
+  counts — that disagrees with these numbers or still carries a `NON_SENSOR_GAP` position.
+- **Front/Rear measurement identity for I7 and I16** comes from the committed Drawing schedule
+  and the existing mapping records, not from invention: I7 Front `TC-NODE-05|A102.4|7`, I7 Rear
+  `TC-NODE-05|A102.4|8`, I16 Front `TC-NODE-06|A102.4|7`, I16 Rear `TC-NODE-06|A102.4|8`
+  (`docs/evidence/tc-drawing-schedule-rev1.csv`). The four Drawing rows previously treated as
+  Drawing/Product-topology conflicts are used Product assignments; the 12 unrelated Drawing
+  internal conflicts stay unresolved.
 - **Water Jets are separate domain entities (WJ1–WJ8)** — see §2.6 — each paired 1:1 with a
   dedicated Isolation Valve **IV1–IV8 by ordinal** (§2.8). Nothing in the matrix owns, contains,
-  or is a Water Jet.
+  or is a Water Jet; no matrix position is a Water Jet slot, a Cannon slot, or an equipment slot.
 - **Installed Position and Target Coverage are separate concepts.** A Water Jet is installed on
-  one wall and covers the *opposite* wall in the matching region: **WJ1 is installed FRONT/LOWER
-  at the I16 gap anchor, targets REAR/LOWER and pairs with IV1**; **WJ3 is installed REAR/LOWER
-  at the I7 gap anchor, targets FRONT/LOWER and pairs with IV3**.
+  one wall and covers the *opposite* wall in the matching region: **WJ1 is installed FRONT/LOWER,
+  targets REAR/LOWER and pairs with IV1**; **WJ3 is installed REAR/LOWER, targets FRONT/LOWER and
+  pairs with IV3**. The earlier placement description "at the I16 / I7 gap anchor" is superseded;
+  the replacement placement description for WJ1 and WJ3 is an **open Owner decision** `[OPEN]`
+  and is not invented here.
 - **Assigned Cleaning Device identity is ordinal and is never inferred from the wall a Sensor is
   located on.** The legacy `cannon` column of `sensorparam.csv` means **Assigned Cleaning Device
-  ID** — a direct ordinal reference to WJ1–WJ8, *not* a grid position, *not* an installed wall,
-  and *not* a "nearest or same-wall Water Jet". Assignment follows responsibility for the
-  **target** wall and region (`WaterJetTopologyCatalog.TryRequireAssignment`), so a Rear-lower
-  Sensor is assigned WJ1 even though WJ1 is installed on the Front-lower wall.
+  ID** — a direct ordinal reference `cannon n → WJn` (WJ1–WJ8), *not* a grid position, *not* an
+  installed wall, and *not* a "nearest or same-wall Water Jet". Assignment follows responsibility
+  for the **target** wall and region, so a Rear-lower Sensor (I7 included) is assigned WJ1 even
+  though WJ1 is installed on the Front-lower wall.
 - Wall rows are the logical rows; there is no rotation or reversal. The question of row
   alignment across walls of unequal height is resolved by this matrix.
 - The labels are a logical reference. They do **not** define Modbus addresses, register maps,
   physical coordinates, Water Jet assignments, or any Production mapping, all of which remain
   confidential deployment values and `[NOT VERIFIED]`.
-- *Superseded wording (historical):* Stage 0.2.1A labelled these two positions "Cannon equipment
-  slots" (logical I7 "Rear Cannon", logical I16 "Front Cannon"). That label is superseded by
-  ADR-0017 and is preserved only inside dated historical records and in that ADR's own
-  supersession history.
+- *Superseded wording (historical):* Stage 0.2.1A labelled I7 and I16 "Cannon equipment slots"
+  (logical I7 "Rear Cannon", logical I16 "Front Cannon"); ADR-0017 (2026-10-08) then recorded
+  them as `NON_SENSOR_GAP` placement anchors (I7 → WJ3, I16 → WJ1) with 106 Sensors and 212
+  channels, and the Sensor sequence "skipping" them. Both are superseded and are preserved only
+  inside dated historical records and in ADR-0017's own supersession history. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
+- *.NET status:* `packages/contracts/WallMap.cs` (`CanonicalSensorMap.NonSensorGapSlots`),
+  `packages/domain/WaterJetTopologyCatalog.cs` (`GapAnchors`) and the related .NET runtime,
+  importer, synthetic map and fixtures still encode the superseded form; their correction is
+  pending the Owner-local .NET pass (no .NET SDK in Arena). Until then the Node layers refuse
+  the stale projections explicitly rather than presenting them.
 
 ### 2.3 Sensor
 
@@ -164,9 +178,10 @@ Rules:
 
 ### 2.4 ThermocoupleChannel
 
-One of two channels belonging to a Sensor: `TC_F` or `TC_R`. There are 212 channels in
-total across 106 sensors. `[OWNER CONFIRMED]` — Owner domain correction during Stage 0.2.1A
-(supersedes the earlier 208 channels across 104 sensors).
+One of two channels belonging to a Sensor: `TC_F` or `TC_R`. There are **216 assigned Product
+TC channels** in total across **108 Sensors** (I7 and I16 included), out of 240 physical TC
+channels (24 unassigned). `[OWNER CONFIRMED]` — Owner critical topology correction (2026-10-12).
+Historical: 212 channels across 106 Sensors (Stage 0.2.1A) and the earlier 208 across 104. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 
 ### 2.5 DirtyScore
 
@@ -185,15 +200,18 @@ one wall and covers the *opposite* wall in the matching region:
 
 | Water Jet | Installed Position | Target Coverage | Dedicated Isolation Valve |
 | --- | --- | --- | --- |
-| WJ1 | FRONT / LOWER — at the `NON_SENSOR_GAP` anchor **I16** | REAR / LOWER | IV1 |
-| WJ3 | REAR / LOWER — at the `NON_SENSOR_GAP` anchor **I7** | FRONT / LOWER | IV3 |
+| WJ1 | FRONT / LOWER — placement description `[OPEN]` (formerly "at the `NON_SENSOR_GAP` anchor I16"; I16 is a Sensor) | REAR / LOWER | IV1 |
+| WJ3 | REAR / LOWER — placement description `[OPEN]` (formerly "at the `NON_SENSOR_GAP` anchor I7"; I7 is a Sensor) | FRONT / LOWER | IV3 |
 | WJ2, WJ4 | LEFT / LOWER, RIGHT / LOWER (between horizontal Sensors) | RIGHT / LOWER, LEFT / LOWER | IV2, IV4 |
 | WJ5, WJ7 | FRONT / UPPER, REAR / UPPER (between vertical Sensors) | REAR / UPPER, FRONT / UPPER | IV5, IV7 |
 | WJ6, WJ8 | LEFT / UPPER, RIGHT / UPPER (Sensor junctions) | RIGHT / UPPER, LEFT / UPPER | IV6, IV8 |
 
-The two gap anchors (I7 → WJ3, I16 → WJ1, §2.2.1) record where a Water Jet is physically
-mounted; they do **not** make the matrix position a Water Jet or any other equipment. The full
-approved table is `packages/domain/WaterJetTopologyCatalog.cs` (ADR-0017 decisions 5 and 7).
+No matrix position is a Water Jet or any other equipment; I7 and I16 are Sensors (Owner
+critical topology correction, §2.2.1), so the former "gap anchor" placement of WJ1 and WJ3 no
+longer describes a matrix position. The replacement placement vocabulary for WJ1 and WJ3 is an
+open Owner decision. The approved table in `packages/domain/WaterJetTopologyCatalog.cs` (ADR-0017
+decisions 5 and 7) still carries the superseded `NonSensorGap` placement for WJ1/WJ3 pending the
+Owner-local .NET pass. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 
 ### 2.7 GalilController
 

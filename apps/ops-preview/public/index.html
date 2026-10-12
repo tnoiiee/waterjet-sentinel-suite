@@ -45,6 +45,7 @@
       <li><a href="#commissioning">Commissioning Monitor</a></li>
       <li><a href="#mapping">Mapping</a></li>
       <li><a href="#node-configuration">Node Configuration</a></li>
+      <li><a href="#tc-acquisition-evidence">TC Acquisition Evidence</a></li>
       <li><a href="#diagnostics">Diagnostics</a></li>
     </ul>
     <div class="view-controls" role="group" aria-label="Presentation only: does not change evidence or state">
@@ -92,11 +93,11 @@
       <div class="summary" id="summary-body"></div>
 
       <h3 id="loop-progress-h">Loop-Test progress
-        <span class="hint">over the 212 Product-compatible measurements · derived from the evidence and the Preview results</span></h3>
+        <span class="hint">over the 216 Product-compatible measurements · derived from the evidence and the Preview results</span></h3>
       <div class="summary" id="loop-progress-body"></div>
 
       <h3 id="wallmap-h">Commissioning Wall Map
-        <span class="hint">approved U-shaped plan view · 108 logical positions · 106 Product Sensors · read-only</span></h3>
+        <span class="hint">approved U-shaped plan view · 108 logical positions · 108 Product Sensors · read-only</span></h3>
       <p class="note">Each Sensor cell also shows the read-only paired value <strong>dFR</strong> =
       FrontTemperature - RearTemperature, with an explicit sign and the unit only while it is available. Front is the
       furnace-facing fin measurement; Rear is the paired waterwall-tube-side reference. The paired value is a derived
@@ -125,7 +126,8 @@
         <div class="wallmap" id="wallmap"></div>
       </div>
       <p class="note" id="wallmap-order-note">Wall order: approved logical position order (logical row 1 to 6, then
-      logical column 1 to 18), I7 and I16 skipped as NON_SENSOR_GAP positions, Front measurement before Rear measurement.
+      logical column 1 to 18) over all 108 Product Sensors, I7 and I16 in their normal ordinal position, Front measurement
+      before Rear measurement.
       Previous/Next above walk that sequence; the Previous/Next controls in Sensor detail keep their separate physical
       schedule order (the evidence order of the 240 rows).</p>
       <p class="note" id="wallmap-selection-note"></p>
@@ -207,6 +209,28 @@
       <h3>Status legend <span class="hint">each status is written out as text, never shown by colour alone</span></h3>
       <ul class="legend" id="node-config-legend"></ul>
       <p class="note" id="node-config-authority"></p>
+    </section>
+
+    <section id="tc-acquisition-evidence" aria-labelledby="tc-acquisition-evidence-h">
+      <h2 id="tc-acquisition-evidence-h">TC Acquisition Evidence <span class="hint">Stage 0.4C-K3 evidence gate · read-only · NO NETWORK PROBE / NO SOCKET / NO PHYSICAL ACQUISITION</span></h2>
+      <p class="note">This section shows the evidence position for the future read-only physical TC acquisition: what is
+      known at manufacturer model level, what the drawing shows, what the Owner confirmed, what is only a candidate, and
+      exactly which evidence is missing. Nothing here is reachable, acquired, connected or verified. The Preview identity
+      stays Stage 0.4C-K2 by Owner rule; the evidence Stage is reported separately.</p>
+      <p class="alert" id="tc-evidence-validation" role="status"></p>
+      <h3>Decision status <span class="hint">protocol and port - no selection, no default, no connection path</span></h3>
+      <div id="tc-evidence-decisions"></div>
+      <h3>Six TC Nodes <span class="hint">evidence statuses per Node · every status is written out as text</span></h3>
+      <div class="table-wrap" id="tc-evidence-wrap">
+        <div id="tc-evidence-body"></div>
+      </div>
+      <h3>Evidence sources <span class="hint">identity, revision, where the bytes were in this session</span></h3>
+      <div id="tc-evidence-sources"></div>
+      <h3>Candidate process image <span class="hint">derived, CANDIDATE_UNVERIFIED, not an address</span></h3>
+      <div id="tc-evidence-process-image"></div>
+      <h3>Missing evidence <span class="hint">exact requests to the Owner</span></h3>
+      <ul class="legend" id="tc-evidence-requests"></ul>
+      <p class="note" id="tc-evidence-authority"></p>
     </section>
 
     <section id="diagnostics" aria-labelledby="diagnostics-h">

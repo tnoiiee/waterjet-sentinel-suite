@@ -2,7 +2,8 @@
 // logical Sensor matrix, presented for field loop testing.
 //
 // CANONICAL TOPOLOGY SOURCE (exactly one identity path, no second source):
-//   - positions, wall assignment, Product Sensor identity and the two NON_SENSOR_GAP positions come
+//   - positions, wall assignment and Product Sensor identity (all 108 positions are Product Sensors;
+//     I7 and I16 are normal Sensors per the Owner critical topology correction) come
 //     from the approved public-safe logical matrix (config/examples/sensor-map.example.json, the
 //     public mirror of the Product wall-map contract), which the Preview host serves read-only at
 //     /api/sensor-map. The UI renders that matrix; it never generates an identity of its own.
@@ -29,10 +30,13 @@ export const WALL_LABELS = Object.freeze({
   FRONT: 'Front wall',
 });
 
-/** Logical positions of the matrix. A NON_SENSOR_GAP is never a Sensor and never a Water Jet. */
+/**
+ * Logical positions of the matrix. Every one of the 108 positions is a Product Sensor (Owner
+ * critical topology correction: I7 and I16 are normal Sensors). No other position kind is accepted;
+ * a served matrix that carries any non-Sensor position is refused by buildWallMap.
+ */
 export const POSITION_KIND = Object.freeze({
   SENSOR: 'SENSOR',
-  NON_SENSOR_GAP: 'NON_SENSOR_GAP',
 });
 
 /** The two measurements a Product Sensor owns. They stay separate everywhere. */
@@ -49,21 +53,20 @@ export const WALL_ROWS = 6;
 /** The protected structure of the approved matrix. Every one of these is asserted, not assumed. */
 export const WALL_MAP_EXPECTED = Object.freeze({
   logicalPositions: 108,
-  productSensors: 106,
-  nonSensorGaps: 2,
-  productCompatibleMeasurements: 212,
-  gapLabels: Object.freeze(['I7', 'I16']),
-  sensorsPerWall: Object.freeze({ LEFT: 24, REAR: 29, RIGHT: 24, FRONT: 29 }),
+  productSensors: 108,
+  nonSensorGaps: 0,
+  productCompatibleMeasurements: 216,
+  sensorsPerWall: Object.freeze({ LEFT: 24, REAR: 30, RIGHT: 24, FRONT: 30 }),
   measurementsPerSensor: 2,
 });
 
 /**
  * The Wall-order navigation sequence, stated once so the screen, the tests and the documentation
  * cannot describe it differently: the approved logical position order (logical row 1 to 6, then
- * logical column 1 to 18), the I7 and I16 NON_SENSOR_GAP positions skipped as Sensors, and for each
- * Product Sensor the Front measurement before the Rear measurement.
+ * logical column 1 to 18) over all 108 Product Sensors (I7 and I16 in their normal ordinal
+ * position), and for each Product Sensor the Front measurement before the Rear measurement.
  */
-export const WALL_MAP_ORDER_TEXT = 'approved logical position order (logical row 1 to 6, then logical column 1 to 18), I7 and I16 skipped as NON_SENSOR_GAP positions, Front measurement before Rear measurement';
+export const WALL_MAP_ORDER_TEXT = 'approved logical position order (logical row 1 to 6, then logical column 1 to 18) over all 108 Product Sensors, I7 and I16 in their normal ordinal position, Front measurement before Rear measurement';
 
 function require(condition, message) {
   if (!condition) throw new Error(`wall map: ${message}`);
@@ -72,8 +75,9 @@ function require(condition, message) {
 /**
  * Builds the read-only Wall Map view model from the served logical matrix and the schedule rows.
  * Refuses loudly rather than presenting a topology it cannot prove: a missing wall, a duplicated
- * Sensor identity, a gap that is not I7 or I16, a Sensor without exactly one Front and one Rear
- * measurement, or a total that differs from the protected baseline all throw.
+ * Sensor identity, any non-Sensor position (there is no NON_SENSOR_GAP position: I7 and I16 are
+ * normal Sensors), a Sensor without exactly one Front and one Rear measurement, or a total that
+ * differs from the protected baseline all throw.
  */
 export function buildWallMap(sensorMap, scheduleRows) {
   require(sensorMap && Array.isArray(sensorMap.walls) && sensorMap.walls.length === WALL_ORDER.length,
@@ -120,26 +124,26 @@ export function buildWallMap(sensorMap, scheduleRows) {
       wallColumns,
       rows: Object.freeze(rows),
       sensorCount: flat.filter((p) => p.positionKind === POSITION_KIND.SENSOR).length,
-      gapCount: flat.filter((p) => p.positionKind === POSITION_KIND.NON_SENSOR_GAP).length,
+      gapCount: 0,
     }));
   }
 
   const sensorPositions = positions.filter((p) => p.positionKind === POSITION_KIND.SENSOR);
-  const gapPositions = positions.filter((p) => p.positionKind === POSITION_KIND.NON_SENSOR_GAP);
+  const gapPositions = Object.freeze([]);
   const sensorIds = sensorPositions.map((p) => p.sensorId);
 
   require(positions.length === WALL_MAP_EXPECTED.logicalPositions, `expected ${WALL_MAP_EXPECTED.logicalPositions} logical positions, found ${positions.length}`);
   require(sensorPositions.length === WALL_MAP_EXPECTED.productSensors, `expected ${WALL_MAP_EXPECTED.productSensors} Product Sensors, found ${sensorPositions.length}`);
-  require(gapPositions.length === WALL_MAP_EXPECTED.nonSensorGaps, `expected ${WALL_MAP_EXPECTED.nonSensorGaps} NON_SENSOR_GAP positions, found ${gapPositions.length}`);
   require(new Set(sensorIds).size === sensorIds.length, 'a Product Sensor identity appears more than once on the Wall Map');
-  const gapLabels = gapPositions.map((p) => p.label).sort().join(',');
-  require(gapLabels === [...WALL_MAP_EXPECTED.gapLabels].sort().join(','), `the NON_SENSOR_GAP positions must be exactly ${WALL_MAP_EXPECTED.gapLabels.join(' and ')}, found ${gapLabels}`);
+  for (const sensorId of ['I7', 'I16']) {
+    require(sensorIds.filter((id) => id === sensorId).length === 1, `Product Sensor ${sensorId} must appear exactly once on the Wall Map`);
+  }
   for (const wall of walls) {
     require(wall.sensorCount === WALL_MAP_EXPECTED.sensorsPerWall[wall.wall],
       `the ${wall.wall} wall must carry ${WALL_MAP_EXPECTED.sensorsPerWall[wall.wall]} Product Sensors, found ${wall.sensorCount}`);
   }
 
-  // The deterministic Wall-order sequence: approved logical order, gaps skipped, Front then Rear.
+  // The deterministic Wall-order sequence: approved logical order over all 108 Sensors, Front then Rear.
   // It is published twice, in the same sequence: by measurement identity (the documented reading of
   // the order) and by physical Channel key (the ONE selection identity the whole screen uses, so the
   // Wall Map, the Overview, Sensor detail and the Preview workflow can never disagree).
@@ -203,11 +207,12 @@ export function buildWallMap(sensorMap, scheduleRows) {
 }
 
 function buildPosition(wall, slot, rowByMeasurement) {
-  const isGap = slot.positionKind === POSITION_KIND.NON_SENSOR_GAP;
-  require(slot.positionKind === POSITION_KIND.SENSOR || isGap, `wall position ${slot.slotId} has an unknown position kind '${slot.positionKind}'`);
-  // A NON_SENSOR_GAP never carries a Sensor identity; a SENSOR position always does.
-  require(isGap ? !slot.sensorId : Boolean(slot.sensorId), `wall position ${slot.slotId} violates the Sensor / NON_SENSOR_GAP contract`);
-  const label = isGap ? slot.logicalLabel : slot.sensorId;
+  // Every logical position is a Product Sensor; a served matrix that still carries a NON_SENSOR_GAP
+  // (or any other) position kind is a superseded or contradictory topology and is refused.
+  require(slot.positionKind === POSITION_KIND.SENSOR,
+    `wall position ${slot.slotId} has position kind '${slot.positionKind}'; every logical position is a Product Sensor (I7 and I16 included)`);
+  require(Boolean(slot.sensorId), `wall position ${slot.slotId} is a Sensor position without a Sensor identity`);
+  const label = slot.sensorId;
   require(typeof label === 'string' && label.length > 0, `wall position ${slot.slotId} carries no identity`);
   const front = rowByMeasurement.get(`${label}:F`);
   const rear = rowByMeasurement.get(`${label}:R`);
@@ -228,7 +233,7 @@ function buildPosition(wall, slot, rowByMeasurement) {
     rearKey: rear.measurementId,
     frontChannelKey: front.physicalChannelKey,
     rearChannelKey: rear.physicalChannelKey,
-    selectableAsSensor: !isGap,
+    selectableAsSensor: true,
   });
 }
 

@@ -20,11 +20,21 @@ namespace Wjss.Contracts;
 /// <summary>Vertical region of the boiler wall. Rows 1–2 (G+2xx, G+1xx) are UPPER; rows 3–6 (G, H, I, J) are LOWER.</summary>
 public enum Region { UPPER, LOWER }
 
-/// <summary>How a Water Jet is physically mounted, per the Owner-approved topology table (ADR-0017 decision 5).</summary>
+/// <summary>
+/// How a Water Jet is physically mounted, per the Owner-approved topology table (ADR-0017
+/// decision 5) as corrected by the Owner Water Jet installed-position ruling (Stage 0.4C-K3):
+/// the former "mounted at the I16 / I7 gap" placements of WJ1 / WJ3 are revoked together
+/// with the gap positions themselves, and no replacement anchor is inferred.
+/// </summary>
 public enum WaterJetPlacementKind
 {
-    /// <summary>Mounted at a NON_SENSOR_GAP logical position (the placement anchor).</summary>
-    NON_SENSOR_GAP,
+    /// <summary>
+    /// Installed position pending authoritative equipment layout. The placement formerly
+    /// depended on a NON_SENSOR_GAP position that is now a Product Sensor; no wall coordinate,
+    /// Sensor anchor, target wall, target Sensor, legacy cannon value or Assigned Cleaning
+    /// Device ID may be used to infer a replacement. Carries no placement anchors.
+    /// </summary>
+    UNRESOLVED,
 
     /// <summary>Mounted between two horizontally adjacent Sensor positions.</summary>
     BETWEEN_HORIZONTAL,
@@ -38,18 +48,18 @@ public enum WaterJetPlacementKind
 
 /// <summary>
 /// One logical matrix position of the Owner-confirmed 18-column × 6-row matrix —
-/// exactly 108 records after a successful import. <see cref="LogicalPositionKind.SENSOR"/>
-/// positions carry the canonical <see cref="LogicalId"/> (validated against the label
-/// derived from <see cref="OrderTotal"/>); the two NON_SENSOR_GAP positions (I7, I16) are
-/// location anchors only: no SensorConfiguration, no Thermocouple channels, no scanOrder,
-/// never a queue, selection, Cleaning Job, alarm, or coverage target.
+/// exactly 108 records after a successful import, every one of them a
+/// <see cref="LogicalPositionKind.SENSOR"/> position carrying the canonical
+/// <see cref="LogicalId"/> (validated against the label derived from <see cref="OrderTotal"/>).
+/// Owner critical topology correction: I7 and I16 are normal Product Sensors with a
+/// SensorConfiguration, two Thermocouple channels and a scanOrder like every other Sensor.
 /// </summary>
 public sealed record LogicalPositionRecord
 {
     /// <summary>Canonical logical-position label, e.g. "I7", "G+102" (sourced from legacy sensorname and validated against the orderTotal-derived label).</summary>
     public required string LogicalId { get; init; }
 
-    /// <summary>SENSOR for the 106 actual Sensors; NON_SENSOR_GAP for I7 and I16.</summary>
+    /// <summary>Always SENSOR: all 108 logical positions are Product Sensors (I7 and I16 included).</summary>
     public required LogicalPositionKind PositionKind { get; init; }
 
     public required Wall Wall { get; init; }
@@ -67,10 +77,10 @@ public sealed record LogicalPositionRecord
     public required int WallRow { get; init; }
 
     /// <summary>
-    /// Legacy zero-based logical-position ordering, range 0–107 over all 108 rows,
-    /// INCLUDING the NON_SENSOR_GAP rows I7 and I16. Provenance/layout ordering only —
-    /// never the Sensor scanOrder (which is derived densely, one-based 1–106, after
-    /// excluding NON_SENSOR_GAP positions).
+    /// Legacy zero-based logical-position ordering, range 0–107 over all 108 rows.
+    /// Provenance/layout ordering only — never the Sensor scanOrder (which is derived
+    /// densely, one-based 1–108, over all 108 Sensor positions in OrderTotal order; the
+    /// canonical scanOrder therefore equals OrderTotal + 1).
     /// </summary>
     public required int OrderTotal { get; init; }
 
@@ -82,9 +92,6 @@ public sealed record LogicalPositionRecord
     /// provenance only. Never a logical-position identity and never a Sensor ID.
     /// </summary>
     public required string LegacyRecordId { get; init; }
-
-    /// <summary>The Water Jet physically anchored at this position; non-null only for NON_SENSOR_GAP positions (I7 → WJ3, I16 → WJ1).</summary>
-    public string? GapAnchorForWaterJetId { get; init; }
 }
 
 /// <summary>
@@ -105,10 +112,10 @@ public sealed record WaterJetConfiguration
 
     /// <summary>
     /// Logical position ids anchoring the placement, per the approved topology table.
-    /// NON_SENSOR_GAP placements anchor at the gap's neighbouring Sensor positions (the
-    /// gap identity itself is carried by LogicalPositionRecord.GapAnchorForWaterJetId);
     /// JUNCTION placements list the distinct endpoints of the vertical and horizontal
-    /// anchor pairs in first-appearance order.
+    /// anchor pairs in first-appearance order. An <see cref="WaterJetPlacementKind.UNRESOLVED"/>
+    /// placement carries NO anchors: no Sensor position is inferred as a replacement for the
+    /// revoked gap anchors.
     /// </summary>
     public required IReadOnlyList<string> PlacementAnchors { get; init; }
 

@@ -66,7 +66,7 @@ export const DIFFERENTIAL_UNAVAILABLE_REASON = selfNamed([
   'REAR_WIRE_BREAK',
   'UNIT_MISMATCH',
   'PAIR_IDENTITY_INCOMPLETE',
-  'NON_SENSOR_GAP',
+  'PRODUCT_TOPOLOGY_CONFLICT',
   'UNASSIGNED_CHANNEL',
 ]);
 
@@ -263,9 +263,13 @@ export function buildThermalPair(frontObservation, rearObservation, hints = {}) 
   if (!(front.side === THERMAL_SIDE.FRONT && rear.side === THERMAL_SIDE.REAR)) {
     return blocked(DIFFERENTIAL_UNAVAILABLE_REASON.PAIR_IDENTITY_INCOMPLETE);
   }
-  if (front.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT || rear.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT
-    || front.rowClass === ROW_CLASS.UNASSIGNED || rear.rowClass === ROW_CLASS.UNASSIGNED) {
-    return blocked(DIFFERENTIAL_UNAVAILABLE_REASON.NON_SENSOR_GAP);
+  if (front.rowClass === ROW_CLASS.UNASSIGNED || rear.rowClass === ROW_CLASS.UNASSIGNED) {
+    return blocked(DIFFERENTIAL_UNAVAILABLE_REASON.UNASSIGNED_CHANNEL);
+  }
+  // Retained defensively for a future evidence revision: the corrected baseline carries no
+  // Product-topology conflict row (I7 and I16 are normal Product Sensors and pair like every other).
+  if (front.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT || rear.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT) {
+    return blocked(DIFFERENTIAL_UNAVAILABLE_REASON.PRODUCT_TOPOLOGY_CONFLICT);
   }
   // The two sides of one pair must come from one observation set: a mismatched scenario or tick would
   // silently pair two different synthetic conditions.
@@ -317,8 +321,9 @@ export function buildThermalPair(frontObservation, rearObservation, hints = {}) 
 }
 
 /**
- * Describes a row that cannot form a Product Sensor pair at all (an unassigned physical Channel or a
- * NON_SENSOR_GAP position). The vocabulary stays in this module so no screen invents its own reason.
+ * Describes a row that cannot form a Product Sensor pair at all (an unassigned physical Channel, or a
+ * Product-topology conflict row should a future evidence revision carry one). The vocabulary stays
+ * in this module so no screen invents its own reason.
  */
 export function describeUnpairedMeasurement(row) {
   if (!row) return unavailable(DIFFERENTIAL_UNAVAILABLE_REASON.PAIR_IDENTITY_INCOMPLETE);
@@ -328,7 +333,7 @@ export function describeUnpairedMeasurement(row) {
     });
   }
   if (row.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT) {
-    return unavailable(DIFFERENTIAL_UNAVAILABLE_REASON.NON_SENSOR_GAP, {
+    return unavailable(DIFFERENTIAL_UNAVAILABLE_REASON.PRODUCT_TOPOLOGY_CONFLICT, {
       identity: { sensorId: row.sensorId, frontChannelKey: row.physicalChannelKey, rowClass: row.rowClass },
     });
   }
@@ -339,9 +344,9 @@ export function describeUnpairedMeasurement(row) {
 
 /**
  * Builds every Product Sensor pair from the schedule and one observation set. A pair is created only
- * from Product-compatible rows that carry a Sensor identity: an unassigned physical Channel and an
- * I7 / I16 NON_SENSOR_GAP position can never produce a pair, and a measurement is never taken from a
- * neighbouring Sensor.
+ * from Product-compatible rows that carry a Sensor identity: an unassigned physical Channel can never
+ * produce a pair, and a measurement is never taken from a neighbouring Sensor. I7 and I16 are normal
+ * Product Sensors (Owner critical topology correction) and pair exactly like every other Sensor.
  *
  * The result is keyed by physical Channel so any surface (Wall Map cell, Overview row, Sensor detail)
  * can find the pair of the measurement it is showing without duplicating the pairing rule.
@@ -401,7 +406,7 @@ export function buildThermalPairs(schedule, observations) {
 
 /**
  * The paired descriptor for one schedule row: the pair of its Sensor, or an unavailable descriptor
- * naming why this row cannot form a Product pair at all (unassigned Channel, NON_SENSOR_GAP).
+ * naming why this row cannot form a Product pair at all (unassigned Channel).
  */
 export function pairForRow(pairs, row) {
   if (!pairs || !row) return describeUnpairedMeasurement(row);

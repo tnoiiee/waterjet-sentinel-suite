@@ -96,8 +96,7 @@ public static class SimulatorScenarioCatalogue
         var topology = new SequencingTopology(
             ordered
                 .Select(sensor => new SequencingSensorAssignment(sensor.SensorId, sensor.AssignedWaterJetId, sensor.AssignedIsolationValveId))
-                .ToArray(),
-            Array.Empty<string>());
+                .ToArray());
 
         var plan = new Plan(topology, ordered, thresholds ?? new SequencingPressureThresholds());
         return new SimulatorScenarioSet

@@ -47,25 +47,42 @@ test('a row view refuses to guess an observation that does not exist', () => {
   assert.throws(() => buildRowView(schedule.rows[0], undefined), /has no observation/);
 });
 
-test('the four evidence classes are distinguishable without colour alone', () => {
+test('the evidence classes present in the corrected baseline are distinguishable without colour alone', () => {
   const classes = new Set(views.map((v) => v.rowClassText));
-  assert.equal(classes.size, 4);
+  // Product-compatible, Drawing internal conflict, unassigned. No Product-topology conflict row exists:
+  // I7 and I16 are normal Product Sensors (Owner critical topology correction).
+  assert.equal(classes.size, 3);
+  assert.equal(views.some((v) => v.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT), false);
   const markers = views.map((v) => v.rowClassMarker);
-  assert.equal(new Set(markers).size, 4);
+  assert.equal(new Set(markers).size, 3);
+  assert.equal(markers.includes('[TC]'), false);
   assert.equal(views.every((v) => v.rowClassClassName.length > 0), true);
   assert.equal(legend().length, 9);
+});
+
+test('the [OFF] legend entry names measurement availability and keeps Sensor operational Disable separate', () => {
+  const off = legend().find((entry) => entry.marker === '[OFF]');
+  assert.ok(off, 'the DISABLED measurement-quality legend entry exists');
+  assert.match(off.text, /^DISABLED \(measurement quality\)/);
+  assert.match(off.text, /MEASUREMENT UNAVAILABLE/);
+  assert.match(off.text, /channel not commissioned/);
+  assert.match(off.text, /Sensor operational Enabled\/Disabled state is separate/);
+  assert.doesNotMatch(off.text, /no measurement exists|no Sensor|does not exist|NON_SENSOR_GAP|gap/i);
+  // The [TC] entry still states that I7 and I16 are normal Product Sensors.
+  const tc = legend().find((entry) => entry.marker === '[TC]');
+  assert.match(tc.text, /I7 and I16 are normal Product Sensors/);
 });
 
 test('filter counts follow the evidence exactly', () => {
   const countsByFilter = filterCounts(views);
   assert.equal(countsByFilter.all, 240);
-  assert.equal(countsByFilter['product-compatible'], 212);
-  assert.equal(countsByFilter['drawing-verified'], 200);
+  assert.equal(countsByFilter['product-compatible'], 216);
+  assert.equal(countsByFilter['drawing-verified'], 204);
   assert.equal(countsByFilter['drawing-internal-conflict'], 12);
-  assert.equal(countsByFilter['product-topology-conflict'], 4);
+  assert.equal(countsByFilter['product-topology-conflict'], 0);
   assert.equal(countsByFilter.unassigned, 24);
-  assert.equal(countsByFilter['commissioning-blocked'], 40);
-  assert.equal(countsByFilter['commissioning-not-tested'], 200);
+  assert.equal(countsByFilter['commissioning-blocked'], 36);
+  assert.equal(countsByFilter['commissioning-not-tested'], 204);
 });
 
 test('filtering never changes the underlying rows', () => {
@@ -81,19 +98,19 @@ test('the summary reports the protected totals plus the live presentation counts
   assert.equal(summary.totalPhysicalChannels, 240);
   assert.equal(summary.mappedPhysicalChannels, 216);
   assert.equal(summary.unassignedPhysicalChannels, 24);
-  assert.equal(summary.productCompatibleMeasurements, 212);
-  assert.equal(summary.productSensors, 106);
-  assert.equal(summary.drawingVerifiedRows, 200);
+  assert.equal(summary.productCompatibleMeasurements, 216);
+  assert.equal(summary.productSensors, 108);
+  assert.equal(summary.drawingVerifiedRows, 204);
   assert.equal(summary.drawingInternalConflictRows, 12);
-  assert.equal(summary.productTopologyConflictRows, 4);
-  assert.equal(summary.conflictRows, 16);
+  assert.equal(summary.productTopologyConflictRows, 0);
+  assert.equal(summary.conflictRows, 12);
   assert.equal(summary.unresolvedRows, 0);
   // 216 mapped Channels carry a sample; the 24 unassigned positions carry no measurement at all.
   assert.equal(summary.good, 216);
   assert.equal(summary.disabled, 24);
   assert.equal(summary.bad, 0);
-  assert.equal(summary.blocked, 40);
-  assert.equal(summary.notTested, 200);
+  assert.equal(summary.blocked, 36);
+  assert.equal(summary.notTested, 204);
   assert.equal(summary.passed, 0);
   assert.equal(summary.currentValueValid, 216);
   assert.equal(summary.currentValueUnavailable, 24);
@@ -127,10 +144,12 @@ test('the simulated wire-break scenario is presented as simulation in every affe
 test('conflict and unassigned rows are presented as BLOCKED and never as GOOD', () => {
   const summary = summaryCounts(schedule, views);
   const blocked = views.filter((v) => v.commissioningState === COMMISSIONING_STATE.BLOCKED);
-  assert.equal(blocked.length, 40);
+  assert.equal(blocked.length, 36);
   assert.equal(blocked.filter((v) => v.rowClass === ROW_CLASS.UNASSIGNED).length, 24);
   assert.equal(blocked.filter((v) => v.rowClass === ROW_CLASS.DRAWING_INTERNAL_CONFLICT).length, 12);
-  assert.equal(blocked.filter((v) => v.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT).length, 4);
+  assert.equal(blocked.filter((v) => v.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT).length, 0);
+  // I7 and I16 are normal Product Sensors: their four measurements are never BLOCKED by topology.
+  assert.equal(blocked.filter((v) => v.sensorId === 'I7' || v.sensorId === 'I16').length, 0);
   for (const view of blocked) assert.notEqual(view.blockingReason, null);
   assert.equal(summary.passed, 0);
 });
@@ -142,8 +161,8 @@ test('a workflow verdict is visible in the view model and in the summary, and on
   const sessionViews = buildRowViews(schedule, observations, session);
   const summary = summaryCounts(schedule, sessionViews);
   assert.equal(summary.passed, 1);
-  assert.equal(summary.blocked, 40);
-  assert.equal(summary.notTested, 199);
+  assert.equal(summary.blocked, 36);
+  assert.equal(summary.notTested, 203);
   const view = sessionViews.find((v) => v.key === target.physicalChannelKey);
   assert.equal(view.commissioningState, COMMISSIONING_STATE.PASS);
   // The evidence row itself is unchanged: the workflow state is presentation-side only.

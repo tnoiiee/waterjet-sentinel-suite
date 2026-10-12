@@ -12,7 +12,7 @@
 //     future VISUAL and WORKFLOW result and says so on screen.
 //   - Every other scenario is a synthetic preview observation. None of them is a Hardware reading.
 
-import { ROW_CLASS, isNonSensorGapSensorId } from './schedule.mjs';
+import { ROW_CLASS, isProductSensorId } from './schedule.mjs';
 import {
   COMMISSIONING_STATE, DIAGNOSTIC_REASON, FIELD_VERIFICATION_STATE, NODE_COMMUNICATION_STATE,
   OBSERVATION_PROVENANCE, PREVIEW_STALE_THRESHOLD_MS, QUALITY,
@@ -33,8 +33,8 @@ import { PAIRED_DIFFERENTIAL_MODE } from './thermalpair.mjs';
 // the identity, no random source, no clock, no environment) and deliberately do NOT depend on the
 // preview tick: deterministic, finite, plausible, varied across Sensors (never one universal delta),
 // independent of wall rendering order and independent of browser timing. A Temperature pair is generated ONLY for a Product-compatible row that
-// carries a Sensor identity; a NON_SENSOR_GAP position, an unassigned Channel and any non-Product row
-// keep an identity-based value of their own and can never form a pair.
+// carries a Product Sensor identity (all 108 Sensors, I7 and I16 included); an unassigned Channel and
+// any non-Product row keep an identity-based value of their own and can never form a pair.
 // -----------------------------------------------------------------------------------------------
 
 /** FNV-1a over a short text - deterministic, no random source, no clock, no environment. */
@@ -59,7 +59,7 @@ function sensorOrdinal(sensorId) {
 export function isPairedTemperatureRow(row) {
   return row.productCompatible === true
     && row.sensorId !== null && row.sensorId !== undefined
-    && !isNonSensorGapSensorId(row.sensorId)
+    && isProductSensorId(row.sensorId)
     && (row.side === 'F' || row.side === 'R');
 }
 
@@ -273,10 +273,12 @@ const SCENARIO_DEFINITIONS = [
       note: 'raw drawing evidence retained - not a verified mapping',
     }),
   }),
+  // Retained defensively: the corrected baseline carries no Product-topology conflict row (I7 and I16
+  // are normal Product Sensors), so this scenario applies to no row of the committed evidence.
   Object.freeze({
     key: 'PRODUCT_TOPOLOGY_CONFLICT',
-    label: 'PRODUCT_TOPOLOGY_CONFLICT - I7 / I16 evidence',
-    summary: 'Shows the I7 / I16 Product-topology conflict evidence. These rows are not Product Sensors, no commissioning PASS is permitted, and they are excluded from Product Runtime Sensor selection.',
+    label: 'PRODUCT_TOPOLOGY_CONFLICT - no row in the corrected baseline',
+    summary: 'A Product-topology conflict row would be BLOCKED from any commissioning PASS. The corrected baseline carries none: I7 and I16 are normal Product Sensors.',
     provenance: OBSERVATION_PROVENANCE.SYNTHETIC_PREVIEW,
     appliesTo: (row) => row.rowClass === ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT,
     observation: (row, tick) => invalidObservation(row, tick, {
@@ -284,8 +286,8 @@ const SCENARIO_DEFINITIONS = [
       diagnosticReason: DIAGNOSTIC_REASON.NOT_MAPPED,
       rawValue: null,
       commissioningState: COMMISSIONING_STATE.BLOCKED,
-      blockingReason: 'PRODUCT_TOPOLOGY_CONFLICT: drawing assigns a live channel to an authoritative NON_SENSOR_GAP position',
-      note: 'NON_SENSOR_GAP position - never a Sensor, never a Water Jet',
+      blockingReason: 'PRODUCT_TOPOLOGY_CONFLICT: the drawing row contradicts the Product topology',
+      note: 'raw drawing evidence retained - not a verified mapping',
     }),
   }),
   Object.freeze({
@@ -435,8 +437,8 @@ function baseIdentity(row, tick) {
     observationTick: tick,
     observationTimestamp: previewTimestamp(tick),
     scenarioSource: 'SYNTHETIC_PREVIEW',
-    // The I7 / I16 conflict rows are never selectable as a Product Runtime Sensor.
-    selectableAsProductSensor: row.productCompatible && !isNonSensorGapSensorId(row.sensorId),
+    // Every Product-compatible row of one of the 108 Product Sensors (I7 and I16 included) is selectable.
+    selectableAsProductSensor: row.productCompatible && isProductSensorId(row.sensorId),
   };
 }
 

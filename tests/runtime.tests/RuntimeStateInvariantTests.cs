@@ -6,10 +6,10 @@ using Xunit;
 namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
-/// Protected-baseline invariants: 108 logical slots, 106 Sensor locations, 212
-/// Thermocouple channels, NON_SENSOR_GAP positions at logical I7 and I16 only,
-/// wall counts 24 / 29 / 24 / 29, one Active Job at most, bounded queue and
-/// bounded trend.
+/// Protected-baseline invariants (Owner critical topology correction, Stage 0.4C-K3):
+/// 108 logical slots, 108 Sensor locations (I7 and I16 are normal Product Sensors; no
+/// NON_SENSOR_GAP position exists), 216 assigned Thermocouple channels, wall counts
+/// 24 / 30 / 24 / 30, one Active Job at most, bounded queue and bounded trend.
 /// Each refusal is asserted through its machine reason code, not through prose.
 /// </summary>
 public sealed class RuntimeStateInvariantTests
@@ -21,7 +21,8 @@ public sealed class RuntimeStateInvariantTests
         SensorOrder,
         SensorIdentity,
         SensorChannels,
-        NonSensorGapPosition,
+        UnknownPositionKind,
+        FormerGapShape,
         WallSummary,
         ActiveTarget,
         QueueShape,
@@ -58,18 +59,35 @@ public sealed class RuntimeStateInvariantTests
     }
 
     [Fact]
-    public void NonSensorGap_Positions_Are_Logical_I7_And_I16_Anchor_WJ3_And_WJ1_And_Are_Not_Sensors()
+    public void I7_And_I16_Are_Ordinary_Sensor_Slots_And_No_Gap_Position_Exists()
     {
         var state = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
 
-        var gapSlots = state.WallMap.Where(slot => slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP).ToArray();
-        var gapSlotCount = gapSlots.Length;
-        Assert.Equal(CanonicalSensorMap.NonSensorGapCount, gapSlotCount);
-        Assert.Contains(gapSlots, slot =>
-            slot.GapAnchorForWaterJetId == "WJ3" && slot.LogicalRow == 5 && slot.LogicalColumn == 7 && slot.SensorId is null);
-        Assert.Contains(gapSlots, slot =>
-            slot.GapAnchorForWaterJetId == "WJ1" && slot.LogicalRow == 5 && slot.LogicalColumn == 16 && slot.SensorId is null);
-        Assert.DoesNotContain(state.Sensors, sensor => sensor.SensorId == "I7" || sensor.SensorId == "I16");
+        Assert.All(state.WallMap, slot => Assert.Equal(LogicalPositionKind.SENSOR, slot.PositionKind));
+        Assert.All(state.WallMap, slot => Assert.False(string.IsNullOrWhiteSpace(slot.SensorId)));
+
+        var i7Slot = state.WallMap.Single(slot => slot.LogicalRow == 5 && slot.LogicalColumn == 7);
+        Assert.Equal("I7", i7Slot.SensorId);
+        Assert.Equal(Wall.REAR, i7Slot.Wall);
+        var i16Slot = state.WallMap.Single(slot => slot.LogicalRow == 5 && slot.LogicalColumn == 16);
+        Assert.Equal("I16", i16Slot.SensorId);
+        Assert.Equal(Wall.FRONT, i16Slot.Wall);
+
+        var i7 = Assert.Single(state.Sensors, sensor => sensor.SensorId == "I7");
+        var i16 = Assert.Single(state.Sensors, sensor => sensor.SensorId == "I16");
+        Assert.Equal(79, state.Sensors.ToList().IndexOf(i7) + 1);
+        Assert.Equal(88, state.Sensors.ToList().IndexOf(i16) + 1);
+        Assert.False(string.IsNullOrWhiteSpace(i7.TcFrontChannel));
+        Assert.False(string.IsNullOrWhiteSpace(i7.TcRearChannel));
+        Assert.False(string.IsNullOrWhiteSpace(i16.TcFrontChannel));
+        Assert.False(string.IsNullOrWhiteSpace(i16.TcRearChannel));
+        Assert.Equal("WJ1", i7.AssignedWaterJetId);
+        Assert.Equal("WJ3", i16.AssignedWaterJetId);
+
+        Assert.Equal(24, state.Sensors.Count(sensor => sensor.Wall == Wall.LEFT));
+        Assert.Equal(30, state.Sensors.Count(sensor => sensor.Wall == Wall.REAR));
+        Assert.Equal(24, state.Sensors.Count(sensor => sensor.Wall == Wall.RIGHT));
+        Assert.Equal(30, state.Sensors.Count(sensor => sensor.Wall == Wall.FRONT));
     }
 
     [Fact]
@@ -84,9 +102,10 @@ public sealed class RuntimeStateInvariantTests
 
         var totals = state.Walls.ToDictionary(summary => summary.Wall, summary => summary.Total);
         Assert.Equal(24, totals[Wall.LEFT]);
-        Assert.Equal(29, totals[Wall.REAR]);
+        Assert.Equal(30, totals[Wall.REAR]);
         Assert.Equal(24, totals[Wall.RIGHT]);
-        Assert.Equal(29, totals[Wall.FRONT]);
+        Assert.Equal(30, totals[Wall.FRONT]);
+        Assert.Equal(CanonicalSensorMap.SensorLocations, totals.Values.Sum());
 
         foreach (var summary in state.Walls)
         {
@@ -100,7 +119,8 @@ public sealed class RuntimeStateInvariantTests
     [InlineData(Tamper.SensorOrder, RuntimeRefusalCodes.SensorOrder)]
     [InlineData(Tamper.SensorIdentity, RuntimeRefusalCodes.SensorIdentity)]
     [InlineData(Tamper.SensorChannels, RuntimeRefusalCodes.SensorChannels)]
-    [InlineData(Tamper.NonSensorGapPosition, RuntimeRefusalCodes.WallMapNonSensorGaps)]
+    [InlineData(Tamper.UnknownPositionKind, RuntimeRefusalCodes.WallMapNonSensorPosition)]
+    [InlineData(Tamper.FormerGapShape, RuntimeRefusalCodes.WallMapSensorBinding)]
     [InlineData(Tamper.WallSummary, RuntimeRefusalCodes.WallSummaryMismatch)]
     [InlineData(Tamper.ActiveTarget, RuntimeRefusalCodes.SensorActiveTarget)]
     [InlineData(Tamper.QueueShape, RuntimeRefusalCodes.QueueShape)]
@@ -165,16 +185,20 @@ public sealed class RuntimeStateInvariantTests
         {
             Sensors = ReplaceFirst(state.Sensors, state.Sensors[0] with { TcFrontChannel = state.Sensors[1].TcRearChannel }),
         },
-        Tamper.NonSensorGapPosition => state with
+        // An unknown position kind (the enum holds SENSOR only; a superseded gap value can
+        // only arrive as an out-of-vocabulary integer) is refused — fail closed.
+        Tamper.UnknownPositionKind => state with
         {
             WallMap = ReplaceFirst(
                 state.WallMap,
-                state.WallMap[0] with
-                {
-                    PositionKind = LogicalPositionKind.NON_SENSOR_GAP,
-                    SensorId = null,
-                    GapAnchorForWaterJetId = "WJ3",
-                }),
+                state.WallMap[0] with { PositionKind = (LogicalPositionKind)99 }),
+        },
+        // The former "I7 gap" shape (Sensor slot without a Sensor identity) is refused.
+        Tamper.FormerGapShape => state with
+        {
+            WallMap = state.WallMap
+                .Select(slot => slot.LogicalRow == 5 && slot.LogicalColumn == 7 ? slot with { SensorId = null } : slot)
+                .ToArray(),
         },
         Tamper.WallSummary => state with
         {

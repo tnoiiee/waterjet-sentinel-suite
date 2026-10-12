@@ -117,8 +117,11 @@ export function isCurrentValueValid({ quality, diagnosticReason }) {
 /**
  * True when the presentation concept INVALID applies: an unavailable current value with a named
  * cause. Exactly as the Stage defines it, INVALID covers Quality BAD and STALE. A DISABLED channel
- * (for example an unassigned physical Channel) is a different presentation: it is "no measurement
- * exists here", which is why "not commissioned" is never shown as BAD.
+ * (for example an unassigned physical Channel) is a different presentation: "no current measurement
+ * is available here", which is why "not commissioned" is never shown as BAD. Measurement-quality
+ * DISABLED is NOT the Sensor operational Enabled/Disabled state (the canonical Runtime Disable that
+ * governs Cleaning Candidates and the GlobalQueue): it says nothing about Sensor existence,
+ * topology, parameters, Front/Rear mapping or Queue eligibility.
  */
 export function isInvalidPresentation({ quality, diagnosticReason }) {
   if (quality !== QUALITY.BAD && quality !== QUALITY.STALE) return false;
@@ -239,18 +242,19 @@ export function presentRawValue(observation) {
 
 /**
  * Value age text. Stale ages are marked as exceeding the Preview threshold.
- * A position with no measurement at all (an unassigned physical Channel) has no value age, and
- * saying so is the honest presentation: it is never rendered as a fresh 0 s sample.
+ * A position with no current measurement available (an unassigned physical Channel) has no value
+ * age, and saying so is the honest presentation: it is never rendered as a fresh 0 s sample. The
+ * wording names measurement availability only; it never implies Sensor operational Disable.
  */
 export function presentValueAge(observation) {
   const age = observation.valueAgeMs;
   if (age === null || age === undefined) {
     return Object.freeze({
       milliseconds: null,
-      text: 'n/a - no measurement exists',
+      text: 'n/a - no current measurement available',
       exceedsPreviewStaleThreshold: false,
       thresholdMs: PREVIEW_STALE_THRESHOLD_MS,
-      note: 'no measurement exists at this position',
+      note: 'no current measurement is available; this does not indicate Sensor operational Disable',
     });
   }
   if (typeof age !== 'number' || age < 0) throw new Error('value age must be a non-negative number of milliseconds');

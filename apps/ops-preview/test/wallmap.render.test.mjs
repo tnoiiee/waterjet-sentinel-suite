@@ -49,11 +49,10 @@ const hasUnit = (block) => nodesByClass(block, 'wj-unit').length > 0;
 const id = (app, name) => app.byId[name];
 const cells = (app) => nodesWith(id(app, 'wallmap'), 'data-slot-id');
 const sensorCells = (app) => cells(app).filter((cell) => cell.attributes['data-sensor-id'] !== undefined);
-const gapCells = (app) => cells(app).filter((cell) => cell.attributes['data-position-kind'] === 'NON_SENSOR_GAP');
+const nonSensorCells = (app) => cells(app).filter((cell) => cell.attributes['data-position-kind'] !== 'SENSOR');
 const blocksOf = (cell) => nodesWith(cell, 'data-side');
 const blockOf = (cell, side) => blocksOf(cell).find((block) => block.attributes['data-side'] === side);
 const cellFor = (app, sensorId) => sensorCells(app).find((cell) => cell.attributes['data-sensor-id'] === sensorId);
-const gapCellFor = (app, label) => gapCells(app).find((cell) => cell.attributes['data-logical-label'] === label);
 const bands = (app) => nodesWith(id(app, 'wallmap'), 'data-wall-columns');
 const focus = (app) => id(app, 'wallmap-frame').attributes['data-wallmap-focus'];
 const selectionState = (app) => id(app, 'wallmap-frame').attributes['data-wallmap-selection'];
@@ -93,25 +92,28 @@ test('the served page carries the Wall Map, its view control, its Wall-order nav
   assert.match(html, /SIMULATION \/ PREVIEW · NO HARDWARE ACCESS · NO DEVICE WRITE ·\s+FIELD VERIFICATION PENDING/);
 });
 
-test('the Wall Map renders 108 logical positions: 106 Product Sensors and exactly the I7/I16 gaps', async () => {
+test('the Wall Map renders 108 logical positions, all of them Product Sensor cells (I7 and I16 included)', async () => {
   await withApp(async (app) => {
     await waitFor(() => cells(app).length > 0, 'the Wall Map to render');
     assert.equal(cells(app).length, 108, 'exactly 108 logical positions');
-    assert.equal(sensorCells(app).length, 106, 'exactly 106 Product Sensor cells');
-    assert.equal(gapCells(app).length, 2, 'exactly two NON_SENSOR_GAP cells');
-    assert.deepEqual(gapCells(app).map((c) => c.attributes['data-logical-label']).sort(), ['I16', 'I7']);
+    assert.equal(sensorCells(app).length, 108, 'exactly 108 Product Sensor cells');
+    assert.equal(nonSensorCells(app).length, 0, 'no non-Sensor cell exists');
     const sensorIds = sensorCells(app).map((c) => c.attributes['data-sensor-id']);
-    assert.equal(new Set(sensorIds).size, 106, 'every Product Sensor appears exactly once');
-    // No gap may be rendered as a Sensor: a gap cell carries no Sensor identity at all.
-    for (const gap of gapCells(app)) {
-      assert.equal(gap.attributes['data-sensor-id'], undefined, 'a NON_SENSOR_GAP cell must never carry a Sensor identity');
-      assert.match(allText(gap), /NON_SENSOR_GAP/);
+    assert.equal(new Set(sensorIds).size, 108, 'every Product Sensor appears exactly once');
+    assert.equal(sensorIds.filter((id) => id === 'I7').length, 1);
+    assert.equal(sensorIds.filter((id) => id === 'I16').length, 1);
+    for (const sensorId of ['I7', 'I16']) {
+      const cell = cellFor(app, sensorId);
+      assert.equal(cell.attributes['data-position-kind'], 'SENSOR');
+      assert.equal(cell.attributes['data-logical-label'], sensorId);
+      assert.doesNotMatch(allText(cell), /NON_SENSOR_GAP/);
+      assert.equal(blocksOf(cell).length, 2, `${sensorId} renders Front and Rear`);
+      for (const block of blocksOf(cell)) assert.equal(block.tagName, 'button', `${sensorId} blocks are selectable`);
     }
-    assert.equal(sensorIds.includes('I7'), false);
-    assert.equal(sensorIds.includes('I16'), false);
+    assert.doesNotMatch(allText(id(app, 'wallmap')), /NON_SENSOR_GAP/);
     // The protected totals the served matrix must reproduce.
-    assert.equal(WALL_MAP_EXPECTED.productSensors, 106);
-    assert.equal(WALL_MAP_EXPECTED.productCompatibleMeasurements, 212);
+    assert.equal(WALL_MAP_EXPECTED.productSensors, 108);
+    assert.equal(WALL_MAP_EXPECTED.productCompatibleMeasurements, 216);
   });
 });
 
@@ -121,8 +123,8 @@ test('the four wall bands keep the approved shape and the approved wall order', 
     assert.deepEqual(bands(app).map((b) => b.attributes['data-wall']), ['REAR', 'LEFT', 'RIGHT', 'FRONT']);
     assert.deepEqual(bands(app).map((b) => b.attributes['data-wall-columns']), ['5', '4', '4', '5']);
     assert.deepEqual(bands(app).map((b) => b.attributes['data-wall-rows']), ['6', '6', '6', '6']);
-    assert.deepEqual(bands(app).map((b) => b.attributes['data-sensor-count']), ['29', '24', '24', '29']);
-    assert.deepEqual(bands(app).map((b) => b.attributes['data-gap-count']), ['1', '0', '0', '1']);
+    assert.deepEqual(bands(app).map((b) => b.attributes['data-sensor-count']), ['30', '24', '24', '30']);
+    assert.equal(bands(app).every((b) => b.attributes['data-gap-count'] === undefined), true);
     // The approved first identities of each wall, in wall-column order (no rotation, no reversal).
     const firstRow = (wall) => nodesWith(id(app, 'wallmap'), 'data-wall-row').filter((cell) => cell.attributes['data-wall'] === wall && cell.attributes['data-wall-row'] === '1').map((cell) => cell.attributes['data-logical-label']);
     assert.deepEqual(firstRow('LEFT'), ['G+201', 'G+202', 'G+203', 'G+204']);
@@ -132,9 +134,9 @@ test('the four wall bands keep the approved shape and the approved wall order', 
     // The hollow centre states the protected counts and the Stage boundary.
     const hollow = allText(id(app, 'wallmap'));
     assert.match(hollow, /108 logical positions/);
-    assert.match(hollow, /106 Product Sensors/);
-    assert.match(hollow, /2 NON_SENSOR_GAP \(I7, I16\)/);
-    assert.match(hollow, /212 measurements/);
+    assert.match(hollow, /108 Product Sensors/);
+    assert.doesNotMatch(hollow, /NON_SENSOR_GAP/);
+    assert.match(hollow, /216 measurements/);
     assert.match(hollow, /SIMULATION \/ PREVIEW/);
   });
 });
@@ -219,24 +221,26 @@ test('STALE is presented as history: it is never the current value', async () =>
   });
 });
 
-test('a NON_SENSOR_GAP cell is labelled, inert, and cannot be selected as a Sensor', async () => {
+test('the I7 cell is an ordinary Sensor cell: selectable Front and Rear blocks, not blocked, never labelled a gap', async () => {
   await withApp(async (app) => {
-    await waitFor(() => gapCells(app).length === 2, 'the gap cells');
-    const gap = gapCellFor(app, 'I7');
-    assert.equal(gap.attributes['data-selectable'], undefined);
-    assert.match(allText(gap), /NON_SENSOR_GAP/);
-    assert.match(String(gap.title), /never a Sensor and never a Water Jet/);
-    // Its two drawing rows are evidence blocks, not selectable measurement controls.
-    for (const block of blocksOf(gap)) {
-      assert.equal(block.tagName, 'div');
-      assert.equal(block.attributes['data-gap-block'], 'true');
-      assert.equal(block.attributes['data-blocked'], 'true');
+    await waitFor(() => cells(app).length === 108, 'the Wall Map to render');
+    const cell = cellFor(app, 'I7');
+    assert.doesNotMatch(allText(cell), /NON_SENSOR_GAP/);
+    assert.equal(String(cell.title ?? ''), '');
+    for (const block of blocksOf(cell)) {
+      assert.equal(block.tagName, 'button');
+      assert.equal(block.attributes['data-inert-block'], undefined);
+      assert.equal(block.attributes['data-blocked'], 'false');
       assert.match(String(block.attributes['data-measurement-key']), /^I7:[FR]$/);
     }
     assert.equal(selectionState(app), 'NONE');
-    click(blocksOf(gap)[0]);
-    assert.equal(selectionState(app), 'NONE', 'clicking a gap block must not select anything');
-    assert.equal(selectedRow(app), null);
+    click(blocksOf(cell)[0]);
+    await waitFor(() => selectionState(app) === 'POSITION', 'the I7 selection');
+    assert.equal(focus(app), 'SENSOR:I7');
+    assert.equal(blockOf(cellFor(app, 'I7'), 'F').attributes['data-selected'], 'true');
+    assert.equal(blockOf(cellFor(app, 'I7'), 'R').attributes['data-selected'], 'false');
+    assert.ok(selectedRow(app), 'the Overview row of I7 Front is selected too');
+    assert.match(allText(selectedRow(app)), /\bI7\b/);
   });
 });
 
@@ -303,21 +307,23 @@ test('an unassigned physical Channel marks the Wall Map selection as NOT_APPLICA
     assert.equal(sensorCells(app).some((cell) => cell.attributes['data-selected'] === 'true'), false, 'no Sensor may be selected for an unassigned Channel');
     assert.match(id(app, 'wallmap-selection-note').textContent, /unassigned physical Channel/);
     // Selecting it changed nothing about the evidence: the counts are unchanged.
-    assert.match(allText(id(app, 'summary-body')), /Product-compatible measurements 212/);
+    assert.match(allText(id(app, 'summary-body')), /Product-compatible measurements 216/);
   });
 });
 
-test('an I7/I16 topology-conflict row highlights the gap, never a Sensor', async () => {
+test('an I16 Overview row selects the I16 Sensor cell exactly like any other Sensor', async () => {
   await withApp(async (app) => {
     await waitFor(() => tableRows(app).length === 240, 'the Overview to render');
-    const gapRow = rowForMeasurement(app, 'I7:F');
-    assert.ok(gapRow, 'the I7 topology-conflict row must exist');
-    click(gapRow);
-    await waitFor(() => selectionState(app) === 'POSITION', 'the gap selection');
-    assert.equal(focus(app), 'NON_SENSOR_GAP:I7');
-    assert.equal(gapCellFor(app, 'I7').attributes['data-selected'], 'true');
-    assert.equal(sensorCells(app).some((cell) => cell.attributes['data-selected'] === 'true'), false, 'a topology conflict must never select a Product Sensor');
-    assert.match(id(app, 'wallmap-selection-note').textContent, /NON_SENSOR_GAP position: never a Sensor/);
+    const row = rowForMeasurement(app, 'I16:R');
+    assert.ok(row, 'the I16 Rear row must exist as a Product-compatible row');
+    click(row);
+    await waitFor(() => selectionState(app) === 'POSITION', 'the I16 selection');
+    assert.equal(focus(app), 'SENSOR:I16');
+    assert.equal(cellFor(app, 'I16').attributes['data-selected'], 'true');
+    assert.equal(blockOf(cellFor(app, 'I16'), 'R').attributes['data-selected'], 'true');
+    assert.equal(blockOf(cellFor(app, 'I16'), 'F').attributes['data-selected'], 'false', 'Front and Rear stay separate');
+    assert.match(id(app, 'wallmap-selection-note').textContent, /Selected: I16 Rear/);
+    assert.doesNotMatch(id(app, 'wallmap-selection-note').textContent, /NON_SENSOR_GAP/);
   });
 });
 
@@ -374,8 +380,8 @@ test('the Preview workflow applies to the selected measurement only: Front never
     assert.equal(stateOf('F'), 'PASS', 'clearing the Rear result must not clear the Front result');
     // And the Loop-Test progress follows the Preview session, not a cached total.
     assert.match(allText(id(app, 'loop-progress-body')), /PASS 1/);
-    assert.match(allText(id(app, 'loop-progress-body')), /Product Sensors 106/);
-    assert.match(allText(id(app, 'loop-progress-body')), /Product-compatible measurements 212/);
+    assert.match(allText(id(app, 'loop-progress-body')), /Product Sensors 108/);
+    assert.match(allText(id(app, 'loop-progress-body')), /Product-compatible measurements 216/);
   });
 });
 
@@ -408,7 +414,7 @@ test('filters dim positions as presentation only: no evidence, no verdict and no
   });
 });
 
-test('Wall-order Previous/Next walks the approved sequence, Front before Rear, and skips the gaps', async () => {
+test('Wall-order Previous/Next walks the approved sequence over all 108 Sensors, Front before Rear, I7 and I16 included', async () => {
   await withApp(async (app) => {
     await waitFor(() => cells(app).length === 108, 'the Wall Map to render');
     assert.equal(selectionState(app), 'NONE');
@@ -423,13 +429,24 @@ test('Wall-order Previous/Next walks the approved sequence, Front before Rear, a
     click(id(app, 'wall-prev'));
     await waitFor(() => blockOf(cellFor(app, 'G+201'), 'R').attributes['data-selected'] === 'true', 'back to the previous measurement');
 
-    // The gaps are skipped as Sensors: the sequence steps from I6:R to I8:F.
+    // I7 sits in its normal ordinal position: I6:R -> I7:F -> I7:R -> I8:F.
     click(rowForMeasurement(app, 'I6:R'));
     await waitFor(() => focus(app) === 'SENSOR:I6' && blockOf(cellFor(app, 'I6'), 'R').attributes['data-selected'] === 'true', 'I6 Rear selected');
     click(id(app, 'wall-next'));
-    await waitFor(() => focus(app) === 'SENSOR:I8', 'the gap to be skipped');
+    await waitFor(() => focus(app) === 'SENSOR:I7', 'I7 Front next');
+    assert.equal(blockOf(cellFor(app, 'I7'), 'F').attributes['data-selected'], 'true');
+    click(id(app, 'wall-next'));
+    await waitFor(() => blockOf(cellFor(app, 'I7'), 'R').attributes['data-selected'] === 'true', 'I7 Rear next');
+    click(id(app, 'wall-next'));
+    await waitFor(() => focus(app) === 'SENSOR:I8', 'then I8 Front');
     assert.equal(blockOf(cellFor(app, 'I8'), 'F').attributes['data-selected'], 'true');
-    assert.equal(gapCellFor(app, 'I7').attributes['data-selected'], 'false');
+    assert.equal(cellFor(app, 'I7').attributes['data-selected'], 'false');
+    // And I16 likewise: I15:R -> I16:F.
+    click(rowForMeasurement(app, 'I15:R'));
+    await waitFor(() => focus(app) === 'SENSOR:I15', 'I15 Rear selected');
+    click(id(app, 'wall-next'));
+    await waitFor(() => focus(app) === 'SENSOR:I16', 'I16 Front next');
+    assert.equal(blockOf(cellFor(app, 'I16'), 'F').attributes['data-selected'], 'true');
 
     // Both ends are deterministic and reported, and the selection stays put.
     click(rowForMeasurement(app, 'J18:R'));
@@ -458,6 +475,11 @@ test('the Wall Map follows the node-scoped scenario, keeps the boundary and repo
     // The map frame keeps the boundary beside the map, and the legend states the synthetic provenance.
     assert.match(allText(id(app, 'wallmap-legend')), /synthetic Preview observation/);
     assert.match(allText(id(app, 'wallmap-legend')), /FIELD VERIFICATION PENDING/);
+    // Measurement Quality DISABLED is measurement availability, never the Sensor operational state.
+    const legendText = allText(id(app, 'wallmap-legend'));
+    assert.match(legendText, /Measurement Quality GOOD, UNCERTAIN, BAD, STALE, DISABLED/);
+    assert.match(legendText, /DISABLED = measurement unavailable, channel not commissioned - not the Sensor operational Enabled\/Disabled state/);
+    assert.doesNotMatch(legendText, /no measurement exists|NON_SENSOR_GAP/);
   });
 });
 
