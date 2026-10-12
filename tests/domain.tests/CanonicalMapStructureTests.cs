@@ -12,6 +12,9 @@ namespace Wjss.Domain.Tests;
 /// </summary>
 public sealed class CanonicalMapStructureTests
 {
+    private static readonly string[] ExpectedCorrectedSensorIds = ["I7", "I16"];
+    private static readonly string[] ExpectedLogicalPositionKinds = ["SENSOR"];
+
     [Fact]
     public void Counts_Match_Owner_Confirmed_Domain()
     {
@@ -52,7 +55,7 @@ public sealed class CanonicalMapStructureTests
         Assert.Equal("I17", sequence[88]);
         Assert.Equal("J18", sequence[107]);
 
-        Assert.Equal(new[] { "I7", "I16" }, CanonicalSensorMap.CorrectedSensorIds.ToArray());
+        Assert.Equal(ExpectedCorrectedSensorIds, CanonicalSensorMap.CorrectedSensorIds.ToArray());
         Assert.True(CanonicalSensorMap.IsProductSensorId("I7"));
         Assert.True(CanonicalSensorMap.IsProductSensorId("I16"));
         Assert.False(CanonicalSensorMap.IsProductSensorId("WJ1"));
@@ -80,7 +83,7 @@ public sealed class CanonicalMapStructureTests
     {
         // Owner critical topology correction: the former NON_SENSOR_GAP positions at I7 and
         // I16 are withdrawn; no member of the canonical map describes a gap or a gap anchor.
-        Assert.Equal(new[] { "SENSOR" }, Enum.GetNames<LogicalPositionKind>());
+        Assert.Equal(ExpectedLogicalPositionKinds, Enum.GetNames<LogicalPositionKind>());
         Assert.DoesNotContain(typeof(CanonicalSensorMap).GetMembers(), m => m.Name.Contains("Gap", StringComparison.Ordinal));
         Assert.DoesNotContain(typeof(WallMapSlot).GetProperties(), p => p.Name.Contains("Gap", StringComparison.Ordinal));
         Assert.Equal("I7", CanonicalSensorMap.SensorIdFor(5, 7));
