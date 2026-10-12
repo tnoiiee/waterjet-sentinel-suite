@@ -124,7 +124,7 @@ public static class CanonicalSensorMap
         throw new ArgumentOutOfRangeException(nameof(logicalColumn), "logical column must be 1-18");
     }
 
-    private static IReadOnlyList<string> BuildSensorSequence()
+    private static System.Collections.ObjectModel.ReadOnlyCollection<string> BuildSensorSequence()
     {
         var sequence = new string[MatrixSlots];
         var index = 0;
