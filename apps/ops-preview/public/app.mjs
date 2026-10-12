@@ -445,7 +445,7 @@ function renderWallLegend() {
   const entries = [
     ['[PC]', 'Product-compatible measurement (a Product Sensor identity)'],
     ['[IC]', 'Drawing internal conflict - may record FAIL or PARTIAL, never PASS'],
-    ['OK ? X ~ OFF', 'Quality GOOD, UNCERTAIN, BAD, STALE, DISABLED (the same markers as the Overview)'],
+    ['OK ? X ~ OFF', 'Measurement Quality GOOD, UNCERTAIN, BAD, STALE, DISABLED (the same markers as the Overview; DISABLED = measurement unavailable, channel not commissioned - not the Sensor operational Enabled/Disabled state)'],
     ['NT IP PASS FAIL PART BLOCK', 'Commissioning NOT_TESTED, IN_PROGRESS, PASS, FAIL, PARTIAL, BLOCKED (read-only state of the Preview workflow)'],
     ['--', 'no current value is presented: never a number, never a unit (the cause is named in Sensor detail)'],
     ['degC', 'engineering unit, shown only while a current value exists'],

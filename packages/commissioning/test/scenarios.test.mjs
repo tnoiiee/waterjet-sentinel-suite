@@ -283,10 +283,13 @@ test('10 UNASSIGNED_CHANNEL has no Sensor identity, no value and no field-verifi
     const presented = presentMeasurement(observation);
     assert.equal(presented.current.valid, false);
     assert.equal(presented.invalidPresentation, false);
-    // No measurement exists here, so the value age is stated as not applicable rather than as a
-    // fresh sample, and the last valid value is explicitly absent.
+    // No current measurement is available here, so the value age is stated as not applicable
+    // rather than as a fresh sample, and the last valid value is explicitly absent. The wording
+    // names measurement availability only - never Sensor non-existence or operational Disable.
     assert.equal(presented.age.milliseconds, null);
-    assert.match(presented.age.text, /no measurement exists/);
+    assert.match(presented.age.text, /no current measurement available/);
+    assert.doesNotMatch(presented.age.text, /exists/);
+    assert.match(presented.age.note, /does not indicate Sensor operational Disable/);
     assert.equal(presented.lastValid.kind, 'NONE');
   }
 });

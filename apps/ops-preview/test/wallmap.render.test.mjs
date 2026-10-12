@@ -475,6 +475,11 @@ test('the Wall Map follows the node-scoped scenario, keeps the boundary and repo
     // The map frame keeps the boundary beside the map, and the legend states the synthetic provenance.
     assert.match(allText(id(app, 'wallmap-legend')), /synthetic Preview observation/);
     assert.match(allText(id(app, 'wallmap-legend')), /FIELD VERIFICATION PENDING/);
+    // Measurement Quality DISABLED is measurement availability, never the Sensor operational state.
+    const legendText = allText(id(app, 'wallmap-legend'));
+    assert.match(legendText, /Measurement Quality GOOD, UNCERTAIN, BAD, STALE, DISABLED/);
+    assert.match(legendText, /DISABLED = measurement unavailable, channel not commissioned - not the Sensor operational Enabled\/Disabled state/);
+    assert.doesNotMatch(legendText, /no measurement exists|NON_SENSOR_GAP/);
   });
 });
 

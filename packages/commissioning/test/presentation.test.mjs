@@ -60,6 +60,19 @@ test('the evidence classes present in the corrected baseline are distinguishable
   assert.equal(legend().length, 9);
 });
 
+test('the [OFF] legend entry names measurement availability and keeps Sensor operational Disable separate', () => {
+  const off = legend().find((entry) => entry.marker === '[OFF]');
+  assert.ok(off, 'the DISABLED measurement-quality legend entry exists');
+  assert.match(off.text, /^DISABLED \(measurement quality\)/);
+  assert.match(off.text, /MEASUREMENT UNAVAILABLE/);
+  assert.match(off.text, /channel not commissioned/);
+  assert.match(off.text, /Sensor operational Enabled\/Disabled state is separate/);
+  assert.doesNotMatch(off.text, /no measurement exists|no Sensor|does not exist|NON_SENSOR_GAP|gap/i);
+  // The [TC] entry still states that I7 and I16 are normal Product Sensors.
+  const tc = legend().find((entry) => entry.marker === '[TC]');
+  assert.match(tc.text, /I7 and I16 are normal Product Sensors/);
+});
+
 test('filter counts follow the evidence exactly', () => {
   const countsByFilter = filterCounts(views);
   assert.equal(countsByFilter.all, 240);

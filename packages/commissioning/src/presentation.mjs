@@ -214,6 +214,6 @@ export function legend() {
     { marker: '[~]', text: 'STALE - age beyond the Preview threshold, not shown as current' },
     { marker: '[?]', text: 'UNCERTAIN - presented and marked, no automatic action' },
     { marker: '[OK]', text: 'GOOD - current value valid' },
-    { marker: '[OFF]', text: 'DISABLED - no measurement exists at this position' },
+    { marker: '[OFF]', text: 'DISABLED (measurement quality) - MEASUREMENT UNAVAILABLE: channel not commissioned; Sensor operational Enabled/Disabled state is separate' },
   ]);
 }

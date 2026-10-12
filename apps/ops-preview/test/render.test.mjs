@@ -222,7 +222,8 @@ test('an unassigned physical Channel offers no verdict at all', () => {
   assert.equal(c[0], '-', 'no Sensor identity');
   assert.equal(c[2], '-', 'no measurement identity');
   assert.match(c[10], /UNAVAILABLE/);
-  assert.match(c[17], /no measurement exists/);
+  assert.match(c[17], /no current measurement available/);
+  assert.doesNotMatch(c[17], /no measurement exists/);
   assert.equal(action('verdict-PASS').disabled, true);
   assert.equal(action('verdict-FAIL').disabled, true);
   filter('all');
