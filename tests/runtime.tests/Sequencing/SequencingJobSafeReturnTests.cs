@@ -20,7 +20,7 @@ public sealed class SequencingJobSafeReturnTests
     private static readonly DateTimeOffset Epoch = new(2026, 10, 9, 0, 0, 0, TimeSpan.Zero);
     private static DateTimeOffset At(int tick) => Epoch.AddSeconds(tick);
     private static readonly SequencingTopology Topology = new(
-        [new("SYN-S01", "WJ1", "IV1"), new("SYN-S02", "WJ2", "IV2")], []);
+        [new("SYN-S01", "WJ1", "IV1"), new("SYN-S02", "WJ2", "IV2")]);
     private static PressureSample Pump(double? bar, int tick, PressureQuality quality = PressureQuality.GOOD, bool stale = false) =>
         new(bar, quality, stale, At(tick), PressureSample.PumpOutletSource);
     private static PressureSample Valve(double? bar, int tick, string valveId = "IV1", PressureQuality quality = PressureQuality.GOOD) =>

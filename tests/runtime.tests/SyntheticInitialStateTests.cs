@@ -145,12 +145,9 @@ public sealed class SyntheticInitialStateTests
             Assert.Equal(slot.WallColumn, generated.WallColumn);
             Assert.Equal(slot.WallRow, generated.WallRow);
 
-            if (slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
-            {
-                Assert.Equal(slot.GapAnchorForWaterJetId, generated.GapAnchorForWaterJetId);
-                Assert.Null(generated.SensorId);
-                continue;
-            }
+            // Owner critical topology correction: every example slot is a Sensor slot.
+            Assert.Equal(LogicalPositionKind.SENSOR, slot.PositionKind);
+            Assert.Equal(slot.SensorId, generated.SensorId);
 
             exampleSensorSlots++;
             var generatedSensor = generatedSensors[position];

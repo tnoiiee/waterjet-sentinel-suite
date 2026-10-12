@@ -4,14 +4,15 @@ namespace Wjss.Contracts;
 public enum Wall { LEFT, REAR, RIGHT, FRONT }
 
 /// <summary>
-/// Canonical logical-position kind (ADR-0017, Owner-approved Stage 0.3A-3 Checkpoint A;
-/// atomic Runtime migration delivered in Stage 0.3A-3 Checkpoint C). NON_SENSOR_GAP
-/// positions are location anchors only: they are never Sensors, never equipment entities,
-/// and never appear in queues, selections, Cleaning Jobs, alarms, or coverage sets. The
-/// formerly transitional <c>CANNON</c> slot vocabulary was migrated away atomically in
-/// Checkpoint C and no Cannon entity or alias exists anywhere in the Runtime surface.
+/// Canonical logical-position kind. Owner critical topology correction (Stage 0.4C-K3,
+/// 2026-10-12): every one of the 108 logical positions is a Product Sensor — I7 and I16
+/// are normal Sensors in their ordinal position, so the only kind is <c>SENSOR</c>. The
+/// superseded <c>NON_SENSOR_GAP</c> member (ADR-0017, 106 Sensors / 212 channels) and the
+/// earlier transitional <c>CANNON</c> slot vocabulary no longer exist anywhere in the
+/// Runtime surface; a payload that still carries either value fails deserialization and is
+/// refused, never folded into a Sensor.
 /// </summary>
-public enum LogicalPositionKind { SENSOR, NON_SENSOR_GAP }
+public enum LogicalPositionKind { SENSOR }
 
 /// <summary>
 /// Data-quality vocabulary for a Sensor presentation record. Quality SEMANTICS are

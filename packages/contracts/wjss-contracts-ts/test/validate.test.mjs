@@ -36,14 +36,38 @@ test('sensorIdFor matches owner logical labels', () => {
 });
 
 // Owner critical topology correction: the validator requires 108 Sensors / 216 channels with I7
-// and I16 as Sensors. snapshot.seed0.json is the .NET generator's golden output and can only be
-// regenerated Owner-local (tests/integration FixtureGenerator, fixtures README section 5). Until
-// that regeneration lands this test FAILS BY DESIGN: a stale 106-Sensor fixture must never be
-// accepted silently. Do not weaken this test to make it pass against the stale fixture.
-test('snapshot.seed0.json passes validation (requires the Owner-local .NET regeneration to the 108-Sensor baseline)', () => {
+// and I16 as Sensors. snapshot.seed0.json was regenerated to that baseline with
+// tools/fixture-generator/generate.mjs (Node mirror of tests/integration FixtureGenerator, proven
+// byte-identical against the previous .NET output); the Owner-local C# parity test is the final
+// gate. A stale 106-Sensor fixture must never be accepted silently.
+test('snapshot.seed0.json passes validation on the 108-Sensor baseline', () => {
   const result = validateEnvelope(fixture('snapshot.seed0.json'));
   assert.deepEqual(result.issues, []);
   assert.equal(result.kind, 'snapshot');
+  const snapshot = fixture('snapshot.seed0.json');
+  assert.equal(snapshot.sensors.length, 108);
+  assert.equal(snapshot.wallMap.filter((s) => s.positionKind === 'SENSOR').length, 108);
+  assert.equal(snapshot.sensors.find((s) => s.sensorId === 'I7').scanOrder, 79);
+  assert.equal(snapshot.sensors.find((s) => s.sensorId === 'I16').scanOrder, 88);
+  assert.equal(new Set(snapshot.sensors.flatMap((s) => [s.tcFrontChannel, s.tcRearChannel])).size, 216);
+  assert.ok(snapshot.wallMap.every((s) => !('gapAnchorForWaterJetId' in s)));
+});
+
+test('WJ1 and WJ3 installed positions are UNRESOLVED with no anchors; targets unchanged; anchors on UNRESOLVED are refused', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  for (const [index, id, targetWall] of [[0, 'WJ1', 'REAR'], [2, 'WJ3', 'FRONT']]) {
+    const jet = snapshot.waterJets[index];
+    assert.equal(jet.waterJetId, id);
+    assert.equal(jet.placementKind, 'UNRESOLVED');
+    assert.deepEqual(jet.placementAnchors, []);
+    assert.equal(jet.targetWall, targetWall);
+    assert.equal(jet.targetRegion, 'LOWER');
+  }
+  snapshot.waterJets[0].placementAnchors = ['I15', 'I17'];
+  assert.ok(validateEnvelope(snapshot).issues.some((i) => i.includes('UNRESOLVED placement must carry no placementAnchors')));
+  const unknown = fixture('snapshot.seed0.json');
+  unknown.waterJets[1].placementKind = 'AT_GAP';
+  assert.ok(validateEnvelope(unknown).issues.some((i) => i.includes('placementKind must be one of')));
 });
 
 test('delta.basic.json passes and is gapless', () => {

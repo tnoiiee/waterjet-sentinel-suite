@@ -35,8 +35,15 @@ public static class RuntimeRefusalCodes
     /// <summary>A wall-map slot disagrees with the canonical logical matrix identity.</summary>
     public const string WallMapSlotIdentity = "WALL_MAP_SLOT_IDENTITY";
 
-    /// <summary>Exactly two Cannon equipment slots are required, at logical I7 and I16.</summary>
-    public const string WallMapNonSensorGaps = "WALL_MAP_NON_SENSOR_GAPS";
+    /// <summary>
+    /// A wall-map slot declares a non-Sensor position kind. Owner critical topology correction:
+    /// every one of the 108 logical positions is a Product Sensor (I7 and I16 included); a slot
+    /// still carrying the superseded gap classification is refused.
+    /// </summary>
+    public const string WallMapNonSensorPosition = "WALL_MAP_NON_SENSOR_POSITION";
+
+    /// <summary>The state fails the central cross-layer <see cref="Wjss.Contracts.TopologyInvariants"/> agreement check (detail carries the TOPOLOGY_* code).</summary>
+    public const string TopologyInvariant = "TOPOLOGY_INVARIANT";
 
     /// <summary>The Snapshot topology must carry exactly 8 Water Jets in ordinal order.</summary>
     public const string TopologyWaterJets = "TOPOLOGY_WATER_JETS";
@@ -53,22 +60,22 @@ public static class RuntimeRefusalCodes
     /// <summary>A Sensor slot must carry exactly the canonical Sensor identity for its position.</summary>
     public const string WallMapSensorBinding = "WALL_MAP_SENSOR_BINDING";
 
-    /// <summary>Exactly 106 Sensor projections are required.</summary>
+    /// <summary>Exactly 108 Sensor projections are required (I7 and I16 included).</summary>
     public const string SensorCount = "SENSOR_COUNT";
 
-    /// <summary>Sensor projections must be ordered by ScanOrder 1..106 without gaps.</summary>
+    /// <summary>Sensor projections must be ordered by ScanOrder 1..108 without gaps.</summary>
     public const string SensorOrder = "SENSOR_ORDER";
 
     /// <summary>A Sensor projection disagrees with the canonical position identity.</summary>
     public const string SensorIdentity = "SENSOR_IDENTITY";
 
-    /// <summary>Per-wall Sensor counts must be 24 / 29 / 24 / 29.</summary>
+    /// <summary>Per-wall Sensor counts must be 24 / 30 / 24 / 30.</summary>
     public const string SensorWallCounts = "SENSOR_WALL_COUNTS";
 
     /// <summary>Each Sensor carries exactly two distinct, non-blank Thermocouple channels.</summary>
     public const string SensorChannels = "SENSOR_TC_CHANNELS";
 
-    /// <summary>The mapping must supply exactly 212 distinct Thermocouple channels.</summary>
+    /// <summary>The mapping must supply exactly 216 distinct Thermocouple channels (108 × 2).</summary>
     public const string SensorChannelTotal = "SENSOR_TC_CHANNEL_TOTAL";
 
     /// <summary>Single Active Job: the Active-Job target must be the one ACTIVE Sensor, and vice versa.</summary>

@@ -483,8 +483,7 @@ public sealed class SimulatorFastTrackTests
             var field = typeof(SimulatorRuntime).GetField("_scenarioTopology", BindingFlags.NonPublic | BindingFlags.Instance)!;
             var topology = Assert.IsType<SequencingTopology>(field.GetValue(runtime));
             field.SetValue(runtime, new SequencingTopology(
-                topology.SensorAssignments.Where(assignment => assignment.SensorId != head.SensorId).ToArray(),
-                topology.NonSensorPositionIds));
+                topology.SensorAssignments.Where(assignment => assignment.SensorId != head.SensorId).ToArray()));
             for (var extraTick = 0; extraTick < 3; extraTick++)
             {
                 Tick(runtime);
@@ -525,6 +524,32 @@ public sealed class SimulatorFastTrackTests
         Assert.True(host.IndexOf("TryLoadSynthetic(", StringComparison.Ordinal) <
             host.IndexOf("CreateSlimBuilder(", StringComparison.Ordinal));
         Assert.Contains("read-only observation", RuntimeStatus.QueuePlaceholderLabel, StringComparison.Ordinal);
+
+        // Owner Sensor Disable ruling: the Disabled list is exposed read-only (status +
+        // Inspector); no enable/disable mutation route or control exists in the host or page.
+        Assert.Contains("DisabledSensorIds = runtime.Sequencing.DisabledSensorIds", host, StringComparison.Ordinal);
+        Assert.Contains("disabledSensorIds", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetSensorEnablement", host, StringComparison.Ordinal);
+        Assert.DoesNotContain("btn-disable", page, StringComparison.Ordinal);
+        Assert.DoesNotContain("btn-enable", page, StringComparison.Ordinal);
+        Assert.Contains(typeof(RuntimeStatus).GetProperties(), p => p.Name == nameof(RuntimeStatus.DisabledSensorIds));
+    }
+
+    [Fact]
+    public async Task Runtime_Status_Exposes_The_Disabled_Sensor_List_Read_Only_And_Empty_By_Default()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION);
+        try
+        {
+            Assert.Empty(runtime.Sequencing.DisabledSensorIds);
+            Assert.False(runtime.Sequencing.IsSensorDisabled("I7"));
+            Assert.False(runtime.Sequencing.IsSensorDisabled("I16"));
+            Assert.IsAssignableFrom<IReadOnlyList<string>>(runtime.Sequencing.DisabledSensorIds);
+            Assert.Null(typeof(SimulatorRuntime).GetMethod("SetSensorEnablement"));
+            Assert.Null(typeof(SimulatorRuntime).GetMethod("DisableSensor"));
+            Assert.Null(typeof(SimulatorRuntime).GetMethod("EnableSensor"));
+        }
+        finally { await runtime.DisposeAsync(); }
     }
 
     private sealed class FixedClock(DateTimeOffset now) : IClock

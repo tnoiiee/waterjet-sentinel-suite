@@ -11,8 +11,10 @@ namespace Wjss.Runtime.Core.Tests;
 /// explicit admission, dispatch-ready FIFO with head-only dispatch, the single
 /// Active Job, pump readiness as a waiting gate (not a Queue state), head
 /// revalidation removal, critical freeze, pause as AutoSequence state, and
-/// deterministic evidence. Every identifier is synthetic (SYN-*); no Production
-/// value, threshold, timeout, tag or coordinate appears.
+/// deterministic evidence; plus the Owner Sensor Disable ruling (Stage 0.4C-K3) with
+/// its I7 / I16 coverage (both are normal Product Sensors, never a topology exception).
+/// Every identifier is synthetic (SYN-*) or a Product Sensor identity (I7, I16); no
+/// Production value, threshold, timeout, tag or coordinate appears.
 /// </summary>
 public sealed class SequencingKernelTests
 {
@@ -21,7 +23,14 @@ public sealed class SequencingKernelTests
     private static readonly string[] SensorIds =
         ["SYN-S01", "SYN-S02", "SYN-S03", "SYN-S04", "SYN-S05", "SYN-S06", "SYN-S07", "SYN-S08", "SYN-S09", "SYN-S10"];
 
-    private static readonly string[] NonSensorIds = ["SYN-G01"];
+    // Owner critical topology correction: I7 and I16 are ordinary Product Sensors. They
+    // join the synthetic topology with their approved assignments (I7 REAR-LOWER → WJ1/IV1,
+    // I16 FRONT-LOWER → WJ3/IV3) and no special handling anywhere in the kernel.
+    private static readonly SequencingSensorAssignment[] CorrectedSensorAssignments =
+    [
+        new("I7", "WJ1", "IV1"),
+        new("I16", "WJ3", "IV3"),
+    ];
 
     private static readonly string[] ForbiddenQueueVocabulary =
         ["BLOCKED", "HELD", "WAITING_FOR_PUMP", "WAITING_FOR_EQUIPMENT", "EXCLUDED"];
@@ -320,21 +329,238 @@ public sealed class SequencingKernelTests
     }
 
     [Fact]
-    public void Admission_Refuses_Non_Sensor_Positions_And_Unknown_Sensors()
+    public void Admission_Refuses_Unknown_And_Blank_Identities_Fail_Closed()
     {
         var state = SequencingKernel.Initial();
 
-        var nonSensor = Admit(state, "SYN-G01", 1);
-        Assert.Equal(SequencingOutcome.REFUSED, nonSensor.Outcome);
-        Assert.Equal(SequencingCodes.NotASensor, nonSensor.Evidence.Code);
-
-        var unknown = Admit(state, "SYN-X99", 2);
+        var unknown = Admit(state, "SYN-X99", 1);
         Assert.Equal(SequencingOutcome.REFUSED, unknown.Outcome);
         Assert.Equal(SequencingCodes.SensorUnknown, unknown.Evidence.Code);
 
-        var queueCount = unknown.State.Queue.Count;
-        Assert.Empty(SequencingKernel.ProjectQueueEntries(unknown.State));
+        // An equipment identity is never a Sensor identity.
+        var equipment = Admit(state, "WJ3", 2);
+        Assert.Equal(SequencingOutcome.REFUSED, equipment.Outcome);
+        Assert.Equal(SequencingCodes.SensorUnknown, equipment.Evidence.Code);
+
+        var blank = Admit(state, " ", 3);
+        Assert.Equal(SequencingOutcome.REFUSED, blank.Outcome);
+        Assert.Equal(SequencingCodes.EntryInvalid, blank.Evidence.Code);
+
+        var queueCount = blank.State.Queue.Count;
+        Assert.Empty(SequencingKernel.ProjectQueueEntries(blank.State));
         Assert.Equal(0, queueCount);
+        Assert.DoesNotContain(typeof(SequencingCodes).GetFields(), f => f.Name == "NotASensor");
+    }
+
+    // ---- Owner Sensor Disable ruling: I7 / I16 coverage (Stage 0.4C-K3) ----
+
+    [Fact]
+    public void D1_Enabled_I7_And_I16_Pass_Normal_Eligibility_By_Default()
+    {
+        var state = SequencingKernel.Initial();
+        Assert.Empty(SequencingKernel.ProjectDisabledSensorIds(state));
+        Assert.False(state.IsSensorDisabled("I7"));
+        Assert.False(state.IsSensorDisabled("I16"));
+        Assert.Null(SequencingTopology.StructuralRefusal(Topology(), "I7"));
+        Assert.Null(SequencingTopology.StructuralRefusal(Topology(), "I16"));
+
+        var i7 = Admit(state, "I7", 1);
+        Assert.Equal(SequencingOutcome.APPLIED, i7.Outcome);
+        Assert.Equal(SequencingCodes.Admitted, i7.Evidence.Code);
+        var i16 = Admit(i7.State, "I16", 2);
+        Assert.Equal(SequencingOutcome.APPLIED, i16.Outcome);
+
+        Assert.Equal(["I7", "I16"], SequencingKernel.ProjectQueueEntries(i16.State).Select(e => e.SensorId).ToArray());
+
+        var dispatched = Dispatch(Start(i16.State, 3).State, 4);
+        Assert.Equal(SequencingOutcome.APPLIED, dispatched.Outcome);
+        Assert.Equal("I7", RequireJob(dispatched.State).TargetSensorId);
+        Assert.Equal("WJ1", RequireJob(dispatched.State).JetId);
+        Assert.Equal("IV1", RequireJob(dispatched.State).ValveId);
+    }
+
+    [Theory]
+    [InlineData("I7")]
+    [InlineData("I16")]
+    public void D2_A_Disabled_Sensor_Cannot_Enter_The_GlobalQueue(string sensorId)
+    {
+        var state = Admit(SequencingKernel.Initial(), "SYN-S01", 1).State;
+        var disabled = SetEnablement(state, sensorId, enabled: false, 2);
+        Assert.Equal(SequencingOutcome.APPLIED, disabled.Outcome);
+        Assert.Equal(SequencingCodes.SensorDisabled, disabled.Evidence.Code);
+        Assert.Null(disabled.Evidence.EntryId); // nothing was queued, nothing removed
+        Assert.Equal(state.QueueRevision, disabled.State.QueueRevision);
+        Assert.Equal([sensorId], SequencingKernel.ProjectDisabledSensorIds(disabled.State).ToArray());
+
+        var queueBefore = QueueJson(disabled.State);
+        var refused = Admit(disabled.State, sensorId, 3);
+        Assert.Equal(SequencingOutcome.REFUSED, refused.Outcome);
+        Assert.Equal(SequencingCodes.SensorDisabled, refused.Evidence.Code);
+        Assert.Equal(queueBefore, QueueJson(refused.State));
+        Assert.DoesNotContain(SequencingKernel.ProjectQueueEntries(refused.State), e => e.SensorId == sensorId);
+
+        // No auto-dispatch and no new Job for the disabled Sensor: the head is SYN-S01.
+        var dispatched = Dispatch(Start(refused.State, 4).State, 5);
+        Assert.Equal("SYN-S01", RequireJob(dispatched.State).TargetSensorId);
+    }
+
+    [Fact]
+    public void D3_Disabling_A_Queued_I7_Removes_Only_I7_With_Reason_SENSOR_DISABLED()
+    {
+        var state = SequencingKernel.Initial();
+        state = Admit(state, "SYN-S01", 1).State;
+        state = Admit(state, "I7", 2).State;
+        state = Admit(state, "SYN-S02", 3).State;
+        var i7EntryId = SequencingKernel.ProjectQueueEntries(state).Single(e => e.SensorId == "I7").EntryId;
+        var revisionBefore = state.QueueRevision;
+
+        var disabled = SetEnablement(state, "I7", enabled: false, 4);
+
+        Assert.Equal(SequencingOutcome.APPLIED, disabled.Outcome);
+        Assert.Equal(SequencingCodes.SensorDisabled, disabled.Evidence.Code);
+        Assert.Equal(i7EntryId, disabled.Evidence.EntryId);
+        Assert.Equal(revisionBefore + 1, disabled.State.QueueRevision);
+        Assert.Equal(["SYN-S01", "SYN-S02"], SequencingKernel.ProjectQueueEntries(disabled.State).Select(e => e.SensorId).ToArray());
+        Assert.Equal([1, 2], SequencingKernel.ProjectQueueEntries(disabled.State).Select(e => e.Position).ToArray());
+        Assert.True(disabled.State.IsSensorDisabled("I7"));
+        Assert.False(disabled.State.IsSensorDisabled("I16"));
+    }
+
+    [Fact]
+    public void D4_Disabling_A_Queued_I16_Preserves_FIFO_Order_Of_The_Remaining_Entries()
+    {
+        var state = SequencingKernel.Initial();
+        state = Admit(state, "SYN-S01", 1).State;
+        state = Admit(state, "I16", 2).State;
+        state = Admit(state, "SYN-S02", 3).State;
+        state = Admit(state, "SYN-S03", 4).State;
+        var retained = SequencingKernel.ProjectQueueEntries(state).Where(e => e.SensorId != "I16").Select(e => e.EntryId).ToArray();
+
+        var disabled = SetEnablement(state, "I16", enabled: false, 5);
+
+        Assert.Equal(SequencingCodes.SensorDisabled, disabled.Evidence.Code);
+        var after = SequencingKernel.ProjectQueueEntries(disabled.State);
+        Assert.Equal(["SYN-S01", "SYN-S02", "SYN-S03"], after.Select(e => e.SensorId).ToArray());
+        Assert.Equal(retained, after.Select(e => e.EntryId).ToArray());
+        Assert.Equal([1, 2, 3], after.Select(e => e.Position).ToArray());
+
+        // Only position one dispatches afterwards, in the preserved order.
+        var dispatched = Dispatch(Start(disabled.State, 6).State, 7);
+        Assert.Equal("SYN-S01", RequireJob(dispatched.State).TargetSensorId);
+        Assert.Equal(["SYN-S02", "SYN-S03"], SequencingKernel.ProjectQueueEntries(dispatched.State).Select(e => e.SensorId).ToArray());
+    }
+
+    [Fact]
+    public void D5_Re_Enabling_I7_Does_Not_Resurrect_The_Removed_Entry()
+    {
+        var state = SequencingKernel.Initial();
+        state = Admit(state, "SYN-S01", 1).State;
+        state = Admit(state, "I7", 2).State;
+        var disabled = SetEnablement(state, "I7", enabled: false, 3).State;
+        var revisionAfterDisable = disabled.QueueRevision;
+
+        var enabled = SetEnablement(disabled, "I7", enabled: true, 4);
+
+        Assert.Equal(SequencingOutcome.APPLIED, enabled.Outcome);
+        Assert.Equal(SequencingCodes.SensorEnabled, enabled.Evidence.Code);
+        Assert.Null(enabled.Evidence.EntryId);
+        Assert.Empty(SequencingKernel.ProjectDisabledSensorIds(enabled.State));
+        Assert.Equal(["SYN-S01"], SequencingKernel.ProjectQueueEntries(enabled.State).Select(e => e.SensorId).ToArray());
+        Assert.Equal(revisionAfterDisable, enabled.State.QueueRevision); // nothing re-queued
+    }
+
+    [Fact]
+    public void D6_Re_Enabling_I16_Requires_New_Evidence_And_Normal_Eligibility()
+    {
+        var state = SequencingKernel.Initial();
+        state = Admit(state, "I16", 1).State;
+        var oldEntryId = SequencingKernel.ProjectQueueEntries(state).Single().EntryId;
+        state = SetEnablement(state, "I16", enabled: false, 2).State;
+        state = SetEnablement(state, "I16", enabled: true, 3).State;
+        Assert.Empty(SequencingKernel.ProjectQueueEntries(state)); // no stale classification reused
+
+        var readmitted = Admit(state, "I16", 4);
+        Assert.Equal(SequencingOutcome.APPLIED, readmitted.Outcome);
+        var entry = Assert.Single(SequencingKernel.ProjectQueueEntries(readmitted.State));
+        Assert.Equal("I16", entry.SensorId);
+        Assert.NotEqual(oldEntryId, entry.EntryId); // a new entry from new evidence
+
+        // Invalid new evidence is still refused by the normal rules after re-enable.
+        var invalid = SequencingKernel.Apply(
+            state,
+            new AdmitQueueEntry(At(5), SequencingAdmissionSource.SCENARIO_PREPARED, "I16", " ", 0, Topology()));
+        Assert.Equal(SequencingCodes.EntryInvalid, invalid.Evidence.Code);
+    }
+
+    [Fact]
+    public void D7_Neither_I7_Nor_I16_Is_A_Topology_Exception_And_Unknown_Identities_Fail_Closed()
+    {
+        var topology = Topology();
+        Assert.NotNull(SequencingTopology.FindAssignment(topology, "I7"));
+        Assert.NotNull(SequencingTopology.FindAssignment(topology, "I16"));
+        Assert.Null(SequencingTopology.FindAssignment(topology, "SYN-X99"));
+
+        var state = SequencingKernel.Initial();
+        var unknown = SetEnablement(state, "SYN-X99", enabled: false, 1);
+        Assert.Equal(SequencingOutcome.REFUSED, unknown.Outcome);
+        Assert.Equal(SequencingCodes.SensorUnknown, unknown.Evidence.Code);
+        Assert.Empty(SequencingKernel.ProjectDisabledSensorIds(unknown.State));
+
+        var blank = SetEnablement(state, "", enabled: false, 2);
+        Assert.Equal(SequencingCodes.EntryInvalid, blank.Evidence.Code);
+
+        var unchanged = SetEnablement(state, "I7", enabled: true, 3);
+        Assert.Equal(SequencingOutcome.NO_OP, unchanged.Outcome);
+        Assert.Equal(SequencingCodes.SensorEnablementUnchanged, unchanged.Evidence.Code);
+
+        // A topology that omits I7 treats it exactly like any other unknown Sensor.
+        var without = Topology(excludedSensorId: "I7");
+        var refused = SequencingKernel.Apply(
+            state,
+            new AdmitQueueEntry(At(4), SequencingAdmissionSource.SCENARIO_PREPARED, "I7", "SCENARIO_PREPARED", 0, without));
+        Assert.Equal(SequencingCodes.SensorUnknown, refused.Evidence.Code);
+    }
+
+    [Fact]
+    public void D8_Disabling_The_Active_Job_Target_Never_Aborts_The_Job_And_Blocks_Future_Candidates()
+    {
+        var state = Start(SequencingKernel.Initial(), 0).State;
+        state = Admit(state, "I7", 1).State;
+        state = Admit(state, "SYN-S01", 2).State;
+        state = Dispatch(state, 3).State;
+        var job = RequireJob(state);
+        Assert.Equal("I7", job.TargetSensorId);
+
+        var disabled = SetEnablement(state, "I7", enabled: false, 4);
+
+        Assert.Equal(SequencingOutcome.APPLIED, disabled.Outcome);
+        Assert.Equal(SequencingCodes.SensorDisabled, disabled.Evidence.Code);
+        Assert.Equal(job.JobId, disabled.Evidence.JobId);
+        Assert.Null(disabled.Evidence.EntryId);
+        Assert.Equal(job.JobId, RequireJob(disabled.State).JobId);
+        Assert.Equal(job.Lifecycle, RequireJob(disabled.State).Lifecycle);
+        Assert.Equal(["SYN-S01"], SequencingKernel.ProjectQueueEntries(disabled.State).Select(e => e.SensorId).ToArray());
+
+        var candidate = Admit(disabled.State, "I7", 5);
+        Assert.Equal(SequencingOutcome.REFUSED, candidate.Outcome);
+        Assert.Equal(SequencingCodes.SensorDisabled, candidate.Evidence.Code);
+    }
+
+    [Fact]
+    public void D9_Evidence_Of_Enablement_Transitions_Is_Deterministic()
+    {
+        static string Script()
+        {
+            var admitted = Admit(SequencingKernel.Initial(), "I7", 1);
+            var disabled = SetEnablement(admitted.State, "I7", enabled: false, 2);
+            var enabled = SetEnablement(disabled.State, "I7", enabled: true, 3);
+            var evidence = new List<SequencingEvidence> { admitted.Evidence, disabled.Evidence, enabled.Evidence };
+            return JsonSerializer.Serialize(evidence, ContractJson.Options);
+        }
+
+        Assert.Equal(Script(), Script());
+        Assert.True(Script().Contains(SequencingCodes.SensorDisabled, StringComparison.Ordinal));
+        Assert.True(Script().Contains(SequencingCodes.SensorEnabled, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -378,10 +604,21 @@ public sealed class SequencingKernelTests
             assignments.Add(new SequencingSensorAssignment(SensorIds[index], "WJ" + ordinal, "IV" + ordinal));
         }
 
-        return new SequencingTopology(assignments, NonSensorIds);
+        foreach (var corrected in CorrectedSensorAssignments)
+        {
+            if (!string.Equals(corrected.SensorId, excludedSensorId, StringComparison.Ordinal))
+            {
+                assignments.Add(corrected);
+            }
+        }
+
+        return new SequencingTopology(assignments);
     }
 
     private static DateTimeOffset At(int second) => Instant.AddSeconds(second);
+
+    private static SequencingTransition SetEnablement(SequencingState state, string sensorId, bool enabled, int second) =>
+        SequencingKernel.Apply(state, new SetSensorEnablement(At(second), sensorId, enabled, Topology()));
 
     private static SequencingTransition Start(SequencingState state, int second) =>
         SequencingKernel.Apply(state, new StartAutoSequence(At(second)));

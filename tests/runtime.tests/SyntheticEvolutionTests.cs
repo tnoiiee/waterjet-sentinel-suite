@@ -179,16 +179,18 @@ public sealed class SyntheticEvolutionTests
                 .Distinct(StringComparer.Ordinal)
                 .Count());
 
-        var gapSlots = evolved.WallMap.Where(slot => slot.PositionKind == LogicalPositionKind.NON_SENSOR_GAP).ToArray();
-        Assert.Equal(2, gapSlots.Length);
-        Assert.Contains(gapSlots, slot => slot.LogicalRow == 5 && slot.LogicalColumn == 7);
-        Assert.Contains(gapSlots, slot => slot.LogicalRow == 5 && slot.LogicalColumn == 16);
-        Assert.All(gapSlots, slot => Assert.Null(slot.SensorId));
+        // Owner critical topology correction: no gap slot survives evolution; I7 and I16
+        // remain ordinary Sensor slots with their identities.
+        Assert.DoesNotContain(evolved.WallMap, slot => slot.PositionKind != LogicalPositionKind.SENSOR);
+        Assert.Equal("I7", evolved.WallMap.Single(slot => slot.LogicalRow == 5 && slot.LogicalColumn == 7).SensorId);
+        Assert.Equal("I16", evolved.WallMap.Single(slot => slot.LogicalRow == 5 && slot.LogicalColumn == 16).SensorId);
+        Assert.Single(evolved.Sensors, sensor => sensor.SensorId == "I7");
+        Assert.Single(evolved.Sensors, sensor => sensor.SensorId == "I16");
 
         Assert.Equal(24, evolved.Sensors.Count(sensor => sensor.Wall == Wall.LEFT));
-        Assert.Equal(29, evolved.Sensors.Count(sensor => sensor.Wall == Wall.REAR));
+        Assert.Equal(30, evolved.Sensors.Count(sensor => sensor.Wall == Wall.REAR));
         Assert.Equal(24, evolved.Sensors.Count(sensor => sensor.Wall == Wall.RIGHT));
-        Assert.Equal(29, evolved.Sensors.Count(sensor => sensor.Wall == Wall.FRONT));
+        Assert.Equal(30, evolved.Sensors.Count(sensor => sensor.Wall == Wall.FRONT));
     }
 
     [Fact]

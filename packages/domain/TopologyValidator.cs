@@ -4,11 +4,14 @@ namespace Wjss.Domain;
 
 /// <summary>
 /// Independent structural validator for a <see cref="SensorParameterMigrationResult"/>
-/// (Stage 0.3A-3 Checkpoint B). Re-checks every protected invariant of the approved
-/// topology on the assembled whole — counts (108 / 106 / 212 / 24-29-24-29), orderTotal
-/// and scanOrder ranges, I7/I16 NON_SENSOR_GAP identity and anchoring, the WJn ↔ IVn
-/// one-to-one pairing, per-Sensor assignment and target-wall agreement, and namespace
-/// disjointness between equipment identities and Sensor identities.
+/// (Stage 0.3A-3 Checkpoint B; Owner critical topology correction Stage 0.4C-K3). Re-checks
+/// every protected invariant of the approved topology on the assembled whole — counts
+/// (108 positions / 108 Sensors / 216 measurement sides / 24-30-24-30), orderTotal and
+/// scanOrder ranges, the authoritative 108-identity Sensor sequence (I7 and I16 once each in
+/// ordinal position; no gap position), the WJn ↔ IVn one-to-one pairing, per-Sensor
+/// assignment and target-wall agreement, namespace disjointness between equipment
+/// identities and Sensor identities, and finally the central cross-layer
+/// <see cref="TopologyInvariants"/> agreement check.
 ///
 /// Returns null when every invariant holds; otherwise a fail-closed refusal. The
 /// importer runs this on its own output before accepting (no accepted result can violate
@@ -18,8 +21,8 @@ namespace Wjss.Domain;
 public static class TopologyValidator
 {
     private const int ExpectedPositions = CanonicalSensorMap.MatrixSlots;            // 108
-    private const int ExpectedSensors = CanonicalSensorMap.SensorLocations;          // 106
-    private const int ExpectedChannels = CanonicalSensorMap.ThermocoupleChannelCount; // 212
+    private const int ExpectedSensors = CanonicalSensorMap.SensorLocations;          // 108
+    private const int ExpectedChannels = CanonicalSensorMap.ThermocoupleChannelCount; // 216
     private const int ExpectedWaterJets = 8;
     private const int ExpectedIsolationValves = 8;
 
@@ -80,41 +83,32 @@ public static class TopologyValidator
             }
         }
 
-        // I7 / I16: the only NON_SENSOR_GAP positions, anchoring exactly WJ3 / WJ1.
-        var gapPositions = result.LogicalPositions
-            .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
-            .ToArray();
-        if (gapPositions.Length != 2)
-        {
-            return Refuse(
-                MigrationRefusalCodes.TopoGapIdentity,
-                $"exactly 2 NON_SENSOR_GAP positions are required (I7, I16), found {gapPositions.Length}.");
-        }
-
-        foreach (var gap in gapPositions)
-        {
-            if (!WaterJetTopologyCatalog.GapAnchors.TryGetValue(gap.LogicalId, out var expectedAnchor)
-                || !string.Equals(gap.GapAnchorForWaterJetId, expectedAnchor, StringComparison.Ordinal))
-            {
-                return Refuse(
-                    MigrationRefusalCodes.TopoGapIdentity,
-                    $"NON_SENSOR_GAP position '{gap.LogicalId}' must anchor '{(WaterJetTopologyCatalog.GapAnchors.TryGetValue(gap.LogicalId, out var anchor) ? anchor : "no Water Jet")}'.");
-            }
-        }
-
+        // Every logical position is a SENSOR position carrying its canonical identity in
+        // ordinal position (Owner critical topology correction: I7 and I16 included; no
+        // NON_SENSOR_GAP position exists).
         var sensorPositions = result.LogicalPositions
             .Where(p => p.PositionKind == LogicalPositionKind.SENSOR)
             .ToArray();
-        if (sensorPositions.Length != ExpectedSensors)
+        if (sensorPositions.Length != ExpectedPositions)
         {
             return Refuse(
-                MigrationRefusalCodes.TopoGapIdentity,
-                $"exactly {ExpectedSensors} SENSOR-kind logical positions are required, found {sensorPositions.Length}.");
+                MigrationRefusalCodes.TopoSensorIdentity,
+                $"all {ExpectedPositions} logical positions must be SENSOR positions (I7 and I16 are Product Sensors), found {sensorPositions.Length}.");
         }
 
-        // Sensor identity set: unique, agreeing with the SENSOR-kind positions, and
-        // disjoint from every equipment identity (no Water Jet or Valve id may appear as
-        // a Sensor id).
+        for (var i = 0; i < sensorPositions.Length; i++)
+        {
+            var expectedId = CanonicalSensorMap.SensorSequence[i];
+            if (!string.Equals(sensorPositions[i].LogicalId, expectedId, StringComparison.Ordinal))
+            {
+                return Refuse(
+                    MigrationRefusalCodes.TopoSensorIdentity,
+                    $"logical position {i} must be Sensor '{expectedId}' (normal ordinal position), found '{sensorPositions[i].LogicalId}'.");
+            }
+        }
+
+        // Sensor identity set: unique, agreeing with the SENSOR positions, and disjoint
+        // from every equipment identity (no Water Jet or Valve id may appear as a Sensor id).
         var sensorIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var position in sensorPositions)
         {
@@ -131,7 +125,7 @@ public static class TopologyValidator
             if (!sensorIds.Contains(sensor.SensorId))
             {
                 return Refuse(
-                    MigrationRefusalCodes.TopoGapIdentity,
+                    MigrationRefusalCodes.TopoSensorIdentity,
                     $"Sensor configuration '{sensor.SensorId}' has no SENSOR-kind logical position.");
             }
         }
@@ -142,20 +136,22 @@ public static class TopologyValidator
             if (sensorIds.Contains(equipmentId))
             {
                 return Refuse(
-                    MigrationRefusalCodes.TopoGapIdentity,
+                    MigrationRefusalCodes.TopoSensorIdentity,
                     $"equipment identity '{equipmentId}' must never appear as a Sensor identity.");
             }
         }
 
-        // scanOrder: dense one-based 1..106 over the Sensors only, strictly ascending,
-        // skipping the NON_SENSOR_GAP positions.
+        // scanOrder: dense one-based 1..108 over all Sensors in OrderTotal order (I7 and I16
+        // in their ordinal position; nothing skipped), strictly ascending and agreeing with
+        // the authoritative sequence.
         for (var i = 0; i < result.Sensors.Count; i++)
         {
-            if (result.Sensors[i].ScanOrder != i + 1)
+            if (result.Sensors[i].ScanOrder != i + 1
+                || !string.Equals(result.Sensors[i].SensorId, CanonicalSensorMap.SensorSequence[i], StringComparison.Ordinal))
             {
                 return Refuse(
                     MigrationRefusalCodes.TopoSensorCount,
-                    $"scanOrder must be the dense sequence 1-{ExpectedSensors} over the Sensors only (gapless, no duplicates, skipping I7 and I16); entry {i + 1} has scanOrder {result.Sensors[i].ScanOrder}.");
+                    $"scanOrder must be the dense sequence 1-{ExpectedSensors} over all Sensors in ordinal order (gapless, no duplicates, I7 and I16 included); entry {i + 1} has scanOrder {result.Sensors[i].ScanOrder} for '{result.Sensors[i].SensorId}'.");
             }
         }
 
@@ -248,10 +244,31 @@ public static class TopologyValidator
 
         // The approved target table itself (installed wall ≠ target wall, opposite wall,
         // matching region) is catalog data; validate it against the independent expectation.
+        // An UNRESOLVED placement must carry no anchors (nothing inferred from a former gap).
         var targetRefusal = ValidateApprovedTargets(result.WaterJets);
         if (targetRefusal is not null)
         {
             return targetRefusal;
+        }
+
+        // Central cross-layer agreement (catalogue, sequence, unique ids, Front / Rear sides,
+        // assigned / physical / unassigned counts, wall totals). Fails closed on any
+        // disagreement, including a Sensor missing or duplicated anywhere.
+        var invariant = TopologyInvariants.FirstViolation(new TopologyObservation
+        {
+            SensorSequence = result.Sensors.Select(s => s.SensorId).ToArray(),
+            FrontMeasurementSensorIds = result.Sensors.Select(s => s.SensorId).ToArray(),
+            RearMeasurementSensorIds = result.Sensors.Select(s => s.SensorId).ToArray(),
+            AssignedMeasurementCount = result.Sensors.Count * 2,
+            PhysicalChannelCount = CanonicalSensorMap.PhysicalThermocoupleChannelCount,
+            UnassignedChannelCount = CanonicalSensorMap.PhysicalThermocoupleChannelCount - (result.Sensors.Count * 2),
+            NonSensorGapCount = result.LogicalPositions.Count(p => p.PositionKind != LogicalPositionKind.SENSOR),
+            SensorsPerWall = result.Sensors.GroupBy(s => s.Wall).ToDictionary(g => g.Key, g => g.Count()),
+            RuntimeSensorCount = result.LogicalPositions.Count,
+        });
+        if (invariant is not null)
+        {
+            return Refuse(MigrationRefusalCodes.TopoInvariantViolation, $"{invariant.Code}: {invariant.Detail}");
         }
 
         return null;
@@ -261,6 +278,21 @@ public static class TopologyValidator
     {
         foreach (var waterJet in waterJets)
         {
+            if (waterJet.PlacementKind == WaterJetPlacementKind.UNRESOLVED && waterJet.PlacementAnchors.Count != 0)
+            {
+                return Refuse(
+                    MigrationRefusalCodes.TopoTargetWallContradiction,
+                    $"Water Jet '{waterJet.WaterJetId}' has an UNRESOLVED installed position and must carry no placement anchors; found [{string.Join(", ", waterJet.PlacementAnchors)}].");
+            }
+
+            if (waterJet.PlacementKind != WaterJetPlacementKind.UNRESOLVED
+                && waterJet.PlacementAnchors.Any(anchor => !CanonicalSensorMap.IsProductSensorId(anchor)))
+            {
+                return Refuse(
+                    MigrationRefusalCodes.TopoTargetWallContradiction,
+                    $"Water Jet '{waterJet.WaterJetId}' anchors on a position that is not a Product Sensor: [{string.Join(", ", waterJet.PlacementAnchors)}].");
+            }
+
             var expectedTarget = waterJet.InstalledWall switch
             {
                 Wall.LEFT => Wall.RIGHT,

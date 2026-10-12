@@ -2,7 +2,8 @@ namespace Wjss.Contracts;
 
 /// <summary>
 /// One logical position of the Owner-confirmed 18-column x 6-row matrix
-/// (108 positions: 106 Sensor locations + 2 NON_SENSOR_GAP placement anchors).
+/// (108 positions = 108 Product Sensor locations; Owner critical topology correction,
+/// 2026-10-12: I7 and I16 are normal Sensors, no NON_SENSOR_GAP position exists).
 /// Delivered once in the Snapshot as <c>wallMap</c>; static; NEVER in a Delta.
 /// The UI renders wall grids from these slots only and generates no IDs.
 /// </summary>
@@ -11,7 +12,7 @@ public sealed record WallMapSlot
     /// <summary>Stable slot identity, e.g. "SLOT-R5-C07". Derived from row/column, never invented per deployment.</summary>
     public required string SlotId { get; init; }
 
-    /// <summary>SENSOR for the 106 actual Sensors; NON_SENSOR_GAP for I7 and I16 (no Sensor identity, no channels, no scan order).</summary>
+    /// <summary>Always SENSOR: every logical position is a Product Sensor (I7 and I16 included).</summary>
     public required LogicalPositionKind PositionKind { get; init; }
     public required Wall Wall { get; init; }
 
@@ -27,35 +28,46 @@ public sealed record WallMapSlot
     /// <summary>1-6 inside the wall; equals LogicalRow (no rotation, no reversal).</summary>
     public required int WallRow { get; init; }
 
-    /// <summary>Sensor identity; null for NON_SENSOR_GAP positions. An equipment identity is never a Sensor ID.</summary>
+    /// <summary>The canonical Sensor identity of this position (never null for a valid slot). An equipment identity is never a Sensor ID.</summary>
     public string? SensorId { get; init; }
-
-    /// <summary>
-    /// The Water Jet physically anchored at this position; non-null only for NON_SENSOR_GAP
-    /// positions (I7 anchors WJ3, I16 anchors WJ1). The gap is a location anchor only — it
-    /// is never a Water Jet identity and never a Sensor identity.
-    /// </summary>
-    public string? GapAnchorForWaterJetId { get; init; }
 }
 
 /// <summary>
-/// Canonical logical matrix structure (Owner-confirmed). The count identities and
-/// NON_SENSOR_GAP positions are protected domain facts. Scan order, device
-/// distribution, channel identifiers and equipment assignment are NOT here:
-/// they belong to Published Configuration (later stage) and are never invented.
+/// Canonical logical matrix structure (Owner-confirmed; Owner critical topology correction
+/// 2026-10-12). The count identities are protected domain facts: 108 Product Sensors
+/// (108 × 2 = 216 assigned Product Thermocouple measurements) out of 240 physical
+/// Thermocouple channels (6 nodes × 5 modules × 8 channels), leaving 24 unassigned
+/// (240 − 216 = 24). Scan order, device distribution, channel identifiers and equipment
+/// assignment are NOT here: they belong to Published Configuration (later stage) and
+/// are never invented. The superseded 106 / 212 / "I7 and I16 are NON_SENSOR_GAP" belief
+/// is revoked and must not be reintroduced.
 /// </summary>
 public static class CanonicalSensorMap
 {
     public const int LogicalColumnCount = 18;
     public const int LogicalRowCount = 6;
-    public const int SensorLocations = 106;
-    public const int ThermocoupleChannelCount = 212;
-    public const int MatrixSlots = 108;
-    public const int NonSensorGapCount = 2;
 
-    /// <summary>Wall totals: sensors per wall (NON_SENSOR_GAP positions are not Sensors).</summary>
+    /// <summary>108 Product Sensors — one per logical position; I7 and I16 included.</summary>
+    public const int SensorLocations = 108;
+
+    /// <summary>Two measurement sides (Front, Rear) per Sensor.</summary>
+    public const int ChannelsPerSensor = 2;
+
+    /// <summary>216 assigned Product Thermocouple measurements (108 × 2).</summary>
+    public const int ThermocoupleChannelCount = SensorLocations * ChannelsPerSensor;
+
+    /// <summary>108 logical slots; equals <see cref="SensorLocations"/> because no non-Sensor position exists.</summary>
+    public const int MatrixSlots = LogicalColumnCount * LogicalRowCount;
+
+    /// <summary>240 physical Thermocouple channels of the six-node baseline (6 × 5 × 8).</summary>
+    public const int PhysicalThermocoupleChannelCount = 240;
+
+    /// <summary>24 physical Thermocouple channels with no Product assignment (240 − 216).</summary>
+    public const int UnassignedThermocoupleChannelCount = PhysicalThermocoupleChannelCount - ThermocoupleChannelCount;
+
+    /// <summary>Wall totals: Sensors per wall (every position is a Sensor): 24 / 30 / 24 / 30.</summary>
     public static readonly IReadOnlyDictionary<Wall, int> SensorsPerWall =
-        new Dictionary<Wall, int> { [Wall.LEFT] = 24, [Wall.REAR] = 29, [Wall.RIGHT] = 24, [Wall.FRONT] = 29 };
+        new Dictionary<Wall, int> { [Wall.LEFT] = 24, [Wall.REAR] = 30, [Wall.RIGHT] = 24, [Wall.FRONT] = 30 };
 
     /// <summary>Wall column ranges in logical-column order.</summary>
     public static readonly IReadOnlyDictionary<Wall, (int FirstColumn, int LastColumn)> WallColumns =
@@ -68,15 +80,20 @@ public static class CanonicalSensorMap
         };
 
     /// <summary>
-    /// The two NON_SENSOR_GAP positions and the Water Jets they physically anchor
-    /// (logical I7 = Rear anchoring WJ3, logical I16 = Front anchoring WJ1). They are
-    /// location anchors only — never Sensors, never equipment identities.
+    /// The two Sensors the Owner critical topology correction restored to the catalogue.
+    /// They are ordinary members of <see cref="SensorSequence"/>; this list exists only so
+    /// that validators can assert their presence explicitly (exactly once each, in ordinal
+    /// position). It confers no special behaviour.
     /// </summary>
-    public static readonly (string LogicalId, string AnchorWaterJetId, int Row, int Column)[] NonSensorGapSlots =
-    [
-        ("I7", "WJ3", 5, 7),
-        ("I16", "WJ1", 5, 16),
-    ];
+    public static readonly IReadOnlyList<string> CorrectedSensorIds = ["I7", "I16"];
+
+    /// <summary>
+    /// The authoritative Product Sensor sequence: exactly 108 identities in canonical
+    /// row-major order — G+201…G+218, G+101…G+118, G1…G18, H1…H18, I1…I18, J1…J18. I7 and I16
+    /// appear once each in their normal ordinal position; there is no hole, no appended
+    /// identity and no renumbering. Index + 1 is the canonical scan order.
+    /// </summary>
+    public static IReadOnlyList<string> SensorSequence { get; } = BuildSensorSequence();
 
     /// <summary>Sensor ID for a logical row key and column, per the Owner-confirmed labelling.</summary>
     public static string SensorIdFor(int logicalRow, int logicalColumn) => logicalRow switch
@@ -90,6 +107,10 @@ public static class CanonicalSensorMap
         _ => throw new ArgumentOutOfRangeException(nameof(logicalRow), "logical row must be 1-6"),
     };
 
+    /// <summary>True when the identity is one of the 108 authoritative Product Sensors.</summary>
+    public static bool IsProductSensorId(string? sensorId) =>
+        sensorId is not null && SensorSequence.Contains(sensorId, StringComparer.Ordinal);
+
     public static Wall WallForColumn(int logicalColumn)
     {
         foreach (var (wall, (first, last)) in WallColumns)
@@ -101,5 +122,20 @@ public static class CanonicalSensorMap
         }
 
         throw new ArgumentOutOfRangeException(nameof(logicalColumn), "logical column must be 1-18");
+    }
+
+    private static IReadOnlyList<string> BuildSensorSequence()
+    {
+        var sequence = new string[MatrixSlots];
+        var index = 0;
+        for (var row = 1; row <= LogicalRowCount; row++)
+        {
+            for (var column = 1; column <= LogicalColumnCount; column++)
+            {
+                sequence[index++] = SensorIdFor(row, column);
+            }
+        }
+
+        return Array.AsReadOnly(sequence);
     }
 }

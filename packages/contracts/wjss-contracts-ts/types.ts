@@ -31,10 +31,13 @@ export type LogicalPositionKind = 'SENSOR';
 /**
  * How a Water Jet is physically mounted (Owner-approved topology table). The superseded
  * 'NON_SENSOR_GAP' placement (WJ1 at I16, WJ3 at I7) is removed by the Owner critical topology
- * correction; the replacement placement of WJ1 and WJ3 is an open Owner decision and is not
- * invented here.
+ * correction. Owner WJ installed-position ruling: WJ1 and WJ3 are 'UNRESOLVED' ("Installed
+ * position pending authoritative layout") with an empty placementAnchors array until layout
+ * evidence exists; no coordinate or anchor is inferred from I7, I16, a former gap, a Sensor
+ * wall, the target wall, a target Sensor, the legacy cannon value or the Assigned Cleaning
+ * Device ID. Installed Position is not Target Coverage; targets are unchanged.
  */
-export type WaterJetPlacementKind = 'BETWEEN_HORIZONTAL' | 'BETWEEN_VERTICAL' | 'JUNCTION';
+export type WaterJetPlacementKind = 'BETWEEN_HORIZONTAL' | 'BETWEEN_VERTICAL' | 'JUNCTION' | 'UNRESOLVED';
 export type Quality = 'GOOD' | 'UNCERTAIN' | 'BAD' | 'STALE' | 'DISABLED';
 export type Classification = 'DIRTY' | 'CLEANER' | 'NOT_CLASSIFIED';
 export type ClassificationBasis = 'CURRENT' | 'LAST_VALIDATED' | 'NONE';

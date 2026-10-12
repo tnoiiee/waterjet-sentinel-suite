@@ -4,7 +4,9 @@ using Xunit;
 namespace Wjss.Domain.Tests;
 
 /// <summary>
-/// Canonical 106 / 212 / 108 structural facts (Owner domain correction).
+/// Canonical 108 Sensors / 216 assigned TC measurements / 240 physical / 24 unassigned
+/// structural facts (Owner critical topology correction, Stage 0.4C-K3: I7 and I16 are
+/// normal Product Sensors; the former 106 / 212 reading is superseded).
 /// The C# map constants are the authoritative single mapping source; the
 /// generated sensor-map example and every fixture must agree with them.
 /// </summary>
@@ -16,15 +18,49 @@ public sealed class CanonicalMapStructureTests
         Assert.Equal(18, CanonicalSensorMap.LogicalColumnCount);
         Assert.Equal(6, CanonicalSensorMap.LogicalRowCount);
         Assert.Equal(108, CanonicalSensorMap.MatrixSlots);
-        Assert.Equal(106, CanonicalSensorMap.SensorLocations);
-        Assert.Equal(212, CanonicalSensorMap.ThermocoupleChannelCount);
-        Assert.Equal(2, CanonicalSensorMap.NonSensorGapCount);
+        Assert.Equal(108, CanonicalSensorMap.SensorLocations);
+        Assert.Equal(2, CanonicalSensorMap.ChannelsPerSensor);
+        Assert.Equal(216, CanonicalSensorMap.ThermocoupleChannelCount);
+        Assert.Equal(240, CanonicalSensorMap.PhysicalThermocoupleChannelCount);
+        Assert.Equal(24, CanonicalSensorMap.UnassignedThermocoupleChannelCount);
+        Assert.Equal(CanonicalSensorMap.MatrixSlots, CanonicalSensorMap.SensorLocations); // every slot is a Sensor
 
         Assert.Equal(24, CanonicalSensorMap.SensorsPerWall[Wall.LEFT]);
-        Assert.Equal(29, CanonicalSensorMap.SensorsPerWall[Wall.REAR]);
+        Assert.Equal(30, CanonicalSensorMap.SensorsPerWall[Wall.REAR]);
         Assert.Equal(24, CanonicalSensorMap.SensorsPerWall[Wall.RIGHT]);
-        Assert.Equal(29, CanonicalSensorMap.SensorsPerWall[Wall.FRONT]);
-        Assert.Equal(106, CanonicalSensorMap.SensorsPerWall.Values.Sum());
+        Assert.Equal(30, CanonicalSensorMap.SensorsPerWall[Wall.FRONT]);
+        Assert.Equal(108, CanonicalSensorMap.SensorsPerWall.Values.Sum());
+    }
+
+    [Fact]
+    public void Sensor_Sequence_Is_The_108_Ordinal_Identities_With_I7_And_I16_In_Place()
+    {
+        var sequence = CanonicalSensorMap.SensorSequence;
+        Assert.Equal(108, sequence.Count);
+        Assert.Equal(108, sequence.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal("G+201", sequence[0]);
+        Assert.Equal("G+218", sequence[17]);
+        Assert.Equal("G+101", sequence[18]);
+        Assert.Equal("G1", sequence[36]);
+        Assert.Equal("H1", sequence[54]);
+        Assert.Equal("I1", sequence[72]);
+        Assert.Equal("I6", sequence[77]);
+        Assert.Equal("I7", sequence[78]);   // scanOrder 79, REAR
+        Assert.Equal("I8", sequence[79]);
+        Assert.Equal("I15", sequence[86]);
+        Assert.Equal("I16", sequence[87]);  // scanOrder 88, FRONT
+        Assert.Equal("I17", sequence[88]);
+        Assert.Equal("J18", sequence[107]);
+
+        Assert.Equal(new[] { "I7", "I16" }, CanonicalSensorMap.CorrectedSensorIds.ToArray());
+        Assert.True(CanonicalSensorMap.IsProductSensorId("I7"));
+        Assert.True(CanonicalSensorMap.IsProductSensorId("I16"));
+        Assert.False(CanonicalSensorMap.IsProductSensorId("WJ1"));
+        Assert.False(CanonicalSensorMap.IsProductSensorId("IV3"));
+        Assert.False(CanonicalSensorMap.IsProductSensorId(null));
+        Assert.False(CanonicalSensorMap.IsProductSensorId("I19"));
+        Assert.Equal(Wall.REAR, CanonicalSensorMap.WallForColumn(7));
+        Assert.Equal(Wall.FRONT, CanonicalSensorMap.WallForColumn(16));
     }
 
     [Fact]
@@ -40,10 +76,15 @@ public sealed class CanonicalMapStructureTests
     }
 
     [Fact]
-    public void NonSensorGap_Positions_Anchor_WJ3_And_WJ1_At_I7_And_I16()
+    public void No_Gap_Vocabulary_Survives_In_The_Canonical_Map()
     {
-        Assert.Equal(("I7", "WJ3", 5, 7), CanonicalSensorMap.NonSensorGapSlots[0]);
-        Assert.Equal(("I16", "WJ1", 5, 16), CanonicalSensorMap.NonSensorGapSlots[1]);
+        // Owner critical topology correction: the former NON_SENSOR_GAP positions at I7 and
+        // I16 are withdrawn; no member of the canonical map describes a gap or a gap anchor.
+        Assert.Equal(new[] { "SENSOR" }, Enum.GetNames<LogicalPositionKind>());
+        Assert.DoesNotContain(typeof(CanonicalSensorMap).GetMembers(), m => m.Name.Contains("Gap", StringComparison.Ordinal));
+        Assert.DoesNotContain(typeof(WallMapSlot).GetProperties(), p => p.Name.Contains("Gap", StringComparison.Ordinal));
+        Assert.Equal("I7", CanonicalSensorMap.SensorIdFor(5, 7));
+        Assert.Equal("I16", CanonicalSensorMap.SensorIdFor(5, 16));
     }
 
     [Fact]

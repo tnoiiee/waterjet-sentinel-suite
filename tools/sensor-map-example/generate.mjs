@@ -36,6 +36,7 @@ export const CORRECTED = Object.freeze({
   sensorLocations: 108,
   thermocoupleChannels: 216,
   nonSensorGapSlots: Object.freeze([]),
+  emitsGapAnchorKey: false,
   // Synthetic device distribution over the 108 scan positions (14 x 4 + 13 x 4 = 108).
   deviceCounts: Object.freeze([14, 14, 14, 14, 13, 13, 13, 13]),
   sensorsPerWall: Object.freeze({ LEFT: 24, REAR: 30, RIGHT: 24, FRONT: 30 }),
@@ -50,6 +51,7 @@ export const CORRECTED = Object.freeze({
 export const LEGACY_SUPERSEDED = Object.freeze({
   sensorLocations: 106,
   thermocoupleChannels: 212,
+  emitsGapAnchorKey: true,
   nonSensorGapSlots: Object.freeze([
     Object.freeze({ logicalId: 'I7', anchorWaterJetId: 'WJ3', row: 5, column: 7 }),
     Object.freeze({ logicalId: 'I16', anchorWaterJetId: 'WJ1', row: 5, column: 16 }),
@@ -113,8 +115,11 @@ export function buildSensorMapExample(profile = CORRECTED) {
         wallColumn: col - first + 1,
         wallRow: row,
         sensorId: gap ? null : sensorIdFor(row, col),
-        gapAnchorForWaterJetId: gap ? gap.anchorWaterJetId : null,
       };
+      if (profile.emitsGapAnchorKey) {
+        // Superseded form only: the corrected contract no longer carries this key at all.
+        slot.gapAnchorForWaterJetId = gap ? gap.anchorWaterJetId : null;
+      }
       if (gap) {
         slot.logicalLabel = `I${col}`;
       } else {

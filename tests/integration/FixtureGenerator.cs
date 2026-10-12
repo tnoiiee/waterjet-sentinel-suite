@@ -11,6 +11,12 @@ namespace Wjss.FixtureEmission.Tests;
 /// byte-stable and the TypeScript/Node reference generator can reproduce the
 /// same numbers. No Production value, address, register, coordinate or timing
 /// constant appears here.
+///
+/// Owner critical topology correction (Stage 0.4C-K3): every one of the 108 logical
+/// positions is a Product Sensor (I7 and I16 included; 216 channels; synthetic device
+/// distribution 14 x 4 + 13 x 4). <c>tools/fixture-generator/generate.mjs</c> is the Node
+/// mirror of <see cref="BuildSnapshot"/> and was proven byte-identical against the
+/// previously committed .NET output before the corrected fixture was regenerated with it.
 /// </summary>
 internal static class FixtureGenerator
 {
@@ -23,7 +29,7 @@ internal static class FixtureGenerator
 
     public static string DeviceIdFor(int scanOrder)
     {
-        int[] counts = [14, 14, 13, 13, 13, 13, 13, 13];
+        int[] counts = [14, 14, 14, 14, 13, 13, 13, 13];
         var remaining = scanOrder;
         for (var d = 0; d < counts.Length; d++)
         {
@@ -40,7 +46,7 @@ internal static class FixtureGenerator
 
     public static int IndexOnDevice(int scanOrder)
     {
-        int[] counts = [14, 14, 13, 13, 13, 13, 13, 13];
+        int[] counts = [14, 14, 14, 14, 13, 13, 13, 13];
         var remaining = scanOrder;
         for (var d = 0; d < counts.Length; d++)
         {
@@ -62,11 +68,6 @@ internal static class FixtureGenerator
         {
             for (var col = 1; col <= CanonicalSensorMap.LogicalColumnCount; col++)
             {
-                if (CanonicalSensorMap.NonSensorGapSlots.Any(c => c.Row == row && c.Column == col))
-                {
-                    continue;
-                }
-
                 list.Add((row, col));
             }
         }
@@ -89,18 +90,16 @@ internal static class FixtureGenerator
             {
                 var wall = CanonicalSensorMap.WallForColumn(col);
                 var (first, _) = CanonicalSensorMap.WallColumns[wall];
-                var gap = CanonicalSensorMap.NonSensorGapSlots.FirstOrDefault(c => c.Row == row && c.Column == col);
                 slots.Add(new WallMapSlot
                 {
                     SlotId = $"SLOT-R{row}-C{col:D2}",
-                    PositionKind = gap.Item1 is null ? LogicalPositionKind.SENSOR : LogicalPositionKind.NON_SENSOR_GAP,
+                    PositionKind = LogicalPositionKind.SENSOR,
                     Wall = wall,
                     LogicalColumn = col,
                     LogicalRow = row,
                     WallColumn = col - first + 1,
                     WallRow = row,
-                    SensorId = gap.Item1 is null ? CanonicalSensorMap.SensorIdFor(row, col) : null,
-                    GapAnchorForWaterJetId = gap.Item2,
+                    SensorId = CanonicalSensorMap.SensorIdFor(row, col),
                 });
             }
         }

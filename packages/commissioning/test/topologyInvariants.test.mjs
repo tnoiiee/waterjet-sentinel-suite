@@ -68,7 +68,8 @@ test('T5 no logical position is a NON_SENSOR_GAP anywhere in the current-facing 
   assert.equal(PROTECTED_BASELINE.NON_SENSOR_GAP_SENSOR_IDS.length, 0);
   assert.equal(WALL_MAP_EXPECTED.nonSensorGaps, 0);
   assert.equal(sensorMapExample.logicalMatrix.slots.some((s) => s.positionKind === 'NON_SENSOR_GAP'), false);
-  assert.equal(sensorMapExample.logicalMatrix.slots.some((s) => s.gapAnchorForWaterJetId !== null), false);
+  // The superseded gap-anchor key no longer exists on any slot (not even as an explicit null).
+  assert.equal(sensorMapExample.logicalMatrix.slots.some((s) => 'gapAnchorForWaterJetId' in s), false);
   assert.equal(sensorMapExample.logicalMatrix.slots.some((s) => 'logicalLabel' in s), false);
   assert.equal(JSON.stringify(sensorMapExample).includes('NON_SENSOR_GAP'), false);
   assert.equal(WALL_MAP.counts.nonSensorGaps, 0);

@@ -33,13 +33,20 @@ measurements, 240 physical TC channels, 24 unassigned.
   `tests/integration/ExampleFiles.cs::SensorMap`; `--legacy-proof` reproduces the
   superseded 106 form for comparison only. The C# generator must adopt the same
   form in the Owner-local .NET pass.
-- `sensor-parameters.migrated.example.json` is **STALE — not regenerated**: it is
-  the output of the .NET importer over the synthetic CSV
-  (`tests/config.tests/SyntheticSensorParameterCsv.cs`), not a formula that can be
-  reproduced provably in Node, so it is left as committed (not hand-edited). It still
-  carries I7/I16 as `NON_SENSOR_GAP`, 106 Sensor configurations, scanOrder 1–106 and
-  `placementKind: NON_SENSOR_GAP` for WJ1/WJ3. Regenerating it requires the
-  Owner-local .NET pass (importer correction + Owner placement decision for WJ1/WJ3).
+- `sensor-parameters.migrated.example.json` has been **regenerated** to that baseline
+  with `tools/migrated-example/generate.mjs` (`--write`): 108 logical positions (all
+  `SENSOR`, no `gapAnchorForWaterJetId`), 108 Sensor configurations with dense
+  scanOrder 1–108 (I7 scan 79 → WJ1/IV1, I16 scan 88 → WJ3/IV3), the same per-Sensor
+  formulas the synthetic CSV (`tests/config.tests/SyntheticSensorParameterCsv.cs`)
+  feeds the importer (dirty bounds 15+(s%10) … 65+(s%10), threshold 55+(s%20),
+  enabled s%17≠0 → six Disabled Sensors at scan 17/34/51/68/85/102, cleaningCount s%4),
+  and `placementKind: UNRESOLVED` with `placementAnchors: []` for WJ1/WJ3 (Owner ruling:
+  installed position pending authoritative layout; nothing inferred from the former
+  gap). Proof: `--legacy-proof` reproduces the previously committed 106-form file
+  **byte-identically**, and a second `--write` run produces no diff. The .NET importer
+  and `SensorParameterMigrationTests` were corrected to the same form; the Owner-local
+  `MigratedExampleShapeTests` / importer run is the remaining C# parity gate
+  (NOT_RUN_ENVIRONMENT_UNAVAILABLE in Arena). The file was never hand-edited.
 
 Stage 0.3A-3 Checkpoint B added `sensor-parameters.migrated.example.json`: the
 canonical shape of the migrated legacy sensor parameters (ADR-0017) — 108

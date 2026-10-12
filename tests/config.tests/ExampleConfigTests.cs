@@ -46,7 +46,7 @@ public sealed class ExampleConfigTests
     }
 
     [Fact]
-    public void Sensor_Map_Example_Matches_Canonical_Counts_And_Excludes_Gap_Positions_From_Sensors()
+    public void Sensor_Map_Example_Matches_Canonical_Counts_And_Has_No_Gap_Positions()
     {
         var path = Path.Combine(RepoRoot()!, "config", "examples", "sensor-map.example.json");
         var node = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
@@ -55,16 +55,11 @@ public sealed class ExampleConfigTests
         var slots = matrix["slots"]!.AsArray();
         Assert.Equal(108, slots.Count);
 
+        // Owner critical topology correction: every one of the 108 slots is a SENSOR slot
+        // (I7 and I16 included); no NON_SENSOR_GAP slot and no gapAnchorForWaterJetId key.
         var sensors = slots.Where(s => (string?)s!["positionKind"] == "SENSOR").ToArray();
-        var nonSensorGaps = slots.Where(s => (string?)s!["positionKind"] == "NON_SENSOR_GAP").ToArray();
-        Assert.Equal(106, sensors.Length);
-        Assert.Equal(2, nonSensorGaps.Length);
-
-        foreach (var gap in nonSensorGaps)
-        {
-            Assert.Null(gap!["sensorId"]);
-            Assert.NotNull(gap["gapAnchorForWaterJetId"]);
-        }
+        Assert.Equal(108, sensors.Length);
+        Assert.DoesNotContain(slots, s => (string?)s!["positionKind"] != "SENSOR");
 
         foreach (var sensor in sensors)
         {
@@ -74,8 +69,9 @@ public sealed class ExampleConfigTests
 
         var ids = sensors.Select(s => (string?)s!["sensorId"]).ToArray();
         Assert.Equal(ids.Length, ids.Distinct().Count());
-        Assert.DoesNotContain("I7", ids);
-        Assert.DoesNotContain("I16", ids);
+        Assert.Contains("I7", ids);
+        Assert.Contains("I16", ids);
+        Assert.Equal(CanonicalSensorMap.SensorSequence.ToArray(), ids.Select(id => id ?? string.Empty).ToArray());
 
         // tcChannels STRUCTURE (round 6b): every SENSOR slot exposes a JsonArray of exactly
         // two non-empty string items, distinct within the pair; scalar (comma-delimited)
@@ -106,25 +102,20 @@ public sealed class ExampleConfigTests
         }).ToArray();
 
         var allChannels = channelPairs.SelectMany(pair => pair).ToArray();
-        Assert.Equal(212, allChannels.Length);             // exactly 2 channels for each of the 106 sensors
-        Assert.Equal(212, allChannels.Distinct().Count()); // globally unique across the machine
-        foreach (var gap in nonSensorGaps)
-        {
-            Assert.Null(gap!["tcChannels"]); // NON_SENSOR_GAP slots never carry the key at all
-        }
+        Assert.Equal(216, allChannels.Length);             // exactly 2 channels for each of the 108 sensors
+        Assert.Equal(216, allChannels.Distinct().Count()); // globally unique across the machine
 
         // canonical totals re-verified through the typed contract record: a scalar string
         // could not even deserialize into the array property (TcChannelRules rejects every
-        // other invalid shape: lengths 0/1/3, blanks, duplicates, NON_SENSOR_GAP channels)
+        // other invalid shape: lengths 0/1/3, blanks, duplicates, non-Sensor positions)
         var slotRecords = slots
             .Select(s => JsonSerializer.Deserialize<SensorMapSlotExample>(s!.ToJsonString(), ContractJson.Options)!)
             .ToArray();
-        TcChannelRules.RequireValidMapping(slotRecords); // 108 slots / 106 sensors / 2 gaps / 212 distinct channels
-        Assert.All(slotRecords.Where(r => r.IsNonSensorGap), r => Assert.Null(r.TcChannels));
+        TcChannelRules.RequireValidMapping(slotRecords); // 108 slots / 108 sensors / 216 distinct channels
         foreach (var wall in new[] { Wall.LEFT, Wall.REAR, Wall.RIGHT, Wall.FRONT })
         {
-            var expected = wall == Wall.LEFT || wall == Wall.RIGHT ? 24 : 29;
-            Assert.Equal(expected, slotRecords.Count(r => r.Wall == wall && !r.IsNonSensorGap));
+            var expected = wall == Wall.LEFT || wall == Wall.RIGHT ? 24 : 30;
+            Assert.Equal(expected, slotRecords.Count(r => r.Wall == wall));
         }
     }
 

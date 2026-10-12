@@ -83,6 +83,7 @@ public sealed record SequencingActiveJob(
 public sealed record SequencingState
 {
     private SequencingEntry[]? _queue;
+    private string[] _disabledSensorIds = [];
 
     internal SequencingState(
         IReadOnlyList<SequencingEntry>? queue,
@@ -128,6 +129,24 @@ public sealed record SequencingState
 
     /// <summary>Latched read-only equipment fault. No clear/reset input is present.</summary>
     public IReadOnlyList<EquipmentFaultState> EquipmentFaults { get; internal init; } = Array.Empty<EquipmentFaultState>();
+
+    /// <summary>
+    /// The Sensors currently Disabled (Owner Sensor Disable ruling, Stage 0.4C-K3), as a
+    /// read-only view over a private ordinal-sorted copy. A Sensor absent from this list is
+    /// Enabled: that is the default for every Sensor, I7 and I16 included. The kernel never
+    /// admits, dispatches or auto-dispatches a Disabled Sensor, and
+    /// <see cref="SequencingStateValidator"/> rejects a state whose queue still holds one.
+    /// Only <see cref="SequencingKernel"/> writes it (through <see cref="SetSensorEnablement"/>).
+    /// </summary>
+    public IReadOnlyList<string> DisabledSensorIds
+    {
+        get => Array.AsReadOnly(_disabledSensorIds);
+        internal init => _disabledSensorIds = value.OrderBy(id => id, StringComparer.Ordinal).ToArray();
+    }
+
+    /// <summary>True when the Sensor is Disabled in this state.</summary>
+    public bool IsSensorDisabled(string sensorId) =>
+        Array.BinarySearch(_disabledSensorIds, sensorId, StringComparer.Ordinal) >= 0;
 
     /// <summary>The evidence sequence of the most recent evidence record (0 before any transition).</summary>
     public int EvidenceSeq { get; internal init; }

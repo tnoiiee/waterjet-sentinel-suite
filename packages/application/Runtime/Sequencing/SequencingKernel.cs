@@ -39,6 +39,20 @@ namespace Wjss.Runtime.Core.Sequencing;
 /// </para>
 ///
 /// <para>
+/// Sensor Enable / Disable (Owner Sensor Disable ruling, Stage 0.4C-K3): the
+/// Enabled / Disabled state lives in <see cref="SequencingState.DisabledSensorIds"/>
+/// (default Enabled for every Sensor, I7 and I16 included). A Disabled Sensor is
+/// refused at admission (SENSOR_DISABLED), never becomes a dispatch candidate and
+/// never produces a new Job; disabling a Sensor removes its queued non-active entry
+/// immediately (reason SENSOR_DISABLED, FIFO of the others preserved) and leaves an
+/// Active Job targeting it untouched — Pump, Valve, Operator Abort, AutoSequence and
+/// Safe Return rules alone govern that Job. Re-enabling never resurrects a removed
+/// entry: a new admission with new valid evidence is required. An unknown identity
+/// is refused (SENSOR_UNKNOWN) and never enters the state. The kernel owns no
+/// mutation UI and no route for this input.
+/// </para>
+///
+/// <para>
 /// State integrity: <see cref="Apply"/> validates the supplied state before any
 /// transition. An inconsistent state is refused with SEQUENCING_STATE_INVALID and
 /// no other field changes. Projections throw InvalidOperationException for an
@@ -92,8 +106,20 @@ public static class SequencingKernel
             ValveLimitObserved e => ObserveValve(state, e),
             AxisFeedbackObserved e => ObserveAxis(state, e),
             FeedbackTimeoutExpired e => ExpireFeedback(state, e),
+            SetSensorEnablement e => SetEnablement(state, e),
             _ => throw new ArgumentOutOfRangeException(nameof(sequencingEvent)),
         };
+    }
+
+    /// <summary>
+    /// Read-only projection of the Disabled Sensors (ordinal order). Every other Sensor is
+    /// Enabled. Throws InvalidOperationException for an inconsistent state.
+    /// </summary>
+    public static IReadOnlyList<string> ProjectDisabledSensorIds(SequencingState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        SequencingStateValidator.RequireValid(state);
+        return state.DisabledSensorIds;
     }
 
     /// <summary>
@@ -221,6 +247,13 @@ public static class SequencingKernel
             return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, structuralRefusal, null, null);
         }
 
+        // Owner Sensor Disable ruling: a Disabled Sensor is never a Cleaning Candidate and
+        // never enters the GlobalQueue, whatever evidence accompanies the request.
+        if (state.IsSensorDisabled(e.SensorId))
+        {
+            return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.SensorDisabled, null, null);
+        }
+
         if (string.IsNullOrWhiteSpace(e.SourceReason) || e.SecondsSinceLastClean < 0)
         {
             return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.EntryInvalid, null, null);
@@ -299,15 +332,20 @@ public static class SequencingKernel
         var headInvalid = headRefusal is not null
             || string.IsNullOrWhiteSpace(head.SourceReason)
             || head.SecondsSinceLastClean < 0;
-        if (headInvalid)
+        if (headInvalid || state.IsSensorDisabled(head.SensorId))
         {
+            // A Disabled head is unreachable for a validated state (the disable transition
+            // already removed it and the validator rejects the overlap); the check is kept
+            // so that dispatch of a Disabled Sensor is refused by construction, never by
+            // assumption.
             var removedRevision = NextCounter(state.QueueRevision, "QueueRevision");
             var removed = state with
             {
                 Queue = remaining,
                 QueueRevision = removedRevision,
             };
-            return Commit(state, removed, SequencingOutcome.APPLIED, kind, e.At, SequencingCodes.RemovedByEligibility, head.EntryId, null);
+            var removalCode = headInvalid ? SequencingCodes.RemovedByEligibility : SequencingCodes.SensorDisabled;
+            return Commit(state, removed, SequencingOutcome.APPLIED, kind, e.At, removalCode, head.EntryId, null);
         }
 
         var assignment = SequencingTopology.FindAssignment(e.Topology, head.SensorId)
@@ -351,6 +389,77 @@ public static class SequencingKernel
             NextJobSeq = nextJobSeq,
         };
         return Commit(state, dispatched, SequencingOutcome.APPLIED, kind, e.At, SequencingCodes.Dispatched, head.EntryId, jobId);
+    }
+
+    /// <summary>
+    /// Sensor Enable / Disable transition (Owner Sensor Disable ruling). Refused under the
+    /// critical latch (the queue is frozen), for a blank identity (ENTRY_INVALID) and for an
+    /// identity the topology does not know (SENSOR_UNKNOWN; fail closed). A no-op when the
+    /// state already matches. A disable removes the Sensor's queued non-active entry in the
+    /// same transition (queue revision advances once; the remaining FIFO order is kept) and
+    /// never touches an Active Job. An enable clears the state only.
+    /// </summary>
+    private static SequencingTransition SetEnablement(SequencingState state, SetSensorEnablement e)
+    {
+        const string kind = SequencingCodes.KindSetSensorEnablement;
+
+        if (state.CriticalSuspended)
+        {
+            return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.CriticalSuspended, null, null);
+        }
+
+        if (string.IsNullOrWhiteSpace(e.SensorId))
+        {
+            return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.EntryInvalid, null, null);
+        }
+
+        if (SequencingTopology.FindAssignment(e.Topology, e.SensorId) is null)
+        {
+            return Commit(state, state, SequencingOutcome.REFUSED, kind, e.At, SequencingCodes.SensorUnknown, null, null);
+        }
+
+        var currentlyDisabled = state.IsSensorDisabled(e.SensorId);
+        if (currentlyDisabled == !e.Enabled)
+        {
+            return Commit(state, state, SequencingOutcome.NO_OP, kind, e.At, SequencingCodes.SensorEnablementUnchanged, null, null);
+        }
+
+        var activeJobId = state.ActiveJob is { } activeJob
+            && string.Equals(activeJob.TargetSensorId, e.SensorId, StringComparison.Ordinal)
+            ? activeJob.JobId
+            : null;
+
+        if (e.Enabled)
+        {
+            // Re-enable: state only. No removed entry is resurrected and no stale
+            // classification is reused; a new admission with new valid evidence is required.
+            var enabled = state with
+            {
+                DisabledSensorIds = state.DisabledSensorIds.Where(id => !string.Equals(id, e.SensorId, StringComparison.Ordinal)).ToArray(),
+            };
+            return Commit(state, enabled, SequencingOutcome.APPLIED, kind, e.At, SequencingCodes.SensorEnabled, null, activeJobId);
+        }
+
+        var disabledIds = new List<string>(state.DisabledSensorIds) { e.SensorId };
+        string? removedEntryId = null;
+        var queue = new List<SequencingEntry>(state.Queue);
+        for (var index = 0; index < queue.Count; index++)
+        {
+            if (string.Equals(queue[index].SensorId, e.SensorId, StringComparison.Ordinal))
+            {
+                removedEntryId = queue[index].EntryId;
+                queue.RemoveAt(index);
+                break;
+            }
+        }
+
+        var disabled = state with
+        {
+            DisabledSensorIds = disabledIds,
+            Queue = queue,
+            QueueRevision = removedEntryId is null ? state.QueueRevision : NextCounter(state.QueueRevision, "QueueRevision"),
+        };
+        return Commit(state, disabled, SequencingOutcome.APPLIED, kind, e.At, SequencingCodes.SensorDisabled, removedEntryId, activeJobId);
     }
 
     /// <summary>
@@ -1065,6 +1174,7 @@ public static class SequencingKernel
         ValveLimitObserved e => (SequencingCodes.KindValveLimitObserved, e.At),
         AxisFeedbackObserved e => (SequencingCodes.KindAxisFeedbackObserved, e.At),
         FeedbackTimeoutExpired e => (SequencingCodes.KindFeedbackTimeoutExpired, e.At),
+        SetSensorEnablement e => (SequencingCodes.KindSetSensorEnablement, e.At),
         _ => throw new ArgumentOutOfRangeException(nameof(sequencingEvent)),
     };
 

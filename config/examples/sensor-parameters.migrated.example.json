@@ -1,6 +1,6 @@
 {
   "_label": "PUBLIC-SAFE EXAMPLE - SYNTHETIC - INCOMPLETE BY DESIGN - NOT FOR DEPLOYMENT",
-  "_stage": "Stage 0.3A-3 Checkpoint B - canonical shape of the migrated legacy sensor parameters (ADR-0017). All values synthetic; acquisition-binding provenance and deferred raw values are null; the Owner CSV itself never enters Git.",
+  "_stage": "Stage 0.3A-3 Checkpoint B - canonical shape of the migrated legacy sensor parameters (ADR-0017), corrected by the Owner critical topology correction (Stage 0.4C-K3): I7 and I16 are normal Product Sensors; 108 Sensor configurations, scanOrder 1-108. All values synthetic; acquisition-binding provenance and deferred raw values are null; the Owner CSV itself never enters Git.",
   "logicalPositions": [
     {
       "logicalId": "G+201",
@@ -12,8 +12,7 @@
       "wallRow": 1,
       "orderTotal": 0,
       "orderWall": 1,
-      "legacyRecordId": "SYN-REC-000",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-000"
     },
     {
       "logicalId": "G+202",
@@ -25,8 +24,7 @@
       "wallRow": 1,
       "orderTotal": 1,
       "orderWall": 2,
-      "legacyRecordId": "SYN-REC-001",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-001"
     },
     {
       "logicalId": "G+203",
@@ -38,8 +36,7 @@
       "wallRow": 1,
       "orderTotal": 2,
       "orderWall": 3,
-      "legacyRecordId": "SYN-REC-002",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-002"
     },
     {
       "logicalId": "G+204",
@@ -51,8 +48,7 @@
       "wallRow": 1,
       "orderTotal": 3,
       "orderWall": 4,
-      "legacyRecordId": "SYN-REC-003",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-003"
     },
     {
       "logicalId": "G+205",
@@ -64,8 +60,7 @@
       "wallRow": 1,
       "orderTotal": 4,
       "orderWall": 1,
-      "legacyRecordId": "SYN-REC-004",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-004"
     },
     {
       "logicalId": "G+206",
@@ -77,8 +72,7 @@
       "wallRow": 1,
       "orderTotal": 5,
       "orderWall": 2,
-      "legacyRecordId": "SYN-REC-005",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-005"
     },
     {
       "logicalId": "G+207",
@@ -90,8 +84,7 @@
       "wallRow": 1,
       "orderTotal": 6,
       "orderWall": 3,
-      "legacyRecordId": "SYN-REC-006",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-006"
     },
     {
       "logicalId": "G+208",
@@ -103,8 +96,7 @@
       "wallRow": 1,
       "orderTotal": 7,
       "orderWall": 4,
-      "legacyRecordId": "SYN-REC-007",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-007"
     },
     {
       "logicalId": "G+209",
@@ -116,8 +108,7 @@
       "wallRow": 1,
       "orderTotal": 8,
       "orderWall": 5,
-      "legacyRecordId": "SYN-REC-008",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-008"
     },
     {
       "logicalId": "G+210",
@@ -129,8 +120,7 @@
       "wallRow": 1,
       "orderTotal": 9,
       "orderWall": 1,
-      "legacyRecordId": "SYN-REC-009",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-009"
     },
     {
       "logicalId": "G+211",
@@ -142,8 +132,7 @@
       "wallRow": 1,
       "orderTotal": 10,
       "orderWall": 2,
-      "legacyRecordId": "SYN-REC-010",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-010"
     },
     {
       "logicalId": "G+212",
@@ -155,8 +144,7 @@
       "wallRow": 1,
       "orderTotal": 11,
       "orderWall": 3,
-      "legacyRecordId": "SYN-REC-011",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-011"
     },
     {
       "logicalId": "G+213",
@@ -168,8 +156,7 @@
       "wallRow": 1,
       "orderTotal": 12,
       "orderWall": 4,
-      "legacyRecordId": "SYN-REC-012",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-012"
     },
     {
       "logicalId": "G+214",
@@ -181,8 +168,7 @@
       "wallRow": 1,
       "orderTotal": 13,
       "orderWall": 1,
-      "legacyRecordId": "SYN-REC-013",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-013"
     },
     {
       "logicalId": "G+215",
@@ -194,8 +180,7 @@
       "wallRow": 1,
       "orderTotal": 14,
       "orderWall": 2,
-      "legacyRecordId": "SYN-REC-014",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-014"
     },
     {
       "logicalId": "G+216",
@@ -207,8 +192,7 @@
       "wallRow": 1,
       "orderTotal": 15,
       "orderWall": 3,
-      "legacyRecordId": "SYN-REC-015",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-015"
     },
     {
       "logicalId": "G+217",
@@ -220,8 +204,7 @@
       "wallRow": 1,
       "orderTotal": 16,
       "orderWall": 4,
-      "legacyRecordId": "SYN-REC-016",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-016"
     },
     {
       "logicalId": "G+218",
@@ -233,8 +216,7 @@
       "wallRow": 1,
       "orderTotal": 17,
       "orderWall": 5,
-      "legacyRecordId": "SYN-REC-017",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-017"
     },
     {
       "logicalId": "G+101",
@@ -246,8 +228,7 @@
       "wallRow": 2,
       "orderTotal": 18,
       "orderWall": 5,
-      "legacyRecordId": "SYN-REC-018",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-018"
     },
     {
       "logicalId": "G+102",
@@ -259,8 +240,7 @@
       "wallRow": 2,
       "orderTotal": 19,
       "orderWall": 6,
-      "legacyRecordId": "SYN-REC-019",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-019"
     },
     {
       "logicalId": "G+103",
@@ -272,8 +252,7 @@
       "wallRow": 2,
       "orderTotal": 20,
       "orderWall": 7,
-      "legacyRecordId": "SYN-REC-020",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-020"
     },
     {
       "logicalId": "G+104",
@@ -285,8 +264,7 @@
       "wallRow": 2,
       "orderTotal": 21,
       "orderWall": 8,
-      "legacyRecordId": "SYN-REC-021",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-021"
     },
     {
       "logicalId": "G+105",
@@ -298,8 +276,7 @@
       "wallRow": 2,
       "orderTotal": 22,
       "orderWall": 6,
-      "legacyRecordId": "SYN-REC-022",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-022"
     },
     {
       "logicalId": "G+106",
@@ -311,8 +288,7 @@
       "wallRow": 2,
       "orderTotal": 23,
       "orderWall": 7,
-      "legacyRecordId": "SYN-REC-023",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-023"
     },
     {
       "logicalId": "G+107",
@@ -324,8 +300,7 @@
       "wallRow": 2,
       "orderTotal": 24,
       "orderWall": 8,
-      "legacyRecordId": "SYN-REC-024",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-024"
     },
     {
       "logicalId": "G+108",
@@ -337,8 +312,7 @@
       "wallRow": 2,
       "orderTotal": 25,
       "orderWall": 9,
-      "legacyRecordId": "SYN-REC-025",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-025"
     },
     {
       "logicalId": "G+109",
@@ -350,8 +324,7 @@
       "wallRow": 2,
       "orderTotal": 26,
       "orderWall": 10,
-      "legacyRecordId": "SYN-REC-026",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-026"
     },
     {
       "logicalId": "G+110",
@@ -363,8 +336,7 @@
       "wallRow": 2,
       "orderTotal": 27,
       "orderWall": 5,
-      "legacyRecordId": "SYN-REC-027",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-027"
     },
     {
       "logicalId": "G+111",
@@ -376,8 +348,7 @@
       "wallRow": 2,
       "orderTotal": 28,
       "orderWall": 6,
-      "legacyRecordId": "SYN-REC-028",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-028"
     },
     {
       "logicalId": "G+112",
@@ -389,8 +360,7 @@
       "wallRow": 2,
       "orderTotal": 29,
       "orderWall": 7,
-      "legacyRecordId": "SYN-REC-029",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-029"
     },
     {
       "logicalId": "G+113",
@@ -402,8 +372,7 @@
       "wallRow": 2,
       "orderTotal": 30,
       "orderWall": 8,
-      "legacyRecordId": "SYN-REC-030",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-030"
     },
     {
       "logicalId": "G+114",
@@ -415,8 +384,7 @@
       "wallRow": 2,
       "orderTotal": 31,
       "orderWall": 6,
-      "legacyRecordId": "SYN-REC-031",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-031"
     },
     {
       "logicalId": "G+115",
@@ -428,8 +396,7 @@
       "wallRow": 2,
       "orderTotal": 32,
       "orderWall": 7,
-      "legacyRecordId": "SYN-REC-032",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-032"
     },
     {
       "logicalId": "G+116",
@@ -441,8 +408,7 @@
       "wallRow": 2,
       "orderTotal": 33,
       "orderWall": 8,
-      "legacyRecordId": "SYN-REC-033",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-033"
     },
     {
       "logicalId": "G+117",
@@ -454,8 +420,7 @@
       "wallRow": 2,
       "orderTotal": 34,
       "orderWall": 9,
-      "legacyRecordId": "SYN-REC-034",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-034"
     },
     {
       "logicalId": "G+118",
@@ -467,8 +432,7 @@
       "wallRow": 2,
       "orderTotal": 35,
       "orderWall": 10,
-      "legacyRecordId": "SYN-REC-035",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-035"
     },
     {
       "logicalId": "G1",
@@ -480,8 +444,7 @@
       "wallRow": 3,
       "orderTotal": 36,
       "orderWall": 9,
-      "legacyRecordId": "SYN-REC-036",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-036"
     },
     {
       "logicalId": "G2",
@@ -493,8 +456,7 @@
       "wallRow": 3,
       "orderTotal": 37,
       "orderWall": 10,
-      "legacyRecordId": "SYN-REC-037",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-037"
     },
     {
       "logicalId": "G3",
@@ -506,8 +468,7 @@
       "wallRow": 3,
       "orderTotal": 38,
       "orderWall": 11,
-      "legacyRecordId": "SYN-REC-038",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-038"
     },
     {
       "logicalId": "G4",
@@ -519,8 +480,7 @@
       "wallRow": 3,
       "orderTotal": 39,
       "orderWall": 12,
-      "legacyRecordId": "SYN-REC-039",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-039"
     },
     {
       "logicalId": "G5",
@@ -532,8 +492,7 @@
       "wallRow": 3,
       "orderTotal": 40,
       "orderWall": 11,
-      "legacyRecordId": "SYN-REC-040",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-040"
     },
     {
       "logicalId": "G6",
@@ -545,8 +504,7 @@
       "wallRow": 3,
       "orderTotal": 41,
       "orderWall": 12,
-      "legacyRecordId": "SYN-REC-041",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-041"
     },
     {
       "logicalId": "G7",
@@ -558,8 +516,7 @@
       "wallRow": 3,
       "orderTotal": 42,
       "orderWall": 13,
-      "legacyRecordId": "SYN-REC-042",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-042"
     },
     {
       "logicalId": "G8",
@@ -571,8 +528,7 @@
       "wallRow": 3,
       "orderTotal": 43,
       "orderWall": 14,
-      "legacyRecordId": "SYN-REC-043",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-043"
     },
     {
       "logicalId": "G9",
@@ -584,8 +540,7 @@
       "wallRow": 3,
       "orderTotal": 44,
       "orderWall": 15,
-      "legacyRecordId": "SYN-REC-044",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-044"
     },
     {
       "logicalId": "G10",
@@ -597,8 +552,7 @@
       "wallRow": 3,
       "orderTotal": 45,
       "orderWall": 9,
-      "legacyRecordId": "SYN-REC-045",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-045"
     },
     {
       "logicalId": "G11",
@@ -610,8 +564,7 @@
       "wallRow": 3,
       "orderTotal": 46,
       "orderWall": 10,
-      "legacyRecordId": "SYN-REC-046",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-046"
     },
     {
       "logicalId": "G12",
@@ -623,8 +576,7 @@
       "wallRow": 3,
       "orderTotal": 47,
       "orderWall": 11,
-      "legacyRecordId": "SYN-REC-047",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-047"
     },
     {
       "logicalId": "G13",
@@ -636,8 +588,7 @@
       "wallRow": 3,
       "orderTotal": 48,
       "orderWall": 12,
-      "legacyRecordId": "SYN-REC-048",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-048"
     },
     {
       "logicalId": "G14",
@@ -649,8 +600,7 @@
       "wallRow": 3,
       "orderTotal": 49,
       "orderWall": 11,
-      "legacyRecordId": "SYN-REC-049",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-049"
     },
     {
       "logicalId": "G15",
@@ -662,8 +612,7 @@
       "wallRow": 3,
       "orderTotal": 50,
       "orderWall": 12,
-      "legacyRecordId": "SYN-REC-050",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-050"
     },
     {
       "logicalId": "G16",
@@ -675,8 +624,7 @@
       "wallRow": 3,
       "orderTotal": 51,
       "orderWall": 13,
-      "legacyRecordId": "SYN-REC-051",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-051"
     },
     {
       "logicalId": "G17",
@@ -688,8 +636,7 @@
       "wallRow": 3,
       "orderTotal": 52,
       "orderWall": 14,
-      "legacyRecordId": "SYN-REC-052",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-052"
     },
     {
       "logicalId": "G18",
@@ -701,8 +648,7 @@
       "wallRow": 3,
       "orderTotal": 53,
       "orderWall": 15,
-      "legacyRecordId": "SYN-REC-053",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-053"
     },
     {
       "logicalId": "H1",
@@ -714,8 +660,7 @@
       "wallRow": 4,
       "orderTotal": 54,
       "orderWall": 13,
-      "legacyRecordId": "SYN-REC-054",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-054"
     },
     {
       "logicalId": "H2",
@@ -727,8 +672,7 @@
       "wallRow": 4,
       "orderTotal": 55,
       "orderWall": 14,
-      "legacyRecordId": "SYN-REC-055",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-055"
     },
     {
       "logicalId": "H3",
@@ -740,8 +684,7 @@
       "wallRow": 4,
       "orderTotal": 56,
       "orderWall": 15,
-      "legacyRecordId": "SYN-REC-056",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-056"
     },
     {
       "logicalId": "H4",
@@ -753,8 +696,7 @@
       "wallRow": 4,
       "orderTotal": 57,
       "orderWall": 16,
-      "legacyRecordId": "SYN-REC-057",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-057"
     },
     {
       "logicalId": "H5",
@@ -766,8 +708,7 @@
       "wallRow": 4,
       "orderTotal": 58,
       "orderWall": 16,
-      "legacyRecordId": "SYN-REC-058",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-058"
     },
     {
       "logicalId": "H6",
@@ -779,8 +720,7 @@
       "wallRow": 4,
       "orderTotal": 59,
       "orderWall": 17,
-      "legacyRecordId": "SYN-REC-059",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-059"
     },
     {
       "logicalId": "H7",
@@ -792,8 +732,7 @@
       "wallRow": 4,
       "orderTotal": 60,
       "orderWall": 18,
-      "legacyRecordId": "SYN-REC-060",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-060"
     },
     {
       "logicalId": "H8",
@@ -805,8 +744,7 @@
       "wallRow": 4,
       "orderTotal": 61,
       "orderWall": 19,
-      "legacyRecordId": "SYN-REC-061",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-061"
     },
     {
       "logicalId": "H9",
@@ -818,8 +756,7 @@
       "wallRow": 4,
       "orderTotal": 62,
       "orderWall": 20,
-      "legacyRecordId": "SYN-REC-062",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-062"
     },
     {
       "logicalId": "H10",
@@ -831,8 +768,7 @@
       "wallRow": 4,
       "orderTotal": 63,
       "orderWall": 13,
-      "legacyRecordId": "SYN-REC-063",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-063"
     },
     {
       "logicalId": "H11",
@@ -844,8 +780,7 @@
       "wallRow": 4,
       "orderTotal": 64,
       "orderWall": 14,
-      "legacyRecordId": "SYN-REC-064",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-064"
     },
     {
       "logicalId": "H12",
@@ -857,8 +792,7 @@
       "wallRow": 4,
       "orderTotal": 65,
       "orderWall": 15,
-      "legacyRecordId": "SYN-REC-065",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-065"
     },
     {
       "logicalId": "H13",
@@ -870,8 +804,7 @@
       "wallRow": 4,
       "orderTotal": 66,
       "orderWall": 16,
-      "legacyRecordId": "SYN-REC-066",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-066"
     },
     {
       "logicalId": "H14",
@@ -883,8 +816,7 @@
       "wallRow": 4,
       "orderTotal": 67,
       "orderWall": 16,
-      "legacyRecordId": "SYN-REC-067",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-067"
     },
     {
       "logicalId": "H15",
@@ -896,8 +828,7 @@
       "wallRow": 4,
       "orderTotal": 68,
       "orderWall": 17,
-      "legacyRecordId": "SYN-REC-068",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-068"
     },
     {
       "logicalId": "H16",
@@ -909,8 +840,7 @@
       "wallRow": 4,
       "orderTotal": 69,
       "orderWall": 18,
-      "legacyRecordId": "SYN-REC-069",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-069"
     },
     {
       "logicalId": "H17",
@@ -922,8 +852,7 @@
       "wallRow": 4,
       "orderTotal": 70,
       "orderWall": 19,
-      "legacyRecordId": "SYN-REC-070",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-070"
     },
     {
       "logicalId": "H18",
@@ -935,8 +864,7 @@
       "wallRow": 4,
       "orderTotal": 71,
       "orderWall": 20,
-      "legacyRecordId": "SYN-REC-071",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-071"
     },
     {
       "logicalId": "I1",
@@ -948,8 +876,7 @@
       "wallRow": 5,
       "orderTotal": 72,
       "orderWall": 17,
-      "legacyRecordId": "SYN-REC-072",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-072"
     },
     {
       "logicalId": "I2",
@@ -961,8 +888,7 @@
       "wallRow": 5,
       "orderTotal": 73,
       "orderWall": 18,
-      "legacyRecordId": "SYN-REC-073",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-073"
     },
     {
       "logicalId": "I3",
@@ -974,8 +900,7 @@
       "wallRow": 5,
       "orderTotal": 74,
       "orderWall": 19,
-      "legacyRecordId": "SYN-REC-074",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-074"
     },
     {
       "logicalId": "I4",
@@ -987,8 +912,7 @@
       "wallRow": 5,
       "orderTotal": 75,
       "orderWall": 20,
-      "legacyRecordId": "SYN-REC-075",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-075"
     },
     {
       "logicalId": "I5",
@@ -1000,8 +924,7 @@
       "wallRow": 5,
       "orderTotal": 76,
       "orderWall": 21,
-      "legacyRecordId": "SYN-REC-076",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-076"
     },
     {
       "logicalId": "I6",
@@ -1013,12 +936,11 @@
       "wallRow": 5,
       "orderTotal": 77,
       "orderWall": 22,
-      "legacyRecordId": "SYN-REC-077",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-077"
     },
     {
       "logicalId": "I7",
-      "positionKind": "NON_SENSOR_GAP",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 5,
@@ -1026,8 +948,7 @@
       "wallRow": 5,
       "orderTotal": 78,
       "orderWall": 23,
-      "legacyRecordId": "SYN-REC-078",
-      "gapAnchorForWaterJetId": "WJ3"
+      "legacyRecordId": "SYN-REC-078"
     },
     {
       "logicalId": "I8",
@@ -1039,8 +960,7 @@
       "wallRow": 5,
       "orderTotal": 79,
       "orderWall": 24,
-      "legacyRecordId": "SYN-REC-079",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-079"
     },
     {
       "logicalId": "I9",
@@ -1052,8 +972,7 @@
       "wallRow": 5,
       "orderTotal": 80,
       "orderWall": 25,
-      "legacyRecordId": "SYN-REC-080",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-080"
     },
     {
       "logicalId": "I10",
@@ -1065,8 +984,7 @@
       "wallRow": 5,
       "orderTotal": 81,
       "orderWall": 17,
-      "legacyRecordId": "SYN-REC-081",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-081"
     },
     {
       "logicalId": "I11",
@@ -1078,8 +996,7 @@
       "wallRow": 5,
       "orderTotal": 82,
       "orderWall": 18,
-      "legacyRecordId": "SYN-REC-082",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-082"
     },
     {
       "logicalId": "I12",
@@ -1091,8 +1008,7 @@
       "wallRow": 5,
       "orderTotal": 83,
       "orderWall": 19,
-      "legacyRecordId": "SYN-REC-083",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-083"
     },
     {
       "logicalId": "I13",
@@ -1104,8 +1020,7 @@
       "wallRow": 5,
       "orderTotal": 84,
       "orderWall": 20,
-      "legacyRecordId": "SYN-REC-084",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-084"
     },
     {
       "logicalId": "I14",
@@ -1117,8 +1032,7 @@
       "wallRow": 5,
       "orderTotal": 85,
       "orderWall": 21,
-      "legacyRecordId": "SYN-REC-085",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-085"
     },
     {
       "logicalId": "I15",
@@ -1130,12 +1044,11 @@
       "wallRow": 5,
       "orderTotal": 86,
       "orderWall": 22,
-      "legacyRecordId": "SYN-REC-086",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-086"
     },
     {
       "logicalId": "I16",
-      "positionKind": "NON_SENSOR_GAP",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 5,
@@ -1143,8 +1056,7 @@
       "wallRow": 5,
       "orderTotal": 87,
       "orderWall": 23,
-      "legacyRecordId": "SYN-REC-087",
-      "gapAnchorForWaterJetId": "WJ1"
+      "legacyRecordId": "SYN-REC-087"
     },
     {
       "logicalId": "I17",
@@ -1156,8 +1068,7 @@
       "wallRow": 5,
       "orderTotal": 88,
       "orderWall": 24,
-      "legacyRecordId": "SYN-REC-088",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-088"
     },
     {
       "logicalId": "I18",
@@ -1169,8 +1080,7 @@
       "wallRow": 5,
       "orderTotal": 89,
       "orderWall": 25,
-      "legacyRecordId": "SYN-REC-089",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-089"
     },
     {
       "logicalId": "J1",
@@ -1182,8 +1092,7 @@
       "wallRow": 6,
       "orderTotal": 90,
       "orderWall": 21,
-      "legacyRecordId": "SYN-REC-090",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-090"
     },
     {
       "logicalId": "J2",
@@ -1195,8 +1104,7 @@
       "wallRow": 6,
       "orderTotal": 91,
       "orderWall": 22,
-      "legacyRecordId": "SYN-REC-091",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-091"
     },
     {
       "logicalId": "J3",
@@ -1208,8 +1116,7 @@
       "wallRow": 6,
       "orderTotal": 92,
       "orderWall": 23,
-      "legacyRecordId": "SYN-REC-092",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-092"
     },
     {
       "logicalId": "J4",
@@ -1221,8 +1128,7 @@
       "wallRow": 6,
       "orderTotal": 93,
       "orderWall": 24,
-      "legacyRecordId": "SYN-REC-093",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-093"
     },
     {
       "logicalId": "J5",
@@ -1234,8 +1140,7 @@
       "wallRow": 6,
       "orderTotal": 94,
       "orderWall": 26,
-      "legacyRecordId": "SYN-REC-094",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-094"
     },
     {
       "logicalId": "J6",
@@ -1247,8 +1152,7 @@
       "wallRow": 6,
       "orderTotal": 95,
       "orderWall": 27,
-      "legacyRecordId": "SYN-REC-095",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-095"
     },
     {
       "logicalId": "J7",
@@ -1260,8 +1164,7 @@
       "wallRow": 6,
       "orderTotal": 96,
       "orderWall": 28,
-      "legacyRecordId": "SYN-REC-096",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-096"
     },
     {
       "logicalId": "J8",
@@ -1273,8 +1176,7 @@
       "wallRow": 6,
       "orderTotal": 97,
       "orderWall": 29,
-      "legacyRecordId": "SYN-REC-097",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-097"
     },
     {
       "logicalId": "J9",
@@ -1286,8 +1188,7 @@
       "wallRow": 6,
       "orderTotal": 98,
       "orderWall": 30,
-      "legacyRecordId": "SYN-REC-098",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-098"
     },
     {
       "logicalId": "J10",
@@ -1299,8 +1200,7 @@
       "wallRow": 6,
       "orderTotal": 99,
       "orderWall": 21,
-      "legacyRecordId": "SYN-REC-099",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-099"
     },
     {
       "logicalId": "J11",
@@ -1312,8 +1212,7 @@
       "wallRow": 6,
       "orderTotal": 100,
       "orderWall": 22,
-      "legacyRecordId": "SYN-REC-100",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-100"
     },
     {
       "logicalId": "J12",
@@ -1325,8 +1224,7 @@
       "wallRow": 6,
       "orderTotal": 101,
       "orderWall": 23,
-      "legacyRecordId": "SYN-REC-101",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-101"
     },
     {
       "logicalId": "J13",
@@ -1338,8 +1236,7 @@
       "wallRow": 6,
       "orderTotal": 102,
       "orderWall": 24,
-      "legacyRecordId": "SYN-REC-102",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-102"
     },
     {
       "logicalId": "J14",
@@ -1351,8 +1248,7 @@
       "wallRow": 6,
       "orderTotal": 103,
       "orderWall": 26,
-      "legacyRecordId": "SYN-REC-103",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-103"
     },
     {
       "logicalId": "J15",
@@ -1364,8 +1260,7 @@
       "wallRow": 6,
       "orderTotal": 104,
       "orderWall": 27,
-      "legacyRecordId": "SYN-REC-104",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-104"
     },
     {
       "logicalId": "J16",
@@ -1377,8 +1272,7 @@
       "wallRow": 6,
       "orderTotal": 105,
       "orderWall": 28,
-      "legacyRecordId": "SYN-REC-105",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-105"
     },
     {
       "logicalId": "J17",
@@ -1390,8 +1284,7 @@
       "wallRow": 6,
       "orderTotal": 106,
       "orderWall": 29,
-      "legacyRecordId": "SYN-REC-106",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-106"
     },
     {
       "logicalId": "J18",
@@ -1403,8 +1296,7 @@
       "wallRow": 6,
       "orderTotal": 107,
       "orderWall": 30,
-      "legacyRecordId": "SYN-REC-107",
-      "gapAnchorForWaterJetId": null
+      "legacyRecordId": "SYN-REC-107"
     }
   ],
   "sensors": [
@@ -3281,6 +3173,30 @@
       "deferredAcquisition": null
     },
     {
+      "sensorId": "I7",
+      "wall": "REAR",
+      "logicalColumn": 7,
+      "logicalRow": 5,
+      "wallColumn": 3,
+      "wallRow": 5,
+      "orderWall": 23,
+      "scanOrder": 79,
+      "diffLowerBound": 24,
+      "diffUpperBound": 74,
+      "dirtyScoreThreshold": 74,
+      "enabled": true,
+      "cleaningCount": 3,
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
+      "legacyRecordId": "SYN-REC-078",
+      "lastCleanTimestampRaw": null,
+      "minTimeAllowAddToQueueRaw": null,
+      "maxTimeAllowAddToQueueRaw": null,
+      "maxTimeEnableRaw": null,
+      "latestUpdateParamsTimestampRaw": null,
+      "deferredAcquisition": null
+    },
+    {
       "sensorId": "I8",
       "wall": "REAR",
       "logicalColumn": 8,
@@ -3288,12 +3204,12 @@
       "wallColumn": 4,
       "wallRow": 5,
       "orderWall": 24,
-      "scanOrder": 79,
-      "diffLowerBound": 24,
-      "diffUpperBound": 74,
-      "dirtyScoreThreshold": 74,
+      "scanOrder": 80,
+      "diffLowerBound": 15,
+      "diffUpperBound": 65,
+      "dirtyScoreThreshold": 55,
       "enabled": true,
-      "cleaningCount": 3,
+      "cleaningCount": 0,
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "legacyRecordId": "SYN-REC-079",
@@ -3312,12 +3228,12 @@
       "wallColumn": 5,
       "wallRow": 5,
       "orderWall": 25,
-      "scanOrder": 80,
-      "diffLowerBound": 15,
-      "diffUpperBound": 65,
-      "dirtyScoreThreshold": 55,
+      "scanOrder": 81,
+      "diffLowerBound": 16,
+      "diffUpperBound": 66,
+      "dirtyScoreThreshold": 56,
       "enabled": true,
-      "cleaningCount": 0,
+      "cleaningCount": 1,
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "legacyRecordId": "SYN-REC-080",
@@ -3336,12 +3252,12 @@
       "wallColumn": 1,
       "wallRow": 5,
       "orderWall": 17,
-      "scanOrder": 81,
-      "diffLowerBound": 16,
-      "diffUpperBound": 66,
-      "dirtyScoreThreshold": 56,
+      "scanOrder": 82,
+      "diffLowerBound": 17,
+      "diffUpperBound": 67,
+      "dirtyScoreThreshold": 57,
       "enabled": true,
-      "cleaningCount": 1,
+      "cleaningCount": 2,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-081",
@@ -3360,12 +3276,12 @@
       "wallColumn": 2,
       "wallRow": 5,
       "orderWall": 18,
-      "scanOrder": 82,
-      "diffLowerBound": 17,
-      "diffUpperBound": 67,
-      "dirtyScoreThreshold": 57,
+      "scanOrder": 83,
+      "diffLowerBound": 18,
+      "diffUpperBound": 68,
+      "dirtyScoreThreshold": 58,
       "enabled": true,
-      "cleaningCount": 2,
+      "cleaningCount": 3,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-082",
@@ -3384,12 +3300,12 @@
       "wallColumn": 3,
       "wallRow": 5,
       "orderWall": 19,
-      "scanOrder": 83,
-      "diffLowerBound": 18,
-      "diffUpperBound": 68,
-      "dirtyScoreThreshold": 58,
+      "scanOrder": 84,
+      "diffLowerBound": 19,
+      "diffUpperBound": 69,
+      "dirtyScoreThreshold": 59,
       "enabled": true,
-      "cleaningCount": 3,
+      "cleaningCount": 0,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-083",
@@ -3408,12 +3324,12 @@
       "wallColumn": 4,
       "wallRow": 5,
       "orderWall": 20,
-      "scanOrder": 84,
-      "diffLowerBound": 19,
-      "diffUpperBound": 69,
-      "dirtyScoreThreshold": 59,
-      "enabled": true,
-      "cleaningCount": 0,
+      "scanOrder": 85,
+      "diffLowerBound": 20,
+      "diffUpperBound": 70,
+      "dirtyScoreThreshold": 60,
+      "enabled": false,
+      "cleaningCount": 1,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-084",
@@ -3432,12 +3348,12 @@
       "wallColumn": 1,
       "wallRow": 5,
       "orderWall": 21,
-      "scanOrder": 85,
-      "diffLowerBound": 20,
-      "diffUpperBound": 70,
-      "dirtyScoreThreshold": 60,
-      "enabled": false,
-      "cleaningCount": 1,
+      "scanOrder": 86,
+      "diffLowerBound": 21,
+      "diffUpperBound": 71,
+      "dirtyScoreThreshold": 61,
+      "enabled": true,
+      "cleaningCount": 2,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-085",
@@ -3456,15 +3372,39 @@
       "wallColumn": 2,
       "wallRow": 5,
       "orderWall": 22,
-      "scanOrder": 86,
-      "diffLowerBound": 21,
-      "diffUpperBound": 71,
-      "dirtyScoreThreshold": 61,
+      "scanOrder": 87,
+      "diffLowerBound": 22,
+      "diffUpperBound": 72,
+      "dirtyScoreThreshold": 62,
       "enabled": true,
-      "cleaningCount": 2,
+      "cleaningCount": 3,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-086",
+      "lastCleanTimestampRaw": null,
+      "minTimeAllowAddToQueueRaw": null,
+      "maxTimeAllowAddToQueueRaw": null,
+      "maxTimeEnableRaw": null,
+      "latestUpdateParamsTimestampRaw": null,
+      "deferredAcquisition": null
+    },
+    {
+      "sensorId": "I16",
+      "wall": "FRONT",
+      "logicalColumn": 16,
+      "logicalRow": 5,
+      "wallColumn": 3,
+      "wallRow": 5,
+      "orderWall": 23,
+      "scanOrder": 88,
+      "diffLowerBound": 23,
+      "diffUpperBound": 73,
+      "dirtyScoreThreshold": 63,
+      "enabled": true,
+      "cleaningCount": 0,
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
+      "legacyRecordId": "SYN-REC-087",
       "lastCleanTimestampRaw": null,
       "minTimeAllowAddToQueueRaw": null,
       "maxTimeAllowAddToQueueRaw": null,
@@ -3480,12 +3420,12 @@
       "wallColumn": 4,
       "wallRow": 5,
       "orderWall": 24,
-      "scanOrder": 87,
-      "diffLowerBound": 22,
-      "diffUpperBound": 72,
-      "dirtyScoreThreshold": 62,
+      "scanOrder": 89,
+      "diffLowerBound": 24,
+      "diffUpperBound": 74,
+      "dirtyScoreThreshold": 64,
       "enabled": true,
-      "cleaningCount": 3,
+      "cleaningCount": 1,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-088",
@@ -3504,12 +3444,12 @@
       "wallColumn": 5,
       "wallRow": 5,
       "orderWall": 25,
-      "scanOrder": 88,
-      "diffLowerBound": 23,
-      "diffUpperBound": 73,
-      "dirtyScoreThreshold": 63,
+      "scanOrder": 90,
+      "diffLowerBound": 15,
+      "diffUpperBound": 65,
+      "dirtyScoreThreshold": 65,
       "enabled": true,
-      "cleaningCount": 0,
+      "cleaningCount": 2,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-089",
@@ -3528,12 +3468,12 @@
       "wallColumn": 1,
       "wallRow": 6,
       "orderWall": 21,
-      "scanOrder": 89,
-      "diffLowerBound": 24,
-      "diffUpperBound": 74,
-      "dirtyScoreThreshold": 64,
+      "scanOrder": 91,
+      "diffLowerBound": 16,
+      "diffUpperBound": 66,
+      "dirtyScoreThreshold": 66,
       "enabled": true,
-      "cleaningCount": 1,
+      "cleaningCount": 3,
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "legacyRecordId": "SYN-REC-090",
@@ -3552,12 +3492,12 @@
       "wallColumn": 2,
       "wallRow": 6,
       "orderWall": 22,
-      "scanOrder": 90,
-      "diffLowerBound": 15,
-      "diffUpperBound": 65,
-      "dirtyScoreThreshold": 65,
+      "scanOrder": 92,
+      "diffLowerBound": 17,
+      "diffUpperBound": 67,
+      "dirtyScoreThreshold": 67,
       "enabled": true,
-      "cleaningCount": 2,
+      "cleaningCount": 0,
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "legacyRecordId": "SYN-REC-091",
@@ -3576,12 +3516,12 @@
       "wallColumn": 3,
       "wallRow": 6,
       "orderWall": 23,
-      "scanOrder": 91,
-      "diffLowerBound": 16,
-      "diffUpperBound": 66,
-      "dirtyScoreThreshold": 66,
+      "scanOrder": 93,
+      "diffLowerBound": 18,
+      "diffUpperBound": 68,
+      "dirtyScoreThreshold": 68,
       "enabled": true,
-      "cleaningCount": 3,
+      "cleaningCount": 1,
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "legacyRecordId": "SYN-REC-092",
@@ -3600,12 +3540,12 @@
       "wallColumn": 4,
       "wallRow": 6,
       "orderWall": 24,
-      "scanOrder": 92,
-      "diffLowerBound": 17,
-      "diffUpperBound": 67,
-      "dirtyScoreThreshold": 67,
+      "scanOrder": 94,
+      "diffLowerBound": 19,
+      "diffUpperBound": 69,
+      "dirtyScoreThreshold": 69,
       "enabled": true,
-      "cleaningCount": 0,
+      "cleaningCount": 2,
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "legacyRecordId": "SYN-REC-093",
@@ -3624,12 +3564,12 @@
       "wallColumn": 1,
       "wallRow": 6,
       "orderWall": 26,
-      "scanOrder": 93,
-      "diffLowerBound": 18,
-      "diffUpperBound": 68,
-      "dirtyScoreThreshold": 68,
+      "scanOrder": 95,
+      "diffLowerBound": 20,
+      "diffUpperBound": 70,
+      "dirtyScoreThreshold": 70,
       "enabled": true,
-      "cleaningCount": 1,
+      "cleaningCount": 3,
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "legacyRecordId": "SYN-REC-094",
@@ -3648,12 +3588,12 @@
       "wallColumn": 2,
       "wallRow": 6,
       "orderWall": 27,
-      "scanOrder": 94,
-      "diffLowerBound": 19,
-      "diffUpperBound": 69,
-      "dirtyScoreThreshold": 69,
+      "scanOrder": 96,
+      "diffLowerBound": 21,
+      "diffUpperBound": 71,
+      "dirtyScoreThreshold": 71,
       "enabled": true,
-      "cleaningCount": 2,
+      "cleaningCount": 0,
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "legacyRecordId": "SYN-REC-095",
@@ -3672,12 +3612,12 @@
       "wallColumn": 3,
       "wallRow": 6,
       "orderWall": 28,
-      "scanOrder": 95,
-      "diffLowerBound": 20,
-      "diffUpperBound": 70,
-      "dirtyScoreThreshold": 70,
+      "scanOrder": 97,
+      "diffLowerBound": 22,
+      "diffUpperBound": 72,
+      "dirtyScoreThreshold": 72,
       "enabled": true,
-      "cleaningCount": 3,
+      "cleaningCount": 1,
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "legacyRecordId": "SYN-REC-096",
@@ -3696,12 +3636,12 @@
       "wallColumn": 4,
       "wallRow": 6,
       "orderWall": 29,
-      "scanOrder": 96,
-      "diffLowerBound": 21,
-      "diffUpperBound": 71,
-      "dirtyScoreThreshold": 71,
+      "scanOrder": 98,
+      "diffLowerBound": 23,
+      "diffUpperBound": 73,
+      "dirtyScoreThreshold": 73,
       "enabled": true,
-      "cleaningCount": 0,
+      "cleaningCount": 2,
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "legacyRecordId": "SYN-REC-097",
@@ -3720,12 +3660,12 @@
       "wallColumn": 5,
       "wallRow": 6,
       "orderWall": 30,
-      "scanOrder": 97,
-      "diffLowerBound": 22,
-      "diffUpperBound": 72,
-      "dirtyScoreThreshold": 72,
+      "scanOrder": 99,
+      "diffLowerBound": 24,
+      "diffUpperBound": 74,
+      "dirtyScoreThreshold": 74,
       "enabled": true,
-      "cleaningCount": 1,
+      "cleaningCount": 3,
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "legacyRecordId": "SYN-REC-098",
@@ -3744,12 +3684,12 @@
       "wallColumn": 1,
       "wallRow": 6,
       "orderWall": 21,
-      "scanOrder": 98,
-      "diffLowerBound": 23,
-      "diffUpperBound": 73,
-      "dirtyScoreThreshold": 73,
+      "scanOrder": 100,
+      "diffLowerBound": 15,
+      "diffUpperBound": 65,
+      "dirtyScoreThreshold": 55,
       "enabled": true,
-      "cleaningCount": 2,
+      "cleaningCount": 0,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-099",
@@ -3768,12 +3708,12 @@
       "wallColumn": 2,
       "wallRow": 6,
       "orderWall": 22,
-      "scanOrder": 99,
-      "diffLowerBound": 24,
-      "diffUpperBound": 74,
-      "dirtyScoreThreshold": 74,
+      "scanOrder": 101,
+      "diffLowerBound": 16,
+      "diffUpperBound": 66,
+      "dirtyScoreThreshold": 56,
       "enabled": true,
-      "cleaningCount": 3,
+      "cleaningCount": 1,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-100",
@@ -3792,12 +3732,12 @@
       "wallColumn": 3,
       "wallRow": 6,
       "orderWall": 23,
-      "scanOrder": 100,
-      "diffLowerBound": 15,
-      "diffUpperBound": 65,
-      "dirtyScoreThreshold": 55,
-      "enabled": true,
-      "cleaningCount": 0,
+      "scanOrder": 102,
+      "diffLowerBound": 17,
+      "diffUpperBound": 67,
+      "dirtyScoreThreshold": 57,
+      "enabled": false,
+      "cleaningCount": 2,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-101",
@@ -3816,12 +3756,12 @@
       "wallColumn": 4,
       "wallRow": 6,
       "orderWall": 24,
-      "scanOrder": 101,
-      "diffLowerBound": 16,
-      "diffUpperBound": 66,
-      "dirtyScoreThreshold": 56,
+      "scanOrder": 103,
+      "diffLowerBound": 18,
+      "diffUpperBound": 68,
+      "dirtyScoreThreshold": 58,
       "enabled": true,
-      "cleaningCount": 1,
+      "cleaningCount": 3,
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "legacyRecordId": "SYN-REC-102",
@@ -3840,12 +3780,12 @@
       "wallColumn": 1,
       "wallRow": 6,
       "orderWall": 26,
-      "scanOrder": 102,
-      "diffLowerBound": 17,
-      "diffUpperBound": 67,
-      "dirtyScoreThreshold": 57,
-      "enabled": false,
-      "cleaningCount": 2,
+      "scanOrder": 104,
+      "diffLowerBound": 19,
+      "diffUpperBound": 69,
+      "dirtyScoreThreshold": 59,
+      "enabled": true,
+      "cleaningCount": 0,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-103",
@@ -3864,12 +3804,12 @@
       "wallColumn": 2,
       "wallRow": 6,
       "orderWall": 27,
-      "scanOrder": 103,
-      "diffLowerBound": 18,
-      "diffUpperBound": 68,
-      "dirtyScoreThreshold": 58,
+      "scanOrder": 105,
+      "diffLowerBound": 20,
+      "diffUpperBound": 70,
+      "dirtyScoreThreshold": 60,
       "enabled": true,
-      "cleaningCount": 3,
+      "cleaningCount": 1,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-104",
@@ -3888,12 +3828,12 @@
       "wallColumn": 3,
       "wallRow": 6,
       "orderWall": 28,
-      "scanOrder": 104,
-      "diffLowerBound": 19,
-      "diffUpperBound": 69,
-      "dirtyScoreThreshold": 59,
+      "scanOrder": 106,
+      "diffLowerBound": 21,
+      "diffUpperBound": 71,
+      "dirtyScoreThreshold": 61,
       "enabled": true,
-      "cleaningCount": 0,
+      "cleaningCount": 2,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-105",
@@ -3912,12 +3852,12 @@
       "wallColumn": 4,
       "wallRow": 6,
       "orderWall": 29,
-      "scanOrder": 105,
-      "diffLowerBound": 20,
-      "diffUpperBound": 70,
-      "dirtyScoreThreshold": 60,
+      "scanOrder": 107,
+      "diffLowerBound": 22,
+      "diffUpperBound": 72,
+      "dirtyScoreThreshold": 62,
       "enabled": true,
-      "cleaningCount": 1,
+      "cleaningCount": 3,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-106",
@@ -3936,12 +3876,12 @@
       "wallColumn": 5,
       "wallRow": 6,
       "orderWall": 30,
-      "scanOrder": 106,
-      "diffLowerBound": 21,
-      "diffUpperBound": 71,
-      "dirtyScoreThreshold": 61,
+      "scanOrder": 108,
+      "diffLowerBound": 23,
+      "diffUpperBound": 73,
+      "dirtyScoreThreshold": 63,
       "enabled": true,
-      "cleaningCount": 2,
+      "cleaningCount": 0,
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "legacyRecordId": "SYN-REC-107",
@@ -3958,11 +3898,8 @@
       "waterJetId": "WJ1",
       "installedWall": "FRONT",
       "installedRegion": "LOWER",
-      "placementKind": "NON_SENSOR_GAP",
-      "placementAnchors": [
-        "I15",
-        "I17"
-      ],
+      "placementKind": "UNRESOLVED",
+      "placementAnchors": [],
       "targetWall": "REAR",
       "targetRegion": "LOWER",
       "dedicatedIsolationValveId": "IV1"
@@ -3984,11 +3921,8 @@
       "waterJetId": "WJ3",
       "installedWall": "REAR",
       "installedRegion": "LOWER",
-      "placementKind": "NON_SENSOR_GAP",
-      "placementAnchors": [
-        "I6",
-        "I8"
-      ],
+      "placementKind": "UNRESOLVED",
+      "placementAnchors": [],
       "targetWall": "FRONT",
       "targetRegion": "LOWER",
       "dedicatedIsolationValveId": "IV3"

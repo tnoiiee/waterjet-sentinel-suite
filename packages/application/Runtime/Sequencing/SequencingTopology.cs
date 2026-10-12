@@ -7,14 +7,16 @@ namespace Wjss.Runtime.Core.Sequencing;
 public sealed record SequencingSensorAssignment(string SensorId, string JetId, string ValveId);
 
 /// <summary>
-/// Explicit equipment eligibility input supplied with each admission or dispatch.
-/// There is no hidden configuration. <see cref="NonSensorPositionIds"/> lists
-/// logical positions that are not Sensors (for example I7 and I16); they are
-/// refused at admission as NOT_A_SENSOR.
+/// Explicit equipment eligibility input supplied with each admission, dispatch or
+/// Sensor enablement change. There is no hidden configuration. Owner critical
+/// topology correction (Stage 0.4C-K3): every logical position is a Product Sensor
+/// (I7 and I16 included), so no "non-Sensor position" list exists any more; an
+/// identity with no assignment is refused as SENSOR_UNKNOWN (fail closed). The
+/// Enabled / Disabled state of a Sensor is kernel state
+/// (<see cref="SequencingState.DisabledSensorIds"/>), not topology.
 /// </summary>
 public sealed record SequencingTopology(
-    IReadOnlyList<SequencingSensorAssignment> SensorAssignments,
-    IReadOnlyList<string> NonSensorPositionIds)
+    IReadOnlyList<SequencingSensorAssignment> SensorAssignments)
 {
     private static readonly string[] WaterJetIds = ["WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8"];
 
@@ -55,9 +57,7 @@ public sealed record SequencingTopology(
         var assignment = FindAssignment(topology, sensorId);
         if (assignment is null)
         {
-            return topology.NonSensorPositionIds.Contains(sensorId, StringComparer.Ordinal)
-                ? SequencingCodes.NotASensor
-                : SequencingCodes.SensorUnknown;
+            return SequencingCodes.SensorUnknown;
         }
 
         if (!IsPairedOrdinal(assignment.JetId, assignment.ValveId))

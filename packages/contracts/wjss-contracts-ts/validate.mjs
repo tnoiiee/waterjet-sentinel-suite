@@ -89,6 +89,8 @@ export function canonicalSensorIds() {
 
 const SENSOR_ID_SET = new Set(canonicalSensorIds());
 const WATER_JET_IDS = TARGET_COVERAGE.map(([, , id]) => id);
+/** Placement vocabulary. UNRESOLVED = installed position pending authoritative layout (WJ1, WJ3); never anchored. */
+const WATER_JET_PLACEMENT_KINDS = new Set(['BETWEEN_HORIZONTAL', 'BETWEEN_VERTICAL', 'JUNCTION', 'UNRESOLVED']);
 const ISOLATION_VALVE_IDS = WATER_JET_IDS.map((id) => `IV${id.slice(2)}`);
 
 // ---------------------------------------------------------------- helpers
@@ -154,12 +156,20 @@ function validateWaterJets(waterJets, path, issues) {
       issues.push(`${path}[${i}]: installed position must differ from target coverage (opposite-wall coverage)`);
     }
     if (w.placementKind === 'NON_SENSOR_GAP') {
-      // I7 and I16 are Sensors: no Water Jet is placed "at a non-Sensor gap". The replacement
-      // placement vocabulary for WJ1/WJ3 is an open Owner decision; this validator only refuses
-      // the superseded value and never invents the new one.
+      // I7 and I16 are Sensors: no Water Jet is placed "at a non-Sensor gap".
       issues.push(`${path}[${i}]: placementKind NON_SENSOR_GAP is superseded (I7 and I16 are Product Sensors; Owner placement decision pending)`);
+    } else if (!WATER_JET_PLACEMENT_KINDS.has(w.placementKind)) {
+      issues.push(`${path}[${i}]: placementKind must be one of ${[...WATER_JET_PLACEMENT_KINDS].join(', ')}`);
     }
-    if (!Array.isArray(w.placementAnchors) || w.placementAnchors.length === 0 || !w.placementAnchors.every(isStr)) {
+    if (w.placementKind === 'UNRESOLVED') {
+      // Owner WJ installed-position ruling: a placement that depended on a revoked gap position
+      // is UNRESOLVED ("Installed position pending authoritative layout") and carries NO
+      // anchors. Nothing is inferred from I7, I16, a former gap, a Sensor wall, the target wall,
+      // a target Sensor, the legacy cannon value or the Assigned Cleaning Device ID.
+      if (!Array.isArray(w.placementAnchors) || w.placementAnchors.length !== 0) {
+        issues.push(`${path}[${i}]: an UNRESOLVED placement must carry no placementAnchors (no inferred installed position)`);
+      }
+    } else if (!Array.isArray(w.placementAnchors) || w.placementAnchors.length === 0 || !w.placementAnchors.every(isStr)) {
       issues.push(`${path}[${i}]: placementAnchors must be a non-empty string array`);
     }
   }

@@ -22,8 +22,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G\u002B201",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B201"
     },
     {
       "slotId": "SLOT-R1-C02",
@@ -33,8 +32,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G\u002B202",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B202"
     },
     {
       "slotId": "SLOT-R1-C03",
@@ -44,8 +42,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G\u002B203",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B203"
     },
     {
       "slotId": "SLOT-R1-C04",
@@ -55,8 +52,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G\u002B204",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B204"
     },
     {
       "slotId": "SLOT-R1-C05",
@@ -66,8 +62,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G\u002B205",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B205"
     },
     {
       "slotId": "SLOT-R1-C06",
@@ -77,8 +72,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G\u002B206",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B206"
     },
     {
       "slotId": "SLOT-R1-C07",
@@ -88,8 +82,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G\u002B207",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B207"
     },
     {
       "slotId": "SLOT-R1-C08",
@@ -99,8 +92,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G\u002B208",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B208"
     },
     {
       "slotId": "SLOT-R1-C09",
@@ -110,8 +102,7 @@
       "logicalRow": 1,
       "wallColumn": 5,
       "wallRow": 1,
-      "sensorId": "G\u002B209",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B209"
     },
     {
       "slotId": "SLOT-R1-C10",
@@ -121,8 +112,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G\u002B210",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B210"
     },
     {
       "slotId": "SLOT-R1-C11",
@@ -132,8 +122,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G\u002B211",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B211"
     },
     {
       "slotId": "SLOT-R1-C12",
@@ -143,8 +132,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G\u002B212",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B212"
     },
     {
       "slotId": "SLOT-R1-C13",
@@ -154,8 +142,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G\u002B213",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B213"
     },
     {
       "slotId": "SLOT-R1-C14",
@@ -165,8 +152,7 @@
       "logicalRow": 1,
       "wallColumn": 1,
       "wallRow": 1,
-      "sensorId": "G\u002B214",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B214"
     },
     {
       "slotId": "SLOT-R1-C15",
@@ -176,8 +162,7 @@
       "logicalRow": 1,
       "wallColumn": 2,
       "wallRow": 1,
-      "sensorId": "G\u002B215",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B215"
     },
     {
       "slotId": "SLOT-R1-C16",
@@ -187,8 +172,7 @@
       "logicalRow": 1,
       "wallColumn": 3,
       "wallRow": 1,
-      "sensorId": "G\u002B216",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B216"
     },
     {
       "slotId": "SLOT-R1-C17",
@@ -198,8 +182,7 @@
       "logicalRow": 1,
       "wallColumn": 4,
       "wallRow": 1,
-      "sensorId": "G\u002B217",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B217"
     },
     {
       "slotId": "SLOT-R1-C18",
@@ -209,8 +192,7 @@
       "logicalRow": 1,
       "wallColumn": 5,
       "wallRow": 1,
-      "sensorId": "G\u002B218",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B218"
     },
     {
       "slotId": "SLOT-R2-C01",
@@ -220,8 +202,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G\u002B101",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B101"
     },
     {
       "slotId": "SLOT-R2-C02",
@@ -231,8 +212,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G\u002B102",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B102"
     },
     {
       "slotId": "SLOT-R2-C03",
@@ -242,8 +222,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G\u002B103",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B103"
     },
     {
       "slotId": "SLOT-R2-C04",
@@ -253,8 +232,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G\u002B104",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B104"
     },
     {
       "slotId": "SLOT-R2-C05",
@@ -264,8 +242,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G\u002B105",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B105"
     },
     {
       "slotId": "SLOT-R2-C06",
@@ -275,8 +252,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G\u002B106",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B106"
     },
     {
       "slotId": "SLOT-R2-C07",
@@ -286,8 +262,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G\u002B107",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B107"
     },
     {
       "slotId": "SLOT-R2-C08",
@@ -297,8 +272,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G\u002B108",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B108"
     },
     {
       "slotId": "SLOT-R2-C09",
@@ -308,8 +282,7 @@
       "logicalRow": 2,
       "wallColumn": 5,
       "wallRow": 2,
-      "sensorId": "G\u002B109",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B109"
     },
     {
       "slotId": "SLOT-R2-C10",
@@ -319,8 +292,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G\u002B110",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B110"
     },
     {
       "slotId": "SLOT-R2-C11",
@@ -330,8 +302,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G\u002B111",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B111"
     },
     {
       "slotId": "SLOT-R2-C12",
@@ -341,8 +312,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G\u002B112",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B112"
     },
     {
       "slotId": "SLOT-R2-C13",
@@ -352,8 +322,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G\u002B113",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B113"
     },
     {
       "slotId": "SLOT-R2-C14",
@@ -363,8 +332,7 @@
       "logicalRow": 2,
       "wallColumn": 1,
       "wallRow": 2,
-      "sensorId": "G\u002B114",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B114"
     },
     {
       "slotId": "SLOT-R2-C15",
@@ -374,8 +342,7 @@
       "logicalRow": 2,
       "wallColumn": 2,
       "wallRow": 2,
-      "sensorId": "G\u002B115",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B115"
     },
     {
       "slotId": "SLOT-R2-C16",
@@ -385,8 +352,7 @@
       "logicalRow": 2,
       "wallColumn": 3,
       "wallRow": 2,
-      "sensorId": "G\u002B116",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B116"
     },
     {
       "slotId": "SLOT-R2-C17",
@@ -396,8 +362,7 @@
       "logicalRow": 2,
       "wallColumn": 4,
       "wallRow": 2,
-      "sensorId": "G\u002B117",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B117"
     },
     {
       "slotId": "SLOT-R2-C18",
@@ -407,8 +372,7 @@
       "logicalRow": 2,
       "wallColumn": 5,
       "wallRow": 2,
-      "sensorId": "G\u002B118",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G\u002B118"
     },
     {
       "slotId": "SLOT-R3-C01",
@@ -418,8 +382,7 @@
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
-      "sensorId": "G1",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G1"
     },
     {
       "slotId": "SLOT-R3-C02",
@@ -429,8 +392,7 @@
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
-      "sensorId": "G2",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G2"
     },
     {
       "slotId": "SLOT-R3-C03",
@@ -440,8 +402,7 @@
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
-      "sensorId": "G3",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G3"
     },
     {
       "slotId": "SLOT-R3-C04",
@@ -451,8 +412,7 @@
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
-      "sensorId": "G4",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G4"
     },
     {
       "slotId": "SLOT-R3-C05",
@@ -462,8 +422,7 @@
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
-      "sensorId": "G5",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G5"
     },
     {
       "slotId": "SLOT-R3-C06",
@@ -473,8 +432,7 @@
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
-      "sensorId": "G6",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G6"
     },
     {
       "slotId": "SLOT-R3-C07",
@@ -484,8 +442,7 @@
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
-      "sensorId": "G7",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G7"
     },
     {
       "slotId": "SLOT-R3-C08",
@@ -495,8 +452,7 @@
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
-      "sensorId": "G8",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G8"
     },
     {
       "slotId": "SLOT-R3-C09",
@@ -506,8 +462,7 @@
       "logicalRow": 3,
       "wallColumn": 5,
       "wallRow": 3,
-      "sensorId": "G9",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G9"
     },
     {
       "slotId": "SLOT-R3-C10",
@@ -517,8 +472,7 @@
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
-      "sensorId": "G10",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G10"
     },
     {
       "slotId": "SLOT-R3-C11",
@@ -528,8 +482,7 @@
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
-      "sensorId": "G11",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G11"
     },
     {
       "slotId": "SLOT-R3-C12",
@@ -539,8 +492,7 @@
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
-      "sensorId": "G12",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G12"
     },
     {
       "slotId": "SLOT-R3-C13",
@@ -550,8 +502,7 @@
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
-      "sensorId": "G13",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G13"
     },
     {
       "slotId": "SLOT-R3-C14",
@@ -561,8 +512,7 @@
       "logicalRow": 3,
       "wallColumn": 1,
       "wallRow": 3,
-      "sensorId": "G14",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G14"
     },
     {
       "slotId": "SLOT-R3-C15",
@@ -572,8 +522,7 @@
       "logicalRow": 3,
       "wallColumn": 2,
       "wallRow": 3,
-      "sensorId": "G15",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G15"
     },
     {
       "slotId": "SLOT-R3-C16",
@@ -583,8 +532,7 @@
       "logicalRow": 3,
       "wallColumn": 3,
       "wallRow": 3,
-      "sensorId": "G16",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G16"
     },
     {
       "slotId": "SLOT-R3-C17",
@@ -594,8 +542,7 @@
       "logicalRow": 3,
       "wallColumn": 4,
       "wallRow": 3,
-      "sensorId": "G17",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G17"
     },
     {
       "slotId": "SLOT-R3-C18",
@@ -605,8 +552,7 @@
       "logicalRow": 3,
       "wallColumn": 5,
       "wallRow": 3,
-      "sensorId": "G18",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "G18"
     },
     {
       "slotId": "SLOT-R4-C01",
@@ -616,8 +562,7 @@
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
-      "sensorId": "H1",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H1"
     },
     {
       "slotId": "SLOT-R4-C02",
@@ -627,8 +572,7 @@
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
-      "sensorId": "H2",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H2"
     },
     {
       "slotId": "SLOT-R4-C03",
@@ -638,8 +582,7 @@
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
-      "sensorId": "H3",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H3"
     },
     {
       "slotId": "SLOT-R4-C04",
@@ -649,8 +592,7 @@
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
-      "sensorId": "H4",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H4"
     },
     {
       "slotId": "SLOT-R4-C05",
@@ -660,8 +602,7 @@
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
-      "sensorId": "H5",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H5"
     },
     {
       "slotId": "SLOT-R4-C06",
@@ -671,8 +612,7 @@
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
-      "sensorId": "H6",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H6"
     },
     {
       "slotId": "SLOT-R4-C07",
@@ -682,8 +622,7 @@
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
-      "sensorId": "H7",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H7"
     },
     {
       "slotId": "SLOT-R4-C08",
@@ -693,8 +632,7 @@
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
-      "sensorId": "H8",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H8"
     },
     {
       "slotId": "SLOT-R4-C09",
@@ -704,8 +642,7 @@
       "logicalRow": 4,
       "wallColumn": 5,
       "wallRow": 4,
-      "sensorId": "H9",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H9"
     },
     {
       "slotId": "SLOT-R4-C10",
@@ -715,8 +652,7 @@
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
-      "sensorId": "H10",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H10"
     },
     {
       "slotId": "SLOT-R4-C11",
@@ -726,8 +662,7 @@
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
-      "sensorId": "H11",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H11"
     },
     {
       "slotId": "SLOT-R4-C12",
@@ -737,8 +672,7 @@
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
-      "sensorId": "H12",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H12"
     },
     {
       "slotId": "SLOT-R4-C13",
@@ -748,8 +682,7 @@
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
-      "sensorId": "H13",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H13"
     },
     {
       "slotId": "SLOT-R4-C14",
@@ -759,8 +692,7 @@
       "logicalRow": 4,
       "wallColumn": 1,
       "wallRow": 4,
-      "sensorId": "H14",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H14"
     },
     {
       "slotId": "SLOT-R4-C15",
@@ -770,8 +702,7 @@
       "logicalRow": 4,
       "wallColumn": 2,
       "wallRow": 4,
-      "sensorId": "H15",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H15"
     },
     {
       "slotId": "SLOT-R4-C16",
@@ -781,8 +712,7 @@
       "logicalRow": 4,
       "wallColumn": 3,
       "wallRow": 4,
-      "sensorId": "H16",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H16"
     },
     {
       "slotId": "SLOT-R4-C17",
@@ -792,8 +722,7 @@
       "logicalRow": 4,
       "wallColumn": 4,
       "wallRow": 4,
-      "sensorId": "H17",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H17"
     },
     {
       "slotId": "SLOT-R4-C18",
@@ -803,8 +732,7 @@
       "logicalRow": 4,
       "wallColumn": 5,
       "wallRow": 4,
-      "sensorId": "H18",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "H18"
     },
     {
       "slotId": "SLOT-R5-C01",
@@ -814,8 +742,7 @@
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
-      "sensorId": "I1",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I1"
     },
     {
       "slotId": "SLOT-R5-C02",
@@ -825,8 +752,7 @@
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
-      "sensorId": "I2",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I2"
     },
     {
       "slotId": "SLOT-R5-C03",
@@ -836,8 +762,7 @@
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
-      "sensorId": "I3",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I3"
     },
     {
       "slotId": "SLOT-R5-C04",
@@ -847,8 +772,7 @@
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
-      "sensorId": "I4",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I4"
     },
     {
       "slotId": "SLOT-R5-C05",
@@ -858,8 +782,7 @@
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
-      "sensorId": "I5",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I5"
     },
     {
       "slotId": "SLOT-R5-C06",
@@ -869,19 +792,17 @@
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
-      "sensorId": "I6",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I6"
     },
     {
       "slotId": "SLOT-R5-C07",
-      "positionKind": "NON_SENSOR_GAP",
+      "positionKind": "SENSOR",
       "wall": "REAR",
       "logicalColumn": 7,
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
-      "sensorId": null,
-      "gapAnchorForWaterJetId": "WJ3"
+      "sensorId": "I7"
     },
     {
       "slotId": "SLOT-R5-C08",
@@ -891,8 +812,7 @@
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
-      "sensorId": "I8",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I8"
     },
     {
       "slotId": "SLOT-R5-C09",
@@ -902,8 +822,7 @@
       "logicalRow": 5,
       "wallColumn": 5,
       "wallRow": 5,
-      "sensorId": "I9",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I9"
     },
     {
       "slotId": "SLOT-R5-C10",
@@ -913,8 +832,7 @@
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
-      "sensorId": "I10",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I10"
     },
     {
       "slotId": "SLOT-R5-C11",
@@ -924,8 +842,7 @@
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
-      "sensorId": "I11",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I11"
     },
     {
       "slotId": "SLOT-R5-C12",
@@ -935,8 +852,7 @@
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
-      "sensorId": "I12",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I12"
     },
     {
       "slotId": "SLOT-R5-C13",
@@ -946,8 +862,7 @@
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
-      "sensorId": "I13",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I13"
     },
     {
       "slotId": "SLOT-R5-C14",
@@ -957,8 +872,7 @@
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
-      "sensorId": "I14",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I14"
     },
     {
       "slotId": "SLOT-R5-C15",
@@ -968,19 +882,17 @@
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
-      "sensorId": "I15",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I15"
     },
     {
       "slotId": "SLOT-R5-C16",
-      "positionKind": "NON_SENSOR_GAP",
+      "positionKind": "SENSOR",
       "wall": "FRONT",
       "logicalColumn": 16,
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
-      "sensorId": null,
-      "gapAnchorForWaterJetId": "WJ1"
+      "sensorId": "I16"
     },
     {
       "slotId": "SLOT-R5-C17",
@@ -990,8 +902,7 @@
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
-      "sensorId": "I17",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I17"
     },
     {
       "slotId": "SLOT-R5-C18",
@@ -1001,8 +912,7 @@
       "logicalRow": 5,
       "wallColumn": 5,
       "wallRow": 5,
-      "sensorId": "I18",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "I18"
     },
     {
       "slotId": "SLOT-R6-C01",
@@ -1012,8 +922,7 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "sensorId": "J1",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J1"
     },
     {
       "slotId": "SLOT-R6-C02",
@@ -1023,8 +932,7 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "sensorId": "J2",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J2"
     },
     {
       "slotId": "SLOT-R6-C03",
@@ -1034,8 +942,7 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "sensorId": "J3",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J3"
     },
     {
       "slotId": "SLOT-R6-C04",
@@ -1045,8 +952,7 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "sensorId": "J4",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J4"
     },
     {
       "slotId": "SLOT-R6-C05",
@@ -1056,8 +962,7 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "sensorId": "J5",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J5"
     },
     {
       "slotId": "SLOT-R6-C06",
@@ -1067,8 +972,7 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "sensorId": "J6",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J6"
     },
     {
       "slotId": "SLOT-R6-C07",
@@ -1078,8 +982,7 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "sensorId": "J7",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J7"
     },
     {
       "slotId": "SLOT-R6-C08",
@@ -1089,8 +992,7 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "sensorId": "J8",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J8"
     },
     {
       "slotId": "SLOT-R6-C09",
@@ -1100,8 +1002,7 @@
       "logicalRow": 6,
       "wallColumn": 5,
       "wallRow": 6,
-      "sensorId": "J9",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J9"
     },
     {
       "slotId": "SLOT-R6-C10",
@@ -1111,8 +1012,7 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "sensorId": "J10",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J10"
     },
     {
       "slotId": "SLOT-R6-C11",
@@ -1122,8 +1022,7 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "sensorId": "J11",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J11"
     },
     {
       "slotId": "SLOT-R6-C12",
@@ -1133,8 +1032,7 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "sensorId": "J12",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J12"
     },
     {
       "slotId": "SLOT-R6-C13",
@@ -1144,8 +1042,7 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "sensorId": "J13",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J13"
     },
     {
       "slotId": "SLOT-R6-C14",
@@ -1155,8 +1052,7 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "sensorId": "J14",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J14"
     },
     {
       "slotId": "SLOT-R6-C15",
@@ -1166,8 +1062,7 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "sensorId": "J15",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J15"
     },
     {
       "slotId": "SLOT-R6-C16",
@@ -1177,8 +1072,7 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "sensorId": "J16",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J16"
     },
     {
       "slotId": "SLOT-R6-C17",
@@ -1188,8 +1082,7 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "sensorId": "J17",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J17"
     },
     {
       "slotId": "SLOT-R6-C18",
@@ -1199,8 +1092,7 @@
       "logicalRow": 6,
       "wallColumn": 5,
       "wallRow": 6,
-      "sensorId": "J18",
-      "gapAnchorForWaterJetId": null
+      "sensorId": "J18"
     }
   ],
   "sensors": [
@@ -2320,11 +2212,11 @@
       "wallColumn": 2,
       "wallRow": 3,
       "scanOrder": 42,
-      "deviceId": "SYN-TC-04",
+      "deviceId": "SYN-TC-03",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-04:CH00",
-      "tcRearChannel": "SYN-TC-04:CH01",
+      "tcFrontChannel": "SYN-TC-03:CH26",
+      "tcRearChannel": "SYN-TC-03:CH27",
       "dirtyScore": 39.5,
       "lastValidatedScore": 39.5,
       "lastValidatedAt": "2026-10-07T00:00:00.000Z",
@@ -2350,8 +2242,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-04:CH02",
-      "tcRearChannel": "SYN-TC-04:CH03",
+      "tcFrontChannel": "SYN-TC-04:CH00",
+      "tcRearChannel": "SYN-TC-04:CH01",
       "dirtyScore": 76.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2377,8 +2269,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-04:CH04",
-      "tcRearChannel": "SYN-TC-04:CH05",
+      "tcFrontChannel": "SYN-TC-04:CH02",
+      "tcRearChannel": "SYN-TC-04:CH03",
       "dirtyScore": 12.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2404,8 +2296,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-04:CH06",
-      "tcRearChannel": "SYN-TC-04:CH07",
+      "tcFrontChannel": "SYN-TC-04:CH04",
+      "tcRearChannel": "SYN-TC-04:CH05",
       "dirtyScore": 49.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2431,8 +2323,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-04:CH08",
-      "tcRearChannel": "SYN-TC-04:CH09",
+      "tcFrontChannel": "SYN-TC-04:CH06",
+      "tcRearChannel": "SYN-TC-04:CH07",
       "dirtyScore": 86.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2458,8 +2350,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-04:CH10",
-      "tcRearChannel": "SYN-TC-04:CH11",
+      "tcFrontChannel": "SYN-TC-04:CH08",
+      "tcRearChannel": "SYN-TC-04:CH09",
       "dirtyScore": 22.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2485,8 +2377,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-04:CH12",
-      "tcRearChannel": "SYN-TC-04:CH13",
+      "tcFrontChannel": "SYN-TC-04:CH10",
+      "tcRearChannel": "SYN-TC-04:CH11",
       "dirtyScore": 59.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2512,8 +2404,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-04:CH14",
-      "tcRearChannel": "SYN-TC-04:CH15",
+      "tcFrontChannel": "SYN-TC-04:CH12",
+      "tcRearChannel": "SYN-TC-04:CH13",
       "dirtyScore": 96.5,
       "lastValidatedScore": 96.5,
       "lastValidatedAt": "2026-10-07T00:00:00.000Z",
@@ -2539,8 +2431,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-04:CH16",
-      "tcRearChannel": "SYN-TC-04:CH17",
+      "tcFrontChannel": "SYN-TC-04:CH14",
+      "tcRearChannel": "SYN-TC-04:CH15",
       "dirtyScore": 32.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2566,8 +2458,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-04:CH18",
-      "tcRearChannel": "SYN-TC-04:CH19",
+      "tcFrontChannel": "SYN-TC-04:CH16",
+      "tcRearChannel": "SYN-TC-04:CH17",
       "dirtyScore": 69.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2593,8 +2485,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-04:CH20",
-      "tcRearChannel": "SYN-TC-04:CH21",
+      "tcFrontChannel": "SYN-TC-04:CH18",
+      "tcRearChannel": "SYN-TC-04:CH19",
       "dirtyScore": 5.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2620,8 +2512,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-04:CH22",
-      "tcRearChannel": "SYN-TC-04:CH23",
+      "tcFrontChannel": "SYN-TC-04:CH20",
+      "tcRearChannel": "SYN-TC-04:CH21",
       "dirtyScore": 42.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2647,8 +2539,8 @@
       "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-04:CH24",
-      "tcRearChannel": "SYN-TC-04:CH25",
+      "tcFrontChannel": "SYN-TC-04:CH22",
+      "tcRearChannel": "SYN-TC-04:CH23",
       "dirtyScore": 79.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2671,11 +2563,11 @@
       "wallColumn": 1,
       "wallRow": 4,
       "scanOrder": 55,
-      "deviceId": "SYN-TC-05",
+      "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-05:CH00",
-      "tcRearChannel": "SYN-TC-05:CH01",
+      "tcFrontChannel": "SYN-TC-04:CH24",
+      "tcRearChannel": "SYN-TC-04:CH25",
       "dirtyScore": 15.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2698,11 +2590,11 @@
       "wallColumn": 2,
       "wallRow": 4,
       "scanOrder": 56,
-      "deviceId": "SYN-TC-05",
+      "deviceId": "SYN-TC-04",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-05:CH02",
-      "tcRearChannel": "SYN-TC-05:CH03",
+      "tcFrontChannel": "SYN-TC-04:CH26",
+      "tcRearChannel": "SYN-TC-04:CH27",
       "dirtyScore": 52.5,
       "lastValidatedScore": 52.5,
       "lastValidatedAt": "2026-10-07T00:00:00.000Z",
@@ -2728,8 +2620,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-05:CH04",
-      "tcRearChannel": "SYN-TC-05:CH05",
+      "tcFrontChannel": "SYN-TC-05:CH00",
+      "tcRearChannel": "SYN-TC-05:CH01",
       "dirtyScore": 89.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2755,8 +2647,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-05:CH06",
-      "tcRearChannel": "SYN-TC-05:CH07",
+      "tcFrontChannel": "SYN-TC-05:CH02",
+      "tcRearChannel": "SYN-TC-05:CH03",
       "dirtyScore": 25.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2782,8 +2674,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-05:CH08",
-      "tcRearChannel": "SYN-TC-05:CH09",
+      "tcFrontChannel": "SYN-TC-05:CH04",
+      "tcRearChannel": "SYN-TC-05:CH05",
       "dirtyScore": 62.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2809,8 +2701,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-05:CH10",
-      "tcRearChannel": "SYN-TC-05:CH11",
+      "tcFrontChannel": "SYN-TC-05:CH06",
+      "tcRearChannel": "SYN-TC-05:CH07",
       "dirtyScore": 99.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2836,8 +2728,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-05:CH12",
-      "tcRearChannel": "SYN-TC-05:CH13",
+      "tcFrontChannel": "SYN-TC-05:CH08",
+      "tcRearChannel": "SYN-TC-05:CH09",
       "dirtyScore": 35.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2863,8 +2755,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-05:CH14",
-      "tcRearChannel": "SYN-TC-05:CH15",
+      "tcFrontChannel": "SYN-TC-05:CH10",
+      "tcRearChannel": "SYN-TC-05:CH11",
       "dirtyScore": 72.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2890,8 +2782,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-05:CH16",
-      "tcRearChannel": "SYN-TC-05:CH17",
+      "tcFrontChannel": "SYN-TC-05:CH12",
+      "tcRearChannel": "SYN-TC-05:CH13",
       "dirtyScore": 8.5,
       "lastValidatedScore": 8.5,
       "lastValidatedAt": "2026-10-07T00:00:00.000Z",
@@ -2917,8 +2809,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-05:CH18",
-      "tcRearChannel": "SYN-TC-05:CH19",
+      "tcFrontChannel": "SYN-TC-05:CH14",
+      "tcRearChannel": "SYN-TC-05:CH15",
       "dirtyScore": 45.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2944,8 +2836,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-05:CH20",
-      "tcRearChannel": "SYN-TC-05:CH21",
+      "tcFrontChannel": "SYN-TC-05:CH16",
+      "tcRearChannel": "SYN-TC-05:CH17",
       "dirtyScore": 82.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2971,8 +2863,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-05:CH22",
-      "tcRearChannel": "SYN-TC-05:CH23",
+      "tcFrontChannel": "SYN-TC-05:CH18",
+      "tcRearChannel": "SYN-TC-05:CH19",
       "dirtyScore": 18.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -2998,8 +2890,8 @@
       "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-05:CH24",
-      "tcRearChannel": "SYN-TC-05:CH25",
+      "tcFrontChannel": "SYN-TC-05:CH20",
+      "tcRearChannel": "SYN-TC-05:CH21",
       "dirtyScore": 55.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3022,11 +2914,11 @@
       "wallColumn": 1,
       "wallRow": 4,
       "scanOrder": 68,
-      "deviceId": "SYN-TC-06",
+      "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-06:CH00",
-      "tcRearChannel": "SYN-TC-06:CH01",
+      "tcFrontChannel": "SYN-TC-05:CH22",
+      "tcRearChannel": "SYN-TC-05:CH23",
       "dirtyScore": 92.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3049,11 +2941,11 @@
       "wallColumn": 2,
       "wallRow": 4,
       "scanOrder": 69,
-      "deviceId": "SYN-TC-06",
+      "deviceId": "SYN-TC-05",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-06:CH02",
-      "tcRearChannel": "SYN-TC-06:CH03",
+      "tcFrontChannel": "SYN-TC-05:CH24",
+      "tcRearChannel": "SYN-TC-05:CH25",
       "dirtyScore": 28.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3079,8 +2971,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-06:CH04",
-      "tcRearChannel": "SYN-TC-06:CH05",
+      "tcFrontChannel": "SYN-TC-06:CH00",
+      "tcRearChannel": "SYN-TC-06:CH01",
       "dirtyScore": 65.5,
       "lastValidatedScore": 65.5,
       "lastValidatedAt": "2026-10-07T00:00:00.000Z",
@@ -3106,8 +2998,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-06:CH06",
-      "tcRearChannel": "SYN-TC-06:CH07",
+      "tcFrontChannel": "SYN-TC-06:CH02",
+      "tcRearChannel": "SYN-TC-06:CH03",
       "dirtyScore": 1.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3133,8 +3025,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-06:CH08",
-      "tcRearChannel": "SYN-TC-06:CH09",
+      "tcFrontChannel": "SYN-TC-06:CH04",
+      "tcRearChannel": "SYN-TC-06:CH05",
       "dirtyScore": 38.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3160,8 +3052,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-06:CH10",
-      "tcRearChannel": "SYN-TC-06:CH11",
+      "tcFrontChannel": "SYN-TC-06:CH06",
+      "tcRearChannel": "SYN-TC-06:CH07",
       "dirtyScore": 75.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3187,8 +3079,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-06:CH12",
-      "tcRearChannel": "SYN-TC-06:CH13",
+      "tcFrontChannel": "SYN-TC-06:CH08",
+      "tcRearChannel": "SYN-TC-06:CH09",
       "dirtyScore": 11.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3214,8 +3106,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-06:CH14",
-      "tcRearChannel": "SYN-TC-06:CH15",
+      "tcFrontChannel": "SYN-TC-06:CH10",
+      "tcRearChannel": "SYN-TC-06:CH11",
       "dirtyScore": 48.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3241,8 +3133,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
-      "tcFrontChannel": "SYN-TC-06:CH16",
-      "tcRearChannel": "SYN-TC-06:CH17",
+      "tcFrontChannel": "SYN-TC-06:CH12",
+      "tcRearChannel": "SYN-TC-06:CH13",
       "dirtyScore": 85.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
@@ -3268,8 +3160,8 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-06:CH18",
-      "tcRearChannel": "SYN-TC-06:CH19",
+      "tcFrontChannel": "SYN-TC-06:CH14",
+      "tcRearChannel": "SYN-TC-06:CH15",
       "dirtyScore": 21.5,
       "lastValidatedScore": 21.5,
       "lastValidatedAt": "2026-10-07T00:00:00.000Z",
@@ -3295,9 +3187,36 @@
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-06:CH20",
-      "tcRearChannel": "SYN-TC-06:CH21",
+      "tcFrontChannel": "SYN-TC-06:CH16",
+      "tcRearChannel": "SYN-TC-06:CH17",
       "dirtyScore": 58.5,
+      "lastValidatedScore": null,
+      "lastValidatedAt": null,
+      "classification": "DIRTY",
+      "classificationBasis": "CURRENT",
+      "quality": "GOOD",
+      "qualityReason": null,
+      "sourceTimestamp": "2026-10-07T00:00:00.000Z",
+      "queueState": "NONE",
+      "isActiveJobTarget": false,
+      "alarmState": "NONE",
+      "alarmSeverity": null
+    },
+    {
+      "sensorId": "I7",
+      "positionKind": "SENSOR",
+      "wall": "REAR",
+      "logicalColumn": 7,
+      "logicalRow": 5,
+      "wallColumn": 3,
+      "wallRow": 5,
+      "scanOrder": 79,
+      "deviceId": "SYN-TC-06",
+      "assignedWaterJetId": "WJ1",
+      "assignedIsolationValveId": "IV1",
+      "tcFrontChannel": "SYN-TC-06:CH18",
+      "tcRearChannel": "SYN-TC-06:CH19",
+      "dirtyScore": 95.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "DIRTY",
@@ -3318,16 +3237,16 @@
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
-      "scanOrder": 79,
+      "scanOrder": 80,
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-06:CH22",
-      "tcRearChannel": "SYN-TC-06:CH23",
-      "dirtyScore": 95.5,
+      "tcFrontChannel": "SYN-TC-06:CH20",
+      "tcRearChannel": "SYN-TC-06:CH21",
+      "dirtyScore": 31.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "DIRTY",
+      "classification": "CLEANER",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3345,16 +3264,16 @@
       "logicalRow": 5,
       "wallColumn": 5,
       "wallRow": 5,
-      "scanOrder": 80,
+      "scanOrder": 81,
       "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
-      "tcFrontChannel": "SYN-TC-06:CH24",
-      "tcRearChannel": "SYN-TC-06:CH25",
-      "dirtyScore": 31.5,
+      "tcFrontChannel": "SYN-TC-06:CH22",
+      "tcRearChannel": "SYN-TC-06:CH23",
+      "dirtyScore": 68.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "CLEANER",
+      "classification": "DIRTY",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3372,16 +3291,16 @@
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
-      "scanOrder": 81,
-      "deviceId": "SYN-TC-07",
+      "scanOrder": 82,
+      "deviceId": "SYN-TC-06",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-07:CH00",
-      "tcRearChannel": "SYN-TC-07:CH01",
-      "dirtyScore": 68.5,
+      "tcFrontChannel": "SYN-TC-06:CH24",
+      "tcRearChannel": "SYN-TC-06:CH25",
+      "dirtyScore": 4.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "DIRTY",
+      "classification": "CLEANER",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3399,13 +3318,13 @@
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
-      "scanOrder": 82,
+      "scanOrder": 83,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-07:CH02",
-      "tcRearChannel": "SYN-TC-07:CH03",
-      "dirtyScore": 4.5,
+      "tcFrontChannel": "SYN-TC-07:CH00",
+      "tcRearChannel": "SYN-TC-07:CH01",
+      "dirtyScore": 41.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "CLEANER",
@@ -3426,39 +3345,12 @@
       "logicalRow": 5,
       "wallColumn": 3,
       "wallRow": 5,
-      "scanOrder": 83,
-      "deviceId": "SYN-TC-07",
-      "assignedWaterJetId": "WJ2",
-      "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-07:CH04",
-      "tcRearChannel": "SYN-TC-07:CH05",
-      "dirtyScore": 41.5,
-      "lastValidatedScore": null,
-      "lastValidatedAt": null,
-      "classification": "CLEANER",
-      "classificationBasis": "CURRENT",
-      "quality": "GOOD",
-      "qualityReason": null,
-      "sourceTimestamp": "2026-10-07T00:00:00.000Z",
-      "queueState": "NONE",
-      "isActiveJobTarget": false,
-      "alarmState": "NONE",
-      "alarmSeverity": null
-    },
-    {
-      "sensorId": "I13",
-      "positionKind": "SENSOR",
-      "wall": "RIGHT",
-      "logicalColumn": 13,
-      "logicalRow": 5,
-      "wallColumn": 4,
-      "wallRow": 5,
       "scanOrder": 84,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
-      "tcFrontChannel": "SYN-TC-07:CH06",
-      "tcRearChannel": "SYN-TC-07:CH07",
+      "tcFrontChannel": "SYN-TC-07:CH02",
+      "tcRearChannel": "SYN-TC-07:CH03",
       "dirtyScore": 78.5,
       "lastValidatedScore": 78.5,
       "lastValidatedAt": "2026-10-07T00:00:00.000Z",
@@ -3473,6 +3365,33 @@
       "alarmSeverity": null
     },
     {
+      "sensorId": "I13",
+      "positionKind": "SENSOR",
+      "wall": "RIGHT",
+      "logicalColumn": 13,
+      "logicalRow": 5,
+      "wallColumn": 4,
+      "wallRow": 5,
+      "scanOrder": 85,
+      "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ2",
+      "assignedIsolationValveId": "IV2",
+      "tcFrontChannel": "SYN-TC-07:CH04",
+      "tcRearChannel": "SYN-TC-07:CH05",
+      "dirtyScore": 14.5,
+      "lastValidatedScore": null,
+      "lastValidatedAt": null,
+      "classification": "CLEANER",
+      "classificationBasis": "CURRENT",
+      "quality": "GOOD",
+      "qualityReason": null,
+      "sourceTimestamp": "2026-10-07T00:00:00.000Z",
+      "queueState": "NONE",
+      "isActiveJobTarget": false,
+      "alarmState": "NONE",
+      "alarmSeverity": null
+    },
+    {
       "sensorId": "I14",
       "positionKind": "SENSOR",
       "wall": "FRONT",
@@ -3480,16 +3399,16 @@
       "logicalRow": 5,
       "wallColumn": 1,
       "wallRow": 5,
-      "scanOrder": 85,
+      "scanOrder": 86,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
-      "tcFrontChannel": "SYN-TC-07:CH08",
-      "tcRearChannel": "SYN-TC-07:CH09",
-      "dirtyScore": 14.5,
+      "tcFrontChannel": "SYN-TC-07:CH06",
+      "tcRearChannel": "SYN-TC-07:CH07",
+      "dirtyScore": 51.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "CLEANER",
+      "classification": "DIRTY",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3507,16 +3426,43 @@
       "logicalRow": 5,
       "wallColumn": 2,
       "wallRow": 5,
-      "scanOrder": 86,
+      "scanOrder": 87,
+      "deviceId": "SYN-TC-07",
+      "assignedWaterJetId": "WJ3",
+      "assignedIsolationValveId": "IV3",
+      "tcFrontChannel": "SYN-TC-07:CH08",
+      "tcRearChannel": "SYN-TC-07:CH09",
+      "dirtyScore": 88.5,
+      "lastValidatedScore": null,
+      "lastValidatedAt": null,
+      "classification": "DIRTY",
+      "classificationBasis": "CURRENT",
+      "quality": "GOOD",
+      "qualityReason": null,
+      "sourceTimestamp": "2026-10-07T00:00:00.000Z",
+      "queueState": "NONE",
+      "isActiveJobTarget": false,
+      "alarmState": "NONE",
+      "alarmSeverity": null
+    },
+    {
+      "sensorId": "I16",
+      "positionKind": "SENSOR",
+      "wall": "FRONT",
+      "logicalColumn": 16,
+      "logicalRow": 5,
+      "wallColumn": 3,
+      "wallRow": 5,
+      "scanOrder": 88,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-07:CH10",
       "tcRearChannel": "SYN-TC-07:CH11",
-      "dirtyScore": 51.5,
+      "dirtyScore": 24.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "DIRTY",
+      "classification": "CLEANER",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3534,13 +3480,13 @@
       "logicalRow": 5,
       "wallColumn": 4,
       "wallRow": 5,
-      "scanOrder": 87,
+      "scanOrder": 89,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-07:CH12",
       "tcRearChannel": "SYN-TC-07:CH13",
-      "dirtyScore": 88.5,
+      "dirtyScore": 61.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "DIRTY",
@@ -3561,16 +3507,16 @@
       "logicalRow": 5,
       "wallColumn": 5,
       "wallRow": 5,
-      "scanOrder": 88,
+      "scanOrder": 90,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-07:CH14",
       "tcRearChannel": "SYN-TC-07:CH15",
-      "dirtyScore": 24.5,
+      "dirtyScore": 98.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "CLEANER",
+      "classification": "DIRTY",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3588,19 +3534,19 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "scanOrder": 89,
+      "scanOrder": 91,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH16",
       "tcRearChannel": "SYN-TC-07:CH17",
-      "dirtyScore": 61.5,
-      "lastValidatedScore": null,
-      "lastValidatedAt": null,
-      "classification": "DIRTY",
-      "classificationBasis": "CURRENT",
-      "quality": "GOOD",
-      "qualityReason": null,
+      "dirtyScore": 34.5,
+      "lastValidatedScore": 34.5,
+      "lastValidatedAt": "2026-10-07T00:00:00.000Z",
+      "classification": "CLEANER",
+      "classificationBasis": "LAST_VALIDATED",
+      "quality": "UNCERTAIN",
+      "qualityReason": "FIXTURE_FORCED",
       "sourceTimestamp": "2026-10-07T00:00:00.000Z",
       "queueState": "NONE",
       "isActiveJobTarget": false,
@@ -3615,13 +3561,13 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "scanOrder": 90,
+      "scanOrder": 92,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH18",
       "tcRearChannel": "SYN-TC-07:CH19",
-      "dirtyScore": 98.5,
+      "dirtyScore": 71.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "DIRTY",
@@ -3642,19 +3588,19 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "scanOrder": 91,
+      "scanOrder": 93,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH20",
       "tcRearChannel": "SYN-TC-07:CH21",
-      "dirtyScore": 34.5,
-      "lastValidatedScore": 34.5,
-      "lastValidatedAt": "2026-10-07T00:00:00.000Z",
+      "dirtyScore": 7.5,
+      "lastValidatedScore": null,
+      "lastValidatedAt": null,
       "classification": "CLEANER",
-      "classificationBasis": "LAST_VALIDATED",
-      "quality": "UNCERTAIN",
-      "qualityReason": "FIXTURE_FORCED",
+      "classificationBasis": "CURRENT",
+      "quality": "GOOD",
+      "qualityReason": null,
       "sourceTimestamp": "2026-10-07T00:00:00.000Z",
       "queueState": "NONE",
       "isActiveJobTarget": false,
@@ -3669,16 +3615,16 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "scanOrder": 92,
+      "scanOrder": 94,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ4",
       "assignedIsolationValveId": "IV4",
       "tcFrontChannel": "SYN-TC-07:CH22",
       "tcRearChannel": "SYN-TC-07:CH23",
-      "dirtyScore": 71.5,
+      "dirtyScore": 44.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "DIRTY",
+      "classification": "CLEANER",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3696,16 +3642,16 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "scanOrder": 93,
+      "scanOrder": 95,
       "deviceId": "SYN-TC-07",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-07:CH24",
       "tcRearChannel": "SYN-TC-07:CH25",
-      "dirtyScore": 7.5,
+      "dirtyScore": 81.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "CLEANER",
+      "classification": "DIRTY",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3723,13 +3669,13 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "scanOrder": 94,
+      "scanOrder": 96,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH00",
       "tcRearChannel": "SYN-TC-08:CH01",
-      "dirtyScore": 44.5,
+      "dirtyScore": 17.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "CLEANER",
@@ -3750,13 +3696,13 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "scanOrder": 95,
+      "scanOrder": 97,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH02",
       "tcRearChannel": "SYN-TC-08:CH03",
-      "dirtyScore": 81.5,
+      "dirtyScore": 54.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "DIRTY",
@@ -3777,19 +3723,19 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "scanOrder": 96,
+      "scanOrder": 98,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH04",
       "tcRearChannel": "SYN-TC-08:CH05",
-      "dirtyScore": 17.5,
-      "lastValidatedScore": null,
-      "lastValidatedAt": null,
-      "classification": "CLEANER",
-      "classificationBasis": "CURRENT",
-      "quality": "GOOD",
-      "qualityReason": null,
+      "dirtyScore": 91.5,
+      "lastValidatedScore": 91.5,
+      "lastValidatedAt": "2026-10-07T00:00:00.000Z",
+      "classification": "DIRTY",
+      "classificationBasis": "LAST_VALIDATED",
+      "quality": "UNCERTAIN",
+      "qualityReason": "FIXTURE_FORCED",
       "sourceTimestamp": "2026-10-07T00:00:00.000Z",
       "queueState": "NONE",
       "isActiveJobTarget": false,
@@ -3804,16 +3750,16 @@
       "logicalRow": 6,
       "wallColumn": 5,
       "wallRow": 6,
-      "scanOrder": 97,
+      "scanOrder": 99,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ1",
       "assignedIsolationValveId": "IV1",
       "tcFrontChannel": "SYN-TC-08:CH06",
       "tcRearChannel": "SYN-TC-08:CH07",
-      "dirtyScore": 54.5,
+      "dirtyScore": 27.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "DIRTY",
+      "classification": "CLEANER",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3831,19 +3777,19 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "scanOrder": 98,
+      "scanOrder": 100,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH08",
       "tcRearChannel": "SYN-TC-08:CH09",
-      "dirtyScore": 91.5,
-      "lastValidatedScore": 91.5,
-      "lastValidatedAt": "2026-10-07T00:00:00.000Z",
+      "dirtyScore": 64.5,
+      "lastValidatedScore": null,
+      "lastValidatedAt": null,
       "classification": "DIRTY",
-      "classificationBasis": "LAST_VALIDATED",
-      "quality": "UNCERTAIN",
-      "qualityReason": "FIXTURE_FORCED",
+      "classificationBasis": "CURRENT",
+      "quality": "GOOD",
+      "qualityReason": null,
       "sourceTimestamp": "2026-10-07T00:00:00.000Z",
       "queueState": "NONE",
       "isActiveJobTarget": false,
@@ -3858,13 +3804,13 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "scanOrder": 99,
+      "scanOrder": 101,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH10",
       "tcRearChannel": "SYN-TC-08:CH11",
-      "dirtyScore": 27.5,
+      "dirtyScore": 0.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "CLEANER",
@@ -3885,16 +3831,16 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "scanOrder": 100,
+      "scanOrder": 102,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH12",
       "tcRearChannel": "SYN-TC-08:CH13",
-      "dirtyScore": 64.5,
+      "dirtyScore": 37.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "DIRTY",
+      "classification": "CLEANER",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3912,16 +3858,16 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "scanOrder": 101,
+      "scanOrder": 103,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ2",
       "assignedIsolationValveId": "IV2",
       "tcFrontChannel": "SYN-TC-08:CH14",
       "tcRearChannel": "SYN-TC-08:CH15",
-      "dirtyScore": 0.5,
+      "dirtyScore": 74.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "CLEANER",
+      "classification": "DIRTY",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -3939,13 +3885,13 @@
       "logicalRow": 6,
       "wallColumn": 1,
       "wallRow": 6,
-      "scanOrder": 102,
+      "scanOrder": 104,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH16",
       "tcRearChannel": "SYN-TC-08:CH17",
-      "dirtyScore": 37.5,
+      "dirtyScore": 10.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "CLEANER",
@@ -3966,19 +3912,19 @@
       "logicalRow": 6,
       "wallColumn": 2,
       "wallRow": 6,
-      "scanOrder": 103,
+      "scanOrder": 105,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH18",
       "tcRearChannel": "SYN-TC-08:CH19",
-      "dirtyScore": 74.5,
-      "lastValidatedScore": null,
-      "lastValidatedAt": null,
-      "classification": "DIRTY",
-      "classificationBasis": "CURRENT",
-      "quality": "GOOD",
-      "qualityReason": null,
+      "dirtyScore": 47.5,
+      "lastValidatedScore": 47.5,
+      "lastValidatedAt": "2026-10-07T00:00:00.000Z",
+      "classification": "CLEANER",
+      "classificationBasis": "LAST_VALIDATED",
+      "quality": "UNCERTAIN",
+      "qualityReason": "FIXTURE_FORCED",
       "sourceTimestamp": "2026-10-07T00:00:00.000Z",
       "queueState": "NONE",
       "isActiveJobTarget": false,
@@ -3993,16 +3939,16 @@
       "logicalRow": 6,
       "wallColumn": 3,
       "wallRow": 6,
-      "scanOrder": 104,
+      "scanOrder": 106,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH20",
       "tcRearChannel": "SYN-TC-08:CH21",
-      "dirtyScore": 10.5,
+      "dirtyScore": 84.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
-      "classification": "CLEANER",
+      "classification": "DIRTY",
       "classificationBasis": "CURRENT",
       "quality": "GOOD",
       "qualityReason": null,
@@ -4020,19 +3966,19 @@
       "logicalRow": 6,
       "wallColumn": 4,
       "wallRow": 6,
-      "scanOrder": 105,
+      "scanOrder": 107,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH22",
       "tcRearChannel": "SYN-TC-08:CH23",
-      "dirtyScore": 47.5,
-      "lastValidatedScore": 47.5,
-      "lastValidatedAt": "2026-10-07T00:00:00.000Z",
+      "dirtyScore": 20.5,
+      "lastValidatedScore": null,
+      "lastValidatedAt": null,
       "classification": "CLEANER",
-      "classificationBasis": "LAST_VALIDATED",
-      "quality": "UNCERTAIN",
-      "qualityReason": "FIXTURE_FORCED",
+      "classificationBasis": "CURRENT",
+      "quality": "GOOD",
+      "qualityReason": null,
       "sourceTimestamp": "2026-10-07T00:00:00.000Z",
       "queueState": "NONE",
       "isActiveJobTarget": false,
@@ -4047,13 +3993,13 @@
       "logicalRow": 6,
       "wallColumn": 5,
       "wallRow": 6,
-      "scanOrder": 106,
+      "scanOrder": 108,
       "deviceId": "SYN-TC-08",
       "assignedWaterJetId": "WJ3",
       "assignedIsolationValveId": "IV3",
       "tcFrontChannel": "SYN-TC-08:CH24",
       "tcRearChannel": "SYN-TC-08:CH25",
-      "dirtyScore": 84.5,
+      "dirtyScore": 57.5,
       "lastValidatedScore": null,
       "lastValidatedAt": null,
       "classification": "DIRTY",
@@ -4072,11 +4018,8 @@
       "waterJetId": "WJ1",
       "installedWall": "FRONT",
       "installedRegion": "LOWER",
-      "placementKind": "NON_SENSOR_GAP",
-      "placementAnchors": [
-        "I15",
-        "I17"
-      ],
+      "placementKind": "UNRESOLVED",
+      "placementAnchors": [],
       "targetWall": "REAR",
       "targetRegion": "LOWER",
       "dedicatedIsolationValveId": "IV1"
@@ -4098,11 +4041,8 @@
       "waterJetId": "WJ3",
       "installedWall": "REAR",
       "installedRegion": "LOWER",
-      "placementKind": "NON_SENSOR_GAP",
-      "placementAnchors": [
-        "I6",
-        "I8"
-      ],
+      "placementKind": "UNRESOLVED",
+      "placementAnchors": [],
       "targetWall": "FRONT",
       "targetRegion": "LOWER",
       "dedicatedIsolationValveId": "IV3"
@@ -4213,38 +4153,38 @@
     {
       "wall": "LEFT",
       "total": 24,
-      "dirty": 13,
-      "cleaner": 11,
+      "dirty": 11,
+      "cleaner": 13,
       "notClassified": 0,
       "uncertain": 3,
-      "maxScore": 98.5
+      "maxScore": 97.5
     },
     {
       "wall": "REAR",
-      "total": 29,
-      "dirty": 14,
-      "cleaner": 15,
+      "total": 30,
+      "dirty": 16,
+      "cleaner": 14,
       "notClassified": 0,
-      "uncertain": 4,
+      "uncertain": 5,
       "maxScore": 99.5
     },
     {
       "wall": "RIGHT",
       "total": 24,
-      "dirty": 13,
-      "cleaner": 11,
+      "dirty": 12,
+      "cleaner": 12,
       "notClassified": 0,
-      "uncertain": 4,
+      "uncertain": 3,
       "maxScore": 100.5
     },
     {
       "wall": "FRONT",
-      "total": 29,
-      "dirty": 12,
-      "cleaner": 17,
+      "total": 30,
+      "dirty": 14,
+      "cleaner": 16,
       "notClassified": 0,
       "uncertain": 4,
-      "maxScore": 92.5
+      "maxScore": 98.5
     }
   ],
   "activeJob": {

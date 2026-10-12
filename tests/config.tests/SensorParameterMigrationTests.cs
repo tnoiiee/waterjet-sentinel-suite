@@ -8,16 +8,19 @@ namespace Wjss.Config.Tests;
 
 /// <summary>
 /// Stage 0.3A-3 Checkpoint B invariant tests for the legacy sensor-parameter migration
-/// (ADR-0017; approved planned tests T1–T20). All fixtures are synthetic public-safe rows
-/// built by <see cref="SyntheticSensorParameterCsv"/>; the Owner CSV never enters Git.
+/// (ADR-0017; approved planned tests T1–T20), corrected to the Owner critical topology
+/// correction (Stage 0.4C-K3): 108 Sensors, 216 structural TC sides, I7 and I16 normal Product
+/// Sensors in ordinal position, no NON_SENSOR_GAP vocabulary, WJ1 / WJ3 placement UNRESOLVED.
+/// All fixtures are synthetic public-safe rows built by <see cref="SyntheticSensorParameterCsv"/>;
+/// the Owner CSV never enters Git.
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local test run is the arbiter).
 /// </summary>
 public sealed class SensorParameterMigrationTests
 {
     // ---- deterministic default-fixture expectations ----
-    private const int ExpectedTimezoneWarnings = 53; // even scanOrder values 2..106
-    private const int ExpectedUnitWarnings = 35;     // scanOrder divisible by 3
-    private const int ExpectedDisabledSensors = 6;   // scanOrder divisible by 17
+    private const int ExpectedTimezoneWarnings = 54; // even scanOrder values 2..108
+    private const int ExpectedUnitWarnings = 36;     // scanOrder divisible by 3 (3..108)
+    private const int ExpectedDisabledSensors = 6;   // scanOrder divisible by 17 (17..102)
 
     // Semantically distinct expected sequences (CA1861: never inline constant arrays as
     // arguments; never consolidate arrays with different meanings).
@@ -27,11 +30,11 @@ public sealed class SensorParameterMigrationTests
     private static readonly string[] ExpectedIsolationValveIdOrder =
         ["IV1", "IV2", "IV3", "IV4", "IV5", "IV6", "IV7", "IV8"];
 
-    private static readonly string[] ExpectedNonSensorGapLogicalIds = ["I7", "I16"];
+    private static readonly string[] ExpectedCorrectedSensorIds = ["I7", "I16"];
 
     private static readonly string[] ExpectedBooleanPropertyNames = ["Enabled"];
 
-    private static readonly string[] ExpectedLogicalPositionKindNames = ["SENSOR", "NON_SENSOR_GAP"];
+    private static readonly string[] ExpectedLogicalPositionKindNames = ["SENSOR"];
 
     private static SensorParameterImportOutcome Import(string csv) =>
         SensorParameterCsvImporter.Import(csv);
@@ -61,57 +64,84 @@ public sealed class SensorParameterMigrationTests
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
         Assert.Equal(108, result.LogicalPositions.Count);
-        Assert.Equal(106, result.Sensors.Count);
+        Assert.Equal(108, result.Sensors.Count);
         Assert.Equal(8, result.WaterJets.Count);
         Assert.Equal(8, result.IsolationValves.Count);
-        Assert.Equal(212, result.Sensors.Count * 2); // structural TC sides: two per Sensor
+        Assert.Equal(216, result.Sensors.Count * 2); // structural TC sides: two per Sensor
         Assert.Equal(24, result.Sensors.Count(s => s.Wall == Wall.LEFT));
-        Assert.Equal(29, result.Sensors.Count(s => s.Wall == Wall.REAR));
+        Assert.Equal(30, result.Sensors.Count(s => s.Wall == Wall.REAR));
         Assert.Equal(24, result.Sensors.Count(s => s.Wall == Wall.RIGHT));
-        Assert.Equal(29, result.Sensors.Count(s => s.Wall == Wall.FRONT));
+        Assert.Equal(30, result.Sensors.Count(s => s.Wall == Wall.FRONT));
         Assert.Null(TopologyValidator.Validate(result));
     }
 
-    // ---- T2 ------------------------------------------------------------------
+    // ---- T2 (Owner critical topology correction) ---------------------------------
 
     [Fact]
-    public void Gap_Positions_Are_NonSensorGap_Anchors_With_No_Sensor_Configuration()
+    public void I7_And_I16_Are_Normal_Sensors_With_No_Gap_Position_And_No_Gap_Property()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
-        var gaps = result.LogicalPositions
-            .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
-            .ToArray();
-        Assert.Equal(2, gaps.Length);
-        Assert.Equal("I7", gaps[0].LogicalId);
-        Assert.Equal("WJ3", gaps[0].GapAnchorForWaterJetId);
-        Assert.Equal("I16", gaps[1].LogicalId);
-        Assert.Equal("WJ1", gaps[1].GapAnchorForWaterJetId);
+        Assert.All(result.LogicalPositions, p => Assert.Equal(LogicalPositionKind.SENSOR, p.PositionKind));
+        Assert.Equal(
+            ExpectedCorrectedSensorIds,
+            result.Sensors.Where(s => s.SensorId is "I7" or "I16").Select(s => s.SensorId).ToArray());
 
-        // No SensorConfiguration and no scanOrder may exist for a gap position.
-        Assert.DoesNotContain(result.Sensors, s => s.SensorId == "I7" || s.SensorId == "I16");
-        Assert.All(gaps, g => Assert.Equal(LogicalPositionKind.NON_SENSOR_GAP, g.PositionKind));
+        var i7 = result.Sensors.Single(s => s.SensorId == "I7");
+        Assert.Equal(79, i7.ScanOrder);
+        Assert.Equal(Wall.REAR, i7.Wall);
+        Assert.Equal(5, i7.LogicalRow);
+        Assert.Equal(7, i7.LogicalColumn);
+        Assert.Equal(3, i7.WallColumn);
+        Assert.True(i7.Enabled);
+        Assert.Equal(15 + (79 % 10), i7.DiffLowerBound);
+        Assert.Equal("WJ1", i7.AssignedWaterJetId);
+        Assert.Equal("IV1", i7.AssignedIsolationValveId);
+
+        var i16 = result.Sensors.Single(s => s.SensorId == "I16");
+        Assert.Equal(88, i16.ScanOrder);
+        Assert.Equal(Wall.FRONT, i16.Wall);
+        Assert.Equal(16, i16.LogicalColumn);
+        Assert.Equal(3, i16.WallColumn);
+        Assert.True(i16.Enabled);
+        Assert.Equal("WJ3", i16.AssignedWaterJetId);
+        Assert.Equal("IV3", i16.AssignedIsolationValveId);
+
+        // The gap-anchor property no longer exists on any canonical record.
+        Assert.DoesNotContain(typeof(LogicalPositionRecord).GetProperties(), p => p.Name == "GapAnchorForWaterJetId");
+        Assert.DoesNotContain(typeof(WallMapSlot).GetProperties(), p => p.Name == "GapAnchorForWaterJetId");
     }
 
     // ---- T3 ------------------------------------------------------------------
 
     [Fact]
-    public void ScanOrder_Is_Dense_1_To_106_Skips_Gaps_And_OrderTotal_Stays_0_To_107()
+    public void ScanOrder_Is_Dense_1_To_108_In_Ordinal_Order_And_OrderTotal_Stays_0_To_107()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
         Assert.Equal(
-            Enumerable.Range(1, 106).ToArray(),
+            Enumerable.Range(1, 108).ToArray(),
             result.Sensors.Select(s => s.ScanOrder).ToArray());
 
         Assert.Equal(
             Enumerable.Range(0, 108).ToArray(),
             result.LogicalPositions.Select(p => p.OrderTotal).ToArray());
 
-        // The sensor sequence skips I7 and I16: their neighbours I6 and I8 are consecutive.
+        Assert.Equal(
+            CanonicalSensorMap.SensorSequence.ToArray(),
+            result.Sensors.Select(s => s.SensorId).ToArray());
+
+        // I7 and I16 sit in their normal ordinal position: I6, I7, I8 and I15, I16, I17 are consecutive.
         var i6 = result.Sensors.Single(s => s.SensorId == "I6");
+        var i7 = result.Sensors.Single(s => s.SensorId == "I7");
         var i8 = result.Sensors.Single(s => s.SensorId == "I8");
-        Assert.Equal(i6.ScanOrder + 1, i8.ScanOrder);
+        Assert.Equal(i6.ScanOrder + 1, i7.ScanOrder);
+        Assert.Equal(i7.ScanOrder + 1, i8.ScanOrder);
+        var i15 = result.Sensors.Single(s => s.SensorId == "I15");
+        var i16 = result.Sensors.Single(s => s.SensorId == "I16");
+        var i17 = result.Sensors.Single(s => s.SensorId == "I17");
+        Assert.Equal(i15.ScanOrder + 1, i16.ScanOrder);
+        Assert.Equal(i16.ScanOrder + 1, i17.ScanOrder);
     }
 
     // ---- T4 / T5 ---------------------------------------------------------------
@@ -143,9 +173,9 @@ public sealed class SensorParameterMigrationTests
         WaterJetPlacementKind Kind, string[] Anchors, Wall TargetWall, Region TargetRegion, string Valve)[]
         ApprovedTopology =
         [
-            ("WJ1", Wall.FRONT, Region.LOWER, WaterJetPlacementKind.NON_SENSOR_GAP, ["I15", "I17"], Wall.REAR, Region.LOWER, "IV1"),
+            ("WJ1", Wall.FRONT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.REAR, Region.LOWER, "IV1"),
             ("WJ2", Wall.LEFT, Region.LOWER, WaterJetPlacementKind.BETWEEN_HORIZONTAL, ["J2", "J3"], Wall.RIGHT, Region.LOWER, "IV2"),
-            ("WJ3", Wall.REAR, Region.LOWER, WaterJetPlacementKind.NON_SENSOR_GAP, ["I6", "I8"], Wall.FRONT, Region.LOWER, "IV3"),
+            ("WJ3", Wall.REAR, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.LOWER, "IV3"),
             ("WJ4", Wall.RIGHT, Region.LOWER, WaterJetPlacementKind.BETWEEN_HORIZONTAL, ["J11", "J12"], Wall.LEFT, Region.LOWER, "IV4"),
             ("WJ5", Wall.FRONT, Region.UPPER, WaterJetPlacementKind.BETWEEN_VERTICAL, ["G+216", "G+116"], Wall.REAR, Region.UPPER, "IV5"),
             ("WJ6", Wall.LEFT, Region.UPPER, WaterJetPlacementKind.JUNCTION, ["G+102", "G+202", "G+203"], Wall.RIGHT, Region.UPPER, "IV6"),
@@ -391,19 +421,17 @@ public sealed class SensorParameterMigrationTests
             Assert.Equal(position.LogicalId, s.SensorId);
         });
 
-        // The gap rows' sensorname values remain the logicalId values of NON_SENSOR_GAP
-        // positions and never create a SensorConfiguration. The importer's canonical
-        // order is numeric structured order by order_total — I7 (78) before I16 (87) —
-        // never lexicographic id order (which would put I16 first).
-        var gapPositions = result.LogicalPositions
-            .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
+        // The importer's canonical order is numeric structured order by order_total — I7
+        // (order_total 78, scanOrder 79) before I16 (order_total 87, scanOrder 88) — never
+        // lexicographic id order (which would put I16 first). Both are Sensor rows.
+        var corrected = result.LogicalPositions
+            .Where(p => p.LogicalId is "I7" or "I16")
             .ToArray();
-        Assert.Equal(
-            ExpectedNonSensorGapLogicalIds,
-            gapPositions.Select(p => p.LogicalId).ToArray());
-        Assert.Equal(78, gapPositions[0].OrderTotal);
-        Assert.Equal(87, gapPositions[1].OrderTotal);
-        Assert.DoesNotContain(result.Sensors, s => s.SensorId is "I7" or "I16");
+        Assert.Equal(ExpectedCorrectedSensorIds, corrected.Select(p => p.LogicalId).ToArray());
+        Assert.Equal(78, corrected[0].OrderTotal);
+        Assert.Equal(87, corrected[1].OrderTotal);
+        Assert.Equal(79, result.Sensors.Single(s => s.SensorId == "I7").ScanOrder);
+        Assert.Equal(88, result.Sensors.Single(s => s.SensorId == "I16").ScanOrder);
     }
 
     // ---- T15 -----------------------------------------------------------------
@@ -448,7 +476,7 @@ public sealed class SensorParameterMigrationTests
             .Where(w => w.Code == MigrationRefusalCodes.MigrationUnitUnverified)
             .ToArray();
         Assert.Equal(ExpectedUnitWarnings, unitWarnings.Length);
-        Assert.Equal(106 - ExpectedUnitWarnings, result.Sensors.Count(s => s.MinTimeAllowAddToQueueRaw is null));
+        Assert.Equal(108 - ExpectedUnitWarnings, result.Sensors.Count(s => s.MinTimeAllowAddToQueueRaw is null));
 
         // DEFER fields are carried raw with no canonical attribute anywhere.
         Assert.All(result.Sensors, s =>
@@ -540,23 +568,19 @@ public sealed class SensorParameterMigrationTests
     // ---- T19 (semantic replacement: imported output + public kinds, no source text)
 
     [Fact]
-    public void Canonical_Output_Contains_Only_Sensor_And_NonSensorGap_Positions()
+    public void Canonical_Output_Contains_Only_Sensor_Positions()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
-        // I7 and I16 are NON_SENSOR_GAP positions in the importer's canonical orderTotal
-        // order, and neither yields a SensorConfiguration.
-        var gapPositions = result.LogicalPositions
-            .Where(p => p.PositionKind == LogicalPositionKind.NON_SENSOR_GAP)
-            .ToArray();
-        Assert.Equal(
-            ExpectedNonSensorGapLogicalIds,
-            gapPositions.Select(p => p.LogicalId).ToArray());
-        Assert.DoesNotContain(result.Sensors, s => s.SensorId is "I7" or "I16");
+        // Every logical position is a Sensor position in canonical orderTotal order, and
+        // every one of them (I7 and I16 included) yields exactly one SensorConfiguration.
+        Assert.Equal(108, result.LogicalPositions.Count(p => p.PositionKind == LogicalPositionKind.SENSOR));
+        Assert.Single(result.Sensors, s => s.SensorId == "I7");
+        Assert.Single(result.Sensors, s => s.SensorId == "I16");
 
-        // The canonical kind vocabulary is exactly SENSOR and NON_SENSOR_GAP: the
-        // Runtime's transitional SlotType representation is not part of the canonical
-        // output vocabulary.
+        // The canonical kind vocabulary is exactly SENSOR: the superseded NON_SENSOR_GAP
+        // member and the Runtime's former transitional SlotType representation are not part
+        // of the canonical output vocabulary.
         Assert.Equal(
             ExpectedLogicalPositionKindNames,
             Enum.GetNames<LogicalPositionKind>());
@@ -592,29 +616,27 @@ public sealed class SensorParameterMigrationTests
     // ---- T20 (semantic replacement: compiled public types, no source text) ----
 
     [Fact]
-    public void Runtime_Vocabulary_Is_Migrated_To_NonSensorGap_With_No_Transitional_Type_Left()
+    public void Runtime_Vocabulary_Is_Sensor_Only_With_No_Gap_Or_Transitional_Type_Left()
     {
-        // Checkpoint C completed the atomic migration: the canonical position
-        // vocabulary is exactly SENSOR and NON_SENSOR_GAP (order matters: the
-        // enumeration declares SENSOR first), the two NON_SENSOR_GAP positions are
-        // I7 anchoring WJ3 and I16 anchoring WJ1, and the former transitional
-        // CANNON slot vocabulary no longer exists as compiled public surface —
-        // no alias connects it to the canonical vocabulary.
+        // Owner critical topology correction: the canonical position vocabulary is exactly
+        // SENSOR; the superseded NON_SENSOR_GAP member, the gap-anchor property and the former
+        // transitional CANNON slot vocabulary no longer exist as compiled public surface — no
+        // alias connects any of them to the canonical vocabulary.
         var kindNames = Enum.GetNames<LogicalPositionKind>();
-        Assert.Equal(2, kindNames.Length);
+        Assert.Single(kindNames);
         Assert.Equal("SENSOR", kindNames[0]);
-        Assert.Equal("NON_SENSOR_GAP", kindNames[1]);
 
-        var nonSensorGapCount = CanonicalSensorMap.NonSensorGapCount;
-        Assert.Equal(2, nonSensorGapCount);
-        Assert.Equal(("I7", "WJ3", 5, 7), CanonicalSensorMap.NonSensorGapSlots[0]);
-        Assert.Equal(("I16", "WJ1", 5, 16), CanonicalSensorMap.NonSensorGapSlots[1]);
+        Assert.Equal(108, CanonicalSensorMap.SensorLocations);
+        Assert.Equal(216, CanonicalSensorMap.ThermocoupleChannelCount);
+        Assert.Equal(240, CanonicalSensorMap.PhysicalThermocoupleChannelCount);
+        Assert.Equal(24, CanonicalSensorMap.UnassignedThermocoupleChannelCount);
+        Assert.Equal(ExpectedCorrectedSensorIds, CanonicalSensorMap.CorrectedSensorIds.ToArray());
+        Assert.DoesNotContain(typeof(CanonicalSensorMap).GetMembers(), m => m.Name.Contains("NonSensorGap", StringComparison.Ordinal));
 
         var wallMapSlotProperties = typeof(WallMapSlot).GetProperties();
         Assert.Contains(wallMapSlotProperties, p => p.Name == "PositionKind");
-        Assert.Contains(wallMapSlotProperties, p => p.Name == "GapAnchorForWaterJetId");
         var transitionalProperties = wallMapSlotProperties
-            .Where(p => p.Name is "SlotType" or "EquipmentId")
+            .Where(p => p.Name is "SlotType" or "EquipmentId" or "GapAnchorForWaterJetId")
             .ToArray();
         Assert.Empty(transitionalProperties);
 
@@ -623,6 +645,48 @@ public sealed class SensorParameterMigrationTests
             .Where(t => t.Name == "SlotType")
             .ToArray();
         Assert.Empty(transitionalTypes);
+    }
+
+    // ---- Owner Sensor Disable ruling: enable token at import ------------------------
+
+    [Fact]
+    public void Empty_Enable_Token_Defaults_To_Enabled_With_A_Recorded_Warning()
+    {
+        var row = SyntheticSensorParameterCsv.RowOfLogicalId("I7");
+        var result = AcceptedResult(SyntheticSensorParameterCsv.WithCell(row, 10, string.Empty));
+
+        var i7 = result.Sensors.Single(s => s.SensorId == "I7");
+        Assert.True(i7.Enabled);
+        var defaulted = result.Warnings.Where(w => w.Code == MigrationRefusalCodes.MigrationEnableDefaulted).ToArray();
+        Assert.Single(defaulted);
+        Assert.Equal(i7.LegacyRecordId, defaulted[0].LegacyRecordId);
+        Assert.Equal("sensor_enable", defaulted[0].Field);
+    }
+
+    [Fact]
+    public void Explicit_Disabled_Token_On_I16_Imports_As_Disabled_Like_Any_Other_Sensor()
+    {
+        var row = SyntheticSensorParameterCsv.RowOfLogicalId("I16");
+        var result = AcceptedResult(SyntheticSensorParameterCsv.WithCell(row, 10, "DISABLED"));
+
+        Assert.False(result.Sensors.Single(s => s.SensorId == "I16").Enabled);
+        Assert.Equal(ExpectedDisabledSensors + 1, result.Sensors.Count(s => !s.Enabled));
+        Assert.Equal(108, result.Sensors.Count);
+        Assert.Null(TopologyValidator.Validate(result));
+    }
+
+    [Fact]
+    public void Unknown_Enable_Token_On_I7_Refuses_Like_Any_Other_Sensor()
+    {
+        var row = SyntheticSensorParameterCsv.RowOfLogicalId("I7");
+        Assert.Equal(MigrationRefusalCodes.MigrationFieldToken, RefusalCodeOf(SyntheticSensorParameterCsv.WithCell(row, 10, "MAYBE")));
+    }
+
+    [Fact]
+    public void Missing_I16_Row_Refuses_With_Position_Count_Not_As_A_Tolerated_Gap()
+    {
+        var csv = SyntheticSensorParameterCsv.WithoutRow(SyntheticSensorParameterCsv.RowOfLogicalId("I16"));
+        Assert.Equal(MigrationRefusalCodes.TopoPositionCount, RefusalCodeOf(csv));
     }
 
     // ---- warning bookkeeping ---------------------------------------------------
@@ -789,16 +853,60 @@ public sealed class TopologyValidatorTests
     }
 
     [Fact]
-    public void Broken_Gap_Anchor_Refuses()
+    public void Corrupted_Position_Identity_Refuses_With_Sensor_Identity()
     {
         var accepted = AcceptedResult();
         var mutated = accepted with
         {
             LogicalPositions = accepted.LogicalPositions
-                .Select(p => p.LogicalId == "I16" ? p with { GapAnchorForWaterJetId = "WJ2" } : p)
+                .Select(p => p.LogicalId == "I16" ? p with { LogicalId = "I16X" } : p)
                 .ToArray(),
         };
-        Assert.Equal(MigrationRefusalCodes.TopoGapIdentity, RefusalCodeOf(mutated));
+        Assert.Equal(MigrationRefusalCodes.TopoSensorIdentity, RefusalCodeOf(mutated));
+    }
+
+    [Fact]
+    public void Sensor_Without_A_Logical_Position_Refuses_With_Sensor_Identity()
+    {
+        var accepted = AcceptedResult();
+        var mutated = accepted with
+        {
+            Sensors = accepted.Sensors
+                .Select(s => s.SensorId == "I7" ? s with { SensorId = "WJ9" } : s)
+                .ToArray(),
+        };
+        Assert.Equal(MigrationRefusalCodes.TopoSensorIdentity, RefusalCodeOf(mutated));
+    }
+
+    [Fact]
+    public void Anchors_On_An_Unresolved_Placement_Refuse()
+    {
+        var accepted = AcceptedResult();
+        var mutated = accepted with
+        {
+            WaterJets = accepted.WaterJets
+                .Select(w => w.WaterJetId == "WJ3" ? w with { PlacementAnchors = ["I6", "I8"] } : w)
+                .ToArray(),
+        };
+        Assert.Equal(MigrationRefusalCodes.TopoTargetWallContradiction, RefusalCodeOf(mutated));
+    }
+
+    [Fact]
+    public void Invariant_Violation_Code_Is_Distinct_And_Central_Check_Accepts_The_Result()
+    {
+        var accepted = AcceptedResult();
+        Assert.Equal("TOPO_INVARIANT_VIOLATION", MigrationRefusalCodes.TopoInvariantViolation);
+        Assert.Empty(TopologyInvariants.Check(new TopologyObservation
+        {
+            SensorSequence = accepted.Sensors.Select(s => s.SensorId).ToArray(),
+            FrontMeasurementSensorIds = accepted.Sensors.Select(s => s.SensorId).ToArray(),
+            RearMeasurementSensorIds = accepted.Sensors.Select(s => s.SensorId).ToArray(),
+            AssignedMeasurementCount = accepted.Sensors.Count * 2,
+            PhysicalChannelCount = CanonicalSensorMap.PhysicalThermocoupleChannelCount,
+            UnassignedChannelCount = CanonicalSensorMap.PhysicalThermocoupleChannelCount - (accepted.Sensors.Count * 2),
+            SensorsPerWall = accepted.Sensors.GroupBy(s => s.Wall).ToDictionary(g => g.Key, g => g.Count()),
+            RuntimeSensorCount = accepted.LogicalPositions.Count,
+        }));
     }
 
     [Fact]

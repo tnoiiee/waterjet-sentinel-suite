@@ -667,6 +667,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         var head = candidate.Queue[0];
         return !string.IsNullOrWhiteSpace(head.SourceReason)
             && head.SecondsSinceLastClean >= 0
+            && !candidate.IsSensorDisabled(head.SensorId)
             && SequencingTopology.StructuralRefusal(_scenarioTopology, head.SensorId) is null;
     }
 

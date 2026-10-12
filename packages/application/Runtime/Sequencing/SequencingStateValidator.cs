@@ -46,6 +46,12 @@ internal static class SequencingStateValidator
     internal const string JobDispatchSeqInvalid = "JOB_DISPATCH_SEQ_INVALID";
     internal const string JobTargetStillQueued = "JOB_TARGET_STILL_QUEUED";
 
+    // Sensor Enable / Disable (Owner Sensor Disable ruling). A Disabled Sensor can never be
+    // represented inside the queue; the kernel removes it at the disable transition.
+    internal const string DisabledSensorIdBlank = "DISABLED_SENSOR_ID_BLANK";
+    internal const string DisabledSensorIdDuplicate = "DISABLED_SENSOR_ID_DUPLICATE";
+    internal const string QueueEntrySensorDisabled = "QUEUE_ENTRY_SENSOR_DISABLED";
+
     // CP-2 Job violations.
     internal const string JobLifecycleUndefined = "JOB_LIFECYCLE_UNDEFINED";
     internal const string JobStageUndefined = "JOB_STAGE_UNDEFINED";
@@ -117,6 +123,25 @@ internal static class SequencingStateValidator
             if (!sensorIds.Add(entry.SensorId))
             {
                 return QueueSensorDuplicate;
+            }
+        }
+
+        var disabledIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var disabledId in state.DisabledSensorIds)
+        {
+            if (IsBlank(disabledId))
+            {
+                return DisabledSensorIdBlank;
+            }
+
+            if (!disabledIds.Add(disabledId))
+            {
+                return DisabledSensorIdDuplicate;
+            }
+
+            if (sensorIds.Contains(disabledId))
+            {
+                return QueueEntrySensorDisabled;
             }
         }
 

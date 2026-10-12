@@ -28,10 +28,10 @@ public sealed record OperationalSnapshot
     /// <summary>The active device profile, displayed in the chrome (ADR-0012 no-silent-substitution).</summary>
     public required DeviceProfile DeviceProfile { get; init; }
 
-    /// <summary>108 logical slots: 106 SENSOR + 2 NON_SENSOR_GAP. Static; Snapshot-only; never in a Delta.</summary>
+    /// <summary>108 logical slots, all SENSOR (I7 and I16 included; Owner critical topology correction). Static; Snapshot-only; never in a Delta.</summary>
     public required IReadOnlyList<WallMapSlot> WallMap { get; init; }
 
-    /// <summary>All 106 Sensor projections, ordered by ScanOrder.</summary>
+    /// <summary>All 108 Sensor projections, ordered by ScanOrder 1–108.</summary>
     public required IReadOnlyList<SensorPresentationState> Sensors { get; init; }
 
     /// <summary>

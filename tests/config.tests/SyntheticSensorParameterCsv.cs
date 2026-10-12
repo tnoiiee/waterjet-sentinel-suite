@@ -20,9 +20,14 @@ namespace Wjss.Config.Tests;
 /// the prohibited transport vocabulary (boundary S3).
 ///
 /// Derivations used by the default fixture (stable, asserted by tests):
-/// scanOrder s ∈ 1..106 → dirty bounds 15+(s%10) .. 65+(s%10); threshold 55+(s%20);
+/// scanOrder s ∈ 1..108 → dirty bounds 15+(s%10) .. 65+(s%10); threshold 55+(s%20);
 /// enabled = s%17 ≠ 0; cleaningCount = s%4; lastclean non-empty for even s;
-/// min_time "120" when s%3 = 0; acquisition tokens on every SENSOR row.
+/// min_time "120" when s%3 = 0; acquisition tokens on every row.
+///
+/// Owner critical topology correction (Stage 0.4C-K3): I7 and I16 are normal Product
+/// Sensors, so every one of the 108 rows is a Sensor row with the same formulas (the former
+/// zero-filled "gap rows" are withdrawn). <c>tools/migrated-example/generate.mjs</c> mirrors
+/// the same formulas for the committed migrated example.
 /// </summary>
 internal static class SyntheticSensorParameterCsv
 {
@@ -45,7 +50,7 @@ internal static class SyntheticSensorParameterCsv
         IpHeader, "channel_pair", BaseAddressHeader, "latest_updateparams_timestamp",
     ];
 
-    /// <summary>The default fixture: header plus all 108 logical-position rows (106 Sensors + I7 + I16).</summary>
+    /// <summary>The default fixture: header plus all 108 Sensor rows (I7 and I16 included).</summary>
     public static string Build() => ToCsv(BuildRows());
 
     /// <summary>Default fixture rows (header first) for per-test mutation.</summary>
@@ -70,20 +75,7 @@ internal static class SyntheticSensorParameterCsv
             wallOrdinal[wall] = wallOrdinal.TryGetValue(wall, out var current) ? current + 1 : 1;
             var recordId = $"SYN-REC-{orderTotal:000}";
 
-            if (logicalId is "I7" or "I16")
-            {
-                // NON_SENSOR_GAP row: identity and layout only; placeholder-like sensor
-                // fields are rejected from import (REJECT FOR I7/I16).
-                yield return
-                [
-                    recordId, logicalId, wall.ToString(), wallOrdinal[wall].ToString(CultureInfo.InvariantCulture),
-                    orderTotal.ToString(CultureInfo.InvariantCulture), "0", "0", "0", "0", "0", "0",
-                    string.Empty, string.Empty, string.Empty, string.Empty,
-                    string.Empty, string.Empty, string.Empty, string.Empty,
-                ];
-                continue;
-            }
-
+            // Every row (I7 and I16 included) is a normal Sensor row.
             scanOrder++;
             var lower = 15 + (scanOrder % 10);
             var region = WaterJetTopologyCatalog.RegionForLogicalRow(logicalRow);
