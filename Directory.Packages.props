@@ -19,7 +19,13 @@
 
     Still not added: coverlet, a third-party logging provider, a validation
     library, and any database or physical-transport vendor package (the S3 list
-    in tools/boundary-scan is the machine check of this rule).
+    in tools/boundary-scan is the machine check of this rule). This checkpoint
+    adds the physical TC field-network read-only transport for the Library
+    Selection Gate: FluentModbus 5.3.2 (MIT, netstandard2.0, compatible with
+    net10.0) as the approved Modbus TCP client candidate; NModbus 3.0.83 was
+    evaluated and rejected (see ADR-0018). Transitive closure of FluentModbus
+    5.3.2 on netstandard2.0 is pinned explicitly because CentralPackage
+    TransitivePinning is enabled.
   -->
 
   <PropertyGroup>
@@ -38,6 +44,13 @@
       so this pin stays the single source of the version.
     -->
     <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <!-- Physical TC read-only Modbus TCP client (Library Selection Gate, ADR-0018). -->
+    <PackageVersion Include="FluentModbus" Version="5.3.2" />
+    <!-- Transitive closure of FluentModbus 5.3.2 (netstandard2.0) — pinned because CentralPackageTransitivePinningEnabled=true -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="System.IO.Ports" Version="8.0.0" />
+    <PackageVersion Include="System.Memory" Version="4.5.5" />
+    <PackageVersion Include="System.Runtime.CompilerServices.Unsafe" Version="6.0.0" />
   </ItemGroup>
 
 </Project>

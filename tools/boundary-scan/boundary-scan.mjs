@@ -26,6 +26,7 @@
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, posix, relative } from 'node:path';
 import { isS2ExceptionAddress } from './s2Exception.mjs';
+import { isS3Exception } from './s3Exception.mjs';
 
 const ROOT = process.argv[2] ?? process.cwd();
 
@@ -161,6 +162,7 @@ for (const { rel, full, dir } of walk(ROOT)) {
       const lower = line.toLowerCase();
       for (const term of VENDOR_TERMS) {
         if (lower.includes(term)) {
+          if (isS3Exception(rel, term)) continue;
           findings.push({ rule: 'S3', at, why: `vendor/transport term '${term}' in Product tree` });
         }
       }
