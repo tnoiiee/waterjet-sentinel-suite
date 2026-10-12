@@ -785,9 +785,17 @@ function renderTcAcquisitionEvidence() {
 
   const p = view.decisions.protocol;
   const port = view.decisions.port;
+  const note = p.evidenceNote;
   decisions.append(definitionList([
     ['Protocol decision', p.status],
-    ['Protocol candidate', p.candidateRef ? `${p.candidateRef} (${p.candidateStatus}) - named by ${p.candidateNamedBy.join(' + ')}; applicability ${p.applicabilityToHeadStation}; session semantics ${p.sessionSemantics}` : 'none recorded'],
+    ['Protocol evidence status', p.evidenceStatus],
+    ['Protocol candidate status', `${p.candidateStatus}${p.candidateRetained ? '' : ' - no candidate is retained; no protocol is inferred from the device family'}`],
+    ['Protocol source completeness', p.sourceCompleteness],
+    ['Non-authoritative evidence note', note
+      ? `${note.reference} Original document readable in this review: ${note.originalDocumentReadableInCurrentReview ? 'yes' : 'no'}; committed profile section truncated: ${note.committedProfileSectionTruncated ? 'yes' : 'no'}; `
+        + `as-installed applicability verified: ${note.asInstalledApplicabilityVerified ? 'yes' : 'no'}; firmware verified: ${note.firmwareVerified ? 'yes' : 'no'}; configuration verified: ${note.configurationVerified ? 'yes' : 'no'}; `
+        + `port resolved: ${note.portResolved ? 'yes' : 'no'}; candidate retained: ${note.protocolCandidateRetained ? 'yes' : 'no'}; adapter authorized: ${note.adapterAuthorized ? 'yes' : 'no'}; acquisition authorized: ${note.acquisitionAuthorized ? 'yes' : 'no'}.`
+      : 'none'],
     ['Approved for a Test adapter', p.approvedForTestAdapter ? 'yes' : `no - Owner approval ${p.ownerApproval}`],
     ['Protocol activated', p.activated ? 'yes' : 'no'],
     ['Port decision', port.status],
@@ -811,9 +819,11 @@ function renderTcAcquisitionEvidence() {
   const byClass = Object.entries(view.claimSummary.byClass).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(' · ');
   sources.append(el('p', { class: 'note' }, `${view.totals.claims} classified claims: ${byClass}.`));
   sources.append(el('table', { id: 'tc-evidence-sources-table' }, [
-    el('thead', {}, [el('tr', {}, ['Source', 'Kind', 'Revision', 'Availability in session', 'Hash'].map((h) => el('th', { scope: 'col' }, h)))]),
+    el('thead', {}, [el('tr', {}, ['Source', 'Kind', 'Revision', 'Availability in session', 'Connected storage', 'Content', 'Evidence status', 'Readable in this review', 'Hash'].map((h) => el('th', { scope: 'col' }, h)))]),
     el('tbody', {}, view.sources.map((s) => el('tr', {}, [
       el('td', {}, s.title), el('td', {}, s.kind), el('td', {}, s.revision ?? 'NOT PROVIDED'), el('td', {}, s.availability),
+      el('td', {}, s.storageAccess ?? 'n/a'), el('td', {}, s.contentRetrieval ?? 'n/a'), el('td', {}, s.evidenceStatus ?? 'n/a'),
+      el('td', {}, s.readableInCurrentReview === true ? 'yes' : s.readableInCurrentReview === 'TRUNCATED' ? 'TRUNCATED' : 'no'),
       el('td', {}, s.hashRecorded ? `recorded (${s.hashBasis})` : 'none'),
     ]))),
   ]));
@@ -822,27 +832,22 @@ function renderTcAcquisitionEvidence() {
     ['Byte order', withCandidate(view.statuses.byteOrder)],
     ['Word order', withCandidate(view.statuses.wordOrder)],
     ['Encoding', withCandidate(view.statuses.encoding)],
-    ['Wire-break decoding', `${evidenceStatus(view.statuses.wireBreakDecoding.status)} - ${view.statuses.wireBreakDecoding.provided.length} of ${view.statuses.wireBreakDecoding.requiredEvidence.length} required evidence items provided; the Preview scenario is synthetic`],
+    ['Wire-break decoding', `${evidenceStatus(view.statuses.wireBreakDecoding.status)} - evidence classification ${view.statuses.wireBreakDecoding.evidenceClassification}; source completeness ${view.statuses.wireBreakDecoding.sourceCompleteness}; `
+      + `Hardware observation ${view.statuses.wireBreakDecoding.hardwareObservationStatus}; physical decoder implemented: ${view.statuses.wireBreakDecoding.physicalDecoderImplemented ? 'yes' : 'no'}; `
+      + `${view.statuses.wireBreakDecoding.provided.length} of ${view.statuses.wireBreakDecoding.requiredEvidence.length} required evidence items provided`],
+    ['Wire-break evidence record', view.statuses.wireBreakDecoding.evidenceRecord
+      ? `Manufacturer document transcription (Stage 0B): ${view.statuses.wireBreakDecoding.evidenceRecord.manufacturerDocumentTranscription.join('; ')}. Reviewer paraphrase: ${view.statuses.wireBreakDecoding.evidenceRecord.reviewerParaphrase.join('; ')}. `
+        + `As-installed configuration: ${view.statuses.wireBreakDecoding.evidenceRecord.asInstalledConfiguration}. Field observation: ${view.statuses.wireBreakDecoding.evidenceRecord.fieldObservation}. Ambiguity: ${view.statuses.wireBreakDecoding.evidenceRecord.ambiguity}.`
+      : 'none'],
   ]));
 
   const c = view.processImageCandidate;
-  if (c.state === 'CANDIDATE_DERIVED') {
-    image.append(el('p', { class: 'note' },
-      `Derived from ${c.basisClaimIds.join(', ')}: ${c.perNodeInputWords} candidate input words per Node (${c.perNodeInputBits} bits), identical for all six Nodes as drawn. `
-      + `Status ${c.candidateStatus}; address ${evidenceStatus(c.addressStatus)}; overlap ${c.overlap ? 'DETECTED' : 'none'}; authoritative no; activation possible no.`));
-    image.append(el('table', { id: 'tc-evidence-candidate-table' }, [
-      el('thead', {}, [el('tr', {}, ['Rack slot', 'Role', 'Model', 'Drawing tag', 'Process module position', 'Process image order', 'Channels', 'Candidate words'].map((h) => el('th', { scope: 'col' }, h)))]),
-      el('tbody', {}, [
-        ...c.nonProcessModules.filter((m) => m.rackSlot === 0).map((m) => el('tr', {}, [m.rackSlot, m.role, m.model, m.drawingTag, 'n/a', 'n/a', '0', 'none (no process data)'].map((v) => el('td', {}, String(v))))),
-        ...c.modules.map((m) => el('tr', {}, [m.rackSlot, m.role, m.model, m.drawingTag, m.processModulePosition, m.processImageOrder, m.channelCount, `${m.startWord}-${m.endWord} (${m.words} words, ${m.candidateStatus})`].map((v) => el('td', {}, String(v))))),
-        ...c.nonProcessModules.filter((m) => m.rackSlot !== 0).map((m) => el('tr', {}, [m.rackSlot, m.role, m.model, m.drawingTag, 'n/a', 'n/a', '0', 'none (no process data)'].map((v) => el('td', {}, String(v))))),
-      ]),
-    ]));
-    if (view.scheduleConsistency) {
-      image.append(el('p', { class: 'note' }, `Schedule consistency: ${view.scheduleConsistency.compared} rows compared, ${view.scheduleConsistency.mismatches} mismatches - ${view.scheduleConsistency.meaning}.`));
-    }
-  } else {
-    image.append(el('p', { class: 'note' }, `Derivation blocked; address ${evidenceStatus(c.addressStatus)}. Blockers: ${c.blockers.join('; ')}.`));
+  // Owner ruling (PR #21): while derivation is blocked, no module, word, start, end, offset or range is
+  // rendered. The only arithmetic shown is RECORD_TO_RECORD_CONSISTENCY_ONLY, classified literally.
+  image.append(el('p', { class: 'note' }, `Process image: DERIVATION BLOCKED (${c.state}); address ${evidenceStatus(c.addressStatus)}; authoritative no; activation possible no. Blockers: ${c.blockers.join('; ')}.`));
+  const rr = view.recordToRecordConsistency;
+  if (rr) {
+    image.append(el('p', { class: 'note' }, `${rr.classification}: ${rr.compared} schedule rows compared with the repository profile numbers, ${rr.mismatches} mismatches. Meaning: ${rr.meaning.join('; ')}.`));
   }
   image.append(el('p', { class: 'note' }, `Verification blockers: ${c.verificationBlockers.join('; ')}.`));
 

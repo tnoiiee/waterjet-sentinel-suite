@@ -65,7 +65,7 @@ test('G: every status is written as text with its code: unresolved port and prot
   assert.deepEqual(rowFor('Reachability'), Array(6).fill('NOT TESTED (REACHABILITY_NOT_TESTED)'));
   assert.deepEqual(rowFor('Acquisition'), Array(6).fill('NOT IMPLEMENTED (ACQUISITION_NOT_IMPLEMENTED)'));
   assert.deepEqual(rowFor('Communication state'), Array(6).fill('CONFIGURED, NOT TESTED (CONFIGURED_NOT_TESTED)'));
-  assert.deepEqual(rowFor('Process image'), Array(6).fill('CANDIDATE, UNVERIFIED (PROCESS_IMAGE_CANDIDATE_UNVERIFIED)'));
+  assert.deepEqual(rowFor('Process image'), Array(6).fill('DERIVATION BLOCKED (PROCESS_IMAGE_DERIVATION_BLOCKED)'));
   assert.deepEqual(rowFor('Byte order'), Array(6).fill('UNRESOLVED (BYTE_ORDER_UNRESOLVED)'));
   assert.deepEqual(rowFor('Word order'), Array(6).fill('UNRESOLVED (WORD_ORDER_UNRESOLVED)'));
   assert.deepEqual(rowFor('Wire-break decoding'), Array(6).fill('DECODING BLOCKED (WIRE_BREAK_DECODING_BLOCKED)'));
@@ -76,12 +76,21 @@ test('G: every status is written as text with its code: unresolved port and prot
   const everything = containers().map(allText).join(' ') + containers().map((c) => c.textContent ?? '').join(' ');
   assert.equal(/\b(ONLINE|ONLINE_READ_ONLY|COMMUNICATION_LOSS|RECONNECTING|CONNECTING)\b/.test(rowFor('Communication state').join(' ')), false);
   assert.equal(/\b502\b/.test(everything), false, 'no port number appears anywhere in the section');
+  // Owner ruling (PR #21): no candidate reference, no word range and no connector-derived archive identity anywhere in the section.
+  assert.equal(/PROCESS_IMAGE_CANDIDATE_UNVERIFIED|CANDIDATE, UNVERIFIED/.test(everything), false);
+  assert.equal(/TC-K3-PROTOCOL-CANDIDATE|OWNER_SOURCE_LOCATED/.test(everything), false);
+  assert.equal(/\b(0-7|8-15|16-23|24-31|32-39)\b|startWord|endWord|40 candidate input words/.test(everything), false, 'no word range or start');
+  assert.equal(/WJSS_TC_EVIDENCE_BASELINE_REV1|17345849|17 345 849|2807f158ced9a984dea288e5ab30e2d8|\.zip|Drive/.test(everything), false, 'no archive identity');
 });
 
-test('G: the decision block shows PROTOCOL_UNRESOLVED with the unapproved candidate reference, PORT_UNRESOLVED with no default, and pending freshness thresholds', () => {
+test('G: the decision block shows PROTOCOL_UNRESOLVED, Owner evidence pending, candidate WITHDRAWN, completeness insufficient, the seven-point note, PORT_UNRESOLVED with no default, and pending freshness thresholds', () => {
   const text = allText(app.byId['tc-evidence-decisions']);
   assert.match(text, /Protocol decision PROTOCOL_UNRESOLVED/);
-  assert.match(text, /TC-K3-PROTOCOL-CANDIDATE-01 \(PROTOCOL_CANDIDATE\) - named by DRAWING_EVIDENCE \+ MANUFACTURER_EVIDENCE/);
+  assert.match(text, /Protocol evidence status OWNER_EVIDENCE_PENDING/);
+  assert.match(text, /Protocol candidate status WITHDRAWN - no candidate is retained; no protocol is inferred from the device family/);
+  assert.match(text, /Protocol source completeness SOURCE_COMPLETENESS_INSUFFICIENT/);
+  assert.match(text, /Non-authoritative evidence note .*transcribed in Stage 0B.*NOT retained as a candidate\. Original document readable in this review: no; committed profile section truncated: yes; as-installed applicability verified: no; firmware verified: no; configuration verified: no; port resolved: no; candidate retained: no; adapter authorized: no; acquisition authorized: no\./);
+  assert.equal(/named by|candidate reference|\(PROTOCOL_CANDIDATE\)/.test(text), false, 'no candidate is named; vendor and transport vocabulary is enforced by the boundary scan (S3)');
   assert.match(text, /Approved for a Test adapter no - Owner approval OWNER_INPUT_PENDING/);
   assert.match(text, /Protocol activated no/);
   assert.match(text, /Port decision PORT_UNRESOLVED/);
@@ -97,29 +106,30 @@ test('G: the evidence-source summary lists the nine sources with their availabil
   assert.match(text, /MANUFACTURER_EVIDENCE \d+/);
   assert.match(text, /CONFLICTING_EVIDENCE 1/);
   assert.match(text, /SYNTHETIC_TEST_ONLY 1/);
-  assert.match(text, /OWNER_SOURCE_LOCATED_NOT_EXTRACTED/);
-  assert.match(text, /COMMITTED_TRUNCATED/);
+  assert.match(text, /NOT_AVAILABLE_IN_SESSION CONNECTED_STORAGE_NOT_AUTHORIZED CONTENT_NOT_RETRIEVED OWNER_EVIDENCE_PENDING no/);
+  assert.equal((text.match(/CONNECTED_STORAGE_NOT_AUTHORIZED CONTENT_NOT_RETRIEVED OWNER_EVIDENCE_PENDING/g) ?? []).length, 4, 'drawing and three manuals');
+  assert.match(text, /COMMITTED_TRUNCATED n\/a n\/a n\/a TRUNCATED/);
   assert.match(text, /recorded \(RECORDED_IN_0B_REVIEW_NOT_RECOMPUTED_IN_K3\)/);
   assert.match(text, /Byte order UNRESOLVED \(BYTE_ORDER_UNRESOLVED\) · candidate LOW_BYTE_FIRST \[MANUFACTURER_EVIDENCE, MODEL_LEVEL\]/);
   assert.match(text, /Word order UNRESOLVED \(WORD_ORDER_UNRESOLVED\) · candidate NOT_APPLICABLE_SINGLE_WORD \[CANDIDATE_UNVERIFIED, MODEL_LEVEL\]/);
   assert.match(text, /Status location UNRESOLVED \(STATUS_LOCATION_UNRESOLVED\) · candidate NOT_ON_FIELD_NETWORK/);
-  assert.match(text, /Wire-break decoding DECODING BLOCKED \(WIRE_BREAK_DECODING_BLOCKED\) - 0 of 8 required evidence items provided; the Preview scenario is synthetic/);
+  assert.match(text, /Wire-break decoding DECODING BLOCKED \(WIRE_BREAK_DECODING_BLOCKED\) - evidence classification CONFLICTING_EVIDENCE; source completeness SOURCE_COMPLETENESS_INSUFFICIENT; Hardware observation NOT_PROVIDED; physical decoder implemented: no; 0 of 8 required evidence items provided/);
+  assert.match(text, /Wire-break evidence record Manufacturer document transcription \(Stage 0B\): .*as transcribed in Stage 0B.*Reviewer paraphrase: .*reviewer wording.*As-installed configuration: MISSING.*Field observation: MISSING.*Ambiguity: WIRE_BREAK_VS_DEACTIVATED_CHANNEL_INDISTINGUISHABLE_BY_DATA_WORD/);
   const sourceTable = app.byId['tc-evidence-sources'].childNodes.find((n) => n.tagName === 'table');
   const sourceRows = sourceTable.childNodes.find((n) => n.tagName === 'tbody').childNodes.filter((n) => n.tagName === 'tr');
   assert.equal(sourceRows.length, 9, 'nine source rows');
-  assert.equal(cellTexts(sourceRows[0]).length, 5);
+  assert.equal(cellTexts(sourceRows[0]).length, 9);
 });
 
-test('G: the candidate process image is shown as derived, CANDIDATE_UNVERIFIED and not an address, with the rack order and 40 words per Node', () => {
+test('G: the process image is shown as DERIVATION BLOCKED with its blockers; the only arithmetic is RECORD_TO_RECORD_CONSISTENCY_ONLY with its meaning; no range table exists', () => {
   const text = allText(app.byId['tc-evidence-process-image']);
-  assert.match(text, /40 candidate input words per Node \(640 bits\)/);
-  assert.match(text, /Status CANDIDATE_UNVERIFIED; address UNRESOLVED \(ADDRESS_UNRESOLVED\); overlap none; authoritative no; activation possible no/);
-  assert.match(text, /0 HEAD_STATION 750-362 -A101 n\/a n\/a 0 none \(no process data\)/);
-  assert.match(text, /1 TC_INPUT_MODULE 750-498 -A102\.1 1 1 8 0-7 \(8 words, CANDIDATE_UNVERIFIED\)/);
-  assert.match(text, /5 TC_INPUT_MODULE 750-498 -A102\.5 5 5 8 32-39 \(8 words, CANDIDATE_UNVERIFIED\)/);
-  assert.match(text, /6 END_MODULE 750-600 -A110 n\/a n\/a 0 none \(no process data\)/);
-  assert.match(text, /Schedule consistency: 240 rows compared, 0 mismatches - record-to-record consistency[^.]*not Hardware verification/);
+  assert.match(text, /Process image: DERIVATION BLOCKED \(DERIVATION_BLOCKED\); address UNRESOLVED \(ADDRESS_UNRESOLVED\); authoritative no; activation possible no\. Blockers: protocol: PROTOCOL_UNRESOLVED; protocol evidence: OWNER_EVIDENCE_PENDING;/);
+  assert.match(text, /source SRC-MANUAL-750-498: OWNER_EVIDENCE_PENDING/);
+  assert.match(text, /SOURCE_NOT_READABLE_IN_CURRENT_REVIEW/);
+  assert.match(text, /RECORD_TO_RECORD_CONSISTENCY_ONLY: 240 schedule rows compared with the repository profile numbers, 0 mismatches\. Meaning: record-to-record comparison only; not hardware verification; not current-session manufacturer verification; does not establish a process-image start; does not establish module offsets; does not authorize an adapter; does not authorize physical acquisition\./);
   assert.match(text, /Verification blockers: .*REQ-K3-03.*REQ-K3-05.*REQ-K3-02.*REQ-K3-04/);
+  assert.equal(app.byId['tc-evidence-process-image'].childNodes.some((n) => n.tagName === 'table'), false, 'no candidate range table');
+  assert.equal(/CANDIDATE_UNVERIFIED|candidate input words|\(8 words|\b0-7\b|\b32-39\b|Schedule consistency/.test(text), false);
 });
 
 test('G: the missing-evidence list names eleven exact requests, each with what it blocks, all OWNER_INPUT_PENDING', () => {
@@ -128,7 +138,7 @@ test('G: the missing-evidence list names eleven exact requests, each with what i
   const text = allText(app.byId['tc-evidence-requests']);
   for (let i = 1; i <= 11; i += 1) assert.match(text, new RegExp(`REQ-K3-${String(i).padStart(2, '0')}`));
   assert.match(text, /blocks: PORT;/);
-  assert.match(text, /blocks: APPROVED_FOR_TEST_ADAPTER/);
+  assert.match(text, /blocks: PROTOCOL_UNRESOLVED; APPROVED_FOR_TEST_ADAPTER/);
   assert.equal((text.match(/OWNER_INPUT_PENDING/g) ?? []).length, 11);
 });
 

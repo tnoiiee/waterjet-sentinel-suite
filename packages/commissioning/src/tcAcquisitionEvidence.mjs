@@ -54,7 +54,39 @@ export const SOURCE_KIND = selfNamed([
 
 /** Where the bytes of a source were during this Stage. A source not in the sandbox is never hashed here. */
 export const SOURCE_AVAILABILITY = selfNamed([
-  'COMMITTED_IN_REPOSITORY', 'COMMITTED_TRUNCATED', 'OWNER_SOURCE_LOCATED_NOT_EXTRACTED', 'NOT_AVAILABLE_IN_SESSION',
+  'COMMITTED_IN_REPOSITORY', 'COMMITTED_TRUNCATED', 'NOT_AVAILABLE_IN_SESSION',
+]);
+
+/**
+ * Whether the ORIGINAL source behind a claim was complete and readable in the current review. A claim
+ * transcribed in an earlier Stage from a document that could not be read again, or recorded in a
+ * committed file that is truncated, is INSUFFICIENT: it may inform, it may never resolve.
+ */
+export const SOURCE_COMPLETENESS = selfNamed([
+  'SOURCE_COMPLETE_IN_CURRENT_REVIEW', 'SOURCE_COMPLETENESS_INSUFFICIENT', 'SOURCE_NOT_READABLE_IN_CURRENT_REVIEW',
+]);
+
+/** What a claim actually rests on. Transcription and paraphrase are kept apart from the document itself. */
+export const SOURCE_BASIS = selfNamed([
+  'OWNER_STATEMENT', 'REPOSITORY_RECORD', 'MANUFACTURER_DOCUMENT_TRANSCRIPTION_0B', 'DRAWING_TRANSCRIPTION_0B',
+  'REVIEWER_PARAPHRASE_0B', 'SYNTHETIC_RULE', 'NONE',
+]);
+
+/** Owner-ruled statuses for evidence that is not in hand. */
+export const OWNER_EVIDENCE_PENDING = 'OWNER_EVIDENCE_PENDING';
+export const CONNECTED_STORAGE_NOT_AUTHORIZED = 'CONNECTED_STORAGE_NOT_AUTHORIZED';
+export const CONTENT_NOT_RETRIEVED = 'CONTENT_NOT_RETRIEVED';
+export const NOT_PROVIDED = 'NOT_PROVIDED';
+/** The literal classification of any agreement between two repository records. It verifies nothing. */
+export const RECORD_TO_RECORD_CONSISTENCY_ONLY = 'RECORD_TO_RECORD_CONSISTENCY_ONLY';
+export const RECORD_TO_RECORD_CONSISTENCY_MEANING = Object.freeze([
+  'record-to-record comparison only',
+  'not hardware verification',
+  'not current-session manufacturer verification',
+  'does not establish a process-image start',
+  'does not establish module offsets',
+  'does not authorize an adapter',
+  'does not authorize physical acquisition',
 ]);
 
 /** Verification vocabulary. Only the first three may appear in this Stage; the last two need proof. */
@@ -63,6 +95,7 @@ export const VERIFICATION_STATUS = selfNamed([
 ]);
 
 export const PROTOCOL_DECISION_STATUS = selfNamed(['PROTOCOL_UNRESOLVED', 'PROTOCOL_CANDIDATE', 'APPROVED_FOR_TEST_ADAPTER']);
+export const PROTOCOL_CANDIDATE_STATUS = selfNamed(['WITHDRAWN', 'PROTOCOL_CANDIDATE']);
 export const PORT_DECISION_STATUS = selfNamed(['PORT_UNRESOLVED', 'PORT_CANDIDATE_UNVERIFIED', 'PORT_APPROVED']);
 /** Statuses that no evidence Stage may ever produce. They need a later Scope Gate and Hardware proof. */
 export const FORBIDDEN_DECISION_STATUSES = Object.freeze(['PROTOCOL_ACTIVATED', 'HARDWARE_CONNECTED', 'ACQUISITION_VERIFIED', 'PROTOCOL_SELECTED']);
@@ -251,21 +284,31 @@ const SRC = Object.freeze({
 /**
  * The SHA-256 values below were computed in the Stage 0.4C-0B review from bytes present at that time
  * and are recorded in docs/TC_EVIDENCE_SOURCE_REGISTER.md section 13.2. They were NOT recomputed in
- * K3 (the archive was located on the Owner-connected source but not extracted), so each is marked as
- * recorded, not re-verified.
+ * K3: the documents were not readable in this review, no connected-storage access is authorized, and
+ * no content was retrieved. Each hash is therefore marked as recorded, not re-verified.
  */
 const HASH_BASIS = 'RECORDED_IN_0B_REVIEW_NOT_RECOMPUTED_IN_K3';
 
+/** The Owner-ruled access position for every source that is not in the repository. */
+const NOT_IN_HAND = Object.freeze({
+  availability: SOURCE_AVAILABILITY.NOT_AVAILABLE_IN_SESSION,
+  storageAccess: CONNECTED_STORAGE_NOT_AUTHORIZED,
+  contentRetrieval: CONTENT_NOT_RETRIEVED,
+  evidenceStatus: OWNER_EVIDENCE_PENDING,
+  readableInCurrentReview: false,
+});
+const IN_REPOSITORY = Object.freeze({ storageAccess: null, contentRetrieval: null, evidenceStatus: null, readableInCurrentReview: true });
+
 const CANONICAL_SOURCES = [
-  { sourceId: SRC.OWNER_BRIEF, kind: SOURCE_KIND.OWNER_STATEMENT, title: 'Stage 0.4C-K3 Owner brief: approved topology, factory-default modules, Test configuration', revision: '0.4C-K3', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.OWNER_CONFIRMED },
-  { sourceId: SRC.NODE_CONFIG, kind: SOURCE_KIND.REPOSITORY_RECORD, title: 'Repository record: canonical six-Node TC Test configuration (Stage 0.4C-K2 module)', revision: 'TC-NODE-CONFIGURATION-TEST-REV1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.REPOSITORY_CONTRACT },
-  { sourceId: SRC.PROFILE, kind: SOURCE_KIND.REPOSITORY_RECORD, title: 'Repository record: TC process-image profile REV1 (manual and drawing facts recorded in the 0B review; sections after section 3 are TRUNCATED in the committed record)', revision: 'BASELINE_REV1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_TRUNCATED, defaultClass: EVIDENCE_CLASS.REPOSITORY_CONTRACT },
-  { sourceId: SRC.SCHEDULE, kind: SOURCE_KIND.REPOSITORY_RECORD, title: 'Repository record: TC drawing schedule REV1 (240 rows; derived model-level word ordinal column)', revision: 'BASELINE_REV1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.REPOSITORY_CONTRACT },
-  { sourceId: SRC.SCENARIOS, kind: SOURCE_KIND.SYNTHETIC_TEST_RULE, title: 'Repository record: synthetic Preview scenario SIMULATED_WIRE_BREAK (Stage 0.4C-K1 module)', revision: '0.4C-K1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.SYNTHETIC_TEST_ONLY },
-  { sourceId: SRC.DRAWING, kind: SOURCE_KIND.DRAWING, title: 'Combined six-cabinet drawing (+SDSCAB1 … +SDSCAB6), REV 1A, 16 MAR 2026, DRAWING_PENDING_REVISION', revision: 'REV 1A', sha256: '08db6f2afd72f0f8a185bfcd30844e7221a332a030bbdade46dafe8c141d6b98', hashBasis: HASH_BASIS, availability: SOURCE_AVAILABILITY.OWNER_SOURCE_LOCATED_NOT_EXTRACTED, defaultClass: EVIDENCE_CLASS.DRAWING_EVIDENCE },
-  { sourceId: SRC.MANUAL_498, kind: SOURCE_KIND.MANUFACTURER_DOCUMENT, title: '750-498 product manual', revision: 'v1.0.0 (Nov 2019)', sha256: 'ed66534d10b0fe95e62c0241cefa4e6057c2cbca060d97a14a6961241611fe83', hashBasis: HASH_BASIS, availability: SOURCE_AVAILABILITY.OWNER_SOURCE_LOCATED_NOT_EXTRACTED, defaultClass: EVIDENCE_CLASS.MANUFACTURER_EVIDENCE },
-  { sourceId: SRC.MANUAL_362, kind: SOURCE_KIND.MANUFACTURER_DOCUMENT, title: '750-362 head-station product manual', revision: 'v1.1.1 (Apr 2022)', sha256: '85e72f83eedcf60a5b4abdd4c38b88ed546e3601da4b80bd7c19eb57d6c427bb', hashBasis: HASH_BASIS, availability: SOURCE_AVAILABILITY.OWNER_SOURCE_LOCATED_NOT_EXTRACTED, defaultClass: EVIDENCE_CLASS.MANUFACTURER_EVIDENCE },
-  { sourceId: SRC.MANUAL_600, kind: SOURCE_KIND.MANUFACTURER_DOCUMENT, title: '750-600 end-module product manual', revision: 'v1.3.0', sha256: 'c390260c5d6041ad271fe6bb23d1f814b6cc3ed9cc6d34f673e70e4f9c604b46', hashBasis: HASH_BASIS, availability: SOURCE_AVAILABILITY.OWNER_SOURCE_LOCATED_NOT_EXTRACTED, defaultClass: EVIDENCE_CLASS.MANUFACTURER_EVIDENCE },
+  { sourceId: SRC.OWNER_BRIEF, kind: SOURCE_KIND.OWNER_STATEMENT, title: 'Stage 0.4C-K3 Owner brief: approved topology, factory-default modules, Test configuration', revision: '0.4C-K3', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, ...IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.OWNER_CONFIRMED },
+  { sourceId: SRC.NODE_CONFIG, kind: SOURCE_KIND.REPOSITORY_RECORD, title: 'Repository record: canonical six-Node TC Test configuration (Stage 0.4C-K2 module)', revision: 'TC-NODE-CONFIGURATION-TEST-REV1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, ...IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.REPOSITORY_CONTRACT },
+  { sourceId: SRC.PROFILE, kind: SOURCE_KIND.REPOSITORY_RECORD, title: 'Repository record: TC process-image profile REV1 (manual and drawing facts recorded in the 0B review; sections after section 3 are TRUNCATED in the committed record)', revision: 'BASELINE_REV1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_TRUNCATED, ...IN_REPOSITORY, readableInCurrentReview: 'TRUNCATED', defaultClass: EVIDENCE_CLASS.REPOSITORY_CONTRACT },
+  { sourceId: SRC.SCHEDULE, kind: SOURCE_KIND.REPOSITORY_RECORD, title: 'Repository record: TC drawing schedule REV1 (240 rows; derived model-level word ordinal column)', revision: 'BASELINE_REV1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, ...IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.REPOSITORY_CONTRACT },
+  { sourceId: SRC.SCENARIOS, kind: SOURCE_KIND.SYNTHETIC_TEST_RULE, title: 'Repository record: synthetic Preview scenario SIMULATED_WIRE_BREAK (Stage 0.4C-K1 module)', revision: '0.4C-K1', sha256: null, hashBasis: null, availability: SOURCE_AVAILABILITY.COMMITTED_IN_REPOSITORY, ...IN_REPOSITORY, defaultClass: EVIDENCE_CLASS.SYNTHETIC_TEST_ONLY },
+  { sourceId: SRC.DRAWING, kind: SOURCE_KIND.DRAWING, title: 'Combined six-cabinet drawing (+SDSCAB1 … +SDSCAB6), REV 1A, 16 MAR 2026, DRAWING_PENDING_REVISION', revision: 'REV 1A', sha256: '08db6f2afd72f0f8a185bfcd30844e7221a332a030bbdade46dafe8c141d6b98', hashBasis: HASH_BASIS, ...NOT_IN_HAND, defaultClass: EVIDENCE_CLASS.DRAWING_EVIDENCE },
+  { sourceId: SRC.MANUAL_498, kind: SOURCE_KIND.MANUFACTURER_DOCUMENT, title: '750-498 product manual', revision: 'v1.0.0 (Nov 2019)', sha256: 'ed66534d10b0fe95e62c0241cefa4e6057c2cbca060d97a14a6961241611fe83', hashBasis: HASH_BASIS, ...NOT_IN_HAND, defaultClass: EVIDENCE_CLASS.MANUFACTURER_EVIDENCE },
+  { sourceId: SRC.MANUAL_362, kind: SOURCE_KIND.MANUFACTURER_DOCUMENT, title: '750-362 head-station product manual', revision: 'v1.1.1 (Apr 2022)', sha256: '85e72f83eedcf60a5b4abdd4c38b88ed546e3601da4b80bd7c19eb57d6c427bb', hashBasis: HASH_BASIS, ...NOT_IN_HAND, defaultClass: EVIDENCE_CLASS.MANUFACTURER_EVIDENCE },
+  { sourceId: SRC.MANUAL_600, kind: SOURCE_KIND.MANUFACTURER_DOCUMENT, title: '750-600 end-module product manual', revision: 'v1.3.0', sha256: 'c390260c5d6041ad271fe6bb23d1f814b6cc3ed9cc6d34f673e70e4f9c604b46', hashBasis: HASH_BASIS, ...NOT_IN_HAND, defaultClass: EVIDENCE_CLASS.MANUFACTURER_EVIDENCE },
 ];
 
 // ------------------------------------------------------------------------------- canonical claims
@@ -289,9 +332,27 @@ const CANONICAL_CLAIMS = [
   { claimId: 'CL-03-FACTORY-DEFAULT', topic: CLAIM_TOPIC.FACTORY_DEFAULT, scope: EVIDENCE_SCOPE.OWNER_DECISION, evidenceClass: EVIDENCE_CLASS.OWNER_CONFIRMED, sourceIds: [SRC.OWNER_BRIEF], verification: VERIFICATION_STATUS.HARDWARE_VERIFICATION_PENDING,
     value: { allTcModulesFactoryDefault: true, instanceConfigurationExport: 'NOT_PROVIDED' },
     note: 'Owner statement: all 30 TC modules use factory-default settings. No engineering-tool export confirms it per instance; no non-default per-Channel setting is invented.' },
-  { claimId: 'CL-04-PROTOCOL-NAMED', topic: CLAIM_TOPIC.PROTOCOL, scope: EVIDENCE_SCOPE.MODEL_LEVEL, evidenceClass: EVIDENCE_CLASS.CANDIDATE_UNVERIFIED, sourceIds: [SRC.DRAWING, SRC.MANUAL_362, SRC.PROFILE], verification: VERIFICATION_STATUS.HARDWARE_VERIFICATION_PENDING,
-    value: { candidateRef: 'TC-K3-PROTOCOL-CANDIDATE-01', namedBy: [EVIDENCE_CLASS.DRAWING_EVIDENCE, EVIDENCE_CLASS.MANUFACTURER_EVIDENCE], nameRecordedIn: 'repository TC process-image profile REV1, sections 1 and 3 (documentation only)' },
-    note: 'The drawing device list and the head-station manual name one field-network protocol for the 750-362. It is a CANDIDATE only: applicability to the actual head stations (firmware, configuration) is unverified and the Owner has not approved it.' },
+  { claimId: 'CL-04-PROTOCOL', topic: CLAIM_TOPIC.PROTOCOL, scope: EVIDENCE_SCOPE.MODEL_LEVEL, evidenceClass: EVIDENCE_CLASS.OWNER_INPUT_PENDING, sourceIds: [SRC.PROFILE], verification: VERIFICATION_STATUS.HARDWARE_VERIFICATION_PENDING,
+    value: {
+      protocolStatus: PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED,
+      evidenceStatus: OWNER_EVIDENCE_PENDING,
+      candidateStatus: PROTOCOL_CANDIDATE_STATUS.WITHDRAWN,
+      sourceCompleteness: SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT,
+      // Non-authoritative evidence note (Owner ruling): a model-level reference transcribed in Stage 0B.
+      evidenceNote: {
+        reference: 'A field-network protocol name for the 750-362 head station was transcribed in Stage 0B from the drawing device list and the head-station manual into the repository profile REV1 (sections 1 and 3). The name is documentation only and is NOT retained as a candidate.',
+        originalDocumentReadableInCurrentReview: false,
+        committedProfileSectionTruncated: true,
+        asInstalledApplicabilityVerified: false,
+        firmwareVerified: false,
+        configurationVerified: false,
+        portResolved: false,
+        protocolCandidateRetained: false,
+        adapterAuthorized: false,
+        acquisitionAuthorized: false,
+      },
+    },
+    note: 'Owner ruling (PR #21 provenance review): the protocol position is PROTOCOL_UNRESOLVED with OWNER_EVIDENCE_PENDING; the earlier candidate record is WITHDRAWN because its only readable support is a Stage 0B transcription of documents not readable in this review, in a committed section that is truncated.' },
   { claimId: 'CL-05-SESSION-SEMANTICS', topic: CLAIM_TOPIC.HEAD_STATION_SESSION, scope: EVIDENCE_SCOPE.MODEL_LEVEL, evidenceClass: EVIDENCE_CLASS.OWNER_INPUT_PENDING, sourceIds: [SRC.PROFILE], verification: VERIFICATION_STATUS.HARDWARE_VERIFICATION_PENDING,
     value: null,
     note: 'Connection and session semantics of the head station (connection limits, timeouts, keep-alive, read operation detail) were recorded in profile section 4, which is truncated in the committed file. No session rule is assumed.' },
@@ -320,8 +381,24 @@ const CANONICAL_CLAIMS = [
     value: { underrange: { dataHex: '0xF830', localStatusHex: '0x41' }, overrange: { dataHex: '0x3584', localStatusHex: '0x42' }, coldJunctionViolation: { dataHex: '0x8000', localStatusHex: '0x00' }, statusVisibleOnFieldNetwork: 'UNRESOLVED' },
     note: 'Model-level clamp and diagnostic representations (profile section 2, manual Table 27). The local status byte is not known to be visible on the field network (CL-09).' },
   { claimId: 'CL-14-WIRE-BREAK', topic: CLAIM_TOPIC.WIRE_BREAK, scope: EVIDENCE_SCOPE.MODEL_LEVEL, evidenceClass: EVIDENCE_CLASS.CONFLICTING_EVIDENCE, sourceIds: [SRC.MANUAL_498, SRC.MANUAL_362, SRC.PROFILE], verification: VERIFICATION_STATUS.HARDWARE_VERIFICATION_PENDING,
-    value: { wireBreak: { dataHex: '0x7FFF', localStatusHex: '0x60' }, deactivatedChannel: { dataHex: '0x7FFF', localStatusHex: null }, distinguishableByDataWordAlone: false, statusByteOnFieldNetwork: 'UNRESOLVED' },
-    note: 'Wire break and a deactivated Channel share the data word 0x7FFF; they differ only in the local status byte, which the head-station class rule says is not on the field network. A data word alone therefore cannot prove wire break. Decoding is BLOCKED until instance evidence resolves it.' },
+    value: {
+      wireBreak: { dataHex: '0x7FFF', localStatusHex: '0x60' }, deactivatedChannel: { dataHex: '0x7FFF', localStatusHex: null },
+      distinguishableByDataWordAlone: false, statusByteOnFieldNetwork: 'UNRESOLVED',
+      sourceCompleteness: SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT,
+      hardwareObservationStatus: NOT_PROVIDED,
+      // The record keeps apart what the manual is transcribed as saying, what the 0B reviewer concluded,
+      // and what is simply missing. None of it is a physical decoding rule.
+      evidenceRecord: {
+        manufacturerDocumentTranscription: ['wire break: data word 0x7FFF with local status 0x60 (750-498 manual Table 27, as transcribed in Stage 0B)',
+          'deactivated Channel: data word 0x7FFF (750-498 manual Table 39, as transcribed in Stage 0B)'],
+        reviewerParaphrase: ['"on the wire identical to wire break" is Stage 0B reviewer wording, not a quoted manual sentence'],
+        asInstalledConfiguration: 'MISSING - Channel enable, diagnostics and wire-break settings are NOT_PROVIDED per instance',
+        fieldObservation: 'MISSING - no Owner-authorised open-circuit observation exists',
+        ambiguity: 'WIRE_BREAK_VS_DEACTIVATED_CHANNEL_INDISTINGUISHABLE_BY_DATA_WORD',
+        originalDocumentReadableInCurrentReview: false,
+      },
+    },
+    note: 'Wire break and a deactivated Channel are transcribed as sharing the data word 0x7FFF, differing only in a local status byte that the head-station class rule says is not on the field network. The raw value is NOT a manufacturer-verified physical decoding rule in this review: the documents were not readable, the configuration is missing and no observation exists. Decoding stays BLOCKED.' },
   { claimId: 'CL-15-MODULE-ORDER', topic: CLAIM_TOPIC.MODULE_ORDER, scope: EVIDENCE_SCOPE.DRAWING_LEVEL, evidenceClass: EVIDENCE_CLASS.DRAWING_EVIDENCE, sourceIds: [SRC.DRAWING, SRC.SCHEDULE, SRC.PROFILE], verification: VERIFICATION_STATUS.HARDWARE_VERIFICATION_PENDING,
     value: { physicalOrderAfterHeadStation: ['-A102.1', '-A102.2', '-A102.3', '-A102.4', '-A102.5'], endModuleLast: '-A110' },
     note: 'Physical module order as drawn. The as-installed order and the engineering-tool order are not verified.' },
@@ -344,8 +421,8 @@ const CANONICAL_CLAIMS = [
     value: { reachabilityStatus: REACHABILITY_STATUS.NOT_TESTED, probesPerformed: 0 },
     note: 'No ping, socket, port probe or name resolution has been performed against any Test address.' },
   { claimId: 'CL-22-CANDIDATE-WORD-ORDINALS', topic: CLAIM_TOPIC.CANDIDATE_WORD_ORDINALS, scope: EVIDENCE_SCOPE.MODEL_LEVEL, evidenceClass: EVIDENCE_CLASS.REPOSITORY_CONTRACT, sourceIds: [SRC.SCHEDULE, SRC.PROFILE], verification: VERIFICATION_STATUS.NOT_HARDWARE_VERIFIED,
-    value: { perNodeInputWords: 40, basis: 'DERIVED_MODEL_LEVEL' },
-    note: 'The committed schedule carries a model-level candidate word ordinal per physical Channel (0 to 39 per Node). It is a repository record of the 0B derivation, not Hardware verification.' },
+    value: { basis: 'DERIVED_MODEL_LEVEL_IN_0B', classification: RECORD_TO_RECORD_CONSISTENCY_ONLY },
+    note: 'The committed schedule carries a model-level word ordinal column derived in Stage 0B. Any agreement with it is RECORD_TO_RECORD_CONSISTENCY_ONLY: it establishes no process-image start, no module offset and no Hardware fact.' },
   { claimId: 'CL-23-SYNTHETIC-WIRE-BREAK', topic: CLAIM_TOPIC.SYNTHETIC_SCENARIO, scope: EVIDENCE_SCOPE.SYNTHETIC, evidenceClass: EVIDENCE_CLASS.SYNTHETIC_TEST_ONLY, sourceIds: [SRC.SCENARIOS], verification: VERIFICATION_STATUS.NOT_HARDWARE_VERIFIED,
     value: { scenarioKey: 'SIMULATED_WIRE_BREAK' },
     note: 'The Preview wire-break scenario is synthetic. It is not physical decoding evidence and can never become authoritative.' },
@@ -353,6 +430,47 @@ const CANONICAL_CLAIMS = [
     value: { truncatedRecords: ['TC process-image profile REV1', 'TC schedule validation REV1'] },
     note: 'Both committed records end with a truncation marker. The lost profile sections held the head-station session and port facts. Restoration requires the Owner-held manuals; nothing lost is reconstructed from memory.' },
 ];
+
+/**
+ * What each claim rests on and whether its original source was complete and readable in THIS review.
+ * Every manual and drawing fact in this set is a Stage 0B transcription: the documents were not
+ * readable in K3 and the committed profile that carries them is truncated after its section 3.
+ */
+const MANUAL_0B = [SOURCE_BASIS.MANUFACTURER_DOCUMENT_TRANSCRIPTION_0B, SOURCE_COMPLETENESS.SOURCE_NOT_READABLE_IN_CURRENT_REVIEW];
+const DRAWING_0B = [SOURCE_BASIS.DRAWING_TRANSCRIPTION_0B, SOURCE_COMPLETENESS.SOURCE_NOT_READABLE_IN_CURRENT_REVIEW];
+const OWNER = [SOURCE_BASIS.OWNER_STATEMENT, SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW];
+const MISSING = [SOURCE_BASIS.NONE, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT];
+const CLAIM_SOURCE_POSITION = Object.freeze({
+  'CL-01-TOPOLOGY-OWNER': OWNER,
+  'CL-02-TOPOLOGY-DRAWING': DRAWING_0B,
+  'CL-03-FACTORY-DEFAULT': OWNER,
+  'CL-04-PROTOCOL': [SOURCE_BASIS.MANUFACTURER_DOCUMENT_TRANSCRIPTION_0B, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT],
+  'CL-05-SESSION-SEMANTICS': [SOURCE_BASIS.REPOSITORY_RECORD, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT],
+  'CL-06-PORT': MISSING,
+  'CL-07-CHANNEL-COUNT': MANUAL_0B,
+  'CL-08-CHANNEL-DATA-WIDTH': MANUAL_0B,
+  'CL-09-STATUS-ON-FIELD-NETWORK': MANUAL_0B,
+  'CL-10-BYTE-ORDER': MANUAL_0B,
+  'CL-11-WORD-ORDER': MANUAL_0B,
+  'CL-12-ENCODING': MANUAL_0B,
+  'CL-13-INVALID-REPRESENTATION': MANUAL_0B,
+  'CL-14-WIRE-BREAK': [SOURCE_BASIS.MANUFACTURER_DOCUMENT_TRANSCRIPTION_0B, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT],
+  'CL-15-MODULE-ORDER': DRAWING_0B,
+  'CL-16-PROCESS-IMAGE-ORDER-RULE': MANUAL_0B,
+  'CL-17-NON-PROCESS-MODULES': MANUAL_0B,
+  'CL-18-FIRMWARE': MISSING,
+  'CL-19-CONVERSION-TIME': MANUAL_0B,
+  'CL-20-FRESHNESS-THRESHOLDS': MISSING,
+  'CL-21-REACHABILITY': [SOURCE_BASIS.REPOSITORY_RECORD, SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW],
+  'CL-22-CANDIDATE-WORD-ORDINALS': [SOURCE_BASIS.REPOSITORY_RECORD, SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW],
+  'CL-23-SYNTHETIC-WIRE-BREAK': [SOURCE_BASIS.SYNTHETIC_RULE, SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW],
+  'CL-24-RECORD-TRUNCATION': [SOURCE_BASIS.REPOSITORY_RECORD, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT],
+});
+const CANONICAL_CLAIMS_POSITIONED = CANONICAL_CLAIMS.map((c) => {
+  const position = CLAIM_SOURCE_POSITION[c.claimId];
+  if (!position) throw new Error(`claim ${c.claimId} has no source position`);
+  return { ...c, sourceBasis: position[0], sourceCompleteness: position[1] };
+});
 
 // ---------------------------------------------------------------------- canonical missing evidence
 
@@ -367,7 +485,7 @@ const CANONICAL_MISSING_EVIDENCE = [
   { requestId: 'REQ-K3-08', category: 7, item: 'Revised (as-built) cabinet and network drawing with the cabinet-to-Node assignment confirmed', blocks: ['ASSUMED_ORDINAL_CORRESPONDENCE', 'as-installed module order'] },
   { requestId: 'REQ-K3-09', category: 11, item: 'Owner decision on freshness thresholds (aging, stale, Last-Valid retention)', blocks: ['freshness semantics', 'stale presentation'] },
   { requestId: 'REQ-K3-10', category: 2, item: 'Restoration of the truncated committed records (profile sections after section 3; validation summary after its truncation marker) from the Owner-held manuals', blocks: ['repository evidence for PORT and session semantics'] },
-  { requestId: 'REQ-K3-11', category: 11, item: 'Owner approval decision on the protocol candidate TC-K3-PROTOCOL-CANDIDATE-01', blocks: ['APPROVED_FOR_TEST_ADAPTER'] },
+  { requestId: 'REQ-K3-11', category: 11, item: 'Owner protocol evidence and decision: complete, readable head-station documentation for the as-installed firmware and configuration, then an explicit Owner protocol decision. No candidate is retained (candidate status WITHDRAWN) until then.', blocks: ['PROTOCOL_UNRESOLVED', 'APPROVED_FOR_TEST_ADAPTER'] },
 ];
 
 // ------------------------------------------------------------------------- evidence set construction
@@ -433,23 +551,20 @@ export const CANONICAL_TC_ACQUISITION_EVIDENCE = createTcAcquisitionEvidenceSet(
   evidenceSetId: TC_ACQUISITION_EVIDENCE_ID,
   synthetic: false,
   sources: CANONICAL_SOURCES,
-  claims: CANONICAL_CLAIMS,
+  claims: CANONICAL_CLAIMS_POSITIONED,
   processImageBasis: CANONICAL_PROCESS_IMAGE_BASIS,
   protocolDecision: {
     status: PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED,
-    candidate: {
-      candidateRef: 'TC-K3-PROTOCOL-CANDIDATE-01',
-      candidateStatus: PROTOCOL_DECISION_STATUS.PROTOCOL_CANDIDATE,
-      claimId: 'CL-04-PROTOCOL-NAMED',
-      sourceIds: [SRC.DRAWING, SRC.MANUAL_362],
-      applicabilityToHeadStation: 'MODEL_LEVEL_ONLY',
-      sessionSemantics: 'NOT_AVAILABLE_IN_SESSION',
-      readOperationKnown: 'MODEL_LEVEL_ONLY',
-      writeOperationRequired: false,
-      ownerApproval: 'OWNER_INPUT_PENDING',
-    },
+    evidenceStatus: OWNER_EVIDENCE_PENDING,
+    candidateStatus: PROTOCOL_CANDIDATE_STATUS.WITHDRAWN,
+    sourceCompleteness: SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT,
+    candidate: null,
+    claimId: 'CL-04-PROTOCOL',
+    ownerApproval: 'OWNER_INPUT_PENDING',
     approvedForTestAdapter: false,
     activated: false,
+    adapterAuthorized: false,
+    acquisitionAuthorized: false,
   },
   portDecision: {
     status: PORT_DECISION_STATUS.PORT_UNRESOLVED,
@@ -460,6 +575,10 @@ export const CANONICAL_TC_ACQUISITION_EVIDENCE = createTcAcquisitionEvidenceSet(
   },
   wireBreakDecoding: {
     status: FIELD_STATUS.WIRE_BREAK_DECODING_BLOCKED,
+    evidenceClassification: EVIDENCE_CLASS.CONFLICTING_EVIDENCE,
+    sourceCompleteness: SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT,
+    hardwareObservationStatus: NOT_PROVIDED,
+    physicalDecoderImplemented: false,
     claimId: 'CL-14-WIRE-BREAK',
     requiredEvidence: ['actual module behaviour', 'Channel configuration', 'raw and status representation on the field network', 'configured wire-break behaviour',
       'distinction from out-of-range', 'distinction from communication loss', 'distinction from disabled Channel', 'distinction from stale data'],
@@ -516,6 +635,14 @@ export function validateTcAcquisitionEvidence(set) {
     if (!Object.values(EVIDENCE_SCOPE).includes(c.scope)) add('UNKNOWN_EVIDENCE_SCOPE', `${at}.scope`);
     if (!Object.values(CLAIM_TOPIC).includes(c.topic)) add('UNKNOWN_CLAIM_TOPIC', `${at}.topic`);
     if (!Object.values(VERIFICATION_STATUS).includes(c.verification)) add('UNKNOWN_VERIFICATION_STATUS', `${at}.verification`);
+    if (!Object.values(SOURCE_COMPLETENESS).includes(c.sourceCompleteness)) add('UNKNOWN_SOURCE_COMPLETENESS', `${at}.sourceCompleteness`);
+    if (!Object.values(SOURCE_BASIS).includes(c.sourceBasis)) add('UNKNOWN_SOURCE_BASIS', `${at}.sourceBasis`);
+    // A transcription or paraphrase of a document that was not readable in this review cannot be complete.
+    if ([SOURCE_BASIS.MANUFACTURER_DOCUMENT_TRANSCRIPTION_0B, SOURCE_BASIS.DRAWING_TRANSCRIPTION_0B, SOURCE_BASIS.REVIEWER_PARAPHRASE_0B].includes(c.sourceBasis)
+      && c.sourceCompleteness === SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW
+      && !(Array.isArray(c.sourceIds) && c.sourceIds.some((id) => sources.get(id)?.readableInCurrentReview === true && sources.get(id)?.kind !== SOURCE_KIND.REPOSITORY_RECORD))) {
+      add('SOURCE_COMPLETENESS_OVERSTATED', `${at}.sourceCompleteness`);
+    }
     const list = byTopic.get(c.topic) ?? []; list.push(c); byTopic.set(c.topic, list);
     const cited = Array.isArray(c.sourceIds) ? c.sourceIds : [];
     for (const id of cited) if (!sources.has(id)) add('MISSING_EVIDENCE_SOURCE', `${at}.sourceIds`);
@@ -626,7 +753,13 @@ export function validateTcAcquisitionEvidence(set) {
   else {
     if (FORBIDDEN_DECISION_STATUSES.includes(pd.status) || pd.activated === true) add('PROTOCOL_ACTIVATION_CLAIM_REFUSED', 'protocolDecision.status');
     else if (pd.status !== PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED) add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.status');
-    if (pd.approvedForTestAdapter === true) add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.approvedForTestAdapter');
+    if (pd.approvedForTestAdapter === true || pd.adapterAuthorized === true || pd.acquisitionAuthorized === true) add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.approvedForTestAdapter');
+    if (pd.evidenceStatus !== OWNER_EVIDENCE_PENDING) add('PROTOCOL_EVIDENCE_STATUS_OVERSTATED', 'protocolDecision.evidenceStatus');
+    if (!Object.values(SOURCE_COMPLETENESS).includes(pd.sourceCompleteness)) add('UNKNOWN_SOURCE_COMPLETENESS', 'protocolDecision.sourceCompleteness');
+    const protocolClaim = claims.get(pd.claimId);
+    if (!protocolClaim || protocolClaim.topic !== CLAIM_TOPIC.PROTOCOL) add('PROTOCOL_CLAIM_MISSING', 'protocolDecision.claimId');
+    // A candidate may be retained ONLY on a source that was complete and readable in this review. A
+    // transcription of an unreadable document, or a truncated record, cannot carry a candidate.
     if (pd.candidate) {
       const cl = claims.get(pd.candidate.claimId);
       const ids = Array.isArray(pd.candidate.sourceIds) ? pd.candidate.sourceIds : [];
@@ -634,10 +767,12 @@ export function validateTcAcquisitionEvidence(set) {
       if (!cl || cl.topic !== CLAIM_TOPIC.PROTOCOL || ids.length === 0 || !ids.every((id) => sources.has(id))) add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.candidate');
       else if (!kinds.some((k) => [SOURCE_KIND.DRAWING, SOURCE_KIND.MANUFACTURER_DOCUMENT, SOURCE_KIND.OWNER_STATEMENT, SOURCE_KIND.ENGINEERING_TOOL_EXPORT].includes(k))) add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.candidate.sourceIds');
       if (kinds.includes(SOURCE_KIND.SYNTHETIC_TEST_RULE)) add('SYNTHETIC_PRESENTED_AS_ACTUAL', 'protocolDecision.candidate.sourceIds');
-      if (pd.candidate.candidateStatus !== PROTOCOL_DECISION_STATUS.PROTOCOL_CANDIDATE) add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.candidate.candidateStatus');
+      if (pd.candidateStatus !== PROTOCOL_CANDIDATE_STATUS.PROTOCOL_CANDIDATE || pd.candidate.candidateStatus !== PROTOCOL_CANDIDATE_STATUS.PROTOCOL_CANDIDATE) add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.candidate.candidateStatus');
       if (pd.candidate.writeOperationRequired !== false) add('WRITE_OPERATION_REFUSED', 'protocolDecision.candidate.writeOperationRequired');
       if (pd.candidate.ownerApproval !== 'OWNER_INPUT_PENDING') add('PROTOCOL_SELECTED_WITHOUT_EVIDENCE', 'protocolDecision.candidate.ownerApproval');
-    }
+      if (pd.sourceCompleteness !== SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW || cl?.sourceCompleteness !== SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW
+        || !ids.every((id) => sources.get(id)?.readableInCurrentReview === true)) add('PROTOCOL_CANDIDATE_WITHOUT_READABLE_SOURCE', 'protocolDecision.candidate');
+    } else if (pd.candidateStatus !== PROTOCOL_CANDIDATE_STATUS.WITHDRAWN) add('PROTOCOL_CANDIDATE_STATUS_INCONSISTENT', 'protocolDecision.candidateStatus');
   }
 
   // Port decision honesty: no value without evidence, never a default, never zero or blank.
@@ -661,7 +796,13 @@ export function validateTcAcquisitionEvidence(set) {
   // Wire-break decoding: a rule needs complete evidence; otherwise it stays BLOCKED.
   const wb = set.wireBreakDecoding;
   if (!wb) add('WIRE_BREAK_POSITION_MISSING', 'wireBreakDecoding');
-  else if (wb.status !== FIELD_STATUS.WIRE_BREAK_DECODING_BLOCKED) {
+  else if (wb.physicalDecoderImplemented === true) add('PHYSICAL_WIRE_BREAK_DECODER_REFUSED', 'wireBreakDecoding.physicalDecoderImplemented');
+  if (wb && wb.status === FIELD_STATUS.WIRE_BREAK_DECODING_BLOCKED) {
+    if (wb.evidenceClassification !== EVIDENCE_CLASS.CONFLICTING_EVIDENCE) add('WIRE_BREAK_CLASSIFICATION_OVERSTATED', 'wireBreakDecoding.evidenceClassification');
+    if (wb.sourceCompleteness === SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW) add('SOURCE_COMPLETENESS_OVERSTATED', 'wireBreakDecoding.sourceCompleteness');
+    if (wb.hardwareObservationStatus !== NOT_PROVIDED) add('HARDWARE_VERIFIED_CLAIM_WITHOUT_PROOF', 'wireBreakDecoding.hardwareObservationStatus');
+  }
+  if (wb && wb.status !== FIELD_STATUS.WIRE_BREAK_DECODING_BLOCKED) {
     const required = Array.isArray(wb.requiredEvidence) ? wb.requiredEvidence : [];
     const provided = Array.isArray(wb.provided) ? wb.provided : [];
     const cl = claims.get(wb.claimId);
@@ -699,8 +840,23 @@ function deriveCandidateProcessImageUnchecked(set, claims) {
     if (!c) { blockers.push(`${label}: no claim`); return null; }
     if (c.evidenceClass === EVIDENCE_CLASS.CONFLICTING_EVIDENCE) { blockers.push(`${label}: CONFLICTING_EVIDENCE`); return null; }
     if (!DERIVATION_READY_CLASSES.includes(c.evidenceClass) || c.value === null || c.value === undefined) { blockers.push(`${label}: ${c.evidenceClass}`); return null; }
+    // Owner ruling (PR #21): a basis whose source was not complete and readable in THIS review blocks derivation.
+    if (c.sourceCompleteness !== SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW) { blockers.push(`${label}: ${c.sourceCompleteness ?? 'UNKNOWN_SOURCE_COMPLETENESS'}`); return null; }
+    if (c.evidenceStatus === OWNER_EVIDENCE_PENDING || c.value?.evidenceStatus === OWNER_EVIDENCE_PENDING) { blockers.push(`${label}: ${OWNER_EVIDENCE_PENDING}`); return null; }
     return c;
   };
+  // Owner ruling (PR #21): no process image can be a current candidate while the protocol is unresolved
+  // or while any cited source is still Owner evidence pending.
+  if (!set.protocolDecision || set.protocolDecision.status === PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED) blockers.push(`protocol: ${PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED}`);
+  if (set.protocolDecision?.evidenceStatus === OWNER_EVIDENCE_PENDING) blockers.push(`protocol evidence: ${OWNER_EVIDENCE_PENDING}`);
+  const sourceById = new Map((set.sources ?? []).map((src) => [src.sourceId, src]));
+  for (const field of ['channelCountClaimId', 'channelDataWidthClaimId', 'moduleOrderClaimId', 'orderingRuleClaimId', 'nonProcessModuleClaimId']) {
+    for (const id of claims.get(basis[field])?.sourceIds ?? []) {
+      const src = sourceById.get(id);
+      if (src?.evidenceStatus === OWNER_EVIDENCE_PENDING) blockers.push(`source ${id}: ${OWNER_EVIDENCE_PENDING}`);
+      else if (src?.readableInCurrentReview !== true) blockers.push(`source ${id}: ${SOURCE_COMPLETENESS.SOURCE_NOT_READABLE_IN_CURRENT_REVIEW}`);
+    }
+  }
   const count = need('channelCountClaimId', 'Channel count');
   const width = need('channelDataWidthClaimId', 'Channel data width');
   const order = need('moduleOrderClaimId', 'module order');
@@ -739,7 +895,7 @@ function deriveCandidateProcessImageUnchecked(set, claims) {
   if (blockers.length > 0) {
     return Object.freeze({
       state: DERIVATION_STATE.DERIVATION_BLOCKED, candidateStatus: null, addressStatus: FIELD_STATUS.ADDRESS_UNRESOLVED,
-      blockers: Object.freeze(blockers), modules: Object.freeze([]), nonProcessModules: Object.freeze(rack.filter((m) => m.role !== MODULE_ROLE.TC_INPUT_MODULE).map(nonProcessView)),
+      blockers: Object.freeze([...new Set(blockers)]), modules: Object.freeze([]), nonProcessModules: Object.freeze(rack.filter((m) => m.role !== MODULE_ROLE.TC_INPUT_MODULE).map(nonProcessView)),
       perNodeInputWords: null, perNodeInputBits: null, overlap: false, basisClaimIds: Object.freeze([]),
     });
   }
@@ -806,23 +962,58 @@ export function deriveCandidateProcessImage(set = CANONICAL_TC_ACQUISITION_EVIDE
 }
 
 /**
- * Compares the derived candidate with the schedule's recorded word ordinal per physical Channel.
- * Agreement is a CONSISTENCY check between two repository records, never Hardware verification.
+ * Internal arithmetic used ONLY for a record-to-record comparison: it computes what the Stage 0B
+ * profile's structural numbers (Channels per module, bits per Channel, fixed rack order) imply for a
+ * word ordinal, and nothing else. It is never exposed, never a candidate, and never an address.
  */
-export function compareCandidateWithSchedule(candidate, rows) {
-  if (candidate.state !== DERIVATION_STATE.CANDIDATE_DERIVED) return Object.freeze({ compared: 0, mismatches: 0, consistent: false, reason: 'NO_CANDIDATE' });
-  const byModule = new Map(candidate.modules.map((m) => [m.processModulePosition, m]));
+function recordArithmetic(set, claims) {
+  const basis = set.processImageBasis ?? {};
+  const channels = claims.get(basis.channelCountClaimId)?.value?.channelsPerModule;
+  const dataBits = claims.get(basis.channelDataWidthClaimId)?.value?.dataBitsPerChannel;
+  const tcModules = (Array.isArray(set.rack) ? set.rack : []).filter((m) => m.role === MODULE_ROLE.TC_INPUT_MODULE);
+  if (!Number.isInteger(channels) || channels <= 0 || !Number.isInteger(dataBits) || dataBits <= 0 || dataBits % 16 !== 0 || tcModules.length === 0) return null;
+  const wordsPerChannel = dataBits / 16;
+  return (position, channel) => {
+    const index = tcModules.findIndex((m) => m.processModulePosition === position);
+    if (index < 0 || !Number.isInteger(channel) || channel < 1 || channel > channels) return null;
+    return index * channels * wordsPerChannel + (channel - 1) * wordsPerChannel;
+  };
+}
+
+/**
+ * RECORD_TO_RECORD_CONSISTENCY_ONLY: compares the repository profile's structural numbers with the
+ * repository schedule's recorded word ordinal, row by row. Agreement between two repository records
+ * is all it can ever show. It verifies no Hardware, no manufacturer fact in this session, no
+ * process-image start, no module offset, and authorizes neither an adapter nor acquisition.
+ * No per-module or per-Channel number is returned.
+ */
+export function recordToRecordConsistency(set, rows) {
+  const claims = new Map((set.claims ?? []).filter((c) => c && typeof c.claimId === 'string').map((c) => [c.claimId, c]));
+  const ordinal = recordArithmetic(set, claims);
   let compared = 0;
   let mismatches = 0;
-  for (const row of rows) {
-    const position = Number.parseInt(String(row.moduleInstance ?? '').split('.').pop(), 10);
-    const m = byModule.get(position);
-    const ch = m?.channels.find((c) => c.channel === row.channel);
-    if (!ch) continue;
-    compared += 1;
-    if (ch.candidateWordOrdinal !== row.wordOrdinal) mismatches += 1;
+  if (ordinal) {
+    for (const row of rows ?? []) {
+      const position = Number.parseInt(String(row.moduleInstance ?? '').split('.').pop(), 10);
+      const expected = ordinal(position, row.channel);
+      if (expected === null) continue;
+      compared += 1;
+      if (expected !== row.wordOrdinal) mismatches += 1;
+    }
   }
-  return Object.freeze({ compared, mismatches, consistent: compared > 0 && mismatches === 0, reason: compared === 0 ? 'NO_ROWS' : null });
+  return Object.freeze({
+    classification: RECORD_TO_RECORD_CONSISTENCY_ONLY,
+    compared,
+    mismatches,
+    consistent: compared > 0 && mismatches === 0,
+    reason: ordinal === null ? 'STRUCTURAL_NUMBERS_UNAVAILABLE' : compared === 0 ? 'NO_ROWS' : null,
+    meaning: RECORD_TO_RECORD_CONSISTENCY_MEANING,
+    hardwareVerified: false,
+    establishesProcessImageStart: false,
+    establishesModuleOffsets: false,
+    authorizesAdapter: false,
+    authorizesAcquisition: false,
+  });
 }
 
 // --------------------------------------------------------------------------------------- the view
@@ -851,8 +1042,15 @@ export function buildTcAcquisitionEvidenceView(set = CANONICAL_TC_ACQUISITION_EV
   const validation = validateTcAcquisitionEvidence(set);
   const configuration = validateTcNodeConfiguration(CANONICAL_TC_NODE_CONFIGURATION);
   const candidate = deriveCandidateProcessImage(set);
+  const pd = set.protocolDecision;
+  const po = set.portDecision;
   const communicationState = evidenceOnlyCommunicationState(configuration.valid);
-  const processImageStatus = candidate.state === DERIVATION_STATE.CANDIDATE_DERIVED ? FIELD_STATUS.PROCESS_IMAGE_CANDIDATE_UNVERIFIED : FIELD_STATUS.PROCESS_IMAGE_DERIVATION_BLOCKED;
+  // Owner ruling (PR #21): the canonical (non-synthetic) set never shows a process-image candidate.
+  // Only a synthetic test set with complete, readable sources can reach PROCESS_IMAGE_CANDIDATE_UNVERIFIED.
+  const processImageStatus = candidate.state === DERIVATION_STATE.CANDIDATE_DERIVED && set.synthetic === true
+    ? FIELD_STATUS.PROCESS_IMAGE_CANDIDATE_UNVERIFIED : FIELD_STATUS.PROCESS_IMAGE_DERIVATION_BLOCKED;
+  const derived = processImageStatus === FIELD_STATUS.PROCESS_IMAGE_CANDIDATE_UNVERIFIED;
+  const protocolClaim = claimById(set, pd?.claimId ?? pd?.candidate?.claimId);
   const byteOrder = fieldStatus(set, set.processImageBasis?.byteOrderClaimId, FIELD_STATUS.BYTE_ORDER_UNRESOLVED, (v) => v.byteOrder);
   const wordOrder = fieldStatus(set, set.processImageBasis?.wordOrderClaimId, FIELD_STATUS.WORD_ORDER_UNRESOLVED, (v) => v.wordOrder);
   const statusLocation = fieldStatus(set, set.processImageBasis?.statusLocationClaimId, FIELD_STATUS.STATUS_LOCATION_UNRESOLVED, (v) => v.candidate);
@@ -860,9 +1058,6 @@ export function buildTcAcquisitionEvidenceView(set = CANONICAL_TC_ACQUISITION_EV
   const wireBreak = set.wireBreakDecoding ?? { status: FIELD_STATUS.WIRE_BREAK_DECODING_BLOCKED };
   const byClass = Object.fromEntries(EVIDENCE_CLASS_VALUES.map((k) => [k, 0]));
   for (const c of set.claims ?? []) if (byClass[c.evidenceClass] !== undefined) byClass[c.evidenceClass] += 1;
-  const pd = set.protocolDecision;
-  const po = set.portDecision;
-
   return Object.freeze({
     schemaVersion: TC_ACQUISITION_EVIDENCE_SCHEMA_VERSION,
     evidenceSetId: set.evidenceSetId,
@@ -874,15 +1069,17 @@ export function buildTcAcquisitionEvidenceView(set = CANONICAL_TC_ACQUISITION_EV
     decisions: Object.freeze({
       protocol: Object.freeze({
         status: pd?.status ?? PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED,
+        evidenceStatus: pd?.evidenceStatus ?? OWNER_EVIDENCE_PENDING,
+        candidateStatus: pd?.candidateStatus ?? PROTOCOL_CANDIDATE_STATUS.WITHDRAWN,
+        sourceCompleteness: pd?.sourceCompleteness ?? SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT,
+        candidateRetained: Boolean(pd?.candidate),
         candidateRef: pd?.candidate?.candidateRef ?? null,
-        candidateStatus: pd?.candidate?.candidateStatus ?? null,
-        candidateNamedBy: Object.freeze([...(claimById(set, pd?.candidate?.claimId)?.value?.namedBy ?? [])]),
         candidateSourceIds: Object.freeze([...(pd?.candidate?.sourceIds ?? [])]),
-        applicabilityToHeadStation: pd?.candidate?.applicabilityToHeadStation ?? null,
-        sessionSemantics: pd?.candidate?.sessionSemantics ?? null,
-        writeOperationRequired: pd?.candidate?.writeOperationRequired ?? null,
-        ownerApproval: pd?.candidate?.ownerApproval ?? 'OWNER_INPUT_PENDING',
+        evidenceNote: protocolClaim?.value?.evidenceNote ? Object.freeze({ ...protocolClaim.value.evidenceNote }) : null,
+        ownerApproval: pd?.ownerApproval ?? pd?.candidate?.ownerApproval ?? 'OWNER_INPUT_PENDING',
         approvedForTestAdapter: pd?.approvedForTestAdapter === true,
+        adapterAuthorized: pd?.adapterAuthorized === true,
+        acquisitionAuthorized: pd?.acquisitionAuthorized === true,
         activated: pd?.activated === true,
       }),
       port: Object.freeze({
@@ -896,7 +1093,14 @@ export function buildTcAcquisitionEvidenceView(set = CANONICAL_TC_ACQUISITION_EV
       processImage: processImageStatus,
       address: candidate.addressStatus,
       byteOrder, wordOrder, statusLocation, encoding,
-      wireBreakDecoding: Object.freeze({ status: wireBreak.status, requiredEvidence: Object.freeze([...(wireBreak.requiredEvidence ?? [])]), provided: Object.freeze([...(wireBreak.provided ?? [])]), syntheticScenarioClaimId: wireBreak.syntheticScenarioClaimId ?? null }),
+      wireBreakDecoding: Object.freeze({
+        status: wireBreak.status,
+        evidenceClassification: wireBreak.evidenceClassification ?? EVIDENCE_CLASS.CONFLICTING_EVIDENCE,
+        sourceCompleteness: wireBreak.sourceCompleteness ?? SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT,
+        hardwareObservationStatus: wireBreak.hardwareObservationStatus ?? NOT_PROVIDED,
+        physicalDecoderImplemented: wireBreak.physicalDecoderImplemented === true,
+        evidenceRecord: claimById(set, wireBreak.claimId)?.value?.evidenceRecord ? Object.freeze({ ...claimById(set, wireBreak.claimId).value.evidenceRecord }) : null,
+        requiredEvidence: Object.freeze([...(wireBreak.requiredEvidence ?? [])]), provided: Object.freeze([...(wireBreak.provided ?? [])]), syntheticScenarioClaimId: wireBreak.syntheticScenarioClaimId ?? null }),
       firmware: FIELD_STATUS.FIRMWARE_NOT_VERIFIED,
       freshnessThresholds: FIELD_STATUS.FRESHNESS_THRESHOLDS_UNRESOLVED,
       hardwareVerification: HARDWARE_VERIFICATION_STATUS.PENDING,
@@ -907,15 +1111,16 @@ export function buildTcAcquisitionEvidenceView(set = CANONICAL_TC_ACQUISITION_EV
       state: candidate.state,
       candidateStatus: candidate.candidateStatus,
       addressStatus: candidate.addressStatus,
-      perNodeInputWords: candidate.perNodeInputWords,
-      perNodeInputBits: candidate.perNodeInputBits,
+      perNodeInputWords: derived ? candidate.perNodeInputWords : null,
+      perNodeInputBits: derived ? candidate.perNodeInputBits : null,
       overlap: candidate.overlap,
-      authoritative: candidate.authoritative,
-      activationPossible: candidate.activationPossible,
+      authoritative: candidate.authoritative === true && derived,
+      activationPossible: false,
       basisClaimIds: candidate.basisClaimIds,
       blockers: candidate.blockers,
       verificationBlockers: candidate.verificationBlockers,
-      modules: candidate.modules,
+      // No module, word or range detail leaves the model unless a synthetic set actually derived one.
+      modules: derived ? candidate.modules : Object.freeze([]),
       nonProcessModules: candidate.nonProcessModules,
     }),
     nodes: Object.freeze(CANONICAL_TC_NODE_CONFIGURATION.nodes.map((n) => Object.freeze({
@@ -940,10 +1145,13 @@ export function buildTcAcquisitionEvidenceView(set = CANONICAL_TC_ACQUISITION_EV
     }))),
     sources: Object.freeze((set.sources ?? []).map((s) => Object.freeze({
       sourceId: s.sourceId, kind: s.kind, title: s.title, revision: s.revision, availability: s.availability,
+      storageAccess: s.storageAccess ?? null, contentRetrieval: s.contentRetrieval ?? null,
+      evidenceStatus: s.evidenceStatus ?? null, readableInCurrentReview: s.readableInCurrentReview ?? false,
       hashRecorded: Boolean(s.sha256), hashBasis: s.hashBasis ?? null, defaultClass: s.defaultClass,
     }))),
     claims: Object.freeze((set.claims ?? []).map((c) => Object.freeze({
       claimId: c.claimId, topic: c.topic, scope: c.scope, evidenceClass: c.evidenceClass, verification: c.verification,
+      sourceBasis: c.sourceBasis ?? null, sourceCompleteness: c.sourceCompleteness ?? null,
       sourceIds: Object.freeze([...(c.sourceIds ?? [])]), note: c.note,
     }))),
     claimSummary: Object.freeze({ total: (set.claims ?? []).length, byClass: Object.freeze(byClass) }),
@@ -960,7 +1168,7 @@ export function buildTcAcquisitionEvidenceView(set = CANONICAL_TC_ACQUISITION_EV
       cabinets: APPROVED_NODE_IDS.length,
       thermocoupleModules: PROTECTED_BASELINE.MODULE_COUNT,
       physicalTcChannels: PROTECTED_BASELINE.PHYSICAL_CHANNEL_COUNT,
-      candidateInputWordsPerNode: candidate.perNodeInputWords,
+      candidateInputWordsPerNode: derived ? candidate.perNodeInputWords : null,
       evidenceSources: (set.sources ?? []).length,
       claims: (set.claims ?? []).length,
       missingEvidenceRequests: (set.missingEvidenceRequests ?? []).length,

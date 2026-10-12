@@ -79,6 +79,8 @@ export {
   classifyFreshness, DECODE_STATUS, DIAGNOSTIC_CATEGORY, SAMPLE_PROVENANCE, ACQUISITION_SAMPLE_FIELDS,
   validateAcquisitionSample, frontRearDeltaPermitted, CLAIM_TOPIC, createTcAcquisitionEvidenceSet,
   CANONICAL_TC_ACQUISITION_EVIDENCE, validateTcAcquisitionEvidence, deriveCandidateProcessImage,
-  compareCandidateWithSchedule, buildTcAcquisitionEvidenceView, canonicalTcAcquisitionEvidenceText,
+  recordToRecordConsistency, buildTcAcquisitionEvidenceView, canonicalTcAcquisitionEvidenceText,
+  SOURCE_COMPLETENESS, SOURCE_BASIS, PROTOCOL_CANDIDATE_STATUS, OWNER_EVIDENCE_PENDING, CONNECTED_STORAGE_NOT_AUTHORIZED,
+  CONTENT_NOT_RETRIEVED, NOT_PROVIDED, RECORD_TO_RECORD_CONSISTENCY_ONLY, RECORD_TO_RECORD_CONSISTENCY_MEANING,
   tcAcquisitionEvidenceFingerprint,
 } from './tcAcquisitionEvidence.mjs';

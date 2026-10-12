@@ -541,16 +541,27 @@ time.
   SHA-256, marked `RECORDED_IN_0B_REVIEW_NOT_RECOMPUTED_IN_K3`: the bytes were
   not present in the K3 sandbox, so no hash was recomputed and none was invented.
 - Twenty-four claims were classified (OWNER_CONFIRMED 2, MANUFACTURER_EVIDENCE 7,
-  DRAWING_EVIDENCE 2, REPOSITORY_CONTRACT 1, CANDIDATE_UNVERIFIED 4,
-  SYNTHETIC_TEST_ONLY 1, OWNER_INPUT_PENDING 4, HARDWARE_VERIFICATION_PENDING 2,
-  CONFLICTING_EVIDENCE 1). The full table is in
+  DRAWING_EVIDENCE 2, REPOSITORY_CONTRACT 1, CANDIDATE_UNVERIFIED 3,
+  SYNTHETIC_TEST_ONLY 1, OWNER_INPUT_PENDING 5, HARDWARE_VERIFICATION_PENDING 2,
+  CONFLICTING_EVIDENCE 1). Every claim also carries a `sourceBasis` and a
+  `sourceCompleteness`: every manual or drawing fact in the set is a Stage 0B
+  transcription (`MANUFACTURER_DOCUMENT_TRANSCRIPTION_0B` /
+  `DRAWING_TRANSCRIPTION_0B`) whose original was
+  `SOURCE_NOT_READABLE_IN_CURRENT_REVIEW`. The full table is in
   [STAGE_0.4C-K3_CHECKPOINT.md](STAGE_0.4C-K3_CHECKPOINT.md) §3.3.
-- The protocol named by the drawing device list (§13.3, `-A101`) and by the
-  head-station manual is recorded in Product source only as the opaque reference
-  `TC-K3-PROTOCOL-CANDIDATE-01` (repository rule S3). Its status is
-  `PROTOCOL_UNRESOLVED` with a `PROTOCOL_CANDIDATE` record; it is not approved
-  for a Test adapter and not activated. The port is `PORT_UNRESOLVED`: no source
-  in this register that is readable in the repository names it.
+- **Protocol (Owner ruling, correction pass).** The protocol name transcribed in
+  §13.3 / §13.4 from the drawing device list (`-A101`) and the head-station manual
+  is **not** a candidate in K3. The Product position is `PROTOCOL_UNRESOLVED`,
+  evidence `OWNER_EVIDENCE_PENDING`, candidate `WITHDRAWN`, completeness
+  `SOURCE_COMPLETENESS_INSUFFICIENT`: the original documents were not readable in
+  this review, the committed profile section carrying the transcription is
+  truncated, and as-installed applicability, firmware and configuration are
+  unverified. The 0B model-level reference is kept only as a non-authoritative
+  note on claim CL-04. No port is resolved, no adapter and no acquisition is
+  authorised. The port is `PORT_UNRESOLVED`: no source in this register that is
+  readable in the repository names it. The §13 rows that describe the protocol as
+  a model-level finding are historical 0B records and are superseded, for the
+  Product position, by this paragraph.
 
 ### 14.2 Intake finding: truncated committed records
 
@@ -561,22 +572,35 @@ head-station field-network session facts — are lost) and
 `evidence/tc-schedule-validation-rev1.md` ends at line 42 with a similar marker.
 Both markers were introduced by the PR #18 merge `48f0315…`. K3 did **not**
 reconstruct the lost text from memory; restoration from the Owner-held manuals
-is requested (`REQ-K3-10`). The 240-row schedule CSV is complete and its derived
-word-ordinal column equals the K3 candidate for 240/240 rows.
+is requested (`REQ-K3-10`). The 240-row schedule CSV is complete; its derived
+word-ordinal column agrees with the profile's structural numbers for 240/240
+rows, classified `RECORD_TO_RECORD_CONSISTENCY_ONLY` (not hardware verification,
+not current-session manufacturer verification; it establishes no process-image
+start and no module offset and authorises no adapter or acquisition). The
+canonical process-image derivation itself is `DERIVATION_BLOCKED` in K3.
 
-### 14.3 Intake finding: Owner-connected source
+### 14.3 Owner evidence disclosure
 
-The connected Google Drive holds exactly one evidence file,
-`WJSS_TC_EVIDENCE_BASELINE_REV1.zip`, 17 345 849 bytes (equal to §13.2), Drive
-MD5 `2807f158ced9a984dea288e5ab30e2d8`. The connector cannot extract text from an
-archive, no individual manual or drawing PDF exists on the Drive, and the archive
-was not transferred, so its SHA-256 was not re-verified in K3 and its members are
-`NOT_AVAILABLE_IN_SESSION` for content (`OWNER_SOURCE_LOCATED_NOT_EXTRACTED`).
-Request: place the three manuals and the drawing on the Drive as individual PDF
-files so their text can be extracted in-session (`REQ-K3-01`, `REQ-K3-02`).
+An Owner evidence archive was reported as located through an unapproved
+connected-storage metadata query. Archive content was not retrieved or read. The
+archive is not accepted as evidence for this checkpoint. Owner authorization is
+required before any future connected-storage access. In the Product evidence set
+the three manuals and the drawing of §13.2 are `NOT_AVAILABLE_IN_SESSION` with
+`storageAccess: CONNECTED_STORAGE_NOT_AUTHORIZED`,
+`contentRetrieval: CONTENT_NOT_RETRIEVED`, `evidenceStatus: OWNER_EVIDENCE_PENDING`
+and `readableInCurrentReview: false`. The SHA-256 values of §13.2 remain as
+recorded in the 0B review and were not recomputed in K3. No intake request is
+made through connected storage; how the evidence is provided is the Owner's
+decision.
 
 ### 14.4 Gates unchanged by K3
 
-`STAGE_0.4C-1_TC_ACQUISITION` and `WIRE_BREAK_DECODING` stay `BLOCKED`. No
-connection, probe, name resolution, loop test, polling or hardware interaction
-was performed or authorised. Nothing in this section is a Stage-completion claim.
+`STAGE_0.4C-1_TC_ACQUISITION` and `WIRE_BREAK_DECODING` stay `BLOCKED`. The
+wire-break position is `WIRE_BREAK_DECODING_BLOCKED`, `CONFLICTING_EVIDENCE`,
+`SOURCE_COMPLETENESS_INSUFFICIENT`, Hardware observation `NOT_PROVIDED`; the
+Product record separates the manufacturer transcription (Tables 27 / 39 of the
+750-498 manual as transcribed in 0B) from the 0B reviewer paraphrase ("on the
+wire identical"), and names the missing as-installed configuration and field
+observation. No decoder exists for 0x7FFF. No connection, probe, name resolution,
+loop test, polling or hardware interaction was performed or authorised. Nothing
+in this section is a Stage-completion claim.

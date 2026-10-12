@@ -19,8 +19,10 @@ import {
   FRESHNESS_STATE, FRESHNESS_THRESHOLDS, LIVE_COMMUNICATION_STATES, PORT_DECISION_STATUS,
   PROTOCOL_DECISION_STATUS, SAMPLE_PROVENANCE, SAMPLE_TIME_FIELDS, SOURCE_AVAILABILITY, SOURCE_KIND,
   TC_ACQUISITION_EVIDENCE_SCHEMA_VERSION, VERIFICATION_STATUS,
+  SOURCE_COMPLETENESS, SOURCE_BASIS, PROTOCOL_CANDIDATE_STATUS, OWNER_EVIDENCE_PENDING, CONNECTED_STORAGE_NOT_AUTHORIZED,
+  CONTENT_NOT_RETRIEVED, NOT_PROVIDED, RECORD_TO_RECORD_CONSISTENCY_ONLY, RECORD_TO_RECORD_CONSISTENCY_MEANING,
   buildTcAcquisitionEvidenceView, canonicalTcAcquisitionEvidenceText, classifyFreshness,
-  compareCandidateWithSchedule, createTcAcquisitionEvidenceSet, deriveCandidateProcessImage,
+  recordToRecordConsistency, createTcAcquisitionEvidenceSet, deriveCandidateProcessImage,
   evidenceOnlyCommunicationState, frontRearDeltaPermitted, tcAcquisitionEvidenceFingerprint,
   validateAcquisitionSample, validateTcAcquisitionEvidence,
 } from '../src/tcAcquisitionEvidence.mjs';
@@ -40,6 +42,20 @@ const codes = (result) => [...new Set(result.issues.map((i) => i.code))];
 /** Rebuilds a mutated copy of the canonical set through the same constructor. */
 const variant = (mutate) => { const c = clone(CANON); mutate(c); return createTcAcquisitionEvidenceSet(c); };
 const claim = (set, id) => set.claims.find((c) => c.claimId === id);
+/**
+ * Mutator producing a synthetic, fully readable copy of the canonical set. It exists only to prove that
+ * the derivation arithmetic is reachable for a synthetic set with complete sources; it is never the
+ * canonical position and it is never authoritative.
+ */
+const completeSynthetic = (c) => {
+  c.synthetic = true;
+  c.evidenceSetId = 'SYN-COMPLETE';
+  for (const src of c.sources) { src.readableInCurrentReview = true; src.evidenceStatus = 'SYNTHETIC_TEST_ONLY'; }
+  for (const cl of c.claims) cl.sourceCompleteness = SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW;
+  c.protocolDecision.status = PROTOCOL_DECISION_STATUS.PROTOCOL_CANDIDATE;
+  c.protocolDecision.evidenceStatus = 'SYNTHETIC_TEST_ONLY';
+};
+const syntheticComplete = () => variant(completeSynthetic);
 
 // --------------------------------------------------------------------------------------- A baseline
 
@@ -97,7 +113,7 @@ test('B: the canonical classification of the key claims is exactly as the eviden
     'CL-01-TOPOLOGY-OWNER': [EVIDENCE_CLASS.OWNER_CONFIRMED, EVIDENCE_SCOPE.OWNER_DECISION],
     'CL-02-TOPOLOGY-DRAWING': [EVIDENCE_CLASS.DRAWING_EVIDENCE, EVIDENCE_SCOPE.DRAWING_LEVEL],
     'CL-03-FACTORY-DEFAULT': [EVIDENCE_CLASS.OWNER_CONFIRMED, EVIDENCE_SCOPE.OWNER_DECISION],
-    'CL-04-PROTOCOL-NAMED': [EVIDENCE_CLASS.CANDIDATE_UNVERIFIED, EVIDENCE_SCOPE.MODEL_LEVEL],
+    'CL-04-PROTOCOL': [EVIDENCE_CLASS.OWNER_INPUT_PENDING, EVIDENCE_SCOPE.MODEL_LEVEL],
     'CL-06-PORT': [EVIDENCE_CLASS.OWNER_INPUT_PENDING, EVIDENCE_SCOPE.MODEL_LEVEL],
     'CL-07-CHANNEL-COUNT': [EVIDENCE_CLASS.MANUFACTURER_EVIDENCE, EVIDENCE_SCOPE.MODEL_LEVEL],
     'CL-08-CHANNEL-DATA-WIDTH': [EVIDENCE_CLASS.MANUFACTURER_EVIDENCE, EVIDENCE_SCOPE.MODEL_LEVEL],
@@ -125,6 +141,26 @@ test('B: the canonical classification of the key claims is exactly as the eviden
   assert.equal(claim(CANON, 'CL-21-REACHABILITY').value.probesPerformed, 0);
 });
 
+test('B: every claim carries its source basis and completeness; nothing transcribed from an unreadable document is complete in this review', () => {
+  for (const c of CANON.claims) {
+    assert.ok(Object.values(SOURCE_BASIS).includes(c.sourceBasis), c.claimId);
+    assert.ok(Object.values(SOURCE_COMPLETENESS).includes(c.sourceCompleteness), c.claimId);
+    if ([SOURCE_BASIS.MANUFACTURER_DOCUMENT_TRANSCRIPTION_0B, SOURCE_BASIS.DRAWING_TRANSCRIPTION_0B, SOURCE_BASIS.REVIEWER_PARAPHRASE_0B].includes(c.sourceBasis)) {
+      assert.notEqual(c.sourceCompleteness, SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW, c.claimId);
+    }
+  }
+  const complete = CANON.claims.filter((c) => c.sourceCompleteness === SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW).map((c) => c.claimId).sort();
+  assert.deepEqual(complete, ['CL-01-TOPOLOGY-OWNER', 'CL-03-FACTORY-DEFAULT', 'CL-21-REACHABILITY', 'CL-22-CANDIDATE-WORD-ORDINALS', 'CL-23-SYNTHETIC-WIRE-BREAK']);
+  assert.equal(claim(CANON, 'CL-04-PROTOCOL').sourceCompleteness, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT);
+  assert.equal(claim(CANON, 'CL-14-WIRE-BREAK').sourceCompleteness, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT);
+  assert.equal(claim(CANON, 'CL-07-CHANNEL-COUNT').sourceCompleteness, SOURCE_COMPLETENESS.SOURCE_NOT_READABLE_IN_CURRENT_REVIEW);
+  assert.equal(claim(CANON, 'CL-22-CANDIDATE-WORD-ORDINALS').value.classification, RECORD_TO_RECORD_CONSISTENCY_ONLY);
+  // Overstating completeness for a transcription is refused; a missing position is refused.
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { claim(c, 'CL-07-CHANNEL-COUNT').sourceCompleteness = SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW; }))).includes('SOURCE_COMPLETENESS_OVERSTATED'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { delete claim(c, 'CL-07-CHANNEL-COUNT').sourceCompleteness; }))).includes('UNKNOWN_SOURCE_COMPLETENESS'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { claim(c, 'CL-07-CHANNEL-COUNT').sourceBasis = 'HEARSAY'; }))).includes('UNKNOWN_SOURCE_BASIS'));
+});
+
 test('B: no instance-level field is resolved by model-level or drawing evidence', () => {
   for (const c of CANON.claims.filter((x) => x.scope === EVIDENCE_SCOPE.INSTANCE_LEVEL)) {
     assert.ok([EVIDENCE_CLASS.HARDWARE_VERIFICATION_PENDING, EVIDENCE_CLASS.OWNER_INPUT_PENDING].includes(c.evidenceClass), c.claimId);
@@ -144,8 +180,25 @@ test('B: sources are identified, hashes are recorded with their basis, and no so
   }
   const manuals = CANON.sources.filter((s) => s.kind === SOURCE_KIND.MANUFACTURER_DOCUMENT);
   assert.equal(manuals.length, 3);
-  for (const m of manuals) assert.equal(m.availability, SOURCE_AVAILABILITY.OWNER_SOURCE_LOCATED_NOT_EXTRACTED);
-  assert.equal(CANON.sources.find((s) => s.sourceId === 'SRC-REPO-PROCESS-IMAGE-PROFILE-REV1').availability, SOURCE_AVAILABILITY.COMMITTED_TRUNCATED);
+  const drawing = CANON.sources.filter((s) => s.kind === SOURCE_KIND.DRAWING);
+  assert.equal(drawing.length, 1);
+  // Owner ruling (PR #21): the Owner documents were not in hand. No "located" claim, no connector metadata.
+  for (const m of [...manuals, ...drawing]) {
+    assert.equal(m.availability, SOURCE_AVAILABILITY.NOT_AVAILABLE_IN_SESSION, m.sourceId);
+    assert.equal(m.storageAccess, CONNECTED_STORAGE_NOT_AUTHORIZED, m.sourceId);
+    assert.equal(m.contentRetrieval, CONTENT_NOT_RETRIEVED, m.sourceId);
+    assert.equal(m.evidenceStatus, OWNER_EVIDENCE_PENDING, m.sourceId);
+    assert.equal(m.readableInCurrentReview, false, m.sourceId);
+  }
+  assert.equal(Object.hasOwn(SOURCE_AVAILABILITY, 'OWNER_SOURCE_LOCATED_NOT_EXTRACTED'), false);
+  const profile = CANON.sources.find((s) => s.sourceId === 'SRC-REPO-PROCESS-IMAGE-PROFILE-REV1');
+  assert.equal(profile.availability, SOURCE_AVAILABILITY.COMMITTED_TRUNCATED);
+  assert.equal(profile.readableInCurrentReview, 'TRUNCATED');
+  // No connector-derived identity leaks into the model: no archive file name, byte size, digest or storage identifier.
+  const text = JSON.stringify(CANON) + SOURCE;
+  for (const token of ['WJSS_TC_EVIDENCE_BASELINE_REV1', '17345849', '17 345 849', '2807f158ced9a984dea288e5ab30e2d8', '.zip', 'drive.google', 'Drive', 'fileId']) {
+    assert.equal(text.includes(token), false, `forbidden token ${token}`);
+  }
 });
 
 test('B: the validator proves missing sources, unknown classes, model mismatches and revision mismatches; it repairs nothing', () => {
@@ -171,29 +224,70 @@ test('B: synthetic evidence can never be presented as actual, and unproven verif
 
 // ---------------------------------------------------------------------- C protocol and port honesty
 
-test('C: the protocol decision is PROTOCOL_UNRESOLVED with a recorded, unapproved, inactive candidate named by drawing and manufacturer evidence', () => {
+test('C: the protocol decision is PROTOCOL_UNRESOLVED, Owner evidence pending, candidate WITHDRAWN, source completeness insufficient; nothing is inferred', () => {
   const pd = CANON.protocolDecision;
   assert.equal(pd.status, PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED);
+  assert.equal(pd.evidenceStatus, OWNER_EVIDENCE_PENDING);
+  assert.equal(pd.candidateStatus, PROTOCOL_CANDIDATE_STATUS.WITHDRAWN);
+  assert.equal(pd.sourceCompleteness, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT);
+  assert.equal(pd.candidate, null);
   assert.equal(pd.approvedForTestAdapter, false);
+  assert.equal(pd.adapterAuthorized, false);
+  assert.equal(pd.acquisitionAuthorized, false);
   assert.equal(pd.activated, false);
-  assert.equal(pd.candidate.candidateRef, 'TC-K3-PROTOCOL-CANDIDATE-01');
-  assert.equal(pd.candidate.candidateStatus, PROTOCOL_DECISION_STATUS.PROTOCOL_CANDIDATE);
-  assert.equal(pd.candidate.ownerApproval, 'OWNER_INPUT_PENDING');
-  assert.equal(pd.candidate.writeOperationRequired, false);
-  assert.deepEqual(claim(CANON, 'CL-04-PROTOCOL-NAMED').value.namedBy, [EVIDENCE_CLASS.DRAWING_EVIDENCE, EVIDENCE_CLASS.MANUFACTURER_EVIDENCE]);
+  assert.equal(pd.ownerApproval, 'OWNER_INPUT_PENDING');
+  const cl = claim(CANON, 'CL-04-PROTOCOL');
+  assert.equal(cl.evidenceClass, EVIDENCE_CLASS.OWNER_INPUT_PENDING);
+  assert.equal(cl.value.candidateStatus, PROTOCOL_CANDIDATE_STATUS.WITHDRAWN);
+  // The seven required statements of the non-authoritative evidence note.
+  const note = cl.value.evidenceNote;
+  assert.equal(note.originalDocumentReadableInCurrentReview, false);
+  assert.equal(note.committedProfileSectionTruncated, true);
+  assert.equal(note.asInstalledApplicabilityVerified, false);
+  assert.equal(note.firmwareVerified, false);
+  assert.equal(note.configurationVerified, false);
+  assert.equal(note.portResolved, false);
+  assert.equal(note.protocolCandidateRetained, false);
+  assert.equal(note.adapterAuthorized, false);
+  assert.equal(note.acquisitionAuthorized, false);
+  // No named candidate reference survives anywhere in the model or its source.
+  const text = JSON.stringify(CANON) + SOURCE;
+  assert.equal(text.includes('TC-K3-PROTOCOL-CANDIDATE'), false);
+  assert.equal(text.includes('CL-04-PROTOCOL-NAMED'), false);
+  assert.doesNotMatch(text, /\b502\b/);
   assert.deepEqual(FORBIDDEN_DECISION_STATUSES, ['PROTOCOL_ACTIVATED', 'HARDWARE_CONNECTED', 'ACQUISITION_VERIFIED', 'PROTOCOL_SELECTED']);
 });
 
-test('C: a protocol cannot be selected, approved or activated without evidence and Owner approval', () => {
+test('C: a protocol cannot be selected, approved, activated or retained as a candidate without complete readable evidence and Owner approval', () => {
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.status = PROTOCOL_DECISION_STATUS.APPROVED_FOR_TEST_ADAPTER; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.approvedForTestAdapter = true; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.adapterAuthorized = true; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.acquisitionAuthorized = true; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.activated = true; }))).includes('PROTOCOL_ACTIVATION_CLAIM_REFUSED'));
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.status = 'PROTOCOL_ACTIVATED'; }))).includes('PROTOCOL_ACTIVATION_CLAIM_REFUSED'));
-  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.candidate.sourceIds = []; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
-  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.candidate.sourceIds = ['SRC-REPO-SYNTHETIC-SCENARIOS-K1']; }))).includes('SYNTHETIC_PRESENTED_AS_ACTUAL'));
-  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.candidate.ownerApproval = 'APPROVED'; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
-  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.candidate.writeOperationRequired = true; }))).includes('WRITE_OPERATION_REFUSED'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.evidenceStatus = 'OWNER_EVIDENCE_RECEIVED'; }))).includes('PROTOCOL_EVIDENCE_STATUS_OVERSTATED'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision.candidateStatus = PROTOCOL_CANDIDATE_STATUS.PROTOCOL_CANDIDATE; }))).includes('PROTOCOL_CANDIDATE_STATUS_INCONSISTENT'));
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.protocolDecision = null; }))).includes('PROTOCOL_DECISION_MISSING'));
+  // Re-introducing a candidate on the Stage 0B transcription (documents not readable, profile truncated) is refused.
+  const reintroduced = (extra = () => {}) => variant((c) => {
+    c.protocolDecision.candidateStatus = PROTOCOL_CANDIDATE_STATUS.PROTOCOL_CANDIDATE;
+    c.protocolDecision.candidate = { candidateRef: 'X', candidateStatus: PROTOCOL_CANDIDATE_STATUS.PROTOCOL_CANDIDATE, claimId: 'CL-04-PROTOCOL', sourceIds: ['SRC-MANUAL-750-362'], writeOperationRequired: false, ownerApproval: 'OWNER_INPUT_PENDING' };
+    extra(c);
+  });
+  assert.ok(codes(validateTcAcquisitionEvidence(reintroduced())).includes('PROTOCOL_CANDIDATE_WITHOUT_READABLE_SOURCE'));
+  assert.ok(codes(validateTcAcquisitionEvidence(reintroduced((c) => { c.protocolDecision.sourceCompleteness = SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW; }))).includes('PROTOCOL_CANDIDATE_WITHOUT_READABLE_SOURCE'));
+  assert.ok(codes(validateTcAcquisitionEvidence(reintroduced((c) => { c.protocolDecision.candidate.sourceIds = []; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
+  assert.ok(codes(validateTcAcquisitionEvidence(reintroduced((c) => { c.protocolDecision.candidate.sourceIds = ['SRC-REPO-SYNTHETIC-SCENARIOS-K1']; }))).includes('SYNTHETIC_PRESENTED_AS_ACTUAL'));
+  assert.ok(codes(validateTcAcquisitionEvidence(reintroduced((c) => { c.protocolDecision.candidate.ownerApproval = 'APPROVED'; }))).includes('PROTOCOL_SELECTED_WITHOUT_EVIDENCE'));
+  assert.ok(codes(validateTcAcquisitionEvidence(reintroduced((c) => { c.protocolDecision.candidate.writeOperationRequired = true; }))).includes('WRITE_OPERATION_REFUSED'));
+  const v = buildTcAcquisitionEvidenceView();
+  assert.equal(v.decisions.protocol.candidateRetained, false);
+  assert.equal(v.decisions.protocol.candidateRef, null);
+  assert.equal(v.decisions.protocol.candidateStatus, PROTOCOL_CANDIDATE_STATUS.WITHDRAWN);
+  assert.equal(v.decisions.protocol.evidenceStatus, OWNER_EVIDENCE_PENDING);
+  assert.equal(v.decisions.protocol.sourceCompleteness, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT);
+  assert.equal(v.decisions.protocol.evidenceNote.protocolCandidateRetained, false);
+  assert.ok(v.missingEvidenceRequests.some((r) => r.blocks.includes('PROTOCOL_UNRESOLVED')));
 });
 
 test('C: the port is PORT_UNRESOLVED with no candidate; zero, blank, default or unsourced values are refused', () => {
@@ -228,34 +322,79 @@ test('C: the view shows PORT_UNRESOLVED and PROTOCOL_UNRESOLVED on every Node an
 
 // ------------------------------------------------------------------------- D process-image evidence
 
-test('D: the canonical derivation is a deterministic 40-word CANDIDATE per Node with ADDRESS_UNRESOLVED and no typed offset', () => {
+test('D: the canonical derivation is DERIVATION_BLOCKED: no module, word, start, end, offset or range is produced', () => {
   const d = deriveCandidateProcessImage();
-  assert.equal(d.state, DERIVATION_STATE.CANDIDATE_DERIVED);
-  assert.equal(d.candidateStatus, 'CANDIDATE_UNVERIFIED');
+  assert.equal(d.state, DERIVATION_STATE.DERIVATION_BLOCKED);
+  assert.equal(d.candidateStatus, null);
   assert.equal(d.addressStatus, FIELD_STATUS.ADDRESS_UNRESOLVED);
-  assert.equal(d.perNodeInputWords, 40);
-  assert.equal(d.perNodeInputBits, 640);
-  assert.equal(d.overlap, false);
+  assert.equal(d.perNodeInputWords, null);
+  assert.equal(d.perNodeInputBits, null);
+  assert.deepEqual(d.modules, []);
   assert.equal(d.authoritative, false);
   assert.equal(d.activationPossible, false);
-  assert.deepEqual(d.modules.map((m) => [m.drawingTag, m.processModulePosition, m.processImageOrder, m.startWord, m.endWord, m.words]),
-    [['-A102.1', 1, 1, 0, 7, 8], ['-A102.2', 2, 2, 8, 15, 8], ['-A102.3', 3, 3, 16, 23, 8], ['-A102.4', 4, 4, 24, 31, 8], ['-A102.5', 5, 5, 32, 39, 8]]);
-  assert.deepEqual(d.modules[2].channels.map((c) => c.candidateWordOrdinal), [16, 17, 18, 19, 20, 21, 22, 23]);
-  assert.deepEqual(d.nonProcessModules.map((m) => [m.rackSlot, m.role, m.processWidthBits, m.addressStatus]), [[0, 'HEAD_STATION', 0, 'NOT_APPLICABLE'], [6, 'END_MODULE', 0, 'NOT_APPLICABLE']]);
-  assert.deepEqual(d.modules[0].processImageOrderBasis, ['CL-15-MODULE-ORDER', 'CL-16-PROCESS-IMAGE-ORDER-RULE']);
-  assert.deepEqual(deriveCandidateProcessImage(), d, 'the derivation is deterministic');
-  // No numeric offset field exists in the evidence set itself: every number above is computed.
+  assert.ok(d.blockers.includes('protocol: PROTOCOL_UNRESOLVED'));
+  assert.ok(d.blockers.includes(`protocol evidence: ${OWNER_EVIDENCE_PENDING}`));
+  assert.ok(d.blockers.some((b) => b.includes(OWNER_EVIDENCE_PENDING) && b.includes('SRC-MANUAL-750-498')));
+  assert.ok(d.blockers.some((b) => b.includes(SOURCE_COMPLETENESS.SOURCE_NOT_READABLE_IN_CURRENT_REVIEW)));
+  const text = JSON.stringify(d);
+  assert.doesNotMatch(text, /startWord|endWord|candidateWordOrdinal|"words"/);
+  assert.deepEqual(deriveCandidateProcessImage(), d, 'the blocked result is deterministic');
+  // No numeric offset field exists in the evidence set itself.
   for (const m of CANON.rack) for (const key of Object.keys(m)) assert.doesNotMatch(key, /offset|address|startWord/i);
+  // Each Owner-named blocker blocks on its own, starting from the synthetic complete set.
+  const blockedBy = (mutate) => deriveCandidateProcessImage(variant((c) => { completeSynthetic(c); mutate(c); })).state;
+  assert.equal(blockedBy(() => {}), DERIVATION_STATE.CANDIDATE_DERIVED, 'the synthetic complete set derives');
+  assert.equal(blockedBy((c) => { claim(c, 'CL-07-CHANNEL-COUNT').sourceCompleteness = SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT; }), DERIVATION_STATE.DERIVATION_BLOCKED);
+  assert.equal(blockedBy((c) => { claim(c, 'CL-15-MODULE-ORDER').sourceCompleteness = SOURCE_COMPLETENESS.SOURCE_NOT_READABLE_IN_CURRENT_REVIEW; }), DERIVATION_STATE.DERIVATION_BLOCKED);
+  assert.equal(blockedBy((c) => { claim(c, 'CL-16-PROCESS-IMAGE-ORDER-RULE').evidenceClass = EVIDENCE_CLASS.OWNER_INPUT_PENDING; }), DERIVATION_STATE.DERIVATION_BLOCKED);
+  assert.equal(blockedBy((c) => { c.sources.find((x) => x.sourceId === 'SRC-MANUAL-750-362').evidenceStatus = OWNER_EVIDENCE_PENDING; }), DERIVATION_STATE.DERIVATION_BLOCKED);
+  assert.equal(blockedBy((c) => { c.protocolDecision.status = PROTOCOL_DECISION_STATUS.PROTOCOL_UNRESOLVED; }), DERIVATION_STATE.DERIVATION_BLOCKED);
+  assert.equal(blockedBy((c) => { c.protocolDecision.evidenceStatus = OWNER_EVIDENCE_PENDING; }), DERIVATION_STATE.DERIVATION_BLOCKED);
 });
 
-test('D: the derived candidate agrees with all 240 committed schedule word ordinals (record-to-record consistency only)', () => {
-  const result = compareCandidateWithSchedule(deriveCandidateProcessImage(), SCHEDULE.rows);
-  assert.deepEqual(result, { compared: 240, mismatches: 0, consistent: true, reason: null });
-  assert.equal(compareCandidateWithSchedule({ state: DERIVATION_STATE.DERIVATION_BLOCKED }, SCHEDULE.rows).consistent, false);
+test('D: the derivation arithmetic stays reachable only for a synthetic complete set, and is never authoritative', () => {
+  const d = deriveCandidateProcessImage(syntheticComplete());
+  assert.equal(d.state, DERIVATION_STATE.CANDIDATE_DERIVED);
+  assert.equal(d.synthetic, true);
+  assert.equal(d.candidateStatus, 'CANDIDATE_UNVERIFIED');
+  assert.equal(d.addressStatus, FIELD_STATUS.ADDRESS_UNRESOLVED);
+  assert.equal(d.authoritative, false);
+  assert.equal(d.activationPossible, false);
+  assert.equal(d.overlap, false);
+  assert.equal(d.modules.length, 5);
+  assert.equal(d.modules.reduce((n, m) => n + m.words, 0), d.perNodeInputWords);
+  assert.deepEqual(d.modules.map((m) => m.drawingTag), ['-A102.1', '-A102.2', '-A102.3', '-A102.4', '-A102.5']);
+  assert.deepEqual(d.nonProcessModules.map((m) => [m.rackSlot, m.role, m.processWidthBits, m.addressStatus]), [[0, 'HEAD_STATION', 0, 'NOT_APPLICABLE'], [6, 'END_MODULE', 0, 'NOT_APPLICABLE']]);
+  assert.deepEqual(d.modules[0].processImageOrderBasis, ['CL-15-MODULE-ORDER', 'CL-16-PROCESS-IMAGE-ORDER-RULE']);
+  assert.deepEqual(deriveCandidateProcessImage(syntheticComplete()), d, 'the derivation is deterministic');
+  // A synthetic derivation is marked synthetic in the view and still has no authority.
+  const v = buildTcAcquisitionEvidenceView(syntheticComplete());
+  assert.equal(v.synthetic, true);
+  assert.equal(v.processImageCandidate.authoritative, false);
+  assert.equal(v.processImageCandidate.activationPossible, false);
+});
+
+test('D: RECORD_TO_RECORD_CONSISTENCY_ONLY compares two repository records and exposes no range, start or offset', () => {
+  const result = recordToRecordConsistency(CANON, SCHEDULE.rows);
+  assert.equal(result.classification, RECORD_TO_RECORD_CONSISTENCY_ONLY);
+  assert.equal(result.compared, 240);
+  assert.equal(result.mismatches, 0);
+  assert.equal(result.consistent, true);
+  assert.equal(result.reason, null);
+  assert.deepEqual(result.meaning, RECORD_TO_RECORD_CONSISTENCY_MEANING);
+  assert.equal(RECORD_TO_RECORD_CONSISTENCY_MEANING.length, 7);
+  for (const k of ['hardwareVerified', 'establishesProcessImageStart', 'establishesModuleOffsets', 'authorizesAdapter', 'authorizesAcquisition']) assert.equal(result[k], false, k);
+  assert.deepEqual(Object.keys(result).sort(), ['authorizesAcquisition', 'authorizesAdapter', 'classification', 'compared', 'consistent', 'establishesModuleOffsets', 'establishesProcessImageStart', 'hardwareVerified', 'meaning', 'mismatches', 'reason']);
+  assert.doesNotMatch(JSON.stringify(result), /startWord|endWord|wordOffset|byteOffset|"modules"|wordOrdinal|\b[0-9]+-[0-9]+\b/);
+  // A disagreeing record is reported, never repaired.
+  const altered = SCHEDULE.rows.map((r, i) => (i === 7 ? { ...r, wordOrdinal: r.wordOrdinal + 1 } : r));
+  assert.deepEqual([recordToRecordConsistency(CANON, altered).mismatches, recordToRecordConsistency(CANON, altered).consistent], [1, false]);
+  assert.equal(recordToRecordConsistency(CANON, []).reason, 'NO_ROWS');
+  assert.equal(recordToRecordConsistency(variant((c) => { claim(c, 'CL-08-CHANNEL-DATA-WIDTH').value = null; }), SCHEDULE.rows).reason, 'STRUCTURAL_NUMBERS_UNAVAILABLE');
 });
 
 test('D: incomplete, conflicting or unresolved evidence blocks derivation: no number is produced', () => {
-  const blocked = (mutate) => { const d = deriveCandidateProcessImage(variant(mutate)); assert.equal(d.state, DERIVATION_STATE.DERIVATION_BLOCKED); assert.equal(d.modules.length, 0); assert.equal(d.perNodeInputWords, null); assert.equal(d.addressStatus, FIELD_STATUS.ADDRESS_UNRESOLVED); return d.blockers; };
+  const blocked = (mutate) => { const d = deriveCandidateProcessImage(variant((c) => { completeSynthetic(c); mutate(c); })); assert.equal(d.state, DERIVATION_STATE.DERIVATION_BLOCKED); assert.equal(d.modules.length, 0); assert.equal(d.perNodeInputWords, null); assert.equal(d.addressStatus, FIELD_STATUS.ADDRESS_UNRESOLVED); return d.blockers; };
   assert.ok(blocked((c) => { claim(c, 'CL-08-CHANNEL-DATA-WIDTH').value = null; }).some((b) => /data width/.test(b)));
   assert.ok(blocked((c) => { claim(c, 'CL-08-CHANNEL-DATA-WIDTH').value.dataBitsPerChannel = 12; }).some((b) => /16-bit/.test(b)));
   assert.ok(blocked((c) => { claim(c, 'CL-08-CHANNEL-DATA-WIDTH').evidenceClass = EVIDENCE_CLASS.CONFLICTING_EVIDENCE; }).some((b) => /CONFLICTING/.test(b)));
@@ -294,9 +433,18 @@ test('D: the view keeps byte order, word order, status location and encoding UNR
   assert.equal(v.statuses.statusLocation.candidate, 'NOT_ON_FIELD_NETWORK');
   assert.equal(v.statuses.encoding.status, FIELD_STATUS.ENCODING_UNRESOLVED);
   assert.match(v.statuses.encoding.candidate, /TWOS_COMPLEMENT 0\.1 degC\/digit TYPE_K/);
-  assert.equal(v.statuses.processImage, FIELD_STATUS.PROCESS_IMAGE_CANDIDATE_UNVERIFIED);
+  assert.equal(v.statuses.processImage, FIELD_STATUS.PROCESS_IMAGE_DERIVATION_BLOCKED);
   assert.equal(v.statuses.address, FIELD_STATUS.ADDRESS_UNRESOLVED);
   assert.equal(v.statuses.firmware, FIELD_STATUS.FIRMWARE_NOT_VERIFIED);
+  assert.equal(v.processImageCandidate.state, DERIVATION_STATE.DERIVATION_BLOCKED);
+  assert.deepEqual(v.processImageCandidate.modules, []);
+  assert.equal(v.processImageCandidate.perNodeInputWords, null);
+  assert.equal(v.totals.candidateInputWordsPerNode, null);
+  assert.doesNotMatch(JSON.stringify(v), /startWord|endWord|candidateWordOrdinal|PROCESS_IMAGE_CANDIDATE_UNVERIFIED/);
+  // The canonical set never shows a candidate even if a blocker were lifted: only a synthetic set can.
+  const liftedButCanonical = buildTcAcquisitionEvidenceView(variant((c) => { completeSynthetic(c); c.synthetic = false; }));
+  assert.equal(liftedButCanonical.statuses.processImage, FIELD_STATUS.PROCESS_IMAGE_DERIVATION_BLOCKED);
+  assert.deepEqual(liftedButCanonical.processImageCandidate.modules, []);
   // Conflicting evidence hides the candidate but keeps the status.
   const conflicted = buildTcAcquisitionEvidenceView(variant((c) => { claim(c, 'CL-10-BYTE-ORDER').evidenceClass = EVIDENCE_CLASS.CONFLICTING_EVIDENCE; }));
   assert.equal(conflicted.statuses.byteOrder.candidate, null);
@@ -312,12 +460,50 @@ test('E: wire-break decoding stays WIRE_BREAK_DECODING_BLOCKED, the claim is CON
   const wb = claim(CANON, 'CL-14-WIRE-BREAK');
   assert.equal(wb.value.wireBreak.dataHex, wb.value.deactivatedChannel.dataHex);
   assert.equal(wb.value.distinguishableByDataWordAlone, false);
+  // Owner ruling (PR #21): classification, completeness, observation and a record that keeps the legs apart.
+  assert.equal(CANON.wireBreakDecoding.evidenceClassification, EVIDENCE_CLASS.CONFLICTING_EVIDENCE);
+  assert.equal(CANON.wireBreakDecoding.sourceCompleteness, SOURCE_COMPLETENESS.SOURCE_COMPLETENESS_INSUFFICIENT);
+  assert.equal(CANON.wireBreakDecoding.hardwareObservationStatus, NOT_PROVIDED);
+  assert.equal(CANON.wireBreakDecoding.physicalDecoderImplemented, false);
+  assert.equal(wb.value.hardwareObservationStatus, NOT_PROVIDED);
+  const rec = wb.value.evidenceRecord;
+  assert.equal(rec.manufacturerDocumentTranscription.length, 2);
+  assert.ok(rec.manufacturerDocumentTranscription.every((t) => /as transcribed in Stage 0B/.test(t)));
+  assert.ok(rec.reviewerParaphrase.some((t) => /reviewer wording/.test(t)));
+  assert.match(rec.asInstalledConfiguration, /^MISSING/);
+  assert.match(rec.fieldObservation, /^MISSING/);
+  assert.equal(rec.ambiguity, 'WIRE_BREAK_VS_DEACTIVATED_CHANNEL_INDISTINGUISHABLE_BY_DATA_WORD');
+  assert.equal(rec.originalDocumentReadableInCurrentReview, false);
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.wireBreakDecoding.evidenceClassification = EVIDENCE_CLASS.MANUFACTURER_EVIDENCE; }))).includes('WIRE_BREAK_CLASSIFICATION_OVERSTATED'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.wireBreakDecoding.sourceCompleteness = SOURCE_COMPLETENESS.SOURCE_COMPLETE_IN_CURRENT_REVIEW; }))).includes('SOURCE_COMPLETENESS_OVERSTATED'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.wireBreakDecoding.hardwareObservationStatus = 'OBSERVED'; }))).includes('HARDWARE_VERIFIED_CLAIM_WITHOUT_PROOF'));
+  assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.wireBreakDecoding.physicalDecoderImplemented = true; }))).includes('PHYSICAL_WIRE_BREAK_DECODER_REFUSED'));
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.wireBreakDecoding.status = 'WIRE_BREAK_DECODING_DEFINED'; }))).includes('WIRE_BREAK_EVIDENCE_INCOMPLETE'));
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.wireBreakDecoding.status = 'WIRE_BREAK_DECODING_DEFINED'; c.wireBreakDecoding.provided = [...c.wireBreakDecoding.requiredEvidence]; }))).includes('WIRE_BREAK_EVIDENCE_INCOMPLETE'), 'listing the items is not proof: an observation source is still required');
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { claim(c, 'CL-14-WIRE-BREAK').value.distinguishableByDataWordAlone = true; }))).includes('WIRE_BREAK_EVIDENCE_INCOMPLETE'));
   assert.ok(codes(validateTcAcquisitionEvidence(variant((c) => { c.wireBreakDecoding = null; }))).includes('WIRE_BREAK_POSITION_MISSING'));
   assert.equal(Object.hasOwn(DIAGNOSTIC_CATEGORY, 'WIRE_BREAK'), false, 'no confirmed physical wire-break category exists');
   assert.equal(DIAGNOSTIC_CATEGORY.WIRE_BREAK_DECODING_BLOCKED, 'WIRE_BREAK_DECODING_BLOCKED');
+});
+
+test('E: the raw value 0x7FFF yields no classification, no fault, no alarm, no trip, no interlock, no queue, no dispatch, no validity and no control anywhere in the module', () => {
+  // No diagnostic category, decode status or sample field is derived from 0x7FFF.
+  assert.equal(Object.values(DIAGNOSTIC_CATEGORY).includes('WIRE_BREAK'), false);
+  assert.equal(Object.values(DECODE_STATUS).some((v) => /WIRE_BREAK$/.test(v)), false);
+  // The module source carries 0x7FFF only inside the evidence record (string data), never in a conditional.
+  const lines = SOURCE.split('\n');
+  const conditional = lines.filter((l) => /0x7FFF|0x7fff|32767/.test(l) && /\b(if|switch|case|\?|===|!==|==|>=|<=)\b|===|!==|\?/.test(l));
+  assert.deepEqual(conditional, [], 'no branch, comparison or ternary on 0x7FFF');
+  assert.doesNotMatch(SOURCE, /0x7FFF\s*\)\s*\{|=== *0x7FFF|0x7FFF *===|32767/i);
+  for (const word of ['fault', 'alarm', 'trip', 'interlock', 'dispatch']) {
+    const near = lines.filter((l) => /0x7FFF/i.test(l) && new RegExp(word, 'i').test(l));
+    assert.deepEqual(near, [], `0x7FFF is never tied to ${word}`);
+  }
+  // A sample carrying the value is simply a sample: the contract gives it no special meaning.
+  const withValue = validateAcquisitionSample(sample({ rawPayloadHex: '0x7FFF' }));
+  const withOther = validateAcquisitionSample(sample({ rawPayloadHex: '0x03E8' }));
+  assert.deepEqual(withValue.issues.map((i) => i.code), withOther.issues.map((i) => i.code), 'the value changes nothing');
+  assert.equal(JSON.stringify(withValue).includes('WIRE_BREAK'), false);
 });
 
 test('E: the synthetic wire-break scenario is classified SYNTHETIC_TEST_ONLY and the view says so', () => {
@@ -440,9 +626,9 @@ test('view: six Nodes with the committed identities, honest statuses, zero verif
     assert.equal(n.hardwareVerificationStatus, 'HARDWARE_VERIFICATION_PENDING');
     assert.equal(n.fieldVerificationStatus, 'FIELD_VERIFICATION_PENDING');
     assert.equal(n.hardwareAccessStatus, 'HARDWARE_ACCESS_NOT_AUTHORIZED');
-    assert.equal(n.processImageStatus, 'PROCESS_IMAGE_CANDIDATE_UNVERIFIED');
+    assert.equal(n.processImageStatus, 'PROCESS_IMAGE_DERIVATION_BLOCKED');
   }
-  assert.deepEqual([v.totals.nodes, v.totals.thermocoupleModules, v.totals.physicalTcChannels, v.totals.candidateInputWordsPerNode], [6, 30, 240, 40]);
+  assert.deepEqual([v.totals.nodes, v.totals.thermocoupleModules, v.totals.physicalTcChannels, v.totals.candidateInputWordsPerNode], [6, 30, 240, null]);
   assert.deepEqual([v.totals.reachabilityTested, v.totals.acquisitionVerified, v.totals.hardwareVerified, v.totals.fieldVerified], [0, 0, 0, 0]);
   for (const [k, val] of Object.entries(v.authority)) if (k !== 'statements') assert.equal(val, false, k);
   assert.ok(v.authority.statements.includes('NO SOCKET'));
@@ -494,4 +680,39 @@ test('H: index.mjs re-exports the K3 surface and no export name matches the K2 t
   }
   for (const name of Object.keys(index)) assert.doesNotMatch(name, /socket|fetch|modem|transport/i);
   assert.equal(CLAIM_TOPIC.PORT, 'PORT');
+});
+
+test('H: the current-facing records carry no connector-derived archive identity and no retained candidate, and do carry the Owner evidence disclosure', () => {
+  const docs = join(HERE, '..', '..', '..', 'docs');
+  const read = (p) => readFileSync(p, 'utf8').replace(/\s+/g, ' '); // hard-wrapped Markdown is compared as one line
+  const checkpoint = read(join(docs, 'STAGE_0.4C-K3_CHECKPOINT.md'));
+  const register = read(join(docs, 'TC_EVIDENCE_SOURCE_REGISTER.md'));
+  const registerK3 = register.slice(register.indexOf(' ## 14.'));
+  assert.ok(registerK3.length > 100, 'register section 14 exists');
+  const changelog = read(join(HERE, '..', '..', '..', 'CHANGELOG.md'));
+  const k3Start = changelog.search(/## [0-9-]+ — Stage 0\.4C-K3 Physical TC Connectivity/);
+  assert.ok(k3Start >= 0, 'CHANGELOG has a K3 entry');
+  const k3Rest = changelog.slice(k3Start);
+  const changelogK3 = k3Rest.slice(0, k3Rest.indexOf(' ## ', 1) > 0 ? k3Rest.indexOf(' ## ', 1) : undefined);
+  const currentState = read(join(docs, 'CURRENT_STATE.md'));
+  const currentHead = currentState.slice(0, currentState.indexOf('HISTORICAL') > 0 ? currentState.indexOf('HISTORICAL') : 4000);
+  assert.match(currentHead, /Stage 0\.4C-K3/);
+  const disclosure = [
+    'An Owner evidence archive was reported as located through an unapproved connected-storage metadata query.',
+    'Archive content was not retrieved or read.',
+    'The archive is not accepted as evidence for this checkpoint.',
+    'Owner authorization is required before any future connected-storage access.',
+  ];
+  const forbidden = ['WJSS_TC_EVIDENCE_BASELINE_REV1', '17345849', '17 345 849', '2807f158ced9a984dea288e5ab30e2d8', 'OWNER_SOURCE_LOCATED_NOT_EXTRACTED', 'TC-K3-PROTOCOL-CANDIDATE', 'individual PDF', 'compareCandidateWithSchedule'];
+  for (const [name, text] of [['K3 checkpoint', checkpoint], ['register section 14', registerK3], ['CHANGELOG K3 entry', changelogK3], ['CURRENT_STATE head', currentHead]]) {
+    for (const token of forbidden) assert.equal(text.includes(token), false, `${name} must not contain ${token}`);
+    for (const sentence of disclosure) assert.ok(text.includes(sentence), `${name} must contain: ${sentence}`);
+    assert.match(text, /WITHDRAWN/, `${name} records the withdrawn candidate`);
+    assert.match(text, /DERIVATION_BLOCKED|DERIVATION BLOCKED/, `${name} records the blocked derivation`);
+    assert.match(text, /RECORD_TO_RECORD_CONSISTENCY_ONLY/, `${name} classifies the arithmetic literally`);
+  }
+  // No word range or start for the canonical set in the current-facing records.
+  for (const [name, text] of [['K3 checkpoint', checkpoint], ['CHANGELOG K3 entry', changelogK3], ['CURRENT_STATE head', currentHead]]) {
+    assert.equal(/40 (candidate )?input words per Node|words 8\(n|\b0-7\b|\b32-39\b/.test(text), false, `${name} exposes no range`);
+  }
 });

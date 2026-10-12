@@ -35,8 +35,8 @@ import {
   COLUMN_COUNT, PROTECTED_BASELINE, SCENARIO_KEYS,
   CANONICAL_TC_NODE_CONFIGURATION, TC_NODE_CONFIGURATION_ID, buildTcNodeConfigurationView,
   tcNodeConfigurationFingerprint,
-  CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, compareCandidateWithSchedule,
-  deriveCandidateProcessImage, tcAcquisitionEvidenceFingerprint,
+  CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, recordToRecordConsistency,
+  tcAcquisitionEvidenceFingerprint,
 } from '../../packages/commissioning/src/index.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -294,12 +294,14 @@ export function tcAcquisitionEvidencePayload() {
   const digest = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
   const fingerprint = tcAcquisitionEvidenceFingerprint(CANONICAL_TC_ACQUISITION_EVIDENCE, digest);
   const { schedule } = loadEvidence();
-  const scheduleConsistency = compareCandidateWithSchedule(deriveCandidateProcessImage(CANONICAL_TC_ACQUISITION_EVIDENCE), schedule.rows);
+  // RECORD_TO_RECORD_CONSISTENCY_ONLY: two repository records compared; no range, start or offset is
+  // produced and no derivation result is exposed while the process image is DERIVATION_BLOCKED.
+  const consistency = recordToRecordConsistency(CANONICAL_TC_ACQUISITION_EVIDENCE, schedule.rows);
   return {
     stageId: STAGE_ID,
     mode: PREVIEW_MODE,
     revision: { fingerprintSha256: fingerprint, shortRevision: fingerprint.slice(0, 12) },
-    scheduleConsistency: { ...scheduleConsistency, meaning: 'record-to-record consistency between the derived candidate and the committed schedule column; not Hardware verification' },
+    recordToRecordConsistency: consistency,
     ...view,
   };
 }

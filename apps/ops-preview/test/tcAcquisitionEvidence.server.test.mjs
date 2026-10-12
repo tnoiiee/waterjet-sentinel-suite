@@ -81,8 +81,25 @@ test('G: the response carries the canonical six Nodes with unresolved port and p
     assert.equal(n.wireBreakDecodingStatus, 'WIRE_BREAK_DECODING_BLOCKED');
   }
   assert.equal(body.decisions.protocol.status, 'PROTOCOL_UNRESOLVED');
+  assert.equal(body.decisions.protocol.evidenceStatus, 'OWNER_EVIDENCE_PENDING');
+  assert.equal(body.decisions.protocol.candidateStatus, 'WITHDRAWN');
+  assert.equal(body.decisions.protocol.sourceCompleteness, 'SOURCE_COMPLETENESS_INSUFFICIENT');
+  assert.equal(body.decisions.protocol.candidateRetained, false);
+  assert.equal(body.decisions.protocol.candidateRef, null);
   assert.equal(body.decisions.protocol.approvedForTestAdapter, false);
+  assert.equal(body.decisions.protocol.adapterAuthorized, false);
+  assert.equal(body.decisions.protocol.acquisitionAuthorized, false);
   assert.equal(body.decisions.protocol.activated, false);
+  assert.equal(body.statuses.processImage, 'PROCESS_IMAGE_DERIVATION_BLOCKED');
+  assert.equal(body.statuses.wireBreakDecoding.evidenceClassification, 'CONFLICTING_EVIDENCE');
+  assert.equal(body.statuses.wireBreakDecoding.sourceCompleteness, 'SOURCE_COMPLETENESS_INSUFFICIENT');
+  assert.equal(body.statuses.wireBreakDecoding.hardwareObservationStatus, 'NOT_PROVIDED');
+  for (const src of body.sources.filter((x) => x.kind === 'MANUFACTURER_DOCUMENT' || x.kind === 'DRAWING')) {
+    assert.equal(src.availability, 'NOT_AVAILABLE_IN_SESSION');
+    assert.equal(src.storageAccess, 'CONNECTED_STORAGE_NOT_AUTHORIZED');
+    assert.equal(src.contentRetrieval, 'CONTENT_NOT_RETRIEVED');
+    assert.equal(src.evidenceStatus, 'OWNER_EVIDENCE_PENDING');
+  }
   assert.equal(body.decisions.port.status, 'PORT_UNRESOLVED');
   assert.equal(body.decisions.port.candidate, null);
 });
@@ -94,6 +111,9 @@ test('G: the response exposes no port number, no protocol or vendor name, no URL
   assert.equal(/[A-Za-z]:\\|\/home\/|\/Users\/|\.csv|\.json|\.pdf/.test(text), false, 'no file path');
   assert.equal(/secret|token|credential|passphrase/i.test(text), false);
   assert.equal(/PRODUCTION_ADDRESS|productionIp/.test(text), false);
+  // Owner ruling (PR #21): no connector-derived archive identity, no candidate reference, no word range or start.
+  assert.equal(/WJSS_TC_EVIDENCE_BASELINE_REV1|17345849|17 345 849|2807f158ced9a984dea288e5ab30e2d8|\.zip|OWNER_SOURCE_LOCATED/.test(text), false, 'no archive identity');
+  assert.equal(/TC-K3-PROTOCOL-CANDIDATE|PROCESS_IMAGE_CANDIDATE_UNVERIFIED|startWord|endWord|candidateWordOrdinal|scheduleConsistency/.test(text), false, 'no candidate or range');
   for (const key of keysOf(JSON.parse(text))) {
     assert.doesNotMatch(key, /secret|token|credential|username|passphrase/i, key);
     assert.doesNotMatch(key, /^(write|command|setpoint|poll|connect)/i, key);
@@ -104,14 +124,20 @@ test('G: every authority flag is an explicit false, verification counts are zero
   const body = await (await fetch(`${base}${ROUTE}`)).json();
   for (const [k, v] of Object.entries(body.authority)) if (k !== 'statements') assert.equal(v, false, k);
   assert.deepEqual([body.totals.reachabilityTested, body.totals.acquisitionVerified, body.totals.hardwareVerified, body.totals.fieldVerified, body.totals.protocolsApproved, body.totals.portsApproved], [0, 0, 0, 0, 0, 0]);
-  assert.equal(body.processImageCandidate.candidateStatus, 'CANDIDATE_UNVERIFIED');
+  assert.equal(body.processImageCandidate.state, 'DERIVATION_BLOCKED');
+  assert.equal(body.processImageCandidate.candidateStatus, null);
   assert.equal(body.processImageCandidate.addressStatus, 'ADDRESS_UNRESOLVED');
   assert.equal(body.processImageCandidate.authoritative, false);
   assert.equal(body.processImageCandidate.activationPossible, false);
-  assert.equal(body.processImageCandidate.perNodeInputWords, 40);
-  assert.deepEqual(body.scheduleConsistency.compared, 240);
-  assert.deepEqual(body.scheduleConsistency.mismatches, 0);
-  assert.match(body.scheduleConsistency.meaning, /not Hardware verification/);
+  assert.equal(body.processImageCandidate.perNodeInputWords, null);
+  assert.deepEqual(body.processImageCandidate.modules, []);
+  assert.equal(body.totals.candidateInputWordsPerNode, null);
+  assert.equal(body.recordToRecordConsistency.classification, 'RECORD_TO_RECORD_CONSISTENCY_ONLY');
+  assert.equal(body.recordToRecordConsistency.compared, 240);
+  assert.equal(body.recordToRecordConsistency.mismatches, 0);
+  assert.equal(body.recordToRecordConsistency.meaning.length, 7);
+  assert.ok(body.recordToRecordConsistency.meaning.includes('not hardware verification'));
+  for (const k of ['hardwareVerified', 'establishesProcessImageStart', 'establishesModuleOffsets', 'authorizesAdapter', 'authorizesAcquisition']) assert.equal(body.recordToRecordConsistency[k], false, k);
   assert.equal(body.validation.valid, true);
   assert.equal(body.missingEvidenceRequests.length, 11);
 });
