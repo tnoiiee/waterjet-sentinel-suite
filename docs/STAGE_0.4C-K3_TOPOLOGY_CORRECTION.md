@@ -1,12 +1,15 @@
 # Stage 0.4C-K3 — Owner Critical Topology Correction (Development Checkpoint Record)
 
-**Status: DEVELOPMENT CHECKPOINT for Owner review on the existing Stage 0.4C-K3 branch
-`arena/200cd6d0-waterjet-sentinel-suite` (PR #21 to `main`, OPEN, NOT MERGED, do not merge),
-based on `main` `cc6ccf8779d87a5a44d1c03a003021791c26aac8`.** Owner Manual Review has **NOT**
-passed. **Stage 0.4C-K3 is NOT claimed complete.** The .NET side of this correction was
-**performed source-side in the K3 Completion Pass (§12) but is NOT compiled and NOT tested in
-Arena** (no .NET SDK — `NOT_RUN_ENVIRONMENT_UNAVAILABLE`); the Owner-local .NET build and test
-run (§8 step 6) is the mandatory arbiter before this PR can be called K3-complete or PR-ready.
+**Status (2026-10-12 closeout): K3 = AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING.**
+Existing Stage 0.4C-K3 branch `arena/200cd6d0-waterjet-sentinel-suite` (PR #21 to `main`,
+**OPEN, UNMERGED**, do not merge), based on `main` `cc6ccf8779d87a5a44d1c03a003021791c26aac8`.
+**Automated Build / Test Gate = PASS** at exact head `041b286322186977c5f87cde8184ae5a180d60a6`
+(Owner-local, §13): Release build PASS, full .NET **455 / 455** PASS, fixture emission **7 / 7**
+PASS, second deterministic emission **7 / 7** PASS with no diff, TypeScript typecheck PASS,
+contracts-ts **36 / 36** PASS, working tree CLEAN. **Schema `/2` retained; OQ-T3 RESOLVED —
+RETAIN_SCHEMA_V2** (§9). **Owner Manual Review = PENDING.** Not claimed: Manual Review passed,
+PR-ready, K3 complete, merged. The earlier "NOT compiled in Arena" statements in §8 and §12 are
+retained as the dated record of the Arena pass; §13 supersedes them as the validation position.
 
 Authority line (unchanged): `SIMULATION / PREVIEW / EVIDENCE AND CONTRACT FOUNDATION ONLY / NO
 NETWORK PROBE / NO SOCKET / NO PHYSICAL ACQUISITION / NO DEVICE WRITE / NO TEST_HARDWARE / NO
@@ -112,12 +115,13 @@ Safe Return; every dependency and lock file; `packages/mapping-config` and `apps
 | Same | `spikes/ui-runtime-react/**` source, fixtures and result summaries (`sensorMap.mjs` 106 Sensors / 2 Cannon slots / 212) | **Retained historical with supersession** (spike README, `CONTRACTS.md`, Owner-local testing and result summaries carry the banner; the spike is declared non-Product review code and already carries the earlier superseded "Cannon" vocabulary) |
 | `G+212`, `G+106`, `SYN-REC-106`, `scanOrder 106` in the stale example | identifiers, not counts | **Unrelated numeric / part of the stale .NET example** |
 
-## 8. .NET — source edits PERFORMED (§12); build and tests NOT RUN (`NOT_RUN_ENVIRONMENT_UNAVAILABLE`)
+## 8. .NET — source edits PERFORMED (§12); build and tests VALIDATED Owner-local (§13)
 
 Historical note: at commit `7dc7c691…` no C# file had been edited (no SDK; WJ1 / WJ3 vocabulary
 open). The Owner then ruled on the vocabulary (UNRESOLVED, §9) and authorised the K3 Completion
-Pass, which performed steps 1–5 below source-side (§12). Step 6 remains Owner-local and
-mandatory; the list is kept as the Owner-local verification order:
+Pass, which performed steps 1–5 below source-side (§12). Step 6 was then executed Owner-local
+at `041b2863…` after two analyzer corrections (§13) and **PASSED**; the list is kept as the
+verification order that was followed:
 
 1. Resolve §9 (WJ1 / WJ3 placement vocabulary).
 2. `packages/contracts/{Enums,Topology,TcChannels,WallMap,Config,Snapshot,SchemaIds}.cs`: remove
@@ -143,10 +147,9 @@ mandatory; the list is kept as the Owner-local verification order:
    `cd packages/contracts/wjss-contracts-ts && npm ci && npm run check` (the one failing Arena
    test `snapshot.seed0.json passes validation` must turn green on the regenerated fixture).
 
-Status after §12: steps 1–5 are performed in source (compile-by-eye, uncompiled); the TS mirror
-test `snapshot.seed0.json passes validation` is **green (36 / 0)** on the regenerated fixture; the
-Runtime Inspector shows "Topology baseline AGREES" only when the (rebuilt) API publishes
-108 / 216 / 240 / 24 and otherwise STALE — nothing was silenced. Step 6 is the open gate.
+Status after §13: steps 1–6 are complete — Release build PASS, 455 / 455, fixture emission
+7 / 7 twice with no diff, `npm run check` PASS (typecheck + 36 / 36). Nothing was silenced. The
+Inspector "Topology baseline" tile compares the live API against 108 / 216 / 240 / 24 / 0.
 
 ## 9. Open Owner decisions
 
@@ -154,7 +157,7 @@ Runtime Inspector shows "Topology baseline AGREES" only when the (rebuilt) API p
 |---|---|---|
 | OQ-T1 | Replacement placement vocabulary for WJ1 and WJ3 (formerly `NON_SENSOR_GAP` at I16 / I7; anchors `I15`,`I17` / `I6`,`I8`) | **RESOLVED by Owner ruling (K3 Completion Pass):** installed position is `UNRESOLVED` (`WaterJetPlacementKind.UNRESOLVED`, `placementAnchors: []`, operator wording "Installed position pending authoritative layout"). Nothing is inferred from I7 / I16 / the former gap / Sensor wall / target wall / target Sensor / legacy cannon / Assigned Cleaning Device ID; Target Coverage unchanged. Implemented in the C# catalogue, validators, API view (`installedPositionNote`), Inspector, TS mirror and both regenerated files (§12.5) |
 | OQ-T2 | Executable location of the Disable / GlobalQueue semantics for I7 and I16 (Owner tests 23–34) | **RESOLVED by Owner ruling (K3 Completion Pass):** implemented in the canonical .NET Runtime / Queue layer — the pure sequencing kernel (`SequencingState.DisabledSensorIds`, event `SetSensorEnablement`) plus the importer default-enable rule — with the I7 / I16 coverage tests of §12.6. Source-authored; Owner-local compile + test pending. Mutation UI / route: **NOT_IMPLEMENTED** (read-only exposure only) |
-| OQ-T3 | Schema identities | The contract keeps `wjss.snapshot/2` and `wjss.delta/2`; whether the topology correction warrants `/3` is an Owner decision not taken here (no field was renamed; the removed keys — `gapAnchorForWaterJetId`, `nonSensorGaps`, `nonSensorGapSlots` — were superseded-only). Open |
+| OQ-T3 | Schema identities | **RESOLVED — RETAIN_SCHEMA_V2** (Owner decision, 2026-10-12). `wjss.snapshot/2` and `wjss.delta/2` are retained; no schema `/3` is introduced in K3. Basis: K3 is backward-compatible with the current schema; existing authoritative Sensor configuration without an explicit enablement state resolves to Enabled; I7 and I16 resolve to Enabled unless explicitly disabled; unknown Sensor identity fails closed; the Sensor Disable state lives in the canonical Runtime / Sequencing foundation without an incompatible Snapshot / Delta wire-shape change; full .NET build PASS, 455 / 455, fixture emission 7 / 7 with no diff on repeat, TypeScript typecheck PASS, contracts-ts 36 / 36; no serializer, fixture-parity, migration or consumer incompatibility requires a major schema revision. No schema identifier, reader, writer, fixture or generated contract was changed by this decision |
 
 ## 10. Validation (Arena, Node v22.22.3)
 
@@ -171,7 +174,8 @@ Runtime Inspector shows "Topology baseline AGREES" only when the (rebuilt) API p
 | `node --test packages/contracts/wjss-contracts-ts/test/validate.test.mjs` | **36 pass / 0 fail** after the K3 Completion Pass (regenerated golden; `UNRESOLVED` placement test added). Historical at `7dc7c691…`: 34 / 1 by design |
 | `tsc --noEmit` (TS mirror) | NOT RUN (no `node_modules` in Arena; Owner-local `npm ci && npm run check`) |
 | `git diff --check`, lock / csproj / props drift against `cc6ccf87` | clean / none |
-| .NET build and 414 tests, Release build, browser rendering of the Preview and Inspector | NOT RUN (`NOT_RUN_ENVIRONMENT_UNAVAILABLE`) |
+| .NET build and tests, Release build | NOT RUN in Arena at `7dc7c691…` (dated row). **Superseded by §13: Owner-local at `041b2863…` — Release build PASS, 455 / 455 PASS, fixture emission 7 / 7 (×2, no diff)** |
+| Browser rendering of the Preview and Inspector | NOT RUN in Arena; Owner Manual Review PENDING |
 
 ## 11. Boundary review
 
@@ -218,14 +222,12 @@ is refused. `G+106` / `G+212` are Sensor identities. No executable layer is on 1
 
 ### 12.3 Not performed / not verified
 
-- **.NET build and tests: NOT RUN (`NOT_RUN_ENVIRONMENT_UNAVAILABLE`).** All C# edits are
-  compile-by-eye. Owner-local, in order: `dotnet build WaterJetSentinelSuite.sln -c Release`;
-  `dotnet test WaterJetSentinelSuite.sln -c Release`;
-  `WJSS_UPDATE_FIXTURES=1 dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release`
-  (expected: no fixture diff against the Node-regenerated `snapshot.seed0.json`; any diff is a
-  finding, not something to overwrite silently); `cd packages/contracts/wjss-contracts-ts && npm ci
-  && npm run check` (`tsc`).
-- Browser rendering of the Inspector / Preview: NOT RUN.
+- **.NET build and tests: NOT RUN in Arena at the time of this pass** (dated statement; all C#
+  edits were compile-by-eye). **Superseded by §13:** the Owner-local run at `041b2863…` executed
+  exactly this sequence and PASSED (Release build; 455 / 455; fixture emission 7 / 7 with no diff,
+  twice; `npm ci && npm run check` PASS). Two analyzer findings surfaced on the way and were
+  corrected without suppression (§13.1).
+- Browser rendering of the Inspector / Preview: NOT RUN in Arena; Owner Manual Review PENDING.
 - Sensor Disable **mutation** UI / API route: **NOT_IMPLEMENTED** (outside the approved read-only
   architecture); the model, kernel behaviour and read-only exposure are implemented.
 
@@ -282,7 +284,10 @@ Commissioning **214 / 0** (one assertion tightened: the gap-anchor key must be a
 Ops Preview 129 / 0; Kiosk 22 / 0; Mapping UI 82 / 0; mapping package 261 pass / 7 skipped / 0
 fail; S2 14 / 0; boundary scan 0 findings (S1–S9 clean); commissioning and ops-preview `check`
 clean; contracts-ts **36 / 0**; lock / csproj / props drift against `cc6ccf87`: none;
-`git diff --check` clean. .NET (414 + new tests), Release build, `tsc`, browser: **NOT RUN**.
+`git diff --check` clean. .NET (414 + new tests), Release build, `tsc`, browser: **NOT RUN** at
+`fcf0e686…` (dated Arena record — superseded by §13: Owner-local at `041b2863…` Release build
+PASS, **455 / 455**, fixture emission 7 / 7 ×2 no diff, typecheck PASS, 36 / 36; browser review
+remains part of the pending Owner Manual Review).
 
 ### 12.8 Evidence status (unchanged, re-verified by R43 / Group H)
 
@@ -302,8 +307,67 @@ IP literals remain only in `tcNodeConfiguration.mjs` (S2 14 / 14). Protected beh
 separation, AI-002 trend-only, AI-003 pump-ready, Safe Return, valve-close classification,
 FrontRearDelta diagnostic-only, Kiosk / WebView2, scoped S2).
 
-### 12.10 Completion statement
+### 12.10 Completion statement (as written at `fcf0e686…`; superseded by §13)
 
-**Stage 0.4C-K3 is NOT complete and PR #21 is NOT PR-ready**: the .NET validation (build + tests +
-fixture parity) is unperformed in Arena. Everything that can run in Arena is green with zero
-failures. PR #21 stays OPEN and unmerged.
+At the time of the Completion Pass the .NET validation was unperformed, so K3 was not complete
+and PR #21 was not PR-ready. §13 records the Owner-local validation that followed.
+
+---
+
+## 13. Owner-local automated validation and closeout (2026-10-12)
+
+### 13.1 Analyzer corrections on the way to a green Release build
+
+| Commit | Parent | Finding (Owner-local Release build, `TreatWarningsAsErrors`, `AnalysisLevel latest-minimum`) | Correction |
+|---|---|---|---|
+| `01f1d00659008194e61133282b0ef004f1b1cff6` | `fcf0e686…` | CA1859 at `packages/contracts/WallMap.cs(127,42)` — private `BuildSensorSequence` declared `IReadOnlyList<string>` while returning `Array.AsReadOnly(sequence)` | Return type changed to `System.Collections.ObjectModel.ReadOnlyCollection<string>`; public `CanonicalSensorMap.SensorSequence` stays `IReadOnlyList<string>`; Sensor IDs, order, I7 / I16 positions and counts unchanged |
+| `041b286322186977c5f87cde8184ae5a180d60a6` | `01f1d006…` | CA1861 at `tests/domain.tests/CanonicalMapStructureTests.cs(55,22)` and `(83,22)` — constant `new[] { … }` expected arrays | Two `private static readonly string[]` fields (`ExpectedCorrectedSensorIds = ["I7", "I16"]`, `ExpectedLogicalPositionKinds = ["SENSOR"]`) substituted; actual expressions, ordering and semantics unchanged |
+
+No suppression, pragma, `NoWarn`, analyzer-severity reduction, `TreatWarningsAsErrors` /
+`AnalysisLevel` / `.editorconfig` change, fixture edit, schema edit or dependency edit was used.
+Each correction was verified against the Owner-supplied exact source ZIP of the preceding head.
+
+### 13.2 Owner-local validation record (exact detached HEAD `041b2863…`)
+
+| Step | Command | Result |
+|---|---|---|
+| Identity | remote PR #21 head, direct parent `01f1d006…`, ancestry from `cc6ccf87…` | verified before validation |
+| Locked restore | `dotnet restore WaterJetSentinelSuite.sln --locked-mode` | **PASS** — restore complete, no source or lock-file drift |
+| Release build | `dotnet build WaterJetSentinelSuite.sln -c Release --no-restore` | **PASS** — all solution projects compiled; 3.8 s; no error; no warning reported |
+| Full .NET tests | `dotnet test WaterJetSentinelSuite.sln -c Release --no-build` | **PASS — Total 455 · Passed 455 · Failed 0 · Skipped 0** (8.5 s) |
+| Fixture emission, run 1 | `WJSS_UPDATE_FIXTURES=1 dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj -c Release --no-build` | **PASS 7 / 7** — no Git diff, working tree clean |
+| Fixture emission, run 2 (determinism) | same command | **PASS 7 / 7** — no additional Git diff, working tree clean |
+| TypeScript contract gate | `cd packages/contracts/wjss-contracts-ts && npm ci && npm run check` | **PASS** — typecheck PASS; contract tests 36 / 36; no package-lock drift; working tree clean |
+| Exact source ZIP | `waterjet-sentinel-suite-041b286322186977c5f87cde8184ae5a180d60a6.zip`, SHA-256 `5366377c9060c6505007622bd95e84c41182c5daa152b0c0454b0465cf13658d`, 2,102,287 bytes, 455 source files; no `.git` / `bin` / `obj` / `node_modules` / `coverage` / `dist` / logs | both analyzer corrections confirmed; no suppression anywhere |
+
+Arena did not and cannot rerun .NET; the figures above are the Owner-local record, reproduced
+exactly.
+
+### 13.3 K3 status after this closeout
+
+| Item | Status |
+|---|---|
+| Automated Build / Test Gate | **PASS** |
+| Release build | PASS |
+| Full .NET | 455 / 455 PASS |
+| Fixture emission | 7 / 7 PASS |
+| Second deterministic emission | 7 / 7 PASS, no diff |
+| TypeScript typecheck | PASS |
+| TypeScript contract tests | 36 / 36 PASS |
+| Working tree after Owner validation | CLEAN |
+| Schema | `/2` retained (`wjss.snapshot/2`, `wjss.delta/2`) |
+| OQ-T3 | RESOLVED — RETAIN_SCHEMA_V2 |
+| Owner Manual Review | **PENDING** |
+| PR #21 | OPEN / UNMERGED |
+| K3 | **AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING** |
+
+Not claimed: Owner Manual Review passed; PR-ready; K3 complete; PR merged; hardware verified;
+physical acquisition implemented; protocol resolved; Port resolved; MODBUS / TEST_HARDWARE /
+PRODUCTION / device write authorised. The Sensor Disable mutation UI remains **NOT_IMPLEMENTED**
+(Runtime foundation and read-only representation only). WJ1 / WJ3 Installed Position remains
+**UNRESOLVED** (no gap anchors; Target Coverage unchanged). Every evidence-honesty position of
+§12.8 is unchanged.
+
+This closeout commit is documentation-only: no `.cs`, `.mjs`, `.ts`, `.json`, `.csv`, HTML, CSS,
+fixture, generated file, lock file, project file, props, `.editorconfig`, schema, Runtime, Queue,
+test or dependency file was changed.

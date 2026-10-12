@@ -19,7 +19,7 @@ K3 is the **evidence gate** between the configured six-Node model of K2 and any 
 | `origin/main` | `cc6ccf8779d87a5a44d1c03a003021791c26aac8` = approved baseline (PR #20 merge; PR #20 state `MERGED`) |
 | Branch | `arena/200cd6d0-waterjet-sentinel-suite`, HEAD = baseline, descends from it, tree and index clean |
 | Pre-change gates (Node v22.22.3) | Commissioning 144/144 · Ops Preview 110/110 · Kiosk contract 22/22 · Mapping UI 82/82 · mapping package 268 total / 261 pass / 7 skipped · boundary scan `0 findings (S1-S9 clean)` · S2 self-tests 14/14 — all equal to the approved totals |
-| .NET | NOT RUN in Arena (no SDK) |
+| .NET | NOT RUN in Arena (no SDK) at this checkpoint. Later Owner-local validation of the same PR at head `041b2863…`: Release build PASS, 455 / 455, fixture emission 7 / 7 (×2, no diff) — see [`STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`](STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md) §13 |
 
 ## 3. Exact-source sweep and evidence intake
 

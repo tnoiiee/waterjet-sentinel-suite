@@ -45,8 +45,8 @@ measurements, 240 physical TC channels, 24 unassigned.
   gap). Proof: `--legacy-proof` reproduces the previously committed 106-form file
   **byte-identically**, and a second `--write` run produces no diff. The .NET importer
   and `SensorParameterMigrationTests` were corrected to the same form; the Owner-local
-  `MigratedExampleShapeTests` / importer run is the remaining C# parity gate
-  (NOT_RUN_ENVIRONMENT_UNAVAILABLE in Arena). The file was never hand-edited.
+  `MigratedExampleShapeTests` / importer run **PASSED** at PR #21 head `041b2863…` (full .NET
+  455 / 455; `docs/STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md` §13). The file was never hand-edited.
 
 Stage 0.3A-3 Checkpoint B added `sensor-parameters.migrated.example.json`: the
 canonical shape of the migrated legacy sensor parameters (ADR-0017) — 108

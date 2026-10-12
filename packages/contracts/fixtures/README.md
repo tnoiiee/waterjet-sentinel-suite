@@ -2,7 +2,7 @@
 
 | File | Purpose |
 | --- | --- |
-| `snapshot.seed0.json` | Full `wjss.snapshot/2` projection (108-slot wall map — 108 Sensor slots, I7 and I16 included; 216 channels; bounded queue; Active Job mid-Safe-Return; health; trend). **Regenerated 2026-10-12 to the corrected baseline** with `tools/fixture-generator/generate.mjs` (byte-exact Node port of `tests/integration/FixtureGenerator.cs`; see "Owner critical topology correction" below). Owner-local C# parity gate (`FixtureParityTests`) pending. |
+| `snapshot.seed0.json` | Full `wjss.snapshot/2` projection (108-slot wall map — 108 Sensor slots, I7 and I16 included; 216 channels; bounded queue; Active Job mid-Safe-Return; health; trend). **Regenerated 2026-10-12 to the corrected baseline** with `tools/fixture-generator/generate.mjs` (byte-exact Node port of `tests/integration/FixtureGenerator.cs`; see "Owner critical topology correction" below). Owner-local C# parity gate (`FixtureParityTests`) **PASSED** at PR #21 head `041b2863…` (7 / 7, no diff, repeated 7 / 7 no diff). |
 | `delta.basic.json` | `wjss.delta/1` gapless delta (`previousRevision` 10 → 11), sparse keys only |
 | `delta.gap.json` | `wjss.delta/1` gap fixture (7 → 12): structurally valid, must be detected as a GAP (consumer re-snapshots) |
 | `command.refusal.json` | `CommandOutcome` refusal envelope sample (`RUNTIME_NOT_IMPLEMENTED`) |
@@ -33,9 +33,11 @@ The authoritative current baseline is 108 Sensors and 216 assigned Product TC me
   - `delta.basic.json` and `delta.gap.json` are unchanged: their Sensor and runtime projections
     carry no topology-dependent field and were re-derived identically by the port.
   The C# generator (`FixtureGenerator.cs`) was corrected to the same form; the Owner-local
-  `FixtureParityTests` run (`WJSS_UPDATE_FIXTURES=1 dotnet test tests/integration/…`) is the
-  remaining C# ↔ fixture parity gate and is **NOT_RUN_ENVIRONMENT_UNAVAILABLE** in Arena.
-  The file was never hand-edited.
+  `FixtureParityTests` run (`WJSS_UPDATE_FIXTURES=1 dotnet test tests/integration/…`) **PASSED**
+  at PR #21 head `041b2863…` — 7 / 7 with no Git diff, and 7 / 7 with no additional diff on the
+  deterministic second run (`docs/STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md` §13). The Arena pass
+  itself could not run .NET; the parity proof is the Owner-local record. The file was never
+  hand-edited.
 - WJ1 / WJ3 installed position (previously "at the I16 / I7 gap") is **UNRESOLVED** by Owner
   ruling: `placementKind: UNRESOLVED`, `placementAnchors: []`, operator wording "Installed
   position pending authoritative layout". Nothing is inferred from I7, I16, a former gap, a
@@ -46,9 +48,11 @@ The authoritative current baseline is 108 Sensors and 216 assigned Product TC me
 ## Status of these files
 
 **GOLDEN FIXTURES — `snapshot.seed0.json` regenerated 2026-10-12 to the 108-Sensor baseline
-via the proven Node port of the .NET generator; Owner-local .NET parity re-validation pending.
-The earlier Owner-local validation (2026-10-07) PASSED against the superseded 106-Sensor
-baseline and is historical.**
+via the proven Node port of the .NET generator; Owner-local .NET parity re-validation PASSED
+at `041b2863…` (fixture emission 7 / 7, no diff, twice; full .NET 455 / 455; contracts-ts
+36 / 36). Schema `wjss.snapshot/2` retained (OQ-T3 RESOLVED — RETAIN_SCHEMA_V2). The earlier
+Owner-local validation (2026-10-07) PASSED against the superseded 106-Sensor baseline and is
+historical.**
 
 - `delta.basic.json`, `delta.gap.json` and `command.refusal.json` are the genuine .NET
   generator output, transferred from the Owner's validated Working Tree (handoff commit
