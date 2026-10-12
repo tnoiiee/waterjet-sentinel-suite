@@ -28,8 +28,42 @@ public sealed record TcNodeEndpoint
 }
 
 /// <summary>
-/// Read-only register block request. Only read function codes are ever issued (FC03 Read Holding
-/// Registers or FC04 Read Input Registers as a test parameter, both CANDIDATE_UNVERIFIED). Quantity 40
+/// Explicit register-area / function-code candidate for a read-only acquisition.
+/// No automatic fallback: the requested area is the only function code attempted.
+/// Both values remain CANDIDATE_UNVERIFIED until one-Node physical evidence establishes
+/// whether the field device exposes the 40-word image at FC03 or FC04, at which start address.
+/// The numeric values correspond to the Modbus function codes (3 and 4) for traceability,
+/// but the candidate state is not verified.
+/// </summary>
+public enum TcRegisterArea
+{
+    /// <summary>FC03 Read Holding Registers — CANDIDATE_UNVERIFIED.</summary>
+    HoldingRegisters = 3,
+
+    /// <summary>FC04 Read Input Registers — CANDIDATE_UNVERIFIED.</summary>
+    InputRegisters = 4,
+}
+
+/// <summary>
+/// Endianness candidate for the Modbus TCP wire. Modbus network byte order is BigEndian
+/// (MSB first). FluentModbus exposes a per-connection <c>ModbusEndianness</c> that controls
+/// whether the library swaps bytes on little-endian hosts. The selected endianness is
+/// explicit (BigEndian) but remains CANDIDATE_UNVERIFIED until bench evidence confirms
+/// the field I/O module mapping and the host's SwapBytes behavior. Word ordering for any
+/// future multi-register value, scaling, and wire-break decoding remain unverified.
+/// </summary>
+public enum TcEndiannessCandidate
+{
+    /// <summary>BigEndian — Modbus network order, CANDIDATE_UNVERIFIED.</summary>
+    BigEndian = 0,
+
+    /// <summary>LittleEndian — alternative wire order, CANDIDATE_UNVERIFIED.</summary>
+    LittleEndian = 1,
+}
+
+/// <summary>
+/// Read-only register block request. Only read function codes are ever issued (FC03 or FC04
+/// as the explicit <see cref="RegisterArea"/> candidate, both CANDIDATE_UNVERIFIED). Quantity 40
 /// at start address 0 is the DERIVED model-level candidate (5 modules × 8 channels) and remains
 /// CANDIDATE_UNVERIFIED until one-Node physical evidence is obtained.
 /// </summary>
@@ -46,11 +80,14 @@ public sealed record TcReadRequest
     /// <summary>Connection generation captured at call time for stale-result fencing.</summary>
     public required int Generation { get; init; }
 
-    /// <summary>Per-call timeout; 0 means use client default.</summary>
+    /// <summary>Per-call timeout; 0 means use client default (2000 ms). Implemented via linked CancellationToken, not via mutable ReadTimeout.</summary>
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMilliseconds(2000);
 
-    /// <summary>True = FC04 Read Input Registers, false = FC03 Read Holding Registers. Both CANDIDATE_UNVERIFIED.</summary>
-    public bool UseInputRegisters { get; init; } = false;
+    /// <summary>Explicit register area / function-code candidate. No fallback.</summary>
+    public required TcRegisterArea RegisterArea { get; init; }
+
+    /// <summary>Explicit endianness candidate for this read. Currently fixed to BigEndian (network order) as candidate.</summary>
+    public TcEndiannessCandidate Endianness { get; init; } = TcEndiannessCandidate.BigEndian;
 }
 
 /// <summary>
@@ -74,6 +111,8 @@ public enum TcReadKind
 /// Application-owned result of a read-only register block read. Raw words are unsigned 16-bit as
 /// received on the wire; no scaling, signedness, temperature decoding, wire-break or overrange logic
 /// is applied here (all remain CANDIDATE_UNVERIFIED / NOT_IMPLEMENTED). Library types are not exposed.
+/// The <see cref="RegisterArea"/> echoes the candidate that was actually attempted; no silent fallback occurred.
+/// The buffer is application-owned (copied from transport-owned memory) and safe to retain.
 /// </summary>
 public sealed record TcReadResult
 {
@@ -85,16 +124,22 @@ public sealed record TcReadResult
     public string? DetailCode { get; init; }
     public string? Detail { get; init; }
 
-    public static TcReadResult SuccessResult(TcNodeEndpoint endpoint, int generation, ushort[] words, DateTimeOffset receivedAt) =>
-        new() { Kind = TcReadKind.Success, Endpoint = endpoint, Generation = generation, RawWords = words, ReceivedAtUtc = receivedAt };
+    /// <summary>Which register area / function-code candidate was attempted, if any (null for Connect or pre-validation failures).</summary>
+    public TcRegisterArea? RegisterArea { get; init; }
 
-    public static TcReadResult Failure(TcReadKind kind, TcNodeEndpoint endpoint, int generation, string code, string detail) =>
-        new() { Kind = kind, Endpoint = endpoint, Generation = generation, DetailCode = code, Detail = detail, ReceivedAtUtc = DateTimeOffset.UtcNow };
+    /// <summary>Endianness mode that was configured for the attempt (null if not applicable).</summary>
+    public TcEndiannessCandidate? Endianness { get; init; }
 
-    public static TcReadResult CancelledResult(TcNodeEndpoint endpoint, int generation) =>
-        Failure(TcReadKind.Cancelled, endpoint, generation, "CANCELLED", "The read was cancelled.");
+    public static TcReadResult SuccessResult(TcNodeEndpoint endpoint, int generation, ushort[] words, DateTimeOffset receivedAt, TcRegisterArea area, TcEndiannessCandidate endianness) =>
+        new() { Kind = TcReadKind.Success, Endpoint = endpoint, Generation = generation, RawWords = words, ReceivedAtUtc = receivedAt, RegisterArea = area, Endianness = endianness };
 
-    public static TcReadResult Stale(TcNodeEndpoint endpoint, int generation, int currentGeneration) =>
+    public static TcReadResult Failure(TcReadKind kind, TcNodeEndpoint endpoint, int generation, string code, string detail, TcRegisterArea? area = null, TcEndiannessCandidate? endianness = null) =>
+        new() { Kind = kind, Endpoint = endpoint, Generation = generation, DetailCode = code, Detail = detail, ReceivedAtUtc = DateTimeOffset.UtcNow, RegisterArea = area, Endianness = endianness };
+
+    public static TcReadResult CancelledResult(TcNodeEndpoint endpoint, int generation, TcRegisterArea? area = null, TcEndiannessCandidate? endianness = null) =>
+        Failure(TcReadKind.Cancelled, endpoint, generation, "CANCELLED", "The read was cancelled.", area, endianness);
+
+    public static TcReadResult Stale(TcNodeEndpoint endpoint, int generation, int currentGeneration, TcRegisterArea? area = null, TcEndiannessCandidate? endianness = null) =>
         Failure(TcReadKind.StaleGenerationRejected, endpoint, generation, "STALE_GENERATION_REJECTED",
-            $"Result generation {generation} is stale; current generation is {currentGeneration}.");
+            $"Result generation {generation} is stale; current generation is {currentGeneration}.", area, endianness);
 }

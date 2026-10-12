@@ -33,6 +33,12 @@ const ALLOWED_PREFIX = 'adapters/tc-acquisition/';
 export function isS3Exception(relPath, term) {
   if (typeof relPath !== 'string' || typeof term !== 'string') return false;
   if (term.toLowerCase() !== ALLOWED_TERM) return false;
+  // Reject non-normalized or traversal paths before prefix check so
+  // 'adapters/tc-acquisition/../tc-acquisition/evil.cs' cannot expand the exception.
+  if (relPath.includes('..') || relPath.includes('//') || relPath.includes('\\')) return false;
+  if (relPath.includes('/./')) return false;
+  if (relPath.startsWith('./') || relPath.startsWith('/')) return false;
+  if (relPath.endsWith('/') || relPath.endsWith(' ')) return false;
   if (ALLOWED_PATHS.includes(relPath)) return true;
   if (relPath.startsWith(ALLOWED_PREFIX)) return true;
   return false;

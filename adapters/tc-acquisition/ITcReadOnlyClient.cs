@@ -7,16 +7,19 @@ namespace Wjss.Adapters.TcAcquisition;
 /// - connect to one configured TC Node (one connection per instance, single session owner);
 /// - read a specified read-only register block and return raw unsigned 16-bit words plus
 ///   communication metadata;
-/// - accept cancellation;
+/// - accept cancellation (read supports per-operation CancellationToken; connect timeout is bounded by
+///   ConnectTimeout and is not cooperatively cancellable mid-handshake — see FluentModbusTcClient docs);
 /// - expose no third-party library types to Domain, Runtime contracts, Kiosk UI or Mapping contracts;
 /// - stop and dispose cleanly;
-/// - reject or fence stale results from an earlier connection generation.
+/// - reject or fence stale results from an earlier connection generation;
+/// - enforce one outstanding read per client and explicit register-area selection (no fallback).
 ///
 /// Physical scope: read-only only. No write/coil path (FC05/FC06/FC15/FC16) is ever exposed or
 /// called. TEST_HARDWARE and PRODUCTION remain NOT_AUTHORIZED; this interface is disabled by
 /// default and requires an explicit future Scope Gate to be used against the six
 /// TEST_CONFIGURATION TC Node addresses (as defined in tcNodeConfiguration.mjs, TEST-NET-1
 /// documentation range) on the Owner-confirmed port (CANDIDATE_UNVERIFIED).
+/// Endianness is explicit (BigEndian network order) but remains CANDIDATE_UNVERIFIED until bench evidence.
 /// </summary>
 public interface ITcReadOnlyClient : IAsyncDisposable
 {
