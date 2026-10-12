@@ -8,8 +8,15 @@
 export {
   COLUMN, COLUMN_COUNT, ROW_STATE, TEMPLATE_COMPATIBILITY, ROW_CLASS, PASS_BLOCKED, PROTECTED_BASELINE,
   parseCsv, requireHeaderContract, parseSchedule, classifyRow, passBlockedReason, scheduleCounts,
-  matchesProtectedBaseline, nodeInventory, measurementsOfSensor, isNonSensorGapSensorId,
+  matchesProtectedBaseline, nodeInventory, measurementsOfSensor, isProductSensorId,
+  PRODUCT_SENSOR_SEQUENCE,
 } from './schedule.mjs';
+
+export {
+  AUTHORITATIVE_TOPOLOGY, TOPOLOGY_REFUSAL, validateSensorSequence, validateSensorCatalogue,
+  validateSchedule, validateWallMapCounts, validateRuntimeCounts, validateTopologyInvariants,
+  requireTopologyInvariants,
+} from './topologyInvariants.mjs';
 
 export {
   QUALITY, QUALITY_VALUES, DIAGNOSTIC_REASON, DIAGNOSTIC_REASON_VALUES, COMMISSIONING_STATE,

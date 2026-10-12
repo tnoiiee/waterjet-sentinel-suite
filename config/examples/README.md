@@ -23,10 +23,29 @@ Since the 2026-10-07 closeout these files are the .NET generator's own output
 sensor-map example's `tcChannels` is the exact two-entry array contract of
 ADR-0014 decision 8, and TypeScript validation of the shape passes 24/24.
 
-Stage 0.3A-3 Checkpoint B adds `sensor-parameters.migrated.example.json`: the
+**Owner critical topology correction (2026-10-12).** The authoritative baseline is
+108 Product Sensors (I7 and I16 are normal Sensors), 216 assigned Product TC
+measurements, 240 physical TC channels, 24 unassigned.
+
+- `sensor-map.example.json` has been **regenerated** to that baseline (108 `SENSOR`
+  slots, no `NON_SENSOR_GAP`, 216 channels, `sensorsPerWall` 24/30/24/30) with
+  `tools/sensor-map-example/generate.mjs` (`--write`), a byte-exact Node port of
+  `tests/integration/ExampleFiles.cs::SensorMap`; `--legacy-proof` reproduces the
+  superseded 106 form for comparison only. The C# generator must adopt the same
+  form in the Owner-local .NET pass.
+- `sensor-parameters.migrated.example.json` is **STALE — not regenerated**: it is
+  the output of the .NET importer over the synthetic CSV
+  (`tests/config.tests/SyntheticSensorParameterCsv.cs`), not a formula that can be
+  reproduced provably in Node, so it is left as committed (not hand-edited). It still
+  carries I7/I16 as `NON_SENSOR_GAP`, 106 Sensor configurations, scanOrder 1–106 and
+  `placementKind: NON_SENSOR_GAP` for WJ1/WJ3. Regenerating it requires the
+  Owner-local .NET pass (importer correction + Owner placement decision for WJ1/WJ3).
+
+Stage 0.3A-3 Checkpoint B added `sensor-parameters.migrated.example.json`: the
 canonical shape of the migrated legacy sensor parameters (ADR-0017) — 108
-logical positions (I7/I16 as NON_SENSOR_GAP anchors), 106 Sensor
-configurations with dense scanOrder 1–106, the WJ1–WJ8 / IV1–IV8 paired
+logical positions, 108 Sensor configurations with dense scanOrder 1–108 (historical
+file content: I7/I16 as NON_SENSOR_GAP anchors, 106 Sensor configurations, scanOrder
+1–106 — Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.), the WJ1–WJ8 / IV1–IV8 paired
 topology, and an empty warnings array. Every value is synthetic; the deferred
 raw fields and the acquisition-binding provenance are null; the Owner CSV
 itself and every real acquisition value never enter Git. The related

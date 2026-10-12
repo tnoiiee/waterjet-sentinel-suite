@@ -109,11 +109,12 @@ test('the schedule payload reproduces the protected baseline exactly', async () 
   assert.equal(body.counts.physicalChannels, 240);
   assert.equal(body.counts.mappedChannels, 216);
   assert.equal(body.counts.unassignedChannels, 24);
-  assert.equal(body.counts.productCompatibleMeasurements, 212);
-  assert.equal(body.counts.productSensors, 106);
-  assert.equal(body.counts.drawingVerifiedRows, 200);
+  assert.equal(body.counts.productCompatibleMeasurements, 216);
+  assert.equal(body.counts.productSensors, 108);
+  assert.equal(body.counts.drawingVerifiedRows, 204);
+  assert.equal(body.counts.productTopologyConflictRows, 0);
+  assert.equal(body.counts.unassignedChannels, 24);
   assert.equal(body.counts.drawingInternalConflictRows, 12);
-  assert.equal(body.counts.productTopologyConflictRows, 4);
   assert.equal(body.counts.unresolvedRows, 0);
   assert.equal(body.counts.matchesProtectedBaseline, true);
   const first = body.rows[0];
@@ -174,22 +175,33 @@ test('the operations summary reports six nodes and the evidence-derived progress
   assert.deepEqual(body.nodeSummary.map((n) => n.nodeId), ['TC-NODE-01', 'TC-NODE-02', 'TC-NODE-03', 'TC-NODE-04', 'TC-NODE-05', 'TC-NODE-06']);
   for (const node of body.nodeSummary) assert.equal(node.state, 'ONLINE');
   assert.equal(body.commissioningProgress.total, 240);
-  assert.equal(body.commissioningProgress.byState.BLOCKED, 40);
-  assert.equal(body.commissioningProgress.byState.NOT_TESTED, 200);
-  assert.equal(body.commissioningProgress.eligibleForPass, 200);
+  assert.equal(body.commissioningProgress.byState.BLOCKED, 36);
+  assert.equal(body.commissioningProgress.byState.NOT_TESTED, 204);
+  assert.equal(body.commissioningProgress.eligibleForPass, 204);
 });
 
-test('the sensor map route serves the public-safe example with I7 and I16 as gaps', async () => {
+test('the sensor map route serves the public-safe example with all 108 positions as Sensors (I7 and I16 included)', async () => {
   const body = await (await fetch(`${base}/api/sensor-map`)).json();
   assert.equal(body.slotCount, 108);
-  assert.equal(body.sensorSlotCount, 106);
-  assert.equal(body.logicalMatrix.thermocoupleChannels, 212);
-  assert.equal(body.nonSensorGapSlots.length, 2);
-  assert.deepEqual([...new Set(body.nonSensorGapSlots.map((g) => g.slotId))].length, 2);
-  const gapText = JSON.stringify(body.nonSensorGapSlots);
-  assert.match(gapText, /I7/);
-  assert.match(gapText, /I16/);
-  for (const gap of body.nonSensorGapSlots) assert.ok(gap.waterJetAnchor);
+  assert.equal(body.sensorSlotCount, 108);
+  assert.equal(body.nonSensorGapSlotCount, 0);
+  assert.equal(body.logicalMatrix.sensorLocations, 108);
+  assert.equal(body.logicalMatrix.thermocoupleChannels, 216);
+  assert.deepEqual(body.logicalMatrix.sensorsPerWall, { LEFT: 24, REAR: 30, RIGHT: 24, FRONT: 30 });
+  assert.equal(body.topologyInvariants.ok, true);
+  assert.equal(body.topologyInvariants.authoritative.PRODUCT_SENSORS, 108);
+  assert.equal(body.topologyInvariants.authoritative.ASSIGNED_PRODUCT_TC_CHANNELS, 216);
+  assert.equal(body.topologyInvariants.authoritative.UNASSIGNED_PHYSICAL_TC_CHANNELS, 24);
+  const slots = body.walls.flatMap((w) => w.slots);
+  assert.equal(slots.length, 108);
+  assert.equal(slots.every((s) => s.positionKind === 'SENSOR' && typeof s.sensorId === 'string'), true);
+  for (const sensorId of ['I7', 'I16']) {
+    const matching = slots.filter((s) => s.sensorId === sensorId);
+    assert.equal(matching.length, 1, sensorId);
+    assert.equal(matching[0].tcChannels.length, 2, sensorId);
+  }
+  const text = JSON.stringify(body);
+  assert.doesNotMatch(text.replace(/NON_SENSOR_GAP_POSITIONS":0/g, ''), /NON_SENSOR_GAP|gapAnchorForWaterJetId|waterJetAnchor|logicalLabel/);
 });
 
 test('no served byte contains a non-loopback address, an external asset or a device endpoint', async () => {

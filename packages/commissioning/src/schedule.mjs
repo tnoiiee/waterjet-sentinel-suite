@@ -73,28 +73,57 @@ export const PASS_BLOCKED = Object.freeze({
   NO_SENSOR_IDENTITY: 'NO_SENSOR_IDENTITY_BLOCKED',
 });
 
-/** The protected physical topology of the merged baseline (Stage 0.4C-0B). Never recomputed away. */
+/**
+ * The protected physical topology of the merged baseline (Stage 0.4C-0B physical structure, Owner
+ * critical topology correction for the Sensor catalogue). Never recomputed away.
+ *
+ * Owner critical topology correction (Stage 0.4C-K3): I7 and I16 are normal Product Sensors. The
+ * former "106 Sensors / 212 Product-compatible measurements / 4 Product-topology conflict rows /
+ * two NON_SENSOR_GAP positions" belief is revoked. The authoritative baseline is 108 Product Sensors
+ * x 2 measurement sides = 216 assigned Product TC measurements out of 240 physical Channels, leaving
+ * 24 unassigned (240 - 216 = 24). The four drawing rows of I7 and I16 (TC-NODE-05 A102.4 ch7/ch8,
+ * TC-NODE-06 A102.4 ch7/ch8) are used Product measurement assignments.
+ */
 export const PROTECTED_BASELINE = Object.freeze({
   NODE_COUNT: 6,
   MODULES_PER_NODE: 5,
   CHANNELS_PER_MODULE: 8,
   MODULE_COUNT: 30,
   PHYSICAL_CHANNEL_COUNT: 240,
-  PRODUCT_COMPATIBLE_MEASUREMENTS: 212,
-  PRODUCT_SENSORS: 106,
-  DRAWING_VERIFIED_ROWS: 200,
+  PRODUCT_COMPATIBLE_MEASUREMENTS: 216,
+  PRODUCT_SENSORS: 108,
+  MEASUREMENTS_PER_SENSOR: 2,
+  DRAWING_VERIFIED_ROWS: 204,
   DRAWING_INTERNAL_CONFLICT_ROWS: 12,
-  PRODUCT_TOPOLOGY_CONFLICT_ROWS: 4,
+  PRODUCT_TOPOLOGY_CONFLICT_ROWS: 0,
   UNASSIGNED_ROWS: 24,
   MAPPED_ROWS: 216,
   MODULE_MODEL: '750-498',
   COUPLER_MODEL: '750-362',
   END_MODEL: '750-600',
   TEMPERATURE_UNIT: 'degC',
-  /** Positions that are authoritative NON_SENSOR_GAP positions: never Sensors, never Water Jets. */
-  NON_SENSOR_GAP_SENSOR_IDS: Object.freeze(['I7', 'I16']),
+  /** No logical position is a NON_SENSOR_GAP: I7 and I16 are normal Product Sensors (Owner correction). */
+  NON_SENSOR_GAP_SENSOR_IDS: Object.freeze([]),
   UNRESOLVED_ROWS: 0,
 });
+
+/**
+ * The authoritative Product Sensor sequence: exactly 108 identities in the approved logical order
+ * (G+201..G+218, G+101..G+118, G1..G18, H1..H18, I1..I18, J1..J18). I7 and I16 appear once each in
+ * their normal ordinal position; there is no hole, no appended identity and no renumbering.
+ */
+export const SENSOR_ROW_PREFIXES = Object.freeze([
+  (c) => `G+${200 + c}`,
+  (c) => `G+${100 + c}`,
+  (c) => `G${c}`,
+  (c) => `H${c}`,
+  (c) => `I${c}`,
+  (c) => `J${c}`,
+]);
+export const LOGICAL_COLUMN_COUNT = 18;
+export const PRODUCT_SENSOR_SEQUENCE = Object.freeze(
+  SENSOR_ROW_PREFIXES.flatMap((label) => Array.from({ length: LOGICAL_COLUMN_COUNT }, (_, i) => label(i + 1))),
+);
 
 /**
  * RFC 4180 field split for one line, plus multi-line aware record splitting. The evidence file is
@@ -235,9 +264,10 @@ export function parseSchedule(csvText) {
       rowClass,
       physicalChannelKey,
       measurementId,
-      // Product compatibility is the evidence column itself: 212 rows carry a template counterpart
-      // (106 Sensors x 2 sides). The 12 Drawing internal-conflict rows are among them, which is
-      // exactly why they are still blocked from a commissioning PASS by passBlockedReason below.
+      // Product compatibility is the evidence column itself: 216 rows carry a template counterpart
+      // (108 Sensors x 2 sides, I7 and I16 included). The 12 Drawing internal-conflict rows are among
+      // them, which is exactly why they are still blocked from a commissioning PASS by
+      // passBlockedReason below.
       productCompatible: templateCompatibility === TEMPLATE_COMPATIBILITY.MATCHED,
       drawingVerified: rowState === ROW_STATE.DRAWING_VERIFIED,
       passBlockedReason: passBlockedReason(rowClass, sensorId),
@@ -257,8 +287,9 @@ export function classifyRow({ rowState, templateCompatibility }) {
     return ROW_CLASS.UNASSIGNED;
   }
   if (templateCompatibility === TEMPLATE_COMPATIBILITY.MATCHED) return ROW_CLASS.PRODUCT_COMPATIBLE;
-  // GAP_CONFLICT rows are the Product-topology conflicts and are already returned above; anything
-  // else is refused loudly rather than folded into a compatible class.
+  // A DRAWING_TOPOLOGY_CONFLICT row is already returned above (the vocabulary is retained so a
+  // future evidence revision cannot be folded into a compatible class silently; the corrected
+  // baseline carries none). Anything else is refused loudly rather than folded into a compatible class.
   throw new Error(`unclassified schedule row: RowState '${rowState}', TemplateCompatibility '${templateCompatibility}'`);
 }
 
@@ -350,10 +381,10 @@ export function measurementsOfSensor(schedule, sensorId) {
 }
 
 /**
- * True when the Sensor identity is one of the authoritative NON_SENSOR_GAP positions.
- * These rows stay raw drawing evidence: they are never Sensors, never Water Jets and never
- * selectable as a Product Runtime Sensor.
+ * True when the identity is one of the 108 authoritative Product Sensors. I7 and I16 are ordinary
+ * members of that sequence (Owner critical topology correction); nothing in the Product treats
+ * them as a gap, an exclusion or a special case.
  */
-export function isNonSensorGapSensorId(sensorId) {
-  return PROTECTED_BASELINE.NON_SENSOR_GAP_SENSOR_IDS.includes(sensorId);
+export function isProductSensorId(sensorId) {
+  return PRODUCT_SENSOR_SEQUENCE.includes(sensorId);
 }

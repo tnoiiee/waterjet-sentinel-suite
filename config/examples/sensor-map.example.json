@@ -3,13 +3,13 @@
   "logicalMatrix": {
     "columns": 18,
     "rows": 6,
-    "sensorLocations": 106,
-    "thermocoupleChannels": 212,
+    "sensorLocations": 108,
+    "thermocoupleChannels": 216,
     "sensorsPerWall": {
       "LEFT": 24,
-      "REAR": 29,
+      "REAR": 30,
       "RIGHT": 24,
-      "FRONT": 29
+      "FRONT": 30
     },
     "slots": [
       {
@@ -680,8 +680,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 42,
         "tcChannels": [
-          "SYN-TC-04:CH00",
-          "SYN-TC-04:CH01"
+          "SYN-TC-03:CH26",
+          "SYN-TC-03:CH27"
         ]
       },
       {
@@ -696,8 +696,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 43,
         "tcChannels": [
-          "SYN-TC-04:CH02",
-          "SYN-TC-04:CH03"
+          "SYN-TC-04:CH00",
+          "SYN-TC-04:CH01"
         ]
       },
       {
@@ -712,8 +712,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 44,
         "tcChannels": [
-          "SYN-TC-04:CH04",
-          "SYN-TC-04:CH05"
+          "SYN-TC-04:CH02",
+          "SYN-TC-04:CH03"
         ]
       },
       {
@@ -728,8 +728,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 45,
         "tcChannels": [
-          "SYN-TC-04:CH06",
-          "SYN-TC-04:CH07"
+          "SYN-TC-04:CH04",
+          "SYN-TC-04:CH05"
         ]
       },
       {
@@ -744,8 +744,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 46,
         "tcChannels": [
-          "SYN-TC-04:CH08",
-          "SYN-TC-04:CH09"
+          "SYN-TC-04:CH06",
+          "SYN-TC-04:CH07"
         ]
       },
       {
@@ -760,8 +760,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 47,
         "tcChannels": [
-          "SYN-TC-04:CH10",
-          "SYN-TC-04:CH11"
+          "SYN-TC-04:CH08",
+          "SYN-TC-04:CH09"
         ]
       },
       {
@@ -776,8 +776,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 48,
         "tcChannels": [
-          "SYN-TC-04:CH12",
-          "SYN-TC-04:CH13"
+          "SYN-TC-04:CH10",
+          "SYN-TC-04:CH11"
         ]
       },
       {
@@ -792,8 +792,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 49,
         "tcChannels": [
-          "SYN-TC-04:CH14",
-          "SYN-TC-04:CH15"
+          "SYN-TC-04:CH12",
+          "SYN-TC-04:CH13"
         ]
       },
       {
@@ -808,8 +808,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 50,
         "tcChannels": [
-          "SYN-TC-04:CH16",
-          "SYN-TC-04:CH17"
+          "SYN-TC-04:CH14",
+          "SYN-TC-04:CH15"
         ]
       },
       {
@@ -824,8 +824,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 51,
         "tcChannels": [
-          "SYN-TC-04:CH18",
-          "SYN-TC-04:CH19"
+          "SYN-TC-04:CH16",
+          "SYN-TC-04:CH17"
         ]
       },
       {
@@ -840,8 +840,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 52,
         "tcChannels": [
-          "SYN-TC-04:CH20",
-          "SYN-TC-04:CH21"
+          "SYN-TC-04:CH18",
+          "SYN-TC-04:CH19"
         ]
       },
       {
@@ -856,8 +856,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 53,
         "tcChannels": [
-          "SYN-TC-04:CH22",
-          "SYN-TC-04:CH23"
+          "SYN-TC-04:CH20",
+          "SYN-TC-04:CH21"
         ]
       },
       {
@@ -872,8 +872,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 54,
         "tcChannels": [
-          "SYN-TC-04:CH24",
-          "SYN-TC-04:CH25"
+          "SYN-TC-04:CH22",
+          "SYN-TC-04:CH23"
         ]
       },
       {
@@ -888,8 +888,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 55,
         "tcChannels": [
-          "SYN-TC-05:CH00",
-          "SYN-TC-05:CH01"
+          "SYN-TC-04:CH24",
+          "SYN-TC-04:CH25"
         ]
       },
       {
@@ -904,8 +904,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 56,
         "tcChannels": [
-          "SYN-TC-05:CH02",
-          "SYN-TC-05:CH03"
+          "SYN-TC-04:CH26",
+          "SYN-TC-04:CH27"
         ]
       },
       {
@@ -920,8 +920,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 57,
         "tcChannels": [
-          "SYN-TC-05:CH04",
-          "SYN-TC-05:CH05"
+          "SYN-TC-05:CH00",
+          "SYN-TC-05:CH01"
         ]
       },
       {
@@ -936,8 +936,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 58,
         "tcChannels": [
-          "SYN-TC-05:CH06",
-          "SYN-TC-05:CH07"
+          "SYN-TC-05:CH02",
+          "SYN-TC-05:CH03"
         ]
       },
       {
@@ -952,8 +952,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 59,
         "tcChannels": [
-          "SYN-TC-05:CH08",
-          "SYN-TC-05:CH09"
+          "SYN-TC-05:CH04",
+          "SYN-TC-05:CH05"
         ]
       },
       {
@@ -968,8 +968,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 60,
         "tcChannels": [
-          "SYN-TC-05:CH10",
-          "SYN-TC-05:CH11"
+          "SYN-TC-05:CH06",
+          "SYN-TC-05:CH07"
         ]
       },
       {
@@ -984,8 +984,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 61,
         "tcChannels": [
-          "SYN-TC-05:CH12",
-          "SYN-TC-05:CH13"
+          "SYN-TC-05:CH08",
+          "SYN-TC-05:CH09"
         ]
       },
       {
@@ -1000,8 +1000,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 62,
         "tcChannels": [
-          "SYN-TC-05:CH14",
-          "SYN-TC-05:CH15"
+          "SYN-TC-05:CH10",
+          "SYN-TC-05:CH11"
         ]
       },
       {
@@ -1016,8 +1016,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 63,
         "tcChannels": [
-          "SYN-TC-05:CH16",
-          "SYN-TC-05:CH17"
+          "SYN-TC-05:CH12",
+          "SYN-TC-05:CH13"
         ]
       },
       {
@@ -1032,8 +1032,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 64,
         "tcChannels": [
-          "SYN-TC-05:CH18",
-          "SYN-TC-05:CH19"
+          "SYN-TC-05:CH14",
+          "SYN-TC-05:CH15"
         ]
       },
       {
@@ -1048,8 +1048,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 65,
         "tcChannels": [
-          "SYN-TC-05:CH20",
-          "SYN-TC-05:CH21"
+          "SYN-TC-05:CH16",
+          "SYN-TC-05:CH17"
         ]
       },
       {
@@ -1064,8 +1064,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 66,
         "tcChannels": [
-          "SYN-TC-05:CH22",
-          "SYN-TC-05:CH23"
+          "SYN-TC-05:CH18",
+          "SYN-TC-05:CH19"
         ]
       },
       {
@@ -1080,8 +1080,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 67,
         "tcChannels": [
-          "SYN-TC-05:CH24",
-          "SYN-TC-05:CH25"
+          "SYN-TC-05:CH20",
+          "SYN-TC-05:CH21"
         ]
       },
       {
@@ -1096,8 +1096,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 68,
         "tcChannels": [
-          "SYN-TC-06:CH00",
-          "SYN-TC-06:CH01"
+          "SYN-TC-05:CH22",
+          "SYN-TC-05:CH23"
         ]
       },
       {
@@ -1112,8 +1112,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 69,
         "tcChannels": [
-          "SYN-TC-06:CH02",
-          "SYN-TC-06:CH03"
+          "SYN-TC-05:CH24",
+          "SYN-TC-05:CH25"
         ]
       },
       {
@@ -1128,8 +1128,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 70,
         "tcChannels": [
-          "SYN-TC-06:CH04",
-          "SYN-TC-06:CH05"
+          "SYN-TC-06:CH00",
+          "SYN-TC-06:CH01"
         ]
       },
       {
@@ -1144,8 +1144,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 71,
         "tcChannels": [
-          "SYN-TC-06:CH06",
-          "SYN-TC-06:CH07"
+          "SYN-TC-06:CH02",
+          "SYN-TC-06:CH03"
         ]
       },
       {
@@ -1160,8 +1160,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 72,
         "tcChannels": [
-          "SYN-TC-06:CH08",
-          "SYN-TC-06:CH09"
+          "SYN-TC-06:CH04",
+          "SYN-TC-06:CH05"
         ]
       },
       {
@@ -1176,8 +1176,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 73,
         "tcChannels": [
-          "SYN-TC-06:CH10",
-          "SYN-TC-06:CH11"
+          "SYN-TC-06:CH06",
+          "SYN-TC-06:CH07"
         ]
       },
       {
@@ -1192,8 +1192,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 74,
         "tcChannels": [
-          "SYN-TC-06:CH12",
-          "SYN-TC-06:CH13"
+          "SYN-TC-06:CH08",
+          "SYN-TC-06:CH09"
         ]
       },
       {
@@ -1208,8 +1208,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 75,
         "tcChannels": [
-          "SYN-TC-06:CH14",
-          "SYN-TC-06:CH15"
+          "SYN-TC-06:CH10",
+          "SYN-TC-06:CH11"
         ]
       },
       {
@@ -1224,8 +1224,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 76,
         "tcChannels": [
-          "SYN-TC-06:CH16",
-          "SYN-TC-06:CH17"
+          "SYN-TC-06:CH12",
+          "SYN-TC-06:CH13"
         ]
       },
       {
@@ -1240,8 +1240,8 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 77,
         "tcChannels": [
-          "SYN-TC-06:CH18",
-          "SYN-TC-06:CH19"
+          "SYN-TC-06:CH14",
+          "SYN-TC-06:CH15"
         ]
       },
       {
@@ -1256,21 +1256,25 @@
         "gapAnchorForWaterJetId": null,
         "scanOrderSynthetic": 78,
         "tcChannels": [
-          "SYN-TC-06:CH20",
-          "SYN-TC-06:CH21"
+          "SYN-TC-06:CH16",
+          "SYN-TC-06:CH17"
         ]
       },
       {
         "slotId": "SLOT-R5-C07",
-        "positionKind": "NON_SENSOR_GAP",
+        "positionKind": "SENSOR",
         "wall": "REAR",
         "logicalColumn": 7,
         "logicalRow": 5,
         "wallColumn": 3,
         "wallRow": 5,
-        "sensorId": null,
-        "gapAnchorForWaterJetId": "WJ3",
-        "logicalLabel": "I7"
+        "sensorId": "I7",
+        "gapAnchorForWaterJetId": null,
+        "scanOrderSynthetic": 79,
+        "tcChannels": [
+          "SYN-TC-06:CH18",
+          "SYN-TC-06:CH19"
+        ]
       },
       {
         "slotId": "SLOT-R5-C08",
@@ -1282,10 +1286,10 @@
         "wallRow": 5,
         "sensorId": "I8",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 79,
+        "scanOrderSynthetic": 80,
         "tcChannels": [
-          "SYN-TC-06:CH22",
-          "SYN-TC-06:CH23"
+          "SYN-TC-06:CH20",
+          "SYN-TC-06:CH21"
         ]
       },
       {
@@ -1298,10 +1302,10 @@
         "wallRow": 5,
         "sensorId": "I9",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 80,
+        "scanOrderSynthetic": 81,
         "tcChannels": [
-          "SYN-TC-06:CH24",
-          "SYN-TC-06:CH25"
+          "SYN-TC-06:CH22",
+          "SYN-TC-06:CH23"
         ]
       },
       {
@@ -1314,10 +1318,10 @@
         "wallRow": 5,
         "sensorId": "I10",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 81,
+        "scanOrderSynthetic": 82,
         "tcChannels": [
-          "SYN-TC-07:CH00",
-          "SYN-TC-07:CH01"
+          "SYN-TC-06:CH24",
+          "SYN-TC-06:CH25"
         ]
       },
       {
@@ -1330,10 +1334,10 @@
         "wallRow": 5,
         "sensorId": "I11",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 82,
+        "scanOrderSynthetic": 83,
         "tcChannels": [
-          "SYN-TC-07:CH02",
-          "SYN-TC-07:CH03"
+          "SYN-TC-07:CH00",
+          "SYN-TC-07:CH01"
         ]
       },
       {
@@ -1346,10 +1350,10 @@
         "wallRow": 5,
         "sensorId": "I12",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 83,
+        "scanOrderSynthetic": 84,
         "tcChannels": [
-          "SYN-TC-07:CH04",
-          "SYN-TC-07:CH05"
+          "SYN-TC-07:CH02",
+          "SYN-TC-07:CH03"
         ]
       },
       {
@@ -1362,10 +1366,10 @@
         "wallRow": 5,
         "sensorId": "I13",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 84,
+        "scanOrderSynthetic": 85,
         "tcChannels": [
-          "SYN-TC-07:CH06",
-          "SYN-TC-07:CH07"
+          "SYN-TC-07:CH04",
+          "SYN-TC-07:CH05"
         ]
       },
       {
@@ -1378,10 +1382,10 @@
         "wallRow": 5,
         "sensorId": "I14",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 85,
+        "scanOrderSynthetic": 86,
         "tcChannels": [
-          "SYN-TC-07:CH08",
-          "SYN-TC-07:CH09"
+          "SYN-TC-07:CH06",
+          "SYN-TC-07:CH07"
         ]
       },
       {
@@ -1394,23 +1398,27 @@
         "wallRow": 5,
         "sensorId": "I15",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 86,
+        "scanOrderSynthetic": 87,
         "tcChannels": [
-          "SYN-TC-07:CH10",
-          "SYN-TC-07:CH11"
+          "SYN-TC-07:CH08",
+          "SYN-TC-07:CH09"
         ]
       },
       {
         "slotId": "SLOT-R5-C16",
-        "positionKind": "NON_SENSOR_GAP",
+        "positionKind": "SENSOR",
         "wall": "FRONT",
         "logicalColumn": 16,
         "logicalRow": 5,
         "wallColumn": 3,
         "wallRow": 5,
-        "sensorId": null,
-        "gapAnchorForWaterJetId": "WJ1",
-        "logicalLabel": "I16"
+        "sensorId": "I16",
+        "gapAnchorForWaterJetId": null,
+        "scanOrderSynthetic": 88,
+        "tcChannels": [
+          "SYN-TC-07:CH10",
+          "SYN-TC-07:CH11"
+        ]
       },
       {
         "slotId": "SLOT-R5-C17",
@@ -1422,7 +1430,7 @@
         "wallRow": 5,
         "sensorId": "I17",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 87,
+        "scanOrderSynthetic": 89,
         "tcChannels": [
           "SYN-TC-07:CH12",
           "SYN-TC-07:CH13"
@@ -1438,7 +1446,7 @@
         "wallRow": 5,
         "sensorId": "I18",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 88,
+        "scanOrderSynthetic": 90,
         "tcChannels": [
           "SYN-TC-07:CH14",
           "SYN-TC-07:CH15"
@@ -1454,7 +1462,7 @@
         "wallRow": 6,
         "sensorId": "J1",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 89,
+        "scanOrderSynthetic": 91,
         "tcChannels": [
           "SYN-TC-07:CH16",
           "SYN-TC-07:CH17"
@@ -1470,7 +1478,7 @@
         "wallRow": 6,
         "sensorId": "J2",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 90,
+        "scanOrderSynthetic": 92,
         "tcChannels": [
           "SYN-TC-07:CH18",
           "SYN-TC-07:CH19"
@@ -1486,7 +1494,7 @@
         "wallRow": 6,
         "sensorId": "J3",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 91,
+        "scanOrderSynthetic": 93,
         "tcChannels": [
           "SYN-TC-07:CH20",
           "SYN-TC-07:CH21"
@@ -1502,7 +1510,7 @@
         "wallRow": 6,
         "sensorId": "J4",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 92,
+        "scanOrderSynthetic": 94,
         "tcChannels": [
           "SYN-TC-07:CH22",
           "SYN-TC-07:CH23"
@@ -1518,7 +1526,7 @@
         "wallRow": 6,
         "sensorId": "J5",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 93,
+        "scanOrderSynthetic": 95,
         "tcChannels": [
           "SYN-TC-07:CH24",
           "SYN-TC-07:CH25"
@@ -1534,7 +1542,7 @@
         "wallRow": 6,
         "sensorId": "J6",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 94,
+        "scanOrderSynthetic": 96,
         "tcChannels": [
           "SYN-TC-08:CH00",
           "SYN-TC-08:CH01"
@@ -1550,7 +1558,7 @@
         "wallRow": 6,
         "sensorId": "J7",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 95,
+        "scanOrderSynthetic": 97,
         "tcChannels": [
           "SYN-TC-08:CH02",
           "SYN-TC-08:CH03"
@@ -1566,7 +1574,7 @@
         "wallRow": 6,
         "sensorId": "J8",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 96,
+        "scanOrderSynthetic": 98,
         "tcChannels": [
           "SYN-TC-08:CH04",
           "SYN-TC-08:CH05"
@@ -1582,7 +1590,7 @@
         "wallRow": 6,
         "sensorId": "J9",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 97,
+        "scanOrderSynthetic": 99,
         "tcChannels": [
           "SYN-TC-08:CH06",
           "SYN-TC-08:CH07"
@@ -1598,7 +1606,7 @@
         "wallRow": 6,
         "sensorId": "J10",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 98,
+        "scanOrderSynthetic": 100,
         "tcChannels": [
           "SYN-TC-08:CH08",
           "SYN-TC-08:CH09"
@@ -1614,7 +1622,7 @@
         "wallRow": 6,
         "sensorId": "J11",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 99,
+        "scanOrderSynthetic": 101,
         "tcChannels": [
           "SYN-TC-08:CH10",
           "SYN-TC-08:CH11"
@@ -1630,7 +1638,7 @@
         "wallRow": 6,
         "sensorId": "J12",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 100,
+        "scanOrderSynthetic": 102,
         "tcChannels": [
           "SYN-TC-08:CH12",
           "SYN-TC-08:CH13"
@@ -1646,7 +1654,7 @@
         "wallRow": 6,
         "sensorId": "J13",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 101,
+        "scanOrderSynthetic": 103,
         "tcChannels": [
           "SYN-TC-08:CH14",
           "SYN-TC-08:CH15"
@@ -1662,7 +1670,7 @@
         "wallRow": 6,
         "sensorId": "J14",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 102,
+        "scanOrderSynthetic": 104,
         "tcChannels": [
           "SYN-TC-08:CH16",
           "SYN-TC-08:CH17"
@@ -1678,7 +1686,7 @@
         "wallRow": 6,
         "sensorId": "J15",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 103,
+        "scanOrderSynthetic": 105,
         "tcChannels": [
           "SYN-TC-08:CH18",
           "SYN-TC-08:CH19"
@@ -1694,7 +1702,7 @@
         "wallRow": 6,
         "sensorId": "J16",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 104,
+        "scanOrderSynthetic": 106,
         "tcChannels": [
           "SYN-TC-08:CH20",
           "SYN-TC-08:CH21"
@@ -1710,7 +1718,7 @@
         "wallRow": 6,
         "sensorId": "J17",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 105,
+        "scanOrderSynthetic": 107,
         "tcChannels": [
           "SYN-TC-08:CH22",
           "SYN-TC-08:CH23"
@@ -1726,7 +1734,7 @@
         "wallRow": 6,
         "sensorId": "J18",
         "gapAnchorForWaterJetId": null,
-        "scanOrderSynthetic": 106,
+        "scanOrderSynthetic": 108,
         "tcChannels": [
           "SYN-TC-08:CH24",
           "SYN-TC-08:CH25"
@@ -1736,8 +1744,8 @@
   },
   "notes": [
     "scanOrderSynthetic and tcChannels are SYNTHETIC example assignments (device distribution); tcChannels is an exact two-entry array (front = lower channel index, rear = higher), not Production data.",
-    "NON_SENSOR_GAP slots (I7, I16) are placement anchors, not Sensors; they carry no sensorId, no thermocouple channels, and only the Water Jet each physically anchors.",
-    "The logical matrix and wall distribution are the Owner-confirmed structure (106 locations, 212 channels)."
+    "Owner critical topology correction: I7 and I16 are normal Product Sensors. Every one of the 108 logical positions is a Sensor with exactly two thermocouple channels; no position is a gap or a placement anchor.",
+    "The logical matrix and wall distribution are the Owner-confirmed structure (108 locations, 216 channels)."
   ],
   "fixtureStatus": "PROVISIONAL STRUCTURAL FIXTURE - OWNER-LOCAL .NET GENERATION REQUIRED"
 }

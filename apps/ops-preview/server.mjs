@@ -36,7 +36,7 @@ import {
   CANONICAL_TC_NODE_CONFIGURATION, TC_NODE_CONFIGURATION_ID, buildTcNodeConfigurationView,
   tcNodeConfigurationFingerprint,
   CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, recordToRecordConsistency,
-  tcAcquisitionEvidenceFingerprint,
+  tcAcquisitionEvidenceFingerprint, requireTopologyInvariants,
 } from '../../packages/commissioning/src/index.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -105,11 +105,14 @@ let cachedEvidence = null;
 export function loadEvidence() {
   if (!cachedEvidence) {
     const schedule = parseSchedule(readFileSync(SCHEDULE_PATH, 'utf8'));
-    cachedEvidence = Object.freeze({
-      schedule,
-      counts: scheduleCounts(schedule),
-      sensorMap: JSON.parse(readFileSync(SENSOR_MAP_PATH, 'utf8')),
-    });
+    const counts = scheduleCounts(schedule);
+    const sensorMap = JSON.parse(readFileSync(SENSOR_MAP_PATH, 'utf8'));
+    // Central topology invariant (Owner critical topology correction): the served Sensor catalogue,
+    // the physical schedule and the Sensor sequence must agree on 108 Sensors / 216 assigned / 240
+    // physical / 24 unassigned / no NON_SENSOR_GAP. Disagreement refuses the whole evidence load:
+    // no surface may present a count another layer contradicts.
+    const topology = requireTopologyInvariants({ sensorMap, schedule, scheduleCounts: counts });
+    cachedEvidence = Object.freeze({ schedule, counts, sensorMap, topology });
   }
   return cachedEvidence;
 }
@@ -241,8 +244,10 @@ function sensorMapPayload() {
     },
     slotCount: slots.length,
     sensorSlotCount: slots.filter((s) => s.positionKind === 'SENSOR').length,
-    nonSensorGapSlots: slots.filter((s) => s.positionKind === 'NON_SENSOR_GAP')
-      .map((s) => ({ slotId: s.slotId, label: s.logicalLabel ?? null, wall: s.wall, waterJetAnchor: s.gapAnchorForWaterJetId })),
+    // Owner critical topology correction: every logical position is a Product Sensor (I7 and I16
+    // included). The invariant check at load time guarantees this count is 0.
+    nonSensorGapSlotCount: slots.filter((s) => s.positionKind !== 'SENSOR').length,
+    topologyInvariants: { ok: loadEvidence().topology.ok, authoritative: loadEvidence().topology.authoritative },
     walls: ['LEFT', 'REAR', 'RIGHT', 'FRONT'].map((wall) => ({
       wall,
       slots: slots.filter((s) => s.wall === wall).map((s) => ({
@@ -253,10 +258,8 @@ function sensorMapPayload() {
         wallColumn: s.wallColumn,
         wallRow: s.wallRow,
         sensorId: s.sensorId,
-        // The approved logical label of the position (I7 / I16 for the NON_SENSOR_GAP positions).
-        // The equipment anchor the matrix records for a gap is deliberately NOT forwarded: no Water
-        // Jet identity may ever be derived from a Sensor wall position here.
-        logicalLabel: s.logicalLabel ?? null,
+        // No equipment identity is forwarded: no Water Jet identity may ever be derived from a
+        // Sensor wall position here.
         tcChannels: s.tcChannels ?? null,
       })),
     })),

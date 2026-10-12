@@ -39,7 +39,7 @@ const nodesByClass = (root, cls) => {
 
 const cells = (app) => nodesWith(id(app, 'wallmap'), 'data-slot-id');
 const sensorCells = (app) => cells(app).filter((cell) => cell.attributes['data-sensor-id'] !== undefined);
-const gapCells = (app) => cells(app).filter((cell) => cell.attributes['data-position-kind'] === 'NON_SENSOR_GAP');
+const nonSensorCells = (app) => cells(app).filter((cell) => cell.attributes['data-position-kind'] !== 'SENSOR');
 const cellFor = (app, sensorId) => sensorCells(app).find((cell) => cell.attributes['data-sensor-id'] === sensorId);
 const blockOf = (cell, side) => nodesWith(cell, 'data-side').find((block) => block.attributes['data-side'] === side);
 const deltaRowOf = (cell) => nodesByClass(cell, 'wj-dfr')[0] ?? null;
@@ -84,16 +84,15 @@ test('E1 every wall position renders exactly one read-only paired row, and only 
         'the paired state of a position must be one of the five documented states');
       assert.match(deltaRowOf(cell).attributes['data-delta-available'], /^(true|false)$/);
     }
-    // NORMAL_GOOD: all 106 complete pairs are available; the two gaps never are.
-    assert.equal(sensorCells(app).filter((c) => c.attributes['data-delta-available'] === 'true').length, 106);
-    assert.equal(gapCells(app).length, 2);
-    for (const gap of gapCells(app)) {
-      assert.equal(gap.attributes['data-delta-available'], 'false');
-      assert.equal(deltaValueOf(gap), '--', 'an unavailable paired value is never a number');
-      assert.equal(deltaUnitOf(gap), null, 'an unavailable paired value never carries a unit');
-      assert.equal(deltaSymbolOf(gap), '[?]');
-      assert.match(deltaRowOf(gap).attributes.title, /NON_SENSOR_GAP/);
-      assert.match(deltaRowOf(gap).attributes.title, /no unit/i);
+    // NORMAL_GOOD: all 108 complete pairs are available (I7 and I16 included); no non-Sensor cell exists.
+    assert.equal(sensorCells(app).filter((c) => c.attributes['data-delta-available'] === 'true').length, 108);
+    assert.equal(nonSensorCells(app).length, 0);
+    for (const sensorId of ['I7', 'I16']) {
+      const cell = sensorCells(app).find((c) => c.attributes['data-sensor-id'] === sensorId);
+      assert.ok(cell, `${sensorId} is a Sensor cell`);
+      assert.equal(cell.attributes['data-delta-available'], 'true');
+      assert.notEqual(deltaValueOf(cell), '--');
+      assert.equal(allText(deltaUnitOf(cell)), 'degC');
     }
   });
 });
@@ -294,7 +293,7 @@ test('G4 an invalid side removes the paired value, and a filter never changes a 
     assert.deepEqual(sensorCells(app).map((cell) => deltaValueOf(cell)), good,
       'a filter is presentation only: it may not change a paired value');
     assert.equal(cells(app).length, 108, 'the map shape is kept');
-    assert.equal(sensorCells(app).length, 106);
+    assert.equal(sensorCells(app).length, 108);
     assert.equal(allText(id(app, 'summary-body')), evidence, 'the evidence counts are unchanged by a filter');
     click(byFilter(id(app, 'filters'), 'all'));
     await waitFor(() => sensorCells(app).every((cell) => cell.attributes['data-filtered'] === 'true'), 'the filter cleared');

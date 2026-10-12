@@ -28,7 +28,16 @@ import {
   syntheticPairedFrontTemperature,
   syntheticPairedReference,
 } from '../src/index.mjs';
-import { schedule, counts, rowsByClass, rowForMeasurement, FIRST_TOPOLOGY_CONFLICT, FIRST_UNASSIGNED } from './helpers/schedule.mjs';
+import { schedule, counts, rowsByClass, rowForMeasurement, FIRST_INTERNAL_CONFLICT, FIRST_UNASSIGNED } from './helpers/schedule.mjs';
+
+const TOPOLOGY_CONFLICT_BLOCKED_REASON = ['PRODUCT_TOPOLOGY_CONFLICT', 'BLOCKED'].join('_');
+/** The corrected baseline carries no Product-topology conflict row; the blocking rule is exercised synthetically. */
+const SYNTHETIC_TOPOLOGY_CONFLICT = Object.freeze({
+  ...FIRST_INTERNAL_CONFLICT,
+  physicalChannelKey: 'SYNTHETIC|TOPOLOGY-CONFLICT|1',
+  rowClass: 'PRODUCT_TOPOLOGY_CONFLICT',
+  passBlockedReason: TOPOLOGY_CONFLICT_BLOCKED_REASON,
+});
 import { buildObservations } from './helpers/scenarios.mjs';
 
 const round1 = (value) => Math.round(value * 10) / 10;
@@ -41,12 +50,12 @@ const pairIds = (pairs) => pairs.pairs.map((p) => p.sensorId);
 
 test('A1 every Product Sensor pair exists exactly once, with one Front and one Rear measurement', () => {
   const pairs = pairsFor('NORMAL_GOOD');
-  assert.equal(pairs.counts.productSensors, 106);
-  assert.equal(pairs.pairs.length, 106);
-  assert.equal(new Set(pairIds(pairs)).size, 106);
+  assert.equal(pairs.counts.productSensors, 108);
+  assert.equal(pairs.pairs.length, 108);
+  assert.equal(new Set(pairIds(pairs)).size, 108);
   // The protected evidence totals are untouched by the paired model.
-  assert.equal(counts.productSensors, 106);
-  assert.equal(counts.productCompatibleMeasurements, 212);
+  assert.equal(counts.productSensors, 108);
+  assert.equal(counts.productCompatibleMeasurements, 216);
   assert.equal(counts.physicalChannels, 240);
   for (const pair of pairs.pairs) {
     assert.match(pair.frontMeasurementIdentity, /:F$/);
@@ -62,7 +71,7 @@ test('A1 every Product Sensor pair exists exactly once, with one Front and one R
 test('A2 NORMAL_GOOD: Front is above Rear for every pair, with a finite delta equal to Front minus Rear', () => {
   const observations = buildObservations('NORMAL_GOOD');
   const pairs = buildThermalPairs(schedule, observations);
-  assert.equal(pairs.counts.available, 106);
+  assert.equal(pairs.counts.available, 108);
   assert.equal(pairs.counts.unavailable, 0);
   for (const pair of pairs.pairs) {
     assert.equal(Number.isFinite(pair.frontValue), true, pair.sensorId);
@@ -131,14 +140,24 @@ test('A4 the paired generator is used by the Front and Rear rows of the same pai
   const tick = 5;
   assert.equal(syntheticEngineeringValue(rearRow, tick, PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE), syntheticPairedReference('H7', tick));
   assert.equal(syntheticEngineeringValue(frontRow, tick, PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE), syntheticPairedFrontTemperature('H7', tick));
-  // A NON_SENSOR_GAP row and an unassigned Channel are never part of a pair.
-  assert.equal(isPairedTemperatureRow(FIRST_TOPOLOGY_CONFLICT), false);
+  // An unassigned Channel is never part of a pair; I7 and I16 pair exactly like H7.
   assert.equal(isPairedTemperatureRow(FIRST_UNASSIGNED), false);
+  for (const sensorId of ['I7', 'I16']) {
+    assert.equal(isPairedTemperatureRow(rowForMeasurement(`${sensorId}:F`)), true);
+    assert.equal(isPairedTemperatureRow(rowForMeasurement(`${sensorId}:R`)), true);
+    assert.equal(syntheticEngineeringValue(rowForMeasurement(`${sensorId}:R`), tick, PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE), syntheticPairedReference(sensorId, tick));
+    assert.equal(syntheticEngineeringValue(rowForMeasurement(`${sensorId}:F`), tick, PAIRED_DIFFERENTIAL_MODE.EXPECTED_POSITIVE), syntheticPairedFrontTemperature(sensorId, tick));
+  }
   const pairs = pairsFor('NORMAL_GOOD');
-  assert.equal(pairIds(pairs).includes('I7'), false);
-  assert.equal(pairIds(pairs).includes('I16'), false);
-  assert.equal(pairOf(pairs, 'I7'), undefined);
-  assert.equal(pairs.byChannelKey.get(FIRST_TOPOLOGY_CONFLICT.physicalChannelKey), undefined);
+  assert.equal(pairIds(pairs).includes('I7'), true);
+  assert.equal(pairIds(pairs).includes('I16'), true);
+  for (const sensorId of ['I7', 'I16']) {
+    const pair = pairOf(pairs, sensorId);
+    assert.equal(pair.state, PAIRED_THERMAL_STATE.EXPECTED_POSITIVE, sensorId);
+    assert.equal(pair.deltaAvailable, true, sensorId);
+    assert.equal(pairs.byChannelKey.get(rowForMeasurement(`${sensorId}:F`).physicalChannelKey), pair);
+    assert.equal(pairs.byChannelKey.get(rowForMeasurement(`${sensorId}:R`).physicalChannelKey), pair);
+  }
   assert.equal(pairs.byChannelKey.get(FIRST_UNASSIGNED.physicalChannelKey), undefined);
 });
 
@@ -156,13 +175,15 @@ test('B1 pair identity is enforced: a mismatched pair is refused, never silently
   // Two observations from different observation sets can never form a pair.
   const otherTick = buildObservations('NORMAL_GOOD', { tick: 9 });
   assert.equal(buildThermalPair(front, otherTick.get(rear.channelKey)).reason, DIFFERENTIAL_UNAVAILABLE_REASON.PAIR_IDENTITY_INCOMPLETE);
-  // A gap position and an unassigned Channel can never form a Product pair.
+  // An unassigned Channel can never form a Product pair; a Product-topology conflict row (none in
+  // the corrected baseline) would be blocked under its own reason, never folded into a pair.
   assert.equal(buildThermalPair(
-    observations.get(FIRST_TOPOLOGY_CONFLICT.physicalChannelKey),
-    observations.get(FIRST_TOPOLOGY_CONFLICT.physicalChannelKey),
-  ).reason, DIFFERENTIAL_UNAVAILABLE_REASON.PAIR_IDENTITY_INCOMPLETE);
-  assert.equal(describeUnpairedMeasurement(FIRST_TOPOLOGY_CONFLICT).reason, DIFFERENTIAL_UNAVAILABLE_REASON.NON_SENSOR_GAP);
+    observations.get(FIRST_UNASSIGNED.physicalChannelKey),
+    observations.get(FIRST_UNASSIGNED.physicalChannelKey),
+  ).reason, DIFFERENTIAL_UNAVAILABLE_REASON.UNASSIGNED_CHANNEL);
+  assert.equal(describeUnpairedMeasurement(SYNTHETIC_TOPOLOGY_CONFLICT).reason, DIFFERENTIAL_UNAVAILABLE_REASON.PRODUCT_TOPOLOGY_CONFLICT);
   assert.equal(describeUnpairedMeasurement(FIRST_UNASSIGNED).reason, DIFFERENTIAL_UNAVAILABLE_REASON.UNASSIGNED_CHANNEL);
+  assert.equal('NON_SENSOR_GAP' in DIFFERENTIAL_UNAVAILABLE_REASON, false, 'no gap vocabulary remains in the paired model');
 });
 
 test('B2 selecting a measurement resolves to its own Sensor pair and nothing else', () => {
@@ -255,10 +276,10 @@ test('C3 every existing scenario keeps its Quality behavior and never fabricates
     const observations = buildObservations(key, ctx);
     const pairs = buildThermalPairs(schedule, observations);
     assert.equal(observations.size, 240, key);
-    assert.equal(pairs.counts.productSensors, 106, key);
-    // No pair is ever invented for a gap or an unassigned Channel, whatever the scenario is.
-    assert.equal(pairIds(pairs).includes('I7'), false, key);
-    assert.equal(pairIds(pairs).includes('I16'), false, key);
+    assert.equal(pairs.counts.productSensors, 108, key);
+    // I7 and I16 own a pair in every scenario, exactly like every other Sensor.
+    assert.equal(pairIds(pairs).includes('I7'), true, key);
+    assert.equal(pairIds(pairs).includes('I16'), true, key);
     // An available delta always means BOTH sides really do have valid current values.
     for (const pair of pairs.pairs) {
       if (!pair.deltaAvailable) continue;
@@ -287,16 +308,22 @@ test('C3 every existing scenario keeps its Quality behavior and never fabricates
   assert.equal(conflictPair.state, PAIRED_THERMAL_STATE.EXPECTED_POSITIVE);
 });
 
-test('C4 the I7 / I16 conflict rows never produce a delta and stay non-Product', () => {
+test('C4 I7 and I16 produce a delta like every other Sensor; a topology-conflict row (none committed) would not', () => {
   const observations = buildObservations('PRODUCT_TOPOLOGY_CONFLICT');
   const pairs = buildThermalPairs(schedule, observations);
-  for (const row of rowsByClass('PRODUCT_TOPOLOGY_CONFLICT')) {
-    const described = pairForRow(pairs, row);
-    assert.equal(described.deltaAvailable, false, row.physicalChannelKey);
-    assert.equal(described.reason, DIFFERENTIAL_UNAVAILABLE_REASON.NON_SENSOR_GAP, row.physicalChannelKey);
-    assert.equal(described.delta, null);
-    assert.equal(described.unit, null);
+  for (const sensorId of ['I7', 'I16']) {
+    for (const side of ['F', 'R']) {
+      const described = pairForRow(pairs, rowForMeasurement(`${sensorId}:${side}`));
+      assert.equal(described.deltaAvailable, true, `${sensorId}:${side}`);
+      assert.equal(described.sensorId, sensorId);
+      assert.equal(Number.isFinite(described.delta), true);
+    }
   }
+  const described = pairForRow(pairs, SYNTHETIC_TOPOLOGY_CONFLICT);
+  assert.equal(described.deltaAvailable, false);
+  assert.equal(described.reason, DIFFERENTIAL_UNAVAILABLE_REASON.PRODUCT_TOPOLOGY_CONFLICT);
+  assert.equal(described.delta, null);
+  assert.equal(described.unit, null);
   // An unassigned physical Channel has no Sensor identity at all, so it can produce no pair either.
   for (const row of rowsByClass('UNASSIGNED')) {
     const described = pairForRow(pairs, row);
@@ -308,8 +335,8 @@ test('C4 the I7 / I16 conflict rows never produce a delta and stay non-Product',
 test('D1 REDUCED_FRONT_REAR_DIFFERENTIAL keeps Front above Rear and reduces the gradient per Sensor', () => {
   const normal = pairsFor('NORMAL_GOOD');
   const reduced = pairsFor('REDUCED_FRONT_REAR_DIFFERENTIAL');
-  assert.equal(reduced.counts.productSensors, 106);
-  assert.equal(reduced.counts.byState[PAIRED_THERMAL_STATE.REDUCED_POSITIVE_CANDIDATE], 106);
+  assert.equal(reduced.counts.productSensors, 108);
+  assert.equal(reduced.counts.byState[PAIRED_THERMAL_STATE.REDUCED_POSITIVE_CANDIDATE], 108);
   assert.equal(reduced.counts.unavailable, 0);
   for (const pair of reduced.pairs) {
     assert.ok(pair.frontValue > pair.rearValue, pair.sensorId);
@@ -331,7 +358,7 @@ test('D1 REDUCED_FRONT_REAR_DIFFERENTIAL keeps Front above Rear and reduces the 
 
 test('D2 NEAR_ZERO_FRONT_REAR_DIFFERENTIAL is deterministic, valid, near zero and declares no deadband', () => {
   const nearZero = pairsFor('NEAR_ZERO_FRONT_REAR_DIFFERENTIAL');
-  assert.equal(nearZero.counts.byState[PAIRED_THERMAL_STATE.NEAR_ZERO_CANDIDATE], 106);
+  assert.equal(nearZero.counts.byState[PAIRED_THERMAL_STATE.NEAR_ZERO_CANDIDATE], 108);
   assert.equal(nearZero.counts.unavailable, 0);
   const deltas = nearZero.pairs.map((p) => round1(p.delta));
   for (const pair of nearZero.pairs) {
@@ -352,7 +379,7 @@ test('D2 NEAR_ZERO_FRONT_REAR_DIFFERENTIAL is deterministic, valid, near zero an
 
 test('D3 REVERSED_FRONT_REAR_DIFFERENTIAL puts Front below Rear and never claims slag or a fault', () => {
   const reversed = pairsFor('REVERSED_FRONT_REAR_DIFFERENTIAL');
-  assert.equal(reversed.counts.byState[PAIRED_THERMAL_STATE.REVERSED_CONTRADICTION], 106);
+  assert.equal(reversed.counts.byState[PAIRED_THERMAL_STATE.REVERSED_CONTRADICTION], 108);
   assert.equal(reversed.counts.unavailable, 0);
   for (const pair of reversed.pairs) {
     assert.ok(pair.frontValue < pair.rearValue, pair.sensorId);
@@ -399,14 +426,14 @@ test('D4 no paired scenario carries alarm, trip, interlock, queue, cleaning, Wat
 test('E1 the paired model adds no Channel, Sensor, measurement or loop-test target', () => {
   const base = scheduleCounts(schedule);
   assert.equal(base.physicalChannels, 240);
-  assert.equal(base.productCompatibleMeasurements, 212);
-  assert.equal(base.productSensors, 106);
+  assert.equal(base.productCompatibleMeasurements, 216);
+  assert.equal(base.productSensors, 108);
   const pairs = pairsFor('NORMAL_GOOD');
   // The paired VALUES are not schedule rows: the evidence totals cannot move.
   assert.equal(schedule.rows.length, 240);
   assert.equal(scheduleCounts(schedule).physicalChannels, base.physicalChannels);
   assert.equal(pairs.counts.productSensors, base.productSensors);
-  assert.equal(pairs.pairs.length * 2, base.productCompatibleMeasurements, '106 pairs are exactly the 212 measurements');
+  assert.equal(pairs.pairs.length * 2, base.productCompatibleMeasurements, '108 pairs are exactly the 216 measurements');
   for (const pair of pairs.pairs) {
     assert.equal('commissioningState' in pair, false, 'the paired value has no commissioning state of its own');
     assert.equal('verdict' in pair, false, 'the paired value has no verdict of its own');

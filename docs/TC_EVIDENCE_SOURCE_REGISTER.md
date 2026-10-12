@@ -8,10 +8,10 @@ commissioning record.
 | Item | Value |
 |---|---|
 | Project / Stage | WaterJet Sentinel Suite (WJSS) — Stage 0.4C-0A |
-| Domain | **Domain B — `TEMPERATURE_SENSOR_COMMISSIONING`** (106 physical Sensor locations, 212 Thermocouple measurement Channels) |
+| Domain | **Domain B — `TEMPERATURE_SENSOR_COMMISSIONING`** (108 Product Sensors, 216 assigned Thermocouple measurement Channels, 240 physical, 24 unassigned — Owner critical topology correction 2026-10-12; historical: 106 / 212. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.) |
 | Created at | Approved remote-main base `bd1437586af73a33d43dfafce27b27538183a283` (PR #16 merge commit) |
 | Governing decisions | Stage 0.4C-0 Owner decisions OQ-01 to OQ-04, treated as authoritative and protected |
-| Current gate | `TC_ACQUISITION_TOPOLOGY: VERIFIED_OWNER_SOURCE` (drawing scope — as-drawn, not as-installed) · `SENSOR_TO_TC_CHANNEL_SCHEDULE: VERIFIED_OWNER_SOURCE` (complete: 212/212 identities scheduled; 12 internal + 4 topology conflicts recorded per-row, 0 unresolved) · `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED` (configuration, transport identity, hardware observation still missing) · `WIRE_BREAK_DECODING: BLOCKED` (configured/observed behaviour still missing; decoding contract documented at `MODEL_LEVEL` only) |
+| Current gate | `TC_ACQUISITION_TOPOLOGY: VERIFIED_OWNER_SOURCE` (drawing scope — as-drawn, not as-installed) · `SENSOR_TO_TC_CHANNEL_SCHEDULE: VERIFIED_OWNER_SOURCE` (complete: 216/216 identities scheduled after the Owner critical topology correction — I7 and I16 Front/Rear included; 12 internal conflicts recorded per-row, 0 topology conflicts, 0 unresolved; historical: 212/212 with 4 topology conflicts) · `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED` (configuration, transport identity, hardware observation still missing) · `WIRE_BREAK_DECODING: BLOCKED` (configured/observed behaviour still missing; decoding contract documented at `MODEL_LEVEL` only) |
 | Stage 0.4C-0B review (2026-10-11) | Brief-stated Owner statements recorded as `PROVIDED_UNVERIFIED` (TCEV-12, TCEV-13; `REQ-TC-001`, `REQ-TC-002` at statement-only scope); drawings and manuals recorded `NOT_AVAILABLE_IN_SESSION` (TCEV-14 … TCEV-16); schedule derivation STOPPED with 0 rows — see §12 and [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md). No verified state was widened |
 | Stage 0.4C-0B completion review (2026-10-12) | Baseline REV1 evidence arrived via the Owner-connected source, integrity-verified (TCEV-17 … TCEV-20) and fully reviewed: 240-row drawing schedule derived with per-row states (12 internal + 4 topology conflicts recorded, 0 unresolved), 750-498/362/600 manuals extracted with section/page refs, process-image profile + decoding contract derived at `MODEL_LEVEL`. `REQ-TC-001` … `REQ-TC-007` advance to drawing/manufacturer-verified states; `REQ-TC-008` … `REQ-TC-020` stay `NOT_PROVIDED`. See §13, [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md) §7 and `docs/evidence/` |
 | Companion record | [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHECKPOINT.md) |
@@ -25,7 +25,7 @@ outside the repository.
 
 ## 1. Scope, and what this register is not
 
-This register answers one question: **what hardware acquires the 212 Thermocouple Channels, and
+This register answers one question: **what hardware acquires the 216 assigned Thermocouple Channels (108 Sensors × Front/Rear; historical figure 212 — Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.), and
 what evidence proves it?** It is an evidence ledger.
 
 It is **not**:
@@ -91,7 +91,7 @@ doing so. This re-confirms conflict CF-01 from Stage 0.4C-0.
 | `MODULE_INSTANCE` | True of one named module in a named position. |
 | `CHANNEL` | True of exactly one Channel. |
 | `COMPLETE_RACK` | True of the whole rack or node, verified as a whole. |
-| `COMPLETE_SENSOR_SCHEDULE` | True of the full 106 Sensor / 212 Channel schedule. |
+| `COMPLETE_SENSOR_SCHEDULE` | True of the full 108 Sensor / 216 Channel schedule (historical wording: 106 / 212). |
 | `PARTIAL_SCREENSHOT` | A screenshot covering only part of the rack or configuration. |
 
 ### 2.3 Non-propagation rule (binding)
@@ -155,12 +155,13 @@ none is listed as favoured. Listing a favourite would be an assumption, not evid
 | Count of acquisition devices / modules | 6 cabinets; 750-362 × 6, 750-498 × 30, 750-600 × 6 — drawing-verified (was brief-stated TCEV-12) | `VERIFIED_OWNER_SOURCE` | `DRAWING_SCOPE` | REQ-TC-002 |
 | Evidence source and scope per row | TCEV-17 (drawing) + TCEV-18/19/20 (manuals); per-Channel refs in `docs/evidence/tc-drawing-schedule-rev1.csv` | `VERIFIED_OWNER_SOURCE` | `DRAWING_SCOPE` | REQ-TC-009 |
 
-**Not derived (binding).** No module count has been computed from 212 Channels divided by any
+**Not derived (binding).** No module count has been computed from 216 (historically 212) Channels divided by any
 assumed Channel capacity. The device count and per-device capacity are independent Owner facts
 (REQ-TC-002); deriving one from the other would invent both. The Stage 0.4C-0B counts above
 are recorded **as brief-stated Owner facts**, not computed — the 240/212/28 arithmetic in the
 checkpoint recomputes the brief's own stated totals as a consistency check, not as an
-independent derivation.
+independent derivation. (Current arithmetic after the Owner critical topology correction:
+240 physical − 216 assigned = 24 unassigned.)
 
 **Domain A positions are not reused.** The 23 RackSlots and the configuration-tool positions
 `Pos. 01–20` recorded in Stage 0.4B-3 and Stage 0.4C-0 describe the **Domain A** rack. They are
@@ -189,9 +190,9 @@ The pre-population policy is in [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHEC
 | Engineering unit | °C for temperature per 750-498 manual (TCEV-18: "for temperature measurements in °C", p72) — `VERIFIED_PRIMARY_MANUFACTURER_SOURCE`, `MODEL_LEVEL`; configured unit per instance unevidenced | REQ-TC-007, REQ-TC-016 |
 | Expected normal range | `NOT_PROVIDED` (no operating ranges in any reviewed evidence) | REQ-TC-016 |
 | Evidence source | `VERIFIED_OWNER_SOURCE` — TCEV-17 + per-row `EvidenceRef` in the schedule CSV | REQ-TC-004 |
-| Verification state | Per-row states in the schedule CSV: 200 `DRAWING_VERIFIED`, 12 `DRAWING_INTERNAL_CONFLICT`, 4 `DRAWING_TOPOLOGY_CONFLICT`, 24 `SPARE_UNMAPPED`, 0 unresolved | REQ-TC-004 |
+| Verification state | Per-row states in the schedule CSV: 204 `DRAWING_VERIFIED`, 12 `DRAWING_INTERNAL_CONFLICT`, 0 `DRAWING_TOPOLOGY_CONFLICT`, 24 `SPARE_UNMAPPED`, 0 unresolved (Owner critical topology correction; historical: 200 / 12 / 4 / 24) | REQ-TC-004 |
 
-**Not inferred (binding).** The 212 TC Channels are **not** mapped to `AI-001` through `AI-035`.
+**Not inferred (binding).** The 216 TC Channels (historically 212) are **not** mapped to `AI-001` through `AI-035`.
 No Channel A/B placement, no module assignment and no TC Channel ordering has been inferred from
 Sensor order, Sensor wall, logical row/column, or scan order.
 
@@ -308,7 +309,7 @@ rollout. Every request is `NOT_PROVIDED` at this head.
 | REQ-TC-001 | Thermocouple acquisition hardware manufacturer and model | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17 p32: WAGO 750-362 / 750-498 / 750-600 + terminal/Power models per cabinet (supersedes statement-only TCEV-12) | `DRAWING_SCOPE` (as-drawn; nameplate/hardware still unevidenced) | Verified as-drawn | None | Owner supplies nameplate/instance evidence for as-installed identity |
 | REQ-TC-002 | Count of acquisition devices/modules and Channel capacity | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17 (6 cabinets × 1+5+1; 8 ch/module) + 750-498 manual TCEV-18 p26 (supersedes TCEV-12) | `DRAWING_SCOPE` + capacity `MODEL_LEVEL` | Verified as-drawn | None | None for counts; instance verification rides on hardware observation |
 | REQ-TC-003 | Physical panel, rack, cabinet or controller location | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17: `+SDSCAB1` … `+SDSCAB6` + design elevations EL.40.000/36.500/26.670 | `DRAWING_SCOPE` (as-designed; as-installed location unevidenced) | Verified as-drawn | None | Owner confirms as-installed locations at commissioning |
-| REQ-TC-004 | Complete Sensor ID to Channel A/B schedule (all 106 Sensors, 212 Channels) | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17 → `docs/evidence/tc-drawing-schedule-rev1.csv` (240 rows; 212 MATCHED incl. 12 internal-conflict rows followed conductor+X110; 4 gap-conflict; 24 spare; 0 unresolved) | `DRAWING_SCOPE`, `COMPLETE_SENSOR_SCHEDULE` (all 212 identities scheduled) | Verified with recorded conflicts | ISS-REV1-01 (12 rows), ISS-REV1-02 (I7/I16, 4 rows) — see the issue register §7.4 | Owner rules on ISS-REV1-01/02 via drawing revision (REV2); no manual transcription requested |
+| REQ-TC-004 | Complete Sensor ID to Channel A/B schedule (all 108 Sensors, 216 Channels; historical wording 106 / 212) | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17 → `docs/evidence/tc-drawing-schedule-rev1.csv` (240 rows; 216 MATCHED incl. 12 internal-conflict rows followed conductor+X110 and the four I7/I16 rows confirmed as Product assignments by the Owner critical topology correction; 0 gap-conflict; 24 spare; 0 unresolved) | `DRAWING_SCOPE`, `COMPLETE_SENSOR_SCHEDULE` (all 216 identities scheduled) | Verified with recorded conflicts | ISS-REV1-01 (12 rows), ISS-REV1-02 (I7/I16, 4 rows) — see the issue register §7.4 | Owner rules on ISS-REV1-01/02 via drawing revision (REV2); no manual transcription requested |
 | REQ-TC-005 | Terminal schedule | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17: `-X110.1` … `-X110.36` + paired `-X111.n` per Channel (spare Channels: none) | `DRAWING_SCOPE`, per-Channel | Verified as-drawn | ISS-REV1-01 affects 12 rows' sheath pairing only, not terminal numbers | None for terminals |
 | REQ-TC-006 | Wiring drawings | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17 reviewed (REV 1A, 16 MAR 2026; hash-recorded, archive not committed) | `DRAWING_SCOPE` (6 cabinets) | Verified present and reviewed | ISS-REV1-01, ISS-REV1-03 (p6/p7 swap) — recorded, pending Owner revision; drawing stays `DRAWING_PENDING_REVISION` | Owner revises per the issue register §7.7 |
 | REQ-TC-007 | TC type per Channel or per approved Channel group | `VERIFIED_OWNER_SOURCE` | Stage 0.4C-1 | Drawing TCEV-17: Type K all 240 Channels (TYP K terminals + Type K cable); 750-498 default Type K (TCEV-18 p70) | `DRAWING_SCOPE` + default `MODEL_LEVEL`; configured per-instance type unevidenced | Verified as-drawn | None | Owner confirms via configuration evidence if any instance deviates from default |

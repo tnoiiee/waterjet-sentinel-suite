@@ -27,26 +27,32 @@ const wallOf = (wall) => WALL_MAP.walls.find((w) => w.wall === wall);
 const mutableServedMap = () => JSON.parse(JSON.stringify(servedSensorMap()));
 const slotIn = (payload, slotId) => payload.walls.flatMap((w) => w.slots).find((s) => s.slotId === slotId);
 
-test('the Wall Map carries exactly 108 logical positions: 106 Product Sensors and 2 NON_SENSOR_GAP positions', () => {
+test('the Wall Map carries exactly 108 logical positions, all of them Product Sensors (I7 and I16 included)', () => {
   assert.equal(WALL_MAP.positions.length, 108);
   assert.equal(WALL_MAP.counts.logicalPositions, WALL_MAP_EXPECTED.logicalPositions);
-  assert.equal(WALL_MAP.counts.productSensors, 106);
-  assert.equal(WALL_MAP.counts.nonSensorGaps, 2);
-  assert.equal(WALL_MAP.counts.productCompatibleMeasurements, 212);
-  assert.equal(WALL_MAP.gapPositions.length, 2);
-  // The gaps are exactly I7 and I16, and they are gaps - never Sensors.
-  assert.deepEqual(WALL_MAP.gapPositions.map((p) => p.label).sort(), ['I16', 'I7']);
-  for (const gap of WALL_MAP.gapPositions) {
-    assert.equal(gap.positionKind, POSITION_KIND.NON_SENSOR_GAP);
-    assert.equal(gap.sensorId, null, 'a NON_SENSOR_GAP position must never carry a Sensor identity');
-    assert.equal(gap.selectableAsSensor, false);
+  assert.equal(WALL_MAP.counts.productSensors, 108);
+  assert.equal(WALL_MAP.counts.nonSensorGaps, 0);
+  assert.equal(WALL_MAP.counts.productCompatibleMeasurements, 216);
+  assert.equal(WALL_MAP.gapPositions.length, 0);
+  assert.equal(Object.keys(POSITION_KIND).length, 1, 'SENSOR is the only position kind');
+  // I7 and I16 are normal Sensor cells: identity, two measurements, selectable.
+  for (const sensorId of ['I7', 'I16']) {
+    const position = WALL_MAP.sensorPositionBySensorId.get(sensorId);
+    assert.equal(position.positionKind, POSITION_KIND.SENSOR);
+    assert.equal(position.sensorId, sensorId);
+    assert.equal(position.label, sensorId);
+    assert.equal(position.selectableAsSensor, true);
+    assert.deepEqual([position.frontKey, position.rearKey], [`${sensorId}:F`, `${sensorId}:R`]);
+    assert.equal(WALL_MAP.positions.filter((p) => p.sensorId === sensorId).length, 1);
   }
   // The protected baseline the evidence states is the same one this presentation asserts.
-  assert.deepEqual(WALL_MAP_EXPECTED.gapLabels, PROTECTED_BASELINE.NON_SENSOR_GAP_SENSOR_IDS);
-  assert.equal(PROTECTED_BASELINE.PRODUCT_SENSORS, 106);
+  assert.equal(PROTECTED_BASELINE.NON_SENSOR_GAP_SENSOR_IDS.length, 0);
+  assert.equal(PROTECTED_BASELINE.PRODUCT_SENSORS, 108);
+  assert.equal(WALL_MAP_EXPECTED.productSensors, PROTECTED_BASELINE.PRODUCT_SENSORS);
+  assert.equal(WALL_MAP_EXPECTED.productCompatibleMeasurements, PROTECTED_BASELINE.PRODUCT_COMPATIBLE_MEASUREMENTS);
 });
 
-test('every wall keeps its approved shape: 6 rows, 5/4/4/5 wall columns, 29/24/24/29 Sensors', () => {
+test('every wall keeps its approved shape: 6 rows, 5/4/4/5 wall columns, 30/24/24/30 Sensors', () => {
   assert.deepEqual(WALL_MAP.walls.map((w) => w.wall), ['LEFT', 'REAR', 'RIGHT', 'FRONT']);
   assert.deepEqual(WALL_MAP.walls.map((w) => w.wallColumns), [4, 5, 4, 5]);
   for (const wall of WALL_MAP.walls) {
@@ -54,12 +60,15 @@ test('every wall keeps its approved shape: 6 rows, 5/4/4/5 wall columns, 29/24/2
     for (const row of wall.rows) assert.equal(row.length, wall.wallColumns, wall.wall);
     assert.equal(wall.sensorCount + wall.gapCount, wall.rows.flat().length);
   }
-  assert.deepEqual(WALL_MAP.counts.sensorsPerWall, { LEFT: 24, REAR: 29, RIGHT: 24, FRONT: 29 });
-  // The gaps sit at wall row 5 (the I row), wall column 3 of their wall.
+  assert.deepEqual(WALL_MAP.counts.sensorsPerWall, { LEFT: 24, REAR: 30, RIGHT: 24, FRONT: 30 });
+  // I7 and I16 sit at wall row 5 (the I row), wall column 3 of their wall - as Sensor cells.
   const rear = wallOf('REAR');
   const front = wallOf('FRONT');
   assert.equal(rear.rows[4][2].label, 'I7');
+  assert.equal(rear.rows[4][2].positionKind, POSITION_KIND.SENSOR);
   assert.equal(front.rows[4][2].label, 'I16');
+  assert.equal(front.rows[4][2].positionKind, POSITION_KIND.SENSOR);
+  for (const wall of WALL_MAP.walls) assert.equal(wall.gapCount, 0, wall.wall);
   assert.equal(WALL_ORDER.join(','), 'LEFT,REAR,RIGHT,FRONT');
 });
 
@@ -78,7 +87,7 @@ test('each wall row carries the approved logical identities in wall-column order
 
 test('no Product Sensor identity is duplicated, invented or omitted, and every one owns Front and Rear', () => {
   const sensors = WALL_MAP.positions.filter((p) => p.positionKind === POSITION_KIND.SENSOR).map((p) => p.sensorId);
-  assert.equal(new Set(sensors).size, 106);
+  assert.equal(new Set(sensors).size, 108);
   const evidenceSensors = [...new Set(schedule.rows.filter((r) => r.productCompatible && r.sensorId).map((r) => r.sensorId))];
   assert.deepEqual([...sensors].sort(), evidenceSensors.sort(), 'the Wall Map must carry exactly the evidence Sensor set');
   for (const position of WALL_MAP.positions) {
@@ -111,33 +120,44 @@ test('no Product Sensor identity is duplicated, invented or omitted, and every o
   }
 });
 
-test('the gap positions carry their drawing-conflict rows, never a Sensor measurement', () => {
-  for (const gap of WALL_MAP.gapPositions) {
-    for (const key of [gap.frontKey, gap.rearKey]) {
+test('the I7 and I16 cells carry their Product-compatible drawing rows exactly like every other Sensor', () => {
+  for (const sensorId of ['I7', 'I16']) {
+    const position = WALL_MAP.sensorPositionBySensorId.get(sensorId);
+    for (const key of [position.frontKey, position.rearKey]) {
       const row = rowForMeasurement(key);
-      assert.equal(row.rowClass, ROW_CLASS.PRODUCT_TOPOLOGY_CONFLICT, key);
-      assert.equal(row.passBlockedReason, 'PRODUCT_TOPOLOGY_CONFLICT_BLOCKED', key);
-      assert.equal(row.productCompatible, false, key);
-      assert.equal(WALL_MAP.positionByMeasurementKey.get(key), gap);
+      assert.equal(row.rowClass, ROW_CLASS.PRODUCT_COMPATIBLE, key);
+      assert.equal(row.passBlockedReason, null, key);
+      assert.equal(row.productCompatible, true, key);
+      assert.equal(WALL_MAP.positionByMeasurementKey.get(key), position);
+      assert.equal(WALL_MAP.order.includes(key), true, 'an I7 / I16 measurement is part of the Wall order');
     }
-    assert.equal(WALL_MAP.order.includes(gap.frontKey), false, 'a gap measurement is never part of the Wall order');
-    assert.equal(WALL_MAP.order.includes(gap.rearKey), false);
+    assert.notEqual(position.frontChannelKey, position.rearChannelKey);
   }
+  // The physical assignments are the committed drawing rows (TC-NODE-05 / TC-NODE-06, A102.4, ch7 / ch8).
+  assert.equal(WALL_MAP.sensorPositionBySensorId.get('I7').frontChannelKey, 'TC-NODE-05|A102.4|7');
+  assert.equal(WALL_MAP.sensorPositionBySensorId.get('I7').rearChannelKey, 'TC-NODE-05|A102.4|8');
+  assert.equal(WALL_MAP.sensorPositionBySensorId.get('I16').frontChannelKey, 'TC-NODE-06|A102.4|7');
+  assert.equal(WALL_MAP.sensorPositionBySensorId.get('I16').rearChannelKey, 'TC-NODE-06|A102.4|8');
 });
 
-test('the Wall order is the approved logical sequence, Front before Rear, with the gaps skipped', () => {
-  assert.equal(WALL_MAP.order.length, 212);
-  assert.equal(new Set(WALL_MAP.order).size, 212);
+test('the Wall order is the approved logical sequence over all 108 Sensors, Front before Rear, no position skipped', () => {
+  assert.equal(WALL_MAP.order.length, 216);
+  assert.equal(new Set(WALL_MAP.order).size, 216);
   assert.equal(WALL_MAP.orderText, WALL_MAP_ORDER_TEXT);
   assert.deepEqual(WALL_MAP.order.slice(0, 4), ['G+201:F', 'G+201:R', 'G+202:F', 'G+202:R']);
   assert.equal(WALL_MAP.order[WALL_MAP.order.length - 1], 'J18:R');
-  assert.equal(WALL_MAP.order.some((key) => key.startsWith('I7:')), false);
-  assert.equal(WALL_MAP.order.some((key) => key.startsWith('I16:')), false);
-  // The step around the I7 gap skips it entirely: I6:R -> I8:F.
+  assert.equal(WALL_MAP.order.filter((key) => key.startsWith('I7:')).length, 2);
+  assert.equal(WALL_MAP.order.filter((key) => key.startsWith('I16:')).length, 2);
+  // I7 and I16 sit in their normal ordinal position: I6:R -> I7:F -> I7:R -> I8:F.
   const i6Rear = WALL_MAP.order.indexOf('I6:R');
-  assert.deepEqual(WALL_MAP.order.slice(i6Rear, i6Rear + 2), ['I6:R', 'I8:F']);
+  assert.deepEqual(WALL_MAP.order.slice(i6Rear, i6Rear + 4), ['I6:R', 'I7:F', 'I7:R', 'I8:F']);
   const i15Rear = WALL_MAP.order.indexOf('I15:R');
-  assert.deepEqual(WALL_MAP.order.slice(i15Rear, i15Rear + 2), ['I15:R', 'I17:F']);
+  assert.deepEqual(WALL_MAP.order.slice(i15Rear, i15Rear + 4), ['I15:R', 'I16:F', 'I16:R', 'I17:F']);
+  // The sequence is the Sensor sequence itself, each Sensor expanded to Front then Rear.
+  const sensorsInOrder = WALL_MAP.order.filter((key) => key.endsWith(':F')).map((key) => key.slice(0, -2));
+  assert.equal(sensorsInOrder.length, 108);
+  assert.equal(sensorsInOrder[78], 'I7');
+  assert.equal(sensorsInOrder[87], 'I16');
   // Every key of the order is a Product-compatible measurement of the evidence.
   for (const key of WALL_MAP.order) assert.equal(rowForMeasurement(key).productCompatible, true, key);
   // Deterministic: rebuilding from the same served matrix gives the same sequence.
@@ -151,7 +171,7 @@ test('Wall-order navigation is deterministic, starts at the first position and s
     return side === 'F' ? position.frontChannelKey : position.rearChannelKey;
   };
   assert.equal(WALL_MAP.order[0], 'G+201:F');
-  assert.equal(WALL_MAP.channelOrder.length, 212);
+  assert.equal(WALL_MAP.channelOrder.length, 216);
   assert.equal(WALL_MAP.channelOrder[0], channelOf('G+201:F'));
   const fromNothing = wallOrderStep(WALL_MAP, null, 1);
   assert.deepEqual([fromNothing.key, fromNothing.moved, fromNothing.edge], [channelOf('G+201:F'), true, false]);
@@ -170,7 +190,9 @@ test('Wall-order navigation is deterministic, starts at the first position and s
   assert.equal(wallOrderStep(WALL_MAP, unassigned.physicalChannelKey, 1).key, channelOf('G+201:F'));
   assert.equal(wallOrderIndex(WALL_MAP, channelOf('G+202:F')), 2);
   assert.equal(wallOrderIndex(WALL_MAP, channelOf('G+202:R')), 3);
-  assert.equal(wallOrderIndex(WALL_MAP, 'I7:F'), -1);
+  assert.equal(wallOrderIndex(WALL_MAP, 'I7:F'), -1, 'a measurement key is not a physical Channel key');
+  assert.equal(wallOrderIndex(WALL_MAP, channelOf('I7:F')), 156);
+  assert.equal(wallOrderIndex(WALL_MAP, channelOf('I16:F')), 174);
   assert.throws(() => wallOrderStep(WALL_MAP, null, 0), /direction/);
 });
 
@@ -183,27 +205,37 @@ test('the Front/Rear view control selects blocks and never merges the two measur
   assert.deepEqual(visibleMeasurements(position, MEASUREMENT_VIEW.REAR).map((b) => b.key), ['H7:R']);
   assert.deepEqual(visibleMeasurements(position).map((b) => b.key), ['H7:F', 'H7:R']);
   assert.throws(() => visibleMeasurements(position, 'SIDE'), /unknown measurement view/);
-  // A gap position renders its two drawing rows and stays labelled as a gap.
-  const gap = WALL_MAP.gapPositions[0];
-  assert.deepEqual(visibleMeasurements(gap, MEASUREMENT_VIEW.BOTH).map((b) => b.key), [gap.frontKey, gap.rearKey]);
+  // I7 renders its two measurements exactly like any other Sensor.
+  const i7 = WALL_MAP.sensorPositionBySensorId.get('I7');
+  assert.deepEqual(visibleMeasurements(i7, MEASUREMENT_VIEW.BOTH).map((b) => b.key), ['I7:F', 'I7:R']);
+  assert.deepEqual(visibleMeasurements(i7, MEASUREMENT_VIEW.REAR).map((b) => b.key), ['I7:R']);
 });
 
 test('the Wall Map refuses a topology it cannot prove', () => {
   const missingSensor = mutableServedMap();
   slotIn(missingSensor, 'SLOT-R1-C01').sensorId = null;
-  assert.throws(() => buildWallMap(missingSensor, schedule.rows), /violates the Sensor \/ NON_SENSOR_GAP contract|no Front measurement/);
+  assert.throws(() => buildWallMap(missingSensor, schedule.rows), /Sensor position without a Sensor identity/);
 
   const duplicated = mutableServedMap();
   slotIn(duplicated, 'SLOT-R1-C02').sensorId = 'G+201';
   assert.throws(() => buildWallMap(duplicated, schedule.rows), /appears more than once/);
 
-  const wrongGap = mutableServedMap();
-  slotIn(wrongGap, 'SLOT-R5-C07').logicalLabel = 'I16';
-  assert.throws(() => buildWallMap(wrongGap, schedule.rows), /NON_SENSOR_GAP positions must be exactly I7 and I16|no Front measurement/);
+  // A served matrix that still carries the revoked NON_SENSOR_GAP belief is refused, never rendered.
+  const staleGap = mutableServedMap();
+  Object.assign(slotIn(staleGap, 'SLOT-R5-C07'), { positionKind: 'NON_SENSOR_GAP', sensorId: null, logicalLabel: 'I7' });
+  assert.throws(() => buildWallMap(staleGap, schedule.rows), /position kind 'NON_SENSOR_GAP'; every logical position is a Product Sensor/);
 
-  const gapAsSensor = mutableServedMap();
-  slotIn(gapAsSensor, 'SLOT-R5-C07').sensorId = 'I7';
-  assert.throws(() => buildWallMap(gapAsSensor, schedule.rows), /violates the Sensor \/ NON_SENSOR_GAP contract/);
+  const staleGap16 = mutableServedMap();
+  Object.assign(slotIn(staleGap16, 'SLOT-R5-C16'), { positionKind: 'NON_SENSOR_GAP', sensorId: null, logicalLabel: 'I16' });
+  assert.throws(() => buildWallMap(staleGap16, schedule.rows), /every logical position is a Product Sensor/);
+
+  const unknownKind = mutableServedMap();
+  slotIn(unknownKind, 'SLOT-R5-C07').positionKind = 'EQUIPMENT';
+  assert.throws(() => buildWallMap(unknownKind, schedule.rows), /position kind 'EQUIPMENT'/);
+
+  const missingI16 = mutableServedMap();
+  slotIn(missingI16, 'SLOT-R5-C16').sensorId = 'I17';
+  assert.throws(() => buildWallMap(missingI16, schedule.rows), /appears more than once/);
 
   const missingWall = servedSensorMap(['LEFT', 'REAR', 'RIGHT']);
   assert.throws(() => buildWallMap(missingWall, schedule.rows), /four walls/);
@@ -216,19 +248,19 @@ test('the Wall Map refuses a topology it cannot prove', () => {
 
 test('Loop-Test progress is derived from the evidence and the Preview session, never cached', () => {
   const fresh = loopTestSummary(schedule, null);
-  assert.equal(fresh.productSensors, 106);
-  assert.equal(fresh.productCompatibleMeasurements, 212);
-  assert.equal(fresh.total, 212);
-  assert.equal(fresh.byState.NOT_TESTED, 200);
+  assert.equal(fresh.productSensors, 108);
+  assert.equal(fresh.productCompatibleMeasurements, 216);
+  assert.equal(fresh.total, 216);
+  assert.equal(fresh.byState.NOT_TESTED, 204);
   assert.equal(fresh.byState.BLOCKED, 12, 'the 12 Drawing internal-conflict rows cannot PASS');
   assert.equal(fresh.byState.PASS + fresh.byState.FAIL + fresh.byState.PARTIAL, 0);
-  assert.equal(fresh.eligibleForPass, 200);
+  assert.equal(fresh.eligibleForPass, 204);
   assert.equal(fresh.blockedFromPass, 12);
-  assert.equal(fresh.notLoopTestable, 28, '4 Product-topology conflicts + 24 unassigned Channels');
+  assert.equal(fresh.notLoopTestable, 24, 'the 24 unassigned Channels only');
 
   const session = new PreviewCommissioningSession({ sessionIndex: 7 });
   const before = loopTestSummary(schedule, session);
-  assert.equal(before.byState.NOT_TESTED, 200, 'an untouched session changes nothing');
+  assert.equal(before.byState.NOT_TESTED, 204, 'an untouched session changes nothing');
 
   session.recordVerdict(rowForMeasurement('G+201:F'), { verdict: 'PASS', remark: 'preview only' });
   session.recordVerdict(rowForMeasurement('G+107:R'), { verdict: 'FAIL' });
@@ -236,7 +268,7 @@ test('Loop-Test progress is derived from the evidence and the Preview session, n
   assert.equal(after.byState.PASS, 1);
   assert.equal(after.byState.FAIL, 1, 'an internal conflict may record FAIL');
   assert.equal(after.byState.BLOCKED, 11, 'a recorded FAIL replaces the evidence BLOCKED state for that row');
-  assert.equal(after.byState.NOT_TESTED, 199);
+  assert.equal(after.byState.NOT_TESTED, 203);
   assert.equal(after.byState.IN_PROGRESS, 0);
   // The summary is presentation only: reading it never records anything.
   assert.equal(session.recordCount, 2);

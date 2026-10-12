@@ -11,7 +11,14 @@ import { buildObservations } from './helpers/scenarios.mjs';
 const rows = {
   eligible: schedule.rows.find((r) => r.rowClass === 'PRODUCT_COMPATIBLE' && r.drawingVerified),
   internalConflict: schedule.rows.find((r) => r.rowClass === 'DRAWING_INTERNAL_CONFLICT'),
-  topologyConflict: schedule.rows.find((r) => r.rowClass === 'PRODUCT_TOPOLOGY_CONFLICT'),
+  // The corrected baseline carries no Product-topology conflict row (I7 and I16 are normal Product
+  // Sensors). The blocking rule is kept and exercised with a synthetic row of that class.
+  topologyConflict: Object.freeze({
+    ...schedule.rows.find((r) => r.rowClass === 'DRAWING_INTERNAL_CONFLICT'),
+    physicalChannelKey: 'SYNTHETIC|TOPOLOGY-CONFLICT|1',
+    rowClass: 'PRODUCT_TOPOLOGY_CONFLICT',
+    passBlockedReason: ['PRODUCT_TOPOLOGY_CONFLICT', 'BLOCKED'].join('_'),
+  }),
   unassigned: schedule.rows.find((r) => r.rowClass === 'UNASSIGNED'),
 };
 const observations = buildObservations('NORMAL_GOOD');
@@ -181,17 +188,17 @@ test('commissioning progress reflects Preview records without changing evidence 
   const session = fresh();
   const before = commissioningProgress(schedule, session);
   assert.equal(before.total, 240);
-  assert.equal(before.byState.BLOCKED, 40);
-  assert.equal(before.byState.NOT_TESTED, 200);
+  assert.equal(before.byState.BLOCKED, 36);
+  assert.equal(before.byState.NOT_TESTED, 204);
   session.recordVerdict(rows.eligible, { verdict: 'PASS' });
   const after = commissioningProgress(schedule, session);
   assert.equal(after.byState.PASS, 1);
-  assert.equal(after.byState.NOT_TESTED, 199);
-  assert.equal(after.byState.BLOCKED, 40);
-  assert.equal(after.blockedFromPass, 40);
-  assert.equal(after.eligibleForPass, 200);
+  assert.equal(after.byState.NOT_TESTED, 203);
+  assert.equal(after.byState.BLOCKED, 36);
+  assert.equal(after.blockedFromPass, 36);
+  assert.equal(after.eligibleForPass, 204);
   session.recordVerdict(rows.internalConflict, { verdict: 'FAIL' });
   const failed = commissioningProgress(schedule, session);
-  assert.equal(failed.byState.BLOCKED, 39);
+  assert.equal(failed.byState.BLOCKED, 35);
   assert.equal(failed.byState.FAIL, 1);
 });

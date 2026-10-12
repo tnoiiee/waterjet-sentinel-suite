@@ -199,8 +199,8 @@ test('the scenario selector, node selector and progress areas are populated', as
       'the Node communication summary must be populated');
     // These areas are built from elements, so their text lives in child text nodes.
     assert.match(allText(app.byId['progress-body']), /BLOCKED/, 'the Commissioning progress must be populated');
-    assert.match(allText(app.byId['progress-body']), /\b40\b/, 'the blocked count must be rendered');
-    assert.match(allText(app.byId['operations-body']), /212/, 'the Operations area must carry the evidence counts');
+    assert.match(allText(app.byId['progress-body']), /\b36\b/, 'the blocked count must be rendered');
+    assert.match(allText(app.byId['operations-body']), /216/, 'the Operations area must carry the evidence counts');
   } finally {
     app.close();
   }

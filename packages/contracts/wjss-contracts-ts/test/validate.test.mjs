@@ -1,16 +1,31 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { validateEnvelope, canonicalSensorIds, sensorIdFor, validateSensorMapExample, sensorMapSummary } from '../validate.mjs';
+import { validateEnvelope, canonicalSensorIds, sensorIdFor, validateSensorMapExample, sensorMapSummary, TOPOLOGY } from '../validate.mjs';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`../../fixtures/${name}`, import.meta.url), 'utf8'));
 
-test('canonical sensor id set has 106 unique ids, no gap identities', () => {
+test('canonical sensor id set has 108 unique ids; I7 and I16 are normal Sensors in ordinal position', () => {
   const ids = canonicalSensorIds();
-  assert.equal(ids.length, 106);
-  assert.equal(new Set(ids).size, 106);
-  assert.ok(!ids.includes('I7'));
-  assert.ok(!ids.includes('I16'));
+  assert.equal(ids.length, 108);
+  assert.equal(new Set(ids).size, 108);
+  assert.equal(ids.filter((id) => id === 'I7').length, 1);
+  assert.equal(ids.filter((id) => id === 'I16').length, 1);
+  assert.equal(ids.indexOf('I7'), 78);
+  assert.equal(ids.indexOf('I16'), 87);
+  assert.deepEqual(ids.slice(77, 80), ['I6', 'I7', 'I8']);
+  assert.deepEqual(ids.slice(86, 89), ['I15', 'I16', 'I17']);
+  assert.deepEqual(TOPOLOGY, {
+    productSensors: 108,
+    assignedProductTcChannels: 216,
+    physicalTcChannels: 240,
+    unassignedPhysicalTcChannels: 24,
+    logicalPositions: 108,
+    nonSensorGapPositions: 0,
+    correctedSensorIds: ['I7', 'I16'],
+  });
+  assert.equal(TOPOLOGY.productSensors * 2, TOPOLOGY.assignedProductTcChannels);
+  assert.equal(TOPOLOGY.physicalTcChannels - TOPOLOGY.assignedProductTcChannels, TOPOLOGY.unassignedPhysicalTcChannels);
 });
 
 test('sensorIdFor matches owner logical labels', () => {
@@ -20,7 +35,12 @@ test('sensorIdFor matches owner logical labels', () => {
   assert.equal(sensorIdFor(6, 18), 'J18');
 });
 
-test('snapshot.seed0.json passes validation', () => {
+// Owner critical topology correction: the validator requires 108 Sensors / 216 channels with I7
+// and I16 as Sensors. snapshot.seed0.json is the .NET generator's golden output and can only be
+// regenerated Owner-local (tests/integration FixtureGenerator, fixtures README section 5). Until
+// that regeneration lands this test FAILS BY DESIGN: a stale 106-Sensor fixture must never be
+// accepted silently. Do not weaken this test to make it pass against the stale fixture.
+test('snapshot.seed0.json passes validation (requires the Owner-local .NET regeneration to the 108-Sensor baseline)', () => {
   const result = validateEnvelope(fixture('snapshot.seed0.json'));
   assert.deepEqual(result.issues, []);
   assert.equal(result.kind, 'snapshot');
@@ -92,11 +112,32 @@ test('prohibited production-scope key names are caught', () => {
   assert.ok(result.issues.some((i) => i.includes('prohibited')));
 });
 
-test('a gap identity as sensorId is rejected', () => {
+test('I7 and I16 are canonical Sensor identities; an unknown identity is rejected', () => {
   const snapshot = fixture('snapshot.seed0.json');
   snapshot.sensors[0].sensorId = 'I7';
-  const result = validateEnvelope(snapshot);
-  assert.ok(result.issues.some((i) => i.includes('canonical Sensor')));
+  assert.equal(validateEnvelope(snapshot).issues.some((i) => i.includes('canonical Sensor')), false, 'I7 is a canonical Sensor id');
+  snapshot.sensors[0].sensorId = 'I19';
+  assert.ok(validateEnvelope(snapshot).issues.some((i) => i.includes('canonical Sensor')));
+});
+
+test('a snapshot that still carries the superseded 106-Sensor topology is rejected explicitly', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const issues = validateEnvelope(snapshot).issues;
+  const stale = snapshot.sensors.length === 106 || snapshot.wallMap.some((s) => s.positionKind === 'NON_SENSOR_GAP');
+  if (stale) {
+    assert.ok(issues.some((i) => i.includes('positionKind must be SENSOR')), 'a NON_SENSOR_GAP slot is refused');
+    assert.ok(issues.some((i) => i.includes('sensors must contain all 108 records')), 'the 106-record set is refused');
+    assert.ok(issues.some((i) => i.includes('sensors must include I7')));
+    assert.ok(issues.some((i) => i.includes('sensors must include I16')));
+    assert.ok(issues.some((i) => i.includes('216 unique thermocouple channels required')));
+  } else {
+    assert.equal(snapshot.sensors.length, 108);
+    assert.ok(snapshot.sensors.some((s) => s.sensorId === 'I7'));
+    assert.ok(snapshot.sensors.some((s) => s.sensorId === 'I16'));
+  }
+  // A Water Jet placed "at a non-Sensor gap" is refused in every case.
+  snapshot.waterJets[0].placementKind = 'NON_SENSOR_GAP';
+  assert.ok(validateEnvelope(snapshot).issues.some((i) => i.includes('placementKind NON_SENSOR_GAP is superseded')));
 });
 
 test('snapshot carries the approved topology: 8 WJs, 8 IVs, ordinal pairing, opposite-wall coverage', () => {
@@ -202,10 +243,17 @@ test('sensor-map example validates with the canonical totals', () => {
   const s = sensorMapSummary(sensorMapDoc());
   assert.deepEqual(
     { slots: s.slots, sensors: s.sensors, nonSensorGaps: s.nonSensorGaps, totalChannels: s.totalChannels, distinctChannels: s.distinctChannels },
-    { slots: 108, sensors: 106, nonSensorGaps: 2, totalChannels: 212, distinctChannels: 212 },
+    { slots: 108, sensors: 108, nonSensorGaps: 0, totalChannels: 216, distinctChannels: 216 },
   );
-  assert.deepEqual(s.sensorsPerWall, { LEFT: 24, REAR: 29, RIGHT: 24, FRONT: 29 });
-  assert.deepEqual(s.gapLogicalLabels, ['I7', 'I16']); // canonical orderTotal order, never lexicographic
+  assert.deepEqual(s.sensorsPerWall, { LEFT: 24, REAR: 30, RIGHT: 24, FRONT: 30 });
+  assert.deepEqual(s.gapLogicalLabels, []);
+  const slots = sensorMapDoc().logicalMatrix.slots;
+  for (const sensorId of ['I7', 'I16']) {
+    const matches = slots.filter((x) => x.sensorId === sensorId);
+    assert.equal(matches.length, 1, `${sensorId} appears exactly once`);
+    assert.equal(matches[0].positionKind, 'SENSOR');
+    assert.equal(matches[0].tcChannels.length, 2);
+  }
 });
 
 test('sensor-map example file stores tcChannels as arrays, never comma strings', () => {
@@ -242,7 +290,7 @@ test('empty channel strings and duplicate pairs are rejected', () => {
   }
 });
 
-test('a channel assigned to two sensors is rejected (global uniqueness, 212 distinct)', () => {
+test('a channel assigned to two sensors is rejected (global uniqueness, 216 distinct)', () => {
   const result = validateSensorMapExample(
     mutateSlots((slots) => { slots[0].tcChannels = ['SYN-TC-01:CH02', 'SYN-TC-01:CH03']; }),
   );
@@ -250,38 +298,42 @@ test('a channel assigned to two sensors is rejected (global uniqueness, 212 dist
   assert.ok(result.issues.some((i) => i.includes('globally unique')));
 });
 
-test('NON_SENSOR_GAP slots must not carry channels and sensor slots must carry them', () => {
-  const gapWith = validateSensorMapExample(
-    mutateSlots((slots) => { slots.find((x) => x.positionKind === 'NON_SENSOR_GAP').tcChannels = ['SYN-TC-01:CH99', 'SYN-TC-01:CH98']; }),
-  );
-  assert.ok(gapWith.issues.some((i) => i.includes('NON_SENSOR_GAP slot must not carry thermocouple channels')));
-
-  const missing = validateSensorMapExample(
-    mutateSlots((slots) => { delete slots[0].tcChannels; }),
-  );
-  assert.ok(missing.issues.some((i) => i.includes('must carry a tcChannels array')));
+test('every slot must carry channels; I7 and I16 included', () => {
+  for (const sensorId of ['I7', 'I16']) {
+    const missing = validateSensorMapExample(
+      mutateSlots((slots) => { delete slots.find((x) => x.sensorId === sensorId).tcChannels; }),
+    );
+    assert.ok(missing.issues.some((i) => i.includes('must carry a tcChannels array')), sensorId);
+    assert.ok(missing.issues.some((i) => i.includes('total channels must be 216')), sensorId);
+  }
 });
 
-test('a gap position disguised as a sensor (wrong shape) is rejected', () => {
-  const result = validateSensorMapExample(
-    mutateSlots((slots) => {
-      slots[0].positionKind = 'NON_SENSOR_GAP';
-      slots[0].sensorId = null;
-      slots[0].gapAnchorForWaterJetId = 'WJ3';
-    }),
-  );
-  // 3 gaps / 105 sensors composition + the displaced sensor totals: all rejected
-  assert.ok(result.issues.some((i) => i.includes('sensor slots must number 106')));
-  assert.ok(result.issues.some((i) => i.includes('NON_SENSOR_GAP slots must number 2')));
+test('a NON_SENSOR_GAP slot is rejected anywhere, including at I7 and I16 (superseded topology)', () => {
+  for (const sensorId of ['I7', 'I16', 'G+201']) {
+    const result = validateSensorMapExample(
+      mutateSlots((slots) => {
+        const slot = slots.find((x) => x.sensorId === sensorId);
+        slot.positionKind = 'NON_SENSOR_GAP';
+        slot.sensorId = null;
+        delete slot.tcChannels;
+      }),
+    );
+    assert.ok(result.issues.some((i) => i.includes('positionKind must be SENSOR')), sensorId);
+    assert.ok(result.issues.some((i) => i.includes('sensor slots must number 108')), sensorId);
+    if (sensorId !== 'G+201') assert.ok(result.issues.some((i) => i.includes(`Sensor ${sensorId} is missing`)), sensorId);
+  }
 });
 
-test('a gap anchor that contradicts its position is rejected (I7 anchors WJ3, I16 anchors WJ1)', () => {
-  const result = validateSensorMapExample(
-    mutateSlots((slots) => {
-      slots.find((x) => x.logicalLabel === 'I7').gapAnchorForWaterJetId = 'WJ1';
-    }),
+test('a gap anchor on a Sensor slot and a duplicated Sensor are rejected', () => {
+  const anchored = validateSensorMapExample(
+    mutateSlots((slots) => { slots.find((x) => x.sensorId === 'I7').gapAnchorForWaterJetId = 'WJ3'; }),
   );
-  assert.ok(result.issues.some((i) => i.includes('gap anchor')));
+  assert.ok(anchored.issues.some((i) => i.includes('must not carry gapAnchorForWaterJetId')));
+  const duplicated = validateSensorMapExample(
+    mutateSlots((slots) => { slots.find((x) => x.sensorId === 'I16').sensorId = 'I15'; }),
+  );
+  assert.ok(duplicated.issues.some((i) => i.includes('appears more than once')));
+  assert.ok(duplicated.issues.some((i) => i.includes('Sensor I16 is missing')));
 });
 
 test('validateEnvelope dispatches the sensor-map kind', () => {
@@ -290,19 +342,26 @@ test('validateEnvelope dispatches the sensor-map kind', () => {
   assert.deepEqual(result.issues, []);
 });
 
+// The Safe Return tests below judge the Active Job / sequence evidence only. The fixture's
+// topology (108 Sensors, I7 and I16 included) is asserted by its own dedicated tests above, so a
+// stale topology does not mask or masquerade as a Safe Return finding here.
+// Issue prefixes: '$.activeJob…' (Active Job / Safe Return legs) and '$: ' (the shared-body
+// lastJobOutcome chain, emitted at the root path); topology issues carry no '$' prefix or '$.waterJets'.
+const safeReturnIssues = (snapshot) => validateEnvelope(snapshot).issues.filter((i) => i.startsWith('$.activeJob') || i.startsWith('$: '));
+
 test('concurrent valve and axis commands accept either feedback order without invented confirmation', () => {
   const snapshot = fixture('snapshot.seed0.json');
   const sr = snapshot.activeJob.safeReturn;
   assert.ok(sr.valve.commandSeq < sr.axis.commandSeq);
   assert.ok(sr.axis.commandSeq < sr.valve.feedbackSeq);
-  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+  assert.deepEqual(safeReturnIssues(snapshot), []);
   sr.valve.commandSeq = sr.axis.commandSeq;
-  assert.ok(validateEnvelope(snapshot).issues.some((issue) => issue.includes('close command must precede axis')));
+  assert.ok(safeReturnIssues(snapshot).some((issue) => issue.includes('close command must precede axis')));
   sr.valve.commandSeq = 11;
   sr.valve.resolution = 'CLOSED_BY_PRESSURE';
   sr.valve.feedback = 'NOT_CONFIRMED';
   sr.valve.feedbackSeq = null;
-  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+  assert.deepEqual(safeReturnIssues(snapshot), []);
 });
 
 
@@ -331,13 +390,13 @@ test('released dual-fault Job needs both remarks and a post-command SR3 in eithe
     events: [{ seq: 14, step: 'SR3', event: 'CLOSED_BY_PRESSURE' }],
   };
   snapshot.sequence.lastJobOutcome = o;
-  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+  assert.deepEqual(safeReturnIssues(snapshot), []);
   o.events = [{ seq: 15, step: 'SR3', event: 'CLOSED_BY_PRESSURE' }];
   o.standbyConfirmedSeq = 14;
-  assert.deepEqual(validateEnvelope(snapshot).issues, []);
+  assert.deepEqual(safeReturnIssues(snapshot), []);
   o.qualifiedRemarks = ['COMPLETED_WITH_VALVE_OPEN_LIMIT_UPPER_FAULT'];
-  assert.ok(validateEnvelope(snapshot).issues.some(i => i.includes('both distinct diagnoses and remarks')));
+  assert.ok(safeReturnIssues(snapshot).some(i => i.includes('both distinct diagnoses and remarks')));
   o.qualifiedRemarks.push('COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT');
   o.valveClosedConfirmedSeq = 15;
-  assert.ok(validateEnvelope(snapshot).issues.some(i => i.includes('no Lower confirmation')));
+  assert.ok(safeReturnIssues(snapshot).some(i => i.includes('no Lower confirmation')));
 });
