@@ -1,15 +1,22 @@
 # Stage 0.4C-K3 — Owner Critical Topology Correction (Development Checkpoint Record)
 
-**Status (2026-10-12 closeout): K3 = AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING.**
-Existing Stage 0.4C-K3 branch `arena/200cd6d0-waterjet-sentinel-suite` (PR #21 to `main`,
-**OPEN, UNMERGED**, do not merge), based on `main` `cc6ccf8779d87a5a44d1c03a003021791c26aac8`.
+**Status (2026-10-12 final closeout): Stage 0.4C-K3 = COMPLETE FOR MERGE REVIEW. Automated
+Gates = PASS. Owner Manual Review = PASS (exact reviewed head
+`b5c7dff2f944956c608d89b903cb151ea6eed551`, §14). Schema Decision = RESOLVED — RETAIN_SCHEMA_V2.
+PR #21 = OPEN / UNMERGED pending final PR checks and the Owner merge action (not merged).**
+Existing Stage 0.4C-K3 branch `arena/200cd6d0-waterjet-sentinel-suite` (PR #21 to `main`),
+based on `main` `cc6ccf8779d87a5a44d1c03a003021791c26aac8`. The paragraph below is the dated
+automated-gate closeout written at `c4d77974…`; its "Manual Review PENDING" wording is superseded
+by §14.
 **Automated Build / Test Gate = PASS** at exact head `041b286322186977c5f87cde8184ae5a180d60a6`
 (Owner-local, §13): Release build PASS, full .NET **455 / 455** PASS, fixture emission **7 / 7**
 PASS, second deterministic emission **7 / 7** PASS with no diff, TypeScript typecheck PASS,
 contracts-ts **36 / 36** PASS, working tree CLEAN. **Schema `/2` retained; OQ-T3 RESOLVED —
-RETAIN_SCHEMA_V2** (§9). **Owner Manual Review = PENDING.** Not claimed: Manual Review passed,
-PR-ready, K3 complete, merged. The earlier "NOT compiled in Arena" statements in §8 and §12 are
-retained as the dated record of the Arena pass; §13 supersedes them as the validation position.
+RETAIN_SCHEMA_V2** (§9). Owner Manual Review was PENDING at `c4d77974…` and **PASSED at
+`b5c7dff2…`** (§14). Not claimed: merged; hardware, field acquisition, protocol, Port, MODBUS,
+TEST_HARDWARE, PRODUCTION or Device Write complete or authorised. The earlier "NOT compiled in
+Arena" statements in §8 and §12 are retained as the dated record of the Arena pass; §13 supersedes
+them as the validation position and §14 closes the Manual Review.
 
 Authority line (unchanged): `SIMULATION / PREVIEW / EVIDENCE AND CONTRACT FOUNDATION ONLY / NO
 NETWORK PROBE / NO SOCKET / NO PHYSICAL ACQUISITION / NO DEVICE WRITE / NO TEST_HARDWARE / NO
@@ -175,7 +182,7 @@ Inspector "Topology baseline" tile compares the live API against 108 / 216 / 240
 | `tsc --noEmit` (TS mirror) | NOT RUN (no `node_modules` in Arena; Owner-local `npm ci && npm run check`) |
 | `git diff --check`, lock / csproj / props drift against `cc6ccf87` | clean / none |
 | .NET build and tests, Release build | NOT RUN in Arena at `7dc7c691…` (dated row). **Superseded by §13: Owner-local at `041b2863…` — Release build PASS, 455 / 455 PASS, fixture emission 7 / 7 (×2, no diff)** |
-| Browser rendering of the Preview and Inspector | NOT RUN in Arena; Owner Manual Review PENDING |
+| Browser rendering of the Preview and Inspector | NOT RUN in Arena; Owner Manual Review **PASSED** Owner-local at `b5c7dff2…` (§14) |
 
 ## 11. Boundary review
 
@@ -227,7 +234,8 @@ is refused. `G+106` / `G+212` are Sensor identities. No executable layer is on 1
   exactly this sequence and PASSED (Release build; 455 / 455; fixture emission 7 / 7 with no diff,
   twice; `npm ci && npm run check` PASS). Two analyzer findings surfaced on the way and were
   corrected without suppression (§13.1).
-- Browser rendering of the Inspector / Preview: NOT RUN in Arena; Owner Manual Review PENDING.
+- Browser rendering of the Inspector / Preview: NOT RUN in Arena; Owner Manual Review **PASSED**
+  Owner-local at `b5c7dff2…` (§14).
 - Sensor Disable **mutation** UI / API route: **NOT_IMPLEMENTED** (outside the approved read-only
   architecture); the model, kernel behaviour and read-only exposure are implemented.
 
@@ -287,7 +295,7 @@ clean; contracts-ts **36 / 0**; lock / csproj / props drift against `cc6ccf87`: 
 `git diff --check` clean. .NET (414 + new tests), Release build, `tsc`, browser: **NOT RUN** at
 `fcf0e686…` (dated Arena record — superseded by §13: Owner-local at `041b2863…` Release build
 PASS, **455 / 455**, fixture emission 7 / 7 ×2 no diff, typecheck PASS, 36 / 36; browser review
-remains part of the pending Owner Manual Review).
+closed by the Owner Manual Review PASS at `b5c7dff2…`, §14).
 
 ### 12.8 Evidence status (unchanged, re-verified by R43 / Group H)
 
@@ -357,13 +365,13 @@ exactly.
 | Working tree after Owner validation | CLEAN |
 | Schema | `/2` retained (`wjss.snapshot/2`, `wjss.delta/2`) |
 | OQ-T3 | RESOLVED — RETAIN_SCHEMA_V2 |
-| Owner Manual Review | **PENDING** |
+| Owner Manual Review | **PENDING** at `c4d77974…` → **PASS** at `b5c7dff2…` (§14) |
 | PR #21 | OPEN / UNMERGED |
-| K3 | **AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING** |
+| K3 | AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING (at `c4d77974…`) → **COMPLETE FOR MERGE REVIEW** (§14) |
 
-Not claimed: Owner Manual Review passed; PR-ready; K3 complete; PR merged; hardware verified;
-physical acquisition implemented; protocol resolved; Port resolved; MODBUS / TEST_HARDWARE /
-PRODUCTION / device write authorised. The Sensor Disable mutation UI remains **NOT_IMPLEMENTED**
+Not claimed (at `c4d77974…`, and still not claimed where it concerns scope): PR merged; hardware
+verified; physical acquisition implemented; protocol resolved; Port resolved; MODBUS /
+TEST_HARDWARE / PRODUCTION / device write authorised. The Sensor Disable mutation UI remains **NOT_IMPLEMENTED**
 (Runtime foundation and read-only representation only). WJ1 / WJ3 Installed Position remains
 **UNRESOLVED** (no gap anchors; Target Coverage unchanged). Every evidence-honesty position of
 §12.8 is unchanged.
@@ -371,3 +379,55 @@ PRODUCTION / device write authorised. The Sensor Disable mutation UI remains **N
 This closeout commit is documentation-only: no `.cs`, `.mjs`, `.ts`, `.json`, `.csv`, HTML, CSS,
 fixture, generated file, lock file, project file, props, `.editorconfig`, schema, Runtime, Queue,
 test or dependency file was changed.
+
+---
+
+## 14. Owner Manual Review PASS and merge-readiness closeout (2026-10-12)
+
+### 14.1 Commits after the validated head
+
+| Commit | Parent | Content | Effect on the Owner-local .NET record |
+|---|---|---|---|
+| `c4d77974a85ea103edc366d87b191636a07ed858` | `041b2863…` | Markdown-only automated-validation closeout (§13) | none (no executable file) |
+| `b5c7dff2f944956c608d89b903cb151ea6eed551` | `c4d77974…` | Measurement-quality presentation wording (`presentation.mjs` legend, `quality.mjs` value-age text and note, Ops Preview Wall Map legend) and the directly corresponding Node tests (quality MQ1–MQ3, presentation legend, scenarios, render, wallmap render); no `.cs`, fixture, schema, contract, dependency or lock-file change | none — the §13 record at `041b2863…` (Release build PASS, 455 / 455, fixture emission 7 / 7 twice with no diff, typecheck PASS, 36 / 36) remains authoritative |
+
+Arena gates after the terminology correction (at `b5c7dff2…`): commissioning **218 / 218**,
+Ops Preview 129 / 129, Kiosk contract 22 / 22, Mapping UI 82 / 82, mapping package 261 pass /
+7 skipped / 0 failed, S2 14 / 14, contracts-ts 36 / 36, boundary S1–S9 0 findings,
+`git diff --check` clean, lock / csproj / props / `.editorconfig` drift 0, fixture / schema drift
+none. .NET was not rerun in Arena (no SDK) and did not need to be (no `.cs` change).
+
+### 14.2 Owner Manual Review record — exact reviewed head `b5c7dff2f944956c608d89b903cb151ea6eed551`
+
+**Result: PASS** (final browser / Kiosk recheck, Owner-local).
+
+| Area | Verified by the Owner |
+|---|---|
+| A. Measurement-quality terminology | Measurement-quality `DISABLED` explicitly separated from the Sensor operational Enabled / Disabled state; legend states DISABLED = measurement unavailable / Channel not commissioned and that Sensor operational Enabled / Disabled state is separate; the former wording "no measurement exists at this position" is absent; value age reads "n/a - no current measurement available"; the unassigned physical Channel remains identifiable as `SPARE_UNMAPPED` / `NO_COUNTERPART_SPARE` and is not represented as a missing Product Sensor; no Queue, Candidate, dispatch or `SENSOR_DISABLED` meaning is attributed to measurement-quality DISABLED |
+| B. Topology presentation | 108 Product Sensors; 216 Product-compatible measurements; 240 physical Channels; 24 unassigned; Product-topology conflict count 0; Drawing internal-conflict count 12; I7 and I16 normal Product Sensors in their authoritative ordinal positions; no I7 / I16 `NON_SENSOR_GAP` or former gap anchor shown; approved U-shaped Sensor Map intact |
+| C. Kiosk and Preview presentation | local Preview host connects; Kiosk read-only; Kiosk identity remains **Stage 0.4C-K2 by approved Owner rule (intentional)**; K3 evidence section reported separately; no hardware access claimed; no device write available; Overview table scrolls inside its own frame; no material UI regression on the reviewed surfaces |
+| D. Evidence honesty | Protocol `PROTOCOL_UNRESOLVED`; Port `PORT_UNRESOLVED`; protocol candidate `WITHDRAWN`; process-image `DERIVATION_BLOCKED`; no candidate startWord / endWord or module offset shown; wire-break decoding `WIRE_BREAK_DECODING_BLOCKED`; 0x7FFF not presented as a physically verified wire-break result; Reachability NOT_TESTED; Physical Acquisition NOT_IMPLEMENTED; MODBUS / TEST_HARDWARE / PRODUCTION / Device Write NOT_AUTHORIZED |
+| E. Sensor operational Disable boundary | presentation no longer conflates measurement-quality DISABLED with Sensor operational Disable; the executable Sensor Disable kernel and Queue behaviour remain as validated by the automated tests (§12.6, §13); Sensor Disable mutation UI remains **NOT_IMPLEMENTED**; no unapproved mutation control added |
+
+### 14.3 Final Stage status
+
+| Item | Status |
+|---|---|
+| Stage 0.4C-K3 | **COMPLETE FOR MERGE REVIEW** |
+| Automated Gates | **PASS** (Owner-local at `041b2863…`, §13; Arena lightweight gates re-run at `b5c7dff2…`, §14.1) |
+| Owner Manual Review | **PASS** (exact head `b5c7dff2…`, §14.2) |
+| Schema Decision | RESOLVED — RETAIN_SCHEMA_V2 (`wjss.snapshot/2`, `wjss.delta/2`) |
+| PR #21 | **OPEN / UNMERGED** pending final PR checks and the Owner merge action — **not merged** |
+
+Scope and boundaries carried forward unchanged: 108 Product Sensors (I7 and I16 normal); 216
+assigned Product TC measurements; 240 physical / 24 unassigned Channels; 12 unrelated Drawing
+internal-conflict rows; 0 Product-topology conflict rows; WJ1–WJ8 direct Assigned Cleaning Device
+identity, WJn ↔ IVn one-to-one; WJ1 / WJ3 Installed Position UNRESOLVED, no former gap anchors;
+Sensor Disable Queue exclusion, `SENSOR_DISABLED` removal, FIFO preservation, Active Job
+non-abort, re-enable stale-candidate protection, unknown Sensor fail-closed; schema `/2`; Kiosk
+Stage 0.4C-K2 identity; K3 evidence-section identity; `PROTOCOL_UNRESOLVED`, candidate
+`WITHDRAWN`, `PORT_UNRESOLVED`, `DERIVATION_BLOCKED`, `RECORD_TO_RECORD_CONSISTENCY_ONLY`,
+`WIRE_BREAK_DECODING_BLOCKED`, Reachability NOT_TESTED, Physical Acquisition NOT_IMPLEMENTED,
+MODBUS / TEST_HARDWARE / PRODUCTION / Device Write NOT_AUTHORIZED, connected-storage provenance
+disclosure. Nothing about hardware, field acquisition, protocol, Port, MODBUS, TEST_HARDWARE,
+PRODUCTION or Device Write is complete or authorised. This closeout commit is Markdown-only.
