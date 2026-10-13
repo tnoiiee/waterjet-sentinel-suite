@@ -256,7 +256,7 @@ public sealed class TrialPolicyTests
     [Fact]
     public async Task Overdue_Worker_Observation_And_Elapsed_Budget_Are_Distinct_From_Cleanup_State()
     {
-        var slowWorker = new TestClient { ConnectWait = _ => Task.Delay(250) };
+        var slowWorker = new TestClient { ConnectWait = _ => Task.Delay(250, CancellationToken.None) };
         var workerRunner = new TrialRunner { Budgets = NarrowBudgets(TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(50)) };
         var e = await workerRunner.RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => slowWorker, TimeSpan.FromSeconds(2), null, CancellationToken.None);
         Assert.Equal(PhysicalTrialStates.Overdue, e.WorkerObservationState);
@@ -265,7 +265,7 @@ public sealed class TrialPolicyTests
         Assert.Empty(e.Words);
         TrialEvidence.Validate(e, TrialCatalog.LoadTrusted());
 
-        var elapsed = new TestClient { ConnectWait = _ => Task.Delay(300) };
+        var elapsed = new TestClient { ConnectWait = _ => Task.Delay(300, CancellationToken.None) };
         var elapsedRunner = new TrialRunner { Budgets = NarrowBudgets(TimeSpan.FromMilliseconds(100), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5)) };
         var expired = await elapsedRunner.RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => elapsed, TimeSpan.FromSeconds(2), null, CancellationToken.None);
         Assert.Equal(PhysicalTrialStates.Elapsed, expired.LifecycleBudgetState);

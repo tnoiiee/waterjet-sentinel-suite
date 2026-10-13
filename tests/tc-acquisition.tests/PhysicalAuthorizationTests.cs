@@ -33,6 +33,10 @@ public sealed class PhysicalAuthorizationTests
         }
     }
 
+    /// <summary>Exact allowlisted property names of the external consumption marker, in canonical order.</summary>
+    private static readonly string[] ExpectedConsumptionMarkerPropertyNames =
+        ["authorizationId", "authorizationPayloadSha256", "consumedAtUtc", "implementationSha", "invocationId", "schemaVersion", "trialId"];
+
     private static BuildIdentity NewIdentity(ECDsa key) => new()
     {
         SchemaVersion = BuildIdentity.SchemaVersionValue,
@@ -285,7 +289,7 @@ public sealed class PhysicalAuthorizationTests
         var markerText = File.ReadAllText(markerPath);
         var marker = JsonDocument.Parse(markerText).RootElement;
         var names = marker.EnumerateObject().Select(p => p.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
-        Assert.Equal(new[] { "authorizationId", "authorizationPayloadSha256", "consumedAtUtc", "implementationSha", "invocationId", "schemaVersion", "trialId" }, names);
+        Assert.Equal(ExpectedConsumptionMarkerPropertyNames, names);
         Assert.Equal("AUTH-T01-0001", marker.GetProperty("authorizationId").GetString());
         Assert.Equal(identity.ImplementationSha, marker.GetProperty("implementationSha").GetString());
         Assert.DoesNotContain("\\", markerText, StringComparison.Ordinal);
