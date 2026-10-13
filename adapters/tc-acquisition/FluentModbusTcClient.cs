@@ -1,4 +1,5 @@
 using System.Net;
+using System.Buffers.Binary;
 
 namespace Wjss.Adapters.TcAcquisition;
 
@@ -15,7 +16,7 @@ namespace Wjss.Adapters.TcAcquisition;
 /// is enforced via a non-blocking gate.
 /// Endianness: the connection is explicitly established with <c>ModbusEndianness.BigEndian</c>
 /// (Modbus network order, CANDIDATE_UNVERIFIED). Returned ushort values are network-raw register
-/// words as decoded by the library according to that setting (SwapBytes on little-endian hosts);
+/// words converted from the library byte payload with the explicit BigEndian candidate;
 /// scaling, wire-break and multi-register word ordering remain unverified. Word-order for future
 /// 32-bit values remains unverified.
 /// Connect lifecycle: FluentModbus <c>ModbusTcpClient.Connect</c> is synchronous and not
@@ -31,7 +32,7 @@ namespace Wjss.Adapters.TcAcquisition;
 /// and cleanup cannot hide the primary failure. Disconnect/Dispose fencing and deterministic cleanup
 /// are preserved.
 /// Memory ownership: FluentModbus returns transport-owned memory that may be reused; the adapter
-/// copies into an application-owned <c>ushort[]</c> before leaving the boundary.
+/// copies the byte payload before explicit BigEndian conversion into an application-owned <c>ushort[]</c> before leaving the boundary.
 /// </summary>
 public sealed class FluentModbusTcClient : ITcReadOnlyClient
 {
@@ -62,7 +63,15 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
         get { lock (_gate) return _endpoint; }
     }
 
-    public async Task<TcReadResult> ConnectAsync(TcNodeEndpoint endpoint, CancellationToken cancellationToken)
+    public Task<TcReadResult> ConnectAsync(TcNodeEndpoint endpoint, CancellationToken cancellationToken)
+    {
+        // Preserve synchronous bounded handshake and faulted-Task exception semantics without
+        // an async method that has no await. This does not introduce mid-handshake cancellation.
+        try { return Task.FromResult(ConnectBounded(endpoint, cancellationToken)); }
+        catch (Exception ex) { return Task.FromException<TcReadResult>(ex); }
+    }
+
+    private TcReadResult ConnectBounded(TcNodeEndpoint endpoint, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
         endpoint.Validate();
@@ -92,7 +101,7 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
         catch (Exception ex)
         {
             lock (_gate) { _endpoint = null; }
-            return TcReadResult.Failure(TcReadKind.ConfigurationRejected, endpoint, newGeneration, "INVALID_IP", ex.Message);
+            return TcReadResult.Failure(TcReadKind.ConfigurationRejected, endpoint, newGeneration, "INVALID_IP", ex.Message, exceptionType: ex.GetType().Name);
         }
 
         var endPoint = new IPEndPoint(ip, endpoint.Port);
@@ -147,18 +156,18 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
             try { client.Dispose(); } catch { }
             lock (_gate) { _endpoint = null; }
             if (connectEx is FluentModbus.ModbusException mex)
-                return TcReadResult.Failure(TcReadKind.ProtocolException, endpoint, newGeneration, "MODBUS_EXCEPTION", mex.Message);
+                return TcReadResult.Failure(TcReadKind.ProtocolException, endpoint, newGeneration, "MODBUS_EXCEPTION", mex.Message, exceptionType: connectEx.GetType().Name);
             if (connectEx is TimeoutException)
-                return TcReadResult.Failure(TcReadKind.Timeout, endpoint, newGeneration, "CONNECT_TIMEOUT", connectEx.Message);
+                return TcReadResult.Failure(TcReadKind.Timeout, endpoint, newGeneration, "CONNECT_TIMEOUT", connectEx.Message, exceptionType: connectEx.GetType().Name);
             if (connectEx is System.Net.Sockets.SocketException || connectEx is System.IO.IOException)
             {
                 var kind = connectEx is System.Net.Sockets.SocketException ? TcReadKind.ConnectionFailure : TcReadKind.TransportClosed;
-                return TcReadResult.Failure(kind, endpoint, newGeneration, connectEx.GetType().Name.ToUpperInvariant(), connectEx.Message);
+                return TcReadResult.Failure(kind, endpoint, newGeneration, connectEx.GetType().Name.ToUpperInvariant(), connectEx.Message, exceptionType: connectEx.GetType().Name);
             }
             // FluentModbus Connect wraps timeout as generic Exception with Message "ModbusClient_TcpConnectTimeout"
             if (connectEx.Message.Contains("TcpConnectTimeout", StringComparison.OrdinalIgnoreCase) || connectEx.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase))
-                return TcReadResult.Failure(TcReadKind.Timeout, endpoint, newGeneration, "CONNECT_TIMEOUT", connectEx.Message);
-            return TcReadResult.Failure(TcReadKind.ConnectionFailure, endpoint, newGeneration, connectEx.GetType().Name.ToUpperInvariant(), connectEx.Message);
+                return TcReadResult.Failure(TcReadKind.Timeout, endpoint, newGeneration, "CONNECT_TIMEOUT", connectEx.Message, exceptionType: connectEx.GetType().Name);
+            return TcReadResult.Failure(TcReadKind.ConnectionFailure, endpoint, newGeneration, connectEx.GetType().Name.ToUpperInvariant(), connectEx.Message, exceptionType: connectEx.GetType().Name);
         }
 
         // Fence stale generation or dispose that raced with Connect.
@@ -218,16 +227,20 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
         {
             int currentGen;
             FluentModbus.ModbusTcpClient? client;
+            TcNodeEndpoint? connectedEndpoint;
             lock (_gate)
             {
                 currentGen = _generation;
                 client = _client;
+                connectedEndpoint = _endpoint;
             }
 
             if (request.Generation != currentGen)
                 return TcReadResult.Stale(request.Endpoint, request.Generation, currentGen, request.RegisterArea, request.Endianness);
             if (client is null || !client.IsConnected)
                 return TcReadResult.Failure(TcReadKind.TransportClosed, request.Endpoint, request.Generation, "NOT_CONNECTED", "No connected transport.", request.RegisterArea, request.Endianness);
+            if (request.Endpoint != connectedEndpoint)
+                return TcReadResult.Failure(TcReadKind.ConfigurationRejected, request.Endpoint, request.Generation, "ENDPOINT_MISMATCH", "Request endpoint must equal the connected endpoint.", request.RegisterArea, request.Endianness);
             if (cancellationToken.IsCancellationRequested)
                 return TcReadResult.CancelledResult(request.Endpoint, request.Generation, request.RegisterArea, request.Endianness);
 
@@ -252,13 +265,17 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
                 // The returned Memory is transport-owned and may be reused; we copy to application-owned array.
                 if (request.RegisterArea == TcRegisterArea.InputRegisters)
                 {
-                    var span = await client.ReadInputRegistersAsync<ushort>((int)request.Endpoint.UnitIdentifier, request.StartAddress, request.Quantity, linkedToken).ConfigureAwait(false);
-                    words = span.ToArray();
+                    var payload = await client.ReadInputRegistersAsync(request.Endpoint.UnitIdentifier, request.StartAddress, request.Quantity, linkedToken).ConfigureAwait(false);
+                    if (payload.Length != request.Quantity * 2)
+                        return TcReadResult.Failure(TcReadKind.MalformedResponse, request.Endpoint, request.Generation, "WORD_COUNT_MISMATCH", "Payload must contain exactly two bytes per requested word.", request.RegisterArea, request.Endianness);
+                    words = CopyBigEndianWords(payload, request.Quantity);
                 }
                 else // HoldingRegisters
                 {
-                    var span = await client.ReadHoldingRegistersAsync<ushort>((int)request.Endpoint.UnitIdentifier, request.StartAddress, request.Quantity, linkedToken).ConfigureAwait(false);
-                    words = span.ToArray();
+                    var payload = await client.ReadHoldingRegistersAsync(request.Endpoint.UnitIdentifier, request.StartAddress, request.Quantity, linkedToken).ConfigureAwait(false);
+                    if (payload.Length != request.Quantity * 2)
+                        return TcReadResult.Failure(TcReadKind.MalformedResponse, request.Endpoint, request.Generation, "WORD_COUNT_MISMATCH", "Payload must contain exactly two bytes per requested word.", request.RegisterArea, request.Endianness);
+                    words = CopyBigEndianWords(payload, request.Quantity);
                 }
 
                 // Stale fence after await: if Disconnect/Dispose/reconnect happened while we awaited, reject.
@@ -266,38 +283,65 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
                 if (request.Generation != currentGen)
                     return TcReadResult.Stale(request.Endpoint, request.Generation, currentGen, request.RegisterArea, request.Endianness);
 
+                if (cancellationToken.IsCancellationRequested)
+                    return TcReadResult.CancelledResult(request.Endpoint, request.Generation, request.RegisterArea, request.Endianness);
+                if (timeoutCts.IsCancellationRequested)
+                    return TcReadResult.Failure(TcReadKind.Timeout, request.Endpoint, request.Generation, "TIMEOUT", "Per-call timeout elapsed.", request.RegisterArea, request.Endianness);
+                if (words.Length != request.Quantity)
+                    return TcReadResult.Failure(TcReadKind.MalformedResponse, request.Endpoint, request.Generation, "WORD_COUNT_MISMATCH", "Returned word count differs from requested quantity.", request.RegisterArea, request.Endianness);
                 return TcReadResult.SuccessResult(request.Endpoint, request.Generation, words, DateTimeOffset.UtcNow, request.RegisterArea, request.Endianness);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
             {
-                return TcReadResult.CancelledResult(request.Endpoint, request.Generation, request.RegisterArea, request.Endianness);
+                return TcReadResult.CancelledResult(request.Endpoint, request.Generation, request.RegisterArea, request.Endianness) with { ExceptionType = ex.GetType().Name };
             }
-            catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException ex) when (timeoutCts.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
-                return TcReadResult.Failure(TcReadKind.Timeout, request.Endpoint, request.Generation, "TIMEOUT", "Per-call timeout elapsed.", request.RegisterArea, request.Endianness);
+                return TcReadResult.Failure(TcReadKind.Timeout, request.Endpoint, request.Generation, "TIMEOUT", "Per-call timeout elapsed.", request.RegisterArea, request.Endianness, ex.GetType().Name);
             }
             catch (TimeoutException ex)
             {
-                return TcReadResult.Failure(TcReadKind.Timeout, request.Endpoint, request.Generation, "TIMEOUT", ex.Message, request.RegisterArea, request.Endianness);
+                return TcReadResult.Failure(TcReadKind.Timeout, request.Endpoint, request.Generation, "TIMEOUT", ex.Message, request.RegisterArea, request.Endianness, ex.GetType().Name);
             }
             catch (FluentModbus.ModbusException ex)
             {
-                return TcReadResult.Failure(TcReadKind.ProtocolException, request.Endpoint, request.Generation, "MODBUS_EXCEPTION", ex.Message, request.RegisterArea, request.Endianness);
+                return TcReadResult.Failure(TcReadKind.ProtocolException, request.Endpoint, request.Generation, "MODBUS_EXCEPTION", ex.Message, request.RegisterArea, request.Endianness, ex.GetType().Name);
+            }
+            catch (Exception ex) when ((ex is System.Net.Sockets.SocketException or System.IO.IOException or ObjectDisposedException) && cancellationToken.IsCancellationRequested)
+            {
+                return TcReadResult.CancelledResult(request.Endpoint, request.Generation, request.RegisterArea, request.Endianness) with { ExceptionType = ex.GetType().Name };
+            }
+            catch (Exception ex) when ((ex is System.Net.Sockets.SocketException or System.IO.IOException or ObjectDisposedException) && timeoutCts.IsCancellationRequested)
+            {
+                return TcReadResult.Failure(TcReadKind.Timeout, request.Endpoint, request.Generation, "TIMEOUT", "Per-call timeout elapsed.", request.RegisterArea, request.Endianness, ex.GetType().Name);
             }
             catch (Exception ex) when (ex is System.Net.Sockets.SocketException || ex is System.IO.IOException)
             {
                 var kind = ex is System.Net.Sockets.SocketException ? TcReadKind.ConnectionFailure : TcReadKind.TransportClosed;
-                return TcReadResult.Failure(kind, request.Endpoint, request.Generation, ex.GetType().Name.ToUpperInvariant(), ex.Message, request.RegisterArea, request.Endianness);
+                return TcReadResult.Failure(kind, request.Endpoint, request.Generation, ex.GetType().Name.ToUpperInvariant(), ex.Message, request.RegisterArea, request.Endianness, ex.GetType().Name);
             }
             catch (Exception ex)
             {
-                return TcReadResult.Failure(TcReadKind.MalformedResponse, request.Endpoint, request.Generation, "UNEXPECTED_RESPONSE", ex.Message, request.RegisterArea, request.Endianness);
+                return TcReadResult.Failure(TcReadKind.MalformedResponse, request.Endpoint, request.Generation, "UNEXPECTED_RESPONSE", ex.Message, request.RegisterArea, request.Endianness, ex.GetType().Name);
             }
         }
         finally
         {
             _singleRead.Release();
         }
+    }
+
+    // The generic library cast can hide an odd trailing byte. Use its existing byte-payload
+    // overload, validate exact size first, then copy/decode the approved BigEndian candidate.
+    // This is data-format validation, not a transport/framing implementation. MBAP identity and
+    // byte-count-field validation still require independent passive wire review.
+    private static ushort[] CopyBigEndianWords(Memory<byte> payload, ushort quantity)
+    {
+        var ownedBytes = payload.ToArray();
+        var words = new ushort[quantity];
+        for (var i = 0; i < words.Length; i++)
+            words[i] = BinaryPrimitives.ReadUInt16BigEndian(ownedBytes.AsSpan(i * 2, 2));
+        return words;
     }
 
     public Task DisconnectAsync()

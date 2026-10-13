@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.TcBench</RootNamespace>
+    <AssemblyName>Wjss.TcBench</AssemblyName>
+    <TrialCatalogFile>$(MSBuildProjectDirectory)/obj/tc-bench/trial-catalog.json</TrialCatalogFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../adapters/tc-acquisition/Wjss.Adapters.TcAcquisition.csproj" />
+    <InternalsVisibleTo Include="Wjss.TcAcquisition.Tests" />
+    <EmbeddedResource Include="$(TrialCatalogFile)" LogicalName="TcTrialCatalog.json" />
+    <EmbeddedResource Include="$(TrialCatalogFile).sha256" LogicalName="TcTrialCatalog.sha256" />
+  </ItemGroup>
+  <Target Name="GenerateTrustedTrialCatalog" BeforeTargets="PrepareForBuild">
+    <Exec Command="node &quot;$(MSBuildProjectDirectory)/../../tools/tc-bench/export-trial-configuration.mjs&quot; --build-output &quot;$(TrialCatalogFile)&quot;" />
+  </Target>
+</Project>

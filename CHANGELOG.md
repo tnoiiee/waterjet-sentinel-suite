@@ -1,3 +1,27 @@
+## 2026-10-13 — Isolated one-Node TC bench — software SOURCE checkpoint, pending locks
+
+**BLOCKED ON OWNER-LOCAL GENUINE LOCK / BUILD / TEST EVIDENCE. NOT MERGE READY.**
+Owner permits atomic source checkpoint/normal assigned-branch push without new locks.
+
+- Added separate planning-only SIMULATION executable, trusted canonical-derived catalog/manifest
+  exporter, one-shot internal software-loopback runner and explicit offline wire/Owner evidence model.
+- Authored fake/ephemeral loopback/policy/evidence tests; .NET builds/tests/fixture parity NOT RUN.
+  Adapter preserves read-only API/classifications and adds endpoint/exact byte/count/owned-copy checks,
+  cancellation exception precedence and exception-type metadata. Sync bounded Connect remains sync;
+  completed/faulted Task wrapper avoids an await-free async method, without claiming compiler success.
+- New S3 revision: selected term ONLY at the exact normalized harness/test lock paths, no directory
+  or generic lock exemption; existing adapter/central exceptions retained, engine/S1/S2/S4–S9 unchanged.
+  Scanner fixtures are temporary outside Git, not manufactured locks.
+- Two new genuine locks remain absent; pins, existing locks, canonical config/evidence/topology,
+  Runtime/Kiosk, fixtures/contract/schema/generators and all control/write scope remain unchanged.
+- Available validation is Node/static/source proof only; full results and exact Owner-local commands
+  are in [scope gate](docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md). Previous gate's results are historical.
+- No automatic acceptance/capture/publication; diagnostic success QUARANTINED. No new dependencies,
+  package version changes, custom transport/fork, retry/fallback, six-Node or Product integration.
+
+**HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
+
 ## 2026-10-13 — Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2 — MERGE READY (PR #22 OPEN targeting main, head `fdc81d801aecabd3f00350948d69a9f9b49f9244`, parent `91f5a68fdb6cfec74efc82f5237f47c600c61728`, genuine lock `49e404356edee64bb9dbaccd395d8bcc66435881` on `d1ea0324`) — FluentModbus 5.3.2 selected, NModbus 3.0.83 rejected
 
 - **Outcome:** `SELECT_FLUENTMODBUS_5_3_2` — FluentModbus 5.3.2 (MIT, `netstandard2.0` via CPM `Directory.Packages.props`) selected; NModbus 3.0.83 rejected for this application lifecycle (no per-operation `CancellationToken` — `ReadHoldingRegistersAsync` returns `Task<ushort[]>` without token vs FluentModbus `ReadHoldingRegistersAsync<T>(…,CancellationToken)`); Raw Socket not selected. Decision rule: prior FluentModbus default retained unless exact evidence proved material blocker; selection on per-operation cancellation contract, not preference/popularity/benchmarks. Record: [`ADR-0018`](docs/decisions/ADR-0018-modbus-tcp-client-library-selection.md), [`STAGE_LIBRARY_SELECTION_GATE_REPORT`](docs/STAGE_LIBRARY_SELECTION_GATE_REPORT.md).

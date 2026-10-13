@@ -1,5 +1,20 @@
 # WaterJet Sentinel Suite (WJSS)
 
+## Current checkpoint — 2026-10-13
+
+**Isolated one-Node TC bench: BLOCKED ON OWNER-LOCAL GENUINE LOCK / BUILD / TEST EVIDENCE.**
+Software source/tests/policy/docs only; NOT MERGE READY. Separate one-shot bench, planning-only
+SIMULATION, no Runtime/Kiosk integration. T01 and physical deployment cannot execute here.
+Two new locks are absent pending genuine Owner-local restore; existing locks/pins remain unchanged.
+No .NET compile/test/fixture-parity or physical evidence is claimed. Closed library-selection
+validation is historical and does not validate these additions.
+
+[Current state](docs/CURRENT_STATE.md) · [Scope gate / Owner-local commands](docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md) ·
+[ADR-0019](docs/decisions/ADR-0019-isolated-one-node-tc-bench.md) · [Bench README](apps/tc-bench/README.md).
+This notice supersedes current-status/next-step wording in the historical table below.
+**HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
+
 **Automated Boiler Wall Water-Jet Cleaning Monitoring and Supervisory Control System**
 
 Repository: `waterjet-sentinel-suite`

@@ -1,5 +1,22 @@
 # Master Plan — WaterJet Sentinel Suite (WJSS)
 
+## Current critical path — 2026-10-13
+
+**Isolated one-Node TC bench SOURCE checkpoint: BLOCKED ON OWNER-LOCAL GENUINE LOCK /
+BUILD / TEST EVIDENCE. Not merge-ready.** Software-only Approach A approved; atomic checkpoint
+and normal assigned-branch push may precede genuine new locks. Separate one-shot bench ownership,
+no Runtime/Kiosk wiring, no executable physical acquisition. T01 remains NOT AUTHORIZED.
+
+Next: pull source checkpoint → clear process TargetPath/WJSS overrides → genuine restore/two new
+locks → inspect/hash → two locked restores → targeted Release builds/fake and ephemeral loopback
+tests → full Release/full .NET → S2/S3/Boundary/Commissioning → fixture parity VERIFY ONLY →
+diff/protected proof → genuine-lock/exact-validation-record commit → independent Owner review.
+[Scope gate and exact commands](STAGE_ONE_NODE_TC_SCOPE_GATE.md);
+[ADR-0019](decisions/ADR-0019-isolated-one-node-tc-bench.md).
+Future physical/capture/deployment gates are separate; no batch trials or six-Node expansion.
+Library selection stays closed; previous merge-ready wording below is historical, not current.
+Hardware contact, T01, passive capture and PHYSICAL_TEST deployment remain NOT AUTHORIZED.
+
 **Document status:** [APPROVED] for the stage-gate discipline, for the Stage 0.1 and Stage 0.2
 positions, and for the approved Stage 0.2 Scope Gate; **stage contents beyond Stage 0.2 remain
 `[PROPOSED]`**.
