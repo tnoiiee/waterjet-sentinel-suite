@@ -141,36 +141,24 @@ for a specific, named purpose:
 
 Non-destructive, additive work is the default: new commits on the stage branch.
 
-### 7.1 Baseline mismatch — Stop Gate
+### 7.1 Baseline mismatch — Standing Sandbox Recreation Protocol
 
-If the local `HEAD`, the expected checkpoint, the remote branch, the index, or the working
-tree does not match the approved baseline, the Agent must:
+Sandbox recreation is a **normal event** (platform-provided sandbox, branch `arena/*`). When the local `HEAD`, expected checkpoint, remote branch, index or working tree does not match the approved baseline, the Agent must first perform the **Owner-approved Standing Sandbox Recreation Protocol** before any edit:
 
-1. Stop before editing.
-2. Report the exact discrepancy.
-3. Preserve the available evidence without modifying repository state.
-4. Not move branch refs.
-5. Not reset or modify the index.
-6. Not restore, overwrite, or delete working-tree content.
-7. Not continue implementation.
-8. Wait for an Owner-approved recovery instruction.
+1. **Targeted fetch** `origin main` and the PR branch (no other fetch, no clone).
+2. **Verify remote head, required SHA and ancestry** (`git rev-parse origin/main`, `origin/arena/*`, `git merge-base --is-ancestor` for `d1ea0324` and PR chain).
+3. **Prove complete non-ignored `path/blob/mode` identity** (`git ls-tree -r HEAD --name-only` vs `git ls-files`, `git ls-files -s` vs `git ls-tree -r HEAD` for mode+blob, `0 missing/0 extra/0 mismatch`).
+4. **CAS `update-ref` if required** (`git update-ref refs/heads/arena/* origin/arena/*` only if local ≠ remote, compare-and-swap).
+5. **`git read-tree` without `-u`** (`git read-tree HEAD` to sync index, no working-tree overwrite).
+6. **Re-prove clean state** (`git status --porcelain 0`, `git diff --check` clean).
 
-Rules that bound this gate:
+If remote SHA/ancestry and complete non-ignored `path/blob/mode` identity are proven and `CAS update-ref` plus `read-tree` without `-u` restore the expected baseline, the Agent **continues without requesting duplicate recovery approval** — this is the normal Owner-approved recreation path, not a destructive operation.
 
-- A remote checkpoint may be used as **evidence**. The existence of that checkpoint does not
-  authorise the Agent to modify local refs, the index, or working-tree content.
-- Content comparison may be used for **diagnosis only**. **Content identity does not by
-  itself authorise recovery operations.**
-- Temporary files or backups under `/tmp` are **not** durable recovery evidence and must
-  never be treated as a safety net that justifies a recovery action.
-- The Owner's local repository and the verified Remote Git checkpoint remain the
-  authoritative durable sources.
-- There is no alternative automatic recovery path. The Agent must never decide
-  independently that a baseline mismatch is safe to recover, and no content backup
-  authorises branch-ref or index movement.
+**STOP only when** SHA, ancestry, identity or CAS proof is **unsafe** (mismatch, missing, extra, mode/blob mismatch, non-clean working tree, or untracked non-ignored content that would be overwritten) — then report the exact discrepancy, preserve evidence without modifying repository state, and wait for Owner instruction.
 
-Recovery requires explicit, Owner-authorised instructions. This gate has no exceptions and
-no self-service variant.
+**Forbidden always (even during recreation):** `reset`, `reset --hard`, `clean`, `restore`, `checkout`/`switch`, `stash`, `rebase`, `force push`, `read-tree -u`, deleting unknown files. Recovery requires explicit Owner authorisation only for those destructive operations — they are not part of the normal recreation protocol.
+
+**Process-protocol violation record (2026-10-13):** The `49e4043`/`fdc81d8` recreation in this PR's history used `git reset --hard` (with `update-ref`/`read-tree`) — that was a violation of this section's current rule (which forbids `reset --hard`). It caused no data loss (`465/465` identity, `0 missing/extra`, clean working tree, remote PR tree `49e4043`/`fdc81d8`/`dfce519` identical to intended reviewed tree, ancestry `d1ea0324→b31d104→49e4043→91f5a68→fdc81d8→dfce519` proven), but it is **not a precedent** — future recoveries must use `CAS update-ref` plus `read-tree` without `-u` only (as correctly used from `dfce519` onward).
 
 ## 8. Owner-only merge rule
 

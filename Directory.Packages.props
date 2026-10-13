@@ -19,13 +19,7 @@
 
     Still not added: coverlet, a third-party logging provider, a validation
     library, and any database or physical-transport vendor package (the S3 list
-    in tools/boundary-scan is the machine check of this rule). This checkpoint
-    adds the physical TC field-network read-only transport for the Library
-    Selection Gate: FluentModbus 5.3.2 (MIT, netstandard2.0, compatible with
-    net10.0) as the approved Modbus TCP client candidate; NModbus 3.0.83 was
-    evaluated and rejected (see ADR-0018). Transitive closure of FluentModbus
-    5.3.2 on netstandard2.0 is pinned explicitly because CentralPackage
-    TransitivePinning is enabled.
+    in tools/boundary-scan is the machine check of this rule). Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2 — MERGE READY (PR #22 OPEN targeting main `dfce519`/`fdc81d8`/`49e4043` on `d1ea0324`, see ADR-0018 and STAGE_LIBRARY_SELECTION_GATE_REPORT): FluentModbus 5.3.2 (MIT, netstandard2.0, compatible with net10.0) is **SELECTED and genuinely locked** (genuine `adapters/tc-acquisition/packages.lock.json` committed at `49e404356edee64bb9dbaccd395d8bcc66435881`, version 2 net10.0, `uAX793...`, CentralTransitive `Microsoft.Extensions.Logging.Abstractions 8.0.0` + `System.IO.Ports 8.0.0`), **not a candidate**; NModbus 3.0.83 was evaluated and rejected (no per-operation CancellationToken). **Version changes require a separate Owner-approved dependency gate** — do not bump `Version="5.3.2"` in this PR. Physical protocol (`FC03` vs `FC04`), register (`0`, `40 words`), `Unit ID`, byte/word order, scaling, wire-break, timing, concurrency and hardware behavior remain `CANDIDATE_UNVERIFIED`/`NOT VERIFIED` until One-Node Physical TC gate (see TC_EVIDENCE_SOURCE_REGISTER). Transitive closure of FluentModbus 5.3.2 on netstandard2.0 is pinned explicitly because CentralPackage TransitivePinning is enabled.
   -->
 
   <PropertyGroup>
@@ -44,7 +38,7 @@
       so this pin stays the single source of the version.
     -->
     <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
-    <!-- Physical TC read-only Modbus TCP client (Library Selection Gate, ADR-0018). -->
+    <!-- Physical TC read-only transport — Library Selection Gate SELECT_FLUENTMODBUS_5_3_2 MERGE READY (FluentModbus 5.3.2 SELECTED, genuinely locked 49e4043, see ADR-0018; version changes require separate Owner gate; physical FC/register/hardware NOT VERIFIED). -->
     <PackageVersion Include="FluentModbus" Version="5.3.2" />
     <!-- Transitive closure of FluentModbus 5.3.2 on net10.0: only Microsoft.Extensions.Logging.Abstractions and System.IO.Ports are required; System.Memory/System.Runtime.CompilerServices.Unsafe are netstandard2.0-only and not present in the genuine net10.0 lock (see ADR-0018). -->
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />

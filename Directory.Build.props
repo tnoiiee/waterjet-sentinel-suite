@@ -27,7 +27,7 @@
 
     <!--
       NuGet lock files: generation is an OWNER-LOCAL step (see the validation
-      document). No lock file is committed from Arena; none may be hand-authored.
+      document). Genuine `adapters/tc-acquisition/packages.lock.json` is committed from Owner-local `dotnet restore` (as at `49e404356edee64bb9dbaccd395d8bcc66435881`, version 2 net10.0, `uAX793...`); Arena must not synthesize or hand-edit lock files (no placeholder `contentHash`, no hand-authored `contentHash`, no absolute path, no credential) — see STAGE_LIBRARY_SELECTION_GATE_REPORT and ADR-0018.
     -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 
