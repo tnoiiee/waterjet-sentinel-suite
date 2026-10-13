@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS TC acquisition adapter — read-only Modbus TCP foundation (Library Selection Gate, ADR-0018).
+
+    This project is the infrastructure side of the application-owned boundary ITcReadOnlyClient.
+    It isolates the selected Modbus TCP client library (FluentModbus 5.3.2, MIT, netstandard2.0)
+    behind an application-owned contract that exposes no third-party types to Domain, Runtime
+    contracts, Kiosk UI or Mapping contracts.
+
+    Scope (this Stage): interface + minimal read-only implementation foundation only.
+    No automatic polling, no device write (FC05/FC06/FC15/FC16 are never called), no
+    TEST_HARDWARE activation, no PRODUCTION use, no hardware verification. The adapter is
+    disabled by default (SIMULATION remains the default source); PHYSICAL_TEST use requires
+    an explicit future Scope Gate and Owner-provided transport evidence (FC03 vs FC04, start
+    address, Unit ID, scaling, wire-break decoding all remain CANDIDATE_UNVERIFIED).
+
+    Library choice: FluentModbus 5.3.2 (see ADR-0018). NModbus 3.0.83 was evaluated and rejected.
+    The central package pin and this project reference are the ONLY Product locations that may
+    contain the vendor term "modbus" (boundary-scan S3 exception, s3Exception.mjs).
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.Adapters.TcAcquisition</RootNamespace>
+    <AssemblyName>Wjss.Adapters.TcAcquisition</AssemblyName>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentModbus" />
+  </ItemGroup>
+
+</Project>

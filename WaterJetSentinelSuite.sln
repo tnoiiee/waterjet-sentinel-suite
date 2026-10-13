@@ -26,6 +26,8 @@ Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Config.Examples.Tests"
 EndProject
 Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.FixtureEmission.Tests", "tests\integration\Wjss.FixtureEmission.Tests.csproj", "{A1000012-0A10-4A10-8A10-0A100A100A12}"
 EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Adapters.TcAcquisition", "adapters\tc-acquisition\Wjss.Adapters.TcAcquisition.csproj", "{A1000013-0A10-4A10-8A10-0A100A100A13}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -80,6 +82,10 @@ Global
 		{A1000012-0A10-4A10-8A10-0A100A100A12}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1000012-0A10-4A10-8A10-0A100A100A12}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1000012-0A10-4A10-8A10-0A100A100A12}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000013-0A10-4A10-8A10-0A100A100A13}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000013-0A10-4A10-8A10-0A100A100A13}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000013-0A10-4A10-8A10-0A100A100A13}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000013-0A10-4A10-8A10-0A100A100A13}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

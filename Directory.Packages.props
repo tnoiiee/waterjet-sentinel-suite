@@ -3,13 +3,7 @@
   <!--
     WJSS Stage 0.3A-1 - central package management (pinned versions).
 
-    Package identity and versions below are PROPOSED from package metadata known to
-    the authoring agent. The Arena environment cannot reach any NuGet endpoint, so
-    NO RESTORE COMPATIBILITY IS CLAIMED. The Owner-local restore (first lock-file
-    generation, then the locked-mode restore flag) must verify these exact
-    identities and versions and MAY bump them to the current stable equivalent as
-    part of the same checkpoint review; any bump must update this file in a
-    review-correction commit.
+    Package identity and versions below remain **pinned according to their accepted checkpoints** (existing validated pins are authoritative, not PROPOSED). The Arena environment cannot reach any NuGet endpoint, so **Arena cannot claim a new NuGet restore result**. **FluentModbus 5.3.2 is SELECTED and genuinely locked** (genuine `adapters/tc-acquisition/packages.lock.json` at `49e404356edee64bb9dbaccd395d8bcc66435881`, version 2 net10.0, `uAX793...`; see Library Selection Gate comment below and ADR-0018) — **no version may be bumped automatically**; **every future version change requires a separate Owner-approved dependency gate and genuine restore/build/test evidence** (locked restore PASS, Release build PASS, 455/455, etc.), and any bump must update this file in a dedicated review-correction commit.
 
     Approved minimum set: Microsoft.NET.Test.Sdk, xunit, xunit.runner.visualstudio
     (Stage 0.3A Scope Gate, Owner amendment), plus the embedded web-view host
@@ -18,8 +12,8 @@
     change only, no dependency refresh beyond this package).
 
     Still not added: coverlet, a third-party logging provider, a validation
-    library, and any database or physical-transport vendor package (the S3 list
-    in tools/boundary-scan is the machine check of this rule).
+    library, and any database provider remain absent (the S3 list
+    in tools/boundary-scan is the machine check of this rule). FluentModbus 5.3.2 is the sole approved physical-transport dependency under the narrow Library Selection Gate (see Library Selection Gate comment below and ADR-0018) — physical protocol (`FC03` vs `FC04`), register (`0`, `40 words`), `Unit ID`, byte/word order, scaling, wire-break, timing, concurrency and hardware behavior remain `CANDIDATE_UNVERIFIED`/`NOT VERIFIED` until the One-Node Physical TC gate proves them. Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2 — MERGE READY (PR #22 OPEN targeting main `dfce519`/`fdc81d8`/`49e4043` on `d1ea0324`, see ADR-0018 and STAGE_LIBRARY_SELECTION_GATE_REPORT): FluentModbus 5.3.2 (MIT, netstandard2.0, compatible with net10.0) is **SELECTED and genuinely locked** (genuine `adapters/tc-acquisition/packages.lock.json` committed at `49e404356edee64bb9dbaccd395d8bcc66435881`, version 2 net10.0, `uAX793...`, CentralTransitive `Microsoft.Extensions.Logging.Abstractions 8.0.0` + `System.IO.Ports 8.0.0`), **not a candidate**; NModbus 3.0.83 was evaluated and rejected (no per-operation CancellationToken). **Version changes require a separate Owner-approved dependency gate** — do not bump `Version="5.3.2"` in this PR. Physical protocol (`FC03` vs `FC04`), register (`0`, `40 words`), `Unit ID`, byte/word order, scaling, wire-break, timing, concurrency and hardware behavior remain `CANDIDATE_UNVERIFIED`/`NOT VERIFIED` until One-Node Physical TC gate (see TC_EVIDENCE_SOURCE_REGISTER). Transitive closure of FluentModbus 5.3.2 on netstandard2.0 is pinned explicitly because CentralPackage TransitivePinning is enabled.
   -->
 
   <PropertyGroup>
@@ -38,6 +32,11 @@
       so this pin stays the single source of the version.
     -->
     <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <!-- Physical TC read-only transport — Library Selection Gate SELECT_FLUENTMODBUS_5_3_2 MERGE READY (FluentModbus 5.3.2 SELECTED, genuinely locked 49e4043, see ADR-0018; version changes require separate Owner gate; physical FC/register/hardware NOT VERIFIED). -->
+    <PackageVersion Include="FluentModbus" Version="5.3.2" />
+    <!-- Transitive closure of FluentModbus 5.3.2 on net10.0: only Microsoft.Extensions.Logging.Abstractions and System.IO.Ports are required; System.Memory/System.Runtime.CompilerServices.Unsafe are netstandard2.0-only and not present in the genuine net10.0 lock (see ADR-0018). -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="System.IO.Ports" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,7 @@
 # Wjss.Kiosk — application-owned shell (Stage 0.4C-K2)
 
+> **Current position (2026-10-13, Library Selection Gate — selected library, PR #22 OPEN targeting main `fdc81d8`, genuine lock `49e4043` MERGE READY):** Kiosk shell and Operations Preview remain **preview/read-only** loopback-only (no TEST-NET-1 documentation range contact, no TEST_HARDWARE/PRODUCTION/device write). Software transport dependency is closed (selected library via CPM, self-owned adapter `ITcReadOnlyClient`, genuine lock `49e4043`) but **is not wired to Kiosk** — no Physical TC acquisition, no `PHYSICAL_TEST`/`PRODUCTION` until One-Node Physical TC gate after PR #22 merge (see `docs/STAGE_LIBRARY_SELECTION_GATE_REPORT.md` and `docs/TC_EVIDENCE_SOURCE_REGISTER.md`). Physical connectivity/reachability/field-hardware/FC/Unit ID/start/byte-word order/scaling/wire-break/timing remain `NOT VERIFIED`.
+
 The full-screen, application-owned Windows window that hosts the local Operations preview route.
 It is a real shell now: WinForms (`net10.0-windows`) wrapping the fixed-name embedded web-view
 runtime control **`Microsoft.Web.WebView2`, pinned at `1.0.4258.31`** in
