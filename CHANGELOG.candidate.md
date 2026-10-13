@@ -178,8 +178,8 @@ foundation record [`docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md`](docs/STAGE_ONE_NODE_T
 No Stage 0.4C-K6 record file exists in the repository yet, and this candidate pass does not create one
 (it is limited to the four authorized candidate paths).
 
-No merge, no physical authorization, and no K7 authorization follows from these results. Current
-authorization boundary:
+No merge, no T01 execution, no physical authorization, and no K7 authorization follows from these
+results. Current authorization boundary:
 
 ```text
 HARDWARE CONTACT NOT AUTHORIZED
@@ -195,9 +195,11 @@ WRITE/CONTROL NOT AUTHORIZED
 
 ## 3. Recent Merged Stages
 
-The canonical status of completed stages — **[`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 4 is
-the roadmap authority** (proposed restructure:
-[`docs/MASTER_PLAN.candidate.md`](docs/MASTER_PLAN.candidate.md)):
+The status of completed stages below is **proposed by this candidate for Owner review**;
+**[`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 4 remains the roadmap authority** (proposed
+restructure: [`docs/MASTER_PLAN.candidate.md`](docs/MASTER_PLAN.candidate.md)). That proposed roadmap is
+not authoritative or canonical unless and until the Owner separately authorizes atomic replacement and
+that replacement is completed and validated:
 
 | Stage | Title | Status |
 | --- | --- | --- |
@@ -233,7 +235,7 @@ for navigation:
 - R40: the first normal Windows commissioning run was 217/218 and the discrepancy was LF versus CRLF
   representation only; the canonical LF rerun was 218/218. Both records are preserved.
 - The Library Selection Gate entry keeps its dated `PR #22 OPEN` wording; PR #22 is merged in the
-  canonical roadmap. The Stage 0.4C-K3 and 0.4C-K2 entries likewise keep their dated
+  proposed roadmap (section 3). The Stage 0.4C-K3 and 0.4C-K2 entries likewise keep their dated
   `OPEN — NOT MERGED` wording.
 - Superseded topology figures (106 / 212 and earlier 208) are retained inside the preserved text
   together with the Owner critical topology correction to 108 / 216.

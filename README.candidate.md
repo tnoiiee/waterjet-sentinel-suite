@@ -95,7 +95,7 @@ authorization, and none is granted by this candidate:
 3. Owner PR review and merge decision for the K6 implementation checkpoint (**K6 NOT MERGED**).
 4. A separate Owner Scope Gate for **K7** — T01 One-Node Physical TC Read-Only Trial
    (**NOT AUTHORIZED**).
-5. Later stages per the canonical roadmap in
+5. Later stages per the proposed roadmap in
    [`docs/MASTER_PLAN.candidate.md`](docs/MASTER_PLAN.candidate.md) section 4 — **PLANNED, NOT
    AUTHORIZED** unless and until the Owner authorizes each one.
 
@@ -328,9 +328,11 @@ licence sections. Heading levels are demoted by two so this candidate keeps one 
   PR #23 into `main` at `193aba764f8934df3dc3b0fd1841e8b64e808cc2`, which is the approved base of
   K6. The current position is section 2 above.
 - The preserved `## Historical status (superseded as current)` table keeps its dated
-  "PR #22 OPEN" / "PR #21 OPEN" wording; the canonical roadmap in
+  "PR #22 OPEN" / "PR #21 OPEN" wording; the proposed roadmap in
   [`docs/MASTER_PLAN.candidate.md`](docs/MASTER_PLAN.candidate.md) section 4 records the
-  Owner-approved status of those stages.
+  Owner-approved status of those stages. That proposed roadmap is **not authoritative or canonical**
+  unless and until the Owner separately authorizes atomic replacement and that replacement is
+  completed and validated.
 - CF-07 (the README status block lagging the then-current stage) remains an open Owner decision; no
   silent repair was made.
 

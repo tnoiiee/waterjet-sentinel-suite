@@ -36,7 +36,7 @@
 
 Stage identifiers follow the repository's existing convention `<program phase><track><ordinal>`:
 
-| Prefix | Track | Ordinal range in the canonical roadmap |
+| Prefix | Track | Ordinal range in the proposed roadmap |
 | --- | --- | --- |
 | `0.4C-K` | TC acquisition and commissioning (Kiosk/bench track) | `K1` … `K17` |
 | `0.4D-G` | Galil and motion | `G1` … `G5` |
@@ -92,10 +92,12 @@ K6 validation evidence summary (Owner-local is authoritative; Agent/Arena had no
 | Agent/Arena | exporter 18/18; S2 14/14; S3 19/19; Boundary clean; Commissioning 218/218; JavaScript syntax and changed-path/protected-surface proofs; genuine locks unchanged; **no** C# build, analyzer, xUnit/.NET test, .NET fixture parity or physical execution |
 | Physical | none — no hardware contact, no passive capture, no port 502 access, no T01 execution |
 
-## 4. Canonical Version Roadmap
+## 4. Proposed Version Roadmap
 
-Roadmap authority: [`docs/MASTER_PLAN.md`](MASTER_PLAN.md) (this section is a proposed restructure of
-that plan, not a second authority).
+Roadmap authority: [`docs/MASTER_PLAN.md`](MASTER_PLAN.md). This section is a **proposed** restructure
+for Owner review — not a second authority, and not canonical: the roadmap and the stage identifiers it
+introduces are **not authoritative or canonical** unless and until the Owner separately authorizes
+atomic replacement and that replacement is completed and validated.
 
 ### 4.1 Completed/Merged history
 
@@ -138,7 +140,7 @@ that plan, not a second authority).
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | Not stated in the approved canonical map (open point) |
+| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | Not stated in approved source material (open point) |
 | `0.4D-G2` | Galil Read-Only Status Acquisition | PLANNED - NOT AUTHORIZED | Read-only Galil status acquisition | 0.4D-G1 |
 | `0.4D-G3` | Galil Controlled Motion Test Foundation | PLANNED - NOT AUTHORIZED | Foundation for controlled Galil motion test | 0.4D-G2 |
 | `0.4D-G4` | Galil Axis Functional Test | PLANNED - NOT AUTHORIZED | Galil axis functional test | 0.4D-G3 |
@@ -148,7 +150,7 @@ that plan, not a second authority).
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | Not stated in the approved canonical map (open point) |
+| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | Not stated in approved source material (open point) |
 | `0.4E-I2` | Single-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Single-job integrated dry cycle | 0.4E-I1 |
 | `0.4E-I3` | Sequential Multi-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Sequential multi-job integrated dry cycle | 0.4E-I2 |
 | `0.4E-I4` | Integrated Dry-Cycle Closeout | PLANNED - NOT AUTHORIZED | Close out the integrated dry cycle | 0.4E-I3 |
@@ -157,7 +159,7 @@ that plan, not a second authority).
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | Not stated in the approved canonical map (open point) |
+| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | Not stated in approved source material (open point) |
 | `0.5A-P2` | Production Configuration and Access Boundary | FUTURE - NOT AUTHORIZED | Production configuration and access boundary | 0.5A-P1 |
 | `0.5A-P3` | Production Pilot Operation | FUTURE - NOT AUTHORIZED | Production pilot operation | 0.5A-P2 |
 | `0.5A-P4` | Production Acceptance and Operational Handover | FUTURE - NOT AUTHORIZED | Production acceptance and operational handover | 0.5A-P3 |
@@ -165,18 +167,20 @@ that plan, not a second authority).
 ### 4.8 Reported conflicts and open points
 
 1. **Dated "OPEN — NOT MERGED" wording.** The preserved historical text and older entries describe
-   `0.4C-K2` (PR #20) and `0.4C-K3` (PR #21) as `OPEN — NOT MERGED` at their checkpoints; the canonical
+   `0.4C-K2` (PR #20) and `0.4C-K3` (PR #21) as `OPEN — NOT MERGED` at their checkpoints; the proposed
    roadmap above records them as **MERGED** (K3 additionally recorded inside the preserved README text
    as `d1ea0324cb37de65a798fe4271429f955d4a9225`, parents `cc6ccf87` / `a6238ac`). The dated wording is
    preserved unchanged; the conflict is reported here rather than silently resolved.
-2. **Binding of stages to pull requests.** The canonical map binds `0.4C-K4` to PR #22 and `0.4C-K5` to
+2. **Binding of stages to pull requests.** The proposed map binds `0.4C-K4` to PR #22 and `0.4C-K5` to
    PR #23 (`193aba76…`). Earlier text binds the Library Selection Gate to PR #22; no earlier text binds
    a PR number to `K4` or `K5` by those identifiers.
 3. **New identifiers.** `0.4C-K6`–`0.4C-K17`, `0.4D-G1`–`G5`, `0.4E-I1`–`I4` and `0.5A-P1`–`P4` are
-   canonical in this pass; they do not all appear in the preserved historical text. No historical
-   record was altered to introduce them.
-4. **Dependencies not stated.** For `0.4D-G1`, `0.4E-I1` and `0.5A-P1` the canonical map does not state
-   a preceding dependency; this is reported as an open point rather than inferred.
+   **proposed by this candidate for Owner review** and are **not authoritative or canonical** unless
+   and until the Owner separately authorizes atomic replacement and that replacement is completed and
+   validated; they do not all appear in the preserved historical text. No historical record was
+   altered to introduce them.
+4. **Dependencies not stated.** For `0.4D-G1`, `0.4E-I1` and `0.5A-P1` the proposed roadmap does not
+   state a preceding dependency; this is reported as an open point rather than inferred.
 5. **Superseded current-position text.** The preserved `Current critical path — 2026-10-13` section
    describes the K5-era closeout next steps (`e71e33b…`). That position was completed by the PR #23
    merge into `main` at `193aba76…`; the current position is section 3 above. The preserved text is not
@@ -207,11 +211,11 @@ authorize another candidate.
 | `0.4C-K6` | `0.4C-K5` |
 | `0.4C-K7` | `0.4C-K6` (not merged) |
 | `0.4C-K8` … `0.4C-K17` | the immediately preceding `0.4C-K` stage |
-| `0.4D-G1` | not stated in the approved canonical map (open point) |
+| `0.4D-G1` | not stated in approved source material (open point) |
 | `0.4D-G2` … `0.4D-G5` | the immediately preceding `0.4D-G` stage |
-| `0.4E-I1` | not stated in the approved canonical map (open point) |
+| `0.4E-I1` | not stated in approved source material (open point) |
 | `0.4E-I2` … `0.4E-I4` | the immediately preceding `0.4E-I` stage |
-| `0.5A-P1` | not stated in the approved canonical map (open point) |
+| `0.5A-P1` | not stated in approved source material (open point) |
 | `0.5A-P2` … `0.5A-P4` | the immediately preceding `0.5A-P` stage |
 
 ## 7. Stage Definitions
@@ -256,7 +260,7 @@ Implemented delivery and evidence for K6: see
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | Not stated in the approved canonical map (open point) |
+| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | Not stated in approved source material (open point) |
 | `0.4D-G2` | Galil Read-Only Status Acquisition | PLANNED - NOT AUTHORIZED | Read-only Galil status acquisition | 0.4D-G1 |
 | `0.4D-G3` | Galil Controlled Motion Test Foundation | PLANNED - NOT AUTHORIZED | Foundation for controlled Galil motion test | 0.4D-G2 |
 | `0.4D-G4` | Galil Axis Functional Test | PLANNED - NOT AUTHORIZED | Galil axis functional test | 0.4D-G3 |
@@ -264,7 +268,7 @@ Implemented delivery and evidence for K6: see
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | Not stated in the approved canonical map (open point) |
+| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | Not stated in approved source material (open point) |
 | `0.4E-I2` | Single-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Single-job integrated dry cycle | 0.4E-I1 |
 | `0.4E-I3` | Sequential Multi-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Sequential multi-job integrated dry cycle | 0.4E-I2 |
 | `0.4E-I4` | Integrated Dry-Cycle Closeout | PLANNED - NOT AUTHORIZED | Close out the integrated dry cycle | 0.4E-I3 |
@@ -276,7 +280,7 @@ authorization, start date or schedule is implied.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | Not stated in the approved canonical map (open point) |
+| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | Not stated in approved source material (open point) |
 | `0.5A-P2` | Production Configuration and Access Boundary | FUTURE - NOT AUTHORIZED | Production configuration and access boundary | 0.5A-P1 |
 | `0.5A-P3` | Production Pilot Operation | FUTURE - NOT AUTHORIZED | Production pilot operation | 0.5A-P2 |
 | `0.5A-P4` | Production Acceptance and Operational Handover | FUTURE - NOT AUTHORIZED | Production acceptance and operational handover | 0.5A-P3 |
@@ -354,7 +358,7 @@ keeps one heading hierarchy.
   (`c0bc2c7…` / `e71e33b…`). That work was merged as PR #23 into `main` at `193aba76…`. The current
   position is section 3 above.
 - The preserved stage ledger in section 11 contains dated, more specific records for stages up to
-  Stage 0.4C-K3 and the Library Selection Gate. The canonical roadmap in section 4 covers
+  Stage 0.4C-K3 and the Library Selection Gate. The proposed roadmap in section 4 covers
   `0.4C-K1` … `0.5A-P4`; conflicts are reported in section 4.8 rather than resolved by editing the
   preserved text.
 
