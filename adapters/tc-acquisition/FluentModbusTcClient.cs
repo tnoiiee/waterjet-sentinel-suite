@@ -203,14 +203,15 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
         request.Endpoint.Validate();
         if (request.Quantity == 0) return TcReadResult.Failure(TcReadKind.ConfigurationRejected, request.Endpoint, request.Generation, "QUANTITY_ZERO", "Quantity must be >0.", request.RegisterArea, request.Endianness);
         if (request.Quantity > 125) return TcReadResult.Failure(TcReadKind.ConfigurationRejected, request.Endpoint, request.Generation, "QUANTITY_EXCEEDS_MODBUS_LIMIT", "Modbus PDU limits read to 125 registers.", request.RegisterArea, request.Endianness);
-        if (!Enum.IsDefined(typeof(TcRegisterArea), request.RegisterArea))
+        if (!Enum.IsDefined(request.RegisterArea))
             return TcReadResult.Failure(TcReadKind.ConfigurationRejected, request.Endpoint, request.Generation, "INVALID_REGISTER_AREA", $"RegisterArea {request.RegisterArea} is not a defined candidate.", null, request.Endianness);
         if (request.Endianness != SelectedEndiannessCandidate)
             return TcReadResult.Failure(TcReadKind.ConfigurationRejected, request.Endpoint, request.Generation, "ENDIANNESS_MISMATCH", $"Endianness {request.Endianness} does not match selected {SelectedEndiannessCandidate} (CANDIDATE_UNVERIFIED).", request.RegisterArea, request.Endianness);
         ThrowIfDisposed();
 
         // One outstanding read per client: fail fast if another read is in progress.
-        if (!_singleRead.Wait(0))
+        // CA2016-clean: explicit CancellationToken.None preserves zero-wait fail-fast semantics; caller cancellation must not replace READ_BUSY.
+        if (!_singleRead.Wait(0, CancellationToken.None))
             return TcReadResult.Failure(TcReadKind.ConfigurationRejected, request.Endpoint, request.Generation, "READ_BUSY", "One outstanding read per client; concurrent reads are not allowed.", request.RegisterArea, request.Endianness);
 
         try
@@ -332,7 +333,11 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
         {
             try { toDispose.Dispose(); } catch { }
         }
-        _singleRead.Dispose();
+        // Intentionally do not dispose _singleRead: it is managed admission state.
+        // Disposing the gate creates a race where an active ReadAsync's finally Release()
+        // would throw ObjectDisposedException and hide the primary read outcome (cancellation,
+        // timeout, protocol, stale or transport). The semaphore is left for GC; the adapter
+        // is disposed and no further reads are admitted via ThrowIfDisposed.
         await Task.CompletedTask.ConfigureAwait(false);
         GC.SuppressFinalize(this);
     }
@@ -341,7 +346,7 @@ public sealed class FluentModbusTcClient : ITcReadOnlyClient
     {
         lock (_gate)
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(FluentModbusTcClient));
+            ObjectDisposedException.ThrowIf(_disposed, this);
         }
     }
 }
