@@ -20,18 +20,20 @@ export function exportCatalog(configuration = CANONICAL_TC_NODE_CONFIGURATION) {
   }
   const node = configuration.nodes.find((n) => n.nodeId === 'TC-NODE-01');
   if (!node || node.cabinetId !== 'CAB1') throw new Error('NODE_CABINET_MISMATCH');
+  // Candidate tuple only. It carries no execution authority and no authorization digest: physical
+  // authority comes solely from the build identity plus a detached Owner authorization, and the
+  // deployment identity is never taken from an artifact.
   const trial = {
     trialId: 'T01', nodeId: node.nodeId, cabinetId: node.cabinetId, address: node.ipAddress,
     port: 502, functionCode: 3, unitId: 0, start: 0, quantity: 40, endianness: 'BigEndian',
     connectionSettingBasis: 'OWNER_AUTHORIZED_BENCH_SETTING', physicalVerification: 'NOT_VERIFIED',
-    executionAuthorized: false,
   };
   const manifest = JSON.stringify(trial) + '\n';
   const catalog = {
-    schemaVersion: 'wjss.tc-bench-catalog/1',
+    schemaVersion: 'wjss.tc-bench-catalog/2',
     // Normalized UTF-8/LF source hash is reproducible across worktree line-ending conversions.
     sourceSha256: digest(readFileSync(sourcePath, 'utf8').replace(/\r\n/g, '\n')),
-    configurationSha256: digest(canonical), trials: [{ manifestSha256: digest(manifest), authorizationSha256: null, trial }],
+    configurationSha256: digest(canonical), trials: [{ manifestSha256: digest(manifest), trial }],
   };
   const bytes = JSON.stringify(catalog) + '\n';
   return Object.freeze({ bytes, sha256: digest(bytes), manifest, manifestSha256: digest(manifest) });

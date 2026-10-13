@@ -8,6 +8,12 @@ namespace Wjss.TcBench;
 
 public enum BenchMode { SIMULATION, PHYSICAL_TEST }
 
+/// <summary>
+/// Immutable trial configuration projected from the canonical TC Node configuration by the offline
+/// exporter and embedded in the reviewed build. The tuple is a candidate representation only: it
+/// carries no execution authority and no authorization digest. Physical authority comes solely from
+/// the build identity plus the detached Owner authorization.
+/// </summary>
 public sealed record TrialConfiguration
 {
     public required string TrialId { get; init; }
@@ -22,7 +28,6 @@ public sealed record TrialConfiguration
     public required string Endianness { get; init; }
     public required string ConnectionSettingBasis { get; init; }
     public required string PhysicalVerification { get; init; }
-    public required bool ExecutionAuthorized { get; init; }
 
     [JsonIgnore]
     public TcNodeEndpoint Endpoint => new() { NodeId = NodeId, IpAddress = Address, Port = Port, UnitIdentifier = UnitId };
@@ -31,7 +36,6 @@ public sealed record TrialConfiguration
 public sealed record CatalogEntry
 {
     public required string ManifestSha256 { get; init; }
-    public string? AuthorizationSha256 { get; init; }
     public required TrialConfiguration Trial { get; init; }
 }
 
@@ -52,7 +56,7 @@ public sealed record TrialCatalog
         var bytes = reader.ReadToEnd();
         if (!string.Equals(Hash(bytes), digestReader.ReadToEnd().Trim(), StringComparison.Ordinal)) throw new InvalidDataException("CATALOG_HASH_MISMATCH");
         var catalog = StrictJson.Read<TrialCatalog>(bytes);
-        if (catalog.SchemaVersion != "wjss.tc-bench-catalog/1" || catalog.Trials.Length != 1
+        if (catalog.SchemaVersion != "wjss.tc-bench-catalog/2" || catalog.Trials.Length != 1
             || !StrictJson.IsHash(catalog.SourceSha256) || !StrictJson.IsHash(catalog.ConfigurationSha256)) throw new InvalidDataException("CATALOG_SHAPE_REJECTED");
         catalog.Select("T01");
         return catalog;
@@ -81,33 +85,53 @@ public sealed record TrialCatalog
         return trusted.Trial;
     }
 
-    public void RequirePhysicalAuthorization(string trialId, string? authorizationBytes, string implementationSha)
-    {
-        var entry = Select(trialId);
-        // T01 ships non-executable. Neither CLI input nor an external record can grant authority.
-        if (!entry.Trial.ExecutionAuthorized || entry.AuthorizationSha256 is null || authorizationBytes is null) throw new InvalidOperationException("PHYSICAL_EXECUTION_NOT_AUTHORIZED");
-        if (!string.Equals(Hash(authorizationBytes), entry.AuthorizationSha256, StringComparison.Ordinal)) throw new InvalidDataException("AUTHORIZATION_HASH_MISMATCH");
-        var authorization = StrictJson.Read<BenchAuthorization>(authorizationBytes);
-        if (authorization.TrialId != trialId || authorization.ManifestSha256 != entry.ManifestSha256
-            || authorization.ImplementationSha != implementationSha || !StrictJson.IsCommit(implementationSha)
-            || authorization.Scope != "ONE_SHOT_READ_ONLY" || !TrialEvidence.SafeIdentifier(authorization.OwnerId)
-            || !TrialEvidence.SafeIdentifier(authorization.Reference) || DateTimeOffset.UtcNow < authorization.ValidFrom
-            || DateTimeOffset.UtcNow > authorization.ValidUntil || authorization.ValidUntil <= authorization.ValidFrom) throw new InvalidDataException("AUTHORIZATION_REJECTED");
-    }
-
     public static string Hash(string bytes) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(bytes)));
 }
 
-public sealed record BenchAuthorization
+/// <summary>
+/// Frozen typed parser for the constrained command line. There is no endpoint switch, no listener,
+/// no environment activation and no acceptance command. An authorization and a detached signature
+/// are accepted only together and only for the physical-test selector; neither can grant authority
+/// on its own and neither can be supplied for a dry run.
+/// </summary>
+public sealed record BenchArguments(string TrialId, BenchMode Mode, string? ManifestPath, string? AuthorizationPath, string? SignaturePath)
 {
-    public required string TrialId { get; init; }
-    public required string ManifestSha256 { get; init; }
-    public required string ImplementationSha { get; init; }
-    public required string OwnerId { get; init; }
-    public required string Reference { get; init; }
-    public required string Scope { get; init; }
-    public required DateTimeOffset ValidFrom { get; init; }
-    public required DateTimeOffset ValidUntil { get; init; }
+    public static BenchArguments Parse(string[] arguments)
+    {
+        ArgumentNullException.ThrowIfNull(arguments);
+        var trialId = "T01";
+        var mode = BenchMode.SIMULATION;
+        string? manifest = null;
+        string? authorization = null;
+        string? signature = null;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            var key = arguments[i];
+            if (!seen.Add(key)) throw new ArgumentException("DUPLICATE_ARGUMENT");
+            switch (key)
+            {
+                case "--dry-run": mode = BenchMode.SIMULATION; break;
+                case "--physical-test": mode = BenchMode.PHYSICAL_TEST; break;
+                case "--trial":
+                case "--manifest":
+                case "--authorization":
+                case "--signature":
+                    if (++i >= arguments.Length || arguments[i].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("MISSING_ARGUMENT");
+                    if (key == "--trial") trialId = arguments[i];
+                    else if (key == "--manifest") manifest = arguments[i];
+                    else if (key == "--authorization") authorization = arguments[i];
+                    else signature = arguments[i];
+                    break;
+                default: throw new ArgumentException("UNAPPROVED_ARGUMENT");
+            }
+        }
+        if (seen.Contains("--dry-run") && seen.Contains("--physical-test")) throw new ArgumentException("CONFLICTING_MODE");
+        if (trialId != "T01") throw new ArgumentException("UNAPPROVED_SELECTION");
+        if ((authorization is not null || signature is not null) && mode != BenchMode.PHYSICAL_TEST) throw new ArgumentException("UNAPPROVED_SELECTION");
+        if (signature is not null && authorization is null) throw new ArgumentException("UNAPPROVED_SELECTION");
+        return new(trialId, mode, manifest, authorization, signature);
+    }
 }
 
 public static class StrictJson
@@ -142,40 +166,7 @@ public static class StrictJson
     }
 
     public static bool IsHash(string? value) => value is { Length: 64 } && value.All(c => char.IsAsciiHexDigit(c) && !char.IsAsciiLetterUpper(c));
-    public static bool IsCommit(string? value) => value is { Length: 40 } && value.All(char.IsAsciiHexDigit);
-}
 
-public sealed record BenchArguments(string TrialId, BenchMode Mode, string? ManifestPath, string? AuthorizationPath)
-{
-    public static BenchArguments Parse(string[] arguments)
-    {
-        ArgumentNullException.ThrowIfNull(arguments);
-        var trialId = "T01";
-        var mode = BenchMode.SIMULATION;
-        string? manifest = null;
-        string? authorization = null;
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        for (var i = 0; i < arguments.Length; i++)
-        {
-            var key = arguments[i];
-            if (!seen.Add(key)) throw new ArgumentException("DUPLICATE_ARGUMENT");
-            switch (key)
-            {
-                case "--dry-run": mode = BenchMode.SIMULATION; break;
-                case "--physical-test": mode = BenchMode.PHYSICAL_TEST; break;
-                case "--trial":
-                case "--manifest":
-                case "--authorization":
-                    if (++i >= arguments.Length || arguments[i].StartsWith("--", StringComparison.Ordinal)) throw new ArgumentException("MISSING_ARGUMENT");
-                    if (key == "--trial") trialId = arguments[i];
-                    else if (key == "--manifest") manifest = arguments[i];
-                    else authorization = arguments[i];
-                    break;
-                default: throw new ArgumentException("UNAPPROVED_ARGUMENT");
-            }
-        }
-        if (seen.Contains("--dry-run") && seen.Contains("--physical-test")) throw new ArgumentException("CONFLICTING_MODE");
-        if (trialId != "T01" || (authorization is not null && mode != BenchMode.PHYSICAL_TEST)) throw new ArgumentException("UNAPPROVED_SELECTION");
-        return new(trialId, mode, manifest, authorization);
-    }
+    /// <summary>Commit identity: exactly 40 lowercase hexadecimal characters. No case folding is applied.</summary>
+    public static bool IsCommit(string? value) => value is { Length: 40 } && value.All(c => char.IsAsciiHexDigit(c) && !char.IsAsciiLetterUpper(c));
 }

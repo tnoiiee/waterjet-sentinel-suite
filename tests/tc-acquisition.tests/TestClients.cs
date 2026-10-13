@@ -20,6 +20,9 @@ internal sealed class TestClient : ITcReadOnlyClient
     public bool Disposed { get; private set; }
     public Func<CancellationToken, Task>? ConnectWait { get; init; }
     public Func<CancellationToken, Task>? ReadWait { get; init; }
+    /// <summary>Deterministic cleanup delay. Cleanup is always awaited to completion; only its elapsed time can be overdue.</summary>
+    public Func<Task>? DisconnectWait { get; init; }
+    public Func<Task>? DisposeWait { get; init; }
     public TcReadKind ConnectKind { get; init; } = TcReadKind.Success;
     public TcReadKind ReadKind { get; init; } = TcReadKind.Success;
     public ushort[] Data { get; init; } = Enumerable.Range(0, 40).Select(i => (ushort)(i + 1)).ToArray();
@@ -44,22 +47,23 @@ internal sealed class TestClient : ITcReadOnlyClient
         return new() { Kind = ReadKind, Endpoint = request.Endpoint, Generation = request.Generation, RawWords = Data.ToArray(), ReceivedAtUtc = DateTimeOffset.UtcNow };
     }
 
-    public Task DisconnectAsync()
+    public async Task DisconnectAsync()
     {
         DisconnectCalls++;
         Generation++;
         IsConnected = false;
         ConnectedEndpoint = null;
-        return CleanupFails ? Task.FromException(new IOException("Synthetic cleanup failure")) : Task.CompletedTask;
+        if (CleanupFails) throw new IOException("Synthetic cleanup failure");
+        if (DisconnectWait is not null) await DisconnectWait();
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         DisposeCalls++;
         Generation++;
         Disposed = true;
         IsConnected = false;
         ConnectedEndpoint = null;
-        return ValueTask.CompletedTask;
+        if (DisposeWait is not null) await DisposeWait();
     }
 }

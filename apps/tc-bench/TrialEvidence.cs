@@ -43,7 +43,7 @@ public sealed record IndexedWord([property: JsonRequired] int Index, [property: 
 
 public sealed record ExternalArtifact([property: JsonRequired] string Id, [property: JsonRequired] long Bytes, [property: JsonRequired] string Sha256);
 
-/// <summary>Offline review observations only, never inferred from copied word count.</summary>
+/// <summary>Offline review observations only, never inferred from copied word count. No capture is implemented here.</summary>
 public sealed record WireReview
 {
     [JsonRequired]
@@ -113,22 +113,49 @@ public sealed record OwnerReview
     public required bool ApprovedWordExcerpt { get; init; }
 }
 
+/// <summary>
+/// Typed diagnostic record for one bench invocation.
+///
+/// Identity is carried from the build, not from a branch name and not from the authorization
+/// artifact: ApprovedBaseSha, ImplementationSha, SourceRef, DeploymentBuildIdentity and
+/// PhysicalCapabilityEnabled all come from the immutable build identity. Authorization state,
+/// lifecycle-budget state, cleanup state and worker-observation state are recorded separately, so a
+/// requested cancellation, an elapsed timeout, an overdue cleanup, an overdue worker observation, an
+/// observed completion and an unproven cleanup can never be confused with one another.
+///
+/// Deterministic dry-run and synthetic records keep explicit NOT_PROVIDED / NOT_ISSUED /
+/// NOT_OBSERVED values: no unavailable physical fact is ever fabricated as a zero.
+/// </summary>
 public sealed record TrialEvidence
 {
     [JsonRequired]
-    public string SchemaVersion { get; init; } = "wjss.tc-bench-trial/1";
+    public string SchemaVersion { get; init; } = "wjss.tc-bench-trial/2";
     [JsonRequired]
-    public string ApprovedBaselineSha { get; init; } = "2ba0b6f4da5e52b277e17a57ed4c71c9668cad73";
+    public string ApprovedBaseSha { get; init; } = "NOT_PROVIDED";
     [JsonRequired]
     public string ImplementationSha { get; init; } = "NOT_PROVIDED";
     [JsonRequired]
-    public string Branch { get; init; } = "arena/bf844c54-waterjet-sentinel-suite";
+    public string SourceRef { get; init; } = "NOT_PROVIDED";
+    [JsonRequired]
+    public string DeploymentBuildIdentity { get; init; } = "NOT_PROVIDED";
+    [JsonRequired]
+    public bool PhysicalCapabilityEnabled { get; init; }
     [JsonRequired]
     public string CleanStateProof { get; init; } = "NOT_PROVIDED";
     [JsonRequired]
     public string TrialId { get; init; } = "T01";
     [JsonRequired]
+    public string AuthorizationId { get; init; } = "NOT_PROVIDED";
+    [JsonRequired]
     public string AuthorizationReference { get; init; } = "NOT_PROVIDED";
+    [JsonRequired]
+    public string AuthorizationPayloadSha256 { get; init; } = "NOT_PROVIDED";
+    [JsonRequired]
+    public string AuthorizationKeyId { get; init; } = "NOT_PROVIDED";
+    [JsonRequired]
+    public string AuthorizationVerification { get; init; } = "NOT_ATTEMPTED";
+    [JsonRequired]
+    public string AuthorizationConsumption { get; init; } = "NOT_ATTEMPTED";
     [JsonRequired]
     public string OperatorId { get; init; } = "NOT_PROVIDED";
     [JsonRequired]
@@ -196,6 +223,8 @@ public sealed record TrialEvidence
     [JsonRequired]
     public string TimeoutState { get; init; } = "NOT_OBSERVED";
     [JsonRequired]
+    public string LifecycleBudgetState { get; init; } = "NOT_OBSERVED";
+    [JsonRequired]
     public string StopState { get; init; } = "NOT_OBSERVED";
     [JsonRequired]
     public string StaleDecision { get; init; } = "NOT_ISSUED";
@@ -213,6 +242,10 @@ public sealed record TrialEvidence
     public string DisposalResult { get; init; } = "NOT_ISSUED";
     [JsonRequired]
     public string TaskCompletion { get; init; } = "NOT_ISSUED";
+    [JsonRequired]
+    public string CleanupState { get; init; } = "NOT_OBSERVED";
+    [JsonRequired]
+    public string WorkerObservationState { get; init; } = "NOT_OBSERVED";
     [JsonRequired]
     public string LifecycleFailureType { get; init; } = "NOT_PROVIDED";
     [JsonRequired]
@@ -246,8 +279,12 @@ public sealed record TrialEvidence
         ArgumentNullException.ThrowIfNull(catalog);
         var entry = catalog.Select(evidence.TrialId);
         var t = entry.Trial;
-        if (evidence.ApprovedBaselineSha != "2ba0b6f4da5e52b277e17a57ed4c71c9668cad73"
-            || evidence.Branch != "arena/bf844c54-waterjet-sentinel-suite" || evidence.SchemaVersion != "wjss.tc-bench-trial/1" || evidence.NodeId != t.NodeId || evidence.CabinetId != t.CabinetId
+        if (evidence.SchemaVersion != "wjss.tc-bench-trial/2"
+            || !StrictJson.IsCommit(evidence.ApprovedBaseSha)
+            || (!StrictJson.IsCommit(evidence.ImplementationSha) && !string.Equals(evidence.ImplementationSha, BuildIdentity.NotProvided, StringComparison.Ordinal))
+            || !SourceRefPolicy.IsValid(evidence.SourceRef)
+            || !StrictJson.IsHash(evidence.DeploymentBuildIdentity)
+            || evidence.NodeId != t.NodeId || evidence.CabinetId != t.CabinetId
             || evidence.FunctionCode != t.FunctionCode || evidence.UnitId != t.UnitId || evidence.Start != t.Start || evidence.Quantity != 40
             || evidence.Endianness != t.Endianness || evidence.PhysicalVerification != "NOT_VERIFIED"
             || evidence.ConnectionSettingBasis != t.ConnectionSettingBasis || evidence.TrialManifestSha256 != entry.ManifestSha256
@@ -258,12 +295,41 @@ public sealed record TrialEvidence
             if (evidence.Endpoint != "127.0.0.1" || evidence.Port is null or < 1 or > 65535 or 502) throw new InvalidDataException("SYNTHETIC_ENDPOINT_REJECTED");
         }
         else if (evidence.Provenance is not ("SIMULATION" or "PHYSICAL_DIAGNOSTIC") || evidence.Endpoint != t.Address || evidence.Port != t.Port) throw new InvalidDataException("EVIDENCE_ENDPOINT_REJECTED");
+
+        if (evidence.Provenance == "PHYSICAL_DIAGNOSTIC")
+        {
+            // A physical record must be internally complete: build-derived identity, verified and
+            // consumed Owner authorization, and no placeholder where a physical fact is required.
+            if (!evidence.PhysicalCapabilityEnabled
+                || !string.Equals(evidence.CleanStateProof, BuildIdentity.DeploymentProofClean, StringComparison.Ordinal)
+                || !StrictJson.IsCommit(evidence.ImplementationSha)
+                || !SourceRefPolicy.IsValid(evidence.SourceRef) || string.Equals(evidence.SourceRef, BuildIdentity.NotProvided, StringComparison.Ordinal)
+                || !SafeIdentifier(evidence.AuthorizationId) || string.Equals(evidence.AuthorizationId, PhysicalTrialStates.NotProvided, StringComparison.Ordinal)
+                || !SafeIdentifier(evidence.AuthorizationKeyId) || string.Equals(evidence.AuthorizationKeyId, PhysicalTrialStates.NotProvided, StringComparison.Ordinal)
+                || !StrictJson.IsHash(evidence.AuthorizationPayloadSha256)
+                || !string.Equals(evidence.AuthorizationVerification, PhysicalTrialStates.Verified, StringComparison.Ordinal)
+                || !string.Equals(evidence.AuthorizationConsumption, PhysicalTrialStates.Consumed, StringComparison.Ordinal))
+                throw new InvalidDataException("PHYSICAL_EVIDENCE_POLICY_MISMATCH");
+        }
+        else if (!string.Equals(evidence.AuthorizationVerification, PhysicalTrialStates.NotAttempted, StringComparison.Ordinal)
+            || !string.Equals(evidence.AuthorizationConsumption, PhysicalTrialStates.NotAttempted, StringComparison.Ordinal)
+            || !string.Equals(evidence.AuthorizationId, PhysicalTrialStates.NotProvided, StringComparison.Ordinal)
+            || !string.Equals(evidence.AuthorizationPayloadSha256, PhysicalTrialStates.NotProvided, StringComparison.Ordinal)
+            || !string.Equals(evidence.AuthorizationKeyId, PhysicalTrialStates.NotProvided, StringComparison.Ordinal))
+        {
+            // Simulation and synthetic records must never claim an authorization was used.
+            throw new InvalidDataException("AUTHORIZATION_STATE_REJECTED");
+        }
+
         if (evidence.Words.Length != 0 && (evidence.Words.Length != 40 || evidence.CopiedWordCount != 40
             || evidence.Read.Kind != TcReadKind.Success || evidence.FinalHandoffDecision != "RETAINED_QUARANTINED"
             || evidence.StaleDecision != "CURRENT_AT_DIAGNOSTIC_HANDOFF" || evidence.AcquisitionEpoch != evidence.AcquisitionEpochAfter
             || evidence.Read.Generation != evidence.GenerationBeforeCleanup || evidence.CancellationState != "NOT_REQUESTED"
             || evidence.DisconnectResult != "COMPLETE" || evidence.DisposalResult != "COMPLETE" || evidence.TaskCompletion != "COMPLETE"
-            || evidence.TransportAfter != "DISCONNECTED" || evidence.Words.Where((word, i) => word.Index != i).Any())) throw new InvalidDataException("INDEXED_WORDS_REJECTED");
+            || evidence.TransportAfter != "DISCONNECTED" || evidence.Words.Where((word, i) => word.Index != i).Any()
+            || !string.Equals(evidence.LifecycleBudgetState, PhysicalTrialStates.NotElapsed, StringComparison.Ordinal)
+            || !string.Equals(evidence.CleanupState, PhysicalTrialStates.Observed, StringComparison.Ordinal)
+            || !string.Equals(evidence.WorkerObservationState, PhysicalTrialStates.Observed, StringComparison.Ordinal))) throw new InvalidDataException("INDEXED_WORDS_REJECTED");
         if (!Enum.IsDefined(evidence.TrialAcceptance) || !Enum.IsDefined(evidence.WireEvidence.Outcome)) throw new InvalidDataException("UNKNOWN_RESULT_LAYER");
         foreach (var artifact in evidence.WireEvidence.Artifacts)
             if (!SafeIdentifier(artifact.Id) || artifact.Bytes <= 0 || !StrictJson.IsHash(artifact.Sha256)) throw new InvalidDataException("ARTIFACT_REJECTED");
@@ -295,6 +361,10 @@ public sealed record TrialEvidence
             || (outcome.State == "OBSERVED" && outcome.Generation is null)) throw new InvalidDataException("OUTCOME_INCOMPLETE");
     }
 
+    /// <summary>
+    /// Wire review validation. K6 implements no capture: these values can only be supplied offline
+    /// from an independently produced capture. A TCP packet size is never an ADU size.
+    /// </summary>
     public static void ValidateWire(TrialEvidence evidence, WireReview wire)
     {
         if (wire.Outcome != WireEvidenceOutcome.MATCHED) return;
@@ -319,9 +389,14 @@ public sealed record TrialEvidence
             || evidence.Words.Length != 40 || evidence.WireEvidence.Outcome != WireEvidenceOutcome.MATCHED
             || evidence.CleanStateProof != "CLEAN_OWNER_VERIFIED" || !StrictJson.IsCommit(evidence.ImplementationSha)
             || !SafeIdentifier(evidence.AuthorizationReference) || evidence.AuthorizationReference == "NOT_PROVIDED"
+            || !SafeIdentifier(evidence.AuthorizationId) || evidence.AuthorizationId == "NOT_PROVIDED"
+            || !SafeIdentifier(evidence.AuthorizationKeyId) || evidence.AuthorizationKeyId == "NOT_PROVIDED"
+            || !StrictJson.IsHash(evidence.AuthorizationPayloadSha256)
+            || evidence.AuthorizationVerification != "VERIFIED" || evidence.AuthorizationConsumption != "CONSUMED"
             || !SafeIdentifier(evidence.OperatorId) || evidence.OperatorId == "NOT_PROVIDED"
             || !SafeIdentifier(evidence.EnvironmentSummary) || evidence.EnvironmentSummary == "NOT_PROVIDED"
             || evidence.StopState != "NOT_REQUESTED" || evidence.TimeoutState != "NOT_ELAPSED"
+            || evidence.LifecycleBudgetState != "NOT_ELAPSED" || evidence.CleanupState != "OBSERVED" || evidence.WorkerObservationState != "OBSERVED"
             || evidence.CopiedWordCount != 40 || evidence.GenerationAfterCleanup is null || evidence.GenerationAfterCleanup <= evidence.GenerationBeforeCleanup) throw new InvalidDataException("TRIAL_NOT_ACCEPTABLE");
     }
 
@@ -368,13 +443,13 @@ public sealed record TrialEvidence
         if (element.ValueKind == JsonValueKind.String)
         {
             var value = element.GetString()!;
-            if (field == "branch" && value == "arena/bf844c54-waterjet-sentinel-suite") return;
-            if (field == "schemaVersion" && value == "wjss.tc-bench-trial/1") return;
+            if (field == "sourceRef" && SourceRefPolicy.IsValid(value)) return;
+            if (field == "schemaVersion" && value == "wjss.tc-bench-trial/2") return;
             var forbidden = "pass" + "word|credential|secret|token|connection" + "string|Bearer|BEGIN.*KEY";
             if (value.Any(char.IsControl) || value.Contains('/') || value.Contains('\\') || (value.Contains(':') || value.Contains('=')) && !DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out _)
                 || Regex.IsMatch(value, forbidden, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)
                 || value.Any(c => !char.IsAscii(c)) || value.Length > 160) throw new InvalidDataException("UNSAFE_PUBLIC_TEXT");
-            // Only typed timestamps, hashes, neutral identifiers, branch, hex words, and IPv4 text.
+            // Only typed timestamps, hashes, neutral identifiers, a validated source reference, hex words, and IPv4 text.
             if (!SafeIdentifier(value) && !System.Net.IPAddress.TryParse(value, out _) && !DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind, out _)) throw new InvalidDataException("UNREVIEWED_FREE_TEXT");
         }
         else if (element.ValueKind == JsonValueKind.Object) foreach (var property in element.EnumerateObject()) RejectUnsafeStrings(property.Value, property.Name);
