@@ -192,3 +192,113 @@ test('the real repository remains clean under the scanner with the exception in 
   assert.equal(run.status, 0, run.stdout);
   assert.match(run.stdout, /boundary-scan: 0 findings \(S1-S9 clean\)/);
 });
+
+// Owner narrow revision: synthetic scanner fixtures only, never genuine or placeholder locks.
+const LOCK_PATHS = ['apps/tc-bench/packages.lock.json', 'tests/tc-acquisition.tests/packages.lock.json'];
+const lockFixture = (term) => JSON.stringify({ dependencies: { synthetic: { [term]: { type: 'Transitive' } } } });
+
+test('S3 locks: selected term passes only at both exact dependency-metadata paths', () => {
+  for (const rel of LOCK_PATHS) {
+    assert.equal(isS3Exception(rel, MOD), true);
+    const result = scan({ [rel]: lockFixture(FLUENT) });
+    assert.equal(result.status, 0, result.stdout);
+    assert.equal(result.findings.length, 0);
+  }
+});
+
+test('S3 locks: harness and test source, README and config retain findings', () => {
+  const paths = [
+    'apps/tc-bench/Program.cs', 'apps/tc-bench/TrialConfiguration.cs', 'apps/tc-bench/README.md',
+    'apps/tc-bench/config.json', 'apps/tc-bench/Wjss.TcBench.csproj',
+    'tests/tc-acquisition.tests/AdapterLifecycleTests.cs', 'tests/tc-acquisition.tests/README.md',
+    'tests/tc-acquisition.tests/config.json', 'tests/tc-acquisition.tests/Wjss.TcAcquisition.Tests.csproj',
+  ];
+  for (const rel of paths) {
+    assert.equal(isS3Exception(rel, MOD), false);
+    const result = scan({ [rel]: `// ${FLUENT}\n` });
+    assert.equal(countFor(result.findings, rel), 1, result.stdout);
+  }
+});
+
+test('S3 locks: sibling, nested, backup, renamed and every unrelated solution lock remain blocked', () => {
+  const unrelated = [...readFileSync(join(REPO, 'WaterJetSentinelSuite.sln'), 'utf8').matchAll(/"([^"\r\n]+\.csproj)"/g)]
+    .map((m) => m[1].replaceAll('\\', '/').replace(/[^/]+$/, 'packages.lock.json'))
+    .filter((rel) => !LOCK_PATHS.includes(rel) && !rel.startsWith(ALLOWED_PREFIX));
+  const others = [
+    'apps/tc-bench-extra/packages.lock.json', 'apps/tc-bench/sub/packages.lock.json',
+    'apps/tc-bench/packages.lock.json.bak', 'apps/tc-bench/packages.lock.old.json',
+    'apps/packages.lock.json', 'tests/tc-acquisition.tests-extra/packages.lock.json',
+    'tests/tc-acquisition.tests/sub/packages.lock.json', 'tests/tc-acquisition.tests/packages.lock.json.bak',
+    'tests/tc-acquisition.tests/packages.lock.old.json', 'tests/packages.lock.json',
+    'config/packages.lock.json', ...unrelated,
+  ];
+  for (const rel of new Set(others)) {
+    assert.equal(isS3Exception(rel, MOD), false, rel);
+    const result = scan({ [rel]: lockFixture(FLUENT) });
+    assert.equal(countFor(result.findings, rel), 1, result.stdout);
+  }
+});
+
+test('S3 locks: path normalization cannot enlarge either exact exception', () => {
+  for (const rel of LOCK_PATHS) {
+    const variants = [
+      rel + '/', rel + ' ', rel + '.bak', rel.toUpperCase(), './' + rel, '/' + rel,
+      rel.replaceAll('/', '\\'), rel.replace('/', '//'), rel.replace('/', '/./'),
+      rel.replace('/', '/../'), rel.replace('packages.lock.json', 'sub/packages.lock.json'),
+      rel.replace('packages.lock.json', ''), rel.replace('packages.lock.json', 'PACKAGES.lock.json'),
+    ];
+    for (const variant of variants) assert.equal(isS3Exception(variant, MOD), false, variant);
+  }
+});
+
+test('S3 locks: other vendor terms stay blocked even in approved lock metadata', () => {
+  for (const term of [WAG, GALL, SQLCL, 'enti' + 'ty framework', 'np' + 'gsql', 'ora' + 'cle', 'red' + 'is', 'mq' + 'tt', 'kaf' + 'ka']) {
+    for (const rel of LOCK_PATHS) {
+      assert.equal(isS3Exception(rel, term), false);
+      const result = scan({ [rel]: lockFixture(term) });
+      assert.equal(countFor(result.findings, rel), 1, result.stdout);
+    }
+  }
+});
+
+test('S3 locks: write/control names receive no exemption; existing scanner behavior is unchanged', () => {
+  for (const term of ['WriteSingleCoil', 'WriteSingleRegister', 'WriteMultipleCoils', 'WriteMultipleRegisters', 'ExecuteFunction', 'Control']) {
+    for (const rel of LOCK_PATHS) {
+      assert.equal(isS3Exception(rel, term), false);
+      // These are not engine vendor rules. Dedicated API/source tests govern no-write behavior;
+      // do not falsely claim that the vocabulary scanner already bans these identifiers.
+      const approved = scan({ [rel]: lockFixture(term) });
+      const ordinary = scan({ ['config/ordinary-lock.json']: lockFixture(term) });
+      assert.equal(countFor(approved.findings, rel), countFor(ordinary.findings, 'config/ordinary-lock.json'));
+    }
+  }
+});
+
+test('S3 locks: S1, S2, S4, S5 and S6 still fire inside both metadata paths', () => {
+  const planted = {
+    S1: `${'ht' + 'tps://example.invalid/x'}`,
+    S2: `${'192' + '.0.2.1'}`,
+    S4: `${'pass' + 'word = "abc123"'}`,
+    S5: `import x from '../${'spi' + 'kes/'}ui-runtime-react/y.mjs';`,
+    S6: `${'Listen' + 'Any'}`,
+  };
+  for (const rel of LOCK_PATHS) for (const [rule, text] of Object.entries(planted)) {
+    const result = scan({ [rel]: lockFixture(FLUENT) + '\n' + text });
+    assert.ok(countFor(result.findings, rel, rule) > 0, result.stdout);
+    assert.equal(result.findings.filter((f) => f.includes(`vendor/transport term '${MOD}'`)).length, 0);
+  }
+});
+
+test('S3 locks: S7-S9 remain active alongside exact lock exceptions', () => {
+  const locks = Object.fromEntries(LOCK_PATHS.map((rel) => [rel, lockFixture(FLUENT)]));
+  const cases = {
+    S7: { 'WaterJetSentinelSuite.sln': 'Microsoft Visual Studio Solution File\n', 'apps/orphan/X.csproj': '<Project />' },
+    S8: { 'apps/orphan/Bad.props': '<Project><ItemGroup></Project>' },
+    S9: { 'apps/kiosk/app.manifest': '<assembly><windowsSettings><dpiAware>true</dpiAware></windowsSettings></assembly>' },
+  };
+  for (const [rule, files] of Object.entries(cases)) {
+    const result = scan({ ...locks, ...files });
+    assert.ok(result.findings.some((f) => f.startsWith(rule + ' ')), result.stdout);
+    for (const rel of LOCK_PATHS) assert.equal(countFor(result.findings, rel, 'S3'), 0);
+  }
+});

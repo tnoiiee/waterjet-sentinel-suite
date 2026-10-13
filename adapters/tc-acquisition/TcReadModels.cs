@@ -124,6 +124,9 @@ public sealed record TcReadResult
     public string? DetailCode { get; init; }
     public string? Detail { get; init; }
 
+    /// <summary>Exception type name only; no exception object or raw message is public evidence.</summary>
+    public string? ExceptionType { get; init; }
+
     /// <summary>Which register area / function-code candidate was attempted, if any (null for Connect or pre-validation failures).</summary>
     public TcRegisterArea? RegisterArea { get; init; }
 
@@ -133,8 +136,8 @@ public sealed record TcReadResult
     public static TcReadResult SuccessResult(TcNodeEndpoint endpoint, int generation, ushort[] words, DateTimeOffset receivedAt, TcRegisterArea area, TcEndiannessCandidate endianness) =>
         new() { Kind = TcReadKind.Success, Endpoint = endpoint, Generation = generation, RawWords = words, ReceivedAtUtc = receivedAt, RegisterArea = area, Endianness = endianness };
 
-    public static TcReadResult Failure(TcReadKind kind, TcNodeEndpoint endpoint, int generation, string code, string detail, TcRegisterArea? area = null, TcEndiannessCandidate? endianness = null) =>
-        new() { Kind = kind, Endpoint = endpoint, Generation = generation, DetailCode = code, Detail = detail, ReceivedAtUtc = DateTimeOffset.UtcNow, RegisterArea = area, Endianness = endianness };
+    public static TcReadResult Failure(TcReadKind kind, TcNodeEndpoint endpoint, int generation, string code, string detail, TcRegisterArea? area = null, TcEndiannessCandidate? endianness = null, string? exceptionType = null) =>
+        new() { ExceptionType = exceptionType, Kind = kind, Endpoint = endpoint, Generation = generation, DetailCode = code, Detail = detail, ReceivedAtUtc = DateTimeOffset.UtcNow, RegisterArea = area, Endianness = endianness };
 
     public static TcReadResult CancelledResult(TcNodeEndpoint endpoint, int generation, TcRegisterArea? area = null, TcEndiannessCandidate? endianness = null) =>
         Failure(TcReadKind.Cancelled, endpoint, generation, "CANCELLED", "The read was cancelled.", area, endianness);
