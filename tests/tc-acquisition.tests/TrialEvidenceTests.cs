@@ -39,7 +39,7 @@ public sealed class TrialEvidenceTests
         var missing = json.ToJsonString();
         Assert.Throws<JsonException>(() => TrialEvidence.ExportPublic(missing, c, TrialCatalog.Hash(missing)));
         Assert.Throws<InvalidDataException>(() => StrictJson.Read<TrialEvidence>("{\"trialId\":\"T01\",\"trialId\":\"T01\"}"));
-        Assert.Throws<JsonException>(() => StrictJson.Read<TrialEvidence>("\0"));
+        Assert.ThrowsAny<JsonException>(() => StrictJson.Read<TrialEvidence>("\0"));
     }
 
     [Theory]
