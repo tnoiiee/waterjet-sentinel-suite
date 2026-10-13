@@ -1,5 +1,7 @@
 # Stage 0.4C-K3 — Owner Critical Topology Correction (Development Checkpoint Record)
 
+> **Current-facing superseding note (2026-10-13, Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2, PR #22 OPEN targeting main `fdc81d801aecabd3f00350948d69a9f9b49f9244`, genuine lock `49e404356edee64bb9dbaccd395d8bcc66435881` on `d1ea0324`, MERGE READY):** This K3 document remains the authoritative record for the Owner Critical Topology Correction (108 Sensors, 216/240, I7/I16 normal, etc.). The **current stage** is now the Library Selection Gate (`SELECT_FLUENTMODBUS_5_3_2`, FluentModbus 5.3.2, self-owned `adapters/tc-acquisition`, `fdc81d8` MERGE READY) — see [`STAGE_LIBRARY_SELECTION_GATE_REPORT`](STAGE_LIBRARY_SELECTION_GATE_REPORT.md), [`CURRENT_STATE`](CURRENT_STATE.md), [`README`](../../README.md) and [`MASTER_PLAN`](MASTER_PLAN.md). This K3 record is retained as dated history and is not rewritten; the next critical-path gate after PR #22 merge is One-Node Physical TC Read-Only Acquisition (requires Owner merge, new session, new branch, Scope Gate).
+
 **Status (2026-10-12 final closeout): Stage 0.4C-K3 = COMPLETE FOR MERGE REVIEW. Automated
 Gates = PASS. Owner Manual Review = PASS (exact reviewed head
 `b5c7dff2f944956c608d89b903cb151ea6eed551`, §14). Schema Decision = RESOLVED — RETAIN_SCHEMA_V2.

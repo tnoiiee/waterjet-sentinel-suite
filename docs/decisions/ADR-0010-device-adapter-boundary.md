@@ -1,5 +1,7 @@
 # ADR-0010 — Device Adapter Boundary
 
+> **Superseding note (2026-10-13, PR #22 Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2, head `fdc81d801aecabd3f00350948d69a9f9b49f9244`, genuine lock `49e404356edee64bb9dbaccd395d8bcc66435881` on `d1ea0324`):** The Modbus TCP client library selection deferred as `[OPEN]` in this ADR's original 2026-10-0X decision is now **resolved by [ADR-0018](ADR-0018-modbus-tcp-client-library-selection.md)** — FluentModbus 5.3.2 selected (MIT, netstandard2.0 via CPM, self-owned `adapters/tc-acquisition` `ITcReadOnlyClient`, genuine lock `49e4043` `fdc81d8` MERGE READY, NModbus 3.0.83 rejected for lacking per-operation CancellationToken). This ADR's historical reasoning (licence/offline-availability unavailable at Stage 0.2) is preserved below as dated record; the `[OPEN]` for Modbus library is superseded, Galil integration remains `[OPEN]`. Current open items: see Verification status and Follow-up gates as updated below.
+
 - **Status:** ACCEPTED — recorded by the Owner at Stage 0.2 acceptance (merged through PR #2,
   merge commit `e779f8ad2c856e367fd65985007a3da411bd0e73`). Accepted as architecture
   direction; **accepted does not mean implemented**. Selections marked `[PROPOSED]`,
@@ -159,7 +161,7 @@ coordinate, limit, or setpoint may be invented or committed.
 | Automatic retry until success | Unbounded and dangerous; can re-energize or duplicate a motion command | Rejected |
 | Replaying buffered commands after reconnection | Explicitly prohibited by the approved reliability principles | Rejected |
 | Simulator implemented as a separate code path with its own interfaces | Simulator would stop being a proof of the application-facing contract and drift from the real path | Rejected |
-| Selecting a Modbus or Galil library now | Licence and offline-availability evidence is unavailable in this Stage; selecting would invent certainty | Deferred — `[OPEN]` |
+| Selecting a Modbus library now | Licence and offline-availability evidence is unavailable in this Stage; selecting would invent certainty | **Deferred — `[OPEN]` in original Stage 0.2 decision — superseded 2026-10-13 by [ADR-0018](ADR-0018-modbus-tcp-client-library-selection.md): `SELECT_FLUENTMODBUS_5_3_2` FluentModbus 5.3.2 (MIT, netstandard2.0, genuine lock `49e4043` `fdc81d8` MERGE READY, self-owned adapter `adapters/tc-acquisition`) — software dependency closed, physical verification still open** |
 | One shared Modbus session or one global polling loop for all devices | A single slow or timed-out device would delay every other device — the legacy failure mode | Rejected — per-device session and serialized command queue required |
 | One request per tag per cycle | Multiplies round trips and dominates poll time; cannot hold a one-second Fast group | Rejected — bounded batch reads of contiguous addresses |
 | Compiling the poll list from scratch every cycle | Wastes the cycle budget on compilation and couples polling cost to configuration size | Rejected — Poll Plan compiled at publication or startup |
@@ -212,10 +214,11 @@ coordinate, limit, or setpoint may be invented or committed.
   are proven for each signal.
 - `[NOT VERIFIED]`: WAGO watchdog behaviour and every bench-verification item in
   [`../SAFETY_BOUNDARY.md`](../SAFETY_BOUNDARY.md) section 4.
-- `[OPEN]`: Modbus library, Galil integration mechanism, retry and timeout values (local
+- `[CLOSED by ADR-0018, 2026-10-13, PR #22 MERGE READY]`: Modbus library — FluentModbus 5.3.2 selected (MIT, via CPM, genuine lock `49e4043` `fdc81d8`, self-owned `adapters/tc-acquisition`); NModbus 3.0.83 rejected; Raw Socket not selected — software dependency closed, physical verification still `NOT VERIFIED` (see `STAGE_LIBRARY_SELECTION_GATE_REPORT.md`).
+- `[OPEN]`: Galil integration mechanism, retry and timeout values (local
   configuration), poll-group interval values (local configuration), batching limits,
   concurrency bound, whether a Poll Plan may be recompiled at runtime, and the in-house
-  fallback decision.
+  fallback decision (if no Galil library passes review).
 - `[NOT VERIFIED]`: the acquisition performance of any Poll Plan design. No poller exists, no
   device has been polled, and no cycle time has been measured. The legacy evidence justifies the
   architecture direction; it does not measure the new one.
@@ -225,7 +228,7 @@ coordinate, limit, or setpoint may be invented or committed.
 
 | Item | Gate that must close it |
 | --- | --- |
-| Modbus library selection with licence and offline-availability evidence | Implementation Stage Gate |
+| Modbus library selection with licence and offline-availability evidence | **CLOSED — Implementation Stage Gate `SELECT_FLUENTMODBUS_5_3_2` (ADR-0018, 2026-10-13, PR #22 `fdc81d8` MERGE READY, genuine lock `49e4043`) — software dependency closed; physical bench verification remains One-Node Physical TC Read-Only Acquisition (separate Scope Gate after PR #22 merge)** |
 | Galil integration mechanism selection | Implementation Stage Gate, before motion code |
 | In-house Modbus subset fallback decision | Implementation Stage Gate, if no library passes review |
 | Command-state evidence model per signal | Implementation Stage Gate, then bench verification |
