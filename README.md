@@ -94,7 +94,9 @@ external protection function. It is **not** certified to IEC, ISA, ISO, or any o
 standard. Industrial standards are used only as guidance and design inspiration. See
 [`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md).
 
-## Planned technical scope (not yet built)
+## Planned full-system scope
+
+Several software foundations already exist and are **checkpoint-validated within scope** — solution + project sources, `global.json` SDK `10.0.401`, `TopologyInvariants`/`WallMap`/`WaterJetTopologyCatalog` 108/216, `SENSOR_DISABLED` kernel, 750-362/750-498 topology, React feasibility spike, Kiosk shell (1.0.4258.31), `adapters/tc-acquisition` `ITcReadOnlyClient` Library Selection Gate `SELECT_FLUENTMODBUS_5_3_2` (`49e4043`/`dfce519` MERGE READY, 455/455, S2/S3 clean) — **physical integration, field commissioning, remaining operational capabilities and Production activation are incomplete/not authorized** (see `docs/CURRENT_STATE.md` and `STAGE_LIBRARY_SELECTION_GATE_REPORT.md`).
 
 Modbus TCP monitoring and supervisory commands through WAGO remote I/O; temperature
 monitoring; DCS hardwired signal monitoring through WAGO I/O; valve and motor supervisory

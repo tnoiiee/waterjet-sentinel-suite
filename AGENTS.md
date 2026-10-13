@@ -218,9 +218,7 @@ any of the following occurs:
    to plant equipment or production systems.
 7. **Destructive Git requested.** See section 7.
 8. **Baseline mismatch.** The local `HEAD`, the expected checkpoint, the remote branch, the
-   index, or the working tree does not match the approved baseline. Apply the Stop Gate in
-   section 7.1: stop before editing, report the discrepancy, preserve evidence without
-   modifying repository state, and wait for an Owner-approved recovery instruction.
+   index, or the working tree does not match the approved baseline. **Apply section 7.1 Standing Sandbox Recreation Protocol first** — perform targeted fetch, verify remote head/required SHA/ancestry, prove complete non-ignored `path/blob/mode` identity (`465/465` `0 missing/extra/mismatch`), apply `CAS update-ref` only if required and `git read-tree` without `-u`, re-prove clean state. **Continue without requesting duplicate Owner approval when remote SHA, ancestry, complete `path/blob/mode` identity and `CAS` proof are safe** (as at `dfce519`/`fdc81d8`/`49e4043` on `d1ea0324`, `465/465` clean). **STOP and wait for Owner instruction only when proof is unsafe** (SHA/ancestry mismatch, missing/extra/mode/blob mismatch, non-clean working tree, or untracked non-ignored content that would be overwritten). **This condition does not authorize any destructive Git command** (`reset`/`reset --hard`/`clean`/`restore`/`checkout`/`switch`/`stash`/`rebase`/`force push`/`read-tree -u`/deleting unknown files remain forbidden — see section 7).
 9. **Evidence unavailable.** A required check cannot be executed or its output cannot be
    observed.
 10. **Merge or merge-adjacent request.** Any instruction to merge, rebase, or rewrite
