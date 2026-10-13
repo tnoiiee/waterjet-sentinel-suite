@@ -39,8 +39,8 @@ public sealed class TrialRunner
     // Even this seam validates loopback before constructing a client, irrespective of factory kind.
     internal async Task<TrialEvidence> RunSoftwareTrialAsync(
         TrialCatalog catalog, TcNodeEndpoint loopback, Func<ITcReadOnlyClient> factory,
-        CancellationToken cancellationToken, TimeSpan readTimeout,
-        Func<Task>? beforeHandoff = null)
+        TimeSpan readTimeout, Func<Task>? beforeHandoff,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(loopback);

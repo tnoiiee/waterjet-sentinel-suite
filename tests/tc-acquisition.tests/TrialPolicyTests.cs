@@ -91,8 +91,8 @@ public sealed class TrialPolicyTests
         var c = TrialCatalog.LoadTrusted();
         var calls = 0;
         ITcReadOnlyClient Factory() { calls++; return new TestClient(); }
-        await Assert.ThrowsAsync<ArgumentException>(() => new TrialRunner().RunSoftwareTrialAsync(c, c.Select("T01").Trial.Endpoint, Factory, CancellationToken.None, TimeSpan.FromSeconds(2)));
-        await Assert.ThrowsAsync<ArgumentException>(() => new TrialRunner().RunSoftwareTrialAsync(c, SoftwareEndpoint with { Port = 502 }, Factory, CancellationToken.None, TimeSpan.FromSeconds(2)));
+        await Assert.ThrowsAsync<ArgumentException>(() => new TrialRunner().RunSoftwareTrialAsync(c, c.Select("T01").Trial.Endpoint, Factory, TimeSpan.FromSeconds(2), null, CancellationToken.None));
+        await Assert.ThrowsAsync<ArgumentException>(() => new TrialRunner().RunSoftwareTrialAsync(c, SoftwareEndpoint with { Port = 502 }, Factory, TimeSpan.FromSeconds(2), null, CancellationToken.None));
         Assert.Equal(0, calls);
     }
 
@@ -102,7 +102,7 @@ public sealed class TrialPolicyTests
         var c = TrialCatalog.LoadTrusted();
         var fake = new TestClient();
         var runner = new TrialRunner();
-        var evidence = await runner.RunSoftwareTrialAsync(c, SoftwareEndpoint, () => fake, CancellationToken.None, TimeSpan.FromSeconds(2));
+        var evidence = await runner.RunSoftwareTrialAsync(c, SoftwareEndpoint, () => fake, TimeSpan.FromSeconds(2), null, CancellationToken.None);
         Assert.Equal(1, fake.ConnectCalls);
         Assert.Equal(1, fake.ReadCalls);
         Assert.Equal(1, fake.DisconnectCalls);
@@ -113,7 +113,7 @@ public sealed class TrialPolicyTests
         Assert.Equal(WireEvidenceOutcome.NOT_PROVIDED, evidence.WireEvidence.Outcome);
         Assert.Equal(TrialAcceptance.QUARANTINED, evidence.TrialAcceptance);
         TrialEvidence.Validate(evidence, c);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => runner.RunSoftwareTrialAsync(c, SoftwareEndpoint, () => fake, CancellationToken.None, TimeSpan.FromSeconds(2)));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => runner.RunSoftwareTrialAsync(c, SoftwareEndpoint, () => fake, TimeSpan.FromSeconds(2), null, CancellationToken.None));
     }
 
     [Theory]
@@ -123,7 +123,7 @@ public sealed class TrialPolicyTests
     public async Task Failed_Connect_Never_Reads_Or_Reconnects(TcReadKind kind)
     {
         var fake = new TestClient { ConnectKind = kind };
-        var e = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, CancellationToken.None, TimeSpan.FromSeconds(2));
+        var e = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, TimeSpan.FromSeconds(2), null, CancellationToken.None);
         Assert.Equal(1, fake.ConnectCalls);
         Assert.Equal(0, fake.ReadCalls);
         Assert.Equal("NOT_ISSUED", e.Read.State);
@@ -138,7 +138,7 @@ public sealed class TrialPolicyTests
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var fake = new TestClient { ConnectWait = _ => { entered.SetResult(); return release.Task; } };
-        var task = new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, cts.Token, TimeSpan.FromSeconds(2));
+        var task = new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, TimeSpan.FromSeconds(2), null, cts.Token);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
         Assert.False(task.IsCompleted);
@@ -157,8 +157,8 @@ public sealed class TrialPolicyTests
     {
         using var cts = new CancellationTokenSource();
         var runner = new TrialRunner();
-        var e = await runner.RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => new TestClient(), cts.Token, TimeSpan.FromSeconds(2),
-            () => { if (callerCancellation) cts.Cancel(); else runner.Stop(); return Task.CompletedTask; });
+        var e = await runner.RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => new TestClient(), TimeSpan.FromSeconds(2),
+            () => { if (callerCancellation) cts.Cancel(); else runner.Stop(); return Task.CompletedTask; }, cts.Token);
         Assert.Empty(e.Words);
         Assert.Equal("REJECTED_OR_NOT_ISSUED", e.FinalHandoffDecision);
         Assert.True(e.AcquisitionEpochAfter > e.AcquisitionEpoch);
@@ -170,7 +170,7 @@ public sealed class TrialPolicyTests
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var fake = new TestClient { ReadWait = async ct => { entered.SetResult(); await Task.Delay(Timeout.InfiniteTimeSpan, ct); } };
         var runner = new TrialRunner();
-        var task = runner.RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, CancellationToken.None, TimeSpan.FromSeconds(2));
+        var task = runner.RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, TimeSpan.FromSeconds(2), null, CancellationToken.None);
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         runner.Stop();
         var e = await task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -184,7 +184,7 @@ public sealed class TrialPolicyTests
     public async Task Harness_Does_Not_Pad_Or_Truncate(int count)
     {
         var fake = new TestClient { Data = new ushort[count] };
-        var e = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, CancellationToken.None, TimeSpan.FromSeconds(2));
+        var e = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, TimeSpan.FromSeconds(2), null, CancellationToken.None);
         Assert.Equal(count, e.CopiedWordCount);
         Assert.Empty(e.Words);
     }
@@ -194,7 +194,7 @@ public sealed class TrialPolicyTests
     {
         foreach (var fake in new[] { new TestClient { ChangeGenerationDuringRead = true }, new TestClient { CleanupFails = true } })
         {
-            var e = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, CancellationToken.None, TimeSpan.FromSeconds(2));
+            var e = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint, () => fake, TimeSpan.FromSeconds(2), null, CancellationToken.None);
             Assert.Empty(e.Words);
             Assert.True(fake.Disposed);
         }
@@ -204,7 +204,7 @@ public sealed class TrialPolicyTests
     {
         var fake = new TestClient { ReadWait = _ => Task.FromException(new IOException("Synthetic read failure")) };
         var result = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint,
-            () => fake, CancellationToken.None, TimeSpan.FromSeconds(1));
+            () => fake, TimeSpan.FromSeconds(1), null, CancellationToken.None);
         Assert.Equal("THREW", result.Read.State);
         Assert.Equal(nameof(IOException), result.Read.ExceptionType);
         Assert.Null(result.Read.Kind);
@@ -219,7 +219,7 @@ public sealed class TrialPolicyTests
     {
         var fake = new TestClient { ThrowObservationAfterDisposal = true };
         var result = await new TrialRunner().RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), SoftwareEndpoint,
-            () => fake, CancellationToken.None, TimeSpan.FromSeconds(1));
+            () => fake, TimeSpan.FromSeconds(1), null, CancellationToken.None);
         Assert.Equal(1, fake.DisconnectCalls);
         Assert.Equal(1, fake.DisposeCalls);
         Assert.Equal("INCOMPLETE", result.DisposalResult);
