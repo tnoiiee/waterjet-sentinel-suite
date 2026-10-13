@@ -27,8 +27,9 @@ public sealed class AdapterLifecycleTests
         Assert.Equal(unit, request[6]);
         Assert.Equal(new byte[] { 0, 0, 0, 40 }, request[8..12]);
         Assert.Equal(TcReadKind.Success, result.Kind);
-        Assert.Equal(40, result.RawWords!.Length);
-        Assert.Equal((ushort)0x1234, result.RawWords[0]);
+        var words = Assert.IsType<ushort[]>(result.RawWords);
+        Assert.Equal(40, words.Length);
+        Assert.Equal((ushort)0x1234, words[0]);
         Assert.Equal(area, result.RegisterArea);
         await client.DisconnectAsync();
         Assert.False(client.IsConnected);
@@ -161,10 +162,12 @@ public sealed class AdapterLifecycleTests
         var endpoint = Endpoint(server.Port);
         await client.ConnectAsync(endpoint, CancellationToken.None);
         var first = await client.ReadAsync(Request(client, endpoint), CancellationToken.None);
-        var saved = first.RawWords!.ToArray();
+        var firstWords = Assert.IsType<ushort[]>(first.RawWords);
+        var saved = firstWords.ToArray();
         var second = await client.ReadAsync(Request(client, endpoint), CancellationToken.None);
-        Assert.Equal(saved, first.RawWords);
-        Assert.NotEqual(first.RawWords[0], second.RawWords![0]);
+        var secondWords = Assert.IsType<ushort[]>(second.RawWords);
+        Assert.Equal(saved, firstWords);
+        Assert.NotEqual(firstWords[0], secondWords[0]);
     }
 
     [Fact]
