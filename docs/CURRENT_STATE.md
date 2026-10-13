@@ -1,22 +1,32 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
-## 2026-10-13 — Current: isolated one-Node TC bench SOURCE checkpoint
+## 2026-10-13 — Current: one-Node TC bench SOFTWARE VALIDATION CLOSED
 
-**BLOCKED ON OWNER-LOCAL GENUINE LOCK / BUILD / TEST EVIDENCE — NOT MERGE READY.**
-Owner approved software scope, exact two new-lock S3 exceptions and source checkpoint push
-without new locks. Approach A is isolated/one-shot; Runtime/Kiosk stay disconnected/unchanged.
-Default planning-only SIMULATION creates no client/network. T01 is non-executable; physical
-deployment is unconditionally refused. Separate adapter/wire/Owner acceptance; success quarantined.
-Source/tests are authored, NOT compiled or executed in .NET. New harness/test locks intentionally
-absent; all existing genuine locks/pins/config/topology protected. Node/static checks do not prove
-C# behavior. No hardware, non-loopback/502 tests, capture or physical deployment performed.
+**READY FOR OWNER PR REVIEW — SOFTWARE ONLY.** Final documentation/proof gates must pass
+before MERGE READY recommendation; PR targets `main` and remains OPEN, not merged by Agent.
+Owner validated exact implementation `c0bc2c71636d3206098fd890e1de40c46fabae65`; genuine locks
+committed in direct child `e71e33b22d039b6cd5940fbe94da1879f71142fa`, only two lock paths.
 
-Latest gate and exact validation/handoff commands:
-[One-Node scope gate](STAGE_ONE_NODE_TC_SCOPE_GATE.md) ·
+Owner-local Windows SDK 10.0.401/runtime 10.0.12: genuine restore and locked restore PASS/no drift;
+all targeted/full Release builds **0 warnings / 0 errors**; focused **81/81**, full .NET **536/536**
+(455 + 81); dry-run **SIMULATION**, connect/read NOT_ISSUED, wire NOT_PROVIDED, QUARANTINED,
+executionAuthorized false; fixture parity VERIFY ONLY **7/7**. No physical I/O or T01 execution.
+R40 was LF/CRLF representation only, not a content/topology/Product defect; final Commissioning
+**218/218**, no tracked fixture drift. Lock hashes also distinguish committed LF from Owner CRLF.
+
+Agent separately verifies exact lock blobs/graphs/both representation hashes, exporter **14/14**,
+S2 **14/14**, S3 **19/19**, Boundary **0 findings**, Commissioning **218/218**, doc/protected/diff
+proof. No Agent-side .NET execution is claimed. Dedicated isolated one-shot bench ownership;
+Runtime/Kiosk and normal Runtime SIMULATOR default remain unchanged/disconnected. All 6 Nodes,
+240/216/24 Channels, 108 Sensors and I7/I16 remain unchanged; no control/Production authority.
+Success without independent wire/Owner review remains QUARANTINED. Physical reachability,
+interoperability, FC03/FC04/Unit/start/byte-word order/image/mapping/scaling/wire-break/timing and
+wire identity/framing remain NOT VERIFIED; physical integration/six-Node/Production/write not authorized.
+
+[Complete closeout, hashes, recovery and dated repairs](STAGE_ONE_NODE_TC_SCOPE_GATE.md) ·
 [ADR-0019](decisions/ADR-0019-isolated-one-node-tc-bench.md).
-Closed library selection is predecessor evidence only, not this implementation's validation.
-All historical merge-ready/next-physical-stage statements below are superseded for CURRENT status
-by this source-only checkpoint and its Owner-local/future authorization gates.
+All older current-status/next-step passages below are retained as dated history, superseded
+by this software-only closeout and its separate future physical authorization gates.
 
 **HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
 PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**

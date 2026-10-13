@@ -1,8 +1,15 @@
 # ADR-0019 — Isolated one-Node TC bench ownership and quarantine
 
 **Status: ACCEPTED scope decision by explicit Owner instruction (2026-10-13).**
-Implementation acceptance remains pending. This decision authorizes software implementation,
-fake-client and loopback validation only. It authorizes no deployment, physical trial or capture.
+**Software validation closeout (2026-10-13):** Owner validated exact implementation
+`c0bc2c71636d3206098fd890e1de40c46fabae65`; genuine locks committed in direct child
+`e71e33b22d039b6cd5940fbe94da1879f71142fa`. Targeted/full Release 0 warnings/0 errors,
+focused 81/81, full .NET 536/536, SIMULATION dry-run and fixture parity 7/7 passed Owner-locally.
+Agent lock/static/Node checks are separate; no Agent-side .NET execution. Final docs/proof gates
+precede software MERGE READY recommendation for an OPEN Owner-review PR, not a merge.
+[Scope closeout](../STAGE_ONE_NODE_TC_SCOPE_GATE.md) records BOTH LF/CRLF lock hash representations,
+R40 explanation, exact history and evidence provenance. The accepted decision authorizes software,
+fake-client and loopback validation only; no deployment, physical trial or capture.
 
 ## Decision
 
@@ -62,9 +69,13 @@ Canonical Node/evidence records stay unresolved/unverified. All topology, Sensor
 Runtime/Kiosk, Queue, Cleaning, Pump, Valve, Water Jet, Galil, alarm/trip/interlock/control,
 package pins, existing locks and fixtures stay unchanged. The only scanner policy addition is
 the Owner-approved selected-term exception at the two exact new dependency-lock paths; engine
-and S1/S2/S4–S9 stay unchanged. New locks remain pending genuine Owner-local restore.
+and S1/S2/S4–S9 stay unchanged. Two genuine new locks are committed at `e71e33b`; existing
+locks and versions are unchanged. LF/CRLF hashes are separately labeled, with no lock edits.
 
 Separate future gate: exact implementation/build SHA, genuine locks and software validation,
 physical identity/isolation, T01 authorization, PHYSICAL_TEST deployment, capture method,
 finite bench lifetime/stop procedure, durable evidence destination, and Owner review.
 Every later trial requires separate authorization; no batch approval.
+
+**HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**

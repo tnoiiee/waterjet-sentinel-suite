@@ -1,3 +1,36 @@
+## 2026-10-13 — One-Node TC bench software validation closeout — Owner PR review
+
+**Software-only validation CLOSED; final documentation/available-check gates precede MERGE READY
+recommendation. No merge or physical authorization.** This supersedes the source-checkpoint
+pending status below without rewriting that dated record.
+
+- Exact Owner-validated implementation `c0bc2c71636d3206098fd890e1de40c46fabae65`; genuine two-lock
+  commit `e71e33b22d039b6cd5940fbe94da1879f71142fa`, direct child, only the harness/test locks changed.
+- Dated source/repair chain preserved: `6ad6fa4` initial source → `8aa5c25` CA1068 token-last calls
+  → `d149635` CS8602 asserted owned-array locals → `c0bc2c7` JSON-family NUL assertion. Product
+  behavior, response generation, nullable/analyzer policy and evidence schema were not relaxed.
+- Owner-local Windows SDK 10.0.401/runtime 10.0.12, cleared documented overrides/build servers:
+  genuine/locked restore PASS/no drift; all targeted/full Release builds **0 warnings / 0 errors**;
+  focused **81/81**, full .NET **536/536** (455 + 81), dry-run SIMULATION/NOT_ISSUED/QUARANTINED,
+  exporter **14/14**, S2 **14/14**, S3 **19/19**, Boundary **0 findings**, Commissioning **218/218**,
+  fixture parity VERIFY ONLY **7/7**. Final tracked/protected/diff proof passed; post-lock-push clean.
+- R40 initial **217/218** was LF versus Windows CRLF only; JSON/topology identical. Approved
+  generator canonical-LF verification passed 218/218; original CRLF worktree representation restored.
+  No Product/topology/fixture-content defect, tracked fixture drift or committed regeneration.
+- Both lock Git blobs/committed LF SHA-256 and Owner-local CRLF SHA-256 are separately labeled
+  in [scope closeout](docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md). Read-only representation comparison
+  reproduces Owner hashes. No lock defect/content-integrity defect or representation write.
+- Agent separately inspected exact committed locks/graphs/hashes and ran syntax, exporter **14/14**,
+  S2 **14/14**, S3 **19/19**, Boundary **0 findings**, Commissioning **218/218**, documentation and
+  protected-path/diff proofs. NO Agent-side .NET execution, restore, dry-run or fixture generation.
+- This closeout changes only proven-drift docs/ADR; Product/tests/projects/solution/locks/policy/
+  packages/config/fixtures remain unchanged. Isolated one-shot/quarantine foundation only; no
+  Runtime/Kiosk integration, physical acquisition, engineering interpretation, custom transport,
+  library fork, write/control, six-Node or Production authority.
+
+**HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
+
 ## 2026-10-13 — Isolated one-Node TC bench — software SOURCE checkpoint, pending locks
 
 **BLOCKED ON OWNER-LOCAL GENUINE LOCK / BUILD / TEST EVIDENCE. NOT MERGE READY.**

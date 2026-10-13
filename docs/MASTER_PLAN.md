@@ -2,20 +2,27 @@
 
 ## Current critical path — 2026-10-13
 
-**Isolated one-Node TC bench SOURCE checkpoint: BLOCKED ON OWNER-LOCAL GENUINE LOCK /
-BUILD / TEST EVIDENCE. Not merge-ready.** Software-only Approach A approved; atomic checkpoint
-and normal assigned-branch push may precede genuine new locks. Separate one-shot bench ownership,
-no Runtime/Kiosk wiring, no executable physical acquisition. T01 remains NOT AUTHORIZED.
-
-Next: pull source checkpoint → clear process TargetPath/WJSS overrides → genuine restore/two new
-locks → inspect/hash → two locked restores → targeted Release builds/fake and ephemeral loopback
-tests → full Release/full .NET → S2/S3/Boundary/Commissioning → fixture parity VERIFY ONLY →
-diff/protected proof → genuine-lock/exact-validation-record commit → independent Owner review.
-[Scope gate and exact commands](STAGE_ONE_NODE_TC_SCOPE_GATE.md);
+**One-Node TC bench software implementation validated; documentation closeout → Owner PR review.**
+Exact validated implementation `c0bc2c71636d3206098fd890e1de40c46fabae65`; genuine lock commit
+`e71e33b22d039b6cd5940fbe94da1879f71142fa`. Owner restore/build/test/verify-only gates are closed:
+targeted/full Release **0w/0e**, focused **81/81**, full .NET **536/536**, dry-run SIMULATION only,
+fixture parity **7/7**. Agent validation remains separately scoped to lock/static/Node/doc proofs.
+[Full evidence and BOTH LF/CRLF lock hashes](STAGE_ONE_NODE_TC_SCOPE_GATE.md) ·
 [ADR-0019](decisions/ADR-0019-isolated-one-node-tc-bench.md).
-Future physical/capture/deployment gates are separate; no batch trials or six-Node expansion.
-Library selection stays closed; previous merge-ready wording below is historical, not current.
-Hardware contact, T01, passive capture and PHYSICAL_TEST deployment remain NOT AUTHORIZED.
+
+Next: atomic docs-only closeout → normal assigned-branch push → verify final SHA/direct parent
+`e71e33b` and clean identity → OPEN PR targeting `main` → Owner review. MERGE READY applies
+ONLY to software review after every required closeout check passes; Agent never merges.
+Approach A is isolated one-shot sole bench-session ownership; Runtime/Kiosk unchanged. T01 is
+non-executable, no Product publication/interpretation/write. Package versions/locks/topology and
+canonical evidence statuses stay protected. R40 and lock hash differences are representation-only.
+
+Future physical work requires its OWN identity/isolation, sole-ownership/lifetime/stop, T01,
+deployment, capture/storage and wire/Owner-review gates. No batch trials, six-Node expansion,
+Runtime/Kiosk physical integration or Production approval follows from software readiness.
+Library selection stays closed. Historical plans below are retained, not current instructions.
+**HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 
 **Document status:** [APPROVED] for the stage-gate discipline, for the Stage 0.1 and Stage 0.2
 positions, and for the approved Stage 0.2 Scope Gate; **stage contents beyond Stage 0.2 remain

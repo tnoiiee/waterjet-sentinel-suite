@@ -1,7 +1,12 @@
-# Isolated TC bench software checkpoint
+# Isolated TC bench — validated software-only foundation
 
-**Software-only. SOURCE AUTHORED; .NET compilation/execution and genuine new locks pending.**
-See `docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md` and ADR-0019 for authorization and handoff.
+**Software-only Owner-local validation CLOSED (2026-10-13); ready for Owner PR review after
+final documentation/proof gates.** Exact implementation `c0bc2c71636d3206098fd890e1de40c46fabae65`;
+genuine locks `e71e33b22d039b6cd5940fbe94da1879f71142fa`. Owner targeted/full Release **0w/0e**,
+focused **81/81**, full .NET **536/536**, fixture parity VERIFY ONLY **7/7**.
+[Scope closeout](../../docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md) records separate Owner/Agent evidence,
+BOTH committed-LF and Owner-Windows-CRLF lock hashes, R40 disposition and dated repairs.
+Agent ran lock/static/Node checks only; no Agent .NET execution or physical deployment.
 
 - Normal executable behavior is configuration/evidence-plan SIMULATION only.
 - T01 is representation only, non-executable. No physical client is constructed by Program.
@@ -10,6 +15,13 @@ See `docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md` and ADR-0019 for authorization and ha
 - Accepted selectors: `--trial T01`, `--dry-run`, optional `--manifest FILE`.
 - Manifest bytes must match the independent embedded expected digest and exact tuple.
 - No automatic acceptance, retry, reconnect, polling, fallback, capture or Product value.
+
+Owner-local `--dry-run` proof: mode/provenance SIMULATION, executionAuthorized false,
+physicalVerification NOT_VERIFIED; connect/read NOT_ISSUED, wire NOT_PROVIDED,
+TrialAcceptance QUARANTINED, copiedWordCount null, words empty, noWrite/noFallback true.
+No physical client/I/O, T01 execution, Product current value or temperature interpretation.
+Agent exporter 14/14, S2 14/14, S3 19/19, Boundary 0 findings, Commissioning 218/218 PASS;
+these do not stand in for Owner-local .NET evidence or authorize physical work.
 
 The build requires Node plus the pinned .NET SDK. The offline exporter imports the existing
 canonical configuration, validates it, and writes only into ignored `obj` build output.
