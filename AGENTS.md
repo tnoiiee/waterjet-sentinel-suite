@@ -70,8 +70,7 @@ in the documentation; Owner decisions recorded during review are marked
 5. Report negative results plainly. A search that found nothing is evidence; report the
    search that was run and what it returned.
 6. Report uncertainty as uncertainty. Use `NOT VERIFIED` rather than an assumption.
-7. If the repository state does not match the expected baseline, stop before editing and
-   report the discrepancy rather than repairing it silently.
+7. If the repository state does not match the expected baseline, **apply section 7.1 Standing Sandbox Recreation Protocol before any Product edit** — perform targeted fetch, verify remote head/required SHA/ancestry, prove complete non-ignored `path/blob/mode` identity, apply `CAS update-ref` only if required and `git read-tree` without `-u`, re-prove clean state. **Continue without requesting duplicate Owner approval when remote SHA, ancestry, complete `path/blob/mode` identity and `CAS` proof are safe**. **Stop and report only when those proofs are unsafe** (SHA/ancestry mismatch, missing/extra/mode/blob mismatch, non-clean working tree, or untracked non-ignored content that would be overwritten). **This condition does not authorize any destructive Git command** (`reset`/`reset --hard`/`clean`/`restore`/`checkout`/`switch`/`stash`/`rebase`/`force push`/`read-tree -u`/deleting unknown files remain forbidden — see section 7).
 
 ## 4. Version and checkpoint rules
 

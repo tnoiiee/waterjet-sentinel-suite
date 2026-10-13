@@ -20,6 +20,8 @@
 
 - **Changed:** genuine `packages.lock.json` committed, Library Selection Gate foundation and validation recorded, current-facing docs aligned to `fdc81d8`; **Unchanged:** 6/40/240/216/24/108/I7/I16/502, no hardware integration, no Production; **Not Verified:** as above. PR #22 `OPEN targeting main` — `MERGE READY` (do not pre-write main merge SHA).
 
+- **Successor-chain continuity (`fdc81d8` → `dfce519` → `0755483` → `7b9343c`):** successors are documentation/governance/XML-comment-only, with no Product, lock, package-version, fixture, test or boundary-policy change; the Library Selection Gate implementation and validation position at `fdc81d8`/`49e4043` (genuine lock version 2 net10.0 FluentModbus 5.3.2, `455/455`, `S2 14/14 S3 11/11` clean) is preserved. A new session must verify the current remote PR head.
+
 
 ## 2026-10-12 — Stage 0.4C-K3 Owner Manual Review PASS — COMPLETE FOR MERGE REVIEW (PR #21 — OPEN / UNMERGED pending final PR checks and the Owner merge action; not merged; documentation-only commit)
 
