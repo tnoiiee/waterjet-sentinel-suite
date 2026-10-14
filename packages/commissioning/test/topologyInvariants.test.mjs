@@ -16,10 +16,16 @@ import {
 import { PRODUCT_SENSOR_SEQUENCE, PROTECTED_BASELINE, ROW_CLASS, parseSchedule, scheduleCounts } from '../src/schedule.mjs';
 import { buildWallMap, WALL_MAP_EXPECTED } from '../src/wallmap.mjs';
 import { schedule, counts, scheduleCsvText } from './helpers/schedule.mjs';
-import { servedSensorMap, sensorMapExample } from './helpers/wallMap.mjs';
+import { SENSOR_MAP_PATH, servedSensorMap, sensorMapExample } from './helpers/wallMap.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = join(HERE, '..', '..', '..', 'docs', 'templates', 'sensor-to-tc-channel-schedule.template.csv');
+// Line-ending representation only. A checkout with core.autocrlf (Windows default) hands the committed
+// LF fixture to readFileSync as CRLF text while the generator always serializes LF, so a raw string
+// comparison fails on representation alone (R40, Owner-local 2026-10-15). CRLF -> LF is the whole
+// normalization: every other byte of the serialized form (indentation, key order, escaping, final
+// newline) still has to match exactly. The fixture on disk is never rewritten by this test.
+const normalizeLineEndings = (text) => text.replace(/\r\n/g, '\n');
 const WALL_MAP = buildWallMap(servedSensorMap(), schedule.rows);
 const ALL_LAYERS = Object.freeze({ sensorMap: sensorMapExample, schedule, scheduleCounts: counts, wallMap: WALL_MAP });
 const codes = (result) => [...new Set(result.violations.map((v) => v.code))];
@@ -371,10 +377,41 @@ test('R39 the authoritative constants are arithmetically consistent and agree wi
 });
 
 test('R40 the committed sensor-map example is reproduced exactly by the Node reference generator (108 form)', async () => {
-  const { buildSensorMapExample, serializeLikeContractJson, CORRECTED } = await import('../../../tools/sensor-map-example/generate.mjs');
+  const { buildSensorMapExample, serializeLikeContractJson, CORRECTED, LEGACY_SUPERSEDED } = await import('../../../tools/sensor-map-example/generate.mjs');
   const generated = serializeLikeContractJson(buildSensorMapExample(CORRECTED));
-  const committed = readFileSync(join(HERE, '..', '..', '..', 'config', 'examples', 'sensor-map.example.json'), 'utf8');
-  assert.equal(generated, committed);
+  const bytesBefore = readFileSync(SENSOR_MAP_PATH);
+  const committed = bytesBefore.toString('utf8');
+  const reproduced = (text) => normalizeLineEndings(text) === generated;
+
+  // The generator serializes LF only; the checkout may hold the committed LF blob as LF or as CRLF.
+  assert.equal(generated.includes('\r'), false, 'the reference generator serializes LF line endings only');
+  const lfForm = normalizeLineEndings(committed);
+  const crlfForm = lfForm.replace(/\n/g, '\r\n');
+  assert.equal(committed === lfForm || committed === crlfForm, true, 'the checkout representation is LF or CRLF, never mixed');
+  assert.equal(reproduced(committed), true, 'the committed example differs from the generator output beyond line endings');
+
+  // Regression: both representations of the same committed content reproduce; the raw comparison
+  // that failed on a CRLF checkout is kept visible rather than silently accepted.
+  assert.equal(lfForm, generated, 'LF committed text equals LF generated text');
+  assert.equal(reproduced(crlfForm), true, 'CRLF checkout representation equals LF generated text after normalization');
+  assert.notEqual(crlfForm, generated, 'the raw comparison still distinguishes the CRLF representation (the defect being normalized)');
+  assert.equal(normalizeLineEndings(lfForm), lfForm, 'normalization is idempotent on LF text');
+
+  // Regression: the normalization bridges line endings only. Genuine content differences, topology or
+  // Sensor-identity drift, and non-line-ending serialized-format differences all still fail.
+  assert.equal(generated.includes('"sensorLocations": 108'), true);
+  assert.equal(reproduced(generated.replace('"sensorLocations": 108', '"sensorLocations": 107')), false, 'a content difference must fail');
+  assert.equal(generated.includes('"sensorId": "I7"'), true);
+  assert.equal(reproduced(generated.replace('"sensorId": "I7"', '"sensorId": "I7A"')), false, 'a Sensor identity difference must fail');
+  assert.equal(reproduced(generated.replace('"positionKind": "SENSOR"', '"positionKind": "NON_SENSOR_GAP"')), false, 'a topology difference must fail');
+  assert.equal(reproduced(serializeLikeContractJson(buildSensorMapExample(LEGACY_SUPERSEDED))), false, 'the superseded 106 form must fail');
+  assert.equal(reproduced(generated.replace('"columns": 18', '"columns":18')), false, 'a serialized-format difference (spacing) must fail');
+  assert.equal(reproduced(generated.replace('\n  "logicalMatrix"', '\n    "logicalMatrix"')), false, 'a serialized-format difference (indentation) must fail');
+  assert.equal(reproduced(`${generated}\n`), false, 'a serialized-format difference (final newline) must fail');
+  assert.equal(reproduced(crlfForm.replace('\\u002B', '+')), false, 'a serialized-format difference (escaping) must fail even on the CRLF representation');
+
+  // The comparison reads only: the fixture bytes on disk are identical before and after.
+  assert.equal(readFileSync(SENSOR_MAP_PATH).equals(bytesBefore), true, 'R40 must not rewrite the committed example');
   assert.equal(CORRECTED.sensorLocations, 108);
   assert.equal(CORRECTED.deviceCounts.reduce((s, n) => s + n, 0), 108);
 });

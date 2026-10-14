@@ -18,6 +18,8 @@ internal sealed class TestClient : ITcReadOnlyClient
     public int DisconnectCalls { get; private set; }
     public int DisposeCalls { get; private set; }
     public bool Disposed { get; private set; }
+    /// <summary>The exact request shape issued by the runner; null until a read is attempted.</summary>
+    public TcReadRequest? LastRequest { get; private set; }
     public Func<CancellationToken, Task>? ConnectWait { get; init; }
     public Func<CancellationToken, Task>? ReadWait { get; init; }
     /// <summary>Deterministic cleanup delay. Cleanup is always awaited to completion; only its elapsed time can be overdue.</summary>
@@ -42,6 +44,7 @@ internal sealed class TestClient : ITcReadOnlyClient
     public async Task<TcReadResult> ReadAsync(TcReadRequest request, CancellationToken cancellationToken)
     {
         ReadCalls++;
+        LastRequest = request;
         if (ReadWait is not null) await ReadWait(cancellationToken);
         if (ChangeGenerationDuringRead) Generation++;
         return new() { Kind = ReadKind, Endpoint = request.Endpoint, Generation = request.Generation, RawWords = Data.ToArray(), ReceivedAtUtc = DateTimeOffset.UtcNow };

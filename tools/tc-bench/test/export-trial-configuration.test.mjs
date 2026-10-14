@@ -61,15 +61,59 @@ test('physical entry is gated before any factory and supports no environment act
   assert.match(program, /PhysicalTrialAuthorization\.Authorize/);
   assert.match(program, /PhysicalTrialRefusals\.DeploymentNotAuthorized/);
   assert.doesNotMatch(program, /GetEnvironmentVariable|Dns\.|new TcpClient|Socket\(/);
-  // Exactly one client factory reference, and it appears only after the authorization gate.
-  assert.equal((program.match(/TcReadOnlyClientFactory/g) ?? []).length, 1);
-  assert.ok(program.indexOf('PhysicalTrialAuthorization.Authorize') < program.indexOf('TcReadOnlyClientFactory'));
+  // Exactly two client factory references, one per real execution class, and neither constructs a
+  // client in Program: the factory is handed to the runner, which validates before invoking it.
+  // Local TCP Simulation: the factory appears only after the fail-closed loopback invocation
+  // configuration. Physical: the factory appears only after the authorization gate.
+  const factories = [...program.matchAll(/TcReadOnlyClientFactory/g)].map((m) => m.index);
+  assert.equal(factories.length, 2);
+  const localBranchStart = program.indexOf('BenchMode.LOCAL_TCP_SIMULATION');
+  const physicalBranchStart = program.indexOf('BenchMode.PHYSICAL_TEST');
+  const dryRunStart = program.indexOf('.DryRun(');
+  assert.ok(localBranchStart > -1 && localBranchStart < physicalBranchStart && physicalBranchStart < dryRunStart);
+  const localBranch = program.slice(localBranchStart, physicalBranchStart);
+  const physicalBranch = program.slice(physicalBranchStart, dryRunStart);
+  const dryRun = program.slice(dryRunStart);
+  assert.ok(localBranch.indexOf('LocalSimulation.InvocationConfiguration(') < localBranch.indexOf('TcReadOnlyClientFactory'));
+  assert.equal((localBranch.match(/RunLocalSimulationAsync\(/g) ?? []).length, 1);
+  assert.doesNotMatch(localBranch, /Authoriz|Signature|PhysicalTrial|RunPhysicalTrialAsync|RunSoftwareTrialAsync/);
+  assert.ok(physicalBranch.indexOf('PhysicalTrialAuthorization.Authorize') < physicalBranch.indexOf('TcReadOnlyClientFactory'));
+  assert.equal((physicalBranch.match(/RunPhysicalTrialAsync\(/g) ?? []).length, 1);
+  assert.doesNotMatch(physicalBranch, /LocalSimulation|RunLocalSimulationAsync/);
+  // The default dry run still constructs nothing.
+  assert.doesNotMatch(dryRun, /TcReadOnlyClientFactory|RunLocalSimulationAsync|RunPhysicalTrialAsync/);
   const policy = read('../../../apps/tc-bench/TrialConfiguration.cs');
   assert.doesNotMatch(policy, /ExecutionAuthorized|AuthorizationSha256/);
   assert.match(policy, /MANIFEST_HASH_MISMATCH/);
   assert.match(policy, /supplied != trusted\.Trial/);
   assert.match(policy, /"--signature"/);
+  assert.match(policy, /"--local-simulation"/);
   assert.doesNotMatch(policy, /SoftwareTrial|TcReadOnlyClient|ConnectAsync/);
+});
+
+test('local simulation class accepts only the literal loopback text and validates before any client (static source)', () => {
+  const local = read('../../../apps/tc-bench/LocalSimulation.cs');
+  assert.match(local, /public const string Provenance = "LOCAL_TCP_SIMULATION";/);
+  assert.match(local, /public const string LoopbackAddress = "127\.0\.0\.1";/);
+  assert.match(local, /public const int SimulatorPort = 502;/);
+  // Exact ordinal text comparison: no parsing, resolution, normalization or correction of the address.
+  assert.match(local, /string\.Equals\(invocation\.Address, LoopbackAddress, StringComparison\.Ordinal\)/);
+  assert.match(local, /LOCAL_SIMULATION_ADDRESS_REJECTED/);
+  assert.match(local, /LOCAL_SIMULATION_PORT_REJECTED/);
+  assert.match(local, /LOCAL_SIMULATION_REQUEST_REJECTED/);
+  assert.match(local, /invocation with \{ Address = trusted\.Address, Port = trusted\.Port \} != trusted/);
+  assert.doesNotMatch(local, /IPAddress\.|Dns\.|TcpClient|Socket\(|GetEnvironmentVariable|PhysicalTrialAuthorization|TcReadOnlyClientFactory|ITcReadOnlyClient/);
+  // The default (template) address is read from the catalog, never typed as a second literal.
+  assert.equal((local.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g) ?? []).length, 1);
+  const runner = read('../../../apps/tc-bench/TrialRunner.cs');
+  assert.match(runner, /public async Task<TrialEvidence> RunLocalSimulationAsync\(TrialCatalog catalog, TrialConfiguration invocation, Func<ITcReadOnlyClient> factory, CancellationToken cancellationToken\)/);
+  const localEntry = runner.slice(runner.indexOf('RunLocalSimulationAsync('), runner.indexOf('RunSoftwareTrialAsync('));
+  assert.ok(localEntry.indexOf('LocalSimulation.RequireValid(catalog, invocation)') < localEntry.indexOf('ExecuteAsync('));
+  assert.match(localEntry, /Provenance = LocalSimulation\.Provenance/);
+  assert.doesNotMatch(localEntry, /PhysicalTrialPlan|Authoriz|PHYSICAL_DIAGNOSTIC|SYNTHETIC_TEST_ONLY/);
+  const evidence = read('../../../apps/tc-bench/TrialEvidence.cs');
+  assert.match(evidence, /evidence\.Provenance == LocalSimulation\.Provenance/);
+  assert.match(evidence, /LOCAL_SIMULATION_ENDPOINT_REJECTED/);
 });
 
 test('authorization verification is detached and uses platform cryptography only (static source)', () => {

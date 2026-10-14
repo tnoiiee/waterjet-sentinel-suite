@@ -101,6 +101,33 @@ public sealed class TrialRunner
         return await ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The Local TCP Simulation entry point: one connection attempt and at most one read against
+    /// the Owner-local loopback simulator, through the same lifecycle as the physical path. The
+    /// invocation configuration is validated fail-closed by <see cref="LocalSimulation.RequireValid"/>
+    /// before any client is constructed. No authorization is read, no physical gate is consulted and
+    /// no plan exists: the evidence is classified <see cref="LocalSimulation.Provenance"/>, records
+    /// the effective loopback endpoint, and stays QUARANTINED. It is never T01 or hardware evidence.
+    /// </summary>
+    public async Task<TrialEvidence> RunLocalSimulationAsync(TrialCatalog catalog, TrialConfiguration invocation, Func<ITcReadOnlyClient> factory, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(invocation);
+        ArgumentNullException.ThrowIfNull(factory);
+        var validated = LocalSimulation.RequireValid(catalog, invocation);
+        var execution = new TrialExecution
+        {
+            Catalog = catalog,
+            Trial = validated,
+            Endpoint = validated.Endpoint,
+            Provenance = LocalSimulation.Provenance,
+            Factory = factory,
+            ReadTimeout = TimeSpan.FromMilliseconds(2000),
+            BuildIdentity = BuildIdentity.LoadTrusted(),
+        };
+        return await ExecuteAsync(execution, cancellationToken).ConfigureAwait(false);
+    }
+
     // Deliberately internal: software validation cannot override the executable's trusted tuple.
     // Even this seam validates loopback before constructing a client, irrespective of factory kind.
     internal async Task<TrialEvidence> RunSoftwareTrialAsync(

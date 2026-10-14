@@ -2,13 +2,24 @@ using System.Text.Json;
 using Wjss.Adapters.TcAcquisition;
 using Wjss.TcBench;
 
-// No endpoint switches, listeners, environment activation, capture, or acceptance command.
+// No free-form endpoint switches, listeners, environment activation, capture, or acceptance command.
 try
 {
     var options = BenchArguments.Parse(args);
     var catalog = TrialCatalog.LoadTrusted();
     var selected = catalog.Select(options.TrialId);
     if (options.ManifestPath is not null) catalog.ValidateManifest(options.TrialId, File.ReadAllText(options.ManifestPath));
+    if (options.Mode == BenchMode.LOCAL_TCP_SIMULATION)
+    {
+        // Owner-local loopback simulator only. The invocation configuration is the trusted default
+        // tuple with the literal loopback address, validated fail-closed before any client exists.
+        // No authorization is read and no physical gate is consulted; the default configuration is
+        // reported unchanged next to the effective invocation, and the result stays QUARANTINED.
+        var invocation = LocalSimulation.InvocationConfiguration(catalog);
+        var evidence = await new TrialRunner().RunLocalSimulationAsync(catalog, invocation, () => TcReadOnlyClientFactory.Create(), CancellationToken.None);
+        Console.WriteLine(JsonSerializer.Serialize(new { mode = LocalSimulation.Provenance, configuration = selected.Trial, invocation, evidence }, StrictJson.Options));
+        return 0;
+    }
     if (options.Mode == BenchMode.PHYSICAL_TEST)
     {
         // Fail-closed gate order: build identity and physical capability, artifact/signature location,

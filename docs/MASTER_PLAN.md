@@ -45,8 +45,8 @@ version: **no application version exists**, and the documentation versioning pol
 | --- | --- |
 | Stage | `0.4C-K6` |
 | Title | T01 Physical Execution Enablement and Bench Readiness |
-| Status | **IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED** |
-| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
+| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14); post-K6 **Local TCP Simulation execution class** (not a roadmap stage; bench tooling only) **IMPLEMENTED ON BRANCH, PR #25 OPEN, NOT MERGED; OWNER-LOCAL VALIDATION COMPLETE — `25d34390` full automated validation; `59d0ffdd` final-head affected gates PASS and Local TCP Simulation run PASS (effective `127.0.0.1:502`, FC03 / Unit 0 / start 0 / quantity 40, 40 words exactly 100–139, `QUARANTINED`; Local Simulation evidence only); OWNER MERGE DECISION PENDING** (2026-10-15); **K7 NOT AUTHORIZED** |
+| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (K6); `f356b162214946058b42fe56fa13e5afc4c80539` (Local TCP Simulation branch `arena/18760814-waterjet-sentinel-suite`) |
 | Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
 | Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
@@ -54,8 +54,17 @@ version: **no application version exists**, and the documentation versioning pol
 
 - The K6 implementation was authored in Arena; **Owner-local automated validation is the
   authoritative evidence** and has passed.
-- **K6 is NOT MERGED** and canonical documentation promotion is complete.
-- **K7 is NOT AUTHORIZED**; K6 validation does not authorize it.
+- **K6 is MERGED** (PR #24, merge commit `f356b162…`, 2026-10-14); canonical documentation promotion is complete.
+- **Local TCP Simulation (2026-10-15, post-K6, not a roadmap stage):** the bench gained a third
+  execution class, `--local-simulation` / `LOCAL_TCP_SIMULATION`, running the existing read-only
+  acquisition once against a simulator on the Owner workstation at the literal loopback address
+  `127.0.0.1:502` with the unchanged default request. It changes no physical protection, grants no
+  physical authority and is not K7 or hardware evidence. Agent-local .NET validation **NOT RUN**;
+  Owner-local validation complete on PR head `59d0ffdd` (affected gates PASS; EasyModbus run PASS,
+  40 words exactly 100–139, `QUARANTINED`; Local Simulation evidence only); Owner merge decision
+  pending. See [`TC_BENCH_LOCAL_SIMULATION.md`](TC_BENCH_LOCAL_SIMULATION.md)
+  and [`CURRENT_STATE.md`](CURRENT_STATE.md) section 3A.
+- **K7 is NOT AUTHORIZED**; neither K6 validation nor the local simulation class authorizes it.
 - Detailed current truth: [`CURRENT_STATE.md`](CURRENT_STATE.md) (authoritative:
   [`CURRENT_STATE.md`](CURRENT_STATE.md)).
 
@@ -104,13 +113,13 @@ validated Atomic Replacement.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — NOT MERGED** | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
+| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — MERGED (PR #24, `f356b162…`, 2026-10-14)**; post-K6 Local TCP Simulation bench class on branch, PR #25 open, not merged | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
 
 ### 4.3 Next Stage
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4C-K7` | T01 One-Node Physical TC Read-Only Trial | **NEXT — NOT AUTHORIZED** | The first authorized one-node physical read-only trial (one invocation, one client, one connect, at most one read) | 0.4C-K6 (not merged) |
+| `0.4C-K7` | T01 One-Node Physical TC Read-Only Trial | **NEXT — NOT AUTHORIZED** | The first authorized one-node physical read-only trial (one invocation, one client, one connect, at most one read) | 0.4C-K6 (merged `f356b162…`); its own Owner Scope Gate |
 
 ### 4.4 Planned TC acquisition and commissioning stages
 
@@ -220,9 +229,10 @@ Genuine decisions that remain open and are **not** resolved by this document:
 
 Current critical path, as conditional steps — none of which is authorized by this document:
 
-1. Final canonical documentation and complete source review. — **in progress**
+1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**
-3. Owner PR review and merge decision for the K6 checkpoint. — **K6 NOT MERGED**
+3. Owner PR review and merge decision for the K6 checkpoint. — **DONE: PR #24 MERGED at `f356b162` (2026-10-14)**
+3A. Local TCP Simulation bench class: Owner-local build/test, Owner-local simulator run, Owner merge decision. — **PR #25 OPEN, NOT MERGED; Owner-local build/test and simulator run DONE on `59d0ffdd` (Local Simulation evidence only, `QUARANTINED`); Owner merge decision PENDING**
 4. Separate Owner Scope Gate for `0.4C-K7`. — **NOT AUTHORIZED**
 5. Subsequent stages in dependency order per section 6. — **PLANNED / FUTURE, NOT AUTHORIZED**
 
@@ -235,7 +245,7 @@ authorize another candidate.
 | --- | --- |
 | `0.4C-K1` … `0.4C-K5` | completed in sequence; each merged |
 | `0.4C-K6` | `0.4C-K5` |
-| `0.4C-K7` | `0.4C-K6` (not merged) |
+| `0.4C-K7` | `0.4C-K6` (merged — PR #24, `f356b162…`, 2026-10-14); K7 remains **NEXT — NOT AUTHORIZED**. The post-K6 Local TCP Simulation bench class (PR #25, open, not merged) is supporting bench capability, not a K7 prerequisite and not physical completion |
 | `0.4C-K8` … `0.4C-K17` | the immediately preceding `0.4C-K` stage |
 | `0.4D-G1` | `0.4C-K17` (Owner-approved dependency) |
 | `0.4D-G2` … `0.4D-G5` | the immediately preceding `0.4D-G` stage |
@@ -263,7 +273,11 @@ Detailed historical records for these stages remain verbatim in section 11 and i
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — NOT MERGED** | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
+| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — MERGED (PR #24, `f356b162…`, 2026-10-14)** | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
+
+Post-K6 bench tooling (not a stage): Local TCP Simulation execution class, see
+[`TC_BENCH_LOCAL_SIMULATION.md`](TC_BENCH_LOCAL_SIMULATION.md) and
+[`CURRENT_STATE.md`](CURRENT_STATE.md) section 3A.
 
 Implemented delivery and evidence for K6: see
 [`CURRENT_STATE.md`](CURRENT_STATE.md) sections 4 and 5.

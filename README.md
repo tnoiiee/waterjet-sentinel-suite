@@ -22,17 +22,25 @@ product description is preserved verbatim in section 11.
 | --- | --- |
 | Stage | `0.4C-K6` |
 | Title | T01 Physical Execution Enablement and Bench Readiness |
-| Status | **IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED** |
-| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
+| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14). Post-K6 **Local TCP Simulation execution class** (`--local-simulation`): **IMPLEMENTED ON BRANCH `arena/18760814-waterjet-sentinel-suite`, PR #25 OPEN, NOT MERGED; AGENT-LOCAL .NET VALIDATION NOT RUN; OWNER-LOCAL AUTOMATED VALIDATION OF `25d34390` RECORDED 2026-10-15 (R40 LF/CRLF test-parity defect corrected on the branch, see CHANGELOG); OWNER-LOCAL FINAL-HEAD AFFECTED GATES PASS AND OWNER-LOCAL LOCAL TCP SIMULATION PASS ON `59d0ffdd` (EasyModbus, effective `127.0.0.1:502`, FC03 / Unit 0 / start 0 / quantity 40 → 40 words, exactly 100–139, `QUARANTINED`, no authorization, no write, no fallback — Local Simulation evidence only, not hardware or T01 evidence); OWNER MERGE DECISION PENDING** (2026-10-15). **K7 NOT AUTHORIZED** |
+| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (K6); `f356b162214946058b42fe56fa13e5afc4c80539` (Local TCP Simulation branch) |
 | Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
 | Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
-| Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
+| Branch | `arena/5fcb82bf-waterjet-sentinel-suite` (K6, merged by PR #24); `arena/18760814-waterjet-sentinel-suite` (Local TCP Simulation, open) |
 
 - The implementation was authored in Arena; **Owner-local automated validation is the authoritative
   evidence** for K6 and has passed.
-- **K6 is NOT MERGED.** The K6 pull request is opened or updated in this pass and its review is in
-  progress; the Owner merge decision is pending, and canonical documentation promotion is complete.
+- **K6 is MERGED** (PR #24, merge commit `f356b162…`, 2026-10-14).
+- **Local TCP Simulation (2026-10-15):** the bench gained a third execution class,
+  `--local-simulation` / provenance `LOCAL_TCP_SIMULATION`, that runs the existing read-only acquisition
+  once against a simulator on the Owner workstation at the literal loopback address `127.0.0.1:502`
+  with the unchanged default request (FC03 / Unit 0 / start 0 / quantity 40). The default
+  configuration `192.0.2.11:502` is unchanged, no authorization is involved, `PHYSICAL_TEST` accepts
+  no endpoint override, and the result stays QUARANTINED. Agent-local .NET build/test were **NOT RUN**
+  (no SDK in the sandbox); Owner-local validation is pending. See
+  [`docs/TC_BENCH_LOCAL_SIMULATION.md`](docs/TC_BENCH_LOCAL_SIMULATION.md) and
+  [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) section 3A.
 - **K7 (T01 One-Node Physical TC Read-Only Trial) is NOT AUTHORIZED.** K6 validation does not
   authorize K7; K7 requires its own Owner Scope Gate.
 - The roadmap authority is [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md); this README is the canonical
@@ -50,10 +58,10 @@ Detailed current truth lives in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)
 
 | Question | Current answer |
 | --- | --- |
-| Current stage | `0.4C-K6` — implemented and Owner-local validated, **not merged** |
+| Current stage | `0.4C-K6` **merged** (`f356b162`); post-K6 Local TCP Simulation execution class on branch, **PR #25 open, not merged; Owner-local final-head gates and Local TCP Simulation run PASS on `59d0ffdd` (Local Simulation evidence only); Owner merge decision pending** |
 | Default build | **Physically disabled.** A normal repository build cannot construct a physical client |
 | T01 | **Non-executable** without an Owner-signed authorization bound to the deployed build; no such artifact exists |
-| Physical acquisition | **None.** No hardware contact, no passive capture, no port 502 access, no T01 execution |
+| Physical acquisition | **None.** No hardware contact, no passive capture, no port 502 access on any non-loopback host, no T01 execution. The only port-502 contact the bench can make is the Owner-local `--local-simulation` class on `127.0.0.1` (not physical evidence) |
 | Topology | 6 Nodes / 40 words per Node / 240 physical TC channels / 216 assigned / 24 unassigned / 108 Sensors (I7 and I16 normal) |
 | Runtime / Kiosk | Unchanged; no physical integration |
 | Acceptance | Diagnostic success remains QUARANTINED; there is no automatic ACCEPTED path |
@@ -67,11 +75,11 @@ Placement rule: **README is an entry point.** Stage detail belongs to
 
 | Item | Value |
 | --- | --- |
-| Approved `main` | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (the PR #23 merge commit) |
-| K6 approved base | the same commit |
-| Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
-| Session branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
-| Parent chain | `00eb3c6…` → `e40d43b…` → `00c2c07…` → `193aba76…` |
+| Approved `main` | `f356b162214946058b42fe56fa13e5afc4c80539` (the PR #24 merge commit, K6; parents `193aba76…` and `3833b52f…`) |
+| K6 approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (the PR #23 merge commit) |
+| Validated implementation head (K6) | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Session branch | `arena/18760814-waterjet-sentinel-suite` (Local TCP Simulation; base `f356b162`); `arena/5fcb82bf-waterjet-sentinel-suite` was the K6 branch |
+| Parent chain (K6) | `00eb3c6…` → `e40d43b…` → `00c2c07…` → `193aba76…`; merged as `f356b162…` |
 | Merge authority | **Owner only.** Agents never merge |
 
 A new session must verify the current remote refs before relying on any SHA written here.
@@ -81,9 +89,15 @@ A new session must verify the current remote refs before relying on any SHA writ
 The current critical path, stated as conditional steps — each step still requires its own
 authorization, and none is granted by this promotion:
 
-1. Final canonical documentation and complete source review. — **in progress**
+1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**
-3. Owner PR review and merge decision for the K6 implementation checkpoint (**K6 NOT MERGED**).
+3. Owner PR review and merge decision for the K6 implementation checkpoint — **DONE: PR #24 MERGED
+   at `f356b162` (2026-10-14)**.
+3A. Local TCP Simulation bench class (branch `arena/18760814-waterjet-sentinel-suite`): Owner-local
+   build/test, Owner-local simulator run, Owner merge decision — **PR #25 OPEN, NOT MERGED; Owner-local
+   build/test DONE (`25d34390` full automated validation; `59d0ffdd` final-head affected gates PASS);
+   Owner-local simulator run DONE on `59d0ffdd` (EasyModbus, 40 words exactly 100–139, `QUARANTINED`,
+   Local Simulation evidence only); Owner merge decision PENDING**.
 4. A separate Owner Scope Gate for **K7** — T01 One-Node Physical TC Read-Only Trial
    (**NOT AUTHORIZED**).
 5. Later stages per the roadmap in
