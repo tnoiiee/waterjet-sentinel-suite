@@ -1,6 +1,341 @@
 # WaterJet Sentinel Suite (WJSS)
 
-## Current software checkpoint — 2026-10-13
+## 1. Project Identity
+
+| Item | Value |
+| --- | --- |
+| Product | **WaterJet Sentinel Suite (WJSS)** |
+| Description | Automated Boiler Wall Water-Jet Cleaning Monitoring and Supervisory Control System |
+| Repository | `waterjet-sentinel-suite` |
+| Deployment model | One Windows 11 Pro workstation per Boiler Unit; one installation controls one Boiler Unit |
+| Operating mode | Full-screen Control Room Kiosk with controlled navigation; default language English |
+| Current entry point | This README — navigation and current position only; it is **not** a roadmap authority |
+
+WJSS is a supervisory monitoring and control application for automated boiler-wall water-jet cleaning.
+It is **not** a Safety Instrumented System and is not certified to any standard; it never commands,
+overrides, bypasses, suppresses or replaces an external protection function. The full original
+product description is preserved verbatim in section 11.
+
+## 2. Current Stage
+
+| Field | Value |
+| --- | --- |
+| Stage | `0.4C-K6` |
+| Title | T01 Physical Execution Enablement and Bench Readiness |
+| Status | **IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED** |
+| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
+| Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
+| Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
+| Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
+
+- The implementation was authored in Arena; **Owner-local automated validation is the authoritative
+  evidence** for K6 and has passed.
+- **K6 is NOT MERGED.** The K6 pull request is opened or updated in this pass and its review is in
+  progress; the Owner merge decision is pending, and canonical documentation promotion is complete.
+- **K7 (T01 One-Node Physical TC Read-Only Trial) is NOT AUTHORIZED.** K6 validation does not
+  authorize K7; K7 requires its own Owner Scope Gate.
+- The roadmap authority is [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md); this README is the canonical
+  entry point.
+- **Implementation identity versus documentation identity.** The Validated Implementation Head is
+  `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. The Candidate documentation commits —
+  `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate foundation),
+  `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction) and
+  `e4c3a37f6ad84194ad2e32287b3c53a4514bd806` (CR-02 refinement) and the CR-03 revision commit — are documentation-only and are **not** part of the validated implementation
+  head; no implementation path changed in them.
+
+## 3. Current Truth
+
+Detailed current truth lives in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md). Compact position:
+
+| Question | Current answer |
+| --- | --- |
+| Current stage | `0.4C-K6` — implemented and Owner-local validated, **not merged** |
+| Default build | **Physically disabled.** A normal repository build cannot construct a physical client |
+| T01 | **Non-executable** without an Owner-signed authorization bound to the deployed build; no such artifact exists |
+| Physical acquisition | **None.** No hardware contact, no passive capture, no port 502 access, no T01 execution |
+| Topology | 6 Nodes / 40 words per Node / 240 physical TC channels / 216 assigned / 24 unassigned / 108 Sensors (I7 and I16 normal) |
+| Runtime / Kiosk | Unchanged; no physical integration |
+| Acceptance | Diagnostic success remains QUARANTINED; there is no automatic ACCEPTED path |
+| Application version | **NOT ESTABLISHED** — no runtime release exists |
+
+Placement rule: **README is an entry point.** Stage detail belongs to
+[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md); stage sequencing and authorization belong to
+[`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
+
+## 4. Approved Baseline
+
+| Item | Value |
+| --- | --- |
+| Approved `main` | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (the PR #23 merge commit) |
+| K6 approved base | the same commit |
+| Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Session branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
+| Parent chain | `00eb3c6…` → `e40d43b…` → `00c2c07…` → `193aba76…` |
+| Merge authority | **Owner only.** Agents never merge |
+
+A new session must verify the current remote refs before relying on any SHA written here.
+
+## 5. Critical Path
+
+The current critical path, stated as conditional steps — each step still requires its own
+authorization, and none is granted by this promotion:
+
+1. Final canonical documentation and complete source review. — **in progress**
+2. Atomic Replacement completed and validated. — **DONE**
+3. Owner PR review and merge decision for the K6 implementation checkpoint (**K6 NOT MERGED**).
+4. A separate Owner Scope Gate for **K7** — T01 One-Node Physical TC Read-Only Trial
+   (**NOT AUTHORIZED**).
+5. Later stages per the roadmap in
+   [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 4 — **PLANNED, NOT
+   AUTHORIZED** unless and until the Owner authorizes each one.
+
+Every later trial requires separate authorization. There is no batch approval for T01–T04, and a
+failure does not authorize another candidate.
+
+## 6. Safety and Authorization Boundary
+
+```text
+HARDWARE CONTACT NOT AUTHORIZED
+T01 NOT AUTHORIZED
+PASSIVE CAPTURE NOT AUTHORIZED
+PORT 502 ACCESS NOT AUTHORIZED
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED
+RUNTIME/KIOSK PHYSICAL INTEGRATION NOT AUTHORIZED
+SIX-NODE ACQUISITION NOT AUTHORIZED
+PRODUCTION NOT AUTHORIZED
+WRITE/CONTROL NOT AUTHORIZED
+```
+
+- The default build remains **physically disabled**.
+- **K6 validation does not authorize K7.**
+- Approved TEST_CONFIGURATION addresses are documentation-range addresses only; they are listed in
+  `packages/commissioning/src/tcNodeConfiguration.mjs` and are not evidence of physical identity.
+- No physical fact — reachability, port, function code, Unit ID, start address, quantity, endianness
+  or framing size — is verified by this pass.
+
+## 7. System Topology
+
+Approved design intent (the authoritative statement remains the preserved original in section 11):
+
+| Item | Approved baseline |
+| --- | --- |
+| Boiler walls | Left, Rear, Right, Front |
+| Product Sensors | **108** (Left 24, Rear 30, Right 24, Front 30); I7 and I16 are normal Product Sensors |
+| Thermocouple channels | **216 assigned** (108 × 2) of **240 physical** (six Nodes × 40); **24 unassigned** |
+| Water Jet assemblies | **8 — WJ1 to WJ8**, each with horizontal X and vertical Y axes |
+| Isolation Valves | **8**, paired WJn ↔ IVn by ordinal, never shared |
+| Galil controllers | 4 (DMC-B140-M), axes A–D |
+| Modbus interface | WAGO 750-362 Modbus TCP Coupler, zero-based internal addressing |
+| Cleaning Jobs | **Strictly sequential** — at most one ACTIVE at any time |
+
+Production tag lists, register maps, addresses and motion values are confidential local deployment
+information and are not in this repository.
+
+## 8. Validation Snapshot
+
+| Area | Owner-local (authoritative) | Agent/Arena (Arena had no `dotnet`) |
+| --- | --- | --- |
+| K6 build | targeted adapter, targeted bench, focused tests and full solution Release builds PASS with no reported warnings or errors | no build performed |
+| K6 tests | focused **95/95**; full .NET **550/550** (0 failed, 0 skipped) | no .NET execution |
+| K6 dry run | SIMULATION only; connect/read NOT_ISSUED; QUARANTINED; no physical I/O | not applicable |
+| K6 physical attempt | refused with `PHYSICAL_CAPABILITY_DISABLED`; deployment state `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED` | not applicable |
+| Node/static | exporter 18/18, S2 14/14, S3 19/19, Boundary S1–S9 clean, Commissioning 218/218, fixture parity 7/7 | exporter 18/18, S2 14/14, S3 19/19, Boundary clean, Commissioning 218/218, syntax and path proofs |
+| Physical | **none** — no hardware contact, no capture, no T01 execution | **none** |
+
+### 8.1 Owner-local K6 record (authoritative)
+
+**Restore**
+
+- normal restore: PASS
+- locked restore: PASS twice
+- lock drift: none
+
+**Build**
+
+- targeted adapter Release build: PASS
+- targeted TC bench Release build: PASS
+- focused test-project Release build: PASS
+- full solution Release build: PASS
+- the reported builds completed with no reported warnings or errors
+
+**Focused tests**
+
+- 95 total
+- 95 passed
+- 0 failed
+- 0 skipped
+
+**Dry run**
+
+- mode SIMULATION
+- physical capability false
+- connect NOT_ISSUED
+- read NOT_ISSUED
+- TrialAcceptance QUARANTINED
+- no copied words
+- no physical I/O
+
+**Default PHYSICAL_TEST attempt**
+
+- refused
+- refusal code `PHYSICAL_CAPABILITY_DISABLED`
+- `acquisitionPerformed` false
+- `deploymentState` `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED`
+- no physical-capable deployment build
+- no real authorization artifact
+- no real Owner signing key
+- no physical contact
+
+**Full .NET**
+
+- 550 total
+- 550 passed
+- 0 failed
+- 0 skipped
+
+**Node/static validation**
+
+- exporter 18/18
+- S2 14/14
+- S3 19/19
+- Boundary S1–S9 zero findings
+- Commissioning check PASS
+- Commissioning 218/218 on the canonical LF representation
+- fixture parity verify-only 7/7
+- `WJSS_UPDATE_FIXTURES` false
+- final working tree clean
+- no lock drift
+- no fixture drift
+- no documentation drift at the validated implementation head
+
+**R40 disposition**
+
+- first normal Windows commissioning run: 217/218
+- only R40 failed
+- the mismatch was LF versus CRLF representation
+- no JSON-content, topology or Product defect
+- the approved generator produced the canonical LF representation
+- canonical LF Commissioning rerun: 218/218
+- the original Owner-local fixture was restored byte-for-byte
+- original/restored Owner-local SHA-256: `CC3F45ADF43CED351F1E8AE0D17D06AEA181FD94D119126DF0659AAC3385DA80`
+- the canonical LF SHA-256 was observed in an earlier generation run as `3BC8774CB74183080297BB89C3A855DB8E46782B421DF41AB955C1CA50A8256A`
+- **Limitation:** the canonical hash was not recomputed in the same execution as the final 218/218 run
+- final worktree clean
+- no generated fixture was committed
+
+### 8.2 Agent/Arena K6 record (separate scope)
+
+Agent/Arena reported, separately from Owner-local validation:
+
+- exporter 18/18
+- S2 14/14
+- S3 19/19
+- Boundary S1–S9 clean
+- Commissioning 218/218
+- JavaScript syntax checks passed
+- changed-path and protected-surface proofs passed
+- genuine locks unchanged
+
+Agent did **not** have `dotnet` and must **not** be credited with:
+
+- C# compilation
+- analyzer execution
+- xUnit or .NET tests
+- .NET fixture parity
+- physical execution
+
+The full narrative record is in
+[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) section 5.
+
+## 9. Documentation Index
+
+The governing documents (unchanged by this pass):
+
+| Document | Purpose |
+| --- | --- |
+| [`AGENTS.md`](AGENTS.md) | Working contract: authority order, scope lock, evidence rules, git rules |
+| [`SECURITY.md`](SECURITY.md) | Security policy, secret handling, vulnerability reporting |
+| [`CHANGELOG.md`](CHANGELOG.md) | Chronological documentation history |
+| [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) | Stage status, verified state, legend, open items |
+| [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) | Staged delivery plan and stage gates — **roadmap authority** |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Forward view of planned stages and milestones |
+| [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) | Consolidated requirements with identifiers and status |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Conceptual architecture, communication health, UI guard |
+| [`docs/DOMAIN_MODEL.md`](docs/DOMAIN_MODEL.md) | Entities, terminology, outcomes, and dispositions |
+| [`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md) | Hardware safety boundary and prohibited control writes |
+| [`docs/CONTROL_AUTHORITY.md`](docs/CONTROL_AUTHORITY.md) | Authority matrix, sequencing authority, DCS override |
+| [`docs/CLEANING_SEQUENCE.md`](docs/CLEANING_SEQUENCE.md) | Cleaning Job, sequencing invariants, failure handling |
+| [`docs/ALARM_MODEL.md`](docs/ALARM_MODEL.md) | Condition, acknowledgement, shelving, cleared-state ack |
+| [`docs/QUEUE_MODEL.md`](docs/QUEUE_MODEL.md) | Eight source queues, GlobalQueue, ownership, refill, stop/rebuild |
+| [`docs/HISTORIAN_RETENTION.md`](docs/HISTORIAN_RETENTION.md) | Storage targets, intervals, retention, cleanup |
+| [`docs/USER_PERMISSION_MODEL.md`](docs/USER_PERMISSION_MODEL.md) | Roles, permissions, sessions, break-glass, override permission |
+| [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) | Planned verification, including required review-confirmed cases |
+| [`docs/PUBLIC_REPOSITORY_BOUNDARY.md`](docs/PUBLIC_REPOSITORY_BOUNDARY.md) | What may and may not be committed |
+| [`docs/decisions/README.md`](docs/decisions/README.md) | Architecture Decision Record index and format |
+| [`.gitignore`](.gitignore) | Files excluded from the public repository |
+
+The complete original index — including every ADR-0001…ADR-0020 row and the Stage 0.2.1A spike
+entries — is preserved verbatim in section 11. No link target was changed or repaired in this pass.
+
+## 10. Development Workflow
+
+Read [`AGENTS.md`](AGENTS.md) first: it defines the authority order, scope-lock rules, evidence
+requirements, public-repository restrictions, device-access prohibitions, prohibited Git operations
+and the **Owner-only merge rule**. Contributors never merge.
+
+Source authority order applied in this repository:
+
+1. Latest Owner instruction
+2. Owner-approved scope
+3. Exact repository source and evidence
+4. Current contracts, tests, analyzers and generators
+5. Existing current-facing documentation
+6. Historical documentation records
+7. Older plans or unapproved proposals
+
+Every stage report states **CHANGED**, **UNCHANGED** and **NOT VERIFIED**. Status legend used
+throughout the documentation:
+
+| Marker | Meaning |
+| --- | --- |
+| `[APPROVED]` | Behaviour or fact approved by the Owner in an approved Stage Gate |
+| `[OWNER CONFIRMED]` | Explicitly confirmed by the Owner during documentation review; binding |
+| `[PROPOSED]` | A recommendation awaiting Owner approval; never treated as approved behaviour |
+| `[NOT VERIFIED]` | Not yet confirmed by bench test, field test or Owner engineering review |
+| `[NOT AUTHORIZED]` | Activity that is currently prohibited |
+| `[OPEN]` | A question requiring an Owner decision; no behaviour may be assumed |
+
+## 11. Historical Detail
+
+The original README text is preserved verbatim below, including its earlier status table, product
+description, planned scope, physical baseline, document index, status legend, contributing and
+licence sections. Heading levels are demoted by two so this document keeps one heading hierarchy.
+
+**Supersession notes (added for navigation only; the preserved text is not rewritten):**
+
+- The preserved `## Current software checkpoint — 2026-10-13` block records the **K5-era** position
+  (`c0bc2c7…` / `e71e33b…`, focused 81/81, full .NET 536/536, PR open). That work was merged as
+  PR #23 into `main` at `193aba764f8934df3dc3b0fd1841e8b64e808cc2`, which is the approved base of
+  K6. The current position is section 2 above.
+- The preserved `## Historical status (superseded as current)` table keeps its dated
+  "PR #22 OPEN" / "PR #21 OPEN" wording; [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 4
+  records the Owner-approved status of those stages.
+- CF-07 (the README status block lagging the then-current stage) remains an open Owner decision; no
+  silent repair was made.
+
+---
+
+### Historical record — verbatim preservation of the authoritative original
+
+The block below is the complete text of `README.md` as it exists at candidate source head
+`00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. Wording, tables, links, counts, SHAs, dates and statuses are unchanged. Only the
+Markdown heading level is shifted by two (for example `##` → `####`) so that this candidate keeps a
+single heading hierarchy; every heading's original text is retained verbatim.
+
+### WaterJet Sentinel Suite (WJSS)
+
+#### Current software checkpoint — 2026-10-13
 
 **One-Node TC bench software validation CLOSED — READY FOR OWNER PR REVIEW.**
 Exact Owner-validated implementation: `c0bc2c71636d3206098fd890e1de40c46fabae65`;
@@ -27,7 +362,7 @@ Repository: `waterjet-sentinel-suite`
 
 ---
 
-## Historical status (superseded as current)
+#### Historical status (superseded as current)
 
 | Item | Value |
 | --- | --- |
@@ -92,7 +427,7 @@ history), and React is **selected** as the Primary UI Framework (see above). See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) sections 23 to 33 and
 [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 3.2.
 
-## What the product is
+#### What the product is
 
 A supervisory monitoring and control application for automated boiler-wall water-jet
 cleaning. The planned deployment model is:
@@ -106,7 +441,7 @@ cleaning. The planned deployment model is:
 - The application uses local application users.
 - The initial system is standalone and does not depend on Internet access.
 
-## What the product is not
+#### What the product is not
 
 WJSS is **not** a Safety Instrumented System. It does not replace emergency stop circuits,
 hardwired protection, motor protection, mechanical limits, or controller-side safe-stop
@@ -115,7 +450,7 @@ external protection function. It is **not** certified to IEC, ISA, ISO, or any o
 standard. Industrial standards are used only as guidance and design inspiration. See
 [`docs/SAFETY_BOUNDARY.md`](docs/SAFETY_BOUNDARY.md).
 
-## Planned full-system scope
+#### Planned full-system scope
 
 Several software foundations already exist and are **checkpoint-validated within scope** — solution + project sources, `global.json` SDK `10.0.401`, `TopologyInvariants`/`WallMap`/`WaterJetTopologyCatalog` 108/216, `SENSOR_DISABLED` kernel, 750-362/750-498 topology, React feasibility spike, Kiosk shell (1.0.4258.31), `adapters/tc-acquisition` `ITcReadOnlyClient` Library Selection Gate `SELECT_FLUENTMODBUS_5_3_2` (`49e4043`/`dfce519` MERGE READY, 455/455, S2/S3 clean) — **physical integration, field commissioning, remaining operational capabilities and Production activation are incomplete/not authorized** (see `docs/CURRENT_STATE.md` and `STAGE_LIBRARY_SELECTION_GATE_REPORT.md`).
 
@@ -126,7 +461,7 @@ GlobalQueue arbitration; Historian; trend visualisation; alarm management; event
 audit logging; diagnostics; configurable roles and permissions; engineering configuration;
 and reporting and export.
 
-## Physical baseline (approved design intent)
+#### Physical baseline (approved design intent)
 
 | Item | Approved baseline |
 | --- | --- |
@@ -146,7 +481,7 @@ and reporting and export.
 Actual production tag lists, register maps, addresses, and motion values are confidential
 local deployment information and are **not** in this repository.
 
-## Two invariants worth stating up front
+#### Two invariants worth stating up front
 
 1. **At most one Cleaning Job may be ACTIVE within one installation at any time.**
    Different Water Jets, valves, walls, or controllers do not grant authority for
@@ -156,9 +491,9 @@ local deployment information and are **not** in this repository.
    Main Pump is running. It cannot protect against process termination, Windows shutdown,
    workstation restart, power loss, or hardware failure.
 
-## Document index
+#### Document index
 
-### Governance
+##### Governance
 
 | Document | Purpose |
 | --- | --- |
@@ -167,7 +502,7 @@ local deployment information and are **not** in this repository.
 | [`CHANGELOG.md`](CHANGELOG.md) | Documentation history |
 | [`.gitignore`](.gitignore) | Files excluded from the public repository |
 
-### Core documentation
+##### Core documentation
 
 | Document | Purpose |
 | --- | --- |
@@ -178,7 +513,7 @@ local deployment information and are **not** in this repository.
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Conceptual architecture, communication health, UI guard |
 | [`docs/DOMAIN_MODEL.md`](docs/DOMAIN_MODEL.md) | Entities, terminology, outcomes, and dispositions |
 
-### Control and safety
+##### Control and safety
 
 | Document | Purpose |
 | --- | --- |
@@ -187,7 +522,7 @@ local deployment information and are **not** in this repository.
 | [`docs/CLEANING_SEQUENCE.md`](docs/CLEANING_SEQUENCE.md) | Cleaning Job, sequencing invariants, failure handling |
 | [`docs/ALARM_MODEL.md`](docs/ALARM_MODEL.md) | Condition, acknowledgement, shelving, cleared-state ack |
 
-### Queues and data
+##### Queues and data
 
 | Document | Purpose |
 | --- | --- |
@@ -195,14 +530,14 @@ local deployment information and are **not** in this repository.
 | [`docs/HISTORIAN_RETENTION.md`](docs/HISTORIAN_RETENTION.md) | Storage targets, intervals, retention, cleanup |
 | [`docs/USER_PERMISSION_MODEL.md`](docs/USER_PERMISSION_MODEL.md) | Roles, permissions, sessions, break-glass, override permission |
 
-### Delivery assurance
+##### Delivery assurance
 
 | Document | Purpose |
 | --- | --- |
 | [`docs/TEST_STRATEGY.md`](docs/TEST_STRATEGY.md) | Planned verification, including required review-confirmed cases |
 | [`docs/PUBLIC_REPOSITORY_BOUNDARY.md`](docs/PUBLIC_REPOSITORY_BOUNDARY.md) | What may and may not be committed |
 
-### Decision records
+##### Decision records
 
 | Document | Purpose |
 | --- | --- |
@@ -213,7 +548,7 @@ local deployment information and are **not** in this repository.
 | [`docs/decisions/ADR-0004-historian-strategy.md`](docs/decisions/ADR-0004-historian-strategy.md) | Historian storage and retention strategy |
 | [`docs/decisions/ADR-0005-hardware-safety-boundary.md`](docs/decisions/ADR-0005-hardware-safety-boundary.md) | Prohibition of production control writes pending bench verification |
 
-#### Stage 0.2 decision records — `ACCEPTED` (architecture direction; not implemented)
+###### Stage 0.2 decision records — `ACCEPTED` (architecture direction; not implemented)
 
 | Document | Purpose |
 | --- | --- |
@@ -226,7 +561,7 @@ local deployment information and are **not** in this repository.
 | [`docs/decisions/ADR-0012-simulator-first-development.md`](docs/decisions/ADR-0012-simulator-first-development.md) | Simulator-first development, device profiles, failure injection, contract parity |
 | [`docs/decisions/ADR-0013-offline-deployment.md`](docs/decisions/ADR-0013-offline-deployment.md) | Offline installation, startup, backup and restore, upgrade and rollback, local-only communication |
 
-#### Stage 0.2.1A feasibility spike — synthetic, removable, not Product code
+###### Stage 0.2.1A feasibility spike — synthetic, removable, not Product code
 
 | Document | Purpose |
 | --- | --- |
@@ -234,7 +569,7 @@ local deployment information and are **not** in this repository.
 | [`docs/spikes/stage-0.2.1a-results.md`](docs/spikes/stage-0.2.1a-results.md) | Arena validation and measurement evidence; Owner-local final Edge gate and manual review PASS (Owner-reported, §0G) |
 | [`spikes/ui-runtime-react/README.md`](spikes/ui-runtime-react/README.md) | Spike layout, run instructions, NOT VERIFIED list |
 
-## Status legend
+#### Status legend
 
 Every substantive statement in this documentation is marked with one of the following:
 
@@ -247,13 +582,13 @@ Every substantive statement in this documentation is marked with one of the foll
 | `[NOT AUTHORIZED]` | Activity that is currently prohibited. |
 | `[OPEN]` | A question requiring an Owner decision. No behaviour may be assumed. |
 
-## Contributing
+#### Contributing
 
 Read [`AGENTS.md`](AGENTS.md) first. It defines the authority order, scope-lock rules,
 evidence requirements, public-repository restrictions, device-access prohibitions,
 prohibited Git operations, and the Owner-only merge rule.
 
-## License and distribution
+#### License and distribution
 
 No licence has been granted in this repository. Publication of this documentation does not
 grant rights to use, modify, or distribute the described system. Contact the Owner before

@@ -1,4 +1,168 @@
-## 2026-10-13 — One-Node TC bench software validation closeout — Owner PR review
+# Changelog
+
+## 1. Changelog Policy
+
+- Entries are newest-first and correspond to Owner-approved Delivery Stages and their review
+  corrections — **not** to software releases. No application version exists.
+- A dated entry describes the position **at that dated checkpoint**. Later records do not rewrite it;
+  supersession is expressed by a newer entry plus, where useful, a clearly labelled note.
+- `PLANNED`, `NEXT` and `FUTURE` stages are never described as completed work.
+- The original policy text, the versioning position and the `[Unreleased]` section of the
+  authoritative `CHANGELOG.md` are preserved verbatim in section 5.
+- The repository has no application version; the documentation versioning policy remains `[OPEN]`.
+
+## 2. Current Stage / Unreleased
+
+### 0.4C-K6 — T01 Physical Execution Enablement and Bench Readiness (unreleased; NOT MERGED)
+
+**Status: IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED.**
+
+| Field | Value |
+| --- | --- |
+| Stage | `0.4C-K6` — T01 Physical Execution Enablement and Bench Readiness |
+| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
+| Initial implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
+| Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
+| Analyzer correction / Validated Implementation Head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
+
+- **Identity separation.** The Validated Implementation Head above is an implementation commit; the
+  Candidate documentation commits (`dccf200…` foundation, `d5daaa…` CR-01 correction, `e4c3a37…`
+  CR-02 refinement, and the CR-03 revision commit) are
+  documentation-only and are **not** part of that validated head.
+
+Canonical documentation promotion:
+
+- the Owner approved the exact Candidate revision;
+- `README.md`, `CHANGELOG.md`, `docs/CURRENT_STATE.md` and `docs/MASTER_PLAN.md` were atomically replaced from the approved Candidate sources;
+- all four Candidate-only paths were removed in the same commit;
+- historical reconstruction remained 4/4;
+- canonical-link validation passed;
+- Product, tests, packages, locks, configuration and fixtures were unchanged;
+- K6 remained NOT MERGED;
+- K7 remained NOT AUTHORIZED.
+
+**Documentation-guard correction.** The approved documentation hierarchy exposed one H2-only
+assumption in the single test that reads and parses `CHANGELOG.md`; the guard is now
+heading-level aware and bounds the exact Stage 0.4C-K3 section by the next heading of the same
+level. Evidence assertions were not removed or relaxed. Focused H2/H4/boundary tests pass, and the
+full Commissioning suite passes on both the authoritative and the promoted documentation layouts.
+No Product behaviour, evidence source, fixture or lock changed.
+
+**Implemented on that base (summary).** Immutable build identity; default physical capability
+disabled; detached Owner-signed authorization verification (ECDSA NIST P-256 / SHA-256,
+SubjectPublicKeyInfo, exact canonical authorization payload, single-use consumption marker, replay
+rejection, exact candidate binding); one-shot execution discipline (physical client construction only
+after all gates pass, one client, one connection attempt, at most one read, no retry, no reconnect, no
+fallback); lifecycle and evidence (outer lifecycle budget, cleanup-overdue evidence,
+worker-observation evidence, generation and epoch fencing, quarantined output, no automatic ACCEPTED
+path); explicit non-delivery (no passive capture implementation, no Runtime/Kiosk integration, no
+device write/control path).
+
+**Owner-local automated validation (authoritative):** normal restore PASS; locked restore PASS twice;
+lock drift none. Targeted adapter, targeted TC bench, focused test-project and full solution Release
+builds PASS with no reported warnings or errors. Focused tests **95/95**; full .NET **550/550** (both
+0 failed, 0 skipped). Exporter **18/18**; S2 **14/14**; S3 **19/19**; Boundary **S1–S9 clean**;
+Commissioning **218/218** on the canonical LF representation; fixture parity verify-only **7/7**;
+`WJSS_UPDATE_FIXTURES` false; final worktree clean with no lock, fixture or documentation drift. Full
+evidence record: [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) section 5.
+
+**Fail-closed behaviour observed.** The dry run stayed in SIMULATION (physical capability false,
+connect and read `NOT_ISSUED`, `TrialAcceptance` QUARANTINED, no copied words, no physical I/O) and the
+default `PHYSICAL_TEST` attempt was refused with `PHYSICAL_CAPABILITY_DISABLED`
+(`acquisitionPerformed` false, `deploymentState` `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED`). No
+physical-capable deployment build, no real authorization artifact and no real Owner signing key exist.
+**No hardware contact and no physical execution occurred.**
+
+**R40 disposition (representation only).** The first normal Windows commissioning run was 217/218 with
+only R40 failing on an LF versus CRLF representation difference — no JSON-content, topology or Product
+defect. The approved generator produced the canonical LF representation; the canonical LF rerun was
+218/218; the original Owner-local fixture was restored byte-for-byte
+(`CC3F45ADF43CED351F1E8AE0D17D06AEA181FD94D119126DF0659AAC3385DA80`), and no generated fixture was
+committed. The canonical LF SHA-256
+`3BC8774CB74183080297BB89C3A855DB8E46782B421DF41AB955C1CA50A8256A` was observed in an earlier
+generator execution and was **not recomputed in the same execution** as the final 218/218 run — a
+labeled limitation.
+
+**Agent/Arena evidence, reported separately (Arena had no `dotnet`):** exporter 18/18; S2 14/14;
+S3 19/19; Boundary S1–S9 clean; Commissioning 218/218; JavaScript syntax checks passed; changed-path
+and protected-surface proofs passed; genuine locks unchanged. Agent must **not** be credited with C#
+compilation, analyzer execution, xUnit or .NET tests, .NET fixture parity or physical execution.
+
+No merge, no T01 execution, no physical authorization, and no K7 authorization follows from these
+results. Current authorization boundary:
+
+```text
+HARDWARE CONTACT NOT AUTHORIZED
+T01 NOT AUTHORIZED
+PASSIVE CAPTURE NOT AUTHORIZED
+PORT 502 ACCESS NOT AUTHORIZED
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED
+RUNTIME/KIOSK PHYSICAL INTEGRATION NOT AUTHORIZED
+SIX-NODE ACQUISITION NOT AUTHORIZED
+PRODUCTION NOT AUTHORIZED
+WRITE/CONTROL NOT AUTHORIZED
+```
+
+## 3. Recent Merged Stages
+
+The status of completed stages below is authoritative, established through the completed, validated
+Atomic Replacement; **[`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) section 4 remains the roadmap
+authority**:
+
+| Stage | Title | Status |
+| --- | --- | --- |
+| `0.4C-K1` | Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview | MERGED |
+| `0.4C-K2` | TC Node/IP Configuration Foundation | MERGED |
+| `0.4C-K3` | 108-Sensor / 216-Measurement Topology Correction | MERGED |
+| `0.4C-K4` | Modbus TCP Client Library Selection and Read-Only Adapter Foundation | MERGED (PR #22) |
+| `0.4C-K5` | One-Node Physical TC Read-Only Acquisition Software Foundation | MERGED (PR #23, `193aba76…`) |
+| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — NOT MERGED** |
+| `0.4C-K7` | T01 One-Node Physical TC Read-Only Trial | **NEXT — NOT AUTHORIZED** |
+
+Where an earlier dated entry still says "PR #20 OPEN" or "PR #21 OPEN", that is the wording at its
+dated checkpoint and is preserved unchanged in section 5; the roadmap table above records the
+Owner-approved status. The merge of PR #21 is additionally recorded inside the preserved README text
+as `d1ea0324cb37de65a798fe4271429f955d4a9225` (parents `cc6ccf87` / `a6238ac`).
+
+## 4. Earlier Development History
+
+Every dated entry of the authoritative `CHANGELOG.md` — including Stage 0.4C-K1 review corrections,
+Stage 0.4C-0B, 0.4C-0A, 0.4C-0, 0.4B-3, 0.4B-2, 0.4B-1, the Stage 0.4A checkpoints, Stage 0.3A-3,
+0.3A-2A, 0.3A-1, Stage 0.2.1A, Stage 0.2, Stage 0.1 and the historical documentation-foundation
+candidate — is preserved verbatim, in its original order, in section 5 of this document. No entry was
+summarised away, reordered within its era or rewritten.
+
+## 5. Historical Corrections and Superseded Records
+
+Corrections already present in the authoritative file are retained unchanged and are listed here only
+for navigation:
+
+- The `2026-10-13` source-checkpoint entry (`BLOCKED ON OWNER-LOCAL GENUINE LOCK / BUILD / TEST
+  EVIDENCE`) is superseded by the later `2026-10-13` software-validation closeout entry, which in turn
+  is superseded as the current position by section 2 above.
+- R40: the first normal Windows commissioning run was 217/218 and the discrepancy was LF versus CRLF
+  representation only; the canonical LF rerun was 218/218. Both records are preserved.
+- The Library Selection Gate entry keeps its dated `PR #22 OPEN` wording; PR #22 is merged in the
+  roadmap (section 3). The Stage 0.4C-K3 and 0.4C-K2 entries likewise keep their dated
+  `OPEN — NOT MERGED` wording.
+- Superseded topology figures (106 / 212 and earlier 208) are retained inside the preserved text
+  together with the Owner critical topology correction to 108 / 216.
+- `README.md` CF-07 observations (status block lagging the then-current stage) are retained; no silent
+  repair was made.
+
+No historical correction was rewritten, re-dated or removed in this document.
+
+---
+
+### Historical record — verbatim preservation of the authoritative original
+
+The block below is the complete text of `CHANGELOG.md` as it exists at candidate source head
+`00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. Wording, tables, links, counts, SHAs, dates and statuses are unchanged. Only the
+Markdown heading level is shifted by two (for example `##` → `####`) so that this candidate keeps a
+single heading hierarchy; every heading's original text is retained verbatim.
+
+#### 2026-10-13 — One-Node TC bench software validation closeout — Owner PR review
 
 **Software-only validation CLOSED; final documentation/available-check gates precede MERGE READY
 recommendation. No merge or physical authorization.** This supersedes the source-checkpoint
@@ -31,7 +195,7 @@ pending status below without rewriting that dated record.
 **HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
 PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 
-## 2026-10-13 — Isolated one-Node TC bench — software SOURCE checkpoint, pending locks
+#### 2026-10-13 — Isolated one-Node TC bench — software SOURCE checkpoint, pending locks
 
 **BLOCKED ON OWNER-LOCAL GENUINE LOCK / BUILD / TEST EVIDENCE. NOT MERGE READY.**
 Owner permits atomic source checkpoint/normal assigned-branch push without new locks.
@@ -55,7 +219,7 @@ Owner permits atomic source checkpoint/normal assigned-branch push without new l
 **HARDWARE CONTACT NOT AUTHORIZED; T01 NOT AUTHORIZED; PASSIVE CAPTURE NOT AUTHORIZED;
 PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 
-## 2026-10-13 — Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2 — MERGE READY (PR #22 OPEN targeting main, head `fdc81d801aecabd3f00350948d69a9f9b49f9244`, parent `91f5a68fdb6cfec74efc82f5237f47c600c61728`, genuine lock `49e404356edee64bb9dbaccd395d8bcc66435881` on `d1ea0324`) — FluentModbus 5.3.2 selected, NModbus 3.0.83 rejected
+#### 2026-10-13 — Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2 — MERGE READY (PR #22 OPEN targeting main, head `fdc81d801aecabd3f00350948d69a9f9b49f9244`, parent `91f5a68fdb6cfec74efc82f5237f47c600c61728`, genuine lock `49e404356edee64bb9dbaccd395d8bcc66435881` on `d1ea0324`) — FluentModbus 5.3.2 selected, NModbus 3.0.83 rejected
 
 - **Outcome:** `SELECT_FLUENTMODBUS_5_3_2` — FluentModbus 5.3.2 (MIT, `netstandard2.0` via CPM `Directory.Packages.props`) selected; NModbus 3.0.83 rejected for this application lifecycle (no per-operation `CancellationToken` — `ReadHoldingRegistersAsync` returns `Task<ushort[]>` without token vs FluentModbus `ReadHoldingRegistersAsync<T>(…,CancellationToken)`); Raw Socket not selected. Decision rule: prior FluentModbus default retained unless exact evidence proved material blocker; selection on per-operation cancellation contract, not preference/popularity/benchmarks. Record: [`ADR-0018`](docs/decisions/ADR-0018-modbus-tcp-client-library-selection.md), [`STAGE_LIBRARY_SELECTION_GATE_REPORT`](docs/STAGE_LIBRARY_SELECTION_GATE_REPORT.md).
 
@@ -80,14 +244,14 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Successor-chain continuity (`fdc81d8` → `dfce519` → `0755483` → `7b9343c`):** successors are documentation/governance/XML-comment-only, with no Product, lock, package-version, fixture, test or boundary-policy change; the Library Selection Gate implementation and validation position at `fdc81d8`/`49e4043` (genuine lock version 2 net10.0 FluentModbus 5.3.2, `455/455`, `S2 14/14 S3 11/11` clean) is preserved. A new session must verify the current remote PR head.
 
 
-## 2026-10-12 — Stage 0.4C-K3 Owner Manual Review PASS — COMPLETE FOR MERGE REVIEW (PR #21 — OPEN / UNMERGED pending final PR checks and the Owner merge action; not merged; documentation-only commit)
+#### 2026-10-12 — Stage 0.4C-K3 Owner Manual Review PASS — COMPLETE FOR MERGE REVIEW (PR #21 — OPEN / UNMERGED pending final PR checks and the Owner merge action; not merged; documentation-only commit)
 
 - **Owner Manual Review: PASS** on exact PR #21 head `b5c7dff2f944956c608d89b903cb151ea6eed551` (parent `c4d77974…`; final browser / Kiosk recheck, Owner-local). Verified: (A) measurement-quality terminology — `DISABLED` separated from the Sensor operational Enabled / Disabled state, legend reads measurement unavailable / Channel not commissioned with the operational state stated separate, "no measurement exists at this position" absent, value age "n/a - no current measurement available", unassigned Channels still `SPARE_UNMAPPED` / `NO_COUNTERPART_SPARE` and never a missing Product Sensor, no Queue / Candidate / dispatch / `SENSOR_DISABLED` meaning attributed; (B) topology — 108 Product Sensors, 216 Product-compatible measurements, 240 physical, 24 unassigned, 0 Product-topology conflicts, 12 Drawing internal conflicts, I7 and I16 normal Sensors in ordinal position, no `NON_SENSOR_GAP` / former gap anchor, U-shaped Sensor Map intact; (C) Kiosk / Preview — local host connects, read-only, **Kiosk identity Stage 0.4C-K2 intentional by Owner rule**, K3 evidence section reported separately, no hardware access, no device write, Overview scrolls inside its own frame, no material UI regression; (D) evidence honesty — `PROTOCOL_UNRESOLVED`, `PORT_UNRESOLVED`, candidate `WITHDRAWN`, `DERIVATION_BLOCKED`, no startWord / endWord / module offset, `WIRE_BREAK_DECODING_BLOCKED`, 0x7FFF not a physically verified result, Reachability NOT_TESTED, Physical Acquisition NOT_IMPLEMENTED, MODBUS / TEST_HARDWARE / PRODUCTION / Device Write NOT_AUTHORIZED; (E) Sensor operational Disable boundary — no conflation, kernel and Queue behaviour as validated, mutation UI **NOT_IMPLEMENTED**, no unapproved control.
 - **Automated validation record retained.** Authoritative Owner-local run at `041b2863…`: locked restore PASS; Release build PASS (all projects, no error, no warning reported); full .NET **455 / 455** (0 failed, 0 skipped); fixture emission **7 / 7** and second deterministic run **7 / 7, no diff**; TypeScript typecheck PASS; contracts-ts **36 / 36**; no package-lock drift; working tree CLEAN. Subsequent commits: `c4d77974…` Markdown-only; `b5c7dff2…` presentation wording + directly corresponding Node tests only (no `.cs`, fixture, schema, contract, dependency or lock change). Arena gates at `b5c7dff2…`: commissioning 218 / 218, Ops Preview 129 / 129, Kiosk 22 / 22, Mapping UI 82 / 82, mapping package 261 / 7 skipped / 0 failed, S2 14 / 14, contracts-ts 36 / 36, boundary S1–S9 0 findings, `git diff --check` clean, drift 0, fixture / schema drift none. .NET was not rerun in Arena.
 - **Stage status.** **Stage 0.4C-K3 = COMPLETE FOR MERGE REVIEW · Automated Gates = PASS · Owner Manual Review = PASS · Schema Decision = RESOLVED — RETAIN_SCHEMA_V2 · PR #21 = OPEN / UNMERGED pending final PR checks and the Owner merge action.** Not stated: PR merged; hardware, field acquisition, protocol, Port, MODBUS, TEST_HARDWARE, PRODUCTION or Device Write complete or authorised.
 - **Documentation closeout (this commit, Markdown only).** `docs/STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md` (status header; §10 / §12.3 / §12.7 / §13.3 Manual-Review rows updated with supersession; new §14 Manual Review record and final status), `docs/CURRENT_STATE.md` (new head position; previous closeout paragraph marked dated), `docs/MASTER_PLAN.md` (final closeout paragraph; previous one marked dated), root `README.md` ("Current stage" row), `docs/STAGE_0.4C-K3_CHECKPOINT.md` (dated "Manual Review NOT passed" sentence given supersession context). Scope and boundaries of the previous entries carried forward unchanged; the automated-gate closeout entry below keeps its dated "MANUAL REVIEW PENDING" wording as history.
 
-## 2026-10-12 — Stage 0.4C-K3 closeout: Owner-local automated validation PASSED, schema v2 retained (PR #21 — OPEN, UNMERGED, do not merge; K3 = AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING; documentation-only commit)
+#### 2026-10-12 — Stage 0.4C-K3 closeout: Owner-local automated validation PASSED, schema v2 retained (PR #21 — OPEN, UNMERGED, do not merge; K3 = AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING; documentation-only commit)
 
 - **Owner-local validation on exact PR #21 head `041b286322186977c5f87cde8184ae5a180d60a6`** (parent `01f1d006…`; ancestry from `cc6ccf87…` verified; exact source ZIP SHA-256 `5366377c9060c6505007622bd95e84c41182c5daa152b0c0454b0465cf13658d`, 455 files): `dotnet restore --locked-mode` **PASS** (no drift) · `dotnet build -c Release --no-restore` **PASS** (all projects, no error, no warning reported) · `dotnet test -c Release --no-build` **455 / 455 PASS**, 0 failed, 0 skipped · fixture emission (`WJSS_UPDATE_FIXTURES=1`, `Wjss.FixtureEmission.Tests.csproj`) **7 / 7 PASS, no Git diff** · second deterministic emission **7 / 7 PASS, no additional diff** · `wjss-contracts-ts` `npm ci && npm run check` **PASS** (typecheck PASS, **36 / 36**, no package-lock drift) · Owner-local working tree **CLEAN** after every step. **Automated Build / Test Gate = PASS.**
 - **Analyzer corrections that preceded the green build (no suppression, pragma, NoWarn, severity, props, `.editorconfig`, fixture, schema or dependency change):** `01f1d006…` "Fix CA1859 in canonical 108-sensor sequence builder" (`packages/contracts/WallMap.cs`: private `BuildSensorSequence` returns `System.Collections.ObjectModel.ReadOnlyCollection<string>`; public `SensorSequence` stays `IReadOnlyList<string>`); `041b2863…` "Fix CA1861 in canonical topology assertions" (`tests/domain.tests/CanonicalMapStructureTests.cs`: `ExpectedCorrectedSensorIds = ["I7", "I16"]`, `ExpectedLogicalPositionKinds = ["SENSOR"]` as `private static readonly string[]`). Each was verified against the Owner-supplied exact source ZIP of the preceding head.
@@ -96,7 +260,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Preserved and restated.** Topology 108 / 108 unique / I7, I16 normal / 108 Front / 108 Rear / 216 assigned / 240 physical / 24 unassigned / 0 I7-I16 conflict rows / 0 `NON_SENSOR_GAP` / 6 Nodes / 30 WAGO 750-498 module records / 12 unrelated Drawing internal conflicts unresolved. Sensor Disable: no Candidate, no GlobalQueue entry, no auto-dispatch; immediate removal of a queued non-active entry with reason `SENSOR_DISABLED`; FIFO preserved; GlobalQueue holds ready-to-dispatch entries only; Active Job not auto-aborted (Pump / Valve / Operator Abort / AutoSequence / Mandatory Safe Return authoritative); re-enable neither resurrects nor reuses stale classification; unknown Sensor fails closed; I7 / I16 identical; **mutation UI NOT_IMPLEMENTED** (Runtime foundation + read-only representation only). Equipment: WJ1–WJ8 ↔ IV1–IV8; legacy cannon = Assigned Cleaning Device ID, cannon n → WJn, not inferred from Sensor wall; Installed Position ≠ Target Coverage; WJ1 / WJ3 Installed Position **UNRESOLVED**, no remaining gap anchors, Target Coverage unchanged. Evidence-honesty: `PROTOCOL_UNRESOLVED` / candidate `WITHDRAWN` / `PORT_UNRESOLVED` / `OWNER_EVIDENCE_PENDING` / `SOURCE_COMPLETENESS_INSUFFICIENT` / `DERIVATION_BLOCKED` / `RECORD_TO_RECORD_CONSISTENCY_ONLY` / no startWord-endWord / `authoritative: false` / `activationPossible: false` / `WIRE_BREAK_DECODING_BLOCKED` (0x7FFF → no physical result) / Reachability NOT_TESTED / Physical Acquisition NOT_IMPLEMENTED / MODBUS, TEST_HARDWARE, PRODUCTION, Device Write NOT_AUTHORIZED / connected-storage disclosure retained / no connector-derived archive metadata.
 - **Status.** Owner Manual Review **PENDING**; PR #21 **OPEN / UNMERGED**; **K3 = AUTOMATED GATES PASSED, OWNER MANUAL REVIEW PENDING.** *(Dated at `c4d77974…`; the Manual Review PASSED at `b5c7dff2…` — see the entry above.)* Not claimed: Manual Review passed, PR-ready, K3 complete, merged, hardware verified, acquisition implemented, protocol or Port resolved, MODBUS / TEST_HARDWARE / PRODUCTION authorised. Arena ran documentation and lightweight gates only; .NET was not rerun in Arena.
 
-## 2026-10-12 — Stage 0.4C-K3 Completion Pass: .NET topology correction, central .NET invariants, Sensor Disable kernel, regenerated fixtures, WJ1 / WJ3 UNRESOLVED (branch `arena/200cd6d0-waterjet-sentinel-suite`, PR #21 — OPEN, NOT MERGED, do not merge; K3 NOT complete, NOT PR-ready)
+#### 2026-10-12 — Stage 0.4C-K3 Completion Pass: .NET topology correction, central .NET invariants, Sensor Disable kernel, regenerated fixtures, WJ1 / WJ3 UNRESOLVED (branch `arena/200cd6d0-waterjet-sentinel-suite`, PR #21 — OPEN, NOT MERGED, do not merge; K3 NOT complete, NOT PR-ready)
 
 - **Historical figures notice.** Every older entry below that states 106 Sensors, 212 channels, 24 / 29 / 24 / 29, Cannon slots, `NON_SENSOR_GAP` at I7 / I16 or "I7 / I16 absent" is a historical record of a superseded belief. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements (240 physical, 24 unassigned, walls 24 / 30 / 24 / 30). Those entries are not edited.
 - **Baseline proven before editing.** HEAD = remote PR head `7dc7c6918f66d3a75a073446cfdfeb08284c44ab` (parent `145b9cc5…`), PR #21 OPEN, clean tree, `main` `cc6ccf87…`; no sandbox recreation.
@@ -110,7 +274,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged.** `tcNodeConfiguration.mjs`, scoped S2, S1–S9, every K3 evidence-honesty position (`PROTOCOL_UNRESOLVED`, `WITHDRAWN`, `PORT_UNRESOLVED`, `DERIVATION_BLOCKED`, `RECORD_TO_RECORD_CONSISTENCY_ONLY`, `WIRE_BREAK_DECODING_BLOCKED`, connected-storage disclosure), Kiosk shell, WebView2, U-shaped Wall Map, FrontRearDelta diagnostic-only, GlobalQueue FIFO / one Active Job / WJ ↔ IV / Pump–Valve / Safe Return rules, Target Coverage, dependencies and lock files. No network action, no connected-storage access, no MODBUS, no probe, no device write.
 - **Status.** K3 NOT complete, PR #21 NOT PR-ready and NOT merged: the .NET validation is unperformed in Arena. *(Dated statement at `fcf0e686…`; closed by the Owner-local validation recorded in the closeout entry above.)*
 
-## 2026-10-12 — Owner Critical Topology Correction: I7 and I16 are normal Product Sensors (Stage 0.4C-K3 branch `arena/200cd6d0-waterjet-sentinel-suite`, PR #21 — OPEN, NOT MERGED, do not merge; K3 NOT complete)
+#### 2026-10-12 — Owner Critical Topology Correction: I7 and I16 are normal Product Sensors (Stage 0.4C-K3 branch `arena/200cd6d0-waterjet-sentinel-suite`, PR #21 — OPEN, NOT MERGED, do not merge; K3 NOT complete)
 
 - **Owner ruling (final).** The 106-Sensor / 212-channel baseline is revoked. Logical **I7 and I16 are normal Product Sensors** with the same parameters, state model, Front/Rear pairing, runtime, commissioning, mapping and queue rules as every other Sensor. Authoritative baseline: **108 Product Sensors** (sequence G+201–G+218, G+101–G+118, G1–G18, H1–H18, I1–I18, J1–J18; I7 and I16 once each in ordinal position; Left 24 / Rear 30 / Right 24 / Front 30), **216 assigned Product TC channels** (108 × 2), **240 physical**, **24 unassigned** (240 − 216). No `NON_SENSOR_GAP` position exists. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 - **Measurement identity, not invented.** I7 Front / Rear = `TC-NODE-05 | A102.4 | ch7 / ch8`, I16 Front / Rear = `TC-NODE-06 | A102.4 | ch7 / ch8`, taken from the committed Drawing schedule; the four rows previously classed `DRAWING_TOPOLOGY_CONFLICT` are `DRAWING_VERIFIED` / `MATCHED` Product assignments (schedule 204 / 12 / 0 / 24; template 216 rows). The 12 unrelated Drawing internal conflicts stay unresolved. ISS-REV1-02 closed as superseded.
@@ -121,7 +285,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Tests.** Commissioning 214 / 214, Ops Preview 129 / 129, Kiosk 22 / 22, Mapping UI 82 / 82, mapping package 261 pass / 7 skipped, S2 14 / 14, boundary scan 0 findings, `git diff --check` clean, no lock drift. .NET and browser: NOT RUN.
 - **Unchanged.** `tcNodeConfiguration.mjs`, the scoped S2 exception, S1–S9, every K3 evidence-honesty position (`PROTOCOL_UNRESOLVED`, `WITHDRAWN`, `PORT_UNRESOLVED`, `DERIVATION_BLOCKED`, `RECORD_TO_RECORD_CONSISTENCY_ONLY`, `WIRE_BREAK_DECODING_BLOCKED`, the connected-storage disclosure), the Kiosk shell, WebView2, the static U-shaped Wall Map, FrontRearDelta diagnostic-only, GlobalQueue / Active Job / WJ↔IV / Pump–Valve / Safe Return rules, every dependency and lock file. No network action, no connected-storage access.
 
-## 2026-10-12 — Stage 0.4C-K2 native Kiosk Stage identity correction (PR #20, same branch — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K2 native Kiosk Stage identity correction (PR #20, same branch — OPEN, NOT MERGED, do not merge)
 
 - **Owner visual review finding, recorded as received.** The native Kiosk header read `Kiosk Preview - Stage 0.4C-K1` and the window title named K1, while the embedded Preview and Diagnostics read `Stage 0.4C-K2`. This was the only blocking mismatch.
 - **Corrected at the source.** `apps/kiosk/KioskShellOptions.cs` now sets `StageId` to `0.4C-K2` and `WindowTitle` to `WaterJet Sentinel Suite - Kiosk Preview (Stage 0.4C-K2)`. The header label is built from `StageId`. Current-facing comments in `MainForm.cs`, `Program.cs` and the Kiosk README were relabelled. The placeholder package version `0.0.0-0.4c-k1-preview` became `0.0.0-0.4c-k2-preview` in the two packages, and their descriptions now open with K2.
@@ -130,7 +294,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged.** The approved origin, WebView2 `1.0.4258.31`, the lock files, layout, reconnecting behaviour, confirmed exit, TC Node configuration, the S2 exception and every authority boundary. No dependency change.
 - **NOT RUN IN ARENA.** The .NET build and rendering of the native header. The Owner must rerun the Kiosk. Owner Manual Review has NOT passed.
 
-## 2026-10-11 — Stage 0.4C-K3 Physical TC Connectivity and Protocol Evidence Gate (branch `arena/200cd6d0-waterjet-sentinel-suite`, based on `main` cc6ccf87 — PR to `main` OPEN, NOT MERGED, do not merge)
+#### 2026-10-11 — Stage 0.4C-K3 Physical TC Connectivity and Protocol Evidence Gate (branch `arena/200cd6d0-waterjet-sentinel-suite`, based on `main` cc6ccf87 — PR to `main` OPEN, NOT MERGED, do not merge)
 
 - **One canonical evidence model.** `packages/commissioning/src/tcAcquisitionEvidence.mjs` holds nine identified evidence sources (with the 0B-recorded SHA-256 values marked as recorded, not recomputed), 24 claims each carrying one of the ten approved classes and one scope (model / drawing / instance / synthetic / Owner decision), the protocol and port decision records, the per-Node rack (no offset field), the wire-break position and eleven missing-evidence requests. Deterministic validation refuses missing sources, unknown classes, model / revision / module-count / Channel-capacity mismatches, incomplete or conflicting widths, missing status, conflicting byte or word order, ambiguous encoding, manual numeric offsets, overlapping placement, incomplete wire-break evidence, model-level evidence applied as instance, synthetic presented as actual, unproven hardware / field claims, and any protocol or port selected without evidence or with an assumed default.
 - **Decisions recorded, not made (Owner ruling, correction pass).** Protocol `PROTOCOL_UNRESOLVED`, evidence `OWNER_EVIDENCE_PENDING`, candidate **`WITHDRAWN`**, completeness `SOURCE_COMPLETENESS_INSUFFICIENT`; no candidate is retained and nothing is inferred from the device family. The 0B model-level protocol reference survives only as a non-authoritative note (original not readable in this review, profile section truncated, as-installed applicability / firmware / configuration unverified, no port, no candidate, no adapter, no acquisition). Port `PORT_UNRESOLVED`, no candidate, no default; no port number appears in the Product tree. No MODBUS library, no network client, no socket.
@@ -143,7 +307,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **NOT RUN IN ARENA.** The .NET build and tests, and any real-browser execution. The 22-step Owner-local handoff is in `docs/STAGE_0.4C-K3_CHECKPOINT.md` §12.
 - **Unchanged.** `tcNodeConfiguration.mjs`, the scoped S2 exception, S1–S9, every dependency and lock file, the Kiosk shell, the Wall Map, the workflow, and the read-only authority. No network action was performed. Owner Manual Review has NOT passed and Stage 0.4C-K3 is NOT claimed complete.
 
-## 2026-10-12 — Stage 0.4C-K2 TC Node/IP Configuration Foundation (branch `arena/699da2a5-waterjet-sentinel-suite`, based on `main` a7d739bb — PR to `main` OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K2 TC Node/IP Configuration Foundation (branch `arena/699da2a5-waterjet-sentinel-suite`, based on `main` a7d739bb — PR to `main` OPEN, NOT MERGED, do not merge)
 
 - **Canonical six-node model.** `packages/commissioning/src/tcNodeConfiguration.mjs` holds `TC-NODE-01`…`06` ↔ `CAB1`…`CAB6` (one-to-one by ordinal) and the six Test addresses `192.0.2.11`–`.16`, the only Product file that holds them. Topology per Node is 750-362 x 1, 5 x 750-498, 40 physical TC Channels and 750-600 x 1. Totals are derived: 6 Nodes, 6 Cabinets, 30 TC modules, 240 channels and 6 configured Test IPs.
 - **Atomic validation.** Identity, topology, IP and duplicate rules are checked together. Leading-zero and malformed IPv4 forms are refused, and a wrong Node-to-address pairing, an invented port or protocol, or any reachability or hardware claim is refused with a named code. Nothing is repaired silently and there is no fallback address.
@@ -154,7 +318,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **NOT RUN IN ARENA.** The .NET build and tests, and any real-browser execution. The Owner-local handoff is in `docs/STAGE_0.4C-K2_CHECKPOINT.md` §9.
 - **Unchanged.** No dependency and no lock file. No device contact of any kind. No Kiosk or Wall Map logic. Owner Manual Review has NOT passed and Stage 0.4C-K2 is NOT claimed complete.
 
-## 2026-10-12 — Stage 0.4C-K1 PR #19 Owner-authorized Front/Rear thermal-pair semantics and synthetic diagnostic pass (same PR — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K1 PR #19 Owner-authorized Front/Rear thermal-pair semantics and synthetic diagnostic pass (same PR — OPEN, NOT MERGED, do not merge)
 
 - **Owner finding, recorded as received.** The Synthetic Preview systematically rendered **Rear above Front** for every Product Sensor pair (the Owner's example: Front 29.4 / Rear 35.1). Front is the furnace-facing fin / heat-collection measurement and Rear is the paired waterwall-tube-side reference, so the inverted reading trained the Operator to read the pair backwards.
 - **Exact cause at the source.** `syntheticEngineeringValue` (`packages/commissioning/src/scenarios.mjs`) carried `const sideBias = row.side === 'F' ? 0 : 4;`, biasing **every** Rear sample about +4 °C above its Front partner. It is a **generation** bug, not a rendering bug: the generator was corrected and **no screen compensates for a value**.
@@ -171,7 +335,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged:** the 240 / 216+24 / 212 / 106 topology and its single canonical source; the U-shape geometry, wall order, row order and the static vertical scrolling contract; the physical-Channel selection identity and every synchronisation; Front/Rear separation and the Both / Front only / Rear only control; the read-only Preview workflow, its evidence blocking and "an internal conflict may record FAIL or PARTIAL but never PASS"; loop-test progress; filters; navigation; the Kiosk shell, the native header layout, WebView2 `1.0.4258.31` and the WinForms-only reference isolation; every lock file; loopback-only hosting, the approved origin and the strict CSP with no external assets; the reconnecting fail-safe and the confirmed exit; the protected evidence and the authoritative workbook. **No dependency was added or changed in this pass. No MODBUS, no physical acquisition, no contact with `192.0.2.11`–`192.0.2.16`, no TEST_HARDWARE, no PRODUCTION, no device write, no cleaning or motion command, no queue authority, no field-verification claim.**
 - **Status.** **PR #19 OPEN — NOT MERGED (do not merge).** Owner Manual Review has **not** passed for this pass; the paired states are **not** a field verification; **Stage 0.4C-K1 is not claimed complete.**
 
-## 2026-10-12 — Stage 0.4C-K1 PR #19 Owner Manual Review correction: the Commissioning Wall Map is now a STATIC vertical view (same PR — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K1 PR #19 Owner Manual Review correction: the Commissioning Wall Map is now a STATIC vertical view (same PR — OPEN, NOT MERGED, do not merge)
 
 - **Owner result, recorded as received.** The Commissioning Wall Map renders and its topology is ACCEPTED: U-shape presentation PASS, 108 logical positions PASS, 106 Product Sensors PASS, I7 and I16 as `NON_SENSOR_GAP` PASS, Front/Rear presentation PASS, complete Wall Map rendering PASS, native Kiosk header inside 1920×1080 PASS, Operations Preview inside the viewport PASS. **One usability defect:** the Wall Map frame carried its **own vertical scrollbar**, producing nested vertical scrolling (document scroll plus an inner scrollbar) that split one spatial reference into two scroll positions — not suitable for field loop testing.
 - **Exact cause.** `.wallmap-frame` was `max-height:80vh; overflow:auto`, so whenever the map's complete natural height (about 1060 px at comfortable density) exceeded the cap the frame scrolled on **both** axes.
@@ -185,7 +349,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged:** Wall Map topology and its single canonical source; 108/106/2 counts; I7/I16 gap identity; U-shape geometry, wall order and row order; Front/Rear separation and the Both/Front/Rear control; physical-Channel selection identity and every synchronisation; workflow, filters, loop-test progress, valid/BAD/STALE rules, scenarios; the runtime-init module-script correction; the native Kiosk header layout; WebView2 `1.0.4258.31` and the reference isolation; the lock files; loopback-only hosting, the approved origin, the strict CSP, no external assets; the reconnecting fail-safe; the confirmed exit; the protected evidence and the authoritative workbook; the read-only Preview boundary. **No MODBUS, no physical acquisition, no contact with `192.0.2.11`–`192.0.2.16`, no TEST_HARDWARE, no PRODUCTION, no device write, no cleaning or motion command, no queue authority, no field-verification claim.**
 - **Status.** **PR #19 OPEN — NOT MERGED (do not merge).** Owner Manual Review has **not** passed for this correction; **Stage 0.4C-K1 is not claimed complete.**
 
-## 2026-10-12 — Stage 0.4C-K1 Commissioning Wall Mapping and Loop-Test usability pass (same PR — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K1 Commissioning Wall Mapping and Loop-Test usability pass (same PR — OPEN, NOT MERGED, do not merge)
 
 - **Owner-authorized pass on the same branch and the same PR #19**, starting at the runtime-init checkpoint `040d322f734e528914527f1b2cfe7bf078d936a8`. It adds a read-only, interactive **Commissioning Wall Map** so that field loop testing no longer needs the manual translation wall position → Sensor → Front/Rear → Node/Cabinet → Module/Channel → value → verdict. No safety, authority, evidence, layout or dependency boundary was reopened, and **no dependency was added**.
 - **New wall model (`packages/commissioning/src/wallmap.mjs`, dependency-free and browser-safe).** Exactly **108 logical positions**, **106 Product Sensor cells** and exactly **two `NON_SENSOR_GAP` cells — I7 and I16**, never Sensors and never Water Jets. The builder **throws** instead of rendering a wrong wall: 108/106/2, exactly the I7+I16 gaps, every Sensor exactly once, exactly one Front **and** one Rear measurement per Sensor, 212 measurements in the documented order, the approved per-wall counts (LEFT 24 / REAR 29 + gap / RIGHT 24 / FRONT 29 + gap), six rows in the approved order (`G+201`, `G+101`, `G`, `H`, `I`, `J`) and distinct Channels per position. The canonical topology source is **the protected Product topology plus committed evidence — `config/examples/sensor-map.example.json` → `logicalMatrix.slots`** — and nothing else; the drawing wall label is never used to infer topology, the Runtime wall summary and the spike UI are shape references only, Water Jet identity is never derived from the Sensor wall, and the served payload never forwards the gap Water-Jet anchor or any device/Channel assignment to the browser.
@@ -198,7 +362,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged:** WebView2 `1.0.4258.31` and the WinForms-only WPF-reference isolation; the lock files (nothing added, refreshed or hand-edited); loopback-only binding, the approved origin, the strict CSP, no external assets; the read-only boundary and every route/method restriction; the protected evidence totals and the authoritative workbook; the reconnecting fail-safe and the confirmed exit. **No MODBUS, no physical acquisition, no contact with `192.0.2.11`–`192.0.2.16`, no TEST_HARDWARE, no PRODUCTION, no device write, no cleaning or motion command, no queue authority, no Runtime supervision, no field-verification claim.**
 - **Status.** **PR #19 OPEN — NOT MERGED (do not merge).** Owner Manual Review has **not** passed for this pass; **Stage 0.4C-K1 is not claimed complete.**
 
-## 2026-10-12 — Stage 0.4C-K1 PR #19 Owner Manual Review runtime-init correction: the Operations Preview now boots and interacts (same PR — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K1 PR #19 Owner Manual Review runtime-init correction: the Operations Preview now boots and interacts (same PR — OPEN, NOT MERGED, do not merge)
 
 - **Owner-local result, recorded as received.** The 1920×1080 width correction **PASSED** visual review (complete native header fits; `Windowed / full screen` and `Exit Kiosk Preview` both visible; the Operations Preview stays inside the screen; Density controls visible; the Overview table contained in its own horizontal-scroll frame). The **interaction review FAILED**: with the host started through the real package command (`npm --prefix .\apps\ops-preview start`, `127.0.0.1:5187`) and the Kiosk reporting `LOCAL HOST: CONNECTED (READ-ONLY PREVIEW)`, the HTML and CSS rendered but the application did nothing — Density controls and Sensor Map / Diagnostics navigation unresponsive, empty Scenario and Node selectors, no Node communication summary, no Commissioning progress, the Overview showing its header with **no rows**, and empty Sensor detail fields.
 - **Exact root cause: the served page contained no `script` element at all.** `apps/ops-preview/public/index.html` loaded `/styles.css` and nothing else, so the browser never requested `app.mjs`: no module executed, no API was called, nothing rendered and no control was wired. Every reported symptom follows from that single omission (including "navigation does not respond" — the anchors scroll to sections that exist but were never filled in).
@@ -210,7 +374,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged:** WebView2 `1.0.4258.31` and the WPF-reference isolation; the corrected 1920×1080 layout strategy (unchanged except where interaction required it); loopback-only binding and the approved origin; no external assets; the read-only Preview boundary and the protected evidence totals (240 rows, 212 Product-compatible measurements, 106 Product Sensors, four I7/I16 topology-conflict rows, twelve internal-conflict rows, 24 unassigned Channels); the reconnecting fail-safe; the confirmed exit; no Production authority, no vendor transport, no hardware or physical transport, no device write or control.
 - **Status.** **PR #19 OPEN — NOT MERGED (do not merge).** Owner Manual Review has **not** passed: the width finding is closed, the runtime correction is complete in source and awaits the Owner-local rerun in checkpoint §15.5.
 
-## 2026-10-12 — Stage 0.4C-K1 PR #19 Owner Manual Review correction: fullscreen 1920x1080 fit and launch-runbook correction (same PR — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K1 PR #19 Owner Manual Review correction: fullscreen 1920x1080 fit and launch-runbook correction (same PR — OPEN, NOT MERGED, do not merge)
 
 - **Owner Manual Review result: FAILED, recorded as received.** Owner-local automated validation had passed (zero-warning Release build, .NET **414/414**, kiosk contract 17/17, WebView2 isolation proof `CoreCount=1, WinFormsCount=1, WpfCount=0, LoaderCount=3`). The Owner then started the real host (`node apps/ops-preview/server.mjs`, `listening on 127.0.0.1:5187`); the Kiosk connected and showed `LOCAL HOST: CONNECTED (READ-ONLY PREVIEW)`, so this was **not** a host or reconnect problem. At fullscreen 1920×1080 the application was **wider than the screen**: the native header pushed **`Exit Kiosk Preview` completely outside the right edge** (`Windowed / full screen` stayed visible, no wrap or compact mode), and in the embedded Operations Preview the **Density control was clipped**, `Comfortable` was only partly visible and right-side content extended past the 1920 px viewport.
 - **Root cause — one cause, two symptoms.** The header's left `FlowLayoutPanel` was `AutoSize = true` with `WrapContents = false` and carried the long boundary/state text, so it demanded its full preferred width; the outer layout's single column had no explicit style, and an unstyled `TableLayoutPanel` column defaults to **AutoSize**, so the column grew to the header's preferred width. That pushed the actions past the right edge and stretched the content cell — and therefore the embedded view and the **web page viewport** — past the screen edge, clipping the page's own right-hand controls. The README claim that 1920×1080 presentation was already DPI-safe was **not supported by the Owner's screenshot** and has been replaced by an explicit acceptance target.
@@ -223,7 +387,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged:** WebView2 `1.0.4258.31` and the successful WinForms-only WPF-reference isolation; Central Package Management; the protected commissioning evidence (240 physical rows, 212 Product-compatible measurements, 106 Product Sensors, I7/I16 gap and conflict treatment); the approved loopback scheme and host; the read-only Preview boundary; the confirmed exit and the reconnecting fail-safe; no Production authority, no vendor transport, no hardware or physical transport, no device write or control.
 - **Status.** **NEW PR #19 against `main` — OPEN, NOT MERGED (do not merge).** The Stage is not complete until the Owner-local rerun confirms the fullscreen fit and the manual acceptance list.
 
-## 2026-10-12 — Stage 0.4C-K1 zero-warning correction: WinForms-only WebView2 reference isolation (same PR against `main` — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K1 zero-warning correction: WinForms-only WebView2 reference isolation (same PR against `main` — OPEN, NOT MERGED, do not merge)
 
 - **Owner-local validation received and recorded** (Owner-local, not Arena): kiosk contract 12/12, commissioning check + 77/77, Operations Preview check + 40/40, Mapping Configuration check + 82/82, normal and locked solution restores passed, full .NET tests **414/414**, boundary scan S1–S9 clean, working tree after restore `M apps/kiosk/packages.lock.json` (the genuine Owner-local lock refresh: `Microsoft.Web.WebView2` requested/resolved `1.0.4258.31`), and a Release build that succeeded **with exactly one warning**, `MSB3277` (WindowsBase `4.0.0.0` versus `5.0.0.0`).
 - **Exact root cause, from the Owner-local package evidence:** `buildTransitive\Microsoft.Web.WebView2.targets` in `1.0.4258.31` has a "regular .NET 5+" branch — the branch selected for `net10.0-windows` — that unconditionally adds `Microsoft.Web.WebView2.Core.dll`, `...WinForms.dll` **and `...Wpf.dll`** to the reference graph. The WPF assembly is compiled against WindowsBase `5.0.0.0` while the .NET 10 reference pack provides the `4.0.0.0` facade, hence `MSB3277` in a project that uses no WPF type. This replaces every earlier hypothesis, including any suggestion that the repository enabled both WinForms and WPF: the evaluated properties are `UseWindowsForms=true` and `UseWPF` empty.
@@ -235,7 +399,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unchanged:** WebView2 package version `1.0.4258.31`; the WinForms-only application model; the Stage 0.4C-K1 preview boundary (`SIMULATION / PREVIEW - NO HARDWARE ACCESS - NO DEVICE WRITE - FIELD VERIFICATION PENDING`); no Production, vendor-transport, hardware, physical-transport or device authority; the protected evidence totals and topology; the authoritative workbook and every evidence file under `docs/evidence/`.
 - **Status.** **NEW PR against `main` — OPEN, NOT MERGED (do not merge).** The Stage is **not** complete until Owner-local zero-warning validation and the manual kiosk review pass. Record: [`docs/STAGE_0.4C-K1_CHECKPOINT.md`](docs/STAGE_0.4C-K1_CHECKPOINT.md) §12 and §13.
 
-## 2026-10-12 — Stage 0.4C-K1: Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview (development checkpoint; NEW PR against `main` — OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-K1: Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview (development checkpoint; NEW PR against `main` — OPEN, NOT MERGED, do not merge)
 
 - **New session after PR #18 MERGED** into `main` at `48f0315ea1bcbd3f71f46a47bb4b55fc04327487` (parents `3e1a7fd9d28db65221c123960a0c85b62d93949a` and `b2048ec0aa5703767a2af85c73eaa1ae94d06e53`, verified by `git cat-file -p`). Platform-assigned branch `arena/3be5c713-waterjet-sentinel-suite`, starting exactly at that commit; base gate PASSED (remote `main` exact match, index and worktree clean, no conflicting open PR, workbook SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` re-verified and unchanged). **The standing sandbox recreation protocol was not triggered** — no ref recovery, index reload or destructive Git operation was needed or used. The merged PR #18 branch `arena/c4b63a26-waterjet-sentinel-suite` was not used, continued or pushed.
 - **Owner dependency decision (the Stage's only dependency change):** `Microsoft.Web.WebView2` pinned **`1.0.4258.31`**, central `<PackageVersion>` in `Directory.Packages.props` plus a **version-free** `PackageReference` in `apps/kiosk/Wjss.Kiosk.csproj`; **Evergreen** WebView2 Runtime for the development preview. **Rejected by the Owner:** Edge application/kiosk mode as the delivered shell, the legacy web-browser control, Electron or another desktop framework, and a source-only shell that stays non-building. Pre-change hashes of the four dependency-relevant files are recorded in [`docs/STAGE_0.4C-K1_CHECKPOINT.md`](docs/STAGE_0.4C-K1_CHECKPOINT.md) §4. **No other dependency was added, removed or refreshed, and no npm dependency was touched for the shell.**
@@ -248,7 +412,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Not verified, and not claimed:** compilation of the changed .NET graph, the Kiosk Release build, the Owner-local lock-file refresh, Windows runtime behaviour, DPI rendering, 1920×1080 visual acceptance, the embedded-view runtime policy callbacks, the Owner Browser Review, and every .NET test. `apps/kiosk/packages.lock.json` (v2, group `net10.0-windows7.0`, still **empty**) must be regenerated Owner-locally; until then a locked-mode restore reports it as stale — expected for this Stage.
 - **Status.** **NO HARDWARE. No live MODBUS. No TEST_HARDWARE. No PRODUCTION. No device write or control. No physical Sensor tested. Field verification remains PENDING.** Physical Sensor acquisition **NOT IMPLEMENTED**; wire-break decoding **BLOCKED**. **NEW PR against `main` — OPEN, NOT MERGED (do not merge).** Record: [`docs/STAGE_0.4C-K1_CHECKPOINT.md`](docs/STAGE_0.4C-K1_CHECKPOINT.md).
 
-## 2026-10-12 — Stage 0.4C-0B completion: Baseline REV1 Evidence Review and 240-Row Schedule (development checkpoint, documentation only; same branch and PR — PR #18 OPEN, NOT MERGED, do not merge)
+#### 2026-10-12 — Stage 0.4C-0B completion: Baseline REV1 Evidence Review and 240-Row Schedule (development checkpoint, documentation only; same branch and PR — PR #18 OPEN, NOT MERGED, do not merge)
 
 - **Same session after the 2026-10-11 evidence-blocked checkpoint** (base `main` `3e1a7fd9d28db65221c123960a0c85b62d93949a`; platform-assigned branch `arena/c4b63a26-waterjet-sentinel-suite`; index and worktree clean; no conflicting open PR; workbook SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` re-verified before and after every read, unchanged). The standing sandbox recreation protocol was **not triggered**.
 - **Received and integrity-verified the Baseline REV1 evidence** via `OWNER_GOOGLE_DRIVE_CONNECTOR` (delivery recorded without links, IDs or tokens): `WJSS_TC_EVIDENCE_BASELINE_REV1.zip`, exactly 17345849 bytes, SHA-256 `7B886950D7F5F665416241E4CB502CD1A5787E3581788C799077C062786AA23E`, ZIP-signed, 4 listable members, per-member SHA-256 recorded (drawing `08db6f2a…1d6b98`, 750-498 `ed66534d…1fe83`, 750-362 `85e72f83…27bb`, 750-600 `c390260c…04b46`; full hashes in the source register TCEV-17 … TCEV-20). Safe extraction with traversal/symlink/encryption guards; **ephemeral bytes removed after review; the archive and evidence PDFs are not committed**.
@@ -265,7 +429,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Hardware loop test NOT EXECUTED. NO live MODBUS communication implemented. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. No device write or control. No physical Sensor tested. **PR #18 OPEN — NOT MERGED (do not merge).**
 - Record: [TC_DRAWING_ISSUE_REGISTER_REV1.md](docs/TC_DRAWING_ISSUE_REGISTER_REV1.md) §7, [TC_EVIDENCE_SOURCE_REGISTER.md](docs/TC_EVIDENCE_SOURCE_REGISTER.md) §13 and [docs/evidence/](docs/evidence/tc-schedule-validation-rev1.md).
 
-## 2026-10-11 — Stage 0.4C-0B: Six-Node Thermocouple Topology Baseline Rev1 (development checkpoint, documentation only; evidence-blocked on drawings and manuals)
+#### 2026-10-11 — Stage 0.4C-0B: Six-Node Thermocouple Topology Baseline Rev1 (development checkpoint, documentation only; evidence-blocked on drawings and manuals)
 
 - **New session after PR #17 MERGED** (merge commit `3e1a7fd9d28db65221c123960a0c85b62d93949a`; parents `bd1437586af73a33d43dfafce27b27538183a283` and `48d8605a4d687f509edf079f2d371319d6bffa21`, verified by `git cat-file -p` in order, with a read-only ancestry fetch proving both parents resolve; PR #17 MERGED at `2026-10-11T08:59:28Z`). Platform-assigned branch `arena/c4b63a26-waterjet-sentinel-suite`, starting exactly at `3e1a7fd9…`. Base gate PASSED: remote `main` exact match, index and worktree clean, no conflicting open PR, workbook SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` re-verified and unchanged (16648 bytes). **The standing sandbox recreation protocol was not triggered** — no ref recovery, index reload or destructive Git operation was needed or used. The merged PR #17 branch `arena/1cfd7e20-waterjet-sentinel-suite` was not used, continued or pushed.
 - **Recorded the Owner-confirmed six-node TC topology baseline rev1 as brief-stated design basis** (6 nodes × `750-362 × 1 + 750-498 × 5 + 750-600 × 1`; 750-362 × 6, 750-498 × 30, 750-600 × 6, 6 endpoints; capacity 240 physical / 212 required / 28 remaining Channels, arithmetic recomputed not copied; `OWNER_CONFIRMED_FACTORY_DEFAULT` basis; TEST ONLY IPs `192.0.2.11`–`192.0.2.16`; proposed IP-independent identities `TC-NODE-*` / `TC-MODULE-*` / `TC-CHANNEL-*`). **Nothing in the baseline is drawing-verified or hardware-verified.** The 28 remaining Channels stay unscheduled, not commissioned spares.
@@ -282,7 +446,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Hardware loop test NOT EXECUTED. NO live MODBUS communication implemented. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. No device write or control. No physical Sensor tested. **NEW PR OPEN — NOT MERGED.**
 - Record: [STAGE_0.4C-0B_CHECKPOINT.md](docs/STAGE_0.4C-0B_CHECKPOINT.md), [TC_DRAWING_ISSUE_REGISTER_REV1.md](docs/TC_DRAWING_ISSUE_REGISTER_REV1.md) and [TC_EVIDENCE_SOURCE_REGISTER.md](docs/TC_EVIDENCE_SOURCE_REGISTER.md).
 
-## 2026-10-10 — Stage 0.4C-0A: Physical Temperature Acquisition Evidence Intake and Commissioning Source Register (development checkpoint, documentation only)
+#### 2026-10-10 — Stage 0.4C-0A: Physical Temperature Acquisition Evidence Intake and Commissioning Source Register (development checkpoint, documentation only)
 
 - **New session after PR #16 MERGED** (merge commit `bd1437586af73a33d43dfafce27b27538183a283`; parents `29ee137c1df617a1aa3321c3c891161d5a5bb41a` and `8ba8d89492bffe6849b77ab135c6e434a48b31f5`, verified by `git cat-file -p`; PR #16 MERGED at `2026-10-10T19:37:37Z`). Platform-assigned branch `arena/1cfd7e20-waterjet-sentinel-suite`, starting exactly at `bd143758…`. Base gate PASSED: remote `main` exact match, index and worktree clean, no conflicting open PR, workbook SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` re-verified and unchanged. **The standing sandbox recreation protocol was not triggered** — no ref recovery, index reload or destructive Git operation was needed or used. The merged PR #16 branch `arena/fecda529-waterjet-sentinel-suite` was not used, continued or pushed.
 - **Added `docs/TC_EVIDENCE_SOURCE_REGISTER.md`** — the physical TC evidence source register. Six intake categories (A physical hardware identity, B module/device topology, C Sensor-to-Channel mapping, D thermocouple configuration, E transport and process representation, F provenance), nine evidence states, seven verification scopes, and a binding **non-propagation rule** (a fact verified for one Channel never propagates to another Channel, module or model; a `PARTIAL_SCREENSHOT` never establishes `COMPLETE_RACK`). **Every acquisition field in categories A–E is `NOT_PROVIDED`.** Provenance ledger TCEV-01 to TCEV-11 holds one verified item (the workbook) and ten `NOT_PROVIDED` requests. **No SHA-256 was invented** for evidence absent from the sandbox. No candidate hardware family is listed as favoured, because no evidence distinguishes them.
@@ -301,7 +465,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Wire-break decoding NOT IMPLEMENTED. Sensor commissioning monitor NOT IMPLEMENTED. Actual process-image offsets NOT VERIFIED. NO MODBUS. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. No device write or control. No physical Sensor tested. **NEW PR OPEN — NOT MERGED.**
 - Record: [STAGE_0.4C-0A_CHECKPOINT.md](docs/STAGE_0.4C-0A_CHECKPOINT.md) and [TC_EVIDENCE_SOURCE_REGISTER.md](docs/TC_EVIDENCE_SOURCE_REGISTER.md).
 
-## 2026-10-10 — Stage 0.4C-0: Owner decisions resolved (documentation only; successor to checkpoint `4babdce`)
+#### 2026-10-10 — Stage 0.4C-0: Owner decisions resolved (documentation only; successor to checkpoint `4babdce`)
 
 - **Successor commit** `docs: resolve Stage 0.4C-0 owner decisions` on the same branch and the same open **PR #16**. Base `main` `29ee137c1df617a1aa3321c3c891161d5a5bb41a` (PR #15 MERGED). No second branch or PR. Not merged.
 - **Owner decisions OQ-01 to OQ-08 recorded** in `docs/STAGE_0.4C-0_CHECKPOINT.md` §0.1: TC gap confirmed (`TC_ACQUISITION_TOPOLOGY: NOT_PROVIDED`, `SENSOR_TO_TC_CHANNEL_SCHEDULE: NOT_PROVIDED`, `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED`); two separate domains (Process Instrument and Temperature Sensor); AI-003 remains Pump Outlet Pressure; `Quality` unchanged with separate `DiagnosticReason` and `CommissioningState`; pilot roles only; timing values `CONFIGURABLE / OWNER_INPUT_PENDING`; Sensor verdict rules; procedure and approval roles.
@@ -312,7 +476,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Changed:** `docs/STAGE_0.4C-0_CHECKPOINT.md`, `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`, `CHANGELOG.md`, `README.md`. **Unchanged:** Product source, tests, workbook, dependencies, lock files, fixtures, configuration, Runtime, Mapping implementation, Galil and MODBUS code.
 - Record: [STAGE_0.4C-0_CHECKPOINT.md](docs/STAGE_0.4C-0_CHECKPOINT.md).
 
-## 2026-10-10 — Stage 0.4C-0: Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (development checkpoint, documentation only)
+#### 2026-10-10 — Stage 0.4C-0: Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (development checkpoint, documentation only)
 
 - New session after **PR #15 MERGED** (merge commit `29ee137c1df617a1aa3321c3c891161d5a5bb41a`; parents `3a73dfce1d2c7c1dc4d3b0274ea10f97406088f6` and `8b479772d4fbef63b8f8eb34f59a1f2eba69618e`, verified). Branch `arena/fecda529-waterjet-sentinel-suite`. Workbook unchanged (SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`).
 - **STOP-1 recorded (CF-01).** The authoritative workbook lists 23 rack modules and no thermocouple input module, while the product model requires 212 thermocouple Channels for 106 Sensors. No module, TC type or Sensor-to-Channel mapping was invented. Thermocouple Channel binding, pilot and rollout are **BLOCKED**; Stage 0.4C-1 is **PROPOSED and BLOCKED**.
@@ -323,7 +487,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Sensor commissioning monitor NOT IMPLEMENTED. Actual process-image offsets NOT VERIFIED. AI-002 Runtime publication NOT IMPLEMENTED. NO MODBUS. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. No device write or control. No physical Sensor tested. Documentation-only: no executable test was run or changed. **PR open — NOT MERGED.**
 - Record: [STAGE_0.4C-0_CHECKPOINT.md](docs/STAGE_0.4C-0_CHECKPOINT.md).
 
-## 2026-10-10 — Stage 0.4B-3 documentation truth alignment (documentation only; review-correction on PR #15)
+#### 2026-10-10 — Stage 0.4B-3 documentation truth alignment (documentation only; review-correction on PR #15)
 
 - **Documentation-only review-correction** on the same branch and the same open **PR #15** — one narrow commit. **No Product source, workbook, test, package manifest, lock file, solution or project file was changed.** Checkpoint under review `abe7e023eb7b5e3f976d8fbc5c9a5b17079058ed`; base `main` `3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6` (**PR #14 MERGED**).
 - **README current status corrected.** The obsolete Stage 0.3A-1 / PR #4 status block is replaced by the Stage 0.4B-3 position: base `3a73dfce…`, checkpoint `abe7e02…`, **PR #14 MERGED**, **PR #15 OPEN — NOT MERGED**, Mapping **268/268** with the authoritative workbook, Mapping UI **82/82**, boundary **S1–S9 clean**, **Owner Browser Review PASSED**, candidate stays `CANDIDATE_UNVERIFIED`, offsets unresolved, AI-002 not implemented, no MODBUS / TEST_HARDWARE / PRODUCTION / device write or control. Stage 0.3A-1 is preserved as history with its PR #4 merge commit `bdf7f8f2`.
@@ -332,7 +496,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Unresolved facts stay explicit:** candidate process-image information remains **`CANDIDATE_UNVERIFIED`** and not authoritative; every byte / word / bit offset remains **null / `OFFSET_UNRESOLVED`**; no address is marked verified; the actual Process Data image and the head-station field-network mapping are **NOT PROVIDED** (evidence requests A–E remain open); AI-002 Runtime publication **NOT IMPLEMENTED**; **NO MODBUS, NO TEST_HARDWARE, NO PRODUCTION, no device write or control**.
 - **Arena re-validation at this correction:** Mapping package check PASS; Mapping package **268 tests — 261 pass / 0 fail / 7 pre-existing Owner-local skips** without the workbook and **268 / 268 / 0 / 0** with the SHA-verified workbook copy outside the repository; Mapping UI check PASS and **82 / 82**; boundary scan **0 findings (S1–S9 clean)**, exit 0; workbook SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` unchanged. **No .NET file was touched, so no .NET result is claimed.**
 
-## 2026-10-10 — Stage 0.4B-3: primary manufacturer evidence ingestion and read-only process-image preview (development checkpoint)
+#### 2026-10-10 — Stage 0.4B-3: primary manufacturer evidence ingestion and read-only process-image preview (development checkpoint)
 
 - New session after merged PR #14, branch `arena/00483ae4-waterjet-sentinel-suite`, base `main` `3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6` (PR #14 merge commit; parents `dbbf34cf` and `a811f6ff` both proven ancestors). Workbook unchanged (SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`).
 - **Module-role correction (Owner ruling).** 750-601 `POWER_SUPPLY`, 750-613 `SYSTEM_POWER_SUPPLY`, 750-600 `END_MODULE` and the 750-362 head station contribute **no** Application Process I/O data: no ProcessModulePosition, no ProcessImageOrder, no Input or Output width, `AddressStatus NOT_APPLICABLE` with `AddressReason NON_PROCESS_DATA_MODULE`. They are no longer reported anywhere as `ADDRESS_UNRESOLVED`, and rack validation no longer claims a Power Supply address stays unresolved.
@@ -345,7 +509,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - AI-002 Runtime publication NOT IMPLEMENTED. CANDIDATE ADDRESSES ARE NOT AUTHORITATIVE. ACTUAL PROCESS DATA AND FIELD-NETWORK MAPPING NOT VERIFIED. NO MODBUS. NO TEST_HARDWARE. NO PRODUCTION. No device write or control. PR OPEN - NOT MERGED.
 - Record: [STAGE_0.4B-3_CHECKPOINT.md](docs/STAGE_0.4B-3_CHECKPOINT.md).
 
-## 2026-10-10 — Stage 0.4B-2: Owner browser review, final narrow corrections and final source review (documentation only)
+#### 2026-10-10 — Stage 0.4B-2: Owner browser review, final narrow corrections and final source review (documentation only)
 
 - **Owner Browser Review: PASS WITH NON-BLOCKING PUNCHLIST** (Owner-reported; not run in Arena). Carry-forward only: slightly larger Comfortable table text; improved filter-toolbar grouping; expandable Evidence summary rows.
 - Corrections on PR #14: Stage subtitle now `Stage 0.4B-2 · Evidence and read-only mapping review` and header comment (`38742ba`); missing-evidence profile note made stage-neutral, `No primary manufacturer process-image evidence has been reviewed for this model.` (`fe38322`; `ModuleProfileRevision` changes as the expected consequence).
@@ -353,7 +517,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - PRIMARY MANUFACTURER PROCESS-IMAGE EVIDENCE NOT PROVIDED; real profiles remain incomplete; addresses remain ADDRESS_UNRESOLVED. No MODBUS; TEST_HARDWARE NOT AUTHORIZED; PRODUCTION NOT AUTHORIZED. PR #14 OPEN - NOT MERGED.
 - Record: [STAGE_0.4B-2_CHECKPOINT.md](docs/STAGE_0.4B-2_CHECKPOINT.md).
 
-## 2026-10-10 — Stage 0.4B-2 Verified Process-Image Evidence Foundation and Mapping UI Readability Refinement: development checkpoint
+#### 2026-10-10 — Stage 0.4B-2 Verified Process-Image Evidence Foundation and Mapping UI Readability Refinement: development checkpoint
 
 - New session, branch `arena/72d57c31-waterjet-sentinel-suite`, base `main` `dbbf34cfe49f4db6c524a675dadb8a24d5ef497f` (PR #12 merge). Workbook unchanged (SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`).
 - **Evidence foundation:** profile-driven evidence sets (head-station rules, module process-data profiles, status-byte, byte/word order, sources) wired into address derivation and revision fingerprints; states `NOT_PROVIDED`, `PROVIDED_UNVERIFIED`, `VERIFIED_PRIMARY_SOURCE`, `VERIFIED_IO_CHECK_EXPORT`, `CONFLICTING_EVIDENCE`, `INCOMPLETE_PROFILE`; four new unresolved reasons. No generic WAGO rule; no invented value. All eight module profiles remain INCOMPLETE; **every address remains ADDRESS_UNRESOLVED**. The SYNTHETIC TEST RULE exists in tests only.
@@ -363,7 +527,7 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - AI-002 Runtime publication NOT IMPLEMENTED; no MODBUS; TEST_HARDWARE NOT AUTHORIZED; PRODUCTION NOT AUTHORIZED; no device write or control. PR OPEN - NOT MERGED.
 - Record: [STAGE_0.4B-2_CHECKPOINT.md](docs/STAGE_0.4B-2_CHECKPOINT.md).
 
-## 2026-10-10 — Stage 0.4B-1 Mapping Configuration: Owner validation and final source review
+#### 2026-10-10 — Stage 0.4B-1 Mapping Configuration: Owner validation and final source review
 
 - **Validated code head `433189f9e489d7af6770e64c971585d99bf941ad`** (branch `arena/1b92c50a-waterjet-sentinel-suite`, base `a5540057` on `main`). PR #12 OPEN, NOT MERGED.
 - **Owner-local validation PASSED (Owner-reported, not executed by Arena):** Mapping 217/217; Mapping UI 56/56; boundary S1–S9 clean; PR-range `git diff --check` PASS. The authoritative workbook was used from an out-of-repository byte-identical copy with no seed. Arena re-ran the same commands at `433189f` and obtained the same totals; those are Arena results and are not claimed as the Owner's run.
@@ -374,18 +538,18 @@ PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED.**
 - **Stated scope:** AI-002 Runtime publication NOT IMPLEMENTED; addresses ADDRESS_UNRESOLVED; activation NOT READY; no MODBUS; TEST_HARDWARE NOT AUTHORIZED; PRODUCTION NOT AUTHORIZED; no device write or control. The workbook `T8_IO_Card_Mapping.xlsx` is unchanged (SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`).
 - Record: [STAGE_0.4B-1_CHECKPOINT.md](docs/STAGE_0.4B-1_CHECKPOINT.md#owner-validation-and-final-source-review-2026-10-10-documentation-closeout), [CURRENT_STATE.md](docs/CURRENT_STATE.md) §11.12 and §12.32, [MASTER_PLAN.md](docs/MASTER_PLAN.md) §3.4.
 
-## 2026-10-10 — Stage 0.4A CP-3c-2 / CP-4A Owner validation and final source review
+#### 2026-10-10 — Stage 0.4A CP-3c-2 / CP-4A Owner validation and final source review
 
 - **Owner-locally validated** at exact code head `fd053fde07c96163b073fc9cb4c0383f31eafe3c` (not compiled or executed in Arena): cleared environment; locked restore PASS with no lock drift; Release build PASS with TreatWarningsAsErrors, 0 warnings / 0 errors; full .NET **414/414**; fixture parity **7/7**; TypeScript typecheck PASS and tests **34/34**; boundary scan **0 findings (S1–S9 clean)**; `git diff --check` PASS; no source drift and clean Owner-local tree. No artifact commit required.
 - Owner browser review **PASSED**: normal and Valve-close fault scenarios, independent Pump/paired-IVn pressure and thresholds, parallel Valve CLOSE then Axis RETURN, cumulative faults, qualified lower-limit completion, leak/not-fully-closed retention, read-only fault modal, blocked next dispatch, two FIFO Jobs sequentially without overlap, final empty Queue and completed Job 2, and truthful Pump control/readiness labels. Screenshots are Owner-observed, not Arena-executed. Static Final Source Review: **PASSED, no blocking defect**. See [checkpoint](docs/STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md).
 - **NON-BLOCKING UI CONTEXT-LABEL PUNCHLIST:** future wording should distinguish Current Active Job from last released Job outcome and Valve-close resolution; not implemented in this closeout. CP-4 full UI refinement is not delivered. No operator control, device command/write path or MODBUS; TEST_HARDWARE and PRODUCTION not authorized. PR #11 **READY FOR OWNER MERGE REVIEW — OPEN, NOT MERGED**. The dated development/pending entry below is superseded as a current-status statement.
 
-## 2026-10-09 — Stage 0.4A CP-3c-2 / CP-4A fast-track development checkpoint
+#### 2026-10-09 — Stage 0.4A CP-3c-2 / CP-4A fast-track development checkpoint
 
 - Owner-authorized SIMULATOR scenario startup, single-writer atomic State/Delta host composition and existing GET-only observation; minimal read-only Inspector sequencing display. No device access, writes, SSE or contract changes.
 - Arena static boundary scan and JS/TypeScript checks passed; .NET SDK unavailable in Arena, so Owner-local Release build, tests, fixture parity and manual observation are **pending**. See [checkpoint](docs/STAGE_0.4A_CP-3C-2_CP-4A_CHECKPOINT.md). PR open, not merged; CP-4 full UI not authorized.
 
-# Changelog
+### Changelog
 
 All notable changes to this repository are recorded in this file.
 
@@ -403,7 +567,7 @@ evidence is authoritative for the checkpoint.**
 
 ---
 
-## Versioning position
+#### Versioning position
 
 - **No application version exists.** The application version is **NOT ESTABLISHED**. No
   runtime release has been built, packaged, or delivered.
@@ -416,16 +580,16 @@ evidence is authoritative for the checkpoint.**
 
 ---
 
-## [Unreleased]
+#### [Unreleased]
 
-### Stage 0.4A CP-3c-1 — Owner-local validation and Final Source Review (documentation-only, 2026-10-09)
+##### Stage 0.4A CP-3c-1 — Owner-local validation and Final Source Review (documentation-only, 2026-10-09)
 
 - Owner-reported validation at code head `29f133ce6598bc2eb489273a2f2d40f8827deb5f` (.NET SDK 10.0.401; not run in Arena): locked restore PASS, lock drift NONE; Release build PASS, 0 warnings, 0 errors; RuntimePublicationTests **20/20**, Runtime.Core **450/450**, full .NET **572/572**, fixture parity **7/7**, TypeScript typecheck PASS and tests **31/31** (0 failed); boundary scan **0 findings, S1–S9 clean**; `git diff --check` PASS; final Owner-local working tree CLEAN. Failed 0, skipped 0 in each reported .NET suite; no Owner-local artifact commit required.
 - Final Source Review (static, exact validated code head): **PASS, no blocking defect**. CP-3c-1 delivers the library-only atomic State/Delta publication aggregate with one writer, bounded contiguous history and detached reader/result snapshots. The full-window trend failure was fixed by checking equal-count *unchanged content* before testing the exact oldest-eviction-plus-append shift. The internal-Delta JSON fingerprint failure was a test defect: fingerprints now serialize `ProjectWire(delta)` and previous Sensors, never raw `RuntimeDelta`. The reader-facing mutable `TrendPoint.Series` alias was corrected with a defensive-copy reader boundary and nested typed freeze, without changing the contract. Analyzer corrections CA1861 and xUnit1031 are closed at the validated code head. No Host integration, Runtime API integration, Inspector change, contract, fixture or TypeScript change is included. CP-3c-2 and CP-4 are NOT AUTHORIZED; TEST_HARDWARE and PRODUCTION device access are NOT AUTHORIZED. PR #10 remains OPEN, NOT MERGED, for Owner merge review.
 - Earlier CP-3c-1 development/pending wording below is dated history, superseded by this validation record.
 
 
-### Stage 0.4A CP-3a / CP-3b — Owner-local validation and Final Source Review (documentation only, 2026-10-09)
+##### Stage 0.4A CP-3a / CP-3b — Owner-local validation and Final Source Review (documentation only, 2026-10-09)
 
 - Owner-local validation reported PASS on `a315e90be28fb5e9662c6a7179587c992273cb88` (Owner-reported; not reproduced in Arena): Release build 0 warnings and 0 errors; full .NET 552/552; focused Runtime.Core 430/430; Retention and Projection 131/131; direct Valve-retention regression 1/1; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean.
 - Valve feedback retention defect closed (`fix(runtime): retain only observed valve feedback`): only the valve observation record is retained as the valve identity, not the preparation context record or the Safe Return step record.
@@ -433,7 +597,7 @@ evidence is authoritative for the checkpoint.**
 - Documentation corrections: the CP-3 UNCHANGED list omitted the FU-1 change to `SequencingStateValidator.cs`; the Safe Return vocabulary conflict is disclosed; superseded status wording is annotated and not erased.
 - CP-3c and CP-4 NOT AUTHORIZED. PR #9 OPEN, NOT MERGED. This entry changes documentation only.
 
-### Stage 0.4A CP-3a / CP-3b — completion correction (Owner-authorized; NOT compiled or executed in Arena; NOT VALIDATED until Owner-local gates pass; not merged)
+##### Stage 0.4A CP-3a / CP-3b — completion correction (Owner-authorized; NOT compiled or executed in Arena; NOT VALIDATED until Owner-local gates pass; not merged)
 
 *Superseded 2026-10-09 by the validation entry above; retained as dated evidence.*
 
@@ -441,14 +605,14 @@ evidence is authoritative for the checkpoint.**
 - CP-3b (simulator library, no host wiring): the scenario catalogue is bound to the canonical Runtime Sensor set. Five-scope bounded retention: evidence log of 256, current-Job Safe Return tail of 16, last dispatch, last Job outcome, first critical. Pure projection of the GlobalQueue, Sensor queue state, Active Job, Safe Return, Sequence, critical event and last Job outcome. The Delta candidate path carries one appended trend point and refuses other trend changes. Planned tests: 236 cases in `tests/runtime.tests/Simulator/`.
 - Owner-local validation required (Release build with 0 warnings, full .NET suite, fixture parity, TypeScript, boundary scan). CP-3c and CP-4 NOT AUTHORIZED. Not merged.
 
-### Stage 0.4A CP-2 — Owner-local validation and Final Source Review (documentation only, 2026-10-08)
+##### Stage 0.4A CP-2 — Owner-local validation and Final Source Review (documentation only, 2026-10-08)
 
 - **OWNER-LOCALLY VALIDATED** at validated head `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c` (Owner-reported; Arena did not run the toolchain). .NET SDK 10.0.401; xUnit runtime .NET 10.0.12; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests **300 total / 300 passed / 0 failed / 0 skipped** (CP-1 validated suite 253 + CP-2 new facts 47); fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan 0 findings (S1–S9 clean); `git diff --check` PASS; final Owner-local working tree CLEAN. No Owner-local artifact commit was required.
 - **CP-2 Final Source Review (read-only, Arena): PASSED.** No blocking defect. Non-blocking follow-ups are recorded in `docs/STAGE_0.4A_CP-2_CHECKPOINT.md` §19. Source and tests were not changed by this review.
 - **F2 (one evidence sequence): PASSED.** **F3 (release under the critical latch): PASSED**, matching the approved behaviour exactly. **EXPECTED_STOP during CLEANING: PASSED** as a refusal that changes no Job lifecycle, water state, Queue or QueueRevision, and does not set the latch. Owner ruling O-3 remains open for confirmation.
 - PR #8 remains OPEN and NOT MERGED. **CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 
-### Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel (source authored; NOT compiled or executed in Arena; PR open, not merged)
+##### Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel (source authored; NOT compiled or executed in Arena; PR open, not merged)
 
 - **Owner-authorized CP-2 scope** recorded in `docs/MASTER_PLAN.md` §3.3.2 (`ef51bd8`).
 - **Kernel** (`packages/application/Runtime/Sequencing/**`, `6b94508`): one Active Job with a lifecycle (accepted `JobLifecycle` names), abstract Pump classification (READY, EXPECTED_STOP, UNEXPECTED_STOP, TRIP), Mandatory Safe Return in the Owner order (SR1 to SR7), abstract Isolation Valve and Axis feedback, and outcome recorded only after Safe Return is verified. Safe Return failure retains the Job with RECOVERY_REQUIRED evidence. The external `SafeReturnReleaseEvidence` and `ReleaseActiveJob` input are removed; release is the kernel's own SR7. One evidence sequence.
@@ -456,7 +620,7 @@ evidence is authoritative for the checkpoint.**
 - **Contracts:** unchanged. No contract blocker.
 - Checkpoint report: `docs/STAGE_0.4A_CP-2_CHECKPOINT.md`. CP-3 and CP-4 NOT AUTHORIZED. Owner-local .NET validation REQUIRED.
 
-### Stage 0.4A CP-1 — Final evidence amendment, F1 closed, CP-1 Final Source Review passed (documentation only, 2026-10-08)
+##### Stage 0.4A CP-1 — Final evidence amendment, F1 closed, CP-1 Final Source Review passed (documentation only, 2026-10-08)
 
 - **OWNER-LOCALLY VALIDATED** at head `03144f43122bed2bd011b26886f663c2b46b79c4` (Owner-reported; Arena did not run the toolchain). .NET SDK 10.0.401; xUnit runtime .NET 10.0.12; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests 253/253 passed; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean; `git diff --check` PASS; working tree clean. No artifact commit was required.
 - **Correction chain:** `2cfe648` (CP-1) → `27c939e` (validation record) → `7b84824` (CP-2 scope gate proposal) → `23b276f` (`fix(runtime): enforce sequencing state integrity`) → `03144f4` (`fix(tests): use predicate assertion for public setters`, xUnit2029 analyzer correction, test-only).
@@ -464,13 +628,13 @@ evidence is authoritative for the checkpoint.**
 - **CP-1 Final Source Review: PASSED.** Carried forward as CP-2 preconditions, not CP-1 blockers: F2 (single evidence sequence) and F3 (release accepted under the critical latch, consistent with the approved CP-2 interpretation).
 - **Status:** CP-2 scope gate PROPOSED ONLY (prerequisite F1 corrected and validated). CP-2, CP-3 and CP-4 NOT AUTHORIZED. PR #7 OPEN, NOT MERGED.
 
-### Stage 0.4A CP-0 / CP-1 — Owner-local validation recorded and CP-1 Final Source Review (documentation only, 2026-10-08)
+##### Stage 0.4A CP-0 / CP-1 — Owner-local validation recorded and CP-1 Final Source Review (documentation only, 2026-10-08)
 
 - **OWNER-LOCALLY VALIDATED** at feature head `2cfe648d512241d9fef459cd91c663b9780753f9` (CP-1; parent `1f76da8` = CP-0; base `909d028`). Owner-reported: .NET SDK 10.0.401; locked restore PASS with no drift; Release build 0 warnings / 0 errors; full .NET tests 217/217 passed; fixture parity 7/7; TypeScript typecheck PASS and tests 31/31; boundary scan S1–S9 clean; `git diff --check` PASS; working tree clean. No artifact commit was required.
 - **CP-1 Final Source Review (read-only):** no blocking public-boundary defect. FOLLOW-UP RECOMMENDED BEFORE MERGE for the public `SequencingState` constructor (a caller can bypass the critical latch or construct an over-capacity or inconsistent state; the kernel does not validate its input). CP-2 precondition: a single evidence sequence (the CP-1 release check currently compares a separate Safe Return sequence). No Runtime, API, Inspector, contract, schema or fixture change.
 - The Stage 0.4A CP-2 scope gate is **proposed** (MASTER_PLAN §3.3.1). CP-2, CP-3 and CP-4 are NOT AUTHORIZED. PR #7 remains OPEN and NOT MERGED.
 
-### Stage 0.4A CP-0 — Status and ADR reconciliation for Stage 0.4A sequencing (documentation only, 2026-10-08)
+##### Stage 0.4A CP-0 — Status and ADR reconciliation for Stage 0.4A sequencing (documentation only, 2026-10-08)
 
 - Recorded that PR #5 (merge `a74db62`) and PR #6 (merge `909d028`, the Stage 0.4A approved base) are
   MERGED to `main`, and that Stage 0.3A-3 is COMPLETE. Superseded the stale "PR OPEN", "Checkpoint C NOT
@@ -482,7 +646,7 @@ evidence is authoritative for the checkpoint.**
   or schema change. CP-2, CP-3 and CP-4 are NOT AUTHORIZED.
 - Source authored in Arena; NOT COMPILED IN ARENA; NOT EXECUTED IN ARENA.
 
-### Stage 0.3A-3 Checkpoint A — Equipment topology decision and legacy parameter migration specification (planning only)
+##### Stage 0.3A-3 Checkpoint A — Equipment topology decision and legacy parameter migration specification (planning only)
 
 Owner-authorized Checkpoint A (planning / decision / specification only) on verified
 remote-main base `a74db62c4a7d4d8d5d2185cfe77a4c0229b01fce` (PR #5 foundation). New
@@ -543,7 +707,7 @@ strengthened (never committed or copied; synthetic public-safe test rows only). 
 restores the first-review §11 importer-behaviour text that had failed to persist in commit
 `3dac1a0c`. Checkpoint B remains NOT STARTED.
 
-### Stage 0.3A-3 Checkpoint B — implemented (Arena-authored; NOT compiled/executed in Arena)
+##### Stage 0.3A-3 Checkpoint B — implemented (Arena-authored; NOT compiled/executed in Arena)
 
 **Checkpoint A final Owner review: PASS. ADR-0017: OWNER APPROVED (explicit Owner
 acceptance decision, 2026-10-08). Checkpoint B: AUTHORIZED and implemented on PR #6.**
@@ -622,7 +786,7 @@ The Owner's genuine lock refresh `0728df61f917ba61f6dd3b8bf6d12e68dfa01d20` (par
 adopted byte-for-byte. Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_B.md`](docs/STAGE_0.3A-3_CHECKPOINT_B.md).
 Checkpoint C remains NOT AUTHORIZED and NOT STARTED; PR #6 OPEN — NOT MERGED.
 
-### Stage 0.3A-3 Checkpoint C — implemented (Arena-authored; NOT compiled/executed in Arena)
+##### Stage 0.3A-3 Checkpoint C — implemented (Arena-authored; NOT compiled/executed in Arena)
 
 **Owner instruction 2026-10-08: Checkpoint C AUTHORIZED FOR IMPLEMENTATION on the existing
 PR #6 branch (required head `0c3dcea`, verified). Checkpoint C: implemented in three slices
@@ -680,7 +844,7 @@ Inspector commit). PR #6 remains OPEN — NOT MERGED.**
 
 Full record: [`docs/STAGE_0.3A-3_CHECKPOINT_C.md`](docs/STAGE_0.3A-3_CHECKPOINT_C.md).
 
-### Stage 0.3A-3 Checkpoint C — Owner-local validation recorded
+##### Stage 0.3A-3 Checkpoint C — Owner-local validation recorded
 
 **Stage 0.3A-3 CHECKPOINT C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-08) — Function
 Review PASSED, Logic Review PASSED, Inspector UI/UX Review PASSED (no critical UI blocker);
@@ -705,7 +869,7 @@ Historical failed build/test observations before the correction chain are not ac
 evidence. Full record:
 [`docs/STAGE_0.3A-3_CHECKPOINT_C.md`](docs/STAGE_0.3A-3_CHECKPOINT_C.md) §16.
 
-### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
+##### Stage 0.3A-2A Checkpoint C — Owner-local validation recorded
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07)** at the genuine lock-refresh
 commit `faa79145a925832baa2ac8685f7fecf7a093552d` (`chore: refresh Checkpoint C project locks`; parent `e6a5a6c`, the Inspector
@@ -727,7 +891,7 @@ layout hotfix). Arena executed no .NET command; this evidence is authoritative.
 
 PR #5 remains **OPEN — NOT MERGED**; `TEST_HARDWARE` and `PRODUCTION` remain **NOT AUTHORIZED**.
 
-### Stage 0.3A-2A Checkpoint C — read-only Runtime API and development Runtime Inspector (source authored in Arena)
+##### Stage 0.3A-2A Checkpoint C — read-only Runtime API and development Runtime Inspector (source authored in Arena)
 
 **SOURCE AUTHORED IN ARENA; NOT COMPILED and NOT EXECUTED there.** Owner-local validation has
 since been recorded in the entry above: at the lock-refresh commit the delivered sources build
@@ -764,7 +928,7 @@ build, xUnit execution of these tests), the Inspector browser behaviour and layo
 `tests/api.tests/packages.lock.json`) — genuine restore output, committed as `faa79145`, never
 hand-edited. Arena still executed nothing itself.
 
-### Stage 0.3A-2A Checkpoint B — Owner-local validation recorded
+##### Stage 0.3A-2A Checkpoint B — Owner-local validation recorded
 
 **STAGE 0.3A-2A CHECKPOINT B OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07).** Validated
 head `cfa6d4a376bbf10a87db2349045cb6b9b57bb544` (the consolidated correction of the Checkpoint B
@@ -800,7 +964,7 @@ NOT MERGED.** **Checkpoint C (read-only Runtime API + development Runtime Inspec
 OWNER-AUTHORIZED**; TEST_HARDWARE and PRODUCTION remain **NOT AUTHORIZED**. Arena ran no .NET
 command of its own and claims no compile or test result.
 
-### Stage 0.3A-2A Checkpoint B — Deterministic synthetic evolution and Snapshot/Delta foundation (`feat(runtime): add deterministic synthetic evolution and snapshot/delta foundation`)
+##### Stage 0.3A-2A Checkpoint B — Deterministic synthetic evolution and Snapshot/Delta foundation (`feat(runtime): add deterministic synthetic evolution and snapshot/delta foundation`)
 
 **Source-only checkpoint (Arena authored; NOT COMPILED and NOT EXECUTED in Arena).** Under the
 Owner's 2026-10-07 instruction, Checkpoint B continues the Owner-locally validated Checkpoint A
@@ -856,7 +1020,7 @@ NOT VERIFIED
 - Every .NET claim: Arena ran no restore, build or test. Owner-local validation per runbook §13
   remains the validation of record. Checkpoint C is not started and stays NOT AUTHORIZED.
 
-### Stage 0.3A-2A Checkpoint A — Owner-local validation recorded (documentation-only closeout)
+##### Stage 0.3A-2A Checkpoint A — Owner-local validation recorded (documentation-only closeout)
 
 **STAGE 0.3A-2A CHECKPOINT A OWNER-LOCALLY VALIDATED (Owner-reported, 2026-10-07).**
 Validated feature head `a512aa76c4b2d7633d2a83b10c523c318b3a420e`; genuine lock-refresh commit
@@ -887,7 +1051,7 @@ Snapshot/Delta foundation) is now **AUTHORIZED**; Checkpoint C remains **NOT AUT
 TEST_HARDWARE and PRODUCTION device access remain **NOT AUTHORIZED**. Arena ran no .NET command
 of its own and claims no compile or test result.
 
-### Stage 0.3A-2A — Runtime State Foundation, Checkpoint A (`feat: add runtime state store and deterministic simulator initial state`)
+##### Stage 0.3A-2A — Runtime State Foundation, Checkpoint A (`feat: add runtime state store and deterministic simulator initial state`)
 
 **Source-only checkpoint (Arena authored; NOT COMPILED and NOT EXECUTED in Arena).** Under the
 Owner's 2026-10-07 instruction, Stage 0.3A-2 is delivered in three checkpoints (A → B → C) on
@@ -936,7 +1100,7 @@ Release build, xUnit run), the `tests/runtime.tests/packages.lock.json` refresh 
 new simulator project reference (real Owner-local restore only — never hand-edited), and
 Checkpoints B and C (not started). Owner-local validation: runbook §12.
 
-### Stage 0.3A-1 — Final Owner-Local Evidence Closeout (`chore: close Stage 0.3A-1 validation evidence`)
+##### Stage 0.3A-1 — Final Owner-Local Evidence Closeout (`chore: close Stage 0.3A-1 validation evidence`)
 
 **STAGE 0.3A-1 OWNER-LOCAL VALIDATION PASSED.** Owner-local at predecessor `685e056` /
 final test state `a9ef185` (2026-10-07): full Release build **PASS — 0 warnings, 0 errors**
@@ -1002,7 +1166,7 @@ decision to drop the remaining `fixtureStatus` marker, is an Owner call). Stage 
 **NOT AUTHORIZED**; Production device access **NOT AUTHORIZED**; `spikes/**` immutable
 (roll `101be71b…3fbc5` re-verified).
 
-### Stage 0.3A-1 — Round 6d cannon logical ordering test correction (`fix: order cannon assertions by logical position`)
+##### Stage 0.3A-1 — Round 6d cannon logical ordering test correction (`fix: order cannon assertions by logical position`)
 
 Owner-local at `39577e2` (2026-10-07): Release build **PASS 0/0**; fresh full suite
 **61 / 60 passed / 1 failed**; parity 7/7; boundary scan clean. The single failure was a
@@ -1027,7 +1191,7 @@ generator, TypeScript mirror, fixtures, examples, lock files and spikes: zero di
 Final Owner-local Release build + fresh full-suite rerun REQUIRED; no .NET/xUnit success
 claimed in Arena.
 
-### Stage 0.3A-1 — Round 6c structural JSON assertion correction (`fix: assert tc channel JSON shape structurally`)
+##### Stage 0.3A-1 — Round 6c structural JSON assertion correction (`fix: assert tc channel JSON shape structurally`)
 
 Owner-local state at `0b088ad` (2026-10-07): full Release build **PASS, 0 warnings / 0
 errors**; fresh full test run 61 total / 59 passed / 2 failed / 0 skipped. Both failures —
@@ -1064,7 +1228,7 @@ Owner-local final build + fresh full-suite rerun REQUIRED; no .NET build or xUni
 claimed in Arena (round-6c C# is compile-reviewed only, with its structural assertions
 mirrored green in Python against the committed example).
 
-### Stage 0.3A-1 — Round 6 Owner-local test correction (`fix: align config tests with tc channel arrays`)
+##### Stage 0.3A-1 — Round 6 Owner-local test correction (`fix: align config tests with tc channel arrays`)
 
 Owner-local result for round 6 (2026-10-07): the tcChannels structured-array contract is
 **accepted** — the .NET generator produced 108 slots / 106 sensors / 2 cannons, 106 sensors
@@ -1092,7 +1256,7 @@ source-only — contract, generator, fixtures, serializer, and package versions 
 Owner-local clean full Release build + fresh full-suite rerun REQUIRED after this correction;
 no .NET build or xUnit success is claimed in Arena.
 
-### Stage 0.3A-1 — Thermocouple channel contract shape correction (round 6)
+##### Stage 0.3A-1 — Thermocouple channel contract shape correction (round 6)
 
 Owner-local state (2026-10-07, rounds 3–5): after the two analyzer errors and the
 `TargetPath` environment root cause were cleared, the full solution Release build
@@ -1128,7 +1292,7 @@ comma-delimited string and its test asserted that by splitting the string.
   modified; spikes immutable (roll `101be71b…3fbc5`). C# sources compile-reviewed only:
   **not built in Arena**. Owner-local rerun of the full validation sequence REQUIRED.
 
-### Stage 0.3A-1 — Owner-local build & contract-test correction round 5
+##### Stage 0.3A-1 — Owner-local build & contract-test correction round 5
 
 **Test-run evidence recorded as NON-AUTHORITATIVE.** `dotnet test ... --no-build --no-restore`
 returned 49 / 42 pass / 7 fail / 0 skip, but the preceding full-solution Release build had
@@ -1165,7 +1329,7 @@ absent/object/null triple stands and `activeJobCleared` stays absent):
 `--no-build` against fresh assemblies; only then may parity/fixture status be judged. No .NET
 success is claimed anywhere in this entry.
 
-### Stage 0.3A-1 — Owner-local build correction round 4
+##### Stage 0.3A-1 — Owner-local build correction round 4
 
 With the external process `TargetPath` override gone, the Owner-local build reached **eleven
 projects compiling successfully**: `Wjss.Time`, `Wjss.Kiosk`, `Wjss.Contracts`,
@@ -1187,7 +1351,7 @@ absolute paths, no weakened assertions, no Product-project logic. **Full Owner-l
 build + test re-run still required** — eleven green compiles are Owner evidence, and the
 config test project plus every test execution await the rerun.
 
-### Stage 0.3A-1 — Owner-local build correction round 3
+##### Stage 0.3A-1 — Owner-local build correction round 3
 
 Root cause of the round-2 cascading `Wjss.Contracts` reference failures was identified as
 **local environment contamination**: a `TargetPath` variable defined in the Owner's active
@@ -1214,7 +1378,7 @@ ordering with exit codes 4/2/3, loopback binding, and the absence of suppression
 intact. **A full Owner-local Release build + test rerun is still required**; the generated
 lock-file set is untouched by this repository.
 
-### Stage 0.3A-1 — Owner-local compile correction (`fix: resolve Owner-local .NET compile blockers`)
+##### Stage 0.3A-1 — Owner-local compile correction (`fix: resolve Owner-local .NET compile blockers`)
 
 **First real .NET evidence.** The Owner ran
 `dotnet build .\WaterJetSentinelSuite.sln --configuration Release --no-restore` locally
@@ -1243,7 +1407,7 @@ source only:
   files. **A full Owner-local Release build + test re-run is required** — this correction fixes
   the two reported errors as reviewed source; nothing here proves the next build passes.
 
-### Stage 0.3A-1 — Source review correction (Owner findings A–E, same PR #4)
+##### Stage 0.3A-1 — Source review correction (Owner findings A–E, same PR #4)
 
 Independent Owner source review of `205456e` found five issues; corrected here as one
 review-correction commit on PR #4. **Still no .NET build claim.**
@@ -1284,7 +1448,7 @@ review-correction commit on PR #4. **Still no .NET build claim.**
   (lockfile untouched); boundary scan **0 findings (S1–S8)**; `spikes/**` sha256 roll
   unchanged; `git diff --check` clean.
 
-### Stage 0.3A-1 — Product foundation source checkpoint (authored in Arena; Owner-local validation PENDING)
+##### Stage 0.3A-1 — Product foundation source checkpoint (authored in Arena; Owner-local validation PENDING)
 
 **Gate:** Owner Option-C amended Stage 0.3A Scope Gate — source-checkpoint authority only.
 **Status: NOT READY FOR MERGE.** .NET build **NOT RUN IN ARENA** (SDK/NuGet endpoints blocked
@@ -1323,7 +1487,7 @@ in the sandbox); the mandatory pre-merge gate is
   behaviour, fixture regeneration by .NET, kiosk behaviour, anything hardware-related.
   **Authorized by nothing here:** 0.3A-2, merges, ZIP.
 
-### Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
+##### Stage 0.2.1A — React UI and Runtime Feasibility Spike (synthetic)
 
 **Scope and Coding Start Gate:** `[APPROVED]`
 **Implementation:** COMPLETE FOR DEVELOPMENT CHECKPOINT — **MERGED** (PR #3)
@@ -1344,7 +1508,7 @@ closeout entry below reflects the state at the time it was written.)
 **Main Development Scope Gate:** PENDING
 **Stage 0.3:** `[NOT AUTHORIZED]`
 
-#### Docs — Stage 0.2.1A closeout: Owner-local final review PASS, React selected (documentation only)
+###### Docs — Stage 0.2.1A closeout: Owner-local final review PASS, React selected (documentation only)
 
 - **Owner decision (2026-10-07)** on `114c0761`: Owner-local final Edge gate **PASS**; Owner manual
   review **PASS**; UI, synthetic AutoSequence controls, GlobalQueue presentation, critical Pump
@@ -1368,7 +1532,7 @@ closeout entry below reflects the state at the time it was written.)
   Owner (`d8d28201`), and Main Development coding began with the Stage 0.3A-1 source checkpoint
   recorded below.
 
-#### Fixed — Final spike closeout: explicit synthetic AutoSequence controls (synthetic review tooling)
+###### Fixed — Final spike closeout: explicit synthetic AutoSequence controls (synthetic review tooling)
 
 **SYNTHETIC REVIEW TOOLING — NOT THE PRODUCTION OPERATOR-CONTROL MODEL.** Production Pause /
 Resume, abort re-queue, Safe Return failure and reset authority remain OWNER DECISION REQUIRED.
@@ -1409,7 +1573,7 @@ Resume, abort re-queue, Safe Return failure and reset authority remain OWNER DEC
 - **Unchanged:** critical Pump / Mandatory Safe Return behaviour, modal, Google Sans, Water Jet
   slots, GlobalQueue cap 8, head-only dispatch, no status column, 106 / 212.
 
-#### Fixed — Critical Main Pump handling and Mandatory Safe Return (Owner critical Pump decision; synthetic)
+###### Fixed — Critical Main Pump handling and Mandatory Safe Return (Owner critical Pump decision; synthetic)
 
 **SYNTHETIC PROOF ONLY — PRODUCTION SAFETY NOT VERIFIED.** No physical Pump, relay, VFD, valve,
 axis, Galil program or interlock is involved; no safety certification is claimed; no Production
@@ -1472,7 +1636,7 @@ coordinates, addresses or protocols are used.
   Dependencies are unchanged. **NOT VERIFIED:** browser / Edge / WebView2 rendering, hardware,
   and Production safety.
 
-#### Fixed — GlobalQueue semantics correction and head-only synthetic dispatch (Owner domain correction)
+###### Fixed — GlobalQueue semantics correction and head-only synthetic dispatch (Owner domain correction)
 
 - **Recorded:** Owner-local Edge at `23f48daa`: 34 selected · 25 passed · 2 failed (`READ-A` G+205 value
   clipped; `WJ-A` assertion waited for `detail-id` after a non-selectable Water Jet slot) · 7 not run.
@@ -1516,7 +1680,7 @@ coordinates, addresses or protocols are used.
   0 FAIL; new S31 head-only dispatch, S32 bounded load); Playwright list 36 tests in 4 files (new
   `QUEUE-B`; `QUEUE-A`, `CTRL-A`, `CTRL-B`, `WJ-A` rewritten). Browser results **NOT VERIFIED** in Arena.
 
-#### Changed — Final Owner UI punchlist (Owner screenshot review of `4129687a`)
+###### Changed — Final Owner UI punchlist (Owner screenshot review of `4129687a`)
 
 - **Recorded:** Owner-local Edge E2E 25 / 25 PASS at `4129687a` (≈ 1.3 min). The second
   Owner-authorized atomic recovery restored the local branch to `4129687a` (identity proof 131 / 131).
@@ -1555,7 +1719,7 @@ coordinates, addresses or protocols are used.
   queue, S30 review presets; S22 scans browser-loadable sources only); Playwright list 35 tests in 4
   files (9 new Owner-local specs). Browser results are **NOT VERIFIED** in Arena.
 
-#### Changed — Operations readability refinement (Owner screenshot review)
+###### Changed — Operations readability refinement (Owner screenshot review)
 
 - **Stale test corrected:** the MAP E2E test asserted the pre-fullscreen Y-interval wall order;
   it now asserts positions relative to the compact centre summary (Rear above, Left left, Right
@@ -1585,7 +1749,7 @@ coordinates, addresses or protocols are used.
   clock with host sleep, ≈ 4 h likely active; invariant violations 0, accepted second Jobs 0,
   Historian rejections 0, 659 synthetic Jobs) — not a controlled benchmark.
 
-#### Changed — Fullscreen Operations UI refinement (Owner-approved Design Addendum)
+###### Changed — Fullscreen Operations UI refinement (Owner-approved Design Addendum)
 
 - Presentation-only refinement of the React feasibility Operations page for Windows 11, Edge F11,
   1920 × 1080, zoom 100 %: strict `100dvh` layout with no page-level scrolling; larger Sensor
@@ -1602,7 +1766,7 @@ coordinates, addresses or protocols are used.
   slots I7 / I16) and **DP-02** (`docs/ARCHITECTURE.md` §34 — final UI framework `[OPEN]`, route is
   React-first Stage 0.2.1A feasibility, Blazor counter-spike deferred behind a separate Scope Gate).
 
-#### Changed — Owner domain correction: 106-location Sensor map
+###### Changed — Owner domain correction: 106-location Sensor map
 
 - The Owner corrected the protected count from **104 / 208** to **106 Sensor locations / 212
   Thermocouple channels** (Left 24, Rear 29, Right 24, Front 29). It is a domain correction, not
@@ -1623,7 +1787,7 @@ coordinates, addresses or protocols are used.
   by the React-first Stage 0.2.1A spike. A Blazor counter-spike requires a future Owner Scope
   Gate.
 
-#### Added
+###### Added
 
 - **`spikes/ui-runtime-react/`** — removable synthetic feasibility spike: Node built-ins-only
   synthetic runtime harness (10 synthetic device sessions, serialized per device, bounded
@@ -1636,14 +1800,14 @@ coordinates, addresses or protocols are used.
   summaries, SBOM, licence inventory, and SHA-256 manifest. Raw results are not committed.
 - **`docs/spikes/stage-0.2.1a-plan.md`** and **`docs/spikes/stage-0.2.1a-results.md`**.
 
-#### Changed
+###### Changed
 
 - Stage status in `README.md`, `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`,
   `docs/ROADMAP.md`, `docs/decisions/README.md`, and ADR-0006 to ADR-0013: Stage 0.2 recorded as
   OWNER ACCEPTED / MERGED; ADRs ACCEPTED (not implemented); Stage 0.2.1A approved and in
   progress.
 
-#### Not changed / not verified
+###### Not changed / not verified
 
 - No Product directory (`apps/`, `packages/`, `adapters/`, `config/`), no .NET code, no SQL, no
   device access, no Production value. SSE is a spike transport only; Production transport
@@ -1651,7 +1815,7 @@ coordinates, addresses or protocols are used.
   browser rendering performance, Windows offline restore, and extended stability are
   **NOT VERIFIED**.
 
-### Stage 0.2 — Technology and Solution Architecture Decision
+##### Stage 0.2 — Technology and Solution Architecture Decision
 
 **Stage 0.2 Scope Gate:** `[APPROVED]`
 **Stage 0.2 architecture checkpoint:** OWNER ACCEPTED / MERGED — PR #2 (source checkpoint
@@ -1671,7 +1835,7 @@ script, migration, hardware adapter, simulator, test code, CI workflow, installe
 script, configuration file, package dependency, release archive, or runtime directory was
 created, and no device or database was contacted.** No dependency was installed.
 
-#### Added
+###### Added
 
 - **`docs/decisions/ADR-0006-ui-delivery-model.md`** — UI delivery model: application-owned
   full-screen kiosk shell, close guard, controlled navigation, static local assets in an
@@ -1743,7 +1907,7 @@ created, and no device or database was contacted.** No dependency was installed.
   `docs/HISTORIAN_RETENTION.md` section 8.1, `docs/QUEUE_MODEL.md` section 11.1,
   `docs/USER_PERMISSION_MODEL.md` section 7.1, and `docs/decisions/README.md`.
 
-#### Changed
+###### Changed
 
 - Stage-status wording across the repository now states one position: Stage 0.1 merged through
   PR #1; Stage 0.2 Scope Gate approved; Stage 0.2 architecture checkpoint submitted; review
@@ -1752,7 +1916,7 @@ created, and no device or database was contacted.** No dependency was installed.
   the forward-looking status of every document.
 - The Stage 0.1 status block in this file is retained as history and annotated as superseded.
 
-#### Unchanged
+###### Unchanged
 
 - Every protected decision is unchanged: one Boiler Unit per Workstation; Windows 11 Pro;
   English default with Thai contextual explanation; 104 Sensor locations; 208 Thermocouple
@@ -1768,7 +1932,7 @@ created, and no device or database was contacted.** No dependency was installed.
 - No schema, migration, SQL script, threshold, register map, tag list, coordinate, IP address,
   connection string, credential, or secret was added.
 
-#### Not verified
+###### Not verified
 
 - Nothing in Stage 0.2 was built, compiled, run, measured, installed, or connected. No
   hardware, database, simulator, kiosk, installer, or deployment behaviour was tested.
@@ -1778,7 +1942,7 @@ created, and no device or database was contacted.** No dependency was installed.
   policy, poll-group intervals, spike acceptance thresholds, and the site-specific
   invalid-value mapping remain `[OPEN]`.
 
-### Stage 0.1 review-correction checkpoint (documentation-only, superseded by Stage 0.2)
+##### Stage 0.1 review-correction checkpoint (documentation-only, superseded by Stage 0.2)
 
 The Owner-confirmed Stage 0.1 review punchlist was applied across the affected documentation.
 No application code,
@@ -1811,9 +1975,9 @@ No application code,
     from implementation acceptance; no application version; historian capacity conclusions
     removed as unsupported.
 
-## [Historical — documentation foundation candidate]
+#### [Historical — documentation foundation candidate]
 
-### Stage 0.1 — Repository Documentation Foundation
+##### Stage 0.1 — Repository Documentation Foundation
 
 **Stage 0.1 Scope Gate:** `[APPROVED]`
 **Stage 0.1 implementation:** MERGED to `main` through PR #1 (merge commit
@@ -1839,7 +2003,7 @@ baseline, the queue and control models, and the delivery plan. No application co
 scaffold, database schema, hardware adapter, CI workflow, production configuration, release
 package, or archive was created.
 
-### Added
+##### Added
 
 - Repository governance
   - `AGENTS.md` — working contract for automated and human contributors: authority
@@ -1883,14 +2047,14 @@ package, or archive was created.
   - `docs/decisions/ADR-0004-historian-strategy.md`
   - `docs/decisions/ADR-0005-hardware-safety-boundary.md`
 
-### Changed
+##### Changed
 
 - `README.md` — replaced the two-line placeholder with the repository entry point.
 - `.gitignore` — extended the existing Visual Studio template with repository-specific
   exclusions for local production configuration, secrets, and exported data, so that
   confidential deployment material stays outside the public repository.
 
-### Safety and scope notes for this entry
+##### Safety and scope notes for this entry
 
 - No production device access was performed. Production device access remains
   `[NOT AUTHORIZED]`.
