@@ -81,7 +81,7 @@ K6 validation evidence summary (Owner-local is authoritative; Agent/Arena had no
 | Default PHYSICAL_TEST attempt | refused with `PHYSICAL_CAPABILITY_DISABLED`; `acquisitionPerformed` false; `deploymentState` `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED` |
 | Node/static (Owner-local) | exporter 18/18; S2 14/14; S3 19/19; Boundary S1–S9 zero findings; Commissioning check PASS; Commissioning 218/218 on canonical LF; fixture parity verify-only 7/7; `WJSS_UPDATE_FIXTURES` false |
 | R40 disposition | initial Windows run 217/218 (LF vs CRLF only); canonical LF rerun 218/218; original fixture restored byte-for-byte; restored SHA-256 `CC3F45ADF43CED351F1E8AE0D17D06AEA181FD94D119126DF0659AAC3385DA80`; canonical LF SHA-256 observed earlier as `3BC8774CB74183080297BB89C3A855DB8E46782B421DF41AB955C1CA50A8256A` (**not recomputed in the same execution as the final 218/218 run — labeled limitation**) |
-| Agent/Arena | exporter 18/18; S2 14/14; S3 19/19; Boundary clean; Commissioning 218/218; JavaScript syntax and changed-path/protected-surface proofs; genuine locks unchanged; **no** C# build, analyzer, xUnit/.NET test, .NET fixture parity or physical execution |
+| Agent/Arena | exporter 18/18; S2 14/14; S3 19/19; Boundary clean; Commissioning 220/220 with the corrected documentation guard (218 pre-existing tests plus 2 authorized regression tests); JavaScript syntax and changed-path/protected-surface proofs; genuine locks unchanged; **no** C# build, analyzer, xUnit/.NET test, .NET fixture parity or physical execution |
 | Physical | none — no hardware contact, no passive capture, no port 502 access, no T01 execution |
 
 ## 4. Proposed Version Roadmap
