@@ -15,7 +15,13 @@
 
 ### 2026-10-15 — Local Modbus TCP Simulation configuration and execution path (post-K6; unreleased; PR OPEN, NOT MERGED)
 
-**Status: IMPLEMENTED ON BRANCH `arena/18760814-waterjet-sentinel-suite` (single commit, direct parent `f356b162214946058b42fe56fa13e5afc4c80539`); AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox); OWNER-LOCAL VALIDATION PENDING; MERGE NOT AUTHORIZED; K7 NOT AUTHORIZED.**
+**Status (updated 2026-10-15 after the correction commit): PR #25 OPEN — NOT MERGED. Implementation commit `25d34390daac70468ed22b426f9a5f2da3bd9a79` (direct parent `f356b162214946058b42fe56fa13e5afc4c80539`): OWNER-LOCAL AUTOMATED VALIDATION COMPLETED — locked restore PASS; targeted Release builds PASS; focused TC acquisition tests 109/109; full Solution Release build PASS; full .NET tests 564/564; dry-run no-I/O PASS; fixture parity 7/7; TC bench Node tests 19/19; S2 14/14; S3 19/19; boundary scan S1–S9 clean; worktree clean (Commissioning 219/220 at that commit — R40 line-ending representation only, corrected below). R40 correction commit `70558e03f99e33cde917f7b97aa2a2133e45234a` (direct parent `25d34390…`): AGENT-LOCAL AFFECTED VALIDATION — Commissioning 220/220; TC bench Node tests 19/19; boundary scan clean. OWNER-LOCAL AFFECTED-GATES RERUN ON THE FINAL PR HEAD — PENDING. OWNER-LOCAL EASYMODBUS LOCAL SIMULATION EXECUTION — NOT RUN. MERGE NOT AUTHORIZED; K7 NOT AUTHORIZED.**
+
+> Status-line note (2026-10-15): the earlier wording of the line above — `single commit`;
+> `AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox)`; `OWNER-LOCAL VALIDATION
+> PENDING` — described the position at the implementation commit before the Owner-local run and is
+> superseded by the status above. The dated body text of this entry is preserved unchanged; the
+> Agent still has not run any .NET command.
 
 Owner request: an application-owned way to run the existing TC Modbus TCP acquisition against a
 Modbus TCP simulator on the Owner workstation (loopback, port 502) without editing Source, without
