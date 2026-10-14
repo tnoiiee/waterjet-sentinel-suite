@@ -6,10 +6,10 @@
 >
 > - Validated Implementation Head: `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`
 > - Candidate Foundation Commit: `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate creation; parent `00eb3c6…`)
-> - Candidate Revision Base: `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction; parent `dccf200…`)
-> - CR-02 Candidate Revision Head: resolved by the Git commit that contains this Candidate revision — reported in the final Agent response and **not** pre-written into document bytes.
+> - Candidate Revision Base: `e4c3a37f6ad84194ad2e32287b3c53a4514bd806` (CR-02 refinement; parent `d5daaaabcb7547c4de40d990f74323501105ee33` — the CR-01 correction, parent `dccf200…`)
+> - CR-03 Candidate Revision Head: resolved by the Git commit that contains this Candidate revision — reported in the final Agent response and **not** pre-written into document bytes.
 > - Authoritative original: `README.md` — present in the working tree, byte-identical, **not modified** by this pass
-> - Generation date: 2026-10-13 (UTC)
+> - Generation date: 2026-10-14 (UTC)
 > - Replacement status: **NO REPLACEMENT PERFORMED.** This candidate does not replace, rename, delete or supersede the authoritative original. Atomic replacement requires a later, separate Owner authorization after review.
 > - This file is for Owner review only. It is not authoritative and must not be cited as the plan, state or history of record.
 
@@ -55,9 +55,11 @@ product description is preserved verbatim in section 11.
   [`docs/MASTER_PLAN.candidate.md`](docs/MASTER_PLAN.candidate.md).
 - **Implementation identity versus documentation identity.** The Validated Implementation Head is
   `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. The Candidate documentation commits —
-  `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate foundation) and
-  `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction) — are documentation-only and are
-  **not** part of the validated implementation head; no implementation path changed in them.
+  `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate foundation),
+  `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction) and
+  `e4c3a37f6ad84194ad2e32287b3c53a4514bd806` (CR-02 refinement) and the CR-03 commit that contains
+  this Candidate revision — are documentation-only and are **not** part of the validated implementation
+  head; no implementation path changed in them.
 
 ## 3. Current Truth
 
@@ -339,15 +341,71 @@ A future promotion would, in one atomic change:
 
 - replace the Candidate H1 with the canonical H1 `# WaterJet Sentinel Suite (WJSS)`;
 - remove the Candidate-only notice, its review/replacement-status metadata and this Promotion Preview;
-- convert Candidate links to canonical links using the mapping below;
+- convert Candidate links to canonical links using the mapping below, rewriting both the visible
+  link label and the link target;
+- apply only the status, gate, roadmap-disposition and wording transitions listed in the
+  promotion-state transition map below;
 - retain the validated implementation facts unchanged;
 - retain every historical preservation block unchanged;
 - make no other substantive content change.
 
+### Promoted Canonical State Preview — NOT EXECUTED
+
+After a successful, separately authorized Atomic Replacement the top of the canonical `README.md`
+would read as follows (preview only — **not** current truth):
+
+| Field | Promoted canonical state |
+| --- | --- |
+| Canonical H1 | `# WaterJet Sentinel Suite (WJSS)` |
+| Role | Canonical project entry point and current-position summary |
+| Roadmap authority | [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) |
+| Detailed current truth | [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) |
+| Chronological history | [`CHANGELOG.md`](CHANGELOG.md) |
+| K6 state | Canonical documentation promoted; final source and PR review in progress; **not merged**; K7 not authorized |
+
+The promoted README would contain no Candidate-review wording and no Candidate links.
+
+### Promotion-state transition map
+
+This map is byte-identical in all four Candidates and defines the complete set of transformations a
+future, separately authorized Atomic Replacement may apply. Nothing in it is executed by this revision.
+
+| Before promotion (Candidate review state) | After promotion (canonical state) |
+| --- | --- |
+| Candidate document path (`README.candidate.md`, `CHANGELOG.candidate.md`, `docs/CURRENT_STATE.candidate.md`, `docs/MASTER_PLAN.candidate.md`) | canonical document path (`README.md`, `CHANGELOG.md`, `docs/CURRENT_STATE.md`, `docs/MASTER_PLAN.md`) |
+| Candidate H1 | canonical H1 (per the table above) |
+| Candidate notice present | Candidate notice removed |
+| Promotion Preview present | Promotion Preview removed |
+| Candidate links | canonical links (per the link map below) |
+| Candidate link labels (the visible link text) | canonical link labels |
+| `proposed restructure` phrases and parentheticals (for example "its proposed restructure is …", "proposed restructure: …") | the parenthetical reference is removed and the remaining canonical sentence names only the canonical document path |
+| K6 status: `IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; FINAL DOCUMENTATION CANDIDATE REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED` | K6 status: `IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED` |
+| `Owner review of the four documentation candidates` / `Owner review of these four candidate documents` (state-table Next gate rows and the §5 critical-path item 1) | Immediate Next Gate: 1. Final canonical documentation and complete source review. 2. Open or update the K6 pull request targeting main. 3. Complete PR readiness and CI review. 4. Owner merge decision. |
+| Candidate review in progress | canonical documentation promoted |
+| Atomic Replacement not authorized | Atomic Replacement completed and validated |
+| Owner Candidate review is the next gate | final source/PR review is the next gate |
+| `docs/MASTER_PLAN.candidate.md` 4.9 item: approval of the proposed restructure and Atomic Replacement (unresolved) | the same item moved into 4.8 Historical Reconciliation, recorded as a resolved governance transition |
+| `this candidate` / `the candidate` / `the candidate contents` / `proposed restructure` / `proposed by this candidate for Owner review` / `not yet authoritative` / `not authoritative or canonical unless and until ...` statements | replaced by the statement that the restructure became authoritative through the completed, validated replacement; the `### 4. Proposed Version Roadmap` heading is retained and no stage is authorized by promotion |
+| Candidate-review risk rows (for example the CURRENT_STATE R2 row) | updated to the post-promotion state: review completed, replacement authorized, replaced and validated; no new risk introduced |
+| Candidate paths present | Candidate paths absent |
+| Factual commit records that name the Candidate document commits (foundation `dccf200…`, CR-01 correction `d5daaa…`, CR-02 refinement `e4c3a37…`) and unrelated technical uses of the word "candidate" (for example "exact candidate binding" in trial vocabulary, or the standing rule that a failure does not authorize another candidate) | retained unchanged: factual history is preserved and only review-status and authority statements are transitioned |
+| Authoritative originals unchanged | canonical files replaced atomically from the approved Candidate blobs |
+| K6 not merged | K6 still not merged |
+| K7 not authorized | K7 still not authorized |
+
+The promoted gate includes no K7 execution, no T01, no hardware contact, no port 502 access, no
+passive capture, no `PHYSICAL_TEST` deployment, no six-Node work, no Runtime/Kiosk physical
+integration, no Production and no write/control. Every roadmap status, dependency and authorization
+boundary is identical before and after promotion, and promotion authorizes no stage.
+
 ### Candidate → canonical link map
 
+Each mapping is applied in both places a Candidate path appears: the visible link label and the link
+target (for example `[`docs/CURRENT_STATE.candidate.md`](docs/CURRENT_STATE.candidate.md)` becomes
+`[`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)`).
+
 | Candidate link (valid in this Candidate set) | Canonical promoted target | Occurrences |
-| --- | --- | --- |
+| --- | --- |
 | [`docs/MASTER_PLAN.candidate.md`](docs/MASTER_PLAN.candidate.md) | [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) | 3 |
 | [`docs/CURRENT_STATE.candidate.md`](docs/CURRENT_STATE.candidate.md) | [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) | 2 |
 | [`CHANGELOG.candidate.md`](CHANGELOG.candidate.md) | [`CHANGELOG.md`](CHANGELOG.md) | 1 |
@@ -358,28 +416,33 @@ canonical paths and are not rewritten by this revision.
 ### Promotion Rules (future Atomic Replacement only — not executed)
 
 These rules describe future behaviour only. None of them is executed, started or authorized by this
-Candidate revision.
+Candidate revision, and they authorize only the transformations listed here.
 
-1. Require the exact Owner-approved Candidate revision commit and the approved Candidate blob IDs.
-2. Re-prove that every authoritative original is unchanged since Owner review.
-3. Re-run the historical reconstruction proof for all four Candidates.
-4. Replace each canonical file atomically from its approved Candidate source.
-5. Replace the Candidate H1 with the canonical H1.
-6. Remove the Candidate-only review notice, the replacement-status metadata and this Promotion Preview.
-7. Convert Candidate links using the approved promotion link mapping above.
-8. Retain the Validated Implementation Head.
-9. Retain the approved roadmap and dependency wording.
-10. Retain the complete historical preservation blocks.
-11. Remove the Candidate paths in the same atomic commit.
-12. Require all four canonical paths to exist after replacement.
-13. Require zero remaining Candidate paths.
-14. Re-run link, anchor, fence and Markdown structure checks.
-15. Re-run preservation and current-truth consistency checks.
-16. Review the complete final diff.
-17. Change no Product, test, lock, configuration or fixture content.
-18. Do not start K7.
-19. Create no Progress Dashboard before PR merge, under the standing post-merge Dashboard rule.
-20. Stop if any approved Candidate blob differs.
+1. Verify the exact Owner-approved CR-03 commit and Candidate blobs.
+2. Re-prove the authoritative originals unchanged since Owner review.
+3. Re-run historical reconstruction 4/4.
+4. Replace canonical files atomically from the approved Candidate sources.
+5. Replace Candidate H1 values with canonical H1 values.
+6. Remove Candidate-only notices, review metadata and Promotion Preview.
+7. Convert every Candidate link using the approved canonical link map.
+8. Apply only the approved promotion-state transition map.
+9. Retain the Validated Implementation Head.
+10. Record the approved Candidate revision identity externally and where the promoted canonical
+    wording requires it, without creating self-reference.
+11. Do not pre-write the future replacement commit SHA.
+12. Retain the approved Proposed Version Roadmap wording and dependencies.
+13. Retain complete historical preservation blocks unchanged.
+14. Move the now-resolved Atomic-Replacement approval item from MASTER_PLAN 4.9 into 4.8 using the
+    approved transition wording.
+15. Retain only the K7/later Scope-Gate question in 4.9.
+16. Remove all four Candidate paths in the same atomic commit.
+17. Require all four canonical paths to exist.
+18. Require zero Candidate paths after replacement.
+19. Re-run links, anchors, fences, historical reconstruction, current-truth consistency, changed-path
+    and protected-surface checks.
+20. Stop if any approved Candidate blob differs or any transformation falls outside this exact
+    allowlist.
+
 ## 11. Historical Detail
 
 The original README text is preserved verbatim below, including its earlier status table, product
