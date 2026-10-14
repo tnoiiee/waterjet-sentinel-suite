@@ -43,6 +43,28 @@ const codes = (result) => [...new Set(result.issues.map((i) => i.code))];
 const variant = (mutate) => { const c = clone(CANON); mutate(c); return createTcAcquisitionEvidenceSet(c); };
 const claim = (set, id) => set.claims.find((c) => c.claimId === id);
 /**
+ * Extracts one Markdown section by its exact heading, bounded by the next heading of the SAME level.
+ *
+ * The approved documentation hierarchy retains every historical dated record verbatim: the K3 record
+ * is an H2 heading in the authoritative CHANGELOG and a demoted heading (H4) inside the preserved
+ * historical block of the promoted CHANGELOG. A fixed " ## " closing-boundary search assumed
+ * H2-only records; once the historical headings were demoted it found no boundary and ran to EOF,
+ * sweeping unrelated historical records into the K3 section. This helper keeps the evidence
+ * assertions identical while making the boundary follow the heading level actually found.
+ *
+ * Returns null when the exact heading is absent, so the caller can assert presence.
+ */
+const extractMarkdownSectionByExactHeading = (text, exactHeadingTitle) => {
+  const heading = new RegExp(`(?:^|(?<=\\s))(?<marks>#{2,6}) (?:${exactHeadingTitle})(?=\\s|$)`);
+  const found = heading.exec(text);
+  if (found === null) return null;
+  const level = found.groups.marks.length;
+  const body = text.slice(found.index + found[0].length);
+  const next = new RegExp(`(?<=\\s)#{${level}} (?=\\S)`).exec(body);
+  return text.slice(found.index, next === null ? text.length : found.index + found[0].length + next.index);
+};
+const K3_CHANGELOG_HEADING = '[0-9-]+ — Stage 0\\.4C-K3 Physical TC Connectivity';
+/**
  * Mutator producing a synthetic, fully readable copy of the canonical set. It exists only to prove that
  * the derivation arithmetic is reachable for a synthetic set with complete sources; it is never the
  * canonical position and it is never authoritative.
@@ -690,10 +712,9 @@ test('H: the current-facing records carry no connector-derived archive identity 
   const registerK3 = register.slice(register.indexOf(' ## 14.'));
   assert.ok(registerK3.length > 100, 'register section 14 exists');
   const changelog = read(join(HERE, '..', '..', '..', 'CHANGELOG.md'));
-  const k3Start = changelog.search(/## [0-9-]+ — Stage 0\.4C-K3 Physical TC Connectivity/);
-  assert.ok(k3Start >= 0, 'CHANGELOG has a K3 entry');
-  const k3Rest = changelog.slice(k3Start);
-  const changelogK3 = k3Rest.slice(0, k3Rest.indexOf(' ## ', 1) > 0 ? k3Rest.indexOf(' ## ', 1) : undefined);
+  const changelogK3 = extractMarkdownSectionByExactHeading(changelog, K3_CHANGELOG_HEADING);
+  assert.ok(changelogK3 !== null, 'CHANGELOG has a K3 entry');
+  assert.ok(changelogK3.length > 100, 'CHANGELOG K3 section is bounded by its exact heading level');
   const currentState = read(join(docs, 'CURRENT_STATE.md'));
   const currentHead = currentState.slice(0, currentState.indexOf('HISTORICAL') > 0 ? currentState.indexOf('HISTORICAL') : 4000);
   assert.match(currentHead, /Stage 0\.4C-K3/);
@@ -715,4 +736,47 @@ test('H: the current-facing records carry no connector-derived archive identity 
   for (const [name, text] of [['K3 checkpoint', checkpoint], ['CHANGELOG K3 entry', changelogK3], ['CURRENT_STATE head', currentHead]]) {
     assert.equal(/40 (candidate )?input words per Node|words 8\(n|\b0-7\b|\b32-39\b/.test(text), false, `${name} exposes no range`);
   }
+});
+
+test('H: the K3 CHANGELOG section is extracted by exact heading and same-level boundary', () => {
+  const title = K3_CHANGELOG_HEADING;
+  const token = 'WJSS_TC_EVIDENCE_BASELINE_REV1';
+  // A. authoritative layout: exact K3 heading at H2, next dated record at H2.
+  const h2 = `## 2026-10-11 — Stage 0.4C-K3 Physical TC Connectivity and Protocol Evidence Gate K3 body ${token} ## 2026-10-12 — Stage 0.4C-K2 TC Node/IP Configuration Foundation unrelated ${token}`;
+  const h2Section = extractMarkdownSectionByExactHeading(h2, title);
+  assert.ok(h2Section.startsWith('## 2026-10-11'), 'H2 section starts at the exact K3 heading');
+  assert.equal(h2Section.includes('K3 body'), true);
+  assert.equal(h2Section.includes('unrelated'), false, 'the next H2 heading ends the section');
+  assert.equal(h2Section.includes(token), true, 'a forbidden token inside the exact K3 section is still detected');
+  // B. approved promoted layout: exact K3 heading demoted to H4, next dated record at H4.
+  const h4 = `#### 2026-10-11 — Stage 0.4C-K3 Physical TC Connectivity and Protocol Evidence Gate K3 body #### 2026-10-12 — Stage 0.4C-K2 TC Node/IP Configuration Foundation unrelated ${token}`;
+  const h4Section = extractMarkdownSectionByExactHeading(h4, title);
+  assert.ok(h4Section.startsWith('#### 2026-10-11'), 'H4 section starts at the exact K3 heading');
+  assert.equal(h4Section.includes('K3 body'), true);
+  assert.equal(h4Section.includes('unrelated'), false, 'the next H4 heading ends the section');
+  assert.equal(h4Section.includes(token), false, 'unrelated historical records cannot contaminate the K3 section');
+  // C. boundary behaviour.
+  assert.equal(extractMarkdownSectionByExactHeading('## unrelated heading only', title), null, 'a missing exact K3 heading yields no section');
+  assert.equal(extractMarkdownSectionByExactHeading('## Stage 0.4C-K3 Physical TC Connectivity without a date', title), null, 'a partial stage name is not the exact K3 dated heading');
+  const noNext = `## 2026-10-11 — Stage 0.4C-K3 Physical TC Connectivity K3 body ${token}`;
+  assert.equal(extractMarkdownSectionByExactHeading(noNext, title), noNext, 'with no next same-level heading the section extends to EOF');
+  const withChild = `#### 2026-10-11 — Stage 0.4C-K3 Physical TC Connectivity K3 body ##### K3 child detail ${token} #### 2026-10-12 — Stage 0.4C-K2 unrelated`;
+  const childSection = extractMarkdownSectionByExactHeading(withChild, title);
+  assert.equal(childSection.includes(token), true, 'a deeper child heading does not terminate the section');
+  assert.equal(childSection.includes('unrelated'), false, 'the section still ends at the next same-level heading');
+  const withShallower = `#### 2026-10-11 — Stage 0.4C-K3 Physical TC Connectivity K3 body ## 2026-10-12 — unrelated shallower heading ## 2026-10-13 — Stage 0.4C-K2 unrelated ${token} #### 2026-10-14 — Stage 0.4C-K1 later same-level record`;
+  const shallowerSection = extractMarkdownSectionByExactHeading(withShallower, title);
+  assert.equal(shallowerSection.includes('unrelated shallower heading'), true, 'a shallower heading does not silently redefine the exact same-level boundary');
+  assert.equal(shallowerSection.includes('2026-10-14'), false, 'the section ends at the next same-level heading');
+});
+
+test('H: the real CHANGELOG yields a bounded K3 section and isolates unrelated historical records', () => {
+  const text = readFileSync(join(HERE, '..', '..', '..', 'CHANGELOG.md'), 'utf8').replace(/\s+/g, ' ');
+  const section = extractMarkdownSectionByExactHeading(text, K3_CHANGELOG_HEADING);
+  assert.ok(section !== null, 'CHANGELOG has a K3 entry');
+  const marks = /^#+/.exec(section)[0].length;
+  assert.ok(marks >= 2 && marks <= 6, `the K3 heading level H${marks} is within H2-H6`);
+  assert.ok(section.length < text.length / 4, 'the K3 section is bounded, not the remainder of the file');
+  assert.equal(section.includes('WJSS_TC_EVIDENCE_BASELINE_REV1'), false, 'unrelated historical records stay outside the K3 section');
+  assert.equal(text.includes('WJSS_TC_EVIDENCE_BASELINE_REV1'), true, 'the identifier exists elsewhere in the file, so the isolation is meaningful');
 });

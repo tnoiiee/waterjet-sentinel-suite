@@ -22,6 +22,11 @@ public sealed class TrialEvidenceTests
         Assert.Null(e.WireEvidence.DataLength);
         Assert.Equal(WireEvidenceOutcome.NOT_PROVIDED, e.WireEvidence.Outcome);
         Assert.Equal(TrialAcceptance.QUARANTINED, e.TrialAcceptance);
+        // A dry run never claims an authorization was verified or consumed.
+        Assert.Equal("NOT_ATTEMPTED", e.AuthorizationVerification);
+        Assert.Equal("NOT_ATTEMPTED", e.AuthorizationConsumption);
+        Assert.Equal("NOT_PROVIDED", e.AuthorizationPayloadSha256);
+        Assert.Null(e.AcquisitionEpochAfter);
         var bytes = TrialEvidence.Serialize(e);
         Assert.Equal(bytes, TrialEvidence.ExportPublic(bytes, c, TrialCatalog.Hash(bytes)));
     }
@@ -96,20 +101,65 @@ public sealed class TrialEvidenceTests
         Assert.Throws<InvalidDataException>(() => TrialEvidence.Validate(e, TrialCatalog.LoadTrusted()));
     }
 
+    [Fact]
+    public void Physical_Records_Require_Verified_And_Consumed_Authorization_And_Build_Derived_Identity()
+    {
+        var c = TrialCatalog.LoadTrusted();
+        var e = PhysicalExample();
+        TrialEvidence.Validate(e, c);
+        foreach (var broken in new[]
+        {
+            e with { AuthorizationVerification = "NOT_ATTEMPTED" },
+            e with { AuthorizationConsumption = "NOT_ATTEMPTED" },
+            e with { AuthorizationId = "NOT_PROVIDED" },
+            e with { AuthorizationKeyId = "NOT_PROVIDED" },
+            e with { AuthorizationPayloadSha256 = "NOT_PROVIDED" },
+            e with { PhysicalCapabilityEnabled = false },
+            e with { CleanStateProof = "NOT_PROVIDED" },
+            e with { SourceRef = "NOT_PROVIDED" },
+            e with { CleanupState = PhysicalTrialStates.Unproven },
+            e with { WorkerObservationState = PhysicalTrialStates.Overdue },
+            e with { LifecycleBudgetState = PhysicalTrialStates.Elapsed },
+        }) Assert.Throws<InvalidDataException>(() => TrialEvidence.Validate(broken, c));
+    }
+
+    [Fact]
+    public void Simulation_Records_Cannot_Claim_Authorization_Use_Or_Physical_Identity()
+    {
+        var c = TrialCatalog.LoadTrusted();
+        foreach (var broken in new[]
+        {
+            DryRun() with { AuthorizationVerification = PhysicalTrialStates.Verified },
+            DryRun() with { AuthorizationConsumption = PhysicalTrialStates.Consumed },
+            DryRun() with { AuthorizationId = "AUTH-01" },
+            DryRun() with { AuthorizationKeyId = "OWNER-KEY-01" },
+            DryRun() with { AuthorizationPayloadSha256 = new string('d', 64) },
+        }) Assert.Throws<InvalidDataException>(() => TrialEvidence.Validate(broken, c));
+    }
+
     private static TrialEvidence PhysicalExample()
     {
         // Offline synthetic record ONLY. Never executed and never claimed as physical evidence.
         var t = DateTimeOffset.UtcNow;
         return DryRun() with
         {
-            Provenance = "PHYSICAL_DIAGNOSTIC", ImplementationSha = new string('a', 40), CleanStateProof = "CLEAN_OWNER_VERIFIED",
-            AuthorizationReference = "SYNTHETIC-REVIEW", OperatorId = "NEUTRAL-01", EnvironmentSummary = "SYNTHETIC_OFFLINE_RECORD", CreatedAt = t,
+            Provenance = "PHYSICAL_DIAGNOSTIC", PhysicalCapabilityEnabled = true,
+            ImplementationSha = new string('a', 40), SourceRef = "wjss-k6-physical",
+            CleanStateProof = "CLEAN_OWNER_VERIFIED",
+            AuthorizationId = "AUTH-SYNTHETIC-01", AuthorizationReference = "SYNTHETIC-REVIEW",
+            AuthorizationPayloadSha256 = new string('d', 64), AuthorizationKeyId = "OWNER-KEY-01",
+            AuthorizationVerification = PhysicalTrialStates.Verified, AuthorizationConsumption = PhysicalTrialStates.Consumed,
+            OperatorId = "NEUTRAL-01", EnvironmentSummary = "SYNTHETIC_OFFLINE_RECORD", CreatedAt = t,
             Connect = new() { State = "OBSERVED", Kind = TcReadKind.Success, StartedAt = t, CompletedAt = t.AddMilliseconds(1), ElapsedMilliseconds = 1, Generation = 1 },
             Read = new() { State = "OBSERVED", Kind = TcReadKind.Success, StartedAt = t.AddMilliseconds(2), CompletedAt = t.AddMilliseconds(10), ElapsedMilliseconds = 8, Generation = 1 },
             CopiedWordCount = 40, Words = Enumerable.Range(0, 40).Select(i => new IndexedWord(i, (ushort)i)).ToArray(),
-            AcquisitionEpoch = 1, AcquisitionEpochAfter = 1, GenerationBeforeCleanup = 1, GenerationAfterCleanup = 3,
-            CancellationState = "NOT_REQUESTED", StopState = "NOT_REQUESTED", TimeoutState = "NOT_ELAPSED", StaleDecision = "CURRENT_AT_DIAGNOSTIC_HANDOFF", FinalHandoffDecision = "RETAINED_QUARANTINED",
-            DisconnectResult = "COMPLETE", DisposalResult = "COMPLETE", TaskCompletion = "COMPLETE", TransportAfter = "DISCONNECTED",
+            AcquisitionEpoch = 1, AcquisitionEpochAfter = 1, GenerationBefore = 1, GenerationBeforeCleanup = 1, GenerationAfterCleanup = 3,
+            CancellationState = "NOT_REQUESTED", StopState = "NOT_REQUESTED", TimeoutState = "NOT_ELAPSED",
+            LifecycleBudgetState = PhysicalTrialStates.NotElapsed, CleanupState = PhysicalTrialStates.Observed,
+            WorkerObservationState = PhysicalTrialStates.Observed,
+            StaleDecision = "CURRENT_AT_DIAGNOSTIC_HANDOFF", FinalHandoffDecision = "RETAINED_QUARANTINED",
+            TransportBefore = "DISCONNECTED", TransportBeforeCleanup = "CONNECTED", TransportAfter = "DISCONNECTED",
+            DisconnectResult = "COMPLETE", DisposalResult = "COMPLETE", TaskCompletion = "COMPLETE",
         };
     }
 

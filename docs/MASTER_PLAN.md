@@ -1,6 +1,404 @@
 # Master Plan — WaterJet Sentinel Suite (WJSS)
 
-## Current critical path — 2026-10-13
+## 1. Master Plan Authority
+
+- **`docs/MASTER_PLAN.md` is the authoritative execution roadmap.** It became authoritative in this
+  document through the completed, validated Atomic Replacement of the Owner-approved revision.
+- **This document is the plan of record.** It cites no authorization: every stage still requires its
+  own Owner Scope Gate before any work may begin.
+- This document does **not** create a second roadmap and does **not** establish a competing authority.
+  There is no `VERSION_ROADMAP.md`; roadmap authority stays with `docs/MASTER_PLAN.md`.
+- A Progress Dashboard, when one exists, is only a **visual projection** of `MASTER_PLAN` and current
+  truth; it is never a roadmap authority or an authorization record. No Progress Dashboard is created
+  by this pass.
+- **Planned does not mean Authorized.** Every stage — including every stage listed as `CURRENT`,
+  `NEXT`, `PLANNED` or `FUTURE` in section 4 — requires its **own Owner Scope Gate** before any work
+  may begin.
+- **Implementation identity versus documentation identity.** The Validated Implementation Head is
+  `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. The Candidate documentation commits —
+  `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate foundation),
+  `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction) and
+  `e4c3a37f6ad84194ad2e32287b3c53a4514bd806` (CR-02 refinement) and the CR-03 revision commit — are documentation-only and are **not** part of the validated implementation
+  head; no implementation path changed in them.
+- Document status of the preserved original: `[APPROVED]` for the stage-gate discipline and for the
+  Stage 0.1 and Stage 0.2 positions; stage contents beyond Stage 0.2 remain `[PROPOSED]`. Governing
+  authority: [`AGENTS.md`](../AGENTS.md) and the approved Stage 0.1 and Stage 0.2 Scope Gates.
+
+## 2. Versioning Convention
+
+Stage identifiers follow the repository's existing convention `<program phase><track><ordinal>`:
+
+| Prefix | Track | Ordinal range in the proposed roadmap |
+| --- | --- | --- |
+| `0.4C-K` | TC acquisition and commissioning (Kiosk/bench track) | `K1` … `K17` |
+| `0.4D-G` | Galil and motion | `G1` … `G5` |
+| `0.4E-I` | Integrated dry cycle | `I1` … `I4` |
+| `0.5A-P` | Production readiness | `P1` … `P4` |
+
+This is a naming convention for **stage identifiers** only. It does not establish an application
+version: **no application version exists**, and the documentation versioning policy remains `[OPEN]`
+(see the preserved `Versioning position` and `5. Standing constraints` text in section 11).
+
+## 3. Current Program Position
+
+| Field | Value |
+| --- | --- |
+| Stage | `0.4C-K6` |
+| Title | T01 Physical Execution Enablement and Bench Readiness |
+| Status | **IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED** |
+| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
+| Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
+| Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
+| Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
+
+- The K6 implementation was authored in Arena; **Owner-local automated validation is the
+  authoritative evidence** and has passed.
+- **K6 is NOT MERGED** and canonical documentation promotion is complete.
+- **K7 is NOT AUTHORIZED**; K6 validation does not authorize it.
+- Detailed current truth: [`CURRENT_STATE.md`](CURRENT_STATE.md) (authoritative:
+  [`CURRENT_STATE.md`](CURRENT_STATE.md)).
+
+K6 delivery, grouped: identity and capability; authorization and trust (detached Owner-signed
+verification, NIST P-256 / SHA-256, SubjectPublicKeyInfo, canonical payload, single-use consumption,
+replay rejection, exact candidate binding); one-shot execution discipline (client construction only
+after all gates pass, one client, one connection attempt, at most one read, no retry, no reconnect,
+no fallback); lifecycle and evidence (outer lifecycle budget, cleanup-overdue evidence,
+worker-observation evidence, generation and epoch fencing, quarantined output, no automatic ACCEPTED
+path); explicit non-delivery (no passive capture, no Runtime/Kiosk integration, no device
+write/control path). Itemised list:
+[`CURRENT_STATE.md`](CURRENT_STATE.md) section 4.
+
+K6 validation evidence summary (Owner-local is authoritative; Agent/Arena had no `dotnet`):
+
+| Check | Result |
+| --- | --- |
+| Restore | normal PASS; locked PASS twice; lock drift none |
+| Builds | targeted adapter, targeted bench, focused tests, full solution — Release PASS, no reported warnings or errors |
+| Focused tests | **95/95** passed (0 failed, 0 skipped) |
+| Full .NET | **550/550** passed (0 failed, 0 skipped) |
+| Dry run | SIMULATION; physical capability false; connect/read NOT_ISSUED; QUARANTINED; no copied words; no physical I/O |
+| Default PHYSICAL_TEST attempt | refused with `PHYSICAL_CAPABILITY_DISABLED`; `acquisitionPerformed` false; `deploymentState` `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED` |
+| Node/static (Owner-local) | exporter 18/18; S2 14/14; S3 19/19; Boundary S1–S9 zero findings; Commissioning check PASS; Commissioning 218/218 on canonical LF; fixture parity verify-only 7/7; `WJSS_UPDATE_FIXTURES` false |
+| R40 disposition | initial Windows run 217/218 (LF vs CRLF only); canonical LF rerun 218/218; original fixture restored byte-for-byte; restored SHA-256 `CC3F45ADF43CED351F1E8AE0D17D06AEA181FD94D119126DF0659AAC3385DA80`; canonical LF SHA-256 observed earlier as `3BC8774CB74183080297BB89C3A855DB8E46782B421DF41AB955C1CA50A8256A` (**not recomputed in the same execution as the final 218/218 run — labeled limitation**) |
+| Agent/Arena | exporter 18/18; S2 14/14; S3 19/19; Boundary clean; Commissioning 220/220 with the corrected documentation guard (218 pre-existing tests plus 2 authorized regression tests); JavaScript syntax and changed-path/protected-surface proofs; genuine locks unchanged; **no** C# build, analyzer, xUnit/.NET test, .NET fixture parity or physical execution |
+| Physical | none — no hardware contact, no passive capture, no port 502 access, no T01 execution |
+
+## 4. Proposed Version Roadmap
+
+Roadmap authority: [`docs/MASTER_PLAN.md`](MASTER_PLAN.md). This section is the roadmap of record:
+the roadmap and the stage identifiers it introduces became authoritative through the completed,
+validated Atomic Replacement.
+
+### 4.1 Completed/Merged history
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4C-K1` | Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview | MERGED | Kiosk shell foundation and the sensor commissioning monitor preview | — |
+| `0.4C-K2` | TC Node/IP Configuration Foundation | MERGED | Canonical six-node TC node/IP configuration foundation | 0.4C-K1 |
+| `0.4C-K3` | 108-Sensor / 216-Measurement Topology Correction | MERGED | Owner critical topology correction: I7 and I16 are normal Product Sensors | 0.4C-K2 |
+| `0.4C-K4` | Modbus TCP Client Library Selection and Read-Only Adapter Foundation | MERGED (PR #22) | Transport library selection and the read-only acquisition adapter foundation | 0.4C-K3 |
+| `0.4C-K5` | One-Node Physical TC Read-Only Acquisition Software Foundation | MERGED (PR #23, `193aba76…`) | Isolated one-shot bench software foundation; diagnostic success quarantined | 0.4C-K4 |
+
+### 4.2 Current Stage
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — NOT MERGED** | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
+
+### 4.3 Next Stage
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4C-K7` | T01 One-Node Physical TC Read-Only Trial | **NEXT — NOT AUTHORIZED** | The first authorized one-node physical read-only trial (one invocation, one client, one connect, at most one read) | 0.4C-K6 (not merged) |
+
+### 4.4 Planned TC acquisition and commissioning stages
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4C-K8` | One-Node Evidence Closeout and Read-Profile Decision | PLANNED - NOT AUTHORIZED | Close out one-node evidence and decide the read profile | 0.4C-K7 |
+| `0.4C-K9` | Six-Node TC Read-Only Acquisition Software Expansion | PLANNED - NOT AUTHORIZED | Extend read-only acquisition software to six nodes | 0.4C-K8 |
+| `0.4C-K10` | Six-Node Physical TC Read-Only Acquisition | PLANNED - NOT AUTHORIZED | Physical read-only acquisition across six nodes | 0.4C-K9 |
+| `0.4C-K11` | Physical TC Channel Mapping Verification | PLANNED - NOT AUTHORIZED | Verify physical TC channel mapping | 0.4C-K10 |
+| `0.4C-K12` | Runtime Physical TC Publication Foundation | PLANNED - NOT AUTHORIZED | Runtime publication foundation for physical TC data | 0.4C-K11 |
+| `0.4C-K13` | Kiosk Physical TC Commissioning Integration | PLANNED - NOT AUTHORIZED | Kiosk commissioning integration for physical TC data | 0.4C-K12 |
+| `0.4C-K14` | Physical TC Baseline Commissioning | PLANNED - NOT AUTHORIZED | Commission the physical TC baseline | 0.4C-K13 |
+| `0.4C-K15` | Pilot TC Loop Test | PLANNED - NOT AUTHORIZED | Pilot TC loop test | 0.4C-K14 |
+| `0.4C-K16` | Full TC Loop Test - 108 Sensors / 216 Measurements | PLANNED - NOT AUTHORIZED | Full TC loop test at 108 Sensors / 216 Measurements | 0.4C-K15 |
+| `0.4C-K17` | Physical TC Acquisition and Commissioning Closeout | PLANNED - NOT AUTHORIZED | Close out physical TC acquisition and commissioning | 0.4C-K16 |
+
+### 4.5 Galil and motion stages
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | `0.4C-K17` (Owner-approved dependency) |
+| `0.4D-G2` | Galil Read-Only Status Acquisition | PLANNED - NOT AUTHORIZED | Read-only Galil status acquisition | 0.4D-G1 |
+| `0.4D-G3` | Galil Controlled Motion Test Foundation | PLANNED - NOT AUTHORIZED | Foundation for controlled Galil motion test | 0.4D-G2 |
+| `0.4D-G4` | Galil Axis Functional Test | PLANNED - NOT AUTHORIZED | Galil axis functional test | 0.4D-G3 |
+| `0.4D-G5` | Galil Motion and Mandatory Safe Return Closeout | PLANNED - NOT AUTHORIZED | Close out Galil motion and mandatory safe return | 0.4D-G4 |
+
+### 4.6 Integrated dry-cycle stages
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | `0.4D-G5` (Owner-approved dependency) |
+| `0.4E-I2` | Single-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Single-job integrated dry cycle | 0.4E-I1 |
+| `0.4E-I3` | Sequential Multi-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Sequential multi-job integrated dry cycle | 0.4E-I2 |
+| `0.4E-I4` | Integrated Dry-Cycle Closeout | PLANNED - NOT AUTHORIZED | Close out the integrated dry cycle | 0.4E-I3 |
+
+### 4.7 Production-readiness stages
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | `0.4E-I4` (Owner-approved dependency) |
+| `0.5A-P2` | Production Configuration and Access Boundary | FUTURE - NOT AUTHORIZED | Production configuration and access boundary | 0.5A-P1 |
+| `0.5A-P3` | Production Pilot Operation | FUTURE - NOT AUTHORIZED | Production pilot operation | 0.5A-P2 |
+| `0.5A-P4` | Production Acceptance and Operational Handover | FUTURE - NOT AUTHORIZED | Production acceptance and operational handover | 0.5A-P3 |
+
+**Dependency note (Owner-approved in CR-02; roadmap dependency only).** `0.4D-G1` follows
+`0.4C-K17`, `0.4E-I1` follows `0.4D-G5` and `0.5A-P1` follows `0.4E-I4`. This approval establishes
+roadmap dependency only: it authorizes none of these stages, adds no dates, and does not authorize an
+automatic transition when a predecessor completes — each stage still requires its own explicit Owner
+Scope Gate. Statuses remain `PLANNED - NOT AUTHORIZED` for `0.4D-G1` and `0.4E-I1`, and
+`FUTURE - NOT AUTHORIZED` for `0.5A-P1`.
+
+### 4.8 Historical Reconciliation
+
+The items below were previously reported as conflicts or open points. Each is reconciled by later,
+already-established evidence and requires **no new Owner decision**; the preserved historical text is
+not rewritten. Every item previously reported in this section is mapped here or in section 4.9.
+
+1. **Dated "OPEN — NOT MERGED" wording.** The preserved historical text and older entries describe
+   `0.4C-K2` (PR #20) and `0.4C-K3` (PR #21) as `OPEN — NOT MERGED` at their checkpoints, while
+   the proposed roadmap records them as **MERGED**. Both are correct for their own dates: the
+   dated wording is the record of that checkpoint, and the merges are established by later
+   evidence (K3 additionally recorded inside the preserved README text as
+   `d1ea0324cb37de65a798fe4271429f955d4a9225`, parents `cc6ccf87` / `a6238ac`). Reconciliation:
+   dated record retained unchanged; current status in section 4.1.
+
+2. **Binding of stages to pull requests.** Established evidence binds `0.4C-K4` to PR #22 and
+   `0.4C-K5` to PR #23 (`193aba76…`). Earlier text binds the Library Selection Gate to PR #22 and
+   does not bind a PR number to `K4` or `K5` by those identifiers — an earlier naming granularity,
+   not a conflict. Reconciliation: the proposed map adds the identifiers without altering any
+   earlier text.
+
+3. **New identifiers.** `0.4C-K6`–`0.4C-K17`, `0.4D-G1`–`G5`, `0.4E-I1`–`I4` and `0.5A-P1`–`P4`
+   are **authoritative for this plan**, having become canonical through the completed, validated Atomic
+   Replacement; they do not all appear in the preserved historical text. No historical record was
+   altered to introduce them; section 4.8 records that governance transition.
+
+4. **Dependencies previously unstated — now decided by the Owner.** `0.4D-G1`, `0.4E-I1` and
+   `0.5A-P1` had no stated preceding dependency in the earlier source material. This was resolved
+   by the Owner in CR-02 (roadmap dependency only): `0.4D-G1` ← `0.4C-K17`, `0.4E-I1` ← `0.4D-G5`,
+   `0.5A-P1` ← `0.4E-I4`, recorded in sections 4.5–4.7, 6 and 7. Statuses, dates and authorization
+   are unchanged: none of these stages is authorized, none has a date, and completion of a
+   predecessor does not authorize a successor automatically.
+
+5. **Superseded current-position text.** The preserved `Current critical path — 2026-10-13`
+   section describes the K5-era closeout next steps (`e71e33b…`). That position was completed by
+   the PR #23 merge into `main` at `193aba76…`, and K6 followed. Reconciliation: the preserved
+   K5-era text is the record of its date; the current position is section 3 above. The preserved
+   text is not rewritten.
+
+6. **Earlier, more specific records.** The preserved sections contain more specific details for
+   many stages (for example the Stage 0.4A CP-2/CP-3 records). Those details are retained verbatim
+   in section 11 and are not replaced by the brief purposes above.
+
+7. **Atomic Replacement completed.** The Owner approved the exact Candidate revision and separately
+   authorized Atomic Replacement. The replacement was completed and validated at the replacement
+   commit reported by Git; no future commit SHA was pre-written.
+
+### 4.9 Owner Decisions Still Required
+
+Genuine decisions that remain open and are **not** resolved by this document:
+
+1. **No Scope Gate exists for any stage after K6.** `0.4C-K7` and every later stage — including
+   `0.4D-G1`, `0.4E-I1` and `0.5A-P1` — require their own explicit Owner Scope Gate before any work
+   may begin. None is authorized, scheduled or dated.
+
+## 5. Critical Path
+
+Current critical path, as conditional steps — none of which is authorized by this document:
+
+1. Final canonical documentation and complete source review. — **in progress**
+2. Atomic Replacement completed and validated. — **DONE**
+3. Owner PR review and merge decision for the K6 checkpoint. — **K6 NOT MERGED**
+4. Separate Owner Scope Gate for `0.4C-K7`. — **NOT AUTHORIZED**
+5. Subsequent stages in dependency order per section 6. — **PLANNED / FUTURE, NOT AUTHORIZED**
+
+No batch approval exists: each later trial requires separate authorization, and a failure does not
+authorize another candidate.
+
+## 6. Stage Dependency Map
+
+| Stage | Depends on |
+| --- | --- |
+| `0.4C-K1` … `0.4C-K5` | completed in sequence; each merged |
+| `0.4C-K6` | `0.4C-K5` |
+| `0.4C-K7` | `0.4C-K6` (not merged) |
+| `0.4C-K8` … `0.4C-K17` | the immediately preceding `0.4C-K` stage |
+| `0.4D-G1` | `0.4C-K17` (Owner-approved dependency) |
+| `0.4D-G2` … `0.4D-G5` | the immediately preceding `0.4D-G` stage |
+| `0.4E-I1` | `0.4D-G5` (Owner-approved dependency) |
+| `0.4E-I2` … `0.4E-I4` | the immediately preceding `0.4E-I` stage |
+| `0.5A-P1` | `0.4E-I4` (Owner-approved dependency) |
+| `0.5A-P2` … `0.5A-P4` | the immediately preceding `0.5A-P` stage |
+
+## 7. Stage Definitions
+
+### 7.1 Completed Stages
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4C-K1` | Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview | MERGED | Kiosk shell foundation and the sensor commissioning monitor preview | — |
+| `0.4C-K2` | TC Node/IP Configuration Foundation | MERGED | Canonical six-node TC node/IP configuration foundation | 0.4C-K1 |
+| `0.4C-K3` | 108-Sensor / 216-Measurement Topology Correction | MERGED | Owner critical topology correction: I7 and I16 are normal Product Sensors | 0.4C-K2 |
+| `0.4C-K4` | Modbus TCP Client Library Selection and Read-Only Adapter Foundation | MERGED (PR #22) | Transport library selection and the read-only acquisition adapter foundation | 0.4C-K3 |
+| `0.4C-K5` | One-Node Physical TC Read-Only Acquisition Software Foundation | MERGED (PR #23, `193aba76…`) | Isolated one-shot bench software foundation; diagnostic success quarantined | 0.4C-K4 |
+
+Detailed historical records for these stages remain verbatim in section 11 and in
+[`../CHANGELOG.md`](../CHANGELOG.md).
+
+### 7.2 Current Stage
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — NOT MERGED** | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
+
+Implemented delivery and evidence for K6: see
+[`CURRENT_STATE.md`](CURRENT_STATE.md) sections 4 and 5.
+
+### 7.3 Planned Stages
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4C-K8` | One-Node Evidence Closeout and Read-Profile Decision | PLANNED - NOT AUTHORIZED | Close out one-node evidence and decide the read profile | 0.4C-K7 |
+| `0.4C-K9` | Six-Node TC Read-Only Acquisition Software Expansion | PLANNED - NOT AUTHORIZED | Extend read-only acquisition software to six nodes | 0.4C-K8 |
+| `0.4C-K10` | Six-Node Physical TC Read-Only Acquisition | PLANNED - NOT AUTHORIZED | Physical read-only acquisition across six nodes | 0.4C-K9 |
+| `0.4C-K11` | Physical TC Channel Mapping Verification | PLANNED - NOT AUTHORIZED | Verify physical TC channel mapping | 0.4C-K10 |
+| `0.4C-K12` | Runtime Physical TC Publication Foundation | PLANNED - NOT AUTHORIZED | Runtime publication foundation for physical TC data | 0.4C-K11 |
+| `0.4C-K13` | Kiosk Physical TC Commissioning Integration | PLANNED - NOT AUTHORIZED | Kiosk commissioning integration for physical TC data | 0.4C-K12 |
+| `0.4C-K14` | Physical TC Baseline Commissioning | PLANNED - NOT AUTHORIZED | Commission the physical TC baseline | 0.4C-K13 |
+| `0.4C-K15` | Pilot TC Loop Test | PLANNED - NOT AUTHORIZED | Pilot TC loop test | 0.4C-K14 |
+| `0.4C-K16` | Full TC Loop Test - 108 Sensors / 216 Measurements | PLANNED - NOT AUTHORIZED | Full TC loop test at 108 Sensors / 216 Measurements | 0.4C-K15 |
+| `0.4C-K17` | Physical TC Acquisition and Commissioning Closeout | PLANNED - NOT AUTHORIZED | Close out physical TC acquisition and commissioning | 0.4C-K16 |
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | `0.4C-K17` (Owner-approved dependency) |
+| `0.4D-G2` | Galil Read-Only Status Acquisition | PLANNED - NOT AUTHORIZED | Read-only Galil status acquisition | 0.4D-G1 |
+| `0.4D-G3` | Galil Controlled Motion Test Foundation | PLANNED - NOT AUTHORIZED | Foundation for controlled Galil motion test | 0.4D-G2 |
+| `0.4D-G4` | Galil Axis Functional Test | PLANNED - NOT AUTHORIZED | Galil axis functional test | 0.4D-G3 |
+| `0.4D-G5` | Galil Motion and Mandatory Safe Return Closeout | PLANNED - NOT AUTHORIZED | Close out Galil motion and mandatory safe return | 0.4D-G4 |
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | `0.4D-G5` (Owner-approved dependency) |
+| `0.4E-I2` | Single-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Single-job integrated dry cycle | 0.4E-I1 |
+| `0.4E-I3` | Sequential Multi-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Sequential multi-job integrated dry cycle | 0.4E-I2 |
+| `0.4E-I4` | Integrated Dry-Cycle Closeout | PLANNED - NOT AUTHORIZED | Close out the integrated dry cycle | 0.4E-I3 |
+
+The purposes above are brief and derived from the stage titles; no implementation commitment,
+authorization, start date or schedule is implied.
+
+### 7.4 Future Stages
+
+| Stage | Title | Status | Brief purpose | Preceding dependency |
+| --- | --- | --- | --- | --- |
+| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | `0.4E-I4` (Owner-approved dependency) |
+| `0.5A-P2` | Production Configuration and Access Boundary | FUTURE - NOT AUTHORIZED | Production configuration and access boundary | 0.5A-P1 |
+| `0.5A-P3` | Production Pilot Operation | FUTURE - NOT AUTHORIZED | Production pilot operation | 0.5A-P2 |
+| `0.5A-P4` | Production Acceptance and Operational Handover | FUTURE - NOT AUTHORIZED | Production acceptance and operational handover | 0.5A-P3 |
+
+## 8. Global Safety and Authorization Gates
+
+- Every stage requires its own Owner Scope Gate; a Stage Gate being approved authorizes work, not
+  acceptance of results.
+- The default build remains **physically disabled**; a physical-capable deployment identity requires
+  explicit Owner-supplied trust metadata.
+- **K6 validation does not authorize K7.**
+
+```text
+HARDWARE CONTACT NOT AUTHORIZED
+T01 NOT AUTHORIZED
+PASSIVE CAPTURE NOT AUTHORIZED
+PORT 502 ACCESS NOT AUTHORIZED
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED
+RUNTIME/KIOSK PHYSICAL INTEGRATION NOT AUTHORIZED
+SIX-NODE ACQUISITION NOT AUTHORIZED
+PRODUCTION NOT AUTHORIZED
+WRITE/CONTROL NOT AUTHORIZED
+```
+
+The full standing constraints that apply to all stages are preserved verbatim in section 11
+(`## 5. Standing constraints across every stage`), including the prohibition on production device
+access, production write control, invented production values, the single-active-Cleaning-Job
+invariant, the absence of an application version, and the statement that the Operations UI close
+guard is not a safety protection.
+
+## 9. Validation and Completion Rules
+
+Operating rules that remain in force (full original text preserved in section 11):
+
+- Work proceeds in small, explicitly approved stages, each with a Scope Gate, one reviewable
+  deliverable set, documentation validation evidence, a Development Checkpoint commit and Owner review
+  before the next stage begins.
+- Stage gates state the stage identifier and title, the exact files or categories that may be created
+  or modified, what is out of scope, the validation required, and the delivery instruction.
+- Every stage report states **CHANGED**, **UNCHANGED**, **NOT VERIFIED**, and the **validation
+  performed** with observed results. Claims of success without observed tool output are prohibited.
+- A documentation stage is done only when the named files exist and are complete, internal links
+  resolve, the status legend is applied consistently, Owner-confirmed decisions are propagated,
+  prohibited content is absent, the diff has been reviewed, the checkpoint commit exists with a
+  CHANGED / UNCHANGED / NOT VERIFIED body, the branch is pushed, and a pull request exists if
+  permissions allow — and the pull request is **not** merged by the contributor.
+- A stage that received review changes is not done until a review-correction checkpoint is submitted
+  and re-review is requested.
+
+## 10. Deferred / Optional Work
+
+- **Stage 0.2.1 proposed UI and Runtime technology spike** — retained as a recorded proposal in
+  section 11 (`### 3.2 Proposed Stage 0.2.1 — UI and Runtime Technology Spike`); the related Stage
+  0.2.1A feasibility spike, already completed, is retained as history.
+- **Blazor counter-spike** — recorded as `NOT REQUIRED` unless a future material blocker is identified
+  (preserved README/`[Unreleased]` text).
+- **Wire-break decoding** — `BLOCKED`: the model capability is documented but the Modbus cyclic image
+  carries no explicit status.
+- **Stage 0.4C-1 TC acquisition** — recorded as `BLOCKED` in earlier Stage 0.4C-0B records; later
+  stages were realigned by the K-series roadmap in section 4.
+- **Production transport and chart library** — remain `[OPEN]` per the preserved records.
+- **Documentation versioning policy** — remains `[OPEN]`.
+
+## 11. Historical Master Plan Records
+
+The authoritative `docs/MASTER_PLAN.md` is preserved verbatim below, including the dated critical-path
+section, the delivery principle, the stage-gate definition, the complete stage ledger, the earlier
+reconciliation and proposal sections, the gate evidence rules, the standing constraints, the
+definition of done and the related-document list. Heading levels are demoted by two so this document
+keeps one heading hierarchy.
+
+**Supersession notes (navigation only; the preserved text is not rewritten):**
+
+- The preserved `## Current critical path — 2026-10-13` section records the K5-era position
+  (`c0bc2c7…` / `e71e33b…`). That work was merged as PR #23 into `main` at `193aba76…`. The current
+  position is section 3 above.
+- The preserved stage ledger in section 11 contains dated, more specific records for stages up to
+  Stage 0.4C-K3 and the Library Selection Gate. The roadmap in section 4 covers
+  `0.4C-K1` … `0.5A-P4`; earlier-vs-current reconciliation is recorded in section 4.8 and the
+  remaining Owner decisions in section 4.9, rather than resolved by editing the preserved text.
+
+---
+
+### Historical record — verbatim preservation of the authoritative original
+
+The block below is the complete text of `docs/MASTER_PLAN.md` as it exists at candidate source head
+`00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. Wording, tables, links, counts, SHAs, dates and statuses are unchanged. Only the
+Markdown heading level is shifted by two (for example `##` → `####`) so that this candidate keeps a
+single heading hierarchy; every heading's original text is retained verbatim.
+
+### Master Plan — WaterJet Sentinel Suite (WJSS)
+
+#### Current critical path — 2026-10-13
 
 **One-Node TC bench software implementation validated; documentation closeout → Owner PR review.**
 Exact validated implementation `c0bc2c71636d3206098fd890e1de40c46fabae65`; genuine lock commit
@@ -36,7 +434,7 @@ any future stage.
 
 ---
 
-## 1. Delivery principle
+#### 1. Delivery principle
 
 Work proceeds in small, explicitly approved stages. Each stage has:
 
@@ -55,7 +453,7 @@ conditions.
 means the work is authorised. It does not mean the resulting implementation is accepted.
 Only the Owner may record acceptance.
 
-## 2. What a stage gate is
+#### 2. What a stage gate is
 
 A Stage Gate is the only authority that permits new artefacts. It must state, at minimum:
 
@@ -69,7 +467,7 @@ Behaviour described in a Scope Gate becomes `[APPROVED]` behaviour. Behaviour co
 the Owner during a documentation review becomes `[OWNER CONFIRMED]` behaviour. Behaviour
 described anywhere else remains `[PROPOSED]` until a later gate approves it.
 
-## 3. Stage ledger
+#### 3. Stage ledger
 
 **Library Selection Gate — SELECT_FLUENTMODBUS_5_3_2 — MERGE READY (2026-10-13; PR #22 OPEN targeting main, head `fdc81d801aecabd3f00350948d69a9f9b49f9244`, parent `91f5a68fdb6cfec74efc82f5237f47c600c61728`, genuine lock `49e404356edee64bb9dbaccd395d8bcc66435881` on `d1ea0324`, implementation repair `b31d1041125b7ea0d5fa758c02c6994edd32e0d4`): FluentModbus 5.3.2 selected, NModbus 3.0.83 rejected, Raw Socket not selected; foundation `adapters/tc-acquisition` (`ITcReadOnlyClient`, explicit FC03/FC04 no fallback, BigEndian candidate, one-outstanding READ_BUSY, cancellation/timeout/error classification, generation/stale fencing, memory copy, no write, self-owned, genuine `packages.lock.json` `49e4043`); Owner-local validation PASS (genuine restore PASS, locked restore PASS×2 no drift, targeted Release 0w0e, full Release 0w0e, full .NET 455/455, S2 14/14 S3 11/11 S1–S9 clean, Commissioning 218/218, sensor-map parity PASS), Arena lock/S2/S3/Boundary/Commissioning PASS (no Arena .NET); topology unchanged 6/40/240/216/24/108/I7/I16/502; NOT VERIFIED physical connectivity/reachability/WAGO/FC03-vs-FC04/Unit ID/start register/byte-word order/scaling/wire-break/timing/concurrency/stale/PHYSICAL_TEST/PRODUCTION/device write; next critical-path after Owner merge → new session → new branch → Scope Gate: One-Node Physical TC Read-Only Acquisition (one Node, 40-word candidate, prove reachability/FC/Unit ID/start/raw words/interpretation, no write, no Production, no six-Node until one-Node passes); future: 6 Nodes→216/24 mapping→Kiosk PHYSICAL_TEST Monitor→commissioning baseline→pilot 2–4→full 108/216→Galil G1–G5→Dry Cycle→Production; prohibited probe/write/Production; record: [`STAGE_LIBRARY_SELECTION_GATE_REPORT`](STAGE_LIBRARY_SELECTION_GATE_REPORT.md) and [`ADR-0018`](decisions/ADR-0018-modbus-tcp-client-library-selection.md). PR #22 OPEN — MERGE READY (do not pre-write main merge SHA).**
 
@@ -167,7 +565,7 @@ authored; Owner-local .NET validation is its mandatory pre-merge gate — see
 [`STAGE_0.3A_PLAN.md`](STAGE_0.3A_PLAN.md)); it authorises **no** other stage, and 0.3A-2+
 stay `[NOT AUTHORIZED]` until each is explicitly approved.
 
-### 3.3 Stage 0.4A — Simulator Sequencing Foundation (Owner authorisation 2026-10-08)
+##### 3.3 Stage 0.4A — Simulator Sequencing Foundation (Owner authorisation 2026-10-08)
 
 - **Approved base:** `main` = `909d02846febfe2383f4d712f04455447f62bab0` (PR #6 merge).
 - **Authorised:** CP-0 (status and ADR reconciliation, documentation only; commit subject
@@ -192,7 +590,7 @@ stay `[NOT AUTHORIZED]` until each is explicitly approved.
   REQUIRED** (matrix row A).
 - **Stage state (updated 2026-10-08, final evidence amendment):** CP-0 and CP-1 are **OWNER-LOCALLY VALIDATED** at `03144f4` (Owner-reported: 253 of 253 .NET tests; Release build 0 warnings and 0 errors). F1 blocking state-integrity defect **CLOSED** (`23b276f`, `03144f4`); CP-1 Final Source Review **PASSED**. The earlier "FOLLOW-UP RECOMMENDED BEFORE MERGE, not blocking" classification of F1 is withdrawn. The earlier validated head `2cfe648` (217 tests) is historical. CP-2 scope gate **PROPOSED** in §3.3.1; **CP-2 coding NOT AUTHORIZED**. CP-3 and CP-4 NOT AUTHORIZED. The earlier "Sources are authored in Arena / NOT COMPILED IN ARENA / OWNER-LOCAL VALIDATION REQUIRED" wording is superseded. PR #7 OPEN, NOT MERGED.
 
-### 3.3.1 Stage 0.4A CP-2 scope gate — PROPOSAL (2026-10-08, not authorized)
+##### 3.3.1 Stage 0.4A CP-2 scope gate — PROPOSAL (2026-10-08, not authorized)
 
 **Status: PROPOSAL ONLY. CP-2 coding is NOT AUTHORIZED.** This section does not authorize any source, test, contract, schema, fixture or runtime change. It is ready for Owner ruling. Items marked **[BLOCKING]** in §19 must be ruled before CP-2 coding may start. Vocabulary is taken from the accepted contracts (`packages/contracts/Enums.cs`, `Jobs.cs`, `SafeReturn.cs`, `Sequence.cs`, `Pump.cs`) and from the accepted [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §§1–7. Spike behaviour is an oracle only; it is cited, not adopted. **Prerequisite update (2026-10-08, final evidence amendment):** the F1 correction is delivered in `23b276f` and Owner-locally validated at `03144f4`. The F1 prerequisite is satisfied. This update does not approve CP-2 and does not change the proposal's content.
 
@@ -373,7 +771,7 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 
 **20. Can CP-2 begin after explicit Owner approval?** Yes, but not yet. CP-2 may start only after an explicit Owner message that: (a) approves this scope gate, or a revised version of it; (b) rules on every **[BLOCKING]** item (O-1, O-2, O-3, O-8, O-9, O-10, O-17); (c) names or refuses the new files in O-18; and (d) reaffirms that CP-3 and CP-4 remain NOT AUTHORIZED. CP-2 would then be a separate checkpoint on `arena/bd0a7c64-waterjet-sentinel-suite`, under PR #7, which remains open until the Owner merges it. Until then, no CP-2 code, test, contract, UI or command path may be created.
 
-### 3.3.2 Stage 0.4A CP-2 coding authorization and applied Owner rulings (2026-10-08)
+##### 3.3.2 Stage 0.4A CP-2 coding authorization and applied Owner rulings (2026-10-08)
 
 **Status: CP-2 OWNER-AUTHORIZED for source and tests in `packages/application/Runtime/Sequencing/**` and `tests/runtime.tests/Sequencing/**` only.** This section supersedes the "coding NOT AUTHORIZED" wording of §3.3.1 for CP-2 only. CP-3 and CP-4 remain NOT AUTHORIZED. No `packages/contracts`, fixture, API, Inspector, Runtime host, device or command surface is changed. PR #7 is not continued. The CP-2 PR is opened from the session branch `arena/bba7709c-waterjet-sentinel-suite` and is not merged.
 
@@ -401,7 +799,7 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 
 **Contract blocker check:** none. Every lifecycle, step, pump kind, outcome and AutoSequence name required by CP-2 is either an accepted contract name (reused) or a kernel-internal name with no wire meaning. `packages/contracts` is not modified.
 
-### 3.3.3 Stage 0.4A CP-2 Owner-local validation and Final Source Review (2026-10-08)
+##### 3.3.3 Stage 0.4A CP-2 Owner-local validation and Final Source Review (2026-10-08)
 
 **Status: CP-2 OWNER-LOCALLY VALIDATED at `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c`; CP-2 Final Source Review PASSED (read-only, no blocking defect).** This section records the closeout only. It authorises no new coding. It does not supersede §3.3.2, which remains the coding authorisation for CP-2.
 
@@ -411,7 +809,7 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 - Authority: PR #8 OPEN, NOT MERGED. **CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - Superseding note (2026-10-09, documentation only): the CP-3 authority wording in this section is superseded for CP-3a and CP-3b by §3.3.4 and §3.3.5. CP-3c and CP-4 remain NOT AUTHORIZED. PR #8 is MERGED to `main` at `d884a541163c2d567ab4ba2882a981431a14bfe7`.
 
-### 3.3.4 Stage 0.4A CP-3a and CP-3b coding scope record (2026-10-08)
+##### 3.3.4 Stage 0.4A CP-3a and CP-3b coding scope record (2026-10-08)
 
 **Status: Owner-authorized for CP-3a and CP-3b (completion correction, 2026-10-08).** CP-3a and CP-3b source and tests are scope-locked to the files below, on the session branch `arena/9aa1746c-waterjet-sentinel-suite`, from approved base `d884a541163c2d567ab4ba2882a981431a14bfe7` (`origin/main`; PR #8 merged; CP-2 §19 present). The implementation is NOT VALIDATED until the Owner-local gates pass: a locked restore, a Release build with 0 warnings and 0 errors under `TreatWarningsAsErrors`, the full .NET suite, fixture parity, TypeScript, and the boundary scan. The agent never merges. *Superseded 2026-10-09 by §3.3.5: the Owner-local gates were reported PASS on `a315e90` (Owner-reported).* **CP-3c and CP-4 are NOT AUTHORIZED.** No Inspector UI, `apps/runtime` host, route, contract, fixture, TypeScript, device, PLC, Modbus, Galil, KMotion, DCS, command, POST/PUT/PATCH/DELETE, SSE, database or system-clock change is authorized.
 
@@ -435,7 +833,7 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 
 **6. Protected behaviour.** Snapshot schema `wjss.snapshot/2`, Delta schema `wjss.delta/2`, the single-writer revision model, the gapless Delta chain, Queue capacity 8 with FIFO head-only dispatch, the three-state `activeJob` encoding, WJn paired with IVn, the `RuntimeStage.Marker` value, and the CP-2 release and latch rules are all unchanged.
 
-### 3.3.5 Stage 0.4A CP-3a and CP-3b Owner-local validation and Final Source Review (2026-10-09, documentation only)
+##### 3.3.5 Stage 0.4A CP-3a and CP-3b Owner-local validation and Final Source Review (2026-10-09, documentation only)
 
 **Status: CP-3a and CP-3b OWNER-LOCALLY VALIDATED at `a315e90be28fb5e9662c6a7179587c992273cb88` (Owner-reported; not reproduced in Arena). CP-3a and CP-3b Final Source Review PASSED (read-only at `a315e90`; no blocking defect). VALVE FEEDBACK RETENTION DEFECT: CLOSED.** This section records validation and review only, and it authorises no new coding. **CP-3c NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** This section does not authorise Host integration, an API field or route, an Inspector change, a command or write, SSE, a database, environment-variable scenario selection, runtime execution of scenarios, TEST_HARDWARE or PRODUCTION device access. PR #9 is OPEN and NOT MERGED. The agent does not merge.
 
@@ -515,7 +913,7 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 - **Carried decisions (unchanged by this section).** O-3, O-4, O-8, O-11, FU-3 and FU-5 remain `[OPEN]`. The FU-4 trigger confirmation remains `[OPEN]`. The NB-1 vocabulary decision belongs to the Owner.
 - **Status block (PASSED form).** CP-3a and CP-3b Final Source Review: **PASSED.** Blocking defects: none. Non-blocking follow-ups: NB-1 to NB-8. Valve feedback retention defect: CLOSED. CP-3c NOT AUTHORIZED. CP-4 NOT AUTHORIZED. PR #9 OPEN, NOT MERGED.
 
-### 3.4 Stage 0.4B-1 — Simulation-only Mapping Configuration: Owner validation and Final Source Review (2026-10-10, documentation only)
+##### 3.4 Stage 0.4B-1 — Simulation-only Mapping Configuration: Owner validation and Final Source Review (2026-10-10, documentation only)
 
 **Status: OWNER-LOCALLY VALIDATED at `433189f9e489d7af6770e64c971585d99bf941ad` (Owner-reported). Owner browser review PASSED WITH NON-BLOCKING UI PUNCHLIST (Owner-observed). Final Source Review PASSED, blocking defects none (static). PR #12 OPEN - NOT MERGED.**
 
@@ -532,7 +930,7 @@ Boundary items (no POST, write, API, UI or control path added; boundaries clean)
 
 Record: [`docs/STAGE_0.4B-1_CHECKPOINT.md`](STAGE_0.4B-1_CHECKPOINT.md), section *Owner validation and Final Source Review (2026-10-10, documentation closeout)*.
 
-### 3.5 Stage 0.4B-3 — Primary manufacturer evidence ingestion and read-only process-image preview (2026-10-10, development checkpoint)
+##### 3.5 Stage 0.4B-3 — Primary manufacturer evidence ingestion and read-only process-image preview (2026-10-10, development checkpoint)
 
 **Status: DEVELOPMENT CHECKPOINT `abe7e023eb7b5e3f976d8fbc5c9a5b17079058ed`. Arena validation PASSED for the JavaScript scope. Owner-local validation PASSED (Owner-confirmed). Owner Browser Review PASSED (Owner-confirmed screenshots). PR #15 OPEN at the time of this checkpoint; since MERGED (merge commit `29ee137c1df617a1aa3321c3c891161d5a5bb41a`, verified in Stage 0.4C-0).**
 
@@ -548,7 +946,7 @@ Record: [`docs/STAGE_0.4B-1_CHECKPOINT.md`](STAGE_0.4B-1_CHECKPOINT.md), section
 
 Record: [`docs/STAGE_0.4B-3_CHECKPOINT.md`](STAGE_0.4B-3_CHECKPOINT.md).
 
-### 3.6 Stage 0.4C-0 — Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (2026-10-10, development checkpoint with Owner decisions)
+##### 3.6 Stage 0.4C-0 — Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (2026-10-10, development checkpoint with Owner decisions)
 
 **Status: DEVELOPMENT CHECKPOINT with Owner decisions OQ-01 to OQ-08 recorded (documentation and contract proposal only). Stage 0.4C-1 TC acquisition BLOCKED. PR #16 was OPEN against `main` at the time of this checkpoint; since MERGED at `bd1437586af73a33d43dfafce27b27538183a283` on `2026-10-10T19:37:37Z` — see §3.7.** The checkpoint commit `4babdce` and the Owner-decision successor commit SHAs are recorded in PR #16 and in the final report, not inside their own commits.
 
@@ -567,7 +965,7 @@ Record: [`docs/STAGE_0.4B-3_CHECKPOINT.md`](STAGE_0.4B-3_CHECKPOINT.md).
 
 Record: [`docs/STAGE_0.4C-0_CHECKPOINT.md`](STAGE_0.4C-0_CHECKPOINT.md).
 
-### 3.7 Stage 0.4C-0A — Physical Temperature Acquisition Evidence Intake and Commissioning Source Register (2026-10-10, development checkpoint)
+##### 3.7 Stage 0.4C-0A — Physical Temperature Acquisition Evidence Intake and Commissioning Source Register (2026-10-10, development checkpoint)
 
 **Status: DEVELOPMENT CHECKPOINT (documentation and evidence-intake structure only), SUBMITTED FOR OWNER REVIEW in a new PR against `main`. `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED`. `WIRE_BREAK_DECODING: BLOCKED`. NEW PR OPEN — NOT MERGED.** The checkpoint commit SHA is recorded in the PR and the final report, not inside its own commit (AGENTS §4.6).
 
@@ -589,7 +987,7 @@ Record: [`docs/STAGE_0.4C-0_CHECKPOINT.md`](STAGE_0.4C-0_CHECKPOINT.md).
 
 Record: [`docs/STAGE_0.4C-0A_CHECKPOINT.md`](STAGE_0.4C-0A_CHECKPOINT.md) and [`docs/TC_EVIDENCE_SOURCE_REGISTER.md`](TC_EVIDENCE_SOURCE_REGISTER.md).
 
-### 3.8 Stage 0.4C-0B — Six-Node Thermocouple Topology Baseline Rev1 (2026-10-11 checkpoint, evidence-blocked; 2026-10-12 evidence-review completion on the same branch)
+##### 3.8 Stage 0.4C-0B — Six-Node Thermocouple Topology Baseline Rev1 (2026-10-11 checkpoint, evidence-blocked; 2026-10-12 evidence-review completion on the same branch)
 
 **Status: DEVELOPMENT CHECKPOINT, SUBMITTED FOR OWNER REVIEW in PR #18 against `main` — OPEN, NOT MERGED (do not merge). `SENSOR_TO_TC_CHANNEL_SCHEDULE: VERIFIED_OWNER_SOURCE` (240-row REV1 schedule with recorded conflicts). `STAGE_0.4C-1_TC_ACQUISITION: BLOCKED`. `WIRE_BREAK_DECODING: BLOCKED`.** Commit SHAs are recorded in the PR and the final report, not inside their own commits (AGENTS §4.6). The 2026-10-11 absence record below is preserved as audit history; the completion follows it.
 
@@ -607,7 +1005,7 @@ Record: [`docs/STAGE_0.4C-0A_CHECKPOINT.md`](STAGE_0.4C-0A_CHECKPOINT.md) and [`
 
 Record: [`docs/STAGE_0.4C-0B_CHECKPOINT.md`](STAGE_0.4C-0B_CHECKPOINT.md), [`docs/TC_DRAWING_ISSUE_REGISTER_REV1.md`](TC_DRAWING_ISSUE_REGISTER_REV1.md), [`docs/TC_EVIDENCE_SOURCE_REGISTER.md`](TC_EVIDENCE_SOURCE_REGISTER.md) and [`docs/evidence/`](evidence/tc-schedule-validation-rev1.md).
 
-### 3.9 Stage 0.4C-K1 — Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview (2026-10-12, development checkpoint)
+##### 3.9 Stage 0.4C-K1 — Application-Owned Kiosk Shell and Sensor Commissioning Monitor Preview (2026-10-12, development checkpoint)
 
 **Status: DEVELOPMENT CHECKPOINT, SUBMITTED FOR OWNER REVIEW in a NEW PR against `main` — OPEN, NOT MERGED (do not merge).** Commit SHAs are recorded in the PR and the final report, not inside their own commits (AGENTS §4.6).
 
@@ -636,7 +1034,7 @@ See also §12 Owner-local results, §13 correction and §13.1 handoff commands i
 
 - **Front/Rear thermal-pair semantics and synthetic diagnostic pass (same branch and PR, 2026-10-12; starting at `4d177f6`).** The Owner found that the Synthetic Preview systematically rendered **Rear above Front** for every Product Sensor pair (Front 29.4 / Rear 35.1), which contradicts the approved Sensor geometry and would train the Operator to read the pair backwards. **Exact cause: the synthetic generator** (`syntheticEngineeringValue` applied `sideBias = side === 'F' ? 0 : 4`, biasing every Rear sample up by about 4 °C) — a generation bug, corrected at the source and never by patching rendered text. Rear is now the deterministic paired waterwall-tube-side **reference** and Front is `Rear + the scenario's declared differential`, so **Front > Rear for every complete pair**; both sides stay pure functions of the physical Sensor identity (no RNG, no clock, no rendering-order dependence). Verified at tick 0: 106/106 pairs available, `NORMAL_GOOD` deltas **3.2 … 6.8 °C in 34 distinct values** (never one universal delta), `REDUCED` **0.8 … 1.7**, `NEAR_ZERO` **0.1 … 0.2**, `REVERSED` **−3.4 … −1.0**. New read-only model `packages/commissioning/src/thermalpair.mjs` derives **`dFR = FrontTemperature − RearTemperature`** per render from the authoritative observations: five states (`EXPECTED_POSITIVE`, `REDUCED_POSITIVE_CANDIDATE`, `NEAR_ZERO_CANDIDATE`, `REVERSED_CONTRADICTION`, `DIFFERENTIAL_UNAVAILABLE`) kept strictly separate from Quality, DiagnosticReason, CommissioningState, evidence blocking and the Preview verdict; the delta exists only when both sides are one Product Sensor with exactly one Front and one Rear, both current values valid, the same compatible unit, neither BAD/STALE/DISABLED/communication-loss/wire-break, both finite and the identity complete — never from a Last Valid Value, a historical value, a BAD/STALE/disabled/unassigned value, an I7/I16 conflict row or a copied/substituted measurement, with fourteen named blocking categories and the sign always winning over a scenario label. Presentation: one compact read-only `dFR` row per Wall Map cell (unit only while available, `dFR --` with the named reason otherwise) and a fourth read-only Sensor-detail card (Front value, Rear value, delta, paired state, guidance, synthetic provenance, `FIELD VERIFICATION PENDING`, no automatic effect); the Overview gains no row and no column, the protected totals stay **240 / 106 / 212**, the delta is not a Channel, measurement, Sensor or loop-test target and receives no observation, verdict, remark or Preview result (recording or clearing one side never mutates the other). **`FrontRearDelta` is READ-ONLY DIAGNOSTIC / TREND ONLY** until field baselines and operating regimes are approved: no threshold, alarm, trip, interlock, persistence, deadband, hysteresis or automatic slag classification, and no Cleaning Queue / GlobalQueue / WaterJet dispatch / cleaning job / AutoSequence / pump / valve / motion / automatic-control / field-approval effect; slag wording stays candidate-bounded. **Scenario catalogue 10 → 13** (three appended protected-intact demonstrations; every count contract updated). Arena gates: commissioning check OK + **105/105**, focused package paired tests **16/16**, Operations Preview check OK + **88/88** (was 78), focused page/presentation paired tests **10/10**, kiosk **21/21**, Mapping UI **82/82**, mapping package **268 (261 pass / 7 skipped)**, boundary **S1–S9 clean**, `git diff --check` clean. **NOT RUN in Arena:** .NET build/tests and real-browser execution (no browser engine, no .NET SDK) — these are source-level and stub-DOM proofs, not a visual verification. Owner Manual Review has not passed; the 28-step Owner-local rerun is checkpoint §18.7. Unchanged: topology and evidence, the U-shape geometry and static vertical scrolling contract, the selection identity and synchronisations, the loop-test workflow authority, the Kiosk shell and WebView2 `1.0.4258.31` with its WinForms-only reference isolation, every lock file, loopback-only hosting, the strict CSP, the reconnecting fail-safe and the confirmed exit — **no dependency added or changed**.
 
-### 3.1 Recorded reconciliation of the Stage 0.2 title
+##### 3.1 Recorded reconciliation of the Stage 0.2 title
 
 The Stage 0.1 candidate decomposition listed Stage 0.2 as *Requirements and Configuration
 Model Refinement* and Stage 0.3 as *Architecture and Interface Specification*. Both entries
@@ -658,7 +1056,7 @@ precedence for Stage 0.2, so the ledger above records the approved title. Conseq
    [`CURRENT_STATE.md`](CURRENT_STATE.md) section 8 and in
    [`ARCHITECTURE.md`](ARCHITECTURE.md) section 34, each with the gate that must close it.
 
-### 3.2 Proposed Stage 0.2.1 — UI and Runtime Technology Spike
+##### 3.2 Proposed Stage 0.2.1 — UI and Runtime Technology Spike
 
 > **SUPERSEDED.** The Owner replaced the dual-candidate proposal with the React-first Stage 0.2.1A feasibility spike; React was subsequently selected as the Primary UI Framework (Owner decision, 2026-10-07); a Blazor counter-spike is not required unless a future material blocker is identified. This section is retained as history.
 
@@ -678,7 +1076,7 @@ Full workload, measurement, and constraint detail is in
 [`ARCHITECTURE.md`](ARCHITECTURE.md) section 33. The spike is **not** authorised by Stage 0.2,
 and Stage 0.2 does not start it.
 
-## 4. Gate evidence rules
+#### 4. Gate evidence rules
 
 For every stage, the report must contain:
 
@@ -690,7 +1088,7 @@ For every stage, the report must contain:
 A stage is not complete until its validation evidence exists and its discrepancies are
 documented. Claims of success without observed tool output are prohibited.
 
-## 5. Standing constraints across every stage
+#### 5. Standing constraints across every stage
 
 These constraints apply to all stages unless a gate explicitly lifts one of them:
 
@@ -715,7 +1113,7 @@ These constraints apply to all stages unless a gate explicitly lifts one of them
 9. **The Operations UI close guard is an operational usability control, not a safety
    protection.** No stage may describe it as hardware fail-safe.
 
-## 6. Definition of done for a documentation stage
+#### 6. Definition of done for a documentation stage
 
 A documentation stage is done when:
 
@@ -735,7 +1133,7 @@ has been submitted and re-review has been requested.
 
 ---
 
-## Related documents
+#### Related documents
 
 - [`AGENTS.md`](../AGENTS.md) — working contract
 - [`CURRENT_STATE.md`](CURRENT_STATE.md) — verified state, stage status, and open items
@@ -744,10 +1142,10 @@ has been submitted and re-review has been requested.
 - [`TEST_STRATEGY.md`](TEST_STRATEGY.md) — planned verification approach
 - [`decisions/README.md`](decisions/README.md) — decision records
 
-### Stage 0.4A CP-3c-1 development scope
+##### Stage 0.4A CP-3c-1 development scope
 Owner-authorized library-only atomic Runtime publication foundation on approved main `6b0ff7e`. State, matching Delta and bounded history must be one reader-visible generation. Existing Host composition is unchanged; CP-3c-2 and CP-4 are not authorized. See `STAGE_0.4A_CP-3C-1_CHECKPOINT.md` for development status; Owner-local validation remains required.
 
-### Stage 0.4A CP-3c-1 Owner-local validation and Final Source Review
+##### Stage 0.4A CP-3c-1 Owner-local validation and Final Source Review
 
 Owner-reported validation at code head `29f133ce6598bc2eb489273a2f2d40f8827deb5f` (.NET SDK 10.0.401; not run in Arena): locked restore PASS, lock drift NONE; Release build PASS, 0 warnings, 0 errors; RuntimePublicationTests **20/20**, Runtime.Core **450/450**, full .NET **572/572**, fixture parity **7/7**, TypeScript typecheck PASS and tests **31/31** (0 failed); boundary scan **0 findings, S1–S9 clean**; `git diff --check` PASS; final Owner-local working tree CLEAN. Failed 0, skipped 0 in each reported .NET suite; no Owner-local artifact commit required.
 

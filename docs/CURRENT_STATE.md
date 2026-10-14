@@ -1,6 +1,353 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
-## 2026-10-13 — Current: one-Node TC bench SOFTWARE VALIDATION CLOSED
+## 1. Current Status
+
+| Question | Answer |
+| --- | --- |
+| Current stage | `0.4C-K6` — T01 Physical Execution Enablement and Bench Readiness |
+| Stage status | **IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED** |
+| Approved `main` | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
+| Session branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
+| Default build | **Physically disabled** — a normal build cannot construct a physical client |
+| Physical evidence | **None.** No hardware contact, no passive capture, no port 502 access, no T01 execution |
+| Application version | **NOT ESTABLISHED** — no runtime release exists |
+| Next gate | 1. Final canonical documentation and complete source review. 2. Open or update the K6 pull request targeting main. 3. Complete PR readiness and CI review. 4. Owner merge decision. |
+
+```text
+HARDWARE CONTACT NOT AUTHORIZED
+T01 NOT AUTHORIZED
+PASSIVE CAPTURE NOT AUTHORIZED
+PORT 502 ACCESS NOT AUTHORIZED
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED
+RUNTIME/KIOSK PHYSICAL INTEGRATION NOT AUTHORIZED
+SIX-NODE ACQUISITION NOT AUTHORIZED
+PRODUCTION NOT AUTHORIZED
+WRITE/CONTROL NOT AUTHORIZED
+```
+
+## 2. Approved Repository Identity
+
+| Item | Value |
+| --- | --- |
+| Repository | `waterjet-sentinel-suite` |
+| Approved `main` | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (PR #23 merge commit; parents `2ba0b6f4…` and `55ab8bed…`) |
+| K6 approved base | the same commit |
+| K6 implementation chain | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` (initial), `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` (namespace correction), `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` (current validated head) |
+| Direct parents | `00eb3c6…` → `e40d43b…` → `00c2c07…` → `193aba76…` |
+| Validated Implementation Head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Approved Candidate Revision | `e255aaf8d3a8b5dced3e020e470488a01bdfd4fa` |
+| Documentation Replacement Commit | the Git commit created by this Atomic Replacement pass — reported after commit and not pre-written into this file |
+| Merge authority | **Owner only.** Agents never merge |
+
+Identity discipline: a new session verifies the current remote refs before relying on any SHA
+recorded here, and must not treat a SHA pre-written in documentation as the identity of a commit it
+is about to create.
+
+- **Implementation identity versus documentation identity.** The Validated Implementation Head is
+  `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. The Candidate documentation commits —
+  `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate foundation),
+  `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction) and
+  `e4c3a37f6ad84194ad2e32287b3c53a4514bd806` (CR-02 refinement) and the CR-03 revision commit — are documentation-only and are **not** part of the validated implementation
+  head; no implementation path changed in them.
+
+## 3. Current Stage — 0.4C-K6
+
+| Field | Value |
+| --- | --- |
+| Stage | `0.4C-K6` |
+| Title | T01 Physical Execution Enablement and Bench Readiness |
+| Status | **IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED** |
+| Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
+| Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
+| Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
+| Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
+
+Scope of the stage: make a **single, Owner-authorized, one-node physical T01 read-only trial
+executable** in principle — under explicit signed authorization and only after every fail-closed gate
+passes — without performing that trial, without contacting hardware, and without weakening any
+existing boundary. The default build stays physically disabled and no authorization artifact exists.
+
+## 4. Implementation Delivered
+
+- immutable build identity
+- default physical capability disabled
+- detached Owner-signed authorization verification
+- ECDSA NIST P-256 / SHA-256 trust profile
+- SubjectPublicKeyInfo public-key representation
+- exact canonical authorization payload
+- single-use authorization consumption marker
+- replay rejection
+- exact candidate binding
+- physical-client construction only after all gates pass
+- one client
+- one connection attempt
+- at most one read
+- no retry
+- no reconnect
+- no fallback
+- outer lifecycle budget
+- cleanup-overdue evidence
+- worker-observation evidence
+- generation and epoch fencing
+- quarantined physical acquisition output
+- no automatic ACCEPTED path
+- no passive capture implementation
+- no Runtime/Kiosk integration
+- no device write/control path
+
+
+Grouped reading: identity and capability (items 1–2); authorization and trust (items 3–9); one-shot
+execution discipline (items 10–16); lifecycle and evidence (items 17–21); explicit non-delivery and
+preserved boundaries (items 22–25).
+
+## 5. Validation Evidence
+
+### 5.1 Owner-local (authoritative)
+
+**Restore**
+
+- normal restore: PASS
+- locked restore: PASS twice
+- lock drift: none
+
+**Build**
+
+- targeted adapter Release build: PASS
+- targeted TC bench Release build: PASS
+- focused test-project Release build: PASS
+- full solution Release build: PASS
+- the reported builds completed with no reported warnings or errors
+
+**Focused tests**
+
+- 95 total
+- 95 passed
+- 0 failed
+- 0 skipped
+
+**Dry run**
+
+- mode SIMULATION
+- physical capability false
+- connect NOT_ISSUED
+- read NOT_ISSUED
+- TrialAcceptance QUARANTINED
+- no copied words
+- no physical I/O
+
+**Default PHYSICAL_TEST attempt**
+
+- refused
+- refusal code `PHYSICAL_CAPABILITY_DISABLED`
+- `acquisitionPerformed` false
+- `deploymentState` `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED`
+- no physical-capable deployment build
+- no real authorization artifact
+- no real Owner signing key
+- no physical contact
+
+**Full .NET**
+
+- 550 total
+- 550 passed
+- 0 failed
+- 0 skipped
+
+**Node/static validation**
+
+- exporter 18/18
+- S2 14/14
+- S3 19/19
+- Boundary S1–S9 zero findings
+- Commissioning check PASS
+- Commissioning 218/218 on the canonical LF representation
+- fixture parity verify-only 7/7
+- `WJSS_UPDATE_FIXTURES` false
+- final working tree clean
+- no lock drift
+- no fixture drift
+- no documentation drift at the validated implementation head
+
+**R40 disposition**
+
+- first normal Windows commissioning run: 217/218
+- only R40 failed
+- the mismatch was LF versus CRLF representation
+- no JSON-content, topology or Product defect
+- the approved generator produced the canonical LF representation
+- canonical LF Commissioning rerun: 218/218
+- the original Owner-local fixture was restored byte-for-byte
+- original/restored Owner-local SHA-256: `CC3F45ADF43CED351F1E8AE0D17D06AEA181FD94D119126DF0659AAC3385DA80`
+- the canonical LF SHA-256 was observed in an earlier generation run as `3BC8774CB74183080297BB89C3A855DB8E46782B421DF41AB955C1CA50A8256A`
+- **Limitation:** the canonical hash was not recomputed in the same execution as the final 218/218 run
+- final worktree clean
+- no generated fixture was committed
+
+### 5.2 Agent/Arena (separate scope; Arena had no `dotnet`)
+
+Agent/Arena reported, separately from Owner-local validation:
+
+- exporter 18/18
+- S2 14/14
+- S3 19/19
+- Boundary S1–S9 clean
+- Commissioning 220/220 with the corrected documentation guard (218 pre-existing tests plus the 2
+  authorized regression tests added for the promoted heading layout)
+- the guard correction changed only that single existing documentation-guard test; no evidence
+  assertion was removed or relaxed
+- JavaScript syntax checks passed
+- changed-path and protected-surface proofs passed
+- genuine locks unchanged
+
+Agent did **not** have `dotnet` and must **not** be credited with:
+
+- C# compilation
+- analyzer execution
+- xUnit or .NET tests
+- .NET fixture parity
+- physical execution
+
+### 5.3 Manual/Physical Evidence
+
+**None.** No hardware contact, no passive capture, no port 502 access, no T01 execution, no
+physical-capable deployment build, no real Owner signing key and no real authorization artifact.
+Physical reachability, interoperability, function code, Unit ID, start register, byte/word order,
+process image, channel mapping, scaling, wire-break decoding and framing identity all remain
+**NOT VERIFIED**. This section stays empty until an authorized trial produces evidence.
+
+### 5.4 Not Run / Not Verified
+
+- Not run by Agent: C# build, analyzer execution, xUnit/.NET tests, .NET fixture parity, physical
+  execution — Arena has no `dotnet`.
+- Not run by anyone in K6: any physical trial, capture, write or control action.
+- Not verified: every physical identity and framing fact listed in 5.3; the standing NOT VERIFIED
+  list is preserved verbatim in section 11 (`## 9. Not verified — standing list`).
+- **R40 limitation:** the canonical LF SHA-256 (`3BC8774C…`) was observed in an earlier generation
+  run and was **not recomputed in the same execution** as the final 218/218 run.
+
+## 6. Current Authorization Boundary
+
+```text
+HARDWARE CONTACT NOT AUTHORIZED
+T01 NOT AUTHORIZED
+PASSIVE CAPTURE NOT AUTHORIZED
+PORT 502 ACCESS NOT AUTHORIZED
+PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED
+RUNTIME/KIOSK PHYSICAL INTEGRATION NOT AUTHORIZED
+SIX-NODE ACQUISITION NOT AUTHORIZED
+PRODUCTION NOT AUTHORIZED
+WRITE/CONTROL NOT AUTHORIZED
+```
+
+- The default build remains **physically disabled**.
+- **K6 validation does not authorize K7.**
+- Every later trial requires separate authorization; there is no T01–T04 batch approval and a failure
+  does not authorize another candidate.
+- Runtime/Kiosk physical integration, six-node acquisition, production and write/control remain
+  unauthorized.
+
+## 7. Current Critical Path
+
+1. Final canonical documentation and complete source review. — **in progress**
+2. Atomic Replacement completed and validated. — **DONE**
+3. Owner PR review and merge decision for the K6 checkpoint. — **K6 NOT MERGED**
+4. Separate Owner Scope Gate for K7. — **NOT AUTHORIZED**
+5. Later stages per
+   [`MASTER_PLAN.md`](MASTER_PLAN.md) section 4 — **PLANNED / FUTURE, NOT AUTHORIZED**.
+
+## 8. Risks and Evidence Gaps
+
+| # | Item | Nature |
+| --- | --- | --- |
+| R1 | K6 is not merged | The implementation exists on the session branch only; merging is an Owner decision |
+| R2 | Documentation candidates were unaudited by the Owner | Closed: Candidate revision approved, Atomic Replacement completed and validated |
+| R3 | R40 canonical-LF hash not recomputed in the final run | Labeled limitation; the authoritative figure is the restored Owner-local SHA-256 `CC3F45AD…` |
+| R4 | Physical identity unproven | Port 502, FC03/FC04, Unit ID, start address, quantity, endianness and framing sizes remain candidates only |
+| R5 | No authorization artifact or Owner signing key exists | The physical-capable trust path has never been exercised end-to-end |
+| R6 | Wireless/wire evidence chain unexercised | No capture implementation and no independent wire review exist in K6 |
+| R7 | K7 dependency | K7 cannot start without its own Owner Scope Gate and an authorized deployment identity |
+| R8 | Lock representation differences | Committed LF versus Owner-local CRLF are representation-only; no integrity or content defect is implied |
+
+## 9. Changed / Unchanged / Not Verified (K6 scope)
+
+**Changed by K6** (final branch range, `193aba76…` → the K6 branch head; 19 changed paths):
+
+- the **14 authorized K6 implementation/test/tool paths** — the isolated bench tooling under
+  `apps/tc-bench/` (build identity, authorization gate, runner, evidence model, program entry), the
+  focused test project under `tests/tc-acquisition.tests/`, and the offline catalog exporter under
+  `tools/tc-bench/` with its test;
+- the **4 promoted canonical documents** — `README.md`, `CHANGELOG.md`, `docs/CURRENT_STATE.md` and
+  `docs/MASTER_PLAN.md` — produced by the Atomic Replacement;
+- the **existing Commissioning documentation-guard test**
+  `packages/commissioning/test/tcAcquisitionEvidence.test.mjs`, whose Stage 0.4C-K3 `CHANGELOG.md`
+  section extraction was made heading-level aware, together with the **2 authorized regression tests**
+  added to it;
+- **removal of the Candidate-only paths** (`README.candidate.md`, `CHANGELOG.candidate.md`,
+  `docs/CURRENT_STATE.candidate.md`, `docs/MASTER_PLAN.candidate.md`) from the final tree during that
+  Atomic Replacement — absent from the final tree and net-zero in the final range.
+
+Exact per-commit file lists are in the commit chain `00c2c07…`, `e40d43b…`, `00eb3c6…`; the promoted
+canonical documents and the documentation-guard correction are in the later documentation commit(s).
+
+**Unchanged:**
+
+- Product behaviour after the Validated Implementation Head
+  `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`;
+- Runtime and Kiosk;
+- TC configuration and topology;
+- dependency declarations;
+- package lock files;
+- fixtures and generators;
+- the physical authorization boundary.
+
+The only change under `packages/` in the final range is the documentation-guard test named above; no
+broad "packages unchanged" claim is made.
+
+**Not verified:** everything in 5.3 and 5.4.
+
+**Documentation-guard correction (this pass).** The approved documentation hierarchy exposed one
+H2-only assumption in the single test that reads and parses `CHANGELOG.md`; the guard is now
+heading-level aware and bounds the exact Stage 0.4C-K3 section by the next heading of the same
+level. That existing guard test was changed and two authorized regression tests were added; no
+evidence assertion was removed or relaxed. The guard passes on the authoritative layout and on the
+promoted layout, and the Commissioning suite passes on both. These are Agent/Arena runs: the
+Owner-local .NET validation in 5.1 was **not** rerun after this documentation-only correction, and no
+Product behaviour, evidence source, dependency, lock, configuration, fixture or generator changed.
+
+## 10. Immediate Next Gate
+
+**Final canonical documentation and complete source review.** The Owner approved the exact Candidate
+revision and separately authorized Atomic Replacement, which was completed and validated. PR
+readiness and the Owner merge decision are the next steps; no K7 activity may begin.
+
+## 11. Historical Current-State Records
+
+The authoritative `docs/CURRENT_STATE.md` is preserved verbatim below, including every dated
+current-status passage, checkpoint record, validation record and open-item list. Heading levels are
+demoted by two so this document keeps one heading hierarchy.
+
+**Supersession notes (navigation only; the preserved text is not rewritten):**
+
+- The preserved `## 2026-10-13 — Current: one-Node TC bench SOFTWARE VALIDATION CLOSED` block records
+  the **K5-era** closeout (`c0bc2c7…` / `e71e33b…`, focused 81/81, full .NET 536/536). That work was
+  merged as PR #23 into `main` at `193aba76…`, the approved base of K6. The current position is
+  section 1 above.
+- All older current-status and next-step passages remain dated records of their checkpoints, including
+  the CF-07 observation that the README status block lagged the then-current stage.
+
+---
+
+### Historical record — verbatim preservation of the authoritative original
+
+The block below is the complete text of `docs/CURRENT_STATE.md` as it exists at candidate source head
+`00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. Wording, tables, links, counts, SHAs, dates and statuses are unchanged. Only the
+Markdown heading level is shifted by two (for example `##` → `####`) so that this candidate keeps a
+single heading hierarchy; every heading's original text is retained verbatim.
+
+### Current State — WaterJet Sentinel Suite (WJSS)
+
+#### 2026-10-13 — Current: one-Node TC bench SOFTWARE VALIDATION CLOSED
 
 **READY FOR OWNER PR REVIEW — SOFTWARE ONLY.** Final documentation/proof gates must pass
 before MERGE READY recommendation; PR targets `main` and remains OPEN, not merged by Agent.
@@ -91,7 +438,7 @@ rather than silently resolved.
 
 ---
 
-## 1. Status legend
+#### 1. Status legend
 
 Used throughout the documentation:
 
@@ -108,7 +455,7 @@ Stage implementation status uses a separate vocabulary: `SUBMITTED FOR OWNER REV
 `CHANGES REQUESTED`, `IN PROGRESS`, `OWNER ACCEPTED`, `NOT MERGED`, `MERGED`. Only the Owner
 may record `OWNER ACCEPTED` or `MERGED`.
 
-## 2. Stage and approval status
+#### 2. Stage and approval status
 
 **Latest Stage 0.4B-3 position (2026-10-10): DEVELOPMENT CHECKPOINT `abe7e023eb7b5e3f976d8fbc5c9a5b17079058ed` on `arena/00483ae4-waterjet-sentinel-suite`, base `main` `3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6` (PR #14 MERGED). Arena validation PASSED: Mapping package 268 tests / 261 pass / 0 fail / 7 pre-existing Owner-local skips, and 268 / 268 / 0 / 0 with the authoritative workbook supplied; Mapping UI 82 / 82; boundary scan S1–S9 clean. Owner-local Stage 0.4B-3 validation PASSED and Owner Browser Review PASSED — both Owner-confirmed, the Browser Review resting on Owner-provided screenshots that do not claim exhaustive browser interaction or responsive coverage. Non-process modules (750-601, 750-613, 750-600, 750-362 head station) are `NOT_APPLICABLE` / `NON_PROCESS_DATA_MODULE`; every other address remains `ADDRESS_UNRESOLVED`; the candidate process image is `CANDIDATE_UNVERIFIED` with no invented byte, word or bit offset. AI-002 Runtime publication NOT IMPLEMENTED. No MODBUS, no TEST_HARDWARE, no PRODUCTION, no device write or control. PR #15 OPEN, NOT MERGED. See §12.33.**
 
@@ -232,7 +579,7 @@ sequence, classification, or revision behaviour. Identical wall-clock timing is 
 
 The Stage 0.1 process-deviation record in section 11.1 is retained unchanged.
 
-## 3. Application version
+#### 3. Application version
 
 | Item | Value |
 | --- | --- |
@@ -243,7 +590,7 @@ The Stage 0.1 process-deviation record in section 11.1 is retained unchanged.
 
 No governance rule requires a documentation stage to advance a version number.
 
-## 4. Repository state
+#### 4. Repository state
 
 | Item | State |
 | --- | --- |
@@ -261,7 +608,7 @@ No governance rule requires a documentation stage to advance a version number.
 | Production configuration | **Does not exist in this repository** |
 | Device connections made | **None** |
 
-## 5. Verified system state
+#### 5. Verified system state
 
 - Stage 0.2 is a documentation and architecture-decision activity only. It created no runtime
   artefact and installed no dependency.
@@ -292,7 +639,7 @@ No governance rule requires a documentation stage to advance a version number.
 - The documentation distinguishes approved behaviour (`[APPROVED]`), Owner review decisions
   (`[OWNER CONFIRMED]`), and proposals (`[PROPOSED]`).
 
-## 6. Owner-confirmed decisions closed during documentation review
+#### 6. Owner-confirmed decisions closed during documentation review
 
 These were previously `[OPEN]` or ambiguously described. They are now settled and must not be
 reopened without a new Owner decision.
@@ -313,7 +660,7 @@ reopened without a new Owner decision.
 | 12 | Cross-wall DirtyScore tie-break is not required; GlobalQueue order comes from the fixed source order | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §2 |
 | 13 | Baseline role for the DCS Permissive Override is **Operator**: the Operator role template holds permission to activate **and** release it; a role without the permission cannot do either. The permission model remains configurable, and the baseline assignment remains Operator until an explicit Owner decision changes it | [`USER_PERMISSION_MODEL.md`](USER_PERMISSION_MODEL.md) §5, [`REQUIREMENTS.md`](REQUIREMENTS.md) OVR-011..OVR-015 |
 
-## 7. Blocking constraints in force right now
+#### 7. Blocking constraints in force right now
 
 1. **No production device access.** `[NOT AUTHORIZED]`
 2. **No production valve or pump write control** until the bench verification in
@@ -329,13 +676,13 @@ reopened without a new Owner decision.
 8. **No reuse of PR #1 or PR #2.** Stage 0.2.1A is delivered through one new pull request to
    `main`, as instructed by the Owner. `[APPROVED]`
 
-## 8. Open items requiring Owner decisions
+#### 8. Open items requiring Owner decisions
 
 These remain unresolved. None may be resolved by assumption. Items closed by the review
 punchlist have been removed; see section 6 for what was closed. Items are grouped below by
 theme rather than numbered, because the list changes as decisions are taken.
 
-### 8.1 Product and technology
+##### 8.1 Product and technology
 
 The Stage 0.1 open technology items were addressed by Stage 0.2. Each one is now either a
 `[PROPOSED]` architecture decision awaiting Owner acceptance, an `[OPEN]` item with a named
@@ -368,7 +715,7 @@ items are listed in section 34 of the same document, and the decision records ar
 | Sensor cell colour tokens, typography, dimensions, animation; accessibility requirement level | `[OPEN]` — deliberately deferred to a future UX/UI decision |
 | Acceptance thresholds for the Stage 0.2.1 spike | `[OPEN]` — must be set before the spike runs |
 
-### 8.2 Sequence, queue, and equipment behaviour
+##### 8.2 Sequence, queue, and equipment behaviour
 
 | Item | Affects |
 | --- | --- |
@@ -393,7 +740,7 @@ Owner logical labels (`G+2xx`, `G+1xx`, `G`, `H`, `I`, `J`). This is no longer a
 question. Production scan order, device distribution, and Water Jet assignment stay
 deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.2.1.
 
-### 8.3 DCS and communication
+##### 8.3 DCS and communication
 
 | Item | Affects |
 | --- | --- |
@@ -403,7 +750,7 @@ deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.
 | Exact local equipment network topology and address plan | [`ARCHITECTURE.md`](ARCHITECTURE.md) §2, [`REQUIREMENTS.md`](REQUIREMENTS.md) PHY-008 |
 | Stale-data timeout production value (30 s is an example only) | [`ARCHITECTURE.md`](ARCHITECTURE.md) §5 |
 
-### 8.4 Alarms, users, and data
+##### 8.4 Alarms, users, and data
 
 | Item | Affects |
 | --- | --- |
@@ -421,7 +768,7 @@ deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.
 | Critical Main Pump / Mandatory Safe Return policies: Safe Return failure, valve / axis failures, outcomes, re-queue, retry, acknowledge role, clear evidence, Resume authority, modal minimise, second alarm channel | [`spikes/critical-pump-safe-return-decision-matrix.md`](spikes/critical-pump-safe-return-decision-matrix.md) (every row `OWNER DECISION REQUIRED`) |
 | Production Pause / Resume semantics (pause the AutoSequence or the Cleaning Job lifecycle) replacing the superseded queue-level `HELD` (**OWNER DECISION REQUIRED**) | [`QUEUE_MODEL.md`](QUEUE_MODEL.md) §7.2 |
 
-## 9. Not verified — standing list
+#### 9. Not verified — standing list
 
 | Item | Reason |
 | --- | --- |
@@ -443,7 +790,7 @@ deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.
 | Runtime build, unit tests, integration tests, database tests, hardware tests | No Product code exists; not applicable. Stage 0.2.1A synthetic spike tests are recorded in section 12.3 and are not Product verification |
 | Stage 0.2.1A WebView2, kiosk, end-to-end latency, long-run UI, Windows offline restore | Not measurable in Arena and not validated. The installed-Edge Owner-local final gate and manual review **PASSED** at `114c0761` (Owner-reported, 2026-10-07); controlled 15- / 60-minute observations waived as merge blockers, not run |
 
-## 10. Sensitive data review
+#### 10. Sensitive data review
 
 | Check | Result |
 | --- | --- |
@@ -458,7 +805,7 @@ deployment data, `[NOT VERIFIED]`. See [`DOMAIN_MODEL.md`](DOMAIN_MODEL.md) §2.
 
 The checks behind this table are listed with their observed results in section 12.
 
-## 11. Checkpoint record
+#### 11. Checkpoint record
 
 > *Topology note (2026-10-12):* the dated records in this section quote the topology figures believed at their time (104 / 208, then 106 / 212 with I7 and I16 as Cannon slots or `NON_SENSOR_GAP` positions). They are retained unedited as history. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 
@@ -480,7 +827,7 @@ The checks behind this table are listed with their observed results in section 1
 Each correction is a new commit on the existing branch. No reviewed checkpoint was amended,
 rebased, or rewritten.
 
-### 11.2 Stage 0.2 checkpoint record
+##### 11.2 Stage 0.2 checkpoint record
 
 | Item | Value |
 | --- | --- |
@@ -502,7 +849,7 @@ rebased, or rewritten.
 *Rows above that described the Stage 0.2 review-in-progress state were replaced when the Owner
 accepted and merged Stage 0.2.*
 
-### 11.3 Stage 0.2.1A checkpoint record
+##### 11.3 Stage 0.2.1A checkpoint record
 
 | Item | Value |
 | --- | --- |
@@ -529,7 +876,7 @@ accepted and merged Stage 0.2.*
 | Stage 0.3 | **NOT AUTHORIZED** |
 | Production Device access | **NOT AUTHORIZED** |
 
-### 11.4 Stage 0.3A-1 Product Foundation Source Checkpoint record
+##### 11.4 Stage 0.3A-1 Product Foundation Source Checkpoint record
 
 | Item | Statement |
 | --- | --- |
@@ -543,7 +890,7 @@ accepted and merged Stage 0.2.*
 | Next | ~~Owner-local runbook PASS~~ **DONE** → Owner merges PR #4 (READY FOR OWNER MERGE — closeout 2026-10-07, see §12.22) → Owner explicitly authorizes **0.3A-2** (nothing advances otherwise; no ZIP before Stage 0.3 exit) |
 | CLOSEOUT (2026-10-07) | Rows above describing "Node-authored fixtures", "NOT READY FOR MERGE" and blanket "NOT verified" are preserved as authored-time state. Authoritative current state: Owner-local Release build PASS (0/0), fresh suite **61/61**, TS 24/24, parity 7/7, boundary clean; fixtures and the 12 lock files are the genuine .NET/restore outputs transferred via handoff `488b98fb…`; SDK pinned `global.json` → `10.0.401`. **PR #4 READY FOR OWNER MERGE — NOT MERGED**; 0.3A-2 and Production devices NOT AUTHORIZED |
 
-### 11.5 Stage 0.3A-2A Runtime State Foundation — Checkpoint A record
+##### 11.5 Stage 0.3A-2A Runtime State Foundation — Checkpoint A record
 
 | Item | Statement |
 | --- | --- |
@@ -559,7 +906,7 @@ accepted and merged Stage 0.2.*
 | Status | **Checkpoint A COMPLETE for development checkpoint** (Owner-locally validated; SUBMITTED FOR OWNER REVIEW — NOT MERGED, the Agent never merges) |
 | Next | **Checkpoint B AUTHORIZED** (deterministic synthetic evolution + Snapshot/Delta foundation) — see §11.6; Checkpoint C (read-only API + lightweight Runtime Inspector) remains **NOT AUTHORIZED** |
 
-### 11.6 Stage 0.3A-2A Checkpoint B — deterministic synthetic evolution + Snapshot/Delta foundation
+##### 11.6 Stage 0.3A-2A Checkpoint B — deterministic synthetic evolution + Snapshot/Delta foundation
 
 | Item | Record |
 | --- | --- |
@@ -575,7 +922,7 @@ accepted and merged Stage 0.2.*
 | Status | **Checkpoint B COMPLETE for a development checkpoint** (Owner-locally validated; SUBMITTED FOR OWNER REVIEW — NOT MERGED). Checkpoint B is **OWNER-LOCALLY VALIDATED** |
 | Next | **Checkpoint C AUTHORIZED and delivered as source** — SIMULATOR runtime composition, deterministic evolution lifecycle, read-only Runtime API (`GET /api/v1/snapshot`, `GET /api/v1/runtime`, `GET /api/v1/deltas`), readiness semantics and a development-only Runtime Inspector; see §11.7. Owner-local Function/Logic/UI review per runbook §14 is the validation of record |
 
-### 11.7 Stage 0.3A-2A Checkpoint C — SIMULATOR runtime composition, read-only Runtime API and development Runtime Inspector
+##### 11.7 Stage 0.3A-2A Checkpoint C — SIMULATOR runtime composition, read-only Runtime API and development Runtime Inspector
 
 | Item | Record |
 | --- | --- |
@@ -595,7 +942,7 @@ accepted and merged Stage 0.2.*
 | Status | **Checkpoint C COMPLETE for a development checkpoint** (Owner-locally validated; SUBMITTED FOR OWNER REVIEW — NOT MERGED) |
 | Next | **Final Source Review** of PR #5 (Owner-only; the Agent never merges). The Inspector is frozen for this checkpoint: no further presentation change is authorised, and the deferred optional polish (top-row vertical balance) must not trigger another change round. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |
 
-### 11.8 Stage 0.3A-3 — Equipment topology & legacy parameter migration — Checkpoints A and B
+##### 11.8 Stage 0.3A-3 — Equipment topology & legacy parameter migration — Checkpoints A and B
 
 | Item | Record |
 | --- | --- |
@@ -609,7 +956,7 @@ accepted and merged Stage 0.2.*
 | Status | **Checkpoint B COMPLETE — OWNER-LOCALLY VALIDATED** (SUBMITTED FOR OWNER REVIEW — PR #6 **OPEN, NOT MERGED**; only the Owner merges) |
 | Next (SUPERSEDED 2026-10-08 — see the CP-0 reconciliation block in §2) | Historical: PR #6 was later merged (`909d028`) and Checkpoint C was later authorised and validated (§11.9). Original text: Owner-only final source review of PR #6. **Checkpoint C NOT AUTHORIZED and NOT STARTED** (proposed scope — atomic CANNON vocabulary migration, Runtime topology integration, Inspector overlays — is documented in [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md) §4 only). `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |
 
-### 11.9 Stage 0.3A-3 Checkpoint C — atomic Runtime topology migration and read-only Inspector integration
+##### 11.9 Stage 0.3A-3 Checkpoint C — atomic Runtime topology migration and read-only Inspector integration
 
 | Item | Record |
 | --- | --- |
@@ -631,7 +978,7 @@ accepted and merged Stage 0.2.*
 | Status | **Checkpoint C COMPLETE — OWNER-LOCALLY VALIDATED** (PR #6 PREPARED FOR FINAL SOURCE REVIEW — **OPEN, NOT MERGED**; only the Owner merges) |
 | Next | Owner-only final source review of PR #6. `TEST_HARDWARE` and `PRODUCTION` remain NOT AUTHORIZED |
 
-### 11.1 Process deviation record
+##### 11.1 Process deviation record
 
 | Item | Statement |
 | --- | --- |
@@ -645,7 +992,7 @@ accepted and merged Stage 0.2.*
 
 This record is retained deliberately. Git history was not rewritten to remove the deviation.
 
-### 11.10 Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel (source authored)
+##### 11.10 Stage 0.4A CP-2 — Cleaning Job, Mandatory Safe Return and Critical Pump Kernel (source authored)
 
 - **Status:** SOURCE AUTHORED; STATICALLY REVIEWED; NOT COMPILED IN ARENA; NOT EXECUTED IN ARENA; **OWNER-LOCAL VALIDATION REQUIRED**. Branch `arena/bba7709c-waterjet-sentinel-suite`, base `8323f78`. PR open, not merged.
 - **Delivered (pure `Runtime.Core` kernel, no host, API, Inspector, device or route):** single Active Job with lifecycle and abstract Pump and feedback inputs; Mandatory Safe Return SR1 to SR7 in the Owner order; outcome recorded only after SR5, in the same transition as SR6 and SR7 (release); Safe Return failure retains the Job with RECOVERY_REQUIRED evidence; critical latch persists after release; one evidence sequence; `SafeReturnReleaseEvidence` removed.
@@ -655,7 +1002,7 @@ This record is retained deliberately. Git history was not rewritten to remove th
 - Full record: `docs/STAGE_0.4A_CP-2_CHECKPOINT.md`.
 - **Owner-local closeout (2026-10-08, §12.31):** OWNER-LOCALLY VALIDATED at `1f94991`; CP-2 Final Source Review PASSED (read-only, no blocking defect); F2 PASSED; F3 PASSED; EXPECTED_STOP refusal during CLEANING PASSED. Non-blocking follow-ups are in checkpoint §19. PR #8 OPEN, NOT MERGED. CP-3 and CP-4 NOT AUTHORIZED.
 
-### 11.11 Stage 0.4A CP-3a / CP-3b — completion correction record (Owner-authorized; NOT VALIDATED until the Owner-local gates pass)
+##### 11.11 Stage 0.4A CP-3a / CP-3b — completion correction record (Owner-authorized; NOT VALIDATED until the Owner-local gates pass)
 
 - **Authority.** Owner-authorized for CP-3a and CP-3b (completion correction, 2026-10-08), scope `docs/MASTER_PLAN.md` §3.3.4. This record supersedes the earlier `[OPEN]` authority wording of the development checkpoint; the checkpoint commit is not rewritten (append-only). CP-3c, CP-4, TEST_HARDWARE and PRODUCTION device access: NOT AUTHORIZED. The agent does not merge. The existing pull request for this branch is PR #9; it is not merged, and no new pull request was created for this correction.
 - **Base.** `origin/main` = `d884a541163c2d567ab4ba2882a981431a14bfe7` (PR #8 merged, CP-1 correction and CP-2 §19 present). Session branch `arena/9aa1746c-waterjet-sentinel-suite`.
@@ -677,7 +1024,7 @@ This record is retained deliberately. Git history was not rewritten to remove th
 - **Contract vocabulary disclosure (NB-1).** The 'Contract change: None' statement above is accurate for this branch. However, the projection's Safe Return `command`, `feedback` and `standby` values (`SR2`, `SR4`, kernel names and `UNKNOWN`) do not match the accepted TypeScript label unions in `packages/contracts/wjss-contracts-ts/types.ts` or the golden fixture (`CLOSE_COMMANDED`, `RETURN_COMMANDED`, `CLOSED_CONFIRMED`, `NOT_CONFIRMED`). The projection tests pin the kernel names. This is recorded as an Owner contract decision, with two options proposed and none applied. No wire emission of Safe Return legs is authorized until it is resolved.
 - **Authority.** CP-3a and CP-3b: Owner-authorized, delivered and Owner-locally validated. **CP-3c NOT AUTHORIZED. CP-4 NOT AUTHORIZED.** PR #9 is OPEN and NOT MERGED. This closeout does not authorise Host integration, API fields or routes, Inspector changes, environment-variable scenario selection, runtime execution of scenarios, TEST_HARDWARE or PRODUCTION access.
 
-### 11.12 Stage 0.4B-1 Mapping Configuration record (2026-10-10)
+##### 11.12 Stage 0.4B-1 Mapping Configuration record (2026-10-10)
 
 - **Scope.** Mapping Configuration only, SIMULATOR provider only, Draft editing, authoritative workbook default `T8_IO_Card_Mapping.xlsx` (Owner commit `6ff9e4a`, SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`, 16,648 bytes, byte-identical). Read-only with respect to hardware.
 - **Validated code head.** `433189f9e489d7af6770e64c971585d99bf941ad`. Base `a5540057` (`main`). Predecessor `8847cfc`. Successor `5f9f437`. Correction commits `438cfd2`, `09608bb`, `64204e9`, `433189f`.
@@ -685,7 +1032,7 @@ This record is retained deliberately. Git history was not rewritten to remove th
 - **Boundary decisions.** The S6 scanner rule is authorised B1 regression protection and stays in place. The two-label Runtime Inspector wording change is an Owner-approved narrow presentation exception and stays in place. Both are non-blocking.
 - **Full record and follow-ups:** [`STAGE_0.4B-1_CHECKPOINT.md`](STAGE_0.4B-1_CHECKPOINT.md), section *Owner validation and Final Source Review (2026-10-10, documentation closeout)*.
 
-## 12. Validation record
+#### 12. Validation record
 
 > *Topology note (2026-10-12):* the dated records in this section quote the topology figures believed at their time (104 / 208, then 106 / 212 with I7 and I16 as Cannon slots or `NON_SENSOR_GAP` positions). They are retained unedited as history. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 
@@ -716,7 +1063,7 @@ Detailed commands and observed output are reported in the delivery report.
 | 20 | No application code or package dependency created | File-type and file-extension inventory |
 | 21 | Diff reviewed before commit | Full diff read before creating the review-correction commit |
 
-### 12.1 Stage 0.2 checkpoint documentation validation record
+##### 12.1 Stage 0.2 checkpoint documentation validation record
 
 Documentation-only validation, performed for the **first** Stage 0.2 checkpoint. Every result
 below is observed output from the method shown. The exact commands are reported in the Stage 0.2
@@ -742,7 +1089,7 @@ checkpoint.
 | 9 | Full diff review | Complete staged diff read before the checkpoint commit | Every change traceable to Stage 0.2; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
 | 10 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, or installer test was executed, and none is claimed |
 
-### 12.2 Stage 0.2 review-correction (punchlist) documentation validation record
+##### 12.2 Stage 0.2 review-correction (punchlist) documentation validation record
 
 Documentation-only validation, performed for the Stage 0.2 review-correction checkpoint that
 implemented the Owner-requested punchlist. Every result below is observed output from the
@@ -765,7 +1112,7 @@ method shown. The exact commands are reported in the Stage 0.2 delivery report.
 | 13 | Full diff review | Complete diff read before the checkpoint commit | Every change is traceable to the punchlist; no domain or product behaviour changed; no proposed decision presented as a runtime fact |
 | 14 | No test claim | Review of the complete diff | No build, runtime, database, hardware, kiosk, simulator, or installer test was executed, and none is claimed |
 
-### 12.3 Stage 0.2.1A Arena validation record
+##### 12.3 Stage 0.2.1A Arena validation record
 
 *Checkpoint `dd20a8bd`, recorded on the superseded 104-location map. See section 12.4 for the
 corrected map.*
@@ -797,7 +1144,7 @@ documents still described the Stage 0.2 submission state: `SECURITY.md`, `ALARM_
 Sensor-map domain correction, and all 12 (plus `ROADMAP.md` and `decisions/README.md`) now carry
 the current status. See section 12.4.
 
-### 12.4 Stage 0.2.1A Sensor-map correction — Arena validation record
+##### 12.4 Stage 0.2.1A Sensor-map correction — Arena validation record
 
 Synthetic spike validation in Arena (Linux x64, Node v22.22.3) of the 106-location correction.
 Detailed evidence: [`spikes/stage-0.2.1a-results.md` §0](spikes/stage-0.2.1a-results.md#0-sensor-map-correction-checkpoint).
@@ -819,7 +1166,7 @@ Detailed evidence: [`spikes/stage-0.2.1a-results.md` §0](spikes/stage-0.2.1a-re
 | 13 | Full diff review | Performed before the correction commit |
 | 14 | Browser, Edge, WebView2, Windows, kiosk, end-to-end latency, long-run UI | **NOT VERIFIED** in Arena — Owner-local re-run and manual UI re-review **PENDING**; 60-minute run **PAUSED** |
 
-### 12.5 Stage 0.2.1A fullscreen Operations refinement — Arena validation record
+##### 12.5 Stage 0.2.1A fullscreen Operations refinement — Arena validation record
 
 Owner-approved Design Addendum (historical topology figures — superseded by the Owner critical
 topology correction: 108 Sensors, 216 channels, 24 / 30 / 24 / 30, I7 and I16 normal Sensors):
@@ -844,7 +1191,7 @@ zoom. Detailed evidence:
 | 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
 | 11 | Full diff review | Performed before the refinement commit |
 
-### 12.6 Stage 0.2.1A Operations readability refinement — Arena validation record
+##### 12.6 Stage 0.2.1A Operations readability refinement — Arena validation record
 
 Owner screenshot review of `ea23bc58`: status markers overlapped long Sensor IDs, small cells and
 typography, oversaturated process colours, alarm and quality relying on colour, weak card
@@ -868,7 +1215,7 @@ Detailed evidence:
 | 10 | Sensitive-data scan (added lines), SHA-256 manifest | PASS / PASS (regenerated and verified) |
 | 11 | Full diff review | Performed before the readability commit |
 
-### 12.7 Stage 0.2.1A final Owner UI punchlist — Arena validation record
+##### 12.7 Stage 0.2.1A final Owner UI punchlist — Arena validation record
 
 Owner screenshot review of `4129687a` (Owner-local Edge E2E 25 / 25 PASS there). Presentation
 changes, opt-in synthetic review tooling, and synthetic queue-source evidence; the U-map, mapping,
@@ -890,7 +1237,7 @@ single-job rule, and dependencies are unchanged. Detailed evidence:
 | 10 | Public-repository boundary | Bundled font redistributable under OFL-1.1 with licence text; no Production Water Jet numbers, addresses, or credentials; per-run token files git-ignored; synthetic controls loopback-only and opt-in |
 | 11 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
 
-### 12.8 Stage 0.2.1A GlobalQueue semantics correction — Arena validation record
+##### 12.8 Stage 0.2.1A GlobalQueue semantics correction — Arena validation record
 
 Owner domain correction after the Owner-local Edge run of `23f48daa` (34 selected · 25 passed ·
 2 failed · 7 not run). The synthetic GlobalQueue now holds ready-to-dispatch entries only (≤ 8,
@@ -916,7 +1263,7 @@ Detailed evidence:
 | 9 | Value clipping (`READ-A`), Water Jet clicks (`WJ-A`), rendered queue panel | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
 | 10 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
 
-### 12.9 Stage 0.2.1A critical Main Pump and Mandatory Safe Return — Arena validation record
+##### 12.9 Stage 0.2.1A critical Main Pump and Mandatory Safe Return — Arena validation record
 
 Owner critical Pump decision on `60cd0398` (recovered by the Owner-authorized one-time recovery,
 identity proof 147 / 147). In the synthetic spike:
@@ -953,7 +1300,7 @@ Detailed evidence:
 | 9 | Modal rendering, geometry, focus trap and Escape in Edge | **NOT VERIFIED** in Arena (no browser) — Owner-local Edge run **PENDING** |
 | 10 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
 
-### 12.10 Stage 0.2.1A final spike closeout (synthetic AutoSequence controls) — Arena validation record
+##### 12.10 Stage 0.2.1A final spike closeout (synthetic AutoSequence controls) — Arena validation record
 
 Owner final closeout on `81c87a44` (recovered by the Owner-authorized one-time recovery, identity
 proof 153 / 153) after the Owner-local Edge run of `81c87a44` (42 selected · 32 passed · 1 failed
@@ -987,7 +1334,7 @@ slots, fonts, and dependencies are unchanged. Detailed evidence:
 | 8 | Controls, alarm colour and modal in Edge | **NOT VERIFIED** in Arena (no browser) — Owner-local final Edge gate **PENDING** |
 | 9 | Markdown links / anchors, sensitive-data scan, SHA-256 manifest, diff review | PASS (counts in the delivery report) |
 
-### 12.11 Stage 0.2.1A Owner-local final review and documentation closeout
+##### 12.11 Stage 0.2.1A Owner-local final review and documentation closeout
 
 Owner decision dated 2026-10-07 on checkpoint `114c07619f9fd249cd80b2e7a5f385ff9e081119`
 (Owner-reported; the Agent received the outcome, not the raw Edge output or screenshots):
@@ -1015,7 +1362,7 @@ queue-level Hold wording in `CONTROL_AUTHORITY.md` (§4 invariant, §6 conflict 
 `USER_PERMISSION_MODEL.md` (queue permissions), and updated the status banners. No runtime, React,
 CSS, contract, fixture, harness, scenario, E2E, dependency or Sensor-map file changed.
 
-### 12.12 Stage 0.3A-1 Product Foundation Source Checkpoint — Arena validation record
+##### 12.12 Stage 0.3A-1 Product Foundation Source Checkpoint — Arena validation record
 
 Validation actually available inside Arena, executed 2026-10-07 on the final tree state (this
 record's tables are the authority for what was and was not checked):
@@ -1042,7 +1389,7 @@ regeneration via the .NET generator, Runtime/kiosk execution, NuGet pin resoluti
 [`STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) — that run,
 reported verbatim into the PR, is the mandatory pre-merge gate.
 
-### 12.13 Stage 0.3A-1 Owner source-review correction — Arena validation record
+##### 12.13 Stage 0.3A-1 Owner source-review correction — Arena validation record
 
 Owner review of `205456e` returned findings A–E; this checkpoint addresses all five as a
 source correction on PR #4 (commit message `fix: correct Stage 0.3A-1 source checkpoint
@@ -1059,7 +1406,7 @@ blockers`). Validation actually executed in Arena, on the corrected tree:
 Still NOT claimed: any .NET restore/build/test result (sandbox unchanged). Fixtures remain
 `PROVISIONAL STRUCTURAL FIXTURE` pending the Owner-local regeneration.
 
-### 12.14 Stage 0.3A-1 Owner-local compile correction — Arena validation record
+##### 12.14 Stage 0.3A-1 Owner-local compile correction — Arena validation record
 
 Owner-local Release build of `355c064` (run twice, identical): **BUILD FAILED** —
 `Wjss.Kiosk` WFO0003 (manifest DPI) and `Wjss.Contracts` CA2231 (`Optional<T>` operators);
@@ -1073,7 +1420,7 @@ findings; negative controls flag every violation) and xUnit static tests
 Arena re-validation after correction: S1–S9 clean, TS 15/15, links green, spikes hash
 unchanged. **Status remains: .NET build NOT VERIFIED — Owner-local re-run required.**
 
-### 12.15 Stage 0.3A-1 Owner-local build round 3 — Arena validation record
+##### 12.15 Stage 0.3A-1 Owner-local build round 3 — Arena validation record
 
 Owner evidence (2026-10-07): round-2 cascade root-caused to a **process-scoped `TargetPath`
 environment override** injected by an external motion-control toolset; after removal, ten
@@ -1091,7 +1438,7 @@ correction: S1–S9 zero findings, TS 15/15, links green, `git diff --check` cle
 unchanged. **Status: first partial compile PASS is Owner-local evidence only; the full
 Release build + test rerun remains REQUIRED. No .NET success is claimed in this record.**
 
-### 12.16 Stage 0.3A-1 Owner-local build round 4 — Arena validation record
+##### 12.16 Stage 0.3A-1 Owner-local build round 4 — Arena validation record
 
 Owner evidence on `c16804c` (TargetPath removed from the build process): **11 projects
 compile** — Time, Kiosk, Contracts, Adapters.Simulator, Domain, Runtime.Api.Tests,
@@ -1109,7 +1456,7 @@ node --test), links green, `git diff --check` clean, spikes roll unchanged, no K
 TargetPath/vendor strings in Product source. **Status: .NET build of the config test project
 and all test executions remain Owner-local; full Release build rerun REQUIRED.**
 
-### 12.17 Stage 0.3A-1 Owner-local build & contract-test correction round 5 — Arena validation record
+##### 12.17 Stage 0.3A-1 Owner-local build & contract-test correction round 5 — Arena validation record
 
 Owner evidence (2026-10-07): full-solution Release build **not yet passing**; the subsequent
 `dotnet test --no-build` (49 total · 42 pass · 7 fail · 0 skip) is recorded **non-authoritative**
@@ -1130,7 +1477,7 @@ validation: S1–S9 zero findings; anchor/JSON checks green; TS 15/15 (npm ci �
 node --test); links and whitespace clean; spikes roll unchanged. **No .NET build/test success
 claimed; Owner-local full Release build + fresh-assembly test run REQUIRED.**
 
-### 12.18 Stage 0.3A-1 thermocouple channel contract shape correction (round 6) — Arena validation record
+##### 12.18 Stage 0.3A-1 thermocouple channel contract shape correction (round 6) — Arena validation record
 
 Owner-local progress (2026-10-07, rounds 3–5): full Release build **0 warnings / 0
 errors**, corrected checkpoint suite **50/50**, fixture/delta parity **7/7**; the earlier
@@ -1150,7 +1497,7 @@ rejection history. Arena static validation: S1–S9 zero findings; JSON parse gr
 unchanged. Round-6 C# is compile-reviewed only, **not built or tested in Arena**; Owner
 must rerun the full sequence including the fixture regeneration gate.
 
-### 12.19 Stage 0.3A-1 round 6 Owner-local test correction — Arena validation record
+##### 12.19 Stage 0.3A-1 round 6 Owner-local test correction — Arena validation record
 
 Owner-local round-6 validation (2026-10-07): the tcChannels structured-array contract is
 VERIFIED by the .NET generator (108/106/2 slots; 212 total and 212 unique channels; 0
@@ -1167,7 +1514,7 @@ cannons key-free), keeping canonical counts and the typed `TcChannelRules` verif
 Arena static validation green; C# remains compile-reviewed only. Owner-local clean Release
 build + fresh full-suite pass REQUIRED before merge.
 
-### 12.20 Stage 0.3A-1 round 6c structural JSON assertion correction — Arena validation record
+##### 12.20 Stage 0.3A-1 round 6c structural JSON assertion correction — Arena validation record
 
 Owner-local at `0b088ad`: Release build **PASS 0 warnings / 0 errors**; fresh full suite
 **61 total / 59 passed / 2 failed / 0 skipped**. Both failures were formatting-sensitive
@@ -1187,7 +1534,7 @@ enabled. Arena mirrored the structural assertions in Python against the committe
 all pass. Owner-local **final build + fresh full-suite rerun** REQUIRED before merge; no
 .NET/xUnit success claimed in Arena.
 
-### 12.21 Stage 0.3A-1 round 6d cannon logical ordering test correction — Arena validation record
+##### 12.21 Stage 0.3A-1 round 6d cannon logical ordering test correction — Arena validation record
 
 Owner-local at `39577e2`: Release build **PASS 0/0**; fresh full suite 61 / **60 passed /
 1 failed** / 0 skipped; parity 7/7; boundary scan S1–S9 clean. The lone failure —
@@ -1208,7 +1555,7 @@ the committed example: structured ordering yields I7→I16 while lexicographic y
 I16→I7, confirming the defect and its correction. Owner-local **final build + fresh
 full-suite rerun (61/61)** REQUIRED before merge.
 
-### 12.22 Stage 0.3A-1 final Owner-local evidence closeout — PASSED
+##### 12.22 Stage 0.3A-1 final Owner-local evidence closeout — PASSED
 
 **STAGE 0.3A-1 OWNER-LOCAL VALIDATION PASSED** (Owner, 2026-10-07; authoritative because
 the full Release build completed successfully immediately before the fresh full-suite
@@ -1231,7 +1578,7 @@ fixtures-README section pointer corrected; dated per-round records untouched). *
 READY FOR OWNER MERGE — NOT MERGED. Stage 0.3A-2 NOT AUTHORIZED. Production device
 access NOT AUTHORIZED.**
 
-### 12.23 Stage 0.3A-2A Checkpoint A — Arena validation record (source-only)
+##### 12.23 Stage 0.3A-2A Checkpoint A — Arena validation record (source-only)
 
 **Scope.** Owner-authorized Stage 0.3A-2 Checkpoint A (Runtime State Foundation,
 SIMULATOR-only) authored in Arena. Arena executed **no .NET command**: the sandbox has no .NET
@@ -1256,7 +1603,7 @@ records the 0.3A-1 closeout position and is preserved as authored-time state; th
 2026-10-07 instruction recorded in §11.5 authorizes Checkpoint A of Stage 0.3A-2. Production
 device access and Production Write remain **NOT AUTHORIZED**.
 
-### 12.24 Stage 0.3A-2A Checkpoint A — Owner-local validation record (PASSED)
+##### 12.24 Stage 0.3A-2A Checkpoint A — Owner-local validation record (PASSED)
 
 **Result (Owner-reported, 2026-10-07; authoritative because the Release build completed
 successfully immediately before the test run).** Validated feature head
@@ -1286,7 +1633,7 @@ recorded here by this evidence commit and in the PR #5 review comments; the fixt
 and the committed fixtures remain untouched (regeneration stays an Owner-local gate); the
 `FixtureGenerator` ↔ adapter unification remains `[OPEN]`.
 
-### 12.25 Stage 0.3A-2A Checkpoint B — Owner-local validation record (PASSED)
+##### 12.25 Stage 0.3A-2A Checkpoint B — Owner-local validation record (PASSED)
 
 **Result (Owner-reported, 2026-10-07; authoritative because the Release build completed
 successfully immediately before the test run).** Validated head
@@ -1327,7 +1674,7 @@ contract cross-checks, a mechanical re-derivation of the revision and history ar
 **ran no .NET command**: the build, locked restore and 129/129 suite are Owner-local evidence.
 Checkpoint B is complete for a development checkpoint and **NOT MERGED**.
 
-### 12.26 Stage 0.3A-2A Checkpoint C — Arena validation record (source-only)
+##### 12.26 Stage 0.3A-2A Checkpoint C — Arena validation record (source-only)
 
 **Arena did not restore, build, or execute any .NET code.** The Checkpoint C sources are
 **authored and statically reviewed only**; the Owner-local Function/Logic/UI review per runbook §14
@@ -1348,7 +1695,7 @@ Slice C1+C2 is commit `06aca79d03c57b703768afffecf95735de7a91d5`; the C3 slice (
 and this record) is the commit immediately following it and — per [`AGENTS.md`](../AGENTS.md)
 §4.6 — does not record its own SHA.
 
-### 12.27 Stage 0.3A-2A Checkpoint C — Owner-local validation record (PASSED)
+##### 12.27 Stage 0.3A-2A Checkpoint C — Owner-local validation record (PASSED)
 
 **STAGE 0.3A-2C OWNER-LOCALLY VALIDATED** (Owner, 2026-10-07; authoritative because Arena can
 neither restore, nor build, nor run this repository). Arena executed no .NET command in this record.
@@ -1371,7 +1718,7 @@ neither restore, nor build, nor run this repository). Arena executed no .NET com
 | PR position | PR #5 **OPEN — NOT MERGED** (only the Owner merges). `TEST_HARDWARE` and `PRODUCTION` remain **NOT AUTHORIZED** |
 | Checkpoint C correction chain (all pushed to the same branch/PR) | `06aca79` feature (composition + read-only API), `7857b3c` Inspector + runbook, `1d7b105` readiness verifies the Snapshot projection, `01bb2aa` CS0120 seed-type disambiguation, `349264a` ambiguous Inspector route removed, `40284b4` Delta chain status corrected in the feed projection + Cannon logical labels + presentation punchlist, `e6a5a6c` Runtime state layout width restored, `faa79145` genuine Owner-local lock refresh |
 
-## 13. Required positive confirmations
+#### 13. Required positive confirmations
 
 The documentation explicitly contains each of the following:
 
@@ -1399,7 +1746,7 @@ hardware, or device verification. See section 9.
 
 ---
 
-### 12.28 Stage 0.3A-3 Checkpoint B — Owner-local validation record (PASSED)
+##### 12.28 Stage 0.3A-3 Checkpoint B — Owner-local validation record (PASSED)
 
 Owner-supplied evidence (Arena never executed .NET); recorded at the closeout commit.
 
@@ -1419,7 +1766,7 @@ Owner-supplied evidence (Arena never executed .NET); recorded at the closeout co
 | Non-authoritative observation excluded | "139 total / 139 passed" at the implementation head (`dotnet test --no-build` over stale binaries after a failed test-project build) is explicitly NOT recorded as validation; its four behavioural failures and all compile/analyzer diagnostics were corrected on the chain `18f853a5` → `901a070` → `79fa0ba5` → `2db853a7` before the fresh authoritative run |
 | Scope | Documentation-only closeout commit on top of the Owner handoff: CHANGELOG, this file (§2 row, §11.8, §12.28), `STAGE_0.3A_PLAN.md` §5d, `ADR-0017` implementation-evidence section, and the new [`STAGE_0.3A-3_CHECKPOINT_B.md`](STAGE_0.3A-3_CHECKPOINT_B.md). Product source, contracts, importer, validator, topology catalog, tests, fixtures, JSON examples, project files, and lock files untouched |
 
-### 12.29 Stage 0.3A-3 Checkpoint C — Arena validation record (source-only)
+##### 12.29 Stage 0.3A-3 Checkpoint C — Arena validation record (source-only)
 
 Implementation record of the atomic Runtime topology migration (Owner authorization
 2026-10-08; PR head `0c3dcea` verified before authoring). Slices C1 `d378edf2` and
@@ -1432,7 +1779,7 @@ balance OK; per-file brace-depth balance over all 36 changed C# sources OK;
 the fixture parity suite and the full xUnit suite are Owner-local gates. Full record:
 [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md).
 
-### 12.30 Stage 0.3A-3 Checkpoint C — Owner-local validation record (PASSED)
+##### 12.30 Stage 0.3A-3 Checkpoint C — Owner-local validation record (PASSED)
 
 Recorded from the Owner's runs (Arena executed no .NET command). Validated feature head
 `162ad7ff1e5c7bab398de6c6d1a38131f17082de`; Owner artifact commit
@@ -1456,7 +1803,7 @@ build/test observations before the correction chain are not acceptance evidence.
 record: [`STAGE_0.3A-3_CHECKPOINT_C.md`](STAGE_0.3A-3_CHECKPOINT_C.md) §16 and
 [`STAGE_0.3A_OWNER_LOCAL_VALIDATION.md`](STAGE_0.3A_OWNER_LOCAL_VALIDATION.md) §14.10.
 
-### 12.31 Stage 0.4A CP-2 — Owner-local validation record and Final Source Review (2026-10-08)
+##### 12.31 Stage 0.4A CP-2 — Owner-local validation record and Final Source Review (2026-10-08)
 
 Recorded from the Owner's runs (Arena executed no .NET command). Authoritative Owner-local
 head: `1f94991b8fddd5b1e7e158c8f02c34a70ac0c14c`. Base `main` @ `8323f78c7ec2480bb30cbdd1432b6caa8e32c601`.
@@ -1475,7 +1822,7 @@ lifecycle, water, Queue, QueueRevision or latch. Full answers, findings and foll
 Authority after this record: PR #8 OPEN, NOT MERGED. CP-3 NOT AUTHORIZED. CP-4 NOT AUTHORIZED.
 TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 
-### 12.32 Stage 0.4B-1 — Owner-local validation and Final Source Review (2026-10-10)
+##### 12.32 Stage 0.4B-1 — Owner-local validation and Final Source Review (2026-10-10)
 
 - **Owner-local (Owner-reported, not executed by Arena):** Mapping 217 total / 217 pass / 0 fail / 0 skipped; Mapping UI 56 / 56 / 0 / 0; boundary 0 findings (S1–S9 clean); `git diff --check origin/main...HEAD` PASS; authoritative workbook copied out of the repository, SHA-256 verified, no seed.
 - **Arena re-run at `433189f`** (not Owner evidence): mapping 217 / 210 / 0 / 7 without the workbook path and 217 / 217 / 0 / 0 with it; UI 56 / 56 / 0 / 0; boundary 0 findings; diff-check exit 0; workbook SHA unchanged; working tree clean.
@@ -1484,7 +1831,7 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - **Final Source Review (static):** PASSED. Blocking defects: none. Boundary scanner: authorised B1 regression protection, in scope. Runtime Inspector wording: owner-approved narrow presentation exception, non-blocking. Non-blocking follow-ups: A (Pump Slot/Channel is a Draft-model API capability, not a browser editor), B (SPARE-versus-placeholder ordering), C (Draft API create-on-missing), D (UI readability).
 - **Stated status.** AI-002 Runtime publication NOT IMPLEMENTED. ADDRESSES REMAIN ADDRESS_UNRESOLVED. ACTIVATION NOT READY. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. PR #12 OPEN - NOT MERGED.
 
-### 12.33 Stage 0.4B-3 — Arena development-checkpoint validation record (2026-10-10)
+##### 12.33 Stage 0.4B-3 — Arena development-checkpoint validation record (2026-10-10)
 
 - **Base gate (Arena-verified).** `git ls-remote origin refs/heads/main` = `3a73dfce3d2c7c1dc4d3b0274ea10f97406088f6`; local `HEAD` and branch `arena/00483ae4-waterjet-sentinel-suite` equal to it; index and worktree clean (0 entries); PR #14 `MERGED` with merge commit `3a73dfce` and parents `dbbf34cf` / `a811f6ff` (both proven ancestors); Stage 0.4B-2 head `fe38322d` proven an ancestor; no conflicting open PR.
 - **Arena results at this checkpoint:** Mapping package check PASS; Mapping package 268 tests / 261 pass / 0 fail / 7 skipped (pre-existing Owner-local workbook skips); Mapping UI check PASS; Mapping UI 82 / 82 / 0 / 0; boundary scan 0 findings (S1–S9 clean); PR-range `git diff --check` clean; workbook SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e` unchanged; working tree clean.
@@ -1493,7 +1840,7 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - **Evidence status.** Primary manuals for all eight models and the two actual-rack screens are Owner-provided outside the repository and are not present in the sandbox; they are recorded as `OWNER_PROVIDED_OUTSIDE_REPOSITORY` with no SHA-256. Actual Process Data image and actual field-network mapping NOT PROVIDED. Candidate addresses NOT AUTHORITATIVE.
 - **Stated status.** 750-601, 750-613 and 750-600 HAVE NO PROCESS I/O ADDRESS (`NOT_APPLICABLE` / `NON_PROCESS_DATA_MODULE`). AI-002 Runtime publication NOT IMPLEMENTED. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. **PR #15 OPEN - NOT MERGED.**
 
-### 12.34 Stage 0.4C-0 — Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (development checkpoint with Owner decisions, 2026-10-10)
+##### 12.34 Stage 0.4C-0 — Physical Sensor readiness, Loop-Test requirements and actual I/O evidence gate (development checkpoint with Owner decisions, 2026-10-10)
 
 - **Base gate (Arena-verified).** `git ls-remote origin refs/heads/main` = `29ee137c1df617a1aa3321c3c891161d5a5bb41a`. Merge commit `29ee137c` (PR #15) has parents `3a73dfce1d2c7c1dc4d3b0274ea10f97406088f6` (parent 1) and `8b479772d4fbef63b8f8eb34f59a1f2eba69618e` (parent 2), confirmed with `git cat-file -p`. PR #15 `MERGED` at `2026-10-10T18:21:35Z`. Session branch remote head `4babdce4c53921f4c8c96073ebafa7d73e6ac07e` at the start of the Owner-decision revision; index and worktree clean; PR #16 OPEN.
 - **Workbook facts (read-only).** 23 rack modules; 114 rows (108 `USED`, 6 `SPARE`); 104 tagged channels (DI 37, DO 31, AI 35, AO 1); 18 `XXX` reserved rows; candidate layout 19 modules and 110 channels. The workbook contains **no thermocouple input module**.
@@ -1506,7 +1853,7 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - **README (authorised narrow correction).** Current-status rows updated to Stage 0.4C-0 current evidence gate, PR #15 merged, PR #16 open, and the TC gap. **Link consistency change:** the `DOMAIN_MODEL.md` §2.2.1 link moved from the legacy anchor (retained in the target) to the canonical anchor; not a broken link.
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Wire-break decoding NOT IMPLEMENTED. Sensor commissioning monitor NOT IMPLEMENTED. Actual process-image offsets NOT VERIFIED. AI-002 Runtime publication NOT IMPLEMENTED. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. No physical Sensor was tested. Full record: [STAGE_0.4C-0_CHECKPOINT.md](STAGE_0.4C-0_CHECKPOINT.md). PR #16 OPEN - NOT MERGED at that date (since MERGED, merge commit `bd1437586af73a33d43dfafce27b27538183a283`; see §12.35).
 
-### 12.35 Stage 0.4C-0A — Physical Temperature Acquisition Evidence Intake and Commissioning Source Register (development checkpoint, 2026-10-10)
+##### 12.35 Stage 0.4C-0A — Physical Temperature Acquisition Evidence Intake and Commissioning Source Register (development checkpoint, 2026-10-10)
 
 - **Base gate (Arena-verified, new session).** `git ls-remote origin refs/heads/main` = `bd1437586af73a33d43dfafce27b27538183a283` — the **PR #16 merge commit**, exactly equal to the approved base. `git cat-file -p bd143758…` shows `parent 29ee137c1df617a1aa3321c3c891161d5a5bb41a` and `parent 8ba8d89492bffe6849b77ab135c6e434a48b31f5`, matching the required merge parents in order. `gh pr view 16` = `state: MERGED`, `mergedAt: 2026-10-10T19:37:37Z`, `baseRefName: main`. Local `HEAD` on `arena/1cfd7e20-waterjet-sentinel-suite` = `bd143758…`; `git status --porcelain=v1` empty; worktree clean; `gh pr list --state open` = `[]`. Workbook present at `./T8_IO_Card_Mapping.xlsx` with SHA-256 `4e0337e25c8377c01559f264653baab25bcfa23f4d3e071fdc8c80896f422e8e`. **The sandbox recreation protocol was not triggered** — no `update-ref`, `read-tree`, targeted fetch or destructive Git operation was needed, and none was used.
 - **Workbook re-parse (read-only).** 114 data rows; `Status` 108 `USED` / 6 `SPARE`; 104 tagged channels (DI 37, DO 31, AI 35, AO 1); 23 slots; 8 distinct module models; 6 `SPARE` rows (750-430 ch 6/7/8, 750-530 ch 8, 750-471 ch 4, 750-554 ch 2). A case-insensitive scan of every parsed cell found no `thermocouple`, no `thermo couple`, no `TC-` tag and none of the thermocouple input module families 750-406, 750-407, 750-469, 750-437 — **re-confirming CF-01**. These values match the recorded Stage 0.4C-0 baseline.
@@ -1518,7 +1865,7 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - **Scope observation (CF-07).** `README.md` is outside this Stage's file scope and was **not** modified; its current-status block is now stale and is reported for an Owner decision rather than repaired silently (AGENTS.md §2.2, §2.3).
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Wire-break decoding NOT IMPLEMENTED. Sensor commissioning monitor NOT IMPLEMENTED. Actual process-image offsets NOT VERIFIED. NO MODBUS IMPLEMENTED. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. No physical Sensor was tested. Full record: [STAGE_0.4C-0A_CHECKPOINT.md](STAGE_0.4C-0A_CHECKPOINT.md) and [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md). **NEW PR OPEN — NOT MERGED.**
 
-### 12.36 Stage 0.4C-0B completion — Baseline REV1 evidence review and 240-row schedule (development checkpoint, 2026-10-12)
+##### 12.36 Stage 0.4C-0B completion — Baseline REV1 evidence review and 240-row schedule (development checkpoint, 2026-10-12)
 
 - **Evidence gate.** `WJSS_TC_EVIDENCE_BASELINE_REV1.zip` via `OWNER_GOOGLE_DRIVE_CONNECTOR`: 17345849 bytes, SHA-256 `7B886950D7F5F665416241E4CB502CD1A5787E3581788C799077C062786AA23E`, ZIP-signed, 4 listable members, per-member hashes recorded (TCEV-17 … TCEV-20). Ephemeral bytes removed after review; archive and PDFs **not** committed.
 - **Schedule.** `docs/evidence/tc-drawing-schedule-rev1.csv`: 240 rows (200 `DRAWING_VERIFIED`, 12 `DRAWING_INTERNAL_CONFLICT`, 4 `DRAWING_TOPOLOGY_CONFLICT`, 24 `SPARE_UNMAPPED`, 0 unresolved); mapped+unmapped = 216+24 = 240; 212 `MATCHED` across 106/106 template Sensors (extras exactly {I7, I16}). All 240 table cells read on-render; all 6 X110 sequences, 6 conflict zones, I7/I16 cells and p6/p7 labels confirmed on-render/crops.
@@ -1529,7 +1876,7 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - **Scope observation (CF-07 still open).** `README.md` outside this Stage's file scope, **not** modified.
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Hardware loop test NOT EXECUTED. NO live MODBUS communication implemented. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. No physical Sensor tested. Full record: [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md) §7, [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md) §13 and `docs/evidence/`. **PR #18 OPEN — NOT MERGED (do not merge).**
 
-## Related documents
+#### Related documents
 
 - [`../AGENTS.md`](../AGENTS.md) — working contract and stop conditions
 - [`MASTER_PLAN.md`](MASTER_PLAN.md) — stage gates and implementation status
@@ -1537,10 +1884,10 @@ TEST_HARDWARE and PRODUCTION device access NOT AUTHORIZED.
 - [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) — current prohibition on control writes
 - [`TEST_STRATEGY.md`](TEST_STRATEGY.md) — verification levels and what has not been tested
 
-### CP-3c-1 development scope
+##### CP-3c-1 development scope
 Atomic Runtime publication is authorized as a library foundation only. The existing Host remains on its legacy stores; no scenario integration or GET behavior changes. See `STAGE_0.4A_CP-3C-1_CHECKPOINT.md`. Owner-local validation required.
 
-### Stage 0.4A CP-3c-1 closeout (2026-10-09)
+##### Stage 0.4A CP-3c-1 closeout (2026-10-09)
 
 Owner-reported validation at code head `29f133ce6598bc2eb489273a2f2d40f8827deb5f` (.NET SDK 10.0.401; not run in Arena): locked restore PASS, lock drift NONE; Release build PASS, 0 warnings, 0 errors; RuntimePublicationTests **20/20**, Runtime.Core **450/450**, full .NET **572/572**, fixture parity **7/7**, TypeScript typecheck PASS and tests **31/31** (0 failed); boundary scan **0 findings, S1–S9 clean**; `git diff --check` PASS; final Owner-local working tree CLEAN. Failed 0, skipped 0 in each reported .NET suite; no Owner-local artifact commit required.
 
@@ -1552,7 +1899,7 @@ ED with **0 rows** (brief §4, exact missing-file report in the issue register);
 - **Scope observation (CF-07 extended).** `README.md` is outside this Stage's file scope and was **not** modified; its status block (still naming Stage 0.4C-0A and PR #17 OPEN) is reported for an Owner decision rather than repaired silently (AGENTS.md §2.2, §2.3).
 - **Status.** Physical Sensor acquisition NOT IMPLEMENTED. Hardware loop test NOT EXECUTED. NO live MODBUS communication implemented. NO TEST_HARDWARE AUTHORIZED. NO PRODUCTION AUTHORIZED. NO DEVICE WRITE OR CONTROL. No physical Sensor was tested. Full record: [STAGE_0.4C-0B_CHECKPOINT.md](STAGE_0.4C-0B_CHECKPOINT.md), [TC_DRAWING_ISSUE_REGISTER_REV1.md](TC_DRAWING_ISSUE_REGISTER_REV1.md) and [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md). **NEW PR OPEN — NOT MERGED.**
 
-## Related documents
+#### Related documents
 
 - [`../AGENTS.md`](../AGENTS.md) — working contract and stop conditions
 - [`MASTER_PLAN.md`](MASTER_PLAN.md) — stage gates and implementation status
@@ -1560,10 +1907,10 @@ ED with **0 rows** (brief §4, exact missing-file report in the issue register);
 - [`SAFETY_BOUNDARY.md`](SAFETY_BOUNDARY.md) — current prohibition on control writes
 - [`TEST_STRATEGY.md`](TEST_STRATEGY.md) — verification levels and what has not been tested
 
-### CP-3c-1 development scope
+##### CP-3c-1 development scope
 Atomic Runtime publication is authorized as a library foundation only. The existing Host remains on its legacy stores; no scenario integration or GET behavior changes. See `STAGE_0.4A_CP-3C-1_CHECKPOINT.md`. Owner-local validation required.
 
-### Stage 0.4A CP-3c-1 closeout (2026-10-09)
+##### Stage 0.4A CP-3c-1 closeout (2026-10-09)
 
 Owner-reported validation at code head `29f133ce6598bc2eb489273a2f2d40f8827deb5f` (.NET SDK 10.0.401; not run in Arena): locked restore PASS, lock drift NONE; Release build PASS, 0 warnings, 0 errors; RuntimePublicationTests **20/20**, Runtime.Core **450/450**, full .NET **572/572**, fixture parity **7/7**, TypeScript typecheck PASS and tests **31/31** (0 failed); boundary scan **0 findings, S1–S9 clean**; `git diff --check` PASS; final Owner-local working tree CLEAN. Failed 0, skipped 0 in each reported .NET suite; no Owner-local artifact commit required.
 

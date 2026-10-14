@@ -1,4 +1,5 @@
 using Wjss.Adapters.TcAcquisition;
+using Wjss.TcBench;
 using Xunit;
 
 namespace Wjss.TcAcquisition.Tests;
@@ -180,6 +181,35 @@ public sealed class AdapterLifecycleTests
         var result = await client.ReadAsync(Request(client, endpoint), CancellationToken.None);
         Assert.NotEqual(TcReadKind.Success, result.Kind);
         Assert.Null(result.RawWords);
+    }
+
+    [Fact]
+    public async Task Software_Seam_Over_Real_Loopback_Performs_One_Connect_One_Read_And_Observed_Cleanup()
+    {
+        // The real adapter behind the isolated software seam: one connect, at most one read, always
+        // observed cleanup, quarantined acquisition-only evidence. Never a physical endpoint.
+        await using var server = new LoopbackResponder();
+        var endpoint = Endpoint(server.Port);
+        var runner = new TrialRunner();
+        var evidence = await runner.RunSoftwareTrialAsync(TrialCatalog.LoadTrusted(), endpoint,
+            () => TcReadOnlyClientFactory.Create(), TimeSpan.FromSeconds(2), null, CancellationToken.None);
+        Assert.Equal(TcReadKind.Success, evidence.Connect.Kind);
+        Assert.Equal(TcReadKind.Success, evidence.Read.Kind);
+        Assert.Equal("COMPLETE", evidence.TaskCompletion);
+        Assert.Equal("COMPLETE", evidence.DisconnectResult);
+        Assert.Equal("COMPLETE", evidence.DisposalResult);
+        Assert.Equal("DISCONNECTED", evidence.TransportAfter);
+        Assert.Equal(PhysicalTrialStates.Observed, evidence.CleanupState);
+        Assert.Equal(40, evidence.Words.Length);
+        Assert.Equal("SYNTHETIC_TEST_ONLY", evidence.Provenance);
+        Assert.Equal("RETAINED_QUARANTINED", evidence.FinalHandoffDecision);
+        Assert.Equal(TrialAcceptance.QUARANTINED, evidence.TrialAcceptance);
+        TrialEvidence.Validate(evidence, TrialCatalog.LoadTrusted());
+        var request = await server.RequestReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(12, request.Length);
+        Assert.Equal(3, request[7]);
+        Assert.Equal(0, request[6]);
+        Assert.Equal(new byte[] { 0, 0, 0, 40 }, request[8..12]);
     }
 
     [Fact]

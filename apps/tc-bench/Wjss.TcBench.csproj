@@ -4,15 +4,62 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Wjss.TcBench</RootNamespace>
     <AssemblyName>Wjss.TcBench</AssemblyName>
-    <TrialCatalogFile>$(MSBuildProjectDirectory)/obj/tc-bench/trial-catalog.json</TrialCatalogFile>
+    <TrialCatalogDirectory>$(MSBuildProjectDirectory)/obj/tc-bench</TrialCatalogDirectory>
+    <TrialCatalogFile>$(TrialCatalogDirectory)/trial-catalog.json</TrialCatalogFile>
+    <TrialBuildIdentityFile>$(TrialCatalogDirectory)/build-identity.txt</TrialBuildIdentityFile>
+
+    <!--
+      Stage 0.4C-K6 build-time trust metadata for the immutable deployment identity.
+
+      The default repository build is physically DISABLED and carries placeholders. A
+      physical-capable deployment build must be produced with explicit Owner-supplied metadata:
+
+        -p:WjssPhysicalCapabilityEnabled=true
+        -p:WjssDeploymentProof=CLEAN_OWNER_VERIFIED
+        -p:WjssImplementationSha=<40 lowercase hex characters>
+        -p:WjssApprovedBaseSha=<40 lowercase hex characters, default is the K6 base>
+        -p:WjssSourceRef=<reviewed source reference>
+        -p:WjssAuthorizationKeyId=<Owner key identifier>
+        -p:WjssOwnerPublicKey=<base64 SubjectPublicKeyInfo of the Owner NIST P-256 key>
+
+      No private key, seed, signature or credential belongs in this file, in this repository or in
+      the generated metadata. Missing, malformed, placeholder or inconsistent metadata is refused
+      when the identity is loaded, so a physical client cannot be constructed from a normal build.
+      These values are written as plain lines and are never interpolated into a shell command.
+    -->
+    <WjssApprovedBaseSha Condition="'$(WjssApprovedBaseSha)' == ''">193aba764f8934df3dc3b0fd1841e8b64e808cc2</WjssApprovedBaseSha>
+    <WjssImplementationSha Condition="'$(WjssImplementationSha)' == ''">NOT_PROVIDED</WjssImplementationSha>
+    <WjssSourceRef Condition="'$(WjssSourceRef)' == ''">NOT_PROVIDED</WjssSourceRef>
+    <WjssDeploymentProof Condition="'$(WjssDeploymentProof)' == ''">NOT_PROVIDED</WjssDeploymentProof>
+    <WjssAuthorizationKeyId Condition="'$(WjssAuthorizationKeyId)' == ''">NOT_PROVIDED</WjssAuthorizationKeyId>
+    <WjssOwnerPublicKey Condition="'$(WjssOwnerPublicKey)' == ''">NOT_PROVIDED</WjssOwnerPublicKey>
+    <WjssPhysicalCapabilityEnabled Condition="'$(WjssPhysicalCapabilityEnabled)' == ''">false</WjssPhysicalCapabilityEnabled>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../adapters/tc-acquisition/Wjss.Adapters.TcAcquisition.csproj" />
     <InternalsVisibleTo Include="Wjss.TcAcquisition.Tests" />
     <EmbeddedResource Include="$(TrialCatalogFile)" LogicalName="TcTrialCatalog.json" />
     <EmbeddedResource Include="$(TrialCatalogFile).sha256" LogicalName="TcTrialCatalog.sha256" />
+    <EmbeddedResource Include="$(TrialBuildIdentityFile)" LogicalName="TcBenchBuildIdentity.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <WjssBuildIdentityLine Include="schemaVersion=wjss.tc-bench-build/1" />
+    <WjssBuildIdentityLine Include="physicalCapabilityEnabled=$(WjssPhysicalCapabilityEnabled)" />
+    <WjssBuildIdentityLine Include="deploymentProof=$(WjssDeploymentProof)" />
+    <WjssBuildIdentityLine Include="approvedBaseSha=$(WjssApprovedBaseSha)" />
+    <WjssBuildIdentityLine Include="implementationSha=$(WjssImplementationSha)" />
+    <WjssBuildIdentityLine Include="sourceRef=$(WjssSourceRef)" />
+    <WjssBuildIdentityLine Include="authorizationKeyId=$(WjssAuthorizationKeyId)" />
+    <WjssBuildIdentityLine Include="ownerPublicKey=$(WjssOwnerPublicKey)" />
   </ItemGroup>
   <Target Name="GenerateTrustedTrialCatalog" BeforeTargets="PrepareForBuild">
+    <MakeDir Directories="$(TrialCatalogDirectory)" />
+    <!-- The catalog is projected from the canonical Node module, so there is exactly one authority. -->
     <Exec Command="node &quot;$(MSBuildProjectDirectory)/../../tools/tc-bench/export-trial-configuration.mjs&quot; --build-output &quot;$(TrialCatalogFile)&quot;" />
+    <WriteLinesToFile File="$(TrialBuildIdentityFile)"
+                      Lines="@(WjssBuildIdentityLine)"
+                      Overwrite="true"
+                      Encoding="UTF-8"
+                      WriteOnlyWhenDifferent="true" />
   </Target>
 </Project>
