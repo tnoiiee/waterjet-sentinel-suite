@@ -22,7 +22,7 @@ product description is preserved verbatim in section 11.
 | --- | --- |
 | Stage | `0.4C-K6` |
 | Title | T01 Physical Execution Enablement and Bench Readiness |
-| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14). Post-K6 **Local TCP Simulation execution class** (`--local-simulation`): **IMPLEMENTED ON BRANCH `arena/18760814-waterjet-sentinel-suite`, PR OPEN, NOT MERGED, AGENT-LOCAL .NET VALIDATION NOT RUN, OWNER-LOCAL VALIDATION PENDING** (2026-10-15). **K7 NOT AUTHORIZED** |
+| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14). Post-K6 **Local TCP Simulation execution class** (`--local-simulation`): **IMPLEMENTED ON BRANCH `arena/18760814-waterjet-sentinel-suite`, PR #25 OPEN, NOT MERGED; AGENT-LOCAL .NET VALIDATION NOT RUN; OWNER-LOCAL AUTOMATED VALIDATION OF `25d34390` RECORDED 2026-10-15 (R40 LF/CRLF test-parity defect corrected on the branch, see CHANGELOG); OWNER-LOCAL SIMULATOR RUN NOT YET PERFORMED** (2026-10-15). **K7 NOT AUTHORIZED** |
 | Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (K6); `f356b162214946058b42fe56fa13e5afc4c80539` (Local TCP Simulation branch) |
 | Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
@@ -58,7 +58,7 @@ Detailed current truth lives in [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md)
 
 | Question | Current answer |
 | --- | --- |
-| Current stage | `0.4C-K6` **merged** (`f356b162`); post-K6 Local TCP Simulation execution class on branch, **PR open, not merged, Owner-local validation pending** |
+| Current stage | `0.4C-K6` **merged** (`f356b162`); post-K6 Local TCP Simulation execution class on branch, **PR #25 open, not merged; Owner-local simulator run not yet performed** |
 | Default build | **Physically disabled.** A normal repository build cannot construct a physical client |
 | T01 | **Non-executable** without an Owner-signed authorization bound to the deployed build; no such artifact exists |
 | Physical acquisition | **None.** No hardware contact, no passive capture, no port 502 access on any non-loopback host, no T01 execution. The only port-502 contact the bench can make is the Owner-local `--local-simulation` class on `127.0.0.1` (not physical evidence) |
@@ -94,7 +94,8 @@ authorization, and none is granted by this promotion:
 3. Owner PR review and merge decision for the K6 implementation checkpoint — **DONE: PR #24 MERGED
    at `f356b162` (2026-10-14)**.
 3A. Local TCP Simulation bench class (branch `arena/18760814-waterjet-sentinel-suite`): Owner-local
-   build/test, Owner-local simulator run, Owner merge decision — **PR OPEN, NOT MERGED**.
+   build/test, Owner-local simulator run, Owner merge decision — **PR #25 OPEN, NOT MERGED; Owner-local
+   automated validation of `25d34390` recorded; simulator run not yet performed**.
 4. A separate Owner Scope Gate for **K7** — T01 One-Node Physical TC Read-Only Trial
    (**NOT AUTHORIZED**).
 5. Later stages per the roadmap in

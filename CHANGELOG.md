@@ -75,6 +75,58 @@ run of the exact commands in `docs/TC_BENCH_LOCAL_SIMULATION.md` §5.2 is the ev
 Owner-local simulator run has not been performed by the Agent; no interoperability with the Owner
 workstation simulator is claimed. Not hardware, WAGO, TC-NODE-01 or T01 evidence.
 
+#### 2026-10-15 — Correction on the same branch (PR #25 — OPEN, NOT MERGED): Commissioning R40 cross-platform line-ending parity; current-facing drift
+
+Owner-local automated validation of the implementation commit `25d34390daac70468ed22b426f9a5f2da3bd9a79`
+(Windows, detached worktree, clean): locked restore PASS; adapter / bench / test Release builds PASS;
+focused TC tests 109/109; full solution build PASS; full .NET tests 564/564; dry-run no-I/O PASS;
+fixture parity 7/7; TC bench Node tests 19/19; S2 14/14; S3 19/19; boundary scan 0 findings;
+Commissioning `check` PASS; **Commissioning tests 219/220 — FAIL `R40 the committed sensor-map example
+is reproduced exactly by the Node reference generator (108 form)`**. The Owner-local Local TCP
+Simulation invocation (EasyModbus) was **NOT run**; nothing is claimed for it.
+
+- **R40 root cause (proven, Owner-local):** cross-platform LF/CRLF raw text comparison. The Owner
+  worktree has `core.autocrlf=true` and no path attribute, so `config/examples/sensor-map.example.json`
+  is CRLF on disk while the committed blob `b76e4892d5fe3e639f287bb598f5702cc28903fe` is LF
+  (`git hash-object` equal; exact text unequal; line-ending-normalized text equal). R40 compared the
+  LF text of `serializeLikeContractJson(...)` with `readFileSync(..., 'utf8')` by raw equality. No
+  content, topology (108 / 216 / 240 / 24), I7 / I16, generator or Local Simulation defect. The same
+  representation mismatch is already recorded twice in the dated history below (the K6 "R40
+  disposition", 217/218 then 218/218 on canonical LF, and the 2026-10-13 Library Selection Gate
+  validation); this correction removes it from the test instead of from the Owner checkout.
+- **Correction:** `packages/commissioning/test/topologyInvariants.test.mjs` — R40 now normalizes the
+  line-ending representation only (`CRLF -> LF`, test-local `normalizeLineEndings`) before the
+  comparison and asserts, in the same test: LF committed text equals LF generated text; the CRLF
+  representation equals after normalization while the raw comparison still distinguishes it; a content
+  difference, a Sensor identity difference, a topology difference, the superseded 106 form, and
+  non-line-ending serialized-format differences (spacing, indentation, final newline, `\u002B`
+  escaping) all still fail; the fixture bytes on disk are identical before and after. The fixture
+  path is taken from the existing `SENSOR_MAP_PATH` helper. No parsed-object-only equality.
+- **Defect-class sweep (Node and .NET test surfaces):** R40 was the only raw equality between
+  generator output and committed worktree text. Already normalized or representation-independent:
+  `packages/commissioning/src/schedule.mjs` (CSV parser normalizes CRLF/CR), the Commissioning
+  documentation guards (`\s+` collapse), `tools/tc-bench/export-trial-configuration.mjs`
+  (`sourceSha256` over CRLF-normalized text), `tests/integration/FixtureParityTests.cs` (semantic
+  `JsonCompare`). Intentionally byte-exact and unchanged: served-file identity tests
+  (`apps/mapping-config` U23, `apps/ops-preview` page test) compare the same worktree file with itself;
+  workbook and font SHA-256 identities are binary. All other `readFileSync` sites parse JSON or match
+  substrings / regular expressions. No `.gitattributes` exists at the repository root (one scoped file
+  under `spikes/.../fonts/`); a repository-wide normalization policy is an Owner decision and was not
+  introduced.
+- **Unchanged:** `config/examples/sensor-map.example.json` (blob `b76e4892…`, not rewritten, not
+  regenerated), `tools/sensor-map-example/generate.mjs`, every C# file, package declarations and lock
+  files, the Local TCP Simulation behaviour and policy, topology and Sensor identities.
+- **Current-facing drift corrected:** the "Recent Merged Stages" K6 row below (was
+  `CURRENT — NOT MERGED`; K6 is merged via PR #24 at `f356b162…`), the `docs/MASTER_PLAN.md` dependency
+  row for K7 (was `0.4C-K6 (not merged)`), and the PR number / Owner-local validation state in the
+  current-position lines of `README.md`, `docs/CURRENT_STATE.md` and `docs/MASTER_PLAN.md`. Dated
+  records are preserved unchanged. K7 remains NEXT — NOT AUTHORIZED; PR #25 remains OPEN — NOT MERGED.
+- **Agent-local validation of the correction:** focused R40 PASS; Commissioning `check` PASS and
+  tests 220/220; a scoped CRLF simulation (temporary copy outside the repository; the committed fixture
+  untouched) reproduced the Owner failure with the previous raw comparison and passed with the
+  corrected R40; `git diff --check` clean. .NET validations were NOT rerun by the Agent (no .NET SDK);
+  no C# file changed.
+
 ### 0.4C-K6 — T01 Physical Execution Enablement and Bench Readiness (MERGED 2026-10-14 — PR #24, merge commit `f356b162214946058b42fe56fa13e5afc4c80539`)
 
 > Supersession note (2026-10-15): the dated status line below records the checkpoint at which this
@@ -193,7 +245,7 @@ authority**:
 | `0.4C-K3` | 108-Sensor / 216-Measurement Topology Correction | MERGED |
 | `0.4C-K4` | Modbus TCP Client Library Selection and Read-Only Adapter Foundation | MERGED (PR #22) |
 | `0.4C-K5` | One-Node Physical TC Read-Only Acquisition Software Foundation | MERGED (PR #23, `193aba76…`) |
-| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — NOT MERGED** |
+| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **MERGED (PR #24, merge commit `f356b162…`, 2026-10-14)** — approved baseline; post-K6 Local TCP Simulation bench class (not a roadmap stage) on branch `arena/18760814-waterjet-sentinel-suite`, PR #25 OPEN, NOT MERGED |
 | `0.4C-K7` | T01 One-Node Physical TC Read-Only Trial | **NEXT — NOT AUTHORIZED** |
 
 Where an earlier dated entry still says "PR #20 OPEN" or "PR #21 OPEN", that is the wording at its

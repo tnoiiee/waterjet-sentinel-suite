@@ -45,7 +45,7 @@ version: **no application version exists**, and the documentation versioning pol
 | --- | --- |
 | Stage | `0.4C-K6` |
 | Title | T01 Physical Execution Enablement and Bench Readiness |
-| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14); post-K6 **Local TCP Simulation execution class** (not a roadmap stage; bench tooling only) **IMPLEMENTED ON BRANCH, PR OPEN, NOT MERGED, OWNER-LOCAL VALIDATION PENDING** (2026-10-15); **K7 NOT AUTHORIZED** |
+| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14); post-K6 **Local TCP Simulation execution class** (not a roadmap stage; bench tooling only) **IMPLEMENTED ON BRANCH, PR #25 OPEN, NOT MERGED; OWNER-LOCAL AUTOMATED VALIDATION OF `25d34390` RECORDED; OWNER-LOCAL SIMULATOR RUN NOT YET PERFORMED** (2026-10-15); **K7 NOT AUTHORIZED** |
 | Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (K6); `f356b162214946058b42fe56fa13e5afc4c80539` (Local TCP Simulation branch `arena/18760814-waterjet-sentinel-suite`) |
 | Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
@@ -111,7 +111,7 @@ validated Atomic Replacement.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — MERGED (PR #24, `f356b162…`, 2026-10-14)**; post-K6 Local TCP Simulation bench class on branch, PR open, not merged | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
+| `0.4C-K6` | T01 Physical Execution Enablement and Bench Readiness | **CURRENT — IMPLEMENTED AND VALIDATED — MERGED (PR #24, `f356b162…`, 2026-10-14)**; post-K6 Local TCP Simulation bench class on branch, PR #25 open, not merged | Signed, single-use authorization and fail-closed one-shot physical execution path; no trial performed | 0.4C-K5 |
 
 ### 4.3 Next Stage
 
@@ -230,7 +230,7 @@ Current critical path, as conditional steps — none of which is authorized by t
 1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**
 3. Owner PR review and merge decision for the K6 checkpoint. — **DONE: PR #24 MERGED at `f356b162` (2026-10-14)**
-3A. Local TCP Simulation bench class: Owner-local build/test, Owner-local simulator run, Owner merge decision. — **PR OPEN, NOT MERGED**
+3A. Local TCP Simulation bench class: Owner-local build/test, Owner-local simulator run, Owner merge decision. — **PR #25 OPEN, NOT MERGED; Owner-local automated validation of `25d34390` recorded; simulator run not yet performed**
 4. Separate Owner Scope Gate for `0.4C-K7`. — **NOT AUTHORIZED**
 5. Subsequent stages in dependency order per section 6. — **PLANNED / FUTURE, NOT AUTHORIZED**
 
@@ -243,7 +243,7 @@ authorize another candidate.
 | --- | --- |
 | `0.4C-K1` … `0.4C-K5` | completed in sequence; each merged |
 | `0.4C-K6` | `0.4C-K5` |
-| `0.4C-K7` | `0.4C-K6` (not merged) |
+| `0.4C-K7` | `0.4C-K6` (merged — PR #24, `f356b162…`, 2026-10-14); K7 remains **NEXT — NOT AUTHORIZED**. The post-K6 Local TCP Simulation bench class (PR #25, open, not merged) is supporting bench capability, not a K7 prerequisite and not physical completion |
 | `0.4C-K8` … `0.4C-K17` | the immediately preceding `0.4C-K` stage |
 | `0.4D-G1` | `0.4C-K17` (Owner-approved dependency) |
 | `0.4D-G2` … `0.4D-G5` | the immediately preceding `0.4D-G` stage |
