@@ -140,7 +140,7 @@ information and are not in this repository.
 | K6 tests | focused **95/95**; full .NET **550/550** (0 failed, 0 skipped) | no .NET execution |
 | K6 dry run | SIMULATION only; connect/read NOT_ISSUED; QUARANTINED; no physical I/O | not applicable |
 | K6 physical attempt | refused with `PHYSICAL_CAPABILITY_DISABLED`; deployment state `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED` | not applicable |
-| Node/static | exporter 18/18, S2 14/14, S3 19/19, Boundary S1–S9 clean, Commissioning 218/218, fixture parity 7/7 | exporter 18/18, S2 14/14, S3 19/19, Boundary clean, Commissioning 218/218, syntax and path proofs |
+| Node/static | exporter 18/18, S2 14/14, S3 19/19, Boundary S1–S9 clean, Commissioning 218/218, fixture parity 7/7 | exporter 18/18, S2 14/14, S3 19/19, Boundary clean, Commissioning 220/220 with the corrected documentation guard (218 pre-existing + 2 authorized regression tests), syntax and path proofs |
 | Physical | **none** — no hardware contact, no capture, no T01 execution | **none** |
 
 ### 8.1 Owner-local K6 record (authoritative)
@@ -232,7 +232,10 @@ Agent/Arena reported, separately from Owner-local validation:
 - S2 14/14
 - S3 19/19
 - Boundary S1–S9 clean
-- Commissioning 218/218
+- Commissioning 220/220 with the corrected documentation guard (218 pre-existing tests plus the 2
+  authorized regression tests added for the promoted heading layout)
+- the guard correction changed only that single existing documentation-guard test; no evidence
+  assertion was removed or relaxed
 - JavaScript syntax checks passed
 - changed-path and protected-surface proofs passed
 - genuine locks unchanged

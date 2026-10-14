@@ -38,16 +38,24 @@ Canonical documentation promotion:
 - all four Candidate-only paths were removed in the same commit;
 - historical reconstruction remained 4/4;
 - canonical-link validation passed;
-- Product, tests, packages, locks, configuration and fixtures were unchanged;
+- Product code and behaviour were unchanged; dependency declarations and lock files were unchanged;
+  configuration and fixtures were unchanged;
+- the existing Commissioning documentation-guard test
+  (`packages/commissioning/test/tcAcquisitionEvidence.test.mjs`) was changed and two authorized
+  regression tests were added for the promoted heading layout; evidence assertions were not removed
+  or relaxed;
 - K6 remained NOT MERGED;
 - K7 remained NOT AUTHORIZED.
 
 **Documentation-guard correction.** The approved documentation hierarchy exposed one H2-only
 assumption in the single test that reads and parses `CHANGELOG.md`; the guard is now
 heading-level aware and bounds the exact Stage 0.4C-K3 section by the next heading of the same
-level. Evidence assertions were not removed or relaxed. Focused H2/H4/boundary tests pass, and the
-full Commissioning suite passes on both the authoritative and the promoted documentation layouts.
-No Product behaviour, evidence source, fixture or lock changed.
+level. That existing guard test was changed and two authorized regression tests were added; no
+evidence assertion was removed or relaxed. The guard passes on the authoritative layout and on the
+promoted layout, and the Commissioning suite passes on both. These are Agent/Arena runs: the
+Owner-local .NET validation recorded above was **not** rerun after this documentation-only
+correction, and no Product behaviour, dependency, lock, configuration, fixture or evidence source
+changed.
 
 **Implemented on that base (summary).** Immutable build identity; default physical capability
 disabled; detached Owner-signed authorization verification (ECDSA NIST P-256 / SHA-256,
@@ -85,9 +93,11 @@ generator execution and was **not recomputed in the same execution** as the fina
 labeled limitation.
 
 **Agent/Arena evidence, reported separately (Arena had no `dotnet`):** exporter 18/18; S2 14/14;
-S3 19/19; Boundary S1–S9 clean; Commissioning 218/218; JavaScript syntax checks passed; changed-path
-and protected-surface proofs passed; genuine locks unchanged. Agent must **not** be credited with C#
-compilation, analyzer execution, xUnit or .NET tests, .NET fixture parity or physical execution.
+S3 19/19; Boundary S1–S9 clean; Commissioning **220/220** with the corrected documentation guard
+(218 pre-existing tests plus the 2 authorized regression tests added by that correction); JavaScript
+syntax checks passed; changed-path and protected-surface proofs passed; genuine locks unchanged.
+Agent must **not** be credited with C# compilation, analyzer execution, xUnit or .NET tests, .NET
+fixture parity or physical execution.
 
 No merge, no T01 execution, no physical authorization, and no K7 authorization follows from these
 results. Current authorization boundary:

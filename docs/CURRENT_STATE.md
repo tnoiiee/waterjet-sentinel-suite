@@ -192,7 +192,10 @@ Agent/Arena reported, separately from Owner-local validation:
 - S2 14/14
 - S3 19/19
 - Boundary S1–S9 clean
-- Commissioning 218/218
+- Commissioning 220/220 with the corrected documentation guard (218 pre-existing tests plus the 2
+  authorized regression tests added for the promoted heading layout)
+- the guard correction changed only that single existing documentation-guard test; no evidence
+  assertion was removed or relaxed
 - JavaScript syntax checks passed
 - changed-path and protected-surface proofs passed
 - genuine locks unchanged
@@ -268,23 +271,49 @@ WRITE/CONTROL NOT AUTHORIZED
 
 ## 9. Changed / Unchanged / Not Verified (K6 scope)
 
-**Changed by K6** (implementation checkpoints, on the K6 branch only): the isolated bench tooling under
-`apps/tc-bench/` (build identity, authorization gate, runner, evidence model, program entry), the
-focused test project under `tests/tc-acquisition.tests/`, the offline catalog exporter under
-`tools/tc-bench/`, and the related Stage-0.4C-K6 documentation records produced in this session.
-Exact per-commit file lists are in the commit chain `00c2c07…`, `e40d43b…`, `00eb3c6…`.
+**Changed by K6** (final branch range, `193aba76…` → the K6 branch head; 19 changed paths):
 
-**Unchanged:** Runtime, Kiosk, adapters' read-only public surface, canonical TC node configuration,
-sensor-channel schedule, packages, locks, fixtures, configuration and boundary policy.
+- the **14 authorized K6 implementation/test/tool paths** — the isolated bench tooling under
+  `apps/tc-bench/` (build identity, authorization gate, runner, evidence model, program entry), the
+  focused test project under `tests/tc-acquisition.tests/`, and the offline catalog exporter under
+  `tools/tc-bench/` with its test;
+- the **4 promoted canonical documents** — `README.md`, `CHANGELOG.md`, `docs/CURRENT_STATE.md` and
+  `docs/MASTER_PLAN.md` — produced by the Atomic Replacement;
+- the **existing Commissioning documentation-guard test**
+  `packages/commissioning/test/tcAcquisitionEvidence.test.mjs`, whose Stage 0.4C-K3 `CHANGELOG.md`
+  section extraction was made heading-level aware, together with the **2 authorized regression tests**
+  added to it;
+- **removal of the Candidate-only paths** (`README.candidate.md`, `CHANGELOG.candidate.md`,
+  `docs/CURRENT_STATE.candidate.md`, `docs/MASTER_PLAN.candidate.md`) from the final tree during that
+  Atomic Replacement — absent from the final tree and net-zero in the final range.
+
+Exact per-commit file lists are in the commit chain `00c2c07…`, `e40d43b…`, `00eb3c6…`; the promoted
+canonical documents and the documentation-guard correction are in the later documentation commit(s).
+
+**Unchanged:**
+
+- Product behaviour after the Validated Implementation Head
+  `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`;
+- Runtime and Kiosk;
+- TC configuration and topology;
+- dependency declarations;
+- package lock files;
+- fixtures and generators;
+- the physical authorization boundary.
+
+The only change under `packages/` in the final range is the documentation-guard test named above; no
+broad "packages unchanged" claim is made.
 
 **Not verified:** everything in 5.3 and 5.4.
 
 **Documentation-guard correction (this pass).** The approved documentation hierarchy exposed one
 H2-only assumption in the single test that reads and parses `CHANGELOG.md`; the guard is now
 heading-level aware and bounds the exact Stage 0.4C-K3 section by the next heading of the same
-level. No evidence assertion was removed or relaxed. Focused H2/H4/boundary tests pass, and the
-full Commissioning suite passes on both the authoritative and the promoted documentation layouts.
-No Product behaviour, evidence source, fixture, lock or configuration changed.
+level. That existing guard test was changed and two authorized regression tests were added; no
+evidence assertion was removed or relaxed. The guard passes on the authoritative layout and on the
+promoted layout, and the Commissioning suite passes on both. These are Agent/Arena runs: the
+Owner-local .NET validation in 5.1 was **not** rerun after this documentation-only correction, and no
+Product behaviour, evidence source, dependency, lock, configuration, fixture or generator changed.
 
 ## 10. Immediate Next Gate
 
