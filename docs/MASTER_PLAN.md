@@ -45,7 +45,7 @@ version: **no application version exists**, and the documentation versioning pol
 | --- | --- |
 | Stage | `0.4C-K6` |
 | Title | T01 Physical Execution Enablement and Bench Readiness |
-| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14); post-K6 **Local TCP Simulation execution class** (not a roadmap stage; bench tooling only) **IMPLEMENTED ON BRANCH, PR #25 OPEN, NOT MERGED; OWNER-LOCAL AUTOMATED VALIDATION OF `25d34390` RECORDED; OWNER-LOCAL SIMULATOR RUN NOT YET PERFORMED** (2026-10-15); **K7 NOT AUTHORIZED** |
+| Status | **K6 MERGED** (PR #24 → `main` `f356b162214946058b42fe56fa13e5afc4c80539`, 2026-10-14); post-K6 **Local TCP Simulation execution class** (not a roadmap stage; bench tooling only) **IMPLEMENTED ON BRANCH, PR #25 OPEN, NOT MERGED; OWNER-LOCAL VALIDATION COMPLETE — `25d34390` full automated validation; `59d0ffdd` final-head affected gates PASS and Local TCP Simulation run PASS (effective `127.0.0.1:502`, FC03 / Unit 0 / start 0 / quantity 40, 40 words exactly 100–139, `QUARANTINED`; Local Simulation evidence only); OWNER MERGE DECISION PENDING** (2026-10-15); **K7 NOT AUTHORIZED** |
 | Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` (K6); `f356b162214946058b42fe56fa13e5afc4c80539` (Local TCP Simulation branch `arena/18760814-waterjet-sentinel-suite`) |
 | Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
@@ -60,7 +60,9 @@ version: **no application version exists**, and the documentation versioning pol
   acquisition once against a simulator on the Owner workstation at the literal loopback address
   `127.0.0.1:502` with the unchanged default request. It changes no physical protection, grants no
   physical authority and is not K7 or hardware evidence. Agent-local .NET validation **NOT RUN**;
-  Owner-local validation pending. See [`TC_BENCH_LOCAL_SIMULATION.md`](TC_BENCH_LOCAL_SIMULATION.md)
+  Owner-local validation complete on PR head `59d0ffdd` (affected gates PASS; EasyModbus run PASS,
+  40 words exactly 100–139, `QUARANTINED`; Local Simulation evidence only); Owner merge decision
+  pending. See [`TC_BENCH_LOCAL_SIMULATION.md`](TC_BENCH_LOCAL_SIMULATION.md)
   and [`CURRENT_STATE.md`](CURRENT_STATE.md) section 3A.
 - **K7 is NOT AUTHORIZED**; neither K6 validation nor the local simulation class authorizes it.
 - Detailed current truth: [`CURRENT_STATE.md`](CURRENT_STATE.md) (authoritative:
@@ -230,7 +232,7 @@ Current critical path, as conditional steps — none of which is authorized by t
 1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**
 3. Owner PR review and merge decision for the K6 checkpoint. — **DONE: PR #24 MERGED at `f356b162` (2026-10-14)**
-3A. Local TCP Simulation bench class: Owner-local build/test, Owner-local simulator run, Owner merge decision. — **PR #25 OPEN, NOT MERGED; Owner-local automated validation of `25d34390` recorded; simulator run not yet performed**
+3A. Local TCP Simulation bench class: Owner-local build/test, Owner-local simulator run, Owner merge decision. — **PR #25 OPEN, NOT MERGED; Owner-local build/test and simulator run DONE on `59d0ffdd` (Local Simulation evidence only, `QUARANTINED`); Owner merge decision PENDING**
 4. Separate Owner Scope Gate for `0.4C-K7`. — **NOT AUTHORIZED**
 5. Subsequent stages in dependency order per section 6. — **PLANNED / FUTURE, NOT AUTHORIZED**
 

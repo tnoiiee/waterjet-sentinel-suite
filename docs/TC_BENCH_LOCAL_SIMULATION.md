@@ -2,7 +2,9 @@
 
 Status: implemented on branch `arena/18760814-waterjet-sentinel-suite` (parent `f356b162`), Agent-local
 .NET build/test NOT RUN (no .NET SDK in the Agent sandbox); Owner-local build and execution are the
-validation of record. Nothing in this document is hardware, WAGO, TC-NODE-01 or T01 evidence.
+validation of record. Owner-local result (2026-10-15, PR head `59d0ffdd…`): affected gates PASS and
+the Local Simulation run PASS — 40 words, exactly 100–139, `QUARANTINED` (see §5.6). PR #25 OPEN, NOT
+MERGED. Nothing in this document is hardware, WAGO, TC-NODE-01 or T01 evidence.
 
 **HARDWARE CONTACT NOT AUTHORIZED · T01 NOT AUTHORIZED · PHYSICAL_TEST DEPLOYMENT NOT AUTHORIZED ·
 WRITE/CONTROL NOT AUTHORIZED.** This path contacts the local host only.
@@ -90,8 +92,9 @@ simulator. Replace `<REPO>` with the local repository path; no Owner path is rec
 
 ### 5.1 Simulator
 
-The Owner reported EasyModbusTCP Server Simulator v5.5 listening on `0.0.0.0:502`, verified so far by
-TCP connect only (PowerShell `Test-NetConnection` to `127.0.0.1` port `502` → `TcpTestSucceeded True`), with Holding
+The Owner reported EasyModbusTCP Server Simulator v5.5 listening on `0.0.0.0:502`, verified at the time
+of writing by TCP connect only (PowerShell `Test-NetConnection` to `127.0.0.1` port `502` →
+`TcpTestSucceeded True`; the completed run is recorded in §5.6), with Holding
 Registers UI addresses `1..40` set to `100..139` (protocol addresses `0..39`). Keep the simulator
 running during the invocation. The application will issue FC03, Unit identifier `0`, start `0`,
 quantity `40`. If the simulator rejects Unit identifier `0` or the register range, the application
@@ -162,6 +165,44 @@ Does not prove: anything about TC-NODE-01, the WAGO coupler, the field network, 
 Unit identifier behavior, FC03 vs FC04, register mapping, scaling, wire-break, timing or
 interoperability beyond the simulator used. These remain `NOT_VERIFIED` / `CANDIDATE_UNVERIFIED` until
 the One-Node Physical TC gate.
+
+### 5.6 Owner-local result (2026-10-15, PR head `59d0ffdd1b3ca13168db4c26d0c0b70031908a3b`)
+
+Owner-local, clean detached validation worktree; the Agent did not run any of it. Affected gates on
+this head: Commissioning check PASS, Commissioning tests 220/220 (R40 PASS on the actual Windows
+checkout), TC bench Node/static-source tests 19/19, S2 14/14, S3 19/19, boundary scan S1–S9 clean,
+locked restore PASS, TC acquisition adapter and TC bench Release builds PASS, no lock drift. (One
+initial build command carried an operator path typo and returned MSB1009; the correct command passed
+immediately afterwards — not a Source defect.)
+
+Simulator: EasyModbusTCP Server Simulator v5.5; listener verified first with
+`Test-NetConnection 127.0.0.1 -Port 502` → `TcpTestSucceeded True` (the TCP check alone is not the
+Modbus result). Invocation exactly as §5.3.
+
+| Field | Owner-local result |
+|---|---|
+| Execution mode / provenance | `LOCAL_TCP_SIMULATION` |
+| Default configuration (unchanged) | `192.0.2.11:502` |
+| Effective invocation | `127.0.0.1:502` |
+| Request | FC03 / Holding Registers; Unit ID 0; Start Address 0; Quantity 40 |
+| Connect / Read | Success / Success |
+| Copied word count | 40 |
+| Returned values | index 0 = 100, index 1 = 101, … index 39 = 139 — exactly 100–139, no gaps or duplicates |
+| Lifecycle | transport before DISCONNECTED; connect and read observed Success; disconnect COMPLETE; disposal COMPLETE; task completion COMPLETE; cleanup state OBSERVED; worker observation OBSERVED; timeout NOT_ELAPSED; cancellation NOT_REQUESTED; stale decision CURRENT_AT_DIAGNOSTIC_HANDOFF |
+| Classification | trial acceptance `QUARANTINED`; physical capability enabled false; authorization ID `NOT_PROVIDED`; authorization verification and consumption `NOT_ATTEMPTED`; noWrite true; noFallback true; `wireEvidence` `NOT_PROVIDED` |
+| Unchanged | Runtime, Kiosk, topology, control authority; validation worktree clean after execution |
+
+Finding recorded on the way: the first two reads returned exactly 40 words with indexes 0–30 = 100–130
+and indexes 31–39 = 0, stable on repetition, Connect / Read / cleanup successful. The Simulator had
+been populated only through value 130 — incomplete Simulator register population, not an application
+truncation defect (the application reports returned words as received and encodes no expected
+pattern, §5.4). After the Owner populated the remaining Holding Registers the final run returned
+100–139. No Source change was needed.
+
+Boundary of this result: it proves the items in §5.5 "Proves" — including that protocol Start Address
+0 maps to Simulator UI address 1 — against this Simulator only. It proves nothing in §5.5 "Does not
+prove"; `wireEvidence` remains `NOT_PROVIDED`; it is not hardware verification and not T01 PASS. PR #25
+remains OPEN, NOT MERGED; Merge and K7 are NOT AUTHORIZED.
 
 ## 6. Change summary (code)
 

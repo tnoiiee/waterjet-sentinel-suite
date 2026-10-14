@@ -15,13 +15,16 @@
 
 ### 2026-10-15 — Local Modbus TCP Simulation configuration and execution path (post-K6; unreleased; PR OPEN, NOT MERGED)
 
-**Status (updated 2026-10-15 after the correction commit): PR #25 OPEN — NOT MERGED. Implementation commit `25d34390daac70468ed22b426f9a5f2da3bd9a79` (direct parent `f356b162214946058b42fe56fa13e5afc4c80539`): OWNER-LOCAL AUTOMATED VALIDATION COMPLETED — locked restore PASS; targeted Release builds PASS; focused TC acquisition tests 109/109; full Solution Release build PASS; full .NET tests 564/564; dry-run no-I/O PASS; fixture parity 7/7; TC bench Node tests 19/19; S2 14/14; S3 19/19; boundary scan S1–S9 clean; worktree clean (Commissioning 219/220 at that commit — R40 line-ending representation only, corrected below). R40 correction commit `70558e03f99e33cde917f7b97aa2a2133e45234a` (direct parent `25d34390…`): AGENT-LOCAL AFFECTED VALIDATION — Commissioning 220/220; TC bench Node tests 19/19; boundary scan clean. OWNER-LOCAL AFFECTED-GATES RERUN ON THE FINAL PR HEAD — PENDING. OWNER-LOCAL EASYMODBUS LOCAL SIMULATION EXECUTION — NOT RUN. MERGE NOT AUTHORIZED; K7 NOT AUTHORIZED.**
+**Status (updated 2026-10-15, final evidence closeout): PR #25 OPEN — NOT MERGED; MERGE NOT AUTHORIZED; K7 NOT AUTHORIZED. Final PR head `59d0ffdd1b3ca13168db4c26d0c0b70031908a3b` (direct parent `70558e03f99e33cde917f7b97aa2a2133e45234a`): OWNER-LOCAL FINAL-HEAD AFFECTED GATES PASS — Commissioning check PASS and tests 220/220 (R40 PASS on the actual Windows checkout); TC bench Node/static-source tests 19/19; S2 14/14; S3 19/19; boundary scan S1–S9 clean; locked restore PASS; TC acquisition adapter and TC bench Release builds PASS; no lock drift; validation worktree clean. OWNER-LOCAL LOCAL TCP SIMULATION PASS on the same head (EasyModbusTCP Server Simulator v5.5): `LOCAL_TCP_SIMULATION`, effective `127.0.0.1:502`, FC03 / Unit ID 0 / Start Address 0 / Quantity 40, copied word count 40, values exactly 100–139, Connect / Read / Disconnect / Disposal COMPLETE, `QUARANTINED`, authorization `NOT_PROVIDED` / `NOT_ATTEMPTED`, no write, no fallback, `wireEvidence` `NOT_PROVIDED` — Local Simulation evidence only, not hardware, WAGO, T01 or physical evidence. Evidence layers: implementation commit `25d34390daac70468ed22b426f9a5f2da3bd9a79` (direct parent `f356b162…`) — Owner-local automated validation (locked restore PASS; targeted Release builds PASS; focused TC acquisition tests 109/109; full Solution Release build PASS; full .NET tests 564/564; dry-run no-I/O PASS; fixture parity 7/7; TC bench Node tests 19/19; S2 14/14; S3 19/19; boundary S1–S9 clean; Commissioning 219/220 at that commit — R40 line-ending representation only, corrected below); R40 correction commit `70558e03…` — Agent-local affected validation (Commissioning 220/220; TC bench Node tests 19/19; boundary scan clean); documentation commit `59d0ffdd…` — Owner-local final-head gates and Local TCP Simulation as above. Physical evidence still not provided.**
 
 > Status-line note (2026-10-15): the earlier wording of the line above — `single commit`;
 > `AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox)`; `OWNER-LOCAL VALIDATION
 > PENDING` — described the position at the implementation commit before the Owner-local run and is
 > superseded by the status above. The dated body text of this entry is preserved unchanged; the
-> Agent still has not run any .NET command.
+> Agent still has not run any .NET command. The subsequent wording `OWNER-LOCAL AFFECTED-GATES RERUN
+> ON THE FINAL PR HEAD — PENDING` / `OWNER-LOCAL EASYMODBUS LOCAL SIMULATION EXECUTION — NOT RUN`
+> (status line at commit `59d0ffdd…`) was accurate when written and is superseded by the final
+> evidence closeout record below.
 
 Owner request: an application-owned way to run the existing TC Modbus TCP acquisition against a
 Modbus TCP simulator on the Owner workstation (loopback, port 502) without editing Source, without
@@ -132,6 +135,61 @@ Simulation invocation (EasyModbus) was **NOT run**; nothing is claimed for it.
   untouched) reproduced the Owner failure with the previous raw comparison and passed with the
   corrected R40; `git diff --check` clean. .NET validations were NOT rerun by the Agent (no .NET SDK);
   no C# file changed.
+
+#### 2026-10-15 — Final evidence closeout (PR #25 — OPEN, NOT MERGED): Owner-local final-head affected gates PASS; Owner-local Local TCP Simulation PASS
+
+Final PR head validated by the Owner: `59d0ffdd1b3ca13168db4c26d0c0b70031908a3b` (direct parent
+`70558e03f99e33cde917f7b97aa2a2133e45234a`; documentation-only on top of the R40 correction; C# unchanged
+since `25d34390…`). Clean detached validation worktree. Documentation-only closeout; the Agent ran no
+.NET command and did not run the simulator.
+
+- **Owner-local final-head affected gates (PASS):** Commissioning syntax check PASS; Commissioning tests
+  220/220 (R40 PASS on the actual Windows checkout); TC bench Node/static-source tests 19/19; S2 14/14;
+  S3 19/19; boundary scan S1–S9 clean, 0 findings; locked restore PASS; TC acquisition adapter Release
+  build PASS; TC bench Release build PASS; no lock drift observed; validation worktree clean. One initial
+  build command carried an operator path typo and returned MSB1009 (project path did not exist); the
+  correct command was run immediately afterwards and passed — not a Source defect.
+- **Owner-local Local TCP Simulation (PASS):** EasyModbusTCP Server Simulator v5.5 on the Owner
+  workstation; TCP listener verified first (`Test-NetConnection 127.0.0.1 -Port 502` →
+  `TcpTestSucceeded True`; the TCP check alone is not the Modbus result). Invocation:
+  `dotnet run --project apps/tc-bench/Wjss.TcBench.csproj -c Release --no-build --no-restore -- --trial T01 --local-simulation`.
+  Result: execution mode `LOCAL_TCP_SIMULATION`; default configuration `192.0.2.11:502` unchanged;
+  effective invocation `127.0.0.1:502`; FC03 / Holding Registers; Unit ID 0; Start Address 0;
+  Quantity 40; Connect Success; Read Success; copied word count 40; returned values index 0 = 100 …
+  index 39 = 139, sequential without gaps or duplicates (exactly 100–139). Lifecycle: transport before
+  DISCONNECTED; connect observed Success; read observed Success; disconnect COMPLETE; disposal COMPLETE;
+  task completion COMPLETE; cleanup state OBSERVED; worker observation OBSERVED; timeout NOT_ELAPSED;
+  cancellation NOT_REQUESTED; stale decision CURRENT_AT_DIAGNOSTIC_HANDOFF. Classification: provenance
+  `LOCAL_TCP_SIMULATION`; trial acceptance `QUARANTINED`; physical capability enabled false;
+  authorization ID `NOT_PROVIDED`; authorization verification and consumption `NOT_ATTEMPTED`; noWrite
+  true; noFallback true; Runtime, Kiosk, topology and control authority unchanged; `wireEvidence`
+  `NOT_PROVIDED`. Validation worktree clean after execution.
+- **Initial zero values (recorded; resolved without Source change):** the first two application reads
+  returned exactly 40 words with indexes 0–30 = 100–130 and indexes 31–39 = 0, stable on repetition,
+  with Connect, Read and cleanup successful. Cause: the Simulator had been populated only through value
+  130 — incomplete Simulator register population, not an application truncation defect. After the
+  Owner populated the remaining Holding Registers the final invocation returned 100–139. No Source,
+  test, fixture, generator, package or lock changed.
+- **Proves / does not prove:** proves that the application-owned client connects to `127.0.0.1:502`,
+  the Local Simulation execution path is operational, FC03 and Unit ID 0 work against this Simulator,
+  protocol Start Address 0 maps to Simulator UI address 1, Quantity 40 returns exactly 40 words, the
+  application-owned copied words match 100–139, the one-shot lifecycle and cleanup complete, evidence
+  stays `QUARANTINED`, and no physical authorization, write or fallback was used. It does not prove
+  T01, WAGO connectivity, physical port 502, TC-NODE-01 identity, cabinet identity, the physical
+  process-image mapping, physical byte or word order, temperature scaling, wire-break behaviour,
+  physical timing, field-network behaviour, passive wire evidence, the MBAP Transaction ID, the
+  response Unit ID from an independent capture, or physical acceptance. Not hardware verification;
+  not T01 PASS.
+- **Evidence layers kept separate:** Owner-local automated validation on `25d34390…` (focused TC
+  109/109; full Solution Release build PASS; full .NET 564/564; dry-run no-I/O PASS; fixture parity
+  7/7; Commissioning 219/220, R40 representation only); Agent-local R40 correction validation on
+  `70558e03…` (Commissioning 220/220; TC bench 19/19; boundary clean); Owner-local affected gates on
+  `59d0ffdd…`; Owner-local Local TCP Simulation on `59d0ffdd…`; physical evidence still not provided.
+- **Status after this closeout:** PR #25 OPEN — NOT MERGED; Merge NOT AUTHORIZED; K7 NOT AUTHORIZED;
+  hardware contact, port 502 access to the coupler, passive capture, PHYSICAL_TEST deployment, T01,
+  Runtime/Kiosk physical integration, six-Node acquisition, Galil, Production and write/control remain
+  NOT AUTHORIZED or NOT VERIFIED as applicable. The Local TCP Simulation class remains post-K6 bench
+  tooling, not a roadmap stage.
 
 ### 0.4C-K6 — T01 Physical Execution Enablement and Bench Readiness (MERGED 2026-10-14 — PR #24, merge commit `f356b162214946058b42fe56fa13e5afc4c80539`)
 

@@ -5,7 +5,7 @@
 | Question | Answer |
 | --- | --- |
 | Current stage | `0.4C-K6` — T01 Physical Execution Enablement and Bench Readiness — **MERGED** (PR #24 → `main` `f356b162`, 2026-10-14); post-K6 Local TCP Simulation execution class **IMPLEMENTED ON BRANCH, PR #25 OPEN, NOT MERGED** (2026-10-15, see section 3A) |
-| Stage status | **K6 MERGED; LOCAL TCP SIMULATION CLASS IMPLEMENTED (PR #25) — OWNER-LOCAL AUTOMATED VALIDATION OF `25d34390` RECORDED, AWAITING OWNER-LOCAL SIMULATOR RUN AND MERGE DECISION; K7 NOT AUTHORIZED** |
+| Stage status | **K6 MERGED; LOCAL TCP SIMULATION CLASS IMPLEMENTED (PR #25) — OWNER-LOCAL VALIDATION COMPLETE (`25d34390` full automated validation; `59d0ffdd` final-head affected gates PASS and Local TCP Simulation run PASS, `QUARANTINED`, Local Simulation evidence only); AWAITING OWNER MERGE DECISION; K7 NOT AUTHORIZED** |
 | Approved `main` | `f356b162214946058b42fe56fa13e5afc4c80539` (PR #24 merge commit; parents `193aba76…` and `3833b52f…`) |
 | Session branch | `arena/18760814-waterjet-sentinel-suite` (branched from `f356b162`; `arena/5fcb82bf-…` is the merged K6 branch, closed) |
 | Default build | **Physically disabled** — a normal build cannot construct a physical client |
@@ -74,7 +74,7 @@ existing boundary. The default build stays physically disabled and no authorizat
 | Field | Value |
 | --- | --- |
 | Title | Local Modbus TCP Simulation configuration and execution path (`--local-simulation`, provenance `LOCAL_TCP_SIMULATION`) |
-| Status | **IMPLEMENTED ON BRANCH; PR #25 OPEN TO `main`; NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox); OWNER-LOCAL AUTOMATED VALIDATION OF `25d34390` RECORDED 2026-10-15 (see the dated note at the end of this section); OWNER-LOCAL SIMULATOR RUN NOT YET PERFORMED** |
+| Status | **IMPLEMENTED ON BRANCH; PR #25 OPEN TO `main`; NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox); OWNER-LOCAL AUTOMATED VALIDATION OF `25d34390` RECORDED 2026-10-15; OWNER-LOCAL FINAL-HEAD AFFECTED GATES PASS AND OWNER-LOCAL LOCAL TCP SIMULATION PASS ON `59d0ffdd` (2026-10-15, see the dated notes at the end of this section); OWNER MERGE DECISION PENDING** |
 | Base | `f356b162214946058b42fe56fa13e5afc4c80539` (direct parent of the single implementation commit) |
 | Reference | [`TC_BENCH_LOCAL_SIMULATION.md`](TC_BENCH_LOCAL_SIMULATION.md) — Owner-local procedure, output guide, boundary |
 
@@ -109,6 +109,35 @@ the same branch in `packages/commissioning/test/topologyInvariants.test.mjs` (li
 normalization only, with regression assertions; fixture and generator unchanged — see `CHANGELOG.md`).
 The Owner-local Local TCP Simulation invocation (EasyModbus) has **NOT** been performed; the .NET
 validations were **NOT** rerun by the Agent (no C# change). PR #25 remains OPEN — NOT MERGED.
+*(Dated statement; the Owner-local run was performed afterwards — see the closeout note below.)*
+
+**Dated closeout note (2026-10-15) — Owner-local final-head affected gates and Local TCP Simulation run
+on PR head `59d0ffdd1b3ca13168db4c26d0c0b70031908a3b` (direct parent `70558e03…`; clean detached
+validation worktree).**
+Affected gates PASS: Commissioning check PASS and tests 220/220 (R40 PASS on the actual Windows
+checkout); TC bench Node/static-source tests 19/19; S2 14/14; S3 19/19; boundary scan S1–S9 clean;
+locked restore PASS; TC acquisition adapter and TC bench Release builds PASS; no lock drift; worktree
+clean. (The full .NET suite 564/564, focused TC 109/109, dry-run and fixture parity 7/7 are the
+`25d34390` evidence; C# is unchanged since that commit and no rerun of them on `59d0ffdd` is reported.)
+Local TCP Simulation PASS: EasyModbusTCP Server Simulator v5.5; listener verified by TCP connect first
+(not the Modbus result); invocation `dotnet run --project apps/tc-bench/Wjss.TcBench.csproj -c Release
+--no-build --no-restore -- --trial T01 --local-simulation`; mode `LOCAL_TCP_SIMULATION`; default
+configuration `192.0.2.11:502` unchanged; effective `127.0.0.1:502`; FC03 / Holding Registers; Unit ID
+0; Start Address 0; Quantity 40; Connect Success; Read Success; copied word count 40; values index 0 =
+100 … index 39 = 139 (exactly 100–139, no gaps or duplicates); disconnect / disposal / task completion
+COMPLETE; cleanup and worker observation OBSERVED; timeout NOT_ELAPSED; cancellation NOT_REQUESTED;
+stale decision CURRENT_AT_DIAGNOSTIC_HANDOFF; provenance `LOCAL_TCP_SIMULATION`; trial acceptance
+`QUARANTINED`; physical capability false; authorization ID `NOT_PROVIDED`; authorization verification
+and consumption `NOT_ATTEMPTED`; noWrite true; noFallback true; `wireEvidence` `NOT_PROVIDED`; Runtime,
+Kiosk, topology and control authority unchanged. The first two reads had returned 40 words with indexes
+31–39 = 0 because the Simulator had been populated only through 130 (incomplete Simulator register
+population, not an application truncation defect); after the Owner completed the register values the
+final run returned 100–139. No Source change. This is Local Simulation evidence only: it does not
+prove T01, WAGO connectivity, physical port 502, TC-NODE-01 or cabinet identity, the physical
+process-image mapping, physical byte/word order, scaling, wire-break, physical timing, field-network
+behaviour, passive wire evidence, MBAP Transaction ID, the response Unit ID from an independent
+capture, or physical acceptance. PR #25 remains OPEN — NOT MERGED; Merge NOT AUTHORIZED; K7 NOT
+AUTHORIZED.
 
 ## 4. Implementation Delivered
 
@@ -294,7 +323,7 @@ WRITE/CONTROL NOT AUTHORIZED
 1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**
 3. Owner PR review and merge decision for the K6 checkpoint. — **DONE: PR #24 MERGED at `f356b162` (2026-10-14)**
-3A. Local TCP Simulation execution class (section 3A): Owner-local build/test, Owner-local simulator run, Owner merge decision. — **PR #25 OPEN, NOT MERGED; .NET validation NOT RUN by the Agent; Owner-local automated validation of `25d34390` recorded; simulator run not yet performed**
+3A. Local TCP Simulation execution class (section 3A): Owner-local build/test, Owner-local simulator run, Owner merge decision. — **PR #25 OPEN, NOT MERGED; .NET validation NOT RUN by the Agent; Owner-local build/test DONE (`25d34390` full automated validation; `59d0ffdd` final-head affected gates PASS); Owner-local simulator run DONE on `59d0ffdd` (40 words exactly 100–139, `QUARANTINED`, Local Simulation evidence only); Owner merge decision PENDING**
 4. Separate Owner Scope Gate for K7. — **NOT AUTHORIZED**
 5. Later stages per
    [`MASTER_PLAN.md`](MASTER_PLAN.md) section 4 — **PLANNED / FUTURE, NOT AUTHORIZED**.
