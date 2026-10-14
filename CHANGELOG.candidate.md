@@ -4,7 +4,10 @@
 > **OWNER REVIEW REQUIRED**
 > **AUTHORITATIVE ORIGINAL REMAINS UNCHANGED**
 >
-> - Candidate source head: `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`
+> - Validated Implementation Head: `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`
+> - Candidate Foundation Commit: `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate creation; parent `00eb3c6…`)
+> - Candidate Revision Base: `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction; parent `dccf200…`)
+> - CR-02 Candidate Revision Head: resolved by the Git commit that contains this Candidate revision — reported in the final Agent response and **not** pre-written into document bytes.
 > - Authoritative original: `CHANGELOG.md` — present in the working tree, byte-identical, **not modified** by this pass
 > - Generation date: 2026-10-13 (UTC)
 > - Replacement status: **NO REPLACEMENT PERFORMED.** This candidate does not replace, rename, delete or supersede the authoritative original. Atomic replacement requires a later, separate Owner authorization after review.
@@ -27,156 +30,61 @@
 
 ### 0.4C-K6 — T01 Physical Execution Enablement and Bench Readiness (unreleased; NOT MERGED)
 
-**Status: IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; FINAL DOCUMENTATION CANDIDATE
-REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED.**
+**Status: IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; FINAL DOCUMENTATION CANDIDATE REVIEW IN PROGRESS;
+NOT MERGED; K7 NOT AUTHORIZED.**
 
 | Field | Value |
 | --- | --- |
-| Stage | `0.4C-K6` |
-| Title | T01 Physical Execution Enablement and Bench Readiness |
-| Status | **IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; FINAL DOCUMENTATION CANDIDATE REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED** |
+| Stage | `0.4C-K6` — T01 Physical Execution Enablement and Bench Readiness |
 | Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
-| Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
+| Initial implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
-| Current validated head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Analyzer correction / Validated Implementation Head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
 | Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
 
-Implements, on approved base `193aba764f8934df3dc3b0fd1841e8b64e808cc2`:
+- **Identity separation.** The Validated Implementation Head above is an implementation commit; the
+  Candidate documentation commits (`dccf200…` foundation, `d5daaa…` CR-01 correction) are
+  documentation-only and are **not** part of that validated head.
 
-- immutable build identity
-- default physical capability disabled
-- detached Owner-signed authorization verification
-- ECDSA NIST P-256 / SHA-256 trust profile
-- SubjectPublicKeyInfo public-key representation
-- exact canonical authorization payload
-- single-use authorization consumption marker
-- replay rejection
-- exact candidate binding
-- physical-client construction only after all gates pass
-- one client
-- one connection attempt
-- at most one read
-- no retry
-- no reconnect
-- no fallback
-- outer lifecycle budget
-- cleanup-overdue evidence
-- worker-observation evidence
-- generation and epoch fencing
-- quarantined physical acquisition output
-- no automatic ACCEPTED path
-- no passive capture implementation
-- no Runtime/Kiosk integration
-- no device write/control path
+**Implemented on that base (summary).** Immutable build identity; default physical capability
+disabled; detached Owner-signed authorization verification (ECDSA NIST P-256 / SHA-256,
+SubjectPublicKeyInfo, exact canonical authorization payload, single-use consumption marker, replay
+rejection, exact candidate binding); one-shot execution discipline (physical client construction only
+after all gates pass, one client, one connection attempt, at most one read, no retry, no reconnect, no
+fallback); lifecycle and evidence (outer lifecycle budget, cleanup-overdue evidence,
+worker-observation evidence, generation and epoch fencing, quarantined output, no automatic ACCEPTED
+path); explicit non-delivery (no passive capture implementation, no Runtime/Kiosk integration, no
+device write/control path).
 
+**Owner-local automated validation (authoritative):** normal restore PASS; locked restore PASS twice;
+lock drift none. Targeted adapter, targeted TC bench, focused test-project and full solution Release
+builds PASS with no reported warnings or errors. Focused tests **95/95**; full .NET **550/550** (both
+0 failed, 0 skipped). Exporter **18/18**; S2 **14/14**; S3 **19/19**; Boundary **S1–S9 clean**;
+Commissioning **218/218** on the canonical LF representation; fixture parity verify-only **7/7**;
+`WJSS_UPDATE_FIXTURES` false; final worktree clean with no lock, fixture or documentation drift. Full
+evidence record: [`docs/CURRENT_STATE.candidate.md`](docs/CURRENT_STATE.candidate.md) section 5.
 
-Owner-local automated validation (authoritative):
+**Fail-closed behaviour observed.** The dry run stayed in SIMULATION (physical capability false,
+connect and read `NOT_ISSUED`, `TrialAcceptance` QUARANTINED, no copied words, no physical I/O) and the
+default `PHYSICAL_TEST` attempt was refused with `PHYSICAL_CAPABILITY_DISABLED`
+(`acquisitionPerformed` false, `deploymentState` `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED`). No
+physical-capable deployment build, no real authorization artifact and no real Owner signing key exist.
+**No hardware contact and no physical execution occurred.**
 
-**Restore**
+**R40 disposition (representation only).** The first normal Windows commissioning run was 217/218 with
+only R40 failing on an LF versus CRLF representation difference — no JSON-content, topology or Product
+defect. The approved generator produced the canonical LF representation; the canonical LF rerun was
+218/218; the original Owner-local fixture was restored byte-for-byte
+(`CC3F45ADF43CED351F1E8AE0D17D06AEA181FD94D119126DF0659AAC3385DA80`), and no generated fixture was
+committed. The canonical LF SHA-256
+`3BC8774CB74183080297BB89C3A855DB8E46782B421DF41AB955C1CA50A8256A` was observed in an earlier
+generator execution and was **not recomputed in the same execution** as the final 218/218 run — a
+labeled limitation.
 
-- normal restore: PASS
-- locked restore: PASS twice
-- lock drift: none
-
-**Build**
-
-- targeted adapter Release build: PASS
-- targeted TC bench Release build: PASS
-- focused test-project Release build: PASS
-- full solution Release build: PASS
-- the reported builds completed with no reported warnings or errors
-
-**Focused tests**
-
-- 95 total
-- 95 passed
-- 0 failed
-- 0 skipped
-
-**Dry run**
-
-- mode SIMULATION
-- physical capability false
-- connect NOT_ISSUED
-- read NOT_ISSUED
-- TrialAcceptance QUARANTINED
-- no copied words
-- no physical I/O
-
-**Default PHYSICAL_TEST attempt**
-
-- refused
-- refusal code `PHYSICAL_CAPABILITY_DISABLED`
-- `acquisitionPerformed` false
-- `deploymentState` `PHYSICAL_TEST_DEPLOYMENT_NOT_AUTHORIZED`
-- no physical-capable deployment build
-- no real authorization artifact
-- no real Owner signing key
-- no physical contact
-
-**Full .NET**
-
-- 550 total
-- 550 passed
-- 0 failed
-- 0 skipped
-
-**Node/static validation**
-
-- exporter 18/18
-- S2 14/14
-- S3 19/19
-- Boundary S1–S9 zero findings
-- Commissioning check PASS
-- Commissioning 218/218 on the canonical LF representation
-- fixture parity verify-only 7/7
-- `WJSS_UPDATE_FIXTURES` false
-- final working tree clean
-- no lock drift
-- no fixture drift
-- no documentation drift at the validated implementation head
-
-**R40 disposition**
-
-- first normal Windows commissioning run: 217/218
-- only R40 failed
-- the mismatch was LF versus CRLF representation
-- no JSON-content, topology or Product defect
-- the approved generator produced the canonical LF representation
-- canonical LF Commissioning rerun: 218/218
-- the original Owner-local fixture was restored byte-for-byte
-- original/restored Owner-local SHA-256: `CC3F45ADF43CED351F1E8AE0D17D06AEA181FD94D119126DF0659AAC3385DA80`
-- the canonical LF SHA-256 was observed in an earlier generation run as `3BC8774CB74183080297BB89C3A855DB8E46782B421DF41AB955C1CA50A8256A`
-- **Limitation:** the canonical hash was not recomputed in the same execution as the final 218/218 run
-- final worktree clean
-- no generated fixture was committed
-
-Agent/Arena validation, reported separately:
-
-Agent/Arena reported, separately from Owner-local validation:
-
-- exporter 18/18
-- S2 14/14
-- S3 19/19
-- Boundary S1–S9 clean
-- Commissioning 218/218
-- JavaScript syntax checks passed
-- changed-path and protected-surface proofs passed
-- genuine locks unchanged
-
-Agent did **not** have `dotnet` and must **not** be credited with:
-
-- C# compilation
-- analyzer execution
-- xUnit or .NET tests
-- .NET fixture parity
-- physical execution
-
-Evidence references: the K6 commit chain `00c2c07…` → `e40d43b…` → `00eb3c6…`; the preceding K5
-foundation record [`docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md`](docs/STAGE_ONE_NODE_TC_SCOPE_GATE.md); and
-[`docs/decisions/ADR-0019-isolated-one-node-tc-bench.md`](docs/decisions/ADR-0019-isolated-one-node-tc-bench.md).
-No Stage 0.4C-K6 record file exists in the repository yet, and this candidate pass does not create one
-(it is limited to the four authorized candidate paths).
+**Agent/Arena evidence, reported separately (Arena had no `dotnet`):** exporter 18/18; S2 14/14;
+S3 19/19; Boundary S1–S9 clean; Commissioning 218/218; JavaScript syntax checks passed; changed-path
+and protected-surface proofs passed; genuine locks unchanged. Agent must **not** be credited with C#
+compilation, analyzer execution, xUnit or .NET tests, .NET fixture parity or physical execution.
 
 No merge, no T01 execution, no physical authorization, and no K7 authorization follows from these
 results. Current authorization boundary:
@@ -224,6 +132,62 @@ Stage 0.4C-0B, 0.4C-0A, 0.4C-0, 0.4B-3, 0.4B-2, 0.4B-1, the Stage 0.4A checkpoin
 candidate — is preserved verbatim, in its original order, in section 5 of this candidate. No entry was
 summarised away, reordered within its era or rewritten.
 
+## Promotion Preview — NOT EXECUTED
+
+**Purpose.** Show the canonical identity and the Candidate-only material treatment that would apply in
+a future, separately authorized Atomic Replacement. This preview performs and implies no replacement:
+nothing is renamed, deleted, promoted or converted here, and the Candidate notice at the top of this
+file stays in place.
+
+| Item | Candidate (now, review only) | Canonical after an authorized replacement |
+| --- | --- | --- |
+| Path | `CHANGELOG.candidate.md` | `CHANGELOG.md` |
+| Document H1 | `# CHANGELOG.candidate.md` | `# Changelog` |
+
+A future promotion would, in one atomic change:
+
+- replace the Candidate H1 with the canonical H1 `# Changelog`;
+- remove the Candidate-only notice, its review/replacement-status metadata and this Promotion Preview;
+- convert Candidate links to canonical links using the mapping below;
+- retain the validated implementation facts unchanged;
+- retain every historical preservation block unchanged;
+- make no other substantive content change.
+
+### Candidate → canonical link map
+
+| Candidate link (valid in this Candidate set) | Canonical promoted target | Occurrences |
+| --- | --- | --- |
+| [`docs/MASTER_PLAN.candidate.md`](docs/MASTER_PLAN.candidate.md) | [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) | 1 |
+| [`docs/CURRENT_STATE.candidate.md`](docs/CURRENT_STATE.candidate.md) | [`docs/CURRENT_STATE.md`](docs/CURRENT_STATE.md) | 1 |
+
+Preserved historical blocks keep their existing link targets: those links were written against
+canonical paths and are not rewritten by this revision.
+
+### Promotion Rules (future Atomic Replacement only — not executed)
+
+These rules describe future behaviour only. None of them is executed, started or authorized by this
+Candidate revision.
+
+1. Require the exact Owner-approved Candidate revision commit and the approved Candidate blob IDs.
+2. Re-prove that every authoritative original is unchanged since Owner review.
+3. Re-run the historical reconstruction proof for all four Candidates.
+4. Replace each canonical file atomically from its approved Candidate source.
+5. Replace the Candidate H1 with the canonical H1.
+6. Remove the Candidate-only review notice, the replacement-status metadata and this Promotion Preview.
+7. Convert Candidate links using the approved promotion link mapping above.
+8. Retain the Validated Implementation Head.
+9. Retain the approved roadmap and dependency wording.
+10. Retain the complete historical preservation blocks.
+11. Remove the Candidate paths in the same atomic commit.
+12. Require all four canonical paths to exist after replacement.
+13. Require zero remaining Candidate paths.
+14. Re-run link, anchor, fence and Markdown structure checks.
+15. Re-run preservation and current-truth consistency checks.
+16. Review the complete final diff.
+17. Change no Product, test, lock, configuration or fixture content.
+18. Do not start K7.
+19. Create no Progress Dashboard before PR merge, under the standing post-merge Dashboard rule.
+20. Stop if any approved Candidate blob differs.
 ## 5. Historical Corrections and Superseded Records
 
 Corrections already present in the authoritative file are retained unchanged and are listed here only

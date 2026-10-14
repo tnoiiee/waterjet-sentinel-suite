@@ -4,7 +4,10 @@
 > **OWNER REVIEW REQUIRED**
 > **AUTHORITATIVE ORIGINAL REMAINS UNCHANGED**
 >
-> - Candidate source head: `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`
+> - Validated Implementation Head: `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`
+> - Candidate Foundation Commit: `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate creation; parent `00eb3c6…`)
+> - Candidate Revision Base: `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction; parent `dccf200…`)
+> - CR-02 Candidate Revision Head: resolved by the Git commit that contains this Candidate revision — reported in the final Agent response and **not** pre-written into document bytes.
 > - Authoritative original: `docs/MASTER_PLAN.md` — present in the working tree, byte-identical, **not modified** by this pass
 > - Generation date: 2026-10-13 (UTC)
 > - Replacement status: **NO REPLACEMENT PERFORMED.** This candidate does not replace, rename, delete or supersede the authoritative original. Atomic replacement requires a later, separate Owner authorization after review.
@@ -28,6 +31,11 @@
 - **Planned does not mean Authorized.** Every stage — including every stage listed as `CURRENT`,
   `NEXT`, `PLANNED` or `FUTURE` in section 4 — requires its **own Owner Scope Gate** before any work
   may begin.
+- **Implementation identity versus documentation identity.** The Validated Implementation Head is
+  `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. The Candidate documentation commits —
+  `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate foundation) and
+  `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction) — are documentation-only and are
+  **not** part of the validated implementation head; no implementation path changed in them.
 - Document status of the preserved original: `[APPROVED]` for the stage-gate discipline and for the
   Stage 0.1 and Stage 0.2 positions; stage contents beyond Stage 0.2 remain `[PROPOSED]`. Governing
   authority: [`AGENTS.md`](../AGENTS.md) and the approved Stage 0.1 and Stage 0.2 Scope Gates.
@@ -57,7 +65,7 @@ version: **no application version exists**, and the documentation versioning pol
 | Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
 | Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
-| Current validated head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
 | Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
 
 - The K6 implementation was authored in Arena; **Owner-local automated validation is the
@@ -140,7 +148,7 @@ atomic replacement and that replacement is completed and validated.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | Not stated in approved source material (open point) |
+| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | `0.4C-K17` (Owner-approved dependency) |
 | `0.4D-G2` | Galil Read-Only Status Acquisition | PLANNED - NOT AUTHORIZED | Read-only Galil status acquisition | 0.4D-G1 |
 | `0.4D-G3` | Galil Controlled Motion Test Foundation | PLANNED - NOT AUTHORIZED | Foundation for controlled Galil motion test | 0.4D-G2 |
 | `0.4D-G4` | Galil Axis Functional Test | PLANNED - NOT AUTHORIZED | Galil axis functional test | 0.4D-G3 |
@@ -150,7 +158,7 @@ atomic replacement and that replacement is completed and validated.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | Not stated in approved source material (open point) |
+| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | `0.4D-G5` (Owner-approved dependency) |
 | `0.4E-I2` | Single-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Single-job integrated dry cycle | 0.4E-I1 |
 | `0.4E-I3` | Sequential Multi-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Sequential multi-job integrated dry cycle | 0.4E-I2 |
 | `0.4E-I4` | Integrated Dry-Cycle Closeout | PLANNED - NOT AUTHORIZED | Close out the integrated dry cycle | 0.4E-I3 |
@@ -159,35 +167,73 @@ atomic replacement and that replacement is completed and validated.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | Not stated in approved source material (open point) |
+| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | `0.4E-I4` (Owner-approved dependency) |
 | `0.5A-P2` | Production Configuration and Access Boundary | FUTURE - NOT AUTHORIZED | Production configuration and access boundary | 0.5A-P1 |
 | `0.5A-P3` | Production Pilot Operation | FUTURE - NOT AUTHORIZED | Production pilot operation | 0.5A-P2 |
 | `0.5A-P4` | Production Acceptance and Operational Handover | FUTURE - NOT AUTHORIZED | Production acceptance and operational handover | 0.5A-P3 |
 
-### 4.8 Reported conflicts and open points
+**Dependency note (Owner-approved in CR-02; roadmap dependency only).** `0.4D-G1` follows
+`0.4C-K17`, `0.4E-I1` follows `0.4D-G5` and `0.5A-P1` follows `0.4E-I4`. This approval establishes
+roadmap dependency only: it authorizes none of these stages, adds no dates, and does not authorize an
+automatic transition when a predecessor completes — each stage still requires its own explicit Owner
+Scope Gate. Statuses remain `PLANNED - NOT AUTHORIZED` for `0.4D-G1` and `0.4E-I1`, and
+`FUTURE - NOT AUTHORIZED` for `0.5A-P1`.
+
+### 4.8 Historical Reconciliation
+
+The items below were previously reported as conflicts or open points. Each is reconciled by later,
+already-established evidence and requires **no new Owner decision**; the preserved historical text is
+not rewritten. Every item previously reported in this section is mapped here or in section 4.9.
 
 1. **Dated "OPEN — NOT MERGED" wording.** The preserved historical text and older entries describe
-   `0.4C-K2` (PR #20) and `0.4C-K3` (PR #21) as `OPEN — NOT MERGED` at their checkpoints; the proposed
-   roadmap above records them as **MERGED** (K3 additionally recorded inside the preserved README text
-   as `d1ea0324cb37de65a798fe4271429f955d4a9225`, parents `cc6ccf87` / `a6238ac`). The dated wording is
-   preserved unchanged; the conflict is reported here rather than silently resolved.
-2. **Binding of stages to pull requests.** The proposed map binds `0.4C-K4` to PR #22 and `0.4C-K5` to
-   PR #23 (`193aba76…`). Earlier text binds the Library Selection Gate to PR #22; no earlier text binds
-   a PR number to `K4` or `K5` by those identifiers.
-3. **New identifiers.** `0.4C-K6`–`0.4C-K17`, `0.4D-G1`–`G5`, `0.4E-I1`–`I4` and `0.5A-P1`–`P4` are
-   **proposed by this candidate for Owner review** and are **not authoritative or canonical** unless
-   and until the Owner separately authorizes atomic replacement and that replacement is completed and
-   validated; they do not all appear in the preserved historical text. No historical record was
-   altered to introduce them.
-4. **Dependencies not stated.** For `0.4D-G1`, `0.4E-I1` and `0.5A-P1` the proposed roadmap does not
-   state a preceding dependency; this is reported as an open point rather than inferred.
-5. **Superseded current-position text.** The preserved `Current critical path — 2026-10-13` section
-   describes the K5-era closeout next steps (`e71e33b…`). That position was completed by the PR #23
-   merge into `main` at `193aba76…`; the current position is section 3 above. The preserved text is not
-   rewritten.
-6. **Earlier, more specific records.** The preserved sections contain more specific details for many
-   stages (for example the Stage 0.4A CP-2/CP-3 records). Those details are retained verbatim in
-   section 11 and are not replaced by the brief purposes above.
+   `0.4C-K2` (PR #20) and `0.4C-K3` (PR #21) as `OPEN — NOT MERGED` at their checkpoints, while
+   the proposed roadmap records them as **MERGED**. Both are correct for their own dates: the
+   dated wording is the record of that checkpoint, and the merges are established by later
+   evidence (K3 additionally recorded inside the preserved README text as
+   `d1ea0324cb37de65a798fe4271429f955d4a9225`, parents `cc6ccf87` / `a6238ac`). Reconciliation:
+   dated record retained unchanged; current status in section 4.1.
+
+2. **Binding of stages to pull requests.** Established evidence binds `0.4C-K4` to PR #22 and
+   `0.4C-K5` to PR #23 (`193aba76…`). Earlier text binds the Library Selection Gate to PR #22 and
+   does not bind a PR number to `K4` or `K5` by those identifiers — an earlier naming granularity,
+   not a conflict. Reconciliation: the proposed map adds the identifiers without altering any
+   earlier text.
+
+3. **New identifiers.** `0.4C-K6`–`0.4C-K17`, `0.4D-G1`–`G5`, `0.4E-I1`–`I4` and `0.5A-P1`–`P4`
+   are **proposed by this candidate for Owner review** and are **not authoritative or canonical**
+   unless and until the Owner separately authorizes atomic replacement and that replacement is
+   completed and validated; they do not all appear in the preserved historical text. No historical
+   record was altered to introduce them; section 4.9 records what that still depends on.
+
+4. **Dependencies previously unstated — now decided by the Owner.** `0.4D-G1`, `0.4E-I1` and
+   `0.5A-P1` had no stated preceding dependency in the earlier source material. This was resolved
+   by the Owner in CR-02 (roadmap dependency only): `0.4D-G1` ← `0.4C-K17`, `0.4E-I1` ← `0.4D-G5`,
+   `0.5A-P1` ← `0.4E-I4`, recorded in sections 4.5–4.7, 6 and 7. Statuses, dates and authorization
+   are unchanged: none of these stages is authorized, none has a date, and completion of a
+   predecessor does not authorize a successor automatically.
+
+5. **Superseded current-position text.** The preserved `Current critical path — 2026-10-13`
+   section describes the K5-era closeout next steps (`e71e33b…`). That position was completed by
+   the PR #23 merge into `main` at `193aba76…`, and K6 followed. Reconciliation: the preserved
+   K5-era text is the record of its date; the current position is section 3 above. The preserved
+   text is not rewritten.
+
+6. **Earlier, more specific records.** The preserved sections contain more specific details for
+   many stages (for example the Stage 0.4A CP-2/CP-3 records). Those details are retained verbatim
+   in section 11 and are not replaced by the brief purposes above.
+
+### 4.9 Owner Decisions Still Required
+
+Genuine decisions that remain open and are **not** resolved by this candidate:
+
+1. **Approval of this proposed restructure and of atomic replacement.** The proposed roadmap, its
+   identifiers and its statuses become canonical only if the Owner approves the Candidate documents
+   **and** separately authorizes a later atomic replacement pass, which must then be completed and
+   validated. Until then `docs/MASTER_PLAN.md` remains the roadmap of record and this candidate
+   remains non-authoritative.
+2. **No Scope Gate exists for any stage after K6.** `0.4C-K7` and every later stage — including
+   `0.4D-G1`, `0.4E-I1` and `0.5A-P1` — require their own explicit Owner Scope Gate before any work
+   may begin. None is authorized, scheduled or dated.
 
 ## 5. Critical Path
 
@@ -211,11 +257,11 @@ authorize another candidate.
 | `0.4C-K6` | `0.4C-K5` |
 | `0.4C-K7` | `0.4C-K6` (not merged) |
 | `0.4C-K8` … `0.4C-K17` | the immediately preceding `0.4C-K` stage |
-| `0.4D-G1` | not stated in approved source material (open point) |
+| `0.4D-G1` | `0.4C-K17` (Owner-approved dependency) |
 | `0.4D-G2` … `0.4D-G5` | the immediately preceding `0.4D-G` stage |
-| `0.4E-I1` | not stated in approved source material (open point) |
+| `0.4E-I1` | `0.4D-G5` (Owner-approved dependency) |
 | `0.4E-I2` … `0.4E-I4` | the immediately preceding `0.4E-I` stage |
-| `0.5A-P1` | not stated in approved source material (open point) |
+| `0.5A-P1` | `0.4E-I4` (Owner-approved dependency) |
 | `0.5A-P2` … `0.5A-P4` | the immediately preceding `0.5A-P` stage |
 
 ## 7. Stage Definitions
@@ -260,7 +306,7 @@ Implemented delivery and evidence for K6: see
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | Not stated in approved source material (open point) |
+| `0.4D-G1` | Galil Hardware and Communication Evidence Gate | PLANNED - NOT AUTHORIZED | Evidence gate for Galil hardware and communication | `0.4C-K17` (Owner-approved dependency) |
 | `0.4D-G2` | Galil Read-Only Status Acquisition | PLANNED - NOT AUTHORIZED | Read-only Galil status acquisition | 0.4D-G1 |
 | `0.4D-G3` | Galil Controlled Motion Test Foundation | PLANNED - NOT AUTHORIZED | Foundation for controlled Galil motion test | 0.4D-G2 |
 | `0.4D-G4` | Galil Axis Functional Test | PLANNED - NOT AUTHORIZED | Galil axis functional test | 0.4D-G3 |
@@ -268,7 +314,7 @@ Implemented delivery and evidence for K6: see
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | Not stated in approved source material (open point) |
+| `0.4E-I1` | Integrated Dry-Cycle Scope and Safety Gate | PLANNED - NOT AUTHORIZED | Scope and safety gate for the integrated dry cycle | `0.4D-G5` (Owner-approved dependency) |
 | `0.4E-I2` | Single-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Single-job integrated dry cycle | 0.4E-I1 |
 | `0.4E-I3` | Sequential Multi-Job Integrated Dry Cycle | PLANNED - NOT AUTHORIZED | Sequential multi-job integrated dry cycle | 0.4E-I2 |
 | `0.4E-I4` | Integrated Dry-Cycle Closeout | PLANNED - NOT AUTHORIZED | Close out the integrated dry cycle | 0.4E-I3 |
@@ -280,7 +326,7 @@ authorization, start date or schedule is implied.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |
-| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | Not stated in approved source material (open point) |
+| `0.5A-P1` | Production Readiness Scope Gate | FUTURE - NOT AUTHORIZED | Scope gate for production readiness | `0.4E-I4` (Owner-approved dependency) |
 | `0.5A-P2` | Production Configuration and Access Boundary | FUTURE - NOT AUTHORIZED | Production configuration and access boundary | 0.5A-P1 |
 | `0.5A-P3` | Production Pilot Operation | FUTURE - NOT AUTHORIZED | Production pilot operation | 0.5A-P2 |
 | `0.5A-P4` | Production Acceptance and Operational Handover | FUTURE - NOT AUTHORIZED | Production acceptance and operational handover | 0.5A-P3 |
@@ -344,6 +390,62 @@ Operating rules that remain in force (full original text preserved in section 11
 - **Production transport and chart library** — remain `[OPEN]` per the preserved records.
 - **Documentation versioning policy** — remains `[OPEN]`.
 
+## Promotion Preview — NOT EXECUTED
+
+**Purpose.** Show the canonical identity and the Candidate-only material treatment that would apply in
+a future, separately authorized Atomic Replacement. This preview performs and implies no replacement:
+nothing is renamed, deleted, promoted or converted here, and the Candidate notice at the top of this
+file stays in place.
+
+| Item | Candidate (now, review only) | Canonical after an authorized replacement |
+| --- | --- | --- |
+| Path | `docs/MASTER_PLAN.candidate.md` | `docs/MASTER_PLAN.md` |
+| Document H1 | `# MASTER_PLAN.candidate.md` | `# Master Plan — WaterJet Sentinel Suite (WJSS)` |
+
+A future promotion would, in one atomic change:
+
+- replace the Candidate H1 with the canonical H1 `# Master Plan — WaterJet Sentinel Suite (WJSS)`;
+- remove the Candidate-only notice, its review/replacement-status metadata and this Promotion Preview;
+- convert Candidate links to canonical links using the mapping below;
+- retain the validated implementation facts unchanged;
+- retain every historical preservation block unchanged;
+- make no other substantive content change.
+
+### Candidate → canonical link map
+
+| Candidate link (valid in this Candidate set) | Canonical promoted target | Occurrences |
+| --- | --- | --- |
+| [`CURRENT_STATE.candidate.md`](CURRENT_STATE.candidate.md) | [`CURRENT_STATE.md`](CURRENT_STATE.md) | 3 |
+| [`../CHANGELOG.candidate.md`](../CHANGELOG.candidate.md) | [`../CHANGELOG.md`](../CHANGELOG.md) | 1 |
+
+Preserved historical blocks keep their existing link targets: those links were written against
+canonical paths and are not rewritten by this revision.
+
+### Promotion Rules (future Atomic Replacement only — not executed)
+
+These rules describe future behaviour only. None of them is executed, started or authorized by this
+Candidate revision.
+
+1. Require the exact Owner-approved Candidate revision commit and the approved Candidate blob IDs.
+2. Re-prove that every authoritative original is unchanged since Owner review.
+3. Re-run the historical reconstruction proof for all four Candidates.
+4. Replace each canonical file atomically from its approved Candidate source.
+5. Replace the Candidate H1 with the canonical H1.
+6. Remove the Candidate-only review notice, the replacement-status metadata and this Promotion Preview.
+7. Convert Candidate links using the approved promotion link mapping above.
+8. Retain the Validated Implementation Head.
+9. Retain the approved roadmap and dependency wording.
+10. Retain the complete historical preservation blocks.
+11. Remove the Candidate paths in the same atomic commit.
+12. Require all four canonical paths to exist after replacement.
+13. Require zero remaining Candidate paths.
+14. Re-run link, anchor, fence and Markdown structure checks.
+15. Re-run preservation and current-truth consistency checks.
+16. Review the complete final diff.
+17. Change no Product, test, lock, configuration or fixture content.
+18. Do not start K7.
+19. Create no Progress Dashboard before PR merge, under the standing post-merge Dashboard rule.
+20. Stop if any approved Candidate blob differs.
 ## 11. Historical Master Plan Records
 
 The authoritative `docs/MASTER_PLAN.md` is preserved verbatim below, including the dated critical-path
@@ -359,8 +461,8 @@ keeps one heading hierarchy.
   position is section 3 above.
 - The preserved stage ledger in section 11 contains dated, more specific records for stages up to
   Stage 0.4C-K3 and the Library Selection Gate. The proposed roadmap in section 4 covers
-  `0.4C-K1` … `0.5A-P4`; conflicts are reported in section 4.8 rather than resolved by editing the
-  preserved text.
+  `0.4C-K1` … `0.5A-P4`; earlier-vs-current reconciliation is recorded in section 4.8 and the
+  remaining Owner decisions in section 4.9, rather than resolved by editing the preserved text.
 
 ---
 

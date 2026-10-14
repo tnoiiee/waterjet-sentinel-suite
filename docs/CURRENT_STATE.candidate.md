@@ -4,7 +4,10 @@
 > **OWNER REVIEW REQUIRED**
 > **AUTHORITATIVE ORIGINAL REMAINS UNCHANGED**
 >
-> - Candidate source head: `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`
+> - Validated Implementation Head: `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`
+> - Candidate Foundation Commit: `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate creation; parent `00eb3c6…`)
+> - Candidate Revision Base: `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction; parent `dccf200…`)
+> - CR-02 Candidate Revision Head: resolved by the Git commit that contains this Candidate revision — reported in the final Agent response and **not** pre-written into document bytes.
 > - Authoritative original: `docs/CURRENT_STATE.md` — present in the working tree, byte-identical, **not modified** by this pass
 > - Generation date: 2026-10-13 (UTC)
 > - Replacement status: **NO REPLACEMENT PERFORMED.** This candidate does not replace, rename, delete or supersede the authoritative original. Atomic replacement requires a later, separate Owner authorization after review.
@@ -52,6 +55,12 @@ Identity discipline: a new session verifies the current remote refs before relyi
 recorded here, and must not treat a SHA pre-written in documentation as the identity of a commit it
 is about to create.
 
+- **Implementation identity versus documentation identity.** The Validated Implementation Head is
+  `00eb3c6c6ad581067aeef79b5c40b4dbb309194e`. The Candidate documentation commits —
+  `dccf200b4132cd281b3471409c23d08fe328c3ac` (Candidate foundation) and
+  `d5daaaabcb7547c4de40d990f74323501105ee33` (CR-01 correction) — are documentation-only and are
+  **not** part of the validated implementation head; no implementation path changed in them.
+
 ## 3. Current Stage — 0.4C-K6
 
 | Field | Value |
@@ -62,7 +71,7 @@ is about to create.
 | Approved base | `193aba764f8934df3dc3b0fd1841e8b64e808cc2` |
 | Initial K6 implementation | `00c2c0786de1966d6da279c8f38fc57c8b3b56de` |
 | Namespace correction | `e40d43b3b9492a5078eac55f4b6776d3ededdfe3` |
-| Current validated head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
+| Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
 | Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
 
 Scope of the stage: make a **single, Owner-authorized, one-node physical T01 read-only trial
@@ -288,6 +297,61 @@ sensor-channel schedule, packages, locks, fixtures, configuration and boundary p
 candidate contents, request changes, or leave the authoritative documents as they are. Atomic
 replacement is **NOT AUTHORIZED** in this pass, and no K7 activity may begin.
 
+## Promotion Preview — NOT EXECUTED
+
+**Purpose.** Show the canonical identity and the Candidate-only material treatment that would apply in
+a future, separately authorized Atomic Replacement. This preview performs and implies no replacement:
+nothing is renamed, deleted, promoted or converted here, and the Candidate notice at the top of this
+file stays in place.
+
+| Item | Candidate (now, review only) | Canonical after an authorized replacement |
+| --- | --- | --- |
+| Path | `docs/CURRENT_STATE.candidate.md` | `docs/CURRENT_STATE.md` |
+| Document H1 | `# CURRENT_STATE.candidate.md` | `# Current State — WaterJet Sentinel Suite (WJSS)` |
+
+A future promotion would, in one atomic change:
+
+- replace the Candidate H1 with the canonical H1 `# Current State — WaterJet Sentinel Suite (WJSS)`;
+- remove the Candidate-only notice, its review/replacement-status metadata and this Promotion Preview;
+- convert Candidate links to canonical links using the mapping below;
+- retain the validated implementation facts unchanged;
+- retain every historical preservation block unchanged;
+- make no other substantive content change.
+
+### Candidate → canonical link map
+
+| Candidate link (valid in this Candidate set) | Canonical promoted target | Occurrences |
+| --- | --- | --- |
+| [`MASTER_PLAN.candidate.md`](MASTER_PLAN.candidate.md) | [`MASTER_PLAN.md`](MASTER_PLAN.md) | 1 |
+
+Preserved historical blocks keep their existing link targets: those links were written against
+canonical paths and are not rewritten by this revision.
+
+### Promotion Rules (future Atomic Replacement only — not executed)
+
+These rules describe future behaviour only. None of them is executed, started or authorized by this
+Candidate revision.
+
+1. Require the exact Owner-approved Candidate revision commit and the approved Candidate blob IDs.
+2. Re-prove that every authoritative original is unchanged since Owner review.
+3. Re-run the historical reconstruction proof for all four Candidates.
+4. Replace each canonical file atomically from its approved Candidate source.
+5. Replace the Candidate H1 with the canonical H1.
+6. Remove the Candidate-only review notice, the replacement-status metadata and this Promotion Preview.
+7. Convert Candidate links using the approved promotion link mapping above.
+8. Retain the Validated Implementation Head.
+9. Retain the approved roadmap and dependency wording.
+10. Retain the complete historical preservation blocks.
+11. Remove the Candidate paths in the same atomic commit.
+12. Require all four canonical paths to exist after replacement.
+13. Require zero remaining Candidate paths.
+14. Re-run link, anchor, fence and Markdown structure checks.
+15. Re-run preservation and current-truth consistency checks.
+16. Review the complete final diff.
+17. Change no Product, test, lock, configuration or fixture content.
+18. Do not start K7.
+19. Create no Progress Dashboard before PR merge, under the standing post-merge Dashboard rule.
+20. Stop if any approved Candidate blob differs.
 ## 11. Historical Current-State Records
 
 The authoritative `docs/CURRENT_STATE.md` is preserved verbatim below, including every dated
