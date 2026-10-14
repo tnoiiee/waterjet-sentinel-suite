@@ -137,6 +137,48 @@ public sealed class TrialEvidenceTests
         }) Assert.Throws<InvalidDataException>(() => TrialEvidence.Validate(broken, c));
     }
 
+    [Fact]
+    public async Task Local_Simulation_Records_Are_Loopback_Only_Never_Physical_And_Never_Acceptable()
+    {
+        var c = TrialCatalog.LoadTrusted();
+        var trusted = c.Select("T01").Trial;
+        var e = await new TrialRunner().RunLocalSimulationAsync(c, LocalSimulation.InvocationConfiguration(c), () => new TestClient(), CancellationToken.None);
+        Assert.Equal(LocalSimulation.Provenance, e.Provenance);
+        Assert.Equal(40, e.Words.Length);
+        TrialEvidence.Validate(e, c);
+        foreach (var broken in new[]
+        {
+            // The configured physical address can never appear under the local class, and the loopback
+            // endpoint can never be presented as the physical class, the dry run or the software seam.
+            e with { Endpoint = trusted.Address },
+            e with { Port = 0 },
+            e with { Port = null },
+            e with { Provenance = "PHYSICAL_DIAGNOSTIC" },
+            e with { Provenance = "SIMULATION" },
+            e with { Provenance = "SYNTHETIC_TEST_ONLY" },
+            e with { Provenance = "LOCAL_SIMULATION" },
+            // A local record can never claim that an authorization was used.
+            e with { AuthorizationVerification = PhysicalTrialStates.Verified },
+            e with { AuthorizationConsumption = PhysicalTrialStates.Consumed },
+            e with { AuthorizationId = "AUTH-01" },
+            e with { AuthorizationKeyId = "OWNER-KEY-01" },
+            e with { AuthorizationPayloadSha256 = new string('d', 64) },
+        }) Assert.Throws<InvalidDataException>(() => TrialEvidence.Validate(broken, c));
+        // Offline review can never ACCEPT a local record, even with a matching wire review: acceptance
+        // is reserved for a physical record. A REJECTED decision is still representable.
+        var bytes = TrialEvidence.Serialize(e);
+        var owner = new OwnerReview
+        {
+            TrialId = e.TrialId, SessionId = e.SessionId, AcquisitionManifestSha256 = TrialCatalog.Hash(bytes),
+            OwnerId = "NEUTRAL-OWNER", Reference = "SYNTHETIC-REVIEW", ReviewedAt = e.CreatedAt.AddMinutes(5),
+            Decision = TrialAcceptance.ACCEPTED, ApprovedWordExcerpt = true,
+        };
+        Assert.Throws<InvalidDataException>(() => TrialEvidence.ApplyOfflineReview(bytes, c, Matched(e), owner));
+        var rejected = TrialEvidence.ApplyOfflineReview(bytes, c, new WireReview(), owner with { Decision = TrialAcceptance.REJECTED, ApprovedWordExcerpt = false });
+        Assert.Equal(TrialAcceptance.REJECTED, rejected.TrialAcceptance);
+        Assert.Equal(LocalSimulation.Provenance, rejected.Provenance);
+    }
+
     private static TrialEvidence PhysicalExample()
     {
         // Offline synthetic record ONLY. Never executed and never claimed as physical evidence.

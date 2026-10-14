@@ -125,6 +125,11 @@ public sealed record OwnerReview
 ///
 /// Deterministic dry-run and synthetic records keep explicit NOT_PROVIDED / NOT_ISSUED /
 /// NOT_OBSERVED values: no unavailable physical fact is ever fabricated as a zero.
+///
+/// Provenance is the execution class: SIMULATION (no-I/O dry run), LOCAL_TCP_SIMULATION (Owner-local
+/// loopback simulator, effective endpoint recorded), SYNTHETIC_TEST_ONLY (software tests) and
+/// PHYSICAL_DIAGNOSTIC (authorized physical trial). Only a PHYSICAL_DIAGNOSTIC record can ever be
+/// accepted offline; every other class stays QUARANTINED.
 /// </summary>
 public sealed record TrialEvidence
 {
@@ -293,6 +298,12 @@ public sealed record TrialEvidence
         if (evidence.Provenance == "SYNTHETIC_TEST_ONLY")
         {
             if (evidence.Endpoint != "127.0.0.1" || evidence.Port is null or < 1 or > 65535 or 502) throw new InvalidDataException("SYNTHETIC_ENDPOINT_REJECTED");
+        }
+        else if (evidence.Provenance == LocalSimulation.Provenance)
+        {
+            // A Local TCP Simulation record carries the literal loopback endpoint only; the configured
+            // physical address can never appear under this class.
+            if (evidence.Endpoint != LocalSimulation.LoopbackAddress || evidence.Port is null or < 1 or > 65535) throw new InvalidDataException("LOCAL_SIMULATION_ENDPOINT_REJECTED");
         }
         else if (evidence.Provenance is not ("SIMULATION" or "PHYSICAL_DIAGNOSTIC") || evidence.Endpoint != t.Address || evidence.Port != t.Port) throw new InvalidDataException("EVIDENCE_ENDPOINT_REJECTED");
 

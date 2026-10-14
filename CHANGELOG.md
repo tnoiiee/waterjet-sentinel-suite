@@ -13,7 +13,73 @@
 
 ## 2. Current Stage / Unreleased
 
-### 0.4C-K6 — T01 Physical Execution Enablement and Bench Readiness (unreleased; NOT MERGED)
+### 2026-10-15 — Local Modbus TCP Simulation configuration and execution path (post-K6; unreleased; PR OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON BRANCH `arena/18760814-waterjet-sentinel-suite` (single commit, direct parent `f356b162214946058b42fe56fa13e5afc4c80539`); AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox); OWNER-LOCAL VALIDATION PENDING; MERGE NOT AUTHORIZED; K7 NOT AUTHORIZED.**
+
+Owner request: an application-owned way to run the existing TC Modbus TCP acquisition against a
+Modbus TCP simulator on the Owner workstation (loopback, port 502) without editing Source, without
+changing the trusted physical candidate, without any physical authorization artifact and without
+`PHYSICAL_TEST`.
+
+Changed:
+
+- NEW `apps/tc-bench/LocalSimulation.cs` — execution class `LOCAL_TCP_SIMULATION` (the protocol name is
+  not permitted as a token in the bench tree by boundary rule S3), literal loopback address constant,
+  simulator port `502`, `InvocationConfiguration(catalog)` (trusted default tuple with ONLY the address
+  replaced by `127.0.0.1`) and fail-closed `RequireValid` (address text exactly `127.0.0.1`, port
+  `1..65535`, request exactly FC03 / Unit `0` / start `0` / quantity `40` / BigEndian / T01 identity;
+  typed `ArgumentException` refusals before any client exists; nothing corrected or resolved).
+- `apps/tc-bench/TrialConfiguration.cs` — `BenchMode.LOCAL_TCP_SIMULATION`; `--local-simulation`
+  selector without value; the three mode selectors are mutually exclusive (`CONFLICTING_MODE`);
+  `--authorization` / `--signature` remain refused outside `--physical-test`.
+- `apps/tc-bench/TrialRunner.cs` — public `RunLocalSimulationAsync(catalog, invocation, factory,
+  token)`: validate, then the unchanged one-shot lifecycle (one client, one connect, at most one read,
+  2000 ms timeouts, explicit disconnect, observed disposal, bounded cancellation, generation/epoch
+  fencing, no retry/reconnect/fallback). The internal software seam and the physical path are
+  unchanged.
+- `apps/tc-bench/TrialEvidence.cs` — `Validate` accepts a `LOCAL_TCP_SIMULATION` record only with
+  endpoint `127.0.0.1` and a valid port (`LOCAL_SIMULATION_ENDPOINT_REJECTED` otherwise); a loopback
+  record under `SIMULATION` / `SYNTHETIC_TEST_ONLY` / `PHYSICAL_DIAGNOSTIC` is refused; offline
+  ACCEPTANCE of a local record stays impossible. Schema version unchanged (`wjss.tc-bench-trial/2`).
+- `apps/tc-bench/Program.cs` — `LOCAL_TCP_SIMULATION` branch before the physical branch: no
+  authorization read, no gate consulted; prints `{ mode, configuration (default, unchanged),
+  invocation (effective), evidence }`; exit `0` when evidence was produced, `2` on typed refusal.
+- Tests extended (existing files): `tests/tc-acquisition.tests/TestClients.cs` (request capture),
+  `TrialPolicyTests.cs` (selector exclusivity, invocation configuration, endpoint and request refusals
+  before the factory, one connect / one exact read / observed cleanup / quarantined local evidence,
+  word-count mismatch reported not corrected, failed connect never reads or retries, stop during read),
+  `TrialEvidenceTests.cs` (local records loopback-only, never physical, never acceptable),
+  `AdapterLifecycleTests.cs` (public local path with the real adapter over an ephemeral loopback port:
+  exact 12-byte FC03 request, 40 words, cleanup observed, evidence validates),
+  `PhysicalAuthorizationTests.cs` (authorization naming `127.0.0.1` refused by exact tuple binding);
+  `tools/tc-bench/test/export-trial-configuration.test.mjs` (static-source guards updated for the
+  two-class entry point and added for the local class).
+- Documentation: NEW `docs/TC_BENCH_LOCAL_SIMULATION.md` (Owner-local procedure with exact repository
+  commands, output guide, boundary, what a local run does and does not prove);
+  `apps/tc-bench/README.md` current execution classes; targeted current-position updates in
+  `README.md`, `docs/CURRENT_STATE.md` (section 3A) and `docs/MASTER_PLAN.md`.
+
+Unchanged: default configuration `192.0.2.11` / `502` / FC03 / Unit `0` / start `0` / quantity `40`;
+the trusted physical candidate; the physical authorization gate and every physical protection (build
+identity, capability flag, detached signature, key, schema, canonical payload, window, identity
+binding, manifest, exact tuple binding, single use, outcome/wire/acceptance separation, refusals,
+quarantine); the adapter and its dependency; package declarations and lock files; Runtime, Kiosk,
+topology, configuration, fixtures and generators; no UI, roles, authentication, persistence or
+network-configuration system.
+
+Validation: Agent-local Node checks only — boundary scan 0 findings; exporter/static-source tests
+19/19; S2/S3 exception tests PASS; `git diff --check` clean. .NET locked restore, Release builds and
+the focused/full .NET suites were **NOT RUN** by the Agent and are **NOT VERIFIED**; the Owner-local
+run of the exact commands in `docs/TC_BENCH_LOCAL_SIMULATION.md` §5.2 is the evidence of record. The
+Owner-local simulator run has not been performed by the Agent; no interoperability with the Owner
+workstation simulator is claimed. Not hardware, WAGO, TC-NODE-01 or T01 evidence.
+
+### 0.4C-K6 — T01 Physical Execution Enablement and Bench Readiness (MERGED 2026-10-14 — PR #24, merge commit `f356b162214946058b42fe56fa13e5afc4c80539`)
+
+> Supersession note (2026-10-15): the dated status line below records the checkpoint at which this
+> entry was written. K6 was subsequently merged to `main` by PR #24 (merge commit `f356b162…`, parents
+> `193aba76…` and `3833b52f…`). The dated text is preserved unchanged.
 
 **Status: IMPLEMENTED AND OWNER-LOCAL AUTOMATED VALIDATION PASSED; CANONICAL DOCUMENTATION PROMOTED; FINAL SOURCE AND PR REVIEW IN PROGRESS; NOT MERGED; K7 NOT AUTHORIZED.**
 

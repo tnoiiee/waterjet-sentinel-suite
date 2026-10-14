@@ -245,6 +245,9 @@ public sealed class PhysicalAuthorizationTests
         Assert.Equal(PhysicalTrialRefusals.ManifestMismatch, WriteAndAuthorize(cases.Path, identity, key, baseline with { ManifestSha256 = new string('e', 64) }));
         Assert.Equal(PhysicalTrialRefusals.TupleMismatch, WriteAndAuthorize(cases.Path, identity, key, baseline with { Quantity = 39 }));
         Assert.Equal(PhysicalTrialRefusals.TupleMismatch, WriteAndAuthorize(cases.Path, identity, key, baseline with { Address = wrongAddress }));
+        // The Local Simulation endpoint can never satisfy the exact physical tuple binding: no signed
+        // authorization can steer PHYSICAL_TEST to the loopback address, and no plan exists for it.
+        Assert.Equal(PhysicalTrialRefusals.TupleMismatch, WriteAndAuthorize(cases.Path, identity, key, baseline with { Address = LocalSimulation.LoopbackAddress }));
         Assert.Equal(PhysicalTrialRefusals.AuthorizationRejected, WriteAndAuthorize(cases.Path, identity, key, baseline with { TrialId = "T02" }));
         Assert.Equal(PhysicalTrialRefusals.AuthorizationRejected, WriteAndAuthorize(cases.Path, identity, key, baseline with { Scope = "READ_ONLY" }));
         Assert.Equal(PhysicalTrialRefusals.AuthorizationRejected, WriteAndAuthorize(cases.Path, identity, key, baseline with { AtMostOneRead = false }));

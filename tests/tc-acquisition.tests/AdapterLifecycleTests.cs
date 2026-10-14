@@ -213,6 +213,46 @@ public sealed class AdapterLifecycleTests
     }
 
     [Fact]
+    public async Task Local_Simulation_Path_Over_Real_Loopback_Issues_One_Exact_FC03_Request_And_Observes_Cleanup()
+    {
+        // The public Local TCP Simulation path with the real adapter. The responder binds an ephemeral
+        // loopback port (never 502), so only the invocation port differs from the Owner-local command
+        // line; address, request shape, lifecycle and evidence class are exactly the production path.
+        await using var server = new LoopbackResponder();
+        var catalog = TrialCatalog.LoadTrusted();
+        var invocation = LocalSimulation.InvocationConfiguration(catalog) with { Port = server.Port };
+        var runner = new TrialRunner();
+        var evidence = await runner.RunLocalSimulationAsync(catalog, invocation, () => TcReadOnlyClientFactory.Create(), CancellationToken.None);
+        var request = await server.RequestReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(12, request.Length);
+        Assert.Equal(0, request[6]);
+        Assert.Equal(3, request[7]);
+        Assert.Equal(new byte[] { 0, 0, 0, 40 }, request[8..12]);
+        Assert.Equal(TcReadKind.Success, evidence.Connect.Kind);
+        Assert.Equal(TcReadKind.Success, evidence.Read.Kind);
+        Assert.Equal(LocalSimulation.Provenance, evidence.Provenance);
+        Assert.Equal("127.0.0.1", evidence.Endpoint);
+        Assert.Equal(server.Port, evidence.Port);
+        Assert.Equal(40, evidence.CopiedWordCount);
+        Assert.Equal(40, evidence.Words.Length);
+        Assert.Equal(0, evidence.Words[0].Index);
+        Assert.Equal((ushort)0x1234, evidence.Words[0].Value);
+        Assert.Equal(39, evidence.Words[39].Index);
+        Assert.Equal((ushort)(0x1234 + 39), evidence.Words[39].Value);
+        Assert.Equal("COMPLETE", evidence.TaskCompletion);
+        Assert.Equal("COMPLETE", evidence.DisconnectResult);
+        Assert.Equal("COMPLETE", evidence.DisposalResult);
+        Assert.Equal("DISCONNECTED", evidence.TransportAfter);
+        Assert.Equal(PhysicalTrialStates.Observed, evidence.CleanupState);
+        Assert.Equal("RETAINED_QUARANTINED", evidence.FinalHandoffDecision);
+        Assert.Equal(TrialAcceptance.QUARANTINED, evidence.TrialAcceptance);
+        Assert.Equal(PhysicalTrialStates.NotAttempted, evidence.AuthorizationVerification);
+        Assert.Equal(PhysicalTrialStates.NotProvided, evidence.AuthorizationId);
+        Assert.False(evidence.PhysicalCapabilityEnabled);
+        TrialEvidence.Validate(evidence, catalog);
+    }
+
+    [Fact]
     public void Public_Boundary_Has_No_Write_Or_Generic_Execution_Operation()
     {
         var methods = typeof(ITcReadOnlyClient).GetMethods().Select(m => m.Name).ToArray();

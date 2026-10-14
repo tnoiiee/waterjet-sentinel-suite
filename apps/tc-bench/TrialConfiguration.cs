@@ -6,7 +6,13 @@ using Wjss.Adapters.TcAcquisition;
 
 namespace Wjss.TcBench;
 
-public enum BenchMode { SIMULATION, PHYSICAL_TEST }
+/// <summary>
+/// Execution class selected on the command line. SIMULATION is the no-I/O dry run (configuration and
+/// evidence plan only). LOCAL_TCP_SIMULATION is one real connect and read against the Owner-local
+/// loopback simulator (see <see cref="LocalSimulation"/>). PHYSICAL_TEST is the authorized physical
+/// path behind the fail-closed gate. The classes are mutually exclusive.
+/// </summary>
+public enum BenchMode { SIMULATION, PHYSICAL_TEST, LOCAL_TCP_SIMULATION }
 
 /// <summary>
 /// Immutable trial configuration projected from the canonical TC Node configuration by the offline
@@ -89,13 +95,18 @@ public sealed record TrialCatalog
 }
 
 /// <summary>
-/// Frozen typed parser for the constrained command line. There is no endpoint switch, no listener,
-/// no environment activation and no acceptance command. An authorization and a detached signature
-/// are accepted only together and only for the physical-test selector; neither can grant authority
-/// on its own and neither can be supplied for a dry run.
+/// Frozen typed parser for the constrained command line. There is no free-form endpoint switch, no
+/// listener, no environment activation and no acceptance command. The three execution-class
+/// selectors (<c>--dry-run</c>, <c>--local-simulation</c>, <c>--physical-test</c>) are mutually
+/// exclusive; <c>--local-simulation</c> carries no value and always means the fixed loopback
+/// simulator endpoint. An authorization and a detached signature are accepted only together and
+/// only for the physical-test selector; neither can grant authority on its own and neither can be
+/// supplied for a dry run or a local simulation.
 /// </summary>
 public sealed record BenchArguments(string TrialId, BenchMode Mode, string? ManifestPath, string? AuthorizationPath, string? SignaturePath)
 {
+    private static readonly string[] ModeSelectors = ["--dry-run", "--local-simulation", "--physical-test"];
+
     public static BenchArguments Parse(string[] arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -112,6 +123,7 @@ public sealed record BenchArguments(string TrialId, BenchMode Mode, string? Mani
             switch (key)
             {
                 case "--dry-run": mode = BenchMode.SIMULATION; break;
+                case "--local-simulation": mode = BenchMode.LOCAL_TCP_SIMULATION; break;
                 case "--physical-test": mode = BenchMode.PHYSICAL_TEST; break;
                 case "--trial":
                 case "--manifest":
@@ -126,7 +138,7 @@ public sealed record BenchArguments(string TrialId, BenchMode Mode, string? Mani
                 default: throw new ArgumentException("UNAPPROVED_ARGUMENT");
             }
         }
-        if (seen.Contains("--dry-run") && seen.Contains("--physical-test")) throw new ArgumentException("CONFLICTING_MODE");
+        if (ModeSelectors.Count(selector => seen.Contains(selector)) > 1) throw new ArgumentException("CONFLICTING_MODE");
         if (trialId != "T01") throw new ArgumentException("UNAPPROVED_SELECTION");
         if ((authorization is not null || signature is not null) && mode != BenchMode.PHYSICAL_TEST) throw new ArgumentException("UNAPPROVED_SELECTION");
         if (signature is not null && authorization is null) throw new ArgumentException("UNAPPROVED_SELECTION");
