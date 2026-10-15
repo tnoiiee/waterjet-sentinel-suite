@@ -798,14 +798,19 @@ public sealed class RuntimeHostCompositionTests
         Assert.Equal(PhysicalTcVocabulary.StartAddress, profile.StartAddress);
         Assert.Equal(PhysicalTcVocabulary.WordCount, profile.Quantity);
 
-        // The read-only function code is the only one this slice can express, and the profile has no
-        // address-shaped member at all.
+        // The read-only function code is the only one this slice can express. The profile's ONLY
+        // member whose name contains "Address" is StartAddress - the zero-based register offset inside
+        // the authorized 0..39 read block, NOT a network address - and it is allowed BY EXACT NAME
+        // through nameof, so a rename or a new address-shaped member cannot slip past. Every other
+        // address-, host- or endpoint-shaped member, present or future, stays rejected and the
+        // assertion keeps its full strength.
         Assert.Equal("FC03", PhysicalTcVocabulary.FunctionCodeHoldingRegisters);
         Assert.DoesNotContain(
             typeof(TcReadProfileIdentity).GetProperties(),
-            property => property.Name.Contains("Address", StringComparison.OrdinalIgnoreCase)
-                || property.Name.Contains("Host", StringComparison.OrdinalIgnoreCase)
-                || property.Name.Contains("Endpoint", StringComparison.OrdinalIgnoreCase));
+            property => property.Name != nameof(TcReadProfileIdentity.StartAddress)
+                && (property.Name.Contains("Address", StringComparison.OrdinalIgnoreCase)
+                    || property.Name.Contains("Host", StringComparison.OrdinalIgnoreCase)
+                    || property.Name.Contains("Endpoint", StringComparison.OrdinalIgnoreCase)));
     }
 
     // --- The physical session, driven by a fake transport -------------------------------------------
