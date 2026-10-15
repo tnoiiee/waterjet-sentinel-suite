@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Wjss.Adapters.TcAcquisition;
 using Wjss.Contracts;
 using Wjss.Time;
@@ -216,7 +217,7 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
     /// can never carry device data, and the record keeps the accepted non-Hardware vocabulary.
     /// </summary>
     private static TcAcquisitionOutcome BuildDeterministicOutcome(
-        IReadOnlyList<ushort> copiedWords, DateTimeOffset acquiredAtUtc)
+        ReadOnlyCollection<ushort> copiedWords, DateTimeOffset acquiredAtUtc)
     {
         for (var index = 0; index < copiedWords.Count; index++)
         {
@@ -251,7 +252,7 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
     /// the confidential value ever leaving the Owner's machine.
     /// </summary>
     private static TcAcquisitionOutcome BuildPhysicalState(
-        IReadOnlyList<ushort> copiedWords, DateTimeOffset acquiredAtUtc) =>
+        ReadOnlyCollection<ushort> copiedWords, DateTimeOffset acquiredAtUtc) =>
         TcAcquisitionOutcome.Success(new TcAcquisitionState
         {
             NodeId = PhysicalTcVocabulary.NodeId,

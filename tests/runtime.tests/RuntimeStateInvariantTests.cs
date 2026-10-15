@@ -14,6 +14,49 @@ namespace Wjss.Runtime.Core.Tests;
 /// </summary>
 public sealed class RuntimeStateInvariantTests
 {
+    /// <summary>
+    /// The exact member names of the TC acquisition records, held in Ordinal order so each assertion
+    /// compares like-for-like with the Ordinal-sorted reflection projection of the same record. The
+    /// projection is never re-ordered to fit the expectation: a missing, extra or duplicated member
+    /// still fails the comparison deterministically.
+    /// </summary>
+    private static readonly string[] ExpectedTcAcquisitionStatePropertyNames =
+    [
+        "AcquiredAtUtc",
+        "AcquisitionState",
+        "CabinetId",
+        "CopiedWordCount",
+        "DecodeStatus",
+        "DiagnosticState",
+        "MappingStatus",
+        "NodeId",
+        "NotVerified",
+        "Physical",
+        "PhysicalEvidence",
+        "Provenance",
+        "Quality",
+        "Quarantined",
+        "RawWords",
+    ];
+
+    private static readonly string[] ExpectedTcPhysicalReadOnlyEvidencePropertyNames =
+    [
+        "CommissioningState",
+        "EndpointIdentity",
+        "MappingEvidenceState",
+        "ReadProfile",
+    ];
+
+    private static readonly string[] ExpectedTcReadProfileIdentityPropertyNames =
+    [
+        "FunctionCode",
+        "Port",
+        "Quantity",
+        "RegisterArea",
+        "StartAddress",
+        "UnitIdentifier",
+    ];
+
     public enum Tamper
     {
         Profile,
@@ -426,24 +469,18 @@ public sealed class RuntimeStateInvariantTests
         Assert.Throws<NotSupportedException>(() => ((IList<ushort>)physical.RawWords)[0] = 0);
         Assert.Throws<NotSupportedException>(() => ((IList<string>)physical.NotVerified)[0] = "X");
 
-        // The member sets are asserted EXACTLY. A record can therefore never grow an endpoint, host,
-        // address or credential field without failing this test, and the read profile may legitimately
-        // carry only the zero-based register start offset and the requested word quantity.
+        // The member sets are asserted EXACTLY, with both sides in Ordinal order. A record can
+        // therefore never grow an endpoint, host, address or credential field without failing this
+        // test, and the read profile may legitimately carry only the zero-based register start offset
+        // and the requested word quantity.
         Assert.Equal(
-            new[]
-            {
-                "NodeId", "CabinetId", "Provenance", "Physical", "Quarantined", "AcquisitionState",
-                "AcquiredAtUtc", "CopiedWordCount", "RawWords", "Quality", "DiagnosticState",
-                "MappingStatus", "DecodeStatus", "NotVerified", "PhysicalEvidence",
-            },
+            ExpectedTcAcquisitionStatePropertyNames,
             typeof(TcAcquisitionState).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
         Assert.Equal(
-            new[] { "CommissioningState", "EndpointIdentity", "MappingEvidenceState", "ReadProfile" }
-                .OrderBy(name => name, StringComparer.Ordinal),
+            ExpectedTcPhysicalReadOnlyEvidencePropertyNames,
             typeof(TcPhysicalReadOnlyEvidence).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
         Assert.Equal(
-            new[] { "FunctionCode", "Port", "Quantity", "RegisterArea", "StartAddress", "UnitIdentifier" }
-                .OrderBy(name => name, StringComparer.Ordinal),
+            ExpectedTcReadProfileIdentityPropertyNames,
             typeof(TcReadProfileIdentity).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
 
         // The only endpoint statement anywhere is the redacted logical identity, and it is not an address.
