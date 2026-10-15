@@ -149,6 +149,7 @@ public static class RuntimeDeltaProjector
             Sequence = delta.Sequence,
             Alarms = delta.Alarms,
             Communication = delta.Communication,
+            TcAcquisition = delta.TcAcquisition,
             Runtime = null,
             TrendPoint = delta.TrendPoint,
         };
@@ -219,6 +220,13 @@ public static class RuntimeDeltaProjector
             throw new InvalidOperationException(
                 $"[{RuntimeRefusalCodes.EvolutionTickTime}] Refused to project a Delta from revision {previous.Revision} "
                 + "to an instant that is not strictly later. Nothing was projected.");
+        }
+
+        // Null means unchanged on the wire. There is no TC clear operation in this one-read slice;
+        // silently treating a clear as unchanged would break replay of the authoritative state.
+        if (previous.TcAcquisition is not null && candidate.TcAcquisition is null)
+        {
+            throw new InvalidOperationException("Refused to project a TC acquisition clear: no clear encoding exists.");
         }
     }
 

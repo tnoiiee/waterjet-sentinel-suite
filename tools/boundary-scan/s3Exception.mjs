@@ -2,14 +2,15 @@
 //
 // S3 forbids vendor/transport vocabulary in the Product tree. The only exception permitted is the
 // approved vendor TCP client library vocabulary (assembled in the scanner as 'mo'+'db'+'us'),
-// and ONLY inside the adapter, central package pin, and two exact dependency-lock paths. It is not
+// and ONLY inside the adapter, central package pin, and four exact dependency-lock paths. It is not
 // a blanket exemption: every other Product file keeps its S3 finding.
 //
 // The exception covers that literal substring (case-insensitive, assembled in the scanner
 // as 'mo'+'db'+'us') when it appears in:
 //   - the central package management file that pins the approved library version
 //   - the application-owned TC acquisition adapter (physical, read-only, disabled by default)
-//   - two exact restore-generated dependency-lock metadata paths (Owner narrow revision)
+//   - four exact restore-generated dependency-lock metadata paths (the two existing bench locks
+//     and the Runtime/API locks required by the one-Node Product project reference)
 // Any other path, any spelling variant outside the allow-list, or any other vendor term keeps
 // its S3 finding.
 //
@@ -25,6 +26,9 @@ const ALLOWED_PATHS = Object.freeze([
   // Dependency metadata only: not source, a directory prefix, or a generic lock exemption.
   'apps/tc-bench/packages.lock.json',
   'tests/tc-acquisition.tests/packages.lock.json',
+  // Only genuine restore metadata for the Runtime -> TC adapter project graph.
+  'apps/runtime/packages.lock.json',
+  'tests/api.tests/packages.lock.json',
 ]);
 
 const ALLOWED_PREFIX = 'adapters/tc-acquisition/';

@@ -184,6 +184,7 @@ public sealed class RuntimePublicationStore
         Sequence = delta.Sequence is null ? null : FreezeSequence(delta.Sequence),
         Alarms = delta.Alarms is null ? null : delta.Alarms with { Items = RuntimeCollections.Freeze(delta.Alarms.Items) },
         Communication = delta.Communication is null ? null : delta.Communication with { Devices = RuntimeCollections.Freeze(delta.Communication.Devices) },
+        TcAcquisition = delta.TcAcquisition is null ? null : RuntimeStateFreezer.FreezeTcAcquisition(delta.TcAcquisition),
         ActiveJob = delta.ActiveJob.Encoding switch
         {
             DeltaJobEncoding.Absent => DeltaJobState.Unchanged(),

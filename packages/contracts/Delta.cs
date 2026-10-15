@@ -73,6 +73,10 @@ public sealed record OperationalDelta
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CommunicationHealth? Communication { get; init; }
 
+    /// <summary>Whole-record TC replacement; absent means unchanged. No clear operation exists in this slice.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcAcquisitionState? TcAcquisition { get; init; }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RuntimeHealth? Runtime { get; init; }
 

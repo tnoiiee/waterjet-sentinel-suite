@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Wjss.Adapters.Simulator;
 using Wjss.Contracts;
 using Wjss.Domain;
@@ -365,6 +366,10 @@ public sealed record RuntimeDeltaFeedItem
     /// <summary>Three-state Active Job encoding of this Delta: absent, present or cleared.</summary>
     public required DeltaJobEncoding ActiveJobEncoding { get; init; }
 
+    /// <summary>One whole TC replacement from the authoritative Delta; omitted when unchanged.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TcAcquisitionState? TcAcquisition { get; init; }
+
     /// <summary>True when this entry continues its retained neighbour: a consumer holding <see cref="PreviousRevision"/> steps cleanly onto <see cref="Revision"/>.</summary>
     public required bool AppliesCleanly { get; init; }
 
@@ -495,6 +500,11 @@ public sealed record RuntimeDeltaFeed
             sections.Add("communication");
         }
 
+        if (delta.TcAcquisition is not null)
+        {
+            sections.Add("tcAcquisition");
+        }
+
         if (delta.TrendPoint is not null)
         {
             sections.Add("trendPoint");
@@ -514,6 +524,7 @@ public sealed record RuntimeDeltaFeed
             ChangedWallCount = delta.ChangedWalls.Count,
             ChangedSections = sections,
             ActiveJobEncoding = delta.ActiveJob.Encoding,
+            TcAcquisition = delta.TcAcquisition,
             AppliesCleanly = !hasRevisionGap,
             HasRevisionGap = hasRevisionGap,
         };

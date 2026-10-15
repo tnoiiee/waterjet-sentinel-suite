@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BOUNDARY, DEFAULT_PORT, STAGE_ID, UI_BIND_HOST, createPreviewServer } from '../server.mjs';
+import { BOUNDARY, DEFAULT_PORT, DEFAULT_RUNTIME_PORT, STAGE_ID, UI_BIND_HOST,
+  createPreviewServer, tcAcquisitionPayload } from '../server.mjs';
+import { allText, bootApp } from './helpers/fakeDom.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, '..', 'public');
@@ -15,7 +17,9 @@ let base;
 let bound;
 
 before(async () => {
-  server = createPreviewServer();
+  server = createPreviewServer({
+    runtimeFetch: async () => { throw new Error('No Runtime host runs in this host test.'); },
+  });
   await new Promise((resolve) => server.listen(0, UI_BIND_HOST, resolve));
   const origin = new URL('http://127.0.0.1');
   origin.port = String(server.address().port);
@@ -58,7 +62,8 @@ test('the Operations route and its assets are served with a restrictive policy a
 
 test('every non-GET method is refused on every route: the host has no write surface at all', async () => {
   const paths = ['/', '/app.mjs', '/api/health', '/api/boundary', '/api/commissioning/schedule',
-    '/api/commissioning/scenarios', '/api/commissioning/observations', '/api/operations/summary', '/api/sensor-map'];
+    '/api/commissioning/scenarios', '/api/commissioning/observations', '/api/operations/summary', '/api/sensor-map',
+    '/api/tc-acquisition'];
   for (const path of paths) {
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       const r = await fetch(`${base}${path}`, { method, body: method === 'DELETE' ? undefined : 'x' });
@@ -234,4 +239,200 @@ test('the UI never navigates away and never issues a write request', async () =>
   assert.equal(/method:\s*['"](POST|PUT|PATCH|DELETE)/.test(app), false);
   const html = readFileSync(join(PUBLIC, 'index.html'), 'utf8');
   assert.equal(/<a [^>]*href="(?!#)/.test(html), false, 'no in-page link may leave the local route');
+});
+
+// Runtime is simulated at the HTTP seam, not by an invented Product state in the Preview.
+// This is the exact JSON shape of the .NET Snapshot's TC state (including its UTC offset).
+const runtimeSnapshot = () => ({
+  kind: 'snapshot', schema: 'wjss.snapshot/2', apiVersion: 1, revision: 2,
+  tcAcquisition: {
+    nodeId: 'TC-NODE-01', cabinetId: 'CAB1', provenance: 'DETERMINISTIC_SIMULATION',
+    physical: false, quarantined: true, acquisitionState: 'COMPLETE',
+    acquiredAtUtc: '2026-10-15T10:20:30+00:00', copiedWordCount: 40,
+    rawWords: Array.from({ length: 40 }, (_, i) => 100 + i),
+    quality: 'SIMULATED', diagnosticState: 'NONE', mappingStatus: 'MAPPING_NOT_VERIFIED',
+    decodeStatus: 'DECODING_NOT_VERIFIED',
+    notVerified: ['PHYSICAL_REACHABILITY', 'REGISTER_MAPPING', 'SCALING', 'WIRE_BREAK', 'FIELD_TIMING'],
+  },
+});
+const okSnapshot = (value) => Response.json(value);
+const runtimeStatus = (revision, readinessCode) => ({
+  currentRevision: revision, profile: 'SIMULATOR', ready: false, readinessCode,
+});
+const pendingFetch = async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+  ? runtimeStatus(1, 'TC_ACQUISITION_NOT_PUBLISHED')
+  : { ...runtimeSnapshot(), revision: 1, tcAcquisition: null });
+
+/** Runs a real Preview host on an ephemeral local port, injecting only the Runtime HTTP fetch. */
+async function withRuntimeFetch(runtimeFetch, run) {
+  const host = createPreviewServer({ runtimeFetch, runtimePort: DEFAULT_RUNTIME_PORT });
+  await new Promise((resolve) => host.listen(0, UI_BIND_HOST, resolve));
+  const origin = new URL('http://127.0.0.1');
+  origin.port = String(host.address().port);
+  try { return await run(origin.origin); }
+  finally { await new Promise((resolve) => host.close(resolve)); }
+}
+
+test('the TC route reads only the fixed Runtime Snapshot URL and projects its revision and 40 words', async () => {
+  const calls = [];
+  await withRuntimeFetch(async (url, options) => {
+    calls.push({ url, method: options.method, accept: options.headers.Accept, signal: options.signal });
+    return okSnapshot(runtimeSnapshot());
+  }, async (origin) => {
+    const res = await fetch(`${origin}/api/tc-acquisition?node=TC-NODE-99&host=elsewhere`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-security-policy'), /default-src 'self'/);
+    assert.equal(res.headers.get('cache-control'), 'no-store');
+    assert.equal(res.headers.get('access-control-allow-origin'), null);
+    const body = await res.json();
+    assert.equal(body.stageId, STAGE_ID);
+    assert.equal(body.status, 'PUBLISHED');
+    assert.equal(body.revision, 2);
+    assert.equal(body.tcAcquisition.node, 'TC-NODE-01');
+    assert.equal(body.tcAcquisition.cabinet, 'CAB1');
+    assert.equal(body.tcAcquisition.provenance, 'DETERMINISTIC_SIMULATION');
+    assert.equal(body.tcAcquisition.physical, false);
+    assert.equal(body.tcAcquisition.quarantine, true);
+    assert.equal(body.tcAcquisition.acquisitionState, 'COMPLETE');
+    assert.equal(body.tcAcquisition.acquisitionTimestampUtc, '2026-10-15T10:20:30+00:00');
+    assert.equal(body.tcAcquisition.copiedWordCount, 40);
+    assert.deepEqual(body.tcAcquisition.words, Array.from({ length: 40 }, (_, i) => 100 + i));
+    assert.deepEqual(body.tcAcquisition.notVerified, runtimeSnapshot().tcAcquisition.notVerified);
+    const head = await fetch(`${origin}/api/tc-acquisition`, { method: 'HEAD' });
+    assert.equal(head.status, 200);
+    assert.equal(await head.text(), '');
+  });
+  assert.equal(calls.length, 2);
+  const expectedOrigin = new URL('http://127.0.0.1');
+  expectedOrigin.port = String(DEFAULT_RUNTIME_PORT);
+  for (const call of calls) {
+    assert.equal(call.url, new URL('/api/v1/snapshot', expectedOrigin).href);
+    assert.equal(call.method, 'GET');
+    assert.equal(call.accept, 'application/json');
+    assert.ok(call.signal instanceof AbortSignal, 'the upstream request must have a time bound');
+  }
+});
+
+test('an unpublished or failed Runtime never gives the Preview a successful TC record', async () => {
+  const pending = await tcAcquisitionPayload({ runtimeFetch: pendingFetch });
+  assert.equal(pending.status, 200);
+  assert.equal(pending.body.status, 'NOT_PUBLISHED');
+  assert.equal(pending.body.revision, 1);
+  assert.equal(pending.body.tcAcquisition, null);
+
+  let reads = 0;
+  const runtimeFetch = async (url) => {
+    reads++;
+    if (reads === 1) return okSnapshot(runtimeSnapshot());
+    if (reads === 2) throw new Error('local Runtime not running');
+    if (reads === 3) return Response.json({ error: 'RUNTIME_NOT_READY' }, { status: 503 });
+    return okSnapshot(url.endsWith('/api/v1/runtime')
+      ? runtimeStatus(2, 'TC_ACQUISITION_NOT_PUBLISHED')
+      : { ...runtimeSnapshot(), tcAcquisition: null });
+  };
+  assert.equal((await tcAcquisitionPayload({ runtimeFetch })).body.status, 'PUBLISHED');
+  for (const expected of [503, 503, 200]) {
+    const projection = await tcAcquisitionPayload({ runtimeFetch });
+    assert.equal(projection.status, expected);
+    assert.equal(projection.body.tcAcquisition, null, 'success must not be cached after an outage');
+    assert.equal(projection.body.status, expected === 200 ? 'NOT_PUBLISHED' : 'RUNTIME_UNAVAILABLE');
+  }
+  assert.equal(reads, 5);
+});
+
+test('a null Snapshot is distinguished using same-revision Runtime diagnostics, not a second state', async () => {
+  const calls = [];
+  const failed = await tcAcquisitionPayload({ runtimeFetch: async (url) => {
+    calls.push(url);
+    return okSnapshot(url.endsWith('/api/v1/runtime')
+      ? runtimeStatus(2, 'TC_ACQUISITION_UNAVAILABLE')
+      : { ...runtimeSnapshot(), tcAcquisition: null });
+  } });
+  const runtimeOrigin = new URL('http://127.0.0.1');
+  runtimeOrigin.port = String(DEFAULT_RUNTIME_PORT);
+  assert.deepEqual(calls, [
+    new URL('/api/v1/snapshot', runtimeOrigin).href,
+    new URL('/api/v1/runtime', runtimeOrigin).href,
+  ]);
+  assert.equal(failed.status, 200);
+  assert.equal(failed.body.status, 'ACQUISITION_FAILED');
+  assert.equal(failed.body.revision, 2);
+  assert.equal(failed.body.tcAcquisition, null);
+
+  const raced = await tcAcquisitionPayload({ runtimeFetch: async (url) => okSnapshot(
+    url.endsWith('/api/v1/runtime')
+      ? runtimeStatus(3, 'TC_ACQUISITION_UNAVAILABLE')
+      : { ...runtimeSnapshot(), tcAcquisition: null },
+  ) });
+  assert.equal(raced.status, 502);
+  assert.equal(raced.body.status, 'INVALID_RUNTIME_RESPONSE');
+  assert.equal(raced.body.tcAcquisition, null);
+});
+
+test('malformed, unsafe, or incomplete Runtime states fail closed without exposing words', async () => {
+  const malformed = [
+    { ...runtimeSnapshot(), tcAcquisition: undefined },
+    { ...runtimeSnapshot(), kind: 'delta' },
+    { ...runtimeSnapshot(), apiVersion: 99 },
+    { ...runtimeSnapshot(), revision: 0 },
+    { ...runtimeSnapshot(), tcAcquisition: { ...runtimeSnapshot().tcAcquisition, physical: true } },
+    { ...runtimeSnapshot(), tcAcquisition: { ...runtimeSnapshot().tcAcquisition, quarantined: false } },
+    { ...runtimeSnapshot(), tcAcquisition: { ...runtimeSnapshot().tcAcquisition, rawWords: [100, 101] } },
+    { ...runtimeSnapshot(), tcAcquisition: { ...runtimeSnapshot().tcAcquisition,
+      rawWords: Array.from({ length: 40 }, (_, i) => 999 + i) } },
+    { ...runtimeSnapshot(), tcAcquisition: { ...runtimeSnapshot().tcAcquisition, notVerified: [] } },
+    { ...runtimeSnapshot(), tcAcquisition: { ...runtimeSnapshot().tcAcquisition,
+      acquiredAtUtc: '2026-10-15T10:20:30+07:00' } },
+  ];
+  for (const snapshot of malformed) {
+    const result = await tcAcquisitionPayload({ runtimeFetch: async () => okSnapshot(snapshot) });
+    assert.equal(result.status, 502);
+    assert.equal(result.body.status, 'INVALID_RUNTIME_RESPONSE');
+    assert.equal(result.body.tcAcquisition, null);
+    assert.equal(JSON.stringify(result.body).includes('rawWords'), false);
+  }
+  const broken = await tcAcquisitionPayload({ runtimeFetch: async () => new Response('not JSON') });
+  assert.equal(broken.status, 502);
+  assert.equal(broken.body.status, 'INVALID_RUNTIME_RESPONSE');
+  let calls = 0;
+  await assert.rejects(tcAcquisitionPayload({ runtimePort: 'untrusted-host:502',
+    runtimeFetch: async () => { calls++; },
+  }), RangeError);
+  assert.equal(calls, 0, 'an invalid Runtime port must never make a request');
+});
+
+test('the real Kiosk section renders published, not-published and unavailable states separately', async () => {
+  const cases = [
+    { upstream: async () => okSnapshot(runtimeSnapshot()), expected: /Runtime revision 2.*TC-NODE-01.*CAB1.*DETERMINISTIC_SIMULATION.*QUARANTINED.*COMPLETE.*Raw words: 100, 101/,
+      status: 200, published: true },
+    { upstream: async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+      ? runtimeStatus(2, 'TC_ACQUISITION_NOT_PUBLISHED')
+      : { ...runtimeSnapshot(), tcAcquisition: null }),
+      expected: /Runtime revision 2: TC acquisition not published\. No acquisition is claimed\./,
+      status: 200, published: false },
+    { upstream: async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+      ? runtimeStatus(2, 'TC_ACQUISITION_UNAVAILABLE')
+      : { ...runtimeSnapshot(), tcAcquisition: null }),
+      expected: /Runtime revision 2: TC acquisition failed\. No state published; no acquisition is claimed\./,
+      status: 200, published: false },
+    { upstream: async () => { throw new Error('Runtime is not running'); },
+      expected: /TC acquisition unavailable: the Runtime Snapshot could not be read\. No acquisition is claimed\./,
+      status: 503, published: false },
+    { upstream: async () => okSnapshot({ ...runtimeSnapshot(), tcAcquisition: { physical: true } }),
+      expected: /TC acquisition unavailable: the Runtime Snapshot could not be read\. No acquisition is claimed\./,
+      status: 502, published: false },
+  ];
+  for (const scenario of cases) {
+    const app = await bootApp({ runtimeFetch: scenario.upstream });
+    try {
+      assert.equal(app.byId['app-root'].attributes['data-app-state'], 'ready');
+      const route = app.requests.find((r) => r.path === '/api/tc-acquisition');
+      assert.equal(route?.status, scenario.status);
+      const text = allText(app.byId['tc-acquisition-body']);
+      assert.match(text, scenario.expected);
+      assert.equal(text.includes('139'), scenario.published, 'words can only appear when Runtime published');
+      assert.equal(text.includes('Raw words'), scenario.published);
+      assert.equal(app.byId['boot-error'].hidden, true, 'this section cannot break the synthetic Monitor');
+    } finally { app.close(); }
+  }
 });

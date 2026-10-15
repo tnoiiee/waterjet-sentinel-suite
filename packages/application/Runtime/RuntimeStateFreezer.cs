@@ -26,16 +26,18 @@ internal static class RuntimeStateFreezer
         Queue = state.Queue with { Entries = RuntimeCollections.Freeze(state.Queue.Entries) },
         Alarms = state.Alarms with { Items = RuntimeCollections.Freeze(state.Alarms.Items) },
         Communication = state.Communication with { Devices = RuntimeCollections.Freeze(state.Communication.Devices) },
-        TcAcquisition = state.TcAcquisition is null ? null : state.TcAcquisition with
-        {
-            RawWords = RuntimeCollections.Freeze(state.TcAcquisition.RawWords),
-            NotVerified = RuntimeCollections.Freeze(state.TcAcquisition.NotVerified),
-        },
+        TcAcquisition = state.TcAcquisition is null ? null : FreezeTcAcquisition(state.TcAcquisition),
         Trend = state.Trend with
         {
             SeriesNames = RuntimeCollections.Freeze(state.Trend.SeriesNames),
             Points = FreezePoints(state.Trend.Points),
         },
+    };
+
+    internal static TcAcquisitionState FreezeTcAcquisition(TcAcquisitionState state) => state with
+    {
+        RawWords = RuntimeCollections.Freeze(state.RawWords),
+        NotVerified = RuntimeCollections.Freeze(state.NotVerified),
     };
 
     private static ReadOnlyCollection<TrendPoint> FreezePoints(IReadOnlyList<TrendPoint> points)

@@ -36,7 +36,7 @@ test('G: the page boots ready; the evidence projection was requested as a local 
   assert.equal(projection.status, 200);
   for (const request of app.requests) {
     assert.equal(request.method, 'GET', request.path);
-    assert.equal(request.status, 200, request.path);
+    assert.equal(request.status, request.path === '/api/tc-acquisition' ? 503 : 200, request.path);
     assert.equal(request.path.startsWith('/'), true, 'every request is a local route');
     assert.equal(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(request.path), false, 'no request names an address');
   }

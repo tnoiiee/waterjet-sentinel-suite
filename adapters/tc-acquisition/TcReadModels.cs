@@ -1,10 +1,11 @@
 namespace Wjss.Adapters.TcAcquisition;
 
 /// <summary>
-/// Read-only TC node endpoint. The IP address must be one of the six approved TEST_CONFIGURATION
-/// addresses (TEST-NET-1 documentation range, as defined in tcNodeConfiguration.mjs) and the port
-/// is the Owner-confirmed factory setting 502 (CANDIDATE_UNVERIFIED until physical evidence
-/// establishes the as-installed value). The Unit
+/// Read-only TC node endpoint. In a future authorized physical flow, the IP address must be one
+/// of the six approved TEST_CONFIGURATION addresses (TEST-NET-1 documentation range, as defined
+/// in tcNodeConfiguration.mjs). The deterministic Product client instead requires a non-address
+/// marker and opens no socket. The port is the Owner-confirmed factory setting 502
+/// (CANDIDATE_UNVERIFIED until physical evidence establishes the as-installed value). The Unit
 /// Identifier default 0x00/0xFF is a Modbus TCP convention (directly connected device) and remains
 /// CANDIDATE_UNVERIFIED — the actual Unit ID behavior is NOT VERIFIED.
 /// </summary>

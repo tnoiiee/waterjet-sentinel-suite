@@ -459,16 +459,19 @@ test('Wall-order Previous/Next walks the approved sequence over all 108 Sensors,
   });
 });
 
-test('the Wall Map follows the node-scoped scenario, keeps the boundary and reports no failed request', async () => {
+test('the Wall Map follows the node-scoped scenario, keeps the boundary and isolates the absent Runtime', async () => {
   await withApp(async (app) => {
     await waitFor(() => cells(app).length === 108, 'the Wall Map to render');
     await applyScenario(app, 'COMMUNICATION_LOSS_NODE', { node: 'TC-NODE-05' });
     await waitFor(() => cells(app).some((cell) => blocksOf(cell).some((b) => b.attributes['data-quality'] === 'BAD')), 'the affected node to render BAD');
     const affected = cells(app).filter((cell) => blocksOf(cell).some((b) => b.attributes['data-quality'] === 'BAD'));
     assert.ok(affected.length >= 18, 'the affected node must mark its Sensors on the Wall Map');
-    // Every request the application made was a successful local GET, and the page is ready.
-    assert.equal(app.requests.every((r) => r.status === 200 && r.method === 'GET'), true, JSON.stringify(app.requests.filter((r) => r.status !== 200)));
+    // The independent Runtime is not started in this test; no fabricated TC state can leak
+    // into an otherwise healthy synthetic Wall Map.
+    assert.equal(app.requests.every((r) => r.status === (r.path === '/api/tc-acquisition' ? 503 : 200)
+      && r.method === 'GET'), true, JSON.stringify(app.requests.filter((r) => r.status !== 200)));
     assert.equal(app.requests.every((r) => r.path.startsWith('/api/')), true);
+    assert.match(allText(id(app, 'tc-acquisition-body')), /Runtime Snapshot could not be read/);
     assert.equal(id(app, 'app-root').attributes['data-app-state'], 'ready');
     assert.equal(id(app, 'boot-error').hidden, true, 'no initialization failure may be visible');
     assert.match(allText(id(app, 'boundary-chips')), /NO HARDWARE ACCESS/);

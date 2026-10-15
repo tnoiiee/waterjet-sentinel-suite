@@ -193,11 +193,15 @@ test('the real repository remains clean under the scanner with the exception in 
   assert.match(run.stdout, /boundary-scan: 0 findings \(S1-S9 clean\)/);
 });
 
-// Owner narrow revision: synthetic scanner fixtures only, never genuine or placeholder locks.
-const LOCK_PATHS = ['apps/tc-bench/packages.lock.json', 'tests/tc-acquisition.tests/packages.lock.json'];
+// Synthetic scanner fixtures only, never genuine or placeholder locks. The Runtime/API additions
+// cover only dependency metadata produced by the one-Node Product project reference.
+const LOCK_PATHS = [
+  'apps/tc-bench/packages.lock.json', 'tests/tc-acquisition.tests/packages.lock.json',
+  'apps/runtime/packages.lock.json', 'tests/api.tests/packages.lock.json',
+];
 const lockFixture = (term) => JSON.stringify({ dependencies: { synthetic: { [term]: { type: 'Transitive' } } } });
 
-test('S3 locks: selected term passes only at both exact dependency-metadata paths', () => {
+test('S3 locks: selected term passes only at the four exact dependency-metadata paths', () => {
   for (const rel of LOCK_PATHS) {
     assert.equal(isS3Exception(rel, MOD), true);
     const result = scan({ [rel]: lockFixture(FLUENT) });
@@ -239,7 +243,7 @@ test('S3 locks: sibling, nested, backup, renamed and every unrelated solution lo
   }
 });
 
-test('S3 locks: path normalization cannot enlarge either exact exception', () => {
+test('S3 locks: path normalization cannot enlarge any exact exception', () => {
   for (const rel of LOCK_PATHS) {
     const variants = [
       rel + '/', rel + ' ', rel + '.bak', rel.toUpperCase(), './' + rel, '/' + rel,
@@ -274,7 +278,7 @@ test('S3 locks: write/control names receive no exemption; existing scanner behav
   }
 });
 
-test('S3 locks: S1, S2, S4, S5 and S6 still fire inside both metadata paths', () => {
+test('S3 locks: S1, S2, S4, S5 and S6 still fire inside all metadata paths', () => {
   const planted = {
     S1: `${'ht' + 'tps://example.invalid/x'}`,
     S2: `${'192' + '.0.2.1'}`,

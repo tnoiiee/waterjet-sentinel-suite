@@ -300,7 +300,32 @@ function validateQueue(q, path, issues) {
   if (q.lastDispatch !== null && q.lastDispatch !== undefined) validateDispatch(q.lastDispatch, `${path}.lastDispatch`, issues);
 }
 
+/** Mirrors the bounded C# TC invariant for the one-Node deterministic wire record. */
+export function validDeterministicTcAcquisition(tc) {
+  const expectedUnknowns = ['PHYSICAL_REACHABILITY', 'REGISTER_MAPPING', 'SCALING', 'WIRE_BREAK', 'FIELD_TIMING'];
+  return tc !== null && typeof tc === 'object' && !Array.isArray(tc)
+    && tc.nodeId === 'TC-NODE-01' && tc.cabinetId === 'CAB1'
+    && tc.provenance === 'DETERMINISTIC_SIMULATION'
+    && tc.physical === false && tc.quarantined === true
+    && tc.acquisitionState === 'COMPLETE'
+    // DateTimeOffset is UTC and non-default; .NET writes +00:00, wire readers may also use Z.
+    && typeof tc.acquiredAtUtc === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$/.test(tc.acquiredAtUtc)
+    && Number.isFinite(Date.parse(tc.acquiredAtUtc))
+    && Date.parse(tc.acquiredAtUtc) !== Date.parse('0001-01-01T00:00:00Z')
+    && tc.copiedWordCount === 40 && Array.isArray(tc.rawWords) && tc.rawWords.length === 40
+    && tc.rawWords.every((word, index) => word === 100 + index)
+    && tc.quality === 'SIMULATED' && tc.diagnosticState === 'NONE'
+    && tc.mappingStatus === 'MAPPING_NOT_VERIFIED' && tc.decodeStatus === 'DECODING_NOT_VERIFIED'
+    && Array.isArray(tc.notVerified) && tc.notVerified.length === expectedUnknowns.length
+    && tc.notVerified.every((value, index) => value === expectedUnknowns[index]);
+}
+
 function validateSharedBody(obj, path, issues) {
+  if ('tcAcquisition' in obj && (obj.kind === 'delta' || obj.tcAcquisition !== null)
+      && !validDeterministicTcAcquisition(obj.tcAcquisition)) {
+    issues.push(`${path}.tcAcquisition: must be a complete quarantined deterministic TC record; Delta cannot clear it`);
+  }
   if (obj.queue !== undefined && obj.queue !== null) validateQueue(obj.queue, `${path}.queue`, issues);
   // null is a legitimate value in BOTH envelopes: Snapshot (no active job) and
   // Delta (the accepted explicit-null CLEAR encoding). Only objects get struct-checked.

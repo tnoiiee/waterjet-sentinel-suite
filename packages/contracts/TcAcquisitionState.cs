@@ -1,6 +1,28 @@
-using System.Text.Json.Serialization;
-
 namespace Wjss.Contracts;
+
+/// <summary>
+/// Canonical vocabulary for the deterministic one-Node, non-Hardware Product slice.
+/// These are presentation identities, not physical addressing or decoded measurements.
+/// </summary>
+public static class DeterministicTcVocabulary
+{
+    public const string NodeId = "TC-NODE-01";
+    public const string CabinetId = "CAB1";
+    public const string Provenance = "DETERMINISTIC_SIMULATION";
+    public const string Complete = "COMPLETE";
+    public const string Quality = "SIMULATED";
+    public const string NoDiagnostic = "NONE";
+    public const string MappingNotVerified = "MAPPING_NOT_VERIFIED";
+    public const string DecodeNotVerified = "DECODING_NOT_VERIFIED";
+    public const int WordCount = 40;
+
+    public static IReadOnlyList<string> NotVerified { get; } = Array.AsReadOnly(new[]
+    {
+        "PHYSICAL_REACHABILITY", "REGISTER_MAPPING", "SCALING", "WIRE_BREAK", "FIELD_TIMING",
+    });
+
+    public static ushort WordAt(int index) => checked((ushort)(100 + index));
+}
 
 /// <summary>
 /// Honest Runtime-facing state for one read-only TC acquisition. This is a Product

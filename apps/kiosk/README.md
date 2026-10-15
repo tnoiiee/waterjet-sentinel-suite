@@ -151,6 +151,14 @@ asserts that every launch command documented here exists and matches the package
 started with `OPS_PREVIEW_PORT=<port>`, start the shell with `$env:WJSS_KIOSK_UI_PORT=<port>` too.
 The **host** is never configurable; only the port can match.
 
+**TC Acquisition (PR #26 Source checkpoint; .NET validation still Owner-local):** after genuine
+restore/build, start the separate SIMULATOR Runtime with
+`dotnet run --project apps/runtime/Wjss.Runtime.csproj -c Release --no-restore` (default loopback API
+port 5181, or match `WJSS_API_PORT` in both processes). The Preview host does not start Runtime.
+The TC section reads only Runtime's Snapshot and status: absent Runtime is unavailable, and a
+first tick not yet published is shown as pending. Use **Refresh Runtime TC state (read-only)**
+to re-read it without starting another acquisition. None of this is physical evidence or control.
+
 **What to verify in the window:** the boundary statement is visible; the Operations route renders at
 1920×1080 with 100% scaling and no browser chrome; `F12` / `Ctrl+Shift+I` do nothing; navigating
 away (or opening a new window) is refused and increments the blocked counters; stopping the host

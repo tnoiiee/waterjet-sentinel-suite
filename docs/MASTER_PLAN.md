@@ -65,7 +65,7 @@ version: **no application version exists**, and the documentation versioning pol
   pending. See [`TC_BENCH_LOCAL_SIMULATION.md`](TC_BENCH_LOCAL_SIMULATION.md)
   and [`CURRENT_STATE.md`](CURRENT_STATE.md) section 3A.
 - **K7 is NOT AUTHORIZED**; neither K6 validation nor the local simulation class authorizes it.
-- **Deterministic Product vertical slice (post-K6, this branch):** one-Node read-only TC acquisition state contract and deterministic Kiosk projection are implemented using deterministic non-Hardware input. Full Runtime host session wiring and Runtime publication remain pending. This is not physical evidence and does not authorize K7, T01, six-Node acquisition, Galil or Production.
+- **Deterministic Product vertical slice (post-K6, PR #26 Source checkpoint):** one-Node read-only TC acquisition is wired in Source from an Application-owned deterministic session through the Runtime host's sole publication store, Snapshot/Delta APIs and the Runtime-backed Kiosk projection. Agent-local .NET build, tests and genuine lock restore are **NOT RUN**; Owner-local SDK `10.0.401` validation remains required before Merge. This is not physical evidence and does not authorize K7, T01, six-Node acquisition, Galil or Production.
 - Detailed current truth: [`CURRENT_STATE.md`](CURRENT_STATE.md) (authoritative:
   [`CURRENT_STATE.md`](CURRENT_STATE.md)).
 

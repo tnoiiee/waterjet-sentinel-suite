@@ -1,4 +1,5 @@
 using Wjss.Adapters.Simulator;
+using Wjss.Adapters.TcAcquisition;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime.Core;
@@ -35,6 +36,12 @@ public static class RuntimeReadinessCodes
     /// <summary>The synthetic evolution lifecycle was not started.</summary>
     public const string EvolutionNotStarted = "EVOLUTION_NOT_STARTED";
 
+    /// <summary>The configured one-read TC session has not yet published a state.</summary>
+    public const string TcAcquisitionNotPublished = "TC_ACQUISITION_NOT_PUBLISHED";
+
+    /// <summary>The one-read TC session failed or its only publication was refused.</summary>
+    public const string TcAcquisitionUnavailable = "TC_ACQUISITION_UNAVAILABLE";
+
     /// <summary>A startup fault was recorded; the runtime reports it instead of claiming readiness.</summary>
     public const string StartupFault = "STARTUP_FAULT";
 
@@ -59,6 +66,9 @@ public static class RuntimeHostFaultCodes
 
     /// <summary>Composition failed before the state store existed.</summary>
     public const string CompositionFault = "COMPOSITION_FAULT";
+
+    /// <summary>The one-read TC outcome could not be published; no success was fabricated.</summary>
+    public const string TcAcquisitionFailed = "TC_ACQUISITION_FAILED";
 }
 
 /// <summary>Readiness answer plus the machine code and detail that produced it.</summary>
@@ -123,6 +133,10 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     private readonly RuntimePublicationWriter? _writer;
     private readonly SimulatorScenario? _scenario;
     private readonly SequencingTopology? _scenarioTopology;
+    private readonly TcAcquisitionSession? _tcSession;
+    private Task<TcAcquisitionOutcome>? _tcTask;
+    private bool _tcOutcomeConsumed;
+    private string? _tcFailureCode;
     private SequencingState _sequencing = SequencingKernel.Initial();
     private SequencingRetention _retention = SequencingRetention.Empty;
     private int _scenarioCursor;
@@ -151,6 +165,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         RuntimePublicationWriter? writer,
         SimulatorScenario? scenario,
         SequencingTopology? scenarioTopology,
+        TcAcquisitionSession? tcSession,
         Action<string, string>? faultObserver,
         DateTimeOffset composedAtUtc,
         string? startupFaultCode,
@@ -162,6 +177,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         _writer = writer;
         _scenario = scenario;
         _scenarioTopology = scenarioTopology;
+        _tcSession = tcSession;
         _faultObserver = faultObserver;
         _startupFaultCode = startupFaultCode;
         _startupFaultDetail = startupFaultDetail;
@@ -202,6 +218,9 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     public int ScenarioCursor => _scenarioCursor;
     public SequencingState Sequencing => _sequencing;
     public SequencingRetention Retention => _retention;
+
+    /// <summary>Read-only observation of the one-use session for in-process diagnostics and tests.</summary>
+    public Task<TcAcquisitionOutcome>? AcquisitionTask => _tcTask;
 
     public RuntimeStoreCounters CountersFor(RuntimePublication publication) => new()
     {
@@ -282,7 +301,8 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     public static SimulatorRuntime Create(
         RuntimeHostOptions options,
         IClock clock,
-        Action<string, string>? faultObserver = null)
+        Action<string, string>? faultObserver = null,
+        Func<ITcReadOnlyClient>? deterministicTcClientFactory = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clock);
@@ -329,6 +349,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             store.CreateWriter(),
             scenario,
             scenarioSet.Topology,
+            deterministicTcClientFactory is null ? null : new TcAcquisitionSession(deterministicTcClientFactory, clock),
             faultObserver,
             composedAtUtc,
             startupFaultCode: null,
@@ -363,6 +384,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             writer: null,
             scenario: null,
             scenarioTopology: null,
+            tcSession: null,
             faultObserver,
             composedAtUtc,
             faultCode,
@@ -446,6 +468,16 @@ public sealed class SimulatorRuntime : IAsyncDisposable
                 + $"not the committed revision {publication.Current.Revision}.");
         }
 
+        if (_tcSession is not null && publication.Current.TcAcquisition is null)
+        {
+            var failure = Volatile.Read(ref _tcFailureCode);
+            return failure is null
+                ? RuntimeReadiness.NotReady(RuntimeReadinessCodes.TcAcquisitionNotPublished,
+                    "The one-read TC acquisition has not been published in a Runtime revision yet.")
+                : RuntimeReadiness.NotReady(RuntimeReadinessCodes.TcAcquisitionUnavailable,
+                    $"The one-read TC acquisition did not publish [{failure}]. No success is claimed.");
+        }
+
         return RuntimeReadiness.IsReady(
             $"SIMULATOR runtime ready at revision {publication.Current.Revision} (tick interval {_options.TickIntervalMilliseconds} ms).");
     }
@@ -481,6 +513,9 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             _nextTickInstant = _store!.Snapshot.Current.GeneratedAtUtc + _options.TickInterval;
         }
 
+        // Only the existing tick loop owns the publication writer. The one-read session owns
+        // its client and cleanup, then hands a fenced outcome to a future accepted tick.
+        _tcTask = _tcSession?.Start(_loopCts.Token);
         _loopTask = Task.Run(() => RunLoopAsync(_loopCts.Token));
     }
 
@@ -508,6 +543,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         }
 
         _loopCompleted = true;
+        if (_tcSession is not null) await _tcSession.DisposeAsync().ConfigureAwait(false);
         _loopCts.Dispose();
     }
 
@@ -591,6 +627,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             return;
         }
 
+        TcAcquisitionState? tcState = null;
         try
         {
             var nextSequencing = _sequencing;
@@ -620,18 +657,23 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             }
 
             var synthetic = outcome.Result!.State;
+            tcState = ConsumeTcOutcome(previous);
             var candidate = synthetic with
             {
                 Sensors = SequencingRuntimeProjection.ProjectSensorQueueStates(nextSequencing, synthetic.Sensors),
                 Queue = SequencingRuntimeProjection.ProjectQueue(nextSequencing, nextRetention),
                 ActiveJob = SequencingRuntimeProjection.ProjectActiveJob(nextSequencing, nextRetention),
                 Sequence = SequencingRuntimeProjection.ProjectSequence(nextSequencing, nextRetention, synthetic.Sequence.Controls),
+                TcAcquisition = tcState ?? synthetic.TcAcquisition,
             };
+            // Acquisition changes only its own field; it never enters sequencing or control.
+            if (_loopCts.IsCancellationRequested) return;
             RuntimeStateInvariants.RequireValid(candidate);
             var delta = RuntimeDeltaProjector.ProjectCandidate(previous, candidate);
             var published = _writer!.Publish(previous.Revision, candidate, delta);
             if (!published.Accepted)
             {
+                if (tcState is not null) Volatile.Write(ref _tcFailureCode, published.Code ?? "TC_PUBLICATION_REFUSED");
                 Interlocked.Increment(ref _rejectedTransitions);
                 RecordFault(published.Code ?? RuntimeHostFaultCodes.CommitRefused, "Runtime publication refused.");
                 _nextTickInstant = tickInstant + _options.TickInterval;
@@ -647,10 +689,41 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
         {
+            if (tcState is not null) Volatile.Write(ref _tcFailureCode, "TC_PUBLICATION_REFUSED");
             Interlocked.Increment(ref _rejectedTransitions);
             _nextTickInstant = tickInstant + _options.TickInterval;
             throw;
         }
+    }
+
+    /// <summary>
+    /// The sole evolution writer adopts a completed one-read outcome at most once, from the
+    /// latest published revision. A delayed read cannot overwrite a newer Snapshot or create
+    /// another writer; failure leaves TC state null and records a machine diagnostic.
+    /// </summary>
+    private TcAcquisitionState? ConsumeTcOutcome(RuntimeState previous)
+    {
+        if (_tcOutcomeConsumed || _tcTask is not { IsCompleted: true } || _loopCts.IsCancellationRequested)
+            return null;
+
+        _tcOutcomeConsumed = true;
+        TcAcquisitionOutcome result;
+        try { result = _tcTask.GetAwaiter().GetResult(); }
+        catch (Exception)
+        {
+            // Even an unexpected session task fault is a diagnosed TC failure, never an
+            // endlessly pending acquisition or a reason to synthesize a successful state.
+            Volatile.Write(ref _tcFailureCode, "TC_ACQUISITION_FAILED");
+            RecordFault(RuntimeHostFaultCodes.TcAcquisitionFailed, "TC_ACQUISITION_FAILED");
+            return null;
+        }
+        if (result.Accepted && result.State is not null && previous.TcAcquisition is null)
+            return result.State;
+
+        var code = result.Accepted ? "TC_ACQUISITION_SUPERSEDED" : result.Code;
+        Volatile.Write(ref _tcFailureCode, code);
+        RecordFault(RuntimeHostFaultCodes.TcAcquisitionFailed, code);
+        return null;
     }
 
     // Only the ready, structurally valid head can progress. An invalid head stays

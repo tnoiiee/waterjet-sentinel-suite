@@ -235,8 +235,9 @@
 
     <section id="tc-acquisition" aria-labelledby="tc-acquisition-h">
       <h2 id="tc-acquisition-h">TC Acquisition <span class="hint">deterministic one-Node vertical slice · read-only · NO HARDWARE ACCESS</span></h2>
-      <p class="note">Deterministic one-Node TC acquisition state for the Product path. This is not physical evidence and does not authorize T01.</p>
-      <div id="tc-acquisition-body"></div>
+      <p class="note">This read-only section projects the authoritative Runtime Snapshot for one deterministic Node. Until Runtime publishes the one-use session, it reports not published or unavailable. This is not physical evidence and does not authorize T01.</p>
+      <button type="button" id="tc-acquisition-refresh">Refresh Runtime TC state (read-only)</button>
+      <div id="tc-acquisition-body" role="status"></div>
     </section>
 
     <section id="diagnostics" aria-labelledby="diagnostics-h">

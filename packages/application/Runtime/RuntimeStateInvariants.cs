@@ -127,24 +127,63 @@ public static class RuntimeStateInvariants
         reasonCode = string.Empty;
         detail = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(state.NodeId))
+        if (state.NodeId != DeterministicTcVocabulary.NodeId
+            || state.CabinetId != DeterministicTcVocabulary.CabinetId)
         {
-            return Refuse(RuntimeRefusalCodes.StateInvalid, "TC acquisition NodeId is required.", out reasonCode, out detail);
+            return Refuse(RuntimeRefusalCodes.StateInvalid,
+                "TC acquisition must name the canonical one-Node and cabinet identity.", out reasonCode, out detail);
         }
 
-        if (state.CopiedWordCount != 40 || state.RawWords.Count != 40)
+        if (state.Provenance != DeterministicTcVocabulary.Provenance || state.Physical || !state.Quarantined
+            || state.AcquisitionState != DeterministicTcVocabulary.Complete
+            || state.Quality != DeterministicTcVocabulary.Quality
+            || state.DiagnosticState != DeterministicTcVocabulary.NoDiagnostic
+            || state.MappingStatus != DeterministicTcVocabulary.MappingNotVerified
+            || state.DecodeStatus != DeterministicTcVocabulary.DecodeNotVerified)
         {
-            return Refuse(RuntimeRefusalCodes.StateInvalid, "The one-Node TC acquisition slice must carry exactly 40 raw words.", out reasonCode, out detail);
+            return Refuse(RuntimeRefusalCodes.StateInvalid,
+                "TC acquisition must remain complete, simulated, non-physical, quarantined and unverified.",
+                out reasonCode, out detail);
         }
 
-        if (state.Physical && !string.Equals(state.Provenance, "PHYSICAL", StringComparison.Ordinal))
+        if (state.AcquiredAtUtc == default || state.AcquiredAtUtc.Offset != TimeSpan.Zero)
         {
-            return Refuse(RuntimeRefusalCodes.StateInvalid, "Deterministic TC acquisition cannot claim Physical = true.", out reasonCode, out detail);
+            return Refuse(RuntimeRefusalCodes.StateInvalid,
+                "TC acquisition requires a non-default UTC acquisition instant.", out reasonCode, out detail);
         }
 
-        if (!state.Quarantined)
+        if (state.RawWords is null || state.CopiedWordCount != state.RawWords.Count
+            || state.RawWords.Count != DeterministicTcVocabulary.WordCount)
         {
-            return Refuse(RuntimeRefusalCodes.StateInvalid, "Deterministic TC acquisition must remain quarantined.", out reasonCode, out detail);
+            return Refuse(RuntimeRefusalCodes.StateInvalid,
+                "TC acquisition must carry exactly 40 copied raw words with a matching copied count.",
+                out reasonCode, out detail);
+        }
+
+        for (var index = 0; index < state.RawWords.Count; index++)
+        {
+            if (state.RawWords[index] != DeterministicTcVocabulary.WordAt(index))
+            {
+                return Refuse(RuntimeRefusalCodes.StateInvalid,
+                    "Deterministic TC acquisition raw words must match the one-Node development sequence.",
+                    out reasonCode, out detail);
+            }
+        }
+
+        if (state.NotVerified is null || state.NotVerified.Count != DeterministicTcVocabulary.NotVerified.Count)
+        {
+            return Refuse(RuntimeRefusalCodes.StateInvalid,
+                "TC acquisition must retain the complete Not Verified set.", out reasonCode, out detail);
+        }
+
+        for (var index = 0; index < state.NotVerified.Count; index++)
+        {
+            if (state.NotVerified[index] != DeterministicTcVocabulary.NotVerified[index])
+            {
+                return Refuse(RuntimeRefusalCodes.StateInvalid,
+                    "TC acquisition Not Verified fields must remain canonical and ordered.",
+                    out reasonCode, out detail);
+            }
         }
 
         return true;
