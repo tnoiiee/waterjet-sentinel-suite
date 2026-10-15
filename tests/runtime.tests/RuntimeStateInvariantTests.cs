@@ -250,10 +250,10 @@ public sealed class RuntimeStateInvariantTests
         foreach (var (label, invalid, expectedCode) in invalidCases)
         {
             var accepted = RuntimeStateInvariants.TryValidate(initial with { TcAcquisition = invalid },
-                out var code, out var detail);
+                out var code, out var refusalDetail);
             Assert.False(accepted, label);
             Assert.Equal(expectedCode, code);
-            Assert.NotEqual(string.Empty, detail);
+            Assert.NotEqual(string.Empty, refusalDetail);
         }
     }
 
