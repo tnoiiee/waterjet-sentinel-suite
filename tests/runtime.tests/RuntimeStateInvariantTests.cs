@@ -220,31 +220,40 @@ public sealed class RuntimeStateInvariantTests
         var shorter = valid.RawWords.Take(39).ToArray();
         var changed = valid.RawWords.ToArray();
         changed[23] = 999;
-        foreach (var invalid in new[]
+
+        // Each case carries the machine reason code it must produce. Every deterministic-shaped
+        // tamper below keeps Physical=false and is therefore refused by the deterministic validator
+        // (STATE_INVALID). The single exception declares Physical=true: that record is no longer
+        // deterministic-shaped, so the profile invariant refuses it first - a SIMULATOR revision must
+        // never carry a physical acquisition record, and the two variants are never blended.
+        var invalidCases = new (string Label, TcAcquisitionState State, string Code)[]
         {
-            valid with { NodeId = "TC-NODE-02" },
-            valid with { CabinetId = "CAB2" },
-            valid with { Provenance = "PHYSICAL" },
-            valid with { Physical = true },
-            valid with { Quarantined = false },
-            valid with { AcquisitionState = "PENDING" },
-            valid with { Quality = "GOOD" },
-            valid with { DiagnosticState = "UNVERIFIED" },
-            valid with { MappingStatus = "VERIFIED" },
-            valid with { DecodeStatus = "VERIFIED" },
-            valid with { AcquiredAtUtc = default },
-            valid with { AcquiredAtUtc = RuntimeTestFixture.Instant.ToOffset(TimeSpan.FromHours(7)) },
-            valid with { CopiedWordCount = 39 },
-            valid with { RawWords = shorter },
-            valid with { RawWords = changed },
-            valid with { NotVerified = valid.NotVerified.Take(4).ToArray() },
-            valid with { NotVerified = valid.NotVerified.Reverse().ToArray() },
-        })
+            ("foreign node", valid with { NodeId = "TC-NODE-02" }, RuntimeRefusalCodes.StateInvalid),
+            ("foreign cabinet", valid with { CabinetId = "CAB2" }, RuntimeRefusalCodes.StateInvalid),
+            ("physical provenance", valid with { Provenance = "PHYSICAL" }, RuntimeRefusalCodes.StateInvalid),
+            ("physical claim", valid with { Physical = true }, RuntimeRefusalCodes.PhysicalTcProfileMismatch),
+            ("not quarantined", valid with { Quarantined = false }, RuntimeRefusalCodes.StateInvalid),
+            ("pending acquisition", valid with { AcquisitionState = "PENDING" }, RuntimeRefusalCodes.StateInvalid),
+            ("good quality", valid with { Quality = "GOOD" }, RuntimeRefusalCodes.StateInvalid),
+            ("unverified diagnostic", valid with { DiagnosticState = "UNVERIFIED" }, RuntimeRefusalCodes.StateInvalid),
+            ("verified mapping", valid with { MappingStatus = "VERIFIED" }, RuntimeRefusalCodes.StateInvalid),
+            ("verified decode", valid with { DecodeStatus = "VERIFIED" }, RuntimeRefusalCodes.StateInvalid),
+            ("default timestamp", valid with { AcquiredAtUtc = default }, RuntimeRefusalCodes.StateInvalid),
+            ("non-UTC timestamp", valid with { AcquiredAtUtc = RuntimeTestFixture.Instant.ToOffset(TimeSpan.FromHours(7)) }, RuntimeRefusalCodes.StateInvalid),
+            ("short count", valid with { CopiedWordCount = 39 }, RuntimeRefusalCodes.StateInvalid),
+            ("short words", valid with { RawWords = shorter }, RuntimeRefusalCodes.StateInvalid),
+            ("changed word", valid with { RawWords = changed }, RuntimeRefusalCodes.StateInvalid),
+            ("short not-verified", valid with { NotVerified = valid.NotVerified.Take(4).ToArray() }, RuntimeRefusalCodes.StateInvalid),
+            ("reversed not-verified", valid with { NotVerified = valid.NotVerified.Reverse().ToArray() }, RuntimeRefusalCodes.StateInvalid),
+        };
+
+        foreach (var (label, invalid, expectedCode) in invalidCases)
         {
             var accepted = RuntimeStateInvariants.TryValidate(initial with { TcAcquisition = invalid },
-                out var code, out _);
-            Assert.False(accepted);
-            Assert.Equal(RuntimeRefusalCodes.StateInvalid, code);
+                out var code, out var detail);
+            Assert.False(accepted, label);
+            Assert.Equal(expectedCode, code);
+            Assert.NotEqual(string.Empty, detail);
         }
     }
 
