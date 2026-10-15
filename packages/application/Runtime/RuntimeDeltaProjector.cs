@@ -59,6 +59,7 @@ public static class RuntimeDeltaProjector
             Sequence = SameContent(candidate.Sequence, previous.Sequence) ? null : candidate.Sequence,
             Alarms = SameContent(candidate.Alarms, previous.Alarms) ? null : candidate.Alarms,
             Communication = SameContent(candidate.Communication, previous.Communication) ? null : candidate.Communication,
+            TcAcquisition = SameContent(candidate.TcAcquisition, previous.TcAcquisition) ? null : candidate.TcAcquisition,
             TrendPoint = evolution.AppendedTrendPoint,
             ActiveJob = EncodeActiveJob(previous.ActiveJob, candidate.ActiveJob),
         };
@@ -114,6 +115,7 @@ public static class RuntimeDeltaProjector
             Sequence = SameContent(candidate.Sequence, previous.Sequence) ? null : candidate.Sequence,
             Alarms = SameContent(candidate.Alarms, previous.Alarms) ? null : candidate.Alarms,
             Communication = SameContent(candidate.Communication, previous.Communication) ? null : candidate.Communication,
+            TcAcquisition = SameContent(candidate.TcAcquisition, previous.TcAcquisition) ? null : candidate.TcAcquisition,
             TrendPoint = AppendedTrendPoint(previous.Trend, candidate.Trend),
             ActiveJob = EncodeActiveJob(previous.ActiveJob, candidate.ActiveJob),
         };

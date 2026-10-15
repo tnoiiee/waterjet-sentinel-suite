@@ -58,6 +58,7 @@ public sealed record OperationalSnapshot
     public required SequenceState Sequence { get; init; }
     public required AlarmSummary Alarms { get; init; }
     public required CommunicationHealth Communication { get; init; }
+    public TcAcquisitionState? TcAcquisition { get; init; }
     public required RuntimeHealth Runtime { get; init; }
     public required TrendWindow Trend { get; init; }
 }

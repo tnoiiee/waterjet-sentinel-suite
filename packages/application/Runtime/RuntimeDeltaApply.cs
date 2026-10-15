@@ -204,6 +204,7 @@ public static class RuntimeDeltaApply
             Sequence = delta.Sequence ?? current.Sequence,
             Alarms = delta.Alarms ?? current.Alarms,
             Communication = delta.Communication ?? current.Communication,
+            TcAcquisition = delta.TcAcquisition ?? current.TcAcquisition,
             Trend = delta.TrendPoint is null
                 ? current.Trend
                 : RuntimeTrendBuffer.Append(current.Trend, delta.TrendPoint),

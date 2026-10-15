@@ -26,6 +26,11 @@ internal static class RuntimeStateFreezer
         Queue = state.Queue with { Entries = RuntimeCollections.Freeze(state.Queue.Entries) },
         Alarms = state.Alarms with { Items = RuntimeCollections.Freeze(state.Alarms.Items) },
         Communication = state.Communication with { Devices = RuntimeCollections.Freeze(state.Communication.Devices) },
+        TcAcquisition = state.TcAcquisition is null ? null : state.TcAcquisition with
+        {
+            RawWords = RuntimeCollections.Freeze(state.TcAcquisition.RawWords),
+            NotVerified = RuntimeCollections.Freeze(state.TcAcquisition.NotVerified),
+        },
         Trend = state.Trend with
         {
             SeriesNames = RuntimeCollections.Freeze(state.Trend.SeriesNames),

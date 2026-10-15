@@ -111,8 +111,42 @@ public static class RuntimeStateInvariants
             return false;
         }
 
+        if (state.TcAcquisition is not null && !TryValidateTcAcquisition(state.TcAcquisition, out reasonCode, out detail))
+        {
+            return false;
+        }
+
         reasonCode = string.Empty;
         detail = string.Empty;
+        return true;
+    }
+
+
+    private static bool TryValidateTcAcquisition(TcAcquisitionState state, out string reasonCode, out string detail)
+    {
+        reasonCode = string.Empty;
+        detail = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(state.NodeId))
+        {
+            return Refuse(RuntimeRefusalCodes.StateInvalid, "TC acquisition NodeId is required.", out reasonCode, out detail);
+        }
+
+        if (state.CopiedWordCount != 40 || state.RawWords.Count != 40)
+        {
+            return Refuse(RuntimeRefusalCodes.StateInvalid, "The one-Node TC acquisition slice must carry exactly 40 raw words.", out reasonCode, out detail);
+        }
+
+        if (state.Physical && !string.Equals(state.Provenance, "PHYSICAL", StringComparison.Ordinal))
+        {
+            return Refuse(RuntimeRefusalCodes.StateInvalid, "Deterministic TC acquisition cannot claim Physical = true.", out reasonCode, out detail);
+        }
+
+        if (!state.Quarantined)
+        {
+            return Refuse(RuntimeRefusalCodes.StateInvalid, "Deterministic TC acquisition must remain quarantined.", out reasonCode, out detail);
+        }
+
         return true;
     }
 

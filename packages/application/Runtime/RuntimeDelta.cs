@@ -141,6 +141,7 @@ public sealed record RuntimeDelta
         && Alarms is null
         && Communication is null
         && Runtime is null
+        && TcAcquisition is null
         && TrendPoint is null
         && ActiveJob.Encoding == DeltaJobEncoding.Absent;
 }
