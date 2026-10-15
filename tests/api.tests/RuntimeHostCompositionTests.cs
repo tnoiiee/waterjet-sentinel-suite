@@ -32,6 +32,13 @@ public sealed class RuntimeHostCompositionTests
     private static readonly int[] ExpectedFeedRevisions = [4, 3, 2];
     private static readonly int[] ExpectedFeedPreviousRevisions = [3, 2, 1];
 
+    // CA1869: one reused serializer configuration. The policy is exactly the camel-case policy the
+    // no-leak assertion was written against; the serialized shape is unchanged.
+    private static readonly JsonSerializerOptions StateJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     /// <summary>Development-shaped options: SIMULATOR only, bounded, no real device identity.</summary>
     private static RuntimeHostOptions DefaultOptions() => new()
     {
@@ -317,7 +324,7 @@ public sealed class RuntimeHostCompositionTests
     public async Task One_Use_Session_Publishes_One_Atomic_Tc_State_And_Matching_Snapshot_Delta_Feed()
     {
         var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-            deterministicTcClientFactory: TcReadOnlyClientFactory.CreateDeterministic);
+            tcClientFactory: TcReadOnlyClientFactory.CreateDeterministic);
         try
         {
             Assert.Null(runtime.Publication.Current.TcAcquisition);
@@ -370,7 +377,7 @@ public sealed class RuntimeHostCompositionTests
     {
         var creations = 0;
         var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-            deterministicTcClientFactory: () =>
+            tcClientFactory: () =>
             {
                 creations++;
                 throw new InvalidOperationException("test-only factory failure");
@@ -401,7 +408,7 @@ public sealed class RuntimeHostCompositionTests
         {
             var client = new DelayedTcClient();
             var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-                deterministicTcClientFactory: () => client);
+                tcClientFactory: () => client);
             var disposed = false;
             try
             {
@@ -459,7 +466,7 @@ public sealed class RuntimeHostCompositionTests
             FailDisconnect = disconnectFails,
         };
         var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-            deterministicTcClientFactory: () => client);
+            tcClientFactory: () => client);
         Task? stopping = null;
         try
         {
@@ -570,8 +577,12 @@ public sealed class RuntimeHostCompositionTests
     // of this plant. The resolver performs no I/O: it validates a string.
 
     /// <summary>Assembles a dotted-quad from octets, so no address literal is committed.</summary>
-    private static string Address(int a, int b, int c, int d) =>
-        string.Join('.', a, b, c, d);
+    // Test-data formatter only. Malformed cases are intentionally built with three and five octets,
+    // valid cases with four, and out-of-range octets are passed through verbatim for the validator to
+    // reject. Nothing is validated, repaired or defaulted here — the helper only formats exactly the
+    // octets the call site supplies, so each case keeps testing precisely what it names.
+    private static string Address(params int[] octets) =>
+        string.Join('.', octets);
 
     /// <summary>A syntactically valid, non-plant, non-reserved host: accepted by the pure validator.</summary>
     private static string ValidEndpointAddress() => Address(10, 20, 30, 40);
@@ -1024,10 +1035,7 @@ public sealed class RuntimeHostCompositionTests
 
     /// <summary>The record as the wire contract serializes it; the endpoint is absent by construction.</summary>
     private static string StateJson(TcAcquisitionState state) =>
-        JsonSerializer.Serialize(state, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        });
+        JsonSerializer.Serialize(state, StateJsonOptions);
 
     private static void AssertRefuses(string variable, string value, string expectedCode)
     {
