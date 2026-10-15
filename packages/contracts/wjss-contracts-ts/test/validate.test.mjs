@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { validateEnvelope, canonicalSensorIds, sensorIdFor, validateSensorMapExample, sensorMapSummary, TOPOLOGY } from '../validate.mjs';
+import { validateEnvelope, validDeterministicTcAcquisition, canonicalSensorIds, sensorIdFor, validateSensorMapExample, sensorMapSummary, TOPOLOGY } from '../validate.mjs';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`../../fixtures/${name}`, import.meta.url), 'utf8'));
 
@@ -74,6 +74,38 @@ test('delta.basic.json passes and is gapless', () => {
   const result = validateEnvelope(fixture('delta.basic.json'));
   assert.deepEqual(result.issues, []);
   assert.equal(result.gap, false);
+});
+
+test('TC Snapshot and Delta share the one-Node invariant; null is Snapshot-only, never a Delta clear', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const delta = fixture('delta.basic.json');
+  const tcAcquisition = {
+    nodeId: 'TC-NODE-01', cabinetId: 'CAB1', provenance: 'DETERMINISTIC_SIMULATION',
+    physical: false, quarantined: true, acquisitionState: 'COMPLETE',
+    acquiredAtUtc: '2026-10-15T12:00:00+00:00', copiedWordCount: 40,
+    rawWords: Array.from({ length: 40 }, (_, i) => 100 + i), quality: 'SIMULATED',
+    diagnosticState: 'NONE', mappingStatus: 'MAPPING_NOT_VERIFIED',
+    decodeStatus: 'DECODING_NOT_VERIFIED',
+    notVerified: ['PHYSICAL_REACHABILITY', 'REGISTER_MAPPING', 'SCALING', 'WIRE_BREAK', 'FIELD_TIMING'],
+  };
+  assert.equal(validDeterministicTcAcquisition(tcAcquisition), true);
+  assert.deepEqual(validateEnvelope({ ...snapshot, tcAcquisition: null }).issues, []);
+  assert.deepEqual(validateEnvelope({ ...snapshot, tcAcquisition }).issues, []);
+  assert.deepEqual(validateEnvelope({ ...delta, tcAcquisition }).issues, []);
+  assert.deepEqual(validateEnvelope(delta).issues, []);
+  assert.ok(validateEnvelope({ ...delta, tcAcquisition: null }).issues.some((i) => i.includes('tcAcquisition')));
+  for (const bad of [
+    { ...tcAcquisition, physical: true },
+    { ...tcAcquisition, quarantined: false },
+    { ...tcAcquisition, acquiredAtUtc: '0001-01-01T00:00:00+00:00' },
+    { ...tcAcquisition, copiedWordCount: 39 },
+    { ...tcAcquisition, rawWords: [...tcAcquisition.rawWords.slice(0, -1), 777] },
+    { ...tcAcquisition, notVerified: ['PHYSICAL_REACHABILITY,REGISTER_MAPPING', 'SCALING', 'WIRE_BREAK', 'FIELD_TIMING'] },
+  ]) {
+    assert.equal(validDeterministicTcAcquisition(bad), false);
+    assert.ok(validateEnvelope({ ...snapshot, tcAcquisition: bad }).issues.some((i) => i.includes('tcAcquisition')));
+    assert.ok(validateEnvelope({ ...delta, tcAcquisition: bad }).issues.some((i) => i.includes('tcAcquisition')));
+  }
 });
 
 test('delta.gap.json is structurally valid and flagged as a gap', () => {

@@ -4,4 +4,7 @@ namespace Wjss.Adapters.TcAcquisition;
 public static class TcReadOnlyClientFactory
 {
     public static ITcReadOnlyClient Create() => new FluentModbusTcClient();
+
+    /// <summary>Explicit non-Hardware Product seam; never creates the physical transport.</summary>
+    public static ITcReadOnlyClient CreateDeterministic() => new DeterministicTcReadOnlyClient();
 }

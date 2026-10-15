@@ -27,7 +27,7 @@ const rowFor = (label) => {
 const containers = () => ['node-config-validation', 'node-config-totals', 'node-config-body', 'node-config-legend', 'node-config-authority']
   .map((id) => app.byId[id]);
 
-test('G: the page boots ready and every request the boot made succeeded as a local GET', () => {
+test('G: the page boots ready; Node configuration succeeds and the absent Runtime is reported separately', () => {
   assert.equal(app.byId['app-root'].attributes['data-app-state'], 'ready');
   assert.equal(app.byId['boot-error'].hidden, true);
   const projection = app.requests.find((r) => r.path === '/api/tc-node-configuration');
@@ -35,7 +35,7 @@ test('G: the page boots ready and every request the boot made succeeded as a loc
   assert.equal(projection.status, 200);
   for (const request of app.requests) {
     assert.equal(request.method, 'GET', request.path);
-    assert.equal(request.status, 200, request.path);
+    assert.equal(request.status, request.path === '/api/tc-acquisition' ? 503 : 200, request.path);
     assert.equal(request.path.startsWith('/'), true, 'every request is a local route');
   }
 });

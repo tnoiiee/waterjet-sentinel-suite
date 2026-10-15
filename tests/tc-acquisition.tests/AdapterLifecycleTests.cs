@@ -13,6 +13,60 @@ public sealed class AdapterLifecycleTests
         RegisterArea = area, Endianness = TcEndiannessCandidate.BigEndian, Timeout = timeout ?? TimeSpan.FromSeconds(2),
     };
 
+    [Fact]
+    public async Task Socket_Free_Deterministic_Client_Rejects_Addresses_And_Never_Repeats_A_Read()
+    {
+        await using var client = TcReadOnlyClientFactory.CreateDeterministic();
+        var marker = new TcNodeEndpoint
+        {
+            NodeId = "TC-NODE-01", IpAddress = DeterministicTcReadOnlyClient.EndpointMarker,
+        };
+        var wrongEndpoint = marker with { IpAddress = "NOT_A_DETERMINISTIC_MARKER" };
+        Assert.Equal(TcReadKind.ConfigurationRejected,
+            (await client.ConnectAsync(wrongEndpoint, CancellationToken.None)).Kind);
+        Assert.Equal(0, client.Generation);
+
+        var connected = await client.ConnectAsync(marker, CancellationToken.None);
+        Assert.Equal(TcReadKind.Success, connected.Kind);
+        Assert.True(client.IsConnected);
+        var request = Request(client, marker);
+        var read = await client.ReadAsync(request, CancellationToken.None);
+        Assert.Equal(TcReadKind.Success, read.Kind);
+        var words = Assert.IsType<ushort[]>(read.RawWords);
+        Assert.Equal(40, words.Length);
+        Assert.Equal(Enumerable.Range(100, 40).Select(n => (ushort)n), words);
+        var repeated = await client.ReadAsync(request, CancellationToken.None);
+        Assert.Equal(TcReadKind.ConfigurationRejected, repeated.Kind);
+        Assert.Equal("DETERMINISTIC_ALREADY_READ", repeated.DetailCode);
+
+        await client.DisconnectAsync();
+        Assert.False(client.IsConnected);
+        Assert.True(client.Generation > connected.Generation);
+        Assert.Equal(TcReadKind.StaleGenerationRejected,
+            (await client.ReadAsync(request, CancellationToken.None)).Kind);
+        Assert.Equal(TcReadKind.ConfigurationRejected,
+            (await client.ConnectAsync(marker, CancellationToken.None)).Kind);
+    }
+
+    [Fact]
+    public async Task Deterministic_Client_Consumes_Invalid_First_Request_Without_A_Corrective_Retry()
+    {
+        await using var client = TcReadOnlyClientFactory.CreateDeterministic();
+        var marker = new TcNodeEndpoint
+        {
+            NodeId = "TC-NODE-01", IpAddress = DeterministicTcReadOnlyClient.EndpointMarker,
+        };
+        Assert.Equal(TcReadKind.Success,
+            (await client.ConnectAsync(marker, CancellationToken.None)).Kind);
+        var request = Request(client, marker);
+        var invalid = await client.ReadAsync(request with { Quantity = 39 }, CancellationToken.None);
+        Assert.Equal(TcReadKind.ConfigurationRejected, invalid.Kind);
+        Assert.Null(invalid.RawWords);
+        var retry = await client.ReadAsync(request, CancellationToken.None);
+        Assert.Equal(TcReadKind.ConfigurationRejected, retry.Kind);
+        Assert.Null(retry.RawWords);
+    }
+
     [Theory]
     [InlineData(TcRegisterArea.HoldingRegisters, 3, 0)]
     [InlineData(TcRegisterArea.InputRegisters, 4, 255)]

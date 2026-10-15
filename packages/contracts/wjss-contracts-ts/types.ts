@@ -430,6 +430,24 @@ export interface TrendWindow {
   points: TrendPoint[];
 }
 
+/** One quarantined, raw-word, deterministic read; not physical temperature or mapping evidence. */
+export interface TcAcquisitionState {
+  nodeId: 'TC-NODE-01';
+  cabinetId: 'CAB1';
+  provenance: 'DETERMINISTIC_SIMULATION';
+  physical: false;
+  quarantined: true;
+  acquisitionState: 'COMPLETE';
+  acquiredAtUtc: string;
+  copiedWordCount: 40;
+  rawWords: number[];
+  quality: 'SIMULATED';
+  diagnosticState: 'NONE';
+  mappingStatus: 'MAPPING_NOT_VERIFIED';
+  decodeStatus: 'DECODING_NOT_VERIFIED';
+  notVerified: string[];
+}
+
 export interface OperationalSnapshot {
   kind: 'snapshot';
   schema: typeof SNAPSHOT_SCHEMA;
@@ -454,6 +472,8 @@ export interface OperationalSnapshot {
   communication: CommunicationHealth;
   runtime: RuntimeHealth;
   trend: TrendWindow;
+  /** Older fixtures may omit this; the wired Runtime serializes null until its one read publishes. */
+  tcAcquisition?: TcAcquisitionState | null;
   /** Optional review marker; PROVISIONAL fixtures carry it until .NET regeneration replaces it. */
   fixtureStatus?: string;
 }
@@ -486,6 +506,8 @@ export interface OperationalDelta {
   communication?: CommunicationHealth;
   runtime?: RuntimeHealth;
   trendPoint?: TrendPoint;
+  /** Absent = unchanged; whole-record replacement only. Null/clear is not accepted. */
+  tcAcquisition?: TcAcquisitionState;
   fixtureStatus?: string;
 }
 

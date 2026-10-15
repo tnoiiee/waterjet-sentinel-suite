@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using Wjss.Adapters.TcAcquisition;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime;
@@ -94,7 +95,9 @@ void ObserveFault(string code, string detail)
 SimulatorRuntime runtime;
 try
 {
-    runtime = SimulatorRuntime.Create(options, clock, ObserveFault);
+    // The Product host opts in explicitly to the socket-free one-read client. The
+    // physical factory is not used, and only the Runtime owns this client lifetime.
+    runtime = SimulatorRuntime.Create(options, clock, ObserveFault, TcReadOnlyClientFactory.CreateDeterministic);
 }
 catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
 {
@@ -113,9 +116,10 @@ var app = builder.Build();
 var startedUtc = DateTimeOffset.UtcNow;
 var inspectorPagePath = Path.Combine(AppContext.BaseDirectory, "Inspector", "index.html");
 
-// 5. Start the deterministic synthetic evolution lifecycle: one non-overlapping
-//    loop, one accepted tick = one committed revision, cancelled on shutdown.
-runtime.Start();
+// 5. Start only an initialized Runtime. A faulted composition has no writer or
+//    Snapshot: keep the host's read-only 503 diagnostics available without claiming
+//    that an evolution loop or a Delta feed exists.
+if (runtime.IsInitialized) runtime.Start();
 
 // 6. Read-only surface (GET only). Every endpoint reports observation; none
 //    accepts a command, and no write route exists anywhere in this host.
@@ -126,6 +130,7 @@ IResult RuntimeUnavailable(string code, string detail) => Results.Json(
         Detail = detail,
         StageMarker = RuntimeStage.Marker,
     },
+    ContractJson.Options,
     statusCode: StatusCodes.Status503ServiceUnavailable);
 
 IResult SnapshotEndpoint() => runtime.IsInitialized
@@ -136,9 +141,11 @@ IResult SnapshotEndpoint() => runtime.IsInitialized
 
 IResult RuntimeEndpoint() => Results.Json(BuildStatus(), ContractJson.Options);
 
-IResult DeltasEndpoint() => Results.Json(
-    runtime.IsInitialized ? RuntimeDeltaFeed.From(runtime.Publication) : RuntimeDeltaFeed.From(runtime.Deltas, null),
-    ContractJson.Options);
+IResult DeltasEndpoint() => runtime.IsInitialized
+    ? Results.Json(RuntimeDeltaFeed.From(runtime.Publication), ContractJson.Options)
+    : RuntimeUnavailable(
+        RuntimeReadinessCodes.StoreNotInitialized,
+        "No authoritative Runtime publication exists, so no Delta feed is available.");
 
 IResult InspectorEndpoint() => File.Exists(inspectorPagePath)
     ? Results.File(inspectorPagePath, "text/html; charset=utf-8")

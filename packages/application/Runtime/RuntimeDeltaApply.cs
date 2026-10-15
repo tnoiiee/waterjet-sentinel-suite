@@ -204,6 +204,7 @@ public static class RuntimeDeltaApply
             Sequence = delta.Sequence ?? current.Sequence,
             Alarms = delta.Alarms ?? current.Alarms,
             Communication = delta.Communication ?? current.Communication,
+            TcAcquisition = delta.TcAcquisition ?? current.TcAcquisition,
             Trend = delta.TrendPoint is null
                 ? current.Trend
                 : RuntimeTrendBuffer.Append(current.Trend, delta.TrendPoint),
@@ -216,7 +217,11 @@ public static class RuntimeDeltaApply
                 $"Refused Delta {delta.Revision}: the reconstructed revision failed structural validation. {detail} Nothing was applied.");
         }
 
-        return DeltaApplyOutcome.Success(candidate);
+        return DeltaApplyOutcome.Success(candidate with
+        {
+            TcAcquisition = candidate.TcAcquisition is null
+                ? null : RuntimeStateFreezer.FreezeTcAcquisition(candidate.TcAcquisition),
+        });
     }
 
     private static bool IdentityUnchanged(SensorPresentationState before, SensorPresentationState after) =>

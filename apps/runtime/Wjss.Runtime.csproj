@@ -40,6 +40,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../adapters/simulator/Wjss.Adapters.Simulator.csproj" />
+    <ProjectReference Include="../../adapters/tc-acquisition/Wjss.Adapters.TcAcquisition.csproj" />
     <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
     <ProjectReference Include="../../packages/domain/Wjss.Domain.csproj" />
     <ProjectReference Include="../../packages/application/Wjss.Runtime.Core.csproj" />

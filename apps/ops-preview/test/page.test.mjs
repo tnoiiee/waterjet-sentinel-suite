@@ -157,18 +157,66 @@ test('application boot completes and reports a ready state', async () => {
     assert.equal(app.byId['boot-error'].hidden, true, 'no initialization error may be visible');
     assert.equal(app.byId['boot-error-detail'].textContent, '');
 
-    // Every request the boot made was a successful local GET: a failed asset, module or API request
-    // can never be hidden behind a passing test again.
+    // Core synthetic routes succeed. The independently injected Runtime is absent in this test:
+    // its TC-only section must visibly degrade rather than make the whole monitor fail or fake data.
     assert.ok(app.requests.length >= 6, `expected several requests, saw ${app.requests.length}`);
     for (const request of app.requests) {
       assert.equal(request.method, 'GET', `${request.path} must be a GET`);
-      assert.equal(request.status, 200, `${request.path} must answer 200 (saw ${request.status})`);
+      assert.equal(request.status, request.path === '/api/tc-acquisition' ? 503 : 200,
+        `${request.path} must report its real status (saw ${request.status})`);
       assert.match(request.path, /^\/(api\/|app\.mjs|styles\.css|pkg\/|index\.html|$)/, `${request.path} must be a local page route`);
     }
+    assert.match(allText(app.byId['tc-acquisition-body']), /Runtime Snapshot could not be read.*No acquisition is claimed/);
     for (const required of ['/api/boundary', '/api/commissioning/schedule', '/api/commissioning/scenarios',
-      '/api/operations/summary', '/api/sensor-map', '/api/commissioning/observations']) {
+      '/api/operations/summary', '/api/sensor-map', '/api/commissioning/observations', '/api/tc-acquisition']) {
       assert.ok(app.requests.some((r) => r.path.startsWith(required)), `${required} must be requested at boot`);
     }
+  } finally {
+    app.close();
+  }
+});
+
+test('read-only TC refresh moves from pending to Runtime-published state and clears stale success on failure', async () => {
+  let snapshots = 0;
+  let unavailable = false;
+  const tcAcquisition = {
+    nodeId: 'TC-NODE-01', cabinetId: 'CAB1', provenance: 'DETERMINISTIC_SIMULATION',
+    physical: false, quarantined: true, acquisitionState: 'COMPLETE',
+    acquiredAtUtc: '2026-10-15T12:00:00+00:00', copiedWordCount: 40,
+    rawWords: Array.from({ length: 40 }, (_, index) => 100 + index),
+    quality: 'SIMULATED', diagnosticState: 'NONE', mappingStatus: 'MAPPING_NOT_VERIFIED',
+    decodeStatus: 'DECODING_NOT_VERIFIED',
+    notVerified: ['PHYSICAL_REACHABILITY', 'REGISTER_MAPPING', 'SCALING', 'WIRE_BREAK', 'FIELD_TIMING'],
+  };
+  const runtimeFetch = async (url) => {
+    if (unavailable) throw new Error('Runtime stopped');
+    if (new URL(url).pathname === '/api/v1/snapshot') {
+      snapshots += 1;
+      return { ok: true, json: async () => ({
+        kind: 'snapshot', schema: 'wjss.snapshot/2', apiVersion: 1, revision: snapshots,
+        tcAcquisition: snapshots === 1 ? null : tcAcquisition,
+      }) };
+    }
+    return { ok: true, json: async () => ({
+      profile: 'SIMULATOR', currentRevision: snapshots, ready: false,
+      readinessCode: 'TC_ACQUISITION_NOT_PUBLISHED',
+    }) };
+  };
+  const app = await bootApp({ runtimeFetch });
+  try {
+    assert.match(allText(app.byId['tc-acquisition-body']), /not published.*No acquisition is claimed/);
+    click(app.byId['tc-acquisition-refresh']);
+    await waitFor(() => allText(app.byId['tc-acquisition-body']).includes('TC-NODE-01'),
+      'TC state to be published by Runtime');
+    assert.match(allText(app.byId['tc-acquisition-body']), /Runtime revision 2.*deterministic simulation only.*QUARANTINED/);
+    assert.equal(snapshots, 2, 'refresh reads a Snapshot; it does not start a second acquisition');
+    unavailable = true;
+    click(app.byId['tc-acquisition-refresh']);
+    await waitFor(() => allText(app.byId['tc-acquisition-body']).includes('Runtime Snapshot could not be read'),
+      'a later Runtime failure to clear the stale published state');
+    assert.doesNotMatch(allText(app.byId['tc-acquisition-body']), /TC-NODE-01|QUARANTINED|100,101/);
+    assert.equal(app.requests.filter((r) => r.path === '/api/tc-acquisition').length, 3);
+    assert.ok(app.requests.every((r) => r.method === 'GET'));
   } finally {
     app.close();
   }

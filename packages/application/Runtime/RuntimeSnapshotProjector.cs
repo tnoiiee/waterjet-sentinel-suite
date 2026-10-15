@@ -73,6 +73,7 @@ public static class RuntimeSnapshotProjector
             Sequence = state.Sequence,
             Alarms = state.Alarms,
             Communication = state.Communication,
+            TcAcquisition = state.TcAcquisition,
             Runtime = new RuntimeHealth
             {
                 UptimeSeconds = uptimeSeconds,

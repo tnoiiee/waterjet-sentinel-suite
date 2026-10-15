@@ -147,6 +147,64 @@ public sealed class RuntimeStateInvariantTests
         Assert.Contains(RuntimeRefusalCodes.ProfileNotSimulator, thrown.Message, StringComparison.Ordinal);
     }
 
+    private static TcAcquisitionState ValidDeterministicTc() => new()
+    {
+        NodeId = DeterministicTcVocabulary.NodeId,
+        CabinetId = DeterministicTcVocabulary.CabinetId,
+        Provenance = DeterministicTcVocabulary.Provenance,
+        Physical = false,
+        Quarantined = true,
+        AcquisitionState = DeterministicTcVocabulary.Complete,
+        AcquiredAtUtc = RuntimeTestFixture.Instant,
+        CopiedWordCount = DeterministicTcVocabulary.WordCount,
+        RawWords = Enumerable.Range(100, 40).Select(n => (ushort)n).ToArray(),
+        Quality = DeterministicTcVocabulary.Quality,
+        DiagnosticState = DeterministicTcVocabulary.NoDiagnostic,
+        MappingStatus = DeterministicTcVocabulary.MappingNotVerified,
+        DecodeStatus = DeterministicTcVocabulary.DecodeNotVerified,
+        NotVerified = DeterministicTcVocabulary.NotVerified.ToArray(),
+    };
+
+    [Fact]
+    public void One_Node_Tc_State_Requires_Exact_Deterministic_Words_And_No_Physical_Claim()
+    {
+        var initial = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
+        Assert.Null(initial.TcAcquisition);
+        var valid = ValidDeterministicTc();
+        Assert.True(RuntimeStateInvariants.TryValidate(initial with { TcAcquisition = valid }, out var reason, out var detail),
+            $"[{reason}] {detail}");
+
+        var shorter = valid.RawWords.Take(39).ToArray();
+        var changed = valid.RawWords.ToArray();
+        changed[23] = 999;
+        foreach (var invalid in new[]
+        {
+            valid with { NodeId = "TC-NODE-02" },
+            valid with { CabinetId = "CAB2" },
+            valid with { Provenance = "PHYSICAL" },
+            valid with { Physical = true },
+            valid with { Quarantined = false },
+            valid with { AcquisitionState = "PENDING" },
+            valid with { Quality = "GOOD" },
+            valid with { DiagnosticState = "UNVERIFIED" },
+            valid with { MappingStatus = "VERIFIED" },
+            valid with { DecodeStatus = "VERIFIED" },
+            valid with { AcquiredAtUtc = default },
+            valid with { AcquiredAtUtc = RuntimeTestFixture.Instant.ToOffset(TimeSpan.FromHours(7)) },
+            valid with { CopiedWordCount = 39 },
+            valid with { RawWords = shorter },
+            valid with { RawWords = changed },
+            valid with { NotVerified = valid.NotVerified.Take(4).ToArray() },
+            valid with { NotVerified = valid.NotVerified.Reverse().ToArray() },
+        })
+        {
+            var accepted = RuntimeStateInvariants.TryValidate(initial with { TcAcquisition = invalid },
+                out var code, out _);
+            Assert.False(accepted);
+            Assert.Equal(RuntimeRefusalCodes.StateInvalid, code);
+        }
+    }
+
     [Fact]
     public void Non_Simulator_Profiles_Are_Refused_At_Composition()
     {

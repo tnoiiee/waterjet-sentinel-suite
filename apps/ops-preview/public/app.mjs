@@ -92,6 +92,9 @@ const state = {
   tcNodeConfiguration: null,
   // The read-only Stage 0.4C-K3 evidence projection. Evidence and contract only; never edited here.
   tcAcquisitionEvidence: null,
+  // Read-only Runtime Snapshot projection. Null represents a Runtime/Preview request failure,
+  // not a completed TC read; the browser has no acquisition client or state writer.
+  tcAcquisition: null,
   observations: new Map(),
   // The read-only paired thermal model, rebuilt from the authoritative observations on every load. It
   // is derived state: it is never written back into an observation, a row, a count or a verdict.
@@ -848,6 +851,46 @@ function renderTcAcquisitionEvidence() {
     + 'model-level evidence does not resolve an instance; the synthetic wire-break scenario is not physical evidence.';
 }
 
+function renderTcAcquisition() {
+  const body = $('tc-acquisition-body');
+  body.replaceChildren();
+  const projection = state.tcAcquisition;
+  if (!projection) {
+    body.append(el('p', { class: 'note' }, 'TC acquisition unavailable: the Runtime Snapshot could not be read. No acquisition is claimed.'));
+    return;
+  }
+  if (projection.status === 'NOT_PUBLISHED') {
+    body.append(el('p', { class: 'note' }, `Runtime revision ${projection.revision}: TC acquisition not published. No acquisition is claimed.`));
+    return;
+  }
+  if (projection.status === 'ACQUISITION_FAILED') {
+    body.append(el('p', { class: 'note' }, `Runtime revision ${projection.revision}: TC acquisition failed. No state published; no acquisition is claimed.`));
+    return;
+  }
+  if (projection.status !== 'PUBLISHED' || !projection.tcAcquisition) {
+    body.append(el('p', { class: 'note' }, 'TC acquisition unavailable: no validated Runtime state. No acquisition is claimed.'));
+    return;
+  }
+  const view = projection.tcAcquisition;
+  body.append(definitionList([
+    ['Runtime revision', String(projection.revision)],
+    ['Node', view.node],
+    ['Cabinet', view.cabinet],
+    ['Provenance', view.provenance],
+    ['Physical', view.physical ? 'yes' : 'no - deterministic simulation only'],
+    ['Quarantine', view.quarantine ? 'QUARANTINED' : 'not quarantined'],
+    ['Acquisition state', view.acquisitionState],
+    ['Acquired at UTC', view.acquisitionTimestampUtc],
+    ['Copied word count', String(view.copiedWordCount)],
+    ['Quality', view.quality],
+    ['Diagnostic state', view.diagnosticState],
+    ['Mapping status', view.mappingStatus],
+    ['Decode status', view.decodeStatus],
+    ['Not verified', view.notVerified.join(', ')],
+  ]));
+  body.append(el('p', { class: 'note' }, 'Raw words: ' + view.words.join(', ')));
+}
+
 function renderDiagnostics() {
   const body = $('diagnostics-body');
   body.replaceChildren();
@@ -1217,6 +1260,10 @@ async function loadObservations(overrides = {}) {
 // ---------------------------------------------------------------------------
 
 function wireControls() {
+  $('tc-acquisition-refresh').addEventListener('click', async () => {
+    await loadTcAcquisition();
+    renderTcAcquisition();
+  });
   $('scenario-apply').addEventListener('click', () => {
     // `||` not `??`: an empty control value (a not-yet-populated selector) must fall back to the
     // current state, never be sent to the host as an empty scenario or node identity.
@@ -1339,6 +1386,19 @@ async function getJson(path) {
   return response.json();
 }
 
+let tcRefreshRequest = 0;
+
+async function loadTcAcquisition() {
+  const request = ++tcRefreshRequest;
+  try {
+    const projection = await getJson('/api/tc-acquisition');
+    if (request === tcRefreshRequest) state.tcAcquisition = projection;
+  } catch {
+    // A failure clears the displayed TC state; never present a stale success as current.
+    if (request === tcRefreshRequest) state.tcAcquisition = null;
+  }
+}
+
 async function loadInitialData() {
   const [boundary, schedule, scenarios, opsSummary, sensorMap] = await Promise.all([
     getJson('/api/boundary'),
@@ -1366,6 +1426,9 @@ async function loadInitialData() {
   } catch {
     state.tcAcquisitionEvidence = null;
   }
+  // The Runtime-backed TC projection is isolated: a missing host or unpublished state cannot
+  // fabricate success and degrades only this section, not the synthetic commissioning workflow.
+  await loadTcAcquisition();
   // One canonical topology path: the served logical matrix carries the positions and the Sensor
   // identities, the schedule rows carry the Front/Rear measurement identities. The builder refuses a
   // topology it cannot prove (a missing wall, a duplicated Sensor, any non-Sensor position, a
@@ -1418,6 +1481,7 @@ async function boot() {
     renderMapping();
     renderNodeConfiguration();
     renderTcAcquisitionEvidence();
+    renderTcAcquisition();
     renderDiagnostics();
     await loadObservations();
     setAppState(APP_STATE.READY);

@@ -69,5 +69,8 @@ public sealed record RuntimeState
 
     public required CommunicationHealth Communication { get; init; }
 
+    /// <summary>Deterministic one-Node TC acquisition state for the Product vertical slice. Null when no acquisition state has been published.</summary>
+    public TcAcquisitionState? TcAcquisition { get; init; }
+
     public required TrendWindow Trend { get; init; }
 }

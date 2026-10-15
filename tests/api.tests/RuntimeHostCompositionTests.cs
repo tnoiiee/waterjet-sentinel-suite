@@ -1,4 +1,6 @@
+using System.Reflection;
 using System.Text.Json;
+using Wjss.Adapters.TcAcquisition;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime;
@@ -301,6 +303,262 @@ public sealed class RuntimeHostCompositionTests
         Assert.Equal("/api/v1/runtime", ApiRoutes.Runtime);
         Assert.Equal("/api/v1/deltas", ApiRoutes.Deltas);
         Assert.Equal("/inspector", ApiRoutes.Inspector);
+    }
+
+    // A long timer prevents a real background tick while these tests invoke the very same
+    // non-overlapping writer path synchronously. No listener, socket or physical client is used.
+    private static RuntimeHostOptions TcOptions() => DefaultOptions() with { TickIntervalMilliseconds = 60000 };
+
+    private static void Tick(SimulatorRuntime runtime) =>
+        typeof(SimulatorRuntime).GetMethod("ExecuteTick", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(runtime, null);
+
+    [Fact]
+    public async Task One_Use_Session_Publishes_One_Atomic_Tc_State_And_Matching_Snapshot_Delta_Feed()
+    {
+        var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
+            deterministicTcClientFactory: TcReadOnlyClientFactory.CreateDeterministic);
+        try
+        {
+            Assert.Null(runtime.Publication.Current.TcAcquisition);
+            Assert.Null(runtime.ProjectSnapshot().TcAcquisition);
+            runtime.Start();
+            var outcome = await runtime.AcquisitionTask!;
+            Assert.True(outcome.Accepted, outcome.Code);
+            Assert.Equal(RuntimeReadinessCodes.TcAcquisitionNotPublished, runtime.Readiness().Code);
+            Assert.Equal(1, runtime.Publication.Current.Revision); // session cannot publish outside the tick writer
+
+            Tick(runtime);
+            var publication = runtime.Publication;
+            var snapshot = runtime.ProjectSnapshot(publication);
+            var feed = RuntimeDeltaFeed.From(publication);
+            Assert.Equal(2, publication.Current.Revision);
+            Assert.Equal(1, publication.Generation);
+            Assert.Equal(snapshot.Revision, publication.Deltas[0].Revision);
+            Assert.Equal(snapshot.Revision, feed.CurrentRevision);
+            Assert.Equal(snapshot.Revision, feed.NewestDeltaRevision);
+            Assert.Equal(1, feed.Count);
+            Assert.Contains("tcAcquisition", feed.Items[0].ChangedSections);
+            Assert.Equal("TC-NODE-01", snapshot.TcAcquisition!.NodeId);
+            Assert.Equal("CAB1", snapshot.TcAcquisition.CabinetId);
+            Assert.Equal("DETERMINISTIC_SIMULATION", snapshot.TcAcquisition.Provenance);
+            Assert.False(snapshot.TcAcquisition.Physical);
+            Assert.True(snapshot.TcAcquisition.Quarantined);
+            Assert.Equal(Enumerable.Range(100, 40).Select(n => (ushort)n), snapshot.TcAcquisition.RawWords);
+            Assert.Equal(snapshot.TcAcquisition.RawWords.ToArray(), feed.Items[0].TcAcquisition!.RawWords.ToArray());
+            Assert.Equal(RuntimeReadinessCodes.Ready, runtime.Readiness(publication).Code);
+
+            using (var snapshotJson = JsonDocument.Parse(JsonSerializer.Serialize(snapshot, ContractJson.Options)))
+                Assert.Equal(40, snapshotJson.RootElement.GetProperty("tcAcquisition")
+                    .GetProperty("rawWords").GetArrayLength());
+            using (var feedJson = JsonDocument.Parse(JsonSerializer.Serialize(feed, ContractJson.Options)))
+                Assert.Equal(40, feedJson.RootElement.GetProperty("items")[0]
+                    .GetProperty("tcAcquisition").GetProperty("rawWords").GetArrayLength());
+
+            Tick(runtime);
+            var next = runtime.Publication;
+            Assert.Equal(3, next.Current.Revision);
+            Assert.Null(next.Deltas[0].TcAcquisition);
+            Assert.Equal(40, next.Current.TcAcquisition!.RawWords.Count);
+            Assert.DoesNotContain("tcAcquisition", RuntimeDeltaFeed.From(next).Items[0].ChangedSections);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task Failed_One_Read_Stays_Null_And_Reports_Unavailable_Without_A_Tc_Delta()
+    {
+        var creations = 0;
+        var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
+            deterministicTcClientFactory: () =>
+            {
+                creations++;
+                throw new InvalidOperationException("test-only factory failure");
+            });
+        try
+        {
+            runtime.Start();
+            var outcome = await runtime.AcquisitionTask!;
+            Assert.False(outcome.Accepted);
+            Assert.Equal("TC_ACQUISITION_FAILED", outcome.Code);
+            Assert.Equal(1, creations);
+            Tick(runtime);
+            Assert.Equal(2, runtime.Publication.Current.Revision);
+            Assert.Null(runtime.ProjectSnapshot().TcAcquisition);
+            Assert.Null(runtime.Publication.Deltas[0].TcAcquisition);
+            Assert.DoesNotContain("tcAcquisition", RuntimeDeltaFeed.From(runtime.Publication).Items[0].ChangedSections);
+            Assert.Equal(RuntimeReadinessCodes.TcAcquisitionUnavailable, runtime.Readiness().Code);
+            Assert.Equal(RuntimeHostFaultCodes.TcAcquisitionFailed, runtime.LastFaultCode);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task Stale_Result_And_Shutdown_Cannot_Adopt_A_Late_Tc_Read()
+    {
+        // In-memory delayed clients only; never use the physical factory or a local responder.
+        foreach (var shutdown in new[] { false, true })
+        {
+            var client = new DelayedTcClient();
+            var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
+                deterministicTcClientFactory: () => client);
+            var disposed = false;
+            try
+            {
+                runtime.Start();
+                await client.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                var endpoint = client.ConnectedEndpoint!;
+                var originalGeneration = client.Generation;
+                if (shutdown)
+                {
+                    await runtime.DisposeAsync();
+                    disposed = true;
+                }
+                else
+                {
+                    await client.DisconnectAsync(); // invalidates the outstanding generation
+                }
+                client.PendingRead.SetResult(TcReadResult.SuccessResult(
+                    endpoint, originalGeneration, Enumerable.Range(100, 40).Select(n => (ushort)n).ToArray(),
+                    Instant, TcRegisterArea.HoldingRegisters, TcEndiannessCandidate.BigEndian));
+                var outcome = await runtime.AcquisitionTask!.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.False(outcome.Accepted);
+                Assert.Null(outcome.State);
+                if (!shutdown)
+                {
+                    Assert.Equal("TC_ACQUISITION_STALE_GENERATION", outcome.Code);
+                    Tick(runtime);
+                    Assert.Equal(RuntimeReadinessCodes.TcAcquisitionUnavailable, runtime.Readiness().Code);
+                    Assert.Null(runtime.Publication.Current.TcAcquisition);
+                }
+                else
+                {
+                    Assert.Equal(1, runtime.Publication.Current.Revision);
+                    Assert.Null(runtime.Publication.Current.TcAcquisition);
+                }
+                Assert.Equal(1, client.ConnectCount);
+                Assert.Equal(1, client.ReadCount);
+                Assert.Equal(1, client.DisposeCount);
+            }
+            finally { if (!disposed) await runtime.DisposeAsync(); }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Runtime_Stop_During_Cleanup_Observes_Both_Steps_And_Refuses_Late_State(bool disconnectFails)
+    {
+        // In-memory gates expose whether a cancelled Runtime still observes asynchronous cleanup.
+        var disconnectGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disposeGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new DelayedTcClient
+        {
+            HoldDisconnect = disconnectGate,
+            HoldDispose = disposeGate,
+            FailDisconnect = disconnectFails,
+        };
+        var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
+            deterministicTcClientFactory: () => client);
+        Task? stopping = null;
+        try
+        {
+            runtime.Start();
+            await client.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var endpoint = client.ConnectedEndpoint!;
+            var generation = client.Generation;
+            client.PendingRead.SetResult(TcReadResult.SuccessResult(
+                endpoint, generation, Enumerable.Range(100, 40).Select(n => (ushort)n).ToArray(),
+                Instant, TcRegisterArea.HoldingRegisters, TcEndiannessCandidate.BigEndian));
+            await client.DisconnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(runtime.AcquisitionTask!.IsCompleted);
+
+            stopping = runtime.DisposeAsync().AsTask();
+            Assert.False(stopping.IsCompleted);
+            disconnectGate.SetResult(true);
+            await client.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(stopping.IsCompleted);
+            disposeGate.SetResult(true);
+            await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var outcome = await runtime.AcquisitionTask!;
+            Assert.False(outcome.Accepted);
+            Assert.Null(outcome.State);
+            Assert.Equal(disconnectFails ? "TC_ACQUISITION_CLEANUP_FAILED" : "TC_ACQUISITION_CANCELLED_OR_SUPERSEDED", outcome.Code);
+            Assert.Equal(1, client.ConnectCount);
+            Assert.Equal(1, client.ReadCount);
+            Assert.Equal(1, client.DisconnectCount);
+            Assert.Equal(1, client.DisposeCount);
+            Assert.False(client.IsConnected);
+            Assert.True(client.Generation > generation);
+            Assert.Equal(1, runtime.Publication.Current.Revision);
+            Assert.Null(runtime.Publication.Current.TcAcquisition);
+        }
+        finally
+        {
+            disconnectGate.TrySetResult(true);
+            disposeGate.TrySetResult(true);
+            if (stopping is null) await runtime.DisposeAsync();
+            else await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    private sealed class DelayedTcClient : ITcReadOnlyClient
+    {
+        public int Generation { get; private set; }
+        public bool IsConnected { get; private set; }
+        public TcNodeEndpoint? ConnectedEndpoint { get; private set; }
+        public int ConnectCount { get; private set; }
+        public int ReadCount { get; private set; }
+        public int DisconnectCount { get; private set; }
+        public int DisposeCount { get; private set; }
+        public bool FailDisconnect { get; init; }
+        public TaskCompletionSource<bool>? HoldDisconnect { get; init; }
+        public TaskCompletionSource<bool>? HoldDispose { get; init; }
+        public TaskCompletionSource<bool> ReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<TcReadResult> PendingRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> DisconnectStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> DisposeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<TcReadResult> ConnectAsync(TcNodeEndpoint endpoint, CancellationToken cancellationToken)
+        {
+            ConnectCount++;
+            Generation++;
+            IsConnected = true;
+            ConnectedEndpoint = endpoint;
+            return Task.FromResult(new TcReadResult
+            {
+                Kind = TcReadKind.Success, Endpoint = endpoint, Generation = Generation,
+            });
+        }
+
+        public Task<TcReadResult> ReadAsync(TcReadRequest request, CancellationToken cancellationToken)
+        {
+            ReadCount++;
+            ReadStarted.TrySetResult(true);
+            return PendingRead.Task;
+        }
+
+        public async Task DisconnectAsync()
+        {
+            DisconnectCount++;
+            Generation++;
+            IsConnected = false;
+            ConnectedEndpoint = null;
+            DisconnectStarted.TrySetResult(true);
+            if (HoldDisconnect is not null) await HoldDisconnect.Task;
+            if (FailDisconnect) throw new IOException("test-only disconnect failure");
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            Generation++;
+            IsConnected = false;
+            ConnectedEndpoint = null;
+            DisposeStarted.TrySetResult(true);
+            if (HoldDispose is not null) await HoldDispose.Task;
+        }
     }
 
     private static void AssertRefuses(string variable, string value, string expectedCode)

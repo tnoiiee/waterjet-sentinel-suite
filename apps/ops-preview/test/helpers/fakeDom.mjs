@@ -92,7 +92,9 @@ export function columnIndex(headerLabels, label) {
  * Boots the real application against a real Preview server on an ephemeral loopback port.
  * Returns { byId, requests, close }, where `requests` records every request the app made.
  */
-export async function bootApp({ waitId = 'monitor-table-body', extraWindow = null, failPath = null } = {}) {
+export async function bootApp({ waitId = 'monitor-table-body', extraWindow = null, failPath = null,
+  runtimeFetch = async () => { throw new Error('The UI test does not start the Runtime host.'); },
+} = {}) {
   const realFetch = globalThis.fetch;
   const byId = {};
   const requests = [];
@@ -116,7 +118,9 @@ export async function bootApp({ waitId = 'monitor-table-body', extraWindow = nul
     body,
     activeElement: null,
   };
-  const server = createPreviewServer();
+  // The Preview server still serves the real route; only its upstream Runtime Snapshot transport
+  // is injected. The default refuses a missing Runtime, never supplying invented acquisition data.
+  const server = createPreviewServer({ runtimeFetch });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const origin = new URL('http://127.0.0.1');
   origin.port = String(server.address().port);

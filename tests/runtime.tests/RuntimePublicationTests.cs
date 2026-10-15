@@ -554,4 +554,83 @@ public sealed class RuntimePublicationTests
         Assert.Equal(baseline, Fingerprint(store.Snapshot));
     }
 
+    [Fact]
+    public void One_Tc_Replacement_Is_Atomic_Frozen_And_Replayable_Without_A_Clear_Encoding()
+    {
+        var initial = SimulatorRunHarness.InitialState();
+        var words = Enumerable.Range(100, DeterministicTcVocabulary.WordCount).Select(n => (ushort)n).ToArray();
+        var unverified = DeterministicTcVocabulary.NotVerified.ToArray();
+        var tc = new TcAcquisitionState
+        {
+            NodeId = DeterministicTcVocabulary.NodeId,
+            CabinetId = DeterministicTcVocabulary.CabinetId,
+            Provenance = DeterministicTcVocabulary.Provenance,
+            Physical = false,
+            Quarantined = true,
+            AcquisitionState = DeterministicTcVocabulary.Complete,
+            AcquiredAtUtc = initial.GeneratedAtUtc,
+            CopiedWordCount = words.Length,
+            RawWords = words,
+            Quality = DeterministicTcVocabulary.Quality,
+            DiagnosticState = DeterministicTcVocabulary.NoDiagnostic,
+            MappingStatus = DeterministicTcVocabulary.MappingNotVerified,
+            DecodeStatus = DeterministicTcVocabulary.DecodeNotVerified,
+            NotVerified = unverified,
+        };
+        var candidate = initial with
+        {
+            Revision = initial.Revision + 1,
+            GeneratedAtUtc = initial.GeneratedAtUtc.AddSeconds(1),
+            TcAcquisition = tc,
+        };
+        var delta = RuntimeDeltaProjector.ProjectCandidate(initial, candidate);
+        Assert.NotNull(delta.TcAcquisition);
+        var store = RuntimePublicationStore.Create(initial, historyCapacity: 2);
+        var writer = store.CreateWriter();
+        Assert.False(writer.Publish(initial.Revision, candidate, delta with { TcAcquisition = null }).Accepted);
+        Assert.Equal(0, store.Snapshot.Generation);
+
+        var accepted = writer.Publish(initial.Revision, candidate, delta);
+        Assert.True(accepted.Accepted, accepted.Code);
+        words[0] = 999;
+        unverified[0] = "ALTERED_AFTER_PUBLICATION";
+        var publication = store.Snapshot;
+        Assert.Equal(2, publication.Current.Revision);
+        Assert.Equal(2, publication.Deltas[0].Revision);
+        Assert.Equal(100, publication.Current.TcAcquisition!.RawWords[0]);
+        Assert.Equal(100, publication.Deltas[0].TcAcquisition!.RawWords[0]);
+        Assert.Equal(DeterministicTcVocabulary.NotVerified[0], publication.Current.TcAcquisition.NotVerified[0]);
+        Assert.Throws<NotSupportedException>(() => ((IList<ushort>)publication.Current.TcAcquisition.RawWords)[0] = 900);
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)publication.Deltas[0].TcAcquisition!.NotVerified)[0] = "MUTATED");
+
+        var applied = RuntimeDeltaApply.Apply(initial, publication.Deltas[0]);
+        Assert.True(applied.Applied, applied.Reason);
+        Assert.Equal(Json(publication.Current), Json(applied.State));
+        Assert.Throws<NotSupportedException>(() => ((IList<ushort>)applied.State!.TcAcquisition!.RawWords)[0] = 900);
+
+        using (var wire = JsonDocument.Parse(Json(RuntimeDeltaProjector.ProjectWire(publication.Deltas[0]))))
+        {
+            var block = wire.RootElement.GetProperty("tcAcquisition");
+            Assert.Equal("TC-NODE-01", block.GetProperty("nodeId").GetString());
+            Assert.False(block.GetProperty("physical").GetBoolean());
+            Assert.True(block.GetProperty("quarantined").GetBoolean());
+            Assert.Equal(40, block.GetProperty("rawWords").GetArrayLength());
+        }
+        var next = publication.Current with
+        {
+            Revision = publication.Current.Revision + 1,
+            GeneratedAtUtc = publication.Current.GeneratedAtUtc.AddSeconds(1),
+        };
+        var unchanged = RuntimeDeltaProjector.ProjectCandidate(publication.Current, next);
+        Assert.Null(unchanged.TcAcquisition);
+        using (var wire = JsonDocument.Parse(Json(RuntimeDeltaProjector.ProjectWire(unchanged))))
+            Assert.False(wire.RootElement.TryGetProperty("tcAcquisition", out _));
+        Assert.True(writer.Publish(publication.Current.Revision, next, unchanged).Accepted);
+        Assert.Equal(40, store.Snapshot.Current.TcAcquisition!.RawWords.Count);
+        Assert.Null(store.Snapshot.Deltas[0].TcAcquisition);
+        Assert.NotNull(store.Snapshot.Deltas[1].TcAcquisition);
+        Assert.Throws<InvalidOperationException>(() => RuntimeDeltaProjector.ProjectCandidate(next,
+            next with { Revision = next.Revision + 1, GeneratedAtUtc = next.GeneratedAtUtc.AddSeconds(1), TcAcquisition = null }));
+    }
+
 }

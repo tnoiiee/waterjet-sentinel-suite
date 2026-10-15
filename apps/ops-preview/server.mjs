@@ -17,6 +17,9 @@
 //   GET /api/tc-acquisition-evidence      the Stage 0.4C-K3 evidence and contract projection, read-only
 //                                         (classification, decision status, candidate process image;
 //                                         no probe, no socket, no device, no live communication state)
+//   GET /api/tc-acquisition               presentation-only projection of the Runtime Snapshot;
+//                                         Runtime status distinguishes a pending from failed session;
+//                                         never a source of acquisition state or device access
 //
 // Every other method is refused with 405, and there is no route that writes, connects, polls, reads
 // a device, changes the Mapping, or commands anything. The server binds to 127.0.0.1 only: the bind
@@ -38,6 +41,7 @@ import {
   CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, recordToRecordConsistency,
   tcAcquisitionEvidenceFingerprint, requireTopologyInvariants,
 } from '../../packages/commissioning/src/index.mjs';
+import { validDeterministicTcAcquisition } from '../../packages/contracts/wjss-contracts-ts/validate.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -56,6 +60,9 @@ export const UI_BIND_HOST = '127.0.0.1';
 /** The approved local origin, assembled from the loopback literal so no other host can be written. */
 export const LOOPBACK_ORIGIN = 'http://127.0.0.1';
 export const DEFAULT_PORT = 5187;
+// The separate Runtime host's existing loopback API port. Only the port may be overridden;
+// requests cannot supply a host, path or origin. This is not a device endpoint.
+export const DEFAULT_RUNTIME_PORT = 5181;
 
 const PUBLIC_FILES = new Set(['index.html', 'app.mjs', 'styles.css']);
 const MIME = Object.freeze({
@@ -309,13 +316,96 @@ export function tcAcquisitionEvidencePayload() {
   };
 }
 
+const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+
+/**
+ * Reads the Runtime host's fixed loopback Snapshot route and, only if its TC state is null,
+ * the fixed Runtime status route for a same-revision pending/failure diagnostic. There is no
+ * acquisition client, retry, fallback or successful state construction in this process.
+ * Transport errors and malformed answers are explicit states, never substituted values.
+ */
+export async function tcAcquisitionPayload({ runtimeFetch = globalThis.fetch,
+  runtimePort = process.env.WJSS_API_PORT ?? DEFAULT_RUNTIME_PORT } = {}) {
+  const port = String(runtimePort);
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+    throw new RangeError('The local Runtime API port must be an integer from 1 through 65535.');
+  }
+  const origin = new URL(LOOPBACK_ORIGIN);
+  origin.port = port;
+  const url = new URL('/api/v1/snapshot', origin);
+  const envelope = (httpStatus, status, revision = null, tcAcquisition = null) => ({
+    status: httpStatus, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, status, revision, tcAcquisition },
+  });
+
+  let response;
+  try {
+    response = await runtimeFetch(url.href, {
+      method: 'GET', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(1200),
+    });
+  } catch {
+    return envelope(503, 'RUNTIME_UNAVAILABLE');
+  }
+  if (!response?.ok) return envelope(503, 'RUNTIME_UNAVAILABLE');
+
+  let snapshot;
+  try { snapshot = await response.json(); }
+  catch { return envelope(502, 'INVALID_RUNTIME_RESPONSE'); }
+  if (!record(snapshot) || snapshot.kind !== 'snapshot' || snapshot.schema !== 'wjss.snapshot/2'
+    || snapshot.apiVersion !== 1 || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1
+    || !Object.hasOwn(snapshot, 'tcAcquisition')) return envelope(502, 'INVALID_RUNTIME_RESPONSE');
+  if (snapshot.tcAcquisition === null) {
+    // A null Snapshot distinguishes no TC state from a published read, but not pending from
+    // failed. The existing Runtime status carries that host-owned diagnostic. Refuse a mismatched
+    // revision (a tick raced these two reads); never invent a result from a stale status answer.
+    let statusResponse;
+    try {
+      statusResponse = await runtimeFetch(new URL('/api/v1/runtime', origin).href, {
+        method: 'GET', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(1200),
+      });
+    } catch { return envelope(503, 'RUNTIME_UNAVAILABLE'); }
+    if (!statusResponse?.ok) return envelope(503, 'RUNTIME_UNAVAILABLE');
+    let runtimeStatus;
+    try { runtimeStatus = await statusResponse.json(); }
+    catch { return envelope(502, 'INVALID_RUNTIME_RESPONSE'); }
+    if (!record(runtimeStatus) || runtimeStatus.currentRevision !== snapshot.revision
+      || runtimeStatus.profile !== 'SIMULATOR' || runtimeStatus.ready !== false) {
+      return envelope(502, 'INVALID_RUNTIME_RESPONSE');
+    }
+    if (runtimeStatus.readinessCode === 'TC_ACQUISITION_UNAVAILABLE')
+      return envelope(200, 'ACQUISITION_FAILED', snapshot.revision);
+    if (runtimeStatus.readinessCode === 'TC_ACQUISITION_NOT_PUBLISHED')
+      return envelope(200, 'NOT_PUBLISHED', snapshot.revision);
+    return envelope(503, 'RUNTIME_UNAVAILABLE');
+  }
+  if (!validDeterministicTcAcquisition(snapshot.tcAcquisition)) return envelope(502, 'INVALID_RUNTIME_RESPONSE');
+
+  const tc = snapshot.tcAcquisition;
+  return envelope(200, 'PUBLISHED', snapshot.revision, {
+    node: tc.nodeId,
+    cabinet: tc.cabinetId,
+    provenance: tc.provenance,
+    physical: tc.physical,
+    quarantine: tc.quarantined,
+    acquisitionState: tc.acquisitionState,
+    acquisitionTimestampUtc: tc.acquiredAtUtc,
+    copiedWordCount: tc.copiedWordCount,
+    words: tc.rawWords.slice(),
+    quality: tc.quality,
+    diagnosticState: tc.diagnosticState,
+    mappingStatus: tc.mappingStatus,
+    decodeStatus: tc.decodeStatus,
+    notVerified: tc.notVerified.slice(),
+  });
+}
+
 function send(res, status, body, type, extra = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': type, ...extra });
   res.end(body);
 }
 
-export function createPreviewServer() {
-  return createServer((req, res) => {
+export function createPreviewServer({ runtimeFetch = globalThis.fetch,
+  runtimePort = process.env.WJSS_API_PORT ?? DEFAULT_RUNTIME_PORT } = {}) {
+  return createServer(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       return send(res, 405, 'method not allowed', 'text/plain; charset=utf-8', { Allow: 'GET, HEAD' });
     }
@@ -365,6 +455,10 @@ export function createPreviewServer() {
       }
       if (path === '/api/tc-acquisition-evidence') {
         return send(res, 200, JSON.stringify(tcAcquisitionEvidencePayload()), MIME['.json']);
+      }
+      if (path === '/api/tc-acquisition') {
+        const { status, body } = await tcAcquisitionPayload({ runtimeFetch, runtimePort });
+        return send(res, status, JSON.stringify(body), MIME['.json']);
       }
       const asset = path.slice(1);
       if (PUBLIC_FILES.has(asset)) {
