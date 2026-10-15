@@ -444,6 +444,65 @@ public sealed class RuntimeHostCompositionTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Runtime_Stop_During_Cleanup_Observes_Both_Steps_And_Refuses_Late_State(bool disconnectFails)
+    {
+        // In-memory gates expose whether a cancelled Runtime still observes asynchronous cleanup.
+        var disconnectGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disposeGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var client = new DelayedTcClient
+        {
+            HoldDisconnect = disconnectGate,
+            HoldDispose = disposeGate,
+            FailDisconnect = disconnectFails,
+        };
+        var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
+            deterministicTcClientFactory: () => client);
+        Task? stopping = null;
+        try
+        {
+            runtime.Start();
+            await client.ReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var endpoint = client.ConnectedEndpoint!;
+            var generation = client.Generation;
+            client.PendingRead.SetResult(TcReadResult.SuccessResult(
+                endpoint, generation, Enumerable.Range(100, 40).Select(n => (ushort)n).ToArray(),
+                Instant, TcRegisterArea.HoldingRegisters, TcEndiannessCandidate.BigEndian));
+            await client.DisconnectStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(runtime.AcquisitionTask!.IsCompleted);
+
+            stopping = runtime.DisposeAsync().AsTask();
+            Assert.False(stopping.IsCompleted);
+            disconnectGate.SetResult(true);
+            await client.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.False(stopping.IsCompleted);
+            disposeGate.SetResult(true);
+            await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var outcome = await runtime.AcquisitionTask!;
+            Assert.False(outcome.Accepted);
+            Assert.Null(outcome.State);
+            Assert.Equal(disconnectFails ? "TC_ACQUISITION_CLEANUP_FAILED" : "TC_ACQUISITION_CANCELLED_OR_SUPERSEDED", outcome.Code);
+            Assert.Equal(1, client.ConnectCount);
+            Assert.Equal(1, client.ReadCount);
+            Assert.Equal(1, client.DisconnectCount);
+            Assert.Equal(1, client.DisposeCount);
+            Assert.False(client.IsConnected);
+            Assert.True(client.Generation > generation);
+            Assert.Equal(1, runtime.Publication.Current.Revision);
+            Assert.Null(runtime.Publication.Current.TcAcquisition);
+        }
+        finally
+        {
+            disconnectGate.TrySetResult(true);
+            disposeGate.TrySetResult(true);
+            if (stopping is null) await runtime.DisposeAsync();
+            else await stopping.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
     private sealed class DelayedTcClient : ITcReadOnlyClient
     {
         public int Generation { get; private set; }
@@ -451,9 +510,15 @@ public sealed class RuntimeHostCompositionTests
         public TcNodeEndpoint? ConnectedEndpoint { get; private set; }
         public int ConnectCount { get; private set; }
         public int ReadCount { get; private set; }
+        public int DisconnectCount { get; private set; }
         public int DisposeCount { get; private set; }
+        public bool FailDisconnect { get; init; }
+        public TaskCompletionSource<bool>? HoldDisconnect { get; init; }
+        public TaskCompletionSource<bool>? HoldDispose { get; init; }
         public TaskCompletionSource<bool> ReadStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<TcReadResult> PendingRead { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> DisconnectStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource<bool> DisposeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task<TcReadResult> ConnectAsync(TcNodeEndpoint endpoint, CancellationToken cancellationToken)
         {
@@ -474,21 +539,25 @@ public sealed class RuntimeHostCompositionTests
             return PendingRead.Task;
         }
 
-        public Task DisconnectAsync()
+        public async Task DisconnectAsync()
         {
+            DisconnectCount++;
             Generation++;
             IsConnected = false;
             ConnectedEndpoint = null;
-            return Task.CompletedTask;
+            DisconnectStarted.TrySetResult(true);
+            if (HoldDisconnect is not null) await HoldDisconnect.Task;
+            if (FailDisconnect) throw new IOException("test-only disconnect failure");
         }
 
-        public ValueTask DisposeAsync()
+        public async ValueTask DisposeAsync()
         {
             DisposeCount++;
             Generation++;
             IsConnected = false;
             ConnectedEndpoint = null;
-            return ValueTask.CompletedTask;
+            DisposeStarted.TrySetResult(true);
+            if (HoldDispose is not null) await HoldDispose.Task;
         }
     }
 

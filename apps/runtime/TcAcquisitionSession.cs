@@ -85,9 +85,11 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
         var cleanupFailed = false;
         if (client is not null)
         {
-            try { await client.DisconnectAsync().WaitAsync(AttemptLimit).ConfigureAwait(false); }
+            // Runtime, session and attempt cancellation must not abandon cleanup observation.
+            // Each step still has its own finite timeout, independent of those cancelled tokens.
+            try { await client.DisconnectAsync().WaitAsync(AttemptLimit, CancellationToken.None).ConfigureAwait(false); }
             catch (Exception) { cleanupFailed = true; }
-            try { await client.DisposeAsync().AsTask().WaitAsync(AttemptLimit).ConfigureAwait(false); }
+            try { await client.DisposeAsync().AsTask().WaitAsync(AttemptLimit, CancellationToken.None).ConfigureAwait(false); }
             catch (Exception) { cleanupFailed = true; }
         }
 
