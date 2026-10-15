@@ -4200,17 +4200,6 @@
     "phaseProgress": 0.5,
     "lifecycle": "SAFE_RETURN_TO_STANDBY",
     "cleaningPhase": "CLEANING_STOPPED",
-    "pumpOutletPressureBar": 16.0,
-    "pumpPressureQuality": "GOOD",
-    "pumpPressureSourceId": "PUMP_OUTLET",
-    "pumpPressureInputValid": true,
-    "pumpReadySetpointBar": 15.0,
-    "valveOutletPressureBar": 0.5,
-    "valvePressureQuality": "GOOD",
-    "valvePressureSourceId": "SYN-VLV-05_OUTLET",
-    "valvePressureInputValid": true,
-    "valveOpenResolution": "OPEN_CONFIRMED",
-    "valveDiagnosis": "NONE",
     "dispatch": {
       "dispatchId": "D-100",
       "queueRevisionBefore": 4,
@@ -4223,6 +4212,17 @@
       "origin": "FIXTURE",
       "dispatchedAt": "2026-10-07T00:00:00.000Z"
     },
+    "pumpOutletPressureBar": 16,
+    "pumpPressureQuality": "GOOD",
+    "pumpPressureSourceId": "PUMP_OUTLET",
+    "pumpPressureInputValid": true,
+    "pumpReadySetpointBar": 15,
+    "valveOutletPressureBar": 0.5,
+    "valvePressureQuality": "GOOD",
+    "valvePressureSourceId": "SYN-VLV-05_OUTLET",
+    "valvePressureInputValid": true,
+    "valveOpenResolution": "OPEN_CONFIRMED",
+    "valveDiagnosis": "NONE",
     "safeReturn": {
       "step": "SR4",
       "trigger": "FIXTURE_TRIGGER",
@@ -4466,6 +4466,7 @@
       }
     ]
   },
+  "tcAcquisition": null,
   "runtime": {
     "uptimeSeconds": 42,
     "sseClients": 1,
