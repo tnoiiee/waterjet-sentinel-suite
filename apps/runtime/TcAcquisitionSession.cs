@@ -52,12 +52,12 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_task is not null) throw new InvalidOperationException("The TC session has already started.");
             var epoch = Interlocked.Increment(ref _epoch);
-            _task = RunOnceAsync(runtimeToken, epoch);
+            _task = RunOnceAsync(epoch, runtimeToken);
             return _task;
         }
     }
 
-    private async Task<TcAcquisitionOutcome> RunOnceAsync(CancellationToken runtimeToken, int epoch)
+    private async Task<TcAcquisitionOutcome> RunOnceAsync(int epoch, CancellationToken runtimeToken)
     {
         using var bound = CancellationTokenSource.CreateLinkedTokenSource(runtimeToken, _stop.Token);
         bound.CancelAfter(AttemptLimit);
