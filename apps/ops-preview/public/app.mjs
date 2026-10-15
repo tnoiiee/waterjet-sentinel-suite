@@ -92,6 +92,8 @@ const state = {
   tcNodeConfiguration: null,
   // The read-only Stage 0.4C-K3 evidence projection. Evidence and contract only; never edited here.
   tcAcquisitionEvidence: null,
+  // The read-only deterministic TC acquisition projection. Runtime-owned Product state in the target architecture; preview projection only here.
+  tcAcquisition: null,
   observations: new Map(),
   // The read-only paired thermal model, rebuilt from the authoritative observations on every load. It
   // is derived state: it is never written back into an observation, a row, a count or a verdict.
@@ -848,6 +850,31 @@ function renderTcAcquisitionEvidence() {
     + 'model-level evidence does not resolve an instance; the synthetic wire-break scenario is not physical evidence.';
 }
 
+function renderTcAcquisition() {
+  const body = $('tc-acquisition-body');
+  body.replaceChildren();
+  const view = state.tcAcquisition;
+  if (!view) {
+    body.append(el('p', { class: 'note' }, 'TC acquisition unavailable: the deterministic projection could not be read.'));
+    return;
+  }
+  body.append(definitionList([
+    ['Node', view.node],
+    ['Cabinet', view.cabinet],
+    ['Provenance', view.provenance],
+    ['Physical', view.physical ? 'yes' : 'no - deterministic simulation only'],
+    ['Quarantine', view.quarantine ? 'QUARANTINED' : 'not quarantined'],
+    ['Acquisition state', view.acquisitionState],
+    ['Copied word count', String(view.copiedWordCount)],
+    ['Quality', view.quality],
+    ['Diagnostic state', view.diagnosticState],
+    ['Mapping status', view.mappingStatus],
+    ['Decode status', view.decodeStatus],
+    ['Not verified', view.notVerified.join(', ')],
+  ]));
+  body.append(el('p', { class: 'note' }, 'Raw words: ' + view.words.join(', ')));
+}
+
 function renderDiagnostics() {
   const body = $('diagnostics-body');
   body.replaceChildren();
@@ -1366,6 +1393,12 @@ async function loadInitialData() {
   } catch {
     state.tcAcquisitionEvidence = null;
   }
+  // The deterministic TC acquisition projection is isolated: its failure degrades only its own section.
+  try {
+    state.tcAcquisition = await getJson('/api/tc-acquisition');
+  } catch {
+    state.tcAcquisition = null;
+  }
   // One canonical topology path: the served logical matrix carries the positions and the Sensor
   // identities, the schedule rows carry the Front/Rear measurement identities. The builder refuses a
   // topology it cannot prove (a missing wall, a duplicated Sensor, any non-Sensor position, a
@@ -1418,6 +1451,7 @@ async function boot() {
     renderMapping();
     renderNodeConfiguration();
     renderTcAcquisitionEvidence();
+    renderTcAcquisition();
     renderDiagnostics();
     await loadObservations();
     setAppState(APP_STATE.READY);

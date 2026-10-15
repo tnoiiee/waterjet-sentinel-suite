@@ -65,6 +65,7 @@ version: **no application version exists**, and the documentation versioning pol
   pending. See [`TC_BENCH_LOCAL_SIMULATION.md`](TC_BENCH_LOCAL_SIMULATION.md)
   and [`CURRENT_STATE.md`](CURRENT_STATE.md) section 3A.
 - **K7 is NOT AUTHORIZED**; neither K6 validation nor the local simulation class authorizes it.
+- **Deterministic Product vertical slice (post-K6, this branch):** one-Node read-only TC acquisition state is now published through the Application-owned Runtime contract and displayed in the Kiosk Sensor Commissioning Monitor using deterministic non-Hardware input. This is not physical evidence and does not authorize K7, T01, six-Node acquisition, Galil or Production.
 - Detailed current truth: [`CURRENT_STATE.md`](CURRENT_STATE.md) (authoritative:
   [`CURRENT_STATE.md`](CURRENT_STATE.md)).
 

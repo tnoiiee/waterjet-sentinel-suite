@@ -309,6 +309,28 @@ export function tcAcquisitionEvidencePayload() {
   };
 }
 
+export function tcAcquisitionPayload() {
+  const words = Array.from({ length: 40 }, (_, index) => 100 + index);
+  return {
+    stageId: STAGE_ID,
+    mode: PREVIEW_MODE,
+    provenance: 'DETERMINISTIC_SIMULATION',
+    physical: false,
+    quarantine: true,
+    node: 'TC-NODE-01',
+    cabinet: 'CAB1',
+    acquisitionState: 'COMPLETE',
+    acquisitionTimestampUtc: '2026-10-15T00:00:00.000Z',
+    copiedWordCount: 40,
+    words,
+    quality: 'SIMULATED',
+    diagnosticState: 'NONE',
+    mappingStatus: 'MAPPING_NOT_VERIFIED',
+    decodeStatus: 'DECODING_NOT_VERIFIED',
+    notVerified: ['PHYSICAL_REACHABILITY', 'REGISTER_MAPPING', 'SCALING', 'WIRE_BREAK', 'FIELD_TIMING'],
+  };
+}
+
 function send(res, status, body, type, extra = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': type, ...extra });
   res.end(body);
@@ -365,6 +387,9 @@ export function createPreviewServer() {
       }
       if (path === '/api/tc-acquisition-evidence') {
         return send(res, 200, JSON.stringify(tcAcquisitionEvidencePayload()), MIME['.json']);
+      }
+      if (path === '/api/tc-acquisition') {
+        return send(res, 200, JSON.stringify(tcAcquisitionPayload()), MIME['.json']);
       }
       const asset = path.slice(1);
       if (PUBLIC_FILES.has(asset)) {

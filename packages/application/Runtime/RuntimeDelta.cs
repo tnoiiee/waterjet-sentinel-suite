@@ -119,6 +119,9 @@ public sealed record RuntimeDelta
     /// <summary>New communication health; null when unchanged.</summary>
     public CommunicationHealth? Communication { get; init; }
 
+    /// <summary>New TC acquisition state; null when unchanged.</summary>
+    public TcAcquisitionState? TcAcquisition { get; init; }
+
     /// <summary>New Runtime health counters; null when unchanged.</summary>
     public RuntimeHealth? Runtime { get; init; }
 
