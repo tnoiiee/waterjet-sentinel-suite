@@ -13,6 +13,97 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-15 — Build-graph defect-class correction after the Owner-local PR #27 Release build failure (no Source defect; on branch; PR OPEN, NOT MERGED)
+
+**Status: CORRECTION APPLIED — DOCUMENTATION AND REGRESSION COVERAGE ONLY; NO PRODUCT SOURCE, BUILD
+FILE, LOCK OR DEPENDENCY CHANGED. AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent
+sandbox); the Owner-local build remains the validation of record.**
+
+**What happened.** At head `d116369198d4c9ae68e24a85ea9d0f124a032cb5` (direct parent
+`4a28b428b82179acc3a83cf368665ae008f5d1cf`, the PR #26 merge commit) the Owner-local locked restore
+PASSED and then `dotnet build WaterJetSentinelSuite.sln -c Release --no-restore` FAILED with **51
+errors and 2 `MSB3245` warnings**. The failures were confined to two projects — `Wjss.Domain`
+(unresolved `Wjss.Contracts` and eleven of its types) and `Wjss.TcBench` (unresolved
+`Wjss.Adapters.TcAcquisition` and its types) — while `Wjss.Contracts`, `Wjss.Adapters.TcAcquisition`,
+`Wjss.Time` and `Wjss.Kiosk` compiled.
+
+**Root cause — an environment override, not the Source.** The two failing projects are exactly the
+two that carry a `ProjectReference`; the four that compiled carry none. Both `MSB3245` warnings
+named a directory belonging to the unrelated external motion-control toolset installed on the
+Owner's machine, raised once per unresolved direct `ProjectReference`. That is the signature of a
+global-property override imported from the build shell — the same class of local environment
+contamination recorded for Stage 0.3A-1 rounds 2–3 above, in which a process-scope `TargetPath` set
+by the same toolset hijacked output and reference resolution and produced a cascading
+`Wjss.Contracts` failure in correct Source.
+
+**The Source was checked and is correct.** `git diff --stat` between the baseline and the failed
+head over `*.csproj`, `*.props`, `*.targets`, `*.sln`, `global.json` and `*.editorconfig` is
+**empty** — the feature commit changed no build file at all. No build file in the repository sets
+`TargetPath`, `TargetDir`, `OutDir`, `OutputPath`, `ReferencePath`, `AssemblySearchPaths`,
+`AdditionalLibPaths`, `AssemblyFoldersEx`, `HintPath` or an external assembly `Reference`; none
+contains an absolute or machine-local path, or the toolset's name; every `ProjectReference`
+resolves to an existing project; the two `AssemblyName`-less assumptions hold; and every unresolved
+type is still declared by the assembly that is supposed to own it (`DeviceProfile` and `Wall` in
+`packages/contracts/Enums.cs`, `CanonicalSensorMap` in `WallMap.cs`, `WaterJetConfiguration`,
+`IsolationValveConfiguration` and `Region` in `Topology.cs`, the five migration/deferred types in
+`Config.cs`; `ITcReadOnlyClient` and the read-kind/result types in
+`adapters/tc-acquisition/`). The defect class is therefore **the local environment, not the
+Product tree**, and no Source, reference or property workaround was added — the repository adopts
+no vendor path, `ReferencePath`/`TargetPath` override or machine-local reference of any kind.
+
+**What the correction changes.** (1) `docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md` §0A now checks the
+whole global-property class rather than `TargetPath` alone, records the exact failure signature
+(`MSB3245` "expected a reference file but received directory" once per direct `ProjectReference`,
+plus `CS0246` only for that assembly's types, plus every reference-free project still compiling),
+states that this signature must never be answered by editing the Product tree, and adds a focused
+~1-minute checkpoint (`Wjss.Domain` and `Wjss.TcBench` Release builds with `--no-restore`) that
+isolates the class before the full build; the §8 evidence template gains the class sweep and the
+focused-checkpoint outcome, additively, without altering the dated template lines. (2)
+`tests/config.tests/ProjectGraphSourceTests.cs` adds static build-graph architecture coverage so the
+same class cannot return unnoticed from the Source side: every `ProjectReference` resolves to an
+existing project inside the repository; the solution and the projects on disk are the same set;
+assembly identities are unique so no project can shadow another; no build file sets an output- or
+reference-resolution property, carries an absolute/UNC/vendor-local path, a `HintPath` or an
+external assembly `Reference`; no project disables analyzer or warning enforcement; and the exact
+PR #27 reference edges, the self-owned adapter and contracts projects, the declaring types and both
+modes of the profile contract are pinned. `docs/CURRENT_STATE.md` records the validation outcome.
+No test in this class depends on the Owner's toolset installation, and none requires a build.
+
+**Unchanged by this correction.** No Product behavior, no runtime code, no contract, no build file,
+no `packages.lock.json` (project graph and dependencies are unchanged, so all committed locks stay
+verbatim), no dependency, no analyzer or warning policy, no endpoint handling, no physical-mode
+semantics, no deterministic-mode semantics. PR #27 remains OPEN and NOT MERGED.
+
+### 2026-10-15 — One-Node physical TC read-only integration (Owner decision R1; on branch; PR OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET
+SDK in the Agent sandbox); OWNER-LOCAL VALIDATION OF RECORD. Merged truth: PR #25 MERGED
+(`b3fb60cd33c992c2af209cb7b291535ffacfed74`, 2026-10-14T20:59:29Z) and PR #26 MERGED
+(`4a28b428b82179acc3a83cf368665ae008f5d1cf`, 2026-10-15T07:59:42Z); `main` stands at the PR #26 merge
+commit, which is this work's direct parent.** The earlier "PR #25 OPEN, NOT MERGED" wording elsewhere
+in this file is a dated record and is superseded by this entry.
+
+**What was added.** The software path for a future one-Node physical READ-ONLY TC acquisition, with
+the endpoint kept outside the repository: an explicit acquisition mode (`WJSS_TC_ACQUISITION_MODE`,
+default `DETERMINISTIC`), the Owner-local endpoint variable `WJSS_TC_NODE_01_ENDPOINT` with
+fail-closed validation and redacted diagnostics (`docs/TC_PHYSICAL_READ_ONLY_ENDPOINT.md`); a separate
+physical quarantined record variant with its own strict validator beside the unchanged deterministic
+validator, plus a dispatcher in both C# and the TypeScript contract mirror; the CAB1 Drawing-rev1
+mapping projection and the candidate decode rule; and the Runtime-backed CAB1 U-shape Sensor Map in the
+Operations Preview.
+
+**Boundary properties.** `TEST_HARDWARE_READ_ONLY` is a separate, narrowly scoped profile that can
+start only in the explicit physical read-only mode with a resolved endpoint; `TEST_HARDWARE` and
+`PRODUCTION` keep their existing refusals exactly. The physical record cannot express acceptance,
+commissioning, a verified decode, a write function code, a different read profile or an endpoint value.
+The deterministic slice is unchanged: the same words, the same contract, the same strict validator.
+
+**Evidence.** Agent-local gates on this branch: boundary scan S1–S9 clean; boundary tests 33/33;
+commissioning 226/226; TypeScript contracts 44/44; TC bench Node tests 19/19; Operations Preview
+149/149; kiosk 22/22. `.NET NOT RUN` in the Agent environment — the Owner-local build and test run is
+the validation of record. No hardware contact, no NIC change, no port-502 access, no physical
+execution, no T01; merge NOT AUTHORIZED.
+
 ### 2026-10-15 — Local Modbus TCP Simulation configuration and execution path (post-K6; unreleased; PR OPEN, NOT MERGED)
 
 **Status (updated 2026-10-15, final evidence closeout): PR #25 OPEN — NOT MERGED; MERGE NOT AUTHORIZED; K7 NOT AUTHORIZED. Final PR head `59d0ffdd1b3ca13168db4c26d0c0b70031908a3b` (direct parent `70558e03f99e33cde917f7b97aa2a2133e45234a`): OWNER-LOCAL FINAL-HEAD AFFECTED GATES PASS — Commissioning check PASS and tests 220/220 (R40 PASS on the actual Windows checkout); TC bench Node/static-source tests 19/19; S2 14/14; S3 19/19; boundary scan S1–S9 clean; locked restore PASS; TC acquisition adapter and TC bench Release builds PASS; no lock drift; validation worktree clean. OWNER-LOCAL LOCAL TCP SIMULATION PASS on the same head (EasyModbusTCP Server Simulator v5.5): `LOCAL_TCP_SIMULATION`, effective `127.0.0.1:502`, FC03 / Unit ID 0 / Start Address 0 / Quantity 40, copied word count 40, values exactly 100–139, Connect / Read / Disconnect / Disposal COMPLETE, `QUARANTINED`, authorization `NOT_PROVIDED` / `NOT_ATTEMPTED`, no write, no fallback, `wireEvidence` `NOT_PROVIDED` — Local Simulation evidence only, not hardware, WAGO, T01 or physical evidence. Evidence layers: implementation commit `25d34390daac70468ed22b426f9a5f2da3bd9a79` (direct parent `f356b162…`) — Owner-local automated validation (locked restore PASS; targeted Release builds PASS; focused TC acquisition tests 109/109; full Solution Release build PASS; full .NET tests 564/564; dry-run no-I/O PASS; fixture parity 7/7; TC bench Node tests 19/19; S2 14/14; S3 19/19; boundary S1–S9 clean; Commissioning 219/220 at that commit — R40 line-ending representation only, corrected below); R40 correction commit `70558e03…` — Agent-local affected validation (Commissioning 220/220; TC bench Node tests 19/19; boundary scan clean); documentation commit `59d0ffdd…` — Owner-local final-head gates and Local TCP Simulation as above. Physical evidence still not provided.**

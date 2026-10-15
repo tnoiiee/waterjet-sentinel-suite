@@ -28,7 +28,8 @@ the pin; record the exact version in the evidence template. If `dotnet` is missi
 satisfy the pin, **STOP**: install/update the SDK, then start at step 1. Record the outcome even
 in this case.
 
-## 0A. Pre-build environment check (added after round 2)
+## 0A. Pre-build environment check (added after round 2; extended 2026-10-15 to the whole
+global-property class)
 
 ```powershell
 $env:TargetPath
@@ -41,6 +42,52 @@ cascading reference/namespace failures in perfectly good source. This is a
 local validation-environment prerequisite, **not a WJSS Product dependency**;
 the Product tree must never add paths, references, or workarounds to
 accommodate an external environment variable.
+
+`TargetPath` is the property that has actually been observed in this repository, but it is not the
+only one that can hijack resolution. Check the class before building:
+
+```powershell
+$names = 'TargetPath','TargetDir','TargetFileName','OutDir','OutputPath',
+         'ReferencePath','AssemblySearchPaths','AdditionalLibPaths',
+         'AssemblyFoldersEx','AssemblyFoldersSuffix'
+foreach ($n in $names) { if (Test-Path "Env:$n") { "OVERRIDE: $n = " + (Get-Item "Env:$n").Value } }
+```
+
+### The failure signature — never mistake it for a Source defect
+
+An environment override of this class produces a signature that is **not** explained by the Source,
+and recognising it saves a full build cycle:
+
+- `MSB3245` — *"expected a reference file but received directory: `<a machine-local directory>`"* —
+  raised **once per direct `ProjectReference`** that could not be resolved. The directory is
+  whatever the overriding environment names, so the warning itself is not evidence about the
+  Product tree.
+- `CS0246` for the types owned by exactly those referenced assemblies — and **only** those. Every
+  project that has **no** `ProjectReference` still compiles cleanly, because nothing has to be
+  resolved.
+- Project order is irrelevant: the referenced project compiles successfully and the consumer still
+  cannot see its types.
+
+Observed instance — the PR #27 Owner-local validation (2026-10-15): locked restore PASS, then
+`dotnet build WaterJetSentinelSuite.sln -c Release --no-restore` reported 51 errors with this exact
+shape. `Wjss.Contracts`, `Wjss.Adapters.TcAcquisition`, `Wjss.Time` and `Wjss.Kiosk` — the four
+projects without a single `ProjectReference` — built; `Wjss.Domain` and `Wjss.TcBench` — the two
+with one — failed on the types of the assembly each references; both `MSB3245` warnings named a
+directory belonging to the unrelated external motion-control toolset that set the override in the
+Owner's PowerShell process.
+
+**Focused checkpoint (~1 minute, before the full build).** These two builds are the smallest
+targets that exercise one reference edge each, so they isolate this class faster than the solution:
+
+```powershell
+dotnet build packages/domain/Wjss.Domain.csproj -c Release --no-restore
+dotnet build apps/tc-bench/Wjss.TcBench.csproj  -c Release --no-restore
+```
+
+Both must PASS. If either fails with the signature above, the environment carries a global
+property (or another machine-local reference override) — clear it per this section and rebuild.
+**Do not** change the Product tree to make that failure go away: the graph is verified resolvable
+in Source, and an unverified environment is not a source of truth about it.
 
 If `TargetPath` is defined:
 
@@ -198,6 +245,9 @@ dotnet --version: ______
 git rev-parse HEAD: ______
 0A env: TargetPath defined at session start? YES/NO (if YES: removed process-scope only;
    value recorded here only if the Owner elects to quote it): ______
+   class sweep at session start (TargetDir/TargetFileName/OutDir/OutputPath/ReferencePath/
+   AssemblySearchPaths/AdditionalLibPaths/AssemblyFoldersEx/AssemblyFoldersSuffix): ______
+0A focused checkpoint (Wjss.Domain + Wjss.TcBench, Release --no-restore): PASS/FAIL ______
 2 restore: PASS/FAIL   notes: ______
   resolved pins: Microsoft.NET.Test.Sdk ___ xunit ___ xunit.runner.visualstudio ___
   packages.lock.json committed (genuine, from the passing restore): count 12 at closeout

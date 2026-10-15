@@ -123,4 +123,23 @@ public static class RuntimeRefusalCodes
     /// Snapshot must be requested. Nothing is applied or fabricated after this result.
     /// </summary>
     public const string ResnapshotRequired = "RESNAPSHOT_REQUIRED";
+
+    // ---------------------------------------------------------------------
+    // One-Node physical TC read-only Product integration.
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// The device profile and the TC acquisition variant disagree: a SIMULATOR revision carried
+    /// physical evidence, or a TEST_HARDWARE revision carried no physical quarantined record. The
+    /// profile is never silently substituted and TEST_HARDWARE is never a general-purpose profile.
+    /// </summary>
+    public const string PhysicalTcProfileMismatch = "PHYSICAL_TC_PROFILE_MISMATCH";
+
+    /// <summary>
+    /// A physical TC acquisition record failed structural validation: wrong Node or Cabinet
+    /// identity, non-quarantined, wrong word count, a missing or altered Not-Verified set, a
+    /// missing evidence block, or an evidence block that does not carry the exact authorized
+    /// read-only profile. Nothing was committed.
+    /// </summary>
+    public const string PhysicalTcRecordInvalid = "PHYSICAL_TC_RECORD_INVALID";
 }

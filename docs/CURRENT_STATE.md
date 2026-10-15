@@ -1,5 +1,42 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Merged truth and current position (added 2026-10-15; supersedes the merged/unmerged wording in
+> the status table below without deleting any dated record).** The pull-request state is taken from
+> the Git host, not from earlier prose:
+>
+> | Pull request | State | Merge commit | Merged (UTC) |
+> | --- | --- | --- | --- |
+> | #25 — Local TCP Simulation execution class | **MERGED** | `b3fb60cd33c992c2af209cb7b291535ffacfed74` | 2026-10-14T20:59:29Z |
+> | #26 — deterministic one-Node TC acquisition-to-Kiosk vertical slice | **MERGED** | `4a28b428b82179acc3a83cf368665ae008f5d1cf` | 2026-10-15T07:59:42Z |
+>
+> `main` therefore stands at `4a28b428b82179acc3a83cf368665ae008f5d1cf`, which is the merge commit of
+> PR #26. Every "PR #25 OPEN — NOT MERGED" statement below is a dated record of the position **before**
+> the merge and is preserved as history, not as current truth.
+>
+> **Current position of this branch.** The One-Node physical read-only integration (Owner decision R1)
+> is implemented on the session branch as ONE additive commit whose direct parent is `4a28b428…`. It is
+> **not merged**. It adds: an explicit acquisition-mode selection, the Owner-local external endpoint
+> policy (`docs/TC_PHYSICAL_READ_ONLY_ENDPOINT.md`), a separate physical quarantined TC record variant
+> with its own strict validator beside the untouched deterministic one, the CAB1 Drawing-rev1 mapping
+> projection and candidate decode, and the Runtime-backed CAB1 U-shape Sensor Map in the Operations
+> Preview. No real endpoint value is committed, and no hardware was contacted.
+>
+> **Owner-local validation of this branch, and the resulting correction (2026-10-15).** At head
+> `d1163691…` the Owner-local locked restore PASSED and the full Release build FAILED with 51 errors
+> confined to `Wjss.Domain` and `Wjss.TcBench`, plus two `MSB3245` warnings naming the output
+> directory of the unrelated external motion-control toolset installed on the Owner's machine. That
+> is the signature of a local build-shell global-property override, not of the Source: the feature
+> commit changed **no** build file, no build file in the repository sets an output- or
+> reference-resolution property (`TargetPath`, `TargetDir`, `OutDir`, `OutputPath`, `ReferencePath`,
+> `AssemblySearchPaths`, …), none carries an absolute or machine-local path, and every
+> `ProjectReference` resolves to an existing project while every unresolved type is still declared
+> by the assembly that owns it. The correction is therefore documentation plus regression coverage,
+> with no Source workaround for the environment: runbook §0A now sweeps the whole property class,
+> records the failure signature and adds a focused pre-build checkpoint, and
+> `tests/config.tests/ProjectGraphSourceTests.cs` pins the build-graph properties. No Product
+> behavior, build file, `packages.lock.json` or dependency changed; `.NET NOT RUN` in the Agent
+> environment, and the Owner-local build remains the validation of record.
+
 ## 1. Current Status
 
 | Question | Answer |

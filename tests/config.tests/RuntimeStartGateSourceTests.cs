@@ -24,6 +24,9 @@ public sealed class RuntimeStartGateSourceTests
     private static string InspectorPage =>
         File.ReadAllText(Path.Combine(ConfigTestPaths.RepoRoot(), "apps", "runtime", "Inspector", "index.html"));
 
+    private static string EndpointConfiguration =>
+        File.ReadAllText(Path.Combine(ConfigTestPaths.RepoRoot(), "apps", "runtime", "TcEndpointConfiguration.cs"));
+
     [Fact]
     public void Logging_Is_Guarded_Not_Suppressed()
     {
@@ -36,8 +39,34 @@ public sealed class RuntimeStartGateSourceTests
         Assert.DoesNotContain("#pragma warning", src, StringComparison.Ordinal);
         Assert.DoesNotContain("SuppressMessage", src, StringComparison.Ordinal);
         Assert.DoesNotContain("LogLevel.None", src, StringComparison.Ordinal);
-        // Structured template preserved verbatim (no interpolation rewrite):
-        Assert.Contains("profile={Profile} url={Url} stage={Stage} startedUtc={StartedUtc:O}", src, StringComparison.Ordinal);
+
+        // Structured template preserved verbatim (no interpolation rewrite). The template now carries
+        // the acquisition mode and the REDACTED endpoint identity alongside the original four fields,
+        // and the source concatenates it across two literals, so each fragment is asserted as written.
+        Assert.Contains(
+            "\"WJSS Runtime host starting. profile={Profile} acquisition={Acquisition} endpoint={Endpoint} \"",
+            src, StringComparison.Ordinal);
+        Assert.Contains("\"url={Url} stage={Stage} startedUtc={StartedUtc:O}\"", src, StringComparison.Ordinal);
+        foreach (var placeholder in new[] { "{Profile}", "{Acquisition}", "{Endpoint}", "{Url}", "{Stage}", "{StartedUtc:O}" })
+        {
+            Assert.Contains(placeholder, src, StringComparison.Ordinal);
+        }
+
+        // The endpoint VALUE is never logged. The {Endpoint} argument is the redacting projector and
+        // the {Acquisition} argument is the mode projector - the endpoint object itself, its address
+        // or any formatted form of it is never passed to the logger.
+        Assert.Contains("TcEndpointConfiguration.DescribeEndpoint(options.Endpoint?.Endpoint)", src, StringComparison.Ordinal);
+        Assert.Contains("TcEndpointConfiguration.DescribeMode(options.AcquisitionMode)", src, StringComparison.Ordinal);
+
+        // ...and that projector can only ever yield one of two redacted labels: it never formats,
+        // interpolates or echoes the endpoint it was handed.
+        var describeStart = EndpointConfiguration.IndexOf("public static string DescribeEndpoint", StringComparison.Ordinal);
+        Assert.True(describeStart >= 0, "the redacting endpoint projector must exist");
+        var projector = EndpointConfiguration[describeStart..EndpointConfiguration.IndexOf(';', describeStart)];
+        Assert.Contains("PhysicalTcVocabulary.EndpointConfigured", projector, StringComparison.Ordinal);
+        Assert.Contains("PhysicalTcVocabulary.EndpointNotConfigured", projector, StringComparison.Ordinal);
+        Assert.DoesNotContain("$\"", projector, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToString", projector, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -66,9 +95,19 @@ public sealed class RuntimeStartGateSourceTests
     public void Profile_Start_Refusals_Unchanged_And_Before_Listener()
     {
         var src = Program;
-        // SIMULATOR default + unknown-label parse (exit 4) + non-startable
+        // The mode-aware default + unknown-label parse (exit 4) + non-startable
         // refusal (exit 2) all run BEFORE any MapGet/listener exists.
-        Assert.Contains("profileLabel = \"SIMULATOR\"", src, StringComparison.Ordinal);
+        //
+        // The default label is no longer an unconditional SIMULATOR: an absent/blank label follows
+        // the selected acquisition mode, so deterministic mode still defaults to SIMULATOR while the
+        // explicit physical read-only mode defaults to its own profile. Neither default is inferred
+        // from the endpoint, and the label is still parsed and startability-checked below.
+        Assert.Contains("var profileLabel = Environment.GetEnvironmentVariable(ProfileEnv);", src, StringComparison.Ordinal);
+        Assert.Contains("if (string.IsNullOrWhiteSpace(profileLabel))", src, StringComparison.Ordinal);
+        Assert.Contains("profileLabel = physicalReadOnly", src, StringComparison.Ordinal);
+        Assert.Contains("? nameof(DeviceProfile.TEST_HARDWARE_READ_ONLY)", src, StringComparison.Ordinal);
+        Assert.Contains(": nameof(DeviceProfile.SIMULATOR);", src, StringComparison.Ordinal);
+        Assert.Contains("acquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY", src, StringComparison.Ordinal);
         Assert.Contains("ProfileStartPolicy.TryParseProfile", src, StringComparison.Ordinal);
         Assert.Contains("ProfileStartPolicy.TryRequireStartable", src, StringComparison.Ordinal);
         var parse = src.IndexOf("TryParseProfile", StringComparison.Ordinal);

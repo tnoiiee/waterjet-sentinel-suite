@@ -68,7 +68,7 @@ export type AutoSequenceMode = 'OFF' | 'RUNNING' | 'PAUSE_REQUESTED' | 'PAUSED' 
 export type PumpRunState = 'STOPPED' | 'STARTING' | 'RUNNING' | 'STOPPING' | 'TRIPPED';
 export type CriticalPumpKind = 'MAIN_PUMP_UNEXPECTED_STOP' | 'MAIN_PUMP_TRIP';
 export type DeviceLinkState = 'ONLINE' | 'TIMEOUT' | 'RECOVERING' | 'STALE_SOURCE';
-export type DeviceProfile = 'SIMULATOR' | 'TEST_HARDWARE' | 'PRODUCTION';
+export type DeviceProfile = 'SIMULATOR' | 'TEST_HARDWARE' | 'PRODUCTION' | 'TEST_HARDWARE_READ_ONLY';
 
 /** Label of the safe-return leg command/feedback states (presentation vocabulary; policy names pending). */
 export type ValveCommandLabel = 'NOT_COMMANDED' | 'CLOSE_COMMANDED';

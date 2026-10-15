@@ -76,7 +76,12 @@ public static class RuntimeStateComposer
         ArgumentNullException.ThrowIfNull(waterJets);
         ArgumentNullException.ThrowIfNull(isolationValves);
 
-        if (!ProfileStartPolicy.TryRequireStartable(profile, out var refusalCode, out var refusalReason))
+        // TEST_HARDWARE_READ_ONLY is reachable only through the explicit physical READ-ONLY mode
+        // (the startup gate resolved an Owner-local endpoint first); every other profile keeps the
+        // standing SIMULATOR-only rule. The Runtime invariants then bind this profile to the physical
+        // quarantined record, so composition alone never grants physical authority.
+        if (!ProfileStartPolicy.TryRequireStartable(
+            profile, profile == DeviceProfile.TEST_HARDWARE_READ_ONLY, out var refusalCode, out var refusalReason))
         {
             throw new InvalidOperationException($"[{refusalCode}] {refusalReason}");
         }

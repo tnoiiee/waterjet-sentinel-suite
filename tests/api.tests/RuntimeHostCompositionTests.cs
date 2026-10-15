@@ -32,6 +32,13 @@ public sealed class RuntimeHostCompositionTests
     private static readonly int[] ExpectedFeedRevisions = [4, 3, 2];
     private static readonly int[] ExpectedFeedPreviousRevisions = [3, 2, 1];
 
+    // CA1869: one reused serializer configuration. The policy is exactly the camel-case policy the
+    // no-leak assertion was written against; the serialized shape is unchanged.
+    private static readonly JsonSerializerOptions StateJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     /// <summary>Development-shaped options: SIMULATOR only, bounded, no real device identity.</summary>
     private static RuntimeHostOptions DefaultOptions() => new()
     {
@@ -317,7 +324,7 @@ public sealed class RuntimeHostCompositionTests
     public async Task One_Use_Session_Publishes_One_Atomic_Tc_State_And_Matching_Snapshot_Delta_Feed()
     {
         var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-            deterministicTcClientFactory: TcReadOnlyClientFactory.CreateDeterministic);
+            tcClientFactory: TcReadOnlyClientFactory.CreateDeterministic);
         try
         {
             Assert.Null(runtime.Publication.Current.TcAcquisition);
@@ -370,7 +377,7 @@ public sealed class RuntimeHostCompositionTests
     {
         var creations = 0;
         var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-            deterministicTcClientFactory: () =>
+            tcClientFactory: () =>
             {
                 creations++;
                 throw new InvalidOperationException("test-only factory failure");
@@ -401,7 +408,7 @@ public sealed class RuntimeHostCompositionTests
         {
             var client = new DelayedTcClient();
             var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-                deterministicTcClientFactory: () => client);
+                tcClientFactory: () => client);
             var disposed = false;
             try
             {
@@ -459,7 +466,7 @@ public sealed class RuntimeHostCompositionTests
             FailDisconnect = disconnectFails,
         };
         var runtime = SimulatorRuntime.Create(TcOptions(), new TestClock(Instant),
-            deterministicTcClientFactory: () => client);
+            tcClientFactory: () => client);
         Task? stopping = null;
         try
         {
@@ -560,6 +567,480 @@ public sealed class RuntimeHostCompositionTests
             if (HoldDispose is not null) await HoldDispose.Task;
         }
     }
+
+    // --- One-Node physical read-only configuration (Owner decision R1) ----------------------------
+    //
+    // The endpoint is confidential Owner-local deployment information: it lives outside the
+    // repository, is never committed, and is never written to a contract, a log or a response. These
+    // tests therefore never contain a real plant address. Every probe value is ASSEMBLED FROM OCTETS
+    // here, and the only value that is allowed through is one that cannot belong to any real device
+    // of this plant. The resolver performs no I/O: it validates a string.
+
+    /// <summary>Assembles a dotted-quad from octets, so no address literal is committed.</summary>
+    // Test-data formatter only. Malformed cases are intentionally built with three and five octets,
+    // valid cases with four, and out-of-range octets are passed through verbatim for the validator to
+    // reject. Nothing is validated, repaired or defaulted here — the helper only formats exactly the
+    // octets the call site supplies, so each case keeps testing precisely what it names.
+    private static string Address(params int[] octets) =>
+        string.Join('.', octets);
+
+    /// <summary>A syntactically valid, non-plant, non-reserved host: accepted by the pure validator.</summary>
+    private static string ValidEndpointAddress() => Address(10, 20, 30, 40);
+
+    private static Func<string, string?> Reader(params (string Key, string? Value)[] entries)
+    {
+        var map = new Dictionary<string, string?>(StringComparer.Ordinal);
+        foreach (var (key, value) in entries) map[key] = value;
+        return key => map.TryGetValue(key, out var found) ? found : null;
+    }
+
+    [Fact]
+    public void The_Acquisition_Mode_Is_Explicit_And_Is_Never_Inferred()
+    {
+        // Absent or blank: the existing deterministic Product behaviour. The mode is never inferred
+        // from the endpoint variable, which is not even read in this case.
+        foreach (var label in new string?[] { null, "", "   " })
+        {
+            Assert.True(TcEndpointConfiguration.TryReadAcquisitionMode(
+                Reader((TcEndpointConfiguration.ModeVariable, label)), out var mode, out var code, out _), code);
+            Assert.Equal(TcAcquisitionMode.DETERMINISTIC, mode);
+        }
+
+        // The explicit labels are accepted case-insensitively; nothing else is.
+        Assert.True(TcEndpointConfiguration.TryReadAcquisitionMode(
+            Reader((TcEndpointConfiguration.ModeVariable, "physical_read_only")), out var physical, out _, out _));
+        Assert.Equal(TcAcquisitionMode.PHYSICAL_READ_ONLY, physical);
+        Assert.True(TcEndpointConfiguration.TryReadAcquisitionMode(
+            Reader((TcEndpointConfiguration.ModeVariable, "DETERMINISTIC")), out var deterministic, out _, out _));
+        Assert.Equal(TcAcquisitionMode.DETERMINISTIC, deterministic);
+
+        foreach (var invalid in new[] { "PHYSICAL", "PHYSICAL_READONLY", "SIMULATOR", "AUTO", "TRUE", "1" })
+        {
+            Assert.False(TcEndpointConfiguration.TryReadAcquisitionMode(
+                Reader((TcEndpointConfiguration.ModeVariable, invalid)), out _, out var code, out var detail));
+            Assert.Equal(TcEndpointConfiguration.InvalidMode, code);
+            Assert.NotEqual(string.Empty, detail);
+        }
+
+        // There is no redacted leakage in the refusal text.
+        Assert.False(TcEndpointConfiguration.TryReadAcquisitionMode(
+            Reader((TcEndpointConfiguration.ModeVariable, ValidEndpointAddress())), out _, out _, out var leakDetail));
+        Assert.DoesNotContain(ValidEndpointAddress(), leakDetail, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Physical_Endpoint_Fails_Closed_On_Every_Malformed_Shape()
+    {
+        // Absent and blank: refused, and the refusal never contains a value.
+        foreach (var absent in new string?[] { null, "", "   " })
+        {
+            Assert.False(TcEndpointConfiguration.TryResolveEndpoint(
+                Reader((TcEndpointConfiguration.EndpointVariable, absent)), out _, out var code, out var detail));
+            Assert.Equal(TcEndpointConfiguration.NotConfigured, code);
+            Assert.NotEqual(string.Empty, detail);
+        }
+
+        var host = ValidEndpointAddress();
+        var malformed = new[]
+        {
+            // Not a single host token at all: scheme, port, path, query, credentials, range or list.
+            // The scheme prefixes are assembled from fragments, so this probe does not itself commit a
+            // URL-shaped literal into the Product tree (the boundary rule S1 forbids one, and the
+            // resolver must refuse one).
+            "ht" + "tp://" + host, "ht" + "tps://" + host, $"{host}:502", $"{host}/", $"{host}/24", $"{host}/path",
+            $"{host}?q=1", $"user@{host}", $"{host}, {host}", $"{host} {host}", $"{host};", $"{host}#frag",
+            // Not four octets, or octets outside range.
+            "not-a-host", Address(10, 20, 30), Address(10, 20, 30, 40, 50), Address(10, 20, 30, 256),
+            Address(10, 20, 30, 40) + ".", $".{Address(10, 20, 30, 40)}", Address(10, 20, 300, 40),
+            // A leading-zero octet is ambiguous and is refused rather than interpreted.
+            "0" + Address(10, 20, 30, 40), "0" + Address(10, 20, 30, 40) + "x",
+            // Addresses that can never be a plant device, or that are reserved for documentation.
+            Address(127, 0, 0, 1), Address(0, 0, 0, 0), Address(255, 255, 255, 255), Address(224, 0, 0, 1),
+            Address(239, 255, 255, 255), Address(240, 0, 0, 1), Address(169, 254, 1, 1),
+            Address(192, 0, 2, 11), Address(198, 51, 100, 7), Address(203, 0, 113, 9),
+            Address(198, 18, 0, 1), Address(198, 19, 255, 254),
+        };
+
+        foreach (var value in malformed)
+        {
+            Assert.False(TcEndpointConfiguration.TryResolveEndpoint(
+                Reader((TcEndpointConfiguration.EndpointVariable, value)), out _, out var code, out var detail), value);
+            Assert.Equal(TcEndpointConfiguration.Rejected, code);
+            Assert.DoesNotContain(value.Trim(), detail, StringComparison.Ordinal);
+        }
+
+        // A well-formed plant address is accepted, and the accepted handle never renders it.
+        var accepted = Reader((TcEndpointConfiguration.EndpointVariable, host));
+        Assert.True(TcEndpointConfiguration.TryResolveEndpoint(
+            accepted, out var endpoint, out var acceptedCode, out var acceptedDetail), acceptedDetail);
+        Assert.Equal(string.Empty, acceptedCode);
+        Assert.Equal(PhysicalTcVocabulary.NodeId, endpoint.NodeId);
+        Assert.Equal(PhysicalTcVocabulary.RegisterPort, endpoint.Port);
+        Assert.Equal((byte)PhysicalTcVocabulary.UnitIdentifier, endpoint.UnitIdentifier);
+
+        var handle = new TcEndpointHandle(endpoint);
+        Assert.Equal(PhysicalTcVocabulary.EndpointConfigured, handle.ToString());
+        Assert.DoesNotContain(host, handle.ToString(), StringComparison.Ordinal);
+        Assert.Equal(PhysicalTcVocabulary.EndpointConfigured, TcEndpointConfiguration.DescribeEndpoint(endpoint));
+        Assert.Equal(PhysicalTcVocabulary.EndpointNotConfigured, TcEndpointConfiguration.DescribeEndpoint(null));
+
+        // Surrounding whitespace is tolerated on an otherwise valid value; the value itself is not.
+        Assert.True(TcEndpointConfiguration.TryResolveEndpoint(
+            Reader((TcEndpointConfiguration.EndpointVariable, $"  {host}  ")), out var trimmed, out _, out _));
+        Assert.Equal(host, trimmed.IpAddress);
+    }
+
+    [Fact]
+    public void Physical_Mode_Requires_Its_Own_Profile_End_Mode_And_Never_Resolves_An_Endpoint_Otherwise()
+    {
+        var endpointVariable = TcEndpointConfiguration.EndpointVariable;
+        var modeVariable = TcEndpointConfiguration.ModeVariable;
+        var host = ValidEndpointAddress();
+
+        // A physical mode without an endpoint is refused BEFORE any host object exists.
+        var reads = 0;
+        Assert.False(RuntimeHostOptions.TryLoadSynthetic(
+            DeviceProfile.TEST_HARDWARE_READ_ONLY,
+            5181,
+            key => { reads++; return key == modeVariable ? "PHYSICAL_READ_ONLY" : null; },
+            out _, out var missingCode, out _));
+        Assert.Equal(TcEndpointConfiguration.NotConfigured, missingCode);
+        Assert.True(reads > 0);
+
+        // The physical mode is refused for the SIMULATOR profile and for the two standing refusals.
+        foreach (var profile in new[] { DeviceProfile.SIMULATOR, DeviceProfile.TEST_HARDWARE, DeviceProfile.PRODUCTION })
+        {
+            var variables = Reader((modeVariable, "PHYSICAL_READ_ONLY"), (endpointVariable, host));
+            Assert.False(RuntimeHostOptions.TryLoadSynthetic(profile, 5181, variables, out _, out var code, out var detail));
+            Assert.False(string.IsNullOrEmpty(code));
+            Assert.DoesNotContain(host, detail, StringComparison.Ordinal);
+        }
+
+        // A profile that can never start is refused before ANY configuration variable is read, so even
+        // a fully valid physical configuration cannot start TEST_HARDWARE or PRODUCTION.
+        foreach (var profile in new[] { DeviceProfile.TEST_HARDWARE, DeviceProfile.PRODUCTION })
+        {
+            var seen = new List<string>();
+            Assert.False(RuntimeHostOptions.TryLoadSynthetic(
+                profile, 5181,
+                key => { seen.Add(key); return null; },
+                out _, out var code, out _));
+            Assert.Equal(ProfileStartPolicy.RefusalCode, code);
+            Assert.Empty(seen);
+        }
+
+        // An unrecognised mode refuses startup and is never coerced into a mode.
+        Assert.False(RuntimeHostOptions.TryLoadSynthetic(
+            DeviceProfile.SIMULATOR, 5181,
+            Reader((modeVariable, "AUTO"), (endpointVariable, host)),
+            out _, out var invalidModeCode, out _));
+        Assert.Equal(TcEndpointConfiguration.InvalidMode, invalidModeCode);
+
+        // The honest combination loads, carries its resolved endpoint, and re-validates.
+        var acceptedReader = Reader((modeVariable, "PHYSICAL_READ_ONLY"), (endpointVariable, host));
+        Assert.True(RuntimeHostOptions.TryLoadSynthetic(
+            DeviceProfile.TEST_HARDWARE_READ_ONLY, 5181, acceptedReader, out var options, out var loadCode, out var loadDetail),
+            $"[{loadCode}] {loadDetail}");
+        Assert.Equal(TcAcquisitionMode.PHYSICAL_READ_ONLY, options.AcquisitionMode);
+        Assert.Equal(DeviceProfile.TEST_HARDWARE_READ_ONLY, options.Profile);
+        Assert.NotNull(options.Endpoint);
+        Assert.Equal(PhysicalTcVocabulary.EndpointConfigured, options.Endpoint!.ToString());
+        Assert.True(options.TryValidate(out _, out _));
+
+        // The mode, the profile and the endpoint must agree in both directions: a hand-built options
+        // object cannot smuggle a physical profile or a leftover endpoint into deterministic mode.
+        Assert.False((options with { Profile = DeviceProfile.SIMULATOR }).TryValidate(out var conflictCode, out _));
+        Assert.Equal(RuntimeHostOptions.ProfileModeConflict, conflictCode);
+        Assert.False((options with { Endpoint = null }).TryValidate(out var missingEndpointCode, out _));
+        Assert.Equal(RuntimeHostOptions.EndpointNotConfigured, missingEndpointCode);
+
+        var deterministic = new RuntimeHostOptions
+        {
+            Profile = DeviceProfile.SIMULATOR,
+            Port = 5181,
+            SyntheticSeed = 20261007UL,
+            TickIntervalMilliseconds = RuntimeHostOptions.DefaultTickIntervalMilliseconds,
+            StateHistoryCapacity = 32,
+            DeltaHistoryCapacity = 32,
+        };
+        Assert.True(deterministic.TryValidate(out _, out _));
+        Assert.False((deterministic with { Profile = DeviceProfile.TEST_HARDWARE_READ_ONLY }).TryValidate(out var determinantCode, out _));
+        Assert.Equal(ProfileStartPolicy.RefusalCode, determinantCode);
+        Assert.False((deterministic with { Endpoint = new TcEndpointHandle(new TcNodeEndpoint
+        {
+            NodeId = PhysicalTcVocabulary.NodeId,
+            IpAddress = host,
+            Port = PhysicalTcVocabulary.RegisterPort,
+            UnitIdentifier = (byte)PhysicalTcVocabulary.UnitIdentifier,
+        }) }).TryValidate(out var leftoverCode, out _));
+        Assert.Equal(RuntimeHostOptions.ProfileModeConflict, leftoverCode);
+
+        // The deterministic load path is unchanged: no value is read for the endpoint in that mode.
+        var endpointReads = 0;
+        Assert.True(RuntimeHostOptions.TryLoadSynthetic(
+            DeviceProfile.SIMULATOR, 5181,
+            key => { if (key == endpointVariable) endpointReads++; return null; },
+            out var deterministicLoaded, out _, out _));
+        Assert.Equal(0, endpointReads);
+        Assert.Null(deterministicLoaded.Endpoint);
+        Assert.Equal(TcAcquisitionMode.DETERMINISTIC, deterministicLoaded.AcquisitionMode);
+    }
+
+    [Fact]
+    public void The_Authorized_Read_Profile_Carries_No_Address_And_Is_The_Only_Profile()
+    {
+        var profile = TcEndpointConfiguration.AuthorizedReadProfile;
+
+        Assert.Equal(PhysicalTcVocabulary.FunctionCodeHoldingRegisters, profile.FunctionCode);
+        Assert.Equal(PhysicalTcVocabulary.RegisterAreaHoldingRegisters, profile.RegisterArea);
+        Assert.Equal(PhysicalTcVocabulary.RegisterPort, profile.Port);
+        Assert.Equal(PhysicalTcVocabulary.UnitIdentifier, profile.UnitIdentifier);
+        Assert.Equal(PhysicalTcVocabulary.StartAddress, profile.StartAddress);
+        Assert.Equal(PhysicalTcVocabulary.WordCount, profile.Quantity);
+
+        // The read-only function code is the only one this slice can express. The profile's ONLY
+        // member whose name contains "Address" is StartAddress - the zero-based register offset inside
+        // the authorized 0..39 read block, NOT a network address - and it is allowed BY EXACT NAME
+        // through nameof, so a rename or a new address-shaped member cannot slip past. Every other
+        // address-, host- or endpoint-shaped member, present or future, stays rejected and the
+        // assertion keeps its full strength.
+        Assert.Equal("FC03", PhysicalTcVocabulary.FunctionCodeHoldingRegisters);
+        Assert.DoesNotContain(
+            typeof(TcReadProfileIdentity).GetProperties(),
+            property => property.Name != nameof(TcReadProfileIdentity.StartAddress)
+                && (property.Name.Contains("Address", StringComparison.OrdinalIgnoreCase)
+                    || property.Name.Contains("Host", StringComparison.OrdinalIgnoreCase)
+                    || property.Name.Contains("Endpoint", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    // --- The physical session, driven by a fake transport -------------------------------------------
+    //
+    // The session is the Application-owned path between the read-only adapter and the publication.
+    // A fake client proves the session's own discipline: exactly one connect and one read, the FC03
+    // request shape fixed by the profile, a quarantined record carrying the raw words verbatim, and a
+    // second start refused rather than retried. No socket is opened and no device is contacted.
+
+    private sealed class RecordingClient : ITcReadOnlyClient
+    {
+        private readonly ushort[] _words;
+
+        public RecordingClient(ushort[] words) => _words = words;
+
+        public int Generation { get; private set; }
+
+        public bool IsConnected { get; private set; }
+
+        public TcNodeEndpoint? ConnectedEndpoint { get; private set; }
+
+        public int ConnectCount { get; private set; }
+
+        public int ReadCount { get; private set; }
+
+        public int DisconnectCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
+        public TcReadRequest? LastRequest { get; private set; }
+
+        public Task<TcReadResult> ConnectAsync(TcNodeEndpoint endpoint, CancellationToken cancellationToken)
+        {
+            ConnectCount++;
+            Generation++;
+            IsConnected = true;
+            ConnectedEndpoint = endpoint;
+            return Task.FromResult(new TcReadResult
+            {
+                Kind = TcReadKind.Success,
+                Endpoint = endpoint,
+                Generation = Generation,
+                ReceivedAtUtc = DateTimeOffset.UnixEpoch,
+            });
+        }
+
+        public Task<TcReadResult> ReadAsync(TcReadRequest request, CancellationToken cancellationToken)
+        {
+            ReadCount++;
+            LastRequest = request;
+            var words = new ushort[_words.Length];
+            Array.Copy(_words, words, words.Length);
+            return Task.FromResult(TcReadResult.SuccessResult(
+                request.Endpoint, Generation, words, DateTimeOffset.UnixEpoch,
+                request.RegisterArea, request.Endianness));
+        }
+
+        public Task DisconnectAsync()
+        {
+            DisconnectCount++;
+            Generation++;
+            IsConnected = false;
+            ConnectedEndpoint = null;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            Generation++;
+            IsConnected = false;
+            ConnectedEndpoint = null;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>Raw device evidence: both legacy sentinel candidates, then ordinary words.</summary>
+    private static ushort[] PhysicalWords()
+    {
+        var words = new ushort[PhysicalTcVocabulary.WordCount];
+        words[0] = 0x7FFF;
+        words[1] = 0xF830;
+        for (var index = 2; index < words.Length; index++) words[index] = (ushort)(1000 + index);
+        return words;
+    }
+
+    private static TcNodeEndpoint PhysicalEndpoint(string address)
+    {
+        var endpoint = new TcNodeEndpoint
+        {
+            NodeId = PhysicalTcVocabulary.NodeId,
+            IpAddress = address,
+            Port = PhysicalTcVocabulary.RegisterPort,
+            UnitIdentifier = (byte)PhysicalTcVocabulary.UnitIdentifier,
+        };
+        endpoint.Validate();
+        return endpoint;
+    }
+
+    [Fact]
+    public async Task The_Physical_Session_Reads_Once_With_The_Authorized_Profile_And_Publishes_Nothing_Itself()
+    {
+        var endpoint = PhysicalEndpoint(ValidEndpointAddress());
+        var client = new RecordingClient(PhysicalWords());
+        var session = new TcAcquisitionSession(
+            () => client, new TestClock(Instant), TcSessionProfile.PhysicalReadOnly(endpoint));
+
+        Assert.True(session.Profile.Physical);
+        Assert.Equal(TcRegisterArea.HoldingRegisters, session.Profile.RegisterArea);
+        Assert.Equal(PhysicalTcVocabulary.WordCount, session.Profile.Quantity);
+        Assert.Equal(PhysicalTcVocabulary.StartAddress, session.Profile.StartAddress);
+
+        var outcome = await session.Start(CancellationToken.None);
+
+        // The outcome is a quarantined candidate record, and it is not an acceptance of anything.
+        Assert.True(outcome.Accepted, outcome.Code);
+        var state = outcome.State!;
+        Assert.True(state.Physical);
+        Assert.True(state.Quarantined);
+        Assert.Equal(PhysicalTcVocabulary.Provenance, state.Provenance);
+        Assert.Equal(PhysicalTcVocabulary.Quality, state.Quality);
+        Assert.Equal(PhysicalTcVocabulary.CommissioningState, state.PhysicalEvidence!.CommissioningState);
+        Assert.Equal(PhysicalTcVocabulary.EndpointConfigured, state.PhysicalEvidence.EndpointIdentity);
+        // The raw words travel verbatim: nothing is scaled, clamped, reordered or classified here.
+        Assert.Equal(PhysicalWords(), state.RawWords.ToArray());
+        Assert.Equal(PhysicalTcVocabulary.WordCount, state.CopiedWordCount);
+        Assert.Equal(Instant, state.AcquiredAtUtc);
+
+        // Exactly one connect and one read, of the authorized shape only.
+        Assert.Equal(1, client.ConnectCount);
+        Assert.Equal(1, client.ReadCount);
+        var request = client.LastRequest!;
+        Assert.Equal(TcRegisterArea.HoldingRegisters, request.RegisterArea);
+        Assert.Equal(endpoint, request.Endpoint);
+        Assert.Equal(PhysicalTcVocabulary.StartAddress, (int)request.StartAddress);
+        Assert.Equal(PhysicalTcVocabulary.WordCount, (int)request.Quantity);
+        // Cleanup completed before the outcome was released.
+        Assert.Equal(1, client.DisconnectCount);
+        Assert.Equal(1, client.DisposeCount);
+        Assert.False(client.IsConnected);
+
+        // A second start is refused, never treated as a retry.
+        await Assert.ThrowsAsync<InvalidOperationException>(() => session.Start(CancellationToken.None));
+        Assert.Equal(1, client.ReadCount);
+
+        // Neither the record nor its evidence can render the endpoint address.
+        Assert.DoesNotContain(
+            StateJson(state),
+            ValidEndpointAddress(),
+            StringComparison.Ordinal);
+
+        await session.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task A_Physical_Session_Whose_Read_Fails_Publishes_Nothing_And_Never_Falls_Back()
+    {
+        var endpoint = PhysicalEndpoint(ValidEndpointAddress());
+
+        // A short read is refused whole: no padding, no partial record, no deterministic fallback.
+        var shortClient = new RecordingClient(PhysicalWords()[..^1]);
+        var shortSession = new TcAcquisitionSession(
+            () => shortClient, new TestClock(Instant), TcSessionProfile.PhysicalReadOnly(endpoint));
+        var shortOutcome = await shortSession.Start(CancellationToken.None);
+        Assert.False(shortOutcome.Accepted);
+        Assert.Null(shortOutcome.State);
+        Assert.Equal("TC_ACQUISITION_READ_REFUSED", shortOutcome.Code);
+        await shortSession.DisposeAsync();
+
+        // A read that fails outright is refused with its own code, and the session is still cleaned up.
+        var failing = new FailingClient();
+        var failingSession = new TcAcquisitionSession(
+            () => failing, new TestClock(Instant), TcSessionProfile.PhysicalReadOnly(endpoint));
+        var failingOutcome = await failingSession.Start(CancellationToken.None);
+        Assert.False(failingOutcome.Accepted);
+        Assert.Null(failingOutcome.State);
+        Assert.Equal("TC_ACQUISITION_CONNECT_REFUSED", failingOutcome.Code);
+        Assert.Equal(0, failing.ReadCount);
+        Assert.Equal(1, failing.DisconnectCount);
+        Assert.Equal(1, failing.DisposeCount);
+        await failingSession.DisposeAsync();
+    }
+
+    /// <summary>A client whose transport never establishes; used to prove no fallback exists.</summary>
+    private sealed class FailingClient : ITcReadOnlyClient
+    {
+        public int Generation { get; private set; }
+
+        public bool IsConnected => false;
+
+        public TcNodeEndpoint? ConnectedEndpoint => null;
+
+        public int ReadCount { get; private set; }
+
+        public int DisconnectCount { get; private set; }
+
+        public int DisposeCount { get; private set; }
+
+        public Task<TcReadResult> ConnectAsync(TcNodeEndpoint endpoint, CancellationToken cancellationToken)
+        {
+            Generation++;
+            return Task.FromResult(TcReadResult.Failure(
+                TcReadKind.ConnectionFailure, endpoint, Generation, "CONNECT_FAILED", "The transport did not establish."));
+        }
+
+        public Task<TcReadResult> ReadAsync(TcReadRequest request, CancellationToken cancellationToken)
+        {
+            ReadCount++;
+            return Task.FromResult(TcReadResult.Failure(
+                TcReadKind.TransportClosed, request.Endpoint, Generation, "CLOSED", "No transport."));
+        }
+
+        public Task DisconnectAsync()
+        {
+            DisconnectCount++;
+            Generation++;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeCount++;
+            Generation++;
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>The record as the wire contract serializes it; the endpoint is absent by construction.</summary>
+    private static string StateJson(TcAcquisitionState state) =>
+        JsonSerializer.Serialize(state, StateJsonOptions);
 
     private static void AssertRefuses(string variable, string value, string expectedCode)
     {

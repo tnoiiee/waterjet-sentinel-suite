@@ -8,6 +8,7 @@ import {
   scheduleCounts,
   nodeInventory, measurementsOfSensor, isProductSensorId, matchesProtectedBaseline, PRODUCT_SENSOR_SEQUENCE,
 } from '../src/schedule.mjs';
+import { buildCab1Mapping, projectCab1Payload, classifyPhysicalWord } from '../src/tcPhysicalMapping.mjs';
 import { scheduleCsvText, schedule, counts, nodes } from './helpers/schedule.mjs';
 
 test('the merged evidence schedule loads 240 physical rows', () => {
@@ -211,4 +212,185 @@ test('column ordinals are fixed and the parser never renames an evidence value',
   const sample = schedule.rows[0];
   assert.equal(typeof sample.rowState, 'string');
   assert.equal(sample.evidenceRef.length > 0, true);
+});
+
+// --- CAB1 one-Node projection and the CANDIDATE decode rule --------------------------------------
+//
+// The projection is derived from the same committed schedule rows as every test above, so a change in
+// the evidence file moves both together. These tests pin the Drawing contract (40 offsets, 36
+// assigned, 4 spare, 18 Sensors, preserved conflict states) and the honest presentation of a
+// physical read (raw evidence plus a CANDIDATE, never a verified temperature).
+
+test('the CAB1 projection reproduces the committed Drawing rev1 contract exactly', () => {
+  const cab1 = buildCab1Mapping(schedule.rows);
+
+  assert.equal(cab1.nodeId, 'TC-NODE-01');
+  assert.equal(cab1.cabinetId, 'CAB1');
+  assert.equal(cab1.measurements.length, 40);
+  assert.deepEqual(cab1.measurements.map((m) => m.offset), Array.from({ length: 40 }, (_, i) => i));
+  assert.equal(cab1.assignedOffsetCount, 36);
+  assert.equal(cab1.spareOffsetCount, 4);
+  assert.equal(cab1.sensorCount, 18);
+  assert.equal(cab1.measurementCount, 36);
+
+  // Modules advance in five blocks of eight channels, matching A102.1 through A102.5.
+  for (let offset = 0; offset < 40; offset += 1) {
+    assert.equal(cab1.measurements[offset].moduleInstance, `A102.${1 + Math.floor(offset / 8)}`, `offset ${offset}`);
+    assert.equal(cab1.measurements[offset].channel, (offset % 8) + 1, `offset ${offset}`);
+  }
+
+  // 0-35 are assigned, 36-39 are spare and never carry a Sensor identity.
+  for (const m of cab1.measurements.slice(0, 36)) {
+    assert.equal(m.spare, false, `offset ${m.offset}`);
+    assert.ok(isProductSensorId(m.sensorId), `offset ${m.offset}`);
+    assert.ok(m.side === 'F' || m.side === 'R', `offset ${m.offset}`);
+  }
+  for (const m of cab1.measurements.slice(36)) {
+    assert.equal(m.spare, true, `offset ${m.offset}`);
+    assert.equal(m.sensorId, null, `offset ${m.offset}`);
+    assert.equal(m.side, null, `offset ${m.offset}`);
+    assert.equal(m.mappingEvidenceState, 'SPARE_UNMAPPED', `offset ${m.offset}`);
+    assert.equal(m.rowState, 'SPARE_UNMAPPED', `offset ${m.offset}`);
+  }
+
+  // Eighteen unique Sensors, each one Front and one Rear, Rear immediately after Front.
+  assert.deepEqual(cab1.sensors.map((s) => s.sensorId),
+    [...Array(9).keys()].map((i) => `G+10${i + 1}`).concat([...Array(9).keys()].map((i) => `G+20${i + 1}`)));
+  for (const sensor of cab1.sensors) {
+    assert.equal(sensor.rearOffset, sensor.frontOffset + 1, sensor.sensorId);
+  }
+
+  // No endpoint and no retired address field can appear in the projection.
+  const text = JSON.stringify(cab1);
+  assert.equal(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/.test(text), false, 'projection must hold no address');
+  assert.equal(Object.hasOwn(cab1, 'ip'), false);
+  assert.equal(Object.hasOwn(cab1.readProfile, 'endpoint'), false);
+  assert.equal(Object.hasOwn(cab1.readProfile, 'host'), false);
+});
+
+test('the CAB1 mapping preserves the two Drawing internal conflicts and does not promote them', () => {
+  const cab1 = buildCab1Mapping(schedule.rows);
+
+  // The conflict rows are the committed ones: offset 13 is G+107 Rear and offset 14 is G+108 Front.
+  // They are surfaced rather than smoothed away, and the node-level summary stays conflicted.
+  assert.deepEqual(cab1.drawingConflictOffsets, [13, 14]);
+  assert.equal(cab1.mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+
+  const conflictRows = cab1.measurements.filter((m) => m.drawingConflict);
+  assert.deepEqual(conflictRows.map((m) => m.offset), [13, 14]);
+  assert.equal(conflictRows[0].sensorId, 'G+107');
+  assert.equal(conflictRows[0].side, 'R');
+  assert.equal(conflictRows[0].rowState, 'DRAWING_INTERNAL_CONFLICT');
+  assert.equal(conflictRows[0].mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+  assert.equal(conflictRows[1].sensorId, 'G+108');
+  assert.equal(conflictRows[1].side, 'F');
+
+  // The two affected Sensors inherit the conflict; every other Sensor stays drawing-verified.
+  assert.equal(cab1.sensors.find((s) => s.sensorId === 'G+107').mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+  assert.equal(cab1.sensors.find((s) => s.sensorId === 'G+108').mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+  assert.equal(cab1.sensors.find((s) => s.sensorId === 'G+106').mappingEvidenceState, 'DRAWING_VERIFIED');
+  assert.equal(cab1.sensors.find((s) => s.sensorId === 'G+109').mappingEvidenceState, 'DRAWING_VERIFIED');
+
+  // 34 drawing-verified rows and 2 conflicts account for every assigned offset.
+  assert.equal(cab1.measurements.filter((m) => m.mappingEvidenceState === 'DRAWING_VERIFIED').length, 34);
+  assert.equal(cab1.measurements.filter((m) => m.drawingConflict).length, 2);
+});
+
+test('the CAB1 projection refuses malformed schedules instead of repairing them', () => {
+  const rows = schedule.rows.filter((r) => r.cabinet === 'CAB1');
+  const mutate = (fn) => rows.map((r) => ({ ...r })).map(fn);
+
+  // Every refusal path is exercised, because a silently repaired mapping would mislead an operator.
+  const cases = [
+    ['a shortened image', mutate((r) => r).slice(0, 39)],
+    ['a duplicated offset', mutate((r) => (r.wordOrdinal === 5 ? { ...r, wordOrdinal: 4 } : r))],
+    ['a negative offset', mutate((r) => (r.wordOrdinal === 5 ? { ...r, wordOrdinal: -1 } : r))],
+    ['a fractional offset', mutate((r) => (r.wordOrdinal === 5 ? { ...r, wordOrdinal: 4.5 } : r))],
+    ['an assigned offset demoted to spare', mutate((r) => (r.wordOrdinal === 5 ? { ...r, rowState: 'SPARE_UNMAPPED', sensorId: null } : r))],
+    ['a spare offset promoted to a Sensor', mutate((r) => (r.wordOrdinal === 37 ? { ...r, rowState: 'DRAWING_VERIFIED', sensorId: 'G+101', side: 'F' } : r))],
+    ['a foreign node identity', mutate((r) => (r.wordOrdinal === 5 ? { ...r, nodeId: 'TC-NODE-02' } : r))],
+    ['a Sensor with only one side', mutate((r) => (r.wordOrdinal === 0 ? { ...r, sensorId: 'G+999' } : r))],
+    ['a broken Front/Rear adjacency', mutate((r) => (r.wordOrdinal === 0 ? { ...r, sensorId: 'G+101', side: 'R' } : r))],
+  ];
+  for (const [label, broken] of cases) {
+    assert.throws(() => buildCab1Mapping(broken), Error, label);
+  }
+});
+
+test('a physical word is presented as raw evidence plus a CANDIDATE, never as a verified value', () => {
+  // Ordinary candidates: signed Int16 divided by ten, exactly the C# `unchecked((short)word) / 10.0`.
+  assert.deepEqual(
+    [0x0000, 0x04D2, 0x7FFE, 0xFFFF, 0x8000].map((w) => classifyPhysicalWord(w).candidateValue),
+    [0, 123.4, 3276.6, -0.1, -3276.8],
+  );
+  for (const word of [0x0000, 0x04D2, 0xFFFF, 0x8000]) {
+    const decoded = classifyPhysicalWord(word);
+    assert.equal(decoded.decodeState, 'DECODE_CANDIDATE_VALUE');
+    assert.equal(decoded.manufacturerMeaning, 'NOT_VERIFIED');
+  }
+
+  // The two legacy sentinel candidates never present as an ordinary temperature, and no numeric
+  // candidate is invented for them: their manufacturer meaning is unverified.
+  const wireBreak = classifyPhysicalWord(0x7FFF);
+  assert.equal(wireBreak.rawHex, '0x7FFF');
+  assert.equal(wireBreak.rawWord, 32767);
+  assert.equal(wireBreak.candidateValue, null);
+  assert.equal(wireBreak.presentAsOrdinaryTemperature, false);
+  assert.equal(wireBreak.decodeState, 'DECODE_LEGACY_WIRE_BREAK_CANDIDATE');
+
+  const reversePolarity = classifyPhysicalWord(0xF830);
+  assert.equal(reversePolarity.rawHex, '0xF830');
+  assert.equal(reversePolarity.rawWord, 63536);
+  assert.equal(reversePolarity.candidateValue, null);
+  assert.equal(reversePolarity.presentAsOrdinaryTemperature, false);
+  assert.equal(reversePolarity.decodeState, 'DECODE_LEGACY_RV_P_CANDIDATE');
+
+  // 0xF830 must never surface as the ordinary -200.0 a naive signed decode would produce.
+  assert.notEqual(reversePolarity.candidateValue, -200);
+
+  // A non-16-bit word is refused rather than coerced.
+  for (const bad of [-1, 65536, 1.5, '0x7FFF', null, undefined, NaN]) {
+    assert.throws(() => classifyPhysicalWord(bad), RangeError, String(bad));
+  }
+});
+
+test('the payload projection pairs raw words to offsets and never fabricates a missing one', () => {
+  const cab1 = buildCab1Mapping(schedule.rows);
+  const words = Array.from({ length: 40 }, (_, i) => (i === 0 ? 0x7FFF : i === 1 ? 0xF830 : i));
+  const projection = projectCab1Payload(cab1, words);
+
+  assert.equal(projection.measurements.length, 40);
+  assert.equal(projection.wordCount, 40);
+  for (const m of projection.measurements) {
+    assert.equal(m.rawWord, words[m.offset], `offset ${m.offset}`);
+    assert.equal(m.moduleInstance, cab1.measurements[m.offset].moduleInstance);
+    assert.equal(m.mappingEvidenceState, cab1.measurements[m.offset].mappingEvidenceState);
+    assert.equal(m.drawingConflict, cab1.measurements[m.offset].drawingConflict);
+  }
+  assert.equal(projection.mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+  assert.deepEqual(projection.drawingConflictOffsets, [13, 14]);
+
+  // A wrong-length or malformed payload is refused: a short read is never padded and a failed read is
+  // never converted into values.
+  for (const bad of [
+    words.slice(0, 39), [...words, 1], [], null, undefined, 'x', 40,
+    [...words.slice(0, 39), 65536], [...words.slice(0, 39), -1], [...words.slice(0, 39), '7'],
+  ]) {
+    assert.throws(() => projectCab1Payload(cab1, bad), Error, JSON.stringify(bad));
+  }
+});
+
+test('the physical read profile is the declared read-only shape and carries no endpoint', () => {
+  const cab1 = buildCab1Mapping(schedule.rows);
+  assert.deepEqual(cab1.readProfile, {
+    functionCode: 'FC03', functionLabel: 'Read Holding Registers', registerArea: 'HOLDING_REGISTERS',
+    port: 502, unitIdentifier: 1, startAddress: 0, quantity: 40, registerWidthBits: 16,
+    registersPerChannel: 1, registersPerSensor: 2, addressConvention: 'ZERO_BASED',
+  });
+  // One register per channel, five modules of eight channels, zero-based addressing.
+  assert.equal(cab1.readProfile.quantity, cab1.measurements.length);
+  assert.equal(cab1.readProfile.quantity / cab1.readProfile.registersPerChannel, 40);
+  // The function code is the read-only one: no write function code appears anywhere in the module.
+  const text = JSON.stringify(cab1);
+  for (const writeCode of ['FC04', 'FC05', 'FC06', 'FC15', 'FC16']) assert.equal(text.includes(writeCode), false, writeCode);
 });

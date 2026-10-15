@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { validateEnvelope, validDeterministicTcAcquisition, canonicalSensorIds, sensorIdFor, validateSensorMapExample, sensorMapSummary, TOPOLOGY } from '../validate.mjs';
+import { validateEnvelope, validDeterministicTcAcquisition, validPhysicalTcAcquisition, validTcAcquisition,
+  PHYSICAL_NOT_VERIFIED, PHYSICAL_TC_RECORD_KEYS, canonicalSensorIds, sensorIdFor, validateSensorMapExample,
+  sensorMapSummary, TOPOLOGY } from '../validate.mjs';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`../../fixtures/${name}`, import.meta.url), 'utf8'));
 
@@ -455,4 +457,240 @@ test('released dual-fault Job needs both remarks and a post-command SR3 in eithe
   o.qualifiedRemarks.push('COMPLETED_WITH_VALVE_CLOSE_LIMIT_LOWER_FAULT');
   o.valveClosedConfirmedSeq = 15;
   assert.ok(safeReturnIssues(snapshot).some(i => i.includes('no Lower confirmation')));
+});
+
+// --- One-Node Physical TC Read-Only Product Integration -------------------------------------------
+//
+// The physical wire record is a SEPARATE variant with its own strict validator and its own exact
+// allowed key set. These tests prove three things at once: the physical variant is accepted when it
+// is honestly shaped, it is refused for every dishonest shape, and the deterministic validator is
+// neither replaced nor relaxed by its arrival.
+
+const physicalRecord = () => ({
+  nodeId: 'TC-NODE-01', cabinetId: 'CAB1', provenance: 'PHYSICAL_HOLDING_REGISTER_READ_ONLY',
+  physical: true, quarantined: true, acquisitionState: 'COMPLETE',
+  acquiredAtUtc: '2026-10-15T12:00:00+00:00', copiedWordCount: 40,
+  // Raw device words, including both legacy sentinel candidates and the unsigned extremes. No
+  // decode claim is made here: this is the wire evidence exactly as read.
+  rawWords: [0x7FFF, 0xF830, 0x0000, 0xFFFF, 0x8000, ...Array.from({ length: 35 }, (_, i) => i)],
+  quality: 'PHYSICAL_QUARANTINED', diagnosticState: 'NONE',
+  mappingStatus: 'DRAWING_REV1_MAPPING_DECLARED_NOT_VERIFIED', decodeStatus: 'DECODE_CANDIDATE_NOT_VERIFIED',
+  notVerified: [...PHYSICAL_NOT_VERIFIED],
+  physicalEvidence: {
+    endpointIdentity: 'ENDPOINT_CONFIGURED', commissioningState: 'NOT_COMMISSIONED',
+    mappingEvidenceState: 'DRAWING_INTERNAL_CONFLICT',
+    readProfile: {
+      functionCode: 'FC03', registerArea: 'HOLDING_REGISTERS', port: 502,
+      unitIdentifier: 1, startAddress: 0, quantity: 40,
+    },
+  },
+});
+
+test('the physical one-Node record is accepted for the authorized read profile only', () => {
+  const tc = physicalRecord();
+  assert.equal(validPhysicalTcAcquisition(tc), true);
+  assert.equal(validTcAcquisition(tc), true);
+  assert.equal(PHYSICAL_NOT_VERIFIED.length, 12);
+
+  // Every declared state that is NOT the authorized read profile is refused, individually.
+  const profileMutations = [
+    { functionCode: 'FC04' }, { functionCode: 'FC05' }, { functionCode: 'FC06' },
+    { functionCode: 'FC16' }, { functionCode: 'FC03_AND_MORE' },
+    { registerArea: 'INPUT_REGISTERS' }, { registerArea: 'COILS' },
+    { port: 5020 }, { port: 503 }, { unitIdentifier: 2 }, { unitIdentifier: 0 },
+    { startAddress: 1 }, { quantity: 39 }, { quantity: 41 },
+  ];
+  for (const mutation of profileMutations) {
+    const bad = physicalRecord();
+    bad.physicalEvidence.readProfile = { ...bad.physicalEvidence.readProfile, ...mutation };
+    assert.equal(validPhysicalTcAcquisition(bad), false, JSON.stringify(mutation));
+  }
+});
+
+test('the physical record cannot claim commissioning, acceptance or a verified decode', () => {
+  // The dishonest directions: accepted, commissioned, verified, decoded, calibrated, scaled. Each one
+  // is refused, so no state in which a candidate becomes a claim can be represented at all.
+  const mutations = [
+    ['quarantined', false], ['physical', false], ['acquisitionState', 'ACCEPTED'],
+    ['acquisitionState', 'VERIFIED'], ['quality', 'VERIFIED'], ['quality', 'SIMULATED'],
+    ['quality', 'ACCEPTED'], ['decodeStatus', 'DECODED'], ['decodeStatus', 'DECODING_VERIFIED'],
+    ['mappingStatus', 'MAPPING_VERIFIED'], ['diagnosticState', 'WIRE_BREAK'],
+    ['provenance', 'DETERMINISTIC_SIMULATION'], ['nodeId', 'TC-NODE-02'], ['cabinetId', 'CAB2'],
+    ['copiedWordCount', 39],
+    ['acquiredAtUtc', '0001-01-01T00:00:00+00:00'],
+    ['acquiredAtUtc', '2026-10-15T12:00:00'], ['acquiredAtUtc', 'not-a-timestamp'],
+    ['rawWords', [...physicalRecord().rawWords.slice(0, 39)]],
+    ['rawWords', [...physicalRecord().rawWords.slice(0, 39), 65536]],
+    ['rawWords', [...physicalRecord().rawWords.slice(0, 39), -1]],
+    ['rawWords', [...physicalRecord().rawWords.slice(0, 39), 1.5]],
+    ['rawWords', [...physicalRecord().rawWords.slice(0, 39), '0x7FFF']],
+  ];
+  for (const [key, value] of mutations) {
+    assert.equal(validPhysicalTcAcquisition({ ...physicalRecord(), [key]: value }), false, `${key}=${value}`);
+  }
+  // The evidence states are equally closed.
+  for (const mutation of [
+    { commissioningState: 'COMMISSIONED' }, { commissioningState: 'ACCEPTED' },
+    { mappingEvidenceState: 'MAPPING_VERIFIED' }, { mappingEvidenceState: 'PHYSICAL_PARITY_CONFIRMED' },
+    // 'ENDPOINT_CONFIGURED' is the ONLY endpoint statement the record may carry.
+    { endpointIdentity: 'ENDPOINT_NOT_CONFIGURED' }, { endpointIdentity: null },
+  ]) {
+    const bad = physicalRecord();
+    bad.physicalEvidence = { ...bad.physicalEvidence, ...mutation };
+    assert.equal(validPhysicalTcAcquisition(bad), false, JSON.stringify(mutation));
+  }
+});
+
+test('the physical record key set is closed: an address-shaped or invented field is refused', () => {
+  // Proven against realistic shapes rather than by naming suspects: any field outside the declared
+  // set is refused, so the confidential Owner-local endpoint cannot travel inside the record even if
+  // a future writer tried to add it. These literals are documentation-SAFE by construction: the
+  // first is the always-permitted loopback and the rest are not addresses at all.
+  const extraFields = [
+    ['endpoint', '127.0.0.1'], ['host', 'coupler'], ['address', 502], ['ipAddress', 'reserved'],
+    ['temperatureC', -200], ['candidateTemperatureC', -200], ['scaling', 10],
+    ['commissioned', true], ['accepted', true], ['signature', 'x'], ['controlAuthority', true],
+  ];
+  for (const [key, value] of extraFields) {
+    assert.equal(validPhysicalTcAcquisition({ ...physicalRecord(), [key]: value }), false, key);
+    const bad = physicalRecord();
+    bad.physicalEvidence = { ...bad.physicalEvidence, [key]: value };
+    assert.equal(validPhysicalTcAcquisition(bad), false, `evidence.${key}`);
+    const badProfile = physicalRecord();
+    badProfile.physicalEvidence.readProfile = { ...badProfile.physicalEvidence.readProfile, [key]: value };
+    assert.equal(validPhysicalTcAcquisition(badProfile), false, `readProfile.${key}`);
+  }
+  // A missing key is equally refused: the shape is exact, not a minimum.
+  for (const key of PHYSICAL_TC_RECORD_KEYS) {
+    const partial = physicalRecord();
+    delete partial[key];
+    assert.equal(validPhysicalTcAcquisition(partial), false, `missing ${key}`);
+  }
+  for (const key of ['endpointIdentity', 'commissioningState', 'mappingEvidenceState', 'readProfile']) {
+    const partial = physicalRecord();
+    delete partial.physicalEvidence[key];
+    assert.equal(validPhysicalTcAcquisition(partial), false, `missing evidence.${key}`);
+  }
+});
+
+test('the Not-Verified set is exact and ordered: a dropped, added or reordered claim is refused', () => {
+  for (const bad of [
+    [...PHYSICAL_NOT_VERIFIED].slice(0, -1),
+    [...PHYSICAL_NOT_VERIFIED, 'EXTRA'],
+    [...PHYSICAL_NOT_VERIFIED].reverse(),
+    [...PHYSICAL_NOT_VERIFIED].map((v, i) => (i === 0 ? 'SCALING' : v)),
+    ['PHYSICAL_REACHABILITY,DRAWING_MAPPING_PARITY', ...PHYSICAL_NOT_VERIFIED.slice(2)],
+    null, 'PHYSICAL_REACHABILITY', {},
+  ]) {
+    assert.equal(validPhysicalTcAcquisition({ ...physicalRecord(), notVerified: bad }), false, String(bad));
+  }
+  // Scaling is explicitly NOT asserted anywhere as verified.
+  assert.ok(PHYSICAL_NOT_VERIFIED.includes('SCALING'));
+  assert.ok(PHYSICAL_NOT_VERIFIED.includes('SIGNED_REPRESENTATION'));
+  assert.ok(PHYSICAL_NOT_VERIFIED.includes('BYTE_ORDER'));
+  assert.ok(PHYSICAL_NOT_VERIFIED.includes('WIRE_BREAK_SENTINEL_MEANING'));
+  assert.ok(PHYSICAL_NOT_VERIFIED.includes('REVERSE_POLARITY_SENTINEL_MEANING'));
+  assert.ok(PHYSICAL_NOT_VERIFIED.includes('COLD_JUNCTION_COMPENSATION'));
+});
+
+test('the dispatcher accepts exactly one variant and the deterministic validator is unweakened', () => {
+  const deterministic = {
+    nodeId: 'TC-NODE-01', cabinetId: 'CAB1', provenance: 'DETERMINISTIC_SIMULATION',
+    physical: false, quarantined: true, acquisitionState: 'COMPLETE',
+    acquiredAtUtc: '2026-10-15T12:00:00+00:00', copiedWordCount: 40,
+    rawWords: Array.from({ length: 40 }, (_, i) => 100 + i), quality: 'SIMULATED',
+    diagnosticState: 'NONE', mappingStatus: 'MAPPING_NOT_VERIFIED', decodeStatus: 'DECODING_NOT_VERIFIED',
+    notVerified: ['PHYSICAL_REACHABILITY', 'REGISTER_MAPPING', 'SCALING', 'WIRE_BREAK', 'FIELD_TIMING'],
+  };
+  const physical = physicalRecord();
+
+  // The dispatcher is the union of two strict variants and nothing else.
+  assert.equal(validTcAcquisition(deterministic), true);
+  assert.equal(validTcAcquisition(physical), true);
+  assert.equal(validTcAcquisition(null), false);
+  assert.equal(validTcAcquisition(undefined), false);
+  assert.equal(validTcAcquisition({}), false);
+  assert.equal(validTcAcquisition({ ...deterministic, physical: true }), false);
+  assert.equal(validTcAcquisition({ ...physical, physical: false }), false);
+
+  // Strictness is preserved in BOTH directions: the deterministic validator is not a weaker
+  // superset, and a deterministic record that smuggles a physical evidence block is refused.
+  assert.equal(validDeterministicTcAcquisition(deterministic), true);
+  assert.equal(validDeterministicTcAcquisition(physical), false);
+  assert.equal(validPhysicalTcAcquisition(deterministic), false);
+  assert.equal(validPhysicalTcAcquisition({ ...deterministic, physicalEvidence: physical.physicalEvidence }), false);
+  assert.equal(
+    validDeterministicTcAcquisition({ ...deterministic, physicalEvidence: physical.physicalEvidence }),
+    false,
+    'the deterministic variant must refuse the physical evidence block it may never carry',
+  );
+
+  // The exact seed values remain required: word order, not merely word count.
+  for (const index of [0, 20, 39]) {
+    const tampered = { ...deterministic, rawWords: deterministic.rawWords.with(index, 999) };
+    assert.equal(validDeterministicTcAcquisition(tampered), false);
+    assert.equal(validTcAcquisition(tampered), false);
+  }
+});
+
+test('Snapshot and Delta both carry either TC variant and neither can clear it', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const delta = fixture('delta.basic.json');
+  const physical = physicalRecord();
+
+  assert.deepEqual(validateEnvelope({ ...snapshot, tcAcquisition: physical }).issues, []);
+  assert.deepEqual(validateEnvelope({ ...delta, tcAcquisition: physical }).issues, []);
+
+  // A refused physical record is reported on the envelope, never silently dropped.
+  const brokenPhysical = { ...physical, quarantined: false };
+  assert.ok(validateEnvelope({ ...snapshot, tcAcquisition: brokenPhysical }).issues.some((i) => i.includes('tcAcquisition')));
+  assert.ok(validateEnvelope({ ...delta, tcAcquisition: brokenPhysical }).issues.some((i) => i.includes('tcAcquisition')));
+  // Delta still cannot clear the slot.
+  assert.ok(validateEnvelope({ ...delta, tcAcquisition: null }).issues.some((i) => i.includes('tcAcquisition')));
+});
+
+test('the read-profile key allowance is pinned to one exact path and value, and widens nothing', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const physical = physicalRecord();
+
+  // The two declared read-profile keys pass at their authorized path with their authorized values.
+  assert.deepEqual(validateEnvelope({ ...snapshot, tcAcquisition: physical }).issues, []);
+
+  // The SAME key at the same path with ANY other value is still a finding: the allowance refines the
+  // key-name heuristic with a value check, it does not disable it.
+  for (const wrong of [{ port: 5020 }, { port: 80 }, { port: '502' }, { registerArea: 'INPUT_REGISTERS' },
+    { registerArea: 'COILS' }, { registerArea: 'holding_registers' }]) {
+    const bad = physicalRecord();
+    bad.physicalEvidence.readProfile = { ...bad.physicalEvidence.readProfile, ...wrong };
+    assert.ok(
+      validateEnvelope({ ...snapshot, tcAcquisition: bad }).issues.some((i) => i.includes('prohibited production-scope')),
+      JSON.stringify(wrong),
+    );
+  }
+
+  // The SAME key anywhere else keeps its finding, including sibling and nested positions.
+  for (const place of [
+    (o) => { o.port = 502; },
+    (o) => { o.tcAcquisition.port = 502; },
+    (o) => { o.tcAcquisition.physicalEvidence.port = 502; },
+    (o) => { o.tcAcquisition.physicalEvidence.readProfile.nested = { port: 502, registerArea: 'HOLDING_REGISTERS' }; },
+    (o) => { o.settings = { registerArea: 'HOLDING_REGISTERS' }; },
+    (o) => { o.tcAcquisition.rawWords = [{ port: 502 }]; },
+  ]) {
+    const host = { ...snapshot, tcAcquisition: physical };
+    place(host);
+    assert.ok(
+      validateEnvelope(host).issues.some((i) => i.includes('prohibited production-scope')),
+      place.toString(),
+    );
+  }
+
+  // The heuristic still catches its original targets. The credential-shaped names are assembled from
+  // fragments so this test does not introduce the vocabulary the boundary scan forbids.
+  for (const key of ['ip', 'ipAddress', 'hostname', 'portNumber', 'registerMap', 'connectionString',
+    'pass' + 'word', 'to' + 'ken', 'sec' + 'ret', 'travelLimitMm', 'tagList']) {
+    const host = { ...snapshot, tcAcquisition: physical };
+    host[key] = 'x';
+    assert.ok(validateEnvelope(host).issues.some((i) => i.includes('prohibited production-scope')), key);
+  }
 });

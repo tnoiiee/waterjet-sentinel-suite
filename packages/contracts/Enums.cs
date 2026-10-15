@@ -86,7 +86,15 @@ public enum CriticalPumpKind { MAIN_PUMP_UNEXPECTED_STOP, MAIN_PUMP_TRIP }
 public enum DeviceLinkState { ONLINE, TIMEOUT, RECOVERING, STALE_SOURCE }
 
 /// <summary>
-/// Device profiles (ADR-0012). Only SIMULATOR may START in Stage 0.3A; the other
+/// Device profiles (ADR-0012). Only SIMULATOR may START under the standing rule; the other
 /// values exist for contract stability and startup refusal. See Wjss.Domain.ProfileStartPolicy.
+///
+/// <see cref="TEST_HARDWARE_READ_ONLY"/> is the one narrow, explicit extension (One-Node Physical
+/// TC Read-Only Product Integration, Owner decision R1). It is startable ONLY when the explicit
+/// one-Node physical read-only acquisition mode was selected, which itself requires a successfully
+/// resolved Owner-local endpoint. It is READ-ONLY: it carries no write, command, control or
+/// Production authority, no key, signature, token or authorization artifact, and no physical-capable
+/// build identity. It is appended so the existing members keep their values and their meaning —
+/// <see cref="TEST_HARDWARE"/> and <see cref="PRODUCTION"/> remain refused exactly as before.
 /// </summary>
-public enum DeviceProfile { SIMULATOR, TEST_HARDWARE, PRODUCTION }
+public enum DeviceProfile { SIMULATOR, TEST_HARDWARE, PRODUCTION, TEST_HARDWARE_READ_ONLY }

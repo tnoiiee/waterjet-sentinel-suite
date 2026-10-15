@@ -110,9 +110,18 @@ const state = {
   // Wall Map: the topology view model built once from the served matrix plus the schedule rows, and
   // the Front/Rear presentation control. The selection is NOT duplicated here - the Wall Map and the
   // Overview share the single `selectedKey`, so they can never disagree about what is selected.
+  // Sensor identity to served Wall Map position, derived once from the served logical matrix. The
+  // U-shape section places its cells from THIS map, so it can never disagree with the Wall Map.
+  sensorPositions: null,
   wallMap: null,
   wallMapError: '',
   measurementView: MEASUREMENT_VIEW.BOTH,
+  // The read-only CAB1 Drawing mapping projection. Mapping evidence only; it carries the read-profile
+  // SHAPE and no endpoint, and its failure degrades only its own section.
+  cab1Mapping: null,
+  // The U-shape measurement selection. Presentation only: it changes no evidence, no value and no
+  // published state. It exists so the cell and the detail note can show ONE source value.
+  selectedPhysicalKey: null,
 };
 
 /**
@@ -851,6 +860,212 @@ function renderTcAcquisitionEvidence() {
     + 'model-level evidence does not resolve an instance; the synthetic wire-break scenario is not physical evidence.';
 }
 
+// ---------------------------------------------------------------------------
+// CAB1 U-shape Sensor Map (one-Node physical read-only, candidate presentation)
+// ---------------------------------------------------------------------------
+//
+// This section has ONE value source: the authoritative Runtime publication, projected by the local
+// Preview host. It opens no socket, holds no address, initiates no acquisition and owns no retry: a
+// missing publication is shown as unavailable and never as a stale or invented value.
+//
+// The U-shape order is DERIVED from the served logical matrix (wall, wall row, wall column), not
+// typed here: the eighteen CAB1 Sensors sit on the bend of the U, G+2xx on wall row 1 and G+1xx on
+// wall row 2. A Sensor with no served position is listed as unpublished rather than placed by guess.
+
+/**
+ * The two bend rows of the U that carry the CAB1 Sensors, in the served reading order: wall row 1
+ * carries the G+2xx Sensors and wall row 2 the G+1xx Sensors. The rows are named here, but every
+ * position (wall, row, column) is read from the served logical matrix at render time.
+ */
+const CAB1_U_SHAPE_ROWS = Object.freeze([1, 2]);
+
+/** The CAB1 measurement selection key: Sensor identity plus side. Never a Channel or an address. */
+const physicalKey = (sensorId, side) => `${sensorId}:${side}`;
+
+/**
+ * The ONE source string for a measurement, used by both the U-shape cell and the detail note, so the
+ * two can never present different evidence. A legacy sentinel candidate has no ordinary temperature:
+ * it shows its raw word and its legacy label instead, and its numeric field stays empty.
+ */
+function physicalSideSource(side) {
+  if (!side) return 'unavailable';
+  const labels = [];
+  if (side.decodeState === 'DECODE_LEGACY_WIRE_BREAK_CANDIDATE') labels.push('LEGACY WIRE-BREAK CANDIDATE');
+  if (side.decodeState === 'DECODE_LEGACY_RV_P_CANDIDATE') labels.push('LEGACY RV/P CANDIDATE');
+  if (side.label && !labels.includes(side.label)) labels.push(side.label);
+  const candidate = side.presentAsOrdinaryTemperature && typeof side.candidateValue === 'number'
+    ? `${side.candidateValue} ${side.candidateUnit ?? ''}`.trim()
+    : null;
+  return `${side.rawHex} (raw ${side.rawWord})`
+    + (candidate ? ` - CANDIDATE ${candidate}` : ' - no ordinary temperature presented')
+    + ` - ${labels.join(' / ') || 'DECODE CANDIDATE'}`;
+}
+
+function physicalSideBlock(side, label = '') {
+  if (!side) {
+    return el('div', { class: 'cab1-side', 'data-value-state': 'UNAVAILABLE', 'data-side': label },
+      [el('span', {}, label ? `${label}: not published` : 'not published')]);
+  }
+  const children = [el('span', { class: 'cab1-raw' }, `${label ? `${label}: ` : ''}${side.rawHex} (raw ${side.rawWord})`)];
+  if (side.presentAsOrdinaryTemperature && typeof side.candidateValue === 'number') {
+    children.push(el('span', { class: 'cab1-candidate' },
+      `CANDIDATE ${side.candidateValue} ${side.candidateUnit ?? ''}`.trim()));
+  } else {
+    // The legacy sentinel candidates never render as an ordinary temperature.
+    children.push(el('span', { class: 'cab1-label' }, 'no ordinary temperature'));
+  }
+  if (side.label) children.push(el('span', { class: 'cab1-label' }, side.label));
+  return el('div', {
+    class: 'cab1-side',
+    'data-value-state': 'CANDIDATE',
+    'data-side': label,
+    'data-decode-state': side.decodeState,
+  }, children);
+}
+
+function renderCab1PhysicalMap() {
+  const body = $('cab1-physical-body');
+  const note = $('cab1-physical-selection');
+  body.replaceChildren();
+  if (note) note.textContent = '';
+
+  const mapping = state.cab1Mapping;
+  if (!mapping) {
+    body.append(el('p', { class: 'note' }, 'CAB1 mapping unavailable: the committed Drawing mapping projection was not served. No Sensor position is drawn and no value is claimed.'));
+    return;
+  }
+
+  // One publication or none. A failed or absent Runtime never yields a partially successful map.
+  const projection = state.tcAcquisition;
+  const published = projection && projection.status === 'PUBLISHED' && projection.tcAcquisition
+    && projection.tcAcquisition.physical === true ? projection.tcAcquisition : null;
+  const values = new Map();
+  if (published) for (const sensor of published.sensors ?? []) values.set(sensor.sensorId, sensor);
+
+  // The approved bounded frame: the U-shape map reuses the Wall Map frame, so the page keeps exactly
+  // the two sideways-scrolling surfaces the layout contract allows and gains no third one.
+  const frame = el('div', { class: 'wallmap-frame', 'data-cab1-state': published ? 'PUBLISHED' : 'UNAVAILABLE' });
+  const map = el('div', {
+    class: 'cab1-map',
+    'data-node': mapping.node,
+    'data-cabinet': mapping.cabinet,
+    'data-sensor-count': String(mapping.sensorCount),
+    'data-mapping-evidence': mapping.mappingEvidenceState,
+  });
+
+  // The bend rows of the U, in the served reading order: wall row 1 then wall row 2.
+  // ONE cell per Sensor (each owns exactly one Front and one Rear measurement), placed by the served
+  // wall row. A cell is never split per measurement: the two sides stay inside their own Sensor.
+  const measurementByOffset = new Map(mapping.measurements.map((m) => [m.offset, m]));
+  for (const wallRow of CAB1_U_SHAPE_ROWS) {
+    const cells = [];
+    for (const sensorEntry of mapping.sensors) {
+      const position = state.sensorPositions ? state.sensorPositions.get(sensorEntry.sensorId) : null;
+      if (!position || position.wallRow !== wallRow) continue;
+      cells.push({ sensorEntry, position });
+    }
+    if (cells.length === 0) continue;
+    const row = CAB1_U_SHAPE_ROWS.indexOf(wallRow) === 0 ? 'G+2xx' : 'G+1xx';
+    const band = el('div', { class: 'cab1-band', 'data-wall-row': String(wallRow), 'data-band': row });
+    band.append(el('div', { class: 'cab1-band-label' }, row));
+    const grid = el('div', { class: 'cab1-cells' });
+    for (const { sensorEntry, position } of cells) {
+      const sensorId = sensorEntry.sensorId;
+      const front = measurementByOffset.get(sensorEntry.frontOffset);
+      const rear = measurementByOffset.get(sensorEntry.rearOffset);
+      const published = values.get(sensorId) ?? null;
+      const cell = el('div', {
+        class: 'cab1-cell',
+        'data-sensor-id': sensorId,
+        'data-wall': position.wall,
+        'data-wall-row': String(position.wallRow),
+        'data-wall-column': String(position.wallColumn),
+        'data-front-offset': String(sensorEntry.frontOffset),
+        'data-rear-offset': String(sensorEntry.rearOffset),
+        'data-drawing-conflict': sensorEntry.drawingConflict ? 'true' : 'false',
+        'data-mapping-evidence': sensorEntry.mappingEvidenceState,
+        'data-value-state': published ? 'CANDIDATE' : 'UNAVAILABLE',
+      });
+      cell.append(el('div', { class: 'cab1-cell-head' }, [
+        el('span', {}, sensorId),
+        el('span', { class: 'cab1-wall' }, `${position.wall} r${position.wallRow} c${position.wallColumn}`),
+      ]));
+      cell.append(el('div', { class: 'cab1-wall' },
+        `${front.moduleInstance} ch${front.channel} (Front) / ${rear.moduleInstance} ch${rear.channel} (Rear)`));
+      if (published) {
+        // Front and Rear stay independent: each block renders from its own measurement.
+        cell.append(physicalSideBlock(published.front, 'Front'));
+        cell.append(physicalSideBlock(published.rear, 'Rear'));
+      } else {
+        // Unavailable clears the current-success presentation for BOTH sides of this Sensor.
+        cell.append(physicalSideBlock(null, 'Front'), physicalSideBlock(null, 'Rear'));
+        cell.append(el('div', { class: 'cab1-label' }, 'NO PUBLICATION'));
+      }
+      if (sensorEntry.drawingConflict) cell.append(el('div', { class: 'cab1-flag' }, 'DRAWING INTERNAL CONFLICT'));
+      cell.append(el('div', { class: 'cab1-label' }, 'PHYSICAL / QUARANTINED / DECODE CANDIDATE / NOT COMMISSIONED'));
+      const selectors = el('div', {});
+      for (const side of ['F', 'R']) {
+        const button = el('button', {
+          type: 'button',
+          'data-physical-key': physicalKey(sensorId, side),
+          'data-physical-side': side,
+        }, `${side === 'F' ? 'Front' : 'Rear'} detail`);
+        button.addEventListener('click', () => selectPhysical(sensorId, side));
+        selectors.append(button);
+      }
+      cell.append(selectors);
+      grid.append(cell);
+    }
+    band.append(grid);
+    map.append(band);
+  }
+  frame.append(map);
+  body.append(frame);
+
+  // Non-CAB1 Sensors are outside this slice and stay unavailable: they are never published here.
+  body.append(el('p', { class: 'cab1-note' },
+    `The ${mapping.sensorCount} CAB1 Sensors of ${mapping.node} (${mapping.cabinet}) are shown above. Non-CAB1 Sensors remain unavailable and are not published by this one-Node slice. `
+    + `Spare offsets ${mapping.spareOffsets ? mapping.spareOffsets.join(', ') : '36-39'} are unmapped and never carry a Sensor.`));
+
+  renderPhysicalSelection();
+}
+
+function selectPhysical(sensorId, side) {
+  state.selectedPhysicalKey = physicalKey(sensorId, side);
+  renderPhysicalSelection();
+}
+
+/**
+ * The detail note for the selected measurement. It reads the SAME projection the cell read, and
+ * restates the honest labels with the number, so a candidate can never be shown as verified.
+ */
+function renderPhysicalSelection() {
+  const note = $('cab1-physical-selection');
+  if (!note) return;
+  const key = state.selectedPhysicalKey;
+  if (!key) {
+    note.textContent = 'No measurement selected. Selecting a cell changes no evidence, no publication and no verdict.';
+    return;
+  }
+  const [sensorId, side] = key.split(':');
+  const projection = state.tcAcquisition;
+  const published = projection && projection.status === 'PUBLISHED' && projection.tcAcquisition
+    && projection.tcAcquisition.physical === true ? projection.tcAcquisition : null;
+  const sensor = published ? (published.sensors ?? []).find((s) => s.sensorId === sensorId) ?? null : null;
+  if (!sensor) {
+    note.textContent = `Selected ${sensorId} ${side === 'F' ? 'Front' : 'Rear'}: no Runtime publication. `
+      + 'The measurement is unavailable; no value is carried forward and no value is claimed.';
+    return;
+  }
+  const measurement = side === 'F' ? sensor.front : sensor.rear;
+  note.textContent = `Selected ${sensorId} ${side === 'F' ? 'Front' : 'Rear'} (offset ${measurement.offset}): `
+    + `${physicalSideSource(measurement)}. `
+    + `Mapping evidence ${sensor.mappingEvidenceState}${sensor.drawingConflict ? ' (Drawing internal conflict - not fully verified)' : ''}. `
+    + `Paired Front-Rear delta: ${sensor.deltaAvailable ? `${sensor.frontRearDeltaC} degC (diagnostic only, not a verdict)` : 'not available'}. `
+    + 'PHYSICAL / QUARANTINED / DECODE CANDIDATE / NOT COMMISSIONED. '
+    + 'Selection only: it changes no evidence and affects no alarm, interlock, trip, Cleaning or dispatch decision.';
+}
+
 function renderTcAcquisition() {
   const body = $('tc-acquisition-body');
   body.replaceChildren();
@@ -1212,6 +1427,7 @@ function renderMonitor() {
   renderSummary(views);
   renderLoopProgress();
   renderWallMap(views);
+  renderCab1PhysicalMap();
   renderFilters(views);
   renderTable(views);
   renderDetail(views);
@@ -1426,9 +1642,25 @@ async function loadInitialData() {
   } catch {
     state.tcAcquisitionEvidence = null;
   }
+  // The served matrix is the ONE topology source: the U-shape section derives its positions from it.
+  const positions = new Map();
+  for (const wall of sensorMap.walls ?? []) {
+    for (const slot of wall.slots ?? []) {
+      if (!slot.sensorId || positions.has(slot.sensorId)) continue;
+      positions.set(slot.sensorId, { wall: wall.wall, wallRow: slot.wallRow, wallColumn: slot.wallColumn });
+    }
+  }
+  state.sensorPositions = positions;
   // The Runtime-backed TC projection is isolated: a missing host or unpublished state cannot
   // fabricate success and degrades only this section, not the synthetic commissioning workflow.
   await loadTcAcquisition();
+  // The CAB1 Drawing mapping projection is isolated too: mapping evidence without a Runtime is still
+  // useful, and its absence degrades only the U-shape section.
+  try {
+    state.cab1Mapping = await getJson('/api/tc-physical-mapping');
+  } catch {
+    state.cab1Mapping = null;
+  }
   // One canonical topology path: the served logical matrix carries the positions and the Sensor
   // identities, the schedule rows carry the Front/Rear measurement identities. The builder refuses a
   // topology it cannot prove (a missing wall, a duplicated Sensor, any non-Sensor position, a
