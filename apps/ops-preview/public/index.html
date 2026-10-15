@@ -46,6 +46,7 @@
       <li><a href="#mapping">Mapping</a></li>
       <li><a href="#node-configuration">Node Configuration</a></li>
       <li><a href="#tc-acquisition-evidence">TC Acquisition Evidence</a></li>
+      <li><a href="#motion-commissioning">Motion Commissioning</a></li>
       <li><a href="#cab1-physical-map">CAB1 U-shape Sensor Map</a></li>
       <li><a href="#diagnostics">Diagnostics</a></li>
     </ul>
@@ -239,6 +240,60 @@
       <p class="note">This read-only section projects the authoritative Runtime Snapshot for one deterministic Node. Until Runtime publishes the one-use session, it reports not published or unavailable. This is not physical evidence and does not authorize T01.</p>
       <button type="button" id="tc-acquisition-refresh">Refresh Runtime TC state (read-only)</button>
       <div id="tc-acquisition-body" role="status"></div>
+    </section>
+
+    <section id="motion-commissioning" aria-labelledby="motion-commissioning-h">
+      <h2 id="motion-commissioning-h">Motion Commissioning
+        <span class="hint">read-only design and commissioning state · NO HARDWARE ACCESS / NO MOTION COMMAND</span></h2>
+      <p class="note">The Application-owned manual motion commissioning foundation: the four motion controllers (one per WSB
+      cabinet), the sixteen controller axes, the eight Water Jet axis allocations, the brake output plan and the limit input
+      plan, with the Application-owned authorization gate. Every value is a status or a logical identity: nothing here is read
+      from a device, no controller endpoint is configured, no controller library is installed, no controller is connected, no
+      axis is homed, no software limit is commissioned, no brake state is read and no motion command has been issued. The
+      authorization gate is CLOSED and every motion intent is refused before any hardware path is reached.</p>
+      <p class="note">The axis role is always written as <strong>Horizontal Axis</strong> or <strong>Vertical Axis</strong>.
+      The controller axis label (A, B, C, D) shown beside it is the identity an engineer needs when working on the controller
+      itself. Values are published in controller units: no counts-to-millimetre conversion is verified, so no value is shown
+      in millimetres and no Legacy value has been promoted to configuration.</p>
+      <p class="alert" id="motion-gate-status" role="status"></p>
+      <h3>Summary</h3>
+      <div class="summary" id="motion-summary"></div>
+      <h3>Water Jet axis allocation <span class="hint">Owner-confirmed · Horizontal Axis / Vertical Axis</span></h3>
+      <div class="table-wrap" id="motion-waterjets-wrap">
+        <div id="motion-waterjets-body"></div>
+      </div>
+      <h3>Motion controllers <span class="hint">one four-axis controller per WSB cabinet · no endpoint configured</span></h3>
+      <div class="table-wrap" id="motion-controllers-wrap">
+        <div id="motion-controllers-body"></div>
+      </div>
+      <h3>Controller axes <span class="hint">sixteen axes · commissioning, home, brake and motion state</span></h3>
+      <div class="table-wrap scroll" id="motion-axes-wrap">
+        <div id="motion-axes-body"></div>
+      </div>
+      <h3>Brake output plan <span class="hint">axis A to output 1, B to 2, C to 3, D to 4</span></h3>
+      <div class="table-wrap" id="motion-brake-wrap">
+        <div id="motion-brake-body"></div>
+      </div>
+      <h3>Limit inputs <span class="hint">Reverse / Home / Forward per axis · polarity unconfirmed, state unread</span></h3>
+      <div class="table-wrap" id="motion-limits-wrap">
+        <div id="motion-limits-body"></div>
+      </div>
+      <h3>Motion command intents <span class="hint">every intent is refused while the gate is closed</span></h3>
+      <div class="table-wrap" id="motion-intents-wrap">
+        <div id="motion-intents-body"></div>
+      </div>
+      <h3>Jog speed <span class="hint">display value only · never executable</span></h3>
+      <div id="motion-jog-body"></div>
+      <h3>Mapping conflicts <span class="hint">open Owner decisions, never suppressed</span></h3>
+      <ul class="legend" id="motion-conflicts"></ul>
+      <h3>Runtime motion state <span class="hint">read from the local Runtime Snapshot only</span></h3>
+      <button type="button" id="motion-refresh">Refresh Runtime motion state (read-only)</button>
+      <div id="motion-runtime-body" role="status"></div>
+      <h3>Not verified <span class="hint">what this projection deliberately does not claim</span></h3>
+      <ul class="legend" id="motion-not-verified"></ul>
+      <h3>Status legend <span class="hint">every state is written out as text, never shown by colour alone</span></h3>
+      <ul class="legend" id="motion-legend"></ul>
+      <p class="note" id="motion-authority"></p>
     </section>
 
     <section id="cab1-physical-map" aria-labelledby="cab1-physical-map-h">

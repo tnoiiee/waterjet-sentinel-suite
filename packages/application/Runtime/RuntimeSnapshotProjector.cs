@@ -74,6 +74,7 @@ public static class RuntimeSnapshotProjector
             Alarms = state.Alarms,
             Communication = state.Communication,
             TcAcquisition = state.TcAcquisition,
+            Motion = state.Motion,
             Runtime = new RuntimeHealth
             {
                 UptimeSeconds = uptimeSeconds,

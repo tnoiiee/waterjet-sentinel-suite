@@ -59,6 +59,13 @@ public sealed record OperationalSnapshot
     public required AlarmSummary Alarms { get; init; }
     public required CommunicationHealth Communication { get; init; }
     public TcAcquisitionState? TcAcquisition { get; init; }
+
+    /// <summary>
+    /// The read-only Application-owned motion commissioning projection. Null until the Runtime
+    /// composes one; Snapshot-only, never carried in a Delta, and never a command surface.
+    /// </summary>
+    public MotionCommissioningProjection? Motion { get; init; }
+
     public required RuntimeHealth Runtime { get; init; }
     public required TrendWindow Trend { get; init; }
 }

@@ -26,6 +26,12 @@
 //   GET /api/tc-physical-mapping          the canonical CAB1 Drawing-rev1 mapping projection, read-only
 //                                         (40 offsets, 18 Sensors, preserved conflict and spare states;
 //                                         no endpoint, no legacy IP field, no device access)
+//   GET /api/motion-commissioning         the read-only manual motion commissioning projection: the
+//                                         Owner-confirmed motion design (four controllers, sixteen
+//                                         axes, eight Water Jet allocations, brake and limit plans)
+//                                         plus the motion section of the local Runtime Snapshot when
+//                                         that host can be read. No endpoint, no connection, no
+//                                         command: the authorization gate is reported CLOSED.
 //
 // Every other method is refused with 405, and there is no route that writes, connects, polls, reads
 // a device, changes the Mapping, or commands anything. The server binds to 127.0.0.1 only: the bind
@@ -47,8 +53,11 @@ import {
   CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, recordToRecordConsistency,
   tcAcquisitionEvidenceFingerprint, requireTopologyInvariants,
   buildCab1Mapping, projectCab1Payload, CAB1_NODE_ID, CAB1_CABINET_ID, PHYSICAL_READ_PROFILE,
+  motionCommissioningDesign, MOTION_ALL_REFUSAL_REASONS,
 } from '../../packages/commissioning/src/index.mjs';
-import { validTcAcquisition, validDeterministicTcAcquisition } from '../../packages/contracts/wjss-contracts-ts/validate.mjs';
+import {
+  validTcAcquisition, validDeterministicTcAcquisition, validMotionCommissioning,
+} from '../../packages/contracts/wjss-contracts-ts/validate.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -560,6 +569,83 @@ export function tcPhysicalMappingPayload() {
   };
 }
 
+/**
+ * The read-only motion commissioning projection.
+ *
+ * Two halves, both read-only and never merged into one claim:
+ *   - `design`: the frozen Owner-confirmed motion design (controllers, axes, Water Jet axis
+ *     allocations, brake and limit plans) with the authorization gate reported CLOSED. It is data,
+ *     so it is always available and never depends on a device.
+ *   - `runtime`: the motion section of the local Runtime Snapshot, or an explicit UNAVAILABLE state.
+ *     The Preview has no motion client of its own: it never contacts a controller, and a missing or
+ *     malformed Runtime answer is reported as a state, never substituted with invented values.
+ *
+ * Nothing here authorizes anything. The gate is CLOSED in this software revision and every motion
+ * intent is refused before any hardware path is reached.
+ */
+export async function motionCommissioningPayload({ runtimeFetch = globalThis.fetch,
+  runtimePort = process.env.WJSS_API_PORT ?? DEFAULT_RUNTIME_PORT, readRuntime = false } = {}) {
+  const design = motionCommissioningDesign();
+  // The Runtime half is read ONLY when the caller asks for it (the section's Refresh control). A
+  // second boot-time Snapshot read would couple the whole page to the Runtime host, and the design
+  // projection does not depend on one: it is Owner-confirmed data with a closed gate.
+  if (!readRuntime) {
+    return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design,
+      runtime: { status: 'NOT_READ', revision: null, motion: null, refusalReasons: [...MOTION_ALL_REFUSAL_REASONS] } } };
+  }
+  const port = String(runtimePort);
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+    throw new RangeError('The local Runtime API port must be an integer from 1 through 65535.');
+  }
+  const origin = new URL(LOOPBACK_ORIGIN);
+  origin.port = port;
+  const envelope = (status, revision = null, motion = null) => ({
+    status, revision, motion,
+    // The refusal vocabulary travels with the state, so the screen can never show a refusal as a
+    // bare code with no wording.
+    refusalReasons: [...MOTION_ALL_REFUSAL_REASONS],
+  });
+
+  let runtime;
+  let response;
+  try {
+    response = await runtimeFetch(new URL('/api/v1/snapshot', origin).href, {
+      method: 'GET', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(1200),
+    });
+  } catch {
+    runtime = envelope('RUNTIME_UNAVAILABLE');
+    return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design, runtime } };
+  }
+  if (!response?.ok) {
+    runtime = envelope('RUNTIME_UNAVAILABLE');
+    return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design, runtime } };
+  }
+
+  let snapshot;
+  try { snapshot = await response.json(); }
+  catch {
+    runtime = envelope('INVALID_RUNTIME_RESPONSE');
+    return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design, runtime } };
+  }
+  if (!record(snapshot) || snapshot.kind !== 'snapshot' || snapshot.schema !== 'wjss.snapshot/2'
+      || snapshot.apiVersion !== 1 || !Number.isSafeInteger(snapshot.revision) || snapshot.revision < 1) {
+    runtime = envelope('INVALID_RUNTIME_RESPONSE');
+    return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design, runtime } };
+  }
+  // Absent or null motion is a legitimate Runtime state: no motion section was composed. It is never
+  // presented as a published projection.
+  if (!Object.hasOwn(snapshot, 'motion') || snapshot.motion === null) {
+    runtime = envelope('NOT_PUBLISHED', snapshot.revision);
+    return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design, runtime } };
+  }
+  if (!validMotionCommissioning(snapshot.motion)) {
+    runtime = envelope('INVALID_RUNTIME_RESPONSE', snapshot.revision);
+    return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design, runtime } };
+  }
+  runtime = envelope('PUBLISHED', snapshot.revision, snapshot.motion);
+  return { status: 200, body: { stageId: STAGE_ID, mode: PREVIEW_MODE, design, runtime } };
+}
+
 export function createPreviewServer({ runtimeFetch = globalThis.fetch,
   runtimePort = process.env.WJSS_API_PORT ?? DEFAULT_RUNTIME_PORT } = {}) {
   return createServer(async (req, res) => {
@@ -618,6 +704,14 @@ export function createPreviewServer({ runtimeFetch = globalThis.fetch,
       }
       if (path === '/api/tc-acquisition') {
         const { status, body } = await tcAcquisitionPayload({ runtimeFetch, runtimePort });
+        return send(res, status, JSON.stringify(body), MIME['.json']);
+      }
+      if (path === '/api/motion-commissioning') {
+        // `?runtime=1` is the only way to make this route read the local Runtime Snapshot. The
+        // default answers with the design projection and an explicit NOT_READ Runtime state.
+        const { status, body } = await motionCommissioningPayload({
+          runtimeFetch, runtimePort, readRuntime: url.searchParams.get('runtime') === '1',
+        });
         return send(res, status, JSON.stringify(body), MIME['.json']);
       }
       const asset = path.slice(1);

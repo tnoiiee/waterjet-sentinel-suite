@@ -93,6 +93,51 @@ const WATER_JET_IDS = TARGET_COVERAGE.map(([, , id]) => id);
 const WATER_JET_PLACEMENT_KINDS = new Set(['BETWEEN_HORIZONTAL', 'BETWEEN_VERTICAL', 'JUNCTION', 'UNRESOLVED']);
 const ISOLATION_VALVE_IDS = WATER_JET_IDS.map((id) => `IV${id.slice(2)}`);
 
+// ---- motion commissioning foundation (mirror of Wjss.Contracts.MotionVocabulary) ----
+// The Application-owned manual motion commissioning projection. Every value is a status or a
+// logical identity: no member carries a network address, and no member can express an authorized
+// motion command. The authorization gate is CLOSED for this software revision.
+export const MOTION_SECTION_ID = 'MOTION_COMMISSIONING_FOUNDATION';
+export const MOTION_SECTION_REVISION = 1;
+export const MOTION_SOURCE = 'APPLICATION_OWNED_MOTION_COMMISSIONING_MODEL';
+export const MOTION_TOPOLOGY_REVISION = 'OWNER_CONFIRMED_REV1';
+export const MOTION_GATE_CLOSED = 'CLOSED';
+export const MOTION_GATE_REASON = 'MOTION_COMMISSIONING_GATE_NOT_OPEN';
+export const MOTION_INTENTS = Object.freeze(['JOG', 'MOVE', 'HOME', 'STOP', 'RELEASE_BRAKE', 'RESET_ENCODER']);
+/** The complete refusal vocabulary in evaluation order: the gate reason leads the standing preconditions. */
+export const MOTION_ALL_REFUSAL_REASONS = Object.freeze([
+  MOTION_GATE_REASON,
+  'GCLIB_NOT_INSTALLED',
+  'CONTROLLER_ENDPOINT_NOT_CONFIGURED',
+  'CONTROLLER_NOT_CONNECTED',
+  'MOTION_PARAMETERS_NOT_CONFIGURED',
+  'SOFTWARE_LIMITS_NOT_COMMISSIONED',
+  'AXIS_NOT_HOMED',
+  'LIMIT_STATE_UNKNOWN',
+  'BRAKE_STATE_UNKNOWN',
+  'HARDWARE_COMMANDS_NOT_AUTHORIZED',
+]);
+export const MOTION_CABINETS = Object.freeze(['WSB1', 'WSB2', 'WSB3', 'WSB4']);
+export const MOTION_AXIS_IDS = Object.freeze(['A', 'B', 'C', 'D']);
+/** A and C are the Horizontal Axis; B and D are the Vertical Axis (Owner-confirmed). */
+export const MOTION_AXIS_ROLE = Object.freeze({ A: 'HORIZONTAL', B: 'VERTICAL', C: 'HORIZONTAL', D: 'VERTICAL' });
+/** Brake output allocation: A-1, B-2, C-3, D-4 (Owner-confirmed). */
+export const MOTION_BRAKE_OUTPUT = Object.freeze({ A: 'OUTPUT_1', B: 'OUTPUT_2', C: 'OUTPUT_3', D: 'OUTPUT_4' });
+/** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the Owner-confirmed allocation. */
+export const MOTION_WATER_JET_BINDINGS = Object.freeze([
+  ['WJ1', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ2', 'WSB1', 'C', 'D', 'DRAWING_REV1_CONFLICT_WJ2_WJ4'],
+  ['WJ3', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ4', 'WSB2', 'A', 'B', 'DRAWING_REV1_CONFLICT_WJ2_WJ4'],
+  ['WJ5', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ6', 'WSB3', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ7', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ8', 'WSB4', 'C', 'D', 'CONFIRMED_OWNER'],
+]);
+export const MOTION_LIMIT_SIGNAL_ROLES = Object.freeze(['REVERSE', 'HOME', 'FORWARD']);
+export const MOTION_CONFLICT_ID = 'MOTION-CONFLICT-01';
+export const MOTION_CONFLICT_STATUS = 'OWNER_DECISION_REQUIRED';
+
 // ---------------------------------------------------------------- helpers
 const isInt = (n) => Number.isInteger(n);
 const isStr = (s) => typeof s === 'string' && s.length > 0;
@@ -446,10 +491,265 @@ export function validTcAcquisition(tc) {
   return validPhysicalTcAcquisition(tc);
 }
 
+/**
+ * Validates the read-only motion commissioning projection.
+ *
+ * The projection is accepted ONLY in the state this software revision can actually publish: the
+ * authorization gate CLOSED, four controllers, sixteen axes, the Owner-confirmed Water Jet axis
+ * allocation, the WJ2 / WJ4 conflict published (never suppressed), the Jog Speed as a display
+ * value in controller units, and no axis homed, connected, commissioned or authorized to move.
+ * A projection that claims a configured endpoint, a ready controller, a homed axis, an executable
+ * parameter or an authorized command is refused: none of those can be true in this revision.
+ */
+export function validMotionCommissioning(motion) {
+  if (motion === null || typeof motion !== 'object' || Array.isArray(motion)) return false;
+  if (!hasExactKeys(motion, MOTION_PROJECTION_KEYS)) return false;
+  if (motion.sectionId !== MOTION_SECTION_ID) return false;
+  if (motion.sectionRevision !== MOTION_SECTION_REVISION) return false;
+  if (motion.source !== MOTION_SOURCE) return false;
+  if (motion.motionTopologyRevision !== MOTION_TOPOLOGY_REVISION) return false;
+  if (motion.authorizationGateState !== MOTION_GATE_CLOSED) return false;
+  if (!sameStrings(motion.authorizationGateReasons, [MOTION_GATE_REASON])) return false;
+  if (!sameStrings(motion.motionIntents, MOTION_INTENTS)) return false;
+  // No axis is in a state in which motion is allowed, so the list is empty by construction.
+  if (!Array.isArray(motion.allowedMotionStates) || motion.allowedMotionStates.length !== 0) return false;
+  if (motion.sessionState !== 'NO_SESSION') return false;
+  if (!isStr(motion.canonicalText)) return false;
+  if (!/^[0-9a-f]{64}$/.test(motion.fingerprint)) return false;
+  if (!Array.isArray(motion.statusLegend) || motion.statusLegend.length === 0
+      || !motion.statusLegend.every((line) => isStr(line) && line.includes(' - '))) return false;
+  if (!Array.isArray(motion.notVerifiedClaims) || motion.notVerifiedClaims.length === 0
+      || !motion.notVerifiedClaims.includes('NO_MOTION_COMMAND_ISSUED')
+      || !motion.notVerifiedClaims.includes('NO_CONTROLLER_CONTACTED')) return false;
+
+  if (!validMotionCommandTotals(motion.commandTotals)) return false;
+  if (!validMotionJogSpeed(motion.jogSpeed)) return false;
+
+  const controllers = motion.controllers;
+  if (!Array.isArray(controllers) || controllers.length !== MOTION_CABINETS.length) return false;
+  if (!controllers.every((controller, index) => validMotionController(controller, MOTION_CABINETS[index]))) return false;
+
+  const axes = motion.axes;
+  if (!Array.isArray(axes) || axes.length !== MOTION_CABINETS.length * MOTION_AXIS_IDS.length) return false;
+  for (let c = 0; c < MOTION_CABINETS.length; c += 1) {
+    for (let a = 0; a < MOTION_AXIS_IDS.length; a += 1) {
+      if (!validMotionAxis(axes[c * MOTION_AXIS_IDS.length + a], `MC-${MOTION_CABINETS[c]}`, MOTION_AXIS_IDS[a])) return false;
+    }
+  }
+
+  const waterJets = motion.waterJets;
+  if (!Array.isArray(waterJets) || waterJets.length !== MOTION_WATER_JET_BINDINGS.length) return false;
+  for (let i = 0; i < MOTION_WATER_JET_BINDINGS.length; i += 1) {
+    const [waterJetId, cabinetId, horizontalAxisId, verticalAxisId, mappingStatus] = MOTION_WATER_JET_BINDINGS[i];
+    const binding = waterJets[i];
+    if (!hasExactKeys(binding, MOTION_WATER_JET_KEYS)) return false;
+    if (binding.waterJetId !== waterJetId || binding.cabinetId !== cabinetId) return false;
+    if (binding.controllerId !== `MC-${cabinetId}`) return false;
+    if (binding.horizontalAxisId !== horizontalAxisId || binding.verticalAxisId !== verticalAxisId) return false;
+    if (binding.mappingStatus !== mappingStatus) return false;
+    if (!MOTION_MAPPING_BASES.includes(binding.mappingBasis)) return false;
+  }
+
+  // The one open mapping conflict must be published, not suppressed: a projection that drops it is
+  // presenting the whole allocation as agreed.
+  const conflicts = motion.mappingConflicts;
+  if (!Array.isArray(conflicts) || conflicts.length !== 1) return false;
+  const conflict = conflicts[0];
+  if (!hasExactKeys(conflict, MOTION_CONFLICT_KEYS)) return false;
+  if (conflict.conflictId !== MOTION_CONFLICT_ID) return false;
+  if (conflict.status !== MOTION_CONFLICT_STATUS) return false;
+  if (!sameStrings(conflict.waterJetIds, ['WJ2', 'WJ4'])) return false;
+  if (!sameStrings(conflict.cabinetIds, ['WSB1', 'WSB2'])) return false;
+  if (!isStr(conflict.description) || !isStr(conflict.effect)) return false;
+
+  return true;
+}
+
+const MOTION_PROJECTION_KEYS = Object.freeze([
+  'sectionId', 'sectionRevision', 'source', 'motionTopologyRevision', 'authorizationGateState',
+  'authorizationGateReasons', 'motionIntents', 'allowedMotionStates', 'sessionState', 'commandTotals',
+  'controllers', 'axes', 'waterJets', 'mappingConflicts', 'jogSpeed', 'notVerifiedClaims',
+  'statusLegend', 'canonicalText', 'fingerprint',
+]);
+const MOTION_CONTROLLER_KEYS = Object.freeze(['identity', 'configuration']);
+const MOTION_CONTROLLER_IDENTITY_KEYS = Object.freeze([
+  'controllerId', 'cabinetId', 'axisCount', 'controllerModel', 'controllerModelStatus', 'controllerIdentityBasis',
+]);
+const MOTION_CONTROLLER_CONFIGURATION_KEYS = Object.freeze([
+  'motionPortIdentity', 'motionPortStatus', 'endpointIdentity', 'controllerConfigurationStatus',
+  'libraryInstallationStatus', 'communicationState', 'motionDispatchReady', 'parameterConfigurationState',
+  'softwareLimitConfigurationState', 'limitInputPolarityStatus', 'endstopConfigurationStatus',
+  'motionDispatchBlockedReason',
+]);
+const MOTION_AXIS_KEYS = Object.freeze(['identity', 'state']);
+const MOTION_AXIS_IDENTITY_KEYS = Object.freeze([
+  'controllerId', 'axisId', 'axisRole', 'axisRoleBasis', 'motionSenseKind', 'motionSenseBasis',
+  'brakeOutputIdentity', 'brakeOutputMappingBasis',
+]);
+const MOTION_AXIS_STATE_KEYS = Object.freeze([
+  'commissioningState', 'homingState', 'homingStateStatus', 'brakeCommandState', 'brakeState',
+  'brakeStateStatus', 'motionState', 'motionStateStatus', 'limitSignals', 'sense', 'safety',
+  'kinematic', 'moveAuthorization',
+]);
+const MOTION_LIMIT_SIGNAL_KEYS = Object.freeze([
+  'signalRole', 'signalKind', 'polarityStatus', 'signalState', 'signalStateStatus', 'senseBasis',
+]);
+const MOTION_SENSE_KEYS = Object.freeze([
+  'motionSenseKind', 'motionSenseBasis', 'senseChannelStatus', 'positionValueStatus',
+  'positionDisplayValue', 'positionUnit',
+]);
+const MOTION_SAFETY_KEYS = Object.freeze([
+  'emergencyStopVisibilityStatus', 'stopCircuitVerificationStatus', 'controlledStopCapabilityStatus',
+  'controlledStopVerificationStatus', 'isolationVerificationStatus', 'localProtectionStatus',
+  'resetEncoderVerificationStatus',
+]);
+const MOTION_KINEMATIC_KEYS = Object.freeze([
+  'kinematicConversionStatus', 'kinematicConversionIsPerAxis', 'publishedUnit', 'conversionProvenanceRequirement',
+]);
+const MOTION_MOVE_AUTHORIZATION_KEYS = Object.freeze(['moveAuthorizationState', 'moveRefusalReasons']);
+const MOTION_WATER_JET_KEYS = Object.freeze([
+  'waterJetId', 'cabinetId', 'controllerId', 'horizontalAxisId', 'verticalAxisId', 'mappingStatus', 'mappingBasis',
+]);
+const MOTION_CONFLICT_KEYS = Object.freeze(['conflictId', 'waterJetIds', 'cabinetIds', 'description', 'status', 'effect']);
+const MOTION_PARAMETER_KEYS = Object.freeze(['parameterId', 'displayValue', 'unit', 'status', 'provenanceBasis', 'executable']);
+const MOTION_COMMAND_TOTALS_KEYS = Object.freeze([
+  'evaluated', 'authorized', 'refused', 'hardwareCommandsIssued', 'commandState', 'journalPersistence',
+]);
+const MOTION_MAPPING_BASES = Object.freeze(['OWNER_CONFIRMED', 'DRAWING_REV1']);
+const MOTION_SENSE_KINDS = Object.freeze(['ENCODER', 'INSTALLED', 'UNCONFIRMED']);
+
+const sameStrings = (actual, expected) => Array.isArray(actual) && actual.length === expected.length
+  && actual.every((value, index) => value === expected[index]);
+
+function validMotionCommandTotals(totals) {
+  if (totals === null || typeof totals !== 'object' || Array.isArray(totals)) return false;
+  if (!hasExactKeys(totals, MOTION_COMMAND_TOTALS_KEYS)) return false;
+  // Nothing has been evaluated against a controller, so nothing was authorized, refused or issued.
+  return totals.evaluated === 0 && totals.authorized === 0 && totals.refused === 0
+    && totals.hardwareCommandsIssued === 0
+    && totals.commandState === 'NO_COMMANDS' && totals.journalPersistence === 'NONE';
+}
+
+/** The initial Jog Speed: a display value in controller units that is never executable. */
+function validMotionJogSpeed(jogSpeed) {
+  if (jogSpeed === null || typeof jogSpeed !== 'object' || Array.isArray(jogSpeed)) return false;
+  if (!hasExactKeys(jogSpeed, MOTION_PARAMETER_KEYS)) return false;
+  return jogSpeed.parameterId === 'JOG_SPEED' && jogSpeed.displayValue === '10'
+    && jogSpeed.unit === 'controller units' && jogSpeed.status === 'LEGACY_CANDIDATE_UNVERIFIED'
+    && jogSpeed.executable === false && isStr(jogSpeed.provenanceBasis);
+}
+
+function validMotionController(controller, cabinetId) {
+  if (controller === null || typeof controller !== 'object' || Array.isArray(controller)) return false;
+  if (!hasExactKeys(controller, MOTION_CONTROLLER_KEYS)) return false;
+  const identity = controller.identity;
+  const configuration = controller.configuration;
+  if (identity === null || typeof identity !== 'object' || Array.isArray(identity)) return false;
+  if (!hasExactKeys(identity, MOTION_CONTROLLER_IDENTITY_KEYS)) return false;
+  if (identity.controllerId !== `MC-${cabinetId}` || identity.cabinetId !== cabinetId) return false;
+  if (identity.axisCount !== MOTION_AXIS_IDS.length) return false;
+  if (!isStr(identity.controllerModel) || !isStr(identity.controllerModelStatus)) return false;
+  // One controller per cabinet is an inference from the confirmed allocation, never a confirmation.
+  if (identity.controllerIdentityBasis !== 'INFERRED_FROM_OWNER_CONFIRMED_MAPPING') return false;
+
+  if (configuration === null || typeof configuration !== 'object' || Array.isArray(configuration)) return false;
+  if (!hasExactKeys(configuration, MOTION_CONTROLLER_CONFIGURATION_KEYS)) return false;
+  // No endpoint is configured, no library is installed and no controller is connected, so no
+  // controller can dispatch motion.
+  if (configuration.motionPortIdentity !== 'MOTION_PORT_NOT_CONFIGURED') return false;
+  if (configuration.motionPortStatus !== 'NOT_CONFIGURED') return false;
+  if (configuration.endpointIdentity !== 'ENDPOINT_NOT_CONFIGURED') return false;
+  if (configuration.controllerConfigurationStatus !== 'NOT_CONFIGURED') return false;
+  if (configuration.libraryInstallationStatus !== 'NOT_INSTALLED') return false;
+  if (configuration.communicationState !== 'NOT_CONNECTED') return false;
+  if (configuration.motionDispatchReady !== false) return false;
+  if (configuration.motionDispatchBlockedReason !== MOTION_GATE_REASON) return false;
+  if (configuration.parameterConfigurationState !== 'NOT_CONFIGURED') return false;
+  if (configuration.softwareLimitConfigurationState !== 'NOT_COMMISSIONED') return false;
+  if (configuration.limitInputPolarityStatus !== 'UNCONFIRMED') return false;
+  return configuration.endstopConfigurationStatus === 'NOT_COMMISSIONED';
+}
+
+function validMotionAxis(axis, controllerId, axisId) {
+  if (axis === null || typeof axis !== 'object' || Array.isArray(axis)) return false;
+  if (!hasExactKeys(axis, MOTION_AXIS_KEYS)) return false;
+  const identity = axis.identity;
+  const state = axis.state;
+  if (identity === null || typeof identity !== 'object' || Array.isArray(identity)) return false;
+  if (!hasExactKeys(identity, MOTION_AXIS_IDENTITY_KEYS)) return false;
+  if (identity.controllerId !== controllerId || identity.axisId !== axisId) return false;
+  if (identity.axisRole !== MOTION_AXIS_ROLE[axisId]) return false;
+  if (identity.axisRoleBasis !== 'OWNER_CONFIRMED') return false;
+  if (!MOTION_SENSE_KINDS.includes(identity.motionSenseKind)) return false;
+  if (identity.motionSenseBasis !== 'OWNER_CONFIRMED') return false;
+  if (identity.brakeOutputIdentity !== MOTION_BRAKE_OUTPUT[axisId]) return false;
+  if (identity.brakeOutputMappingBasis !== 'OWNER_CONFIRMED') return false;
+
+  if (state === null || typeof state !== 'object' || Array.isArray(state)) return false;
+  if (!hasExactKeys(state, MOTION_AXIS_STATE_KEYS)) return false;
+  if (state.commissioningState !== 'NOT_COMMISSIONED') return false;
+  if (state.homingState !== 'NOT_HOMED' || state.homingStateStatus !== 'UNKNOWN') return false;
+  if (state.brakeCommandState !== 'NONE' || state.brakeState !== 'UNKNOWN' || state.brakeStateStatus !== 'NOT_AVAILABLE') return false;
+  if (state.motionState !== 'UNKNOWN' || state.motionStateStatus !== 'NOT_AVAILABLE') return false;
+
+  if (!Array.isArray(state.limitSignals) || state.limitSignals.length !== MOTION_LIMIT_SIGNAL_ROLES.length) return false;
+  for (let i = 0; i < MOTION_LIMIT_SIGNAL_ROLES.length; i += 1) {
+    const signal = state.limitSignals[i];
+    if (signal === null || typeof signal !== 'object' || Array.isArray(signal)) return false;
+    if (!hasExactKeys(signal, MOTION_LIMIT_SIGNAL_KEYS)) return false;
+    if (signal.signalRole !== MOTION_LIMIT_SIGNAL_ROLES[i]) return false;
+    if (!MOTION_SENSE_KINDS.includes(signal.signalKind)) return false;
+    // The switches are installed, but the electrical meaning is unconfirmed and the state is unread.
+    if (signal.polarityStatus !== 'UNCONFIRMED') return false;
+    if (signal.signalState !== 'UNKNOWN' || signal.signalStateStatus !== 'NOT_AVAILABLE') return false;
+    if (!isStr(signal.senseBasis)) return false;
+  }
+
+  const sense = state.sense;
+  if (sense === null || typeof sense !== 'object' || Array.isArray(sense)) return false;
+  if (!hasExactKeys(sense, MOTION_SENSE_KEYS)) return false;
+  if (sense.motionSenseKind !== identity.motionSenseKind) return false;
+  if (sense.senseChannelStatus !== 'NOT_AVAILABLE' || sense.positionValueStatus !== 'NOT_READ') return false;
+  // A position is never invented: the display value is null while nothing is read.
+  if (sense.positionDisplayValue !== null) return false;
+
+  const safety = state.safety;
+  if (safety === null || typeof safety !== 'object' || Array.isArray(safety)) return false;
+  if (!hasExactKeys(safety, MOTION_SAFETY_KEYS)) return false;
+  if (safety.emergencyStopVisibilityStatus !== 'NOT_AVAILABLE') return false;
+  if (safety.stopCircuitVerificationStatus !== 'NOT_VERIFIED') return false;
+  if (safety.controlledStopCapabilityStatus !== 'UNRESOLVED') return false;
+  if (safety.controlledStopVerificationStatus !== 'NOT_VERIFIED') return false;
+  if (safety.isolationVerificationStatus !== 'NOT_VERIFIED') return false;
+  if (safety.localProtectionStatus !== 'NOT_VERIFIED') return false;
+  if (safety.resetEncoderVerificationStatus !== 'NOT_VERIFIED') return false;
+
+  const kinematic = state.kinematic;
+  if (kinematic === null || typeof kinematic !== 'object' || Array.isArray(kinematic)) return false;
+  if (!hasExactKeys(kinematic, MOTION_KINEMATIC_KEYS)) return false;
+  // Counts stay counts: no conversion is published and the conversion is per axis when it exists.
+  if (kinematic.kinematicConversionStatus !== 'UNRESOLVED') return false;
+  if (kinematic.kinematicConversionIsPerAxis !== true) return false;
+  if (kinematic.publishedUnit !== 'controller units') return false;
+  if (kinematic.conversionProvenanceRequirement !== 'MEASURED_DURING_COMMISSIONING') return false;
+
+  const move = state.moveAuthorization;
+  if (move === null || typeof move !== 'object' || Array.isArray(move)) return false;
+  if (!hasExactKeys(move, MOTION_MOVE_AUTHORIZATION_KEYS)) return false;
+  if (move.moveAuthorizationState !== 'REFUSED') return false;
+  return sameStrings(move.moveRefusalReasons, MOTION_ALL_REFUSAL_REASONS);
+}
+
 function validateSharedBody(obj, path, issues) {
   if ('tcAcquisition' in obj && (obj.kind === 'delta' || obj.tcAcquisition !== null)
       && !validTcAcquisition(obj.tcAcquisition)) {
     issues.push(`${path}.tcAcquisition: must be a complete quarantined TC record — either the deterministic non-Hardware variant or the physical read-only variant; Delta cannot clear it`);
+  }
+  // null is a legitimate motion value in a Snapshot (no motion state composed); a published
+  // projection must be the complete not-configured / not-commissioned state of this revision.
+  if ('motion' in obj && (obj.kind === 'delta' || obj.motion !== null)
+      && !validMotionCommissioning(obj.motion)) {
+    issues.push(`${path}.motion: must be the complete read-only motion commissioning projection with the authorization gate CLOSED`);
   }
   if (obj.queue !== undefined && obj.queue !== null) validateQueue(obj.queue, `${path}.queue`, issues);
   // null is a legitimate value in BOTH envelopes: Snapshot (no active job) and
@@ -688,6 +988,9 @@ function validateDelta(obj, issues) {
   if ('wallMap' in obj) issues.push('wallMap must never appear in a Delta');
   if ('waterJets' in obj) issues.push('waterJets must never appear in a Delta (process-lifetime immutable topology; Snapshot establishes it)');
   if ('isolationValves' in obj) issues.push('isolationValves must never appear in a Delta (process-lifetime immutable topology; Snapshot establishes it)');
+  // The motion commissioning projection is Snapshot-only: the Runtime Delta has no motion member,
+  // so a Delta carrying one cannot be produced by the Runtime and is refused.
+  if ('motion' in obj) issues.push('motion must never appear in a Delta (Snapshot-only commissioning projection; the Runtime Delta carries no motion member)');
   // Three-state activeJob encoding (accepted baseline; Owner review 2026-10-07):
   // absent key = unchanged | object = replace | explicit null = clear.
   if ('activeJobCleared' in obj) {

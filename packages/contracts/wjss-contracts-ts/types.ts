@@ -448,6 +448,188 @@ export interface TcAcquisitionState {
   notVerified: string[];
 }
 
+/**
+ * The read-only Application-owned motion commissioning projection: four motion controllers
+ * (one per WSB cabinet), sixteen controller axes and the eight Water Jet axis allocations.
+ *
+ * It is composed by the Application model from Owner-confirmed data and from the standing
+ * not-configured / not-commissioned state of the software revision that publishes it. It is
+ * never a device read, it carries no network address, and it is never a command surface: the
+ * authorization gate is CLOSED and every motion intent is refused before any hardware path.
+ */
+export interface MotionCommissioningProjection {
+  sectionId: string;
+  sectionRevision: number;
+  source: string;
+  motionTopologyRevision: string;
+  /** CLOSED: every motion intent is refused before any hardware path is reached. */
+  authorizationGateState: string;
+  authorizationGateReasons: string[];
+  /** The six motion intents the foundation knows: JOG, MOVE, HOME, STOP, RELEASE_BRAKE, RESET_ENCODER. */
+  motionIntents: string[];
+  /** Empty: no axis is in a state in which motion is allowed. */
+  allowedMotionStates: string[];
+  sessionState: string;
+  commandTotals: MotionCommandTotals;
+  controllers: MotionControllerProjection[];
+  axes: MotionAxisProjection[];
+  waterJets: MotionWaterJetAxisBinding[];
+  mappingConflicts: MotionMappingConflict[];
+  /** The initial Jog Speed: a display value in controller units, never executable. */
+  jogSpeed: MotionParameterState;
+  notVerifiedClaims: string[];
+  /** Every status and refusal code with its wording, so no state is shown by colour alone. */
+  statusLegend: string[];
+  canonicalText: string;
+  fingerprint: string;
+}
+
+/** Logical identity of one motion controller. No member carries an address. */
+export interface MotionControllerIdentity {
+  controllerId: string;
+  cabinetId: string;
+  axisCount: number;
+  controllerModel: string;
+  controllerModelStatus: string;
+  controllerIdentityBasis: string;
+}
+
+/** Configuration state of one motion controller: every member an explicit not-configured value. */
+export interface MotionControllerConfigurationState {
+  motionPortIdentity: string;
+  motionPortStatus: string;
+  /** Redacted logical identity only: ENDPOINT_NOT_CONFIGURED while nothing is configured. */
+  endpointIdentity: string;
+  controllerConfigurationStatus: string;
+  libraryInstallationStatus: string;
+  communicationState: string;
+  motionDispatchReady: boolean;
+  parameterConfigurationState: string;
+  softwareLimitConfigurationState: string;
+  limitInputPolarityStatus: string;
+  endstopConfigurationStatus: string;
+  motionDispatchBlockedReason: string;
+}
+
+export interface MotionControllerProjection {
+  identity: MotionControllerIdentity;
+  configuration: MotionControllerConfigurationState;
+}
+
+/** Owner-confirmed identity of one controller axis: role, position sense and brake output. */
+export interface MotionAxisIdentity {
+  controllerId: string;
+  axisId: string;
+  /** HORIZONTAL or VERTICAL: A and C are the Horizontal Axis, B and D the Vertical Axis. */
+  axisRole: string;
+  axisRoleBasis: string;
+  motionSenseKind: string;
+  motionSenseBasis: string;
+  brakeOutputIdentity: string;
+  brakeOutputMappingBasis: string;
+}
+
+/** One installed limit input of one axis. Polarity is UNCONFIRMED and the state is UNKNOWN. */
+export interface MotionLimitSignalState {
+  signalRole: string;
+  signalKind: string;
+  polarityStatus: string;
+  signalState: string;
+  signalStateStatus: string;
+  senseBasis: string;
+}
+
+export interface MotionAxisSenseState {
+  motionSenseKind: string;
+  motionSenseBasis: string;
+  senseChannelStatus: string;
+  positionValueStatus: string;
+  positionDisplayValue: string | null;
+  positionUnit: string | null;
+}
+
+/** Motion-local protections. NOT the Cleaning-process interlocks, which never appear here. */
+export interface MotionAxisSafetyState {
+  emergencyStopVisibilityStatus: string;
+  stopCircuitVerificationStatus: string;
+  controlledStopCapabilityStatus: string;
+  controlledStopVerificationStatus: string;
+  isolationVerificationStatus: string;
+  localProtectionStatus: string;
+  resetEncoderVerificationStatus: string;
+}
+
+export interface MotionAxisKinematicState {
+  kinematicConversionStatus: string;
+  kinematicConversionIsPerAxis: boolean;
+  publishedUnit: string;
+  conversionProvenanceRequirement: string;
+}
+
+export interface MotionAxisMoveAuthorization {
+  moveAuthorizationState: string;
+  moveRefusalReasons: string[];
+}
+
+export interface MotionAxisCommissioningState {
+  commissioningState: string;
+  homingState: string;
+  homingStateStatus: string;
+  brakeCommandState: string;
+  brakeState: string;
+  brakeStateStatus: string;
+  motionState: string;
+  motionStateStatus: string;
+  limitSignals: MotionLimitSignalState[];
+  sense: MotionAxisSenseState;
+  safety: MotionAxisSafetyState;
+  kinematic: MotionAxisKinematicState;
+  moveAuthorization: MotionAxisMoveAuthorization;
+}
+
+export interface MotionAxisProjection {
+  identity: MotionAxisIdentity;
+  state: MotionAxisCommissioningState;
+}
+
+/** The Owner-confirmed axis allocation of one Water Jet. */
+export interface MotionWaterJetAxisBinding {
+  waterJetId: string;
+  cabinetId: string;
+  controllerId: string;
+  horizontalAxisId: string;
+  verticalAxisId: string;
+  mappingStatus: string;
+  mappingBasis: string;
+}
+
+export interface MotionMappingConflict {
+  conflictId: string;
+  waterJetIds: string[];
+  cabinetIds: string[];
+  description: string;
+  status: string;
+  effect: string;
+}
+
+export interface MotionParameterState {
+  parameterId: string;
+  displayValue: string;
+  unit: string;
+  status: string;
+  provenanceBasis: string;
+  executable: boolean;
+}
+
+export interface MotionCommandTotals {
+  evaluated: number;
+  authorized: number;
+  refused: number;
+  hardwareCommandsIssued: number;
+  commandState: string;
+  journalPersistence: string;
+}
+
 export interface OperationalSnapshot {
   kind: 'snapshot';
   schema: typeof SNAPSHOT_SCHEMA;
@@ -474,6 +656,11 @@ export interface OperationalSnapshot {
   trend: TrendWindow;
   /** Older fixtures may omit this; the wired Runtime serializes null until its one read publishes. */
   tcAcquisition?: TcAcquisitionState | null;
+  /**
+   * The read-only Application-owned motion commissioning projection. Null when the Runtime
+   * composed none. Snapshot-only; NEVER in a Delta (the Runtime Delta has no motion member).
+   */
+  motion?: MotionCommissioningProjection | null;
   /** Optional review marker; PROVISIONAL fixtures carry it until .NET regeneration replaces it. */
   fixtureStatus?: string;
 }

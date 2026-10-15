@@ -1,5 +1,6 @@
 using Wjss.Contracts;
 using Wjss.Domain;
+using Wjss.Runtime.Core.Motion;
 
 namespace Wjss.Runtime.Core;
 
@@ -32,6 +33,10 @@ namespace Wjss.Runtime.Core;
 ///   acquisition evidence yet, and a fabricated ONLINE state is refused by the
 ///   invariants,</item>
 ///   <item>the bounded trend window is empty.</item>
+///   <item>the motion commissioning projection is composed with its authorization gate CLOSED:
+///   no controller endpoint is configured, no controller library is installed, no controller is
+///   connected, no axis is homed and no motion command is authorized. It is a composed projection,
+///   never a device read.</item>
 /// </list>
 /// </summary>
 public static class RuntimeStateComposer
@@ -103,6 +108,11 @@ public static class RuntimeStateComposer
             Sequence = IdleSequence(),
             Alarms = EmptyAlarms(),
             Communication = NoEvidenceCommunication(),
+            // The motion commissioning projection is composed, never acquired: it is a pure
+            // function of the Owner-confirmed topology and of this revision's standing
+            // not-configured state. It therefore publishes the closed gate from the first revision,
+            // and no commit path in this revision changes it.
+            Motion = MotionCommissioningProjector.Project(),
             Trend = EmptyTrend(),
         };
 

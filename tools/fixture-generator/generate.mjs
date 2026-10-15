@@ -400,6 +400,11 @@ export function buildSnapshot(profile) {
         pollsFailed: 0,
       })),
     },
+    // The Snapshot contract gained the motion commissioning member. The C# generator leaves it
+    // unset, so `DefaultIgnoreCondition.Never` serializes it as an explicit null: the deterministic
+    // sample composes no motion projection. Adding it here keeps the Node port byte-aligned with the
+    // C# generator for the new member.
+    motion: null,
     runtime: {
       uptimeSeconds: 42,
       sseClients: 1,
