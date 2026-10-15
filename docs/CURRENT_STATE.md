@@ -20,6 +20,22 @@
 > with its own strict validator beside the untouched deterministic one, the CAB1 Drawing-rev1 mapping
 > projection and candidate decode, and the Runtime-backed CAB1 U-shape Sensor Map in the Operations
 > Preview. No real endpoint value is committed, and no hardware was contacted.
+>
+> **Owner-local validation of this branch, and the resulting correction (2026-10-15).** At head
+> `d1163691…` the Owner-local locked restore PASSED and the full Release build FAILED with 51 errors
+> confined to `Wjss.Domain` and `Wjss.TcBench`, plus two `MSB3245` warnings naming the output
+> directory of the unrelated external motion-control toolset installed on the Owner's machine. That
+> is the signature of a local build-shell global-property override, not of the Source: the feature
+> commit changed **no** build file, no build file in the repository sets an output- or
+> reference-resolution property (`TargetPath`, `TargetDir`, `OutDir`, `OutputPath`, `ReferencePath`,
+> `AssemblySearchPaths`, …), none carries an absolute or machine-local path, and every
+> `ProjectReference` resolves to an existing project while every unresolved type is still declared
+> by the assembly that owns it. The correction is therefore documentation plus regression coverage,
+> with no Source workaround for the environment: runbook §0A now sweeps the whole property class,
+> records the failure signature and adds a focused pre-build checkpoint, and
+> `tests/config.tests/ProjectGraphSourceTests.cs` pins the build-graph properties. No Product
+> behavior, build file, `packages.lock.json` or dependency changed; `.NET NOT RUN` in the Agent
+> environment, and the Owner-local build remains the validation of record.
 
 ## 1. Current Status
 

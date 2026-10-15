@@ -13,6 +13,67 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-15 — Build-graph defect-class correction after the Owner-local PR #27 Release build failure (no Source defect; on branch; PR OPEN, NOT MERGED)
+
+**Status: CORRECTION APPLIED — DOCUMENTATION AND REGRESSION COVERAGE ONLY; NO PRODUCT SOURCE, BUILD
+FILE, LOCK OR DEPENDENCY CHANGED. AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent
+sandbox); the Owner-local build remains the validation of record.**
+
+**What happened.** At head `d116369198d4c9ae68e24a85ea9d0f124a032cb5` (direct parent
+`4a28b428b82179acc3a83cf368665ae008f5d1cf`, the PR #26 merge commit) the Owner-local locked restore
+PASSED and then `dotnet build WaterJetSentinelSuite.sln -c Release --no-restore` FAILED with **51
+errors and 2 `MSB3245` warnings**. The failures were confined to two projects — `Wjss.Domain`
+(unresolved `Wjss.Contracts` and eleven of its types) and `Wjss.TcBench` (unresolved
+`Wjss.Adapters.TcAcquisition` and its types) — while `Wjss.Contracts`, `Wjss.Adapters.TcAcquisition`,
+`Wjss.Time` and `Wjss.Kiosk` compiled.
+
+**Root cause — an environment override, not the Source.** The two failing projects are exactly the
+two that carry a `ProjectReference`; the four that compiled carry none. Both `MSB3245` warnings
+named a directory belonging to the unrelated external motion-control toolset installed on the
+Owner's machine, raised once per unresolved direct `ProjectReference`. That is the signature of a
+global-property override imported from the build shell — the same class of local environment
+contamination recorded for Stage 0.3A-1 rounds 2–3 above, in which a process-scope `TargetPath` set
+by the same toolset hijacked output and reference resolution and produced a cascading
+`Wjss.Contracts` failure in correct Source.
+
+**The Source was checked and is correct.** `git diff --stat` between the baseline and the failed
+head over `*.csproj`, `*.props`, `*.targets`, `*.sln`, `global.json` and `*.editorconfig` is
+**empty** — the feature commit changed no build file at all. No build file in the repository sets
+`TargetPath`, `TargetDir`, `OutDir`, `OutputPath`, `ReferencePath`, `AssemblySearchPaths`,
+`AdditionalLibPaths`, `AssemblyFoldersEx`, `HintPath` or an external assembly `Reference`; none
+contains an absolute or machine-local path, or the toolset's name; every `ProjectReference`
+resolves to an existing project; the two `AssemblyName`-less assumptions hold; and every unresolved
+type is still declared by the assembly that is supposed to own it (`DeviceProfile` and `Wall` in
+`packages/contracts/Enums.cs`, `CanonicalSensorMap` in `WallMap.cs`, `WaterJetConfiguration`,
+`IsolationValveConfiguration` and `Region` in `Topology.cs`, the five migration/deferred types in
+`Config.cs`; `ITcReadOnlyClient` and the read-kind/result types in
+`adapters/tc-acquisition/`). The defect class is therefore **the local environment, not the
+Product tree**, and no Source, reference or property workaround was added — the repository adopts
+no vendor path, `ReferencePath`/`TargetPath` override or machine-local reference of any kind.
+
+**What the correction changes.** (1) `docs/STAGE_0.3A_OWNER_LOCAL_VALIDATION.md` §0A now checks the
+whole global-property class rather than `TargetPath` alone, records the exact failure signature
+(`MSB3245` "expected a reference file but received directory" once per direct `ProjectReference`,
+plus `CS0246` only for that assembly's types, plus every reference-free project still compiling),
+states that this signature must never be answered by editing the Product tree, and adds a focused
+~1-minute checkpoint (`Wjss.Domain` and `Wjss.TcBench` Release builds with `--no-restore`) that
+isolates the class before the full build; the §8 evidence template gains the class sweep and the
+focused-checkpoint outcome, additively, without altering the dated template lines. (2)
+`tests/config.tests/ProjectGraphSourceTests.cs` adds static build-graph architecture coverage so the
+same class cannot return unnoticed from the Source side: every `ProjectReference` resolves to an
+existing project inside the repository; the solution and the projects on disk are the same set;
+assembly identities are unique so no project can shadow another; no build file sets an output- or
+reference-resolution property, carries an absolute/UNC/vendor-local path, a `HintPath` or an
+external assembly `Reference`; no project disables analyzer or warning enforcement; and the exact
+PR #27 reference edges, the self-owned adapter and contracts projects, the declaring types and both
+modes of the profile contract are pinned. `docs/CURRENT_STATE.md` records the validation outcome.
+No test in this class depends on the Owner's toolset installation, and none requires a build.
+
+**Unchanged by this correction.** No Product behavior, no runtime code, no contract, no build file,
+no `packages.lock.json` (project graph and dependencies are unchanged, so all committed locks stay
+verbatim), no dependency, no analyzer or warning policy, no endpoint handling, no physical-mode
+semantics, no deterministic-mode semantics. PR #27 remains OPEN and NOT MERGED.
+
 ### 2026-10-15 — One-Node physical TC read-only integration (Owner decision R1; on branch; PR OPEN, NOT MERGED)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET
