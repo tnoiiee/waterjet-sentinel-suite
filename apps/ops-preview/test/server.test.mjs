@@ -6,8 +6,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BOUNDARY, DEFAULT_PORT, DEFAULT_RUNTIME_PORT, STAGE_ID, UI_BIND_HOST,
-  createPreviewServer, tcAcquisitionPayload } from '../server.mjs';
+  createPreviewServer, tcAcquisitionPayload, tcPhysicalMappingPayload } from '../server.mjs';
 import { allText, bootApp } from './helpers/fakeDom.mjs';
+import { PHYSICAL_NOT_VERIFIED } from '../../../packages/contracts/wjss-contracts-ts/validate.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, '..', 'public');
@@ -434,5 +435,266 @@ test('the real Kiosk section renders published, not-published and unavailable st
       assert.equal(text.includes('Raw words'), scenario.published);
       assert.equal(app.byId['boot-error'].hidden, true, 'this section cannot break the synthetic Monitor');
     } finally { app.close(); }
+  }
+});
+
+// --- One-Node physical read-only variant, served read-only ---------------------------------------
+//
+// The physical envelope is a CANDIDATE presentation. It must carry its honest labels together with
+// the numbers, must present the legacy sentinels as raw evidence rather than as temperatures, must
+// keep the two Drawing conflicts visible, and must never carry an endpoint. The endpoint is absent
+// from the Runtime record by construction, so there is nothing to redact or leak here: these tests
+// prove the ABSENCE.
+
+/** The exact JSON shape of a published PHYSICAL quarantined record, as the Runtime would write it. */
+const physicalSnapshot = (overrides = {}) => ({
+  kind: 'snapshot', schema: 'wjss.snapshot/2', apiVersion: 1, revision: 7,
+  tcAcquisition: {
+    nodeId: 'TC-NODE-01', cabinetId: 'CAB1', provenance: 'PHYSICAL_HOLDING_REGISTER_READ_ONLY',
+    physical: true, quarantined: true, acquisitionState: 'COMPLETE',
+    acquiredAtUtc: '2026-10-15T10:20:30+00:00', copiedWordCount: 40,
+    // Offset 0 and 1 are the legacy sentinel candidates; the rest are ordinary words.
+    rawWords: [0x7FFF, 0xF830, ...Array.from({ length: 38 }, (_, i) => 100 + i)],
+    quality: 'PHYSICAL_QUARANTINED', diagnosticState: 'NONE',
+    mappingStatus: 'DRAWING_REV1_MAPPING_DECLARED_NOT_VERIFIED',
+    decodeStatus: 'DECODE_CANDIDATE_NOT_VERIFIED',
+    notVerified: [...PHYSICAL_NOT_VERIFIED],
+    physicalEvidence: {
+      endpointIdentity: 'ENDPOINT_CONFIGURED', commissioningState: 'NOT_COMMISSIONED',
+      mappingEvidenceState: 'DRAWING_INTERNAL_CONFLICT',
+      readProfile: {
+        functionCode: 'FC03', registerArea: 'HOLDING_REGISTERS', port: 502,
+        unitIdentifier: 1, startAddress: 0, quantity: 40,
+      },
+    },
+  },
+  ...overrides,
+});
+
+const physicalRuntimeStatus = () => ({
+  currentRevision: 7, profile: 'TEST_HARDWARE_READ_ONLY', ready: true,
+});
+
+test('the TC route serves the physical variant with its candidate labels and its raw sentinels', async () => {
+  const runtimeFetch = async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+    ? physicalRuntimeStatus() : physicalSnapshot());
+
+  await withRuntimeFetch(runtimeFetch, async (origin) => {
+    const res = await fetch(`${origin}/api/tc-acquisition`);
+    assert.equal(res.status, 200);
+    const envelope = await res.json();
+    assert.equal(envelope.status, 'PUBLISHED');
+    assert.equal(envelope.revision, 7);
+    assert.equal(envelope.stageId, STAGE_ID);
+    const tcAcquisition = envelope.tcAcquisition;
+    assert.equal(tcAcquisition.physical, true);
+    assert.equal(tcAcquisition.quarantine, true);
+    assert.equal(tcAcquisition.quality, 'PHYSICAL_QUARANTINED');
+    assert.deepEqual(tcAcquisition.labels, ['PHYSICAL', 'QUARANTINED', 'DECODE CANDIDATE', 'NOT COMMISSIONED']);
+    assert.equal(tcAcquisition.commissioningState, 'NOT_COMMISSIONED');
+    assert.equal(tcAcquisition.mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+    // The redacted identity is the only endpoint statement in the response.
+    assert.equal(tcAcquisition.endpointIdentity, 'ENDPOINT_CONFIGURED');
+    assert.equal(tcAcquisition.sensorCount, 18);
+    assert.equal(tcAcquisition.measurementCount, 36);
+    assert.deepEqual(tcAcquisition.spareOffsets, [36, 37, 38, 39]);
+    assert.equal(tcAcquisition.readProfile.functionCode, 'FC03');
+    assert.equal(tcAcquisition.readProfile.quantity, 40);
+    // Scaling, signedness and byte order are declared unverified, never asserted.
+    assert.equal(tcAcquisition.candidateDecode.state, 'DECODE_CANDIDATE_NOT_VERIFIED');
+    assert.equal(tcAcquisition.candidateDecode.scaling, 'NOT_VERIFIED');
+    assert.equal(tcAcquisition.candidateDecode.signedRepresentation, 'NOT_VERIFIED');
+    assert.equal(tcAcquisition.candidateDecode.byteOrder, 'NOT_VERIFIED');
+    assert.deepEqual(tcAcquisition.notVerified, PHYSICAL_NOT_VERIFIED);
+  });
+});
+
+test('the legacy sentinel candidates never surface as ordinary temperatures in the served payload', async () => {
+  const runtimeFetch = async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+    ? physicalRuntimeStatus() : physicalSnapshot());
+
+  await withRuntimeFetch(runtimeFetch, async (origin) => {
+    const res = await fetch(`${origin}/api/tc-acquisition`);
+    const { tcAcquisition } = await res.json();
+    const sensor = tcAcquisition.sensors.find((s) => s.sensorId === 'G+101');
+
+    // Offset 0 (Front) is the legacy wire-break candidate; offset 1 (Rear) is the legacy RV/P one.
+    assert.equal(sensor.front.offset, 0);
+    assert.equal(sensor.front.rawWord, 0x7FFF);
+    assert.equal(sensor.front.rawHex, '0x7FFF');
+    assert.equal(sensor.front.candidateValue, null);
+    assert.equal(sensor.front.presentAsOrdinaryTemperature, false);
+    assert.equal(sensor.front.decodeState, 'DECODE_LEGACY_WIRE_BREAK_CANDIDATE');
+    assert.equal(sensor.front.manufacturerMeaning, 'NOT_VERIFIED');
+
+    assert.equal(sensor.rear.offset, 1);
+    assert.equal(sensor.rear.rawWord, 0xF830);
+    assert.equal(sensor.rear.rawHex, '0xF830');
+    assert.equal(sensor.rear.candidateValue, null);
+    assert.equal(sensor.rear.presentAsOrdinaryTemperature, false);
+    assert.notEqual(sensor.rear.candidateValue, -200);
+    assert.equal(sensor.rear.decodeState, 'DECODE_LEGACY_RV_P_CANDIDATE');
+
+    // Neither sentinel side may produce a fabricated paired delta.
+    assert.equal(sensor.frontRearDeltaC, null);
+    assert.equal(sensor.deltaAvailable, false);
+
+    // An ordinary pair still yields a candidate number AND a read-only diagnostic delta.
+    const ordinary = tcAcquisition.sensors.find((s) => s.sensorId === 'G+102');
+    assert.equal(typeof ordinary.front.candidateValue, 'number');
+    assert.equal(typeof ordinary.rear.candidateValue, 'number');
+    assert.equal(ordinary.deltaAvailable, true);
+    assert.equal(ordinary.frontRearDeltaC, Number((ordinary.front.candidateValue - ordinary.rear.candidateValue).toFixed(4)));
+  });
+});
+
+test('the served physical payload keeps the two Drawing conflicts visible and never hides a spared offset', async () => {
+  const runtimeFetch = async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+    ? physicalRuntimeStatus() : physicalSnapshot());
+
+  await withRuntimeFetch(runtimeFetch, async (origin) => {
+    const { tcAcquisition } = await (await fetch(`${origin}/api/tc-acquisition`)).json();
+    const conflicted = tcAcquisition.sensors.filter((s) => s.drawingConflict);
+    assert.deepEqual(conflicted.map((s) => s.sensorId).sort(), ['G+107', 'G+108']);
+    for (const sensor of conflicted) assert.equal(sensor.mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+    assert.equal(tcAcquisition.sensors.find((s) => s.sensorId === 'G+101').drawingConflict, false);
+    // The eighteen Sensors of CAB1 are exactly G+101..G+109 and G+201..G+209.
+    assert.deepEqual(tcAcquisition.sensors.map((s) => s.sensorId),
+      [...Array(9).keys()].map((i) => `G+10${i + 1}`).concat([...Array(9).keys()].map((i) => `G+20${i + 1}`)));
+    // Every served byte is local-safe: no address, no endpoint field, no credential-shaped key.
+    const text = JSON.stringify(tcAcquisition);
+    // Loopback is the one literal the boundary permits; anything else would be a leak.
+    const addresses = text.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g) ?? [];
+    assert.deepEqual(addresses.filter((a) => a !== '127.0.0.1'), [], 'no non-loopback address may be served');
+    // Terms are assembled from fragments so this assertion never introduces the vocabulary it
+    // forbids (the same convention the boundary scanner and the served-UI test use).
+    const forbidden = ['end' + 'point', 'ho' + 'st', 'i' + 'p', 'addre' + 'ss',
+      'pass' + 'word', 'to' + 'ken', 'sec' + 'ret'];
+    for (const term of forbidden) assert.equal(text.includes(`"${term}"`), false, term);
+  });
+});
+
+test('a physical Runtime that is not ready or has an unknown profile never yields a successful record', async () => {
+  // A ready:false physical Runtime (no publication yet) is a NOT_PUBLISHED/pending answer.
+  const pendingPhysical = async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+    ? { currentRevision: 7, profile: 'TEST_HARDWARE_READ_ONLY', ready: false, readinessCode: 'TC_ACQUISITION_NOT_PUBLISHED' }
+    : { ...physicalSnapshot(), tcAcquisition: null });
+  const pending = await tcAcquisitionPayload({ runtimeFetch: pendingPhysical });
+  assert.equal(pending.status, 200);
+  assert.equal(pending.body.status, 'NOT_PUBLISHED');
+  assert.equal(pending.body.tcAcquisition, null);
+
+  // When the Snapshot carries no TC state, the Runtime status supplies the diagnosis, and an
+  // unrecognised profile there is refused rather than echoed: the projection never relabels a run.
+  for (const profile of ['PRODUCTION', 'TEST_HARDWARE', 'SOMETHING_ELSE', undefined]) {
+    const runtimeFetch = async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+      ? { currentRevision: 7, profile, ready: false }
+      : { ...physicalSnapshot(), tcAcquisition: null });
+    const result = await tcAcquisitionPayload({ runtimeFetch });
+    assert.equal(result.status, 502, String(profile));
+    assert.equal(result.body.status, 'INVALID_RUNTIME_RESPONSE');
+    assert.equal(result.body.tcAcquisition, null);
+  }
+
+  // A published record is self-describing: its own provenance selects the variant, so the envelope
+  // reports the record it actually received and never relabels it.
+  const published = await tcAcquisitionPayload({ runtimeFetch: async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+    ? physicalRuntimeStatus() : physicalSnapshot()) });
+  assert.equal(published.body.status, 'PUBLISHED');
+  assert.equal(published.body.tcAcquisition.provenance, 'PHYSICAL_HOLDING_REGISTER_READ_ONLY');
+  assert.equal(published.body.tcAcquisition.physical, true);
+});
+
+test('an unsafe physical record is refused whole: no words, no candidates, no partial success', async () => {
+  const runtimeFetch = async (url) => okSnapshot(url.endsWith('/api/v1/runtime')
+    ? physicalRuntimeStatus() : physicalSnapshot());
+  const base = await tcAcquisitionPayload({ runtimeFetch });
+  assert.equal(base.body.status, 'PUBLISHED');
+
+  const request = async (mutate) => {
+    const snapshot = physicalSnapshot();
+    mutate(snapshot.tcAcquisition);
+    const fetchImpl = async (url) => okSnapshot(url.endsWith('/api/v1/runtime') ? physicalRuntimeStatus() : snapshot);
+    return tcAcquisitionPayload({ runtimeFetch: fetchImpl });
+  };
+
+  for (const mutate of [
+    (tc) => { tc.quarantined = false; },
+    (tc) => { tc.physical = false; },
+    (tc) => { tc.quality = 'VERIFIED'; },
+    (tc) => { tc.commissioningState = 'COMMISSIONED'; },
+    (tc) => { tc.rawWords = tc.rawWords.slice(0, 39); },
+    (tc) => { tc.rawWords = [...tc.rawWords.slice(0, 39), 65536]; },
+    (tc) => { tc.copiedWordCount = 39; },
+    (tc) => { tc.acquiredAtUtc = '0001-01-01T00:00:00+00:00'; },
+    (tc) => { tc.notVerified = tc.notVerified.slice(0, -1); },
+    (tc) => { tc.nodeId = 'TC-NODE-02'; },
+    (tc) => { tc.cabinetId = 'CAB2'; },
+    (tc) => { tc.physicalEvidence.commissioningState = 'ACCEPTED'; },
+    (tc) => { tc.physicalEvidence.readProfile = { ...tc.physicalEvidence.readProfile, functionCode: 'FC16' }; },
+    (tc) => { tc.physicalEvidence.readProfile = { ...tc.physicalEvidence.readProfile, quantity: 39 }; },
+    (tc) => { tc.physicalEvidence.readProfile = { ...tc.physicalEvidence.readProfile, port: 5020 }; },
+    (tc) => { tc.physicalEvidence.readProfile = { ...tc.physicalEvidence.readProfile, unitIdentifier: 2 }; },
+    (tc) => { tc.physicalEvidence.readProfile = { ...tc.physicalEvidence.readProfile, startAddress: 1 }; },
+    // The allow-list is closed: an endpoint-shaped extra field is refused rather than forwarded.
+    (tc) => { tc.endpoint = '127.0.0.1'; },
+    (tc) => { tc.physicalEvidence.endpointIdentity = '127.0.0.1'; },
+    (tc) => { tc.physicalEvidence.endpointIdentity = 'ENDPOINT_NOT_CONFIGURED'; },
+  ]) {
+    const result = await request(mutate);
+    assert.equal(result.status, 502, mutate.toString());
+    assert.equal(result.body.status, 'INVALID_RUNTIME_RESPONSE');
+    assert.equal(result.body.tcAcquisition, null, 'a refused record must not expose words');
+  }
+});
+
+test('the mapping route serves the CAB1 projection read-only, with no Runtime needed and no endpoint', async () => {
+  // The mapping projection is useful precisely when nothing is running, so it is served from the
+  // committed Drawing evidence alone and never contacts a Runtime.
+  const res = await fetch(`${base}/api/tc-physical-mapping`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /application\/json/);
+  assert.match(res.headers.get('content-security-policy'), /default-src 'self'/);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  assert.equal(res.headers.get('access-control-allow-origin'), null);
+
+  const body = await res.json();
+  assert.equal(body.node, 'TC-NODE-01');
+  assert.equal(body.cabinet, 'CAB1');
+  assert.equal(body.wordCount, 40);
+  assert.equal(body.assignedOffsetCount, 36);
+  assert.equal(body.spareOffsetCount, 4);
+  assert.equal(body.sensorCount, 18);
+  assert.equal(body.mappingEvidenceState, 'DRAWING_INTERNAL_CONFLICT');
+  assert.deepEqual(body.drawingConflictOffsets, [13, 14]);
+  assert.deepEqual(body.measurements.map((m) => m.offset), Array.from({ length: 40 }, (_, i) => i));
+  assert.deepEqual(body.measurements.slice(36).map((m) => m.sensorId), [null, null, null, null]);
+  assert.equal(body.readProfile.functionCode, 'FC03');
+  assert.equal(body.boundary.hardwareConnection, false);
+  assert.equal(body.boundary.deviceWriteAuthority, false);
+
+  // HEAD works, writes are refused, and the payload equals the direct projection.
+  assert.equal((await fetch(`${base}/api/tc-physical-mapping`, { method: 'HEAD' })).status, 200);
+  assert.equal((await fetch(`${base}/api/tc-physical-mapping`, { method: 'POST' })).status, 405);
+  assert.deepEqual(body, tcPhysicalMappingPayload());
+
+  // No address, no endpoint key, no vendor or transport vocabulary anywhere in the served bytes.
+  const text = JSON.stringify(body);
+  const addresses = text.match(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g) ?? [];
+  assert.deepEqual(addresses.filter((a) => a !== '127.0.0.1'), [], 'only the loopback literal is permitted');
+  // The served mapping payload must carry no endpoint-shaped key and no vendor vocabulary. The
+  // terms are assembled from fragments, as the boundary scanner does, so this test does not itself
+  // introduce the words it forbids.
+  const forbiddenKeys = ['end' + 'point', 'ho' + 'st', 'ipAddre' + 'ss', 'soc' + 'ket', 'cred' + 'ential'];
+  const forbiddenVendors = ['mo' + 'dbus', 'ga' + 'lil', 'wa' + 'go'];
+  const lower = text.toLowerCase();
+  // A KEY is forbidden, so the quoted form is matched: `bindHost` is the loopback Preview's own bind
+  // label and is not an endpoint key, while a `"host"` field would be.
+  for (const term of forbiddenKeys) assert.equal(lower.includes(`"${term.toLowerCase()}"`), false, term);
+  for (const term of forbiddenVendors) assert.equal(lower.includes(term), false, term);
+  // The projection is address-free by shape: no per-measurement network field exists at all.
+  for (const measurement of body.measurements) {
+    assert.deepEqual(Object.keys(measurement), ['offset', 'moduleInstance', 'moduleModel', 'channel',
+      'sensorId', 'side', 'sideLabel', 'spare', 'rowState', 'drawingConflict', 'mappingEvidenceState']);
   }
 });

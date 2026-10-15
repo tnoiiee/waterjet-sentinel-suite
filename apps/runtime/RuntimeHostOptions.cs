@@ -69,11 +69,44 @@ public sealed record RuntimeHostOptions
     /// <summary>Delta-history capacity outside the accepted bounds.</summary>
     public const string InvalidDeltaHistoryCapacity = "INVALID_DELTA_HISTORY_CAPACITY";
 
+    /// <summary>
+    /// The acquisition mode and the device profile disagree, or a physical mode was assembled
+    /// without its required Owner-local endpoint. Nothing is bound and no profile is substituted.
+    /// </summary>
+    public const string ProfileModeConflict = "TC_PROFILE_MODE_CONFLICT";
+
+    /// <summary>
+    /// The Owner-local endpoint is required by the selected mode but is absent, blank, malformed,
+    /// a loopback/non-plant address, or not a single bare host value. Nothing is bound.
+    /// </summary>
+    public const string EndpointNotConfigured = TcEndpointConfiguration.NotConfigured;
+
+    /// <summary>The endpoint value was supplied but refused; see the refusal detail.</summary>
+    public const string EndpointRejected = TcEndpointConfiguration.Rejected;
+
+    /// <summary>The mode label was supplied but is not a recognised mode.</summary>
+    public const string InvalidAcquisitionMode = TcEndpointConfiguration.InvalidMode;
+
     public SimulatorScenarioId Scenario { get; init; } = SimulatorScenarioId.IDLE;
 
     public SequencingPressureThresholds PressureThresholds { get; init; } = new();
 
     public required DeviceProfile Profile { get; init; }
+
+    /// <summary>
+    /// Explicit TC acquisition mode. An absent configuration value means
+    /// <see cref="TcAcquisitionMode.DETERMINISTIC"/>, which is the pre-existing non-Hardware Product
+    /// behaviour; physical mode is never inferred from the presence of another variable.
+    /// </summary>
+    public TcAcquisitionMode AcquisitionMode { get; init; } = TcAcquisitionMode.DETERMINISTIC;
+
+    /// <summary>
+    /// The resolved Owner-local physical read-only endpoint. Null in deterministic mode, and null
+    /// whenever a physical mode was refused before composition. The value is confidential local
+    /// deployment information: it is never committed, serialized, published, logged or displayed, and
+    /// the handle's <c>ToString</c> is redacted.
+    /// </summary>
+    public TcEndpointHandle? Endpoint { get; init; }
 
     public required int Port { get; init; }
 
@@ -87,12 +120,16 @@ public sealed record RuntimeHostOptions
     public required int DeltaHistoryCapacity { get; init; }
 
     /// <summary>
-    /// Reads the synthetic configuration values (seed, tick interval, history
-    /// capacities) from a variable reader, for an already-gated profile and port.
-    /// The device profile and the loopback port are validated by the host before
-    /// this call, so profile refusals always happen before any host object exists.
-    /// Refusals are values, never exceptions: the caller prints the code and exits
-    /// before a listener is created.
+    /// Reads the synthetic configuration values (seed, tick interval, history capacities) and the
+    /// explicit TC acquisition mode from a variable reader, for an already-gated profile and port.
+    /// Every validation happens before any host object exists, so a refused profile, mode or endpoint
+    /// can never bind a port. Refusals are values, never exceptions: the caller prints the code and
+    /// exits before a listener is created.
+    ///
+    /// Ordering is part of the safety posture: a profile that can NEVER start (TEST_HARDWARE,
+    /// PRODUCTION) is refused before any variable is read at all. Only then is the acquisition mode
+    /// read, and only then is the mode-aware profile gate applied — followed, in physical mode, by
+    /// resolution of the Owner-local endpoint before any listener exists.
     /// </summary>
     public static bool TryLoadSynthetic(
         DeviceProfile profile,
@@ -108,9 +145,44 @@ public sealed record RuntimeHostOptions
         refusalCode = string.Empty;
         refusalDetail = string.Empty;
 
-        // Profile gate first, even for callers bypassing Program. Read the scenario exactly once.
-        if (!ProfileStartPolicy.TryRequireStartable(profile, out refusalCode, out refusalDetail))
+        // 1. Unconditionally refused profiles are decided FIRST and without reading anything else.
+        //    This preserves the standing safety property exactly: a profile that can never start
+        //    causes no configuration read at all (TEST_HARDWARE and PRODUCTION keep their refusal).
+        var modeMaySelectProfile =
+            profile == DeviceProfile.SIMULATOR || profile == DeviceProfile.TEST_HARDWARE_READ_ONLY;
+        if (!modeMaySelectProfile)
+        {
+            return ProfileStartPolicy.TryRequireStartable(
+                profile, physicalReadOnlyMode: false, out refusalCode, out refusalDetail);
+        }
+
+        // 2. The acquisition mode is never inferred: an absent value means the existing deterministic
+        //    Product behaviour, and an unrecognised value refuses startup.
+        if (!TcEndpointConfiguration.TryReadAcquisitionMode(
+            readEnvironment, out var acquisitionMode, out refusalCode, out refusalDetail))
+        {
             return false;
+        }
+
+        var physicalReadOnly = acquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY;
+
+        // 3. Mode-aware profile gate: TEST_HARDWARE_READ_ONLY may start ONLY for the explicit physical
+        //    read-only mode; SIMULATOR may start in either mode, and the consistency check below then
+        //    refuses the mismatched combination. Nothing is substituted.
+        if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, out refusalCode, out refusalDetail))
+            return false;
+
+        // 4. The Owner-local endpoint is resolved BEFORE any host object exists, so a physical mode
+        //    can never bind a port and then discover that no endpoint was configured. The value is
+        //    validated here and is never written anywhere.
+        TcEndpointHandle? endpoint = null;
+        if (physicalReadOnly)
+        {
+            if (!TcEndpointConfiguration.TryResolveEndpoint(readEnvironment, out var resolved, out refusalCode, out refusalDetail))
+                return false;
+            endpoint = new TcEndpointHandle(resolved);
+        }
+
         var scenarioLabel = readEnvironment(ScenarioVariable);
         var scenario = SimulatorScenarioId.IDLE;
         if (scenarioLabel is not null && !SimulatorScenarioCatalogue.TryParse(scenarioLabel, out scenario))
@@ -199,6 +271,8 @@ public sealed record RuntimeHostOptions
         options = new RuntimeHostOptions
         {
             Profile = profile,
+            AcquisitionMode = acquisitionMode,
+            Endpoint = endpoint,
             Scenario = scenario,
             PressureThresholds = thresholds,
             Port = port,
@@ -217,8 +291,42 @@ public sealed record RuntimeHostOptions
     /// </summary>
     public bool TryValidate(out string refusalCode, out string refusalDetail)
     {
-        if (!ProfileStartPolicy.TryRequireStartable(Profile, out refusalCode, out refusalDetail))
+        if (!ProfileStartPolicy.TryRequireStartable(
+            Profile, AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY, out refusalCode, out refusalDetail))
         {
+            return false;
+        }
+
+        // The mode, the profile and the endpoint must agree in both directions. Physical mode without
+        // its Owner-local endpoint, a physical profile in deterministic mode, or a leftover endpoint in
+        // deterministic mode are all refused rather than resolved: nothing is substituted or defaulted.
+        if (AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY)
+        {
+            if (Profile != DeviceProfile.TEST_HARDWARE_READ_ONLY)
+            {
+                refusalCode = ProfileModeConflict;
+                refusalDetail =
+                    "The physical read-only acquisition mode runs only under the "
+                    + "TEST_HARDWARE_READ_ONLY device profile. No other profile is substituted, "
+                    + "TEST_HARDWARE grants no read-only physical authority, and PRODUCTION is never startable.";
+                return false;
+            }
+
+            if (Endpoint is null)
+            {
+                refusalCode = EndpointNotConfigured;
+                refusalDetail =
+                    "The physical read-only acquisition mode requires a resolved Owner-local endpoint. "
+                    + "It is deliberately not committed and no value is defaulted or substituted.";
+                return false;
+            }
+        }
+        else if (Profile != DeviceProfile.SIMULATOR || Endpoint is not null)
+        {
+            refusalCode = ProfileModeConflict;
+            refusalDetail =
+                "Deterministic acquisition mode runs only under the SIMULATOR device profile and carries "
+                + "no endpoint. A physical profile or a resolved endpoint in deterministic mode is refused.";
             return false;
         }
 

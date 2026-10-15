@@ -100,6 +100,23 @@ const isStr = (s) => typeof s === 'string' && s.length > 0;
 const PROHIBITED_KEY = new RegExp(
   '^(ip|host|port|regi' + 'ster|coordi' + 'nate|travelLim' + 'it|tagLis' + 't|connectio' + 'nString|pass' + 'word|tok' + 'en|sec' + 'ret)', 'i');
 
+// The one-Node PHYSICAL read-only slice must record the DECLARED read profile it used, which the
+// Owner-approved Scope fixes and publishes, and whose shape legitimately names a holding-register
+// AREA and the factory PORT. That is the only collision with the key-name heuristic above, and it is
+// resolved by PINNING BOTH THE PATH AND THE VALUE rather than by renaming the keys to slip past the
+// pattern. The allowance is therefore strictly narrower than the heuristic it refines: anywhere else,
+// and at this path with any other value, the finding stands. Nothing else is exempted, and the
+// deterministic variant carries no such block at all (it is refused below).
+const AUTHORIZED_READ_PROFILE_KEYS = Object.freeze({
+  [`$.tcAcquisition.physicalEvidence.readProfile.port`]: 502,
+  [`$.tcAcquisition.physicalEvidence.readProfile.registerArea`]: 'HOLDING_REGISTERS',
+});
+
+function isAuthorizedReadProfileKey(path, key, value) {
+  const pinned = AUTHORIZED_READ_PROFILE_KEYS[`${path}.${key}`];
+  return pinned !== undefined && value === pinned;
+}
+
 function scanProhibitedKeys(node, path, issues, depth = 0) {
   if (depth > 12 || node === null || typeof node !== 'object') return;
   if (Array.isArray(node)) {
@@ -108,7 +125,7 @@ function scanProhibitedKeys(node, path, issues, depth = 0) {
   }
   for (const [key, value] of Object.entries(node)) {
     // 'host' is the health-payload host LABEL (never a network host); allowed.
-    if (PROHIBITED_KEY.test(key) && key !== 'host') {
+    if (PROHIBITED_KEY.test(key) && key !== 'host' && !isAuthorizedReadProfileKey(path, key, value)) {
       issues.push(`${path}.${key}: prohibited production-scope key name`);
     }
     scanProhibitedKeys(value, `${path}.${key}`, issues, depth + 1);
@@ -318,13 +335,121 @@ export function validDeterministicTcAcquisition(tc) {
     && tc.quality === 'SIMULATED' && tc.diagnosticState === 'NONE'
     && tc.mappingStatus === 'MAPPING_NOT_VERIFIED' && tc.decodeStatus === 'DECODING_NOT_VERIFIED'
     && Array.isArray(tc.notVerified) && tc.notVerified.length === expectedUnknowns.length
-    && tc.notVerified.every((value, index) => value === expectedUnknowns[index]);
+    && tc.notVerified.every((value, index) => value === expectedUnknowns[index])
+    // The deterministic variant may never carry the physical evidence block: the two variants are
+    // never blended, and the physical read profile must not appear on a non-Hardware record. This
+    // ADDS strictness; no previously-valid deterministic record is affected, because a record without
+    // the block is unaffected by its absence.
+    && !('physicalEvidence' in tc);
+}
+
+/**
+ * Canonical Not-Verified set of a PHYSICAL quarantined record. Mirrors the C# invariant exactly:
+ * a physical record that drops or reorders an entry is refused before it is displayed.
+ */
+export const PHYSICAL_NOT_VERIFIED = Object.freeze([
+  'PHYSICAL_REACHABILITY', 'DRAWING_MAPPING_PARITY', 'SCALING', 'SIGNED_REPRESENTATION',
+  'BYTE_ORDER', 'WORD_ORDER', 'WIRE_BREAK_SENTINEL_MEANING', 'REVERSE_POLARITY_SENTINEL_MEANING',
+  'COLD_JUNCTION_COMPENSATION', 'FIELD_TIMING', 'MBAP_TRANSACTION_ID', 'RESPONSE_UNIT_ID',
+]);
+
+/** The three Drawing mapping evidence summary states a physical record may carry. */
+export const PHYSICAL_MAPPING_EVIDENCE_STATES = Object.freeze([
+  'DRAWING_VERIFIED', 'DRAWING_INTERNAL_CONFLICT', 'SPARE_UNMAPPED',
+]);
+
+/**
+ * The physical wire record is validated by EXACT KEY ALLOW-LIST, not by a name blocklist. A record
+ * that carries any key outside the declared shape is refused, so an unexpected field — an address,
+ * a host, a credential-shaped value or an invented evidence claim — cannot ride along unnoticed. This
+ * is stricter than pattern matching on suspicious names: the declared set is the whole record.
+ */
+export const PHYSICAL_TC_RECORD_KEYS = Object.freeze([
+  'nodeId', 'cabinetId', 'provenance', 'physical', 'quarantined', 'acquisitionState',
+  'acquiredAtUtc', 'copiedWordCount', 'rawWords', 'quality', 'diagnosticState',
+  'mappingStatus', 'decodeStatus', 'notVerified', 'physicalEvidence',
+]);
+
+/** The evidence block is likewise closed: only the redacted identity and the declared evidence may appear. */
+export const PHYSICAL_TC_EVIDENCE_KEYS = Object.freeze([
+  'endpointIdentity', 'commissioningState', 'mappingEvidenceState', 'readProfile',
+]);
+
+/** The read-profile block is the fixed authorized shape, so its key set is closed too. */
+export const PHYSICAL_TC_READ_PROFILE_KEYS = Object.freeze([
+  'functionCode', 'registerArea', 'port', 'unitIdentifier', 'startAddress', 'quantity',
+]);
+
+/** True only when the object's own enumerable keys are exactly the declared set (no extra, no missing). */
+function hasExactKeys(obj, allowed) {
+  const keys = Object.keys(obj);
+  if (keys.length !== allowed.length) return false;
+  return keys.every((key) => allowed.includes(key));
+}
+
+/**
+ * Mirrors the bounded C# invariant for the ONE-NODE PHYSICAL read-only quarantined wire record.
+ *
+ * The record may express candidate, quarantined, unverified evidence ONLY: `physical` must be true,
+ * `quarantined` must be true, the commissioning and mapping states must be the declared-not-verified
+ * vocabulary, the read profile must equal the authorized read-only tuple, and no address-shaped key
+ * may appear anywhere. There is deliberately no accepted, commissioned, decoded or verified state.
+ */
+export function validPhysicalTcAcquisition(tc) {
+  if (tc === null || typeof tc !== 'object' || Array.isArray(tc)) return false;
+  if (!hasExactKeys(tc, PHYSICAL_TC_RECORD_KEYS)) return false;
+  return tc.nodeId === 'TC-NODE-01' && tc.cabinetId === 'CAB1'
+    && tc.provenance === 'PHYSICAL_HOLDING_REGISTER_READ_ONLY'
+    && tc.physical === true && tc.quarantined === true
+    && tc.acquisitionState === 'COMPLETE'
+    && typeof tc.acquiredAtUtc === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$/.test(tc.acquiredAtUtc)
+    && Number.isFinite(Date.parse(tc.acquiredAtUtc))
+    && Date.parse(tc.acquiredAtUtc) !== Date.parse('0001-01-01T00:00:00Z')
+    && tc.copiedWordCount === 40 && Array.isArray(tc.rawWords) && tc.rawWords.length === 40
+    // Raw words are device evidence: any 16-bit value is acceptable, and NOTHING is asserted about
+    // scaling, signedness, byte order, wire-break or reverse polarity here.
+    && tc.rawWords.every((word) => Number.isInteger(word) && word >= 0 && word <= 0xFFFF)
+    && tc.quality === 'PHYSICAL_QUARANTINED' && tc.diagnosticState === 'NONE'
+    && tc.mappingStatus === 'DRAWING_REV1_MAPPING_DECLARED_NOT_VERIFIED'
+    && tc.decodeStatus === 'DECODE_CANDIDATE_NOT_VERIFIED'
+    && Array.isArray(tc.notVerified) && tc.notVerified.length === PHYSICAL_NOT_VERIFIED.length
+    && tc.notVerified.every((value, index) => value === PHYSICAL_NOT_VERIFIED[index])
+    && validPhysicalEvidence(tc.physicalEvidence);
+}
+
+/** Validates the physical evidence block: redacted identity, authorized profile, honest states. */
+function validPhysicalEvidence(evidence) {
+  if (evidence === null || typeof evidence !== 'object' || Array.isArray(evidence)) return false;
+  if (!hasExactKeys(evidence, PHYSICAL_TC_EVIDENCE_KEYS)) return false;
+  if (evidence.endpointIdentity !== 'ENDPOINT_CONFIGURED') return false;
+  if (evidence.commissioningState !== 'NOT_COMMISSIONED') return false;
+  if (!PHYSICAL_MAPPING_EVIDENCE_STATES.includes(evidence.mappingEvidenceState)) return false;
+  const profile = evidence.readProfile;
+  if (profile === null || typeof profile !== 'object' || Array.isArray(profile)) return false;
+  if (!hasExactKeys(profile, PHYSICAL_TC_READ_PROFILE_KEYS)) return false;
+  return profile.functionCode === 'FC03'
+    && profile.registerArea === 'HOLDING_REGISTERS'
+    && profile.port === 502
+    && profile.unitIdentifier === 1
+    && profile.startAddress === 0
+    && profile.quantity === 40;
+}
+
+/**
+ * The single dispatch point for a wire TC record. Both strict variants are preserved: the
+ * deterministic validator is neither replaced nor relaxed, and a record that satisfies neither
+ * variant is refused. There is no third, weaker generic path.
+ */
+export function validTcAcquisition(tc) {
+  if (validDeterministicTcAcquisition(tc)) return true;
+  return validPhysicalTcAcquisition(tc);
 }
 
 function validateSharedBody(obj, path, issues) {
   if ('tcAcquisition' in obj && (obj.kind === 'delta' || obj.tcAcquisition !== null)
-      && !validDeterministicTcAcquisition(obj.tcAcquisition)) {
-    issues.push(`${path}.tcAcquisition: must be a complete quarantined deterministic TC record; Delta cannot clear it`);
+      && !validTcAcquisition(obj.tcAcquisition)) {
+    issues.push(`${path}.tcAcquisition: must be a complete quarantined TC record — either the deterministic non-Hardware variant or the physical read-only variant; Delta cannot clear it`);
   }
   if (obj.queue !== undefined && obj.queue !== null) validateQueue(obj.queue, `${path}.queue`, issues);
   // null is a legitimate value in BOTH envelopes: Snapshot (no active job) and
@@ -508,7 +633,7 @@ function validateSnapshot(obj, issues) {
   if (obj.apiVersion !== API_VERSION) issues.push(`apiVersion must be ${API_VERSION}`);
   if (!isInt(obj.revision) || obj.revision < 1) issues.push('revision must be an integer >= 1');
   if (!isStr(obj.generatedAt)) issues.push('generatedAt required');
-  if (!['SIMULATOR', 'TEST_HARDWARE', 'PRODUCTION'].includes(obj.deviceProfile)) issues.push('deviceProfile invalid');
+  if (!['SIMULATOR', 'TEST_HARDWARE', 'PRODUCTION', 'TEST_HARDWARE_READ_ONLY'].includes(obj.deviceProfile)) issues.push('deviceProfile invalid');
 
   const map = obj.wallMap ?? [];
   if (map.length !== TOPOLOGY.logicalPositions) issues.push(`wallMap must contain all ${TOPOLOGY.logicalPositions} slots (got ${map.length})`);

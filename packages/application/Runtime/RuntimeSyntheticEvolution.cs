@@ -200,7 +200,12 @@ public static class RuntimeSyntheticEvolution
         ArgumentNullException.ThrowIfNull(rules);
         _ = rules.Validated();
 
-        if (!ProfileStartPolicy.TryRequireStartable(state.DeviceProfile, out var profileCode, out var profileReason))
+        // A TEST_HARDWARE_READ_ONLY state can only have been composed by the explicit physical READ-ONLY
+        // acquisition mode; the evolution must keep advancing it so the one bounded read can be
+        // published. The Runtime invariants still bind that profile to the physical quarantined
+        // record, so continuing to evolve grants it no authority and no other profile is affected.
+        if (!ProfileStartPolicy.TryRequireStartable(
+            state.DeviceProfile, state.DeviceProfile == DeviceProfile.TEST_HARDWARE_READ_ONLY, out var profileCode, out var profileReason))
         {
             return SyntheticTickOutcome.Refused(profileCode, profileReason);
         }

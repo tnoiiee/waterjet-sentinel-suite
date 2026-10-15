@@ -13,6 +13,36 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-15 — One-Node physical TC read-only integration (Owner decision R1; on branch; PR OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET
+SDK in the Agent sandbox); OWNER-LOCAL VALIDATION OF RECORD. Merged truth: PR #25 MERGED
+(`b3fb60cd33c992c2af209cb7b291535ffacfed74`, 2026-10-14T20:59:29Z) and PR #26 MERGED
+(`4a28b428b82179acc3a83cf368665ae008f5d1cf`, 2026-10-15T07:59:42Z); `main` stands at the PR #26 merge
+commit, which is this work's direct parent.** The earlier "PR #25 OPEN, NOT MERGED" wording elsewhere
+in this file is a dated record and is superseded by this entry.
+
+**What was added.** The software path for a future one-Node physical READ-ONLY TC acquisition, with
+the endpoint kept outside the repository: an explicit acquisition mode (`WJSS_TC_ACQUISITION_MODE`,
+default `DETERMINISTIC`), the Owner-local endpoint variable `WJSS_TC_NODE_01_ENDPOINT` with
+fail-closed validation and redacted diagnostics (`docs/TC_PHYSICAL_READ_ONLY_ENDPOINT.md`); a separate
+physical quarantined record variant with its own strict validator beside the unchanged deterministic
+validator, plus a dispatcher in both C# and the TypeScript contract mirror; the CAB1 Drawing-rev1
+mapping projection and the candidate decode rule; and the Runtime-backed CAB1 U-shape Sensor Map in the
+Operations Preview.
+
+**Boundary properties.** `TEST_HARDWARE_READ_ONLY` is a separate, narrowly scoped profile that can
+start only in the explicit physical read-only mode with a resolved endpoint; `TEST_HARDWARE` and
+`PRODUCTION` keep their existing refusals exactly. The physical record cannot express acceptance,
+commissioning, a verified decode, a write function code, a different read profile or an endpoint value.
+The deterministic slice is unchanged: the same words, the same contract, the same strict validator.
+
+**Evidence.** Agent-local gates on this branch: boundary scan S1–S9 clean; boundary tests 33/33;
+commissioning 226/226; TypeScript contracts 44/44; TC bench Node tests 19/19; Operations Preview
+149/149; kiosk 22/22. `.NET NOT RUN` in the Agent environment — the Owner-local build and test run is
+the validation of record. No hardware contact, no NIC change, no port-502 access, no physical
+execution, no T01; merge NOT AUTHORIZED.
+
 ### 2026-10-15 — Local Modbus TCP Simulation configuration and execution path (post-K6; unreleased; PR OPEN, NOT MERGED)
 
 **Status (updated 2026-10-15, final evidence closeout): PR #25 OPEN — NOT MERGED; MERGE NOT AUTHORIZED; K7 NOT AUTHORIZED. Final PR head `59d0ffdd1b3ca13168db4c26d0c0b70031908a3b` (direct parent `70558e03f99e33cde917f7b97aa2a2133e45234a`): OWNER-LOCAL FINAL-HEAD AFFECTED GATES PASS — Commissioning check PASS and tests 220/220 (R40 PASS on the actual Windows checkout); TC bench Node/static-source tests 19/19; S2 14/14; S3 19/19; boundary scan S1–S9 clean; locked restore PASS; TC acquisition adapter and TC bench Release builds PASS; no lock drift; validation worktree clean. OWNER-LOCAL LOCAL TCP SIMULATION PASS on the same head (EasyModbusTCP Server Simulator v5.5): `LOCAL_TCP_SIMULATION`, effective `127.0.0.1:502`, FC03 / Unit ID 0 / Start Address 0 / Quantity 40, copied word count 40, values exactly 100–139, Connect / Read / Disconnect / Disposal COMPLETE, `QUARANTINED`, authorization `NOT_PROVIDED` / `NOT_ATTEMPTED`, no write, no fallback, `wireEvidence` `NOT_PROVIDED` — Local Simulation evidence only, not hardware, WAGO, T01 or physical evidence. Evidence layers: implementation commit `25d34390daac70468ed22b426f9a5f2da3bd9a79` (direct parent `f356b162…`) — Owner-local automated validation (locked restore PASS; targeted Release builds PASS; focused TC acquisition tests 109/109; full Solution Release build PASS; full .NET tests 564/564; dry-run no-I/O PASS; fixture parity 7/7; TC bench Node tests 19/19; S2 14/14; S3 19/19; boundary S1–S9 clean; Commissioning 219/220 at that commit — R40 line-ending representation only, corrected below); R40 correction commit `70558e03…` — Agent-local affected validation (Commissioning 220/220; TC bench Node tests 19/19; boundary scan clean); documentation commit `59d0ffdd…` — Owner-local final-head gates and Local TCP Simulation as above. Physical evidence still not provided.**

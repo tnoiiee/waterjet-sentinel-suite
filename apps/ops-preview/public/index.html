@@ -46,6 +46,7 @@
       <li><a href="#mapping">Mapping</a></li>
       <li><a href="#node-configuration">Node Configuration</a></li>
       <li><a href="#tc-acquisition-evidence">TC Acquisition Evidence</a></li>
+      <li><a href="#cab1-physical-map">CAB1 U-shape Sensor Map</a></li>
       <li><a href="#diagnostics">Diagnostics</a></li>
     </ul>
     <div class="view-controls" role="group" aria-label="Presentation only: does not change evidence or state">
@@ -238,6 +239,14 @@
       <p class="note">This read-only section projects the authoritative Runtime Snapshot for one deterministic Node. Until Runtime publishes the one-use session, it reports not published or unavailable. This is not physical evidence and does not authorize T01.</p>
       <button type="button" id="tc-acquisition-refresh">Refresh Runtime TC state (read-only)</button>
       <div id="tc-acquisition-body" role="status"></div>
+    </section>
+
+    <section id="cab1-physical-map" aria-labelledby="cab1-physical-map-h">
+      <h2 id="cab1-physical-map-h">CAB1 U-shape Sensor Map <span class="hint">one-Node physical read-only · PHYSICAL · QUARANTINED · DECODE CANDIDATE · NOT COMMISSIONED</span></h2>
+      <p class="note">The eighteen CAB1 Sensors of the one Node, presented in their served U-shape position. Every number below is a CANDIDATE decoded from quarantined raw register words that the authoritative Runtime published; nothing here is commissioned, verified, calibrated or accepted, and nothing here affects any alarm, interlock, trip, Cleaning or dispatch decision. The Preview reads the local Runtime Snapshot only: it never contacts a device, never holds a network address and never initiates an acquisition.</p>
+      <p class="note">A Sensor whose Front or Rear value is not published is shown as unavailable. Unavailable clears the current-success presentation for that measurement: no stale value is carried forward and no value is invented. The two Drawing internal-conflict measurements are flagged where they appear. Non-CAB1 Sensors remain unavailable and are not published by this slice.</p>
+      <div id="cab1-physical-body" role="status"></div>
+      <p class="note" id="cab1-physical-selection" role="status"></p>
     </section>
 
     <section id="diagnostics" aria-labelledby="diagnostics-h">

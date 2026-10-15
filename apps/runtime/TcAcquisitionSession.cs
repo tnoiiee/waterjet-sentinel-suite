@@ -19,10 +19,68 @@ public sealed record TcAcquisitionOutcome
 }
 
 /// <summary>
+/// The immutable acquisition profile ONE session is created for. The profile fixes the mode, the
+/// endpoint, the function code, the read tuple and the resulting record variant BEFORE a client
+/// exists, so a session can never switch mode, correct its profile, retry with a different tuple or
+/// fall back to the other variant. There is no profile-selection logic inside the session.
+/// </summary>
+public sealed record TcSessionProfile
+{
+    public required TcAcquisitionMode Mode { get; init; }
+
+    /// <summary>The endpoint the session connects to. Non-address marker in deterministic mode.</summary>
+    public required TcNodeEndpoint Endpoint { get; init; }
+
+    /// <summary>True for the explicit one-Node physical read-only variant.</summary>
+    public bool Physical => Mode == TcAcquisitionMode.PHYSICAL_READ_ONLY;
+
+    /// <summary>The requested register area, i.e. the only function code ever issued (FC03).</summary>
+    public TcRegisterArea RegisterArea => TcRegisterArea.HoldingRegisters;
+
+    /// <summary>The requested 16-bit word quantity of this profile.</summary>
+    public ushort Quantity =>
+        Physical ? (ushort)PhysicalTcVocabulary.WordCount : DeterministicTcReadOnlyClient.WordCount;
+
+    /// <summary>The candidate zero-based start address of this profile.</summary>
+    public ushort StartAddress =>
+        Physical ? (ushort)PhysicalTcVocabulary.StartAddress : (ushort)0;
+
+    /// <summary>The non-Hardware deterministic profile. Identical to the accepted one-Node Product slice.</summary>
+    public static TcSessionProfile Deterministic() => new()
+    {
+        Mode = TcAcquisitionMode.DETERMINISTIC,
+        // This marker is deliberately not an address: no socket, device, retry or reconnect exists.
+        Endpoint = new TcNodeEndpoint
+        {
+            NodeId = DeterministicTcVocabulary.NodeId,
+            IpAddress = DeterministicTcReadOnlyClient.EndpointMarker,
+            Port = PhysicalTcVocabulary.RegisterPort,
+            UnitIdentifier = 0x00,
+        },
+    };
+
+    /// <summary>
+    /// The explicit physical read-only profile for the already-resolved Owner-local endpoint. The
+    /// endpoint value travels only inside this in-memory profile.
+    /// </summary>
+    public static TcSessionProfile PhysicalReadOnly(TcNodeEndpoint endpoint) => new()
+    {
+        Mode = TcAcquisitionMode.PHYSICAL_READ_ONLY,
+        Endpoint = endpoint,
+    };
+}
+
+/// <summary>
 /// One-use Product session. It owns its read-only client, cancellation, generation/epoch fencing,
 /// copying and cleanup. It never writes Runtime state itself: the host's existing non-overlapping
 /// tick consumes a successful outcome and publishes it with the matching Delta through its sole
-/// RuntimePublicationStore writer. No UI callback, device connection, retry or polling exists here.
+/// RuntimePublicationStore writer. No UI callback, retry, reconnect or polling loop exists here.
+///
+/// Mode discipline: the session is created for exactly one immutable <see cref="TcSessionProfile"/>.
+/// Deterministic mode asserts the development word sequence and produces the non-Hardware record;
+/// physical read-only mode reads the Owner-local endpoint once, accepts whatever 40 words the device
+/// returns, and produces a QUARANTINED physical record that can never be accepted by any code path.
+/// There is no fallback from one variant to the other in either direction.
 /// </summary>
 public sealed class TcAcquisitionSession : IAsyncDisposable
 {
@@ -32,17 +90,22 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
 
     private readonly Func<ITcReadOnlyClient> _clientFactory;
     private readonly IClock _clock;
+    private readonly TcSessionProfile _profile;
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
     private Task<TcAcquisitionOutcome>? _task;
     private bool _disposed;
     private int _epoch;
 
-    public TcAcquisitionSession(Func<ITcReadOnlyClient> clientFactory, IClock clock)
+    public TcAcquisitionSession(Func<ITcReadOnlyClient> clientFactory, IClock clock, TcSessionProfile profile)
     {
         _clientFactory = clientFactory ?? throw new ArgumentNullException(nameof(clientFactory));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _profile = profile ?? throw new ArgumentNullException(nameof(profile));
     }
+
+    /// <summary>The immutable profile this one-use session was created for.</summary>
+    public TcSessionProfile Profile => _profile;
 
     /// <summary>Starts exactly once. A second call is refused, never treated as a retry.</summary>
     public Task<TcAcquisitionOutcome> Start(CancellationToken runtimeToken)
@@ -75,7 +138,8 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
         }
         catch (Exception)
         {
-            // No exception message or invented success crosses the Application boundary.
+            // No exception message or invented success crosses the Application boundary. In physical
+            // mode no transport exception text can therefore carry the endpoint value outward.
             outcome = TcAcquisitionOutcome.Refused("TC_ACQUISITION_FAILED");
         }
 
@@ -102,12 +166,10 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
 
     private async Task<TcAcquisitionOutcome> AcquireAsync(ITcReadOnlyClient client, CancellationToken token)
     {
-        // This marker is not an IP address. No physical endpoint is ever constructed or read.
-        var endpoint = new TcNodeEndpoint
-        {
-            NodeId = DeterministicTcVocabulary.NodeId,
-            IpAddress = DeterministicTcReadOnlyClient.EndpointMarker,
-        };
+        // The endpoint is fixed by the profile before the client exists. In deterministic mode it is
+        // the non-address marker and no physical endpoint is ever constructed; in physical mode it is
+        // the Owner-local endpoint resolved at startup and never written anywhere.
+        var endpoint = _profile.Endpoint;
         var connected = await client.ConnectAsync(endpoint, token).WaitAsync(token).ConfigureAwait(false);
         if (connected.Kind != TcReadKind.Success)
             return TcAcquisitionOutcome.Refused("TC_ACQUISITION_CONNECT_REFUSED");
@@ -116,15 +178,16 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
             || connected.Endpoint != endpoint)
             return TcAcquisitionOutcome.Refused("TC_ACQUISITION_STALE_GENERATION");
 
-        // The interface requires a read-only area and a start field. These fixed placeholders are
-        // not physical register evidence; the deterministic implementation performs no transport I/O.
+        // FC03 Read Holding Registers only. The register area is fixed by the profile and cannot be
+        // selected, widened or corrected by configuration: FC04 and every write function code remain
+        // unreachable from this path.
         var request = new TcReadRequest
         {
             Endpoint = endpoint,
             Generation = generation,
-            StartAddress = 0,
-            Quantity = DeterministicTcReadOnlyClient.WordCount,
-            RegisterArea = TcRegisterArea.HoldingRegisters,
+            StartAddress = _profile.StartAddress,
+            Quantity = _profile.Quantity,
+            RegisterArea = _profile.RegisterArea,
             Endianness = TcEndiannessCandidate.BigEndian,
             Timeout = AttemptLimit,
         };
@@ -135,17 +198,33 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
             return TcAcquisitionOutcome.Refused("TC_ACQUISITION_STALE_GENERATION");
         if (read.Kind != TcReadKind.Success || read.Endpoint != endpoint
             || read.RegisterArea != request.RegisterArea || read.Endianness != request.Endianness
-            || read.RawWords is null || read.RawWords.Length != DeterministicTcVocabulary.WordCount)
+            || read.RawWords is null || read.RawWords.Length != _profile.Quantity)
             return TcAcquisitionOutcome.Refused("TC_ACQUISITION_READ_REFUSED");
-        for (var index = 0; index < read.RawWords.Length; index++)
+
+        // Both collections are copied before the client is disconnected/disposed. The clock belongs to
+        // the Application, never to the client's own result timestamp.
+        var copiedWords = Array.AsReadOnly((ushort[])read.RawWords.Clone());
+        var acquiredAtUtc = _clock.UtcNow.ToUniversalTime();
+
+        return _profile.Physical
+            ? BuildPhysicalState(copiedWords, acquiredAtUtc)
+            : BuildDeterministicOutcome(copiedWords, acquiredAtUtc);
+    }
+
+    /// <summary>
+    /// The deterministic variant: the development word sequence is asserted, so a deterministic run
+    /// can never carry device data, and the record keeps the accepted non-Hardware vocabulary.
+    /// </summary>
+    private static TcAcquisitionOutcome BuildDeterministicOutcome(
+        IReadOnlyList<ushort> copiedWords, DateTimeOffset acquiredAtUtc)
+    {
+        for (var index = 0; index < copiedWords.Count; index++)
         {
-            if (read.RawWords[index] != DeterministicTcVocabulary.WordAt(index))
+            if (copiedWords[index] != DeterministicTcVocabulary.WordAt(index))
                 return TcAcquisitionOutcome.Refused("TC_ACQUISITION_INVALID_WORDS");
         }
 
-        // Both collections are copied before the client is disconnected/disposed. The clock belongs
-        // to the Application, not the deterministic client's synthetic result timestamp.
-        var state = new TcAcquisitionState
+        return TcAcquisitionOutcome.Success(new TcAcquisitionState
         {
             NodeId = DeterministicTcVocabulary.NodeId,
             CabinetId = DeterministicTcVocabulary.CabinetId,
@@ -153,17 +232,52 @@ public sealed class TcAcquisitionSession : IAsyncDisposable
             Physical = false,
             Quarantined = true,
             AcquisitionState = DeterministicTcVocabulary.Complete,
-            AcquiredAtUtc = _clock.UtcNow.ToUniversalTime(),
-            CopiedWordCount = read.RawWords.Length,
-            RawWords = Array.AsReadOnly((ushort[])read.RawWords.Clone()),
+            AcquiredAtUtc = acquiredAtUtc,
+            CopiedWordCount = copiedWords.Count,
+            RawWords = copiedWords,
             Quality = DeterministicTcVocabulary.Quality,
             DiagnosticState = DeterministicTcVocabulary.NoDiagnostic,
             MappingStatus = DeterministicTcVocabulary.MappingNotVerified,
             DecodeStatus = DeterministicTcVocabulary.DecodeNotVerified,
             NotVerified = Array.AsReadOnly(DeterministicTcVocabulary.NotVerified.ToArray()),
-        };
-        return TcAcquisitionOutcome.Success(state);
+        });
     }
+
+    /// <summary>
+    /// The physical read-only variant. Whatever the device returned is preserved verbatim and stays
+    /// QUARANTINED: no scaling, no signed interpretation, no wire-break classification and no
+    /// acceptance is applied here. The record states the exact read profile that was used and the
+    /// redacted endpoint identity — never the address — so a reader can audit the acquisition without
+    /// the confidential value ever leaving the Owner's machine.
+    /// </summary>
+    private static TcAcquisitionOutcome BuildPhysicalState(
+        IReadOnlyList<ushort> copiedWords, DateTimeOffset acquiredAtUtc) =>
+        TcAcquisitionOutcome.Success(new TcAcquisitionState
+        {
+            NodeId = PhysicalTcVocabulary.NodeId,
+            CabinetId = PhysicalTcVocabulary.CabinetId,
+            Provenance = PhysicalTcVocabulary.Provenance,
+            Physical = true,
+            Quarantined = true,
+            AcquisitionState = PhysicalTcVocabulary.Complete,
+            AcquiredAtUtc = acquiredAtUtc,
+            CopiedWordCount = copiedWords.Count,
+            RawWords = copiedWords,
+            Quality = PhysicalTcVocabulary.Quality,
+            DiagnosticState = PhysicalTcVocabulary.NoDiagnostic,
+            MappingStatus = PhysicalTcVocabulary.MappingStatus,
+            DecodeStatus = PhysicalTcVocabulary.DecodeStatus,
+            NotVerified = Array.AsReadOnly(PhysicalTcVocabulary.NotVerified.ToArray()),
+            PhysicalEvidence = new TcPhysicalReadOnlyEvidence
+            {
+                EndpointIdentity = PhysicalTcVocabulary.EndpointConfigured,
+                ReadProfile = TcEndpointConfiguration.AuthorizedReadProfile,
+                // CAB1 carries two DRAWING_INTERNAL_CONFLICT rows (offsets 13 and 14); its mapping is
+                // therefore declared but not fully drawing-verified, and the summary says so.
+                MappingEvidenceState = PhysicalTcVocabulary.MappingEvidenceDrawingInternalConflict,
+                CommissioningState = PhysicalTcVocabulary.CommissioningState,
+            },
+        });
 
     public async ValueTask DisposeAsync()
     {

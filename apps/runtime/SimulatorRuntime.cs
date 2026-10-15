@@ -302,7 +302,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         RuntimeHostOptions options,
         IClock clock,
         Action<string, string>? faultObserver = null,
-        Func<ITcReadOnlyClient>? deterministicTcClientFactory = null)
+        Func<ITcReadOnlyClient>? tcClientFactory = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(clock);
@@ -349,7 +349,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             store.CreateWriter(),
             scenario,
             scenarioSet.Topology,
-            deterministicTcClientFactory is null ? null : new TcAcquisitionSession(deterministicTcClientFactory, clock),
+            tcClientFactory is null ? null : new TcAcquisitionSession(tcClientFactory, clock, SessionProfileFor(options)),
             faultObserver,
             composedAtUtc,
             startupFaultCode: null,
@@ -360,6 +360,17 @@ public sealed class SimulatorRuntime : IAsyncDisposable
 
         return runtime;
     }
+
+    /// <summary>
+    /// The immutable session profile of the already-validated options. The mode is never inferred
+    /// here: it comes from the explicit acquisition mode, and a physical mode is impossible without
+    /// the Owner-local endpoint that <see cref="RuntimeHostOptions.TryValidate"/> already required.
+    /// No fallback between profiles exists, and none can be reached from this method.
+    /// </summary>
+    private static TcSessionProfile SessionProfileFor(RuntimeHostOptions options) =>
+        options.AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY && options.Endpoint is not null
+            ? TcSessionProfile.PhysicalReadOnly(options.Endpoint.Endpoint)
+            : TcSessionProfile.Deterministic();
 
     /// <summary>
     /// Builds a runtime that carries a startup fault instead of a state store. The
@@ -409,7 +420,21 @@ public sealed class SimulatorRuntime : IAsyncDisposable
                 $"The configuration is not valid: [{validationCode}] {validationDetail}");
         }
 
-        if (_options.Profile != DeviceProfile.SIMULATOR)
+        // Readiness accepts the explicit physical READ-ONLY profile as well, and nothing else. The
+        // profile is never reported as SIMULATOR, the endpoint is never included, and the TC checks
+        // below still refuse readiness until the physical record has actually been published.
+        if (_options.Profile == DeviceProfile.TEST_HARDWARE_READ_ONLY)
+        {
+            if (_options.AcquisitionMode != TcAcquisitionMode.PHYSICAL_READ_ONLY || _options.Endpoint is null)
+            {
+                return RuntimeReadiness.NotReady(
+                    RuntimeReadinessCodes.ProfileNotSimulator,
+                    $"[{RuntimeRefusalCodes.PhysicalTcProfileMismatch}] The active device profile is "
+                    + $"{_options.Profile} without a resolved physical read-only mode and endpoint. "
+                    + "No profile is silently substituted.");
+            }
+        }
+        else if (_options.Profile != DeviceProfile.SIMULATOR)
         {
             return RuntimeReadiness.NotReady(
                 RuntimeReadinessCodes.ProfileNotSimulator,
@@ -479,7 +504,10 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         }
 
         return RuntimeReadiness.IsReady(
-            $"SIMULATOR runtime ready at revision {publication.Current.Revision} (tick interval {_options.TickIntervalMilliseconds} ms).");
+            $"{_options.Profile} runtime ready at revision {publication.Current.Revision} "
+            + $"(acquisition {TcEndpointConfiguration.DescribeMode(_options.AcquisitionMode)}, "
+            + $"endpoint {TcEndpointConfiguration.DescribeEndpoint(_options.Endpoint?.Endpoint)}, "
+            + $"tick interval {_options.TickIntervalMilliseconds} ms).");
     }
 
     /// <summary>Projects the current committed revision as the accepted Snapshot contract.</summary>

@@ -26,6 +26,48 @@ async function withApp(body) {
   }
 }
 
+/** Boots the real application with a PHYSICAL Runtime publication injected at the HTTP seam. */
+const PHYSICAL_NOT_VERIFIED_LIST = ['PHYSICAL_REACHABILITY', 'DRAWING_MAPPING_PARITY', 'SCALING',
+  'SIGNED_REPRESENTATION', 'BYTE_ORDER', 'WORD_ORDER', 'WIRE_BREAK_SENTINEL_MEANING',
+  'REVERSE_POLARITY_SENTINEL_MEANING', 'COLD_JUNCTION_COMPENSATION', 'FIELD_TIMING',
+  'MBAP_TRANSACTION_ID', 'RESPONSE_UNIT_ID'];
+
+const physicalRecord = (overrides = {}) => ({
+  nodeId: 'TC-NODE-01', cabinetId: 'CAB1', provenance: 'PHYSICAL_HOLDING_REGISTER_READ_ONLY',
+  physical: true, quarantined: true, acquisitionState: 'COMPLETE',
+  acquiredAtUtc: '2026-10-15T12:00:00+00:00', copiedWordCount: 40,
+  rawWords: [0x7FFF, 0xF830, ...Array.from({ length: 38 }, (_, i) => 100 + i)],
+  quality: 'PHYSICAL_QUARANTINED', diagnosticState: 'NONE',
+  mappingStatus: 'DRAWING_REV1_MAPPING_DECLARED_NOT_VERIFIED',
+  decodeStatus: 'DECODE_CANDIDATE_NOT_VERIFIED',
+  notVerified: [...PHYSICAL_NOT_VERIFIED_LIST],
+  physicalEvidence: {
+    endpointIdentity: 'ENDPOINT_CONFIGURED', commissioningState: 'NOT_COMMISSIONED',
+    mappingEvidenceState: 'DRAWING_INTERNAL_CONFLICT',
+    readProfile: {
+      functionCode: 'FC03', registerArea: 'HOLDING_REGISTERS', port: 502,
+      unitIdentifier: 1, startAddress: 0, quantity: 40,
+    },
+  },
+  ...overrides,
+});
+
+const physicalRuntimeFetch = (tcAcquisition = physicalRecord()) => async (url) => {
+  if (String(url).endsWith('/api/v1/runtime')) {
+    return Response.json({ currentRevision: 9, profile: 'TEST_HARDWARE_READ_ONLY', ready: true });
+  }
+  return Response.json({ kind: 'snapshot', schema: 'wjss.snapshot/2', apiVersion: 1, revision: 9, tcAcquisition });
+};
+
+const withPhysicalApp = async (body) => {
+  const app = await bootApp({ runtimeFetch: physicalRuntimeFetch() });
+  try {
+    return await body(app);
+  } finally {
+    app.close();
+  }
+};
+
 const nodesWith = (root, attribute) => {
   const found = [];
   walk(root, (node) => {
@@ -504,4 +546,195 @@ test('the Wall Map presentation is bounded: fixed cells in a horizontally bounde
   assert.equal(/100vw/.test(css), false, 'no viewport-relative width may be used');
   // Nothing about the map uses an inline style: the content security policy allows no inline style.
   assert.equal(/style="/.test(html), false, 'the served page must contain no inline style attribute');
+});
+
+// --- CAB1 one-Node U-shape Sensor Map (physical read-only, candidate presentation) ---------------
+//
+// These tests drive the REAL application with a PHYSICAL Runtime publication injected at the HTTP
+// seam and the REAL committed Drawing mapping served by the Preview host. They prove the section's
+// logic and text: the eighteen CAB1 Sensors, Front and Rear kept separate, candidate labels carried
+// with the numbers, the legacy sentinels never shown as ordinary temperatures, unavailable clearing
+// the current-success presentation, and no control surface of any kind.
+
+const cab1Body = (app) => app.byId['cab1-physical-body'];
+const cab1Cells = (app) => {
+  const found = [];
+  walk(cab1Body(app), (node) => { if (node.attributes?.['data-sensor-id']) found.push(node); });
+  return found;
+};
+
+test('the served page carries the CAB1 U-shape section with its honest labels and its navigation anchor', () => {
+  assert.match(html, /href="#cab1-physical-map">CAB1 U-shape Sensor Map</);
+  const start = html.indexOf('<section id="cab1-physical-map"');
+  assert.ok(start > -1, 'the section must be in the served page');
+  const section = html.slice(start, html.indexOf('</section>', start));
+  assert.match(section, /PHYSICAL[\s\S]*QUARANTINED[\s\S]*DECODE CANDIDATE[\s\S]*NOT COMMISSIONED/);
+  assert.match(section, /never contacts a device, never holds a network address and never initiates an acquisition/);
+  assert.match(section, /Unavailable clears the current-success presentation/);
+  assert.match(section, /Non-CAB1 Sensors remain unavailable/);
+  // It sits after the TC Acquisition section and before Diagnostics, and adds no third scroll frame.
+  assert.match(html, /id="tc-acquisition"[\s\S]*id="cab1-physical-map"[\s\S]*id="diagnostics"/);
+  assert.equal(/cab1-frame/.test(css), false, 'the U-shape map must reuse the approved bounded frame');
+});
+
+test('the U-shape map renders the eighteen CAB1 Sensors in their served U-bend position', async () => {
+  await withPhysicalApp(async (app) => {
+    const cells = cab1Cells(app);
+    assert.equal(cells.length, 18);
+    // The bend: G+2xx on wall row 1, G+1xx on wall row 2, in reading order, all placed from the
+    // served matrix rather than typed into the page.
+    assert.deepEqual(cells.map((c) => c.attributes['data-sensor-id']),
+      [...Array(9).keys()].map((i) => `G+20${i + 1}`).concat([...Array(9).keys()].map((i) => `G+10${i + 1}`)));
+    for (const cell of cells) {
+      const id = cell.attributes['data-sensor-id'];
+      const row = id.startsWith('G+2') ? 1 : 2;
+      assert.equal(cell.attributes['data-wall-row'], String(row), id);
+      assert.ok(cell.attributes['data-wall'], id);
+      assert.equal(cell.attributes['data-value-state'], 'CANDIDATE', id);
+    }
+    // G+101..G+104 and G+201..G+204 sit on the LEFT wall; G+105.. and G+205.. on the REAR wall.
+    assert.equal(cells.find((c) => c.attributes['data-sensor-id'] === 'G+101').attributes['data-wall'], 'LEFT');
+    assert.equal(cells.find((c) => c.attributes['data-sensor-id'] === 'G+105').attributes['data-wall'], 'REAR');
+    assert.equal(cells.find((c) => c.attributes['data-sensor-id'] === 'G+209').attributes['data-wall'], 'REAR');
+  });
+});
+
+test('the two Drawing internal conflicts are flagged on the map and never smoothed away', async () => {
+  await withPhysicalApp(async (app) => {
+    const conflicted = cab1Cells(app).filter((c) => c.attributes['data-drawing-conflict'] === 'true');
+    assert.deepEqual(conflicted.map((c) => c.attributes['data-sensor-id']).sort(), ['G+107', 'G+108']);
+    for (const cell of conflicted) {
+      assert.equal(cell.attributes['data-mapping-evidence'], 'DRAWING_INTERNAL_CONFLICT');
+      assert.match(allText(cell), /DRAWING INTERNAL CONFLICT/);
+    }
+    assert.equal(cab1Cells(app).find((c) => c.attributes['data-sensor-id'] === 'G+101')
+      .attributes['data-drawing-conflict'], 'false');
+  });
+});
+
+test('the legacy sentinel candidates never appear as ordinary temperatures on the map', async () => {
+  await withPhysicalApp(async (app) => {
+    const g101 = allText(cab1Cells(app).find((c) => c.attributes['data-sensor-id'] === 'G+101'));
+    // Offset 0 is the legacy wire-break candidate and offset 1 the legacy RV/P candidate.
+    assert.match(g101, /0x7FFF/);
+    assert.match(g101, /0xF830/);
+    assert.match(g101, /32767/);
+    assert.match(g101, /63536/);
+    assert.match(g101, /no ordinary temperature/);
+    assert.match(g101, /LEGACY WIRE-BREAK CANDIDATE/);
+    assert.match(g101, /LEGACY RV\/P CANDIDATE/);
+    assert.equal(/-200/.test(g101), false, 'the naive signed decode must never be presented');
+    assert.equal(/CANDIDATE -?\d/.test(g101), false, 'a sentinel must present no numeric candidate');
+    // Every cell carries the mandatory labels with its evidence.
+    for (const cell of cab1Cells(app)) {
+      assert.match(allText(cell), /PHYSICAL \/ QUARANTINED \/ DECODE CANDIDATE \/ NOT COMMISSIONED/,
+        cell.attributes['data-sensor-id']);
+    }
+    // An ordinary Sensor still presents candidate numbers with the unit.
+    assert.match(allText(cab1Cells(app).find((c) => c.attributes['data-sensor-id'] === 'G+102')), /CANDIDATE \d/);
+  });
+});
+
+test('a cell and the Sensor detail show the same source value for the same measurement', async () => {
+  await withPhysicalApp(async (app) => {
+    const cell = cab1Cells(app).find((c) => c.attributes['data-sensor-id'] === 'G+102');
+    const frontButton = cell.childNodes.filter((n) => n.tagName === 'div').flatMap((n) => n.childNodes)
+      .find((n) => n.attributes?.['data-physical-side'] === 'F');
+    assert.ok(frontButton, 'the cell must offer a Front detail control');
+    assert.equal(frontButton.attributes['data-physical-key'], 'G+102:F');
+    click(frontButton);
+    const note = app.byId['cab1-physical-selection'].textContent;
+    // Offset 2 is raw word 100, so the CANDIDATE rule (signed raw / 10.0) yields 10 degC.
+    assert.match(note, /Selected G\+102 Front \(offset 2\)/);
+    assert.match(note, /0x0064 \(raw 100\)/);
+    assert.match(note, /CANDIDATE 10 degC/);
+    assert.match(note, /PHYSICAL \/ QUARANTINED \/ DECODE CANDIDATE \/ NOT COMMISSIONED/);
+    assert.match(note, /changes no evidence and affects no alarm, interlock, trip, Cleaning or dispatch/);
+    // The same raw evidence and the same candidate the cell shows are what the note shows.
+    const cellText = allText(cell);
+    assert.match(cellText, /0x0064 \(raw 100\)/);
+    assert.match(cellText, /CANDIDATE 10 degC/);
+    assert.match(note, new RegExp(cellText.match(/0x0064 \(raw 100\)/)[0].replace(/[()]/g, '\\$&')));
+  });
+});
+
+test('an unpublished or failed Runtime leaves every CAB1 cell unavailable, never stale or invented', async () => {
+  // No Runtime at all: the section must draw no value.
+  const app = await bootApp({});
+  try {
+    const cells = cab1Cells(app);
+    assert.equal(cells.length, 18);
+    for (const cell of cells) {
+      assert.equal(cell.attributes['data-value-state'], 'UNAVAILABLE', cell.attributes['data-sensor-id']);
+      assert.match(allText(cell), /not published/);
+      assert.match(allText(cell), /NO PUBLICATION/);
+      assert.equal(/CANDIDATE -?\d/.test(allText(cell)), false, 'no value may be presented without a publication');
+    }
+    // The mapping itself is still served, so the shape is drawn from the committed Drawing evidence.
+    assert.equal(/CAB1 mapping unavailable/.test(allText(cab1Body(app))), false);
+  } finally {
+    app.close();
+  }
+
+  // A failed acquisition is reported as a failure, and still no value appears.
+  const failed = await bootApp({
+    runtimeFetch: async (url) => (String(url).endsWith('/api/v1/runtime')
+      ? Response.json({ currentRevision: 4, profile: 'TEST_HARDWARE_READ_ONLY', ready: false, readinessCode: 'TC_ACQUISITION_UNAVAILABLE' })
+      : Response.json({ kind: 'snapshot', schema: 'wjss.snapshot/2', apiVersion: 1, revision: 4, tcAcquisition: null })),
+  });
+  try {
+    for (const cell of cab1Cells(failed)) {
+      assert.equal(cell.attributes['data-value-state'], 'UNAVAILABLE');
+      assert.equal(/CANDIDATE \d/.test(allText(cell)), false);
+    }
+  } finally {
+    failed.close();
+  }
+});
+
+test('the U-shape section offers no control, no write and no hardware action', async () => {
+  await withPhysicalApp(async (app) => {
+    const controls = [];
+    walk(cab1Body(app), (node) => {
+      if (node.tagName === 'button' || node.tagName === 'input' || node.tagName === 'a') controls.push(node);
+    });
+    // The only controls are the read-only detail selectors, which change presentation only.
+    for (const control of controls) {
+      assert.equal(control.tagName, 'button');
+      assert.ok(control.attributes['data-physical-key'], 'only measurement detail selectors are allowed');
+      assert.equal(control.tagName === 'a', false);
+    }
+    assert.equal(controls.length, 36, 'one Front and one Rear detail control per CAB1 Sensor');
+    // Nothing in the section can command, configure, retry or acknowledge.
+    const text = allText(cab1Body(app));
+    for (const forbidden of ['RESET', 'RETRY', 'RECONNECT', 'ACKNOWLEDGE', 'COMMAND', 'SET ', 'WRITE']) {
+      assert.equal(text.includes(forbidden), false, forbidden);
+    }
+    // The section states the boundary it operates under.
+    assert.match(allText(cab1Body(app)), /PHYSICAL \/ QUARANTINED \/ DECODE CANDIDATE \/ NOT COMMISSIONED/);
+  });
+});
+
+test('selection in the U-shape section changes no publication, no counts and no verdict', async () => {
+  await withPhysicalApp(async (app) => {
+    const before = {
+      table: allText(app.byId['monitor-table-body']),
+      summary: allText(app.byId['summary-body']),
+      nodeSummary: allText(app.byId['node-summary-body']),
+      cells: cab1Cells(app).map((c) => allText(c)),
+    };
+    const cell = cab1Cells(app).find((c) => c.attributes['data-sensor-id'] === 'G+107');
+    const rear = cell.childNodes.filter((n) => n.tagName === 'div').flatMap((n) => n.childNodes)
+      .find((n) => n.attributes?.['data-physical-side'] === 'R');
+    click(rear);
+    const note = app.byId['cab1-physical-selection'].textContent;
+    assert.match(note, /Selected G\+107 Rear \(offset 13\)/);
+    assert.match(note, /Drawing internal conflict/);
+    assert.deepEqual(cab1Cells(app).map((c) => allText(c)), before.cells, 'selection must not mutate a cell');
+    assert.equal(allText(app.byId['monitor-table-body']), before.table, 'the Overview must not change');
+    assert.equal(allText(app.byId['summary-body']), before.summary, 'no count may change');
+    assert.equal(allText(app.byId['node-summary-body']), before.nodeSummary, 'no node summary may change');
+    // The unselected measurement of the same Sensor is untouched by the selection.
+    assert.match(allText(cab1Cells(app).find((c) => c.attributes['data-sensor-id'] === 'G+107')), /Front:/);
+  });
 });

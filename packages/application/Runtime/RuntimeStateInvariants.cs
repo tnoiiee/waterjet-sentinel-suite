@@ -46,14 +46,9 @@ public static class RuntimeStateInvariants
                 out detail);
         }
 
-        if (state.DeviceProfile != DeviceProfile.SIMULATOR)
+        if (!TryValidateProfile(state, out reasonCode, out detail))
         {
-            return Refuse(
-                RuntimeRefusalCodes.ProfileNotSimulator,
-                $"Device profile {state.DeviceProfile} must never reach a committed Runtime state in Stage 0.3A; "
-                + "only SIMULATOR may start (ADR-0012), and no fallback to SIMULATOR is permitted.",
-                out reasonCode,
-                out detail);
+            return false;
         }
 
         if (state.Config is null)
@@ -122,10 +117,227 @@ public static class RuntimeStateInvariants
     }
 
 
-    private static bool TryValidateTcAcquisition(TcAcquisitionState state, out string reasonCode, out string detail)
+    /// <summary>
+    /// Validates the device profile against the acquisition variant it carries.
+    ///
+    /// The SIMULATOR invariant is unchanged and is not weakened: a SIMULATOR revision still carries
+    /// the deterministic non-Hardware record (or no TC record at all) and must NEVER carry physical
+    /// evidence. The one narrow extension is the explicit one-Node physical READ-ONLY Product mode,
+    /// which commits <see cref="DeviceProfile.TEST_HARDWARE_READ_ONLY"/> and is admissible only for
+    /// the physical quarantined variant of the record. That profile is therefore not a general-purpose
+    /// profile, and TEST_HARDWARE and PRODUCTION stay refused in every case. No acquisition mode can be
+    /// inferred from this check.
+    /// </summary>
+    private static bool TryValidateProfile(RuntimeState state, out string reasonCode, out string detail)
     {
         reasonCode = string.Empty;
         detail = string.Empty;
+
+        switch (state.DeviceProfile)
+        {
+            case DeviceProfile.SIMULATOR:
+                if (state.TcAcquisition is { Physical: true })
+                {
+                    return Refuse(
+                        RuntimeRefusalCodes.PhysicalTcProfileMismatch,
+                        "A SIMULATOR revision must never carry a physical TC acquisition record: physical "
+                        + "evidence requires the explicit physical read-only acquisition mode and its own "
+                        + "profile, and no profile is silently substituted.",
+                        out reasonCode,
+                        out detail);
+                }
+
+                return true;
+
+            case DeviceProfile.TEST_HARDWARE_READ_ONLY:
+                // The explicit physical read-only mode reaches this profile only after its own
+                // startup gate resolved an Owner-local endpoint. Between composition and the single
+                // publication the record is legitimately absent (readiness reports NOT_READY until it
+                // arrives), so absence is admissible — but the two variants may never be blended. A
+                // deterministic record under this profile is refused outright.
+                if (state.TcAcquisition is { Physical: false })
+                {
+                    return Refuse(
+                        RuntimeRefusalCodes.PhysicalTcProfileMismatch,
+                        "The TEST_HARDWARE_READ_ONLY profile is authorized only for the explicit one-Node "
+                        + "physical READ-ONLY acquisition mode. It must never carry a deterministic "
+                        + "non-Hardware record: the two variants are never blended and no mode is silently "
+                        + "substituted.",
+                        out reasonCode,
+                        out detail);
+                }
+
+                return true;
+
+            default:
+                return Refuse(
+                    RuntimeRefusalCodes.ProfileNotSimulator,
+                    $"Device profile {state.DeviceProfile} must never reach a committed Runtime state: only "
+                    + "SIMULATOR may start, or TEST_HARDWARE_READ_ONLY for the explicit physical read-only "
+                    + "acquisition mode (ADR-0012). No fallback to SIMULATOR is permitted and Production is "
+                    + "never startable.",
+                    out reasonCode,
+                    out detail);
+        }
+    }
+
+    /// <summary>
+    /// Dispatches TC validation to the variant the record declares. Each variant keeps its own
+    /// strict validator; the deterministic validator is never replaced by, or relaxed into, a
+    /// weaker generic one.
+    /// </summary>
+    private static bool TryValidateTcAcquisition(TcAcquisitionState state, out string reasonCode, out string detail) =>
+        state.Physical
+            ? TryValidatePhysicalTcAcquisition(state, out reasonCode, out detail)
+            : TryValidateDeterministicTcAcquisition(state, out reasonCode, out detail);
+
+    /// <summary>
+    /// Structural validation of the physical quarantined record. It can express ONLY candidate,
+    /// quarantined, non-commissioned evidence: <c>quarantined</c> must be true, the identity must be
+    /// the canonical one-Node/Cabinet pair, the profile must equal the authorized read-only tuple,
+    /// and the evidence block must be present with a redacted endpoint identity. There is no field
+    /// and no code path here that could accept, commission, validate or approve a physical read.
+    /// </summary>
+    private static bool TryValidatePhysicalTcAcquisition(TcAcquisitionState state, out string reasonCode, out string detail)
+    {
+        reasonCode = string.Empty;
+        detail = string.Empty;
+
+        if (state.NodeId != PhysicalTcVocabulary.NodeId || state.CabinetId != PhysicalTcVocabulary.CabinetId)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition must name the canonical one-Node and Cabinet identity.",
+                out reasonCode, out detail);
+        }
+
+        if (!state.Quarantined
+            || state.Provenance != PhysicalTcVocabulary.Provenance
+            || state.AcquisitionState != PhysicalTcVocabulary.Complete
+            || state.Quality != PhysicalTcVocabulary.Quality
+            || state.DiagnosticState != PhysicalTcVocabulary.NoDiagnostic
+            || state.MappingStatus != PhysicalTcVocabulary.MappingStatus
+            || state.DecodeStatus != PhysicalTcVocabulary.DecodeStatus)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition must remain complete, quarantined, mapping-declared and "
+                + "decode-candidate. There is no automatic ACCEPTED encoding, and a non-quarantined "
+                + "physical record is refused before publication.",
+                out reasonCode, out detail);
+        }
+
+        if (state.AcquiredAtUtc == default || state.AcquiredAtUtc.Offset != TimeSpan.Zero)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition requires a non-default UTC acquisition instant.",
+                out reasonCode, out detail);
+        }
+
+        if (state.RawWords is null || state.CopiedWordCount != state.RawWords.Count
+            || state.RawWords.Count != PhysicalTcVocabulary.WordCount)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                $"A physical TC acquisition must carry exactly {PhysicalTcVocabulary.WordCount} copied raw "
+                + "words with a matching copied count.",
+                out reasonCode, out detail);
+        }
+
+        if (state.NotVerified is null || state.NotVerified.Count != PhysicalTcVocabulary.NotVerified.Count)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition must retain the complete Not Verified set.",
+                out reasonCode, out detail);
+        }
+
+        for (var index = 0; index < state.NotVerified.Count; index++)
+        {
+            if (state.NotVerified[index] != PhysicalTcVocabulary.NotVerified[index])
+            {
+                return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                    "Physical TC acquisition Not Verified fields must remain canonical and ordered.",
+                    out reasonCode, out detail);
+            }
+        }
+
+        var evidence = state.PhysicalEvidence;
+        if (evidence is null)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition requires its read-profile evidence block.",
+                out reasonCode, out detail);
+        }
+
+        // The redacted logical identity is the ONLY endpoint statement a contract may carry. A record
+        // that carries anything else (including an address-shaped value) is refused.
+        if (evidence.EndpointIdentity != PhysicalTcVocabulary.EndpointConfigured)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition records only the redacted logical endpoint identity "
+                + $"'{PhysicalTcVocabulary.EndpointConfigured}'; no address is ever part of the contract.",
+                out reasonCode, out detail);
+        }
+
+        var profile = evidence.ReadProfile;
+        if (profile is null)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition requires its logical read-profile identity.",
+                out reasonCode, out detail);
+        }
+
+        if (profile.FunctionCode != PhysicalTcVocabulary.FunctionCodeHoldingRegisters
+            || profile.RegisterArea != PhysicalTcVocabulary.RegisterAreaHoldingRegisters
+            || profile.Port != PhysicalTcVocabulary.RegisterPort
+            || profile.UnitIdentifier != PhysicalTcVocabulary.UnitIdentifier
+            || profile.StartAddress != PhysicalTcVocabulary.StartAddress
+            || profile.Quantity != PhysicalTcVocabulary.WordCount)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                $"A physical TC acquisition must carry the exact authorized read-only profile "
+                + $"({PhysicalTcVocabulary.FunctionCodeHoldingRegisters}, {PhysicalTcVocabulary.RegisterAreaHoldingRegisters}, "
+                + $"port {PhysicalTcVocabulary.RegisterPort}, unit {PhysicalTcVocabulary.UnitIdentifier}, "
+                + $"start {PhysicalTcVocabulary.StartAddress}, quantity {PhysicalTcVocabulary.WordCount}). "
+                + "A different function code, area, unit, start or quantity is refused: no fallback and "
+                + "no profile correction exists.",
+                out reasonCode, out detail);
+        }
+
+        if (evidence.MappingEvidenceState != PhysicalTcVocabulary.MappingEvidenceDrawingVerified
+            && evidence.MappingEvidenceState != PhysicalTcVocabulary.MappingEvidenceDrawingInternalConflict
+            && evidence.MappingEvidenceState != PhysicalTcVocabulary.MappingEvidenceSpareUnmapped)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                "A physical TC acquisition must carry a known Drawing mapping evidence state; mapping "
+                + "evidence may not be omitted or invented.",
+                out reasonCode, out detail);
+        }
+
+        if (evidence.CommissioningState != PhysicalTcVocabulary.CommissioningState)
+        {
+            return Refuse(RuntimeRefusalCodes.PhysicalTcRecordInvalid,
+                $"A physical TC acquisition must remain '{PhysicalTcVocabulary.CommissioningState}'; "
+                + "no read can commission, validate or accept anything.",
+                out reasonCode, out detail);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Structural validation of the deterministic non-Hardware record. Unchanged from the accepted
+    /// one-Node Product slice, with one added refusal: the record must not carry a physical evidence
+    /// block, so the two variants cannot be blended.
+    /// </summary>
+    private static bool TryValidateDeterministicTcAcquisition(TcAcquisitionState state, out string reasonCode, out string detail)
+    {
+        reasonCode = string.Empty;
+        detail = string.Empty;
+
+        if (state.PhysicalEvidence is not null)
+        {
+            return Refuse(RuntimeRefusalCodes.StateInvalid,
+                "A deterministic TC acquisition must not carry a physical read-only evidence block.",
+                out reasonCode, out detail);
+        }
 
         if (state.NodeId != DeterministicTcVocabulary.NodeId
             || state.CabinetId != DeterministicTcVocabulary.CabinetId)

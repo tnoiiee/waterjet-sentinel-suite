@@ -19,7 +19,13 @@
 //                                         no probe, no socket, no device, no live communication state)
 //   GET /api/tc-acquisition               presentation-only projection of the Runtime Snapshot;
 //                                         Runtime status distinguishes a pending from failed session;
-//                                         never a source of acquisition state or device access
+//                                         never a source of acquisition state or device access.
+//                                         Accepts BOTH quarantined TC variants: the deterministic
+//                                         non-Hardware record and the one-Node physical READ-ONLY
+//                                         record, whose CAB1 measurement projection travels with it.
+//   GET /api/tc-physical-mapping          the canonical CAB1 Drawing-rev1 mapping projection, read-only
+//                                         (40 offsets, 18 Sensors, preserved conflict and spare states;
+//                                         no endpoint, no legacy IP field, no device access)
 //
 // Every other method is refused with 405, and there is no route that writes, connects, polls, reads
 // a device, changes the Mapping, or commands anything. The server binds to 127.0.0.1 only: the bind
@@ -40,8 +46,9 @@ import {
   tcNodeConfigurationFingerprint,
   CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, recordToRecordConsistency,
   tcAcquisitionEvidenceFingerprint, requireTopologyInvariants,
+  buildCab1Mapping, projectCab1Payload, CAB1_NODE_ID, CAB1_CABINET_ID, PHYSICAL_READ_PROFILE,
 } from '../../packages/commissioning/src/index.mjs';
-import { validDeterministicTcAcquisition } from '../../packages/contracts/wjss-contracts-ts/validate.mjs';
+import { validTcAcquisition, validDeterministicTcAcquisition } from '../../packages/contracts/wjss-contracts-ts/validate.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -367,8 +374,14 @@ export async function tcAcquisitionPayload({ runtimeFetch = globalThis.fetch,
     let runtimeStatus;
     try { runtimeStatus = await statusResponse.json(); }
     catch { return envelope(502, 'INVALID_RUNTIME_RESPONSE'); }
+    // Either the deterministic SIMULATOR run or the explicit one-Node physical READ-ONLY run is
+    // acceptable here, and the reported profile must be the one the Runtime actually reports: the
+    // projection never relabels a physical run as SIMULATOR or the reverse. An unrecognised profile
+    // is refused rather than echoed.
+    const knownProfile = runtimeStatus?.profile === 'SIMULATOR'
+      || runtimeStatus?.profile === 'TEST_HARDWARE_READ_ONLY';
     if (!record(runtimeStatus) || runtimeStatus.currentRevision !== snapshot.revision
-      || runtimeStatus.profile !== 'SIMULATOR' || runtimeStatus.ready !== false) {
+      || !knownProfile || runtimeStatus.ready !== false) {
       return envelope(502, 'INVALID_RUNTIME_RESPONSE');
     }
     if (runtimeStatus.readinessCode === 'TC_ACQUISITION_UNAVAILABLE')
@@ -377,9 +390,11 @@ export async function tcAcquisitionPayload({ runtimeFetch = globalThis.fetch,
       return envelope(200, 'NOT_PUBLISHED', snapshot.revision);
     return envelope(503, 'RUNTIME_UNAVAILABLE');
   }
-  if (!validDeterministicTcAcquisition(snapshot.tcAcquisition)) return envelope(502, 'INVALID_RUNTIME_RESPONSE');
+  if (!validTcAcquisition(snapshot.tcAcquisition)) return envelope(502, 'INVALID_RUNTIME_RESPONSE');
 
   const tc = snapshot.tcAcquisition;
+  if (tc.physical) return physicalAcquisitionEnvelope(envelope, snapshot, tc);
+
   return envelope(200, 'PUBLISHED', snapshot.revision, {
     node: tc.nodeId,
     cabinet: tc.cabinetId,
@@ -398,9 +413,151 @@ export async function tcAcquisitionPayload({ runtimeFetch = globalThis.fetch,
   });
 }
 
+/**
+ * Presentation-only projection of a published PHYSICAL quarantined record for the one-Node slice.
+ *
+ * Every value below is CANDIDATE evidence. The projection therefore carries the honest labels with
+ * the numbers: PHYSICAL, QUARANTINED, DECODE CANDIDATE and NOT COMMISSIONED travel together, and the
+ * legacy sentinel candidates (0x7FFF, 0xF830) never present as ordinary temperatures because
+ * `projectCab1Payload` classifies them before any numeric decode. The endpoint is not represented in
+ * the record and is not represented here; a withheld value is reported as unavailable, never as a
+ * stale or fabricated number.
+ */
+function physicalAcquisitionEnvelope(envelope, snapshot, tc) {
+  const { schedule } = loadEvidence();
+  const mapping = buildCab1Mapping(schedule.rows);
+  const projection = projectCab1Payload(mapping, tc.rawWords);
+
+  const sensors = projection.sensors.map((sensor) => {
+    const front = projection.measurements.find((m) => m.offset === sensor.frontOffset);
+    const rear = projection.measurements.find((m) => m.offset === sensor.rearOffset);
+    return {
+      sensorId: sensor.sensorId,
+      front: { offset: front.offset, ...decodeView(front) },
+      rear: { offset: rear.offset, ...decodeView(rear) },
+      drawingConflict: sensor.drawingConflict,
+      mappingEvidenceState: sensor.mappingEvidenceState,
+      // A paired delta is only meaningful when BOTH sides carry an ordinary candidate number; the
+      // legacy sentinels have no numeric meaning, so no delta is fabricated for them.
+      frontRearDeltaC: (typeof front.candidateValue === 'number' && typeof rear.candidateValue === 'number')
+        ? Number((front.candidateValue - rear.candidateValue).toFixed(4))
+        : null,
+      deltaAvailable: typeof front.candidateValue === 'number' && typeof rear.candidateValue === 'number',
+    };
+  });
+
+  return envelope(200, 'PUBLISHED', snapshot.revision, {
+    node: tc.nodeId,
+    cabinet: tc.cabinetId,
+    provenance: tc.provenance,
+    physical: true,
+    quarantine: true,
+    acquisitionState: tc.acquisitionState,
+    acquisitionTimestampUtc: tc.acquiredAtUtc,
+    copiedWordCount: tc.copiedWordCount,
+    words: tc.rawWords.slice(),
+    quality: tc.quality,
+    diagnosticState: tc.diagnosticState,
+    mappingStatus: tc.mappingStatus,
+    decodeStatus: tc.decodeStatus,
+    notVerified: tc.notVerified.slice(),
+    // Presentational labels, so a consumer cannot render a candidate number without them.
+    labels: ['PHYSICAL', 'QUARANTINED', 'DECODE CANDIDATE', 'NOT COMMISSIONED'],
+    // The redacted identity only. There is no endpoint field in any TC response, by construction.
+    endpointIdentity: tc.physicalEvidence?.endpointIdentity ?? null,
+    commissioningState: tc.physicalEvidence?.commissioningState ?? null,
+    mappingEvidenceState: tc.physicalEvidence?.mappingEvidenceState ?? null,
+    readProfile: tc.physicalEvidence?.readProfile ? { ...tc.physicalEvidence.readProfile } : null,
+    candidateDecode: {
+      rule: 'unchecked((short)word) / 10.0',
+      unit: 'degC',
+      state: 'DECODE_CANDIDATE_NOT_VERIFIED',
+      signedRepresentation: 'NOT_VERIFIED',
+      byteOrder: 'NOT_VERIFIED',
+      scaling: 'NOT_VERIFIED',
+    },
+    wordCount: projection.wordCount,
+    sensorCount: sensors.length,
+    measurementCount: projection.measurements.filter((m) => !m.spare).length,
+    spareOffsetCount: projection.measurements.filter((m) => m.spare).length,
+    sensors,
+    spareOffsets: projection.measurements.filter((m) => m.spare).map((m) => m.offset),
+    boundary: BOUNDARY,
+  });
+}
+
+/**
+ * One measurement as the browser sees it. `candidateValue` is null for the legacy sentinel
+ * candidates: their manufacturer meaning is unverified, so their numeric field stays empty and their
+ * legacy label is shown instead of a temperature.
+ */
+function decodeView(measurement) {
+  return {
+    moduleInstance: measurement.moduleInstance,
+    moduleModel: measurement.moduleModel,
+    channel: measurement.channel,
+    sensorId: measurement.sensorId,
+    side: measurement.side,
+    sideLabel: measurement.sideLabel,
+    rawWord: measurement.rawWord,
+    rawHex: measurement.rawHex,
+    decodeState: measurement.decodeState,
+    label: measurement.label,
+    candidateValue: measurement.candidateValue,
+    candidateUnit: measurement.candidateUnit,
+    manufacturerMeaning: measurement.manufacturerMeaning,
+    presentAsOrdinaryTemperature: measurement.presentAsOrdinaryTemperature,
+    mappingEvidenceState: measurement.mappingEvidenceState,
+    drawingConflict: measurement.drawingConflict,
+    rowState: measurement.rowState,
+    spare: measurement.spare,
+  };
+}
+
 function send(res, status, body, type, extra = {}) {
   res.writeHead(status, { ...SECURITY_HEADERS, 'Content-Type': type, ...extra });
   res.end(body);
+}
+
+/**
+ * The canonical CAB1 Drawing-rev1 mapping projection, derived from the committed schedule. It carries
+ * the read-profile SHAPE (function code, register area, port, unit, start, quantity) and never an
+ * endpoint value: the Owner-local address is not represented in this process, this projection or any
+ * response. Mapping-only output is useful precisely when no Runtime is running.
+ */
+export function tcPhysicalMappingPayload() {
+  const { schedule } = loadEvidence();
+  const mapping = buildCab1Mapping(schedule.rows);
+  return {
+    stageId: STAGE_ID,
+    mode: PREVIEW_MODE,
+    node: mapping.nodeId,
+    cabinet: mapping.cabinetId,
+    cabinetTag: mapping.cabinetTag,
+    wordCount: mapping.wordCount,
+    assignedOffsetCount: mapping.assignedOffsetCount,
+    spareOffsetCount: mapping.spareOffsetCount,
+    sensorCount: mapping.sensorCount,
+    measurementCount: mapping.measurementCount,
+    mappingEvidenceState: mapping.mappingEvidenceState,
+    drawingConflictOffsets: mapping.drawingConflictOffsets.slice(),
+    readProfile: { ...mapping.readProfile },
+    sensors: mapping.sensors.map((s) => ({ ...s })),
+    measurements: mapping.measurements.map((m) => ({
+      offset: m.offset,
+      moduleInstance: m.moduleInstance,
+      moduleModel: m.moduleModel,
+      channel: m.channel,
+      sensorId: m.sensorId,
+      side: m.side,
+      sideLabel: m.sideLabel,
+      spare: m.spare,
+      rowState: m.rowState,
+      drawingConflict: m.drawingConflict,
+      mappingEvidenceState: m.mappingEvidenceState,
+    })),
+    boundary: BOUNDARY,
+  };
 }
 
 export function createPreviewServer({ runtimeFetch = globalThis.fetch,
@@ -455,6 +612,9 @@ export function createPreviewServer({ runtimeFetch = globalThis.fetch,
       }
       if (path === '/api/tc-acquisition-evidence') {
         return send(res, 200, JSON.stringify(tcAcquisitionEvidencePayload()), MIME['.json']);
+      }
+      if (path === '/api/tc-physical-mapping') {
+        return send(res, 200, JSON.stringify(tcPhysicalMappingPayload()), MIME['.json']);
       }
       if (path === '/api/tc-acquisition') {
         const { status, body } = await tcAcquisitionPayload({ runtimeFetch, runtimePort });

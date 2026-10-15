@@ -27,24 +27,39 @@ const string ProfileEnv = RuntimeHostOptions.ProfileVariable;
 const string PortEnv = RuntimeHostOptions.PortVariable;
 const int DefaultPort = 5181;
 
-// 1. Device profile (ADR-0012). Default SIMULATOR; unknown labels are a
-//    configuration error; anything but SIMULATOR is refused by the policy.
+// 0. Acquisition mode (explicit; absent value means the existing deterministic Product behaviour).
+//    The mode is read BEFORE the profile so that the profile default and the profile gate can agree
+//    with it. Nothing is inferred from any other variable, and no mode is silently substituted.
+if (!TcEndpointConfiguration.TryReadAcquisitionMode(
+    Environment.GetEnvironmentVariable, out var acquisitionMode, out var modeCode, out var modeDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{modeCode}]: {modeDetail} Nothing was bound.");
+    return 4;
+}
+
+var physicalReadOnly = acquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY;
+
+// 1. Device profile (ADR-0012). Default SIMULATOR; the explicit physical read-only mode defaults to
+//    TEST_HARDWARE and nothing else. Unknown labels are a configuration error; any profile the mode
+//    does not authorize is refused by the policy.
 var profileLabel = Environment.GetEnvironmentVariable(ProfileEnv);
 if (string.IsNullOrWhiteSpace(profileLabel))
 {
-    profileLabel = "SIMULATOR";
+    profileLabel = physicalReadOnly
+        ? nameof(DeviceProfile.TEST_HARDWARE_READ_ONLY)
+        : nameof(DeviceProfile.SIMULATOR);
 }
 
 if (!ProfileStartPolicy.TryParseProfile(profileLabel, out var profile))
 {
     Console.Error.WriteLine(
         $"WJSS startup refused: unknown device profile '{profileLabel}' " +
-        "(expected SIMULATOR | TEST_HARDWARE | PRODUCTION). " +
+        "(expected SIMULATOR | TEST_HARDWARE | PRODUCTION | TEST_HARDWARE_READ_ONLY). " +
         $"Fix {ProfileEnv}. Nothing was bound.");
     return 4;
 }
 
-if (!ProfileStartPolicy.TryRequireStartable(profile, out var refusalCode, out var refusalReason))
+if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, out var refusalCode, out var refusalReason))
 {
     Console.Error.WriteLine($"WJSS startup refused [{refusalCode}]: {refusalReason}");
     return 2;
@@ -92,12 +107,19 @@ void ObserveFault(string code, string detail)
     }
 }
 
+// The one-read client of the selected mode. Deterministic mode keeps the socket-free client; the
+// physical read-only mode uses the existing read-only adapter for the Owner-local endpoint. The
+// factory is chosen from the validated mode only, so a client can never be constructed for a mode
+// that was not selected, and only the Runtime owns this client lifetime. Nothing here contacts a
+// device: the client is constructed at composition time and used by the one-use session.
+Func<ITcReadOnlyClient> tcClientFactory = options.AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY
+    ? TcReadOnlyClientFactory.Create
+    : TcReadOnlyClientFactory.CreateDeterministic;
+
 SimulatorRuntime runtime;
 try
 {
-    // The Product host opts in explicitly to the socket-free one-read client. The
-    // physical factory is not used, and only the Runtime owns this client lifetime.
-    runtime = SimulatorRuntime.Create(options, clock, ObserveFault, TcReadOnlyClientFactory.CreateDeterministic);
+    runtime = SimulatorRuntime.Create(options, clock, ObserveFault, tcClientFactory);
 }
 catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
 {
@@ -297,11 +319,19 @@ RuntimeStatus BuildStatus()
 // evaluation - including the {StartedUtc:O} round-trip formatting - is only
 // performed when Information logging is actually enabled. Same level, same
 // template, same structured payloads; no suppression, no interpolation.
+// The acquisition mode and the REDACTED endpoint identity are observable; the endpoint value is
+// never logged. DescribeEndpoint returns only ENDPOINT_CONFIGURED / ENDPOINT_NOT_CONFIGURED.
 if (app.Logger.IsEnabled(LogLevel.Information))
 {
     app.Logger.LogInformation(
-        "WJSS Runtime host starting. profile={Profile} url={Url} stage={Stage} startedUtc={StartedUtc:O}",
-        options.Profile, baseUrl, RuntimeStage.Marker, startedUtc);
+        "WJSS Runtime host starting. profile={Profile} acquisition={Acquisition} endpoint={Endpoint} "
+        + "url={Url} stage={Stage} startedUtc={StartedUtc:O}",
+        options.Profile,
+        TcEndpointConfiguration.DescribeMode(options.AcquisitionMode),
+        TcEndpointConfiguration.DescribeEndpoint(options.Endpoint?.Endpoint),
+        baseUrl,
+        RuntimeStage.Marker,
+        startedUtc);
 }
 
 try

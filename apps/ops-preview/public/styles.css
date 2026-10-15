@@ -226,3 +226,24 @@ footer { padding:14px 24px 28px; color:var(--muted); font-size:var(--fs-small); 
 /* The Loop-Test note is a full-width caption of the summary grid, never a stray cell. */
 .summary > .note { grid-column:1 / -1; margin:0; }
 @media (max-width: 900px) { .viewbar { position:static; } .detail-card dl { grid-template-columns:1fr; } }
+
+/* CAB1 U-shape Sensor Map: the eighteen one-Node CAB1 Sensors in their served U-bend position.
+   Fixed-cell layout inside a horizontally bounded frame, so the section adds no page-width element
+   and no page-level layout regression. Colours carry no control meaning: every class here is a
+   PRESENTATION label for candidate, quarantined and unverified evidence. */
+.cab1-map { display:flex; flex-direction:column; gap:8px; width:max-content; margin:0 auto; }
+.cab1-band { display:flex; align-items:stretch; gap:8px; }
+.cab1-band-label { width:64px; flex:0 0 64px; display:flex; align-items:center; font-size:var(--fs-small); color:var(--muted); }
+.cab1-cells { display:grid; grid-template-columns:repeat(9, 168px); gap:6px; }
+.cab1-cell { border:1px solid var(--line); border-radius:6px; background:var(--panel); padding:6px; display:flex; flex-direction:column; gap:4px; font-size:var(--fs-small); }
+.cab1-cell[data-drawing-conflict="true"] { border-color:#d29922; box-shadow:inset 0 0 0 1px #d29922; }
+.cab1-cell[data-value-state="UNAVAILABLE"] { border-style:dashed; }
+.cab1-cell-head { display:flex; justify-content:space-between; gap:6px; color:var(--fg); }
+.cab1-wall { color:var(--muted); }
+.cab1-side { display:flex; flex-direction:column; gap:1px; border-left:2px solid var(--line); padding-left:5px; }
+.cab1-side[data-value-state="UNAVAILABLE"] { border-left-style:dashed; color:var(--muted); }
+.cab1-raw { font-variant-numeric:tabular-nums; color:var(--muted); }
+.cab1-candidate { font-variant-numeric:tabular-nums; }
+.cab1-label { color:var(--muted); text-transform:none; }
+.cab1-flag { color:#d29922; }
+.cab1-note { margin:8px 0 0; font-size:var(--fs-small); color:var(--muted); }

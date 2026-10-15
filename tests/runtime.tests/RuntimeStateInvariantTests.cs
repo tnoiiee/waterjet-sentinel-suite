@@ -230,6 +230,228 @@ public sealed class RuntimeStateInvariantTests
         }
     }
 
+    // --- One-Node physical read-only variant (Owner decision R1) ----------------------------------
+    //
+    // The physical record is a SEPARATE variant carried under its own profile. These tests prove the
+    // three properties that matter: the variant is admissible only with its own profile, the two
+    // variants can never be blended in either direction, and a counterfeit physical record — one that
+    // claims an accepted, commissioned, verified or differently-profiled read — is refused.
+
+    /// <summary>The authorized logical read-profile identity, built here without any app assembly.</summary>
+    private static TcReadProfileIdentity AuthorizedProfile() => new()
+    {
+        FunctionCode = PhysicalTcVocabulary.FunctionCodeHoldingRegisters,
+        RegisterArea = PhysicalTcVocabulary.RegisterAreaHoldingRegisters,
+        Port = PhysicalTcVocabulary.RegisterPort,
+        UnitIdentifier = PhysicalTcVocabulary.UnitIdentifier,
+        StartAddress = PhysicalTcVocabulary.StartAddress,
+        Quantity = PhysicalTcVocabulary.WordCount,
+    };
+
+    /// <summary>A complete, honest physical read-only record. Every field is the declared value.</summary>
+    private static TcAcquisitionState PhysicalRecord() => new()
+    {
+        NodeId = PhysicalTcVocabulary.NodeId,
+        CabinetId = PhysicalTcVocabulary.CabinetId,
+        Provenance = PhysicalTcVocabulary.Provenance,
+        Physical = true,
+        Quarantined = true,
+        AcquisitionState = PhysicalTcVocabulary.Complete,
+        AcquiredAtUtc = RuntimeTestFixture.Instant,
+        CopiedWordCount = PhysicalTcVocabulary.WordCount,
+        // Raw device evidence, including both legacy sentinel candidates. Nothing is decoded here.
+        RawWords = Array.AsReadOnly(BuildPhysicalWords()),
+        Quality = PhysicalTcVocabulary.Quality,
+        DiagnosticState = PhysicalTcVocabulary.NoDiagnostic,
+        MappingStatus = PhysicalTcVocabulary.MappingStatus,
+        DecodeStatus = PhysicalTcVocabulary.DecodeStatus,
+        NotVerified = Array.AsReadOnly(PhysicalTcVocabulary.NotVerified.ToArray()),
+        PhysicalEvidence = new TcPhysicalReadOnlyEvidence
+        {
+            EndpointIdentity = PhysicalTcVocabulary.EndpointConfigured,
+            ReadProfile = AuthorizedProfile(),
+            MappingEvidenceState = PhysicalTcVocabulary.MappingEvidenceDrawingInternalConflict,
+            CommissioningState = PhysicalTcVocabulary.CommissioningState,
+        },
+    };
+
+    private static ushort[] BuildPhysicalWords()
+    {
+        var words = new ushort[PhysicalTcVocabulary.WordCount];
+        words[0] = 0x7FFF;   // legacy wire-break candidate
+        words[1] = 0xF830;   // legacy reverse-polarity candidate
+        for (var index = 2; index < words.Length; index++) words[index] = (ushort)index;
+        return words;
+    }
+
+    private static TcAcquisitionState DeterministicRecord() => new()
+    {
+        NodeId = DeterministicTcVocabulary.NodeId,
+        CabinetId = DeterministicTcVocabulary.CabinetId,
+        Provenance = DeterministicTcVocabulary.Provenance,
+        Physical = false,
+        Quarantined = true,
+        AcquisitionState = DeterministicTcVocabulary.Complete,
+        AcquiredAtUtc = RuntimeTestFixture.Instant,
+        CopiedWordCount = DeterministicTcVocabulary.WordCount,
+        RawWords = Array.AsReadOnly(Enumerable.Range(0, DeterministicTcVocabulary.WordCount)
+            .Select(DeterministicTcVocabulary.WordAt).ToArray()),
+        Quality = DeterministicTcVocabulary.Quality,
+        DiagnosticState = DeterministicTcVocabulary.NoDiagnostic,
+        MappingStatus = DeterministicTcVocabulary.MappingNotVerified,
+        DecodeStatus = DeterministicTcVocabulary.DecodeNotVerified,
+        NotVerified = Array.AsReadOnly(DeterministicTcVocabulary.NotVerified.ToArray()),
+    };
+
+    private static RuntimeState WithPhysical(RuntimeState state) => state with
+    {
+        DeviceProfile = DeviceProfile.TEST_HARDWARE_READ_ONLY,
+        TcAcquisition = PhysicalRecord(),
+    };
+
+    [Fact]
+    public void Physical_Record_Is_Admissible_Only_Under_Its_Own_Read_Only_Profile()
+    {
+        var simulator = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
+
+        // The honest combination: the read-only profile carrying its quarantined physical record.
+        Assert.True(
+            RuntimeStateInvariants.TryValidate(WithPhysical(simulator), out var code, out var detail),
+            $"[{code}] {detail}");
+
+        // Between composition and the single publication the record is legitimately absent; the
+        // profile is still valid, and no record is ever invented for it.
+        var awaiting = simulator with { DeviceProfile = DeviceProfile.TEST_HARDWARE_READ_ONLY };
+        Assert.True(RuntimeStateInvariants.TryValidate(awaiting, out code, out detail), $"[{code}] {detail}");
+
+        // Neither profile may carry the other variant, and the standing refusals are unchanged.
+        Assert.False(RuntimeStateInvariants.TryValidate(
+            simulator with { TcAcquisition = PhysicalRecord() }, out code, out _));
+        Assert.Equal(RuntimeRefusalCodes.PhysicalTcProfileMismatch, code);
+
+        Assert.False(RuntimeStateInvariants.TryValidate(
+            WithPhysical(simulator) with { TcAcquisition = DeterministicRecord() }, out code, out _));
+        Assert.Equal(RuntimeRefusalCodes.PhysicalTcProfileMismatch, code);
+
+        foreach (var profile in new[] { DeviceProfile.TEST_HARDWARE, DeviceProfile.PRODUCTION })
+        {
+            Assert.False(RuntimeStateInvariants.TryValidate(
+                WithPhysical(simulator) with { DeviceProfile = profile }, out code, out _));
+            Assert.Equal(RuntimeRefusalCodes.ProfileNotSimulator, code);
+
+            Assert.False(RuntimeStateInvariants.TryValidate(
+                simulator with { DeviceProfile = profile }, out code, out _));
+            Assert.Equal(RuntimeRefusalCodes.ProfileNotSimulator, code);
+        }
+    }
+
+    [Fact]
+    public void A_Counterfeit_Physical_Record_Is_Refused_Whole()
+    {
+        var simulator = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
+        var honest = PhysicalRecord();
+
+        // Each counterfeit claims something the read-only slice can never establish: acceptance,
+        // commissioning, a verified decode, a different read profile or a wrong identity.
+        static TcAcquisitionState WithEvidence(
+            TcAcquisitionState state, Func<TcPhysicalReadOnlyEvidence, TcPhysicalReadOnlyEvidence> mutate) =>
+            state with { PhysicalEvidence = mutate(state.PhysicalEvidence!) };
+
+        // Each counterfeit carries the machine reason code it must produce. The variant-blending
+        // refusal is produced by the profile invariant, which is checked first; every other
+        // counterfeit is refused by the physical record validator itself.
+        var counterfeits = new (string Label, TcAcquisitionState State, string Code)[]
+        {
+            ("not quarantined", honest with { Quarantined = false }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("not physical", honest with { Physical = false }, RuntimeRefusalCodes.PhysicalTcProfileMismatch),
+            ("accepted", honest with { AcquisitionState = "ACCEPTED" }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("verified quality", honest with { Quality = "VERIFIED" }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("simulated quality", honest with { Quality = DeterministicTcVocabulary.Quality }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("decoded", honest with { DecodeStatus = "DECODED" }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("mapping verified", honest with { MappingStatus = "MAPPING_VERIFIED" }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("deterministic provenance", honest with { Provenance = DeterministicTcVocabulary.Provenance }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("foreign node", honest with { NodeId = "TC-NODE-02" }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("foreign cabinet", honest with { CabinetId = "CAB2" }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("short read", honest with { CopiedWordCount = PhysicalTcVocabulary.WordCount - 1 }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("short words", honest with { RawWords = Array.AsReadOnly(BuildPhysicalWords()[..^1]) }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("default timestamp", honest with { AcquiredAtUtc = default }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("unspecified timestamp", honest with { AcquiredAtUtc = DateTimeOffset.MinValue }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("dropped claim", honest with
+            {
+                NotVerified = Array.AsReadOnly(PhysicalTcVocabulary.NotVerified.Take(PhysicalTcVocabulary.NotVerified.Count - 1).ToArray()),
+            }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("reordered claims", honest with
+            {
+                NotVerified = Array.AsReadOnly(PhysicalTcVocabulary.NotVerified.Reverse().ToArray()),
+            }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("local-time instant", honest with
+            {
+                AcquiredAtUtc = new DateTimeOffset(2026, 10, 7, 7, 0, 0, TimeSpan.FromHours(7)),
+            }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("missing evidence", honest with { PhysicalEvidence = null }, RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("commissioned", WithEvidence(honest, e => e with { CommissioningState = "COMMISSIONED" }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("endpoint stated as absent", WithEvidence(honest, e => e with { EndpointIdentity = PhysicalTcVocabulary.EndpointNotConfigured }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("endpoint stated as an address", WithEvidence(honest, e => e with { EndpointIdentity = "CONFIGURED" }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("unknown mapping evidence", WithEvidence(honest, e => e with { MappingEvidenceState = "PHYSICAL_PARITY_CONFIRMED" }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("write function code", WithEvidence(honest, e => e with { ReadProfile = e.ReadProfile with { FunctionCode = "FC16" } }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("input registers", WithEvidence(honest, e => e with { ReadProfile = e.ReadProfile with { RegisterArea = "INPUT_REGISTERS" } }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("wrong port", WithEvidence(honest, e => e with { ReadProfile = e.ReadProfile with { Port = 5020 } }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("wrong unit", WithEvidence(honest, e => e with { ReadProfile = e.ReadProfile with { UnitIdentifier = 2 } }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("wrong start", WithEvidence(honest, e => e with { ReadProfile = e.ReadProfile with { StartAddress = 1 } }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+            ("wrong quantity", WithEvidence(honest, e => e with { ReadProfile = e.ReadProfile with { Quantity = 39 } }), RuntimeRefusalCodes.PhysicalTcRecordInvalid),
+        };
+
+        foreach (var (label, state, expectedCode) in counterfeits)
+        {
+            var candidate = WithPhysical(simulator) with { TcAcquisition = state };
+            Assert.False(RuntimeStateInvariants.TryValidate(candidate, out var code, out var detail), label);
+            Assert.Equal(expectedCode, code);
+            Assert.NotEqual(string.Empty, detail);
+        }
+
+        // The honest record is still valid, so the refusals above are not vacuous.
+        Assert.True(RuntimeStateInvariants.TryValidate(WithPhysical(simulator), out var okCode, out var okDetail),
+            $"[{okCode}] {okDetail}");
+    }
+
+    [Fact]
+    public void The_Physical_Record_Is_Immutable_And_Carries_No_Address()
+    {
+        var physical = PhysicalRecord();
+
+        // Every collection is a read-only wrapper over a private copy, and the record shape has no
+        // address-typed member at all.
+        Assert.IsAssignableFrom<IReadOnlyList<ushort>>(physical.RawWords);
+        Assert.IsAssignableFrom<IReadOnlyList<string>>(physical.NotVerified);
+        Assert.Throws<NotSupportedException>(() => ((IList<ushort>)physical.RawWords)[0] = 0);
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)physical.NotVerified)[0] = "X");
+
+        // The member sets are asserted EXACTLY. A record can therefore never grow an endpoint, host,
+        // address or credential field without failing this test, and the read profile may legitimately
+        // carry only the zero-based register start offset and the requested word quantity.
+        Assert.Equal(
+            new[]
+            {
+                "NodeId", "CabinetId", "Provenance", "Physical", "Quarantined", "AcquisitionState",
+                "AcquiredAtUtc", "CopiedWordCount", "RawWords", "Quality", "DiagnosticState",
+                "MappingStatus", "DecodeStatus", "NotVerified", "PhysicalEvidence",
+            },
+            typeof(TcAcquisitionState).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
+        Assert.Equal(
+            new[] { "CommissioningState", "EndpointIdentity", "MappingEvidenceState", "ReadProfile" }
+                .OrderBy(name => name, StringComparer.Ordinal),
+            typeof(TcPhysicalReadOnlyEvidence).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
+        Assert.Equal(
+            new[] { "FunctionCode", "Port", "Quantity", "RegisterArea", "StartAddress", "UnitIdentifier" }
+                .OrderBy(name => name, StringComparer.Ordinal),
+            typeof(TcReadProfileIdentity).GetProperties().Select(property => property.Name).OrderBy(name => name, StringComparer.Ordinal));
+
+        // The only endpoint statement anywhere is the redacted logical identity, and it is not an address.
+        Assert.Equal(PhysicalTcVocabulary.EndpointConfigured, physical.PhysicalEvidence!.EndpointIdentity);
+        Assert.DoesNotContain(physical.PhysicalEvidence.EndpointIdentity, c => char.IsDigit(c));
+        Assert.DoesNotContain(physical.PhysicalEvidence.EndpointIdentity, c => c == '.');
+    }
+
     private static RuntimeState Apply(RuntimeState state, Tamper tamper) => tamper switch
     {
         Tamper.Profile => state with { DeviceProfile = DeviceProfile.TEST_HARDWARE },
