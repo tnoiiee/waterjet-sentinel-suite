@@ -90,19 +90,30 @@ public sealed class MotionCommissioningTests
     [Fact]
     public void No_Session_Can_Be_Opened_While_The_Gate_Is_Closed_And_Stop_Is_Refused_Too()
     {
-        var session = new MotionCommissioningSession();
+        // The session is a STATIC type: while the gate is closed no session can be opened, so there
+        // is no instance to construct and no instance state to carry. Every member is either a
+        // constant of the closed gate or a delegation to the gate's evaluation, and every one
+        // refuses. Nothing here invents a session record to look object oriented.
+        Assert.Equal(MotionVocabulary.SessionStateNoSession, MotionCommissioningSession.State);
+        Assert.False(MotionCommissioningSession.IsOpen);
+        Assert.Equal(0, MotionCommissioningSession.OwnedAxisCount);
+        Assert.Empty(MotionCommissioningSession.Evaluations);
 
-        Assert.Equal(MotionVocabulary.SessionStateNoSession, session.State);
-        Assert.False(session.IsOpen);
-        Assert.Empty(session.Evaluations);
-
-        Assert.False(session.TryOpen(out var refusalReasons));
+        Assert.False(MotionCommissioningSession.TryOpen(out var refusalReasons));
         Assert.Equal(MotionVocabulary.AllRefusalReasons, refusalReasons);
         Assert.Equal(MotionVocabulary.RefusalMotionCommissioningGateNotOpen, refusalReasons[0]);
 
+        // One intent evaluated through the session is refused exactly as it is through the gate: a
+        // session is a precondition of execution, never a way around the gate.
+        var evaluated = MotionCommissioningSession.Evaluate(ValidIntent(MotionVocabulary.IntentJog, "MC-WSB1", "A"));
+        Assert.False(evaluated.Authorized);
+        Assert.Equal(MotionVocabulary.CommandStateRefused, evaluated.CommandState);
+        Assert.False(evaluated.HardwareCommandIssued);
+        Assert.Equal(MotionVocabulary.HardwareCommandStateNotIssued, evaluated.HardwareCommandState);
+
         // The explicit Stop path exists independently of the gate, and it is refused here for the
         // same reason: no controller is connected, so no stop command can be delivered.
-        var stops = session.StopAllAxes();
+        var stops = MotionCommissioningSession.StopAllAxes();
         Assert.Equal(16, stops.Count);
         Assert.All(stops, stop => Assert.False(stop.Authorized));
         Assert.All(stops, stop => Assert.False(stop.HardwareCommandIssued));

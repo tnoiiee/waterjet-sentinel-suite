@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Security.Cryptography;
 using System.Text;
 using Wjss.Contracts;
@@ -133,7 +134,7 @@ public static class MotionCommissioningProjector
         for (var index = 0; index < catalogue.Controllers.Count; index++)
         {
             var controller = catalogue.Controllers[index];
-            text.Append("C").Append(index + 1).Append(' ').Append(controller.Identity.ControllerId)
+            text.Append('C').Append(index + 1).Append(' ').Append(controller.Identity.ControllerId)
                 .Append(" cabinet ").Append(controller.Identity.CabinetId)
                 .Append(" axes ").Append(controller.Identity.AxisCount)
                 .Append(" model ").Append(controller.Identity.ControllerModel)
@@ -159,7 +160,7 @@ public static class MotionCommissioningProjector
         {
             var axis = catalogue.Axes[index];
             var state = axis.State;
-            text.Append("A").Append(index + 1).Append(' ').Append(axis.Identity.ControllerId)
+            text.Append('A').Append(index + 1).Append(' ').Append(axis.Identity.ControllerId)
                 .Append('/').Append(axis.Identity.AxisId).Append(' ')
                 .Append(axis.Identity.AxisRole).Append(" (").Append(axis.Identity.AxisRoleBasis).Append(')')
                 .Append(" sense ").Append(axis.Identity.MotionSenseKind)
@@ -192,7 +193,7 @@ public static class MotionCommissioningProjector
         for (var index = 0; index < catalogue.WaterJets.Count; index++)
         {
             var waterJet = catalogue.WaterJets[index];
-            text.Append("W").Append(index + 1).Append(' ').Append(waterJet.WaterJetId)
+            text.Append('W').Append(index + 1).Append(' ').Append(waterJet.WaterJetId)
                 .Append(" cabinet ").Append(waterJet.CabinetId)
                 .Append(" controller ").Append(waterJet.ControllerId)
                 .Append(" horizontal ").Append(waterJet.HorizontalAxisId)
@@ -205,7 +206,7 @@ public static class MotionCommissioningProjector
         for (var index = 0; index < catalogue.MappingEvidenceNotes.Count; index++)
         {
             var note = catalogue.MappingEvidenceNotes[index];
-            text.Append("E").Append(index + 1).Append(' ').Append(note.EvidenceId)
+            text.Append('E').Append(index + 1).Append(' ').Append(note.EvidenceId)
                 .Append(" water jets ").Append(string.Join(",", note.WaterJetIds))
                 .Append(" cabinets ").Append(string.Join(",", note.CabinetIds))
                 .Append(" status ").Append(note.Status)
@@ -216,13 +217,13 @@ public static class MotionCommissioningProjector
         text.Append("NOT VERIFIED ").Append(catalogue.NotVerifiedClaims.Count).Append('\n');
         for (var index = 0; index < catalogue.NotVerifiedClaims.Count; index++)
         {
-            text.Append("N").Append(index + 1).Append(' ').Append(catalogue.NotVerifiedClaims[index]).Append('\n');
+            text.Append('N').Append(index + 1).Append(' ').Append(catalogue.NotVerifiedClaims[index]).Append('\n');
         }
 
         text.Append("LEGEND ").Append(catalogue.StatusLegend.Count).Append('\n');
         for (var index = 0; index < catalogue.StatusLegend.Count; index++)
         {
-            text.Append("L").Append(index + 1).Append(' ').Append(catalogue.StatusLegend[index]).Append('\n');
+            text.Append('L').Append(index + 1).Append(' ').Append(catalogue.StatusLegend[index]).Append('\n');
         }
 
         return text.ToString();
@@ -239,7 +240,7 @@ public static class MotionCommissioningProjector
     /// Every status and refusal code with its wording, in a fixed order, so no surface can present a
     /// state by colour alone. The order is explicit: dictionary enumeration order is not contractual.
     /// </summary>
-    private static IReadOnlyList<string> StatusLegend()
+    private static ReadOnlyCollection<string> StatusLegend()
     {
         var codes = MotionVocabulary.StatusLegendOrder;
         var lines = new string[codes.Count];
