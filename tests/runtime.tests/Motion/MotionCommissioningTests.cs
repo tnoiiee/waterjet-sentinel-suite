@@ -399,7 +399,26 @@ public sealed class MotionCommissioningTests
         Assert.Contains("CONTROLLERS 4", first.CanonicalText, StringComparison.Ordinal);
         Assert.Contains("AXES 16", first.CanonicalText, StringComparison.Ordinal);
         Assert.Contains("WATER JETS 8", first.CanonicalText, StringComparison.Ordinal);
-        Assert.Contains("CONFLICTS 1", first.CanonicalText, StringComparison.Ordinal);
+
+        // The Drawing rev1 discrepancy is an EVIDENCE NOTE, never a canonical conflict: all eight
+        // mappings stay Owner-confirmed, WJ2 and WJ4 included, so the text publishes one evidence
+        // note and no conflict count at all.
+        Assert.Contains("EVIDENCE NOTES 1", first.CanonicalText, StringComparison.Ordinal);
+        Assert.DoesNotContain("CONFLICTS", first.CanonicalText);
+        var confirmedRow = $" - {MotionVocabulary.MappingConfirmedOwner} ({MotionVocabulary.BasisOwnerConfirmed})";
+        var confirmedRows = 0;
+        foreach (var line in first.CanonicalText.Split('\n'))
+        {
+            if (line.EndsWith(confirmedRow, StringComparison.Ordinal)) confirmedRows++;
+        }
+
+        Assert.Equal(ExpectedWaterJetIds.Length, confirmedRows);
+
+        // And the two rows the discrepancy names, stated in the text exactly as the Owner ruled them.
+        Assert.Contains($"W2 WJ2 cabinet WSB1 controller MC-WSB1 horizontal C vertical D{confirmedRow}",
+            first.CanonicalText, StringComparison.Ordinal);
+        Assert.Contains($"W4 WJ4 cabinet WSB2 controller MC-WSB2 horizontal A vertical B{confirmedRow}",
+            first.CanonicalText, StringComparison.Ordinal);
     }
 
     [Fact]
