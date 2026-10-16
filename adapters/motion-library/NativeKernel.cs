@@ -36,7 +36,7 @@ internal static class NativeMethods
 
     [DllImport("kernel32.dll", EntryPoint = "GetProcAddress", ExactSpelling = true, SetLastError = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
-    internal static extern IntPtr GetProcAddress(IntPtr hModule, [MarshalAs(UnmanagedType.LPStr)] string lpProcName);
+    internal static extern IntPtr GetProcAddress(IntPtr hModule, [In] byte[] lpProcName);
 
     [DllImport("kernel32.dll", EntryPoint = "GetModuleFileNameW", ExactSpelling = true, CharSet = CharSet.Unicode, SetLastError = true)]
     [DefaultDllImportSearchPaths(DllImportSearchPath.System32)]
@@ -101,9 +101,20 @@ internal sealed class WindowsNativeKernel : INativeKernel
     public IntPtr LoadApprovedModule(string approvedAbsolutePath) =>
         NativeMethods.LoadLibraryExW(approvedAbsolutePath, IntPtr.Zero, NativeMethods.ApprovedLoadFlags);
 
-    /// <inheritdoc/>
-    public IntPtr ResolveExport(IntPtr module, string exportName) =>
-        NativeMethods.GetProcAddress(module, exportName);
+    /// <summary>
+    /// Resolves the single authorized export by name. The wire form is a bounded,
+    /// null-terminated ASCII byte buffer: GetProcAddress takes LPCSTR, so the buffer is
+    /// sized exactly to the name (ASCII encodes one byte per character) and its final byte
+    /// stays zero. No managed string is marshaled across this boundary, and the only name
+    /// the runner can ever pass is the committed authorized export name, which is pure ASCII.
+    /// </summary>
+    public IntPtr ResolveExport(IntPtr module, string exportName)
+    {
+        ArgumentNullException.ThrowIfNull(exportName);
+        var wireName = new byte[exportName.Length + 1];
+        _ = System.Text.Encoding.ASCII.GetBytes(exportName, 0, exportName.Length, wireName, 0);
+        return NativeMethods.GetProcAddress(module, wireName);
+    }
 
     /// <inheritdoc/>
     public string? GetLoadedModulePath(IntPtr module)
