@@ -229,6 +229,35 @@ public sealed class IdentitySourceBoundaryTests
     }
 
     [Fact]
+    public void B1H_Runbook_Model_Confirmation_Exit_Code_Matches_Program_And_Readme()
+    {
+        var root = RepoRoot();
+        var runbook = File.ReadAllText(Path.Combine(root, "docs", "MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md"));
+        var sectionStart = runbook.IndexOf("## B. B1-H", StringComparison.Ordinal);
+        Assert.True(sectionStart >= 0);
+        var b1hSection = runbook[sectionStart..];
+
+        Assert.Contains("Exit **0**", b1hSection, StringComparison.Ordinal);
+        Assert.Contains("IDENTITY_SESSION_COMPLETE", b1hSection, StringComparison.Ordinal);
+        Assert.Contains("Exit **2**", b1hSection, StringComparison.Ordinal);
+        Assert.Contains("MODEL_CONFIRMATION_REQUIRED", b1hSection, StringComparison.Ordinal);
+        Assert.Contains("refused, non-accepted software outcome", b1hSection, StringComparison.Ordinal);
+        Assert.Contains("do not retry", b1hSection, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
+            "Acceptance: exit 0; `IDENTITY_SESSION_COMPLETE` or `MODEL_CONFIRMATION_REQUIRED`",
+            b1hSection,
+            StringComparison.Ordinal);
+
+        var program = File.ReadAllText(Path.Combine(root, "apps", "motion-identity", "Program.cs"));
+        Assert.Contains("if (outcome.Accepted)", program, StringComparison.Ordinal);
+        Assert.Contains("return 2;", program, StringComparison.Ordinal);
+        var readme = File.ReadAllText(Path.Combine(root, "apps", "motion-identity", "README.md"));
+        Assert.Contains("Exit **2**", readme, StringComparison.Ordinal);
+        Assert.Contains("model confirmation required", readme, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CONNECTION_HANDLE_INVALID", readme, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void The_Identity_Surface_Never_Couples_To_The_Motion_Execution_Side_Or_Preview()
     {
         var source = ReadIdentityGateSources();

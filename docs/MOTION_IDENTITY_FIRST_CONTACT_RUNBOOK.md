@@ -154,13 +154,22 @@ a time:
 3. Set the five variables process-scope only (endpoint value stays Owner-local).
 4. Run the probe harness first (`apps/motion-probe`) — Gate A PASS required.
 5. Run the identity harness (`apps/motion-identity`) ONCE — one-shot connect / reads / close.
-6. Acceptance: exit 0; `IDENTITY_SESSION_COMPLETE` or `MODEL_CONFIRMATION_REQUIRED` (the latter
-   is a normal, honest outcome: record the observed revision text for the Owner's model
-   confirmation decision); `controllerHandleClosed: true`; `nativeHandlesReleased: true`;
-   serial observed and redacted.
-7. Owner manual confirmation: the Owner compares the displayed revision text with the expected
-   `DMC-B140-M` model and confirms the controller is the intended MC-WSB1 unit by its own
-   installation knowledge (the software never claims physical identity).
+6. Classify the single run without retry:
+   - Exit **0** with `IDENTITY_SESSION_COMPLETE`, `controllerHandleClosed: true` and
+     `nativeHandlesReleased: true` means the software identity session completed. It does **not**
+     confirm the physical controller identity; the Owner decision in step 7 is still required.
+   - Exit **2** with `MODEL_CONFIRMATION_REQUIRED`, `controllerHandleClosed: true` and
+     `nativeHandlesReleased: true` is a refused, non-accepted software outcome. It is not hardware
+     acceptance. The revision text is available for the separate Owner manual decision in step 7;
+     do not retry, reconnect, or start a second session. Any further controller contact requires
+     a separate explicit Owner authorization.
+   - Any other exit-2 refusal, invalid cleanup state, or unlisted outcome is a STOP; do not retry.
+     In particular, `CONNECTION_HANDLE_INVALID` is a refusal, not a successful identity session.
+   The serial is observed only in redacted form in every outcome.
+7. The Owner manually compares the displayed revision text with the expected `DMC-B140-M` model
+   and decides whether the observed evidence identifies the intended MC-WSB1 unit, using the
+   Owner's installation knowledge. Record the Owner decision separately. Neither exit 0 nor exit 2
+   by itself confirms physical identity; the software never makes that claim.
 8. Redaction review of any transcript (no endpoint, no serial) and mandatory cleanup (variables
    removed, no vendor processes, worktree clean).
 

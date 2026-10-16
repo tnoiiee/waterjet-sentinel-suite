@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Wjss.Adapters.MotionLibrary;
 using Xunit;
 
@@ -156,8 +157,22 @@ public sealed class MotionControllerIdentitySessionTests
         };
     }
 
-    private static MotionControllerEndpointConfiguration EndpointConfiguration() =>
-        new() { EndpointValue = string.Join(".", 10, 20, 30, 40) };
+    private static MotionControllerEndpointConfiguration EndpointConfiguration()
+    {
+        var resolved = MotionControllerEndpointResolver.TryResolve(
+            name => name == MotionControllerEndpointResolver.EndpointVariable
+                ? string.Join(".", 10, 20, 30, 40)
+                : null,
+            out var configuration,
+            out var refusalCode,
+            out _);
+        if (!resolved)
+        {
+            throw new InvalidOperationException($"Synthetic endpoint shape refused: {refusalCode}");
+        }
+
+        return configuration;
+    }
 
     private static MotionLibraryProbeOutcome ProbeAccepted() =>
         MotionLibraryProbeOutcome.Complete("test-version-shape", "synthetic proof");
@@ -223,10 +238,14 @@ public sealed class MotionControllerIdentitySessionTests
             string.Join(".", 10, 20, 30, 40) + " --direct --timeout 2000",
             kernel.LastAddress);
 
-        // The serial value never appears in any renderable outcome field.
+        // The serial and endpoint never appear in any renderable outcome, JSON outcome or log.
+        var endpoint = string.Join(".", 10, 20, 30, 40);
         Assert.DoesNotContain("12345", outcome.Detail, StringComparison.Ordinal);
         Assert.DoesNotContain("12345", outcome.SerialStatus ?? string.Empty, StringComparison.Ordinal);
-        Assert.DoesNotContain(string.Join(".", 10, 20, 30, 40), outcome.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain(endpoint, outcome.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain(endpoint, outcome.ToString() ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(endpoint, JsonSerializer.Serialize(outcome), StringComparison.Ordinal);
+        Assert.DoesNotContain(endpoint, string.Join("\n", kernel.Log), StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------- refusal pre-conditions
@@ -295,6 +314,31 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.True(outcome.NativeHandlesReleased);
         Assert.Equal(1, kernel.OpenCount);
         Assert.Equal(0, kernel.CloseCount);
+    }
+
+    [Fact]
+    public void Open_Success_With_Zero_Handle_Refuses_Before_All_Identity_Reads()
+    {
+        var kernel = new FakeControllerKernel { OpenHandle = IntPtr.Zero };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("CONNECTION_HANDLE_INVALID", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Equal(1, kernel.OpenCount);
+        Assert.Equal(0, kernel.CloseCount);
+        Assert.DoesNotContain("connection-type", kernel.Log);
+        Assert.DoesNotContain("revision", kernel.Log);
+        Assert.DoesNotContain("serial", kernel.Log);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
+        Assert.Equal(
+            new[]
+            {
+                MotionLibraryProbeVocabulary.PrimaryModuleFileName,
+                MotionLibraryProbeVocabulary.CompanionModuleFileName,
+            },
+            kernel.ReleasedModuleFileNames);
     }
 
     // ------------------------------------------------------------------------------ read rules
@@ -589,6 +633,36 @@ public sealed class MotionControllerIdentitySessionTests
     }
 
     // ------------------------------------------------------------- source-shape requirements
+
+    [Fact]
+    public void Export_Allow_List_Is_Read_Only_And_Cannot_Change_Later_Session_Resolution()
+    {
+        var expected = new[]
+        {
+            MotionControllerApi.ForceDirectModeExportName,
+            MotionControllerApi.OpenExportName,
+            MotionControllerApi.CloseExportName,
+            MotionControllerApi.ConnectionTypeExportName,
+            MotionControllerApi.RevisionInformationExportName,
+            MotionControllerApi.SerialNumberExportName,
+        };
+        var exposed = MotionControllerApi.AuthorizedControllerExports;
+
+        Assert.Equal(expected, exposed);
+        Assert.False(exposed is string[]);
+        var callerView = Assert.IsAssignableFrom<IList<string>>(exposed);
+        Assert.Throws<NotSupportedException>(() => callerView[0] = "unapproved-export");
+        Assert.Equal(expected, MotionControllerApi.AuthorizedControllerExports);
+
+        var kernel = new FakeControllerKernel();
+        var outcome = Session(kernel).Run();
+        Assert.True(outcome.Accepted);
+        var resolvedNames = kernel.Log
+            .Where(entry => entry.StartsWith("resolve:", StringComparison.Ordinal))
+            .Select(entry => entry["resolve:".Length..])
+            .ToArray();
+        Assert.Equal(expected, resolvedNames);
+    }
 
     [Fact]
     public void No_Raw_Command_Axis_Read_Or_Motion_Can_Be_Requested_Of_The_Kernel()

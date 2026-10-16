@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text.Json;
 using Wjss.Adapters.MotionLibrary;
 using Xunit;
 
@@ -58,6 +60,9 @@ public sealed class MotionControllerEndpointConfigurationTests
             string.Join(".", 1, 2, 3) + ".",
             "." + string.Join(".", 1, 2, 3),
             string.Join(".", 1, 2) + ".." + 3,
+            Address(10, 1, 2, 3) + ";suffix",
+            Address(10, 1, 2, 3) + "&extra",
+            Address(10, 1, 2, 3) + "|token",
         };
 
         foreach (var candidate in candidates)
@@ -92,19 +97,49 @@ public sealed class MotionControllerEndpointConfigurationTests
     }
 
     [Fact]
-    public void A_Canonical_Unicast_Dotted_Quad_Resolves_And_Renders_Redacted()
+    public void A_Canonical_Unicast_Dotted_Quad_Resolves_And_Builds_Only_The_Fixed_Direct_Address()
     {
         var candidate = Address(10, 20, 30, 40);
         Assert.True(TryResolveValue(candidate, out var configuration, out var code));
         Assert.Equal(string.Empty, code);
-        Assert.Equal(candidate, configuration.EndpointValue);
+        Assert.Equal(
+            candidate + " --direct --timeout 2000",
+            MotionControllerApi.BuildDirectConnectionAddress(configuration));
 
         // The ONLY renderable endpoint statement: the value itself never appears.
         Assert.Equal("ENDPOINT_CONFIGURED", configuration.ToString());
         Assert.Equal(
             "ENDPOINT_CONFIGURED",
             MotionControllerEndpointResolver.DescribeConfiguration(configuration));
-        Assert.DoesNotContain("10", configuration.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(candidate, configuration.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(candidate, JsonSerializer.Serialize(configuration), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Validated_Endpoint_Is_Opaque_To_Public_Callers_And_Default_Json_Serialization()
+    {
+        var candidate = Address(10, 20, 30, 40);
+        Assert.True(TryResolveValue(candidate, out var configuration, out _));
+
+        var type = typeof(MotionControllerEndpointConfiguration);
+        Assert.Empty(type.GetConstructors(BindingFlags.Public | BindingFlags.Instance));
+        Assert.Empty(type.GetProperties(BindingFlags.Public | BindingFlags.Instance));
+        Assert.Empty(type.GetFields(BindingFlags.Public | BindingFlags.Instance));
+
+        var addressBuilder = typeof(MotionControllerApi).GetMethod(
+            "BuildDirectConnectionAddress",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(addressBuilder);
+        Assert.Equal(new[] { type }, addressBuilder!.GetParameters().Select(parameter => parameter.ParameterType));
+        Assert.Null(typeof(MotionControllerApi).GetMethod(
+            "BuildDirectConnectionAddress",
+            BindingFlags.Public | BindingFlags.Static));
+
+        var json = JsonSerializer.Serialize(configuration);
+        Assert.DoesNotContain(candidate, json, StringComparison.Ordinal);
+        Assert.DoesNotContain("EndpointValue", json, StringComparison.Ordinal);
+        Assert.Equal("{}", json);
+        Assert.Equal("ENDPOINT_CONFIGURED", configuration.ToString());
     }
 
     [Fact]

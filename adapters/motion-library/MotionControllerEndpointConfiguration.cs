@@ -1,21 +1,25 @@
 namespace Wjss.Adapters.MotionLibrary;
 
 /// <summary>
-/// A resolved Owner-local controller endpoint handle.
-///
-/// It exists so the identity session can hold the endpoint without ever rendering it:
-/// <see cref="ToString"/> returns only the redacted status, so console diagnostics, structured
-/// log templates, exception text, debugger output and any accidental interpolation can never
-/// reveal the confidential value. The value itself is reachable only through the typed member,
-/// which the session reads solely to build the in-memory open-address text; it is never part of
-/// an outcome, a fixture, evidence, a document or UI state.
+/// An opaque, validated Owner-local controller endpoint handle. Only the adapter assembly can
+/// construct it; the public resolver creates one only after the canonical endpoint checks pass.
+/// The raw value is an internal, non-serializing member used only by the one-shot session to build
+/// the in-memory open-address text. No public property or generated record formatter exposes it.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
 /// </summary>
-public sealed record MotionControllerEndpointConfiguration
+public sealed class MotionControllerEndpointConfiguration
 {
-    /// <summary>The Owner-local endpoint value. Never serialized, logged or displayed.</summary>
-    public required string EndpointValue { get; init; }
+    private readonly string _endpointValue;
+
+    internal MotionControllerEndpointConfiguration(string endpointValue)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(endpointValue);
+        _endpointValue = endpointValue;
+    }
+
+    /// <summary>Internal session-only access; excluded from default JSON serialization.</summary>
+    internal string EndpointValue => _endpointValue;
 
     /// <summary>The redacted status only; the endpoint value is never included.</summary>
     public override string ToString() => MotionControllerIdentityVocabulary.EndpointConfigured;
@@ -97,7 +101,7 @@ public static class MotionControllerEndpointResolver
                 out configuration, out refusalCode, out refusalDetail);
         }
 
-        configuration = new MotionControllerEndpointConfiguration { EndpointValue = raw };
+        configuration = new MotionControllerEndpointConfiguration(raw);
         return true;
     }
 

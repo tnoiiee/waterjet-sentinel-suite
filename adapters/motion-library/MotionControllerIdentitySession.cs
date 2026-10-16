@@ -254,8 +254,8 @@ public sealed class MotionControllerIdentitySession
                 return outcome;
             }
 
-            var exports = new IntPtr[MotionControllerApi.AuthorizedControllerExports.Length];
-            for (var index = 0; index < MotionControllerApi.AuthorizedControllerExports.Length; index++)
+            var exports = new IntPtr[MotionControllerApi.AuthorizedControllerExports.Count];
+            for (var index = 0; index < MotionControllerApi.AuthorizedControllerExports.Count; index++)
             {
                 var exportName = MotionControllerApi.AuthorizedControllerExports[index];
                 var export = kernel.ResolveExport(primaryModule, exportName);
@@ -333,7 +333,7 @@ public sealed class MotionControllerIdentitySession
 
             // Phase 4: exactly one open attempt with the in-memory direct open-address text.
             var addressBuffer = ToAsciiBuffer(
-                MotionControllerApi.BuildDirectConnectionAddress(_endpointConfiguration.EndpointValue));
+                MotionControllerApi.BuildDirectConnectionAddress(_endpointConfiguration));
             var capturedOpen = CurrentGeneration;
             if (!TryBeginNativeOperation())
             {
@@ -390,6 +390,18 @@ public sealed class MotionControllerIdentitySession
                           "session is over.",
                     CurrentGeneration,
                     controllerHandleClosed: false,
+                    nativeHandlesReleased: false);
+                return outcome;
+            }
+
+            if (handle == IntPtr.Zero)
+            {
+                outcome = MotionControllerIdentityOutcome.Refused(
+                    MotionControllerIdentityVocabulary.ConnectionHandleInvalid,
+                    "gclib_open reported success but returned no controller handle. No identity reads " +
+                    "were attempted; the session is over with no retry or reconnect.",
+                    CurrentGeneration,
+                    controllerHandleClosed: true,
                     nativeHandlesReleased: false);
                 return outcome;
             }

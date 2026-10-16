@@ -66,6 +66,9 @@ public static class MotionControllerIdentityVocabulary
     /// <summary>The single open attempt failed with a non-timeout library result.</summary>
     public const string ConnectionFailed = "CONNECTION_FAILED";
 
+    /// <summary>gclib_open reported success but returned a zero controller handle; no identity read was attempted.</summary>
+    public const string ConnectionHandleInvalid = "CONNECTION_HANDLE_INVALID";
+
     /// <summary>The single open attempt timed out (library timeout 2000 ms).</summary>
     public const string ConnectionTimeout = "CONNECTION_TIMEOUT";
 

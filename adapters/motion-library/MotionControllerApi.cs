@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace Wjss.Adapters.MotionLibrary;
@@ -59,11 +60,12 @@ public static class MotionControllerApi
     public const string SerialNumberExportName = "gclib_serial_number";
 
     /// <summary>
-    /// The complete B1 export allow-list, in resolution order. No other export may be resolved
-    /// or invoked by this boundary; the Gate A version export remains authorized for the probe
-    /// surface only.
+    /// The complete B1 export allow-list, in fixed resolution order. The backing array is private
+    /// and the returned read-only wrapper cannot be downcast to or used to mutate that array. No
+    /// other export may be resolved or invoked by this boundary; Gate A's version export remains
+    /// authorized for the probe surface only.
     /// </summary>
-    public static readonly string[] AuthorizedControllerExports =
+    private static readonly IReadOnlyList<string> AuthorizedControllerExportNames = Array.AsReadOnly(new[]
     {
         ForceDirectModeExportName,
         OpenExportName,
@@ -71,7 +73,10 @@ public static class MotionControllerApi
         ConnectionTypeExportName,
         RevisionInformationExportName,
         SerialNumberExportName,
-    };
+    });
+
+    /// <summary>Read-only view of the fixed six-export B1 allow-list.</summary>
+    public static IReadOnlyList<string> AuthorizedControllerExports => AuthorizedControllerExportNames;
 
     // ------------------------------------------------------------- result / enum constants
 
@@ -132,15 +137,14 @@ public static class MotionControllerApi
     public const int RevisionBufferLength = 256;
 
     /// <summary>
-    /// Builds the one open-address text for the session, in memory only:
-    /// "&lt;endpoint&gt; --direct --timeout 2000". The result never leaves the session, is never
-    /// logged and is never part of an outcome.
+    /// Builds the one open-address text in memory only from the opaque configuration produced by
+    /// the endpoint resolver. Raw strings cannot enter this path from a public caller.
     /// </summary>
-    public static string BuildDirectConnectionAddress(string endpoint)
+    internal static string BuildDirectConnectionAddress(MotionControllerEndpointConfiguration configuration)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
+        ArgumentNullException.ThrowIfNull(configuration);
         return string.Concat(
-            endpoint,
+            configuration.EndpointValue,
             " ",
             DirectModeSwitch,
             " ",

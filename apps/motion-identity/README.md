@@ -25,10 +25,10 @@ identity session:
 - Exit **0** — accepted (`IDENTITY_SESSION_COMPLETE`): every step passed. Physical identity is
   still Owner-confirmed at the separately authorized B1-H First Contact Gate.
 - Exit **2** — refused: the canonical refusal code is printed (endpoint missing/rejected, proof
-  refused, direct mode not enforced, concurrent authority detected, connection failed/timeout,
-  connection-type mismatch, revision/serial response invalid, model confirmation required, stale
-  generation, operation busy, lifecycle budget exceeded, close failed/cleanup unproven, native
-  unload failed). Nothing is defaulted, corrected or retried.
+  refused, direct mode not enforced, concurrent authority detected, connection failed,
+  `CONNECTION_HANDLE_INVALID`, timeout, connection-type mismatch, revision/serial response invalid,
+  model confirmation required, stale generation, operation busy, lifecycle budget exceeded, close
+  failed/cleanup unproven, native unload failed). Nothing is defaulted, corrected or retried.
 - Exit **4** — invalid invocation (any argument).
 
 The JSON outcome is redacted: it never contains the endpoint, the serial number, a native path, a
