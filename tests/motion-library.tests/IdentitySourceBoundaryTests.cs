@@ -15,6 +15,14 @@ namespace Wjss.MotionLibrary.Tests;
 /// </summary>
 public sealed class IdentitySourceBoundaryTests
 {
+    private static readonly string[][] GateDirectorySegments =
+    {
+        new[] { "adapters", "motion-library" },
+        new[] { "apps", "motion-identity" },
+    };
+
+    private static readonly char[] PathSeparators = { '/', '\\' };
+
     private static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -41,7 +49,7 @@ public sealed class IdentitySourceBoundaryTests
 
     private static bool ContainsBuildOutputDirectory(string relativePath)
     {
-        var segments = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        var segments = relativePath.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries);
         for (var index = 0; index < segments.Length - 1; index++)
         {
             if (string.Equals(segments[index], "bin", StringComparison.OrdinalIgnoreCase)
@@ -58,11 +66,7 @@ public sealed class IdentitySourceBoundaryTests
     {
         var root = RepoRoot();
         var files = new List<string>();
-        foreach (var segments in new[]
-                 {
-                     new[] { "adapters", "motion-library" },
-                     new[] { "apps", "motion-identity" },
-                 })
+        foreach (var segments in GateDirectorySegments)
         {
             var directory = Path.Combine(root, segments[0], segments[1]);
             foreach (var file in Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories))

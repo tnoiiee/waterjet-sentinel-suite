@@ -47,6 +47,8 @@ public sealed class ProbeSourceBoundaryTests
         "WJSS_MOTION_LIB_GCLIBO_SHA256",
     };
 
+    private static readonly char[] PathSeparators = { '/', '\\' };
+
     private static bool IsGateSourceFile(string root, string file)
     {
         if (ContainsBuildOutputDirectory(Path.GetRelativePath(root, file)))
@@ -61,7 +63,7 @@ public sealed class ProbeSourceBoundaryTests
 
     private static bool ContainsBuildOutputDirectory(string relativePath)
     {
-        var segments = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        var segments = relativePath.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries);
         for (var index = 0; index < segments.Length - 1; index++)
         {
             if (string.Equals(segments[index], "bin", StringComparison.OrdinalIgnoreCase)
