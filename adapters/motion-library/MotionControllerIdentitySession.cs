@@ -797,7 +797,7 @@ public sealed class MotionControllerIdentitySession
     }
 
     private static bool ContainsOrdinal(string text, string token) =>
-        text.IndexOf(token, StringComparison.Ordinal) >= 0;
+        text.Contains(token, StringComparison.Ordinal);
 
     private static byte[] ToAsciiBuffer(string value)
     {
