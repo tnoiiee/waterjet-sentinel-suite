@@ -271,6 +271,7 @@ public sealed class ProbeRunnerTests : IDisposable
         Assert.DoesNotContain(kernel.Events, e => e.StartsWith("resolve:", StringComparison.Ordinal));
         // The companion that did load was deterministically released by cleanup.
         Assert.Contains($"release:{MotionLibraryProbeVocabulary.CompanionModuleFileName}", kernel.Events);
+        Assert.True(outcome.NativeHandlesReleased);
         AssertRedacted(outcome);
     }
 
@@ -285,7 +286,34 @@ public sealed class ProbeRunnerTests : IDisposable
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionLibraryProbeVocabulary.NativeModulePathMismatch, outcome.Code);
         Assert.DoesNotContain(kernel.Events, e => e.StartsWith("resolve:", StringComparison.Ordinal));
+        // Both loaded modules were released before the outcome was produced: the refusal reports
+        // the truthful final handle state, and the unload order stays primary first, companion
+        // last, with each handle released exactly once.
+        Assert.True(outcome.NativeHandlesReleased);
+        var releaseIndexPrimary = kernel.Events.IndexOf($"release:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}");
+        var releaseIndexCompanion = kernel.Events.IndexOf($"release:{MotionLibraryProbeVocabulary.CompanionModuleFileName}");
+        Assert.True(releaseIndexPrimary >= 0);
+        Assert.True(releaseIndexCompanion >= 0);
+        Assert.True(releaseIndexPrimary < releaseIndexCompanion);
         AssertRedacted(outcome);
+
+        // When the substituted module is the companion instead, the primary is never loaded and
+        // the refusal still reports the truthful final handle state for what was held.
+        var companionSubstituted = new RecordingKernel
+        {
+            ModulePathSubstitutionForFile = MotionLibraryProbeVocabulary.CompanionModuleFileName,
+        };
+
+        var companionOutcome = Run(companionSubstituted);
+
+        Assert.False(companionOutcome.Accepted);
+        Assert.Equal(MotionLibraryProbeVocabulary.NativeModulePathMismatch, companionOutcome.Code);
+        Assert.True(companionOutcome.NativeHandlesReleased);
+        Assert.Contains($"release:{MotionLibraryProbeVocabulary.CompanionModuleFileName}", companionSubstituted.Events);
+        Assert.DoesNotContain(
+            companionSubstituted.Events,
+            e => e.StartsWith($"load:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}", StringComparison.Ordinal));
+        AssertRedacted(companionOutcome);
     }
 
     [Fact]
@@ -305,19 +333,29 @@ public sealed class ProbeRunnerTests : IDisposable
     }
 
     [Fact]
-    public void An_Empty_Or_Unterminated_Version_Buffer_Is_A_Call_Failure()
+    public void An_Empty_Unterminated_Or_Non_Printable_Version_Buffer_Is_A_Call_Failure()
     {
         WriteModules();
         var silent = new RecordingKernel { VersionBytes = null };
         var outcome = Run(silent);
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionLibraryProbeVocabulary.NativeVersionCallFailed, outcome.Code);
+        Assert.True(outcome.NativeHandlesReleased);
         AssertRedacted(outcome);
 
         var unterminated = new RecordingKernel { FillWithoutTerminator = true };
         outcome = Run(unterminated);
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionLibraryProbeVocabulary.NativeVersionCallFailed, outcome.Code);
+        Assert.True(outcome.NativeHandlesReleased);
+        AssertRedacted(outcome);
+
+        // Bytes outside the printable 0x20-0x7E range are not a provable version either.
+        var nonPrintable = new RecordingKernel { VersionBytes = new byte[] { 0x01, 0x02 } };
+        outcome = Run(nonPrintable);
+        Assert.False(outcome.Accepted);
+        Assert.Equal(MotionLibraryProbeVocabulary.NativeVersionCallFailed, outcome.Code);
+        Assert.True(outcome.NativeHandlesReleased);
         AssertRedacted(outcome);
     }
 
@@ -333,6 +371,7 @@ public sealed class ProbeRunnerTests : IDisposable
         Assert.Equal(MotionLibraryProbeVocabulary.NativeVersionMismatch, outcome.Code);
         Assert.DoesNotContain("1.2.3-other", outcome.Detail, StringComparison.Ordinal);
         Assert.DoesNotContain(ExpectedVersion, outcome.Detail, StringComparison.Ordinal);
+        Assert.True(outcome.NativeHandlesReleased);
         AssertRedacted(outcome);
     }
 

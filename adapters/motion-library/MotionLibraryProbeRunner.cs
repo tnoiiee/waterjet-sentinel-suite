@@ -69,24 +69,37 @@ public sealed class MotionLibraryProbeRunner
         finally
         {
             // Deterministic cleanup on every exit path: release whatever was loaded, in reverse
-            // load order. An accepted core already released and zeroed both handles, so this is a
-            // no-op there; on refusal paths it is the unload proof, and an unload that cannot be
-            // confirmed degrades the outcome honestly instead of masking the primary refusal.
+            // load order. An accepted core already released and zeroed both handles, so this is
+            // a no-op there; on refusal paths it is the unload proof. The outcome must tell the
+            // truth about the FINAL handle state: handles held when cleanup began that cleanup
+            // then released are reported released — the primary refusal code and detail are
+            // preserved unchanged. An unload that cannot be confirmed keeps the outcome
+            // unreleased and, when every proof otherwise passed, is refused as
+            // NATIVE_UNLOAD_FAILED; the original refusal is never masked, and release is never
+            // claimed before cleanup has actually run.
+            var handlesWereHeld = primaryModule != IntPtr.Zero || companionModule != IntPtr.Zero;
             var cleaned = ReleaseModules(ref primaryModule, ref companionModule);
-            if (outcome is not null && !cleaned)
+            if (outcome is not null)
             {
-                outcome = outcome.Accepted
-                    ? MotionLibraryProbeOutcome.Refused(
-                        MotionLibraryProbeVocabulary.NativeUnloadFailed,
-                        "The probe proofs passed, but a native module handle could not be released " +
-                        "deterministically. The probe does not report success with an unreleased handle.",
-                        nativeHandlesReleased: false)
-                    : outcome with
-                    {
-                        NativeHandlesReleased = false,
-                        Detail = outcome.Detail + " Deterministic cleanup of the loaded native " +
-                                 "handles could not be fully confirmed.",
-                    };
+                if (!outcome.Accepted && handlesWereHeld && cleaned)
+                {
+                    outcome = outcome with { NativeHandlesReleased = true };
+                }
+                else if (!cleaned)
+                {
+                    outcome = outcome.Accepted
+                        ? MotionLibraryProbeOutcome.Refused(
+                            MotionLibraryProbeVocabulary.NativeUnloadFailed,
+                            "The probe proofs passed, but a native module handle could not be released " +
+                            "deterministically. The probe does not report success with an unreleased handle.",
+                            nativeHandlesReleased: false)
+                        : outcome with
+                        {
+                            NativeHandlesReleased = false,
+                            Detail = outcome.Detail + " Deterministic cleanup of the loaded native " +
+                                     "handles could not be fully confirmed.",
+                        };
+                }
             }
         }
 

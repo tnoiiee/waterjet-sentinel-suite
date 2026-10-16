@@ -227,6 +227,16 @@ internal static class NativeFileInspection
             return false;
         }
 
+        if (raw.Contains('"'))
+        {
+            // Explicit and deterministic: the platform invalid-character set varies by release
+            // and is never allowed to define this gate's quote rule. A quote can make a
+            // configured value pass shape checks silently, so the guard is stated here once,
+            // in canonical order, before any drive/path normalization touches the value.
+            reason = "The approved native directory must be a literal path: quote characters are never accepted.";
+            return false;
+        }
+
         var hasDrive = char.IsAsciiLetter(raw[0])
                        && raw[1] == ':'
                        && (raw[2] == '\\' || raw[2] == '/');
