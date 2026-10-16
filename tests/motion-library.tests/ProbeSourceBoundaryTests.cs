@@ -25,12 +25,35 @@ public sealed class ProbeSourceBoundaryTests
         return directory.FullName;
     }
 
+    /// <summary>
+    /// Path segments of the two probe gate directories under the repository root, allocated
+    /// once: <see cref="GateFiles"/> combines each entry with the runtime root, in this order.
+    /// </summary>
+    private static readonly string[][] GateDirectorySegments =
+    {
+        new[] { "adapters", "motion-library" },
+        new[] { "apps", "motion-probe" },
+    };
+
+    /// <summary>
+    /// The complete committed set of gate environment-variable names, allocated once; the
+    /// assertion still applies the same ordinal sort at the use site.
+    /// </summary>
+    private static readonly string[] GateEnvironmentVariableNames =
+    {
+        "WJSS_MOTION_LIB_DIR",
+        "WJSS_MOTION_LIB_EXPECTED_VERSION",
+        "WJSS_MOTION_LIB_GCLIB_SHA256",
+        "WJSS_MOTION_LIB_GCLIBO_SHA256",
+    };
+
     private static List<string> GateFiles()
     {
         var root = RepoRoot();
         var files = new List<string>();
-        foreach (var directory in new[] { Path.Combine(root, "adapters", "motion-library"), Path.Combine(root, "apps", "motion-probe") })
+        foreach (var segments in GateDirectorySegments)
         {
+            var directory = Path.Combine(root, segments[0], segments[1]);
             foreach (var file in Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories))
             {
                 if (file.EndsWith(".cs", StringComparison.Ordinal)
@@ -119,15 +142,7 @@ public sealed class ProbeSourceBoundaryTests
         var source = ReadGateSources();
         var names = Regex.Matches(source, "WJSS_MOTION_LIB_[A-Z_0-9]+").Select(m => m.Value).Distinct(StringComparer.Ordinal).ToArray();
 
-        var expected = new[]
-            {
-                "WJSS_MOTION_LIB_DIR",
-                "WJSS_MOTION_LIB_EXPECTED_VERSION",
-                "WJSS_MOTION_LIB_GCLIB_SHA256",
-                "WJSS_MOTION_LIB_GCLIBO_SHA256",
-            }
-            .OrderBy(n => n, StringComparer.Ordinal)
-            .ToArray();
+        var expected = GateEnvironmentVariableNames.OrderBy(n => n, StringComparer.Ordinal).ToArray();
 
         Assert.Equal(expected, names.OrderBy(n => n, StringComparer.Ordinal).ToArray());
 
