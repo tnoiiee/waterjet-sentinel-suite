@@ -16,6 +16,25 @@ public sealed class ProbeRunnerTests : IDisposable
 {
     private const string ExpectedVersion = "9.9.9-test";
 
+    /// <summary>The expected kernel-event sequence of one accepted probe, allocated once.</summary>
+    private static readonly string[] ExpectedHappyPathEvents =
+    {
+        $"load:{MotionLibraryProbeVocabulary.CompanionModuleFileName}",
+        $"getpath:{MotionLibraryProbeVocabulary.CompanionModuleFileName}",
+        $"load:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}",
+        $"getpath:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}",
+        $"resolve:{MotionLibraryProbeVocabulary.AuthorizedExportName}",
+        "invoke:export",
+        $"release:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}",
+        $"release:{MotionLibraryProbeVocabulary.CompanionModuleFileName}",
+    };
+
+    /// <summary>The complete resolve-event set of any probe run, allocated once.</summary>
+    private static readonly string[] ExpectedResolveOnlyEvents =
+    {
+        $"resolve:{MotionLibraryProbeVocabulary.AuthorizedExportName}",
+    };
+
     private readonly string _directory;
 
     public ProbeRunnerTests()
@@ -65,7 +84,7 @@ public sealed class ProbeRunnerTests : IDisposable
 
         public bool FailRelease { get; set; }
 
-        public IReadOnlyList<string> Events => _events;
+        public List<string> Events => _events;
 
         public IntPtr LoadApprovedModule(string approvedAbsolutePath)
         {
@@ -173,19 +192,7 @@ public sealed class ProbeRunnerTests : IDisposable
         Assert.True(outcome.NativeHandlesReleased);
         AssertRedacted(outcome);
 
-        Assert.Equal(
-            new[]
-            {
-                $"load:{MotionLibraryProbeVocabulary.CompanionModuleFileName}",
-                $"getpath:{MotionLibraryProbeVocabulary.CompanionModuleFileName}",
-                $"load:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}",
-                $"getpath:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}",
-                $"resolve:{MotionLibraryProbeVocabulary.AuthorizedExportName}",
-                "invoke:export",
-                $"release:{MotionLibraryProbeVocabulary.PrimaryModuleFileName}",
-                $"release:{MotionLibraryProbeVocabulary.CompanionModuleFileName}",
-            },
-            kernel.Events);
+        Assert.Equal(ExpectedHappyPathEvents, kernel.Events);
     }
 
     [Fact]
@@ -196,7 +203,7 @@ public sealed class ProbeRunnerTests : IDisposable
         _ = Run(kernel);
 
         var resolved = kernel.Events.Where(e => e.StartsWith("resolve:", StringComparison.Ordinal)).ToArray();
-        Assert.Equal(new[] { $"resolve:{MotionLibraryProbeVocabulary.AuthorizedExportName}" }, resolved);
+        Assert.Equal(ExpectedResolveOnlyEvents, resolved);
         Assert.DoesNotContain(kernel.Events, e => e.Contains("open", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(kernel.Events, e => e.Contains("close", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(kernel.Events, e => e.Contains("command", StringComparison.OrdinalIgnoreCase));

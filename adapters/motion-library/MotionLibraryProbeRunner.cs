@@ -209,7 +209,7 @@ public sealed class MotionLibraryProbeRunner
     }
 
     /// <summary>File existence was proven; now prove the SHA-256 identity against the expected value.</summary>
-    private bool VerifyFileIdentity(
+    private static bool VerifyFileIdentity(
         string path, byte[] expectedHash, string moduleFileName, out MotionLibraryProbeOutcome refusal)
     {
         refusal = null!;
@@ -238,7 +238,7 @@ public sealed class MotionLibraryProbeRunner
     }
 
     /// <summary>Prove the image's PE machine is the approved x64 architecture before any load.</summary>
-    private bool VerifyX64(string path, string moduleFileName, out MotionLibraryProbeOutcome refusal)
+    private static bool VerifyX64(string path, string moduleFileName, out MotionLibraryProbeOutcome refusal)
     {
         refusal = null!;
         byte[] prefix;

@@ -209,13 +209,13 @@ internal static class NativeFileInspection
             return false;
         }
 
-        if (raw.IndexOf('%') >= 0)
+        if (raw.Contains('%'))
         {
             reason = "The approved native directory must be a literal path: expansion tokens are never expanded.";
             return false;
         }
 
-        if (raw.IndexOf('*') >= 0 || raw.IndexOf('?') >= 0)
+        if (raw.Contains('*') || raw.Contains('?'))
         {
             reason = "The approved native directory must name exactly one directory: wildcards are rejected.";
             return false;
@@ -239,7 +239,7 @@ internal static class NativeFileInspection
             return false;
         }
 
-        if (raw.IndexOf(':', 2) >= 0)
+        if (raw.AsSpan(2).Contains(':'))
         {
             reason = "The approved native directory may not contain a colon beyond the drive volume separator.";
             return false;
@@ -290,9 +290,9 @@ internal static class NativeFileInspection
     {
         fullPath = string.Empty;
         if (moduleFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
-            || moduleFileName.IndexOf('\\') >= 0
-            || moduleFileName.IndexOf('/') >= 0
-            || moduleFileName.IndexOf(':') >= 0)
+            || moduleFileName.Contains('\\')
+            || moduleFileName.Contains('/')
+            || moduleFileName.Contains(':'))
         {
             return false;
         }
