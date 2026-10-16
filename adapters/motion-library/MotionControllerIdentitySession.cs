@@ -134,10 +134,13 @@ public sealed class MotionControllerIdentitySession
         IntPtr closeExport = IntPtr.Zero;
         IntPtr handle = IntPtr.Zero;
         var opened = false;
-        MotionControllerIdentityOutcome? outcome = null;
+        MotionControllerIdentityOutcome? finalOutcome = null;
 
-        try
+        MotionControllerIdentityOutcome ExecuteIdentityFlow()
         {
+            // Early returns are provisional; RunCore owns cleanup and its single final return.
+            MotionControllerIdentityOutcome? outcome = null;
+
             bool BudgetExceeded() => _elapsedMilliseconds() > MotionControllerApi.TotalLifecycleBudgetMilliseconds;
 
             MotionControllerIdentityOutcome Stale() => MotionControllerIdentityOutcome.Refused(
@@ -622,6 +625,11 @@ public sealed class MotionControllerIdentitySession
                 "serial was observed and redacted; Owner manual confirmation remains required.");
             return outcome;
         }
+
+        try
+        {
+            finalOutcome = ExecuteIdentityFlow();
+        }
         finally
         {
             // Deterministic cleanup on EVERY post-open path: close the controller handle first,
@@ -647,75 +655,85 @@ public sealed class MotionControllerIdentitySession
                 InvalidateGeneration();
             }
 
-            if (outcome is not null)
+            if (finalOutcome is not null)
             {
-            var finalHandleClosed = !handleWasOpen || closeConfirmed;
-            var finalReleased = modulesWereHeld ? released : outcome.NativeHandlesReleased;
+                var finalHandleClosed = !handleWasOpen || closeConfirmed;
+                var finalReleased = modulesWereHeld ? released : finalOutcome.NativeHandlesReleased;
 
-            if (outcome.Accepted)
-            {
-                if (!finalHandleClosed)
+                if (finalOutcome.Accepted)
                 {
-                    outcome = MotionControllerIdentityOutcome.Refused(
-                        MotionControllerIdentityVocabulary.CleanupUnproven,
-                        "Every identity read passed, but the controller handle close could not be " +
-                        "confirmed. The session does not report success with an unproven cleanup; " +
-                        "the isolated process containment applies.",
-                        outcome.Generation,
-                        controllerHandleClosed: false,
-                        nativeHandlesReleased: finalReleased,
-                        revisionInformation: outcome.RevisionInformation,
-                        modelComparison: outcome.ModelComparison,
-                        serialStatus: outcome.SerialStatus,
-                        connectionTypeStatus: outcome.ConnectionTypeStatus);
-                }
-                else if (modulesWereHeld && !released)
-                {
-                    outcome = MotionControllerIdentityOutcome.Refused(
-                        MotionControllerIdentityVocabulary.NativeUnloadFailed,
-                        "Every identity step passed, but a native module handle could not be " +
-                        "released deterministically. The session does not report success with an " +
-                        "unreleased handle.",
-                        outcome.Generation,
-                        controllerHandleClosed: true,
-                        nativeHandlesReleased: false,
-                        revisionInformation: outcome.RevisionInformation,
-                        modelComparison: outcome.ModelComparison,
-                        serialStatus: outcome.SerialStatus,
-                        connectionTypeStatus: outcome.ConnectionTypeStatus);
+                    if (!finalHandleClosed)
+                    {
+                        var detail =
+                            "Every identity read passed, but the controller handle close could not be " +
+                            "confirmed. The session does not report success with an unproven cleanup; " +
+                            "the isolated process containment applies.";
+                        if (!finalReleased)
+                        {
+                            detail += " Deterministic cleanup of the loaded native handles could not " +
+                                      "be fully confirmed.";
+                        }
+
+                        finalOutcome = MotionControllerIdentityOutcome.Refused(
+                            MotionControllerIdentityVocabulary.CleanupUnproven,
+                            detail,
+                            finalOutcome.Generation,
+                            controllerHandleClosed: false,
+                            nativeHandlesReleased: finalReleased,
+                            revisionInformation: finalOutcome.RevisionInformation,
+                            modelComparison: finalOutcome.ModelComparison,
+                            serialStatus: finalOutcome.SerialStatus,
+                            connectionTypeStatus: finalOutcome.ConnectionTypeStatus);
+                    }
+                    else if (!finalReleased)
+                    {
+                        finalOutcome = MotionControllerIdentityOutcome.Refused(
+                            MotionControllerIdentityVocabulary.NativeUnloadFailed,
+                            "Every identity step passed, but a native module handle could not be " +
+                            "released deterministically. The session does not report success with an " +
+                            "unreleased handle.",
+                            finalOutcome.Generation,
+                            controllerHandleClosed: true,
+                            nativeHandlesReleased: false,
+                            revisionInformation: finalOutcome.RevisionInformation,
+                            modelComparison: finalOutcome.ModelComparison,
+                            serialStatus: finalOutcome.SerialStatus,
+                            connectionTypeStatus: finalOutcome.ConnectionTypeStatus);
+                    }
+                    else
+                    {
+                        finalOutcome = finalOutcome with
+                        {
+                            ControllerHandleClosed = true,
+                            NativeHandlesReleased = true,
+                        };
+                    }
                 }
                 else
                 {
-                    outcome = outcome with
+                    var detail = finalOutcome.Detail;
+                    if (!finalHandleClosed)
                     {
-                        ControllerHandleClosed = true,
-                        NativeHandlesReleased = true,
+                        detail += " The controller handle close could not be confirmed; cleanup is " +
+                                  "unproven and the isolated process containment applies.";
+                    }
+                    if (modulesWereHeld && !released)
+                    {
+                        detail += " Deterministic cleanup of the loaded native handles could not be " +
+                                  "fully confirmed.";
+                    }
+
+                    finalOutcome = finalOutcome with
+                    {
+                        Detail = detail,
+                        ControllerHandleClosed = finalHandleClosed,
+                        NativeHandlesReleased = finalReleased,
                     };
                 }
             }
-            else
-            {
-                var detail = outcome.Detail;
-                if (!finalHandleClosed)
-                {
-                    detail += " The controller handle close could not be confirmed; cleanup is " +
-                              "unproven and the isolated process containment applies.";
-                }
-                else if (modulesWereHeld && !released)
-                {
-                    detail += " Deterministic cleanup of the loaded native handles could not be " +
-                              "fully confirmed.";
-                }
-
-                outcome = outcome with
-                {
-                    Detail = detail,
-                    ControllerHandleClosed = finalHandleClosed,
-                    NativeHandlesReleased = finalReleased,
-                };
-            }
-            }
         }
+
+        return finalOutcome ?? throw new InvalidOperationException("The identity flow produced no outcome.");
     }
 
     /// <summary>Closes the controller handle through the resolved close export; true only when closed and confirmed.</summary>

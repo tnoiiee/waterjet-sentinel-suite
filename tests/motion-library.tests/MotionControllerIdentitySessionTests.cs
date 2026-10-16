@@ -46,6 +46,7 @@ public sealed class MotionControllerIdentitySessionTests
         public uint SerialValue = 12345;
 
         public bool ReleaseResult = true;
+        public readonly List<string> ReleasedModuleFileNames = new();
         public Func<string, bool>? LoadFailure;
         public Action? OnOpen;
 
@@ -80,6 +81,7 @@ public sealed class MotionControllerIdentitySessionTests
         public bool ReleaseModule(IntPtr module)
         {
             Log.Add("release");
+            ReleasedModuleFileNames.Add(Path.GetFileName(ModulePaths[module]));
             return ReleaseResult;
         }
 
@@ -207,6 +209,14 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.True(outcome.NativeHandlesReleased);
         Assert.Equal(1, kernel.OpenCount);
         Assert.Equal(1, kernel.CloseCount);
+        Assert.True(kernel.Log.IndexOf("close") < kernel.Log.IndexOf("release"));
+        Assert.Equal(
+            new[]
+            {
+                MotionLibraryProbeVocabulary.PrimaryModuleFileName,
+                MotionLibraryProbeVocabulary.CompanionModuleFileName,
+            },
+            kernel.ReleasedModuleFileNames);
         Assert.True(kernel.Log.IndexOf("force") < kernel.Log.IndexOf("open"));
         Assert.True(kernel.Log.IndexOf("open") < kernel.Log.IndexOf("connection-type"));
         Assert.True(kernel.Log.IndexOf("connection-type") < kernel.Log.IndexOf("revision"));
@@ -241,6 +251,10 @@ public sealed class MotionControllerIdentitySessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal("CONCURRENT_CONTROLLER_AUTHORITY_DETECTED", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Equal(0, kernel.CloseCount);
+        Assert.Empty(kernel.ReleasedModuleFileNames);
         Assert.Empty(kernel.Log);
     }
 
@@ -253,6 +267,10 @@ public sealed class MotionControllerIdentitySessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal("NATIVE_PROOF_REFUSED", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Equal(0, kernel.CloseCount);
+        Assert.Empty(kernel.ReleasedModuleFileNames);
         Assert.Empty(kernel.Log);
     }
 
@@ -266,6 +284,8 @@ public sealed class MotionControllerIdentitySessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal("CONNECTION_TIMEOUT", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
         Assert.Equal(1, kernel.OpenCount);
         Assert.Equal(0, kernel.CloseCount);
     }
@@ -278,6 +298,8 @@ public sealed class MotionControllerIdentitySessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal("CONNECTION_FAILED", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
         Assert.Equal(1, kernel.OpenCount);
         Assert.Equal(0, kernel.CloseCount);
     }
@@ -294,6 +316,7 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.Equal("CONNECTION_TYPE_MISMATCH", outcome.Code);
         Assert.Equal("GCLIB_SERIAL", outcome.ConnectionTypeStatus);
         Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
         Assert.Equal(1, kernel.CloseCount);
     }
 
@@ -379,6 +402,10 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.False(outcome.Accepted);
         Assert.Equal("CLEANUP_UNPROVEN", outcome.Code);
         Assert.False(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Contains("controller handle close could not be confirmed", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
         Assert.Equal("DMC-B140-M Rev 1.2.3", outcome.RevisionInformation);
         Assert.Equal("MODEL_MATCHED", outcome.ModelComparison);
     }
@@ -392,6 +419,107 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.False(outcome.Accepted);
         Assert.Equal("CLEANUP_UNPROVEN", outcome.Code);
         Assert.False(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Contains("controller handle close could not be confirmed", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
+    }
+
+    [Fact]
+    public void Accepted_Identity_Is_Refused_And_Both_Cleanup_Failures_Are_Reported()
+    {
+        var kernel = new FakeControllerKernel
+        {
+            CloseResult = 1,
+            ReleaseResult = false,
+        };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("CLEANUP_UNPROVEN", outcome.Code);
+        Assert.False(outcome.ControllerHandleClosed);
+        Assert.False(outcome.NativeHandlesReleased);
+        Assert.Contains("controller handle close could not be confirmed", outcome.Detail, StringComparison.Ordinal);
+        Assert.Contains("Deterministic cleanup of the loaded native handles could not be", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
+    }
+
+    [Fact]
+    public void Primary_Read_Refusal_Is_Preserved_When_Close_Fails()
+    {
+        var kernel = new FakeControllerKernel
+        {
+            ConnectionTypeValue = 2,
+            CloseResult = 1,
+        };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("CONNECTION_TYPE_MISMATCH", outcome.Code);
+        Assert.False(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Contains("controller handle close could not be confirmed", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
+    }
+
+    [Fact]
+    public void Primary_Read_Refusal_Is_Preserved_When_Unload_Fails()
+    {
+        var kernel = new FakeControllerKernel
+        {
+            ConnectionTypeValue = 2,
+            ReleaseResult = false,
+        };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("CONNECTION_TYPE_MISMATCH", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.False(outcome.NativeHandlesReleased);
+        Assert.Contains("Deterministic cleanup of the loaded native handles could not be", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
+    }
+
+    [Fact]
+    public void Primary_Read_Refusal_Reports_Both_Close_And_Unload_Failures()
+    {
+        var kernel = new FakeControllerKernel
+        {
+            ConnectionTypeValue = 2,
+            CloseResult = 1,
+            ReleaseResult = false,
+        };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("CONNECTION_TYPE_MISMATCH", outcome.Code);
+        Assert.False(outcome.ControllerHandleClosed);
+        Assert.False(outcome.NativeHandlesReleased);
+        Assert.Contains("controller handle close could not be confirmed", outcome.Detail, StringComparison.Ordinal);
+        Assert.Contains("Deterministic cleanup of the loaded native handles could not be", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
+    }
+
+    [Fact]
+    public void Revision_Read_Exception_Still_Closes_And_Unloads()
+    {
+        var kernel = new FakeControllerKernel
+        {
+            OnRevision = () => throw new InvalidOperationException("synthetic revision read failure"),
+        };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("REVISION_RESPONSE_INVALID", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
+        Assert.True(kernel.Log.IndexOf("close") < kernel.Log.IndexOf("release"));
     }
 
     [Fact]
@@ -404,6 +532,9 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.Equal("NATIVE_UNLOAD_FAILED", outcome.Code);
         Assert.False(outcome.NativeHandlesReleased);
         Assert.True(outcome.ControllerHandleClosed);
+        Assert.Contains("native module handle could not be released", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Equal(2, kernel.ReleasedModuleFileNames.Count);
     }
 
     // ------------------------------------------------------------- budgets, busy and fencing
@@ -461,6 +592,7 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.True(outcome.ControllerHandleClosed);
         Assert.Equal(1, kernel.CloseCount);
         Assert.True(outcome.NativeHandlesReleased);
+        Assert.True(session.CurrentGeneration > outcome.Generation);
     }
 
     // ------------------------------------------------------------- source-shape requirements
