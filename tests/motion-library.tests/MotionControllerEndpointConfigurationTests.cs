@@ -1,3 +1,4 @@
+using Wjss.Adapters.MotionLibrary;
 using Xunit;
 
 namespace Wjss.MotionLibrary.Tests;
