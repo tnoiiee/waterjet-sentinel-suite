@@ -467,6 +467,26 @@ config/site/
 **/event-logs/
 **/production-logs/
 
+# Native motion-library artefacts (Native Load / Version Probe Software Gate).
+# The native communication library is Owner-local installed software and must NEVER
+# be committed: no module, import library, header, symbol file, export table or
+# vendored wrapper may enter the public repository. These rules are a safety net,
+# not an authorisation; the source-boundary tests pin the same prohibition.
+adapters/motion-library/**/*.dll
+adapters/motion-library/**/*.lib
+adapters/motion-library/**/*.exp
+adapters/motion-library/**/*.obj
+adapters/motion-library/**/*.h
+adapters/motion-library/**/*.hpp
+adapters/motion-library/**/*.pdb
+apps/motion-probe/**/*.dll
+apps/motion-probe/**/*.lib
+apps/motion-probe/**/*.exp
+apps/motion-probe/**/*.obj
+apps/motion-probe/**/*.h
+apps/motion-probe/**/*.hpp
+apps/motion-probe/**/*.pdb
+
 # ---------------------------------------------------------------------------
 # WJSS amendment (Stage 0.3A-1, Owner-approved gate section 6):
 # The ROOT /packages/ tree is tracked Product source (Wjss.Contracts,

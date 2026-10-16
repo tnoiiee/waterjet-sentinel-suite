@@ -32,6 +32,12 @@ Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.TcBench", "apps\tc-ben
 EndProject
 Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.TcAcquisition.Tests", "tests\tc-acquisition.tests\Wjss.TcAcquisition.Tests.csproj", "{A1000015-0A10-4A10-8A10-0A100A100A15}"
 EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.Adapters.MotionLibrary", "adapters\motion-library\Wjss.Adapters.MotionLibrary.csproj", "{A1000016-0A10-4A10-8A10-0A100A100A16}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.MotionProbe", "apps\motion-probe\Wjss.MotionProbe.csproj", "{A1000017-0A10-4A10-8A10-0A100A100A17}"
+EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.MotionLibrary.Tests", "tests\motion-library.tests\Wjss.MotionLibrary.Tests.csproj", "{A1000018-0A10-4A10-8A10-0A100A100A18}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -98,6 +104,18 @@ Global
 		{A1000015-0A10-4A10-8A10-0A100A100A15}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1000015-0A10-4A10-8A10-0A100A100A15}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1000015-0A10-4A10-8A10-0A100A100A15}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000016-0A10-4A10-8A10-0A100A100A16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000016-0A10-4A10-8A10-0A100A100A16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000016-0A10-4A10-8A10-0A100A100A16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000016-0A10-4A10-8A10-0A100A100A16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000017-0A10-4A10-8A10-0A100A100A17}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000017-0A10-4A10-8A10-0A100A100A17}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000017-0A10-4A10-8A10-0A100A100A17}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000017-0A10-4A10-8A10-0A100A100A17}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000018-0A10-4A10-8A10-0A100A100A18}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000018-0A10-4A10-8A10-0A100A100A18}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000018-0A10-4A10-8A10-0A100A100A18}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000018-0A10-4A10-8A10-0A100A100A18}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
