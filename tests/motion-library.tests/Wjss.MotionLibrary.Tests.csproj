@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Focused tests of the native load / version probe boundary (Native Load / Version
+    Probe Software Gate). The complete configuration, file-shape, orchestration and
+    refusal defect class is exercised WITHOUT any real native module: synthetic PE
+    fixture files in a per-test temporary directory plus a recording kernel seam.
+    No native binary, hash or absolute Owner path is or may be part of this project.
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local run is the validation
+    of record). The genuine packages.lock.json of this project is produced only by the
+    Owner-local restore against the already-pinned test stack, never hand-authored.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>Wjss.MotionLibrary.Tests</AssemblyName>
+    <RootNamespace>Wjss.MotionLibrary.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+    <ProjectReference Include="../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

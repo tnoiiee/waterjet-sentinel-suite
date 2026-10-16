@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS motion library native-load/version probe harness (Native Load / Version Probe
+    Software Gate).
+
+    An Owner-invoked, console-only probe front-end for the Wjss.Adapters.MotionLibrary
+    boundary. It takes no arguments, binds no port, opens no socket, writes no file and
+    contacts nothing: it resolves the four Owner-local environment variables, runs the
+    fail-closed native load / version probe and prints a REDACTED JSON outcome. Library
+    inspection/loading only — no controller endpoint, discovery, connection, read or
+    motion command exists here or can be constructed from here.
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (no .NET SDK available in the
+    Arena sandbox). The Owner-local run is the validation of record
+    (docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md). The genuine packages.lock.json of this
+    project is produced only by the Owner-local restore, never hand-authored.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.MotionProbe</RootNamespace>
+    <AssemblyName>Wjss.MotionProbe</AssemblyName>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj" />
+  </ItemGroup>
+
+</Project>

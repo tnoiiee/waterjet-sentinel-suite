@@ -13,6 +13,65 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-16 — Native load / version probe software gate (library inspection/loading only; on branch; PR OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local build and probe run are the validation of record
+([runbook](docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md)). LIBRARY INSPECTION/LOADING ONLY: NO
+controller endpoint, NIC change, discovery, connection, read or motion command; NO gcaps, vendor
+GUI or PATH/registry search; the Motion authorization gate stays CLOSED and the candidate values
+stay NOT_CONFIGURED / NOT_COMMISSIONED.**
+
+**What the Gate is.** A minimal, vendor-neutral, fail-closed boundary that proves — only when the
+Owner invokes it on the Owner workstation — that the Owner-installed motion communication library
+loads from the approved Owner-local directory and reports the Owner-expected library version.
+Evidence basis (Owner Gate instruction §2/§3): signed vendor installer of the selected release,
+Owner-captured file identities and x64 architecture of both module files, and the exact installed
+header declaration `gclib_result gclib_version(char* version, size_t len)` — the only export
+invoked (library-local; no controller handle, no connection). No other declaration, result
+constant or behaviour was inferred or implemented.
+
+**Boundary.** New self-owned adapter `adapters/motion-library/` (no ProjectReference, no
+PackageReference): redacted configuration record + fail-closed resolver (environment only; no
+I/O; shapes only), file-shape proofs (SHA-256 parse/compare, bounded hash read, PE machine scan,
+path containment), an internal kernel surface (kernel32 only; `LoadLibraryExW` with a restricted
+search set — module load directory + application directory + System32, never current
+directory/user directories/PATH, so the same-named copies in other vendor tool folders can never
+be selected; `GetProcAddress` for exactly the one authorized export; `GetModuleFileNameW` for the
+loaded-module-path proof; `FreeLibrary` for deterministic unload), and the ordered probe runner.
+New console-only harness `apps/motion-probe/` (no arguments, no bind, no socket, redacted JSON,
+exit codes 0/2/4). New focused test suite `tests/motion-library.tests/` covering the whole
+configuration/file-shape/orchestration defect class with synthetic PE fixtures and a recording
+kernel seam — no real native module and no real hash anywhere. The committed configuration is
+shape and environment-variable names only (`WJSS_MOTION_LIB_DIR`,
+`WJSS_MOTION_LIB_GCLIB_SHA256`, `WJSS_MOTION_LIB_GCLIBO_SHA256`,
+`WJSS_MOTION_LIB_EXPECTED_VERSION`): no directory, hash, expected version, native binary, header,
+import library or vendored wrapper is committed (`.gitignore` guard rules plus source-boundary
+tests pin the same prohibition).
+
+**Refusal vocabulary (canonical):** `NATIVE_LIB_DIR_NOT_CONFIGURED`, `NATIVE_LIB_DIR_REJECTED`,
+`NATIVE_FILE_NOT_FOUND`, `NATIVE_FILE_READ_FAILED`, `NATIVE_FILE_IDENTITY_MISMATCH`,
+`NATIVE_ARCHITECTURE_MISMATCH`, `NATIVE_LOAD_FAILED`, `NATIVE_EXPORT_NOT_FOUND`,
+`NATIVE_VERSION_CALL_FAILED`, `NATIVE_VERSION_MISMATCH`, `NATIVE_MODULE_PATH_MISMATCH`,
+`NATIVE_UNLOAD_FAILED`, `NATIVE_PROBE_UNSUPPORTED_PLATFORM`; success
+`NATIVE_LIBRARY_PROBE_COMPLETE`.
+
+**Dependencies/locks/fixtures.** No package added, no version pin changed, no
+`Directory.Packages.props` change. The three new projects receive genuine `packages.lock.json`
+only from the Owner-local restore (never hand-authored); they land after the passing Owner-local
+validation per the repository lock policy. No contract, Snapshot, Delta or fixture changed:
+fixture parity expectations unchanged. Runtime composition, Kiosk, Preview and the read-only
+static Motion catalogue route are untouched.
+
+**NOT VERIFIED / NOT RUN here:** any compilation, test execution, native load or version call
+(no .NET or native library exists in Arena). Owner-local validation of record: genuine restore
+(exactly three new locks) → locked restore → Release build 0/0 → focused suite → full suite →
+boundary scan → probe run (exit 0, version exactly equal to the expected value,
+`nativeHandlesReleased: true`) → redaction/no-contact/cleanup proofs; full commands and the
+evidence template in `docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md`. The next Gate (one-controller
+read-only connection) remains PREPARED BUT NOT AUTHORIZED; it requires a separate Owner Scope
+Gate, a new session and a new branch.
+
 ### 2026-10-15 — Build-graph defect-class correction after the Owner-local PR #27 Release build failure (no Source defect; on branch; PR OPEN, NOT MERGED)
 
 **Status: CORRECTION APPLIED — DOCUMENTATION AND REGRESSION COVERAGE ONLY; NO PRODUCT SOURCE, BUILD

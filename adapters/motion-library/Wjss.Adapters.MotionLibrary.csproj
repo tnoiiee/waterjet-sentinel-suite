@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS motion library adapter — native load / version probe boundary (Native Load
+    / Version Probe Software Gate).
+
+    This project is the infrastructure side of a minimal, vendor-neutral, fail-closed
+    boundary that proves the Owner-installed motion communication library loads from the
+    approved Owner-local directory and reports the Owner-expected library version. The
+    Gate authorizes library inspection/loading ONLY: no controller endpoint, no
+    controller discovery, no controller connection, no controller read and no motion
+    command exists here or can be constructed from here (the only resolvable native
+    export is the library-local version query of the exact installed header evidence).
+
+    Boundary: self-owned (mirroring adapters/tc-acquisition); no Contracts/Domain
+    reference and no package reference of any kind (operating-system loading primitives
+    and BCL only); redacted outcomes only; owner-local configuration by environment
+    variables only. No native binary, header, import library or vendor wrapper is part
+    of this project, and none may ever be added (see .gitignore and the source-boundary
+    tests).
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (no .NET SDK available in the
+    Arena sandbox; official SDK/NuGet endpoints are blocked there). The Owner-local
+    Windows workstation build is the validation of record. The genuine
+    packages.lock.json of this project is produced only by the Owner-local restore,
+    never hand-authored (see docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.Adapters.MotionLibrary</RootNamespace>
+    <AssemblyName>Wjss.Adapters.MotionLibrary</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Focused-test seam: the kernel is internal so the complete native-load defect
+         class (missing export, wrong module path, failed unload, dead buffer) is
+         exercised without any real native module. -->
+    <InternalsVisibleTo Include="Wjss.MotionLibrary.Tests" />
+  </ItemGroup>
+
+</Project>
