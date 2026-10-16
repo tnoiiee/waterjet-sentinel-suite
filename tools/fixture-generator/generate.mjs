@@ -400,6 +400,9 @@ export function buildSnapshot(profile) {
         pollsFailed: 0,
       })),
     },
+    // The Snapshot carries NO motion member at all. The static motion commissioning catalogue lives
+    // on the dedicated read-only catalogue route, so it is neither composed here nor serialized as a
+    // null placeholder: a Snapshot with a motion member is refused by the contract validator.
     runtime: {
       uptimeSeconds: 42,
       sseClients: 1,

@@ -26,6 +26,18 @@
 //   GET /api/tc-physical-mapping          the canonical CAB1 Drawing-rev1 mapping projection, read-only
 //                                         (40 offsets, 18 Sensors, preserved conflict and spare states;
 //                                         no endpoint, no legacy IP field, no device access)
+//   GET /api/motion-commissioning/catalogue
+//                                         the read-only STATIC motion commissioning catalogue: the
+//                                         Owner-confirmed topology (four controllers, sixteen axes,
+//                                         the eight canonical Water Jet allocations, brake and limit
+//                                         plans), the controller model, the Horizontal/Vertical axis
+//                                         roles with their physical axis letters, every configuration
+//                                         and commissioning status, the mapping provenance, the
+//                                         recorded Drawing evidence notes, the candidate values and
+//                                         the authorization gate. It reads NO Runtime and no device.
+//                                         The static catalogue is deliberately NOT a Snapshot member
+//                                         and NOT a Delta member: it does not change with a revision,
+//                                         so it is never re-sent with every Snapshot.
 //
 // Every other method is refused with 405, and there is no route that writes, connects, polls, reads
 // a device, changes the Mapping, or commands anything. The server binds to 127.0.0.1 only: the bind
@@ -47,6 +59,7 @@ import {
   CANONICAL_TC_ACQUISITION_EVIDENCE, buildTcAcquisitionEvidenceView, recordToRecordConsistency,
   tcAcquisitionEvidenceFingerprint, requireTopologyInvariants,
   buildCab1Mapping, projectCab1Payload, CAB1_NODE_ID, CAB1_CABINET_ID, PHYSICAL_READ_PROFILE,
+  motionCommissioningDesign, MOTION_ALL_REFUSAL_REASONS,
 } from '../../packages/commissioning/src/index.mjs';
 import { validTcAcquisition, validDeterministicTcAcquisition } from '../../packages/contracts/wjss-contracts-ts/validate.mjs';
 
@@ -560,6 +573,51 @@ export function tcPhysicalMappingPayload() {
   };
 }
 
+/**
+ * The read-only STATIC motion commissioning catalogue.
+ *
+ * One payload, one authority: the Owner-confirmed data the Application model publishes. It carries
+ * the topology (four controllers, sixteen axes, the eight canonical Water Jet allocations), the
+ * controller model, the Horizontal / Vertical axis roles with their physical axis letters, the brake
+ * output identity, every configuration and commissioning status, the mapping provenance, the
+ * recorded Drawing evidence notes, the candidate values and the authorization gate state.
+ *
+ * It is STATIC: composed from Owner-confirmed data alone. It therefore reads NO Runtime and contacts
+ * NO controller, and it never depends on a device being reachable.
+ *
+ * It is deliberately NOT a member of the Runtime Snapshot and NOT a member of a Runtime Delta: the
+ * Snapshot stays reserved for dynamic observed motion state (connection state, axis state, command /
+ * encoder position, moving / stopped, Reverse / Home / Forward, brake commanded and observed, active
+ * command lifecycle, fault and refusal, timestamps, quality), none of which is authorized in this
+ * revision. Serving the catalogue from its own route keeps every Snapshot small and every revision
+ * cheap instead of re-sending the same static content with them.
+ *
+ * Nothing here authorizes anything. The gate is CLOSED in this software revision and every motion
+ * intent is refused before any hardware path is reached.
+ */
+export function motionCataloguePayload() {
+  return {
+    status: 200,
+    body: {
+      stageId: STAGE_ID,
+      mode: PREVIEW_MODE,
+      catalogue: motionCommissioningDesign(),
+      // The refusal vocabulary travels with the catalogue, so the screen can never show a refusal as
+      // a bare code with no wording.
+      refusalReasons: [...MOTION_ALL_REFUSAL_REASONS],
+      // Where the catalogue does and does not live. Stated in the payload, not only in a comment: a
+      // consumer that expects the Snapshot to carry it is told, by the payload itself.
+      placement: {
+        route: '/api/motion-commissioning/catalogue',
+        static: true,
+        carriedBySnapshot: false,
+        carriedByDelta: false,
+        runtimeReadRequired: false,
+      },
+    },
+  };
+}
+
 export function createPreviewServer({ runtimeFetch = globalThis.fetch,
   runtimePort = process.env.WJSS_API_PORT ?? DEFAULT_RUNTIME_PORT } = {}) {
   return createServer(async (req, res) => {
@@ -618,6 +676,12 @@ export function createPreviewServer({ runtimeFetch = globalThis.fetch,
       }
       if (path === '/api/tc-acquisition') {
         const { status, body } = await tcAcquisitionPayload({ runtimeFetch, runtimePort });
+        return send(res, status, JSON.stringify(body), MIME['.json']);
+      }
+      if (path === '/api/motion-commissioning/catalogue') {
+        // The static catalogue route: no Runtime read, no query parameter, no dynamic state. The
+        // Snapshot is reserved for dynamic observed motion state, none of which is authorized yet.
+        const { status, body } = motionCataloguePayload();
         return send(res, status, JSON.stringify(body), MIME['.json']);
       }
       const asset = path.slice(1);

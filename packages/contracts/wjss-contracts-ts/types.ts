@@ -448,6 +448,213 @@ export interface TcAcquisitionState {
   notVerified: string[];
 }
 
+/**
+ * The read-only Application-owned STATIC motion commissioning catalogue: four motion controllers
+ * (one per WSB cabinet), sixteen controller axes, the eight CANONICAL Water Jet axis allocations,
+ * the standing configuration and commissioning statuses, the provenance, the evidence notes, the
+ * candidate values and the authorization gate.
+ *
+ * It is composed by the Application model from Owner-confirmed data and from the standing
+ * not-configured / not-commissioned state of the software revision that publishes it. It is
+ * never a device read, it carries no network address, and it is never a command surface: the
+ * authorization gate is CLOSED and every motion intent is refused before any hardware path.
+ *
+ * It is STATIC and it is NOT a Snapshot member and NOT a Delta member: it is served by the
+ * dedicated read-only catalogue route, so the Snapshot stays reserved for dynamic observed state.
+ */
+export interface MotionCommissioningCatalogue {
+  sectionId: string;
+  sectionRevision: number;
+  source: string;
+  motionTopologyRevision: string;
+  /** CLOSED: every motion intent is refused before any hardware path is reached. */
+  authorizationGateState: string;
+  authorizationGateReasons: string[];
+  /** The six motion intents the foundation knows: JOG, MOVE, HOME, STOP, RELEASE_BRAKE, RESET_ENCODER. */
+  motionIntents: string[];
+  /** Empty: no axis is in a state in which motion is allowed. */
+  allowedMotionStates: string[];
+  sessionState: string;
+  commandTotals: MotionCommandTotals;
+  controllers: MotionControllerProjection[];
+  axes: MotionAxisProjection[];
+  waterJets: MotionWaterJetAxisBinding[];
+  /** Recorded Drawing discrepancies. Evidence metadata only; never canonical ambiguity. */
+  mappingEvidenceNotes: MotionMappingEvidenceNote[];
+  /** The initial Jog Speed: a display value in controller units, never executable. */
+  jogSpeed: MotionParameterState;
+  notVerifiedClaims: string[];
+  /** Every status and refusal code with its wording, so no state is shown by colour alone. */
+  statusLegend: string[];
+  canonicalText: string;
+  fingerprint: string;
+}
+
+/** Logical identity of one motion controller. No member carries an address. */
+export interface MotionControllerIdentity {
+  controllerId: string;
+  cabinetId: string;
+  axisCount: number;
+  controllerModel: string;
+  controllerModelStatus: string;
+  controllerIdentityBasis: string;
+}
+
+/** Configuration state of one motion controller: every member an explicit not-configured value. */
+export interface MotionControllerConfigurationState {
+  motionPortIdentity: string;
+  motionPortStatus: string;
+  /** Redacted logical identity only: ENDPOINT_NOT_CONFIGURED while nothing is configured. */
+  endpointIdentity: string;
+  controllerConfigurationStatus: string;
+  libraryInstallationStatus: string;
+  communicationState: string;
+  motionDispatchReady: boolean;
+  parameterConfigurationState: string;
+  softwareLimitConfigurationState: string;
+  limitInputPolarityStatus: string;
+  endstopConfigurationStatus: string;
+  motionDispatchBlockedReason: string;
+}
+
+export interface MotionControllerProjection {
+  identity: MotionControllerIdentity;
+  configuration: MotionControllerConfigurationState;
+}
+
+/** Owner-confirmed identity of one controller axis: role, position sense and brake output. */
+export interface MotionAxisIdentity {
+  controllerId: string;
+  axisId: string;
+  /** HORIZONTAL or VERTICAL: A and C are the Horizontal Axis, B and D the Vertical Axis. */
+  axisRole: string;
+  axisRoleBasis: string;
+  motionSenseKind: string;
+  motionSenseBasis: string;
+  brakeOutputIdentity: string;
+  brakeOutputMappingBasis: string;
+}
+
+/** One installed limit input of one axis. Polarity is UNCONFIRMED and the state is UNKNOWN. */
+export interface MotionLimitSignalState {
+  signalRole: string;
+  signalKind: string;
+  polarityStatus: string;
+  signalState: string;
+  signalStateStatus: string;
+  senseBasis: string;
+}
+
+export interface MotionAxisSenseState {
+  motionSenseKind: string;
+  motionSenseBasis: string;
+  senseChannelStatus: string;
+  positionValueStatus: string;
+  positionDisplayValue: string | null;
+  positionUnit: string | null;
+}
+
+/** Motion-local protections. NOT the Cleaning-process interlocks, which never appear here. */
+export interface MotionAxisSafetyState {
+  emergencyStopVisibilityStatus: string;
+  stopCircuitVerificationStatus: string;
+  controlledStopCapabilityStatus: string;
+  controlledStopVerificationStatus: string;
+  isolationVerificationStatus: string;
+  localProtectionStatus: string;
+  resetEncoderVerificationStatus: string;
+}
+
+export interface MotionAxisKinematicState {
+  kinematicConversionStatus: string;
+  kinematicConversionIsPerAxis: boolean;
+  publishedUnit: string;
+  conversionProvenanceRequirement: string;
+}
+
+export interface MotionAxisMoveAuthorization {
+  moveAuthorizationState: string;
+  moveRefusalReasons: string[];
+}
+
+export interface MotionAxisCommissioningState {
+  commissioningState: string;
+  homingState: string;
+  homingStateStatus: string;
+  brakeCommandState: string;
+  brakeState: string;
+  brakeStateStatus: string;
+  motionState: string;
+  motionStateStatus: string;
+  limitSignals: MotionLimitSignalState[];
+  sense: MotionAxisSenseState;
+  safety: MotionAxisSafetyState;
+  kinematic: MotionAxisKinematicState;
+  moveAuthorization: MotionAxisMoveAuthorization;
+}
+
+export interface MotionAxisProjection {
+  identity: MotionAxisIdentity;
+  state: MotionAxisCommissioningState;
+}
+
+/**
+ * The CANONICAL Owner-confirmed axis allocation of one Water Jet: WJ1 = A,B; WJ2 = C,D;
+ * WJ3 = C,D; WJ4 = A,B; WJ5 = C,D; WJ6 = A,B; WJ7 = A,B; WJ8 = C,D.
+ *
+ * The allocation is explicit data: no parity rule, no odd/even Water Jet formula and no
+ * cabinet-derived axis formula derives any row. The physical axis letter is the diagnostic identity
+ * of the controller axis; the Operator-facing identity is the ROLE ("Horizontal Axis" /
+ * "Vertical Axis") and the letter never replaces it.
+ */
+export interface MotionWaterJetAxisBinding {
+  waterJetId: string;
+  cabinetId: string;
+  controllerId: string;
+  horizontalAxisId: string;
+  verticalAxisId: string;
+  /** CONFIRMED_OWNER for all eight Water Jets: the Drawing rev1 discrepancy is an evidence note. */
+  mappingStatus: string;
+  /** OWNER_CONFIRMED: the mapping provenance of every row is the Owner's confirmation. */
+  mappingBasis: string;
+}
+
+/**
+ * A recorded Drawing discrepancy, carried as EVIDENCE METADATA ONLY.
+ *
+ * It is not canonical ambiguity and it is not an open decision: the Owner-confirmed mapping is
+ * canonical and governs the Product. The note exists so the discrepancy is not silently lost, and
+ * it states explicitly that the discrepancy has NOT been physically resolved.
+ */
+export interface MotionMappingEvidenceNote {
+  evidenceId: string;
+  waterJetIds: string[];
+  cabinetIds: string[];
+  statement: string;
+  status: string;
+  classification: string;
+  effect: string;
+  physicalResolution: string;
+}
+
+export interface MotionParameterState {
+  parameterId: string;
+  displayValue: string;
+  unit: string;
+  status: string;
+  provenanceBasis: string;
+  executable: boolean;
+}
+
+export interface MotionCommandTotals {
+  evaluated: number;
+  authorized: number;
+  refused: number;
+  hardwareCommandsIssued: number;
+  commandState: string;
+  journalPersistence: string;
+}
+
 export interface OperationalSnapshot {
   kind: 'snapshot';
   schema: typeof SNAPSHOT_SCHEMA;

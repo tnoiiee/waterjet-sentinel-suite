@@ -15,6 +15,8 @@ import {
   buildRowViews, buildThermalPairs, buildWallMap, canRecordPass, filterCounts, filterRows, getFilter,
   legend, loopTestSummary, pairForRow, summaryCounts, visibleMeasurements, wallMeasurementKey,
   wallOrderStep,
+  MOTION_ALL_REFUSAL_REASONS, MOTION_AXIS_IDS, MOTION_INTENT_WORDING, MOTION_REFUSAL_WORDING,
+  MOTION_NOT_VERIFIED_WORDING, MOTION_STATUS_WORDING, motionStatusText,
 } from '/pkg/index.mjs';
 
 const $ = (id) => document.getElementById(id);
@@ -95,6 +97,10 @@ const state = {
   // Read-only Runtime Snapshot projection. Null represents a Runtime/Preview request failure,
   // not a completed TC read; the browser has no acquisition client or state writer.
   tcAcquisition: null,
+  // The read-only STATIC motion commissioning catalogue served by the dedicated catalogue route.
+  // This browser owns no motion command:
+  // it displays state and never raises, sends or authorizes one.
+  motionCatalogue: null,
   observations: new Map(),
   // The read-only paired thermal model, rebuilt from the authoritative observations on every load. It
   // is derived state: it is never written back into an observation, a row, a count or a verdict.
@@ -1576,6 +1582,246 @@ function setMeasurementView(view) {
 }
 
 // ---------------------------------------------------------------------------
+// Motion Commissioning - the read-only STATIC catalogue of the Owner-confirmed motion design, the
+// Application-owned authorization gate, the mapping provenance and the recorded evidence notes.
+//
+// Every value below is data composed by the Application model. Nothing here connects to a
+// controller, reads a device, issues a command or opens a session, and no control on this page can.
+// The catalogue is static: it is not read from the Runtime Snapshot and it is not carried by one.
+// ---------------------------------------------------------------------------
+
+/** One "CODE - wording" legend line. No state on this page is ever carried by colour alone. */
+function motionLegendItem(code, text) {
+  return el('li', {}, [el('span', { class: 'marker' }, code), ` - ${text}`]);
+}
+
+/** One summary cell of the motion status grid. */
+function motionCell(label, value, cls = '') {
+  return el('div', { class: cls ? `cell ${cls}` : 'cell' }, [
+    el('span', { class: 'k' }, label), el('span', { class: 'v' }, String(value)),
+  ]);
+}
+
+/** A table whose first column holds row headers. */
+function motionTable(headers, rows) {
+  return el('table', {}, [
+    el('thead', {}, [el('tr', {}, headers.map((header) => el('th', { scope: 'col' }, header)))]),
+    el('tbody', {}, rows.map((cells) => el('tr', {}, cells.map((cell, index) => (index === 0
+      ? el('th', { scope: 'row' }, cell)
+      : el('td', {}, cell)))))),
+  ]);
+}
+
+/** A transposed table: one column per item, so all of them are visible together. */
+function motionColumnsTable(rowLabel, items, labelOf, rows) {
+  return el('table', {}, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { scope: 'col' }, rowLabel),
+      ...items.map((item) => el('th', { scope: 'col' }, labelOf(item))),
+    ])]),
+    el('tbody', {}, rows.map(([label, pick]) => el('tr', {}, [
+      el('th', { scope: 'row' }, label),
+      ...items.map((item) => el('td', {}, pick(item))),
+    ]))),
+  ]);
+}
+
+/** "OUTPUT_3" reads as "Output 3" on the screen; the code stays visible in the legend. */
+function brakeOutputWording(identity) {
+  return identity.replace('OUTPUT_', 'Output ');
+}
+
+/**
+ * The physical controller axis letter as DIAGNOSTIC IDENTITY ONLY. It is never used on its own to
+ * name an axis on the screen: the role wording always comes first. The vendor name is deliberately
+ * not printed here - this repository keeps vendor vocabulary out of the served UI.
+ */
+function physicalAxisWording(axisId) {
+  return axisId;
+}
+
+/** A status code with its wording, so the code is never alone on the screen. */
+function statusWithWording(code) {
+  return `${code} (${motionStatusText(code)})`;
+}
+
+function renderMotionCommissioning() {
+  const ids = ['motion-gate-status', 'motion-summary', 'motion-waterjets-body', 'motion-controllers-body',
+    'motion-axes-body', 'motion-brake-body', 'motion-limits-body', 'motion-intents-body', 'motion-jog-body',
+    'motion-evidence-notes', 'motion-not-verified', 'motion-legend', 'motion-authority'];
+  for (const id of ids) $(id).replaceChildren();
+
+  const view = state.motionCatalogue;
+  if (!view) {
+    $('motion-gate-status').textContent = 'Motion commissioning catalogue unavailable: the static read-only catalogue could not be read from the local Preview host.';
+    $('motion-authority').textContent = 'NO HARDWARE ACCESS / NO MOTION COMMAND. This section sends no request to a controller, opens no session, releases no brake, homes no axis and moves nothing. The authorization gate is CLOSED.';
+    return;
+  }
+
+  const design = view.catalogue;
+  const gateWording = design.authorizationGateReasons
+    .map((reason) => `${reason} (${MOTION_REFUSAL_WORDING[reason] ?? reason})`).join(' · ');
+  $('motion-gate-status').textContent = `Authorization gate: ${design.authorizationGateState}`
+    + ` (${motionStatusText(design.authorizationGateState)}) - ${gateWording}.`
+    + ' Every motion intent is refused before any hardware path is reached.';
+
+  const homedAxes = design.axes.filter((axis) => axis.homingState !== 'NOT_HOMED').length;
+  const readyControllers = design.controllers.filter((controller) => controller.motionDispatchReady).length;
+  $('motion-summary').append(...[
+    ['Motion controllers', design.controllers.length, ''],
+    ['Controller axes', design.axes.length, ''],
+    ['Water Jets mapped', design.waterJets.length, ''],
+    ['Axes homed', homedAxes, homedAxes === 0 ? 'warn' : ''],
+    ['Controllers ready', `${readyControllers} of ${design.controllers.length}`, readyControllers === 0 ? 'warn' : 'ok'],
+    ['Motion commands issued', 0, 'ok'],
+    ['Authorization gate', design.authorizationGateState, 'warn'],
+    ['Water Jet mappings confirmed', `${design.waterJets.length} of ${design.waterJets.length}`, 'ok'],
+    ['Drawing evidence notes', design.mappingEvidenceNotes.length, 'warn'],
+  ].map(([label, value, cls]) => motionCell(label, value, cls)));
+
+  // The CANONICAL Owner-confirmed Water Jet axis allocation. The axis ROLE is the axis identity on
+  // the screen ("Horizontal Axis" / "Vertical Axis"); the physical controller axis letter is
+  // appended to it as diagnostic identity only ("Horizontal Axis · C"), never used instead of the
+  // role. The vendor name is deliberately not printed in the served UI.
+  // Every row is explicit data with Owner-confirmed provenance: WJ2 = C,D and WJ4 = A,B included.
+  $('motion-waterjets-body').append(motionTable(
+    ['Water Jet', 'Cabinet', 'Controller', 'Horizontal Axis', 'Vertical Axis', 'Mapping status', 'Provenance'],
+    design.waterJets.map((waterJet) => [
+      waterJet.waterJetId,
+      waterJet.cabinetId,
+      waterJet.controllerId,
+      `${waterJet.horizontalAxisWording} · ${physicalAxisWording(waterJet.horizontalAxisId)}`,
+      `${waterJet.verticalAxisWording} · ${physicalAxisWording(waterJet.verticalAxisId)}`,
+      statusWithWording(waterJet.mappingStatus),
+      statusWithWording(waterJet.mappingBasis),
+    ]),
+  ));
+
+  $('motion-controllers-body').append(motionColumnsTable('Attribute',
+    design.controllers,
+    (controller) => controller.controllerId,
+    [
+      ['Cabinet', (c) => c.cabinetId],
+      ['Axes', (c) => String(c.axisCount)],
+      ['Model', (c) => `${c.controllerModel} (${motionStatusText(c.controllerModelStatus)})`],
+      ['Identity basis', (c) => motionStatusText(c.controllerIdentityBasis)],
+      ['Motion port', (c) => `${c.motionPortIdentity} (${motionStatusText(c.motionPortStatus)})`],
+      ['Endpoint', (c) => `${c.endpointIdentity} (${motionStatusText(c.endpointIdentity)})`],
+      ['Library', (c) => statusWithWording(c.libraryInstallationStatus)],
+      ['Communication', (c) => statusWithWording(c.communicationState)],
+      ['Parameters', (c) => motionStatusText(c.parameterConfigurationState)],
+      ['Software limits', (c) => motionStatusText(c.softwareLimitConfigurationState)],
+      ['Limit polarity', (c) => motionStatusText(c.limitInputPolarityStatus)],
+      ['End stops', (c) => motionStatusText(c.endstopConfigurationState)],
+      ['Dispatch ready', (c) => (c.motionDispatchReady ? 'TRUE' : 'FALSE')],
+      ['Blocked by', (c) => `${c.motionDispatchBlockedReason} (${MOTION_REFUSAL_WORDING[c.motionDispatchBlockedReason] ?? c.motionDispatchBlockedReason})`],
+    ]));
+
+  $('motion-axes-body').append(motionTable(
+    ['Controller', 'Physical axis', 'Axis role', 'Position sense', 'Brake output', 'Commissioning', 'Home',
+      'Brake command', 'Brake state', 'Motion state', 'Absolute move'],
+    design.axes.map((axis) => [
+      axis.controllerId,
+      physicalAxisWording(axis.axisId),
+      axis.axisWording,
+      motionStatusText(axis.motionSenseKind),
+      brakeOutputWording(axis.brakeOutputIdentity),
+      motionStatusText(axis.commissioningState),
+      statusWithWording(axis.homingState),
+      motionStatusText(axis.brakeCommandState),
+      statusWithWording(axis.brakeState),
+      statusWithWording(axis.motionState),
+      statusWithWording(axis.moveAuthorizationState),
+    ]),
+  ));
+
+  // Brake output plan: A-1, B-2, C-3, D-4 on every controller (Owner-confirmed).
+  const brakePlan = MOTION_AXIS_IDS.map((axisId) => design.axes.find((axis) => axis.axisId === axisId));
+  $('motion-brake-body').append(motionTable(
+    ['Controller axis', 'Axis role', 'Brake output', 'Allocation basis'],
+    brakePlan.filter(Boolean).map((axis) => [
+      physicalAxisWording(axis.axisId),
+      axis.axisWording,
+      brakeOutputWording(axis.brakeOutputIdentity),
+      motionStatusText(axis.brakeOutputMappingBasis),
+    ]),
+  ));
+
+  // Limit inputs: three installed inputs per axis (Reverse, Home, Forward). The polarity is
+  // UNCONFIRMED, so the state is never assumed active high or active low.
+  $('motion-limits-body').append(motionTable(
+    ['Controller axis', 'Axis role', 'Sense', 'Reverse', 'Home', 'Forward', 'Polarity'],
+    brakePlan.filter(Boolean).map((axis) => [
+      physicalAxisWording(axis.axisId),
+      axis.axisWording,
+      motionStatusText(axis.motionSenseKind),
+      ...axis.limitSignals.map((signal) => statusWithWording(signal.signalState)),
+      motionStatusText(axis.limitSignals[0].polarityStatus),
+    ]),
+  ));
+
+  // Every intent is refused: the gate reason and then the standing preconditions, in evaluation order.
+  $('motion-intents-body').append(motionTable(
+    ['Motion intent', 'Command state', 'Refused by (gate)', 'Standing preconditions'],
+    design.motionIntents.map((intent) => [
+      `${intent} (${MOTION_INTENT_WORDING[intent] ?? intent})`,
+      motionStatusText('REFUSED'),
+      design.authorizationGateReasons[0],
+      String(MOTION_ALL_REFUSAL_REASONS.length - design.authorizationGateReasons.length),
+    ]),
+  ));
+
+  $('motion-jog-body').append(el('p', { class: 'note' },
+    `Jog Speed: ${design.jogSpeed.displayValue} ${design.jogSpeed.unit} - `
+    + `${motionStatusText(design.jogSpeed.status)}. Display only: `
+    + `${design.jogSpeed.executable ? 'EXECUTABLE' : 'NOT EXECUTABLE'}, never sent to a controller. `
+    + 'No counts-to-millimetre conversion is verified, so no value is published in millimetres.'));
+
+  // Recorded Drawing evidence: published, never suppressed, and never allowed to read as ambiguity.
+  // Each note states its classification (evidence only, not canonical) and that the discrepancy has
+  // NOT been physically resolved on the installation.
+  $('motion-evidence-notes').append(...design.mappingEvidenceNotes.map((note) => el('li', {}, [
+    el('span', { class: 'marker' }, note.evidenceId),
+    ` ${note.waterJetIds.join(', ')} (${note.cabinetIds.join(', ')}) - ${statusWithWording(note.status)}, `,
+    `${statusWithWording(note.classification)}, ${statusWithWording(note.physicalResolution)}. `,
+    note.statement,
+    ' ',
+    note.effect,
+  ])));
+
+  $('motion-not-verified').append(...design.notVerifiedClaims.map((claim) => el('li', {}, [
+    el('span', { class: 'marker' }, claim), ` - ${MOTION_NOT_VERIFIED_WORDING[claim] ?? claim}`,
+  ])));
+
+  $('motion-legend').append(...MOTION_ALL_REFUSAL_REASONS.map((reason) => motionLegendItem(reason, MOTION_REFUSAL_WORDING[reason] ?? reason)));
+  $('motion-legend').append(...Object.entries(MOTION_STATUS_WORDING).map(([code, text]) => motionLegendItem(code, text)));
+
+  $('motion-authority').textContent = 'NO HARDWARE ACCESS / NO MOTION COMMAND / NO BRAKE OUTPUT / NO HOME / NO MOVE / NO ENCODER RESET. '
+    + 'This section reads the local Preview host only: it contacts no controller, configures no endpoint, opens no session, '
+    + 'releases no brake, homes no axis, resets no encoder and moves nothing. The authorization gate is CLOSED and every '
+    + 'motion intent is refused before any hardware path is reached. Motion-local protections (stop, hard-limit direction '
+    + 'blocking, bounded speed, brake state, homing state, software limits) are reported here and are NOT the '
+    + 'Cleaning-process interlocks. Nothing on this screen is commissioned, verified or field verified. This catalogue is '
+    + 'static: it is served by the dedicated read-only catalogue route and is carried by neither the Runtime Snapshot nor '
+    + 'a Runtime Delta, so it is never re-sent with every revision.';
+}
+
+/**
+ * Reads the STATIC motion commissioning catalogue from the dedicated read-only catalogue route.
+ *
+ * There is no Runtime variant and no refresh: the catalogue is Owner-confirmed data with a closed
+ * gate and standing not-configured / not-commissioned statuses, so it does not change with a
+ * revision and this page never couples its boot to a second host to render it.
+ */
+async function loadMotionCatalogue() {
+  try {
+    state.motionCatalogue = await getJson('/api/motion-commissioning/catalogue');
+  } catch {
+    state.motionCatalogue = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Uncaught-failure surface (so a broken interaction can never look like an idle screen)
 // ---------------------------------------------------------------------------
 
@@ -1654,6 +1900,9 @@ async function loadInitialData() {
   // The Runtime-backed TC projection is isolated: a missing host or unpublished state cannot
   // fabricate success and degrades only this section, not the synthetic commissioning workflow.
   await loadTcAcquisition();
+  // The static motion commissioning catalogue is isolated as well: it is Owner-confirmed data with a
+  // closed gate, so it does not depend on a Runtime host at all.
+  await loadMotionCatalogue();
   // The CAB1 Drawing mapping projection is isolated too: mapping evidence without a Runtime is still
   // useful, and its absence degrades only the U-shape section.
   try {
@@ -1714,6 +1963,7 @@ async function boot() {
     renderNodeConfiguration();
     renderTcAcquisitionEvidence();
     renderTcAcquisition();
+    renderMotionCommissioning();
     renderDiagnostics();
     await loadObservations();
     setAppState(APP_STATE.READY);
