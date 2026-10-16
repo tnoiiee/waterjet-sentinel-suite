@@ -94,9 +94,12 @@ const WATER_JET_PLACEMENT_KINDS = new Set(['BETWEEN_HORIZONTAL', 'BETWEEN_VERTIC
 const ISOLATION_VALVE_IDS = WATER_JET_IDS.map((id) => `IV${id.slice(2)}`);
 
 // ---- motion commissioning foundation (mirror of Wjss.Contracts.MotionVocabulary) ----
-// The Application-owned manual motion commissioning projection. Every value is a status or a
+// The Application-owned STATIC manual motion commissioning catalogue. Every value is a status or a
 // logical identity: no member carries a network address, and no member can express an authorized
 // motion command. The authorization gate is CLOSED for this software revision.
+//
+// The catalogue is NOT a Snapshot member and NOT a Delta member. It is served by the dedicated
+// read-only catalogue route, so the Snapshot stays reserved for dynamic observed state.
 export const MOTION_SECTION_ID = 'MOTION_COMMISSIONING_FOUNDATION';
 export const MOTION_SECTION_REVISION = 1;
 export const MOTION_SOURCE = 'APPLICATION_OWNED_MOTION_COMMISSIONING_MODEL';
@@ -126,17 +129,21 @@ export const MOTION_BRAKE_OUTPUT = Object.freeze({ A: 'OUTPUT_1', B: 'OUTPUT_2',
 /** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the Owner-confirmed allocation. */
 export const MOTION_WATER_JET_BINDINGS = Object.freeze([
   ['WJ1', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ2', 'WSB1', 'C', 'D', 'DRAWING_REV1_CONFLICT_WJ2_WJ4'],
+  ['WJ2', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
   ['WJ3', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
-  ['WJ4', 'WSB2', 'A', 'B', 'DRAWING_REV1_CONFLICT_WJ2_WJ4'],
+  ['WJ4', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ5', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
   ['WJ6', 'WSB3', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ7', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ8', 'WSB4', 'C', 'D', 'CONFIRMED_OWNER'],
 ]);
 export const MOTION_LIMIT_SIGNAL_ROLES = Object.freeze(['REVERSE', 'HOME', 'FORWARD']);
-export const MOTION_CONFLICT_ID = 'MOTION-CONFLICT-01';
-export const MOTION_CONFLICT_STATUS = 'OWNER_DECISION_REQUIRED';
+/** The one recorded Drawing discrepancy: evidence metadata only, never canonical ambiguity. */
+export const MOTION_EVIDENCE_NOTE_ID = 'MOTION-EVIDENCE-01';
+export const MOTION_EVIDENCE_STATUS = 'DRAWING_REV1_CONFLICT_RECORDED';
+export const MOTION_EVIDENCE_CLASSIFICATION = 'EVIDENCE_ONLY_NOT_CANONICAL';
+/** The discrepancy has NOT been physically resolved on the installation: recorded, not closed. */
+export const MOTION_EVIDENCE_RESOLUTION = 'NOT_PHYSICALLY_RESOLVED';
 
 // ---------------------------------------------------------------- helpers
 const isInt = (n) => Number.isInteger(n);
@@ -492,44 +499,46 @@ export function validTcAcquisition(tc) {
 }
 
 /**
- * Validates the read-only motion commissioning projection.
+ * Validates the STATIC read-only motion commissioning catalogue.
  *
- * The projection is accepted ONLY in the state this software revision can actually publish: the
- * authorization gate CLOSED, four controllers, sixteen axes, the Owner-confirmed Water Jet axis
- * allocation, the WJ2 / WJ4 conflict published (never suppressed), the Jog Speed as a display
+ * The catalogue is accepted ONLY in the state this software revision can actually publish: the
+ * authorization gate CLOSED, four controllers, sixteen axes, the CANONICAL Owner-confirmed Water Jet
+ * axis allocation for all eight Water Jets (WJ2 = C,D and WJ4 = A,B included), the WJ2 / WJ4 Drawing
+ * rev1 discrepancy recorded as evidence only and never as ambiguity, the Jog Speed as a display
  * value in controller units, and no axis homed, connected, commissioned or authorized to move.
- * A projection that claims a configured endpoint, a ready controller, a homed axis, an executable
- * parameter or an authorized command is refused: none of those can be true in this revision.
+ * A catalogue that claims a configured endpoint, a ready controller, a homed axis, an executable
+ * parameter, an authorized command, or an open Owner decision is refused: none of those can be true
+ * in this revision.
  */
-export function validMotionCommissioning(motion) {
-  if (motion === null || typeof motion !== 'object' || Array.isArray(motion)) return false;
-  if (!hasExactKeys(motion, MOTION_PROJECTION_KEYS)) return false;
-  if (motion.sectionId !== MOTION_SECTION_ID) return false;
-  if (motion.sectionRevision !== MOTION_SECTION_REVISION) return false;
-  if (motion.source !== MOTION_SOURCE) return false;
-  if (motion.motionTopologyRevision !== MOTION_TOPOLOGY_REVISION) return false;
-  if (motion.authorizationGateState !== MOTION_GATE_CLOSED) return false;
-  if (!sameStrings(motion.authorizationGateReasons, [MOTION_GATE_REASON])) return false;
-  if (!sameStrings(motion.motionIntents, MOTION_INTENTS)) return false;
-  // No axis is in a state in which motion is allowed, so the list is empty by construction.
-  if (!Array.isArray(motion.allowedMotionStates) || motion.allowedMotionStates.length !== 0) return false;
-  if (motion.sessionState !== 'NO_SESSION') return false;
-  if (!isStr(motion.canonicalText)) return false;
-  if (!/^[0-9a-f]{64}$/.test(motion.fingerprint)) return false;
-  if (!Array.isArray(motion.statusLegend) || motion.statusLegend.length === 0
-      || !motion.statusLegend.every((line) => isStr(line) && line.includes(' - '))) return false;
-  if (!Array.isArray(motion.notVerifiedClaims) || motion.notVerifiedClaims.length === 0
-      || !motion.notVerifiedClaims.includes('NO_MOTION_COMMAND_ISSUED')
-      || !motion.notVerifiedClaims.includes('NO_CONTROLLER_CONTACTED')) return false;
+export function validMotionCommissioningCatalogue(catalogue) {
+  if (catalogue === null || typeof catalogue !== 'object' || Array.isArray(catalogue)) return false;
+  if (!hasExactKeys(catalogue, MOTION_CATALOGUE_KEYS)) return false;
+  if (catalogue.sectionId !== MOTION_SECTION_ID) return false;
+  if (catalogue.sectionRevision !== MOTION_SECTION_REVISION) return false;
+  if (catalogue.source !== MOTION_SOURCE) return false;
+  if (catalogue.motionTopologyRevision !== MOTION_TOPOLOGY_REVISION) return false;
+  if (catalogue.authorizationGateState !== MOTION_GATE_CLOSED) return false;
+  if (!sameStrings(catalogue.authorizationGateReasons, [MOTION_GATE_REASON])) return false;
+  if (!sameStrings(catalogue.motionIntents, MOTION_INTENTS)) return false;
+  // No axis is in a state in which catalogue is allowed, so the list is empty by construction.
+  if (!Array.isArray(catalogue.allowedMotionStates) || catalogue.allowedMotionStates.length !== 0) return false;
+  if (catalogue.sessionState !== 'NO_SESSION') return false;
+  if (!isStr(catalogue.canonicalText)) return false;
+  if (!/^[0-9a-f]{64}$/.test(catalogue.fingerprint)) return false;
+  if (!Array.isArray(catalogue.statusLegend) || catalogue.statusLegend.length === 0
+      || !catalogue.statusLegend.every((line) => isStr(line) && line.includes(' - '))) return false;
+  if (!Array.isArray(catalogue.notVerifiedClaims) || catalogue.notVerifiedClaims.length === 0
+      || !catalogue.notVerifiedClaims.includes('NO_MOTION_COMMAND_ISSUED')
+      || !catalogue.notVerifiedClaims.includes('NO_CONTROLLER_CONTACTED')) return false;
 
-  if (!validMotionCommandTotals(motion.commandTotals)) return false;
-  if (!validMotionJogSpeed(motion.jogSpeed)) return false;
+  if (!validMotionCommandTotals(catalogue.commandTotals)) return false;
+  if (!validMotionJogSpeed(catalogue.jogSpeed)) return false;
 
-  const controllers = motion.controllers;
+  const controllers = catalogue.controllers;
   if (!Array.isArray(controllers) || controllers.length !== MOTION_CABINETS.length) return false;
   if (!controllers.every((controller, index) => validMotionController(controller, MOTION_CABINETS[index]))) return false;
 
-  const axes = motion.axes;
+  const axes = catalogue.axes;
   if (!Array.isArray(axes) || axes.length !== MOTION_CABINETS.length * MOTION_AXIS_IDS.length) return false;
   for (let c = 0; c < MOTION_CABINETS.length; c += 1) {
     for (let a = 0; a < MOTION_AXIS_IDS.length; a += 1) {
@@ -537,7 +546,7 @@ export function validMotionCommissioning(motion) {
     }
   }
 
-  const waterJets = motion.waterJets;
+  const waterJets = catalogue.waterJets;
   if (!Array.isArray(waterJets) || waterJets.length !== MOTION_WATER_JET_BINDINGS.length) return false;
   for (let i = 0; i < MOTION_WATER_JET_BINDINGS.length; i += 1) {
     const [waterJetId, cabinetId, horizontalAxisId, verticalAxisId, mappingStatus] = MOTION_WATER_JET_BINDINGS[i];
@@ -547,28 +556,36 @@ export function validMotionCommissioning(motion) {
     if (binding.controllerId !== `MC-${cabinetId}`) return false;
     if (binding.horizontalAxisId !== horizontalAxisId || binding.verticalAxisId !== verticalAxisId) return false;
     if (binding.mappingStatus !== mappingStatus) return false;
-    if (!MOTION_MAPPING_BASES.includes(binding.mappingBasis)) return false;
+    // Canonical provenance: every row's basis is the Owner's confirmation. The Drawing rev1
+    // discrepancy is evidence metadata only, so no row may carry a drawing-derived basis and no row
+    // may carry an open-decision status.
+    if (binding.mappingBasis !== MOTION_MAPPING_BASIS) return false;
+    if (binding.mappingStatus === 'OWNER_DECISION_REQUIRED') return false;
+    if (MOTION_AXIS_ROLE[binding.horizontalAxisId] !== 'HORIZONTAL') return false;
+    if (MOTION_AXIS_ROLE[binding.verticalAxisId] !== 'VERTICAL') return false;
   }
 
-  // The one open mapping conflict must be published, not suppressed: a projection that drops it is
-  // presenting the whole allocation as agreed.
-  const conflicts = motion.mappingConflicts;
-  if (!Array.isArray(conflicts) || conflicts.length !== 1) return false;
-  const conflict = conflicts[0];
-  if (!hasExactKeys(conflict, MOTION_CONFLICT_KEYS)) return false;
-  if (conflict.conflictId !== MOTION_CONFLICT_ID) return false;
-  if (conflict.status !== MOTION_CONFLICT_STATUS) return false;
-  if (!sameStrings(conflict.waterJetIds, ['WJ2', 'WJ4'])) return false;
-  if (!sameStrings(conflict.cabinetIds, ['WSB1', 'WSB2'])) return false;
-  if (!isStr(conflict.description) || !isStr(conflict.effect)) return false;
+  // The one recorded Drawing discrepancy must be published as evidence: a catalogue that drops it
+  // loses the discrepancy, and one that resolves it claims a physical resolution no one has made.
+  const notes = catalogue.mappingEvidenceNotes;
+  if (!Array.isArray(notes) || notes.length !== 1) return false;
+  const note = notes[0];
+  if (!hasExactKeys(note, MOTION_EVIDENCE_NOTE_KEYS)) return false;
+  if (note.evidenceId !== MOTION_EVIDENCE_NOTE_ID) return false;
+  if (note.status !== MOTION_EVIDENCE_STATUS) return false;
+  if (note.classification !== MOTION_EVIDENCE_CLASSIFICATION) return false;
+  if (note.physicalResolution !== MOTION_EVIDENCE_RESOLUTION) return false;
+  if (!sameStrings(note.waterJetIds, ['WJ2', 'WJ4'])) return false;
+  if (!sameStrings(note.cabinetIds, ['WSB1', 'WSB2'])) return false;
+  if (!isStr(note.statement) || !isStr(note.effect)) return false;
 
   return true;
 }
 
-const MOTION_PROJECTION_KEYS = Object.freeze([
+const MOTION_CATALOGUE_KEYS = Object.freeze([
   'sectionId', 'sectionRevision', 'source', 'motionTopologyRevision', 'authorizationGateState',
   'authorizationGateReasons', 'motionIntents', 'allowedMotionStates', 'sessionState', 'commandTotals',
-  'controllers', 'axes', 'waterJets', 'mappingConflicts', 'jogSpeed', 'notVerifiedClaims',
+  'controllers', 'axes', 'waterJets', 'mappingEvidenceNotes', 'jogSpeed', 'notVerifiedClaims',
   'statusLegend', 'canonicalText', 'fingerprint',
 ]);
 const MOTION_CONTROLLER_KEYS = Object.freeze(['identity', 'configuration']);
@@ -610,12 +627,16 @@ const MOTION_MOVE_AUTHORIZATION_KEYS = Object.freeze(['moveAuthorizationState', 
 const MOTION_WATER_JET_KEYS = Object.freeze([
   'waterJetId', 'cabinetId', 'controllerId', 'horizontalAxisId', 'verticalAxisId', 'mappingStatus', 'mappingBasis',
 ]);
-const MOTION_CONFLICT_KEYS = Object.freeze(['conflictId', 'waterJetIds', 'cabinetIds', 'description', 'status', 'effect']);
+const MOTION_EVIDENCE_NOTE_KEYS = Object.freeze([
+  'evidenceId', 'waterJetIds', 'cabinetIds', 'statement', 'status', 'classification', 'effect',
+  'physicalResolution',
+]);
 const MOTION_PARAMETER_KEYS = Object.freeze(['parameterId', 'displayValue', 'unit', 'status', 'provenanceBasis', 'executable']);
 const MOTION_COMMAND_TOTALS_KEYS = Object.freeze([
   'evaluated', 'authorized', 'refused', 'hardwareCommandsIssued', 'commandState', 'journalPersistence',
 ]);
-const MOTION_MAPPING_BASES = Object.freeze(['OWNER_CONFIRMED', 'DRAWING_REV1']);
+/** The only mapping provenance a Water Jet row may carry: the Owner's confirmation. */
+const MOTION_MAPPING_BASIS = 'OWNER_CONFIRMED';
 const MOTION_SENSE_KINDS = Object.freeze(['ENCODER', 'INSTALLED', 'UNCONFIRMED']);
 
 const sameStrings = (actual, expected) => Array.isArray(actual) && actual.length === expected.length
@@ -745,11 +766,10 @@ function validateSharedBody(obj, path, issues) {
       && !validTcAcquisition(obj.tcAcquisition)) {
     issues.push(`${path}.tcAcquisition: must be a complete quarantined TC record — either the deterministic non-Hardware variant or the physical read-only variant; Delta cannot clear it`);
   }
-  // null is a legitimate motion value in a Snapshot (no motion state composed); a published
-  // projection must be the complete not-configured / not-commissioned state of this revision.
-  if ('motion' in obj && (obj.kind === 'delta' || obj.motion !== null)
-      && !validMotionCommissioning(obj.motion)) {
-    issues.push(`${path}.motion: must be the complete read-only motion commissioning projection with the authorization gate CLOSED`);
+  // The static motion commissioning catalogue is NOT a Snapshot member: it lives on the dedicated
+  // read-only catalogue route, so a Snapshot carrying it is refused. This enforces the separation.
+  if ('motion' in obj) {
+    issues.push(`${path}.motion: the static motion commissioning catalogue is not a ${obj.kind} member; it is served by the dedicated read-only catalogue route`);
   }
   if (obj.queue !== undefined && obj.queue !== null) validateQueue(obj.queue, `${path}.queue`, issues);
   // null is a legitimate value in BOTH envelopes: Snapshot (no active job) and
@@ -988,9 +1008,9 @@ function validateDelta(obj, issues) {
   if ('wallMap' in obj) issues.push('wallMap must never appear in a Delta');
   if ('waterJets' in obj) issues.push('waterJets must never appear in a Delta (process-lifetime immutable topology; Snapshot establishes it)');
   if ('isolationValves' in obj) issues.push('isolationValves must never appear in a Delta (process-lifetime immutable topology; Snapshot establishes it)');
-  // The motion commissioning projection is Snapshot-only: the Runtime Delta has no motion member,
-  // so a Delta carrying one cannot be produced by the Runtime and is refused.
-  if ('motion' in obj) issues.push('motion must never appear in a Delta (Snapshot-only commissioning projection; the Runtime Delta carries no motion member)');
+  // The static motion commissioning catalogue is not a Delta member either: a Delta carrying one
+  // cannot be produced by the Runtime and is refused.
+  if ('motion' in obj) issues.push('motion must never appear in a Delta (the static motion commissioning catalogue is served by the dedicated read-only catalogue route; the Runtime Delta carries dynamic state only)');
   // Three-state activeJob encoding (accepted baseline; Owner review 2026-10-07):
   // absent key = unchanged | object = replace | explicit null = clear.
   if ('activeJobCleared' in obj) {

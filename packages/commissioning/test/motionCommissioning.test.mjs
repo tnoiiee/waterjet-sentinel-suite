@@ -11,7 +11,8 @@ import {
   MOTION_ALL_REFUSAL_REASONS, MOTION_AXIS_IDS, MOTION_AXIS_ROLE, MOTION_AXIS_SENSE, MOTION_BRAKE_OUTPUT,
   MOTION_CABINETS, MOTION_COMMISSIONING_DESIGN, MOTION_GATE_CLOSED, MOTION_GATE_REASON, MOTION_INTENTS,
   MOTION_LIMIT_SIGNAL_ROLES, MOTION_NOT_VERIFIED_CLAIMS, MOTION_REFUSAL_WORDING, MOTION_STANDING_REFUSAL_REASONS,
-  MOTION_WATER_JET_BINDINGS, axisWording, canonicalMotionCommissioningText, motionCommissioningDesign,
+  MOTION_STATUS_WORDING, MOTION_WATER_JET_BINDINGS, axisWording, axisPresentation,
+  canonicalMotionCommissioningText, motionCommissioningDesign,
   motionCommissioningFingerprint, motionStatusText, validateMotionCommissioningDesign,
 } from '../src/index.mjs';
 
@@ -58,10 +59,47 @@ test('the Owner-confirmed Water Jet axis allocation is carried exactly', () => {
     assert.equal(row.horizontalAxisId, horizontal);
     assert.equal(row.verticalAxisId, vertical);
     assert.equal(row.mappingStatus, mappingStatus);
-    // The screen wording of a role is always "Horizontal Axis" or "Vertical Axis".
+    // The screen wording of a role is always "Horizontal Axis" or "Vertical Axis"...
     assert.equal(row.horizontalAxisWording, axisWording(MOTION_AXIS_ROLE[horizontal]));
     assert.equal(row.verticalAxisWording, axisWording(MOTION_AXIS_ROLE[vertical]));
+    // ...and the physical axis letter may only ever be appended to it as diagnostic identity.
+    assert.equal(row.horizontalAxisPresentation, axisPresentation(MOTION_AXIS_ROLE[horizontal], horizontal));
+    assert.equal(row.verticalAxisPresentation, axisPresentation(MOTION_AXIS_ROLE[vertical], vertical));
+    assert.match(row.horizontalAxisPresentation, /^Horizontal Axis · [ABCD]$/);
+    assert.match(row.verticalAxisPresentation, /^Vertical Axis · [ABCD]$/);
+    // Canonical provenance: every row, WJ2 and WJ4 included.
+    assert.equal(row.mappingBasis, 'OWNER_CONFIRMED');
+    // Exactly one Horizontal Axis and exactly one Vertical Axis per Water Jet.
+    assert.equal(MOTION_AXIS_ROLE[horizontal], 'HORIZONTAL');
+    assert.equal(MOTION_AXIS_ROLE[vertical], 'VERTICAL');
+    assert.notEqual(horizontal, vertical);
   });
+});
+
+test('the canonical mapping is explicit data: no parity rule and no cabinet rule can produce it', () => {
+  const horizontal = (waterJetId) => MOTION_COMMISSIONING_DESIGN.waterJets
+    .find((row) => row.waterJetId === waterJetId).horizontalAxisId;
+
+  // The canonical values the Owner ruled.
+  assert.equal(horizontal('WJ2'), 'C');
+  assert.equal(horizontal('WJ4'), 'A');
+
+  // No cabinet-derived formula: the two Water Jets of every cabinet take different axis pairs.
+  for (const cabinet of MOTION_CABINETS) {
+    const [first, second] = MOTION_COMMISSIONING_DESIGN.waterJets.filter((row) => row.cabinetId === cabinet);
+    assert.notEqual(first.horizontalAxisId, second.horizontalAxisId, cabinet);
+  }
+
+  // No odd/even parity formula: WJ2 and WJ4 disagree, WJ6 and WJ8 disagree, WJ1 and WJ3 disagree,
+  // and WJ5 and WJ7 disagree.
+  assert.notEqual(horizontal('WJ2'), horizontal('WJ4'));
+  assert.notEqual(horizontal('WJ6'), horizontal('WJ8'));
+  assert.notEqual(horizontal('WJ1'), horizontal('WJ3'));
+  assert.notEqual(horizontal('WJ5'), horizontal('WJ7'));
+
+  // Every Water Jet still carries exactly one Horizontal and exactly one Vertical axis.
+  assert.equal(MOTION_COMMISSIONING_DESIGN.waterJets.filter((row) => 'AC'.includes(row.horizontalAxisId)).length, 8);
+  assert.equal(MOTION_COMMISSIONING_DESIGN.waterJets.filter((row) => 'BD'.includes(row.verticalAxisId)).length, 8);
 });
 
 test('A and C are the Horizontal Axis, B and D the Vertical Axis, on every controller', () => {
@@ -121,16 +159,25 @@ test('the Jog Speed is a display value in controller units and is never executab
   assert.equal(jogSpeed.executable, false);
 });
 
-test('the WJ2 / WJ4 mapping conflict is published and never suppressed', () => {
-  assert.equal(MOTION_COMMISSIONING_DESIGN.mappingConflicts.length, 1);
-  const conflict = MOTION_COMMISSIONING_DESIGN.mappingConflicts[0];
-  assert.deepEqual([...conflict.waterJetIds], ['WJ2', 'WJ4']);
-  assert.deepEqual([...conflict.cabinetIds], ['WSB1', 'WSB2']);
-  assert.equal(conflict.status, 'OWNER_DECISION_REQUIRED');
-  assert.ok(conflict.description.length > 0);
-  assert.ok(conflict.effect.length > 0);
-  const flagged = MOTION_COMMISSIONING_DESIGN.waterJets.filter((w) => w.mappingStatus !== 'CONFIRMED_OWNER');
-  assert.deepEqual(flagged.map((w) => w.waterJetId), ['WJ2', 'WJ4']);
+test('the WJ2 / WJ4 Drawing discrepancy is recorded as evidence only and changes no mapping', () => {
+  assert.equal(MOTION_COMMISSIONING_DESIGN.mappingEvidenceNotes.length, 1);
+  const note = MOTION_COMMISSIONING_DESIGN.mappingEvidenceNotes[0];
+  assert.equal(note.evidenceId, 'MOTION-EVIDENCE-01');
+  assert.deepEqual([...note.waterJetIds], ['WJ2', 'WJ4']);
+  assert.deepEqual([...note.cabinetIds], ['WSB1', 'WSB2']);
+  assert.equal(note.status, 'DRAWING_REV1_CONFLICT_RECORDED');
+  assert.equal(note.classification, 'EVIDENCE_ONLY_NOT_CANONICAL');
+  assert.equal(note.physicalResolution, 'NOT_PHYSICALLY_RESOLVED');
+  assert.ok(note.statement.length > 0);
+  assert.ok(note.effect.length > 0);
+
+  // Evidence only: the note does not make any row ambiguous and does not reopen a decision.
+  for (const row of MOTION_COMMISSIONING_DESIGN.waterJets) {
+    assert.equal(row.mappingStatus, 'CONFIRMED_OWNER', row.waterJetId);
+    assert.equal(row.mappingBasis, 'OWNER_CONFIRMED', row.waterJetId);
+  }
+  assert.equal(MOTION_STATUS_WORDING.OWNER_DECISION_REQUIRED, undefined);
+  assert.equal(MOTION_COMMISSIONING_DESIGN.waterJets.filter((w) => w.mappingStatus !== 'CONFIRMED_OWNER').length, 0);
 });
 
 test('the canonical text is deterministic, complete and carries no address', () => {
@@ -143,7 +190,11 @@ test('the canonical text is deterministic, complete and carries no address', () 
   assert.match(first, /CONTROLLERS 4/);
   assert.match(first, /AXES 16/);
   assert.match(first, /WATER JETS 8/);
-  assert.match(first, /CONFLICTS 1/);
+  assert.match(first, /EVIDENCE NOTES 1/);
+  assert.match(first, /DRAWING_REV1_CONFLICT_RECORDED/);
+  assert.match(first, /EVIDENCE_ONLY_NOT_CANONICAL/);
+  assert.match(first, /NOT_PHYSICALLY_RESOLVED/);
+  assert.doesNotMatch(first, /OWNER_DECISION_REQUIRED/);
   assert.match(first, /ENDPOINT_NOT_CONFIGURED/);
   // The projection is public-safe: no IPv4 literal and no address-shaped value anywhere in it.
   assert.doesNotMatch(first, /\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b/);
@@ -179,7 +230,11 @@ test('the validator refuses every claim the revision cannot make', () => {
   assert.equal(mutate((d) => { d.jogSpeed.executable = true; }), false);
   assert.equal(mutate((d) => { d.jogSpeed.unit = 'mm/s'; }), false);
   assert.equal(mutate((d) => { d.waterJets[0].horizontalAxisId = 'C'; }), false);
-  assert.equal(mutate((d) => { d.mappingConflicts = []; }), false);
+  assert.equal(mutate((d) => { d.mappingEvidenceNotes = []; }), false);
+  assert.equal(mutate((d) => { d.mappingEvidenceNotes[0].status = 'RESOLVED'; }), false);
+  assert.equal(mutate((d) => { d.mappingEvidenceNotes[0].classification = 'CANONICAL'; }), false);
+  assert.equal(mutate((d) => { d.waterJets[1].mappingStatus = 'OWNER_DECISION_REQUIRED'; }), false);
+  assert.equal(mutate((d) => { d.waterJets[1].mappingBasis = 'DRAWING_REV1'; }), false);
   assert.equal(mutate((d) => { d.axes = d.axes.slice(0, 15); }), false);
   assert.equal(validateMotionCommissioningDesign(null), false);
   assert.equal(validateMotionCommissioningDesign({}), false);

@@ -449,15 +449,20 @@ export interface TcAcquisitionState {
 }
 
 /**
- * The read-only Application-owned motion commissioning projection: four motion controllers
- * (one per WSB cabinet), sixteen controller axes and the eight Water Jet axis allocations.
+ * The read-only Application-owned STATIC motion commissioning catalogue: four motion controllers
+ * (one per WSB cabinet), sixteen controller axes, the eight CANONICAL Water Jet axis allocations,
+ * the standing configuration and commissioning statuses, the provenance, the evidence notes, the
+ * candidate values and the authorization gate.
  *
  * It is composed by the Application model from Owner-confirmed data and from the standing
  * not-configured / not-commissioned state of the software revision that publishes it. It is
  * never a device read, it carries no network address, and it is never a command surface: the
  * authorization gate is CLOSED and every motion intent is refused before any hardware path.
+ *
+ * It is STATIC and it is NOT a Snapshot member and NOT a Delta member: it is served by the
+ * dedicated read-only catalogue route, so the Snapshot stays reserved for dynamic observed state.
  */
-export interface MotionCommissioningProjection {
+export interface MotionCommissioningCatalogue {
   sectionId: string;
   sectionRevision: number;
   source: string;
@@ -474,7 +479,8 @@ export interface MotionCommissioningProjection {
   controllers: MotionControllerProjection[];
   axes: MotionAxisProjection[];
   waterJets: MotionWaterJetAxisBinding[];
-  mappingConflicts: MotionMappingConflict[];
+  /** Recorded Drawing discrepancies. Evidence metadata only; never canonical ambiguity. */
+  mappingEvidenceNotes: MotionMappingEvidenceNote[];
   /** The initial Jog Speed: a display value in controller units, never executable. */
   jogSpeed: MotionParameterState;
   notVerifiedClaims: string[];
@@ -592,24 +598,43 @@ export interface MotionAxisProjection {
   state: MotionAxisCommissioningState;
 }
 
-/** The Owner-confirmed axis allocation of one Water Jet. */
+/**
+ * The CANONICAL Owner-confirmed axis allocation of one Water Jet: WJ1 = A,B; WJ2 = C,D;
+ * WJ3 = C,D; WJ4 = A,B; WJ5 = C,D; WJ6 = A,B; WJ7 = A,B; WJ8 = C,D.
+ *
+ * The allocation is explicit data: no parity rule, no odd/even Water Jet formula and no
+ * cabinet-derived axis formula derives any row. The physical axis letter is the diagnostic identity
+ * of the controller axis; the Operator-facing identity is the ROLE ("Horizontal Axis" /
+ * "Vertical Axis") and the letter never replaces it.
+ */
 export interface MotionWaterJetAxisBinding {
   waterJetId: string;
   cabinetId: string;
   controllerId: string;
   horizontalAxisId: string;
   verticalAxisId: string;
+  /** CONFIRMED_OWNER for all eight Water Jets: the Drawing rev1 discrepancy is an evidence note. */
   mappingStatus: string;
+  /** OWNER_CONFIRMED: the mapping provenance of every row is the Owner's confirmation. */
   mappingBasis: string;
 }
 
-export interface MotionMappingConflict {
-  conflictId: string;
+/**
+ * A recorded Drawing discrepancy, carried as EVIDENCE METADATA ONLY.
+ *
+ * It is not canonical ambiguity and it is not an open decision: the Owner-confirmed mapping is
+ * canonical and governs the Product. The note exists so the discrepancy is not silently lost, and
+ * it states explicitly that the discrepancy has NOT been physically resolved.
+ */
+export interface MotionMappingEvidenceNote {
+  evidenceId: string;
   waterJetIds: string[];
   cabinetIds: string[];
-  description: string;
+  statement: string;
   status: string;
+  classification: string;
   effect: string;
+  physicalResolution: string;
 }
 
 export interface MotionParameterState {
@@ -656,11 +681,6 @@ export interface OperationalSnapshot {
   trend: TrendWindow;
   /** Older fixtures may omit this; the wired Runtime serializes null until its one read publishes. */
   tcAcquisition?: TcAcquisitionState | null;
-  /**
-   * The read-only Application-owned motion commissioning projection. Null when the Runtime
-   * composed none. Snapshot-only; NEVER in a Delta (the Runtime Delta has no motion member).
-   */
-  motion?: MotionCommissioningProjection | null;
   /** Optional review marker; PROVISIONAL fixtures carry it until .NET regeneration replaces it. */
   fixtureStatus?: string;
 }

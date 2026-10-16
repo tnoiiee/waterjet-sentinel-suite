@@ -1,16 +1,18 @@
-// Stage 0.4C-K2 - real-page contract of the read-only Motion Commissioning section.
+// Stage 0.4C-K2 - real-page contract of the read-only Motion Commissioning STATIC CATALOGUE.
 //
 // The REAL public/app.mjs runs against the REAL Preview host through the stub DOM. This proves the
 // application logic and the rendered text; it does not prove CSS, layout or a real browser.
 //
-// The Runtime is deliberately absent in this harness (the default transport refuses it), so the
-// section must report that honestly: the Owner-confirmed design renders, and the Runtime half shows
-// an explicit unavailable state instead of an invented projection.
+// The catalogue is static: it is served by the dedicated read-only route and it is NOT read from the
+// Runtime Snapshot. The harness therefore needs no Runtime host at all, and the section must render
+// in full without one.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { allText, bootApp, cellTexts, html, rowsOf } from './helpers/fakeDom.mjs';
-import { MOTION_WATER_JET_BINDINGS } from '../../../packages/commissioning/src/index.mjs';
+import {
+  MOTION_AXIS_ROLE, MOTION_WATER_JET_BINDINGS, axisPresentation,
+} from '../../../packages/commissioning/src/index.mjs';
 
 let app;
 let closed = false;
@@ -33,30 +35,30 @@ const column = (id, label) => {
   return bodyRows(id).map((row) => cellTexts(row)[index]);
 };
 
-test('the page boots ready and the motion projection is requested as a local GET', () => {
+test('the page boots ready and the static catalogue is requested as a local GET', () => {
   assert.equal(app.byId['app-root'].attributes['data-app-state'], 'ready');
   assert.equal(app.byId['boot-error'].hidden, true);
-  const projection = app.requests.find((r) => r.path === '/api/motion-commissioning');
-  assert.ok(projection, 'the motion projection must be requested at boot');
-  assert.equal(projection.status, 200);
-  assert.equal(projection.method, 'GET');
+  const catalogue = app.requests.find((r) => r.path === '/api/motion-commissioning/catalogue');
+  assert.ok(catalogue, 'the static catalogue must be requested at boot');
+  assert.equal(catalogue.status, 200);
+  assert.equal(catalogue.method, 'GET');
   for (const request of app.requests) {
     assert.equal(request.method, 'GET', request.path);
     assert.equal(request.path.startsWith('/'), true, 'every request is a local route');
   }
 });
 
-test('the section is in the served page, carries the boundary text and offers no command control', () => {
+test('the section is in the served page, carries the boundary text and offers no control at all', () => {
   const markup = section();
   assert.match(markup, /Motion Commissioning/);
   assert.match(markup, /NO HARDWARE ACCESS \/ NO MOTION COMMAND/);
   assert.match(markup, /id="motion-gate-status"/);
   assert.match(html, /href="#motion-commissioning">Motion Commissioning</);
-  // The only control in the section refreshes the read-only Runtime view. There is no Jog, Move,
-  // Home, Stop, brake, encoder-reset or connect control on this page.
-  const buttons = markup.match(/<button/g) ?? [];
-  assert.equal(buttons.length, 1, 'exactly one read-only refresh control');
-  assert.match(markup, /id="motion-refresh"/);
+  // The catalogue is static, so the section needs no control whatsoever: there is no refresh, no
+  // Jog, Move, Home, Stop, brake, encoder-reset or connect control on this page.
+  assert.equal((markup.match(/<button/g) ?? []).length, 0, 'the static catalogue section has no control');
+  assert.doesNotMatch(markup, /<input|<form|<select/);
+  assert.doesNotMatch(markup, /motion-refresh/);
   for (const forbidden of ['jog', 'move', 'home', 'release brake', 'reset encoder', 'connect']) {
     assert.doesNotMatch(markup.toLowerCase(), new RegExp(`>\\s*${forbidden}\\s*<`), `no '${forbidden}' control`);
   }
@@ -70,7 +72,7 @@ test('the authorization gate is rendered as CLOSED with its reason, never as a b
   assert.match(gate, /refused before any hardware path/i);
 });
 
-test('the summary counts render, with nothing homed and nothing ready', () => {
+test('the summary counts render, with nothing homed, nothing ready and all eight mappings confirmed', () => {
   const cells = rowsOf(app.byId, 'motion-summary');
   const text = cells.map(allText).join(' | ');
   assert.match(text, /Motion controllers 4/);
@@ -80,22 +82,40 @@ test('the summary counts render, with nothing homed and nothing ready', () => {
   assert.match(text, /Controllers ready 0 of 4/);
   assert.match(text, /Motion commands issued 0/);
   assert.match(text, /Authorization gate CLOSED/);
+  // Canonical mapping: all eight confirmed, and the Drawing discrepancy is an evidence note only.
+  assert.match(text, /Water Jet mappings confirmed 8 of 8/);
+  assert.match(text, /Drawing evidence notes 1/);
+  assert.doesNotMatch(text, /Mapping conflicts/);
 });
 
-test('all eight Water Jets render with the Owner-confirmed allocation and the axis role wording', () => {
+test('all eight Water Jets render the canonical mapping: role first, physical axis letter as identity', () => {
   assert.deepEqual(column('motion-waterjets-body', 'Water Jet'), MOTION_WATER_JET_BINDINGS.map(([id]) => id));
   assert.deepEqual(column('motion-waterjets-body', 'Cabinet'), MOTION_WATER_JET_BINDINGS.map(([, cabinet]) => cabinet));
   assert.deepEqual(column('motion-waterjets-body', 'Controller'), MOTION_WATER_JET_BINDINGS.map(([, cabinet]) => `MC-${cabinet}`));
+
   const horizontal = column('motion-waterjets-body', 'Horizontal Axis');
   const vertical = column('motion-waterjets-body', 'Vertical Axis');
   MOTION_WATER_JET_BINDINGS.forEach(([, , h, v], index) => {
-    // A and C read as the Horizontal Axis; B and D as the Vertical Axis. No other wording appears.
-    assert.equal(horizontal[index], `${h} - ${h === 'A' || h === 'C' ? 'Horizontal Axis' : 'Vertical Axis'}`);
-    assert.equal(vertical[index], `${v} - ${v === 'A' || v === 'C' ? 'Horizontal Axis' : 'Vertical Axis'}`);
+    // The ROLE leads; the physical controller axis letter follows as diagnostic identity only.
+    assert.equal(horizontal[index], axisPresentation(MOTION_AXIS_ROLE[h], h));
+    assert.equal(vertical[index], axisPresentation(MOTION_AXIS_ROLE[v], v));
+    assert.match(horizontal[index], /^Horizontal Axis · [ABCD]$/);
+    assert.match(vertical[index], /^Vertical Axis · [ABCD]$/);
   });
-  const statuses = column('motion-waterjets-body', 'Mapping status');
-  assert.equal(statuses[0], 'CONFIRMED_OWNER (Confirmed by the Owner)');
-  assert.match(statuses[1], /DRAWING_REV1_CONFLICT_WJ2_WJ4/);
+
+  // The canonical values the Owner ruled for the two Water Jets of the recorded Drawing discrepancy.
+  assert.equal(horizontal[1], 'Horizontal Axis · C');
+  assert.equal(vertical[1], 'Vertical Axis · D');
+  assert.equal(horizontal[3], 'Horizontal Axis · A');
+  assert.equal(vertical[3], 'Vertical Axis · B');
+
+  // Every row is canonically confirmed with Owner-confirmed provenance: no open decision survives.
+  for (const status of column('motion-waterjets-body', 'Mapping status')) {
+    assert.equal(status, 'CONFIRMED_OWNER (Confirmed by the Owner)');
+  }
+  for (const basis of column('motion-waterjets-body', 'Provenance')) {
+    assert.equal(basis, 'OWNER_CONFIRMED (Owner confirmed)');
+  }
 });
 
 test('all four controllers render, none configured, none connected, none ready', () => {
@@ -120,6 +140,10 @@ test('all sixteen axes render: not homed, brake unknown, absolute move refused',
   const roles = column('motion-axes-body', 'Axis role');
   assert.equal(roles.filter((role) => role === 'Horizontal Axis').length, 8);
   assert.equal(roles.filter((role) => role === 'Vertical Axis').length, 8);
+  // The physical axis letter is present as diagnostic identity, and only ever beside the role.
+  const physical = column('motion-axes-body', 'Physical axis');
+  assert.deepEqual(physical.filter((axis) => axis === 'A').length, 4);
+  for (const axis of physical) assert.match(axis, /^[ABCD]$/);
   for (const value of column('motion-axes-body', 'Home')) assert.equal(value, 'NOT_HOMED (Not homed)');
   for (const value of column('motion-axes-body', 'Brake command')) assert.equal(value, 'None');
   for (const value of column('motion-axes-body', 'Brake state')) assert.equal(value, 'UNKNOWN (Unknown)');
@@ -163,11 +187,17 @@ test('the Jog Speed renders as a display value in controller units that is not e
   assert.doesNotMatch(text, /mm\/s/);
 });
 
-test('the mapping conflict, the not-verified claims and the legend render', () => {
-  const conflicts = rowsOf(app.byId, 'motion-conflicts').map(allText).join(' | ');
-  assert.match(conflicts, /MOTION-CONFLICT-01/);
-  assert.match(conflicts, /WJ2, WJ4/);
-  assert.match(conflicts, /OWNER_DECISION_REQUIRED/);
+test('the Drawing evidence note, the not-verified claims and the legend render', () => {
+  const notes = rowsOf(app.byId, 'motion-evidence-notes').map(allText).join(' | ');
+  assert.match(notes, /MOTION-EVIDENCE-01/);
+  assert.match(notes, /WJ2, WJ4/);
+  assert.match(notes, /WSB1, WSB2/);
+  // Recorded as evidence: never as an open decision, and explicitly not physically resolved.
+  assert.match(notes, /DRAWING_REV1_CONFLICT_RECORDED/);
+  assert.match(notes, /EVIDENCE_ONLY_NOT_CANONICAL/);
+  assert.match(notes, /NOT_PHYSICALLY_RESOLVED/);
+  assert.doesNotMatch(notes, /OWNER_DECISION_REQUIRED/);
+  assert.doesNotMatch(notes, /MOTION-CONFLICT-01/);
 
   const notVerified = rowsOf(app.byId, 'motion-not-verified').map(allText).join(' | ');
   for (const claim of ['NO_CONTROLLER_CONTACTED', 'NO_MOTION_COMMAND_ISSUED', 'NO_UNIT_CONVERSION_VERIFIED']) {
@@ -182,31 +212,20 @@ test('the mapping conflict, the not-verified claims and the legend render', () =
   assert.ok(legend.split(' | ').length >= 10, 'every refusal reason is worded in the legend');
 });
 
-test('at boot the Runtime Snapshot is not read, and the design still renders in full', () => {
-  const runtimeText = app.byId['motion-runtime-body'].childNodes.map(allText).join(' ');
-  assert.match(runtimeText, /NOT_READ/);
-  assert.match(runtimeText, /Use Refresh to read it/);
-  assert.doesNotMatch(runtimeText, /fingerprint/i);
-  // No boot request carries the Runtime read flag: the page never couples its boot to the Runtime.
-  for (const request of app.requests.filter((r) => r.path.startsWith('/api/motion-commissioning'))) {
-    assert.equal(request.path, '/api/motion-commissioning');
+test('the catalogue is static: no Runtime Snapshot is read, and the section renders in full anyway', () => {
+  // No request in the whole page boot reads the Runtime Snapshot for this section: the catalogue
+  // route is the only motion request, and it carries no Runtime read flag.
+  for (const request of app.requests.filter((r) => r.path.includes('motion'))) {
+    assert.equal(request.path, '/api/motion-commissioning/catalogue');
   }
+  // The section rendered the whole catalogue without a Runtime host.
+  assert.equal(bodyRows('motion-axes-body').length, 16);
+  assert.equal(column('motion-waterjets-body', 'Water Jet').length, 8);
+
   const authority = app.byId['motion-authority'].textContent;
   assert.match(authority, /NO HARDWARE ACCESS \/ NO MOTION COMMAND \/ NO BRAKE OUTPUT \/ NO HOME \/ NO MOVE \/ NO ENCODER RESET/);
   assert.match(authority, /NOT the Cleaning-process interlocks/);
-});
-
-test('the refresh control reads the Runtime once and reports an absent host honestly', async () => {
-  const before = app.requests.filter((r) => r.path.startsWith('/api/motion-commissioning')).length;
-  await app.byId['motion-refresh'].listeners.click[0]();
-  const after = app.requests.filter((r) => r.path.startsWith('/api/motion-commissioning'));
-  assert.equal(after.length, before + 1);
-  for (const request of after) assert.equal(request.method, 'GET');
-  assert.equal(after[after.length - 1].path, '/api/motion-commissioning?runtime=1');
-
-  // The harness intentionally has no Runtime host: the section must report that, not invent a
-  // projection and not keep a stale one.
-  const runtimeText = app.byId['motion-runtime-body'].childNodes.map(allText).join(' ');
-  assert.match(runtimeText, /RUNTIME_UNAVAILABLE/);
-  assert.doesNotMatch(runtimeText, /fingerprint/i);
+  // The separation is stated on the screen, not only in the payload.
+  assert.match(authority, /static: it is served by the dedicated read-only catalogue route/);
+  assert.match(authority, /carried by neither the Runtime Snapshot nor a Runtime Delta/);
 });

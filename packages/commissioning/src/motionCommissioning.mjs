@@ -10,9 +10,18 @@
 // Owner-confirmed facts carried here (never derived, never inferred from another layer):
 //   - Axis A and C are the Horizontal Axis; axis B and D are the Vertical Axis.
 //   - Brake outputs: A to output 1, B to output 2, C to output 3, D to output 4.
-//   - WJ1/WSB1 = A,B | WJ2/WSB1 = C,D | WJ3/WSB2 = C,D | WJ4/WSB2 = A,B |
-//     WJ5/WSB3 = C,D | WJ6/WSB3 = A,B | WJ7/WSB4 = A,B | WJ8/WSB4 = C,D.
+//   - The CANONICAL Water Jet mapping: WJ1 = A,B | WJ2 = C,D | WJ3 = C,D | WJ4 = A,B |
+//     WJ5 = C,D | WJ6 = A,B | WJ7 = A,B | WJ8 = C,D. Every row is explicit data: the two even
+//     Water Jets WJ2 and WJ4 take different axis pairs, and the two Water Jets of WSB1 take
+//     different axis pairs, so no parity rule and no cabinet rule can derive this table.
+//   - The Drawing rev1 expectation for WJ2 / WJ4 was the other axis pair on the same cabinet. The
+//     Owner has ruled the canonical allocation above; the Drawing discrepancy is recorded as
+//     EVIDENCE ONLY and is NOT physically resolved.
 // One controller per WSB cabinet is INFERRED from that allocation, and is marked as an inference.
+//
+// This catalogue is STATIC: it never changes with a Runtime revision, it is not carried by the
+// Runtime Snapshot or by a Runtime Delta, and it is served by the dedicated read-only catalogue
+// route.
 //
 // No network address, no endpoint and no vendor-specific command string appears in this file: a
 // controller is named by the cabinet that holds it, and the motion port is reported as not
@@ -96,8 +105,9 @@ export const MOTION_STATUS_WORDING = Object.freeze({
   NO_SESSION: 'No session',
   'DRAWING_CONFIRMED': 'Drawing confirmed',
   CONFIRMED_OWNER: 'Confirmed by the Owner',
-  DRAWING_REV1_CONFLICT_WJ2_WJ4: 'Drawing conflict: WJ2 / WJ4',
-  OWNER_DECISION_REQUIRED: 'Owner decision required',
+  DRAWING_REV1_CONFLICT_RECORDED: 'Drawing rev1 discrepancy recorded (evidence only)',
+  EVIDENCE_ONLY_NOT_CANONICAL: 'Evidence only, not canonical',
+  NOT_PHYSICALLY_RESOLVED: 'Not physically resolved',
   LEGACY_CANDIDATE_UNVERIFIED: 'Legacy candidate, unverified',
   INFERRED_FROM_OWNER_CONFIRMED_MAPPING: 'Inferred from the confirmed mapping',
   OWNER_CONFIRMED: 'Owner confirmed',
@@ -119,9 +129,9 @@ export const MOTION_LIMIT_SIGNAL_ROLES = Object.freeze(['REVERSE', 'HOME', 'FORW
 /** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the confirmed allocation. */
 export const MOTION_WATER_JET_BINDINGS = Object.freeze([
   ['WJ1', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ2', 'WSB1', 'C', 'D', 'DRAWING_REV1_CONFLICT_WJ2_WJ4'],
+  ['WJ2', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
   ['WJ3', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
-  ['WJ4', 'WSB2', 'A', 'B', 'DRAWING_REV1_CONFLICT_WJ2_WJ4'],
+  ['WJ4', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ5', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
   ['WJ6', 'WSB3', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ7', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
@@ -144,17 +154,23 @@ export const MOTION_NOT_VERIFIED_CLAIMS = Object.freeze([
 ]);
 
 /**
- * The one open mapping conflict. It is published, not suppressed: the WJ2 / WJ4 allocation must not
- * be used for motion until the Owner rules, and no surface may present the allocation as agreed.
+ * The one recorded Drawing discrepancy, carried as EVIDENCE METADATA ONLY.
+ *
+ * The Owner has ruled the canonical allocation (WJ2 = C,D; WJ4 = A,B), so this is NOT an open
+ * decision and NOT ambiguity. The note exists so the discrepancy is not silently lost. It changes
+ * no mapping, does not override the Owner, does not open the authorization gate, and states
+ * explicitly that the discrepancy has NOT been physically resolved on the installation.
  */
-export const MOTION_MAPPING_CONFLICTS = Object.freeze([
+export const MOTION_MAPPING_EVIDENCE_NOTES = Object.freeze([
   {
-    conflictId: 'MOTION-CONFLICT-01',
+    evidenceId: 'MOTION-EVIDENCE-01',
     waterJetIds: Object.freeze(['WJ2', 'WJ4']),
     cabinetIds: Object.freeze(['WSB1', 'WSB2']),
-    description: 'The Owner-confirmed allocation gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. The Drawing rev1 expectation for those two Water Jets is the other axis pair on the same cabinet. Both cannot be correct.',
-    status: 'OWNER_DECISION_REQUIRED',
-    effect: 'The WJ2 and WJ4 allocation must not be used for motion until the Owner rules. The conflict does not block the other six Water Jets and it does not open the authorization gate.',
+    statement: 'The canonical allocation gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. The Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The Owner has ruled the canonical allocation.',
+    status: 'DRAWING_REV1_CONFLICT_RECORDED',
+    classification: 'EVIDENCE_ONLY_NOT_CANONICAL',
+    effect: 'This note changes no Product mapping: all eight Water Jets publish CONFIRMED_OWNER with OWNER_CONFIRMED provenance, WJ2 and WJ4 included. The note exists so the Drawing discrepancy is not lost. It does not open the authorization gate and it does not authorise any motion.',
+    physicalResolution: 'NOT_PHYSICALLY_RESOLVED',
   },
 ]);
 
@@ -182,6 +198,19 @@ export function motionStatusText(code) {
 /** The Operator-facing axis wording: "Horizontal Axis" or "Vertical Axis", never a letter on its own. */
 export function axisWording(axisRole) {
   return axisRole === 'HORIZONTAL' ? HORIZONTAL_AXIS_WORDING : VERTICAL_AXIS_WORDING;
+}
+
+/**
+ * The one-line Operator identity of one physical axis: the ROLE first, then the physical controller
+ * axis letter as DIAGNOSTIC IDENTITY ONLY, e.g. "Horizontal Axis · C". The letter never replaces and
+ * never precedes the role.
+ *
+ * The vendor name is deliberately NOT printed: this repository's boundary keeps vendor vocabulary
+ * out of the served UI. The letter A/B/C/D is the controller axis identity and is enough for an
+ * engineer standing at the cabinet.
+ */
+export function axisPresentation(axisRole, axisId) {
+  return `${axisWording(axisRole)} · ${axisId}`;
 }
 
 const axisRows = () => MOTION_CABINETS.flatMap((cabinetId) => MOTION_AXIS_IDS.map((axisId) => {
@@ -252,10 +281,13 @@ const waterJetRows = () => MOTION_WATER_JET_BINDINGS.map(([waterJetId, cabinetId
   controllerId: `MC-${cabinetId}`,
   horizontalAxisId,
   horizontalAxisWording: axisWording(MOTION_AXIS_ROLE[horizontalAxisId]),
+  horizontalAxisPresentation: axisPresentation(MOTION_AXIS_ROLE[horizontalAxisId], horizontalAxisId),
   verticalAxisId,
   verticalAxisWording: axisWording(MOTION_AXIS_ROLE[verticalAxisId]),
+  verticalAxisPresentation: axisPresentation(MOTION_AXIS_ROLE[verticalAxisId], verticalAxisId),
   mappingStatus,
-  mappingBasis: mappingStatus === 'CONFIRMED_OWNER' ? 'OWNER_CONFIRMED' : 'DRAWING_REV1',
+  // Canonical provenance: the Owner's confirmation. No row carries a drawing-derived basis.
+  mappingBasis: 'OWNER_CONFIRMED',
 }));
 
 /**
@@ -281,7 +313,7 @@ export const MOTION_COMMISSIONING_DESIGN = Object.freeze({
   controllers: Object.freeze(controllerRows()),
   axes: Object.freeze(axisRows()),
   waterJets: Object.freeze(waterJetRows()),
-  mappingConflicts: MOTION_MAPPING_CONFLICTS,
+  mappingEvidenceNotes: MOTION_MAPPING_EVIDENCE_NOTES,
   notVerifiedClaims: MOTION_NOT_VERIFIED_CLAIMS,
 });
 
@@ -334,10 +366,11 @@ export function canonicalMotionCommissioningText(design = MOTION_COMMISSIONING_D
       '-', `${waterJet.mappingStatus} (${waterJet.mappingBasis})`,
     ].join(' '));
   }
-  lines.push(`CONFLICTS ${design.mappingConflicts.length}`);
-  for (const conflict of design.mappingConflicts) {
-    lines.push([conflict.conflictId, `water jets ${conflict.waterJetIds.join(',')}`,
-      `cabinets ${conflict.cabinetIds.join(',')}`, `status ${conflict.status}`].join(' '));
+  lines.push(`EVIDENCE NOTES ${design.mappingEvidenceNotes.length}`);
+  for (const note of design.mappingEvidenceNotes) {
+    lines.push([note.evidenceId, `water jets ${note.waterJetIds.join(',')}`,
+      `cabinets ${note.cabinetIds.join(',')}`, `status ${note.status}`,
+      `classification ${note.classification}`, `resolution ${note.physicalResolution}`].join(' '));
   }
   lines.push(`NOT VERIFIED ${design.notVerifiedClaims.length}`);
   for (const claim of design.notVerifiedClaims) lines.push(claim);
@@ -368,7 +401,14 @@ export function validateMotionCommissioningDesign(design) {
   if (design.controllers?.length !== MOTION_CABINETS.length) return false;
   if (design.axes?.length !== MOTION_CABINETS.length * MOTION_AXIS_IDS.length) return false;
   if (design.waterJets?.length !== MOTION_WATER_JET_BINDINGS.length) return false;
-  if (!Array.isArray(design.mappingConflicts) || design.mappingConflicts.length !== 1) return false;
+  if (!Array.isArray(design.mappingEvidenceNotes) || design.mappingEvidenceNotes.length !== 1) return false;
+  {
+    const [note] = design.mappingEvidenceNotes;
+    if (note.evidenceId !== 'MOTION-EVIDENCE-01') return false;
+    if (note.status !== 'DRAWING_REV1_CONFLICT_RECORDED') return false;
+    if (note.classification !== 'EVIDENCE_ONLY_NOT_CANONICAL') return false;
+    if (note.physicalResolution !== 'NOT_PHYSICALLY_RESOLVED') return false;
+  }
   if (!Array.isArray(design.notVerifiedClaims) || design.notVerifiedClaims.length === 0) return false;
 
   for (const controller of design.controllers) {
@@ -398,6 +438,13 @@ export function validateMotionCommissioningDesign(design) {
     if (waterJet.waterJetId !== waterJetId || waterJet.cabinetId !== cabinetId) return false;
     if (waterJet.horizontalAxisId !== horizontalAxisId || waterJet.verticalAxisId !== verticalAxisId) return false;
     if (waterJet.mappingStatus !== mappingStatus) return false;
+    // Canonical provenance: every row is Owner-confirmed. No open-decision status may appear.
+    if (waterJet.mappingBasis !== 'OWNER_CONFIRMED') return false;
+    if (waterJet.mappingStatus === 'OWNER_DECISION_REQUIRED') return false;
+    if (waterJet.horizontalAxisPresentation !== axisPresentation(MOTION_AXIS_ROLE[waterJet.horizontalAxisId], waterJet.horizontalAxisId)) return false;
+    if (waterJet.verticalAxisPresentation !== axisPresentation(MOTION_AXIS_ROLE[waterJet.verticalAxisId], waterJet.verticalAxisId)) return false;
+    if (MOTION_AXIS_ROLE[waterJet.horizontalAxisId] !== 'HORIZONTAL') return false;
+    if (MOTION_AXIS_ROLE[waterJet.verticalAxisId] !== 'VERTICAL') return false;
   }
 
   return true;

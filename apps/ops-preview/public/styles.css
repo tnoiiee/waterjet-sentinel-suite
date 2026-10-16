@@ -247,20 +247,3 @@ footer { padding:14px 24px 28px; color:var(--muted); font-size:var(--fs-small); 
 .cab1-label { color:var(--muted); text-transform:none; }
 .cab1-flag { color:#d29922; }
 .cab1-note { margin:8px 0 0; font-size:var(--fs-small); color:var(--muted); }
-
-/* Motion Commissioning: the canonical text block of the Runtime motion projection. It is a
-   preformatted, horizontally bounded frame, so the section can never widen the page. Colours carry
-   no control meaning: the gate status is written out as text next to every value. */
-.motion-canonical {
-  margin: 8px 0 0;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel-2);
-  /* Wrapped, never scrolled: only the Overview table frame and the Wall Map frame may scroll. */
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--fs-small);
-  color: var(--fg);
-}

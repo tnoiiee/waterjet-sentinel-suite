@@ -26,8 +26,13 @@ namespace Wjss.Contracts;
 ///   <item>Each WSB cabinet holds one four-axis controller, so the controller identity is the WSB
 ///   cabinet identity. That one-controller-per-cabinet reading is INFERRED from the confirmed
 ///   Water Jet allocation above, not separately confirmed by the Owner.</item>
-///   <item>The WJ2 / WJ4 axis allocation conflicts with the Drawing rev1 expectation and is an
-///   open Owner decision (recorded as <see cref="MappingDrawingConflict"/>).</item>
+///   <item>WJ2 = C,D and WJ4 = A,B. The Owner has ruled this allocation CANONICAL and
+///   <see cref="MappingConfirmedOwner"/>. A Drawing rev1 discrepancy for the same two Water Jets is
+///   recorded as evidence metadata only (<see cref="DrawingEvidenceRecorded"/>,
+///   <see cref="EvidenceClassificationEvidenceOnly"/>); it is not canonical ambiguity, it does not
+///   override the confirmed mapping, and it is <see cref="PhysicalResolutionNotResolved"/>.
+///   The mapping is explicit data: no parity rule, no odd/even formula and no cabinet-derived
+///   formula derives any row.</item>
 /// </list>
 ///
 /// The initial Jog Speed is carried as a DISPLAY value in controller units with status
@@ -153,10 +158,20 @@ public static class MotionVocabulary
 
     // ----------------------------------------------------------------------------------- mapping
 
+    /// <summary>The canonical Product mapping status of every Water Jet, WJ2 and WJ4 included.</summary>
     public const string MappingConfirmedOwner = "CONFIRMED_OWNER";
 
-    /// <summary>The Drawing rev1 expectation disagrees with the Owner-confirmed WJ2 / WJ4 allocation.</summary>
-    public const string MappingDrawingConflict = "DRAWING_REV1_CONFLICT_WJ2_WJ4";
+    /// <summary>
+    /// The Drawing rev1 discrepancy for WJ2 / WJ4, recorded as EVIDENCE ONLY. It is not a canonical
+    /// ambiguity: the Owner-confirmed mapping governs the Product.
+    /// </summary>
+    public const string DrawingEvidenceRecorded = "DRAWING_REV1_CONFLICT_RECORDED";
+
+    /// <summary>The classification of a recorded Drawing discrepancy: evidence metadata, never canonical.</summary>
+    public const string EvidenceClassificationEvidenceOnly = "EVIDENCE_ONLY_NOT_CANONICAL";
+
+    /// <summary>The physical discrepancy has not been resolved on the installation: recorded, not closed.</summary>
+    public const string PhysicalResolutionNotResolved = "NOT_PHYSICALLY_RESOLVED";
 
     public const string BasisOwnerConfirmed = "OWNER_CONFIRMED";
 
@@ -229,11 +244,14 @@ public static class MotionVocabulary
     /// <summary>The controller model status: recorded by the Owner-provided cabinet drawing.</summary>
     public const string ControllerModelStatusDrawingConfirmed = "DRAWING_CONFIRMED";
 
-    /// <summary>The one mapping conflict of this revision: the WJ2 / WJ4 axis allocation.</summary>
-    public const string ConflictIdWj2Wj4 = "MOTION-CONFLICT-01";
+    /// <summary>The one recorded Drawing discrepancy of this revision: the WJ2 / WJ4 axis allocation.</summary>
+    public const string EvidenceNoteIdWj2Wj4 = "MOTION-EVIDENCE-01";
 
-    /// <summary>The status of an open mapping conflict: the Owner decides, nothing is suppressed.</summary>
-    public const string ConflictStatusOwnerDecisionRequired = "OWNER_DECISION_REQUIRED";
+    /// <summary>
+    /// Diagnostic wording of the physical controller axis letter. The Operator-facing axis identity is
+    /// the role ("Horizontal Axis" / "Vertical Axis"); the physical letter is diagnostic identity only.
+    /// </summary>
+    public const string PhysicalAxisWording = "Physical axis";
 
     /// <summary>No position value exists because no position is read.</summary>
     public const string PositionValueNotRead = "NOT_READ";
@@ -361,7 +379,9 @@ public static class MotionVocabulary
             [StatusAccessDeferred] = "Access deferred",
             [StatusBlockedNoLegacyEvidence] = "Blocked: no Legacy evidence",
             [MappingConfirmedOwner] = "Confirmed by the Owner",
-            [MappingDrawingConflict] = "Drawing conflict: WJ2 / WJ4",
+            [DrawingEvidenceRecorded] = "Drawing rev1 discrepancy recorded (evidence only)",
+            [EvidenceClassificationEvidenceOnly] = "Evidence only, not canonical",
+            [PhysicalResolutionNotResolved] = "Not physically resolved",
             [BasisOwnerConfirmed] = "Owner confirmed",
             [BasisInferred] = "Inferred from confirmed mapping",
             [BasisDrawingRev1] = "Drawing rev1",
@@ -433,8 +453,9 @@ public static class MotionVocabulary
         AxisRoleHorizontal,
         AxisRoleVertical,
         MappingConfirmedOwner,
-        MappingDrawingConflict,
-        ConflictStatusOwnerDecisionRequired,
+        DrawingEvidenceRecorded,
+        EvidenceClassificationEvidenceOnly,
+        PhysicalResolutionNotResolved,
         BasisOwnerConfirmed,
         BasisInferred,
         BasisDrawingRev1,
@@ -712,8 +733,15 @@ public sealed record MotionControllerProjection
 }
 
 /// <summary>
-/// The Owner-confirmed axis allocation of one Water Jet: which controller drives it and which axis
-/// is the Horizontal Axis and which is the Vertical Axis.
+/// The CANONICAL Owner-confirmed axis allocation of one Water Jet: which controller drives it and
+/// which physical axis is the Horizontal Axis and which is the Vertical Axis.
+///
+/// The allocation is EXPLICIT DATA. No parity rule, no odd/even Water Jet formula and no
+/// cabinet-derived axis formula is permitted to derive a row: WJ2 = C,D and WJ4 = A,B are confirmed
+/// values, the same as every other row.
+///
+/// The physical axis letter is the diagnostic identity of the controller axis. The Operator-facing
+/// identity is the role: "Horizontal Axis" / "Vertical Axis". The letter never replaces the role.
 /// </summary>
 public sealed record MotionWaterJetAxisBinding
 {
@@ -728,32 +756,47 @@ public sealed record MotionWaterJetAxisBinding
 
     public required string VerticalAxisId { get; init; }
 
-    /// <summary>CONFIRMED_OWNER, or the WJ2 / WJ4 Drawing conflict status.</summary>
+    /// <summary>
+    /// CONFIRMED_OWNER for all eight Water Jets. The WJ2 / WJ4 Drawing rev1 discrepancy is recorded
+    /// separately as an evidence note; it does not make any row ambiguous.
+    /// </summary>
     public required string MappingStatus { get; init; }
 
+    /// <summary>OWNER_CONFIRMED: the mapping provenance of every row is the Owner's confirmation.</summary>
     public required string MappingBasis { get; init; }
 }
 
 /// <summary>
-/// A mapping conflict that the Owner must decide. It is published with the state so no surface can
-/// present a single agreed allocation while a conflict exists.
+/// A recorded Drawing discrepancy, carried as EVIDENCE METADATA ONLY.
+///
+/// It is not canonical ambiguity and it is not an open decision: the Owner-confirmed mapping is
+/// canonical and governs the Product. The note exists so the discrepancy is not silently lost, and
+/// it states explicitly that the discrepancy has NOT been physically resolved on the installation.
 /// </summary>
-public sealed record MotionMappingConflict
+public sealed record MotionMappingEvidenceNote
 {
-    public required string ConflictId { get; init; }
+    public required string EvidenceId { get; init; }
 
+    /// <summary>The Water Jets the discrepancy concerns.</summary>
     public required IReadOnlyList<string> WaterJetIds { get; init; }
 
-    /// <summary>The WSB cabinets the conflicting Water Jets belong to.</summary>
+    /// <summary>The WSB cabinets those Water Jets belong to.</summary>
     public required IReadOnlyList<string> CabinetIds { get; init; }
 
-    public required string Description { get; init; }
+    /// <summary>What the Drawing expectation was, stated as evidence.</summary>
+    public required string Statement { get; init; }
 
-    /// <summary>OWNER_DECISION_REQUIRED: the conflict is open, not resolved and not suppressed.</summary>
+    /// <summary>The evidence status: <see cref="MotionVocabulary.DrawingEvidenceRecorded"/>.</summary>
     public required string Status { get; init; }
 
-    /// <summary>What the conflict blocks: the affected allocation is not to be used for motion.</summary>
+    /// <summary>The classification: <see cref="MotionVocabulary.EvidenceClassificationEvidenceOnly"/>.</summary>
+    public required string Classification { get; init; }
+
+    /// <summary>What the note does and does not change for the Product.</summary>
     public required string Effect { get; init; }
+
+    /// <summary><see cref="MotionVocabulary.PhysicalResolutionNotResolved"/>: recorded, not closed.</summary>
+    public required string PhysicalResolution { get; init; }
 }
 
 /// <summary>
@@ -802,13 +845,16 @@ public sealed record MotionCommandTotals
 }
 
 /// <summary>
-/// The read-only motion commissioning projection published with the Runtime Snapshot.
+/// The read-only STATIC motion commissioning catalogue: the Owner-confirmed topology, the standing
+/// configuration and commissioning statuses, the provenance, the evidence notes, the candidate
+/// values and the authorization gate.
 ///
-/// It is composed entirely by the Application model from Owner-confirmed data and from the standing
-/// not-configured / not-commissioned state of this software revision. No member is read from a
-/// device, no member carries an address, and no member can express an authorized motion command.
+/// It is composed entirely by the Application model from Owner-confirmed data. No member is read
+/// from a device, no member carries an address, and no member can express an authorized motion
+/// command. It is static: it is never carried by the Runtime Snapshot or by a Runtime Delta, and it
+/// is served by the dedicated read-only catalogue route.
 /// </summary>
-public sealed record MotionCommissioningProjection
+public sealed record MotionCommissioningCatalogue
 {
     public required string SectionId { get; init; }
 
@@ -842,7 +888,8 @@ public sealed record MotionCommissioningProjection
     /// <summary>The eight Water Jet axis allocations.</summary>
     public required IReadOnlyList<MotionWaterJetAxisBinding> WaterJets { get; init; }
 
-    public required IReadOnlyList<MotionMappingConflict> MappingConflicts { get; init; }
+    /// <summary>Recorded Drawing discrepancies. Evidence metadata only; never canonical ambiguity.</summary>
+    public required IReadOnlyList<MotionMappingEvidenceNote> MappingEvidenceNotes { get; init; }
 
     /// <summary>The initial Jog Speed: a display value in controller units, never executable.</summary>
     public required MotionParameterState JogSpeed { get; init; }

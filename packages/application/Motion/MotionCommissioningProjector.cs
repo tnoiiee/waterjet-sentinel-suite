@@ -5,12 +5,17 @@ using Wjss.Contracts;
 namespace Wjss.Runtime.Core.Motion;
 
 /// <summary>
-/// Composes the read-only motion commissioning projection that the Runtime publishes with its
-/// Snapshot.
+/// Composes the STATIC read-only motion commissioning catalogue: the Owner-confirmed topology, the
+/// standing configuration and commissioning statuses, the provenance, the evidence notes, the
+/// candidate values and the authorization gate.
 ///
-/// The projection is a pure function of the Owner-confirmed topology catalog and of the standing
+/// The catalogue is NOT part of the Runtime Snapshot and NOT part of a Runtime Delta: it does not
+/// change with a revision, so it is served by the dedicated read-only catalogue route instead of
+/// being re-sent with every Snapshot.
+///
+/// The catalogue is a pure function of the Owner-confirmed topology catalog and of the standing
 /// not-configured / not-commissioned state of this software revision: it reads no device, contacts
-/// no controller and depends on no clock, so the same revision always produces the same projection,
+/// no controller and depends on no clock, so the same revision always produces the same catalogue,
 /// the same canonical text and the same fingerprint.
 ///
 /// Nothing here grants authority. The gate is CLOSED, every axis refuses an absolute Move, no
@@ -28,8 +33,8 @@ public static class MotionCommissioningProjector
         MotionVocabulary.SignalForward,
     ];
 
-    /// <summary>Composes the projection of this revision.</summary>
-    public static MotionCommissioningProjection Project()
+    /// <summary>Composes the catalogue of this revision.</summary>
+    public static MotionCommissioningCatalogue Project()
     {
         var controllers = MotionTopologyCatalog.Controllers;
         var controllerProjections = new MotionControllerProjection[controllers.Count];
@@ -53,7 +58,7 @@ public static class MotionCommissioningProjector
             };
         }
 
-        var projection = new MotionCommissioningProjection
+        var catalogue = new MotionCommissioningCatalogue
         {
             SectionId = MotionVocabulary.SectionId,
             SectionRevision = MotionVocabulary.SectionRevision,
@@ -76,7 +81,7 @@ public static class MotionCommissioningProjector
             Controllers = Array.AsReadOnly(controllerProjections),
             Axes = Array.AsReadOnly(axisProjections),
             WaterJets = MotionTopologyCatalog.WaterJetBindings,
-            MappingConflicts = MotionTopologyCatalog.MappingConflicts,
+            MappingEvidenceNotes = MotionTopologyCatalog.MappingEvidenceNotes,
             JogSpeed = new MotionParameterState
             {
                 ParameterId = "JOG_SPEED",
@@ -92,8 +97,8 @@ public static class MotionCommissioningProjector
             Fingerprint = string.Empty,
         };
 
-        var canonicalText = CanonicalText(projection);
-        return projection with
+        var canonicalText = CanonicalText(catalogue);
+        return catalogue with
         {
             CanonicalText = canonicalText,
             Fingerprint = Fingerprint(canonicalText),
@@ -101,33 +106,33 @@ public static class MotionCommissioningProjector
     }
 
     /// <summary>
-    /// The whole projection as one deterministic text block. This is the parity surface of the
+    /// The whole catalogue as one deterministic text block. This is the parity surface of the
     /// motion foundation: any change to a published value changes this text and its fingerprint.
     /// </summary>
-    public static string CanonicalText(MotionCommissioningProjection projection)
+    public static string CanonicalText(MotionCommissioningCatalogue catalogue)
     {
-        ArgumentNullException.ThrowIfNull(projection);
+        ArgumentNullException.ThrowIfNull(catalogue);
 
         var text = new StringBuilder();
-        text.Append("MOTION COMMISSIONING FOUNDATION rev ").Append(projection.SectionRevision)
-            .Append(" (").Append(projection.MotionTopologyRevision).Append(") - ")
-            .Append(projection.Source).Append('\n');
-        text.Append("GATE ").Append(projection.AuthorizationGateState).Append(" - ")
-            .Append(string.Join(", ", projection.AuthorizationGateReasons)).Append('\n');
-        text.Append("SESSION ").Append(projection.SessionState).Append(" - EVALUATED ")
-            .Append(projection.CommandTotals.Evaluated).Append(" AUTHORIZED ")
-            .Append(projection.CommandTotals.Authorized).Append(" REFUSED ")
-            .Append(projection.CommandTotals.Refused).Append(" HARDWARE ISSUED ")
-            .Append(projection.CommandTotals.HardwareCommandsIssued).Append(" - JOURNAL ")
-            .Append(projection.CommandTotals.JournalPersistence).Append('\n');
-        text.Append("JOG SPEED ").Append(projection.JogSpeed.DisplayValue).Append(' ')
-            .Append(projection.JogSpeed.Unit).Append(" - ").Append(projection.JogSpeed.Status)
-            .Append(" - EXECUTABLE ").Append(projection.JogSpeed.Executable ? "true" : "false").Append('\n');
-        text.Append("INTENTS ").Append(string.Join(", ", projection.MotionIntents)).Append('\n');
-        text.Append("CONTROLLERS ").Append(projection.Controllers.Count).Append('\n');
-        for (var index = 0; index < projection.Controllers.Count; index++)
+        text.Append("MOTION COMMISSIONING FOUNDATION rev ").Append(catalogue.SectionRevision)
+            .Append(" (").Append(catalogue.MotionTopologyRevision).Append(") - ")
+            .Append(catalogue.Source).Append('\n');
+        text.Append("GATE ").Append(catalogue.AuthorizationGateState).Append(" - ")
+            .Append(string.Join(", ", catalogue.AuthorizationGateReasons)).Append('\n');
+        text.Append("SESSION ").Append(catalogue.SessionState).Append(" - EVALUATED ")
+            .Append(catalogue.CommandTotals.Evaluated).Append(" AUTHORIZED ")
+            .Append(catalogue.CommandTotals.Authorized).Append(" REFUSED ")
+            .Append(catalogue.CommandTotals.Refused).Append(" HARDWARE ISSUED ")
+            .Append(catalogue.CommandTotals.HardwareCommandsIssued).Append(" - JOURNAL ")
+            .Append(catalogue.CommandTotals.JournalPersistence).Append('\n');
+        text.Append("JOG SPEED ").Append(catalogue.JogSpeed.DisplayValue).Append(' ')
+            .Append(catalogue.JogSpeed.Unit).Append(" - ").Append(catalogue.JogSpeed.Status)
+            .Append(" - EXECUTABLE ").Append(catalogue.JogSpeed.Executable ? "true" : "false").Append('\n');
+        text.Append("INTENTS ").Append(string.Join(", ", catalogue.MotionIntents)).Append('\n');
+        text.Append("CONTROLLERS ").Append(catalogue.Controllers.Count).Append('\n');
+        for (var index = 0; index < catalogue.Controllers.Count; index++)
         {
-            var controller = projection.Controllers[index];
+            var controller = catalogue.Controllers[index];
             text.Append("C").Append(index + 1).Append(' ').Append(controller.Identity.ControllerId)
                 .Append(" cabinet ").Append(controller.Identity.CabinetId)
                 .Append(" axes ").Append(controller.Identity.AxisCount)
@@ -149,10 +154,10 @@ public static class MotionCommissioningProjector
                 .Append('\n');
         }
 
-        text.Append("AXES ").Append(projection.Axes.Count).Append('\n');
-        for (var index = 0; index < projection.Axes.Count; index++)
+        text.Append("AXES ").Append(catalogue.Axes.Count).Append('\n');
+        for (var index = 0; index < catalogue.Axes.Count; index++)
         {
-            var axis = projection.Axes[index];
+            var axis = catalogue.Axes[index];
             var state = axis.State;
             text.Append("A").Append(index + 1).Append(' ').Append(axis.Identity.ControllerId)
                 .Append('/').Append(axis.Identity.AxisId).Append(' ')
@@ -183,10 +188,10 @@ public static class MotionCommissioningProjector
                 .Append('\n');
         }
 
-        text.Append("WATER JETS ").Append(projection.WaterJets.Count).Append('\n');
-        for (var index = 0; index < projection.WaterJets.Count; index++)
+        text.Append("WATER JETS ").Append(catalogue.WaterJets.Count).Append('\n');
+        for (var index = 0; index < catalogue.WaterJets.Count; index++)
         {
-            var waterJet = projection.WaterJets[index];
+            var waterJet = catalogue.WaterJets[index];
             text.Append("W").Append(index + 1).Append(' ').Append(waterJet.WaterJetId)
                 .Append(" cabinet ").Append(waterJet.CabinetId)
                 .Append(" controller ").Append(waterJet.ControllerId)
@@ -196,26 +201,28 @@ public static class MotionCommissioningProjector
                 .Append(" (").Append(waterJet.MappingBasis).Append(')').Append('\n');
         }
 
-        text.Append("CONFLICTS ").Append(projection.MappingConflicts.Count).Append('\n');
-        for (var index = 0; index < projection.MappingConflicts.Count; index++)
+        text.Append("EVIDENCE NOTES ").Append(catalogue.MappingEvidenceNotes.Count).Append('\n');
+        for (var index = 0; index < catalogue.MappingEvidenceNotes.Count; index++)
         {
-            var conflict = projection.MappingConflicts[index];
-            text.Append("X").Append(index + 1).Append(' ').Append(conflict.ConflictId)
-                .Append(" water jets ").Append(string.Join(",", conflict.WaterJetIds))
-                .Append(" cabinets ").Append(string.Join(",", conflict.CabinetIds))
-                .Append(" status ").Append(conflict.Status).Append('\n');
+            var note = catalogue.MappingEvidenceNotes[index];
+            text.Append("E").Append(index + 1).Append(' ').Append(note.EvidenceId)
+                .Append(" water jets ").Append(string.Join(",", note.WaterJetIds))
+                .Append(" cabinets ").Append(string.Join(",", note.CabinetIds))
+                .Append(" status ").Append(note.Status)
+                .Append(" classification ").Append(note.Classification)
+                .Append(" resolution ").Append(note.PhysicalResolution).Append('\n');
         }
 
-        text.Append("NOT VERIFIED ").Append(projection.NotVerifiedClaims.Count).Append('\n');
-        for (var index = 0; index < projection.NotVerifiedClaims.Count; index++)
+        text.Append("NOT VERIFIED ").Append(catalogue.NotVerifiedClaims.Count).Append('\n');
+        for (var index = 0; index < catalogue.NotVerifiedClaims.Count; index++)
         {
-            text.Append("N").Append(index + 1).Append(' ').Append(projection.NotVerifiedClaims[index]).Append('\n');
+            text.Append("N").Append(index + 1).Append(' ').Append(catalogue.NotVerifiedClaims[index]).Append('\n');
         }
 
-        text.Append("LEGEND ").Append(projection.StatusLegend.Count).Append('\n');
-        for (var index = 0; index < projection.StatusLegend.Count; index++)
+        text.Append("LEGEND ").Append(catalogue.StatusLegend.Count).Append('\n');
+        for (var index = 0; index < catalogue.StatusLegend.Count; index++)
         {
-            text.Append("L").Append(index + 1).Append(' ').Append(projection.StatusLegend[index]).Append('\n');
+            text.Append("L").Append(index + 1).Append(' ').Append(catalogue.StatusLegend[index]).Append('\n');
         }
 
         return text.ToString();

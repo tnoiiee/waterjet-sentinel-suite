@@ -4,11 +4,14 @@ namespace Wjss.Runtime.Core.Motion;
 
 /// <summary>
 /// The Owner-confirmed motion topology: four motion controllers (one per WSB cabinet), the sixteen
-/// controller axes, the eight Water Jet axis allocations and the one open mapping conflict.
+/// controller axes, the eight CANONICAL Water Jet axis allocations and the one Drawing evidence
+/// note. All eight allocations are CONFIRMED_OWNER: WJ2 = C,D and WJ4 = A,B included.
 ///
 /// Every entry is DATA received from the Owner or read from the Owner-provided cabinet drawing.
 /// Nothing here is derived from a device read, from the Legacy source (which is not available to
-/// this repository), or from a parity assumption between layers.
+/// this repository), or from a parity assumption between layers. The Water Jet allocation in
+/// particular is explicit data: no odd/even formula, no cabinet-derived axis formula and no
+/// inferred parity rule produces any row.
 ///
 /// Public-repository boundary: the catalog carries NO network address and NO endpoint. A controller
 /// is named by the WSB cabinet that holds it; the motion port of every controller is
@@ -61,9 +64,9 @@ public static class MotionTopologyCatalog
     public static IReadOnlyList<MotionWaterJetAxisBinding> WaterJetBindings { get; } =
     [
         Binding("WJ1", "WSB1", "MC-WSB1", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ2", "WSB1", "MC-WSB1", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingDrawingConflict),
+        Binding("WJ2", "WSB1", "MC-WSB1", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
         Binding("WJ3", "WSB2", "MC-WSB2", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ4", "WSB2", "MC-WSB2", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingDrawingConflict),
+        Binding("WJ4", "WSB2", "MC-WSB2", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
         Binding("WJ5", "WSB3", "MC-WSB3", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
         Binding("WJ6", "WSB3", "MC-WSB3", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
         Binding("WJ7", "WSB4", "MC-WSB4", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
@@ -71,20 +74,26 @@ public static class MotionTopologyCatalog
     ];
 
     /// <summary>
-    /// The one open mapping conflict: the Owner-confirmed WJ2 / WJ4 axis allocation disagrees with
-    /// the Drawing rev1 expectation for the same two Water Jets. It is published, not suppressed:
-    /// the affected allocation must not be used for motion until the Owner rules.
+    /// The one recorded Drawing discrepancy, carried as EVIDENCE METADATA ONLY.
+    ///
+    /// The Owner has ruled the canonical allocation (WJ2 = C,D, WJ4 = A,B). This note records that
+    /// the Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same
+    /// cabinet, so the discrepancy is not silently lost. The note does not make the mapping
+    /// ambiguous, does not override the canonical allocation and does not open the authorization
+    /// gate; and it states explicitly that the discrepancy has NOT been physically resolved.
     /// </summary>
-    public static IReadOnlyList<MotionMappingConflict> MappingConflicts { get; } =
+    public static IReadOnlyList<MotionMappingEvidenceNote> MappingEvidenceNotes { get; } =
     [
-        new MotionMappingConflict
+        new MotionMappingEvidenceNote
         {
-            ConflictId = MotionVocabulary.ConflictIdWj2Wj4,
+            EvidenceId = MotionVocabulary.EvidenceNoteIdWj2Wj4,
             WaterJetIds = ["WJ2", "WJ4"],
             CabinetIds = ["WSB1", "WSB2"],
-            Description = "The Owner-confirmed allocation gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. The Drawing rev1 expectation for those two Water Jets is the other axis pair on the same cabinet. Both cannot be correct.",
-            Status = MotionVocabulary.ConflictStatusOwnerDecisionRequired,
-            Effect = "The WJ2 and WJ4 allocation must not be used for motion until the Owner rules. The conflict does not block the other six Water Jets and it does not open the authorization gate.",
+            Statement = "The canonical allocation gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. The Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The Owner has ruled the canonical allocation.",
+            Status = MotionVocabulary.DrawingEvidenceRecorded,
+            Classification = MotionVocabulary.EvidenceClassificationEvidenceOnly,
+            Effect = "This note changes no Product mapping: all eight Water Jets publish CONFIRMED_OWNER with OWNER_CONFIRMED provenance, WJ2 and WJ4 included. The note exists so the Drawing discrepancy is not lost. It does not open the authorization gate and it does not authorise any motion.",
+            PhysicalResolution = MotionVocabulary.PhysicalResolutionNotResolved,
         },
     ];
 
@@ -157,6 +166,11 @@ public static class MotionTopologyCatalog
         BrakeOutputMappingBasis = MotionVocabulary.BasisOwnerConfirmed,
     };
 
+    /// <summary>
+    /// Builds one explicit Water Jet allocation. The two physical axis letters are PASSED IN, never
+    /// computed: there is no odd/even rule, no cabinet-derived rule and no parity rule here, and the
+    /// mapping provenance is always the Owner's confirmation.
+    /// </summary>
     private static MotionWaterJetAxisBinding Binding(
         string waterJetId, string cabinetId, string controllerId, string horizontalAxisId, string verticalAxisId, string mappingStatus) => new()
     {
@@ -166,8 +180,6 @@ public static class MotionTopologyCatalog
         HorizontalAxisId = horizontalAxisId,
         VerticalAxisId = verticalAxisId,
         MappingStatus = mappingStatus,
-        MappingBasis = mappingStatus == MotionVocabulary.MappingConfirmedOwner
-            ? MotionVocabulary.BasisOwnerConfirmed
-            : MotionVocabulary.BasisDrawingRev1,
+        MappingBasis = MotionVocabulary.BasisOwnerConfirmed,
     };
 }

@@ -1,9 +1,11 @@
-// Test helper - the canonical read-only motion commissioning projection of this software revision.
+// Test helper - the canonical read-only STATIC motion commissioning catalogue of this revision.
 //
-// It mirrors Wjss.Contracts.MotionCommissioningProjection (C# authoritative) exactly, so a test can
-// exercise the JavaScript validator and the Preview server against the same shape the Runtime
-// serializes. Every value is the standing not-configured / not-commissioned / not-authorized value:
-// the gate is CLOSED, nothing is configured, connected, homed or executable.
+// It mirrors Wjss.Contracts.MotionCommissioningCatalogue (C# authoritative) exactly, so a test can
+// exercise the JavaScript validator against the same shape the Product publishes. Every value is the
+// standing not-configured / not-commissioned / not-authorized value: the gate is CLOSED, nothing is
+// configured, connected, homed or executable.
+//
+// The catalogue is STATIC and is NOT a Snapshot member and NOT a Delta member.
 
 import {
   MOTION_ALL_REFUSAL_REASONS, MOTION_AXIS_IDS, MOTION_AXIS_ROLE, MOTION_BRAKE_OUTPUT, MOTION_CABINETS,
@@ -77,8 +79,8 @@ function axisProjection(controllerId, axisId) {
   };
 }
 
-/** The canonical projection of this software revision: the gate CLOSED, nothing configured. */
-export function canonicalMotionProjection() {
+/** The canonical static catalogue of this software revision: the gate CLOSED, nothing configured. */
+export function canonicalMotionCatalogue() {
   return {
     sectionId: 'MOTION_COMMISSIONING_FOUNDATION',
     sectionRevision: 1,
@@ -129,15 +131,18 @@ export function canonicalMotionProjection() {
       horizontalAxisId,
       verticalAxisId,
       mappingStatus,
-      mappingBasis: mappingStatus === 'CONFIRMED_OWNER' ? 'OWNER_CONFIRMED' : 'DRAWING_REV1',
+      // Canonical provenance: every row's basis is the Owner's confirmation.
+      mappingBasis: 'OWNER_CONFIRMED',
     })),
-    mappingConflicts: [{
-      conflictId: 'MOTION-CONFLICT-01',
+    mappingEvidenceNotes: [{
+      evidenceId: 'MOTION-EVIDENCE-01',
       waterJetIds: ['WJ2', 'WJ4'],
       cabinetIds: ['WSB1', 'WSB2'],
-      description: 'The Owner-confirmed allocation disagrees with Drawing rev1 for WJ2 and WJ4.',
-      status: 'OWNER_DECISION_REQUIRED',
-      effect: 'The WJ2 and WJ4 allocation must not be used for motion until the Owner rules.',
+      statement: 'The canonical allocation gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. The Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The Owner has ruled the canonical allocation.',
+      status: 'DRAWING_REV1_CONFLICT_RECORDED',
+      classification: 'EVIDENCE_ONLY_NOT_CANONICAL',
+      effect: 'This note changes no Product mapping: all eight Water Jets publish CONFIRMED_OWNER with OWNER_CONFIRMED provenance, WJ2 and WJ4 included.',
+      physicalResolution: 'NOT_PHYSICALLY_RESOLVED',
     }],
     jogSpeed: {
       parameterId: 'JOG_SPEED',

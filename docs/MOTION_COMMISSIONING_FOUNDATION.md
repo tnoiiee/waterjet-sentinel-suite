@@ -28,8 +28,8 @@ drive the four motion controllers that move the eight Water Jets. At this revisi
 * the motion command model (intent, evaluation, session, refusal vocabulary);
 * an **authorization gate that is CLOSED**, which refuses every motion intent on every axis before
   any hardware path is reached;
-* the read-only publication of all of the above in the Runtime Snapshot and in the Preview
-  Engineering page.
+* the read-only publication of all of the above as a **static catalogue** on the dedicated read-only
+  catalogue route, and in the Preview Engineering page.
 
 It does **not** contain a controller library, a connection, an endpoint, a driver, a command
 encoder, a homing routine, a jog routine, a brake write, an encoder reset, or any device access of
@@ -44,9 +44,9 @@ any kind. There is no code path in this revision that can produce a controller c
 | Axis role | A and C are the **Horizontal Axis**; B and D are the **Vertical Axis** | Owner-confirmed |
 | Brake output | axis A → output 1, B → output 2, C → output 3, D → output 4 | Owner-confirmed |
 | WJ1 (WSB1) | A, B | Owner-confirmed |
-| WJ2 (WSB1) | C, D | Owner-confirmed; conflicts with Drawing rev1 (§3) |
+| WJ2 (WSB1) | C, D | **Canonical** — Owner-confirmed; the Drawing rev1 discrepancy is recorded as evidence only (§3) |
 | WJ3 (WSB2) | C, D | Owner-confirmed |
-| WJ4 (WSB2) | A, B | Owner-confirmed; conflicts with Drawing rev1 (§3) |
+| WJ4 (WSB2) | A, B | **Canonical** — Owner-confirmed; the Drawing rev1 discrepancy is recorded as evidence only (§3) |
 | WJ5 (WSB3) | C, D | Owner-confirmed |
 | WJ6 (WSB3) | A, B | Owner-confirmed |
 | WJ7 (WSB4) | A, B | Owner-confirmed |
@@ -58,7 +58,16 @@ any kind. There is no code path in this revision that can produce a controller c
 | Initial Jog Speed | 10, **controller units**, Legacy candidate, unverified, display only | Owner-provided; never executable |
 
 The Operator-facing axis wording is **"Horizontal Axis"** and **"Vertical Axis"** only. No other
-axis wording (X/Y, left/right, up/down, cannon axis numbering) exists anywhere in the software.
+axis wording (X/Y, left/right, up/down, cannon axis numbering) exists anywhere in the software. The
+physical controller axis letter (A/B/C/D) may appear **only as diagnostic identity beside the role**
+("Horizontal Axis · C"), never instead of it.
+
+The eight Water Jet rows are **explicit data, not a rule**. The mapping is not derived from a parity
+rule, from the Water Jet ordinal, or from the cabinet: the two even Water Jets WJ2 (C,D) and WJ4
+(A,B) take different axis pairs, the two odd Water Jets WJ5 (C,D) and WJ7 (A,B) take different axis
+pairs, and the two Water Jets of WSB1 (A,B and C,D) take different axis pairs. No odd/even formula
+and no cabinet-derived formula reproduces this table, so none is implemented; tests assert the exact
+eight rows instead.
 
 ---
 
@@ -67,7 +76,7 @@ axis wording (X/Y, left/right, up/down, cannon axis numbering) exists anywhere i
 | Item | Status | Why it is not confirmed |
 | --- | --- | --- |
 | One controller per WSB cabinet | `INFERRED_FROM_OWNER_CONFIRMED_MAPPING` | It follows from the confirmed Water Jet allocation (each WSB drives exactly one A,B pair and one C,D pair), but the Owner has not separately confirmed the controller count per cabinet. |
-| WJ2 / WJ4 axis allocation | `DRAWING_REV1_CONFLICT_WJ2_WJ4`, `OWNER_DECISION_REQUIRED` | The Drawing rev1 expectation for these two Water Jets is the other axis pair on the same cabinet. Both cannot be correct. The conflict is **published with the state**, never suppressed, and the affected allocation must not be used for motion until the Owner rules. |
+| WJ2 / WJ4 Drawing rev1 discrepancy | `DRAWING_REV1_CONFLICT_RECORDED`, `EVIDENCE_ONLY_NOT_CANONICAL`, `NOT_PHYSICALLY_RESOLVED` | The Drawing rev1 expectation for these two Water Jets was the other axis pair on the same cabinet. **The Owner has ruled the canonical allocation** (WJ2 = C,D; WJ4 = A,B), so this is **not** an open decision and **not** ambiguity: it is recorded evidence. The note is published with the catalogue, never suppressed, and it changes no mapping: all eight rows publish `CONFIRMED_OWNER` with `OWNER_CONFIRMED` provenance. The discrepancy itself has **NOT** been physically resolved on the installation, and this revision does not claim that it has. |
 | Limit input polarity | `UNCONFIRMED` on all sixteen axes | The switches are installed and their behaviour on the existing hardware is real, but the electrical meaning is established only by reading the Legacy implementation and the Drawing against the installation. Until then the polarity is never assumed active high or active low. |
 | Counts → millimetre conversion | `UNRESOLVED`, per axis, `MEASURED_DURING_COMMISSIONING` | No conversion is published. Values are counts and controller units only. |
 | Motion parameters (speeds, accelerations, limits) | `NOT_CONFIGURED` / `NOT_COMMISSIONED` | Nothing has been measured or configured in the Product. The Legacy Jog Speed is carried as a display value with status `LEGACY_CANDIDATE_UNVERIFIED`. |
@@ -196,31 +205,56 @@ condition. The boundary a future adapter must respect:
 
 | Path | Role |
 | --- | --- |
-| `packages/contracts/MotionCommissioning.cs` | The wire contract: the motion commissioning projection and every status/refusal vocabulary. No behaviour. |
-| `packages/application/Motion/MotionTopologyCatalog.cs` | The Owner-confirmed topology and the one open mapping conflict. Data only. |
+| `packages/contracts/MotionCommissioning.cs` | The wire contract: the motion commissioning catalogue and every status/refusal vocabulary. No behaviour. |
+| `packages/application/Motion/MotionTopologyCatalog.cs` | The Owner-confirmed topology (canonical, explicit data) and the one recorded Drawing evidence note. Data only. |
 | `packages/application/Motion/MotionCommandGate.cs` | `MotionAuthorizationGate` (CLOSED), the intent and evaluation records, and the evaluation function. |
 | `packages/application/Motion/MotionCommissioningSession.cs` | The session: `NO_SESSION`, refused open, refused Stop-all. |
-| `packages/application/Motion/MotionCommissioningProjector.cs` | Composes the projection, its canonical text and its fingerprint. Pure; reads nothing. |
+| `packages/application/Motion/MotionCommissioningProjector.cs` | Composes the static catalogue, its canonical text and its fingerprint. Pure; reads nothing. |
 | `packages/contracts/wjss-contracts-ts/{types.ts,validate.mjs}` | The TypeScript mirror and the structural validator (the C# records are authoritative). |
-| `packages/commissioning/src/motionCommissioning.mjs` | The read-only **Preview** projection of the same confirmed design: data and wording only, no gate logic and no device access. |
-| `apps/ops-preview` | The Engineering Motion Commissioning page: a new read-only section and one GET route. |
+| `packages/commissioning/src/motionCommissioning.mjs` | The read-only **Preview** catalogue of the same confirmed design: data and wording only, no gate logic and no device access. |
+| `apps/ops-preview` | The Engineering Motion Commissioning page: a read-only section and the dedicated read-only GET route `/api/motion-commissioning/catalogue`. |
 | Tests | `tests/runtime.tests/Motion/MotionCommissioningTests.cs`, `packages/contracts/wjss-contracts-ts/test/motion.validate.test.mjs`, `packages/commissioning/test/motionCommissioning.test.mjs`, `apps/ops-preview/test/motionCommissioning.{render,server}.test.mjs`. |
 
-The projection is published in the Runtime **Snapshot only**. It is never carried by a Delta: the
-Runtime Delta has no motion member, and the contract validator refuses a Delta that contains one.
+### The catalogue is static: it is not a Snapshot member and not a Delta member
+
+The catalogue is ~40 KB of content that does **not** change with a revision. Carrying it inside every
+Runtime Snapshot would re-send it on every revision (in the committed fixture it would be roughly a
+third of the Snapshot payload) for content that never changes and that contains no observed state. It
+is therefore served by its own dedicated read-only route, and the Snapshot stays reserved for the
+**dynamic observed motion state** the Product will publish later:
+
+* controller connection state; axis state; command and encoder position; moving / stopped;
+* Reverse / Home / Forward input state; brake commanded and brake observed;
+* active command lifecycle; fault and refusal; timestamps; quality.
+
+**None of that dynamic state is authorized in this revision**, so the Snapshot carries no motion
+member at all — not even a null placeholder. The contract validator refuses a `motion` member in a
+Snapshot **and** in a Delta, so the separation is enforced by the contract, not only by a comment:
+
+* `GET /api/motion-commissioning/catalogue` — the static catalogue. It performs **no Runtime read**,
+  takes no query parameter and carries no dynamic state. The payload states its own placement
+  (`static: true`, `carriedBySnapshot: false`, `carriedByDelta: false`, `runtimeReadRequired: false`).
+* Snapshot / Delta — **no** `motion` member. `validate.mjs` refuses one in either envelope, and a
+  test asserts that the committed fixture carries none.
+
+There is one canonical source for the mapping: the Owner-confirmed table above, encoded once per
+language (C# `MotionTopologyCatalog`, JS `MOTION_WATER_JET_BINDINGS`) and cross-checked by tests in
+both. The Preview route serves the JS catalogue; a Product-side consumer would read the C# catalogue
+through a Product route. No third table exists.
 
 ---
 
 ## 11. Publication and the Public-Repository Boundary
 
-* The Runtime composes the projection at initial composition and publishes it from revision 1. No
-  commit path in this revision changes it.
-* The published projection contains no network address, no port value, no host name and no
+* The Application model composes the catalogue from Owner-confirmed data. It depends on no Runtime
+  host, no revision and no device, and no commit path in this revision changes it.
+* The published catalogue contains no network address, no port value, no host name and no
   vendor-specific command string. Controllers are named by the WSB cabinet that holds them.
-* The Preview route reads the Runtime Snapshot **on demand only** (the section's Refresh control);
-  the design projection never waits on a Runtime host. An absent or malformed Runtime answer is an
-  explicit state (`NOT_READ`, `NOT_PUBLISHED`, `RUNTIME_UNAVAILABLE`, `INVALID_RUNTIME_RESPONSE`),
-  never a substituted value.
+* The Preview catalogue route reads **no Runtime at all**, and the section has no Refresh control: a
+  static catalogue has nothing to refresh. The page therefore never couples its boot to a second
+  host, and no Runtime state — published, absent or malformed — can be substituted for the catalogue.
+* The served UI carries no vendor vocabulary: the physical controller axis letter is printed as
+  diagnostic identity (A/B/C/D), never with a vendor name.
 * Boundary scan S1–S9: clean (0 findings) at this revision.
 
 ---
@@ -238,7 +272,9 @@ above.
 
 ## 13. STOP conditions (stop and request an Owner decision)
 
-1. Any mapping conflict not already recorded (axis, Water Jet, cabinet or controller).
+1. Any mapping conflict not already recorded (axis, Water Jet, cabinet or controller) — including a
+   new Drawing discrepancy, or any attempt to treat a recorded evidence note as ambiguity or as an
+   open decision again.
 2. Any polarity conflict, or a polarity that is confirmed for some axes and not others.
 3. Any brake-output ambiguity (allocation, polarity, or an output shared between axes).
 4. Any counts-to-millimetre conversion conflict, or a conversion that is not per axis.
@@ -261,9 +297,15 @@ above.
 ## 14. Validation performed and required
 
 **Performed in Arena (this revision):** `node --check` on every new and edited JavaScript file;
-commissioning package tests 238/238; contracts-TS 54/54; ops-preview 170/170; kiosk 22/22;
-mapping-config 82/82 and 261/261 (7 skipped, pre-existing); tc-bench 19/19; boundary-scan tests
-33/33; boundary scan S1–S9 **0 findings**.
+commissioning package tests 239/239; contracts-TS 55/55; ops-preview 171/171; kiosk 22/22;
+mapping-config 82/82 and 261/261 (7 skipped, pre-existing); boundary-scan tests 33/33; boundary scan
+S1–S9 **0 findings**.
+
+**Snapshot static-payload evidence (measured):** the committed golden fixture
+`packages/contracts/fixtures/snapshot.seed0.json` is **122,110 bytes** and carries **no** `motion`
+key; the static catalogue is **32,163 bytes** as served by the Preview route (41,003 bytes for the
+C#-shaped mirror the contract tests use). The separation removes that payload from every Snapshot
+revision and from every Delta.
 
 **NOT RUN in Arena:** the whole .NET side. No SDK is available in the sandbox, so the C# build, the
 C# unit tests and the fixture-parity gate are **NOT RUN** and no C# compile or test result is claimed.
@@ -277,32 +319,45 @@ WJSS_UPDATE_FIXTURES=1 dotnet test tests/integration/Wjss.FixtureEmission.Tests.
 node tools/boundary-scan/boundary-scan.mjs .
 ```
 
-The golden fixture `packages/contracts/fixtures/snapshot.seed0.json` does not yet carry the `motion`
-key, because the committed file is generated by the .NET generator. The Node port
-(`tools/fixture-generator/generate.mjs`) was updated to emit `"motion": null`, matching the C#
-serialization exactly, so the Owner-local `WJSS_UPDATE_FIXTURES=1` run produces the expected single
-addition and no other diff.
+The golden fixture `packages/contracts/fixtures/snapshot.seed0.json` carries **no** `motion` key, and
+**no fixture regeneration is required** for this correction: the Snapshot schema returns to the
+baseline it had before the motion member was added, and the committed fixture was generated from that
+baseline. The Node port (`tools/fixture-generator/generate.mjs`) had been emitting `"motion": null`
+to match the C# serialization of the nullable member; that line is now removed, because a Snapshot
+with a `motion` member — null included — is refused by the contract validator. The remaining
+C#/Node generator divergence for `tcAcquisition` is **pre-existing** and is untouched here.
 
 ---
 
 ## 15. Changed / Unchanged / Not Verified
 
 **Changed:** new motion contract (`packages/contracts/MotionCommissioning.cs`); new Application
-model (`packages/application/Motion/*`); `RuntimeState`, `OperationalSnapshot` and the Snapshot
-projector carry the nullable motion section; the initial composition publishes it; the TypeScript
-mirror, the contract validator and the Preview (package module, server route, page section and
-styles) were extended; new focused tests in four suites; the fixture generator emits the new member;
-one existing navigation-count assertion updated from seven sections to eight.
+model (`packages/application/Motion/*`) whose catalogue is **static**; the TypeScript mirror, the
+contract validator and the Preview (package module, the dedicated catalogue route, page section and
+wording) were extended; new focused tests in four suites; the Node fixture generator no longer emits a
+`motion` member; one existing navigation-count assertion updated from seven sections to eight.
+
+**Changed by the focused correction:** the canonical WJ2 / WJ4 mapping is now `CONFIRMED_OWNER` with
+`OWNER_CONFIRMED` provenance and the Drawing rev1 discrepancy is carried as an **evidence note**
+(`DRAWING_REV1_CONFLICT_RECORDED`, `EVIDENCE_ONLY_NOT_CANONICAL`, `NOT_PHYSICALLY_RESOLVED`) instead
+of an open decision; `OWNER_DECISION_REQUIRED` no longer exists in the vocabulary; the static
+catalogue was **removed from the Runtime Snapshot** (contract, Runtime state, Snapshot projector and
+initial composition) and is served by the dedicated read-only route
+`GET /api/motion-commissioning/catalogue`; the Snapshot-coupled Preview route and the section's
+Refresh control were removed; the physical controller axis letter is rendered only as diagnostic
+identity beside the role.
 
 **Unchanged:** the Product authority path (single-writer Runtime State Store, atomic publication,
-Snapshot/Delta semantics); the Stage identity `0.4C-K2` and the Preview boundary; the TC acquisition
-contract and evidence positions; the protected topology baseline (108 Sensors / 216 channels); the
-loopback-only bind host; the Delta contract (motion is refused there); every refusal reason, status
-and boundary rule that already existed; no lock file, no project reference, no central package pin
-and no dependency of any kind was added.
+Snapshot/Delta semantics — the Snapshot simply has no motion member); the Stage identity `0.4C-K2`
+and the Preview boundary; the TC acquisition contract and evidence positions; the protected topology
+baseline (108 Sensors / 216 channels); the loopback-only bind host; the closed authorization gate and
+every refusal reason, status and boundary rule that already existed; no controller contact, no
+endpoint, no command route, no gclib and no hardware capability; no lock file, no project reference,
+no central package pin and no dependency of any kind was added.
 
 **Not Verified:** everything about hardware. No controller was contacted, read or configured; no
 controller library was installed or selected; no axis was homed; no brake was released; no encoder
 was reset; no motion command was issued; no endpoint was configured; no limit polarity was measured;
 no unit conversion was measured; no Legacy value was promoted to configuration; no Owner decision in
-§3 was taken; the WJ2 / WJ4 conflict remains open; the .NET build and tests were NOT RUN in Arena.
+§3 was taken; the WJ2 / WJ4 Drawing discrepancy remains **not physically resolved** (recorded as
+evidence only, never claimed closed); the .NET build and tests were NOT RUN in Arena.

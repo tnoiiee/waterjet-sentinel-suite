@@ -7,8 +7,9 @@ namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
 /// The manual motion commissioning foundation: the closed authorization gate, the refusal of every
-/// motion intent on every axis, the Owner-confirmed axis allocation, the published not-configured /
-/// not-commissioned state, and the deterministic canonical text.
+/// motion intent on every axis, the CANONICAL Owner-confirmed axis allocation of all eight Water
+/// Jets (WJ2 = C,D and WJ4 = A,B included), the Drawing rev1 discrepancy recorded as evidence only,
+/// the published not-configured / not-commissioned state, and the deterministic canonical text.
 ///
 /// These tests prove the SOFTWARE position of this revision. They prove nothing about hardware: no
 /// controller is contacted here, and no test result may be read as device evidence.
@@ -147,6 +148,19 @@ public sealed class MotionCommissioningTests
             Assert.Equal(expected.Horizontal, actual.HorizontalAxisId);
             Assert.Equal(expected.Vertical, actual.VerticalAxisId);
             Assert.Equal($"MC-{expected.CabinetId}", actual.ControllerId);
+
+            // Canonical provenance: every row, WJ2 and WJ4 included, is Owner-confirmed.
+            Assert.Equal(MotionVocabulary.MappingConfirmedOwner, actual.MappingStatus);
+            Assert.Equal(MotionVocabulary.BasisOwnerConfirmed, actual.MappingBasis);
+
+            // Exactly one Horizontal Axis and exactly one Vertical Axis, per the topology catalog.
+            var horizontal = MotionTopologyCatalog.FindAxis(actual.ControllerId, actual.HorizontalAxisId);
+            var vertical = MotionTopologyCatalog.FindAxis(actual.ControllerId, actual.VerticalAxisId);
+            Assert.NotNull(horizontal);
+            Assert.NotNull(vertical);
+            Assert.Equal(MotionVocabulary.AxisRoleHorizontal, horizontal!.AxisRole);
+            Assert.Equal(MotionVocabulary.AxisRoleVertical, vertical!.AxisRole);
+            Assert.NotEqual(actual.HorizontalAxisId, actual.VerticalAxisId);
         }
 
         // A and C are the Horizontal Axis; B and D are the Vertical Axis, on every controller.
@@ -255,24 +269,84 @@ public sealed class MotionCommissioningTests
         Assert.Equal(MotionVocabulary.StatusNotCommissioned, defaults.TargetStatus);
     }
 
+    /// <summary>
+    /// The canonical allocation is EXPLICIT DATA, not a rule. The two Water Jets of WSB1 take
+    /// different axis pairs and the two Water Jets of WSB2 take different axis pairs, so no
+    /// cabinet-derived formula can produce the table; and the even Water Jets WJ2 and WJ4 take
+    /// different axis pairs while the odd Water Jets WJ5 and WJ7 also take different axis pairs, so
+    /// no odd/even parity formula can produce it either.
+    /// </summary>
     [Fact]
-    public void The_WJ2_And_WJ4_Mapping_Conflict_Is_Published_And_Not_Suppressed()
+    public void The_Canonical_Allocation_Is_Explicit_Data_And_No_Parity_Or_Cabinet_Formula_Produces_It()
     {
-        var projection = MotionCommissioningProjector.Project();
+        var catalogue = MotionCommissioningProjector.Project();
 
-        var conflict = Assert.Single(projection.MappingConflicts);
-        Assert.Equal(MotionVocabulary.ConflictIdWj2Wj4, conflict.ConflictId);
-        Assert.Equal(new[] { "WJ2", "WJ4" }, conflict.WaterJetIds);
-        Assert.Equal(new[] { "WSB1", "WSB2" }, conflict.CabinetIds);
-        Assert.Equal(MotionVocabulary.ConflictStatusOwnerDecisionRequired, conflict.Status);
-        Assert.False(string.IsNullOrWhiteSpace(conflict.Description));
-        Assert.False(string.IsNullOrWhiteSpace(conflict.Effect));
+        Assert.Equal(8, catalogue.WaterJets.Count);
+        Assert.Equal(new[] { "WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8" },
+            catalogue.WaterJets.Select(binding => binding.WaterJetId).ToArray());
 
-        // The two Water Jets of the conflict are marked in the allocation itself, so no surface can
-        // present the whole table as agreed.
-        Assert.Equal(MotionVocabulary.MappingDrawingConflict, projection.WaterJets.Single(b => b.WaterJetId == "WJ2").MappingStatus);
-        Assert.Equal(MotionVocabulary.MappingDrawingConflict, projection.WaterJets.Single(b => b.WaterJetId == "WJ4").MappingStatus);
-        Assert.Equal(6, projection.WaterJets.Count(b => b.MappingStatus == MotionVocabulary.MappingConfirmedOwner));
+        // No cabinet-derived axis formula: WSB1 and WSB2 each carry both axis pairs.
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ2"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ3"), HorizontalOf(catalogue, "WJ4"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ6"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ7"), HorizontalOf(catalogue, "WJ8"));
+
+        // No odd/even parity formula: the even Water Jets disagree with each other, and so do the
+        // odd ones.
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ2"), HorizontalOf(catalogue, "WJ4"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ6"), HorizontalOf(catalogue, "WJ8"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ3"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ7"));
+
+        // Every Water Jet still carries exactly one Horizontal Axis and exactly one Vertical Axis.
+        Assert.All(catalogue.WaterJets, binding =>
+        {
+            var horizontal = MotionTopologyCatalog.FindAxis(binding.ControllerId, binding.HorizontalAxisId);
+            var vertical = MotionTopologyCatalog.FindAxis(binding.ControllerId, binding.VerticalAxisId);
+            Assert.NotNull(horizontal);
+            Assert.NotNull(vertical);
+            Assert.Equal(MotionVocabulary.AxisRoleHorizontal, horizontal!.AxisRole);
+            Assert.Equal(MotionVocabulary.AxisRoleVertical, vertical!.AxisRole);
+        });
+        Assert.Equal(8, catalogue.WaterJets.Count(binding => binding.HorizontalAxisId is "A" or "C"));
+        Assert.Equal(8, catalogue.WaterJets.Count(binding => binding.VerticalAxisId is "B" or "D"));
+
+        // And the canonical values the Owner ruled: WJ2 = C,D and WJ4 = A,B.
+        Assert.Equal("C", HorizontalOf(catalogue, "WJ2"));
+        Assert.Equal("D", VerticalOf(catalogue, "WJ2"));
+        Assert.Equal("A", HorizontalOf(catalogue, "WJ4"));
+        Assert.Equal("B", VerticalOf(catalogue, "WJ4"));
+    }
+
+    [Fact]
+    public void The_WJ2_And_WJ4_Drawing_Discrepancy_Is_Recorded_As_Evidence_Only_And_Changes_No_Mapping()
+    {
+        var catalogue = MotionCommissioningProjector.Project();
+
+        var note = Assert.Single(catalogue.MappingEvidenceNotes);
+        Assert.Equal(MotionVocabulary.EvidenceNoteIdWj2Wj4, note.EvidenceId);
+        Assert.Equal(new[] { "WJ2", "WJ4" }, note.WaterJetIds);
+        Assert.Equal(new[] { "WSB1", "WSB2" }, note.CabinetIds);
+        Assert.Equal(MotionVocabulary.DrawingEvidenceRecorded, note.Status);
+        Assert.Equal(MotionVocabulary.EvidenceClassificationEvidenceOnly, note.Classification);
+        Assert.Equal(MotionVocabulary.PhysicalResolutionNotResolved, note.PhysicalResolution);
+        Assert.False(string.IsNullOrWhiteSpace(note.Statement));
+        Assert.False(string.IsNullOrWhiteSpace(note.Effect));
+
+        // Evidence only: the note does not make any row ambiguous and does not override the Owner.
+        Assert.All(catalogue.WaterJets, binding => Assert.Equal(MotionVocabulary.MappingConfirmedOwner, binding.MappingStatus));
+        Assert.All(catalogue.WaterJets, binding => Assert.Equal(MotionVocabulary.BasisOwnerConfirmed, binding.MappingBasis));
+
+        // No open-decision status survives anywhere in the published surface.
+        Assert.False(MotionVocabulary.StatusText.ContainsKey("OWNER_DECISION_REQUIRED"));
+        Assert.DoesNotContain("OWNER_DECISION_REQUIRED", catalogue.StatusLegend);
+        Assert.DoesNotContain("OWNER_DECISION_REQUIRED", catalogue.CanonicalText);
+
+        // The note is published, and it says the discrepancy is not physically resolved.
+        Assert.Contains("EVIDENCE NOTES 1", catalogue.CanonicalText);
+        Assert.Contains(MotionVocabulary.DrawingEvidenceRecorded, catalogue.CanonicalText);
+        Assert.Contains(MotionVocabulary.EvidenceClassificationEvidenceOnly, catalogue.CanonicalText);
+        Assert.Contains(MotionVocabulary.PhysicalResolutionNotResolved, catalogue.CanonicalText);
     }
 
     [Fact]
@@ -322,6 +396,14 @@ public sealed class MotionCommissioningTests
         Assert.Equal(MotionVocabulary.JournalPersistenceNone, projection.CommandTotals.JournalPersistence);
         Assert.Equal(MotionVocabulary.SessionStateNoSession, projection.SessionState);
     }
+
+    /// <summary>The canonical Horizontal Axis letter of one Water Jet, read from the catalogue.</summary>
+    private static string HorizontalOf(MotionCommissioningCatalogue catalogue, string waterJetId) =>
+        catalogue.WaterJets.Single(binding => binding.WaterJetId == waterJetId).HorizontalAxisId;
+
+    /// <summary>The canonical Vertical Axis letter of one Water Jet, read from the catalogue.</summary>
+    private static string VerticalOf(MotionCommissioningCatalogue catalogue, string waterJetId) =>
+        catalogue.WaterJets.Single(binding => binding.WaterJetId == waterJetId).VerticalAxisId;
 
     private static MotionCommandIntent ValidIntent(string intent, string controllerId, string axisId) => new()
     {

@@ -252,13 +252,17 @@
       axis is homed, no software limit is commissioned, no brake state is read and no motion command has been issued. The
       authorization gate is CLOSED and every motion intent is refused before any hardware path is reached.</p>
       <p class="note">The axis role is always written as <strong>Horizontal Axis</strong> or <strong>Vertical Axis</strong>.
-      The controller axis label (A, B, C, D) shown beside it is the identity an engineer needs when working on the controller
-      itself. Values are published in controller units: no counts-to-millimetre conversion is verified, so no value is shown
-      in millimetres and no Legacy value has been promoted to configuration.</p>
+      The physical controller axis letter (A, B, C, D) may appear only as diagnostic identity beside the role, never instead
+      of it: <strong>Horizontal Axis · A</strong>. Values are published in controller units: no counts-to-millimetre
+      conversion is verified, so no value is shown in millimetres and no Legacy value has been promoted to configuration.</p>
+      <p class="note">This section is the <strong>static</strong> motion commissioning catalogue. It is served by the dedicated
+      read-only route <code>/api/motion-commissioning/catalogue</code> and is deliberately carried by neither the Runtime
+      Snapshot nor a Runtime Delta: it does not change with a revision, so it is not re-sent with every Snapshot. The Snapshot
+      stays reserved for dynamic observed motion state, none of which is authorized in this revision.</p>
       <p class="alert" id="motion-gate-status" role="status"></p>
       <h3>Summary</h3>
       <div class="summary" id="motion-summary"></div>
-      <h3>Water Jet axis allocation <span class="hint">Owner-confirmed · Horizontal Axis / Vertical Axis</span></h3>
+      <h3>Water Jet axis allocation <span class="hint">canonical · Owner-confirmed · Horizontal Axis / Vertical Axis</span></h3>
       <div class="table-wrap" id="motion-waterjets-wrap">
         <div id="motion-waterjets-body"></div>
       </div>
@@ -284,11 +288,8 @@
       </div>
       <h3>Jog speed <span class="hint">display value only · never executable</span></h3>
       <div id="motion-jog-body"></div>
-      <h3>Mapping conflicts <span class="hint">open Owner decisions, never suppressed</span></h3>
-      <ul class="legend" id="motion-conflicts"></ul>
-      <h3>Runtime motion state <span class="hint">read from the local Runtime Snapshot only</span></h3>
-      <button type="button" id="motion-refresh">Refresh Runtime motion state (read-only)</button>
-      <div id="motion-runtime-body" role="status"></div>
+      <h3>Recorded Drawing evidence notes <span class="hint">evidence only · not canonical · not physically resolved</span></h3>
+      <ul class="legend" id="motion-evidence-notes"></ul>
       <h3>Not verified <span class="hint">what this projection deliberately does not claim</span></h3>
       <ul class="legend" id="motion-not-verified"></ul>
       <h3>Status legend <span class="hint">every state is written out as text, never shown by colour alone</span></h3>

@@ -72,13 +72,5 @@ public sealed record RuntimeState
     /// <summary>Deterministic one-Node TC acquisition state for the Product vertical slice. Null when no acquisition state has been published.</summary>
     public TcAcquisitionState? TcAcquisition { get; init; }
 
-    /// <summary>
-    /// The read-only Application-owned motion commissioning projection (four motion controllers,
-    /// sixteen axes, eight Water Jet axis allocations). It is composed at initial composition from
-    /// the Owner-confirmed topology and the standing not-configured state; no commit path changes
-    /// it, it is Snapshot-only and it is never carried in a Delta.
-    /// </summary>
-    public MotionCommissioningProjection? Motion { get; init; }
-
     public required TrendWindow Trend { get; init; }
 }
