@@ -47,16 +47,10 @@ public sealed class MotionControllerIdentitySessionTests
 
         public bool ReleaseResult = true;
         public readonly List<string> ReleasedModuleFileNames = new();
-        public Func<string, bool>? LoadFailure;
-        public Action? OnOpen;
 
         public IntPtr LoadApprovedModule(string approvedAbsolutePath)
         {
             Log.Add("load");
-            if (LoadFailure is not null && LoadFailure(approvedAbsolutePath))
-            {
-                return IntPtr.Zero;
-            }
 
             var module = NextModuleHandle;
             NextModuleHandle = IntPtr.Add(NextModuleHandle, 1);
@@ -96,7 +90,6 @@ public sealed class MotionControllerIdentitySessionTests
             Log.Add("open");
             OpenCount++;
             LastAddress = Encoding.ASCII.GetString(addressBuffer, 0, addressBuffer.Length - 1);
-            OnOpen?.Invoke();
             handle = OpenResult == 0 ? OpenHandle : IntPtr.Zero;
             return OpenResult;
         }
