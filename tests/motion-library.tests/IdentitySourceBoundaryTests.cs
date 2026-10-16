@@ -27,6 +27,33 @@ public sealed class IdentitySourceBoundaryTests
         return directory.FullName;
     }
 
+    private static bool IsGateSourceFile(string root, string file)
+    {
+        if (ContainsBuildOutputDirectory(Path.GetRelativePath(root, file)))
+        {
+            return false;
+        }
+
+        return file.EndsWith(".cs", StringComparison.Ordinal)
+            || file.EndsWith(".csproj", StringComparison.Ordinal)
+            || file.EndsWith(".md", StringComparison.Ordinal);
+    }
+
+    private static bool ContainsBuildOutputDirectory(string relativePath)
+    {
+        var segments = relativePath.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 0; index < segments.Length - 1; index++)
+        {
+            if (string.Equals(segments[index], "bin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(segments[index], "obj", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static List<string> IdentityGateFiles()
     {
         var root = RepoRoot();
@@ -40,9 +67,7 @@ public sealed class IdentitySourceBoundaryTests
             var directory = Path.Combine(root, segments[0], segments[1]);
             foreach (var file in Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories))
             {
-                if (file.EndsWith(".cs", StringComparison.Ordinal)
-                    || file.EndsWith(".csproj", StringComparison.Ordinal)
-                    || file.EndsWith(".md", StringComparison.Ordinal))
+                if (IsGateSourceFile(root, file))
                 {
                     files.Add(file);
                 }
@@ -51,6 +76,36 @@ public sealed class IdentitySourceBoundaryTests
 
         Assert.NotEmpty(files);
         return files;
+    }
+
+    [Fact]
+    public void Gate_Source_Filter_Excludes_Build_Output_By_Exact_Path_Segment()
+    {
+        var root = RepoRoot();
+        var authoredSource = Path.Combine(root, "adapters", "motion-library", "MotionControllerIdentitySession.cs");
+        Assert.True(IsGateSourceFile(root, authoredSource));
+        Assert.Contains(authoredSource, IdentityGateFiles());
+
+        var generatedObjAssemblyInfo = Path.Combine(
+            root, "adapters", "motion-library", "obj", "Release", "net10.0", "Wjss.Adapters.MotionLibrary.AssemblyInfo.cs");
+        var generatedBinSource = Path.Combine(
+            root, "apps", "motion-identity", "bin", "Release", "net10.0", "GeneratedAssemblyInfo.cs");
+        Assert.False(IsGateSourceFile(root, generatedObjAssemblyInfo));
+        Assert.False(IsGateSourceFile(root, generatedBinSource));
+        Assert.True(ContainsBuildOutputDirectory("adapters/motion-library/obj/Release/net10.0/AssemblyInfo.cs"));
+        Assert.True(ContainsBuildOutputDirectory("apps\\motion-identity\\bin\\Release\\net10.0\\AssemblyInfo.cs"));
+
+        var lookalikeSegments = Path.Combine(root, "adapters", "motion-library", "binary", "object-store", "Identity_bin.cs");
+        var lookalikeFileName = Path.Combine(root, "adapters", "motion-library", "source", "obj.cs");
+        Assert.True(IsGateSourceFile(root, lookalikeSegments));
+        Assert.True(IsGateSourceFile(root, lookalikeFileName));
+        Assert.True(IsGateSourceFile(root, Path.Combine(root, "adapters", "motion-library", "README.md")));
+        Assert.True(IsGateSourceFile(root, Path.Combine(root, "adapters", "motion-library", "Gate.csproj")));
+        Assert.False(IsGateSourceFile(root, Path.Combine(root, "adapters", "motion-library", "notes.txt")));
+
+        Assert.All(
+            IdentityGateFiles(),
+            file => Assert.False(ContainsBuildOutputDirectory(Path.GetRelativePath(root, file))));
     }
 
     private static string ReadIdentityGateSources()
