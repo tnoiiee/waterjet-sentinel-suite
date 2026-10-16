@@ -38,6 +38,26 @@ public sealed class MotionCommissioningTests
         ("D", "OUTPUT_4"),
     ];
 
+    /// <summary>The four WSB cabinet identities of the four motion controllers, in controller order.</summary>
+    private static readonly string[] ExpectedCabinetIds = ["WSB1", "WSB2", "WSB3", "WSB4"];
+
+    /// <summary>The three installed limit inputs of every axis, in Reverse, Home, Forward order.</summary>
+    private static readonly string[] ExpectedLimitSignalRoles =
+    [
+        MotionVocabulary.SignalReverse,
+        MotionVocabulary.SignalHome,
+        MotionVocabulary.SignalForward,
+    ];
+
+    /// <summary>The eight Water Jets, in Water Jet ordinal order.</summary>
+    private static readonly string[] ExpectedWaterJetIds = ["WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8"];
+
+    /// <summary>The two Water Jets named by the Drawing rev1 discrepancy note, in Water Jet ordinal order.</summary>
+    private static readonly string[] ExpectedDiscrepancyWaterJetIds = ["WJ2", "WJ4"];
+
+    /// <summary>The two cabinets named by the Drawing rev1 discrepancy note, in Water Jet ordinal order.</summary>
+    private static readonly string[] ExpectedDiscrepancyCabinetIds = ["WSB1", "WSB2"];
+
     [Fact]
     public void The_Authorization_Gate_Is_Closed_And_Carries_The_Gate_Reason()
     {
@@ -133,7 +153,7 @@ public sealed class MotionCommissioningTests
         Assert.Equal(MotionVocabulary.MotionTopologyRevision, projection.MotionTopologyRevision);
 
         var cabinets = projection.Controllers.Select(controller => controller.Identity.CabinetId).ToArray();
-        Assert.Equal(new[] { "WSB1", "WSB2", "WSB3", "WSB4" }, cabinets);
+        Assert.Equal(ExpectedCabinetIds, cabinets);
         Assert.All(projection.Controllers, controller => Assert.Equal(4, controller.Identity.AxisCount));
         Assert.All(projection.Controllers, controller => Assert.Equal("DMC-B140-M", controller.Identity.ControllerModel));
         Assert.All(projection.Controllers,
@@ -242,7 +262,7 @@ public sealed class MotionCommissioningTests
 
             // Three installed limit inputs, in Reverse, Home, Forward order, all unconfirmed and unknown.
             var roles = state.LimitSignals.Select(signal => signal.SignalRole).ToArray();
-            Assert.Equal(new[] { MotionVocabulary.SignalReverse, MotionVocabulary.SignalHome, MotionVocabulary.SignalForward }, roles);
+            Assert.Equal(ExpectedLimitSignalRoles, roles);
             Assert.All(state.LimitSignals, signal => Assert.Equal(MotionVocabulary.PolarityUnconfirmed, signal.PolarityStatus));
             Assert.All(state.LimitSignals, signal => Assert.Equal(MotionVocabulary.SignalStateUnknown, signal.SignalState));
             Assert.All(state.LimitSignals, signal => Assert.Equal(MotionVocabulary.StatusNotAvailable, signal.SignalStateStatus));
@@ -293,8 +313,7 @@ public sealed class MotionCommissioningTests
         var catalogue = MotionCommissioningProjector.Project();
 
         Assert.Equal(8, catalogue.WaterJets.Count);
-        Assert.Equal(new[] { "WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8" },
-            catalogue.WaterJets.Select(binding => binding.WaterJetId).ToArray());
+        Assert.Equal(ExpectedWaterJetIds, catalogue.WaterJets.Select(binding => binding.WaterJetId).ToArray());
 
         // No cabinet-derived axis formula: WSB1 and WSB2 each carry both axis pairs.
         Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ2"));
@@ -336,8 +355,8 @@ public sealed class MotionCommissioningTests
 
         var note = Assert.Single(catalogue.MappingEvidenceNotes);
         Assert.Equal(MotionVocabulary.EvidenceNoteIdWj2Wj4, note.EvidenceId);
-        Assert.Equal(new[] { "WJ2", "WJ4" }, note.WaterJetIds);
-        Assert.Equal(new[] { "WSB1", "WSB2" }, note.CabinetIds);
+        Assert.Equal(ExpectedDiscrepancyWaterJetIds, note.WaterJetIds);
+        Assert.Equal(ExpectedDiscrepancyCabinetIds, note.CabinetIds);
         Assert.Equal(MotionVocabulary.DrawingEvidenceRecorded, note.Status);
         Assert.Equal(MotionVocabulary.EvidenceClassificationEvidenceOnly, note.Classification);
         Assert.Equal(MotionVocabulary.PhysicalResolutionNotResolved, note.PhysicalResolution);
