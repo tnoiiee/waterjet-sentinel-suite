@@ -108,10 +108,33 @@ public sealed class ProbeSourceBoundaryTests
     [Fact]
     public void Only_The_Authorized_Export_Is_Named_And_No_Vendor_Import_Exists()
     {
-        var source = ReadGateSources();
-        Assert.Contains("\"gclib_version\"", source);
+        // The probe surface files keep the exact Gate A posture: the single authorized version
+        // export is named and no connection/close export may appear there. The B1 identity
+        // surface (MotionController* + apps/motion-identity) is pinned separately by
+        // IdentitySourceBoundaryTests with its own complete allow-list.
+        var probeSurface = string.Empty;
+        foreach (var file in GateFiles())
+        {
+            var name = Path.GetFileName(file);
+            if (name.StartsWith("MotionLibraryProbe", StringComparison.Ordinal)
+                || name.Equals("NativeKernel.cs", StringComparison.Ordinal)
+                || file.Contains(Path.Combine("apps", "motion-probe"), StringComparison.Ordinal))
+            {
+                probeSurface += File.ReadAllText(file) + "\n";
+            }
+        }
+
+        Assert.NotEqual(string.Empty, probeSurface);
+        Assert.Contains("\"gclib_version\"", probeSurface);
 
         foreach (var prohibited in new[] { "gclib_open", "gclib_close", "GVersion", "gcaps_version", "gclib_command", "gclib_examples" })
+        {
+            Assert.DoesNotContain(prohibited, probeSurface, StringComparison.Ordinal);
+        }
+
+        // Raw-command and legacy-wrapping vocabulary stays banned across the WHOLE gate set.
+        var source = ReadGateSources();
+        foreach (var prohibited in new[] { "GVersion", "gcaps_version", "gclib_command", "gclib_examples" })
         {
             Assert.DoesNotContain(prohibited, source, StringComparison.Ordinal);
         }

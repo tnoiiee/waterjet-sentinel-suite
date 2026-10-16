@@ -13,6 +13,37 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-16 — B1 one-controller identity software foundation (first-contact foundation; SOFTWARE ONLY; on branch)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local build and refusal-path harness runs are the
+validation of record ([runbook](docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md)). SOFTWARE ONLY:
+one direct connection attempt and the three typed identity reads (connection type, revision
+information, serial number); NO raw controller command, axis read, motion, controller
+configuration, discovery or gcaps; NO endpoint value, NIC change or hardware contact in this
+gate; B1-H First Contact is a SEPARATE authorization. The Motion authorization gate stays CLOSED
+and candidate values stay `NOT_CONFIGURED` / `NOT_COMMISSIONED`.**
+
+**What the Gate is.** A legacy-seeded, one-shot, fail-closed identity session on the existing
+native-library boundary: Gate A probe first (no connection attempt may precede the native
+identity/version proof), direct/no-gcaps posture enforced before any open
+(`gclib_force_gcaps` with the direct-only byte), one `gclib_open` attempt with the in-memory
+connection string `"<endpoint> --direct --timeout 2000"`, the three approved typed reads in
+fixed order, redacted identity classification (expected model token compared ordinally; absence
+is `MODEL_CONFIRMATION_REQUIRED`, never a false accept or reject; serial observed and redacted
+for Owner manual confirmation), then deterministic controller close and native-handle release on
+every path with a truthful cleanup state. One connection generation (late results rejected), one
+outstanding native operation (fail-fast busy), no retry, no reconnect, no polling, no replay.
+
+**Boundary.** `adapters/motion-library` gains the B1 identity surface (vendor-neutral session,
+endpoint resolver for `WJSS_MOTION_CONTROLLER_01_ENDPOINT`, allow-listed kernel seam reusing the
+single restricted loader; exactly six typed exports and no raw-command API resolvable — pinned by
+source-boundary tests). New isolated Owner-invoked harness `apps/motion-identity` (no arguments;
+exit 0/2/4; redacted JSON; no ports, files, UI or Runtime). Focused fake-kernel tests cover the
+complete B1 defect class. The probe surface keeps its exact Gate A posture. Legacy evidence pack
+(`FormCannonController` / `FormDataCenter` / `IDataProvider`) was inventoried for scope narrowing
+only; no legacy architecture, raw-command UI or auto-cleaning logic is imported.
+
 ### 2026-10-16 — Native load / version probe software gate (library inspection/loading only; on branch; PR OPEN, NOT MERGED)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
