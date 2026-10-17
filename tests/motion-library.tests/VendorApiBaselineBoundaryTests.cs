@@ -103,6 +103,8 @@ public sealed class VendorApiBaselineBoundaryTests
         "MotionControllerApi.cs",
         "MotionObservationTrialSession.cs",
         "MotionControllerIdentitySession.cs",
+        "MotionStopDispatchKernel.cs",
+        "MotionStopOwner.cs",
     };
 
     private static readonly string[] ProhibitedEntries =
@@ -594,7 +596,7 @@ public sealed class VendorApiBaselineBoundaryTests
     }
 
     [Fact]
-    public void No_C1_Implementation_Or_Write_Path_Exists_In_The_Adapter()
+    public void No_Unapproved_C1_Implementation_Or_Write_Path_Exists_In_The_Adapter()
     {
         foreach (var fileName in CommandCapableAdapterFiles)
         {
