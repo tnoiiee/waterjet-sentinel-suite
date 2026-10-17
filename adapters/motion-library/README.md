@@ -1,11 +1,14 @@
-# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface)
+# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface + B2 Observed-State Surface)
 
-**Gates:** Native Load / Version Probe Software Gate (Gate A) and the B1 one-controller identity
-software foundation. The adapter carries two separately authorized, strictly separated surfaces:
-the probe surface (library inspection/loading ONLY, unchanged) and the B1 identity surface (one
-direct connection attempt, three typed identity reads, deterministic close — no raw command of
-any kind). **Validation:** SOURCE-AUTHORED IN ARENA; NOT
-COMPILED IN ARENA — the Owner-local build and probe run are the validation of record
+**Gates:** Native Load / Version Probe Software Gate (Gate A), the B1 one-controller identity
+software foundation and the B2 read-only observed-state surface. The adapter carries three
+separately authorized, strictly separated surfaces: the probe surface (library inspection/loading
+ONLY, unchanged), the B1 identity surface (one direct connection attempt, three typed identity
+reads, deterministic close — no raw command of any kind) and the B2 observed-state surface (typed
+vocabulary, closed state model and session discipline plus ONE internal, typed, length-bounded
+read-only boundary over the four Legacy-evidenced reads — the verified subset is non-empty and is
+recorded in `docs/MOTION_OBSERVED_STATE_FOUNDATION.md`). **Validation:** SOURCE-AUTHORED IN
+ARENA; NOT COMPILED IN ARENA — the Owner-local build and probe run are the validation of record
 (see `docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md`).
 
 ## What this adapter is
@@ -58,6 +61,11 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
 | `MotionLibraryProbeOutcome.cs` | One redacted outcome: `Accepted`, one vocabulary code, redacted detail, version only on acceptance, truthful native-handle-release state. |
 | `NativeKernel.cs` | Internal OS loading surface (kernel32 `LoadLibraryExW`/`GetProcAddress`/`GetModuleFileNameW`/`FreeLibrary` with a restricted flag set) behind a narrow internal interface. |
 | `MotionLibraryProbeRunner.cs` | The ordered, fail-closed proof: existence → identity → architecture → companion load → module-path proof → primary load → module-path proof → single export → one bounded version call → version equality → deterministic unload. |
+| `MotionObservedStateVocabulary.cs` | B2 shape only: the four typed observation kinds and candidate identifiers, the closed axis and output sets, the six interpretation states (four reachable, `VERIFIED` reserved), the native-unit words, the acceptance words and the refusal vocabulary. No vendor command mnemonic and no command builder. |
+| `MotionObservedState.cs` | B2 model: the state (private constructor, no public factory, no position/limit/home/brake/fault/safe member), the typed request and the redacted outcome. |
+| `MotionObservationSession.cs` | B2 session: one owner, one outstanding observation, one generation, stale and replay rejection, deterministic idempotent close. Model mode has no I/O; reading mode reaches the wire only through the internal typed boundary. |
+| `MotionObservationCommandPlan.cs` | B2 plan (internal): the sixteen typed intents, the immutable literal request table, the fixed request and response bounds, and the bounded response parser. No native name, no handle and no I/O. |
+| `MotionControllerCommandKernel.cs` | B2 native boundary (internal): the one approved command-and-response export constant, its resolution through the already-authorized kernel seam, and the bound kernel that issues one typed intent and validates the reply. Holds no module and releases nothing. |
 
 ## Owner-local configuration (environment only; values never committed)
 
@@ -83,8 +91,11 @@ A one-shot, fail-closed identity session for the separately authorized B1 softwa
    loaded-module-path proofs;
 4. enforces the direct/no-gcaps posture (`gclib_force_gcaps` with the direct-only byte) BEFORE any
    open;
-5. opens exactly ONE controller handle with the in-memory open-address text
-   `"<endpoint> --direct --timeout 2000"`;
+5. opens exactly ONE controller handle with the in-memory controller address — the validated
+   canonical endpoint only, which is the documented `gclib_open()` address argument (gclib 2.6.0
+   manual, `gclib_open` entry, printed page 48); no option switch is appended, because
+   `--direct`/`--timeout` are documented for the deprecated legacy `GOpen()` parameter (printed
+   page 76) and direct mode is already selected process-wide by `gclib_force_gcaps(false)`;
 6. performs exactly three typed identity reads in fixed order — connection type (expected
    Ethernet), revision information (bounded, zeroed, printable-shape validated), serial number
    (nonzero required);
@@ -94,6 +105,12 @@ A one-shot, fail-closed identity session for the separately authorized B1 softwa
 8. closes the controller handle on EVERY post-open path and releases both module handles
    deterministically; the outcome always tells the truth about the final cleanup state.
 
+The single open attempt's library result is classified into ONE canonical redacted refusal word in
+the installed header order — `OPEN_INVALID_ARGUMENT`, `OPEN_INTERNAL_ERROR`, `CONNECTION_TIMEOUT`,
+`OPEN_COMMAND_ERROR`, `OPEN_BUFFER_TOO_SMALL`, `OPEN_NOT_CONNECTED`, `OPEN_NOT_SUBSCRIBED` — and
+any other non-zero value becomes `OPEN_RESULT_UNRECOGNISED`. The raw integer, the vendor error
+string and every native detail stay inside the boundary; the word is the whole diagnostic.
+
 Hard rules: one connection generation (late results rejected), one outstanding native operation
 (fail-fast busy), no retry, no reconnect, no polling, no replay, no raw command, no axis read, no
 motion, no controller configuration, no discovery. The session owns nothing reusable: it is the
@@ -102,3 +119,75 @@ isolated one-shot process boundary itself.
 Redaction: outcomes never contain an endpoint, a serial number, a native path, a hash or raw
 vendor error text. The endpoint variable (`WJSS_MOTION_CONTROLLER_01_ENDPOINT`) is process-local
 environment configuration only and is never committed.
+
+## B2 observed-state surface (verified subset non-empty; software only)
+
+The four read candidates of the Legacy baseline — axis status, first position value, second
+position value and one digital output — are real, documented vendor reads, and all four are in the
+**verified subset** (`VERIFIED_FOR_B2`). The Owner-authorized B2 surface resolves ONE further
+native command-and-response export behind a private, typed boundary:
+
+- an **intent is a type**, one of sixteen closed members; the request text is a LITERAL from an
+  immutable table, so no caller text, concatenation, format string or configuration value can
+  reach a request;
+- the axis domain is the four controller letters and the output domain is the Owner-confirmed
+  numbering 1 to 4 — nothing else resolves;
+- the request length and the response buffer are fixed, the reply has to be terminated and
+  printable, and the accepted value is one bounded decimal token; an empty, truncated,
+  non-printable, comma-separated, error-marked, hexadecimal or oversized reply becomes a refusal
+  word, never a repaired value;
+- no write, stop, jog, brake, home, define, move, auto, program-array or output-mutation mnemonic
+  exists in the table, so none can be formed;
+- the boundary is internal, has an internal constructor and is never exposed by a public member,
+  route, contract, outcome or UI; the read path is reachable only from inside this assembly;
+- the boundary holds no module handle and releases nothing: it is invalidated before the lifecycle
+  owner closes the controller handle and unloads the module, so it cannot outlive them.
+
+**Honesty rule.** A verified read is not a verified meaning. The two position candidates are
+reported `RAW_OBSERVED` (the value is preserved and no engineering meaning is adopted), and the
+status word and the output state are reported `UNCONFIRMED` (the value is preserved and no bit,
+polarity, wiring or brake meaning is attached). `VERIFIED` stays unreachable: no candidate has a
+commissioned meaning for this machine, and no millimetre conversion, limit polarity, Home, fault,
+brake or motion-complete statement is produced. An observation never enables a command: the Motion
+authorization gate stays CLOSED, endpoint configuration is `NOT_CONFIGURED` and the axes stay
+`NOT_COMMISSIONED`.
+
+`docs/MOTION_OBSERVED_STATE_FOUNDATION.md` records the per-candidate evidence, the private
+boundary, the scoped source-boundary exception (one exact file, one exact token), the separate
+Owner-local B1-H and B2-H gates, and the C1 contract that is documented but **NOT IMPLEMENTED**.
+
+The vendor contract behind both surfaces — the three-layer separation (current C interface,
+deprecated legacy interface, controller command language), the verified library entries with their
+printed-page citations, the open-address misuse rule, the result order and the API/command registry
+— is recorded in `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`. That document is evidence only:
+it authorizes nothing and it is not executable authority.
+
+## B2-H one-shot observation trial composition (software only)
+
+`MotionObservationTrialSession` is the smallest executable composition over that boundary. It is
+one-shot by construction and performs exactly this sequence:
+
+1. Gate A native identity/version proof (injected in tests, real probe runner in production);
+2. load only the approved modules through the restricted loader, companion first, and prove each
+   loaded path;
+3. resolve only the four authorized exports — `gclib_force_gcaps`, `gclib_open`, `gclib_close`
+   and the single scoped read export (named only in the internal boundary file);
+4. `gclib_force_gcaps(false)` before the open;
+5. exactly one `gclib_open` with the validated bare address;
+6. one `MotionObservationSession` bound to that handle and that export;
+7. the fixed sixteen typed intents, once, in plan order;
+8. boundary invalidation, then controller close, then module release, in that order;
+9. a redacted outcome whose cleanup flags are the measured truth.
+
+There is no retry, no reconnect, no replay, no polling, no timer, no background reader, no second
+open and no second session owner. A second `Run()` is refused with
+`OBSERVATION_TRIAL_ALREADY_RUN`. The first refused read stops the remaining sequence and keeps its
+own canonical code. Cleanup that cannot be confirmed turns an otherwise complete pass into
+`CLEANUP_UNPROVEN` or `NATIVE_UNLOAD_FAILED` — a partial pass is never reported as complete.
+
+The trial type has no string parameter, so no caller text can reach a request. `gclib_open`
+refusals reuse the single canonical B1 classification (`MotionControllerApi.ClassifyOpenRefusal`),
+so the two surfaces cannot drift.
+
+`docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md` is the runbook of record for the executable and for the
+Owner-local software gate; `apps/motion-observation` is the console harness.

@@ -63,7 +63,11 @@ public static class MotionControllerIdentityVocabulary
     /// <summary>The injected precondition evaluation detected a concurrent controller authority. Nothing was opened.</summary>
     public const string ConcurrentControllerAuthorityDetected = "CONCURRENT_CONTROLLER_AUTHORITY_DETECTED";
 
-    /// <summary>The single open attempt failed with a non-timeout library result.</summary>
+    /// <summary>
+    /// A non-open failure on the identity path: an identity read refused, or the single open call
+    /// threw before a library result could be classified. A classified open result never uses this
+    /// word; it uses the exact open-result code below.
+    /// </summary>
     public const string ConnectionFailed = "CONNECTION_FAILED";
 
     /// <summary>gclib_open reported success but returned a zero controller handle; no identity read was attempted.</summary>
@@ -71,6 +75,40 @@ public static class MotionControllerIdentityVocabulary
 
     /// <summary>The single open attempt timed out (library timeout 2000 ms).</summary>
     public const string ConnectionTimeout = "CONNECTION_TIMEOUT";
+
+    // ------------------------------------------------------- open-result classification
+
+    /// <summary>
+    /// The canonical classification of the single gclib_open result, in the installed gclib 2.6.0
+    /// header order. Each installed value keeps its own word so the Owner-local diagnosis can tell
+    /// an invalid argument from an internal fault, a timeout, a command fault, a buffer fault, a
+    /// not-connected state and a not-subscribed state without the raw integer, a vendor error
+    /// string or any other native detail. Any other non-zero result is
+    /// <see cref="OpenResultUnrecognised"/>.
+    /// </summary>
+    /// <remarks>gclib_open result GCLIB_INVALID_ARGUMENT (installed header value 1).</remarks>
+    public const string OpenInvalidArgument = "OPEN_INVALID_ARGUMENT";
+
+    /// <summary>gclib_open result GCLIB_INTERNAL_ERROR (installed header value 2).</summary>
+    public const string OpenInternalError = "OPEN_INTERNAL_ERROR";
+
+    /// <summary>gclib_open result GCLIB_COMMAND_ERROR (installed header value 4).</summary>
+    public const string OpenCommandError = "OPEN_COMMAND_ERROR";
+
+    /// <summary>gclib_open result GCLIB_BUFFER_TOO_SMALL (installed header value 5).</summary>
+    public const string OpenBufferTooSmall = "OPEN_BUFFER_TOO_SMALL";
+
+    /// <summary>gclib_open result GCLIB_NOT_CONNECTED (installed header value 6).</summary>
+    public const string OpenNotConnected = "OPEN_NOT_CONNECTED";
+
+    /// <summary>gclib_open result GCLIB_NOT_SUBSCRIBED (installed header value 7).</summary>
+    public const string OpenNotSubscribed = "OPEN_NOT_SUBSCRIBED";
+
+    /// <summary>
+    /// A non-zero gclib_open result outside the installed header order. It is neither successful
+    /// nor silently folded into a known failure; the value itself is never exposed.
+    /// </summary>
+    public const string OpenResultUnrecognised = "OPEN_RESULT_UNRECOGNISED";
 
     /// <summary>The open connection type was not the expected Ethernet type.</summary>
     public const string ConnectionTypeMismatch = "CONNECTION_TYPE_MISMATCH";

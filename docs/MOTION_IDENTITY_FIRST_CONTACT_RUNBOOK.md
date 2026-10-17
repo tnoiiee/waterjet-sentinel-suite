@@ -165,6 +165,11 @@ a time:
      a separate explicit Owner authorization.
    - Any other exit-2 refusal, invalid cleanup state, or unlisted outcome is a STOP; do not retry.
      In particular, `CONNECTION_HANDLE_INVALID` is a refusal, not a successful identity session.
+   - A refused open carries exactly one canonical classification — `OPEN_INVALID_ARGUMENT`,
+     `OPEN_INTERNAL_ERROR`, `CONNECTION_TIMEOUT`, `OPEN_COMMAND_ERROR`, `OPEN_BUFFER_TOO_SMALL`,
+     `OPEN_NOT_CONNECTED`, `OPEN_NOT_SUBSCRIBED` or `OPEN_RESULT_UNRECOGNISED`. Record the exact
+     word; the raw library value and any vendor error text are never printed, and a refused open is
+     never retried, reconnected or re-attempted in the same authorization.
    The serial is observed only in redacted form in every outcome.
 7. The Owner manually compares the displayed revision text with the expected `DMC-B140-M` model
    and decides whether the observed evidence identifies the intended MC-WSB1 unit, using the
@@ -172,6 +177,42 @@ a time:
    by itself confirms physical identity; the software never makes that claim.
 8. Redaction review of any transcript (no endpoint, no serial) and mandatory cleanup (variables
    removed, no vendor processes, worktree clean).
+
+### B.1 Documented open contract (gclib 2.6.0 manual)
+
+The manual is the authority for the value the harness passes to `gclib_open()`. The same contract,
+with the printed page citations, the deprecated-layer comparison and the Owner A/B observation, is
+committed in `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md` (section C and section D); this
+runbook remains the procedure of record. In summary:
+
+- `gclib_open(gclib_handle* h, const char* address)` — the second parameter is the controller
+  **address**, i.e. the address token the library reports for a detected controller; the
+  documented return for an unreachable controller is `GCLIB_NOT_CONNECTED` (section 11.1.5.4.7,
+  printed page 48).
+- The `--direct`, `--timeout`, `--baud` and related switches are documented for the **deprecated
+  legacy `GOpen()` `connection_string`** (section 11.2.3.2.1, printed page 76). They are not part
+  of the `gclib_open()` address argument.
+- Direct/no-gcaps operation is a process-wide selection made by `gclib_force_gcaps(false)`, and
+  the manual states it cannot be undone (section 11.1.5.4.6, printed page 48). That call is the
+  sole direct-mode authority in this harness.
+- `gclib_close()` takes the handle and zeroes it on success (section 11.1.5.4.9, printed page 49);
+  the connection example notes the controller may be left inconsistent if a program exits before
+  closing (section 2.2, printed page 4).
+
+The harness therefore passes the validated canonical endpoint and nothing else. It appends no
+option text, keeps no library timeout in the address, and performs no retry or reconnect.
+
+### B.2 Dated Owner-local native evidence (2026-10-17; historical, not rewritten)
+
+Three B1-H attempts that sent the earlier, longer address form (`<endpoint> --direct
+--timeout 2000`) reached the controller endpoint (ICMP and TCP 23 reachable) but `gclib_open`
+returned `GCLIB_NOT_CONNECTED`; the harness reported `OPEN_NOT_CONNECTED` with truthful cleanup.
+A minimal native C diagnostic against the exact installed header, import library and DLL
+reproduced this: the longer form returned result 6 with a non-zero handle, and `gclib_close`
+returned success and zeroed the handle. The same diagnostic with the bare endpoint returned
+result 0 (`GCLIB_SUCCESS`) with a non-zero handle, closed successfully. Both diagnostics called
+`gclib_force_gcaps(false)` before the open and performed no identity read, discovery, IP
+assignment, configuration, raw command, output access or motion.
 
 STOP and request an Owner decision if: any vendor service must be touched; the NIC sighting shows
 the standalone state incorrect; the harness refuses with any code not listed above; the cleanup

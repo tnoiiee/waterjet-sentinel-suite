@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Globalization;
 
 namespace Wjss.Adapters.MotionLibrary;
 
@@ -29,10 +28,14 @@ namespace Wjss.Adapters.MotionLibrary;
 ///         GCLIB_ETHERNET = 1, GCLIB_SERIAL, GCLIB_PCI
 ///     } gclib_connection_t;
 ///
-/// The connection-string switches are the documented address options of the same release
-/// ("--direct: connect directly to hardware instead of via gcaps"; "--timeout: timeout in ms"):
-/// the B1 session builds the open-address text in memory as
-/// "&lt;endpoint&gt; --direct --timeout 2000" and never persists it.
+/// Connection contract, from the gclib 2.6.0 manual (Google Drive, gclib.pdf):
+/// the gclib_open() entry (printed page 48) takes the controller ADDRESS — the address token the
+/// library reports for a detected controller, never an option string. The "--direct"/
+/// "--timeout" switches are documented for the deprecated legacy GOpen() parameter (printed
+/// page 76), not for gclib_open(). Direct/no-gcaps operation is selected process-wide by
+/// gclib_force_gcaps(false) (printed page 48, same section as gclib_open). The B1 session
+/// therefore builds the open value in memory from the validated endpoint only and never persists
+/// it.
 ///
 /// Nothing here is a raw controller command: B1 issues no command string of any kind.
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
@@ -113,16 +116,7 @@ public static class MotionControllerApi
     /// <summary>gclib_connection_t: GCLIB_PCI.</summary>
     public const int ConnectionTypePci = 3;
 
-    // ------------------------------------------------------------------ address and budgets
-
-    /// <summary>Documented connection-string switch selecting direct operations (no gcaps).</summary>
-    public const string DirectModeSwitch = "--direct";
-
-    /// <summary>Documented connection-string switch carrying the library timeout in milliseconds.</summary>
-    public const string TimeoutSwitch = "--timeout";
-
-    /// <summary>The approved connection/library timeout: 2000 ms (Owner-approved budget).</summary>
-    public const int ConnectionTimeoutMilliseconds = 2000;
+    // -------------------------------------------------------------------------- budgets
 
     /// <summary>The approved per-read budget: 2000 ms.</summary>
     public const int ReadBudgetMilliseconds = 2000;
@@ -137,19 +131,37 @@ public static class MotionControllerApi
     public const int RevisionBufferLength = 256;
 
     /// <summary>
-    /// Builds the one open-address text in memory only from the opaque configuration produced by
-    /// the endpoint resolver. Raw strings cannot enter this path from a public caller.
+    /// Builds the one open value in memory from the opaque configuration produced by the endpoint
+    /// resolver. Raw strings cannot enter this path from a public caller.
+    ///
+    /// The value is the validated canonical endpoint and NOTHING else: the manual's gclib_open()
+    /// entry (printed page 48) documents its second parameter as the controller address, and the
+    /// option switches belong to the deprecated legacy GOpen() parameter only (printed page 76).
+    /// Direct mode is not an address option here: it is the process-wide gclib_force_gcaps(false)
+    /// call the session makes before this value is used.
     /// </summary>
-    internal static string BuildDirectConnectionAddress(MotionControllerEndpointConfiguration configuration)
+    internal static string BuildOpenAddress(MotionControllerEndpointConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        return string.Concat(
-            configuration.EndpointValue,
-            " ",
-            DirectModeSwitch,
-            " ",
-            TimeoutSwitch,
-            " ",
-            ConnectionTimeoutMilliseconds.ToString(CultureInfo.InvariantCulture));
+        return configuration.EndpointValue;
     }
+
+    /// <summary>
+    /// The SINGLE canonical classification of one gclib_open result, shared by the B1 identity
+    /// session and the B2 observation trial so the mapping cannot drift. Each installed-header
+    /// value keeps its own redacted refusal word; a value outside the header keeps its own word so
+    /// an unexpected result is never confused with a known failure. The integer, the vendor error
+    /// string and every other native detail stay inside the boundary.
+    /// </summary>
+    internal static string ClassifyOpenRefusal(int openResult) => openResult switch
+    {
+        ResultInvalidArgument => MotionControllerIdentityVocabulary.OpenInvalidArgument,
+        ResultInternalError => MotionControllerIdentityVocabulary.OpenInternalError,
+        ResultTimeout => MotionControllerIdentityVocabulary.ConnectionTimeout,
+        ResultCommandError => MotionControllerIdentityVocabulary.OpenCommandError,
+        ResultBufferTooSmall => MotionControllerIdentityVocabulary.OpenBufferTooSmall,
+        ResultNotConnected => MotionControllerIdentityVocabulary.OpenNotConnected,
+        ResultNotSubscribed => MotionControllerIdentityVocabulary.OpenNotSubscribed,
+        _ => MotionControllerIdentityVocabulary.OpenResultUnrecognised,
+    };
 }

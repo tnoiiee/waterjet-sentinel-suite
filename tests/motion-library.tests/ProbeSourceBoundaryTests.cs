@@ -189,12 +189,25 @@ public sealed class ProbeSourceBoundaryTests
             Assert.DoesNotContain(prohibited, probeSurface, StringComparison.Ordinal);
         }
 
-        // Raw-command and legacy-wrapping vocabulary stays banned across the WHOLE gate set.
-        var source = ReadGateSources();
-        foreach (var prohibited in new[] { "GVersion", "gcaps_version", "gclib_command", "gclib_examples" })
+        // Raw-command and legacy-wrapping vocabulary stays banned across the WHOLE gate set,
+        // with the single Owner-authorized B2 exception: one exact file may name one exact
+        // token. Everything else in every other file remains prohibited.
+        var root = RepoRoot();
+        foreach (var file in GateFiles())
         {
-            Assert.DoesNotContain(prohibited, source, StringComparison.Ordinal);
+            var text = File.ReadAllText(file);
+            foreach (var prohibited in new[] { "GVersion", "gcaps_version", "gclib_command", "gclib_examples" })
+            {
+                if (B2CommandTokenException.Covers(root, file, prohibited))
+                {
+                    continue;
+                }
+
+                Assert.DoesNotContain(prohibited, text, StringComparison.Ordinal);
+            }
         }
+
+        var source = ReadGateSources();
 
         // The vendor module is reachable ONLY by explicit absolute-path load; never by a static
         // import. The adapter P/Invokes kernel32 exclusively.

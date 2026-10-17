@@ -4,7 +4,8 @@ namespace Wjss.Adapters.MotionLibrary;
 /// An opaque, validated Owner-local controller endpoint handle. Only the adapter assembly can
 /// construct it; the public resolver creates one only after the canonical endpoint checks pass.
 /// The raw value is an internal, non-serializing member used only by the one-shot session to build
-/// the in-memory open-address text. No public property or generated record formatter exposes it.
+/// the in-memory controller address it passes to gclib_open(). No public property or generated
+/// record formatter exposes it.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
 /// </summary>
@@ -38,8 +39,8 @@ public sealed class MotionControllerEndpointConfiguration
 /// only an environment reader, so no repository file can supply, override or default the value.
 /// The resolver is fail-closed and performs NO I/O: it validates shape only. The accepted shape
 /// is exactly one canonical dotted-quad IPv4 host address — no port, no scheme, no whitespace, no
-/// option text, no leading zeros — because the value is concatenated into a open-address text
-/// whose documented option switches must never be reachable from configuration. Loopback,
+/// option text, no leading zeros — because the value becomes the gclib_open() address itself, and
+/// the library timeout and direct posture must never be reachable from configuration. Loopback,
 /// unspecified and broadcast/multicast addresses are rejected. Nothing here probes, pings,
 /// resolves, scans or enumerates anything.
 /// </summary>
@@ -57,7 +58,7 @@ public static class MotionControllerEndpointResolver
     /// <summary>
     /// Reads and validates the endpoint. Fails closed on absence, blankness, any character
     /// outside digits and dots, any whitespace (so option text can never be smuggled into the
-    /// open-address text), any non-canonical octet, any port or scheme, and the loopback,
+    /// address), any non-canonical octet, any port or scheme, and the loopback,
     /// unspecified and broadcast/multicast address forms.
     /// </summary>
     public static bool TryResolve(

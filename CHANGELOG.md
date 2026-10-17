@@ -13,6 +13,247 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-17 — Integrity correction: B1-H model-confirmation provenance (DOCUMENTATION AND TEST EVIDENCE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: ON THE SESSION BRANCH — NOT MERGED; NO PRODUCT SOURCE, DEPENDENCY, PROJECT, LOCK OR FIXTURE
+CHANGE; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox). The Motion
+authorization gate stays CLOSED; endpoint configuration is `NOT_CONFIGURED`; the axes stay
+`NOT_COMMISSIONED`. No hardware operation was performed while producing this entry.**
+
+**Correction.** The closeout record stated that the B1-H identity contact observed the exact expected
+model token `DMC-B140-M` and therefore returned `MODEL_MATCHED`, `IDENTITY_SESSION_COMPLETE` and
+exit 0. That statement was wrong and is corrected here explicitly rather than silently rewritten.
+
+**Accepted evidence, as four separate records.** The bounded revision response actually observed was
+`DMCB140 Rev 1.0c2`; the exact expected token `DMC-B140-M` was **not** present in it
+(HARNESS OBSERVATION). The harness therefore followed its documented manual-confirmation path and
+reported `MODEL_CONFIRMATION_REQUIRED` as a non-accepted software outcome with exit 2, the serial
+observed and redacted, the connection established over Ethernet, and both cleanup steps proven
+(HARNESS CLASSIFICATION). The Owner then confirmed manually that `DMCB140 Rev 1.0c2` identifies the
+expected controller model `DMC-B140-M` (OWNER CONFIRMATION) and accepted the B1-H WSB1 / MC-WSB1
+identity first contact as **PASS** (FINAL OWNER ACCEPTANCE).
+
+**Unchanged.** B1-H remains **PASS**, and B2-H remains **PASS** with all sixteen readings and their
+published value texts unchanged. The automatic `MODEL_MATCHED` → `IDENTITY_SESSION_COMPLETE` → exit 0
+path is a separate software path proven only by its unit tests with a synthetic revision that
+contains the token; it was not this contact's result, and the earlier entry is not altered to imply
+otherwise. Both paths still carry `OWNER_MANUAL_CONFIRMATION_REQUIRED`, because an automatic match is
+a string comparison, not a physical identity confirmation.
+
+**Secondary documentation punchlist.** Two stale XML comments in
+`adapters/motion-library/MotionObservedState.cs` still claim that only `UNAVAILABLE` is reachable,
+while the committed B2 boundary produces `RAW_OBSERVED` and `UNCONFIRMED` for accepted reads. They are
+comment-only and are recorded for PR #32 in the vendor baseline section K.5. Product Source is
+deliberately unchanged in this pass.
+
+### 2026-10-17 — PR #31 evidence closeout: vendor API baseline, registry and intake protocol (DOCUMENTATION AND EVIDENCE ONLY; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: ON THE SESSION BRANCH — NOT MERGED; NO PRODUCT SOURCE CHANGE; AGENT-LOCAL .NET BUILD/TEST
+NOT RUN (no .NET SDK in the Agent sandbox); the Owner-local build and run remain the validation of
+record. SOFTWARE ONLY: the Agent contacted no controller and performed no additional hardware
+contact of any kind. The Motion authorization gate stays CLOSED; endpoint configuration is
+`NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Addition.** A new canonical evidence document,
+`docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`, records the vendor interface contract the motion
+adapter depends on, derived read-only from the exact vendor document (version 2.6.0, cited by
+printed page; the document itself is not committed). It separates the three interfaces that are
+routinely conflated — the current C interface, the deprecated legacy interface and the controller
+command language — records eight verified library contracts plus three supporting entries, states
+the `gclib_open` misuse-regression rule with the Owner A/B observation (option-suffixed value →
+`GCLIB_NOT_CONNECTED`; bare validated address → `GCLIB_SUCCESS`), pins the result order 0-7, adds a
+five-status API/command registry (including the thirteen non-executable C1 candidates), and defines
+the mandatory fifteen-step new-API/new-command intake protocol with its prohibitions.
+
+**Hardware evidence recorded, not produced.** The same document records the Owner-reported **B1-H
+PASS** (identity first contact) and **B2-H PASS** (read-only trial, 16 of 16 reads accepted, open
+`GCLIB_SUCCESS`, boundary invalidated before the close, handle closed, native handles released,
+exit 0) in redacted form. The sixteen observed value texts are published with the Owner's explicit
+authorization; no endpoint, serial, host, path, hash, request text, vendor error string or raw JSON
+envelope is committed, and no bit, limit, Home, fault, brake, unit or motion meaning is inferred
+from any value.
+
+**Lock position.** The genuine Owner-generated `apps/motion-observation/packages.lock.json` (Owner
+commit `2d2ebe41`) is on the branch, closing the previous `BLOCKED PENDING OWNER` position. It was
+not regenerated, rewritten or reformatted, and no other lock file changed.
+
+**No new capability.** No Product source, test project, dependency, package pin, lock file,
+fixture, contract, route, UI, Runtime composition or roadmap item changed. C1 remains documented and
+**NOT IMPLEMENTED**; every C1 candidate is non-executable and carries
+`BLOCKED_PENDING_VENDOR_EVIDENCE` or `NOT_REVIEWED`.
+
+### 2026-10-17 — B2-H one-shot read-only observation executable composition (addition; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local build and run are the validation of record
+([runbook](docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md)). SOFTWARE ONLY: the Agent contacted no
+controller, loaded no library and opened no handle. The Motion authorization gate stays CLOSED;
+endpoint configuration is `NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Addition.** The B2 read boundary now has its smallest executable composition: one Owner-invoked
+console harness (`apps/motion-observation`, registered in the solution) over the one-shot
+`MotionObservationTrialSession`. The composition performs, exactly once and in order: invocation
+validation, Owner-local native configuration resolution, Gate A proof, endpoint resolution through
+the validated resolver, restricted load of the approved modules with path proof, resolution of only
+the four authorized exports, `gclib_force_gcaps(false)` before the open, exactly one `gclib_open`
+with the validated bare address, one observation session bound to that handle, the fixed sixteen
+typed intents in deterministic order, then boundary invalidation, controller close and module
+release in that order, and a redacted outcome whose cleanup flags are the measured truth.
+
+**No new capability.** There is no string parameter on the trial, no raw command, no arbitrary axis,
+output or subject, no retry, no reconnect, no replay, no polling, no timer, no background reader,
+no second open, no second session owner, no write, no motion, no output control, no configuration
+write and no discovery. The first refused read stops the remaining sequence. A cleanup that cannot
+be confirmed prevents acceptance. `gclib_open` refusals now reuse one canonical classification
+shared by B1 and B2, so the two surfaces cannot drift.
+
+**Tests (authored, not executed in Arena).** A focused trial-composition suite covers the fixed
+plan and its order, the native lifecycle order (force before open, invalidate before close, close
+before release), refusal and cleanup paths, the one-shot guard, the canonical open classification
+and redaction; an invocation-boundary suite covers the no-argument harness, the single
+configuration source, the absence of a text-to-request path, and the absence of a new dependency,
+build output or Runtime/contracts coupling.
+
+**Lock position.** This checkpoint adds one project, so exactly one genuine lock file is expected
+from the Owner-local restore: `apps/motion-observation/packages.lock.json`. It is never
+hand-authored; until it exists on the branch the lock status is `BLOCKED PENDING OWNER`.
+
+**Unchanged.** B1 lifecycle, its six-export allow-list and its harness; the B2 read plan, its
+sixteen literals and its scoped source-boundary exception; the native probe surface; the
+commissioning contracts; the Runtime composition; the Preview and its routes; the Motion
+authorization gate; every dependency pin; every existing lock file.
+
+### 2026-10-17 — B1 gclib_open address corrected to the documented Vendor contract (correction; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local build and run are the validation of record
+([runbook](docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md)). SOFTWARE ONLY: the Agent contacted no
+controller and loaded no library. The Motion authorization gate stays CLOSED; endpoint
+configuration is `NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Correction.** Earlier B1 code passed the longer address form `<endpoint> --direct --timeout
+2000` to `gclib_open`. The gclib 2.6.0 manual's `gclib_open` entry (printed page 48) documents the
+second parameter as the controller address token, never an option string; the `--direct`/
+`--timeout` switches are documented for the deprecated legacy `GOpen()` parameter (printed
+page 76); and direct/no-gcaps is the process-wide, irreversible `gclib_force_gcaps(false)` from
+the same page as `gclib_open`. The B1 session now passes the validated canonical endpoint and
+nothing else, keeps `gclib_force_gcaps(false)` as the sole direct-mode authority, and drops the
+three address-option constants that became dead.
+
+**Owner-local evidence (dated, not rewritten).** Three B1-H attempts with the longer form reached
+the endpoint but returned `GCLIB_NOT_CONNECTED`; a minimal native C diagnostic against the exact
+installed header, import library and DLL reproduced result 6 for the longer form and result 0
+(`GCLIB_SUCCESS`) for the bare endpoint, with both non-zero handles closed successfully. No
+identity read, discovery, IP assignment, configuration, raw command, output access or motion
+occurred in either diagnostic.
+
+### 2026-10-17 — B2 verified read-only subset and private internal controller read boundary (correction; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local software gate is the validation of record
+([foundation](docs/MOTION_OBSERVED_STATE_FOUNDATION.md)). SOFTWARE ONLY: no controller was
+contacted, no library was loaded and no export was resolved. The Motion authorization gate stays
+CLOSED; endpoint configuration is `NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Correction.** The earlier entry below read the B1 sentence "no raw controller command, no axis
+read" as a permanent prohibition of every B2 read, and consequently recorded an EMPTY verified
+subset. That reading was wrong: the sentence describes the B1 identity surface. The Owner
+separately authorized a private, internal, typed, read-only B2 boundary under explicit conditions.
+The four Legacy read candidates are now `VERIFIED_FOR_B2` and implemented; the B1 surface is
+unchanged.
+
+**The boundary.** A closed set of sixteen typed intents (three axis kinds over axes A-D plus
+outputs 1-4), an immutable literal request table with no interpolation, a fixed request-length
+bound, a fixed response buffer, termination and printable-byte validation, a bounded decimal
+parser, and an exact zero-or-one check for an output state. An empty, truncated, non-printable,
+comma-separated, error-marked, hexadecimal or oversized reply is a refusal word, never a repaired
+or rounded value. No write, stop, jog, brake, home, define, move, auto, program-array or
+output-mutation operation exists in the table. The boundary is internal, is never returned by a
+public member, holds no module handle and is invalidated before the lifecycle owner closes the
+controller handle and unloads the module.
+
+**Interpretation stays weaker than the read.** The two position candidates are reported
+`RAW_OBSERVED` and the status word and output state `UNCONFIRMED`. `VERIFIED` stays unreachable:
+no millimetre conversion, limit polarity, Home, fault, brake or motion-complete meaning is
+produced, and an observation never enables a command.
+
+**Scoped source-boundary exception.** The repository-wide prohibition on naming a raw command API
+is unchanged. Exactly one file may name exactly one token, matched by exact repository-relative
+path and exact ordinal token, so a wildcard, a sibling file, a nested path, a case variant or a
+build-output path is not covered, and no write or control mnemonic, public command API, Runtime,
+contracts, UI or B1 harness file is covered either.
+
+**Documents corrected.** The evidence baseline now records the verified subset, the per-candidate
+read-only proof, the response bounds and the interpretation limits (sections B.2, B.4 and H), with
+the STOP resolution in G.2 and the decision status in G.3. The foundation document records the
+authority split, the boundary and the two separate B2-H tiers. The adapter README describes the
+surface rather than a blocked model. C1 remains documented and **NOT IMPLEMENTED** (PR #32
+candidate).
+
+**NOT VERIFIED / NOT RUN here:** any compilation or test execution; any controller contact, read,
+motion or brake operation; any status-bit, polarity, output-numbering or unit fact.
+
+**No dependency, project or lock change:** no project added, no package pin changed, no lock file
+touched, no contract, Snapshot, Delta or fixture changed, no route or UI change.
+
+### 2026-10-17 — B2 read-only observed-state foundation and redacted Legacy baseline (SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local software gate is the validation of record
+([foundation](docs/MOTION_OBSERVED_STATE_FOUNDATION.md)). SOFTWARE ONLY: the verified read subset
+is EMPTY and no read is implemented. The four B2 candidates — axis status, commanded position,
+actual position and one digital output — are real, documented vendor reads, and each one needs the
+raw command-and-response path that the B1 authority line forbids ("no raw controller command, no
+axis read") and that the source-boundary tests pin as a prohibited token. A seventh native export
+would be an authorization change, so it was reported to the Owner instead of being taken. The
+Motion authorization gate stays CLOSED; endpoint configuration is `NOT_CONFIGURED` and the axes
+stay `NOT_COMMISSIONED`.**
+
+**Redacted Legacy baseline.** `docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md` records the
+seven-path Legacy pack (controller, designer and resource files plus the provider contract) with
+sections A–G: provenance and integrity, the exact command inventory (liveness read, output-bank
+clear, home velocity and switch search, begin motion, stop, brake set and clear, output read,
+acceleration, speed, deceleration, absolute target, jog, position define, encoder define, status
+word, commanded position, actual position, input read) with per-command site, caller, origin,
+native unit, ordering, failure, cleanup, concurrency, vendor verification and disposition; the
+control flows; twenty-one Legacy defects; the WJSS correction and its status; the checkpoint mapping;
+and the evidence gaps plus the STOP items. Every endpoint, coordinate and commissioning constant
+is redacted; no Legacy source line is copied; the pack is not committed.
+
+**B2 surface.** `adapters/motion-library` gains a typed vocabulary (four kinds, four axes, the
+Owner-confirmed output numbering, six interpretation states of which only `UNAVAILABLE` and
+`REFUSED` are reachable), a closed state model with a private constructor and no public factory
+and NO position, limit, home, brake, fault or "safe" member, and one session with a single
+observation slot, one generation, stale and replay rejection and deterministic idempotent close.
+The B2 sources contain no I/O, no native import, no endpoint type, no socket, no file access and
+no command text; a valid request returns `UNAVAILABLE` with
+`OBSERVATION_SURFACE_NOT_AUTHORIZED` and an invalid or disallowed request returns `REFUSED`. An
+observation can never enable a command. New focused tests pin the four BLOCKED dispositions, the
+reachable-state set, the model shape, the one-owner/one-outstanding/generation fence and the
+absence of command material.
+
+**C1 documented, NOT IMPLEMENTED.** `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` states the C1
+prerequisites and contract shape for a future Owner-authorized read: an explicit export and command
+set, interpretation evidence, a single connection owner, bounded redacted responses, preserved
+native units and the rule that an observation never enables a command. No export, session, parser,
+test or configuration exists for C1, and B2-H contains no device step because no B2 operation is
+authorized.
+
+**Dependencies/locks/fixtures.** No project added, no package added, no version pin changed, no
+`Directory.Packages.props` change, no lock file touched, no contract, Snapshot, Delta or fixture
+changed, no route or UI change. `dotnet restore --locked-mode` must remain clean; a genuine new
+lock would be a STOP condition.
+
+**NOT VERIFIED / NOT RUN here:** any compilation or test execution; any controller contact, read,
+motion or brake operation; any status-bit, polarity, output-numbering or unit fact. Owner-local
+sequence: B1-H per its own runbook if separately authorized, then the B2-H software gate on the
+exact PR head, then a separate Owner decision on C1.
+
+**Superseded in part:** the statements in this entry that the verified read subset is EMPTY and
+that all four candidates are BLOCKED are superseded by the correction entry above. The B1 identity
+surface described here is unchanged. See the foundation document section 3 and the evidence
+baseline sections B.4, G.2 and H.
+
 ### 2026-10-16 — B1 one-controller identity software foundation (first-contact foundation; SOFTWARE ONLY; on branch)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no

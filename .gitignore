@@ -493,6 +493,13 @@ apps/motion-identity/**/*.obj
 apps/motion-identity/**/*.h
 apps/motion-identity/**/*.hpp
 apps/motion-identity/**/*.pdb
+apps/motion-observation/**/*.dll
+apps/motion-observation/**/*.lib
+apps/motion-observation/**/*.exp
+apps/motion-observation/**/*.obj
+apps/motion-observation/**/*.h
+apps/motion-observation/**/*.hpp
+apps/motion-observation/**/*.pdb
 
 # ---------------------------------------------------------------------------
 # WJSS amendment (Stage 0.3A-1, Owner-approved gate section 6):

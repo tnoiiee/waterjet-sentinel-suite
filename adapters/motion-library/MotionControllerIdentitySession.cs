@@ -331,9 +331,12 @@ public sealed class MotionControllerIdentitySession
                 return outcome;
             }
 
-            // Phase 4: exactly one open attempt with the in-memory direct open-address text.
+            // Phase 4: exactly one open attempt with the in-memory validated controller address.
+            // gclib_open() takes the controller address token, never an option string; the
+            // direct/no-gcaps posture was already enforced by gclib_force_gcaps(false) above
+            // (gclib 2.6.0 manual, gclib_open and gclib_force_gcaps entries, printed page 48).
             var addressBuffer = ToAsciiBuffer(
-                MotionControllerApi.BuildDirectConnectionAddress(_endpointConfiguration));
+                MotionControllerApi.BuildOpenAddress(_endpointConfiguration));
             var capturedOpen = CurrentGeneration;
             if (!TryBeginNativeOperation())
             {
@@ -379,15 +382,18 @@ public sealed class MotionControllerIdentitySession
 
             if (openResult != MotionControllerApi.ResultSuccess)
             {
-                outcome = MotionControllerIdentityOutcome.Refused(
-                    openResult == MotionControllerApi.ResultTimeout
-                        ? MotionControllerIdentityVocabulary.ConnectionTimeout
-                        : MotionControllerIdentityVocabulary.ConnectionFailed,
+                var refusalCode = MotionControllerApi.ClassifyOpenRefusal(openResult);
+                var refusalDetail =
                     openResult == MotionControllerApi.ResultTimeout
                         ? "The single open attempt timed out within the library timeout (2000 ms). " +
                           "There is no retry and no reconnect; the session is over."
-                        : "The single open attempt failed. There is no retry and no reconnect; the " +
-                          "session is over.",
+                        : "The single open attempt was refused and classified with the canonical " +
+                          "open-result word carried by this code, in the installed library result " +
+                          "order. There is no retry, no reconnect and no vendor error text; the " +
+                          "session is over.";
+                outcome = MotionControllerIdentityOutcome.Refused(
+                    refusalCode,
+                    refusalDetail,
                     CurrentGeneration,
                     controllerHandleClosed: false,
                     nativeHandlesReleased: false);
