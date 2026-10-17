@@ -484,31 +484,72 @@ deterministic close — per `docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md`. Exe
 the Owner workstation, at the head recorded in the closeout. The Agent did not run, repeat or
 observe it.
 
-### H.1 Reported outcome
+**Reading rule.** Four things are recorded separately below and must never be collapsed into one:
+what the harness OBSERVED, how the harness CLASSIFIED it, what the Owner CONFIRMED manually, and
+what the Owner finally ACCEPTED. The Owner's decision settles the B1-H outcome; it does not
+retroactively change the harness result, and no field below is back-filled from a later decision.
 
-| Item | Value |
+### H.1 Harness observation
+
+| Item | Observed value |
 | --- | --- |
 | Gate A native proof | PASS |
 | Endpoint | `ENDPOINT_CONFIGURED` (the value is never recorded) |
 | Open attempts | 1 |
 | Open classification | `GCLIB_SUCCESS` |
-| Connection type | Ethernet, accepted |
-| Revision read | bounded, printable, contained the expected model token `DMC-B140-M` → `MODEL_MATCHED` |
-| Serial read | observed and withheld (`SERIAL_OBSERVED_REDACTED`), never rendered |
-| Close | confirmed; handle zeroed |
-| Native modules | released |
-| Harness exit | 0 |
-| Session code | `IDENTITY_SESSION_COMPLETE` |
+| Connection | Ethernet; the connection-type read passed |
+| Revision information | `DMCB140 Rev 1.0c2` (bounded, terminated and printable) |
+| Serial number | observed and withheld (`SERIAL_OBSERVED_REDACTED`); the value is never rendered |
+| Motion or output-control command | NONE — this surface resolves no command export, so no command of any kind was issued |
 
-The exact revision string and the serial number are machine-identifying values and are withheld
-from this repository. The Owner's manual identity decision is the Owner's own record; this baseline
-records only that B1-H is reported **PASS** and what the redacted software outcome was.
+### H.2 Harness classification
 
-### H.2 What B1-H establishes, and what it does not
+| Item | Value |
+| --- | --- |
+| Exact expected model token | `DMC-B140-M` |
+| Exact expected token present in the observed revision text | NO |
+| Model comparison | `MODEL_CONFIRMATION_REQUIRED` |
+| Outcome code | `MODEL_CONFIRMATION_REQUIRED` |
+| Outcome accepted | NO — refused, non-accepted software outcome |
+| Harness exit | 2 — the harness returns zero only for an accepted outcome; a `MODEL_CONFIRMATION_REQUIRED` outcome is non-accepted |
+| Controller handle closed | TRUE — close confirmed and the handle zeroed |
+| Native modules released | TRUE |
+
+The observed revision text does not carry the exact expected model token, so the harness followed
+its documented manual-confirmation path: it neither accepted nor rejected physical identity and
+handed the decision to the Owner. That classification is a statement about the observed STRING; it
+is not a statement that the machine is the wrong model, and it is not a failure of the connection.
+
+### H.3 Owner confirmation and final acceptance
+
+| Item | Value |
+| --- | --- |
+| OWNER CONFIRMATION | the observed revision `DMCB140 Rev 1.0c2` identifies the expected Controller model `DMC-B140-M` |
+| Basis of the confirmation | Owner installation knowledge, compared against the observed revision text |
+| FINAL OWNER ACCEPTANCE | B1-H WSB1 / MC-WSB1 identity first contact: **PASS** |
+| B1-H status in this baseline | **PASS** |
+
+### H.4 The automatic software path is separate and was not the observed result
+
+`MODEL_MATCHED` → `IDENTITY_SESSION_COMPLETE` → exit 0 is the harness path that runs when the
+observed revision text DOES contain the exact token. It is proven only by the focused software
+tests, which inject a synthetic revision containing the token. It is **not** what this hardware
+contact produced, and no field in H.1, H.2 or H.3 is restated to match it.
+
+Both paths still carry `OWNER_MANUAL_CONFIRMATION_REQUIRED` as the logical-identity status: even an
+automatic token match is a software string comparison, never a physical identity confirmation. The
+difference is only whether the harness itself already knows the string matched.
+
+The serial number remains withheld. The observed revision text is published because it is the
+evidence the Owner's manual confirmation was made against and the Owner authorized it for this
+closeout; it describes a firmware/model string and carries no endpoint, credential, path or serial.
+
+### H.5 What B1-H establishes, and what it does not
 
 It establishes that the documented open contract works on this machine with the bare validated
 address, that the identity reads answer inside their bounds, and that the lifecycle closes and
-unloads deterministically.
+unloads deterministically. The identity **PASS** rests on the Owner's manual confirmation of the
+observed revision text (H.3), not on an automatic token match.
 
 It does **not** establish any axis, limit, home, brake, fault, motion or unit fact. It is an identity
 contact, not a motion commissioning step, and it opens no gate.
@@ -568,9 +609,10 @@ interpretation word and the value; nothing else is derived from them.
 The readings above are native controller state text. They contain no endpoint, no serial number, no
 host, no path, no hash, no request text and no vendor error string. They are recorded because the
 Owner authorized publishing the sixteen observed values as part of this closeout; the raw harness
-envelope, the JSON document, the endpoint statement and every machine-identifying value remain
-uncommitted. Recording a value is not an interpretation: sections I.4 and J list what may not be
-concluded from it.
+envelope, the JSON document, the endpoint statement, the serial number and every other
+machine-identifying value remain uncommitted. The B1-H revision text published in section H is a
+firmware/model string, not an identifier of the machine's location or serial. Recording a value is
+not an interpretation: sections I.4 and J list what may not be concluded from it.
 
 ### I.4 What must not be inferred from these sixteen values
 
@@ -663,6 +705,26 @@ Only what its own Owner authorization names. It may not contain, under this base
 and no configuration. `MotionCommandGate.IsClosed` remains `true`. No C1 candidate in section F.3
 has an executable form anywhere in the repository.
 
+### K.5 Documentation punchlist for PR #32 (recorded here, not changed here)
+
+A secondary drift review found two stale XML documentation comments in the B2 model. They are
+recorded as a punchlist because this repair is a B1-H evidence-provenance correction and Product
+Source is deliberately unchanged.
+
+| Location | Current comment says | Why it is stale |
+| --- | --- | --- |
+| `adapters/motion-library/MotionObservedState.cs`, member `InterpretationState` | "In this revision only `UNAVAILABLE` is reachable" | The committed B2 read boundary produces `RAW_OBSERVED` and `UNCONFIRMED` for accepted reads, and `REFUSED` and `UNAVAILABLE` for the other paths — four reachable words, as `MotionObservedStateVocabulary.ReachableInterpretationStates` pins |
+| `adapters/motion-library/MotionObservedState.cs`, factory `Unavailable` | "The only state this revision can produce" and "no authorized read surface exists" | A read surface exists; the factory now describes only the no-value path, not the whole revision |
+
+Both comments are documentation only: they are not compiled into behaviour, no member reads them,
+and no test asserts them. Correcting them would be comment-only, but it is still a Product Source
+change, so it is **not** made in this pass. The `MotionObservationSession` comment that a session
+*without* a read boundary can only report `UNAVAILABLE` remains accurate and is not part of this
+punchlist.
+
+PR #32 (or a separate documentation-only correction) may fix the two comments with no behaviour
+change, and must not change any interpretation logic while doing so.
+
 ---
 
 ## L. Validation position of this document
@@ -673,6 +735,15 @@ citation in sections B, C, D and E; review of every changed surface; boundary sc
 section, registry and protocol completeness checks; leakage scans for endpoint, serial, path, hash,
 request text and vendor error text; source-boundary and document-boundary tests authored (not
 executed here); `git diff --check`; project and lock drift checks; clean-worktree proof.
+
+**Integrity correction (2026-10-17).** An earlier revision of section H stated that the observed
+revision contained the exact model token and that the harness therefore returned `MODEL_MATCHED`,
+`IDENTITY_SESSION_COMPLETE` and exit 0. That was wrong. Section H now records, as separate fields,
+what the harness observed (`DMCB140 Rev 1.0c2`), how it classified that string
+(`MODEL_CONFIRMATION_REQUIRED`), what the Owner confirmed manually, and what the Owner finally
+accepted. B1-H remains **PASS**. The earlier text is not silently rewritten out of the record: the
+correction is stated here and in `CHANGELOG.md`, and the automatic path is described in H.4 as a
+separate software path that this contact did not produce.
 
 **NOT RUN in Arena:** the .NET build, the locked restore, the focused suite and the full suite. No
 .NET SDK is available in the Agent environment, so no compile or test result is claimed.

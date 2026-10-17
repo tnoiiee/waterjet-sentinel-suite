@@ -13,6 +13,39 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-17 — Integrity correction: B1-H model-confirmation provenance (DOCUMENTATION AND TEST EVIDENCE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: ON THE SESSION BRANCH — NOT MERGED; NO PRODUCT SOURCE, DEPENDENCY, PROJECT, LOCK OR FIXTURE
+CHANGE; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no .NET SDK in the Agent sandbox). The Motion
+authorization gate stays CLOSED; endpoint configuration is `NOT_CONFIGURED`; the axes stay
+`NOT_COMMISSIONED`. No hardware operation was performed while producing this entry.**
+
+**Correction.** The closeout record stated that the B1-H identity contact observed the exact expected
+model token `DMC-B140-M` and therefore returned `MODEL_MATCHED`, `IDENTITY_SESSION_COMPLETE` and
+exit 0. That statement was wrong and is corrected here explicitly rather than silently rewritten.
+
+**Accepted evidence, as four separate records.** The bounded revision response actually observed was
+`DMCB140 Rev 1.0c2`; the exact expected token `DMC-B140-M` was **not** present in it
+(HARNESS OBSERVATION). The harness therefore followed its documented manual-confirmation path and
+reported `MODEL_CONFIRMATION_REQUIRED` as a non-accepted software outcome with exit 2, the serial
+observed and redacted, the connection established over Ethernet, and both cleanup steps proven
+(HARNESS CLASSIFICATION). The Owner then confirmed manually that `DMCB140 Rev 1.0c2` identifies the
+expected controller model `DMC-B140-M` (OWNER CONFIRMATION) and accepted the B1-H WSB1 / MC-WSB1
+identity first contact as **PASS** (FINAL OWNER ACCEPTANCE).
+
+**Unchanged.** B1-H remains **PASS**, and B2-H remains **PASS** with all sixteen readings and their
+published value texts unchanged. The automatic `MODEL_MATCHED` → `IDENTITY_SESSION_COMPLETE` → exit 0
+path is a separate software path proven only by its unit tests with a synthetic revision that
+contains the token; it was not this contact's result, and the earlier entry is not altered to imply
+otherwise. Both paths still carry `OWNER_MANUAL_CONFIRMATION_REQUIRED`, because an automatic match is
+a string comparison, not a physical identity confirmation.
+
+**Secondary documentation punchlist.** Two stale XML comments in
+`adapters/motion-library/MotionObservedState.cs` still claim that only `UNAVAILABLE` is reachable,
+while the committed B2 boundary produces `RAW_OBSERVED` and `UNCONFIRMED` for accepted reads. They are
+comment-only and are recorded for PR #32 in the vendor baseline section K.5. Product Source is
+deliberately unchanged in this pass.
+
 ### 2026-10-17 — PR #31 evidence closeout: vendor API baseline, registry and intake protocol (DOCUMENTATION AND EVIDENCE ONLY; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
 
 **Status: ON THE SESSION BRANCH — NOT MERGED; NO PRODUCT SOURCE CHANGE; AGENT-LOCAL .NET BUILD/TEST

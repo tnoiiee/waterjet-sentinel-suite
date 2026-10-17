@@ -140,6 +140,21 @@ public sealed class VendorApiBaselineBoundaryTests
     private static int CountOccurrences(string text, string token) =>
         text.Split(token, StringSplitOptions.None).Length - 1;
 
+    /// <summary>
+    /// Returns the text between two markers, exclusive of the end marker, so an assertion can be
+    /// scoped to one evidence record instead of the whole document.
+    /// </summary>
+    private static string Section(string document, string startMarker, string endMarker)
+    {
+        var start = document.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Missing section marker: {startMarker}");
+
+        var end = document.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end > start, $"Missing end marker after '{startMarker}': {endMarker}");
+
+        return document[start..end];
+    }
+
     // --------------------------------------------------------------------- existence and banner
 
     [Fact]
@@ -350,16 +365,118 @@ public sealed class VendorApiBaselineBoundaryTests
     // -------------------------------------------------------------------------- hardware records
 
     [Fact]
-    public void The_Identity_First_Contact_Record_Is_A_Redacted_Pass()
+    public void The_Identity_First_Contact_Record_Separates_Observation_Classification_Confirmation_And_Acceptance()
     {
         var document = Baseline();
+        var identityRecord = Section(document, "## H. B1-H", "## I. B2-H");
+        var observedRecord = Section(identityRecord, "### H.1 Harness observation", "### H.4");
 
-        Assert.Contains("## H. B1-H — identity first contact: PASS", document, StringComparison.Ordinal);
-        Assert.Contains(MotionControllerIdentityVocabulary.ExpectedControllerModel, document, StringComparison.Ordinal);
-        Assert.Contains(MotionControllerIdentityVocabulary.IdentitySessionComplete, document, StringComparison.Ordinal);
-        Assert.Contains(MotionControllerIdentityVocabulary.SerialObservedRedacted, document, StringComparison.Ordinal);
-        Assert.Contains("Owner-reported", document, StringComparison.Ordinal);
-        Assert.Contains("The Agent did not run, repeat or", document, StringComparison.Ordinal);
+        // B1-H remains a PASS, and the expected model remains the committed token.
+        Assert.Contains("## H. B1-H — identity first contact: PASS", identityRecord, StringComparison.Ordinal);
+        Assert.Contains("| B1-H status in this baseline | **PASS** |", identityRecord, StringComparison.Ordinal);
+        Assert.Contains(
+            MotionControllerIdentityVocabulary.ExpectedControllerModel,
+            identityRecord,
+            StringComparison.Ordinal);
+
+        // The four records exist as separate fields: harness observation, harness classification,
+        // Owner confirmation, final Owner acceptance.
+        Assert.Contains("### H.1 Harness observation", identityRecord, StringComparison.Ordinal);
+        Assert.Contains("### H.2 Harness classification", identityRecord, StringComparison.Ordinal);
+        Assert.Contains("| OWNER CONFIRMATION |", identityRecord, StringComparison.Ordinal);
+        Assert.Contains("| FINAL OWNER ACCEPTANCE |", identityRecord, StringComparison.Ordinal);
+
+        // The observation is the revision text that was actually observed, and the classification
+        // is the manual-confirmation path that text produces.
+        Assert.Contains("`DMCB140 Rev 1.0c2`", observedRecord, StringComparison.Ordinal);
+        Assert.Contains(
+            "| Exact expected token present in the observed revision text | NO |",
+            observedRecord,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            $"| Model comparison | `{MotionControllerIdentityVocabulary.ModelConfirmationRequired}` |",
+            observedRecord,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            $"| Outcome code | `{MotionControllerIdentityVocabulary.ModelConfirmationRequired}` |",
+            observedRecord,
+            StringComparison.Ordinal);
+        Assert.Contains("| Harness exit | 2", observedRecord, StringComparison.Ordinal);
+
+        // The observed record never claims the automatic path and never claims exit 0.
+        Assert.DoesNotContain(
+            MotionControllerIdentityVocabulary.ModelMatched,
+            observedRecord,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            MotionControllerIdentityVocabulary.IdentitySessionComplete,
+            observedRecord,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("exit 0", observedRecord, StringComparison.Ordinal);
+
+        // Cleanup, redaction and the no-command posture stay recorded on the observed record.
+        Assert.Contains("| Controller handle closed | TRUE", observedRecord, StringComparison.Ordinal);
+        Assert.Contains("| Native modules released | TRUE", observedRecord, StringComparison.Ordinal);
+        Assert.Contains(
+            MotionControllerIdentityVocabulary.SerialObservedRedacted,
+            observedRecord,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "| Motion or output-control command | NONE",
+            observedRecord,
+            StringComparison.Ordinal);
+        Assert.Contains("The Agent did not run, repeat or", identityRecord, StringComparison.Ordinal);
+
+        // No endpoint, serial value, path or hash on the identity record.
+        Assert.DoesNotMatch(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", identityRecord);
+        Assert.DoesNotMatch(@"\b[0-9A-Fa-f]{64}\b", identityRecord);
+        Assert.DoesNotMatch(@"[A-Za-z]:[\\/]", identityRecord);
+    }
+
+    [Fact]
+    public void The_Automatic_Model_Match_Is_Described_Only_As_A_Separate_Software_Path()
+    {
+        var document = Baseline();
+        var identityRecord = Section(document, "## H. B1-H", "## I. B2-H");
+        var automaticPath = Section(
+            identityRecord,
+            "### H.4 The automatic software path",
+            "### H.5");
+
+        Assert.Contains(MotionControllerIdentityVocabulary.ModelMatched, automaticPath, StringComparison.Ordinal);
+        Assert.Contains(
+            MotionControllerIdentityVocabulary.IdentitySessionComplete,
+            automaticPath,
+            StringComparison.Ordinal);
+        Assert.Contains("exit 0", automaticPath, StringComparison.Ordinal);
+        Assert.Contains("**not** what this hardware", automaticPath, StringComparison.Ordinal);
+        Assert.Contains(
+            MotionControllerIdentityVocabulary.OwnerManualConfirmationRequired,
+            automaticPath,
+            StringComparison.Ordinal);
+
+        // The software path is still documented, so this is a separation and not a deletion.
+        Assert.Contains(MotionControllerIdentityVocabulary.ModelMatched, document, StringComparison.Ordinal);
+        Assert.Contains(
+            MotionControllerIdentityVocabulary.IdentitySessionComplete,
+            document,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Stale_Observed_State_Comments_Are_Recorded_As_A_Punchlist_Without_A_Source_Change()
+    {
+        var document = Baseline();
+        var punchlist = Section(
+            document,
+            "### K.5 Documentation punchlist",
+            "## L. Validation position");
+
+        Assert.Contains("MotionObservedState.cs", punchlist, StringComparison.Ordinal);
+        Assert.Contains("InterpretationState", punchlist, StringComparison.Ordinal);
+        Assert.Contains("Unavailable", punchlist, StringComparison.Ordinal);
+        Assert.Contains("**not** made in this pass", punchlist, StringComparison.Ordinal);
+        Assert.Contains("PR #32", punchlist, StringComparison.Ordinal);
     }
 
     [Fact]
