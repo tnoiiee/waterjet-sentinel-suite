@@ -6,12 +6,17 @@ namespace Wjss.MotionLibrary.Tests;
 /// <summary>
 /// Static source and asset boundary coverage of the B1 one-controller identity surface. These
 /// tests pin the PUBLIC-REPOSITORY posture of the new sources without building anything: the
-/// complete export allow-list and not one export more; no raw-command, discovery, subscription or
-/// gcaps API name anywhere in the gate sources; no vendor import-table binding; no committed
-/// endpoint, directory, real hash or serial; the single endpoint variable name free of the S6
-/// host rule; no coupling to the Motion execution side, the Runtime composition or the Preview
-/// UI; and the native-artefact ignore rules in place. (S1–S9 are separately machine-checked by
+/// complete B1 export allow-list and not one export more; no discovery, subscription or gcaps API
+/// name anywhere in the gate sources; no vendor import-table binding; no committed endpoint,
+/// directory, real hash or serial; the single endpoint variable name free of the S6 host rule; no
+/// coupling to the Motion execution side, the Runtime composition or the Preview UI; and the
+/// native-artefact ignore rules in place. (S1-S9 are separately machine-checked by
 /// tools/boundary-scan.)
+///
+/// The raw-command prohibition below carries the Owner-authorized B2 exception: the internal B2
+/// native boundary file may name the one approved read-only command export, and nothing else may.
+/// The exception is matched by exact repository-relative path and exact token, so it cannot cover
+/// a second file, a case variant, a nested path or any other export.
 /// </summary>
 public sealed class IdentitySourceBoundaryTests
 {
@@ -148,31 +153,43 @@ public sealed class IdentitySourceBoundaryTests
     [Fact]
     public void No_Raw_Command_Discovery_Subscription_Or_Gcaps_Version_Api_Is_Named()
     {
-        var source = ReadIdentityGateSources();
-
-        foreach (var prohibited in new[]
-                 {
-                     "gclib_command",
-                     "gclib_addresses",
-                     "gclib_ip_requests",
-                     "gclib_assign_ip",
-                     "gclib_set_baud_rate",
-                     "gclib_data_record",
-                     "gclib_set_data_records",
-                     "gclib_subscribe_data_records",
-                     "gclib_set_interrupts",
-                     "gclib_list_servers",
-                     "gclib_set_server",
-                     "gclib_program",
-                     "gclib_set_array",
-                     "gclib_set_firmware",
-                     "gclib_gcaps_version",
-                     "gclib_examples",
-                     "GVersion",
-                     "GCmd",
-                 })
+        var root = RepoRoot();
+        var prohibitedNames = new[]
         {
-            Assert.DoesNotContain(prohibited, source, StringComparison.Ordinal);
+            "gclib_command",
+            "gclib_addresses",
+            "gclib_ip_requests",
+            "gclib_assign_ip",
+            "gclib_set_baud_rate",
+            "gclib_data_record",
+            "gclib_set_data_records",
+            "gclib_subscribe_data_records",
+            "gclib_set_interrupts",
+            "gclib_list_servers",
+            "gclib_set_server",
+            "gclib_program",
+            "gclib_set_array",
+            "gclib_set_firmware",
+            "gclib_gcaps_version",
+            "gclib_examples",
+            "GVersion",
+            "GCmd",
+        };
+
+        foreach (var file in IdentityGateFiles())
+        {
+            var text = File.ReadAllText(file);
+
+            foreach (var prohibited in prohibitedNames)
+            {
+                // The one Owner-authorized B2 exception: exact file, exact token, nothing else.
+                if (B2CommandTokenException.Covers(root, file, prohibited))
+                {
+                    continue;
+                }
+
+                Assert.DoesNotContain(prohibited, text, StringComparison.Ordinal);
+            }
         }
     }
 

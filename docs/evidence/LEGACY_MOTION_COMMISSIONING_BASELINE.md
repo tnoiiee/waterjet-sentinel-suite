@@ -96,16 +96,23 @@ value. Ordering, failure, cleanup and concurrency describe the call site, not a 
 
 Dispositions:
 
-- **BLOCKED** — a read that has no authorized surface at this checkpoint. The vendor command is
-  real and documented, but issuing it needs a raw command-and-response path that the B1 gate
-  explicitly does not authorize ("no raw controller command, no axis read"). Not implemented.
+- **VERIFIED_FOR_B2** — a read-only observation implemented by the B2 surface. It passes every
+  criterion at once: the operation is read-only, the request is an immutable literal for a typed
+  intent, the subject is a closed validated domain, the Legacy usage is exact, the vendor
+  documentation supports the semantics, the request and the response are length-bounded, the
+  intent is unreachable from arbitrary caller text, and no write, control or motion operation can
+  be formed. Interpretation may still be incomplete; the candidate row states its limit.
+- **BLOCKED** — a read that has no authorized surface at this checkpoint, or that fails any one of
+  the read-only, bounded, vendor-evidenced or typed-intent criteria. Not implemented.
 - **EXCLUDED** — deliberately outside every current and planned WJSS surface: either an
   unconditional multi-output write, or dead code in the Legacy source.
 - **LATER** — a motion, brake or position-definition write that belongs to a future
   Owner-authorized motion stage. Not implemented, not prepared, not scheduled.
 
-No command in this inventory is implemented by PR #31. The four B2 read candidates are recorded
-separately in section B.4.
+No write, control or motion command in this inventory is implemented. The four B2 read candidates
+are recorded separately in section B.4; the Owner authorized them for a private internal read-only
+boundary in the PR #31 correction, and section H records that boundary and its scoped source
+exception.
 
 ### B.1 Shared dispatch path
 
@@ -137,13 +144,22 @@ by "whatever the awaited call returns".
 | File / method | `FormDataCenter.cs` / `ProcessAxisStatusAndPositionAsync` |
 | Caller | the feedback loop (`GetGalilDataAsync`), per axis |
 | Origin | feedback timer, not an Operator control |
-| Native unit | axis status word, native integer; the fractional part is discarded |
-| Ordering | first of three per-axis reads; then commanded position, then actual position |
-| Failure | any exception reports one generic error and stops the whole feedback loop |
-| Cleanup | none |
-| Concurrency | per axis sequential, axes sequential; the next timer tick can overlap the current pass |
-| Vendor verification | the vendor command reference documents the message command and the status-word operand; the **bit order and polarity for the installed controller family are NOT confirmed** |
-| Disposition | **BLOCKED** |
+| Exact template | `MG _TS{axis}`; the four accepted literals are held in the internal B2 plan |
+| Subject domain | controller axis A, B, C or D only |
+| Vendor evidence | the message command that returns an operand value and the read-only status-word operand are both documented; the command reference for the installed model documents the status word and its bit table |
+| Read-only proof | the operand is a read-only status value and the message command only returns it; the operand has no assignment form |
+| Response shape | one formatted decimal number per single-axis request |
+| Termination | the native reply has to carry a NUL terminator inside the fixed response buffer |
+| Maximum response size | 32 bytes fixed in the adapter; accepted value text at most 16 characters |
+| Native unit | status bit field in the controller's own encoding |
+| Side effects | none: nothing is changed, queued, started or cleared |
+| Firmware / model dependency | the bit table is documented for the installed model; any other model is out of scope |
+| Parser needs | one bounded unsigned integer 0-255 after normalization; any other shape is refused |
+| Interpretation limit | `UNCONFIRMED`: one documented bit position is explicitly undefined, one has no stated meaning, the motor-state bit names a single axis, and limit-bit polarity is documented but not commissioned on this machine |
+| Failure | one canonical refusal word; no vendor text, no partial value and no retry |
+| Cleanup | none required: the boundary retains nothing between calls |
+| Concurrency | one outstanding observation per session, serialized |
+| Disposition | **VERIFIED_FOR_B2** |
 
 #### B2-OBS-2 — `TP {axis}`
 
@@ -152,13 +168,22 @@ by "whatever the awaited call returns".
 | File / method | `FormDataCenter.cs` / `ProcessAxisStatusAndPositionAsync` |
 | Caller | the feedback loop, per axis, through a direct vendor call that bypasses the shared dispatch path |
 | Origin | feedback timer |
-| Native unit | commanded (theoretical) position, controller counts |
-| Ordering | second per-axis read, after the status word and before the actual position |
-| Failure | same as B2-OBS-1: generic error, loop stops |
-| Cleanup | none |
-| Concurrency | same as B2-OBS-1 |
-| Vendor verification | documented as the commanded-position read; the response text format on this firmware is NOT verified |
-| Disposition | **BLOCKED** |
+| Exact template | `TP {axis}`; the four accepted literals are held in the internal B2 plan |
+| Subject domain | controller axis A, B, C or D only |
+| Vendor evidence | documented tell-position read, with the single-axis form documented separately from the all-axis form |
+| Read-only proof | the read reports the current position value and changes nothing |
+| Response shape | one decimal number for a single-axis request; a multi-axis reply would carry commas and is refused |
+| Termination | NUL terminator inside the fixed response buffer |
+| Maximum response size | 32 bytes fixed; accepted value text at most 16 characters |
+| Native unit | controller counts; never converted to millimetres |
+| Side effects | none |
+| Firmware / model dependency | the reply follows the controller's position-format setting; a hexadecimal-format reply is refused rather than reinterpreted |
+| Parser needs | one bounded signed decimal token with at most four fraction digits; anything else is refused |
+| Interpretation limit | `RAW_OBSERVED`: the Legacy label and the vendor description of which of the two position values is commanded and which is measured disagree for this machine, so no label is adopted |
+| Failure | one canonical refusal word; no retry |
+| Cleanup | none required |
+| Concurrency | one outstanding observation per session, serialized |
+| Disposition | **VERIFIED_FOR_B2** |
 
 #### B2-OBS-3 — `RP {axis}`
 
@@ -167,13 +192,22 @@ by "whatever the awaited call returns".
 | File / method | `FormDataCenter.cs` / `ProcessAxisStatusAndPositionAsync` |
 | Caller | the feedback loop, per axis, through a direct vendor call that bypasses the shared dispatch path |
 | Origin | feedback timer |
-| Native unit | actual (encoder) position, controller counts |
-| Ordering | third per-axis read |
-| Failure | same as B2-OBS-1 |
-| Cleanup | none |
-| Concurrency | same as B2-OBS-1 |
-| Vendor verification | documented as the actual-position read; the response text format on this firmware is NOT verified |
-| Disposition | **BLOCKED** |
+| Exact template | `RP {axis}`; the four accepted literals are held in the internal B2 plan |
+| Subject domain | controller axis A, B, C or D only |
+| Vendor evidence | documented reference-position read, with the single-axis form documented |
+| Read-only proof | the read reports the reference position value and changes nothing |
+| Response shape | one decimal number for a single-axis request; a comma-separated reply is refused |
+| Termination | NUL terminator inside the fixed response buffer |
+| Maximum response size | 32 bytes fixed; accepted value text at most 16 characters |
+| Native unit | controller counts; never converted to millimetres |
+| Side effects | none |
+| Firmware / model dependency | the reply follows the controller's position-format setting; a hexadecimal-format reply is refused |
+| Parser needs | one bounded signed decimal token with at most four fraction digits |
+| Interpretation limit | `RAW_OBSERVED`: the same Legacy-versus-vendor disagreement as B2-OBS-2; the value is preserved and no meaning is adopted |
+| Failure | one canonical refusal word; no retry |
+| Cleanup | none required |
+| Concurrency | one outstanding observation per session, serialized |
+| Disposition | **VERIFIED_FOR_B2** |
 
 #### B2-OBS-4 — `MG @OUT[{output}]`
 
@@ -182,13 +216,22 @@ by "whatever the awaited call returns".
 | File / method | `FormDataCenter.cs` / `ProcessDigitalOutputAsync` |
 | Caller | the feedback loop, once per output in the closed output namespace |
 | Origin | feedback timer |
-| Native unit | output state; the Legacy parse is a text substring check for the digit `1` followed by a decimal point |
-| Ordering | all output reads precede the per-axis reads in one poll pass |
-| Failure | generic error, then the whole feedback loop stops |
-| Cleanup | none |
-| Concurrency | sequential inside one poll pass; passes can overlap across ticks |
-| Vendor verification | the message command and the output-array operand are documented; the **response text shape is NOT verified**, and the substring parse would also accept unrelated text containing that sequence |
-| Disposition | **BLOCKED** |
+| Exact template | `MG @OUT[{output}]`; the four accepted literals are held in the internal B2 plan |
+| Subject domain | outputs 1, 2, 3 and 4 only - the Owner-confirmed numbering of the closed namespace |
+| Vendor evidence | the output-array operand is documented as returning the logical state of one output (zero or one), and the message command is documented as returning an operand value |
+| Read-only proof | the operand is a read; the output-changing operations are different commands and no such command exists in the plan |
+| Response shape | one formatted decimal number that has to be exactly zero or exactly one |
+| Termination | NUL terminator inside the fixed response buffer |
+| Maximum response size | 32 bytes fixed; accepted value text at most 16 characters |
+| Native unit | logical output state as the controller reports it |
+| Side effects | none |
+| Firmware / model dependency | the operand is documented for the installed model family |
+| Parser needs | one bounded decimal token, then an exact zero-or-one check; any other number is refused instead of rounded |
+| Interpretation limit | `UNCONFIRMED`: the logical state is preserved with NO wiring, polarity, brake or interlock meaning, and whether the read reflects the commanded or the physical output remains an open evidence gap |
+| Failure | one canonical refusal word; no retry |
+| Cleanup | none required |
+| Concurrency | one outstanding observation per session, serialized |
+| Disposition | **VERIFIED_FOR_B2** |
 
 ### B.3 Motion, brake and position-definition commands
 
@@ -320,18 +363,31 @@ that axis. Documented vendor command; per-axis behaviour on the installed machin
 
 ### B.4 B2 candidate disposition — verified subset
 
-| Candidate | Kind | Vendor command family | Disposition |
-| --- | --- | --- | --- |
-| B2-OBS-1 | `AXIS_STATUS` | message command, status-word operand | **BLOCKED** |
-| B2-OBS-2 | `COMMAND_POSITION` | message command, commanded-position read | **BLOCKED** |
-| B2-OBS-3 | `ACTUAL_POSITION` | message command, actual-position read | **BLOCKED** |
-| B2-OBS-4 | `DIGITAL_OUTPUT` | message command, output-array operand | **BLOCKED** |
+| Candidate | Kind | Vendor read shape | Interpretation | Disposition |
+| --- | --- | --- | --- | --- |
+| B2-OBS-1 | `AXIS_STATUS` | message command over the status-word operand | `UNCONFIRMED` | **VERIFIED_FOR_B2** |
+| B2-OBS-2 | `COMMAND_POSITION` | first per-axis position read | `RAW_OBSERVED` | **VERIFIED_FOR_B2** |
+| B2-OBS-3 | `ACTUAL_POSITION` | second per-axis position read | `RAW_OBSERVED` | **VERIFIED_FOR_B2** |
+| B2-OBS-4 | `DIGITAL_OUTPUT` | output-array operand read | `UNCONFIRMED` | **VERIFIED_FOR_B2** |
 
-The verified subset is **empty**. Each candidate is a real, documented vendor read, and each one
-requires the raw command-and-response path. The B1 gate authorizes exactly six typed identity
-exports and states that it authorizes "no raw controller command" and "no axis read"; the
-source-boundary tests also pin the raw command API as a prohibited token. A seventh export would
-be an authorization change, so it was not taken. See section G.2.
+The verified subset is **non-empty and complete for this checkpoint**: all four Legacy read
+candidates pass the read-only, typed-intent, closed-domain, immutable-literal, vendor-evidenced and
+length-bounded criteria, so all four are implemented by the internal B2 surface.
+
+The authority split that makes this possible is recorded once, here. The B1 identity surface is
+unchanged: exactly six typed identity exports, no raw controller read and no public command
+surface. The B2 observed-state surface is separately authorized by the Owner to resolve ONE
+further command-and-response export behind a private, internal, typed boundary. That boundary is
+not a general command API: an intent is a type, the request is a literal from an immutable table,
+the subject domain is closed, the request and the response are bounded, and no write, control or
+motion operation exists in the table. The earlier reading of the B1 sentence as a permanent
+prohibition of every B2 read was wrong and is corrected here. Sections G.2 and H record the
+resolution and the boundary.
+
+Interpretation is deliberately weaker than the read. Two candidates keep a native value with no
+meaning adopted, and two keep a value whose machine meaning is not commissioned. No candidate
+reaches `VERIFIED`, and no millimetre, polarity, Home, fault, brake or motion-complete meaning is
+produced. See section G.1 for the evidence that is still missing.
 
 ### B.5 Other commands present in the pack
 
@@ -348,7 +404,7 @@ be an authorization change, so it was not taken. See section G.2.
 | Cleanup | none |
 | Concurrency | per caller, with no serialization |
 | Vendor verification | documented message command with the time operand; response format on this firmware NOT verified |
-| Disposition | **BLOCKED** — a read with no authorized surface (it is a liveness read, not one of the four observed-state candidates) |
+| Disposition | **BLOCKED** — outside the verified subset: it is a liveness read, not one of the four Owner-authorized observation candidates, and adding it would widen the closed plan |
 
 #### `OP 0`
 
@@ -595,11 +651,11 @@ Nothing in this table upgrades a `NOT VERIFIED` hardware fact to a verified one.
 
 | Command shape | Disposition | Checkpoint that may ever carry it |
 | --- | --- | --- |
-| `MG TIME` | BLOCKED | none at this checkpoint; a read needs an Owner-authorized read surface |
-| `MG _TS{axis}` | BLOCKED (B2-OBS-1) | B2 contract only (PR #32 C1 candidate) |
-| `TP {axis}` | BLOCKED (B2-OBS-2) | B2 contract only (PR #32 C1 candidate) |
-| `RP {axis}` | BLOCKED (B2-OBS-3) | B2 contract only (PR #32 C1 candidate) |
-| `MG @OUT[{output}]` | BLOCKED (B2-OBS-4) | B2 contract only (PR #32 C1 candidate) |
+| `MG TIME` | BLOCKED | none; it is outside the four Owner-authorized observation candidates |
+| `MG _TS{axis}` | VERIFIED_FOR_B2 (B2-OBS-1) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
+| `TP {axis}` | VERIFIED_FOR_B2 (B2-OBS-2) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
+| `RP {axis}` | VERIFIED_FOR_B2 (B2-OBS-3) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
+| `MG @OUT[{output}]` | VERIFIED_FOR_B2 (B2-OBS-4) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
 | `OP 0` | EXCLUDED | none |
 | `TI0` | EXCLUDED | none |
 | Home velocity, home switch search, begin motion | LATER | a future Owner-authorized motion stage (roadmap G-series) |
@@ -613,14 +669,16 @@ Nothing in this table upgrades a `NOT VERIFIED` hardware fact to a verified one.
 
 - **B1** — the existing identity foundation: six typed identity exports, one open, three identity
   reads, deterministic close. It reads no axis and sends no raw command.
-- **B2** — this PR: the typed observed-state vocabulary, the closed state model and the
-  one-owner/one-outstanding/generation-fenced session. Because the verified subset is empty, the
-  only reachable outcomes are `UNAVAILABLE` (valid subject, no authorized read surface) and
-  `REFUSED` (request not allowed to proceed). No read is performed.
+- **B2** — this PR: the typed observed-state vocabulary, the closed state model, the
+  one-owner/one-outstanding/generation-fenced session and ONE private internal read boundary over
+  a non-empty verified subset of four typed read-only intents. A valid request produces an
+  accepted `RAW_OBSERVED` or `UNCONFIRMED` state; an invalid or disallowed request produces
+  `REFUSED`; a valid subject with no boundary or with an unusable reply produces `UNAVAILABLE`.
+  `VERIFIED` and `STALE` are never produced as state words.
 - **C1** — the next contract, documented in `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` and **not
-  implemented**. C1 would connect an Owner-authorized read surface to the Application; it needs a
-  seventh typed export (or an equivalent vendor-supported read API), a single connection owner, a
-  bounded response rule and the interpretation evidence that section G lists as missing.
+  implemented**. C1 would connect the B2 read surface to the Application; it needs its own
+  contract, a single connection owner at the application boundary, a freshness rule and the
+  interpretation evidence that section G lists as missing.
 - **LATER** — every motion, brake and position-definition command. None is prepared here.
 
 This document does not add a roadmap stage, does not reorder the critical path and does not
@@ -654,34 +712,46 @@ replace any planning document.
 10. The Legacy application's own defaults disagreed with each other, so no "Legacy default" can be
     treated as the intended configuration.
 
-### G.2 STOP conditions reported to the Owner
 
-- **S-1 — B2 has no authorized read surface.** Every candidate requires the raw
-  command-and-response path, which the B1 authority line forbids and the source-boundary tests
-  pin as a prohibited token. The verified subset is empty. PR #31 therefore implements the model
-  and the refusal, not a read. **Owner decision required** before any read can exist.
-- **S-2 — A seventh export would be an authorization change, not an implementation detail.** It
-  would add a new native export to the allow-list and would need its own gate, its own Owner-local
-  validation and a new session branch.
-- **S-3 — No dependency, project or lock change was made** to avoid this, because none of them
-  would authorize a read. A new project would also create a genuine lock file and require an
-  Owner-local restore, which is out of scope here.
-- **S-4 — B2-H (hardware) is not defined by this PR.** There is no B2 hardware operation to run:
-  no read is authorized. The Owner-local step for this checkpoint is a software gate only
-  (section F of `docs/MOTION_OBSERVED_STATE_FOUNDATION.md`).
+These gaps are the reason the implemented reads keep a weak interpretation. A bounded, validated
+read proves the VALUE; it does not prove what the value means on this machine. Gaps 2, 3 and 4 in
+particular keep the status word and the output state at `UNCONFIRMED`, and gaps 1 and 5 keep both
+position values at `RAW_OBSERVED`. None of them is closed by this checkpoint.
 
-### G.3 Owner decisions requested
+### G.2 STOP conditions reported to the Owner — resolution
 
-1. Authorize, defer or reject a future **read-surface gate** that would permit a typed,
-   allow-listed read of the four candidates (or a subset), with the exact export, the connection
-   ownership rule and the response-format evidence named in advance.
-2. Confirm whether the installed controller family's status-word bit order and polarity evidence
-   exists; if it does not, decide whether any interpreted state may ever be produced or only
-   `RAW_OBSERVED`/`UNCONFIRMED`.
-3. Confirm the output numbering for every cabinet, or decide that output observation stays out of
-   scope.
-4. Confirm that no Legacy constant, default or coordinate may be promoted, even after a read is
-   authorized, until a separate commissioning evidence gate proves it.
+- **S-1 — B2 has no authorized read surface. RESOLVED BY OWNER DECISION.** The B1 sentence
+  "no raw controller command, no axis read" is a statement about the B1 identity surface, not a
+  permanent prohibition of every B2 read. The Owner authorized a separate, private, internal,
+  typed, read-only B2 boundary under the conditions recorded in section H. The verified subset is
+  therefore non-empty. The earlier reading of the B1 sentence as a global ban was wrong and is
+  corrected here.
+- **S-2 — A seventh export would be an authorization change, not an implementation detail.
+  RESOLVED AS A SCOPED EXCEPTION.** The B1 allow-list is still exactly six exports. The B2 surface
+  resolves exactly one further export through its own internal boundary file, and the
+  source-boundary tests allow that name in that exact file and no other. It is not a widening of
+  the B1 allow-list and it is not a public command API.
+- **S-3 — No dependency, project or lock change was made, and none is needed.** The boundary uses
+  the operating-system loading primitives and the BCL only. There is no new project, no new package
+  reference and no lock-file change, so no Owner-local restore is required for it.
+- **S-4 — B2-H is now defined and is separate from B1-H.** B2-H is an Owner-local READ-ONLY
+  observation trial: it may issue the verified subset against the controller, and it may not
+  configure, home, move, brake or write anything. It is not run by the Agent. B1-H remains the
+  identity first-contact gate and is unchanged. Section H.4 states the prerequisites.
+
+### G.3 Owner decisions requested — status
+
+1. **RESOLVED — authorized.** A typed, allow-listed, read-only surface is authorized for the four
+   candidates under the conditions of section H. The exact export, the connection ownership rule
+   and the response-format rule are recorded there.
+2. **OPEN — evidence still missing.** No status-word bit-order or polarity evidence for this
+   machine exists. The decision taken for this checkpoint is the conservative one: no interpreted
+   state is produced, and the status word stays `UNCONFIRMED`.
+3. **OPEN — evidence still missing.** Output numbering is confirmed only for the Owner-stated
+   allocation 1-4. The decision taken is to restrict the closed namespace to those four and to
+   report the logical state as `UNCONFIRMED`, with no wiring or polarity meaning.
+4. **CONFIRMED.** No Legacy constant, default or coordinate is promoted, before or after a read.
+   Every read keeps a native value and every conversion remains absent.
 
 ### G.4 Not verified by this document
 
@@ -689,3 +759,64 @@ No build, no test execution, no controller contact, no read, no motion, no brake
 configuration change occurred. Every hardware statement in this document is a reading of Legacy
 source text, not a measurement. The Agent environment has no .NET SDK, so no compile or test
 result is claimed here.
+---
+
+## H. The B2 private read boundary (verified subset)
+
+**Document class:** EVIDENCE AND DESIGN RECORD. It authorizes no hardware operation and no
+Product surface. `docs/MASTER_PLAN.md` remains the roadmap of record.
+
+### H.1 What the boundary is
+
+One internal type family inside `adapters/motion-library`:
+
+1. a closed **typed intent** set of sixteen members — three axis kinds over the four controller
+   axes plus the four outputs of the closed namespace;
+2. one **immutable literal request table** keyed by that intent; there is no interpolation, so the
+   request text cannot be influenced by a caller;
+3. one **typed read interface** whose only method takes an intent and returns a bounded result; it
+   has no string, buffer, handle or command parameter;
+4. one **concrete kernel** that resolves the single approved command-and-response export in an
+   already loaded module and invokes it against an already open controller handle;
+5. one **response validator and parser**: terminated, printable, single, bounded decimal token;
+   exact zero-or-one for an output state; refusal for anything else.
+
+### H.2 What it cannot do
+
+- It cannot form a write, stop, jog, brake, home, define, move, auto, program-array or
+  output-mutation request: none exists in the table, and the table is the only source of request
+  text.
+- It cannot accept arbitrary caller text: the public surface is a typed request and the intent
+  enum is internal.
+- It cannot be reached from outside the adapter assembly: every member is internal.
+- It cannot outlive the controller handle: it holds no module handle, it releases nothing, and it
+  is invalidated before the lifecycle owner closes the handle and unloads the module.
+- It cannot surface a value it did not validate, a vendor error text, an exception message, an
+  endpoint, a serial, a path, a hash or a request text in any outcome, log or exception.
+
+### H.3 The scoped source-boundary exception
+
+The repository-wide prohibition on naming a raw command API is unchanged. Exactly one exception
+exists:
+
+- **one file**: the internal B2 native boundary source in `adapters/motion-library`;
+- **one token**: the single command-and-response export name;
+- matched by exact repository-relative path and exact ordinal token, so a wildcard, a sibling
+  file, a nested path, a case variant, a build-output path or any other token is not covered;
+- the exception does not extend to write or control mnemonics, to a public command API, to the
+  Runtime composition, to the contracts, to the UI or to the B1 harness, and it does not soften
+  the repository boundary rules.
+
+### H.4 Owner-local B2-H prerequisites
+
+1. B1-H identity first contact is complete and the physical identity is Owner-confirmed.
+2. The Owner-local locked restore and Release build pass with no warning.
+3. The focused B2 suite and the full suite pass, including the negative-space boundary tests.
+4. The repository boundary scan reports no finding.
+5. The trial is read-only by construction: no write, control or motion operation is exposed, and
+   the Motion authorization gate stays CLOSED.
+
+### H.5 Not verified
+
+No controller was contacted, no library was loaded, no export was resolved and no read was issued
+while producing this section. No build and no test execution occurred in the Agent environment.

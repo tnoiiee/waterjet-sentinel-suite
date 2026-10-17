@@ -20,11 +20,12 @@ TC work that remains the priority path.
 
 ## 1. What this checkpoint is
 
-A typed, vendor-neutral model of observed motion state plus the session discipline that any future
-read would have to obey, implemented so that:
+A typed, vendor-neutral model of observed motion state, the session discipline that governs it,
+and ONE private internal read boundary over a non-empty verified subset, implemented so that:
 
 - the four read candidates have a canonical, closed vocabulary;
 - the model can truthfully say "unavailable" and cannot claim anything stronger;
+- the read boundary is typed, immutable, length-bounded and unreachable from outside the adapter;
 - one session owns one observation slot;
 - at most one observation is outstanding;
 - one generation per session, with stale results rejected and replays refused;
@@ -33,42 +34,70 @@ read would have to obey, implemented so that:
 
 ## 2. What this checkpoint is not
 
-- It is **not a read**. No library is loaded, no connection is opened and no command is sent. The
-  B2 sources contain no I/O call, no native import, no socket and no endpoint type.
-- It is **not an authorization**. The gate stays closed and the refusal vocabulary is unchanged.
+- It is **not a general command API**. The read boundary accepts a typed intent only; it has no
+  string, buffer or handle parameter, no request text in any public member, and no write, control
+  or motion operation in its table.
+- It is **not an authorization**. The gate stays closed, the endpoint stays `NOT_CONFIGURED`, the
+  axes stay `NOT_COMMISSIONED`, and an observation never enables a command.
 - It is **not a stage** in `docs/MASTER_PLAN.md`, and it does not authorize the roadmap's
   read-only or motion stages.
 - It is **not a value model**: there is no position, limit, home, brake, fault or "safe" member,
   and no unit conversion.
 - It is **not a UI, route, Snapshot member, Delta member or fixture change**.
+- The three model sources still contain no I/O call, no native import, no socket and no endpoint
+  type. The single native call lives in one separate internal boundary file.
 
 ## 3. Candidate dispositions
 
-All four candidates are **BLOCKED**. The verified subset is empty.
+All four candidates are **VERIFIED_FOR_B2** and implemented. The verified subset is non-empty and
+complete for this checkpoint.
 
-| Candidate | Kind | Why it is blocked |
-| --- | --- | --- |
-| B2-OBS-1 | `AXIS_STATUS` | Needs the raw command-and-response path; the B1 gate authorizes six typed identity exports and states "no raw controller command, no axis read" |
-| B2-OBS-2 | `COMMAND_POSITION` | Same reason |
-| B2-OBS-3 | `ACTUAL_POSITION` | Same reason |
-| B2-OBS-4 | `DIGITAL_OUTPUT` | Same reason |
+| Candidate | Kind | Read shape | Interpretation |
+| --- | --- | --- | --- |
+| B2-OBS-1 | `AXIS_STATUS` | status-word read over the message command | `UNCONFIRMED` |
+| B2-OBS-2 | `COMMAND_POSITION` | first per-axis position read | `RAW_OBSERVED` |
+| B2-OBS-3 | `ACTUAL_POSITION` | second per-axis position read | `RAW_OBSERVED` |
+| B2-OBS-4 | `DIGITAL_OUTPUT` | output-array read, outputs 1-4 | `UNCONFIRMED` |
 
-The vendor commands behind these candidates are real and documented, and the vendor
-command-and-response entry point is documented as the way to issue them. That is exactly the
-problem: using it would add a seventh native export to an allow-list that the gate fixes at six,
-and it would perform the axis read the gate forbids. That is an authorization decision for the
-Owner, not an implementation choice for the Agent. It is reported in section 9 and in the
-baseline's section G, and it is not worked around.
+**The authority split that makes this possible, stated once.** The B1 identity surface is
+unchanged: exactly six typed identity exports, no raw controller read and no public command
+surface. The B2 observed-state surface is separately authorized to resolve ONE further
+command-and-response export behind a private, internal, typed boundary. That boundary is not a
+widening of the B1 allow-list and it is not a public API:
 
-Because the verified subset is empty, the only reachable outcomes are:
+- an intent is a **type** from a closed set of sixteen;
+- the request is a **literal** from an immutable table, so there is no interpolation and no
+  caller-supplied text anywhere on the path;
+- the subject domain is closed: axis A-D, outputs 1-4;
+- the request length and the response buffer are **fixed**; the reply has to be terminated,
+  printable and one bounded decimal token; an output state has to be exactly zero or exactly one;
+- an empty, truncated, non-printable, multi-value, error-marked, hexadecimal or oversized reply is
+  a **refusal word**, never a repaired, rounded or truncated value;
+- no write, stop, jog, brake, home, define, move, auto, program-array or output-mutation mnemonic
+  exists in the table, so none can be formed;
+- the boundary is internal, is never returned by a public member, and holds no module handle: it
+  is invalidated before the lifecycle owner closes the controller handle and unloads the module.
 
-- `UNAVAILABLE` — the subject is valid, but no authorized read surface exists. The model produces
-  one state with no value, no unit and no meaning.
+The earlier reading of the B1 sentence "no raw controller command, no axis read" as a permanent
+prohibition of every B2 read was wrong. It is a statement about the B1 surface. The correction is
+recorded in the evidence baseline sections B.4, G.2 and H.
+
+**Interpretation stays weaker than the read.** A bounded, validated read proves the VALUE; it does
+not prove what the value means on this machine. The two position candidates keep their native
+value with no meaning adopted (`RAW_OBSERVED`), and the status word and output state keep a value
+whose machine meaning is not commissioned (`UNCONFIRMED`). `VERIFIED` stays unreachable: no
+millimetre conversion, no limit polarity, no Home, no fault, no brake and no motion-complete
+meaning is produced. The reachable outcome words are therefore:
+
+- `RAW_OBSERVED` / `UNCONFIRMED` — one bounded native value was accepted.
+- `UNAVAILABLE` — the subject is valid but no read boundary is attached, or the reply was not
+  usable. The model produces one state with no value, no unit and no meaning.
 - `REFUSED` — the request itself was not allowed to proceed (unknown kind, unknown axis, invalid
-  subject, busy slot, closed session, stale generation, replayed result). No state is produced.
+  subject, boundary closed or unbound, native failure, busy slot, closed session, stale
+  generation). No state is produced.
 
-`VERIFIED`, `RAW_OBSERVED`, `UNCONFIRMED` and `STALE` are declared and reserved. They are never
-produced by this revision, and the focused suite pins that.
+`VERIFIED` and `STALE` are declared and reserved. They are never produced as state words, and the
+focused suite pins that.
 
 ## 4. The model
 
@@ -78,10 +107,10 @@ produced by this revision, and the focused suite pins that.
 | Axes | `A`, `B`, `C`, `D` — closed set, diagnostic identity only |
 | Output namespace | numbers 1 to 4 — the Owner-confirmed brake allocation, a numbering fact and not a polarity claim |
 | Interpretation states | `VERIFIED`, `RAW_OBSERVED`, `UNCONFIRMED`, `UNAVAILABLE`, `STALE`, `REFUSED` — closed list |
-| Reachable states | `UNAVAILABLE`, `REFUSED` only |
-| Native units | `NONE` while no value exists; `CONTROLLER_UNITS` reserved for a future authorized read |
+| Reachable states | `RAW_OBSERVED`, `UNCONFIRMED`, `UNAVAILABLE`, `REFUSED` — `VERIFIED` and `STALE` stay reserved |
+| Native units | `NONE` while no value exists; `CONTROLLER_UNITS` for both position reads; `STATUS_BITS` for the status word; `LOGICAL_STATE` for an output |
 | State members | kind, axis, output number, interpretation state, native unit, native value text, detail code — nothing else |
-| Construction | the state type has a private constructor and no public factory |
+| Construction | the state type has a private constructor and no public factory; only the internal unavailable and observed factories can build one |
 
 There is deliberately no member that could be read as "in position", "limit active", "home
 active", "brake released", "fault" or "safe". An unknown state is not inactive, not zero and not
@@ -98,6 +127,10 @@ safe; it is unknown.
 | No retry of a read result; no reconnect; no polling | The type has no loop, no timer, no connection, no restart path and no result cache; a second request is a new evaluation, never a replay |
 | Deterministic close | `Dispose` closes the session and is idempotent; a closed session accepts nothing and never reopens |
 | No command coupling | No reference to the authorization gate, the command gate, the commissioning session, the Runtime, the queue, the pump, the valve, alarms or Production |
+| Typed, immutable read plan | Sixteen closed intents and sixteen literal requests; the table is a read-only wrapper and cannot be extended at run time |
+| Fixed bounds | One request-length bound checked before the call, one fixed response buffer, one accepted value-text length |
+| One native site | The single native call lives in one internal boundary file; the three model sources contain no I/O call |
+| Close invalidates the boundary first | The boundary is invalidated before the lifecycle owner closes the controller handle and unloads the module, and it can never be used again |
 
 ## 6. C1 contract — documented, NOT IMPLEMENTED
 
@@ -106,8 +139,9 @@ C1 is the next contract. It is written down here so the Owner can decide whether
 
 ### 6.1 Prerequisites
 
-1. An Owner decision that authorizes a read surface, naming the exact native export and the exact
-   command shapes (typed, fixed, no caller text).
+1. **RESOLVED — authorized for the B2 layer.** The Owner authorized a private read surface,
+   naming the exact native export and the exact typed, fixed, caller-text-free request shapes;
+   the evidence baseline section H records it. C1 is the next layer and needs its own decision.
 2. Evidence for the interpretation that would be claimed: status-word bit order and polarity for
    the installed controller family, the output numbering for every cabinet, and the physical
    meaning of the brake outputs.
@@ -142,24 +176,27 @@ its own Owner gate, its own session branch and its own Owner-local validation.
 authorization and is executed by the Owner only, on the exact PR head, after the software gates
 below pass. This checkpoint does not change B1-H, its ordering or its acceptance.
 
-### 7.2 B2-H (Owner-local; software only; no device contact)
+### 7.2 B2-H (Owner-local; two tiers, kept separate)
 
-There is no B2 hardware operation to run, because no read is authorized. B2-H therefore contains
-no device step and produces no hardware evidence; it is a software gate on the Owner workstation.
+B2-H is separate from B1-H and has two tiers. **B2-H(S)** is the software gate below and runs
+first; **B2-H(R)** is a read-only device trial that may run only after a separate Owner
+authorization, and only with B1-H complete.
+
+**B2-H(S) — software gate, no device contact**
 
 ```powershell
 # 0. exact head and clean worktree
 git rev-parse HEAD
 git status --porcelain
 
-# 1. locked restore — must NOT create a new lock file (no project was added)
+# 1. locked restore - must NOT create a new lock file (no project was added)
 dotnet restore WaterJetSentinelSuite.sln --locked-mode
 git status --porcelain
 
 # 2. Release build, no restore
 dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
 
-# 3. focused B2 suite
+# 3. focused suite
 dotnet test tests/motion-library.tests/Wjss.MotionLibrary.Tests.csproj -c Release --no-build
 
 # 4. full suite
@@ -169,14 +206,12 @@ dotnet test WaterJetSentinelSuite.sln -c Release --no-build
 node tools/boundary-scan/boundary-scan.mjs .
 ```
 
-Expected results:
-
 | Step | Acceptance |
 | --- | --- |
 | 1 | PASS; no new or modified `packages.lock.json`; no other change |
 | 2 | 0 warnings, 0 errors (`TreatWarningsAsErrors`) |
-| 3 | all focused tests pass, including the four BLOCKED dispositions and the reachable-state pin |
-| 4 | all existing tests pass, unchanged |
+| 3 | every focused test passes, including the sixteen-literal plan, the parser refusal table, the four verified dispositions and the negative-space boundary tests |
+| 4 | every existing test passes |
 | 5 | `0 findings (S1-S9 clean)` |
 
 Additional proofs to attach:
@@ -185,22 +220,31 @@ Additional proofs to attach:
 Get-Process | Where-Object { $_.Name -match 'gclib|gcaps|gdk|galil' }   # expected: no rows
 Get-NetTCPConnection | Where-Object { $_.OwningProcess -eq $PID }        # expected: no new external connection
 Select-String -Path adapters/motion-library/MotionObservation*.cs -Pattern 'DllImport|LoadLibrary|Socket|HttpClient'
-# expected: no rows (the B2 surface has no I/O)
+# expected: no rows (the three model sources still have no I/O call)
 git status --porcelain
 ```
 
-Acceptance for B2-H: steps 0 to 5 PASS, the process and network sighting is clean, the B2 surface
-still contains no I/O call, and the worktree contains only the authorized PR #31 changes. A PASS
-means the **software** foundation is accepted for this checkpoint; it says nothing about any
+**B2-H(R) — read-only device trial, separate authorization, Owner only**
+
+Prerequisites: B1-H complete and the physical identity Owner-confirmed; B2-H(S) PASS on the exact
+PR head; an explicit Owner authorization naming the trial. The trial may issue only the verified
+subset. It may not configure, home, move, jog, brake, define a position, clear an output or change
+any parameter. No retry, no reconnect, no polling loop: one bounded sequence, one open, one close.
+It is not run by the Agent, and nothing in this checkpoint records a hardware result.
+
+**Acceptance for B2-H(S):** steps 0 to 5 PASS, the process and network sighting is clean, the
+three model sources still contain no I/O call, and the worktree contains only the authorized
+PR #31 changes. A PASS means the **software** surface is accepted; it says nothing about any
 controller, and it does not open the Motion gate.
 
 ### 7.3 Order
 
 1. B1-H on the exact PR head, per its own runbook, if and only if the Owner has authorized it.
-2. B2-H as above.
-3. A separate Owner decision on C1 (section 6) before any read is designed.
+2. B2-H(S) software gate on the same head.
+3. B2-H(R) read-only trial only under a separate Owner authorization.
+4. A separate Owner decision on C1 (section 6) before any application contract is designed.
 
-None of the three steps is performed by the Agent.
+None of the four steps is performed by the Agent.
 
 ## 8. Validation performed here
 
@@ -215,28 +259,33 @@ No compile or test result is claimed.
 
 **Not verified anywhere:** every controller fact in the baseline's section G.
 
-## 9. STOP items reported to the Owner
+## 9. STOP items reported to the Owner — status
 
-1. **A read surface does not exist and must not be improvised.** All four candidates are BLOCKED;
-   the verified subset is empty; the model refuses rather than guesses.
-2. **A seventh native export is an authorization change.** It needs its own gate and its own
-   Owner-local validation; it cannot ride on PR #31.
-3. **B2-H has no hardware step.** It is a software gate by construction, because no B2 operation
-   is authorized.
-4. **No dependency, project or lock change was made.** A new project would create a genuine lock
-   and require an Owner-local restore; nothing about it would authorize a read.
+1. **RESOLVED BY OWNER DECISION.** A read surface now exists, but only as the private, typed,
+   bounded boundary described in section 3 and the evidence baseline section H. It cannot be
+   improvised into a general command API, and it exposes no write, control or motion operation.
+2. **RESOLVED AS A SCOPED EXCEPTION.** The B1 allow-list is still exactly six exports. The B2
+   surface resolves exactly one further export through its own internal file, with an exact-path,
+   exact-token source-boundary exception that cannot be widened.
+3. **DEFINED.** B2-H now has a software tier and a separately authorized read-only device tier;
+   neither is executed by the Agent.
+4. **CONFIRMED.** No dependency, project or lock change was made, and none is needed.
 
 ## 10. Changed / Unchanged / Not Verified
 
-**Changed:** three source files in `adapters/motion-library` (vocabulary, state model, session);
-two focused test files; this document; the redacted Legacy baseline; the adapter README; the
+**Changed:** five source files in `adapters/motion-library` (vocabulary, state model, session, the
+new internal read plan and the new internal native boundary); four focused test files plus the
+scoped-exception test helper; this document; the redacted Legacy baseline; the adapter README; the
 CHANGELOG entry.
 
-**Unchanged:** the Motion authorization gate and its refusal vocabulary; the commissioning
-contracts and Application model; the topology catalogue and every Owner-confirmed mapping; the B1
-identity surface and harness; the native probe surface; the Runtime composition; the Kiosk; the
-Preview and its routes; every project file, package pin and lock file; every fixture; the
-network posture.
+**Unchanged:** the Motion authorization gate and its refusal vocabulary; the B1 identity surface,
+its six-export allow-list and its harness; the native probe surface; the commissioning contracts
+and Application model; the topology catalogue and every Owner-confirmed mapping; the Runtime
+composition; the Kiosk; the Preview and its routes; every project file, package pin and lock file;
+every fixture; the network posture.
 
 **Not verified:** any compilation or test execution; any controller connection or read; any axis,
 brake, limit, home or fault fact; any unit conversion; any timing.
+
+**Status line.** `COMPILE — NOT VERIFIED BY AGENT`; `TESTS — NOT VERIFIED BY AGENT`;
+`IMPLEMENTATION COMPLETE — NOT CLAIMED BY AGENT`.

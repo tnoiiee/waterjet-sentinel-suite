@@ -1,14 +1,14 @@
-# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface + B2 Observed-State Model)
+# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface + B2 Observed-State Surface)
 
 **Gates:** Native Load / Version Probe Software Gate (Gate A), the B1 one-controller identity
-software foundation and the B2 read-only observed-state foundation. The adapter carries three
+software foundation and the B2 read-only observed-state surface. The adapter carries three
 separately authorized, strictly separated surfaces: the probe surface (library inspection/loading
 ONLY, unchanged), the B1 identity surface (one direct connection attempt, three typed identity
-reads, deterministic close — no raw command of any kind) and the B2 observed-state model (typed
-vocabulary, closed state model and session discipline; **no read, no I/O and no command** — all
-four read candidates are BLOCKED at this checkpoint, see
-`docs/MOTION_OBSERVED_STATE_FOUNDATION.md`). **Validation:** SOURCE-AUTHORED IN ARENA; NOT
-COMPILED IN ARENA — the Owner-local build and probe run are the validation of record
+reads, deterministic close — no raw command of any kind) and the B2 observed-state surface (typed
+vocabulary, closed state model and session discipline plus ONE internal, typed, length-bounded
+read-only boundary over the four Legacy-evidenced reads — the verified subset is non-empty and is
+recorded in `docs/MOTION_OBSERVED_STATE_FOUNDATION.md`). **Validation:** SOURCE-AUTHORED IN
+ARENA; NOT COMPILED IN ARENA — the Owner-local build and probe run are the validation of record
 (see `docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md`).
 
 ## What this adapter is
@@ -61,9 +61,11 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
 | `MotionLibraryProbeOutcome.cs` | One redacted outcome: `Accepted`, one vocabulary code, redacted detail, version only on acceptance, truthful native-handle-release state. |
 | `NativeKernel.cs` | Internal OS loading surface (kernel32 `LoadLibraryExW`/`GetProcAddress`/`GetModuleFileNameW`/`FreeLibrary` with a restricted flag set) behind a narrow internal interface. |
 | `MotionLibraryProbeRunner.cs` | The ordered, fail-closed proof: existence → identity → architecture → companion load → module-path proof → primary load → module-path proof → single export → one bounded version call → version equality → deterministic unload. |
-| `MotionObservedStateVocabulary.cs` | B2 shape only: the four typed observation kinds and candidate identifiers, the closed axis and output sets, the six interpretation states (two reachable), the native-unit words and the refusal vocabulary. No vendor command mnemonic and no command builder. |
+| `MotionObservedStateVocabulary.cs` | B2 shape only: the four typed observation kinds and candidate identifiers, the closed axis and output sets, the six interpretation states (four reachable, `VERIFIED` reserved), the native-unit words, the acceptance words and the refusal vocabulary. No vendor command mnemonic and no command builder. |
 | `MotionObservedState.cs` | B2 model: the state (private constructor, no public factory, no position/limit/home/brake/fault/safe member), the typed request and the redacted outcome. |
-| `MotionObservationSession.cs` | B2 session: one owner, one outstanding observation, one generation, stale and replay rejection, deterministic idempotent close. No I/O call of any kind. |
+| `MotionObservationSession.cs` | B2 session: one owner, one outstanding observation, one generation, stale and replay rejection, deterministic idempotent close. Model mode has no I/O; reading mode reaches the wire only through the internal typed boundary. |
+| `MotionObservationCommandPlan.cs` | B2 plan (internal): the sixteen typed intents, the immutable literal request table, the fixed request and response bounds, and the bounded response parser. No native name, no handle and no I/O. |
+| `MotionControllerCommandKernel.cs` | B2 native boundary (internal): the one approved command-and-response export constant, its resolution through the already-authorized kernel seam, and the bound kernel that issues one typed intent and validates the reply. Holds no module and releases nothing. |
 
 ## Owner-local configuration (environment only; values never committed)
 
@@ -109,27 +111,38 @@ Redaction: outcomes never contain an endpoint, a serial number, a native path, a
 vendor error text. The endpoint variable (`WJSS_MOTION_CONTROLLER_01_ENDPOINT`) is process-local
 environment configuration only and is never committed.
 
-## B2 observed-state foundation (software only; all four read candidates BLOCKED)
+## B2 observed-state surface (verified subset non-empty; software only)
 
-The four read candidates of the Legacy baseline — axis status, commanded position, actual
-position and one digital output — are real, documented vendor reads, and every one of them needs
-the raw command-and-response path. The B1 authority line authorizes "no raw controller command,
-no axis read" and the identity allow-list is fixed at six typed exports, so **the verified subset
-is empty** and no read is implemented. The checkpoint therefore delivers the model and the
-discipline that a future authorized read must obey:
+The four read candidates of the Legacy baseline — axis status, first position value, second
+position value and one digital output — are real, documented vendor reads, and all four are in the
+**verified subset** (`VERIFIED_FOR_B2`). The Owner-authorized B2 surface resolves ONE further
+native command-and-response export behind a private, typed boundary:
 
-- a closed, typed vocabulary (four kinds, four axes, the Owner-confirmed output numbering, six
-  interpretation states of which exactly two are reachable);
-- a state model that can say `UNAVAILABLE` and cannot claim `VERIFIED`, `RAW_OBSERVED`,
-  `UNCONFIRMED` or `STALE`, and has no member that could be read as position, limit, home, brake,
-  fault or "safe";
-- one session that owns one observation slot, allows one outstanding observation, fences one
-  generation, rejects stale and replayed results, and closes deterministically and idempotently;
-- no endpoint, no native module, no socket, no file, no environment read and no command text in
-  the B2 sources.
+- an **intent is a type**, one of sixteen closed members; the request text is a LITERAL from an
+  immutable table, so no caller text, concatenation, format string or configuration value can
+  reach a request;
+- the axis domain is the four controller letters and the output domain is the Owner-confirmed
+  numbering 1 to 4 — nothing else resolves;
+- the request length and the response buffer are fixed, the reply has to be terminated and
+  printable, and the accepted value is one bounded decimal token; an empty, truncated,
+  non-printable, comma-separated, error-marked, hexadecimal or oversized reply becomes a refusal
+  word, never a repaired value;
+- no write, stop, jog, brake, home, define, move, auto, program-array or output-mutation mnemonic
+  exists in the table, so none can be formed;
+- the boundary is internal, has an internal constructor and is never exposed by a public member,
+  route, contract, outcome or UI; the read path is reachable only from inside this assembly;
+- the boundary holds no module handle and releases nothing: it is invalidated before the lifecycle
+  owner closes the controller handle and unloads the module, so it cannot outlive them.
 
-A valid request returns `UNAVAILABLE` with `OBSERVATION_SURFACE_NOT_AUTHORIZED`; an invalid or
-disallowed request returns `REFUSED` with its vocabulary code. Nothing is ever issued, and an
-observation can never enable a command. `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` records the
-full disposition, the C1 contract that is documented but **NOT IMPLEMENTED**, and the Owner-local
-software gate.
+**Honesty rule.** A verified read is not a verified meaning. The two position candidates are
+reported `RAW_OBSERVED` (the value is preserved and no engineering meaning is adopted), and the
+status word and the output state are reported `UNCONFIRMED` (the value is preserved and no bit,
+polarity, wiring or brake meaning is attached). `VERIFIED` stays unreachable: no candidate has a
+commissioned meaning for this machine, and no millimetre conversion, limit polarity, Home, fault,
+brake or motion-complete statement is produced. An observation never enables a command: the Motion
+authorization gate stays CLOSED, endpoint configuration is `NOT_CONFIGURED` and the axes stay
+`NOT_COMMISSIONED`.
+
+`docs/MOTION_OBSERVED_STATE_FOUNDATION.md` records the per-candidate evidence, the private
+boundary, the scoped source-boundary exception (one exact file, one exact token), the separate
+Owner-local B1-H and B2-H gates, and the C1 contract that is documented but **NOT IMPLEMENTED**.

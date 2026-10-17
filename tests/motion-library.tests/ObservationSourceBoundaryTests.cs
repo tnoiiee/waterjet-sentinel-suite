@@ -4,12 +4,12 @@ using Xunit;
 namespace Wjss.MotionLibrary.Tests;
 
 /// <summary>
-/// Static boundary coverage of the B2 read-only observed-state foundation. These tests pin the
+/// Static boundary coverage of the B2 read-only observed-state surface. These tests pin the
 /// PUBLIC-REPOSITORY posture of the new sources without building anything: the four candidate
-/// dispositions are recorded as BLOCKED in the evidence baseline, the evidence document carries
-/// no address and no hash, the foundation document states the closed gate and the C1 deferral,
-/// the B2 sources are isolated from the native boundary and contain no command text, and the
-/// Motion application model keeps no reference back to this surface.
+/// dispositions are recorded as VERIFIED_FOR_B2 in the evidence baseline, the evidence document
+/// carries no address and no hash, the foundation document states the closed gate and the C1
+/// deferral, the three model sources stay isolated from the native boundary and contain no
+/// command text, and the Motion application model keeps no reference back to this surface.
 /// </summary>
 public sealed class ObservationSourceBoundaryTests
 {
@@ -40,17 +40,17 @@ public sealed class ObservationSourceBoundaryTests
             RepoRoot(), "docs", "evidence", "LEGACY_MOTION_COMMISSIONING_BASELINE.md"));
 
     [Fact]
-    public void The_Evidence_Baseline_Records_Every_Candidate_As_Blocked()
+    public void The_Evidence_Baseline_Records_Every_Verified_Candidate_And_Its_Interpretation_Limit()
     {
         var lines = EvidenceBaseline().Split('\n');
 
-        foreach (var candidate in MotionObservedStateVocabulary.CandidateIds)
+        foreach (var candidate in MotionObservedStateVocabulary.VerifiedForB2Candidates)
         {
             var row = lines.FirstOrDefault(line =>
                 line.StartsWith($"| {candidate} |", StringComparison.Ordinal));
 
             Assert.NotNull(row);
-            Assert.Contains("BLOCKED", row, StringComparison.Ordinal);
+            Assert.Contains("VERIFIED_FOR_B2", row, StringComparison.Ordinal);
         }
     }
 
@@ -84,7 +84,7 @@ public sealed class ObservationSourceBoundaryTests
         Assert.Contains("MOTION_COMMISSIONING_GATE_NOT_OPEN", document, StringComparison.Ordinal);
         Assert.Contains("NOT_CONFIGURED", document, StringComparison.Ordinal);
         Assert.Contains("NOT_COMMISSIONED", document, StringComparison.Ordinal);
-        Assert.Contains("BLOCKED", document, StringComparison.Ordinal);
+        Assert.Contains("B2-H", document, StringComparison.Ordinal);
         Assert.Contains("C1", document, StringComparison.Ordinal);
         Assert.Contains("NOT IMPLEMENTED", document, StringComparison.Ordinal);
         Assert.DoesNotMatch(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", document);
@@ -99,7 +99,7 @@ public sealed class ObservationSourceBoundaryTests
         Assert.Contains("MotionObservedStateVocabulary.cs", readme, StringComparison.Ordinal);
         Assert.Contains("MotionObservedState.cs", readme, StringComparison.Ordinal);
         Assert.Contains("MotionObservationSession.cs", readme, StringComparison.Ordinal);
-        Assert.Contains("BLOCKED", readme, StringComparison.Ordinal);
+        Assert.Contains("VERIFIED_FOR_B2", readme, StringComparison.Ordinal);
     }
 
     [Fact]

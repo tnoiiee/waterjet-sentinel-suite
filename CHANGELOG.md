@@ -13,6 +13,55 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-17 — B2 verified read-only subset and private internal controller read boundary (correction; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local software gate is the validation of record
+([foundation](docs/MOTION_OBSERVED_STATE_FOUNDATION.md)). SOFTWARE ONLY: no controller was
+contacted, no library was loaded and no export was resolved. The Motion authorization gate stays
+CLOSED; endpoint configuration is `NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Correction.** The earlier entry below read the B1 sentence "no raw controller command, no axis
+read" as a permanent prohibition of every B2 read, and consequently recorded an EMPTY verified
+subset. That reading was wrong: the sentence describes the B1 identity surface. The Owner
+separately authorized a private, internal, typed, read-only B2 boundary under explicit conditions.
+The four Legacy read candidates are now `VERIFIED_FOR_B2` and implemented; the B1 surface is
+unchanged.
+
+**The boundary.** A closed set of sixteen typed intents (three axis kinds over axes A-D plus
+outputs 1-4), an immutable literal request table with no interpolation, a fixed request-length
+bound, a fixed response buffer, termination and printable-byte validation, a bounded decimal
+parser, and an exact zero-or-one check for an output state. An empty, truncated, non-printable,
+comma-separated, error-marked, hexadecimal or oversized reply is a refusal word, never a repaired
+or rounded value. No write, stop, jog, brake, home, define, move, auto, program-array or
+output-mutation operation exists in the table. The boundary is internal, is never returned by a
+public member, holds no module handle and is invalidated before the lifecycle owner closes the
+controller handle and unloads the module.
+
+**Interpretation stays weaker than the read.** The two position candidates are reported
+`RAW_OBSERVED` and the status word and output state `UNCONFIRMED`. `VERIFIED` stays unreachable:
+no millimetre conversion, limit polarity, Home, fault, brake or motion-complete meaning is
+produced, and an observation never enables a command.
+
+**Scoped source-boundary exception.** The repository-wide prohibition on naming a raw command API
+is unchanged. Exactly one file may name exactly one token, matched by exact repository-relative
+path and exact ordinal token, so a wildcard, a sibling file, a nested path, a case variant or a
+build-output path is not covered, and no write or control mnemonic, public command API, Runtime,
+contracts, UI or B1 harness file is covered either.
+
+**Documents corrected.** The evidence baseline now records the verified subset, the per-candidate
+read-only proof, the response bounds and the interpretation limits (sections B.2, B.4 and H), with
+the STOP resolution in G.2 and the decision status in G.3. The foundation document records the
+authority split, the boundary and the two separate B2-H tiers. The adapter README describes the
+surface rather than a blocked model. C1 remains documented and **NOT IMPLEMENTED** (PR #32
+candidate).
+
+**NOT VERIFIED / NOT RUN here:** any compilation or test execution; any controller contact, read,
+motion or brake operation; any status-bit, polarity, output-numbering or unit fact.
+
+**No dependency, project or lock change:** no project added, no package pin changed, no lock file
+touched, no contract, Snapshot, Delta or fixture changed, no route or UI change.
+
 ### 2026-10-17 — B2 read-only observed-state foundation and redacted Legacy baseline (SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
@@ -65,6 +114,11 @@ lock would be a STOP condition.
 motion or brake operation; any status-bit, polarity, output-numbering or unit fact. Owner-local
 sequence: B1-H per its own runbook if separately authorized, then the B2-H software gate on the
 exact PR head, then a separate Owner decision on C1.
+
+**Superseded in part:** the statements in this entry that the verified read subset is EMPTY and
+that all four candidates are BLOCKED are superseded by the correction entry above. The B1 identity
+surface described here is unchanged. See the foundation document section 3 and the evidence
+baseline sections B.4, G.2 and H.
 
 ### 2026-10-16 — B1 one-controller identity software foundation (first-contact foundation; SOFTWARE ONLY; on branch)
 

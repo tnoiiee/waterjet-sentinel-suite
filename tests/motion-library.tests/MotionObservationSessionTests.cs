@@ -5,15 +5,15 @@ using Xunit;
 namespace Wjss.MotionLibrary.Tests;
 
 /// <summary>
-/// Focused B2 defect-class coverage of the read-only observed-state foundation, WITHOUT any
-/// controller, native module or socket: every reachable outcome is UNAVAILABLE or REFUSED, the
-/// typed allow-list cannot be widened at run time, one session owns exactly one observation slot,
-/// the generation fence rejects stale and replayed results, close is deterministic, and the
-/// surface carries no command, no address and no fabricated meaning.
+/// Focused B2 defect-class coverage of the read-only observed-state model, WITHOUT any
+/// controller, native module or socket: a session with no read boundary reports UNAVAILABLE or
+/// REFUSED, the typed allow-list cannot be widened at run time, one session owns exactly one
+/// observation slot, the generation fence rejects stale and replayed results, close is
+/// deterministic, and the surface carries no command, no address and no fabricated meaning.
 ///
-/// The four read candidates are BLOCKED at this checkpoint (no authorized read surface), so the
-/// suite proves the model's honesty — it cannot claim a value it never obtained — rather than a
-/// read that is not authorized. No test here contacts anything.
+/// The read path itself is covered by MotionObservationReadBoundaryTests with a recording kernel;
+/// this suite covers the model-only mode, which has no boundary and therefore no value. No test
+/// here contacts anything.
 /// </summary>
 public sealed class MotionObservationSessionTests
 {
@@ -114,12 +114,14 @@ public sealed class MotionObservationSessionTests
     }
 
     [Fact]
-    public void Only_Unavailable_And_Refused_Are_Reachable_Interpretation_States()
+    public void Only_The_Four_Bounded_Interpretation_States_Are_Reachable()
     {
         Assert.Equal(6, MotionObservedStateVocabulary.InterpretationStates.Count);
         Assert.Equal(
             new[]
             {
+                MotionObservedStateVocabulary.InterpretationRawObserved,
+                MotionObservedStateVocabulary.InterpretationUnconfirmed,
                 MotionObservedStateVocabulary.InterpretationUnavailable,
                 MotionObservedStateVocabulary.InterpretationRefused,
             },
@@ -143,10 +145,6 @@ public sealed class MotionObservationSessionTests
                 Assert.Contains(outcome.InterpretationState, MotionObservedStateVocabulary.ReachableInterpretationStates);
                 Assert.DoesNotContain(
                     MotionObservedStateVocabulary.InterpretationVerified, outcome.InterpretationState, StringComparison.Ordinal);
-                Assert.DoesNotContain(
-                    MotionObservedStateVocabulary.InterpretationRawObserved, outcome.InterpretationState, StringComparison.Ordinal);
-                Assert.DoesNotContain(
-                    MotionObservedStateVocabulary.InterpretationUnconfirmed, outcome.InterpretationState, StringComparison.Ordinal);
                 Assert.DoesNotContain(
                     MotionObservedStateVocabulary.InterpretationStale, outcome.InterpretationState, StringComparison.Ordinal);
             }
