@@ -1,6 +1,10 @@
-# WJSS Motion Library Adapter — Native Load / Version Probe Boundary
+# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface)
 
-**Gate:** Native Load / Version Probe Software Gate. **Validation:** SOURCE-AUTHORED IN ARENA; NOT
+**Gates:** Native Load / Version Probe Software Gate (Gate A) and the B1 one-controller identity
+software foundation. The adapter carries two separately authorized, strictly separated surfaces:
+the probe surface (library inspection/loading ONLY, unchanged) and the B1 identity surface (one
+direct connection attempt, three typed identity reads, deterministic close — no raw command of
+any kind). **Validation:** SOURCE-AUTHORED IN ARENA; NOT
 COMPILED IN ARENA — the Owner-local build and probe run are the validation of record
 (see `docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md`).
 
@@ -23,10 +27,16 @@ Owner invocation only — that the Owner-installed motion communication library:
 6. reports a version that **equals the Owner-configured expected version** exactly;
 7. and releases every native handle deterministically.
 
-Only `gclib_version` is resolvable through this boundary. No open, close, discovery, address
-enumeration, command, callback, subscription, revision, serial or status API can be reached:
-the kernel interface exposes only load / resolve-one-export / module-path / invoke-version /
-release.
+On the probe surface, only `gclib_version` is resolvable: no open, close, discovery, address
+enumeration, command, callback, subscription, revision, serial or status API can be reached
+through it, and the probe kernel interface exposes only load / resolve-one-export / module-path /
+invoke-version / release. On the B1 identity surface, exactly six exports are resolvable
+(`gclib_force_gcaps`, `gclib_open`, `gclib_close`, `gclib_connection_type`,
+`gclib_revision_information`, `gclib_serial_number`) and the sibling kernel interface exposes
+only the invocation shapes those declarations require. Neither surface can resolve a raw-command,
+discovery, subscription, program/array/firmware or gcaps-version API, and the source-boundary
+tests pin both allow-lists exactly. Both surfaces reuse the one restricted loader
+(`NativeMethods`): there is no second loader.
 
 ## What it is NOT (strictly out of scope for this Gate)
 
@@ -60,3 +70,35 @@ release.
 
 The values for these variables live in the Owner-local evidence for this Gate. They are never
 written to disk by the adapter, never logged and never returned in any output.
+
+## B1 identity surface (one-controller first-contact software foundation)
+
+A one-shot, fail-closed identity session for the separately authorized B1 software gate (see
+`docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md`). It:
+
+1. runs the Gate A probe first — no connection attempt may precede the native identity/version
+   proof;
+2. evaluates injected precondition posture (concurrent-authority refusal is a real code path);
+3. loads the approved modules (companion first) with the same restricted search set and the same
+   loaded-module-path proofs;
+4. enforces the direct/no-gcaps posture (`gclib_force_gcaps` with the direct-only byte) BEFORE any
+   open;
+5. opens exactly ONE controller handle with the in-memory open-address text
+   `"<endpoint> --direct --timeout 2000"`;
+6. performs exactly three typed identity reads in fixed order — connection type (expected
+   Ethernet), revision information (bounded, zeroed, printable-shape validated), serial number
+   (nonzero required);
+7. classifies identity evidence redactedly: the expected model token is compared ordinally; its
+   absence is `MODEL_CONFIRMATION_REQUIRED`, never a false accept and never a false reject. The
+   serial is observed, redacted and left to Owner manual confirmation;
+8. closes the controller handle on EVERY post-open path and releases both module handles
+   deterministically; the outcome always tells the truth about the final cleanup state.
+
+Hard rules: one connection generation (late results rejected), one outstanding native operation
+(fail-fast busy), no retry, no reconnect, no polling, no replay, no raw command, no axis read, no
+motion, no controller configuration, no discovery. The session owns nothing reusable: it is the
+isolated one-shot process boundary itself.
+
+Redaction: outcomes never contain an endpoint, a serial number, a native path, a hash or raw
+vendor error text. The endpoint variable (`WJSS_MOTION_CONTROLLER_01_ENDPOINT`) is process-local
+environment configuration only and is never committed.

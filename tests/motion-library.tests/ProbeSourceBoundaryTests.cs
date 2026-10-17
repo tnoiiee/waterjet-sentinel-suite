@@ -47,6 +47,35 @@ public sealed class ProbeSourceBoundaryTests
         "WJSS_MOTION_LIB_GCLIBO_SHA256",
     };
 
+    private static readonly char[] PathSeparators = { '/', '\\' };
+
+    private static bool IsGateSourceFile(string root, string file)
+    {
+        if (ContainsBuildOutputDirectory(Path.GetRelativePath(root, file)))
+        {
+            return false;
+        }
+
+        return file.EndsWith(".cs", StringComparison.Ordinal)
+            || file.EndsWith(".csproj", StringComparison.Ordinal)
+            || file.EndsWith(".md", StringComparison.Ordinal);
+    }
+
+    private static bool ContainsBuildOutputDirectory(string relativePath)
+    {
+        var segments = relativePath.Split(PathSeparators, StringSplitOptions.RemoveEmptyEntries);
+        for (var index = 0; index < segments.Length - 1; index++)
+        {
+            if (string.Equals(segments[index], "bin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(segments[index], "obj", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static List<string> GateFiles()
     {
         var root = RepoRoot();
@@ -56,9 +85,7 @@ public sealed class ProbeSourceBoundaryTests
             var directory = Path.Combine(root, segments[0], segments[1]);
             foreach (var file in Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories))
             {
-                if (file.EndsWith(".cs", StringComparison.Ordinal)
-                    || file.EndsWith(".csproj", StringComparison.Ordinal)
-                    || file.EndsWith(".md", StringComparison.Ordinal))
+                if (IsGateSourceFile(root, file))
                 {
                     files.Add(file);
                 }
@@ -67,6 +94,36 @@ public sealed class ProbeSourceBoundaryTests
 
         Assert.NotEmpty(files);
         return files;
+    }
+
+    [Fact]
+    public void Gate_Source_Filter_Excludes_Build_Output_By_Exact_Path_Segment()
+    {
+        var root = RepoRoot();
+        var authoredSource = Path.Combine(root, "adapters", "motion-library", "MotionLibraryProbeRunner.cs");
+        Assert.True(IsGateSourceFile(root, authoredSource));
+        Assert.Contains(authoredSource, GateFiles());
+
+        var generatedObjAssemblyInfo = Path.Combine(
+            root, "apps", "motion-probe", "obj", "Release", "net10.0", "Wjss.MotionProbe.AssemblyInfo.cs");
+        var generatedBinSource = Path.Combine(
+            root, "apps", "motion-probe", "bin", "Release", "net10.0", "GeneratedAssemblyInfo.cs");
+        Assert.False(IsGateSourceFile(root, generatedObjAssemblyInfo));
+        Assert.False(IsGateSourceFile(root, generatedBinSource));
+        Assert.True(ContainsBuildOutputDirectory("apps/motion-probe/obj/Release/net10.0/AssemblyInfo.cs"));
+        Assert.True(ContainsBuildOutputDirectory("apps\\motion-probe\\bin\\Release\\net10.0\\AssemblyInfo.cs"));
+
+        var lookalikeSegments = Path.Combine(root, "adapters", "motion-library", "binary", "object-store", "Probe_bin.cs");
+        var lookalikeFileName = Path.Combine(root, "adapters", "motion-library", "source", "obj.cs");
+        Assert.True(IsGateSourceFile(root, lookalikeSegments));
+        Assert.True(IsGateSourceFile(root, lookalikeFileName));
+        Assert.True(IsGateSourceFile(root, Path.Combine(root, "adapters", "motion-library", "README.md")));
+        Assert.True(IsGateSourceFile(root, Path.Combine(root, "adapters", "motion-library", "Gate.csproj")));
+        Assert.False(IsGateSourceFile(root, Path.Combine(root, "adapters", "motion-library", "notes.txt")));
+
+        Assert.All(
+            GateFiles(),
+            file => Assert.False(ContainsBuildOutputDirectory(Path.GetRelativePath(root, file))));
     }
 
     private static string ReadGateSources()
@@ -108,10 +165,33 @@ public sealed class ProbeSourceBoundaryTests
     [Fact]
     public void Only_The_Authorized_Export_Is_Named_And_No_Vendor_Import_Exists()
     {
-        var source = ReadGateSources();
-        Assert.Contains("\"gclib_version\"", source);
+        // The probe surface files keep the exact Gate A posture: the single authorized version
+        // export is named and no connection/close export may appear there. The B1 identity
+        // surface (MotionController* + apps/motion-identity) is pinned separately by
+        // IdentitySourceBoundaryTests with its own complete allow-list.
+        var probeSurface = string.Empty;
+        foreach (var file in GateFiles())
+        {
+            var name = Path.GetFileName(file);
+            if (name.StartsWith("MotionLibraryProbe", StringComparison.Ordinal)
+                || name.Equals("NativeKernel.cs", StringComparison.Ordinal)
+                || file.Contains(Path.Combine("apps", "motion-probe"), StringComparison.Ordinal))
+            {
+                probeSurface += File.ReadAllText(file) + "\n";
+            }
+        }
+
+        Assert.NotEqual(string.Empty, probeSurface);
+        Assert.Contains("\"gclib_version\"", probeSurface);
 
         foreach (var prohibited in new[] { "gclib_open", "gclib_close", "GVersion", "gcaps_version", "gclib_command", "gclib_examples" })
+        {
+            Assert.DoesNotContain(prohibited, probeSurface, StringComparison.Ordinal);
+        }
+
+        // Raw-command and legacy-wrapping vocabulary stays banned across the WHOLE gate set.
+        var source = ReadGateSources();
+        foreach (var prohibited in new[] { "GVersion", "gcaps_version", "gclib_command", "gclib_examples" })
         {
             Assert.DoesNotContain(prohibited, source, StringComparison.Ordinal);
         }

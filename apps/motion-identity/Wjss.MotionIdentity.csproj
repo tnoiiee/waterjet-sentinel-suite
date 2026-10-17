@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS one-controller identity harness (B1 first-contact software foundation).
+
+    An Owner-invoked, console-only front-end for the Wjss.Adapters.MotionLibrary B1 identity
+    surface. It takes no arguments, binds no port, opens no listener, writes no file and starts no
+    Runtime: it resolves the Owner-local probe values and the Owner-local endpoint variable,
+    enforces the direct/no-gcaps posture, opens exactly one controller connection attempt, reads
+    only connection type, revision information and serial number, and prints a REDACTED JSON
+    outcome. No raw controller command, no axis read, no motion and no discovery exist here or can
+    be constructed from here. Real hardware contact is authorized only by a later, separate B1-H
+    First Contact Gate; the software validation runs are refusal-path only.
+
+    SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (no .NET SDK available in the Arena sandbox).
+    The Owner-local run is the validation of record
+    (docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md). The genuine packages.lock.json of this
+    project is produced only by the Owner-local restore, never hand-authored.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.MotionIdentity</RootNamespace>
+    <AssemblyName>Wjss.MotionIdentity</AssemblyName>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj" />
+  </ItemGroup>
+
+</Project>
