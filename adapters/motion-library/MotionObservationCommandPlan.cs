@@ -183,7 +183,7 @@ internal static class MotionObservationCommandPlan
     /// The complete and immutable request plan. The backing dictionary is private and the public
     /// view is a read-only wrapper, so no caller can add, remove or replace an entry.
     /// </summary>
-    private static readonly IReadOnlyDictionary<MotionObservationIntent, string> RequestTemplates =
+    private static readonly ReadOnlyDictionary<MotionObservationIntent, string> RequestTemplates =
         new ReadOnlyDictionary<MotionObservationIntent, string>(
             new Dictionary<MotionObservationIntent, string>
             {
