@@ -1,5 +1,9 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Checkpoint identifier (2026-10-18; C1 Stop-only software foundation):** branch
+> `arena/791ec087-waterjet-sentinel-suite`; implementation checkpoint commit
+> `9c53006ce8f8c97d9ebe1b09146150030a528413`.
+
 > **Merged truth and current position (added 2026-10-15; supersedes the merged/unmerged wording in
 > the status table below without deleting any dated record).** The pull-request state is taken from
 > the Git host, not from earlier prose:
