@@ -230,6 +230,15 @@ public sealed class MotionObservationTrialSession
                     "retry and no reconnect; the trial is over.");
             }
 
+            // The native open has now been attempted exactly once, so its canonical
+            // classification is established HERE and carried into every post-open outcome: the
+            // refusal branches below, the read pass, the cleanup-adjusted outcomes and the abort
+            // path. It is never recomputed from a later state and never overwritten. A path that
+            // refuses BEFORE this point keeps the empty (not-attempted) representation.
+            openClassification = openResult == MotionControllerApi.ResultSuccess
+                ? MotionObservationTrialVocabulary.OpenSucceeded
+                : MotionControllerApi.ClassifyOpenRefusal(openResult);
+
             // A handle returned alongside a refusal is still owned by this lifecycle and is closed
             // on the cleanup path.
             opened = handle != IntPtr.Zero;
@@ -237,22 +246,22 @@ public sealed class MotionObservationTrialSession
             if (openResult != MotionControllerApi.ResultSuccess)
             {
                 return Refuse(
-                    MotionControllerApi.ClassifyOpenRefusal(openResult),
+                    openClassification,
                     "The single open attempt was refused and classified with the canonical " +
-                    "open-result word carried by this code. There is no retry, no reconnect and no " +
-                    "vendor error text; the trial is over.");
+                    "open-result word carried by this code and by this classification. There is no " +
+                    "retry, no reconnect and no vendor error text; the trial is over.",
+                    openClassification);
             }
-
-            // The vendor call itself reported success, so the classification is truthful even if
-            // the returned handle is unusable.
-            openClassification = MotionObservationTrialVocabulary.OpenSucceeded;
 
             if (handle == IntPtr.Zero)
             {
+                // The vendor call itself reported success, so the classification stays
+                // GCLIB_SUCCESS even though the returned handle is unusable.
                 return Refuse(
                     MotionControllerIdentityVocabulary.ConnectionHandleInvalid,
                     "The open reported success but returned no controller handle. No identity or " +
-                    "observation read was attempted; there is no retry and no reconnect.");
+                    "observation read was attempted; there is no retry and no reconnect.",
+                    openClassification);
             }
 
             // Phase 6: one observation session bound to this handle and this export. The read

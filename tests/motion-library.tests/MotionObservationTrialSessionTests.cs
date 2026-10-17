@@ -396,6 +396,7 @@ public sealed class MotionObservationTrialSessionTests
         Assert.True(first.Accepted);
         Assert.False(second.Accepted);
         Assert.Equal(MotionObservationTrialVocabulary.TrialAlreadyRun, second.Code);
+        Assert.Equal(string.Empty, second.OpenClassification);
         Assert.Equal(1, kernel.OpenCount);
         Assert.Equal(1, kernel.CloseCount);
     }
@@ -435,20 +436,26 @@ public sealed class MotionObservationTrialSessionTests
         Assert.Equal(ExpectedReleaseOrder, kernel.ReleasedModuleFileNames.ToArray());
         Assert.True(outcome.NativeHandlesReleased);
         Assert.True(outcome.ControllerHandleClosed);
+        Assert.Equal(string.Empty, outcome.OpenClassification);
     }
 
     [Fact]
     public void An_Open_Refusal_Uses_The_Canonical_Classification()
     {
         var kernel = new FakeControllerKernel { OpenResult = 6 };
-        var outcome = Session(kernel, new FakeReadKernel()).Run();
+        var readKernel = new FakeReadKernel();
+        var outcome = Session(kernel, readKernel).Run();
 
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionControllerIdentityVocabulary.OpenNotConnected, outcome.Code);
         Assert.Equal(MotionControllerIdentityVocabulary.OpenNotConnected, outcome.OpenClassification);
         Assert.Equal(1, kernel.OpenCount);
         Assert.Equal(0, kernel.CloseCount);
+        Assert.Empty(readKernel.Issued);
         Assert.True(outcome.ObservationBoundaryInvalidated);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Equal(ExpectedReleaseOrder, kernel.ReleasedModuleFileNames.ToArray());
     }
 
     [Fact]
@@ -459,7 +466,9 @@ public sealed class MotionObservationTrialSessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionControllerIdentityVocabulary.OpenResultUnrecognised, outcome.Code);
+        Assert.Equal(MotionControllerIdentityVocabulary.OpenResultUnrecognised, outcome.OpenClassification);
         Assert.DoesNotContain("42", outcome.Detail, StringComparison.Ordinal);
+        Assert.DoesNotContain("42", outcome.OpenClassification, StringComparison.Ordinal);
         Assert.Equal(1, kernel.OpenCount);
     }
 
@@ -475,6 +484,9 @@ public sealed class MotionObservationTrialSessionTests
         Assert.Equal(MotionObservationTrialVocabulary.OpenSucceeded, outcome.OpenClassification);
         Assert.Empty(readKernel.Issued);
         Assert.Equal(1, kernel.OpenCount);
+        Assert.Equal(0, kernel.CloseCount);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.Equal(ExpectedReleaseOrder, kernel.ReleasedModuleFileNames.ToArray());
     }
 
     [Fact]
@@ -490,6 +502,7 @@ public sealed class MotionObservationTrialSessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionControllerIdentityVocabulary.OpenNotConnected, outcome.Code);
+        Assert.Equal(MotionControllerIdentityVocabulary.OpenNotConnected, outcome.OpenClassification);
         Assert.True(outcome.ControllerHandleClosed);
         Assert.Equal(1, kernel.CloseCount);
         Assert.Equal(ExpectedReleaseOrder, kernel.ReleasedModuleFileNames.ToArray());
@@ -514,6 +527,7 @@ public sealed class MotionObservationTrialSessionTests
         Assert.Equal(1, kernel.CloseCount);
         Assert.True(outcome.ObservationBoundaryInvalidated);
         Assert.True(outcome.ControllerHandleClosed);
+        Assert.Equal(MotionObservationTrialVocabulary.OpenSucceeded, outcome.OpenClassification);
     }
 
     [Fact]
@@ -553,7 +567,34 @@ public sealed class MotionObservationTrialSessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionControllerIdentityVocabulary.CleanupUnproven, outcome.Code);
+        Assert.Equal(MotionObservationTrialVocabulary.OpenSucceeded, outcome.OpenClassification);
         Assert.False(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Contains(
+            "controller handle close could not be confirmed",
+            outcome.Detail,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void A_Refused_Open_With_A_Failed_Close_Keeps_Its_Classification()
+    {
+        // The open is refused and yet returns a handle that cannot be closed: the overall code and
+        // the classification stay the canonical refusal word, and only the cleanup truth changes.
+        var kernel = new FakeControllerKernel
+        {
+            OpenResult = 6,
+            ReturnHandleOnRefusedOpen = true,
+            CloseResult = 1,
+        };
+
+        var outcome = Session(kernel, new FakeReadKernel()).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal(MotionControllerIdentityVocabulary.OpenNotConnected, outcome.Code);
+        Assert.Equal(MotionControllerIdentityVocabulary.OpenNotConnected, outcome.OpenClassification);
+        Assert.False(outcome.ControllerHandleClosed);
+        Assert.Equal(1, kernel.CloseCount);
         Assert.True(outcome.NativeHandlesReleased);
         Assert.Contains(
             "controller handle close could not be confirmed",
@@ -569,6 +610,7 @@ public sealed class MotionObservationTrialSessionTests
 
         Assert.False(outcome.Accepted);
         Assert.Equal(MotionControllerIdentityVocabulary.NativeUnloadFailed, outcome.Code);
+        Assert.Equal(MotionObservationTrialVocabulary.OpenSucceeded, outcome.OpenClassification);
         Assert.True(outcome.ControllerHandleClosed);
         Assert.False(outcome.NativeHandlesReleased);
     }
