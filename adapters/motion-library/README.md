@@ -66,6 +66,25 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
 | `MotionObservationSession.cs` | B2 session: one owner, one outstanding observation, one generation, stale and replay rejection, deterministic idempotent close. Model mode has no I/O; reading mode reaches the wire only through the internal typed boundary. |
 | `MotionObservationCommandPlan.cs` | B2 plan (internal): the sixteen typed intents, the immutable literal request table, the fixed request and response bounds, and the bounded response parser. No native name, no handle and no I/O. |
 | `MotionControllerCommandKernel.cs` | B2 native boundary (internal): the one approved command-and-response export constant, its resolution through the already-authorized kernel seam, and the bound kernel that issues one typed intent and validates the reply. Holds no module and releases nothing. |
+| `MotionStopCommandPlan.cs` | C1 Stop plan (internal): the closed A/B axis domain (`MotionStopAxis`, Axis A = Horizontal, Axis B = Vertical, default value refused) and the only two Stop templates, chosen by a switch with no caller text. |
+| `MotionStopAcknowledgement.cs` | C1 Stop acknowledgement (internal): the redacted outcome vocabulary (no confirmed-stop code) and the separate reply classifier. Not the B2 numeric parser. |
+| `MotionStopDispatchKernel.cs` | C1 Stop carrier (internal): one guarded native dispatch against an already-open handle and an already-resolved export, with the same signature as the B2 carrier. Invalidation makes no native call. |
+| `MotionStopSession.cs` | C1 Stop session (internal): one operation slot, a generation fence, duplicate, replay and stale rejection, one dispatch per accepted operation, no retry, and a redacted outcome that never claims confirmation. |
+| `MotionStopOwner.cs` | C1 Stop owner (internal): the only close path. Invalidates the session first, then closes the handle, then releases the module. Idempotent. |
+
+## C1 Stop-only software foundation (source-authored; not compiled in the Arena sandbox)
+
+- The only C1 command is `Stop` on Axis A (Horizontal) or Axis B (Vertical). Axis C, Axis D, empty,
+  combined, multi-axis, unqualified, Stop-all and caller-supplied text are refused by construction.
+- The command text is one of two fixed templates in `MotionStopCommandPlan.cs`. Their family-level
+  evidence is the B140 command reference; they are not firmware-specific evidence for
+  `DMC-B140-M` or `DMCB140 Rev 1.0c2`.
+- A dispatch that completes is reported as `STOP_DISPATCHED`. It is never reported as a confirmed
+  stop: no observed state is read and no confirmation field can be set.
+- Nothing is retried, reconnected, replayed or polled. Invalidation precedes handle close, and
+  handle close precedes module release.
+- No code in this change opens a connection or calls the native layer outside the focused tests,
+  which use recording fakes only. No Runtime, API or Kiosk path reaches this code.
 
 ## Owner-local configuration (environment only; values never committed)
 
