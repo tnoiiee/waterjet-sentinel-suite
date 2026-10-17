@@ -102,6 +102,12 @@ A one-shot, fail-closed identity session for the separately authorized B1 softwa
 8. closes the controller handle on EVERY post-open path and releases both module handles
    deterministically; the outcome always tells the truth about the final cleanup state.
 
+The single open attempt's library result is classified into ONE canonical redacted refusal word in
+the installed header order — `OPEN_INVALID_ARGUMENT`, `OPEN_INTERNAL_ERROR`, `CONNECTION_TIMEOUT`,
+`OPEN_COMMAND_ERROR`, `OPEN_BUFFER_TOO_SMALL`, `OPEN_NOT_CONNECTED`, `OPEN_NOT_SUBSCRIBED` — and
+any other non-zero value becomes `OPEN_RESULT_UNRECOGNISED`. The raw integer, the vendor error
+string and every native detail stay inside the boundary; the word is the whole diagnostic.
+
 Hard rules: one connection generation (late results rejected), one outstanding native operation
 (fail-fast busy), no retry, no reconnect, no polling, no replay, no raw command, no axis read, no
 motion, no controller configuration, no discovery. The session owns nothing reusable: it is the

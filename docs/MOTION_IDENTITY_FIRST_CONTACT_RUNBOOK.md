@@ -165,6 +165,11 @@ a time:
      a separate explicit Owner authorization.
    - Any other exit-2 refusal, invalid cleanup state, or unlisted outcome is a STOP; do not retry.
      In particular, `CONNECTION_HANDLE_INVALID` is a refusal, not a successful identity session.
+   - A refused open carries exactly one canonical classification — `OPEN_INVALID_ARGUMENT`,
+     `OPEN_INTERNAL_ERROR`, `CONNECTION_TIMEOUT`, `OPEN_COMMAND_ERROR`, `OPEN_BUFFER_TOO_SMALL`,
+     `OPEN_NOT_CONNECTED`, `OPEN_NOT_SUBSCRIBED` or `OPEN_RESULT_UNRECOGNISED`. Record the exact
+     word; the raw library value and any vendor error text are never printed, and a refused open is
+     never retried, reconnected or re-attempted in the same authorization.
    The serial is observed only in redacted form in every outcome.
 7. The Owner manually compares the displayed revision text with the expected `DMC-B140-M` model
    and decides whether the observed evidence identifies the intended MC-WSB1 unit, using the

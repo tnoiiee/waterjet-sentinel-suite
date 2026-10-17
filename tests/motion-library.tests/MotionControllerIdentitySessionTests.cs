@@ -31,6 +31,7 @@ public sealed class MotionControllerIdentitySessionTests
 
         public int OpenResult = 0;
         public IntPtr OpenHandle = new(201);
+        public bool ReturnHandleOnRefusedOpen;
         public int CloseResult = 0;
         public bool CloseThrows;
         public bool CloseZeroesHandle = true;
@@ -91,7 +92,7 @@ public sealed class MotionControllerIdentitySessionTests
             Log.Add("open");
             OpenCount++;
             LastAddress = Encoding.ASCII.GetString(addressBuffer, 0, addressBuffer.Length - 1);
-            handle = OpenResult == 0 ? OpenHandle : IntPtr.Zero;
+            handle = OpenResult == 0 || ReturnHandleOnRefusedOpen ? OpenHandle : IntPtr.Zero;
             return OpenResult;
         }
 
@@ -176,6 +177,22 @@ public sealed class MotionControllerIdentitySessionTests
 
     private static MotionLibraryProbeOutcome ProbeAccepted() =>
         MotionLibraryProbeOutcome.Complete("test-version-shape", "synthetic proof");
+
+    /// <summary>
+    /// The canonical open-result refusal words in the installed gclib 2.6.0 header order
+    /// (GCLIB_INVALID_ARGUMENT through GCLIB_NOT_SUBSCRIBED). A constant expected sequence, so it
+    /// is allocated once; the order and the values are the assertion.
+    /// </summary>
+    private static readonly string[] ExpectedOpenRefusalCodes =
+    {
+        "OPEN_INVALID_ARGUMENT",
+        "OPEN_INTERNAL_ERROR",
+        "CONNECTION_TIMEOUT",
+        "OPEN_COMMAND_ERROR",
+        "OPEN_BUFFER_TOO_SMALL",
+        "OPEN_NOT_CONNECTED",
+        "OPEN_NOT_SUBSCRIBED",
+    };
 
     private static MotionControllerIdentitySession Session(
         FakeControllerKernel kernel,
@@ -309,11 +326,127 @@ public sealed class MotionControllerIdentitySessionTests
         var outcome = Session(kernel).Run();
 
         Assert.False(outcome.Accepted);
-        Assert.Equal("CONNECTION_FAILED", outcome.Code);
+        Assert.Equal("OPEN_NOT_CONNECTED", outcome.Code);
         Assert.True(outcome.ControllerHandleClosed);
         Assert.True(outcome.NativeHandlesReleased);
         Assert.Equal(1, kernel.OpenCount);
         Assert.Equal(0, kernel.CloseCount);
+    }
+
+    [Theory]
+    [InlineData(1, "OPEN_INVALID_ARGUMENT")]
+    [InlineData(2, "OPEN_INTERNAL_ERROR")]
+    [InlineData(3, "CONNECTION_TIMEOUT")]
+    [InlineData(4, "OPEN_COMMAND_ERROR")]
+    [InlineData(5, "OPEN_BUFFER_TOO_SMALL")]
+    [InlineData(6, "OPEN_NOT_CONNECTED")]
+    [InlineData(7, "OPEN_NOT_SUBSCRIBED")]
+    [InlineData(8, "OPEN_RESULT_UNRECOGNISED")]
+    [InlineData(-1, "OPEN_RESULT_UNRECOGNISED")]
+    public void Every_Installed_Header_Open_Result_Maps_To_Its_Canonical_Refusal(
+        int openResult,
+        string expectedCode)
+    {
+        var kernel = new FakeControllerKernel { OpenResult = openResult };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal(expectedCode, outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Equal(1, kernel.OpenCount);
+        Assert.Equal(0, kernel.CloseCount);
+        Assert.DoesNotContain("connection-type", kernel.Log);
+        Assert.DoesNotContain("revision", kernel.Log);
+        Assert.DoesNotContain("serial", kernel.Log);
+    }
+
+    [Fact]
+    public void Open_Result_Zero_Still_Continues_To_The_Identity_Read_Path()
+    {
+        var kernel = new FakeControllerKernel { OpenResult = 0 };
+        var outcome = Session(kernel).Run();
+
+        Assert.True(outcome.Accepted);
+        Assert.Equal("IDENTITY_SESSION_COMPLETE", outcome.Code);
+        Assert.Equal(1, kernel.OpenCount);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.Contains("connection-type", kernel.Log);
+        Assert.Contains("revision", kernel.Log);
+        Assert.Contains("serial", kernel.Log);
+    }
+
+    [Fact]
+    public void Open_Refusal_Codes_Cover_The_Installed_Header_Order_And_Fold_Only_Unknown_Values()
+    {
+        var codes = new List<string>();
+        for (var openResult = 1; openResult <= 7; openResult++)
+        {
+            codes.Add(Session(new FakeControllerKernel { OpenResult = openResult }).Run().Code);
+        }
+
+        Assert.Equal(ExpectedOpenRefusalCodes, codes);
+
+        var unknownPositive = Session(new FakeControllerKernel { OpenResult = 8 }).Run();
+        var unknownNegative = Session(new FakeControllerKernel { OpenResult = -1 }).Run();
+
+        Assert.Equal("OPEN_RESULT_UNRECOGNISED", unknownPositive.Code);
+        Assert.Equal("OPEN_RESULT_UNRECOGNISED", unknownNegative.Code);
+        Assert.DoesNotContain(unknownPositive.Code, codes);
+    }
+
+    [Fact]
+    public void A_Handle_Returned_Alongside_A_Refused_Open_Is_Closed_And_Reported_Truthfully()
+    {
+        var kernel = new FakeControllerKernel
+        {
+            OpenResult = 6,
+            ReturnHandleOnRefusedOpen = true,
+        };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("OPEN_NOT_CONNECTED", outcome.Code);
+        Assert.True(outcome.ControllerHandleClosed);
+        Assert.True(outcome.NativeHandlesReleased);
+        Assert.Equal(1, kernel.OpenCount);
+        Assert.Equal(1, kernel.CloseCount);
+        Assert.DoesNotContain("connection-type", kernel.Log);
+    }
+
+    [Fact]
+    public void A_Refused_Open_With_A_Failed_Close_Is_Never_Accepted()
+    {
+        var kernel = new FakeControllerKernel
+        {
+            OpenResult = 6,
+            ReturnHandleOnRefusedOpen = true,
+            CloseResult = 1,
+        };
+        var outcome = Session(kernel).Run();
+
+        Assert.False(outcome.Accepted);
+        Assert.Equal("OPEN_NOT_CONNECTED", outcome.Code);
+        Assert.False(outcome.ControllerHandleClosed);
+        Assert.Contains("controller handle close could not be confirmed", outcome.Detail, StringComparison.Ordinal);
+        Assert.Equal(1, kernel.CloseCount);
+    }
+
+    [Fact]
+    public void An_Open_Refusal_Carries_Only_The_Canonical_Classification()
+    {
+        var kernel = new FakeControllerKernel { OpenResult = 1 };
+        var outcome = Session(kernel).Run();
+        var json = JsonSerializer.Serialize(outcome);
+
+        Assert.Equal("OPEN_INVALID_ARGUMENT", outcome.Code);
+        Assert.Contains("\"OPEN_INVALID_ARGUMENT\"", json, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"[A-Za-z]:[\\/]", outcome.Detail);
+        Assert.DoesNotMatch(@"\b[0-9A-Fa-f]{64}\b", json);
+        Assert.DoesNotMatch(@"\b(?:\d{1,3}\.){3}\d{1,3}\b", json);
+        Assert.DoesNotContain(MotionControllerEndpointResolver.EndpointVariable, json, StringComparison.Ordinal);
+        Assert.DoesNotContain("gclib_open", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("synthetic", json, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
