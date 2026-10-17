@@ -208,7 +208,7 @@ node tools/boundary-scan/boundary-scan.mjs .
 
 | Step | Acceptance |
 | --- | --- |
-| 1 | PASS; no new or modified `packages.lock.json`; no other change |
+| 1 | PASS; no new or modified `packages.lock.json` for THIS checkpoint (it adds no project). The later B2-H executable checkpoint DOES add one project and therefore expects exactly one new generated `apps/motion-observation/packages.lock.json` — see `docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md` |
 | 2 | 0 warnings, 0 errors (`TreatWarningsAsErrors`) |
 | 3 | every focused test passes, including the sixteen-literal plan, the parser refusal table, the four verified dispositions and the negative-space boundary tests |
 | 4 | every existing test passes |
@@ -223,6 +223,9 @@ Select-String -Path adapters/motion-library/MotionObservation*.cs -Pattern 'DllI
 # expected: no rows (the three model sources still have no I/O call)
 git status --porcelain
 ```
+
+The executable form of this tier — the one-shot observation harness and its lifecycle — is
+specified in `docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md`.
 
 **B2-H(R) — read-only device trial, separate authorization, Owner only**
 
@@ -269,7 +272,10 @@ No compile or test result is claimed.
    exact-token source-boundary exception that cannot be widened.
 3. **DEFINED.** B2-H now has a software tier and a separately authorized read-only device tier;
    neither is executed by the Agent.
-4. **CONFIRMED.** No dependency, project or lock change was made, and none is needed.
+4. **CONFIRMED for this checkpoint.** No dependency, project or lock change was made, and none
+   is needed here. The later B2-H executable composition adds one console project and therefore
+   requires exactly one genuine Owner-local generated lock file; that is recorded separately in
+   `docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md`.
 
 ## 10. Changed / Unchanged / Not Verified
 

@@ -13,6 +13,47 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-17 — B2-H one-shot read-only observation executable composition (addition; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local build and run are the validation of record
+([runbook](docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md)). SOFTWARE ONLY: the Agent contacted no
+controller, loaded no library and opened no handle. The Motion authorization gate stays CLOSED;
+endpoint configuration is `NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Addition.** The B2 read boundary now has its smallest executable composition: one Owner-invoked
+console harness (`apps/motion-observation`, registered in the solution) over the one-shot
+`MotionObservationTrialSession`. The composition performs, exactly once and in order: invocation
+validation, Owner-local native configuration resolution, Gate A proof, endpoint resolution through
+the validated resolver, restricted load of the approved modules with path proof, resolution of only
+the four authorized exports, `gclib_force_gcaps(false)` before the open, exactly one `gclib_open`
+with the validated bare address, one observation session bound to that handle, the fixed sixteen
+typed intents in deterministic order, then boundary invalidation, controller close and module
+release in that order, and a redacted outcome whose cleanup flags are the measured truth.
+
+**No new capability.** There is no string parameter on the trial, no raw command, no arbitrary axis,
+output or subject, no retry, no reconnect, no replay, no polling, no timer, no background reader,
+no second open, no second session owner, no write, no motion, no output control, no configuration
+write and no discovery. The first refused read stops the remaining sequence. A cleanup that cannot
+be confirmed prevents acceptance. `gclib_open` refusals now reuse one canonical classification
+shared by B1 and B2, so the two surfaces cannot drift.
+
+**Tests (authored, not executed in Arena).** A focused trial-composition suite covers the fixed
+plan and its order, the native lifecycle order (force before open, invalidate before close, close
+before release), refusal and cleanup paths, the one-shot guard, the canonical open classification
+and redaction; an invocation-boundary suite covers the no-argument harness, the single
+configuration source, the absence of a text-to-request path, and the absence of a new dependency,
+build output or Runtime/contracts coupling.
+
+**Lock position.** This checkpoint adds one project, so exactly one genuine lock file is expected
+from the Owner-local restore: `apps/motion-observation/packages.lock.json`. It is never
+hand-authored; until it exists on the branch the lock status is `BLOCKED PENDING OWNER`.
+
+**Unchanged.** B1 lifecycle, its six-export allow-list and its harness; the B2 read plan, its
+sixteen literals and its scoped source-boundary exception; the native probe surface; the
+commissioning contracts; the Runtime composition; the Preview and its routes; the Motion
+authorization gate; every dependency pin; every existing lock file.
+
 ### 2026-10-17 — B1 gclib_open address corrected to the documented Vendor contract (correction; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no

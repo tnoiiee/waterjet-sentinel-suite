@@ -145,4 +145,23 @@ public static class MotionControllerApi
         ArgumentNullException.ThrowIfNull(configuration);
         return configuration.EndpointValue;
     }
+
+    /// <summary>
+    /// The SINGLE canonical classification of one gclib_open result, shared by the B1 identity
+    /// session and the B2 observation trial so the mapping cannot drift. Each installed-header
+    /// value keeps its own redacted refusal word; a value outside the header keeps its own word so
+    /// an unexpected result is never confused with a known failure. The integer, the vendor error
+    /// string and every other native detail stay inside the boundary.
+    /// </summary>
+    internal static string ClassifyOpenRefusal(int openResult) => openResult switch
+    {
+        ResultInvalidArgument => MotionControllerIdentityVocabulary.OpenInvalidArgument,
+        ResultInternalError => MotionControllerIdentityVocabulary.OpenInternalError,
+        ResultTimeout => MotionControllerIdentityVocabulary.ConnectionTimeout,
+        ResultCommandError => MotionControllerIdentityVocabulary.OpenCommandError,
+        ResultBufferTooSmall => MotionControllerIdentityVocabulary.OpenBufferTooSmall,
+        ResultNotConnected => MotionControllerIdentityVocabulary.OpenNotConnected,
+        ResultNotSubscribed => MotionControllerIdentityVocabulary.OpenNotSubscribed,
+        _ => MotionControllerIdentityVocabulary.OpenResultUnrecognised,
+    };
 }

@@ -382,7 +382,7 @@ public sealed class MotionControllerIdentitySession
 
             if (openResult != MotionControllerApi.ResultSuccess)
             {
-                var refusalCode = ClassifyOpenRefusal(openResult);
+                var refusalCode = MotionControllerApi.ClassifyOpenRefusal(openResult);
                 var refusalDetail =
                     openResult == MotionControllerApi.ResultTimeout
                         ? "The single open attempt timed out within the library timeout (2000 ms). " +
@@ -848,24 +848,5 @@ public sealed class MotionControllerIdentitySession
         MotionControllerApi.ConnectionTypeSerial => "GCLIB_SERIAL",
         MotionControllerApi.ConnectionTypePci => "GCLIB_PCI",
         _ => "CONNECTION_TYPE_UNRECOGNISED",
-    };
-
-    /// <summary>
-    /// Maps one installed-header gclib_result value from the single open attempt to its canonical
-    /// redacted refusal code. The numeric constants are the already-committed ones and match the
-    /// installed gclib 2.6.0 enum order; the helper never returns the integer, never carries a
-    /// vendor string and never interprets a read or a cleanup result. A value outside the header
-    /// keeps its own word so an unexpected result is never confused with a known failure.
-    /// </summary>
-    private static string ClassifyOpenRefusal(int openResult) => openResult switch
-    {
-        MotionControllerApi.ResultInvalidArgument => MotionControllerIdentityVocabulary.OpenInvalidArgument,
-        MotionControllerApi.ResultInternalError => MotionControllerIdentityVocabulary.OpenInternalError,
-        MotionControllerApi.ResultTimeout => MotionControllerIdentityVocabulary.ConnectionTimeout,
-        MotionControllerApi.ResultCommandError => MotionControllerIdentityVocabulary.OpenCommandError,
-        MotionControllerApi.ResultBufferTooSmall => MotionControllerIdentityVocabulary.OpenBufferTooSmall,
-        MotionControllerApi.ResultNotConnected => MotionControllerIdentityVocabulary.OpenNotConnected,
-        MotionControllerApi.ResultNotSubscribed => MotionControllerIdentityVocabulary.OpenNotSubscribed,
-        _ => MotionControllerIdentityVocabulary.OpenResultUnrecognised,
     };
 }

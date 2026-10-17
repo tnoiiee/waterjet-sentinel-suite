@@ -155,3 +155,33 @@ authorization gate stays CLOSED, endpoint configuration is `NOT_CONFIGURED` and 
 `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` records the per-candidate evidence, the private
 boundary, the scoped source-boundary exception (one exact file, one exact token), the separate
 Owner-local B1-H and B2-H gates, and the C1 contract that is documented but **NOT IMPLEMENTED**.
+
+## B2-H one-shot observation trial composition (software only)
+
+`MotionObservationTrialSession` is the smallest executable composition over that boundary. It is
+one-shot by construction and performs exactly this sequence:
+
+1. Gate A native identity/version proof (injected in tests, real probe runner in production);
+2. load only the approved modules through the restricted loader, companion first, and prove each
+   loaded path;
+3. resolve only the four authorized exports — `gclib_force_gcaps`, `gclib_open`, `gclib_close`
+   and the single scoped read export (named only in the internal boundary file);
+4. `gclib_force_gcaps(false)` before the open;
+5. exactly one `gclib_open` with the validated bare address;
+6. one `MotionObservationSession` bound to that handle and that export;
+7. the fixed sixteen typed intents, once, in plan order;
+8. boundary invalidation, then controller close, then module release, in that order;
+9. a redacted outcome whose cleanup flags are the measured truth.
+
+There is no retry, no reconnect, no replay, no polling, no timer, no background reader, no second
+open and no second session owner. A second `Run()` is refused with
+`OBSERVATION_TRIAL_ALREADY_RUN`. The first refused read stops the remaining sequence and keeps its
+own canonical code. Cleanup that cannot be confirmed turns an otherwise complete pass into
+`CLEANUP_UNPROVEN` or `NATIVE_UNLOAD_FAILED` — a partial pass is never reported as complete.
+
+The trial type has no string parameter, so no caller text can reach a request. `gclib_open`
+refusals reuse the single canonical B1 classification (`MotionControllerApi.ClassifyOpenRefusal`),
+so the two surfaces cannot drift.
+
+`docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md` is the runbook of record for the executable and for the
+Owner-local software gate; `apps/motion-observation` is the console harness.
