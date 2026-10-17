@@ -380,22 +380,48 @@ public sealed class MotionObservationSessionTests
 
     // ------------------------------------------------------------------- model honesty (shape)
 
+    /// <summary>
+    /// The factory predicate under test: a public static method that is declared by the model and
+    /// returns the model. A record's compiler-generated equality operators are public static and
+    /// are declared by the record itself, but they return <c>bool</c>, so the return-type half of
+    /// the predicate is what keeps them out of the factory set.
+    /// </summary>
+    private static MethodInfo[] FactoryShapedMethods(Type model) =>
+        model.GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Where(method => method.DeclaringType == model && method.ReturnType == model)
+            .ToArray();
+
+    /// <summary>
+    /// A test-local model that does expose one public static factory, used only to prove the
+    /// predicate still reports the shape it exists to catch.
+    /// </summary>
+    private sealed record FactoryShapedProbe
+    {
+        public static FactoryShapedProbe Create() => new();
+    }
+
     [Fact]
     public void The_State_Model_Has_No_Public_Constructor_And_No_Public_Factory()
     {
         Assert.Empty(typeof(MotionObservedState).GetConstructors());
 
-        var publicFactories = typeof(MotionObservedState)
+        // Public static methods declared by the model DO exist: the compiler-generated record
+        // equality operators. They are bool-returning and cannot construct the model, so a
+        // predicate that only checks "public static" plus "declared here" is too broad.
+        var declaredPublicStatics = typeof(MotionObservedState)
             .GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Where(method => method.DeclaringType == typeof(MotionObservedState))
             .ToArray();
-        Assert.Empty(publicFactories);
+        Assert.NotEmpty(declaredPublicStatics.Where(method => method.ReturnType == typeof(bool)));
 
-        var publicOutcomeFactories = typeof(MotionObservationOutcome)
-            .GetMethods(BindingFlags.Public | BindingFlags.Static)
-            .Where(method => method.DeclaringType == typeof(MotionObservationOutcome))
-            .ToArray();
-        Assert.Empty(publicOutcomeFactories);
+        // No public static method returns either model, so neither model has a public factory.
+        Assert.Empty(FactoryShapedMethods(typeof(MotionObservedState)));
+        Assert.Empty(FactoryShapedMethods(typeof(MotionObservationOutcome)));
+
+        // The same predicate still catches a real factory: a public static method returning its
+        // own model, so the boundary is corrected rather than relaxed.
+        var probeFactory = Assert.Single(FactoryShapedMethods(typeof(FactoryShapedProbe)));
+        Assert.Equal(nameof(FactoryShapedProbe.Create), probeFactory.Name);
     }
 
     [Fact]
