@@ -412,7 +412,7 @@ public sealed class MotionObservationSessionTests
             .GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Where(method => method.DeclaringType == typeof(MotionObservedState))
             .ToArray();
-        Assert.NotEmpty(declaredPublicStatics.Where(method => method.ReturnType == typeof(bool)));
+        Assert.Contains(declaredPublicStatics, method => method.ReturnType == typeof(bool));
 
         // No public static method returns either model, so neither model has a public factory.
         Assert.Empty(FactoryShapedMethods(typeof(MotionObservedState)));
