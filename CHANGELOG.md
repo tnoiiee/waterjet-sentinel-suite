@@ -13,6 +13,59 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-17 — B2 read-only observed-state foundation and redacted Legacy baseline (SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local software gate is the validation of record
+([foundation](docs/MOTION_OBSERVED_STATE_FOUNDATION.md)). SOFTWARE ONLY: the verified read subset
+is EMPTY and no read is implemented. The four B2 candidates — axis status, commanded position,
+actual position and one digital output — are real, documented vendor reads, and each one needs the
+raw command-and-response path that the B1 authority line forbids ("no raw controller command, no
+axis read") and that the source-boundary tests pin as a prohibited token. A seventh native export
+would be an authorization change, so it was reported to the Owner instead of being taken. The
+Motion authorization gate stays CLOSED; endpoint configuration is `NOT_CONFIGURED` and the axes
+stay `NOT_COMMISSIONED`.**
+
+**Redacted Legacy baseline.** `docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md` records the
+seven-path Legacy pack (controller, designer and resource files plus the provider contract) with
+sections A–G: provenance and integrity, the exact command inventory (liveness read, output-bank
+clear, home velocity and switch search, begin motion, stop, brake set and clear, output read,
+acceleration, speed, deceleration, absolute target, jog, position define, encoder define, status
+word, commanded position, actual position, input read) with per-command site, caller, origin,
+native unit, ordering, failure, cleanup, concurrency, vendor verification and disposition; the
+control flows; twenty-one Legacy defects; the WJSS correction and its status; the checkpoint mapping;
+and the evidence gaps plus the STOP items. Every endpoint, coordinate and commissioning constant
+is redacted; no Legacy source line is copied; the pack is not committed.
+
+**B2 surface.** `adapters/motion-library` gains a typed vocabulary (four kinds, four axes, the
+Owner-confirmed output numbering, six interpretation states of which only `UNAVAILABLE` and
+`REFUSED` are reachable), a closed state model with a private constructor and no public factory
+and NO position, limit, home, brake, fault or "safe" member, and one session with a single
+observation slot, one generation, stale and replay rejection and deterministic idempotent close.
+The B2 sources contain no I/O, no native import, no endpoint type, no socket, no file access and
+no command text; a valid request returns `UNAVAILABLE` with
+`OBSERVATION_SURFACE_NOT_AUTHORIZED` and an invalid or disallowed request returns `REFUSED`. An
+observation can never enable a command. New focused tests pin the four BLOCKED dispositions, the
+reachable-state set, the model shape, the one-owner/one-outstanding/generation fence and the
+absence of command material.
+
+**C1 documented, NOT IMPLEMENTED.** `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` states the C1
+prerequisites and contract shape for a future Owner-authorized read: an explicit export and command
+set, interpretation evidence, a single connection owner, bounded redacted responses, preserved
+native units and the rule that an observation never enables a command. No export, session, parser,
+test or configuration exists for C1, and B2-H contains no device step because no B2 operation is
+authorized.
+
+**Dependencies/locks/fixtures.** No project added, no package added, no version pin changed, no
+`Directory.Packages.props` change, no lock file touched, no contract, Snapshot, Delta or fixture
+changed, no route or UI change. `dotnet restore --locked-mode` must remain clean; a genuine new
+lock would be a STOP condition.
+
+**NOT VERIFIED / NOT RUN here:** any compilation or test execution; any controller contact, read,
+motion or brake operation; any status-bit, polarity, output-numbering or unit fact. Owner-local
+sequence: B1-H per its own runbook if separately authorized, then the B2-H software gate on the
+exact PR head, then a separate Owner decision on C1.
+
 ### 2026-10-16 — B1 one-controller identity software foundation (first-contact foundation; SOFTWARE ONLY; on branch)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no

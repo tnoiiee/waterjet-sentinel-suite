@@ -1,10 +1,13 @@
-# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface)
+# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface + B2 Observed-State Model)
 
-**Gates:** Native Load / Version Probe Software Gate (Gate A) and the B1 one-controller identity
-software foundation. The adapter carries two separately authorized, strictly separated surfaces:
-the probe surface (library inspection/loading ONLY, unchanged) and the B1 identity surface (one
-direct connection attempt, three typed identity reads, deterministic close — no raw command of
-any kind). **Validation:** SOURCE-AUTHORED IN ARENA; NOT
+**Gates:** Native Load / Version Probe Software Gate (Gate A), the B1 one-controller identity
+software foundation and the B2 read-only observed-state foundation. The adapter carries three
+separately authorized, strictly separated surfaces: the probe surface (library inspection/loading
+ONLY, unchanged), the B1 identity surface (one direct connection attempt, three typed identity
+reads, deterministic close — no raw command of any kind) and the B2 observed-state model (typed
+vocabulary, closed state model and session discipline; **no read, no I/O and no command** — all
+four read candidates are BLOCKED at this checkpoint, see
+`docs/MOTION_OBSERVED_STATE_FOUNDATION.md`). **Validation:** SOURCE-AUTHORED IN ARENA; NOT
 COMPILED IN ARENA — the Owner-local build and probe run are the validation of record
 (see `docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md`).
 
@@ -58,6 +61,9 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
 | `MotionLibraryProbeOutcome.cs` | One redacted outcome: `Accepted`, one vocabulary code, redacted detail, version only on acceptance, truthful native-handle-release state. |
 | `NativeKernel.cs` | Internal OS loading surface (kernel32 `LoadLibraryExW`/`GetProcAddress`/`GetModuleFileNameW`/`FreeLibrary` with a restricted flag set) behind a narrow internal interface. |
 | `MotionLibraryProbeRunner.cs` | The ordered, fail-closed proof: existence → identity → architecture → companion load → module-path proof → primary load → module-path proof → single export → one bounded version call → version equality → deterministic unload. |
+| `MotionObservedStateVocabulary.cs` | B2 shape only: the four typed observation kinds and candidate identifiers, the closed axis and output sets, the six interpretation states (two reachable), the native-unit words and the refusal vocabulary. No vendor command mnemonic and no command builder. |
+| `MotionObservedState.cs` | B2 model: the state (private constructor, no public factory, no position/limit/home/brake/fault/safe member), the typed request and the redacted outcome. |
+| `MotionObservationSession.cs` | B2 session: one owner, one outstanding observation, one generation, stale and replay rejection, deterministic idempotent close. No I/O call of any kind. |
 
 ## Owner-local configuration (environment only; values never committed)
 
@@ -102,3 +108,28 @@ isolated one-shot process boundary itself.
 Redaction: outcomes never contain an endpoint, a serial number, a native path, a hash or raw
 vendor error text. The endpoint variable (`WJSS_MOTION_CONTROLLER_01_ENDPOINT`) is process-local
 environment configuration only and is never committed.
+
+## B2 observed-state foundation (software only; all four read candidates BLOCKED)
+
+The four read candidates of the Legacy baseline — axis status, commanded position, actual
+position and one digital output — are real, documented vendor reads, and every one of them needs
+the raw command-and-response path. The B1 authority line authorizes "no raw controller command,
+no axis read" and the identity allow-list is fixed at six typed exports, so **the verified subset
+is empty** and no read is implemented. The checkpoint therefore delivers the model and the
+discipline that a future authorized read must obey:
+
+- a closed, typed vocabulary (four kinds, four axes, the Owner-confirmed output numbering, six
+  interpretation states of which exactly two are reachable);
+- a state model that can say `UNAVAILABLE` and cannot claim `VERIFIED`, `RAW_OBSERVED`,
+  `UNCONFIRMED` or `STALE`, and has no member that could be read as position, limit, home, brake,
+  fault or "safe";
+- one session that owns one observation slot, allows one outstanding observation, fences one
+  generation, rejects stale and replayed results, and closes deterministically and idempotently;
+- no endpoint, no native module, no socket, no file, no environment read and no command text in
+  the B2 sources.
+
+A valid request returns `UNAVAILABLE` with `OBSERVATION_SURFACE_NOT_AUTHORIZED`; an invalid or
+disallowed request returns `REFUSED` with its vocabulary code. Nothing is ever issued, and an
+observation can never enable a command. `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` records the
+full disposition, the C1 contract that is documented but **NOT IMPLEMENTED**, and the Owner-local
+software gate.
