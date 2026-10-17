@@ -13,6 +13,30 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-17 — B1 gclib_open address corrected to the documented Vendor contract (correction; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no
+.NET SDK in the Agent sandbox); the Owner-local build and run are the validation of record
+([runbook](docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md)). SOFTWARE ONLY: the Agent contacted no
+controller and loaded no library. The Motion authorization gate stays CLOSED; endpoint
+configuration is `NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Correction.** Earlier B1 code passed the longer address form `<endpoint> --direct --timeout
+2000` to `gclib_open`. The gclib 2.6.0 manual's `gclib_open` entry (printed page 48) documents the
+second parameter as the controller address token, never an option string; the `--direct`/
+`--timeout` switches are documented for the deprecated legacy `GOpen()` parameter (printed
+page 76); and direct/no-gcaps is the process-wide, irreversible `gclib_force_gcaps(false)` from
+the same page as `gclib_open`. The B1 session now passes the validated canonical endpoint and
+nothing else, keeps `gclib_force_gcaps(false)` as the sole direct-mode authority, and drops the
+three address-option constants that became dead.
+
+**Owner-local evidence (dated, not rewritten).** Three B1-H attempts with the longer form reached
+the endpoint but returned `GCLIB_NOT_CONNECTED`; a minimal native C diagnostic against the exact
+installed header, import library and DLL reproduced result 6 for the longer form and result 0
+(`GCLIB_SUCCESS`) for the bare endpoint, with both non-zero handles closed successfully. No
+identity read, discovery, IP assignment, configuration, raw command, output access or motion
+occurred in either diagnostic.
+
 ### 2026-10-17 — B2 verified read-only subset and private internal controller read boundary (correction; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no

@@ -91,8 +91,11 @@ A one-shot, fail-closed identity session for the separately authorized B1 softwa
    loaded-module-path proofs;
 4. enforces the direct/no-gcaps posture (`gclib_force_gcaps` with the direct-only byte) BEFORE any
    open;
-5. opens exactly ONE controller handle with the in-memory open-address text
-   `"<endpoint> --direct --timeout 2000"`;
+5. opens exactly ONE controller handle with the in-memory controller address — the validated
+   canonical endpoint only, which is the documented `gclib_open()` address argument (gclib 2.6.0
+   manual, `gclib_open` entry, printed page 48); no option switch is appended, because
+   `--direct`/`--timeout` are documented for the deprecated legacy `GOpen()` parameter (printed
+   page 76) and direct mode is already selected process-wide by `gclib_force_gcaps(false)`;
 6. performs exactly three typed identity reads in fixed order — connection type (expected
    Ethernet), revision information (bounded, zeroed, printable-shape validated), serial number
    (nonzero required);

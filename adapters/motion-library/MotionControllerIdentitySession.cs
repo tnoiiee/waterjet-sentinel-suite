@@ -331,9 +331,12 @@ public sealed class MotionControllerIdentitySession
                 return outcome;
             }
 
-            // Phase 4: exactly one open attempt with the in-memory direct open-address text.
+            // Phase 4: exactly one open attempt with the in-memory validated controller address.
+            // gclib_open() takes the controller address token, never an option string; the
+            // direct/no-gcaps posture was already enforced by gclib_force_gcaps(false) above
+            // (gclib 2.6.0 manual, gclib_open and gclib_force_gcaps entries, printed page 48).
             var addressBuffer = ToAsciiBuffer(
-                MotionControllerApi.BuildDirectConnectionAddress(_endpointConfiguration));
+                MotionControllerApi.BuildOpenAddress(_endpointConfiguration));
             var capturedOpen = CurrentGeneration;
             if (!TryBeginNativeOperation())
             {

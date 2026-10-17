@@ -73,7 +73,7 @@ public sealed class MotionControllerEndpointConfigurationTests
     }
 
     [Fact]
-    public void Option_Text_Can_Never_Be_Smuggled_Into_The_Connection_String()
+    public void Option_Text_Can_Never_Be_Smuggled_Into_The_Open_Address()
     {
         var smuggled = Address(10, 1, 2, 3) + " --direct --timeout 1";
         Assert.False(TryResolveValue(smuggled, out _, out var code));
@@ -97,14 +97,21 @@ public sealed class MotionControllerEndpointConfigurationTests
     }
 
     [Fact]
-    public void A_Canonical_Unicast_Dotted_Quad_Resolves_And_Builds_Only_The_Fixed_Direct_Address()
+    public void A_Canonical_Unicast_Dotted_Quad_Resolves_And_Builds_Only_The_Validated_Address()
     {
         var candidate = Address(10, 20, 30, 40);
         Assert.True(TryResolveValue(candidate, out var configuration, out var code));
         Assert.Equal(string.Empty, code);
-        Assert.Equal(
-            candidate + " --direct --timeout 2000",
-            MotionControllerApi.BuildDirectConnectionAddress(configuration));
+
+        // gclib 2.6.0 manual, gclib_open entry (printed page 48): the second parameter is the
+        // controller ADDRESS, never an option string. Direct mode is gclib_force_gcaps(false)
+        // from the same page, so no --direct and no --timeout may be appended here.
+        var openAddress = MotionControllerApi.BuildOpenAddress(configuration);
+        Assert.Equal(candidate, openAddress);
+        Assert.DoesNotContain(" ", openAddress, StringComparison.Ordinal);
+        Assert.DoesNotContain("--direct", openAddress, StringComparison.Ordinal);
+        Assert.DoesNotContain("--timeout", openAddress, StringComparison.Ordinal);
+        Assert.DoesNotContain("2000", openAddress, StringComparison.Ordinal);
 
         // The ONLY renderable endpoint statement: the value itself never appears.
         Assert.Equal("ENDPOINT_CONFIGURED", configuration.ToString());
@@ -127,12 +134,12 @@ public sealed class MotionControllerEndpointConfigurationTests
         Assert.Empty(type.GetFields(BindingFlags.Public | BindingFlags.Instance));
 
         var addressBuilder = typeof(MotionControllerApi).GetMethod(
-            "BuildDirectConnectionAddress",
+            "BuildOpenAddress",
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(addressBuilder);
         Assert.Equal(new[] { type }, addressBuilder!.GetParameters().Select(parameter => parameter.ParameterType));
         Assert.Null(typeof(MotionControllerApi).GetMethod(
-            "BuildDirectConnectionAddress",
+            "BuildOpenAddress",
             BindingFlags.Public | BindingFlags.Static));
 
         var json = JsonSerializer.Serialize(configuration);

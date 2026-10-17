@@ -248,12 +248,16 @@ public sealed class MotionControllerIdentitySessionTests
         Assert.True(kernel.Log.IndexOf("revision") < kernel.Log.IndexOf("serial"));
         Assert.True(kernel.Log.IndexOf("serial") < kernel.Log.IndexOf("close"));
 
-        // Direct mode is enforced with the zero byte (no gcaps) and the open-address text is the
-        // documented direct form with the approved timeout.
+        // Direct mode is enforced with the zero byte (no gcaps) BEFORE the open; the address the
+        // library receives is the validated controller address only. The manual's gclib_open
+        // entry (printed page 48) takes the address, and the option switches on printed page 76
+        // belong to the deprecated legacy GOpen parameter, not to this call.
         Assert.Equal(0, kernel.LastForceByte);
-        Assert.Equal(
-            string.Join(".", 10, 20, 30, 40) + " --direct --timeout 2000",
-            kernel.LastAddress);
+        Assert.Equal(string.Join(".", 10, 20, 30, 40), kernel.LastAddress);
+        Assert.DoesNotContain(" ", kernel.LastAddress!, StringComparison.Ordinal);
+        Assert.DoesNotContain("--direct", kernel.LastAddress!, StringComparison.Ordinal);
+        Assert.DoesNotContain("--timeout", kernel.LastAddress!, StringComparison.Ordinal);
+        Assert.DoesNotContain("2000", kernel.LastAddress!, StringComparison.Ordinal);
 
         // The serial and endpoint never appear in any renderable outcome, JSON outcome or log.
         var endpoint = string.Join(".", 10, 20, 30, 40);

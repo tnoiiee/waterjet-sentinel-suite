@@ -15,7 +15,10 @@ identity session:
 1. Gate A native identity/version proof (the complete probe, unchanged);
 2. injected precondition posture;
 3. direct/no-gcaps posture enforced before any open;
-4. exactly one controller connection attempt with `"--direct --timeout 2000"`;
+4. exactly one controller connection attempt whose `gclib_open()` address is the validated
+   canonical endpoint only (gclib 2.6.0 manual, `gclib_open` entry, printed page 48); direct/no-
+   gcaps is not an address option — it is the process-wide `gclib_force_gcaps(false)` call that
+   precedes the open;
 5. exactly three typed identity reads — connection type, revision information, serial number;
 6. redacted identity classification (model token match or `MODEL_CONFIRMATION_REQUIRED`);
 7. deterministic controller close and native-handle release on every path.

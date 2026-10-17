@@ -33,7 +33,7 @@ internal interface IControllerKernel
     /// <summary>Invokes gclib_force_gcaps with the zero byte meaning "no gcaps, direct only".</summary>
     void InvokeForceDirectMode(IntPtr export, byte directOnly);
 
-    /// <summary>Invokes gclib_open once with the bounded connection-string buffer.</summary>
+    /// <summary>Invokes gclib_open once with the bounded controller-address buffer.</summary>
     int InvokeOpen(IntPtr export, byte[] addressBuffer, out IntPtr handle);
 
     /// <summary>Invokes gclib_close; the handle must come back zeroed on success.</summary>
