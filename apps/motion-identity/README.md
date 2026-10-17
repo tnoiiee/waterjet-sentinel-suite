@@ -4,6 +4,10 @@
 SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA — the Owner-local build and run are the
 validation of record (see `docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md`).
 
+The vendor contract this harness depends on — including the open-address rule and the reason the
+legacy option switches must never be appended — is recorded in
+`docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md` (sections C and D).
+
 ## What this harness is
 
 An Owner-invoked, console-only front-end for the B1 identity surface of

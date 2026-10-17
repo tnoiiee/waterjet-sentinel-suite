@@ -35,12 +35,19 @@ output-mutation operation in this project, and none can be formed from it. A com
 not an authorization: the Motion gate stays CLOSED, the endpoint stays `NOT_CONFIGURED` and the
 axes stay `NOT_COMMISSIONED`.
 
+## Vendor contract
+
+The library contract behind this harness — the three-layer separation, the verified entries, the
+open-address misuse rule, the result order and the command registry — is recorded in
+[`docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`](../../docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md).
+That document is evidence only: it authorizes nothing, and a completed trial opens no gate.
+
 ## Build note
 
 `Directory.Build.props` sets `RestorePackagesWithLockFile=true`, so the first Owner-local restore
-generates `apps/motion-observation/packages.lock.json`. That genuine generated file is committed by
-the Owner; it is never hand-authored. Until it exists on the branch the lock status is
-`BLOCKED PENDING OWNER`.
+generated `apps/motion-observation/packages.lock.json`. That genuine generated file was committed by
+the Owner (commit `2d2ebe41`) and is never hand-authored; the Agent never regenerated, rewrote or
+reformatted it, and no other lock file changed. Subsequent restores use `--locked-mode`.
 
 SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. The Owner-local build and run are the validation
 of record.

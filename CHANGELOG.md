@@ -13,6 +13,42 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-17 — PR #31 evidence closeout: vendor API baseline, registry and intake protocol (DOCUMENTATION AND EVIDENCE ONLY; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
+
+**Status: ON THE SESSION BRANCH — NOT MERGED; NO PRODUCT SOURCE CHANGE; AGENT-LOCAL .NET BUILD/TEST
+NOT RUN (no .NET SDK in the Agent sandbox); the Owner-local build and run remain the validation of
+record. SOFTWARE ONLY: the Agent contacted no controller and performed no additional hardware
+contact of any kind. The Motion authorization gate stays CLOSED; endpoint configuration is
+`NOT_CONFIGURED`; the axes stay `NOT_COMMISSIONED`.**
+
+**Addition.** A new canonical evidence document,
+`docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`, records the vendor interface contract the motion
+adapter depends on, derived read-only from the exact vendor document (version 2.6.0, cited by
+printed page; the document itself is not committed). It separates the three interfaces that are
+routinely conflated — the current C interface, the deprecated legacy interface and the controller
+command language — records eight verified library contracts plus three supporting entries, states
+the `gclib_open` misuse-regression rule with the Owner A/B observation (option-suffixed value →
+`GCLIB_NOT_CONNECTED`; bare validated address → `GCLIB_SUCCESS`), pins the result order 0-7, adds a
+five-status API/command registry (including the thirteen non-executable C1 candidates), and defines
+the mandatory fifteen-step new-API/new-command intake protocol with its prohibitions.
+
+**Hardware evidence recorded, not produced.** The same document records the Owner-reported **B1-H
+PASS** (identity first contact) and **B2-H PASS** (read-only trial, 16 of 16 reads accepted, open
+`GCLIB_SUCCESS`, boundary invalidated before the close, handle closed, native handles released,
+exit 0) in redacted form. The sixteen observed value texts are published with the Owner's explicit
+authorization; no endpoint, serial, host, path, hash, request text, vendor error string or raw JSON
+envelope is committed, and no bit, limit, Home, fault, brake, unit or motion meaning is inferred
+from any value.
+
+**Lock position.** The genuine Owner-generated `apps/motion-observation/packages.lock.json` (Owner
+commit `2d2ebe41`) is on the branch, closing the previous `BLOCKED PENDING OWNER` position. It was
+not regenerated, rewritten or reformatted, and no other lock file changed.
+
+**No new capability.** No Product source, test project, dependency, package pin, lock file,
+fixture, contract, route, UI, Runtime composition or roadmap item changed. C1 remains documented and
+**NOT IMPLEMENTED**; every C1 candidate is non-executable and carries
+`BLOCKED_PENDING_VENDOR_EVIDENCE` or `NOT_REVIEWED`.
+
 ### 2026-10-17 — B2-H one-shot read-only observation executable composition (addition; SOFTWARE ONLY; on branch; PR #31 OPEN, NOT MERGED)
 
 **Status: IMPLEMENTED ON THE SESSION BRANCH — NOT MERGED; AGENT-LOCAL .NET BUILD/TEST NOT RUN (no

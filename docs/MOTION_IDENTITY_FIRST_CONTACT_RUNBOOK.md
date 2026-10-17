@@ -180,7 +180,10 @@ a time:
 
 ### B.1 Documented open contract (gclib 2.6.0 manual)
 
-The manual is the authority for the value the harness passes to `gclib_open()`:
+The manual is the authority for the value the harness passes to `gclib_open()`. The same contract,
+with the printed page citations, the deprecated-layer comparison and the Owner A/B observation, is
+committed in `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md` (section C and section D); this
+runbook remains the procedure of record. In summary:
 
 - `gclib_open(gclib_handle* h, const char* address)` — the second parameter is the controller
   **address**, i.e. the address token the library reports for a detected controller; the

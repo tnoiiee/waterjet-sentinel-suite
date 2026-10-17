@@ -26,6 +26,11 @@ the connected Google Drive connector, held outside the repository for analysis, 
 committed. No Legacy source line is copied into this repository; every statement below is a
 paraphrase of behaviour.
 
+**Companion evidence.** The vendor interface contract behind every library call in this baseline is
+recorded separately in `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md` (version 2.6.0, cited by
+printed page). This document remains the Legacy source-side record; that one is the vendor-side
+record. Neither overrules the other, and neither authorizes a command.
+
 ---
 
 ## A. Provenance and pack integrity

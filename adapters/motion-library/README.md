@@ -156,6 +156,12 @@ authorization gate stays CLOSED, endpoint configuration is `NOT_CONFIGURED` and 
 boundary, the scoped source-boundary exception (one exact file, one exact token), the separate
 Owner-local B1-H and B2-H gates, and the C1 contract that is documented but **NOT IMPLEMENTED**.
 
+The vendor contract behind both surfaces — the three-layer separation (current C interface,
+deprecated legacy interface, controller command language), the verified library entries with their
+printed-page citations, the open-address misuse rule, the result order and the API/command registry
+— is recorded in `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`. That document is evidence only:
+it authorizes nothing and it is not executable authority.
+
 ## B2-H one-shot observation trial composition (software only)
 
 `MotionObservationTrialSession` is the smallest executable composition over that boundary. It is

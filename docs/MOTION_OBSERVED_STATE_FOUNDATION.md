@@ -16,6 +16,11 @@ service, driver or registry setting was touched.
 not a gate and not a roadmap item; it does not reorder the critical path and does not replace the
 TC work that remains the priority path.
 
+**Vendor contract record.** The interface contract this surface depends on is recorded in
+`docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md` — the three-layer separation, the verified
+contracts, the open-address misuse rule, the result order and the command registry. That document is
+evidence only; it is not executable authority and it authorizes no command.
+
 ---
 
 ## 1. What this checkpoint is
@@ -295,3 +300,21 @@ brake, limit, home or fault fact; any unit conversion; any timing.
 
 **Status line.** `COMPILE — NOT VERIFIED BY AGENT`; `TESTS — NOT VERIFIED BY AGENT`;
 `IMPLEMENTATION COMPLETE — NOT CLAIMED BY AGENT`.
+
+---
+
+## 11. Closeout pointer (2026-10-17)
+
+Additive record; sections 1-10 above describe the position at their own dated checkpoint and are
+not rewritten.
+
+- The vendor interface contract behind this surface is now committed as
+  `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`: three layers kept separate, eight verified
+  library contracts plus three supporting entries, the open-address misuse rule with the Owner A/B
+  observation, the result order 0-7, the API/command registry and the mandatory intake protocol.
+- **B1-H PASS** and **B2-H PASS** (16 of 16 reads) are recorded there in redacted form, with the
+  native value text the Owner authorized publishing. Neither result opens the Motion gate: it stays
+  CLOSED, the endpoint stays `NOT_CONFIGURED` and the axes stay `NOT_COMMISSIONED`.
+- C1 is unchanged: still documented in section 6, still **NOT IMPLEMENTED**, and still requiring its
+  own Owner authorization. Every C1 candidate in the registry is
+  `BLOCKED_PENDING_VENDOR_EVIDENCE` and has no executable form anywhere in the repository.
