@@ -15,6 +15,22 @@ namespace Wjss.MotionLibrary.Tests;
 /// </summary>
 public sealed class MotionStopContractTests
 {
+    // ------------------------------------------------------------------ expected lifecycle event sequences
+    // Expected values only. Each field is private, exact in order, and is read only by Assert.Equal.
+    // None is passed to code under test, mutated, or exposed outside this test type.
+
+    private static readonly string[] ExpectedSingleDispatchEvents = ["dispatch"];
+
+    private static readonly string[] ExpectedDispatchThenInvalidationEvents = ["dispatch", "dispose"];
+
+    private static readonly string[] ExpectedDoubleInvalidationEvents = ["dispose", "dispose"];
+
+    private static readonly string[] ExpectedInvalidateCloseReleaseEvents = ["dispose", "close", "release"];
+
+    private static readonly string[] ExpectedInvalidateReleaseEvents = ["dispose", "release"];
+
+    private static readonly string[] ExpectedAttachedCloseReleaseEvents = ["close", "release"];
+
     // ------------------------------------------------------------------ recording seams
 
     private sealed class FakeDispatchKernel : IStopDispatchKernel
@@ -205,7 +221,7 @@ public sealed class MotionStopContractTests
         Assert.Equal(1, session.KernelDispatchCount);
 
         // No readback, polling or confirmation read follows the single dispatch.
-        Assert.Equal(new[] { "dispatch" }, events);
+        Assert.Equal(ExpectedSingleDispatchEvents, events);
     }
 
     [Fact]
@@ -366,7 +382,7 @@ public sealed class MotionStopContractTests
         Assert.True(outcome.NativeDispatchAttempted);
         Assert.False(outcome.StopDispatched);
         Assert.False(outcome.StopConfirmed);
-        Assert.Equal(new[] { "dispatch", "dispose" }, events);
+        Assert.Equal(ExpectedDispatchThenInvalidationEvents, events);
     }
 
     [Fact]
@@ -394,7 +410,7 @@ public sealed class MotionStopContractTests
         session.Invalidate();
         session.Invalidate();
 
-        Assert.Equal(new[] { "dispose", "dispose" }, events);
+        Assert.Equal(ExpectedDoubleInvalidationEvents, events);
         Assert.True(dispatch.IsInvalidated);
         Assert.True(session.IsClosed);
     }
@@ -506,7 +522,7 @@ public sealed class MotionStopContractTests
 
         var outcome = owner.Close();
 
-        Assert.Equal(new[] { "dispose", "close", "release" }, events);
+        Assert.Equal(ExpectedInvalidateCloseReleaseEvents, events);
         Assert.True(outcome.SessionInvalidated);
         Assert.True(outcome.HandleClosed);
         Assert.True(outcome.ModuleReleased);
@@ -542,7 +558,7 @@ public sealed class MotionStopContractTests
 
         var outcome = owner.Close();
 
-        Assert.Equal(new[] { "dispose", "release" }, events);
+        Assert.Equal(ExpectedInvalidateReleaseEvents, events);
         Assert.Equal(0, controller.CloseCount);
         Assert.True(outcome.HandleClosed);
         Assert.True(outcome.ModuleReleased);
@@ -558,7 +574,7 @@ public sealed class MotionStopContractTests
 
         var outcome = owner.Close();
 
-        Assert.Equal(new[] { "dispose", "close", "release" }, events);
+        Assert.Equal(ExpectedInvalidateCloseReleaseEvents, events);
         Assert.True(outcome.SessionInvalidated);
         Assert.False(outcome.HandleClosed);
         Assert.True(outcome.ModuleReleased);
@@ -580,7 +596,7 @@ public sealed class MotionStopContractTests
         var outcome = owner!.Close();
 
         // The bound carrier invalidates without a native call, then the handle and module follow.
-        Assert.Equal(new[] { "close", "release" }, events);
+        Assert.Equal(ExpectedAttachedCloseReleaseEvents, events);
         Assert.True(outcome.HandleClosed);
         Assert.True(outcome.ModuleReleased);
     }

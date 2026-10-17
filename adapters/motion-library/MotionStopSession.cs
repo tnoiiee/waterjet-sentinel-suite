@@ -64,6 +64,11 @@ internal sealed class MotionStopOutcome
         Axis = axis;
         Generation = generation;
         NativeDispatchAttempted = nativeDispatchAttempted;
+
+        // Fixed invariants of this software foundation. They are not constructor parameters, so no
+        // caller can create an outcome that claims confirmation or permits a retry.
+        StopConfirmed = false;
+        RetryPermitted = false;
     }
 
     /// <summary>The canonical outcome code. See <see cref="MotionStopOutcomeCodes"/>.</summary>
@@ -82,10 +87,10 @@ internal sealed class MotionStopOutcome
     internal bool StopDispatched => string.Equals(Code, MotionStopOutcomeCodes.Dispatched, StringComparison.Ordinal);
 
     /// <summary>Always false in this software foundation. Confirmation requires a later observed-state contract.</summary>
-    internal bool StopConfirmed => false;
+    internal bool StopConfirmed { get; }
 
-    /// <summary>Always false: a Stop is never retried, reconnected or replayed.</summary>
-    internal bool RetryPermitted => false;
+    /// <summary>Always false: a Stop is never retried, reconnected, replayed or dispatched again automatically.</summary>
+    internal bool RetryPermitted { get; }
 
     /// <summary>The fixed redacted detail for <see cref="Code"/>.</summary>
     internal string Detail => MotionStopOutcomeCodes.DetailFor(Code);

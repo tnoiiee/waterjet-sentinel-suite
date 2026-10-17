@@ -18,6 +18,12 @@ public sealed class MotionStopBoundaryTests
 {
     private const string TemplatePlanFile = "adapters/motion-library/MotionStopCommandPlan.cs";
 
+    // The single file allowed to name the native command export. Expected value only; never mutated.
+    private static readonly string[] ExpectedCommandExportCarrierFiles =
+    [
+        "adapters/motion-library/MotionControllerCommandKernel.cs",
+    ];
+
     private static readonly string[] StopFiles =
     {
         "adapters/motion-library/MotionStopCommandPlan.cs",
@@ -106,7 +112,7 @@ public sealed class MotionStopBoundaryTests
     {
         var text = ReadRepositoryFile(TemplatePlanFile);
 
-        Assert.Equal(2, Regex.Matches(text, "template = \"ST [AB]\";", RegexOptions.CultureInvariant).Count);
+        Assert.Equal(2, Regex.Count(text, "template = \"ST [AB]\";", RegexOptions.CultureInvariant));
         Assert.Contains("template = \"ST A\";", text, StringComparison.Ordinal);
         Assert.Contains("template = \"ST B\";", text, StringComparison.Ordinal);
     }
@@ -197,7 +203,7 @@ public sealed class MotionStopBoundaryTests
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new[] { "adapters/motion-library/MotionControllerCommandKernel.cs" }, matches);
+        Assert.Equal(ExpectedCommandExportCarrierFiles, matches);
     }
 
     [Fact]
