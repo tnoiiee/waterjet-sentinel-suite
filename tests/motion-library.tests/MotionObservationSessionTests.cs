@@ -29,6 +29,35 @@ public sealed class MotionObservationSessionTests
         OutputNumber = outputNumber,
     };
 
+    /// <summary>
+    /// The four Legacy/B2 candidate identifiers, in kind order. A constant expected sequence, so it
+    /// is allocated once instead of on every assertion (CA1861); the values and their order are the
+    /// assertion, not test data.
+    /// </summary>
+    private static readonly string[] ExpectedCandidateIds =
+    {
+        "B2-OBS-1",
+        "B2-OBS-2",
+        "B2-OBS-3",
+        "B2-OBS-4",
+    };
+
+    /// <summary>
+    /// The complete public member set of the observed-state model, in ordinal order. A constant
+    /// expected sequence, allocated once (CA1861); it is the model-shape boundary, so every name
+    /// and the order are asserted explicitly.
+    /// </summary>
+    private static readonly string[] ExpectedObservedStatePropertyNames =
+    {
+        "AxisId",
+        "DetailCode",
+        "InterpretationState",
+        "Kind",
+        "NativeUnit",
+        "NativeValueText",
+        "OutputNumber",
+    };
+
     // ------------------------------------------------------------------ reachable state model
 
     [Fact]
@@ -105,7 +134,7 @@ public sealed class MotionObservationSessionTests
 
         Assert.Equal(4, MotionObservedStateVocabulary.CandidateIds.Count);
         Assert.Equal(
-            new[] { "B2-OBS-1", "B2-OBS-2", "B2-OBS-3", "B2-OBS-4" },
+            ExpectedCandidateIds,
             MotionObservedStateVocabulary.CandidateIds);
 
         var callerView = Assert.IsAssignableFrom<IList<string>>(MotionObservedStateVocabulary.ObservationKinds);
@@ -379,16 +408,7 @@ public sealed class MotionObservationSessionTests
             .ToArray();
 
         Assert.Equal(
-            new[]
-            {
-                "AxisId",
-                "DetailCode",
-                "InterpretationState",
-                "Kind",
-                "NativeUnit",
-                "NativeValueText",
-                "OutputNumber",
-            },
+            ExpectedObservedStatePropertyNames,
             names);
     }
 

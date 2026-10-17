@@ -73,6 +73,20 @@ public sealed class MotionObservationReadBoundaryTests
         OutputNumber = outputNumber,
     };
 
+    /// <summary>
+    /// The exact typed intent the closed plan maps an output subject to. It mirrors the plan's
+    /// own mapping so a test can prove WHICH intent was issued, not merely how many were issued.
+    /// </summary>
+    private static MotionObservationIntent ExpectedDigitalOutputIntent(int outputNumber) =>
+        outputNumber switch
+        {
+            1 => MotionObservationIntent.DigitalOutput1,
+            2 => MotionObservationIntent.DigitalOutput2,
+            3 => MotionObservationIntent.DigitalOutput3,
+            4 => MotionObservationIntent.DigitalOutput4,
+            _ => throw new ArgumentOutOfRangeException(nameof(outputNumber)),
+        };
+
     // ----------------------------------------------------------------------- the request plan
 
     [Fact]
@@ -346,7 +360,8 @@ public sealed class MotionObservationReadBoundaryTests
             Assert.Equal(
                 MotionObservedStateVocabulary.ObservationOutputStateUnconfirmed,
                 state.DetailCode);
-            Assert.Equal(1, kernel.Issued.Count);
+            var issuedIntent = Assert.Single(kernel.Issued);
+            Assert.Equal(ExpectedDigitalOutputIntent(output), issuedIntent);
         }
     }
 
