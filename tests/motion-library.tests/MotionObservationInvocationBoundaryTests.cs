@@ -191,10 +191,10 @@ public sealed class MotionObservationInvocationBoundaryTests
             .Where(constructor => constructor.IsPublic)
             .ToArray();
 
-        var constructor = Assert.Single(publicConstructors);
+        var reflectedConstructor = Assert.Single(publicConstructors);
         Assert.Equal(
             ExpectedPublicConstructorParameterTypes,
-            constructor.GetParameters().Select(parameter => parameter.ParameterType).ToArray());
+            reflectedConstructor.GetParameters().Select(parameter => parameter.ParameterType).ToArray());
     }
 
     [Fact]
