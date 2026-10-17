@@ -4,17 +4,15 @@
     WJSS motion library adapter — native load / version probe boundary (Native Load
     / Version Probe Software Gate).
 
-    This project is the infrastructure side of a minimal, vendor-neutral, fail-closed
-    native-library boundary with two separately authorized surfaces. The probe surface
-    (Gate A) proves the Owner-installed motion communication library loads from the
-    approved Owner-local directory and reports the Owner-expected library version; its
-    only resolvable native export is the library-local version query of the exact
-    installed header evidence. The B1 identity surface adds exactly the six typed
-    identity exports of the exact installed header declarations (force direct-mode,
-    open, close, connection type, revision information, serial number) behind a
-    one-shot, redacted, fail-closed session: no raw controller command, discovery,
-    axis read, motion or controller configuration exists here or can be constructed
-    from here.
+    This project is the infrastructure side of separately authorized, vendor-neutral,
+    fail-closed motion-library surfaces. Gate A proves the Owner-installed library from its
+    approved Owner-local directory and resolves only the library-local version export. B1
+    exposes the six typed identity exports. B2 observation is a separate fixed read-only
+    boundary. PR #32 adds the C1 Stop-only typed A/B plan and owner; the isolated
+    Wjss.MotionStopTrial executable is the only production composition that opens a handle
+    for that Stop trial. The Stop path reuses only the approved direct/open/close lifecycle
+    and fixed command export; it adds no raw-command, discovery, identity-read, or other
+    motion entry point.
 
     Boundary: self-owned (mirroring adapters/tc-acquisition); no Contracts/Domain
     reference and no package reference of any kind (operating-system loading primitives
@@ -41,6 +39,7 @@
          class (missing export, wrong module path, failed unload, dead buffer) is
          exercised without any real native module. -->
     <InternalsVisibleTo Include="Wjss.MotionLibrary.Tests" />
+    <InternalsVisibleTo Include="Wjss.MotionStopTrial" />
   </ItemGroup>
 
 </Project>

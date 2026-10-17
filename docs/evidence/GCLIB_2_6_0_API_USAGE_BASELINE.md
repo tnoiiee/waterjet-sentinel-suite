@@ -11,12 +11,16 @@
 **Document class:** EVIDENCE ONLY. This is the canonical, redacted baseline of what the installed
 vendor communication library (version 2.6.0) documents about the application programming interface
 the WJSS motion-library adapter uses, and of what one Owner-local identity contact and one
-Owner-local read-only observation trial actually returned. It authorizes no software change, no
-configuration, no connection and no command. It competes with no planning document.
+Owner-local read-only observation trial actually returned. It provides no independent authority for
+software change, configuration, connection or command. Scope markers below record the separate
+Owner-authorized C1 Stop-only software boundary; they do not grant hardware-trial authorization.
+This document competes with no planning document.
 
-**Checkpoint.** PR #31 — B2 read-only observed-state foundation, closeout. Companion evidence:
-`docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md` (Legacy source behaviour) and
-`docs/MOTION_OBSERVED_STATE_FOUNDATION.md` (the B2 model).
+**Checkpoint.** PR #32 — C1 Stop-only typed A/B software foundation, merged; no Controller contact,
+real Stop dispatch or hardware authorization. This baseline also records the separate B2
+read-only observation evidence. Companion evidence: `docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md`
+(Legacy source behaviour) and `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` (the B2 model and the
+distinct B2-to-Application C1 contract).
 
 **Gate position.** The Motion authorization gate is CLOSED
 (`MOTION_COMMISSIONING_GATE_NOT_OPEN`). Controller endpoint configuration is `NOT_CONFIGURED`; the
@@ -319,8 +323,8 @@ below are the only form any outcome carries.
 
 A value outside this order is classified `OPEN_RESULT_UNRECOGNISED`. It is never folded into a
 known failure, never displayed as a number, and never treated as success. The mapping lives in one
-place (`MotionControllerApi.ClassifyOpenRefusal`) and is shared by the B1 identity session and the
-B2 trial, so the two surfaces cannot drift.
+place (`MotionControllerApi.ClassifyOpenRefusal`) and is shared by the B1 identity session, B2
+observation trial and isolated C1 Stop trial, so those separate compositions cannot drift.
 
 The connection-type enumeration is a separate list with Ethernet first (value 1), then serial and
 PCI (printed pages 45-46). WJSS accepts only the Ethernet type and reports `CONNECTION_TYPE_MISMATCH`
@@ -338,19 +342,20 @@ otherwise.
 | `REVIEWED_NOT_USED` | The contract was read and matched, and no WJSS surface calls it. Reviewed so that a future proposal cannot claim ignorance. |
 | `DEPRECATED_NOT_ALLOWED` | The vendor marks the entry as deprecated. It may not be used, and no WJSS surface resolves it. |
 | `BLOCKED_PENDING_VENDOR_EVIDENCE` | A candidate whose use would require vendor evidence this closeout does not have (for the controller command language, the controller's own command reference). Not implemented, not authorized. |
+| `OWNER_AUTHORIZED_SOFTWARE_ONLY` | The exact scoped A/B Stop software foundation only. Not vendor verification, hardware-trial authorization, Stop confirmation or commissioning. |
 | `NOT_REVIEWED` | **The default.** No entry exists in this registry, so nothing is known and nothing is permitted. Absence is not permission. |
 
 ### F.2 Library-entry registry
 
 | Entry | Status | Surface that uses it | Why |
 | --- | --- | --- | --- |
-| `gclib_force_gcaps` | `VERIFIED_FOR_WJSS` | B1 identity session, B2 trial | sole direct/no-gcaps authority, called once before the open |
-| `gclib_open` | `VERIFIED_FOR_WJSS` | B1 identity session, B2 trial | exactly one open per session, bare validated address |
-| `gclib_close` | `VERIFIED_FOR_WJSS` | B1 identity session, B2 trial | deterministic close, handle zeroed and confirmed |
+| `gclib_force_gcaps` | `VERIFIED_FOR_WJSS` | B1 identity session, B2 trial, isolated C1 Stop trial | sole direct/no-gcaps authority, called once before the open |
+| `gclib_open` | `VERIFIED_FOR_WJSS` | B1 identity session, B2 trial, isolated C1 Stop trial | exactly one open per session, bare validated address |
+| `gclib_close` | `VERIFIED_FOR_WJSS` | B1 identity session, B2 trial, isolated C1 Stop trial | deterministic close, handle zeroed and confirmed |
 | `gclib_connection_type` | `VERIFIED_FOR_WJSS` | B1 identity session | rejects a non-Ethernet connection |
 | `gclib_revision_information` | `VERIFIED_FOR_WJSS` | B1 identity session | bounded identity read, model token only |
 | `gclib_serial_number` | `VERIFIED_FOR_WJSS` | B1 identity session | read and withheld; never rendered |
-| `gclib_command` | `VERIFIED_FOR_WJSS` | B2 read boundary only | one scoped export, sixteen literal read-only requests, bounded response |
+| `gclib_command` | `VERIFIED_FOR_WJSS` | B2 typed read boundary; separate C1 typed Stop carrier | one approved export, bounded response, and only the exact closed requests owned by each separately authorized typed plan |
 | `gclib_address` | `REVIEWED_NOT_USED` | none | the validated endpoint is already held; no read-back is needed |
 | `gclib_error` | `REVIEWED_NOT_USED` | none | vendor error text may change between releases and is prohibited in outcomes |
 | `gclib_addresses` | `REVIEWED_NOT_USED` | none | discovery is out of scope and unauthorized |
@@ -373,15 +378,28 @@ the vendor document for the controller has not been read to support.
 | `RP A`, `RP B`, `RP C`, `RP D` | B2-OBS-3 | `VERIFIED_FOR_WJSS` | `CONTROLLER_UNITS` | `RAW_OBSERVED` |
 | `MG @OUT[1]`, `MG @OUT[2]`, `MG @OUT[3]`, `MG @OUT[4]` | B2-OBS-4 | `VERIFIED_FOR_WJSS` | `LOGICAL_STATE` | `UNCONFIRMED` |
 
-The sixteen literals above are the **entire** command surface of WJSS. There is no seventeenth
-literal, no caller-supplied request, no format string and no concatenation on the request path.
+The sixteen literals above are the **entire read-only request surface of the closed B2 plan**.
+They are distinct from the two separately scoped C1 Stop-only templates below. Neither plan accepts
+caller-supplied request text, uses a format string or concatenates request text.
 
-**C1 candidates — non-executable, not authorized, not prepared**
+**Scoped C1 Stop-only software foundation — not hardware authorization**
+
+| Scoped candidate | Status | Evidence position |
+| --- | --- | --- |
+| C1 Stop on Axis A (Horizontal) | `OWNER_AUTHORIZED_SOFTWARE_ONLY` | PR #32 merged a closed typed plan and owner; this isolated trial harness adds exact invocation, endpoint/native-proof/consent gates and one dispatch maximum. No Controller acceptance or physical stop is claimed. |
+| C1 Stop on Axis B (Vertical) | `OWNER_AUTHORIZED_SOFTWARE_ONLY` | same narrow software-only boundary; the request remains a separate fixed template selected by the typed B axis. No Controller acceptance or physical stop is claimed. |
+
+`OWNER_AUTHORIZED_SOFTWARE_ONLY` is a scope marker for these two typed forms only. It is not a
+firmware-specific semantic claim, a trial authorization, a Stop confirmation, a safety claim or a
+commissioning result. The exact templates remain centralized in `MotionStopCommandPlan.cs`; the
+isolated `apps/motion-stop-trial` composition is the only production entry for this later trial.
+
+**Other C1 candidates and expanded forms — blocked, not authorized**
 
 | Candidate | Status | Evidence position |
 | --- | --- | --- |
-| `ST` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | controller-language mnemonic; not documented in `gclib.pdf`; the controller's own command reference has not been reviewed for this closeout |
-| `JG` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | as above |
+| `ST` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | every form outside the two exact typed A/B templates (including unqualified, other-axis, combined and multi-axis forms); `gclib.pdf` does not document the command language |
+| `JG` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | controller-language candidate; no matching authorization or firmware evidence |
 | `BG` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | as above |
 | `HV` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | as above |
 | `HM` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | as above |
@@ -394,8 +412,9 @@ literal, no caller-supplied request, no format string and no concatenation on th
 | `SB` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | as above; this is an output write and is additionally outside every authorized surface |
 | `CB` | `BLOCKED_PENDING_VENDOR_EVIDENCE` | as above; this is an output write and is additionally outside every authorized surface |
 
-No C1 candidate has a request literal, a plan entry, a session path, a test fixture, a
-configuration key or a public member. `MotionCommandGate.IsClosed` remains `true`, the candidate
+Only the two typed A/B Stop forms have a Stop plan and isolated trial path. No raw or general
+command interface, extra axis, sequence, output operation, automatic retry, readback, confirmation
+or connection owner is added elsewhere. `MotionCommandGate.IsClosed` remains `true`, candidate
 values remain `NOT_CONFIGURED` / `NOT_COMMISSIONED`, and no roadmap item is created here.
 
 ### F.4 The default rule
@@ -411,10 +430,12 @@ with the intake protocol in section G rather than with a judgement call.
 
 ### G.1 When it applies
 
-Before any additional library entry, controller command, request literal, response parser,
-connection option or configuration key may enter the Product — including a change that "only
-extends a table", "only adds one test", or "only reads one more value". It applies equally to C1
-and to every later stage.
+Before any library entry, controller command, request literal, response parser, connection option
+or configuration key **outside the exact scopes already recorded in F.3 and K** may enter the
+Product — including a change that "only extends a table", "only adds one test", or "only reads one
+more value". The exact typed A/B Stop-only software scope is a separate, explicit Owner-authorized
+exception; this protocol does not convert it into vendor verification or hardware-trial
+authorization, and it does not permit any expansion.
 
 ### G.2 The fifteen steps
 
@@ -452,8 +473,9 @@ and to every later stage.
 8. No hardware contact, configuration, NIC change or vendor service as part of an intake.
 9. No interpretation upgrade without the named evidence — and never because a value "looks
    reasonable".
-10. No C1 implementation, and no roadmap promotion, under this protocol. C1 needs its own
-    authorization (section K).
+10. No additional C1 implementation or roadmap promotion under this protocol. The exact C1 Stop-only
+    software scope is covered by its separate Owner authorization in section K; this intake protocol
+    does not authorize any expansion.
 
 ### G.4 Evidence record shape
 
@@ -637,7 +659,9 @@ not an interpretation: sections I.4 and J list what may not be concluded from it
 
 ## J. Evidence gaps
 
-These are the reasons the B2 interpretation stays weak and the reason C1 cannot be designed yet.
+These gaps keep B2 interpretation weak and block broadening or making firmware, physical-effect,
+confirmation or commissioning claims for C1 Stop. They do not change the narrow software-only A/B
+scope recorded in F.3 and K.
 
 1. **Status-word bit order and polarity** for the installed controller family are unconfirmed. No
    vendor bit table for this model has been reviewed in this closeout.
@@ -650,9 +674,10 @@ These are the reasons the B2 interpretation stays weak and the reason C1 cannot 
 5. **Whether an output read reflects the commanded or the physical output** is unknown.
 6. **Electrical polarity of any output**, and therefore of any brake function, is unknown.
 7. **The physical meaning of one controller count** is unknown, so no conversion can exist.
-8. **The controller's own command reference** has not been reviewed in this closeout. Every C1
-   candidate therefore stays `BLOCKED_PENDING_VENDOR_EVIDENCE`; `gclib.pdf` does not document the
-   command language at all (B.3).
+8. **The controller's own command reference** is not documented by `gclib.pdf` and the exact
+   firmware response/physical effect is not established here. This limits all other command
+   candidates and prevents firmware or hardware claims; the narrow typed A/B Stop software scope
+   is authorized separately and is not evidence of acceptance.
 9. **The installed firmware's exact response format** for any command is unknown; the parser accepts
    one bounded numeric token and refuses everything else rather than learning the format by
    observation.
@@ -667,49 +692,74 @@ H or I values.
 
 ---
 
-## K. PR #32 — C1 successor boundary (documented, NOT IMPLEMENTED)
+## K. C1 scopes and authorization boundaries
 
-### K.1 What C1 is
+### K.1 Two distinct C1 contracts
 
-C1 is the next contract: the application-facing boundary that would make the already-implemented B2
-read surface usable by the Application. It is written down in
-`docs/MOTION_OBSERVED_STATE_FOUNDATION.md` section 6 and **does not exist in code, tests,
-configuration or contracts**.
+The C1 label in `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` section 6 means the separate
+**B2-to-Application read contract**: making the existing B2 read-only observations available to an
+Application. That contract remains **NOT IMPLEMENTED**. It is not the C1 Stop-only foundation.
 
-### K.2 What PR #32 may contain
+PR #32 separately merged the narrowly scoped **C1 Stop-only software foundation**. Its authority
+covers only the closed typed Stop domain for Axis A (Horizontal) and Axis B (Vertical), the two
+existing templates in `MotionStopCommandPlan.cs`, and the internal Stop session/owner. PR #32's
+scope explicitly made no Controller contact, no hardware execution and no real Stop dispatch.
 
-Only what its own Owner authorization names. It may not contain, under this baseline:
+### K.2 Isolated Owner-invoked no-load trial harness
 
-- any new library entry beyond the seven already-verified entries (F.2);
-- any controller command beyond the sixteen literals (F.3);
-- any write, control, motion, brake, home, position-define, output-mutation, discovery,
-  subscription, program/array/firmware or configuration operation;
-- any interpretation upgrade from `RAW_OBSERVED` or `UNCONFIRMED` without the evidence in section J;
-- any dependency, project, package pin or lock change that this closeout did not identify;
-- any hardware contact performed by the Agent, and any repetition of B1-H or B2-H;
-- any relaxation of a redaction rule, an allow-list or an exception scope.
+The isolated `apps/motion-stop-trial` composition is the only production path for a later no-load
+WSB1 Controller Stop trial. It accepts exactly one fixed mode and one typed A/B selection; requires
+an exact-match Owner-local consent, the validated Owner-local endpoint and Gate A configuration
+before running Gate A, then requires the Gate A native identity proof before loading the Controller
+modules or opening the Controller. It uses the existing restricted loader, loaded-path proof,
+direct-mode selection, C1 owner and fixed command plan. It opens at most one
+handle, creates one Stop owner/session and makes at most one selected dispatch.
 
-### K.3 Entry criteria for C1
+It has no raw command, arbitrary axis, multi-axis form, file/stdin/interactive input, native option,
+retry, reconnect, replay, queue, fallback, automatic rerun, identity read or confirmation
+readback. Cleanup is Stop-boundary invalidation, handle close, then native-module unload. Reports
+are deterministic and redacted; `STOP_DISPATCHED` is not a confirmed stop, stopped/safe state or
+commissioning result. This composition is separate from B1 identity and B2 observation and is not
+reachable from Runtime, API, Kiosk, Operations Preview, Production composition or
+`MotionCommandGate`.
 
-1. Owner authorization naming the surface and the exact entries.
-2. The evidence in section J that the claimed interpretation needs.
-3. A single connection owner at the application boundary, with B1's rules preserved: one open, one
-   outstanding operation, one generation, no retry, no reconnect, deterministic close and unload.
-4. A freshness rule, so an observed value can never be read as a current or authorized state.
-5. Attestation that the Motion authorization gate stays CLOSED and the candidate values stay
+This source-authored harness has not been built or run in Arena. No vendor DLL was loaded, no
+endpoint was contacted, and no real Stop was transmitted while authoring this change. Fake-kernel
+and source-boundary tests are software-only. This section records the software scope; it does not
+authorize invocation against a real Controller.
+
+### K.3 Explicit non-claims and closed gate
+
+The exact A/B software scope does not establish firmware-specific acceptance, a physical Stop,
+response semantics, Stop confirmation, safe state, commissioning or any axis interpretation. The
+Motion authorization gate remains CLOSED (`MotionCommandGate.IsClosed == true`); endpoint
+configuration remains `NOT_CONFIGURED`; axes remain `NOT_COMMISSIONED`. No roadmap item or gate
+promotion is made here.
+
+### K.4 Separate Owner Scope Gate for the actual trial
+
+The actual no-load WSB1 Controller trial requires a separate post-merge Owner Scope Gate. Building,
+testing, committing, pushing or merging this software foundation is not that authorization. The Owner's
+next action after merge is to validate the exact PR head locally and make a review/merge decision;
+only after merge may a separate Scope Gate be considered. No hardware step is authorized or
+performed by this baseline or this change.
+
+### K.5 B2-to-Application C1 entry criteria (unchanged)
+
+Before that distinct read contract can be designed, it still requires:
+
+1. Owner authorization naming that application surface and its exact entries.
+2. The section J evidence for every interpretation the Application would claim.
+3. A single application-boundary connection owner, with one open, one outstanding operation, one
+generation, no retry, no reconnect and deterministic close/unload.
+4. A freshness rule so an observed value is never mistaken for current or authorized state.
+5. Attestation that the Motion authorization gate remains CLOSED and candidate values remain
    `NOT_CONFIGURED` / `NOT_COMMISSIONED`.
 
-### K.4 Status
+### K.6 Historical B2 documentation punchlist (outside this Stop-only scope)
 
-**NOT IMPLEMENTED.** No export, no session, no parser, no route, no Snapshot member, no UI, no test
-and no configuration. `MotionCommandGate.IsClosed` remains `true`. No C1 candidate in section F.3
-has an executable form anywhere in the repository.
-
-### K.5 Documentation punchlist for PR #32 (recorded here, not changed here)
-
-A secondary drift review found two stale XML documentation comments in the B2 model. They are
-recorded as a punchlist because this repair is a B1-H evidence-provenance correction and Product
-Source is deliberately unchanged.
+An earlier review recorded two stale XML documentation comments in the B2 model. They remain a
+separate documentation punchlist and are intentionally not addressed by the C1 Stop change.
 
 | Location | Current comment says | Why it is stale |
 | --- | --- | --- |
@@ -717,24 +767,26 @@ Source is deliberately unchanged.
 | `adapters/motion-library/MotionObservedState.cs`, factory `Unavailable` | "The only state this revision can produce" and "no authorized read surface exists" | A read surface exists; the factory now describes only the no-value path, not the whole revision |
 
 Both comments are documentation only: they are not compiled into behaviour, no member reads them,
-and no test asserts them. Correcting them would be comment-only, but it is still a Product Source
-change, so it is **not** made in this pass. The `MotionObservationSession` comment that a session
-*without* a read boundary can only report `UNAVAILABLE` remains accurate and is not part of this
-punchlist.
-
-PR #32 (or a separate documentation-only correction) may fix the two comments with no behaviour
-change, and must not change any interpretation logic while doing so.
+and no test asserts them. Correcting them is outside this scope. The `MotionObservationSession`
+comment that a session *without* a read boundary can only report `UNAVAILABLE` remains accurate.
 
 ---
 
 ## L. Validation position of this document
 
-**Performed in Arena:** exact-name retrieval by the Drive connector (one match, read-only); full
-text extraction of the vendor document outside the repository; printed-page verification of every
-citation in sections B, C, D and E; review of every changed surface; boundary scans (`S1`-`S9`);
-section, registry and protocol completeness checks; leakage scans for endpoint, serial, path, hash,
-request text and vendor error text; source-boundary and document-boundary tests authored (not
-executed here); `git diff --check`; project and lock drift checks; clean-worktree proof.
+**Prior B2 evidence-closeout checks (recorded at the PR #31 / PR #32 baseline):** exact-name
+retrieval by the Drive connector (one match, read-only); full text extraction of the vendor document
+outside the repository; printed-page verification of every citation in sections B, C, D and E;
+review of every changed surface; boundary scans (`S1`-`S9`); section, registry and protocol
+completeness checks; leakage scans for endpoint, serial, path, hash, request text and vendor error
+text; source-boundary and document-boundary tests authored (not executed there); `git diff --check`;
+project and lock drift checks; clean-worktree proof. This is historical baseline validation, not a
+clean-worktree claim for the current session branch.
+
+**C1 trial-harness authoring session (2026-10-18):** The source was not built or run. No vendor DLL
+was loaded, no endpoint was contacted and no Controller was contacted. Current-session static
+validation is recorded in `CHANGELOG.md`; .NET restore, build and tests are not claimed because no
+.NET SDK is available in the Agent environment.
 
 **Integrity correction (2026-10-17).** An earlier revision of section H stated that the observed
 revision contained the exact model token and that the harness therefore returned `MODEL_MATCHED`,

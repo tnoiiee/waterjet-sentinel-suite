@@ -1,15 +1,15 @@
-# WJSS Motion Library Adapter — Native Library Boundary (Probe Surface + B1 Identity Surface + B2 Observed-State Surface)
+# WJSS Motion Library Adapter — Native Library Boundary (Gate A + B1 + B2 + C1 Stop-only)
 
-**Gates:** Native Load / Version Probe Software Gate (Gate A), the B1 one-controller identity
-software foundation and the B2 read-only observed-state surface. The adapter carries three
-separately authorized, strictly separated surfaces: the probe surface (library inspection/loading
-ONLY, unchanged), the B1 identity surface (one direct connection attempt, three typed identity
-reads, deterministic close — no raw command of any kind) and the B2 observed-state surface (typed
-vocabulary, closed state model and session discipline plus ONE internal, typed, length-bounded
-read-only boundary over the four Legacy-evidenced reads — the verified subset is non-empty and is
-recorded in `docs/MOTION_OBSERVED_STATE_FOUNDATION.md`). **Validation:** SOURCE-AUTHORED IN
-ARENA; NOT COMPILED IN ARENA — the Owner-local build and probe run are the validation of record
-(see `docs/NATIVE_LOAD_VERSION_PROBE_RUNBOOK.md`).
+**Surfaces:** Native Load / Version Probe Software Gate (Gate A), B1 one-controller identity,
+B2 read-only observed state, and the separate C1 Stop-only foundation merged in PR #32. The
+adapter carries four strictly separated surfaces: Gate A library inspection/loading only; B1
+identity with one direct connection attempt and three typed reads; B2's fixed read-only observation
+boundary; and the internal C1 A/B Stop plan and owner. The only production composition that opens
+for C1 Stop is the isolated `apps/motion-stop-trial` console harness, gated by exact invocation,
+Owner-local consent, endpoint validation, and Gate A proof. It is not Runtime/API/Kiosk/Preview
+composition, and it does not open the application Motion gate. **Validation:** SOURCE-AUTHORED IN
+ARENA; NOT COMPILED IN ARENA — the Owner-local .NET build is the validation of record; no native
+DLL was loaded and no Controller was contacted here.
 
 ## What this adapter is
 
@@ -65,12 +65,18 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
 | `MotionObservedState.cs` | B2 model: the state (private constructor, no public factory, no position/limit/home/brake/fault/safe member), the typed request and the redacted outcome. |
 | `MotionObservationSession.cs` | B2 session: one owner, one outstanding observation, one generation, stale and replay rejection, deterministic idempotent close. Model mode has no I/O; reading mode reaches the wire only through the internal typed boundary. |
 | `MotionObservationCommandPlan.cs` | B2 plan (internal): the sixteen typed intents, the immutable literal request table, the fixed request and response bounds, and the bounded response parser. No native name, no handle and no I/O. |
-| `MotionControllerCommandKernel.cs` | B2 native boundary (internal): the one approved command-and-response export constant, its resolution through the already-authorized kernel seam, and the bound kernel that issues one typed intent and validates the reply. Holds no module and releases nothing. |
+| `MotionControllerCommandKernel.cs` | Shared export-name/resolution seam: B2's fixed read kernel and the separate C1 typed Stop carrier reuse the one approved native command-and-response export; neither accepts caller text. |
 | `MotionStopCommandPlan.cs` | C1 Stop plan (internal): the closed A/B axis domain (`MotionStopAxis`, Axis A = Horizontal, Axis B = Vertical, default value refused) and the only two Stop templates, chosen by a switch with no caller text. |
 | `MotionStopAcknowledgement.cs` | C1 Stop acknowledgement (internal): the redacted outcome vocabulary (no confirmed-stop code) and the separate reply classifier. Not the B2 numeric parser. |
 | `MotionStopDispatchKernel.cs` | C1 Stop carrier (internal): one guarded native dispatch against an already-open handle and an already-resolved export, with the same signature as the B2 carrier. Invalidation makes no native call. |
 | `MotionStopSession.cs` | C1 Stop session (internal): one operation slot, a generation fence, duplicate, replay and stale rejection, one dispatch per accepted operation, no retry, and a redacted outcome that never claims confirmation. |
-| `MotionStopOwner.cs` | C1 Stop owner (internal): the only close path. Invalidates the session first, then closes the handle, then releases the module. Idempotent. |
+| `MotionStopOwner.cs` | C1 Stop owner (internal): invalidates its one session, then closes the handle, then releases the primary module. Idempotent; the trial releases the companion afterward. |
+| `MotionStopTrialInvocation.cs` | Isolated harness entry: exact two-argument mode/A-or-B parser, one-use consent consumption, and fail-closed endpoint/native-configuration gates. |
+| `MotionStopTrialSession.cs` | One-shot C1 trial lifecycle: Gate A, restricted module/path proof, approved export resolution, one direct-mode selection, one open, one typed Stop owner/session, invalidate-close-unload cleanup. |
+| `MotionStopTrialOutcome.cs` | Fixed, redacted trial vocabulary and lifecycle flags. It cannot claim Stop confirmation. |
+| `Wjss.Adapters.MotionLibrary.csproj` | Grants the isolated harness friend-assembly access to this adapter's internal boundary; it adds no package or dependency. |
+| `apps/motion-stop-trial/Program.cs` | Console-only invocation and explicit redacted JSON projection. |
+| `apps/motion-stop-trial/Wjss.MotionStopTrial.csproj` | Isolated executable project; its only project reference is this adapter. |
 
 ## C1 Stop-only software foundation (source-authored; not compiled in the Arena sandbox)
 
@@ -83,8 +89,10 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
   stop: no observed state is read and no confirmation field can be set.
 - Nothing is retried, reconnected, replayed or polled. Invalidation precedes handle close, and
   handle close precedes module release.
-- No code in this change opens a connection or calls the native layer outside the focused tests,
-  which use recording fakes only. No Runtime, API or Kiosk path reaches this code.
+- The Owner-invoked harness is the only production composition that opens a handle for this C1
+  Stop trial. It was not executed in Arena; no native DLL was loaded and no endpoint or Controller
+  was contacted. Focused tests use recording fakes only. No Runtime, API, Kiosk, Operations Preview or
+  Production-composition path reaches this code.
 
 ## Owner-local configuration (environment only; values never committed)
 
@@ -97,6 +105,14 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
 
 The values for these variables live in the Owner-local evidence for this Gate. They are never
 written to disk by the adapter, never logged and never returned in any output.
+
+The isolated C1 Stop trial also requires the existing endpoint variable
+`WJSS_MOTION_CONTROLLER_01_ENDPOINT` and an exact-match, Owner-local consent assertion in
+`WJSS_MOTION_STOP_TRIAL_CONSENT`. The environment-supplied assertion is a one-invocation local
+confirmation, not a credential or reusable authorization service. It is checked and removed from
+the trial process before configuration resolution; the Owner must also unset it in the invoking
+shell after the run. Neither the endpoint nor the supplied consent value is committed, echoed,
+logged or included in evidence.
 
 ## B1 identity surface (one-controller first-contact software foundation)
 
@@ -171,9 +187,10 @@ brake or motion-complete statement is produced. An observation never enables a c
 authorization gate stays CLOSED, endpoint configuration is `NOT_CONFIGURED` and the axes stay
 `NOT_COMMISSIONED`.
 
-`docs/MOTION_OBSERVED_STATE_FOUNDATION.md` records the per-candidate evidence, the private
-boundary, the scoped source-boundary exception (one exact file, one exact token), the separate
-Owner-local B1-H and B2-H gates, and the C1 contract that is documented but **NOT IMPLEMENTED**.
+`docs/MOTION_OBSERVED_STATE_FOUNDATION.md` records the per-candidate B2 evidence, the private
+read boundary, the separate Owner-local B1-H and B2-H gates, and the distinct B2-to-Application
+C1 contract, which remains **NOT IMPLEMENTED**. That application-facing read contract is separate
+from the internal C1 Stop-only foundation of PR #32 and its isolated trial harness.
 
 The vendor contract behind both surfaces — the three-layer separation (current C interface,
 deprecated legacy interface, controller command language), the verified library entries with their
@@ -208,5 +225,7 @@ The trial type has no string parameter, so no caller text can reach a request. `
 refusals reuse the single canonical B1 classification (`MotionControllerApi.ClassifyOpenRefusal`),
 so the two surfaces cannot drift.
 
-`docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md` is the runbook of record for the executable and for the
-Owner-local software gate; `apps/motion-observation` is the console harness.
+`docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md` is the runbook of record for the read-only executable
+and its Owner-local software gate; `apps/motion-observation` is that console harness. The separate
+C1 Stop harness and its required future authorization boundary are documented in
+`docs/MOTION_STOP_TRIAL_RUNBOOK.md`.

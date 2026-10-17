@@ -148,7 +148,8 @@ public static class MotionControllerApi
 
     /// <summary>
     /// The SINGLE canonical classification of one gclib_open result, shared by the B1 identity
-    /// session and the B2 observation trial so the mapping cannot drift. Each installed-header
+    /// session, B2 observation trial, and the isolated C1 Stop trial so the mapping cannot drift.
+    /// These compositions remain separate; only the open-result vocabulary is shared. Each installed-header
     /// value keeps its own redacted refusal word; a value outside the header keeps its own word so
     /// an unexpected result is never confused with a known failure. The integer, the vendor error
     /// string and every other native detail stay inside the boundary.

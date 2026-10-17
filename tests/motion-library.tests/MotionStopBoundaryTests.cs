@@ -10,9 +10,9 @@ namespace Wjss.MotionLibrary.Tests;
 ///
 /// They establish five facts. Exactly one production file carries a quoted Stop command text, and
 /// that file is the closed template plan. The Stop files name no read or other command literal.
-/// No file outside the Stop set names a Stop type. The Stop surface is internal only. The Stop
-/// carrier resolves its export through the existing approved seam and does not name the native
-/// export token.
+/// No file outside the exact Stop-file set names a Stop type. The Stop surface is internal only.
+/// The Stop carrier resolves its export through the existing approved seam and does not name the
+/// native export token.
 /// </summary>
 public sealed class MotionStopBoundaryTests
 {
@@ -31,6 +31,12 @@ public sealed class MotionStopBoundaryTests
         "adapters/motion-library/MotionStopDispatchKernel.cs",
         "adapters/motion-library/MotionStopSession.cs",
         "adapters/motion-library/MotionStopOwner.cs",
+        "adapters/motion-library/MotionStopTrialInvocation.cs",
+        "adapters/motion-library/MotionStopTrialSession.cs",
+        "adapters/motion-library/MotionStopTrialOutcome.cs",
+        "adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj",
+        "apps/motion-stop-trial/Program.cs",
+        "apps/motion-stop-trial/Wjss.MotionStopTrial.csproj",
     };
 
     private static readonly string[] ProductionTrees = { "adapters", "apps", "packages" };

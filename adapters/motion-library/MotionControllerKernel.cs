@@ -4,13 +4,13 @@ namespace Wjss.Adapters.MotionLibrary;
 
 /// <summary>
 /// The B1 identity surface's view of the operating-system loading and export-invocation
-/// primitives. Internal and not part of any public surface: it exists so the complete B1 defect
-/// class (missing export, wrong invocation order, failed close, failed unload, dead buffer,
-/// late generation) is exercised by focused tests without any real native module and without any
-/// controller. It exposes ONLY what the one-shot identity session needs: load one approved
-/// module, read the loaded module path, resolve one named export, invoke the six authorized
-/// identity exports, release one module. There is no raw-command, discovery, subscription or
-/// motion concept here and none can be added through this interface.
+/// primitives, with the restricted load/path/open/close lifecycle also reused by the isolated C1
+/// Stop trial. Internal and not part of any public surface: it exists so the native defect class
+/// (missing export, wrong invocation order, failed close, failed unload, dead buffer, late
+/// generation) is exercised by focused tests without any real native module or Controller. The
+/// B1 identity session invokes its six typed identity exports; the C1 Stop trial uses only the
+/// lifecycle methods and delegates Stop through the separate typed Stop boundary. No raw-command,
+/// discovery, subscription or general motion surface is exposed through this interface.
 ///
 /// This is a SIBLING of the probe seam (<see cref="INativeKernel"/>, which remains pinned to the
 /// single version export). Both surfaces reuse the same restricted loader
@@ -50,8 +50,9 @@ internal interface IControllerKernel
 }
 
 /// <summary>
-/// The production B1 kernel: thin, guarded, and only ever used by the Owner-invoked identity
-/// harness. Every delegate below implements exactly the installed-header declaration recorded in
+/// The production restricted controller kernel: thin and guarded, used by the Owner-invoked B1
+/// identity harness and by the isolated C1 Stop trial for its approved lifecycle only. Every
+/// delegate below implements exactly the installed-header declaration recorded in
 /// <see cref="MotionControllerApi"/>; no vendor error constant is inferred and no result value is
 /// interpreted beyond the classification rules of the session. The delegates are declared for
 /// the 64-bit Windows process the runner requires (the same ABI reasoning as the probe's version
