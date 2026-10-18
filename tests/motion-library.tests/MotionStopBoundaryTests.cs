@@ -182,9 +182,9 @@ public sealed class MotionStopBoundaryTests
     [Fact]
     public void Only_The_Closed_Typed_Axis_Plan_Can_Reach_The_Native_Stop_Buffer()
     {
-        var invocation = ReadRepositoryFile("adapters/motion-library/MotionStopTrialInvocation.cs");
+        var invocation = ReadRepositoryFile("adapters/motion-library/MotionStopTrialInvocation.cs").ReplaceLineEndings("\n");
         var trialSession = ReadRepositoryFile("adapters/motion-library/MotionStopTrialSession.cs");
-        var plan = ReadRepositoryFile(TemplatePlanFile);
+        var plan = ReadRepositoryFile(TemplatePlanFile).ReplaceLineEndings("\n");
         var session = ReadRepositoryFile("adapters/motion-library/MotionStopSession.cs");
         var dispatch = ReadRepositoryFile("adapters/motion-library/MotionStopDispatchKernel.cs");
 
