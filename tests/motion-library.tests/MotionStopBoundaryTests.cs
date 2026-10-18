@@ -139,11 +139,7 @@ public sealed class MotionStopBoundaryTests
             {
                 // This one string axis parameter is report-only: it copies an axis label into
                 // MotionStopTrialOutcome.Axis and has no route to the command plan or dispatch.
-                Assert.Equal(1, matches.Count);
-                if (matches.Count != 1)
-                {
-                    continue;
-                }
+                Assert.Single(matches);
 
                 Assert.Equal("axis", matches[0].Groups[1].Value);
 
@@ -179,7 +175,7 @@ public sealed class MotionStopBoundaryTests
                 continue;
             }
 
-            Assert.Equal(0, matches.Count, file);
+            Assert.True(matches.Count == 0, file);
         }
     }
 
@@ -219,10 +215,10 @@ public sealed class MotionStopBoundaryTests
         Assert.Contains("private static byte[] CreateAsciiBuffer(string planTemplate)", dispatch, StringComparison.Ordinal);
         Assert.Contains("var export = Marshal.GetDelegateForFunctionPointer<StopCommandExport>(_export);", dispatch, StringComparison.Ordinal);
         Assert.Contains("var result = export(_handle, commandBuffer, replyBuffer, (UIntPtr)replyBuffer.Length);", dispatch, StringComparison.Ordinal);
-        Assert.Equal(2, Regex.Matches(dispatch, @"CreateAsciiBuffer\(").Count);
-        Assert.Equal(1, Regex.Matches(dispatch, @"\bexport\(").Count);
-        Assert.Equal(1, Regex.Matches(dispatch, @"CreateAsciiBuffer\(template\)").Count);
-        Assert.Equal(2, Regex.Matches(dispatch, @"(?m)^\s*(?:public\s+)?MotionStopNativeReply Dispatch\(").Count);
+        Assert.Equal(2, Regex.Count(dispatch, @"CreateAsciiBuffer\("));
+        Assert.Single(Regex.Matches(dispatch, @"\bexport\("));
+        Assert.Single(Regex.Matches(dispatch, @"CreateAsciiBuffer\(template\)"));
+        Assert.Equal(2, Regex.Count(dispatch, @"(?m)^\s*(?:public\s+)?MotionStopNativeReply Dispatch\("));
     }
 
     [Fact]
