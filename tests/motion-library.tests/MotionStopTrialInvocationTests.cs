@@ -380,10 +380,10 @@ public sealed class MotionStopTrialInvocationTests
         Assert.Equal(MotionLibraryProbeVocabulary.NativeProbeUnsupportedPlatform, first.RefusalCode);
         Assert.Equal(MotionStopTrialVocabulary.TrialAlreadyRun, second.RefusalCode);
         Assert.Single(environment.Removals);
-        Assert.Single(environment.Reads.Where(name => string.Equals(
+        Assert.Single(environment.Reads, name => string.Equals(
             name,
             MotionStopTrialVocabulary.ConsentVariable,
-            StringComparison.Ordinal)));
+            StringComparison.Ordinal));
         Assert.Equal(1, gateACalls);
     }
 }

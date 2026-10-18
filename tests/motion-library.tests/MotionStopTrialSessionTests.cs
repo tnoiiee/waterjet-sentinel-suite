@@ -230,6 +230,35 @@ public sealed class MotionStopTrialSessionTests
 
     private static readonly string SyntheticAddress = string.Join(".", 10, 20, 30, 40);
 
+    private static readonly string[] ExpectedReleasedModuleOrder =
+    {
+        "module-primary-shape",
+        "module-companion-shape",
+    };
+
+    private static readonly string[] ExpectedGateAOnlyLog =
+    {
+        "gate-a",
+    };
+
+    private static readonly string[] ExpectedCompanionOnlyReleasedModules =
+    {
+        "module-companion-shape",
+    };
+
+    private static readonly string[] ExpectedOpenRefusalCleanupOrder =
+    {
+        "invalidate",
+        "close",
+        "release-module-primary-shape",
+        "release-module-companion-shape",
+    };
+
+    private static readonly string[] ExpectedInvalidationFailureTail =
+    {
+        "invalidate-failed",
+    };
+
     private static readonly string[] ExpectedExportNames =
     {
         MotionControllerApi.ForceDirectModeExportName,
@@ -341,7 +370,7 @@ public sealed class MotionStopTrialSessionTests
         Assert.Equal(1, kernel.CloseCount);
         Assert.Equal(SyntheticAddress, kernel.LastAddress);
         Assert.Equal(0, kernel.IdentityReadCount);
-        Assert.Equal(new[] { "module-primary-shape", "module-companion-shape" }, kernel.ReleasedModules);
+        Assert.Equal(ExpectedReleasedModuleOrder, kernel.ReleasedModules);
     }
 
     [Fact]
@@ -409,7 +438,7 @@ public sealed class MotionStopTrialSessionTests
         Assert.Equal(MotionLibraryProbeVocabulary.NativeFileIdentityMismatch, outcome.RefusalCode);
         Assert.True(outcome.NativeModulesReleased);
         Assert.Equal(MotionStopTrialVocabulary.CleanupComplete, outcome.CleanupCode);
-        Assert.Equal(new[] { "gate-a" }, kernel.Log);
+        Assert.Equal(ExpectedGateAOnlyLog, kernel.Log);
         Assert.Empty(dispatch.DispatchedAxes);
         Assert.False(outcome.StopConfirmed);
     }
@@ -430,7 +459,7 @@ public sealed class MotionStopTrialSessionTests
         Assert.Equal(MotionStopTrialVocabulary.CleanupIncomplete, outcome.CleanupCode);
         Assert.Equal(MotionLibraryProbeVocabulary.NativeUnloadFailed, outcome.CleanupFailureCode);
         Assert.False(outcome.NativeModulesReleased);
-        Assert.Equal(new[] { "gate-a" }, kernel.Log);
+        Assert.Equal(ExpectedGateAOnlyLog, kernel.Log);
         Assert.Empty(dispatch.DispatchedAxes);
     }
 
@@ -470,7 +499,7 @@ public sealed class MotionStopTrialSessionTests
         Assert.False(outcome.OpenAttempted);
         Assert.Equal(0, kernel.OpenCount);
         Assert.True(outcome.NativeModulesReleased);
-        Assert.Equal(new[] { "module-companion-shape" }, kernel.ReleasedModules);
+        Assert.Equal(ExpectedCompanionOnlyReleasedModules, kernel.ReleasedModules);
         Assert.Empty(dispatch.DispatchedAxes);
     }
 
@@ -565,8 +594,7 @@ public sealed class MotionStopTrialSessionTests
         var outcome = CreateSession(MotionStopAxis.A, kernel, dispatch).Run();
 
         Assert.Equal(MotionControllerIdentityVocabulary.ConnectionTimeout, outcome.RefusalCode);
-        Assert.Equal(new[] { "invalidate", "close", "release-module-primary-shape", "release-module-companion-shape" },
-            kernel.Log.TakeLast(4));
+        Assert.Equal(ExpectedOpenRefusalCleanupOrder, kernel.Log.TakeLast(4));
         Assert.Equal(1, dispatch.InvalidationCount);
         Assert.Equal(1, kernel.CloseCount);
         Assert.Empty(dispatch.DispatchedAxes);
@@ -668,7 +696,7 @@ public sealed class MotionStopTrialSessionTests
         Assert.False(outcome.NativeModulesReleased);
         Assert.Equal(MotionStopOutcomeCodes.Dispatched, outcome.StopCode);
         Assert.Equal(1, kernel.CloseCount);
-        Assert.Equal(new[] { "module-primary-shape", "module-companion-shape" }, kernel.ReleasedModules);
+        Assert.Equal(ExpectedReleasedModuleOrder, kernel.ReleasedModules);
         Assert.Equal(2, kernel.ReleasedModules.Count);
     }
 
@@ -686,7 +714,7 @@ public sealed class MotionStopTrialSessionTests
         Assert.False(outcome.StopSessionInvalidated);
         Assert.False(outcome.ControllerHandleClosed);
         Assert.False(outcome.NativeModulesReleased);
-        Assert.Equal(new[] { "invalidate-failed" }, kernel.Log.TakeLast(1));
+        Assert.Equal(ExpectedInvalidationFailureTail, kernel.Log.TakeLast(1));
         Assert.Equal(0, kernel.CloseCount);
         Assert.Empty(kernel.ReleasedModules);
     }
@@ -704,7 +732,7 @@ public sealed class MotionStopTrialSessionTests
         Assert.Equal(MotionControllerIdentityVocabulary.NativeUnloadFailed, outcome.CleanupFailureCode);
         Assert.False(outcome.NativeModulesReleased);
         Assert.Equal(2, kernel.ReleasedModules.Count);
-        Assert.Equal(new[] { "module-primary-shape", "module-companion-shape" }, kernel.ReleasedModules);
+        Assert.Equal(ExpectedReleasedModuleOrder, kernel.ReleasedModules);
     }
 
     [Fact]

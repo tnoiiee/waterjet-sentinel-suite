@@ -16,6 +16,17 @@ public sealed class MotionStopTrialBoundaryTests
     private const string SessionSource = "adapters/motion-library/MotionStopTrialSession.cs";
     private const string VocabularySource = "adapters/motion-library/MotionStopTrialOutcome.cs";
 
+    private static readonly string[] ExpectedMotionLibraryProjectReferences =
+    {
+        "../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj",
+    };
+
+    private static readonly string[] InvocationSearchRoots =
+    {
+        "adapters",
+        "apps",
+    };
+
     private static string RepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -56,7 +67,7 @@ public sealed class MotionStopTrialBoundaryTests
 
         Assert.Equal("Exe", project.Descendants("OutputType").Single().Value);
         Assert.Equal("net10.0", project.Descendants("TargetFramework").Single().Value);
-        Assert.Equal(new[] { "../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj" }, projectReferences);
+        Assert.Equal(ExpectedMotionLibraryProjectReferences, projectReferences);
         Assert.DoesNotContain(project.Descendants(), element =>
             string.Equals(element.Name.LocalName, "PackageReference", StringComparison.Ordinal));
     }
@@ -108,7 +119,7 @@ public sealed class MotionStopTrialBoundaryTests
             .ToArray();
         Assert.Equal(new[] { ProgramSource }, appSourceFiles);
 
-        var invocationSites = new[] { "adapters", "apps" }
+        var invocationSites = InvocationSearchRoots
             .SelectMany(tree => Directory.EnumerateFiles(
                 Path.Combine(root, tree),
                 "*.cs",
