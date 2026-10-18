@@ -44,6 +44,11 @@ public sealed class ManualMotionBoundaryTests
 
     private const string PlanFile = "adapters/motion-library/ManualMotionCommandPlan.cs";
 
+    private static readonly string[] ExpectedStopTypeCarrierFiles =
+    {
+        "adapters/motion-library/ManualMotionControllerOwner.cs",
+    };
+
     private static readonly Regex TemplateLiteral = new(
         "\"(?:JG|BG|HV|HM|DP|DE|AC|SP|DC|PA)\"|\"(?:SB|CB) ",
         RegexOptions.CultureInvariant);
@@ -233,6 +238,6 @@ public sealed class ManualMotionBoundaryTests
             .OrderBy(file => file, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(new[] { "adapters/motion-library/ManualMotionControllerOwner.cs" }, stopTypeCarriers);
+        Assert.Equal(ExpectedStopTypeCarrierFiles, stopTypeCarriers);
     }
 }

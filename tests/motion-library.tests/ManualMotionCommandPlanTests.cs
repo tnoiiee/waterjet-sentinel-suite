@@ -13,6 +13,10 @@ namespace Wjss.MotionLibrary.Tests;
 /// </summary>
 public sealed class ManualMotionCommandPlanTests
 {
+    private static readonly string[] ExpectedPlanAxisNames = { "A", "B" };
+
+    private static readonly string[] ExpectedBrakeOutputNames = { "None", "Output1", "Output2" };
+
     private static string Render(ManualMotionPlanCommand command)
     {
         Assert.True(ManualMotionCommandPlan.TryRender(command, out var text, out var refusalCode), refusalCode);
@@ -108,10 +112,10 @@ public sealed class ManualMotionCommandPlanTests
         Assert.DoesNotContain("Stop", names);
         Assert.All(names, name => Assert.DoesNotContain("Relative", name, StringComparison.Ordinal));
         Assert.Equal(
-            new[] { "A", "B" },
+            ExpectedPlanAxisNames,
             Enum.GetNames<ManualMotionPlanAxis>());
         Assert.Equal(
-            new[] { "None", "Output1", "Output2" },
+            ExpectedBrakeOutputNames,
             Enum.GetNames<ManualMotionBrakeOutput>());
     }
 

@@ -217,6 +217,16 @@ public sealed class ManualMotionControllerOwnerTests
 
     private static readonly string SyntheticAddress = string.Join(".", 10, 20, 30, 40);
 
+    private static readonly string[] ExpectedCleanupOrder =
+    {
+        "invalidate-read",
+        "invalidate-stop",
+        "invalidate-command",
+        "close",
+        "release-module-primary-shape",
+        "release-module-companion-shape",
+    };
+
     private sealed class OwnerRig
     {
         internal OwnerRig(Func<MotionLibraryProbeOutcome>? gateAProbe = null)
@@ -348,17 +358,7 @@ public sealed class ManualMotionControllerOwnerTests
         Assert.True(closed.ModulesReleased);
 
         var tail = rig.Kernel.Log.Skip(rig.Kernel.Log.IndexOf("invalidate-read")).ToArray();
-        Assert.Equal(
-            new[]
-            {
-                "invalidate-read",
-                "invalidate-stop",
-                "invalidate-command",
-                "close",
-                "release-module-primary-shape",
-                "release-module-companion-shape",
-            },
-            tail);
+        Assert.Equal(ExpectedCleanupOrder, tail);
 
         var closedAgain = rig.Owner.Close();
         Assert.Same(closed, closedAgain);
