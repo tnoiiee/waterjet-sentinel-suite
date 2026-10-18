@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Xunit;
 
@@ -44,6 +45,9 @@ public sealed class MotionStopTrialBoundaryTests
 
     private static int CountOccurrences(string text, string token) =>
         text.Split(token, StringSplitOptions.None).Length - 1;
+
+    private static string NormalizeWords(string text) =>
+        Regex.Replace(text, @"[^\p{L}\p{N}]+", " ").Trim();
 
     private static bool IsGeneratedOrDependencyFile(string root, string path)
     {
@@ -289,14 +293,23 @@ public sealed class MotionStopTrialBoundaryTests
     public void The_Runbook_Separates_Software_Validation_From_The_Post_Merge_Scope_Gate()
     {
         var runbook = ReadRepositoryFile("docs/MOTION_STOP_TRIAL_RUNBOOK.md");
+        var words = NormalizeWords(runbook);
 
-        Assert.Contains("not hardware authorization", runbook, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("fake-kernel", runbook, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("separate post-merge Owner Scope Gate", runbook, StringComparison.Ordinal);
-        Assert.Contains("stopConfirmed` is permanently false", runbook, StringComparison.Ordinal);
-        Assert.Contains("| `0` | One selected Stop dispatch completed and cleanup is complete", runbook, StringComparison.Ordinal);
-        Assert.Contains("| `2` | A precondition/lifecycle refusal occurred", runbook, StringComparison.Ordinal);
-        Assert.Contains("| `4` | The invocation is not exactly the fixed mode", runbook, StringComparison.Ordinal);
+        // Normalize Markdown punctuation and hyphenation so these checks pin the safety meaning,
+        // not whether the runbook spells the term as "fake-kernel", "fake kernel", or a phrase.
+        Assert.Contains("software only source foundation", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not hardware authorization", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("no controller contact or real stop dispatch was performed while authoring this change", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("owner local software validation fake source tests only", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fake gate a results fake controller kernels fake stop dispatch kernels and source boundary reads only", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("it does not load native modules open a controller probe a network or issue a real command", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("a separate post merge owner scope gate is required before any real controller invocation", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("only after merge may a separate scope gate authorize the actual no load wsb1 trial", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("stopconfirmed is permanently false dispatch is not a confirmed stop stopped safe state or commissioned result no confirmation readback occurs", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("0 one selected stop dispatch completed and cleanup is complete no stop is confirmed", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("2 a precondition lifecycle refusal occurred or cleanup could not be proven complete", words, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("4 the invocation is not exactly the fixed mode plus one uppercase a b token", words, StringComparison.OrdinalIgnoreCase);
+
         Assert.Contains("GCLIB_2_6_0_API_USAGE_BASELINE.md", runbook, StringComparison.Ordinal);
     }
 }
