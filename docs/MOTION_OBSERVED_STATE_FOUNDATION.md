@@ -137,16 +137,21 @@ safe; it is unknown.
 | One native site | The single native call lives in one internal boundary file; the three model sources contain no I/O call |
 | Close invalidates the boundary first | The boundary is invalidated before the lifecycle owner closes the controller handle and unloads the module, and it can never be used again |
 
-## 6. C1 contract — documented, NOT IMPLEMENTED
+## 6. B2-to-Application C1 contract — documented, NOT IMPLEMENTED
 
-C1 is the next contract. It is written down here so the Owner can decide whether to authorize it;
-**no part of C1 exists in code, tests or configuration**.
+In this document, **C1 means only the separate application-facing contract that would make the B2
+read surface available to the Application**. That contract is written down here so the Owner can
+decide whether to authorize it; **no part of the B2-to-Application C1 contract exists in code,
+tests or configuration**. It is distinct from PR #32's internal C1 Stop-only A/B software
+foundation and the isolated trial harness documented in `docs/MOTION_STOP_TRIAL_RUNBOOK.md`.
 
 ### 6.1 Prerequisites
 
 1. **RESOLVED — authorized for the B2 layer.** The Owner authorized a private read surface,
    naming the exact native export and the exact typed, fixed, caller-text-free request shapes;
-   the evidence baseline section H records it. C1 is the next layer and needs its own decision.
+   the evidence baseline section F.3 records the closed request set and section I records the
+   Owner's B2-H trial. The B2-to-Application C1 contract needs its own decision and remains
+   distinct from the separate PR #32 C1 Stop-only surface.
 2. Evidence for the interpretation that would be claimed: status-word bit order and polarity for
    the installed controller family, the output numbering for every cabinet, and the physical
    meaning of the brake outputs.
@@ -170,8 +175,10 @@ C1 is the next contract. It is written down here so the Owner can decide whether
 
 ### 6.3 Status
 
-**NOT IMPLEMENTED.** No export, no session, no parser, no test and no configuration. C1 requires
-its own Owner gate, its own session branch and its own Owner-local validation.
+**NOT IMPLEMENTED for the B2-to-Application C1 contract.** No Application read export, session,
+parser, route or configuration exists. The separate PR #32 C1 Stop-only software foundation does
+not implement this read contract. Any B2-to-Application C1 work still requires its own Owner gate,
+session branch and Owner-local validation.
 
 ## 7. Owner-local gate for this checkpoint
 
@@ -250,7 +257,8 @@ controller, and it does not open the Motion gate.
 1. B1-H on the exact PR head, per its own runbook, if and only if the Owner has authorized it.
 2. B2-H(S) software gate on the same head.
 3. B2-H(R) read-only trial only under a separate Owner authorization.
-4. A separate Owner decision on C1 (section 6) before any application contract is designed.
+4. A separate Owner decision on the B2-to-Application C1 contract (section 6) before any
+   application read contract is designed. This is distinct from the internal C1 Stop-only path.
 
 None of the four steps is performed by the Agent.
 
@@ -315,6 +323,12 @@ not rewritten.
 - **B1-H PASS** and **B2-H PASS** (16 of 16 reads) are recorded there in redacted form, with the
   native value text the Owner authorized publishing. Neither result opens the Motion gate: it stays
   CLOSED, the endpoint stays `NOT_CONFIGURED` and the axes stay `NOT_COMMISSIONED`.
-- C1 is unchanged: still documented in section 6, still **NOT IMPLEMENTED**, and still requiring its
-  own Owner authorization. Every C1 candidate in the registry is
-  `BLOCKED_PENDING_VENDOR_EVIDENCE` and has no executable form anywhere in the repository.
+- The B2-to-Application C1 contract in section 6 remains **NOT IMPLEMENTED** and requires its own
+  Owner authorization. It is distinct from the internal C1 Stop-only A/B foundation merged in PR
+  #32 and the isolated Owner-invoked trial harness documented in
+  `docs/MOTION_STOP_TRIAL_RUNBOOK.md`.
+- The C1 Stop-only scope is software foundation only: typed Axis A (Horizontal) or Axis B (Vertical),
+  one dispatch maximum, redacted outcomes, no confirmation and no application Motion gate opening.
+  Other C1 forms remain blocked. No Controller contact, real native DLL execution or hardware
+  Stop trial was performed or authorized by this document; the actual no-load trial requires a
+  separate post-merge Owner Scope Gate.

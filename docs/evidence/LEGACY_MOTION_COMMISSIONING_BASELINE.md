@@ -9,7 +9,11 @@ what the Legacy application actually did. It takes no decision and authorizes no
 `docs/SAFETY_BOUNDARY.md` remains the safety boundary. This document introduces no stage, no gate
 and no roadmap item, and it does not promote any Legacy value into Product configuration.
 
-**Checkpoint.** PR #31 — B2 read-only observed-state foundation.
+**Checkpoint.** Original evidence checkpoint: PR #31 — B2 read-only observed-state foundation.
+**Later scope note (2026-10-17):** PR #32 merged a separate C1 Stop-only typed A/B software
+foundation; this Legacy record remains historical evidence, not a current permission to use its
+raw command paths. The isolated no-load trial harness and its separate post-merge Owner Scope Gate
+are recorded in `docs/MOTION_STOP_TRIAL_RUNBOOK.md`. No hardware trial is authorized here.
 
 **Gate position.** The Motion authorization gate is CLOSED
 (`MOTION_COMMISSIONING_GATE_NOT_OPEN`). Controller endpoint configuration is `NOT_CONFIGURED`;
@@ -113,11 +117,15 @@ Dispositions:
   unconditional multi-output write, or dead code in the Legacy source.
 - **LATER** — a motion, brake or position-definition write that belongs to a future
   Owner-authorized motion stage. Not implemented, not prepared, not scheduled.
+- **OWNER_AUTHORIZED_SOFTWARE_ONLY** — only the exact internal C1 Stop A/B typed plan merged in
+  PR #32; not a Legacy call path, hardware trial authorization or stop-confirmation claim.
 
-No write, control or motion command in this inventory is implemented. The four B2 read candidates
-are recorded separately in section B.4; the Owner authorized them for a private internal read-only
-boundary in the PR #31 correction, and section H records that boundary and its scoped source
-exception.
+At the original PR #31 checkpoint, no write, control or motion command in this Legacy inventory
+had a WJSS implementation. The four B2 read candidates are recorded separately in section B.4;
+the Owner authorized them for a private internal read-only boundary in the PR #31 correction, and
+section H records that boundary and its scoped source exception. PR #32 later added a distinct
+internal C1 Stop-only typed A/B software foundation; it does not port or expose the Legacy command
+paths described here and does not authorize a hardware trial.
 
 ### B.1 Shared dispatch path
 
@@ -289,7 +297,7 @@ that axis. Documented vendor command; per-axis behaviour on the installed machin
 | Cleanup | none |
 | Concurrency | can be issued while a move dispatch is still in flight |
 | Vendor verification | documented decelerate-to-stop command. It is a controlled stop, not an emergency stop, and nothing in this baseline treats it as one |
-| Disposition | **LATER** |
+| Disposition | **OWNER_AUTHORIZED_SOFTWARE_ONLY** for the separate exact typed C1 A/B plan only; this Legacy call path is not implemented or reused, and no hardware trial is authorized |
 
 #### `SB {output}` and `CB {output}`
 
@@ -641,7 +649,7 @@ implements the model that makes it impossible. It never means the physical behav
 | D-14 | A failure is a refusal code on one outcome; there is no shared loop to stop | Enforced by B1 and B2 |
 | D-15 | Dead code is not carried; only the referenced surface exists | Enforced by B2 |
 | D-16, D-17 | No configuration file, no path persistence, no default promotion; candidate values stay `NOT_CONFIGURED` / `NOT_COMMISSIONED` | Not implemented — out of scope |
-| D-18 | No auto-move, no timer, no step dispatcher; Motion execution is absent | Not implemented — out of scope |
+| D-18 | No auto-move, timer-driven step dispatcher or motion-creation surface; the separate C1 Stop-only path creates no motion | No sequence or move execution; Stop dispatch remains separately gated |
 | D-19 | Close is deterministic and idempotent; a closed session never reopens | Enforced by B1 and B2 |
 | D-20 | Outcomes are redacted and carry a vocabulary code; no command text and no vendor error text | Enforced by B1 and B2 |
 | D-21 | One dispatch surface: the B2 session has no alternate path, and a refusal is produced before anything is evaluated | Enforced by B2 |
@@ -657,14 +665,15 @@ Nothing in this table upgrades a `NOT VERIFIED` hardware fact to a verified one.
 | Command shape | Disposition | Checkpoint that may ever carry it |
 | --- | --- | --- |
 | `MG TIME` | BLOCKED | none; it is outside the four Owner-authorized observation candidates |
-| `MG _TS{axis}` | VERIFIED_FOR_B2 (B2-OBS-1) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
-| `TP {axis}` | VERIFIED_FOR_B2 (B2-OBS-2) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
-| `RP {axis}` | VERIFIED_FOR_B2 (B2-OBS-3) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
-| `MG @OUT[{output}]` | VERIFIED_FOR_B2 (B2-OBS-4) | B2 internal read boundary (this PR); C1 contract NOT IMPLEMENTED (PR #32 candidate) |
+| `MG _TS{axis}` | VERIFIED_FOR_B2 (B2-OBS-1) | B2 internal read boundary (this PR); B2-to-Application C1 contract remains NOT IMPLEMENTED |
+| `TP {axis}` | VERIFIED_FOR_B2 (B2-OBS-2) | B2 internal read boundary (this PR); B2-to-Application C1 contract remains NOT IMPLEMENTED |
+| `RP {axis}` | VERIFIED_FOR_B2 (B2-OBS-3) | B2 internal read boundary (this PR); B2-to-Application C1 contract remains NOT IMPLEMENTED |
+| `MG @OUT[{output}]` | VERIFIED_FOR_B2 (B2-OBS-4) | B2 internal read boundary (this PR); B2-to-Application C1 contract remains NOT IMPLEMENTED |
 | `OP 0` | EXCLUDED | none |
 | `TI0` | EXCLUDED | none |
 | Home velocity, home switch search, begin motion | LATER | a future Owner-authorized motion stage (roadmap G-series) |
-| Stop | LATER | a future Owner-authorized motion stage |
+| C1 Stop on Axis A (Horizontal) or B (Vertical) | OWNER_AUTHORIZED_SOFTWARE_ONLY | PR #32 fixed typed plan and internal owner; isolated no-load trial harness remains gated by a separate post-merge Owner Scope Gate |
+| Stop outside the exact typed A/B domain | BLOCKED | no unqualified, other-axis, combined, multi-axis or raw-command surface |
 | Brake release / set | LATER | a future Owner-authorized motion stage |
 | Acceleration, speed, deceleration, absolute target | LATER | a future Owner-authorized motion stage |
 | Jog speed | LATER | a future Owner-authorized motion stage |
@@ -680,11 +689,13 @@ Nothing in this table upgrades a `NOT VERIFIED` hardware fact to a verified one.
   accepted `RAW_OBSERVED` or `UNCONFIRMED` state; an invalid or disallowed request produces
   `REFUSED`; a valid subject with no boundary or with an unusable reply produces `UNAVAILABLE`.
   `VERIFIED` and `STALE` are never produced as state words.
-- **C1** — the next contract, documented in `docs/MOTION_OBSERVED_STATE_FOUNDATION.md` and **not
-  implemented**. C1 would connect the B2 read surface to the Application; it needs its own
-  contract, a single connection owner at the application boundary, a freshness rule and the
-  interpretation evidence that section G lists as missing.
-- **LATER** — every motion, brake and position-definition command. None is prepared here.
+- **B2-to-Application C1** — the separate read contract documented in
+  `docs/MOTION_OBSERVED_STATE_FOUNDATION.md`; it remains **not implemented** and still needs its own
+  contract, application-boundary owner, freshness rule and interpretation evidence from section G.
+- **C1 Stop-only** — PR #32's internal software foundation for exact typed Axis A/B Stop only. It
+  does not expose the Legacy path, authorize hardware execution or claim Stop confirmation; the
+  actual no-load trial requires a separate Owner Scope Gate.
+- **LATER** — every other motion, brake and position-definition command. None is prepared here.
 
 This document does not add a roadmap stage, does not reorder the critical path and does not
 replace any planning document.
@@ -736,9 +747,10 @@ position values at `RAW_OBSERVED`. None of them is closed by this checkpoint.
   resolves exactly one further export through its own internal boundary file, and the
   source-boundary tests allow that name in that exact file and no other. It is not a widening of
   the B1 allow-list and it is not a public command API.
-- **S-3 — No dependency, project or lock change was made, and none is needed.** The boundary uses
-  the operating-system loading primitives and the BCL only. There is no new project, no new package
-  reference and no lock-file change, so no Owner-local restore is required for it.
+- **S-3 — B2 required no new dependency, project or lock change.** Its boundary uses operating-
+  system loading primitives and the BCL only. A later, separate C1 Stop trial harness adds one
+  isolated console project and no package dependency; its genuine lock file must be generated by
+  Owner-local restore. This does not change the B2 surface or authorize hardware execution.
 - **S-4 — B2-H is now defined and is separate from B1-H.** B2-H is an Owner-local READ-ONLY
   observation trial: it may issue the verified subset against the controller, and it may not
   configure, home, move, brake or write anything. It is not run by the Agent. B1-H remains the

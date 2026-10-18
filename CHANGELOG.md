@@ -13,6 +13,38 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-18 — Isolated C1 Stop trial software foundation (Owner-invoked; no hardware authorization)
+
+**Status: SOURCE-AUTHORED ON THE SESSION BRANCH; .NET RESTORE/BUILD/TEST NOT RUN (no SDK in Arena);
+NO CONTROLLER CONTACT, ENDPOINT CONNECTION OR VENDOR DLL LOAD/EXECUTION.** This is a software-only foundation for a
+possible later no-load WSB1 Controller Stop trial, not authorization to perform one.
+
+**Addition.** Added `apps/motion-stop-trial`, an isolated console harness with one exact mode and
+one typed Axis A (Horizontal) or Axis B (Vertical) selection; a one-use exact-match Owner-local
+consent gate; endpoint and Gate A configuration checks before Gate A's native load, then Gate A
+identity proof before Controller-module load/open; the restricted loader and loaded-path proof;
+only approved direct/open/close and command-export
+resolution; one Stop owner/session and at most one dispatch; and invalidate → close → unload
+cleanup. Its outcome is redacted, `StopConfirmed` is fixed false, and a dispatch is never described
+as stopped, safe or commissioned. Runtime, API, Kiosk, Operations Preview, Production composition,
+`MotionCommandGate` and the closed application gate are unchanged.
+
+**Tests and records.** Added fake-kernel lifecycle/invocation tests and narrow source-boundary
+checks. Updated the C1 status distinction: PR #32's C1 Stop-only software scope is separate from
+the B2-to-Application C1 read contract, which remains NOT IMPLEMENTED. The no-load hardware trial
+still needs a separate post-merge Owner Scope Gate. See
+[`docs/MOTION_STOP_TRIAL_RUNBOOK.md`](docs/MOTION_STOP_TRIAL_RUNBOOK.md).
+
+**Validation.** `node --version` returned `v22.22.3`; the post-change
+`node tools/boundary-scan/boundary-scan.mjs .` returned **0 findings (S1-S9 clean)**; and
+`git diff --check` completed cleanly. Python stdlib checks parsed both adapter/app project files,
+confirmed the app has exactly one adapter project reference, zero package references and no
+lockfile, verified the solution registration with 21 unique project GUIDs, and resolved relative
+links in six changed Markdown documents. `dotnet`, `csc` and `mcs` are unavailable in this sandbox,
+so restore, build, and all .NET unit/source-boundary tests were **NOT RUN**. The new project's
+genuine `packages.lock.json` was not generated; only Owner-local `dotnet restore` may generate it.
+No `docs/MASTER_PLAN.md` change was made.
+
 ### 2026-10-17 — Integrity correction: B1-H model-confirmation provenance (DOCUMENTATION AND TEST EVIDENCE ONLY; on branch; PR #31 OPEN, NOT MERGED)
 
 **Status: ON THE SESSION BRANCH — NOT MERGED; NO PRODUCT SOURCE, DEPENDENCY, PROJECT, LOCK OR FIXTURE

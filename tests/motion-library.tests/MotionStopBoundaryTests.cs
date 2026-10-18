@@ -10,13 +10,14 @@ namespace Wjss.MotionLibrary.Tests;
 ///
 /// They establish five facts. Exactly one production file carries a quoted Stop command text, and
 /// that file is the closed template plan. The Stop files name no read or other command literal.
-/// No file outside the Stop set names a Stop type. The Stop surface is internal only. The Stop
-/// carrier resolves its export through the existing approved seam and does not name the native
-/// export token.
+/// No file outside the exact Stop-file set names a Stop type. The Stop surface is internal only.
+/// The Stop carrier resolves its export through the existing approved seam and does not name the
+/// native export token.
 /// </summary>
 public sealed class MotionStopBoundaryTests
 {
     private const string TemplatePlanFile = "adapters/motion-library/MotionStopCommandPlan.cs";
+    private const string TrialOutcomeFile = "adapters/motion-library/MotionStopTrialOutcome.cs";
 
     // The single file allowed to name the native command export. Expected value only; never mutated.
     private static readonly string[] ExpectedCommandExportCarrierFiles =
@@ -31,6 +32,12 @@ public sealed class MotionStopBoundaryTests
         "adapters/motion-library/MotionStopDispatchKernel.cs",
         "adapters/motion-library/MotionStopSession.cs",
         "adapters/motion-library/MotionStopOwner.cs",
+        "adapters/motion-library/MotionStopTrialInvocation.cs",
+        "adapters/motion-library/MotionStopTrialSession.cs",
+        "adapters/motion-library/MotionStopTrialOutcome.cs",
+        "adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj",
+        "apps/motion-stop-trial/Program.cs",
+        "apps/motion-stop-trial/Wjss.MotionStopTrial.csproj",
     };
 
     private static readonly string[] ProductionTrees = { "adapters", "apps", "packages" };
@@ -46,7 +53,8 @@ public sealed class MotionStopBoundaryTests
         "[\"'](?:TS|SC|PT|GA|GM|MO|MG|TP|RP|TC|AB|JG|BG|SB|CB|DP|DE|HM|HV|AC|SP|DC|PA|PR|AM|MC|SH|TB|TV|OB|OP)(?=[ \"'=\\[\\d])",
         RegexOptions.CultureInvariant);
 
-    // A caller-supplied command text parameter on any Stop type: none may exist.
+    // Candidate caller-text parameters across Stop files. A report-only axis label is classified
+    // separately; every other match is forbidden, especially on the typed command path.
     private static readonly Regex CallerTextParameter = new(
         "[,(]\\s*string\\??\\s+(text|command|template|suffix|prefix|separator|axis|value|input|raw)\\b",
         RegexOptions.CultureInvariant);
@@ -120,11 +128,97 @@ public sealed class MotionStopBoundaryTests
     [Fact]
     public void No_Stop_Source_Accepts_Caller_Command_Text_Or_A_Caller_Suffix()
     {
+        Assert.Contains(TrialOutcomeFile, StopFiles);
+
         foreach (var file in StopFiles)
         {
             var text = ReadRepositoryFile(file);
-            Assert.False(CallerTextParameter.IsMatch(text), file);
+            var matches = CallerTextParameter.Matches(text);
+
+            if (string.Equals(file, TrialOutcomeFile, StringComparison.Ordinal))
+            {
+                // This one string axis parameter is report-only: it copies an axis label into
+                // MotionStopTrialOutcome.Axis and has no route to the command plan or dispatch.
+                Assert.Single(matches);
+
+                Assert.Equal("axis", matches[0].Groups[1].Value);
+
+                var factoryStart = text.IndexOf(
+                    "internal static MotionStopTrialOutcome RefusedBeforeNative(",
+                    StringComparison.Ordinal);
+                Assert.True(factoryStart >= 0, file);
+                if (factoryStart < 0)
+                {
+                    continue;
+                }
+
+                var factoryEnd = text.IndexOf(
+                    "internal static MotionStopTrialOutcome AcceptedPreconditions(",
+                    factoryStart,
+                    StringComparison.Ordinal);
+                Assert.True(factoryEnd > factoryStart, file);
+                if (factoryEnd <= factoryStart)
+                {
+                    continue;
+                }
+
+                Assert.InRange(matches[0].Index, factoryStart, factoryEnd - 1);
+                var refusalFactory = text[factoryStart..factoryEnd];
+                Assert.Contains("string? axis = null,", refusalFactory, StringComparison.Ordinal);
+                Assert.Contains("Axis = axis,", refusalFactory, StringComparison.Ordinal);
+                Assert.Contains("internal string? Axis { get; set; }", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("MotionStopCommandPlan", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("MotionStopSession", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("MotionStopDispatchKernel", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("IStopDispatchKernel", text, StringComparison.Ordinal);
+                Assert.DoesNotContain("MotionControllerCommandApi", text, StringComparison.Ordinal);
+                continue;
+            }
+
+            Assert.True(matches.Count == 0, file);
         }
+    }
+
+    [Fact]
+    public void Only_The_Closed_Typed_Axis_Plan_Can_Reach_The_Native_Stop_Buffer()
+    {
+        var invocation = ReadRepositoryFile("adapters/motion-library/MotionStopTrialInvocation.cs").ReplaceLineEndings("\n");
+        var trialSession = ReadRepositoryFile("adapters/motion-library/MotionStopTrialSession.cs");
+        var plan = ReadRepositoryFile(TemplatePlanFile).ReplaceLineEndings("\n");
+        var session = ReadRepositoryFile("adapters/motion-library/MotionStopSession.cs");
+        var dispatch = ReadRepositoryFile("adapters/motion-library/MotionStopDispatchKernel.cs");
+
+        // Raw process arguments are accepted only as the exact mode plus one exact A/B token,
+        // then converted to MotionStopAxis before entering the trial session.
+        Assert.Contains("TryParseInvocation(arguments, out var axis)", invocation, StringComparison.Ordinal);
+        Assert.Contains("internal static bool TryParseInvocation(string[]? arguments, out MotionStopAxis axis)", invocation, StringComparison.Ordinal);
+        Assert.Contains("arguments is null || arguments.Length != 2", invocation, StringComparison.Ordinal);
+        Assert.Contains("!string.Equals(arguments[0], MotionStopTrialVocabulary.ModeToken, StringComparison.Ordinal)", invocation, StringComparison.Ordinal);
+        Assert.Contains("string.Equals(arguments[1], \"A\", StringComparison.Ordinal)", invocation, StringComparison.Ordinal);
+        Assert.Contains("string.Equals(arguments[1], \"B\", StringComparison.Ordinal)", invocation, StringComparison.Ordinal);
+        Assert.Contains("axis: AxisToken(axis)", invocation, StringComparison.Ordinal);
+        Assert.Contains("            endpointConfiguration,\n            axis,\n            () => _gateAProbe(nativeConfiguration),", invocation, StringComparison.Ordinal);
+        Assert.Contains("MotionStopAxis axis,", trialSession, StringComparison.Ordinal);
+        Assert.Contains("private readonly MotionStopAxis _axis;", trialSession, StringComparison.Ordinal);
+        Assert.Contains("owner.Session.Stop(_axis)", trialSession, StringComparison.Ordinal);
+
+        // Every command-capable boundary takes the closed enum; only the plan returns a template,
+        // and the native byte buffer is built from that returned value.
+        Assert.Contains("internal static bool TryGetTemplate(MotionStopAxis axis, out string template)", plan, StringComparison.Ordinal);
+        Assert.Contains("case MotionStopAxis.A:\n                template = \"ST A\";", plan, StringComparison.Ordinal);
+        Assert.Contains("case MotionStopAxis.B:\n                template = \"ST B\";", plan, StringComparison.Ordinal);
+        Assert.Contains("internal MotionStopOutcome Stop(MotionStopAxis axis)", session, StringComparison.Ordinal);
+        Assert.Contains("reply = _kernel.Dispatch(axis);", session, StringComparison.Ordinal);
+        Assert.Contains("MotionStopNativeReply Dispatch(MotionStopAxis axis);", dispatch, StringComparison.Ordinal);
+        Assert.Contains("if (!MotionStopCommandPlan.TryGetTemplate(axis, out var template))", dispatch, StringComparison.Ordinal);
+        Assert.Contains("var commandBuffer = CreateAsciiBuffer(template);", dispatch, StringComparison.Ordinal);
+        Assert.Contains("private static byte[] CreateAsciiBuffer(string planTemplate)", dispatch, StringComparison.Ordinal);
+        Assert.Contains("var export = Marshal.GetDelegateForFunctionPointer<StopCommandExport>(_export);", dispatch, StringComparison.Ordinal);
+        Assert.Contains("var result = export(_handle, commandBuffer, replyBuffer, (UIntPtr)replyBuffer.Length);", dispatch, StringComparison.Ordinal);
+        Assert.Equal(2, Regex.Count(dispatch, @"CreateAsciiBuffer\("));
+        Assert.Single(Regex.Matches(dispatch, @"\bexport\("));
+        Assert.Single(Regex.Matches(dispatch, @"CreateAsciiBuffer\(template\)"));
+        Assert.Equal(2, Regex.Count(dispatch, @"(?m)^\s*(?:public\s+)?MotionStopNativeReply Dispatch\("));
     }
 
     [Fact]

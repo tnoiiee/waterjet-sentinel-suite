@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Wjss.Adapters.MotionLibrary;
 using Xunit;
 
@@ -35,6 +36,7 @@ public sealed class VendorApiBaselineBoundaryTests
         "REVIEWED_NOT_USED",
         "DEPRECATED_NOT_ALLOWED",
         "BLOCKED_PENDING_VENDOR_EVIDENCE",
+        "OWNER_AUTHORIZED_SOFTWARE_ONLY",
         "NOT_REVIEWED",
     };
 
@@ -85,9 +87,11 @@ public sealed class VendorApiBaselineBoundaryTests
         "docs/MOTION_OBSERVED_STATE_FOUNDATION.md",
         "docs/MOTION_IDENTITY_FIRST_CONTACT_RUNBOOK.md",
         "docs/MOTION_OBSERVATION_TRIAL_RUNBOOK.md",
+        "docs/MOTION_STOP_TRIAL_RUNBOOK.md",
         "adapters/motion-library/README.md",
         "apps/motion-identity/README.md",
         "apps/motion-observation/README.md",
+        "apps/motion-stop-trial/README.md",
         "CHANGELOG.md",
     };
 
@@ -95,6 +99,7 @@ public sealed class VendorApiBaselineBoundaryTests
     {
         "adapters/motion-library/MotionControllerIdentitySession.cs",
         "adapters/motion-library/MotionObservationTrialSession.cs",
+        "adapters/motion-library/MotionStopTrialSession.cs",
     };
 
     private static readonly string[] CommandCapableAdapterFiles =
@@ -105,6 +110,8 @@ public sealed class VendorApiBaselineBoundaryTests
         "MotionControllerIdentitySession.cs",
         "MotionStopDispatchKernel.cs",
         "MotionStopOwner.cs",
+        "MotionStopTrialInvocation.cs",
+        "MotionStopTrialSession.cs",
     };
 
     private static readonly string[] ProhibitedEntries =
@@ -257,9 +264,12 @@ public sealed class VendorApiBaselineBoundaryTests
         foreach (var fileName in OpenCallSiteFiles)
         {
             var session = ReadRepositoryFile(fileName);
+            var openCall = fileName.EndsWith("MotionStopTrialSession.cs", StringComparison.Ordinal)
+                ? "controllerKernel.InvokeOpen("
+                : "kernel.InvokeOpen(";
 
             Assert.Equal(1, CountOccurrences(session, "MotionControllerApi.BuildOpenAddress("));
-            Assert.Equal(1, CountOccurrences(session, "kernel.InvokeOpen("));
+            Assert.Equal(1, CountOccurrences(session, openCall));
         }
     }
 
@@ -284,7 +294,10 @@ public sealed class VendorApiBaselineBoundaryTests
         {
             var session = ReadRepositoryFile(fileName);
             var force = session.IndexOf("InvokeForceDirectMode", StringComparison.Ordinal);
-            var open = session.IndexOf("kernel.InvokeOpen(", StringComparison.Ordinal);
+            var openCall = fileName.EndsWith("MotionStopTrialSession.cs", StringComparison.Ordinal)
+                ? "controllerKernel.InvokeOpen("
+                : "kernel.InvokeOpen(";
+            var open = session.IndexOf(openCall, StringComparison.Ordinal);
 
             Assert.True(force >= 0, $"{fileName} must select direct mode explicitly.");
             Assert.True(open >= 0, $"{fileName} must open exactly one handle.");
@@ -297,7 +310,7 @@ public sealed class VendorApiBaselineBoundaryTests
     // ------------------------------------------------------------------------------ the registry
 
     [Fact]
-    public void The_Registry_Carries_The_Five_Statuses_And_Defaults_To_Not_Reviewed()
+    public void The_Registry_Carries_All_Statuses_And_Defaults_To_Not_Reviewed()
     {
         var document = Baseline();
 
@@ -471,14 +484,14 @@ public sealed class VendorApiBaselineBoundaryTests
         var document = Baseline();
         var punchlist = Section(
             document,
-            "### K.5 Documentation punchlist",
+            "### K.6 Historical B2 documentation punchlist (outside this Stop-only scope)",
             "## L. Validation position");
 
         Assert.Contains("MotionObservedState.cs", punchlist, StringComparison.Ordinal);
         Assert.Contains("InterpretationState", punchlist, StringComparison.Ordinal);
         Assert.Contains("Unavailable", punchlist, StringComparison.Ordinal);
-        Assert.Contains("**not** made in this pass", punchlist, StringComparison.Ordinal);
-        Assert.Contains("PR #32", punchlist, StringComparison.Ordinal);
+        Assert.Contains("Correcting them is outside this scope", punchlist, StringComparison.Ordinal);
+        Assert.Contains("remains accurate", punchlist, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -557,9 +570,10 @@ public sealed class VendorApiBaselineBoundaryTests
     // --------------------------------------------------------------------------------- C1 and gate
 
     [Fact]
-    public void Every_C1_Candidate_Is_Registered_As_Blocked_And_Has_No_Executable_Form()
+    public void Only_The_Scoped_A_B_Stop_Foundation_Is_Software_Authorized_Other_Candidates_Stay_Blocked()
     {
-        var lines = Baseline().Split('\n');
+        var document = Baseline();
+        var lines = document.Split('\n');
 
         foreach (var candidate in C1Candidates)
         {
@@ -570,8 +584,17 @@ public sealed class VendorApiBaselineBoundaryTests
             Assert.Contains("BLOCKED_PENDING_VENDOR_EVIDENCE", row, StringComparison.Ordinal);
         }
 
-        var plan = ReadRepositoryFile("adapters/motion-library/MotionObservationCommandPlan.cs");
-        Assert.Contains("private static readonly ReadOnlyDictionary<MotionObservationIntent, string> RequestTemplates", plan, StringComparison.Ordinal);
+        var scopedStop = Section(
+            document,
+            "**Scoped C1 Stop-only software foundation",
+            "**Other C1 candidates and expanded forms");
+        Assert.Contains("OWNER_AUTHORIZED_SOFTWARE_ONLY", scopedStop, StringComparison.Ordinal);
+        Assert.Contains("Axis A (Horizontal)", scopedStop, StringComparison.Ordinal);
+        Assert.Contains("Axis B (Vertical)", scopedStop, StringComparison.Ordinal);
+        Assert.Contains("No Controller acceptance or physical stop is claimed", scopedStop, StringComparison.Ordinal);
+
+        var observationPlan = ReadRepositoryFile("adapters/motion-library/MotionObservationCommandPlan.cs");
+        Assert.Contains("private static readonly ReadOnlyDictionary<MotionObservationIntent, string> RequestTemplates", observationPlan, StringComparison.Ordinal);
         Assert.Equal(16, MotionObservationCommandPlan.Templates.Count);
         Assert.Equal(16, MotionObservationCommandPlan.Intents.Count);
 
@@ -579,6 +602,11 @@ public sealed class VendorApiBaselineBoundaryTests
         {
             Assert.Matches(@"^(MG _TS[A-D]|TP [A-D]|RP [A-D]|MG @OUT\[[1-4]\])$", template);
         }
+
+        var stopPlan = ReadRepositoryFile("adapters/motion-library/MotionStopCommandPlan.cs");
+        Assert.Equal(2, Regex.Count(stopPlan, "template = \"ST [AB]\";", RegexOptions.CultureInvariant));
+        Assert.Contains("case MotionStopAxis.A:", stopPlan, StringComparison.Ordinal);
+        Assert.Contains("case MotionStopAxis.B:", stopPlan, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -638,12 +666,15 @@ public sealed class VendorApiBaselineBoundaryTests
     }
 
     [Fact]
-    public void The_Baseline_Declares_PR32_As_The_C1_Successor_And_Not_Implemented()
+    public void The_Baseline_Distinguishes_PR32_Stop_Only_From_B2_To_Application_C1()
     {
         var document = Baseline();
 
-        Assert.Contains("## K. PR #32 — C1 successor boundary (documented, NOT IMPLEMENTED)", document, StringComparison.Ordinal);
-        Assert.Contains("**NOT IMPLEMENTED.**", document, StringComparison.Ordinal);
-        Assert.Contains("MotionCommandGate.IsClosed` remains `true`", document, StringComparison.Ordinal);
+        Assert.Contains("## K. C1 scopes and authorization boundaries", document, StringComparison.Ordinal);
+        Assert.Contains("PR #32 separately merged the narrowly scoped **C1 Stop-only software foundation**", document, StringComparison.Ordinal);
+        Assert.Contains("That contract remains **NOT IMPLEMENTED**", document, StringComparison.Ordinal);
+        Assert.Contains("### K.4 Separate Owner Scope Gate for the actual trial", document, StringComparison.Ordinal);
+        Assert.Contains("MotionCommandGate.IsClosed == true", document, StringComparison.Ordinal);
+        Assert.Contains("made no Controller contact, no hardware execution and no real Stop dispatch", document, StringComparison.Ordinal);
     }
 }

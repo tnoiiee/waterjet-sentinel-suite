@@ -18,8 +18,10 @@ internal sealed class MotionStopCloseOutcome
 }
 
 /// <summary>
-/// The single controller owner of the C1 Stop path. It holds one Stop session, one dispatch
-/// boundary, one controller handle and one module, and it is the only type that closes them.
+/// The single controller owner of a C1 Stop operation. It holds one Stop session, one dispatch
+/// boundary, one controller handle and the primary module; it alone closes that handle and
+/// releases that primary module. The isolated trial releases the approved companion module only
+/// after this owner has completed its close sequence.
 ///
 /// Close order is the safety property:
 ///   1. invalidate the Stop session and its dispatch boundary (no native call);
@@ -29,8 +31,9 @@ internal sealed class MotionStopCloseOutcome
 /// Module release is attempted even when the handle close fails, so a failed close never keeps a
 /// module loaded.
 ///
-/// This type performs no open, no connection and no discovery. It is handed an already-open handle
-/// by its caller. In this pass nothing in the repository constructs it outside the focused tests.
+/// This type performs no open, connection or discovery. It is handed an already-open handle by
+/// the isolated Owner-invoked trial composition; focused tests use fake kernels. The B2 observation
+/// path does not construct or invoke this C1 Stop owner.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
 /// </summary>

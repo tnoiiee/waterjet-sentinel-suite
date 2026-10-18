@@ -80,8 +80,8 @@ internal interface IStopDispatchKernel : IDisposable
 ///
 /// Export resolution is NOT performed here. The lifecycle owner resolves the export through the
 /// existing approved seam (<see cref="MotionControllerCommandApi.ResolveCommandExport"/>) and passes
-/// the pointer in. This file therefore never names the native export token, so the B2 carrier
-/// exception stays closed to <c>MotionControllerCommandKernel.cs</c> and no second file can name it.
+/// the pointer in. This file therefore never names the native export token; its sole source
+/// occurrence remains in <c>MotionControllerCommandKernel.cs</c> for both separate typed boundaries.
 ///
 /// Invalidation takes the same lock as a dispatch. A call that is already in flight therefore
 /// completes before invalidation returns, and no call can begin after invalidation. Invalidation

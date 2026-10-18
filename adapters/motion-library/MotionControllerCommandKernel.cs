@@ -3,46 +3,37 @@ using System.Runtime.InteropServices;
 namespace Wjss.Adapters.MotionLibrary;
 
 /// <summary>
-/// The B2 private read boundary: the ONE approved native command-and-response export, resolved
-/// through the already-authorized kernel seam, and the ONE bound kernel that can invoke it.
+/// The shared, restricted carrier for the one approved native command-and-response export.
+/// B2 uses it only through its fixed read-only observation boundary. The separate C1 Stop-only
+/// composition uses the same approved export through its own closed typed plan and dispatch
+/// boundary; it does not enter the B2 read kernel.
 ///
-/// Authority. The B1 identity surface is unchanged and still resolves exactly six typed identity
-/// exports with no raw command of any kind. The separately authorized B2 read boundary adds
-/// exactly one further export for exactly one purpose: issuing one of the sixteen fixed
-/// read-only request literals of <see cref="MotionObservationCommandPlan"/> and returning its
-/// bounded response. The export is a general command-and-response entry point in the vendor
-/// library, so the boundary is made safe by construction rather than by trusting the caller:
+/// Authority. B1 identity remains six typed identity exports with no raw command. B2 issues only
+/// the fixed read-only intents in <see cref="MotionObservationCommandPlan"/>. C1 Stop accepts
+/// only its closed A/B axis domain and maps it to the two already-owned Stop templates. Both
+/// command-capable paths are typed, internal, fixed-plan boundaries: no public member, route,
+/// contract, UI, input string, reflection, dynamic invocation, unmanaged callback or second loader
+/// can supply arbitrary command text. The vendor export is general-purpose, so safety comes from
+/// the two separate closed plans and owners, not from trusting a caller.
 ///
-///   - the only public entry is a typed intent, and the request text is looked up from an
-///     immutable literal table inside this assembly;
-///   - this class is internal, has an internal constructor and is never exposed by a public
-///     member, a route, a contract, a UI or an outcome;
-///   - the request is length-bounded before the call, the response buffer is a fixed size, and
-///     the reply must be one terminated printable numeric token;
-///   - no write, stop, jog, brake, home, define, move, auto, program-array or output-mutation
-///     mnemonic exists in the literal table, so no such request can be formed at all;
-///   - no reflection, no dynamic invocation, no unmanaged callback and no second loader exist on
-///     this path.
-///
-/// Lifecycle. This kernel owns NOTHING it could release: it holds the controller handle the
-/// owner already opened and the export pointer the owner already resolved, and its
-/// <see cref="Dispose"/> performs no native call. The owner closes the controller handle and
-/// releases the module afterwards; because this kernel refuses every later call once
-/// invalidated, an ordering mistake cannot turn into a post-close native call. That is the whole
-/// cleanup truth of the B2 layer, and it is stated as such in the evidence baseline.
+/// Lifecycle. The B2 read kernel and C1 Stop carrier own NOTHING they could release: each holds
+/// only a controller handle and export pointer already resolved by its respective lifecycle owner.
+/// Their invalidation performs no native call, and each owner closes its handle and releases its
+/// module only after invalidation. These separate cleanup orders are pinned by focused tests.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
 /// </summary>
 internal static class MotionControllerCommandApi
 {
     /// <summary>
-    /// The single approved B2 native export name, taken verbatim from the installed-header
-    /// evidence. The vendor declaration takes the handle, the request text, the response buffer
-    /// and the response length as a pointer-sized unsigned value, and the vendor documentation
-    /// states that the call issues the request to the controller and provides the response.
+    /// The single approved native command-and-response export name, shared by the separate B2
+    /// fixed read boundary and C1 typed Stop boundary. The vendor declaration takes the handle,
+    /// request text, response buffer and pointer-sized response length; the vendor documentation
+    /// says the call issues the request to the Controller and provides the response.
     ///
-    /// This constant is the only occurrence of the name in the repository, and the
-    /// source-boundary tests pin that fact with an exact-path, exact-token exception.
+    /// This constant is the only source occurrence of the native export name, and source-boundary
+    /// tests pin that fact with an exact-path, exact-token exception. Neither boundary accepts
+    /// caller-supplied request text.
     /// </summary>
     internal const string CommandExportName = "gclib_command";
 

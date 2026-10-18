@@ -3,15 +3,15 @@ namespace Wjss.Adapters.MotionLibrary;
 /// <summary>
 /// The canonical vocabulary of the native load / version probe software gate.
 ///
-/// This adapter is a minimal, vendor-neutral, fail-closed boundary that PROVES an Owner-installed
-/// motion communication library can be loaded from an approved Owner-local directory and reports
-/// the library's own version. This Gate authorizes library inspection and loading ONLY. It does
-/// not authorize a controller endpoint, controller discovery, a controller connection, a
-/// controller read or any motion command, and nothing in this adapter can perform one: the only
-/// native export the boundary is allowed to resolve is
+/// This adapter contains a minimal, vendor-neutral, fail-closed Gate A boundary that PROVES an
+/// Owner-installed motion communication library can be loaded from an approved Owner-local
+/// directory and reports the library's own version. Gate A authorizes library inspection and
+/// loading ONLY. The probe surface itself does not resolve an endpoint or perform discovery,
+/// Controller connection, reads or motion: its only native export is
 /// <see cref="MotionLibraryProbeVocabulary.AuthorizedExportName"/>, a library-local version query
-/// that takes a caller-supplied output buffer, requires no controller handle, opens no controller
-/// connection and contacts no endpoint.
+/// that requires no Controller handle, opens no connection and contacts no endpoint. Separate
+/// B1, B2 and C1 Stop compositions remain independently scoped; passing Gate A alone authorizes
+/// none of them.
 ///
 /// Public-repository boundary: this file commits SHAPE ONLY. The commits here are environment
 /// variable NAMES, the two approved module FILE NAMES, the single authorized export NAME and the
