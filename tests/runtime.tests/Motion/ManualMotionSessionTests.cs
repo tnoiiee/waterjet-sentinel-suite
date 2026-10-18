@@ -398,6 +398,10 @@ public sealed class ManualMotionSessionTests
         harness.OpenAndObserve();
 
         harness.Session.RequestJogStart(ManualMotionAxis.A, ManualMotionJogDirection.Positive, 13);
+
+        // A queued request is not active until a Step applies it; wait for Running so the loop
+        // below cannot exit vacuously on the pre-request idle snapshot.
+        harness.DriveUntil(snapshot => snapshot.ActiveOperation?.Phase == ManualMotionOperationPhase.Running);
         for (var index = 0; index < 300 && harness.Snapshot.ActiveOperation is not null; index++)
         {
             harness.Session.RequestJogHeartbeat(ManualMotionAxis.A, 13);
@@ -482,6 +486,9 @@ public sealed class ManualMotionSessionTests
         harness.OpenAndObserve();
 
         harness.Session.RequestHome(ManualMotionAxis.B);
+
+        // Wait until the queued Home has actually begun; ActiveOperation is already null before it.
+        harness.DriveUntil(snapshot => snapshot.ActiveOperation?.Phase == ManualMotionOperationPhase.Running);
         harness.DriveUntil(snapshot => snapshot.ActiveOperation is null, maximumSteps: 900, millisecondsPerStep: 100);
 
         var axis = harness.Axis(ManualMotionAxis.B);
