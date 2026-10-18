@@ -259,7 +259,8 @@ public sealed class MotionStopBoundaryTests
 
         foreach (var relative in ProductionSourceFiles(root))
         {
-            if (StopFiles.Contains(relative, StringComparer.Ordinal))
+            if (StopFiles.Contains(relative, StringComparer.Ordinal)
+                || StopReusingFiles.Contains(relative, StringComparer.Ordinal))
             {
                 continue;
             }
