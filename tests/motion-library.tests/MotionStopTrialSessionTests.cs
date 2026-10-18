@@ -382,7 +382,7 @@ public sealed class MotionStopTrialSessionTests
     {
         var kernel = new FakeControllerKernel();
         var dispatch = new FakeStopDispatchKernel(kernel);
-        var session = CreateSession((MotionStopAxis)2, kernel, dispatch);
+        var session = CreateSession((MotionStopAxis)3, kernel, dispatch);
 
         var outcome = session.Run();
 

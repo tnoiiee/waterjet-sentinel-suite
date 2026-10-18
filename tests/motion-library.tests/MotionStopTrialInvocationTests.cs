@@ -140,14 +140,14 @@ public sealed class MotionStopTrialInvocationTests
     }
 
     [Theory]
-    [InlineData("A", MotionStopAxis.A)]
-    [InlineData("B", MotionStopAxis.B)]
-    public void Exact_Axis_Tokens_Map_To_The_Closed_Stop_Enum(string token, MotionStopAxis expected)
+    [InlineData("A")]
+    [InlineData("B")]
+    public void Exact_Axis_Tokens_Map_To_The_Closed_Stop_Enum(string token)
     {
         Assert.True(MotionStopTrialInvocation.TryParseInvocation(
             new[] { MotionStopTrialVocabulary.ModeToken, token },
             out var axis));
-        Assert.Equal(expected, axis);
+        Assert.Equal(token == "A" ? MotionStopAxis.A : MotionStopAxis.B, axis);
     }
 
     [Fact]
