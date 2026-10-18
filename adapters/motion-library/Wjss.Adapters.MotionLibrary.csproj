@@ -12,7 +12,10 @@
     Wjss.MotionStopTrial executable is the only production composition that opens a handle
     for that Stop trial. The Stop path reuses only the approved direct/open/close lifecycle
     and fixed command export; it adds no raw-command, discovery, identity-read, or other
-    motion entry point.
+    motion entry point. PR #34 adds the closed typed Manual Motion Commissioning plan, its
+    carrier and one long-lived WSB1 controller owner that reuses the same restricted
+    lifecycle, the B2 read boundary and the typed A/B Stop session; the isolated
+    Wjss.MotionCommissioning application is its only production composition.
 
     Boundary: self-owned (mirroring adapters/tc-acquisition); no Contracts/Domain
     reference and no package reference of any kind (operating-system loading primitives
@@ -40,6 +43,10 @@
          exercised without any real native module. -->
     <InternalsVisibleTo Include="Wjss.MotionLibrary.Tests" />
     <InternalsVisibleTo Include="Wjss.MotionStopTrial" />
+    <!-- PR #34: the isolated Owner-local Manual Motion Commissioning application (WSB1 A/B). It
+         composes the internal controller owner, the closed commissioning plan and the existing
+         typed Stop session; it is not Runtime/API/Kiosk/Preview/Production composition. -->
+    <InternalsVisibleTo Include="Wjss.MotionCommissioning" />
   </ItemGroup>
 
 </Project>

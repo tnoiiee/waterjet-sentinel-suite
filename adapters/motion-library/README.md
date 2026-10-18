@@ -1,14 +1,16 @@
-# WJSS Motion Library Adapter — Native Library Boundary (Gate A + B1 + B2 + C1 Stop-only)
+# WJSS Motion Library Adapter — Native Library Boundary (Gate A + B1 + B2 + C1 Stop-only + Manual Motion Commissioning)
 
 **Surfaces:** Native Load / Version Probe Software Gate (Gate A), B1 one-controller identity,
-B2 read-only observed state, and the separate C1 Stop-only foundation merged in PR #32. The
-adapter carries four strictly separated surfaces: Gate A library inspection/loading only; B1
-identity with one direct connection attempt and three typed reads; B2's fixed read-only observation
-boundary; and the internal C1 A/B Stop plan and owner. The only production composition that opens
-for C1 Stop is the isolated `apps/motion-stop-trial` console harness, gated by exact invocation,
-Owner-local consent, endpoint validation, and Gate A proof. It is not Runtime/API/Kiosk/Preview
-composition, and it does not open the application Motion gate. **Validation:** SOURCE-AUTHORED IN
-ARENA; NOT COMPILED IN ARENA — the Owner-local .NET build is the validation of record; no native
+B2 read-only observed state, the separate C1 Stop-only foundation merged in PR #32, and the
+WSB1 Manual Motion Commissioning foundation proposed in PR #34. The adapter carries strictly
+separated surfaces: Gate A library inspection/loading only; B1 identity with one direct connection
+attempt and three typed reads; B2's fixed read-only observation boundary; the internal C1 A/B Stop
+plan and owner; and an internal, Owner-invoked manual-motion owner for WSB1 Axis A (Horizontal)
+and Axis B (Vertical) only. The only production composition that opens for C1 Stop is the isolated
+`apps/motion-stop-trial` console harness. The only production composition for the manual-motion
+surface is the isolated `apps/motion-commissioning` application. Neither is Runtime/API/Kiosk/
+Preview composition, and neither opens the application Motion gate. **Validation:** SOURCE-AUTHORED
+IN ARENA; NOT COMPILED IN ARENA — the Owner-local .NET build is the validation of record; no native
 DLL was loaded and no Controller was contacted here.
 
 ## What this adapter is
@@ -74,7 +76,12 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
 | `MotionStopTrialInvocation.cs` | Isolated harness entry: exact two-argument mode/A-or-B parser, one-use consent consumption, and fail-closed endpoint/native-configuration gates. |
 | `MotionStopTrialSession.cs` | One-shot C1 trial lifecycle: Gate A, restricted module/path proof, approved export resolution, one direct-mode selection, one open, one typed Stop owner/session, invalidate-close-unload cleanup. |
 | `MotionStopTrialOutcome.cs` | Fixed, redacted trial vocabulary and lifecycle flags. It cannot claim Stop confirmation. |
-| `Wjss.Adapters.MotionLibrary.csproj` | Grants the isolated harness friend-assembly access to this adapter's internal boundary; it adds no package or dependency. |
+| `ManualMotionCommandPlan.cs` | Manual-motion plan (internal): the closed WSB1 A/B axis and brake-output domains and the bounded typed templates for brake output, Jog, Begin, Home velocity/search, position/dual-zero definition, and absolute Move setup/target. There is no caller text, relative target, drive enable/disable, output-bank write, or Stop template. |
+| `ManualMotionCommandKernel.cs` | Manual-motion native carrier (internal): at most one guarded dispatch for one typed plan item against an already-open handle and already-resolved approved export. Invalidation makes no native call. |
+| `ManualMotionControllerOutcome.cs` | Manual-motion redacted outcome and consent vocabulary, the closed A/B read targets, and generation-bearing dispatch/read results. Outcomes carry codes only and cannot claim Stop confirmation. |
+| `ManualMotionControllerInvocation.cs` | Fail-closed Owner-local invocation gate: one-use exact consent consumption, then existing Gate A and endpoint configuration resolution. It does not load or open a Controller. |
+| `ManualMotionControllerOwner.cs` | One long-lived WSB1 session owner: Gate A proof, restricted companion/primary load and path proof, approved export resolution, one direct-mode selection, one open, controller-wide native-call serialization, generation fencing, reuse of the existing typed A/B Stop session, and invalidate → close → primary/companion release cleanup. |
+| `Wjss.Adapters.MotionLibrary.csproj` | Grants the isolated harnesses friend-assembly access to this adapter's internal boundaries; it adds no package or dependency. |
 | `apps/motion-stop-trial/Program.cs` | Console-only invocation and explicit redacted JSON projection. |
 | `apps/motion-stop-trial/Wjss.MotionStopTrial.csproj` | Isolated executable project; its only project reference is this adapter. |
 
@@ -93,6 +100,32 @@ tests pin both allow-lists exactly. Both surfaces reuse the one restricted loade
   Stop trial. It was not executed in Arena; no native DLL was loaded and no endpoint or Controller
   was contacted. Focused tests use recording fakes only. No Runtime, API, Kiosk, Operations Preview or
   Production-composition path reaches this code.
+
+## Manual Motion Commissioning foundation, WSB1 A/B only (PR #34; software capability, not hardware authorization)
+
+- The internal plan is closed to Axis A (Horizontal), Axis B (Vertical), brake output 1 for A and
+  brake output 2 for B. It can express only the approved bounded command shapes used by the
+  Application session: individual brake-output set/clear, signed Jog speed, Begin, Home speed,
+  Home search, position-zero definition, dual-zero definition, acceleration, speed, deceleration,
+  and an absolute target. The existing typed Stop session remains the only Stop path.
+- It cannot express Servo/drive enable or disable writes, a relative-position target, an output-bank
+  write, a burn/save operation, soft-limit writes, a Controller program, another cabinet, Axis C/D,
+  simultaneous axes, raw caller text, or an arbitrary template.
+- The owner permits one open for one long-lived session. A second open is refused; native work is
+  serialized behind one controller gate; results from an earlier generation are rejected; and a
+  communications fault never causes an automatic retry or a new connection.
+- Reads use the already approved typed observation boundary, restricted to the status, TP/RP and
+  brake-output observations for A/B. Raw values stay separate from Application interpretation.
+  Unexpected, rejected, stale or out-of-range replies become codes without a fabricated value.
+- The owner observes drive readiness only through the Application profile's status-bit
+  interpretation. It writes no drive-readiness command.
+- Cleanup is one deterministic sequence: invalidate the read, Stop and manual-motion boundaries;
+  close the handle; then release the primary module and companion module. A repeated close returns
+  the first measured outcome and makes no second native lifetime attempt.
+- This foundation was source-authored and statically scanned in the sandbox only. It was not
+  compiled or executed there, no vendor module was loaded, and no Controller or endpoint was
+  contacted. Owner-local exact-head validation and a separate post-merge hardware Scope Gate are
+  still required before using `apps/motion-commissioning` in hardware-capable mode.
 
 ## Owner-local configuration (environment only; values never committed)
 
@@ -113,6 +146,14 @@ confirmation, not a credential or reusable authorization service. It is checked 
 the trial process before configuration resolution; the Owner must also unset it in the invoking
 shell after the run. Neither the endpoint nor the supplied consent value is committed, echoed,
 logged or included in evidence.
+
+The isolated Manual Motion Commissioning application has a separate exact-match consent variable,
+`WJSS_MANUAL_MOTION_CONSENT`, plus `WJSS_MANUAL_MOTION_PROFILE`, which names a fully qualified
+Owner-local profile file outside the repository. The application consumes the process consent
+before resolving the existing endpoint and Gate A configuration; unset it in the invoking shell
+afterward. The profile path and values, endpoint and consent are never committed or displayed.
+See `docs/MANUAL_MOTION_COMMISSIONING_RUNBOOK.md` for the software-validation sequence and the
+separate hardware authorization boundary.
 
 ## B1 identity surface (one-controller first-contact software foundation)
 

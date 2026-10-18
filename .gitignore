@@ -500,6 +500,17 @@ apps/motion-observation/**/*.obj
 apps/motion-observation/**/*.h
 apps/motion-observation/**/*.hpp
 apps/motion-observation/**/*.pdb
+apps/motion-commissioning/**/*.dll
+apps/motion-commissioning/**/*.lib
+apps/motion-commissioning/**/*.exp
+apps/motion-commissioning/**/*.obj
+apps/motion-commissioning/**/*.h
+apps/motion-commissioning/**/*.hpp
+apps/motion-commissioning/**/*.pdb
+
+# Owner-local Manual Motion Commissioning profiles (PR #34). The profile carries Owner-local
+# commissioning values and is kept OUTSIDE the repository; this rule is a safety net only.
+**/*.wjss-manual-motion-profile.json
 
 # ---------------------------------------------------------------------------
 # WJSS amendment (Stage 0.3A-1, Owner-approved gate section 6):

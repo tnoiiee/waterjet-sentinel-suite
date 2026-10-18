@@ -13,6 +13,44 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-18 — Integrated WSB1 Manual Motion Commissioning vertical slice (software only; no hardware authorization)
+
+**Status: SOURCE-AUTHORED ON THE SESSION BRANCH FOR PR #34; .NET RESTORE/BUILD/TEST AND LOCK
+GENERATION NOT RUN (no .NET SDK in the Agent sandbox); NO NATIVE DLL LOAD, ENDPOINT CONNECTION,
+CONTROLLER COMMAND OR HARDWARE CONTACT.** This checkpoint adds a commissioning software capability
+only. It does not commission WSB1 or either axis and does not authorize the hardware-capable mode.
+
+**Addition.** Added one isolated vertical slice for WSB1 Axis A (Horizontal, brake output 1) and
+Axis B (Vertical, brake output 2): a pure Application manual-motion session and strict Owner-local
+profile; deterministic simulated port; internal bounded motion-library command plans and one
+long-lived serialized Controller owner reusing the existing typed A/B Stop path; and the isolated
+`apps/motion-commissioning` Windows application. The typed surface covers individual brake
+release/apply, hold-to-run Jog, per-axis Stop, Home, DP define zero, DE define dual zero, bounded
+absolute Move, raw observed-state projection and a redacted codes-only log. It has no raw-command
+entry, drive-readiness write, relative move, output-bank write, simultaneous-axis operation,
+automatic sequence, retry/reconnect/replay/discovery or Runtime/API/Kiosk/Preview composition.
+`StopConfirmed` remains false.
+
+**Profile and evidence.** Real commissioning values remain Owner-local JSON outside Git; absent or
+`null` values remain `NOT_CONFIGURED`, axes remain `NOT_COMMISSIONED`, and electrical/status
+interpretations remain `UNCONFIRMED`. No Legacy numeric value, delay, coordinate or decode was
+promoted. Added the commissioning runbook and a continuity record that references, without
+rewriting, the existing Legacy and vendor API evidence baselines.
+
+**Tests authored, not run in the sandbox.** Added profile, Application-session and simulated-port
+tests plus adapter plan, owner/invocation/serialization and source-boundary tests. One existing
+Stop inventory test gained a narrowly scoped exception for the single new owner file that reuses
+the typed Stop session; the plan itself contains no Stop template. The new project's genuine
+`packages.lock.json` was not generated and must come only from Owner-local `dotnet restore` on the
+exact head. Hardware-capable use still requires separate post-merge Owner Scope Gate authorization.
+
+**Validation actually run in the Agent sandbox.** `node tools/boundary-scan/boundary-scan.mjs .`
+returned **0 findings (S1-S9 clean)**; `git diff --check` completed cleanly; and Python stdlib
+checks parsed the changed project XML, resolved the new application's two project references,
+verified 22 solution project entries with unique GUIDs, resolved relative links in the changed
+Markdown, and confirmed LF/final-newline/no-trailing-whitespace hygiene across the changed file
+set. No .NET PASS is claimed.
+
 ### 2026-10-18 — Isolated C1 Stop trial software foundation (Owner-invoked; no hardware authorization)
 
 **Status: SOURCE-AUTHORED ON THE SESSION BRANCH; .NET RESTORE/BUILD/TEST NOT RUN (no SDK in Arena);
