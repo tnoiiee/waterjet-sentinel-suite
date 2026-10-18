@@ -506,7 +506,7 @@ public sealed class ManualMotionControllerOwnerTests
     }
 
     [Fact]
-    public void Native_Calls_Are_Serialized_Controller_Wide()
+    public async Task Native_Calls_Are_Serialized_Controller_Wide()
     {
         var rig = new OwnerRig();
         Assert.True(rig.Owner.Open().Opened);

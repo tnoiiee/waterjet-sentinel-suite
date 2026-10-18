@@ -28,11 +28,18 @@ public sealed class ManualMotionCommandPlanTests
     }
 
     [Theory]
-    [InlineData(ManualMotionPlanAxis.A, 1)]
-    [InlineData(ManualMotionPlanAxis.B, 2)]
-    public void Brake_Output_Allocation_Is_The_Owner_Confirmed_Mapping(ManualMotionPlanAxis axis, int output)
+    [InlineData("A", 1)]
+    [InlineData("B", 2)]
+    public void Brake_Output_Allocation_Is_The_Owner_Confirmed_Mapping(string axis, int output)
     {
-        Assert.Equal(output, (int)ManualMotionCommandPlan.BrakeOutputOf(axis));
+        var planAxis = axis switch
+        {
+            "A" => ManualMotionPlanAxis.A,
+            "B" => ManualMotionPlanAxis.B,
+            _ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
+        };
+
+        Assert.Equal(output, (int)ManualMotionCommandPlan.BrakeOutputOf(planAxis));
     }
 
     [Fact]

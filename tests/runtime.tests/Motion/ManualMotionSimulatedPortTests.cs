@@ -23,7 +23,7 @@ public sealed class ManualMotionSimulatedPortTests
     {
         var result = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
         Assert.True(result.Succeeded);
-        return result.RawValue;
+        return result.Value;
     }
 
     private static ManualMotionProfile ClearOutputProfile()
@@ -80,7 +80,11 @@ public sealed class ManualMotionSimulatedPortTests
         Assert.Equal(ManualMotionSimulatedPort.CodeOpenAlreadyPerformed, secondOpen.Code);
         Assert.Equal(2, port.OpenCount);
 
-        Assert.True(port.Close().Attempted);
+        var closed = port.Close();
+        Assert.True(closed.BoundariesInvalidated);
+        Assert.True(closed.HandleClosed);
+        Assert.True(closed.ModulesReleased);
+        Assert.Equal(1, port.CloseCount);
         var afterClose = port.Execute(Command(ManualMotionPortCommandKind.Stop));
         Assert.False(afterClose.Accepted);
         Assert.Equal(ManualMotionSimulatedPort.CodeNotOpen, afterClose.Code);
@@ -114,7 +118,7 @@ public sealed class ManualMotionSimulatedPortTests
         // freshly opened port must already report the applied state, never a released brake.
         var brakeOutput = port.Read(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.A, 1));
         Assert.True(brakeOutput.Succeeded);
-        Assert.Equal(1m, brakeOutput.RawValue);
+        Assert.Equal(1m, brakeOutput.Value);
 
         port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, operand: 2000));
         port.Execute(Command(ManualMotionPortCommandKind.Begin));
@@ -172,7 +176,7 @@ public sealed class ManualMotionSimulatedPortTests
         clock.Advance(TimeSpan.FromSeconds(6));
         var status = port.Read(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.B, 0));
         Assert.True(status.Succeeded);
-        var homeBit = ((long)status.RawValue >> 3) & 1;
+        var homeBit = ((long)status.Value >> 3) & 1;
         Assert.Equal(1, homeBit);
     }
 
@@ -205,7 +209,7 @@ public sealed class ManualMotionSimulatedPortTests
         refusing.Open();
         var refused = refusing.Execute(Command(ManualMotionPortCommandKind.Begin));
         Assert.False(refused.Accepted);
-        Assert.False(refused.CommunicationFault);
+        Assert.False(refused.Fault);
         Assert.Equal(ManualMotionSimulatedPort.CodeRefused, refused.Code);
 
         var faulting = new ManualMotionSimulatedPort(
@@ -215,7 +219,7 @@ public sealed class ManualMotionSimulatedPortTests
         faulting.Open();
         var faulted = faulting.Execute(Command(ManualMotionPortCommandKind.Begin));
         Assert.False(faulted.Accepted);
-        Assert.True(faulted.CommunicationFault);
+        Assert.True(faulted.Fault);
         Assert.Equal(ManualMotionSimulatedPort.CodeFault, faulted.Code);
     }
 
@@ -230,8 +234,8 @@ public sealed class ManualMotionSimulatedPortTests
         Assert.True(faulting.Read(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.A, 0)).Succeeded);
         var faulted = faulting.Read(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.A, 0));
         Assert.False(faulted.Succeeded);
-        Assert.True(faulted.CommunicationFault);
-        Assert.Equal(0m, faulted.RawValue);
+        Assert.True(faulted.Fault);
+        Assert.Equal(0m, faulted.Value);
 
         var invalidating = new ManualMotionSimulatedPort(
             new TestClock(Instant),
@@ -240,7 +244,7 @@ public sealed class ManualMotionSimulatedPortTests
         var opened = invalidating.Open();
         Assert.True(opened.Opened);
         var read = invalidating.Read(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.A, 0));
-        Assert.NotEqual(opened.Generation, read.Generation);
+        Assert.NotEqual(opened.PortGeneration, read.PortGeneration);
     }
 
     [Fact]
