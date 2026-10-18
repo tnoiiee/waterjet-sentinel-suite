@@ -45,6 +45,12 @@ internal static class MotionStopTrialVocabulary
 /// </summary>
 internal sealed class MotionStopTrialOutcome
 {
+    private MotionStopTrialOutcome()
+    {
+        // Confirmation is not observed in this scope and is never inferred from dispatch.
+        StopConfirmed = false;
+    }
+
     internal string PreconditionCode { get; set; } = MotionStopTrialVocabulary.PreconditionRefused;
     internal string RefusalCode { get; set; } = string.Empty;
     internal string ConsentCode { get; set; } = MotionStopTrialVocabulary.NotEvaluated;
@@ -57,7 +63,7 @@ internal sealed class MotionStopTrialOutcome
     internal string StopCode { get; set; } = MotionStopTrialVocabulary.StopNotDispatched;
     internal bool NativeDispatchAttempted { get; set; }
     internal bool StopDispatched { get; set; }
-    internal bool StopConfirmed => false;
+    internal bool StopConfirmed { get; }
     internal string CleanupCode { get; set; } = MotionStopTrialVocabulary.CleanupComplete;
     internal string CleanupFailureCode { get; set; } = string.Empty;
     internal bool StopSessionInvalidated { get; set; } = true;

@@ -261,7 +261,13 @@ public sealed class MotionStopTrialBoundaryTests
     {
         var outcome = ReadRepositoryFile(VocabularySource);
 
-        Assert.Contains("internal bool StopConfirmed => false;", outcome, StringComparison.Ordinal);
+        Assert.Contains("private MotionStopTrialOutcome()", outcome, StringComparison.Ordinal);
+        Assert.Contains("StopConfirmed = false;", outcome, StringComparison.Ordinal);
+        Assert.Contains("internal bool StopConfirmed { get; }", outcome, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(outcome, "StopConfirmed ="));
+        Assert.DoesNotContain("StopConfirmed = true", outcome, StringComparison.Ordinal);
+        Assert.DoesNotContain("bool stopConfirmed", outcome, StringComparison.Ordinal);
+        Assert.DoesNotContain("StopConfirmed { get; set;", outcome, StringComparison.Ordinal);
         Assert.Contains("internal string CleanupFailureCode", outcome, StringComparison.Ordinal);
         Assert.DoesNotContain("public bool StopConfirmed", outcome, StringComparison.Ordinal);
         Assert.DoesNotContain("Safe => true", outcome, StringComparison.Ordinal);
