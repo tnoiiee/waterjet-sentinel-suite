@@ -33,7 +33,7 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
     private const int NotConfiguredRow = 13;
 
     private readonly Label[] _values = new Label[StateRowCount];
-    private readonly Label?[] _timestamps = new Label?[StateRowCount];
+    private readonly ManualMotionTimestampCell?[] _timestamps = new ManualMotionTimestampCell?[StateRowCount];
     private readonly Label?[] _details = new Label?[StateRowCount];
 
     internal ManualMotionAxisStateGrid()
@@ -103,7 +103,7 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
 
         if (HasTimestamp(row))
         {
-            var timestamp = CreateLabel(string.Empty, monospace: true);
+            var timestamp = CreateTimestampCell();
             Controls.Add(timestamp, 2, row);
             _timestamps[row] = timestamp;
         }
@@ -165,11 +165,11 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
 
     private void SetDetail(int row, string text) => SetText(_details[row], text);
 
-    private static void SetText(Label? label, string text)
+    private static void SetText(Control? control, string text)
     {
-        if (label is not null && !string.Equals(label.Text, text, StringComparison.Ordinal))
+        if (control is not null && !string.Equals(control.Text, text, StringComparison.Ordinal))
         {
-            label.Text = text;
+            control.Text = text;
         }
     }
 
@@ -201,6 +201,14 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
 
         return label;
     }
+
+    private static ManualMotionTimestampCell CreateTimestampCell() => new()
+    {
+        Dock = DockStyle.Fill,
+        Margin = new Padding(3, 0, 3, 0),
+        Padding = new Padding(2, 0, 2, 0),
+        Font = new Font("Consolas", 9F, FontStyle.Regular, GraphicsUnit.Point),
+    };
 
     private static string FieldText(int row) => row switch
     {

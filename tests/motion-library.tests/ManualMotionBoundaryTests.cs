@@ -39,6 +39,7 @@ public sealed class ManualMotionBoundaryTests
         "apps/motion-commissioning/ManualMotionForm.cs",
         "apps/motion-commissioning/ManualMotionProfileFile.cs",
         "apps/motion-commissioning/ManualMotionSessionRunner.cs",
+        "apps/motion-commissioning/ManualMotionTimestampCell.cs",
         "apps/motion-commissioning/MotionLibraryManualMotionPort.cs",
         "apps/motion-commissioning/Program.cs",
     };
@@ -73,6 +74,7 @@ public sealed class ManualMotionBoundaryTests
         "NO VALUE READ",
         "current",
         "STALE",
+        "HH:mm:ss.fff",
         "last read refused: ",
     };
 
