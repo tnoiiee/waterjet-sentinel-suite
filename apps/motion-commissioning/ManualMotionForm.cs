@@ -467,6 +467,18 @@ internal sealed class ManualMotionForm : Form
 
     private sealed record ActivePress(ManualMotionAxis Axis, long PressId);
 
+    /// <summary>
+    /// The ordinary Label used for a frequently updated Axis state panel, with background and text
+    /// painting completed in the double buffer before the completed frame is presented.
+    /// </summary>
+    private sealed class BufferedStateLabel : Label
+    {
+        internal BufferedStateLabel()
+        {
+            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+        }
+    }
+
     /// <summary>The controls of one axis panel. Not a control type itself, so it declares no designer-visible property.</summary>
     private sealed class AxisControls
     {
@@ -494,7 +506,7 @@ internal sealed class ManualMotionForm : Form
                 Width = 150,
                 ThousandsSeparator = false,
             };
-            State = new Label
+            State = new BufferedStateLabel
             {
                 Dock = DockStyle.Fill,
                 AutoSize = false,
