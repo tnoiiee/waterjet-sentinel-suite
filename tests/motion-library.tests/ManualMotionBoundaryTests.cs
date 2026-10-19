@@ -35,6 +35,7 @@ public sealed class ManualMotionBoundaryTests
 
     private static readonly string[] AppFiles =
     {
+        "apps/motion-commissioning/ManualMotionAxisStateGrid.cs",
         "apps/motion-commissioning/ManualMotionForm.cs",
         "apps/motion-commissioning/ManualMotionProfileFile.cs",
         "apps/motion-commissioning/ManualMotionSessionRunner.cs",
@@ -43,6 +44,37 @@ public sealed class ManualMotionBoundaryTests
     };
 
     private const string PlanFile = "adapters/motion-library/ManualMotionCommandPlan.cs";
+
+    private static readonly string[] ExpectedAxisStatePresentationText =
+    {
+        "Brake command",
+        "Brake output (raw)",
+        "Status word (raw)",
+        "Motion bit",
+        "Home input bit",
+        "Drive readiness",
+        "Position TP (raw)",
+        "Position RP (raw)",
+        "Home state",
+        "Coordinate (DP)",
+        "Dual zero (DE)",
+        "\"Stop\"",
+        "Last outcome",
+        "NOT_CONFIGURED",
+        "command state only; the physical brake is NOT confirmed",
+        "logical state, UNCONFIRMED (no wiring or polarity meaning)",
+        "native status bits",
+        "Owner-attested profile bit; not vendor- or hardware-verified",
+        "bit NOT_CONFIGURED",
+        "no drive or motor interpretation (UNCONFIRMED)",
+        "native units, label unresolved",
+        "effect UNVERIFIED",
+        "dispatch only; StopConfirmed = ",
+        "NO VALUE READ",
+        "current",
+        "STALE",
+        "last read refused: ",
+    };
 
     private static readonly string[] ExpectedStopTypeCarrierFiles =
     {
@@ -145,6 +177,17 @@ public sealed class ManualMotionBoundaryTests
         Assert.DoesNotContain("TextBox", form, StringComparison.Ordinal);
         Assert.DoesNotContain("RichTextBox", form, StringComparison.Ordinal);
         Assert.DoesNotContain("ComboBox", form, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Axis_State_Grid_Retains_Every_Field_And_Qualifying_Wording()
+    {
+        var grid = Read("apps/motion-commissioning/ManualMotionAxisStateGrid.cs");
+
+        foreach (var expected in ExpectedAxisStatePresentationText)
+        {
+            Assert.Contains(expected, grid, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

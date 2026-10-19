@@ -313,24 +313,7 @@ internal sealed class ManualMotionForm : Form
             ? controls.Title
             : string.Concat(controls.Title, "   (NOT ALLOWED BY PROFILE)");
 
-        var lines = new List<string>
-        {
-            Line("Brake command", string.Concat(axis.BrakeCommandState.ToString(), "  (command state only; the physical brake is NOT confirmed)")),
-            Line("Brake output (raw)", ObservationText(axis.BrakeOutput, "logical state, UNCONFIRMED (no wiring or polarity meaning)")),
-            Line("Status word (raw)", ObservationText(axis.StatusWord, "native status bits")),
-            Line("Motion bit", InterpretationText(axis.Motion, axis.InterpretationOwnerAttested)),
-            Line("Home input bit", InterpretationText(axis.HomeInput, axis.InterpretationOwnerAttested)),
-            Line("Drive readiness", "observation only: raw status word above; no drive or motor interpretation (UNCONFIRMED)"),
-            Line("Position TP (raw)", ObservationText(axis.PositionTp, "native units, label unresolved")),
-            Line("Position RP (raw)", ObservationText(axis.PositionRp, "native units, label unresolved")),
-            Line("Home state", axis.HomeState.ToString()),
-            Line("Coordinate (DP)", axis.CoordinateState.ToString()),
-            Line("Dual zero (DE)", string.Concat(axis.DualZeroState.ToString(), "  (effect UNVERIFIED)")),
-            Line("Stop", string.Concat(axis.StopState.ToString(), "  (dispatch only; StopConfirmed = ", axis.StopConfirmed ? "true" : "false", ")")),
-            Line("Last outcome", Dash(axis.LastOutcomeCode)),
-            Line("NOT_CONFIGURED", axis.NotConfigured.Count == 0 ? "none" : string.Join(", ", axis.NotConfigured)),
-        };
-        controls.State.Text = string.Join(Environment.NewLine, lines);
+        controls.StateGrid.Display(axis);
 
         var ready = snapshot.State == ManualMotionSessionState.Ready && !closing;
         var idle = snapshot.ActiveOperation is null;
@@ -426,58 +409,9 @@ internal sealed class ManualMotionForm : Form
             operation.StopRequested ? "   STOP REQUESTED" : string.Empty);
     }
 
-    private static string ObservationText(ManualMotionReadingSnapshot observation, string note)
-    {
-        var refusal = observation.LastRefusalCode.Length == 0
-            ? string.Empty
-            : string.Concat("  last read refused: ", observation.LastRefusalCode);
-        if (observation.Value is not decimal value)
-        {
-            return string.Concat("NO VALUE READ", refusal);
-        }
-
-        var at = observation.ObservedAt is DateTimeOffset observedAt
-            ? observedAt.ToLocalTime().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture)
-            : "-";
-        return string.Concat(
-            value.ToString(CultureInfo.InvariantCulture),
-            "  [",
-            observation.Fresh ? "current" : "STALE",
-            " @ ",
-            at,
-            "]  ",
-            note,
-            refusal);
-    }
-
-    private static string InterpretationText(ManualMotionInterpretation interpretation, bool ownerAttested)
-    {
-        var basis = ownerAttested ? "  (Owner-attested profile bit; not vendor- or hardware-verified)" : "  (bit NOT_CONFIGURED)";
-        return interpretation switch
-        {
-            ManualMotionInterpretation.Active => string.Concat("ACTIVE", basis),
-            ManualMotionInterpretation.Inactive => string.Concat("INACTIVE", basis),
-            _ => string.Concat("UNKNOWN (no current status read, or bit NOT_CONFIGURED)", basis),
-        };
-    }
-
-    private static string Line(string label, string value) => string.Concat(label.PadRight(20), ": ", value);
-
     private static string Dash(string value) => value.Length == 0 ? "-" : value;
 
     private sealed record ActivePress(ManualMotionAxis Axis, long PressId);
-
-    /// <summary>
-    /// The ordinary Label used for a frequently updated Axis state panel, with background and text
-    /// painting completed in the double buffer before the completed frame is presented.
-    /// </summary>
-    private sealed class BufferedStateLabel : Label
-    {
-        internal BufferedStateLabel()
-        {
-            SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
-        }
-    }
 
     /// <summary>The controls of one axis panel. Not a control type itself, so it declares no designer-visible property.</summary>
     private sealed class AxisControls
@@ -506,12 +440,7 @@ internal sealed class ManualMotionForm : Form
                 Width = 150,
                 ThousandsSeparator = false,
             };
-            State = new BufferedStateLabel
-            {
-                Dock = DockStyle.Fill,
-                AutoSize = false,
-                Font = new Font("Consolas", 9F, FontStyle.Regular, GraphicsUnit.Point),
-            };
+            StateGrid = new ManualMotionAxisStateGrid();
 
             var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
             commands.Controls.Add(BrakeRelease);
@@ -540,7 +469,7 @@ internal sealed class ManualMotionForm : Form
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             layout.Controls.Add(commands, 0, 0);
             layout.Controls.Add(move, 0, 1);
-            layout.Controls.Add(State, 0, 2);
+            layout.Controls.Add(StateGrid, 0, 2);
             Group.Controls.Add(layout);
         }
 
@@ -570,7 +499,7 @@ internal sealed class ManualMotionForm : Form
 
         internal NumericUpDown Target { get; }
 
-        internal Label State { get; }
+        internal ManualMotionAxisStateGrid StateGrid { get; }
 
         private static Button CreateButton(string text) => new()
         {
