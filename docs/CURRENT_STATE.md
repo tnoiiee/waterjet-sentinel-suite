@@ -1,8 +1,12 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
-> **Checkpoint identifier (2026-10-18; C1 Stop-only software foundation):** branch
-> `arena/791ec087-waterjet-sentinel-suite`; implementation checkpoint commit
-> `9c53006ce8f8c97d9ebe1b09146150030a528413`.
+> **Checkpoint identifier (2026-10-18; PR #34 integrated WSB1 Manual Motion Commissioning
+> vertical slice, software only):** branch `arena/49344b63-waterjet-sentinel-suite`;
+> implementation checkpoint commit `40e25cabf89222c33ce3803434671c04e1932f4a`. This checkpoint
+> is submitted for Owner review and is **not merged**. .NET restore/build/test and the new app's
+> lock generation remain **NOT RUN** in the Agent sandbox (no .NET SDK); no native DLL load,
+> endpoint contact, Controller command or hardware execution occurred. Hardware-capable use still
+> requires Owner-local exact-head validation and a separate post-merge Owner Scope Gate.
 
 > **Merged truth and current position (added 2026-10-15; supersedes the merged/unmerged wording in
 > the status table below without deleting any dated record).** The pull-request state is taken from

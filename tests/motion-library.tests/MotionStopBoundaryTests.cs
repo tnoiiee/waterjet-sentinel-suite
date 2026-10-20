@@ -10,7 +10,8 @@ namespace Wjss.MotionLibrary.Tests;
 ///
 /// They establish five facts. Exactly one production file carries a quoted Stop command text, and
 /// that file is the closed template plan. The Stop files name no read or other command literal.
-/// No file outside the exact Stop-file set names a Stop type. The Stop surface is internal only.
+/// No file outside the exact Stop-file set names a Stop type, except the one PR #34 Manual Motion
+/// controller owner that reuses this typed Stop session by approved design. The Stop surface is internal only.
 /// The Stop carrier resolves its export through the existing approved seam and does not name the
 /// native export token.
 /// </summary>
@@ -38,6 +39,16 @@ public sealed class MotionStopBoundaryTests
         "adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj",
         "apps/motion-stop-trial/Program.cs",
         "apps/motion-stop-trial/Wjss.MotionStopTrial.csproj",
+    };
+
+    // PR #34 scoped reuse: the Manual Motion Commissioning controller owner is the ONE additional
+    // production file allowed to name a Stop type, because its approved design reuses the existing
+    // typed A/B Stop session (and its acknowledgement classifier) instead of adding a second Stop
+    // path. It is not a Stop source file: it carries no Stop template and no Stop dispatch of its
+    // own, and every other Stop assertion below still excludes it.
+    private static readonly string[] StopReusingFiles =
+    {
+        "adapters/motion-library/ManualMotionControllerOwner.cs",
     };
 
     private static readonly string[] ProductionTrees = { "adapters", "apps", "packages" };
@@ -248,7 +259,8 @@ public sealed class MotionStopBoundaryTests
 
         foreach (var relative in ProductionSourceFiles(root))
         {
-            if (StopFiles.Contains(relative, StringComparer.Ordinal))
+            if (StopFiles.Contains(relative, StringComparer.Ordinal)
+                || StopReusingFiles.Contains(relative, StringComparer.Ordinal))
             {
                 continue;
             }
