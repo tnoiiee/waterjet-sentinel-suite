@@ -61,6 +61,7 @@ public sealed class ManualMotionSession
     private DateTimeOffset _observationCycleStartedAt;
     private long _observationCycleOperationId;
     private bool _observationCycleStopPriority;
+    private bool _observationCycleMotionBegun;
     private bool _closeRequested;
     private bool _portClosed;
     private string _openCode = string.Empty;
@@ -1332,8 +1333,9 @@ public sealed class ManualMotionSession
     /// eligible on the following steps, one read per step, so every kind of an allowed axis is
     /// refreshed once per cycle. Status is always first. This method is reached only after the
     /// step has served pending Stops and the active operation, so an urgent lifecycle is never
-    /// queued behind a cycle remainder; a context change (an operation starting or ending, or
-    /// post-Stop supervision beginning) discards the remainder and the next observation starts a
+    /// queued behind a cycle remainder; a context change (an operation starting or ending,
+    /// motion beginning after an accepted Begin, or post-Stop supervision beginning) discards
+    /// the remainder and the next observation starts a
     /// fresh Status-first cycle. An overrun cycle starts no catch-up burst: the next cycle
     /// becomes due one interval after this cycle started and still advances one read per step.
     /// </summary>
@@ -1349,10 +1351,13 @@ public sealed class ManualMotionSession
 
         var operation = _active;
         var operationId = operation?.Id ?? 0;
+        var motionBegun = operation?.MotionBegun ?? false;
         var stopPriority = operation is { Phase: ManualMotionOperationPhase.AwaitingStopped };
 
         if (_observationCycle is not null
-            && (operationId != _observationCycleOperationId || stopPriority != _observationCycleStopPriority))
+            && (operationId != _observationCycleOperationId
+                || motionBegun != _observationCycleMotionBegun
+                || stopPriority != _observationCycleStopPriority))
         {
             _observationCycle = null;
             _nextObservationCycleDue = now;
@@ -1377,6 +1382,7 @@ public sealed class ManualMotionSession
             _observationCycleIndex = 0;
             _observationCycleStartedAt = now;
             _observationCycleOperationId = operationId;
+            _observationCycleMotionBegun = motionBegun;
             _observationCycleStopPriority = stopPriority;
         }
 

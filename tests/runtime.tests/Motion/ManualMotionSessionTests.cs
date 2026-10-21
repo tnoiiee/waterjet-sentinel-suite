@@ -1109,6 +1109,89 @@ public sealed class ManualMotionSessionTests
     }
 
     [Fact]
+    public void An_Accepted_Begin_Rebases_The_Observation_Cycle_Status_First()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile()) { PositionValue = 111m };
+        harness.OpenSession();
+        harness.Drive(4);
+
+        // One complete idle cycle has published the pre-motion position.
+        Assert.Equal(4, harness.Reads.Count);
+        Assert.Equal(111m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        harness.Session.RequestJogStart(ManualMotionAxis.A, ManualMotionJogDirection.Positive, 7);
+
+        // The brake release consumes the step's one port call; no read shares it.
+        harness.StepOnce();
+        Assert.Equal(4, harness.Reads.Count);
+        Assert.Equal(
+            new[] { ManualMotionPortCommandKind.BrakeOutputSet },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+
+        // One long step lands inside the brake settle: a pre-Begin cycle starts with Status and
+        // is deliberately left incomplete (TP, RP and the brake output remain unread).
+        harness.StepOnce(90);
+        Assert.Equal(ManualMotionOperationPhase.BrakeSettling, harness.Snapshot.ActiveOperation?.Phase);
+        Assert.Equal(5, harness.Reads.Count);
+        Assert.Equal(ManualMotionReadKind.StatusWord, harness.Reads[4].Kind);
+        Assert.Single(harness.Port.Executed);
+        Assert.Equal(111m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        // Configuring and Beginning each consume their step's one port call.
+        harness.StepOnce();
+        Assert.Equal(5, harness.Reads.Count);
+        Assert.Equal(2, harness.Port.Executed.Count);
+        harness.StepOnce();
+        Assert.Equal(5, harness.Reads.Count);
+        Assert.Equal(ManualMotionPortCommandKind.Begin, harness.Port.Executed[2].Kind);
+        Assert.Equal(ManualMotionOperationPhase.Running, harness.Snapshot.ActiveOperation?.Phase);
+
+        // Motion has begun: the synthetic position now differs from the pre-Begin value. The
+        // pre-Begin cycle remainder is discarded, so the first observation after Begin is a
+        // fresh Status read — never the leftover TP — and only then does TP publish the
+        // post-Begin position.
+        harness.PositionValue = 222m;
+        harness.StepOnce();
+        Assert.Equal(6, harness.Reads.Count);
+        Assert.Equal(ManualMotionReadKind.StatusWord, harness.Reads[5].Kind);
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Axis(ManualMotionAxis.A).Motion);
+        Assert.Equal(111m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        harness.StepOnce();
+        Assert.Equal(7, harness.Reads.Count);
+        Assert.Equal(ManualMotionReadKind.PositionTp, harness.Reads[6].Kind);
+        Assert.Equal(3, harness.Port.Executed.Count);
+        Assert.Equal(222m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        // Capture loss pre-empts the rest of the cycle: the Stop is the next port call, ahead of
+        // the unread RP and brake-output remainder.
+        harness.Session.RequestJogRelease(ManualMotionAxis.A, 7, ManualMotionJogEndReason.CaptureLost);
+        harness.StepOnce();
+        Assert.Equal(7, harness.Reads.Count);
+        Assert.Equal(ManualMotionPortCommandKind.Stop, harness.Port.Executed[3].Kind);
+
+        harness.DriveUntil(snapshot => snapshot.ActiveOperation is null);
+
+        Assert.Equal(ManualMotionCodes.JogStoppedCaptureLost, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Equal(
+            new[]
+            {
+                ManualMotionPortCommandKind.BrakeOutputSet,
+                ManualMotionPortCommandKind.JogSpeed,
+                ManualMotionPortCommandKind.Begin,
+                ManualMotionPortCommandKind.Stop,
+                ManualMotionPortCommandKind.BrakeOutputClear,
+            },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+        // While the stopped state was awaited, Status evidence kept sole priority.
+        Assert.Equal(7, harness.ReadsAtLastStop);
+        var afterStop = Assert.Single(harness.Reads.Skip(harness.ReadsAtLastStop));
+        Assert.Equal(ManualMotionReadKind.StatusWord, afterStop.Kind);
+        // The post-Begin position stays published; nothing reverts to the pre-Begin value.
+        Assert.Equal(222m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+    }
+
+    [Fact]
     public void Jog_Still_Refuses_When_Status_Is_Genuinely_Stale()
     {
         var harness = new RecordingHarness(TrialLikeProfile());
