@@ -164,6 +164,14 @@ allocations: A → 1 and B → 2.
 For a real Owner-local profile, every value must be established under the
 separate hardware commissioning gate. In particular:
 
+- `observationIntervalMilliseconds` is the cadence between the starts of
+  complete observation cycles, not a delay between individual reads. Each
+  cycle reads, per profile-allowed axis, the status word first, then TP,
+  RP and the configured brake-output state, one native read per session
+  step, so the configured brake output remains under observation while an
+  operation runs and the status word is refreshed every cycle. This
+  scheduling semantics changes no hardware authorization: simulation and
+  automated tests remain software evidence only.
 - `brakeReleaseAction` accepts the typed profile values for setting or
   clearing the individual output; electrical polarity remains
   `UNCONFIRMED` until separately proven and recorded.

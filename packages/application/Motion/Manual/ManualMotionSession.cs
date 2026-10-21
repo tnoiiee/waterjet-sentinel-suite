@@ -55,8 +55,13 @@ public sealed class ManualMotionSession
     private long _logSequence;
     private long _operationSequence;
     private OperationRuntime? _active;
-    private DateTimeOffset _nextObservationDue;
-    private int _observationCursor;
+    private DateTimeOffset _nextObservationCycleDue;
+    private List<ManualMotionPortRead>? _observationCycle;
+    private int _observationCycleIndex;
+    private DateTimeOffset _observationCycleStartedAt;
+    private long _observationCycleOperationId;
+    private bool _observationCycleStopPriority;
+    private bool _observationCycleMotionBegun;
     private bool _closeRequested;
     private bool _portClosed;
     private string _openCode = string.Empty;
@@ -96,7 +101,7 @@ public sealed class ManualMotionSession
         }
 
         var now = clock.UtcNow;
-        _nextObservationDue = now;
+        _nextObservationCycleDue = now;
         if (_state == ManualMotionSessionState.ProfileRefused)
         {
             AppendLog(now, null, ManualMotionOperationKind.None, _profileCode);
@@ -267,10 +272,7 @@ public sealed class ManualMotionSession
             return;
         }
 
-        if (now >= _nextObservationDue)
-        {
-            Observe(now);
-        }
+        Observe(now);
     }
 
     // ---------------------------------------------------------------------- request handling
@@ -1206,7 +1208,7 @@ public sealed class ManualMotionSession
         _portGeneration = result.PortGeneration;
         _generation++;
         _state = ManualMotionSessionState.Ready;
-        _nextObservationDue = now;
+        _nextObservationCycleDue = now;
         AppendLog(now, null, ManualMotionOperationKind.None, ManualMotionCodes.SessionOpened);
     }
 
@@ -1255,6 +1257,7 @@ public sealed class ManualMotionSession
 
     private void FaultSession(DateTimeOffset now, ManualMotionAxis? axis, ManualMotionOperationKind operation, string code)
     {
+        _observationCycle = null;
         var active = _active;
         _active = null;
         if (active is not null)
@@ -1322,25 +1325,86 @@ public sealed class ManualMotionSession
 
     // ------------------------------------------------------------------------ observation
 
+    /// <summary>
+    /// Advances the priority-tiered complete observation cycle by at most one read.
+    ///
+    /// The profile observation interval is the cadence between the STARTS of complete cycles,
+    /// never a delay between the reads of one cycle: once a cycle starts, its remaining reads are
+    /// eligible on the following steps, one read per step, so every kind of an allowed axis is
+    /// refreshed once per cycle. Status is always first. This method is reached only after the
+    /// step has served pending Stops and the active operation, so an urgent lifecycle is never
+    /// queued behind a cycle remainder; a context change (an operation starting or ending,
+    /// motion beginning after an accepted Begin, or post-Stop supervision beginning) discards
+    /// the remainder and the next observation starts a
+    /// fresh Status-first cycle. An overrun cycle starts no catch-up burst: the next cycle
+    /// becomes due one interval after this cycle started and still advances one read per step.
+    /// </summary>
     private void Observe(DateTimeOffset now)
     {
         var interval = _profile?.ObservationIntervalMilliseconds;
         if (interval is null || !ObservationTimingConfigured)
         {
-            _nextObservationDue = DateTimeOffset.MaxValue;
+            _observationCycle = null;
+            _nextObservationCycleDue = DateTimeOffset.MaxValue;
             return;
         }
 
-        _nextObservationDue = now + Milliseconds(interval.Value);
-        var plan = ObservationPlan();
-        if (plan.Count == 0)
+        var operation = _active;
+        var operationId = operation?.Id ?? 0;
+        var motionBegun = operation?.MotionBegun ?? false;
+        var stopPriority = operation is { Phase: ManualMotionOperationPhase.AwaitingStopped };
+
+        if (_observationCycle is not null
+            && (operationId != _observationCycleOperationId
+                || motionBegun != _observationCycleMotionBegun
+                || stopPriority != _observationCycleStopPriority))
         {
+            _observationCycle = null;
+            _nextObservationCycleDue = now;
+        }
+
+        var cycle = _observationCycle;
+        if (cycle is null)
+        {
+            if (now < _nextObservationCycleDue)
+            {
+                return;
+            }
+
+            cycle = ObservationPlan();
+            if (cycle.Count == 0)
+            {
+                _nextObservationCycleDue = now + Milliseconds(interval.Value);
+                return;
+            }
+
+            _observationCycle = cycle;
+            _observationCycleIndex = 0;
+            _observationCycleStartedAt = now;
+            _observationCycleOperationId = operationId;
+            _observationCycleMotionBegun = motionBegun;
+            _observationCycleStopPriority = stopPriority;
+        }
+
+        var read = cycle[_observationCycleIndex];
+        ExecuteObservationRead(read, now);
+
+        if (_observationCycle is null)
+        {
+            // The read faulted the session and the cycle was discarded with it.
             return;
         }
 
-        var read = plan[_observationCursor % plan.Count];
-        _observationCursor = (_observationCursor + 1) % plan.Count;
+        _observationCycleIndex++;
+        if (_observationCycleIndex >= cycle.Count)
+        {
+            _observationCycle = null;
+            _nextObservationCycleDue = _observationCycleStartedAt + Milliseconds(interval.Value);
+        }
+    }
 
+    private void ExecuteObservationRead(ManualMotionPortRead read, DateTimeOffset now)
+    {
         _callSequence++;
         var sequence = _callSequence;
         ManualMotionPortReadResult result;
@@ -1383,19 +1447,31 @@ public sealed class ManualMotionSession
         observation.LastRefusalCode = string.Empty;
     }
 
+    /// <summary>
+    /// The complete read set of one observation cycle, in deterministic order: Status first, then
+    /// TP, RP and the configured brake-output state. While an operation runs the cycle covers its
+    /// axis only; while the stopped state after a Stop is awaited, Status evidence has sole
+    /// priority and the cycle is the Status read alone. The plan derives from the profile-allowed
+    /// axes and their configured outputs — no axis is hard-coded.
+    /// </summary>
     private List<ManualMotionPortRead> ObservationPlan()
     {
         var plan = new List<ManualMotionPortRead>(8);
         if (_active is not null)
         {
-            // While an operation runs, the status of its axis is read every other read.
             var axis = _active.Axis;
-            if (_profile?.For(axis) is not null)
+            if (_profile?.For(axis) is { } p)
             {
                 plan.Add(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, axis, 0));
-                plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
-                plan.Add(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, axis, 0));
-                plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
+                if (_active.Phase != ManualMotionOperationPhase.AwaitingStopped)
+                {
+                    plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
+                    plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
+                    if (p.BrakeOutput is int output)
+                    {
+                        plan.Add(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, axis, output));
+                    }
+                }
             }
 
             return plan;
@@ -1601,9 +1677,10 @@ public sealed class ManualMotionSession
             StatusWord = ObservationSnapshot(runtime.Status, now),
             Motion = InterpretMotion(runtime.Axis, now),
             HomeInput = InterpretHome(runtime.Axis, now),
-            InterpretationOwnerAttested = p is not null
+            MotionInterpretationConfigured = p is not null
                 && p.MotionStatusBit is not null
-                && p.MotionActiveValue is not null
+                && p.MotionActiveValue is not null,
+            HomeInterpretationConfigured = p is not null
                 && p.HomeStatusBit is not null
                 && p.HomeActiveValue is not null,
             PositionTp = ObservationSnapshot(runtime.PositionTp, now),

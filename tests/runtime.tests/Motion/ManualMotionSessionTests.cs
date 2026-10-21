@@ -188,6 +188,142 @@ public sealed class ManualMotionSessionTests
     private static List<ManualMotionPortCommandKind> KindsAfter(Harness harness, int skip) =>
         harness.Port.ExecutedCommands.Skip(skip).Select(command => command.Kind).ToList();
 
+    /// <summary>
+    /// The approved-trial timing shape as a synthetic test profile: Axis A only, 100 ms observation
+    /// interval against a 300 ms freshness window, motion bit 7 active-high, and every Home, Move
+    /// and dual-zero value deliberately NOT_CONFIGURED. Every number is a test value; nothing here
+    /// is a hardware commissioning value.
+    /// </summary>
+    private static ManualMotionProfile TrialLikeProfile(bool includeBrakePolarity = true) => new()
+    {
+        Source = ManualMotionProfileSource.OwnerLocalFile,
+        ControllerId = "WSB1",
+        ObservationIntervalMilliseconds = 100,
+        ObservationFreshnessMilliseconds = 300,
+        JogHeartbeatTimeoutMilliseconds = 5000,
+        JogMaximumHoldMilliseconds = 60000,
+        AxisA = new ManualMotionAxisProfile
+        {
+            BrakeOutput = 1,
+            BrakeReleaseAction = includeBrakePolarity ? ManualMotionBrakeReleaseAction.SetOutput : null,
+            BrakeSettleMilliseconds = 100,
+            JogSpeed = 2000,
+            StopTimeoutMilliseconds = 1000,
+            MotionStatusBit = 7,
+            MotionActiveValue = 1,
+        },
+        AxisB = null,
+    };
+
+    /// <summary>
+    /// A FakePort session that records every read (with its fake-clock time) and models just enough
+    /// controller behaviour for the observation-cycle tests: Begin makes the status motion bit
+    /// active, Stop makes it inactive, and the brake-output read follows the brake commands.
+    /// </summary>
+    private sealed class RecordingHarness
+    {
+        internal RecordingHarness(ManualMotionProfile profile)
+        {
+            Port = new FakePort
+            {
+                ReadHandler = read =>
+                {
+                    Reads.Add(read);
+                    ReadTimes.Add(Clock.UtcNow);
+                    if (FailReadKinds.Contains(read.Kind))
+                    {
+                        return new ManualMotionPortReadResult(false, false, 0m, "FAKE_REFUSED", 1);
+                    }
+
+                    var value = read.Kind switch
+                    {
+                        ManualMotionReadKind.StatusWord => Moving ? 128m : 0m,
+                        ManualMotionReadKind.BrakeOutputState => BrakeReleased ? 1m : 0m,
+                        _ => PositionValue,
+                    };
+                    return new ManualMotionPortReadResult(true, false, value, "FAKE_READ", 1);
+                },
+                ExecuteHandler = command =>
+                {
+                    if (command.Kind == ManualMotionPortCommandKind.Begin)
+                    {
+                        Moving = true;
+                    }
+                    else if (command.Kind == ManualMotionPortCommandKind.Stop)
+                    {
+                        Moving = false;
+                        ReadsAtLastStop = Reads.Count;
+                    }
+                    else if (command.Kind == ManualMotionPortCommandKind.BrakeOutputSet)
+                    {
+                        BrakeReleased = true;
+                    }
+                    else if (command.Kind == ManualMotionPortCommandKind.BrakeOutputClear)
+                    {
+                        BrakeReleased = false;
+                    }
+
+                    return new ManualMotionPortCommandResult(true, false, true, "FAKE_DISPATCHED", 1);
+                },
+            };
+            Session = new ManualMotionSession(Port, ManualMotionProfileResult.FromProfile(profile), Clock);
+        }
+
+        internal TestClock Clock { get; } = new(Instant);
+
+        internal FakePort Port { get; }
+
+        internal ManualMotionSession Session { get; }
+
+        internal ManualMotionSnapshot Snapshot => Session.Snapshot;
+
+        internal List<ManualMotionPortRead> Reads { get; } = new();
+
+        internal List<DateTimeOffset> ReadTimes { get; } = new();
+
+        internal HashSet<ManualMotionReadKind> FailReadKinds { get; } = new();
+
+        internal bool Moving { get; private set; }
+
+        internal bool BrakeReleased { get; private set; }
+
+        internal int ReadsAtLastStop { get; private set; } = -1;
+
+        internal decimal PositionValue { get; set; }
+
+        internal void OpenSession()
+        {
+            Session.Step();
+            Assert.Equal(ManualMotionSessionState.Ready, Snapshot.State);
+        }
+
+        internal void StepOnce(int milliseconds = 10)
+        {
+            Clock.Advance(TimeSpan.FromMilliseconds(milliseconds));
+            Session.Step();
+        }
+
+        internal void Drive(int steps, int millisecondsPerStep = 10)
+        {
+            for (var index = 0; index < steps; index++)
+            {
+                StepOnce(millisecondsPerStep);
+            }
+        }
+
+        internal void DriveUntil(Func<ManualMotionSnapshot, bool> done, int maximumSteps = 500, int millisecondsPerStep = 10)
+        {
+            for (var index = 0; index < maximumSteps && !done(Snapshot); index++)
+            {
+                StepOnce(millisecondsPerStep);
+            }
+
+            Assert.True(done(Snapshot), "the session did not reach the expected state within the step budget");
+        }
+
+        internal ManualMotionAxisSnapshot Axis(ManualMotionAxis axis) => Snapshot.Axes[(int)axis - 1];
+    }
+
     [Fact]
     public void Session_Opens_Once_And_Publishes_Simulated_Identity_And_Raw_Observations()
     {
@@ -205,7 +341,8 @@ public sealed class ManualMotionSessionTests
         Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
         Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionTp.Value);
         Assert.Equal(ManualMotionInterpretation.Inactive, harness.Axis(ManualMotionAxis.A).Motion);
-        Assert.True(harness.Axis(ManualMotionAxis.A).InterpretationOwnerAttested);
+        Assert.True(harness.Axis(ManualMotionAxis.A).MotionInterpretationConfigured);
+        Assert.True(harness.Axis(ManualMotionAxis.A).HomeInterpretationConfigured);
         Assert.False(harness.Axis(ManualMotionAxis.A).StopConfirmed);
         Assert.False(harness.Axis(ManualMotionAxis.B).StopConfirmed);
         Assert.Empty(harness.Port.ExecutedCommands);
@@ -865,6 +1002,381 @@ public sealed class ManualMotionSessionTests
 
         Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, session.Snapshot.Axes[0].LastOutcomeCode);
         Assert.Empty(port.Executed);
+    }
+
+    [Fact]
+    public void Idle_Cycle_Reads_The_Complete_Set_Status_First_At_Cycle_Cadence()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+
+        for (var step = 0; step < 40; step++)
+        {
+            var readsBefore = harness.Reads.Count;
+            harness.StepOnce();
+            Assert.True(harness.Reads.Count - readsBefore <= 1, "more than one native read in a single Step");
+            if (harness.Reads.Count > 0)
+            {
+                Assert.True(
+                    harness.Axis(ManualMotionAxis.A).StatusWord.Fresh,
+                    "status went stale inside the 100/300 complete-cycle cadence");
+            }
+        }
+
+        Assert.Equal(
+            new[]
+            {
+                new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.A, 1),
+            },
+            harness.Reads.Take(4).ToArray());
+        // The interval is the cadence between cycle STARTS: the second cycle begins one interval
+        // after the first, and its remaining reads follow on consecutive steps.
+        Assert.Equal(ManualMotionReadKind.StatusWord, harness.Reads[4].Kind);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), harness.ReadTimes[4] - harness.ReadTimes[0]);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), harness.ReadTimes[5] - harness.ReadTimes[4]);
+        // Exactly four complete cycles start within 400 ms of driving; no catch-up burst adds more.
+        Assert.Equal(16, harness.Reads.Count);
+        Assert.Empty(harness.Port.Executed);
+    }
+
+    [Fact]
+    public void Two_Allowed_Axes_Cycle_In_Deterministic_Order_With_Status_First_Per_Axis()
+    {
+        var harness = new RecordingHarness(ManualMotionProfile.CreateSimulationProfile());
+        harness.OpenSession();
+        harness.Drive(8, 25);
+
+        Assert.Equal(
+            new[]
+            {
+                new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.A, 1),
+                new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.B, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.B, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.B, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.B, 2),
+            },
+            harness.Reads.Take(8).ToArray());
+    }
+
+    [Fact]
+    public void Jog_At_The_Approved_Timing_Never_Hits_A_Stale_Status_Window()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(50);
+
+        harness.Session.RequestJogStart(ManualMotionAxis.A, ManualMotionJogDirection.Positive, 71);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperation?.Phase == ManualMotionOperationPhase.Running);
+
+        // While the Jog runs, the complete active cycle keeps Status and the brake output current.
+        var readsAtRunning = harness.Reads.Count;
+        harness.DriveUntil(
+            _ => harness.Reads.Skip(readsAtRunning).Any(read => read.Kind == ManualMotionReadKind.StatusWord)
+                && harness.Reads.Skip(readsAtRunning).Any(read => read.Kind == ManualMotionReadKind.BrakeOutputState),
+            maximumSteps: 50);
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Axis(ManualMotionAxis.A).Motion);
+        Assert.True(harness.Axis(ManualMotionAxis.A).BrakeOutput.Fresh);
+        Assert.Equal(1m, harness.Axis(ManualMotionAxis.A).BrakeOutput.Value);
+
+        harness.Session.RequestJogRelease(ManualMotionAxis.A, 71, ManualMotionJogEndReason.Released);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperation is null);
+
+        Assert.Equal(ManualMotionCodes.JogStoppedOnRelease, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Equal(
+            new[]
+            {
+                ManualMotionPortCommandKind.BrakeOutputSet,
+                ManualMotionPortCommandKind.JogSpeed,
+                ManualMotionPortCommandKind.Begin,
+                ManualMotionPortCommandKind.Stop,
+                ManualMotionPortCommandKind.BrakeOutputClear,
+            },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+        Assert.DoesNotContain(harness.Snapshot.Log, entry => entry.Code == ManualMotionCodes.ObservationNotFresh);
+        // After the Stop dispatch, Status evidence had sole priority until the operation completed:
+        // no TP, RP or brake-output read was placed ahead of it.
+        Assert.True(harness.ReadsAtLastStop >= 0);
+        Assert.NotEmpty(harness.Reads.Skip(harness.ReadsAtLastStop));
+        Assert.All(
+            harness.Reads.Skip(harness.ReadsAtLastStop),
+            read => Assert.Equal(ManualMotionReadKind.StatusWord, read.Kind));
+    }
+
+    [Fact]
+    public void An_Accepted_Begin_Rebases_The_Observation_Cycle_Status_First()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile()) { PositionValue = 111m };
+        harness.OpenSession();
+        harness.Drive(4);
+
+        // One complete idle cycle has published the pre-motion position.
+        Assert.Equal(4, harness.Reads.Count);
+        Assert.Equal(111m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        harness.Session.RequestJogStart(ManualMotionAxis.A, ManualMotionJogDirection.Positive, 7);
+
+        // The brake release consumes the step's one port call; no read shares it.
+        harness.StepOnce();
+        Assert.Equal(4, harness.Reads.Count);
+        Assert.Equal(
+            new[] { ManualMotionPortCommandKind.BrakeOutputSet },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+
+        // One long step lands inside the brake settle: a pre-Begin cycle starts with Status and
+        // is deliberately left incomplete (TP, RP and the brake output remain unread).
+        harness.StepOnce(90);
+        Assert.Equal(ManualMotionOperationPhase.BrakeSettling, harness.Snapshot.ActiveOperation?.Phase);
+        Assert.Equal(5, harness.Reads.Count);
+        Assert.Equal(ManualMotionReadKind.StatusWord, harness.Reads[4].Kind);
+        Assert.Single(harness.Port.Executed);
+        Assert.Equal(111m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        // Configuring and Beginning each consume their step's one port call.
+        harness.StepOnce();
+        Assert.Equal(5, harness.Reads.Count);
+        Assert.Equal(2, harness.Port.Executed.Count);
+        harness.StepOnce();
+        Assert.Equal(5, harness.Reads.Count);
+        Assert.Equal(ManualMotionPortCommandKind.Begin, harness.Port.Executed[2].Kind);
+        Assert.Equal(ManualMotionOperationPhase.Running, harness.Snapshot.ActiveOperation?.Phase);
+
+        // Motion has begun: the synthetic position now differs from the pre-Begin value. The
+        // pre-Begin cycle remainder is discarded, so the first observation after Begin is a
+        // fresh Status read — never the leftover TP — and only then does TP publish the
+        // post-Begin position.
+        harness.PositionValue = 222m;
+        harness.StepOnce();
+        Assert.Equal(6, harness.Reads.Count);
+        Assert.Equal(ManualMotionReadKind.StatusWord, harness.Reads[5].Kind);
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Axis(ManualMotionAxis.A).Motion);
+        Assert.Equal(111m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        harness.StepOnce();
+        Assert.Equal(7, harness.Reads.Count);
+        Assert.Equal(ManualMotionReadKind.PositionTp, harness.Reads[6].Kind);
+        Assert.Equal(3, harness.Port.Executed.Count);
+        Assert.Equal(222m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+
+        // Capture loss pre-empts the rest of the cycle: the Stop is the next port call, ahead of
+        // the unread RP and brake-output remainder.
+        harness.Session.RequestJogRelease(ManualMotionAxis.A, 7, ManualMotionJogEndReason.CaptureLost);
+        harness.StepOnce();
+        Assert.Equal(7, harness.Reads.Count);
+        Assert.Equal(ManualMotionPortCommandKind.Stop, harness.Port.Executed[3].Kind);
+
+        harness.DriveUntil(snapshot => snapshot.ActiveOperation is null);
+
+        Assert.Equal(ManualMotionCodes.JogStoppedCaptureLost, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Equal(
+            new[]
+            {
+                ManualMotionPortCommandKind.BrakeOutputSet,
+                ManualMotionPortCommandKind.JogSpeed,
+                ManualMotionPortCommandKind.Begin,
+                ManualMotionPortCommandKind.Stop,
+                ManualMotionPortCommandKind.BrakeOutputClear,
+            },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+        // While the stopped state was awaited, Status evidence kept sole priority.
+        Assert.Equal(7, harness.ReadsAtLastStop);
+        var afterStop = Assert.Single(harness.Reads.Skip(harness.ReadsAtLastStop));
+        Assert.Equal(ManualMotionReadKind.StatusWord, afterStop.Kind);
+        // The post-Begin position stays published; nothing reverts to the pre-Begin value.
+        Assert.Equal(222m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+    }
+
+    [Fact]
+    public void Jog_Still_Refuses_When_Status_Is_Genuinely_Stale()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(20);
+        Assert.True(harness.Axis(ManualMotionAxis.A).StatusWord.Fresh);
+
+        harness.FailReadKinds.Add(ManualMotionReadKind.StatusWord);
+        harness.Drive(40);
+        Assert.False(harness.Axis(ManualMotionAxis.A).StatusWord.Fresh);
+        Assert.True(harness.Axis(ManualMotionAxis.A).PositionTp.Fresh);
+
+        harness.Session.RequestJogStart(ManualMotionAxis.A, ManualMotionJogDirection.Positive, 73);
+        harness.StepOnce();
+
+        Assert.Equal(ManualMotionCodes.ObservationNotFresh, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Empty(harness.Port.Executed);
+    }
+
+    [Fact]
+    public void A_Standalone_Stop_Preempts_An_Incomplete_Observation_Cycle()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(2);
+
+        // Status and TP of the first cycle are read; RP and the brake output remain.
+        Assert.Equal(2, harness.Reads.Count);
+        harness.Session.RequestStop(ManualMotionAxis.A);
+        harness.StepOnce();
+
+        Assert.Equal(2, harness.Reads.Count);
+        var stop = Assert.Single(harness.Port.Executed);
+        Assert.Equal(ManualMotionPortCommandKind.Stop, stop.Kind);
+
+        harness.StepOnce();
+        Assert.Equal(3, harness.Reads.Count);
+        Assert.Equal(ManualMotionReadKind.PositionRp, harness.Reads[2].Kind);
+    }
+
+    [Fact]
+    public void Close_Preempts_An_Incomplete_Observation_Cycle()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(2);
+
+        harness.Session.RequestClose();
+        harness.DriveUntil(snapshot => snapshot.State == ManualMotionSessionState.Closed, maximumSteps: 20);
+
+        Assert.Equal(2, harness.Reads.Count);
+        Assert.Equal(1, harness.Port.CloseCount);
+        Assert.True(harness.Snapshot.IsTerminal);
+
+        harness.Drive(3);
+        Assert.Equal(2, harness.Reads.Count);
+        Assert.Equal(1, harness.Port.CloseCount);
+    }
+
+    [Fact]
+    public void A_Failed_Read_Keeps_Its_Prior_Value_And_Timestamp_Until_A_Later_Read_Recovers()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile()) { PositionValue = 111m };
+        harness.OpenSession();
+        harness.Drive(4);
+
+        var before = harness.Axis(ManualMotionAxis.A).PositionTp;
+        Assert.Equal(111m, before.Value);
+        Assert.True(before.Fresh);
+
+        harness.FailReadKinds.Add(ManualMotionReadKind.PositionTp);
+        harness.Drive(40);
+
+        var stale = harness.Axis(ManualMotionAxis.A).PositionTp;
+        Assert.Equal(111m, stale.Value);
+        Assert.Equal(before.ObservedAt, stale.ObservedAt);
+        Assert.False(stale.Fresh);
+        Assert.Equal("FAKE_REFUSED", stale.LastRefusalCode);
+        Assert.True(harness.Axis(ManualMotionAxis.A).StatusWord.Fresh);
+
+        harness.FailReadKinds.Remove(ManualMotionReadKind.PositionTp);
+        harness.PositionValue = 222m;
+        harness.DriveUntil(_ => harness.Axis(ManualMotionAxis.A).PositionTp.Fresh);
+
+        Assert.Equal(222m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+    }
+
+    [Fact]
+    public void A_Long_Pause_Produces_No_Catch_Up_Burst()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+
+        harness.StepOnce(1000);
+        Assert.Single(harness.Reads);
+
+        harness.Drive(3);
+        Assert.Equal(4, harness.Reads.Count);
+        Assert.Equal(
+            new[]
+            {
+                ManualMotionReadKind.StatusWord,
+                ManualMotionReadKind.PositionTp,
+                ManualMotionReadKind.PositionRp,
+                ManualMotionReadKind.BrakeOutputState,
+            },
+            harness.Reads.Select(read => read.Kind).ToArray());
+    }
+
+    [Fact]
+    public void Motion_And_Home_Interpretation_Configuration_Are_Reported_Independently()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(10);
+
+        var axisA = harness.Axis(ManualMotionAxis.A);
+        Assert.True(axisA.MotionInterpretationConfigured);
+        Assert.False(axisA.HomeInterpretationConfigured);
+        Assert.Equal(ManualMotionInterpretation.Inactive, axisA.Motion);
+        Assert.Equal(ManualMotionInterpretation.Unknown, axisA.HomeInput);
+
+        var axisB = harness.Axis(ManualMotionAxis.B);
+        Assert.False(axisB.AllowedByProfile);
+        Assert.False(axisB.MotionInterpretationConfigured);
+        Assert.False(axisB.HomeInterpretationConfigured);
+    }
+
+    [Fact]
+    public void Brake_Release_Refuses_When_The_Release_Polarity_Is_Not_Configured()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile(includeBrakePolarity: false));
+        harness.OpenSession();
+        harness.Drive(4);
+
+        harness.Session.RequestBrakeRelease(ManualMotionAxis.A);
+        harness.StepOnce();
+
+        Assert.Equal(ManualMotionCodes.BrakePolarityNotConfigured, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Empty(harness.Port.Executed);
+    }
+
+    [Fact]
+    public void Home_Refuses_Before_Any_Command_When_Home_Parameters_Are_Not_Configured()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(4);
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.StepOnce();
+
+        Assert.Equal(ManualMotionCodes.HomeParametersNotConfigured, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Empty(harness.Port.Executed);
+    }
+
+    [Fact]
+    public void Define_Dual_Zero_Refuses_Without_Explicit_Profile_Permission()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(4);
+
+        harness.Session.RequestDefineDualZero(ManualMotionAxis.A);
+        harness.StepOnce();
+
+        Assert.Equal(ManualMotionCodes.DualZeroNotPermittedByProfile, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Empty(harness.Port.Executed);
+    }
+
+    [Fact]
+    public void Define_Position_Zero_Without_Verification_Configuration_Reports_Not_Verified()
+    {
+        var harness = new RecordingHarness(TrialLikeProfile());
+        harness.OpenSession();
+        harness.Drive(4);
+
+        harness.Session.RequestDefinePositionZero(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperation is null
+            && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.PositionZeroNotVerified);
+
+        Assert.Equal(ManualMotionCoordinateState.ZeroDispatched, harness.Axis(ManualMotionAxis.A).CoordinateState);
+        var define = Assert.Single(harness.Port.Executed);
+        Assert.Equal(ManualMotionPortCommandKind.DefinePositionZero, define.Kind);
+        Assert.Equal(0, define.Operand);
     }
 
     [Fact]

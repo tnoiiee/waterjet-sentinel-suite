@@ -50,8 +50,11 @@ public sealed class ManualMotionAxisSnapshot
     /// <summary>The home-input interpretation of the status word under the Owner-local profile.</summary>
     public required ManualMotionInterpretation HomeInput { get; init; }
 
-    /// <summary>True when both status bits are configured; the interpretation basis is then OWNER-ATTESTED, never vendor-verified.</summary>
-    public required bool InterpretationOwnerAttested { get; init; }
+    /// <summary>True when the profile configures the motion status bit and its active value; the interpretation basis is then OWNER-ATTESTED, never vendor-verified.</summary>
+    public required bool MotionInterpretationConfigured { get; init; }
+
+    /// <summary>True when the profile configures the home-input status bit and its active value; the interpretation basis is then OWNER-ATTESTED, never vendor-verified.</summary>
+    public required bool HomeInterpretationConfigured { get; init; }
 
     /// <summary>The first raw position read (TP), label unresolved.</summary>
     public required ManualMotionReadingSnapshot PositionTp { get; init; }
