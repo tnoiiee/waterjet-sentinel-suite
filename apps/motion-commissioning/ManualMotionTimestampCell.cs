@@ -15,10 +15,15 @@ namespace Wjss.MotionCommissioning;
 /// </summary>
 internal sealed class ManualMotionTimestampCell : Control
 {
+    // Single line with end ellipsis: at a narrow panel width the freshness wording at the start
+    // of the text stays readable and the remainder ellipsizes, instead of wrapping into a second
+    // line that the row height clips mid-glyph. The complete text remains on the control (and in
+    // the grid ToolTip), and painting stays clipped to this cell.
     private const TextFormatFlags TimestampTextFlags =
         TextFormatFlags.Left |
         TextFormatFlags.VerticalCenter |
-        TextFormatFlags.WordBreak |
+        TextFormatFlags.SingleLine |
+        TextFormatFlags.EndEllipsis |
         TextFormatFlags.TextBoxControl |
         TextFormatFlags.NoPrefix |
         TextFormatFlags.PreserveGraphicsClipping |

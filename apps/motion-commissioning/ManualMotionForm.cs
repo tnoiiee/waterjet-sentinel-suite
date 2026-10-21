@@ -41,6 +41,7 @@ internal sealed class ManualMotionForm : Form
     private readonly AxisControls _axisB = new(ManualMotionAxis.B);
     private readonly AxisControls _axisC = new(ManualMotionAxis.C);
     private readonly AxisControls _axisD = new(ManualMotionAxis.D);
+    private readonly BufferedTableLayoutPanel _axesLayout = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
 
     private ActivePress? _activePress;
     private long _pressSequence;
@@ -49,10 +50,20 @@ internal sealed class ManualMotionForm : Form
     private bool _closeComplete;
     private DateTimeOffset _closeRequestedAt;
 
+    // Interactive-resize presentation coalescing: while the Operator drags the window frame (move
+    // or resize), ticks retain only the latest snapshot here and presentation renders it once when
+    // the drag ends. This never touches the heartbeat above, any session request, or the close
+    // path; the session runner keeps stepping throughout.
+    private bool _interactiveResize;
+    private ManualMotionSnapshot? _pendingSnapshot;
+
     internal ManualMotionForm(ManualMotionSession session, ManualMotionSessionRunner runner)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+
+        // Buffer this window's own painting; the layout containers and state grids buffer theirs.
+        DoubleBuffered = true;
 
         BuildLayout();
         WireAxis(_axisA);
@@ -60,6 +71,9 @@ internal sealed class ManualMotionForm : Form
         WireAxis(_axisC);
         WireAxis(_axisD);
 
+        // The size/move drag loop raises ResizeBegin/ResizeEnd for both moving and resizing.
+        ResizeBegin += (_, _) => _interactiveResize = true;
+        ResizeEnd += (_, _) => OnInteractiveResizeEnd();
         Deactivate += (_, _) => EndActivePress(ManualMotionJogEndReason.Deactivated);
         _refreshTimer.Interval = RefreshIntervalMilliseconds;
         _refreshTimer.Tick += (_, _) => OnRefreshTick();
@@ -103,8 +117,14 @@ internal sealed class ManualMotionForm : Form
             ? "WJSS Manual Motion Commissioning - SIMULATED"
             : "WJSS Manual Motion Commissioning - HARDWARE-CAPABLE (WSB1)";
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(1100, 760);
-        Size = new Size(1320, 900);
+
+        // Minimum usable size for the four-axis 2x2 layout: each of the two panel rows must still
+        // fit the identity line, the command rows and the 14-row state grid with every grid row at
+        // least one full text line high, and each panel column must keep the field, value and
+        // freshness cells readable. Below this size the previous 1100x760 floor (sized for the
+        // former single panel row) collapsed grid rows and corrupted the text during resizing.
+        MinimumSize = new Size(1240, 920);
+        Size = new Size(1360, 980);
         Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
         _modeBanner.Dock = DockStyle.Fill;
@@ -124,21 +144,20 @@ internal sealed class ManualMotionForm : Form
         _operationLine.AutoEllipsis = true;
         _operationLine.TextAlign = ContentAlignment.MiddleLeft;
 
-        var axes = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
-        axes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        axes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        axes.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-        axes.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
-        axes.Controls.Add(_axisA.Group, 0, 0);
-        axes.Controls.Add(_axisB.Group, 1, 0);
-        axes.Controls.Add(_axisC.Group, 0, 1);
-        axes.Controls.Add(_axisD.Group, 1, 1);
+        _axesLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        _axesLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        _axesLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+        _axesLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+        _axesLayout.Controls.Add(_axisA.Group, 0, 0);
+        _axesLayout.Controls.Add(_axisB.Group, 1, 0);
+        _axesLayout.Controls.Add(_axisC.Group, 0, 1);
+        _axesLayout.Controls.Add(_axisD.Group, 1, 1);
 
         _logList.Dock = DockStyle.Fill;
         _logList.IntegralHeight = false;
         _logList.Font = new Font("Consolas", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5 };
+        var root = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
@@ -148,7 +167,7 @@ internal sealed class ManualMotionForm : Form
         root.Controls.Add(_modeBanner, 0, 0);
         root.Controls.Add(_sessionLine, 0, 1);
         root.Controls.Add(_operationLine, 0, 2);
-        root.Controls.Add(axes, 0, 3);
+        root.Controls.Add(_axesLayout, 0, 3);
         root.Controls.Add(_logList, 0, 4);
         Controls.Add(root);
     }
@@ -263,6 +282,8 @@ internal sealed class ManualMotionForm : Form
 
     private void OnRefreshTick()
     {
+        // The hold-to-run heartbeat is posted first and unconditionally: presentation coalescing
+        // during an interactive resize never delays or suppresses it.
         var press = _activePress;
         if (press is not null)
         {
@@ -270,7 +291,16 @@ internal sealed class ManualMotionForm : Form
         }
 
         var snapshot = _session.Snapshot;
-        Render(snapshot);
+        if (_interactiveResize)
+        {
+            // Retain only the latest snapshot (never a queue, never replayed); it is rendered once
+            // when the drag ends. Log entries are sequence-based, so none are lost by waiting.
+            _pendingSnapshot = snapshot;
+        }
+        else
+        {
+            Render(snapshot);
+        }
 
         if (_closeRequested && !_closeComplete)
         {
@@ -283,6 +313,23 @@ internal sealed class ManualMotionForm : Form
                 Close();
             }
         }
+    }
+
+    private void OnInteractiveResizeEnd()
+    {
+        _interactiveResize = false;
+        if (IsDisposed)
+        {
+            _pendingSnapshot = null;
+            return;
+        }
+
+        // One layout at the final size, then one render of the latest retained snapshot; normal
+        // per-tick rendering resumes from the next tick, so no field can remain outdated.
+        var snapshot = _pendingSnapshot ?? _session.Snapshot;
+        _pendingSnapshot = null;
+        PerformLayout();
+        Render(snapshot);
     }
 
     private void Render(ManualMotionSnapshot snapshot)
@@ -308,10 +355,20 @@ internal sealed class ManualMotionForm : Form
 
         if (snapshot.Axes.Count >= 4)
         {
-            RenderAxis(_axisA, snapshot.Axes[0], snapshot, _closeRequested);
-            RenderAxis(_axisB, snapshot.Axes[1], snapshot, _closeRequested);
-            RenderAxis(_axisC, snapshot.Axes[2], snapshot, _closeRequested);
-            RenderAxis(_axisD, snapshot.Axes[3], snapshot, _closeRequested);
+            // One layout pass for the whole four-panel update instead of one per changed cell.
+            // The suspension is confined to this render pass and always resumes before returning.
+            _axesLayout.SuspendLayout();
+            try
+            {
+                RenderAxis(_axisA, snapshot.Axes[0], snapshot, _closeRequested);
+                RenderAxis(_axisB, snapshot.Axes[1], snapshot, _closeRequested);
+                RenderAxis(_axisC, snapshot.Axes[2], snapshot, _closeRequested);
+                RenderAxis(_axisD, snapshot.Axes[3], snapshot, _closeRequested);
+            }
+            finally
+            {
+                _axesLayout.ResumeLayout(performLayout: false);
+            }
         }
 
         AppendNewLogEntries(snapshot.Log);
@@ -319,12 +376,27 @@ internal sealed class ManualMotionForm : Form
 
     private static void RenderAxis(AxisControls controls, ManualMotionAxisSnapshot axis, ManualMotionSnapshot snapshot, bool closing)
     {
-        controls.Title = string.Concat(axis.RoleLabel, " Axis - ", axis.AxisLetter);
-        controls.Group.Text = axis.AllowedByProfile
-            ? controls.Title
-            : string.Concat(controls.Title, "   (NOT ALLOWED BY PROFILE)");
+        // The title, group caption and canonical identity line are stable for the whole session:
+        // assign each only when its text actually changes, never as per-tick layout churn.
+        var title = string.Concat(axis.RoleLabel, " Axis - ", axis.AxisLetter);
+        if (!string.Equals(controls.Title, title, StringComparison.Ordinal))
+        {
+            controls.Title = title;
+        }
 
-        controls.Identity.Text = IdentityText(axis);
+        var groupText = axis.AllowedByProfile
+            ? title
+            : string.Concat(title, "   (NOT ALLOWED BY PROFILE)");
+        if (!string.Equals(controls.Group.Text, groupText, StringComparison.Ordinal))
+        {
+            controls.Group.Text = groupText;
+        }
+
+        var identity = IdentityText(axis);
+        if (!string.Equals(controls.Identity.Text, identity, StringComparison.Ordinal))
+        {
+            controls.Identity.Text = identity;
+        }
 
         controls.StateGrid.Display(axis);
 
@@ -439,6 +511,19 @@ internal sealed class ManualMotionForm : Form
 
     private sealed record ActivePress(ManualMotionAxis Axis, long PressId);
 
+    /// <summary>
+    /// A layout container whose own painting is double-buffered, so interactive resizing repaints
+    /// the container surface without visible tearing. Presentation only: it changes no layout
+    /// semantics, request, or session behavior.
+    /// </summary>
+    private sealed class BufferedTableLayoutPanel : TableLayoutPanel
+    {
+        internal BufferedTableLayoutPanel()
+        {
+            DoubleBuffered = true;
+        }
+    }
+
     /// <summary>The controls of one axis panel. Not a control type itself, so it declares no designer-visible property.</summary>
     private sealed class AxisControls
     {
@@ -498,7 +583,7 @@ internal sealed class ManualMotionForm : Form
             move.Controls.Add(Target);
             move.Controls.Add(Move);
 
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+            var layout = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));

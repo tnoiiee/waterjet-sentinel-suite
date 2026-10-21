@@ -469,6 +469,133 @@ public sealed class MotionCommissioningTests
     private static string HorizontalOf(MotionCommissioningCatalogue catalogue, string waterJetId) =>
         catalogue.WaterJets.Single(binding => binding.WaterJetId == waterJetId).HorizontalAxisId;
 
+    // ------------------------------------------------------------------
+    // Manual Motion Commissioning window presentation pins (Phase 1A resize repair).
+    // Source-boundary assertions only: they pin the presentation structure and prove no actual
+    // smoothness. Interactive move/resize behaviour is accepted by Owner Manual Simulation
+    // Review; no window is created here and no session or motion behaviour is exercised.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void The_Commissioning_Window_Keeps_Four_Axis_Panels_In_A_Two_By_Two_Layout_At_A_Usable_Minimum_Size()
+    {
+        var form = ReadAppSource("apps/motion-commissioning/ManualMotionForm.cs");
+
+        Assert.Contains("new(ManualMotionAxis.A)", form, StringComparison.Ordinal);
+        Assert.Contains("new(ManualMotionAxis.B)", form, StringComparison.Ordinal);
+        Assert.Contains("new(ManualMotionAxis.C)", form, StringComparison.Ordinal);
+        Assert.Contains("new(ManualMotionAxis.D)", form, StringComparison.Ordinal);
+        Assert.Contains("ColumnCount = 2, RowCount = 2", form, StringComparison.Ordinal);
+        Assert.Contains("_axesLayout.Controls.Add(_axisC.Group, 0, 1)", form, StringComparison.Ordinal);
+        Assert.Contains("_axesLayout.Controls.Add(_axisD.Group, 1, 1)", form, StringComparison.Ordinal);
+        Assert.Contains("snapshot.Axes.Count >= 4", form, StringComparison.Ordinal);
+
+        // The four-panel minimum replaces the former single-panel-row floor.
+        Assert.Contains("MinimumSize = new Size(1240, 920)", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("new Size(1100, 760)", form, StringComparison.Ordinal);
+
+        // Identity is consumed from the snapshot projection only; the window derives no topology.
+        Assert.Contains("IdentityText(axis)", form, StringComparison.Ordinal);
+        Assert.Contains("axis.WaterJetId", form, StringComparison.Ordinal);
+        Assert.Contains("axis.CabinetId", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("MotionTopologyCatalog", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("WaterJetTopologyCatalog", form, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Interactive_Resize_Coalesces_Presentation_Without_Touching_The_Jog_Heartbeat()
+    {
+        var form = ReadAppSource("apps/motion-commissioning/ManualMotionForm.cs");
+
+        Assert.Contains("ResizeBegin += ", form, StringComparison.Ordinal);
+        Assert.Contains("ResizeEnd += ", form, StringComparison.Ordinal);
+        Assert.Contains("private ManualMotionSnapshot? _pendingSnapshot;", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("Queue<", form, StringComparison.Ordinal);
+
+        // Inside the tick, the hold-to-run heartbeat is posted before (outside) the
+        // presentation-coalescing branch, and the branch retains the snapshot instead of rendering.
+        var tick = Section(form, "private void OnRefreshTick()", "private void OnInteractiveResizeEnd()");
+        var heartbeat = tick.IndexOf("RequestJogHeartbeat", StringComparison.Ordinal);
+        var coalescing = tick.IndexOf("if (_interactiveResize)", StringComparison.Ordinal);
+        Assert.True(heartbeat >= 0 && coalescing > heartbeat, "heartbeat must precede the resize branch");
+        Assert.Contains("_pendingSnapshot = snapshot;", tick, StringComparison.Ordinal);
+
+        // When the drag ends, exactly the retained latest snapshot is rendered once.
+        var resizeEnd = Section(form, "private void OnInteractiveResizeEnd()", "private void Render(");
+        Assert.Contains("_interactiveResize = false;", resizeEnd, StringComparison.Ordinal);
+        Assert.Contains("Render(snapshot);", resizeEnd, StringComparison.Ordinal);
+
+        // One suspended-layout batch per render, always resumed in the same pass.
+        var render = Section(form, "private void Render(ManualMotionSnapshot snapshot)", "private static void RenderAxis(");
+        Assert.Contains("_axesLayout.SuspendLayout();", render, StringComparison.Ordinal);
+        Assert.Contains("finally", render, StringComparison.Ordinal);
+        Assert.Contains("_axesLayout.ResumeLayout(performLayout: false);", render, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void State_Grid_Cells_Ellipsize_Instead_Of_Wrapping_And_Keep_The_Full_Text_On_A_ToolTip()
+    {
+        var grid = ReadAppSource("apps/motion-commissioning/ManualMotionAxisStateGrid.cs");
+        var cell = ReadAppSource("apps/motion-commissioning/ManualMotionTimestampCell.cs");
+
+        Assert.Contains("AutoEllipsis = true", grid, StringComparison.Ordinal);
+        Assert.Contains("_toolTip.SetToolTip(control, text);", grid, StringComparison.Ordinal);
+        Assert.Contains("DoubleBuffered = true;", grid, StringComparison.Ordinal);
+        Assert.Contains("new ColumnStyle(SizeType.Percent, 19F)", grid, StringComparison.Ordinal);
+        Assert.Contains("new ColumnStyle(SizeType.Percent, 16F)", grid, StringComparison.Ordinal);
+        Assert.Contains("new ColumnStyle(SizeType.Percent, 25F)", grid, StringComparison.Ordinal);
+        Assert.Contains("new ColumnStyle(SizeType.Percent, 40F)", grid, StringComparison.Ordinal);
+
+        // The freshness/timestamp cell stays on one line with end ellipsis: the current/STALE
+        // wording at the start of the text remains readable and nothing wraps to a clipped line.
+        Assert.Contains("TextFormatFlags.SingleLine", cell, StringComparison.Ordinal);
+        Assert.Contains("TextFormatFlags.EndEllipsis", cell, StringComparison.Ordinal);
+        Assert.DoesNotContain("TextFormatFlags.WordBreak", cell, StringComparison.Ordinal);
+        Assert.Contains("\"current\"", grid, StringComparison.Ordinal);
+        Assert.Contains("\"STALE\"", grid, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Resize_Repair_Leaves_Cadences_And_The_No_Raw_Command_Surface_Unchanged()
+    {
+        var form = ReadAppSource("apps/motion-commissioning/ManualMotionForm.cs");
+        var runner = ReadAppSource("apps/motion-commissioning/ManualMotionSessionRunner.cs");
+
+        Assert.Contains("private const int RefreshIntervalMilliseconds = 100;", form, StringComparison.Ordinal);
+        Assert.Contains("private const int StepIntervalMilliseconds = 10;", runner, StringComparison.Ordinal);
+        Assert.Contains("DoubleBuffered = true;", form, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("TextBox", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("RichTextBox", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("ComboBox", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("DllImport", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("NativeLibrary", form, StringComparison.Ordinal);
+    }
+
+    private static string ReadAppSource(string relativePath) =>
+        File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar)))
+            .ReplaceLineEndings("\n");
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "WaterJetSentinelSuite.sln")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Repository root not found.");
+    }
+
+    private static string Section(string text, string startMarker, string endMarker)
+    {
+        var start = text.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, string.Concat("section start not found: ", startMarker));
+        var end = text.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end > start, string.Concat("section end not found: ", endMarker));
+        return text[start..end];
+    }
+
     /// <summary>The canonical Vertical Axis letter of one Water Jet, read from the catalogue.</summary>
     private static string VerticalOf(MotionCommissioningCatalogue catalogue, string waterJetId) =>
         catalogue.WaterJets.Single(binding => binding.WaterJetId == waterJetId).VerticalAxisId;
