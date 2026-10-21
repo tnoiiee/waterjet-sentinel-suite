@@ -40,16 +40,22 @@ export const TOPOLOGY = Object.freeze({
   correctedSensorIds: Object.freeze(['I7', 'I16']),
 });
 
-/** Approved target coverage: assignment follows the TARGET wall/region (legacy cleaning-device ordinal maps directly to WJn). */
+/**
+ * Canonical target coverage (Canonical Topology Adoption, 2026-10-21): WJ1-WJ4 clean the
+ * UPPER tier and WJ5-WJ8 the LOWER tier, each from the opposite wall in the same tier.
+ * Assignment follows the TARGET wall/region (legacy cleaning-device ordinal maps directly
+ * to WJn). The pre-adoption coverage (LOWER for WJ1-WJ4, UPPER for WJ5-WJ8) is superseded
+ * for current authority and survives only in frozen historical generator proof data.
+ */
 export const TARGET_COVERAGE = [
-  ['REAR', 'LOWER', 'WJ1'],
-  ['RIGHT', 'LOWER', 'WJ2'],
-  ['FRONT', 'LOWER', 'WJ3'],
-  ['LEFT', 'LOWER', 'WJ4'],
-  ['REAR', 'UPPER', 'WJ5'],
-  ['RIGHT', 'UPPER', 'WJ6'],
-  ['FRONT', 'UPPER', 'WJ7'],
-  ['LEFT', 'UPPER', 'WJ8'],
+  ['REAR', 'UPPER', 'WJ1'],
+  ['RIGHT', 'UPPER', 'WJ2'],
+  ['FRONT', 'UPPER', 'WJ3'],
+  ['LEFT', 'UPPER', 'WJ4'],
+  ['REAR', 'LOWER', 'WJ5'],
+  ['RIGHT', 'LOWER', 'WJ6'],
+  ['FRONT', 'LOWER', 'WJ7'],
+  ['LEFT', 'LOWER', 'WJ8'],
 ];
 const COVERAGE_BY_ID = new Map(TARGET_COVERAGE.map(([w, r, id]) => [id, `${w}|${r}`]));
 
@@ -89,7 +95,12 @@ export function canonicalSensorIds() {
 
 const SENSOR_ID_SET = new Set(canonicalSensorIds());
 const WATER_JET_IDS = TARGET_COVERAGE.map(([, , id]) => id);
-/** Placement vocabulary. UNRESOLVED = installed position pending authoritative layout (WJ1, WJ3); never anchored. */
+/**
+ * Placement vocabulary. Under the current Owner disposition the fine-grained placement of
+ * ALL EIGHT Water Jets is UNRESOLVED (fine-grained placement pending authoritative layout;
+ * canonical wall/tier confirmed) and never anchored; the resolved kinds remain defined
+ * vocabulary for a future authoritative layout, not current Product truth.
+ */
 const WATER_JET_PLACEMENT_KINDS = new Set(['BETWEEN_HORIZONTAL', 'BETWEEN_VERTICAL', 'JUNCTION', 'UNRESOLVED']);
 const ISOLATION_VALVE_IDS = WATER_JET_IDS.map((id) => `IV${id.slice(2)}`);
 
@@ -103,7 +114,13 @@ const ISOLATION_VALVE_IDS = WATER_JET_IDS.map((id) => `IV${id.slice(2)}`);
 export const MOTION_SECTION_ID = 'MOTION_COMMISSIONING_FOUNDATION';
 export const MOTION_SECTION_REVISION = 1;
 export const MOTION_SOURCE = 'APPLICATION_OWNED_MOTION_COMMISSIONING_MODEL';
-export const MOTION_TOPOLOGY_REVISION = 'OWNER_CONFIRMED_REV1';
+/** Current canonical motion topology revision (Canonical Topology Adoption, 2026-10-21). */
+export const MOTION_TOPOLOGY_REVISION = 'OWNER_CONFIRMED_REV2';
+/**
+ * HISTORICAL ONLY: the superseded motion topology revision. REV1 remains the historical
+ * identity of the earlier allocation and its evidence; current validators require REV2.
+ */
+export const MOTION_TOPOLOGY_REVISION_HISTORICAL_REV1 = 'OWNER_CONFIRMED_REV1';
 export const MOTION_GATE_CLOSED = 'CLOSED';
 export const MOTION_GATE_REASON = 'MOTION_COMMISSIONING_GATE_NOT_OPEN';
 export const MOTION_INTENTS = Object.freeze(['JOG', 'MOVE', 'HOME', 'STOP', 'RELEASE_BRAKE', 'RESET_ENCODER']);
@@ -126,15 +143,15 @@ export const MOTION_AXIS_IDS = Object.freeze(['A', 'B', 'C', 'D']);
 export const MOTION_AXIS_ROLE = Object.freeze({ A: 'HORIZONTAL', B: 'VERTICAL', C: 'HORIZONTAL', D: 'VERTICAL' });
 /** Brake output allocation: A-1, B-2, C-3, D-4 (Owner-confirmed). */
 export const MOTION_BRAKE_OUTPUT = Object.freeze({ A: 'OUTPUT_1', B: 'OUTPUT_2', C: 'OUTPUT_3', D: 'OUTPUT_4' });
-/** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the Owner-confirmed allocation. */
+/** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the Owner-confirmed REV2 allocation. */
 export const MOTION_WATER_JET_BINDINGS = Object.freeze([
-  ['WJ1', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ2', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
-  ['WJ3', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
-  ['WJ4', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ5', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
-  ['WJ6', 'WSB3', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ7', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ1', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ2', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ3', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ4', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ5', 'WSB3', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ6', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ7', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
   ['WJ8', 'WSB4', 'C', 'D', 'CONFIRMED_OWNER'],
 ]);
 export const MOTION_LIMIT_SIGNAL_ROLES = Object.freeze(['REVERSE', 'HOME', 'FORWARD']);
@@ -226,20 +243,21 @@ function validateWaterJets(waterJets, path, issues) {
     }
     if (w.placementKind === 'NON_SENSOR_GAP') {
       // I7 and I16 are Sensors: no Water Jet is placed "at a non-Sensor gap".
-      issues.push(`${path}[${i}]: placementKind NON_SENSOR_GAP is superseded (I7 and I16 are Product Sensors; Owner placement decision pending)`);
+      issues.push(`${path}[${i}]: placementKind NON_SENSOR_GAP is superseded (I7 and I16 are Product Sensors; fine-grained placement is UNRESOLVED for all Water Jets under the current Owner disposition)`);
     } else if (!WATER_JET_PLACEMENT_KINDS.has(w.placementKind)) {
       issues.push(`${path}[${i}]: placementKind must be one of ${[...WATER_JET_PLACEMENT_KINDS].join(', ')}`);
+    } else if (w.placementKind !== 'UNRESOLVED') {
+      // Owner placement disposition (Canonical Topology Adoption): the fine-grained
+      // placement of EVERY Water Jet is UNRESOLVED. Only the canonical installed
+      // wall/region is authoritative; a resolved placement kind belongs to a future
+      // authoritative layout and is refused here.
+      issues.push(`${path}[${i}]: placementKind must be UNRESOLVED in the current canonical topology (fine-grained placement unresolved for all Water Jets; canonical wall/tier confirmed)`);
     }
-    if (w.placementKind === 'UNRESOLVED') {
-      // Owner WJ installed-position ruling: a placement that depended on a revoked gap position
-      // is UNRESOLVED ("Installed position pending authoritative layout") and carries NO
-      // anchors. Nothing is inferred from I7, I16, a former gap, a Sensor wall, the target wall,
-      // a target Sensor, the legacy cannon value or the Assigned Cleaning Device ID.
-      if (!Array.isArray(w.placementAnchors) || w.placementAnchors.length !== 0) {
-        issues.push(`${path}[${i}]: an UNRESOLVED placement must carry no placementAnchors (no inferred installed position)`);
-      }
-    } else if (!Array.isArray(w.placementAnchors) || w.placementAnchors.length === 0 || !w.placementAnchors.every(isStr)) {
-      issues.push(`${path}[${i}]: placementAnchors must be a non-empty string array`);
+    // An UNRESOLVED placement carries NO anchors. Nothing is inferred, mirrored or
+    // transferred from I7, I16, a former gap, a Sensor wall, the target wall, a target
+    // Sensor, the legacy cannon value or the Assigned Cleaning Device ID.
+    if (!Array.isArray(w.placementAnchors) || w.placementAnchors.length !== 0) {
+      issues.push(`${path}[${i}]: placementAnchors must be empty: an UNRESOLVED placement must carry no placementAnchors (no inferred installed position)`);
     }
   }
 }
@@ -503,7 +521,7 @@ export function validTcAcquisition(tc) {
  *
  * The catalogue is accepted ONLY in the state this software revision can actually publish: the
  * authorization gate CLOSED, four controllers, sixteen axes, the CANONICAL Owner-confirmed Water Jet
- * axis allocation for all eight Water Jets (WJ2 = C,D and WJ4 = A,B included), the WJ2 / WJ4 Drawing
+ * axis allocation for all eight Water Jets (REV2: WJ2 = A,B and WJ4 = C,D included), the WJ2 / WJ4 Drawing
  * rev1 discrepancy recorded as evidence only and never as ambiguity, the Jog Speed as a display
  * value in controller units, and no axis homed, connected, commissioned or authorized to move.
  * A catalogue that claims a configured endpoint, a ready controller, a homed axis, an executable

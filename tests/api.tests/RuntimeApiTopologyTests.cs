@@ -15,7 +15,8 @@ namespace Wjss.Runtime.Api.Tests;
 /// Sensors / 216 assigned / 240 physical / 24 unassigned / 8 WJ / 8 IV), the corrected
 /// Sensor references I7 and I16 (normal Product Sensors, never presented as Water Jet
 /// identities, never gaps), the paired WJ/IV topology views with installed position
-/// separate from target coverage (WJ1 / WJ3 UNRESOLVED, no anchors) and acquisition
+/// separate from target coverage (Canonical Topology Adoption: canonical wall / tier,
+/// fine-grained placement UNRESOLVED with no anchors for all eight) and acquisition
 /// explicitly DEFERRED, and per-Sensor assigned device references. No control surface is asserted to exist: the
 /// route registry carries the read-only routes only, every host mapping is a
 /// GET, and no write/command/dispatch route constant exists to map.
@@ -77,31 +78,34 @@ public sealed class RuntimeApiTopologyTests
     }
 
     [Fact]
-    public void WJ1_And_WJ3_Installed_Position_Is_Unresolved_With_No_Anchor_And_Unchanged_Target_Coverage()
+    public void All_WaterJet_Fine_Grained_Placements_Are_Unresolved_With_No_Anchors_And_Canonical_Target_Coverage()
     {
         var topology = RuntimeEquipmentTopology.Canonical();
 
+        // Canonical Topology Adoption: for every Water Jet the note states that only the
+        // fine-grained placement is pending — the canonical wall / tier is confirmed and
+        // no view may present it as unknown.
+        Assert.All(topology.WaterJets, w =>
+        {
+            Assert.Equal(WaterJetPlacementKind.UNRESOLVED, w.PlacementKind);
+            Assert.Empty(w.PlacementAnchors);
+            Assert.Equal(WaterJetTopologyCatalog.UnresolvedPlacementWording, w.InstalledPositionNote);
+        });
+        Assert.Contains("canonical wall/tier confirmed", WaterJetTopologyCatalog.UnresolvedPlacementWording, StringComparison.Ordinal);
+
         var wj1 = topology.WaterJets.Single(w => w.WaterJetId == "WJ1");
-        Assert.Equal(WaterJetPlacementKind.UNRESOLVED, wj1.PlacementKind);
-        Assert.Empty(wj1.PlacementAnchors);
-        Assert.Equal(WaterJetTopologyCatalog.UnresolvedPlacementWording, wj1.InstalledPositionNote);
+        Assert.Equal(Wall.FRONT, wj1.InstalledWall);
+        Assert.Equal(Region.UPPER, wj1.InstalledRegion);
         Assert.Equal(Wall.REAR, wj1.TargetWall);
-        Assert.Equal(Region.LOWER, wj1.TargetRegion);
+        Assert.Equal(Region.UPPER, wj1.TargetRegion);
         Assert.Equal("IV1", wj1.DedicatedIsolationValveId);
 
         var wj3 = topology.WaterJets.Single(w => w.WaterJetId == "WJ3");
-        Assert.Equal(WaterJetPlacementKind.UNRESOLVED, wj3.PlacementKind);
-        Assert.Empty(wj3.PlacementAnchors);
-        Assert.Equal(WaterJetTopologyCatalog.UnresolvedPlacementWording, wj3.InstalledPositionNote);
+        Assert.Equal(Wall.REAR, wj3.InstalledWall);
+        Assert.Equal(Region.UPPER, wj3.InstalledRegion);
         Assert.Equal(Wall.FRONT, wj3.TargetWall);
-        Assert.Equal(Region.LOWER, wj3.TargetRegion);
+        Assert.Equal(Region.UPPER, wj3.TargetRegion);
         Assert.Equal("IV3", wj3.DedicatedIsolationValveId);
-
-        Assert.All(topology.WaterJets.Where(w => w.PlacementKind != WaterJetPlacementKind.UNRESOLVED), w =>
-        {
-            Assert.Null(w.InstalledPositionNote);
-            Assert.True(w.PlacementAnchors.Count > 0);
-        });
     }
 
     [Fact]
@@ -155,17 +159,17 @@ public sealed class RuntimeApiTopologyTests
                     waterJet.TargetRegion);
             }
 
-            // The binding legacy example: rear-lower Sensors are cleaned by WJ1/IV1,
-            // which installs on the front-lower wall (assignment is responsibility,
-            // never location).
+            // The binding legacy example (canonical topology): rear-lower Sensors are
+            // cleaned by WJ5/IV5, which installs on the front-lower wall (assignment is
+            // responsibility, never location).
             var rearLowerSensors = runtime.State.Sensors
                 .Where(s => s.Wall == Wall.REAR && s.LogicalRow == 5)
                 .ToArray();
             Assert.True(rearLowerSensors.Length > 0);
             Assert.All(rearLowerSensors, s =>
             {
-                Assert.Equal("WJ1", s.AssignedWaterJetId);
-                Assert.Equal("IV1", s.AssignedIsolationValveId);
+                Assert.Equal("WJ5", s.AssignedWaterJetId);
+                Assert.Equal("IV5", s.AssignedIsolationValveId);
             });
 
             // The composed snapshot itself carries the topology collections.

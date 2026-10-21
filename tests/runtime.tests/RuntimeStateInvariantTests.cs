@@ -124,8 +124,8 @@ public sealed class RuntimeStateInvariantTests
         Assert.False(string.IsNullOrWhiteSpace(i7.TcRearChannel));
         Assert.False(string.IsNullOrWhiteSpace(i16.TcFrontChannel));
         Assert.False(string.IsNullOrWhiteSpace(i16.TcRearChannel));
-        Assert.Equal("WJ1", i7.AssignedWaterJetId);
-        Assert.Equal("WJ3", i16.AssignedWaterJetId);
+        Assert.Equal("WJ5", i7.AssignedWaterJetId);
+        Assert.Equal("WJ7", i16.AssignedWaterJetId);
 
         Assert.Equal(24, state.Sensors.Count(sensor => sensor.Wall == Wall.LEFT));
         Assert.Equal(30, state.Sensors.Count(sensor => sensor.Wall == Wall.REAR));

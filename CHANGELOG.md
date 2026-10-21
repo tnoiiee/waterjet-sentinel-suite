@@ -13,6 +13,72 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-21 — Canonical Topology Adoption (software/data only; no hardware authorization)
+
+**Status: SOURCE-AUTHORED ON THE SESSION BRANCH; .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in
+the Agent sandbox; the Owner-local .NET gate — locked restore, build, full test suite and the
+authoritative C# `FixtureParityTests` — remains pending and no .NET result is claimed). NO NATIVE
+DLL LOAD, ENDPOINT CONNECTION, CONTROLLER COMMAND OR HARDWARE CONTACT.** This checkpoint adopts the
+Owner canonical installed topology and the canonical/default Sensor-to-WaterJet assignments as one
+consolidated pass. It changes no sequencing, safety, pump/valve, manual-motion execution or
+hardware-facing behaviour.
+
+**Canonical installed topology and Target Coverage.** WJ1–WJ4 are the UPPER tier and WJ5–WJ8 the
+LOWER tier: WJ1 FRONT/UPPER, WJ2 LEFT/UPPER, WJ3 REAR/UPPER, WJ4 RIGHT/UPPER, WJ5 FRONT/LOWER, WJ6
+LEFT/LOWER, WJ7 REAR/LOWER, WJ8 RIGHT/LOWER, each spraying the opposite wall in the same tier. This
+supersedes the installed/target rows approved earlier in ADR-0017 decisions 5 and 7; the ADR-0017
+spirit/history is preserved by an addendum (the original dated body is untouched).
+
+**Canonical/default assignments.** By physical Sensor wall/tier: REAR/UPPER 10 → WJ1/IV1, RIGHT/UPPER
+8 → WJ2/IV2, FRONT/UPPER 10 → WJ3/IV3, LEFT/UPPER 8 → WJ4/IV4, REAR/LOWER 20 → WJ5/IV5, RIGHT/LOWER
+16 → WJ6/IV6, FRONT/LOWER 20 → WJ7/IV7, LEFT/LOWER 16 → WJ8/IV8 (total 108). I7 (REAR/LOWER) →
+WJ5/IV5 and I16 (FRONT/LOWER) → WJ7/IV7; both remain ordinary Product Sensors. All 108 assigned
+WJ/IV values change versus the pre-adoption baseline. Legacy semantics are unchanged: `cannon` is
+the Assigned Cleaning Device ID, `cannon n → WJn`, WJn↔IVn. No Sensor-specific override, effective
+assignment, modal or provenance surface was added; the private Owner CSV is not in Git and was not
+inspected. Sensor/TC physical topology and the Sensor→SDS/Cabinet/module/channel mapping are
+unchanged (108 Sensors, 216 assigned TC channels of 240 physical, 24 spare).
+
+**Placement.** The fine-grained placement of ALL EIGHT Water Jets is now `UNRESOLVED` with no
+placement anchors: the stale opposite-tier anchors of WJ2, WJ4, WJ5, WJ6, WJ7 and WJ8 were removed
+and no anchor was inferred, mirrored, transferred or generated. Only fine-grained placement/anchors
+remain unresolved — the canonical installed wall/tier and Target Coverage are authoritative. C# and
+TypeScript validators refuse resolved placement kinds and any anchor.
+
+**Motion allocation REV2.** The current motion identities are `OWNER_CONFIRMED_REV2` and
+`MOTION_COMMISSIONING_DESIGN_REV2` (schema `/1` unchanged): WJ1=WSB2 A/B, WJ2=WSB1 A/B, WJ3=WSB1 C/D,
+WJ4=WSB2 C/D, WJ5=WSB3 A/B, WJ6=WSB4 A/B, WJ7=WSB3 C/D, WJ8=WSB4 C/D (A/C Horizontal, B/D Vertical;
+brake outputs A→1, B→2, C→3, D→4 as catalogue identity only). `OWNER_CONFIRMED_REV1` /
+`MOTION_COMMISSIONING_DESIGN_REV1` remain historical identities: current validators refuse them
+(the commissioning design validator now also refuses a REV1 `designId`), current publication uses
+REV2, and design fingerprints update deterministically from the REV2 canonical text (JS design
+fingerprint `c85bfce56d41b8bf…`, deterministic across runs, superseding the REV1 `c008220fb8aa8480…`;
+nothing is hard-coded). The WJ2/WJ4 Drawing evidence note remains `NOT_PHYSICALLY_RESOLVED`,
+evidence-only, reworded as a superseded-REV1 record; nothing asserts which allocation installed
+wiring matches. Manual Motion execution is unchanged (WSB1 A/B, outputs 1/2, A/B Stop only); the
+runbook now merely clarifies that WSB1 A/B is diagnostically WJ2 (Upper Left, Target Coverage
+Right/Upper). No Manual C/D, output 3/4 write, WJ selection or Cleaning Path surface was added.
+
+**Generators and generated resources.** The fixture generator now strictly separates the current
+canonical equipment/assignment table from a frozen, explicitly historical/non-Product table used
+only by `--legacy-proof`; current generation never imports the historical table. Regenerated via the
+generator owners only: `snapshot.seed0.json` (topology/assignment leaves only versus baseline),
+`delta.basic.json` (two WJ8/IV8 → WJ4/IV4 pairs) and `sensor-parameters.migrated.example.json`
+(topology-only). `sensor-map.example.json` is byte-unchanged. Byte proofs (Agent sandbox, Node):
+`--legacy-proof` snapshot and migrated example are byte-identical to commit `7dc7c691…`, and the
+historical `--delta` is byte-identical to the pre-adoption committed delta; regeneration is
+deterministic on a second run.
+
+**Validation observed (Agent sandbox only).** contracts-ts `npm test` 56/56 and `tsc` typecheck
+PASS (exit 0); commissioning `npm run check` PASS and `npm test` 239/239; ops-preview
+`npm run check` PASS and `npm test` 171/171; mapping-config app 82/82 and package 261 pass /
+7 skipped / 0 fail; boundary scan `0 findings (S1-S9 clean)` exit 0 and its own tests 33/33;
+reconciliation assertions PASS (108/216/240/24 integrity, per-WJ counts 10/8/10/8/20/16/20/16,
+108/108 WJ+IV changed, I7→WJ5/IV5, I16→WJ7/IV7, 0 SDS-channel changes, 0 package/lock/project
+changes, 0 Manual Motion/motion-library/evidence files changed); `git diff --check` clean. **.NET
+restore/build/test and C# fixture parity: NOT RUN — Owner-local gate pending.** No physical
+placement, wiring, Hardware or Production claim is made or implied.
+
 ### 2026-10-18 — Integrated WSB1 Manual Motion Commissioning vertical slice (software only; no hardware authorization)
 
 **Status: SOURCE-AUTHORED ON THE SESSION BRANCH FOR PR #34; .NET RESTORE/BUILD/TEST AND LOCK

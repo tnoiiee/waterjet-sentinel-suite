@@ -117,17 +117,25 @@ sequence is exactly, in this order and with no holes, replacement identities or 
   dedicated Isolation Valve **IV1–IV8 by ordinal** (§2.8). Nothing in the matrix owns, contains,
   or is a Water Jet; no matrix position is a Water Jet slot, a Cannon slot, or an equipment slot.
 - **Installed Position and Target Coverage are separate concepts.** A Water Jet is installed on
-  one wall and covers the *opposite* wall in the matching region: **WJ1 is installed FRONT/LOWER,
-  targets REAR/LOWER and pairs with IV1**; **WJ3 is installed REAR/LOWER, targets FRONT/LOWER and
-  pairs with IV3**. The earlier placement description "at the I16 / I7 gap anchor" is superseded;
-  the replacement placement description for WJ1 and WJ3 is an **open Owner decision** `[OPEN]`
-  and is not invented here.
+  one wall and covers the *opposite* wall in the matching region. Canonical installed topology
+  (Owner Canonical Topology Adoption, 2026-10-21; §2.6 table): **WJ1 is installed FRONT/UPPER,
+  targets REAR/UPPER and pairs with IV1**; **WJ3 is installed REAR/UPPER, targets FRONT/UPPER and
+  pairs with IV3** — WJ1–WJ4 form the UPPER tier and WJ5–WJ8 the LOWER tier. The *fine-grained*
+  placement of **all eight** Water Jets is `UNRESOLVED` with no placement anchors: the earlier
+  "at the I16 / I7 gap anchor" descriptions stay revoked and the stale opposite-tier anchors of
+  the other six are removed; no replacement anchor is inferred, mirrored or transferred. Only
+  the fine-grained placement is unresolved — the canonical installed wall / tier and Target
+  Coverage are authoritative.
 - **Assigned Cleaning Device identity is ordinal and is never inferred from the wall a Sensor is
   located on.** The legacy `cannon` column of `sensorparam.csv` means **Assigned Cleaning Device
   ID** — a direct ordinal reference `cannon n → WJn` (WJ1–WJ8), *not* a grid position, *not* an
   installed wall, and *not* a "nearest or same-wall Water Jet". Assignment follows responsibility
-  for the **target** wall and region, so a Rear-lower Sensor (I7 included) is assigned WJ1 even
-  though WJ1 is installed on the Front-lower wall.
+  for the **target** wall and region, so a Rear-lower Sensor (I7 included) is assigned WJ5 even
+  though WJ5 is installed on the Front-lower wall. Canonical default assignment by physical
+  Sensor wall / tier: Rear/Upper → WJ1/IV1 (10 Sensors), Right/Upper → WJ2/IV2 (8),
+  Front/Upper → WJ3/IV3 (10), Left/Upper → WJ4/IV4 (8), Rear/Lower → WJ5/IV5 (20),
+  Right/Lower → WJ6/IV6 (16), Front/Lower → WJ7/IV7 (20), Left/Lower → WJ8/IV8 (16) —
+  108 in total, I7 → WJ5/IV5 and I16 → WJ7/IV7 included.
 - Wall rows are the logical rows; there is no rotation or reversal. The question of row
   alignment across walls of unequal height is resolved by this matrix.
 - The labels are a logical reference. They do **not** define Modbus addresses, register maps,
@@ -138,11 +146,13 @@ sequence is exactly, in this order and with no holes, replacement identities or 
   them as `NON_SENSOR_GAP` placement anchors (I7 → WJ3, I16 → WJ1) with 106 Sensors and 212
   channels, and the Sensor sequence "skipping" them. Both are superseded and are preserved only
   inside dated historical records and in ADR-0017's own supersession history. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
-- *.NET status:* `packages/contracts/WallMap.cs` (`CanonicalSensorMap.NonSensorGapSlots`),
-  `packages/domain/WaterJetTopologyCatalog.cs` (`GapAnchors`) and the related .NET runtime,
-  importer, synthetic map and fixtures still encode the superseded form; their correction is
-  pending the Owner-local .NET pass (no .NET SDK in Arena). Until then the Node layers refuse
-  the stale projections explicitly rather than presenting them.
+- *.NET status:* the .NET contracts, domain catalogue, importer, runtime, synthetic map and
+  fixtures encode the corrected 108 / 216 baseline (Owner-validated at Stage 0.4C-K3) and,
+  as of the Canonical Topology Adoption (2026-10-21), the canonical installed topology,
+  canonical Target Coverage, canonical default assignments and the all-`UNRESOLVED`
+  fine-grained placement disposition. The Adoption's own .NET build / test / fixture-parity
+  validation is the pending Owner-local gate (no .NET SDK in the Agent environment); no
+  result is claimed here before that gate runs.
 
 ### 2.3 Sensor
 
@@ -198,20 +208,32 @@ reserved for the duration of a Cleaning Job. `[OWNER CONFIRMED]`
 **Installed Position and Target Coverage are separate attributes.** A Water Jet is installed on
 one wall and covers the *opposite* wall in the matching region:
 
-| Water Jet | Installed Position | Target Coverage | Dedicated Isolation Valve |
+Canonical installed topology (Owner Canonical Topology Adoption, 2026-10-21). For every row
+the *fine-grained* placement is `UNRESOLVED` with no placement anchors (see below):
+
+| Water Jet | Installed Position (canonical wall / tier) | Target Coverage | Dedicated Isolation Valve |
 | --- | --- | --- | --- |
-| WJ1 | FRONT / LOWER — placement description `[OPEN]` (formerly "at the `NON_SENSOR_GAP` anchor I16"; I16 is a Sensor) | REAR / LOWER | IV1 |
-| WJ3 | REAR / LOWER — placement description `[OPEN]` (formerly "at the `NON_SENSOR_GAP` anchor I7"; I7 is a Sensor) | FRONT / LOWER | IV3 |
-| WJ2, WJ4 | LEFT / LOWER, RIGHT / LOWER (between horizontal Sensors) | RIGHT / LOWER, LEFT / LOWER | IV2, IV4 |
-| WJ5, WJ7 | FRONT / UPPER, REAR / UPPER (between vertical Sensors) | REAR / UPPER, FRONT / UPPER | IV5, IV7 |
-| WJ6, WJ8 | LEFT / UPPER, RIGHT / UPPER (Sensor junctions) | RIGHT / UPPER, LEFT / UPPER | IV6, IV8 |
+| WJ1 | FRONT / UPPER | REAR / UPPER | IV1 |
+| WJ2 | LEFT / UPPER | RIGHT / UPPER | IV2 |
+| WJ3 | REAR / UPPER | FRONT / UPPER | IV3 |
+| WJ4 | RIGHT / UPPER | LEFT / UPPER | IV4 |
+| WJ5 | FRONT / LOWER | REAR / LOWER | IV5 |
+| WJ6 | LEFT / LOWER | RIGHT / LOWER | IV6 |
+| WJ7 | REAR / LOWER | FRONT / LOWER | IV7 |
+| WJ8 | RIGHT / LOWER | LEFT / LOWER | IV8 |
 
 No matrix position is a Water Jet or any other equipment; I7 and I16 are Sensors (Owner
 critical topology correction, §2.2.1), so the former "gap anchor" placement of WJ1 and WJ3 no
-longer describes a matrix position. The replacement placement vocabulary for WJ1 and WJ3 is an
-open Owner decision. The approved table in `packages/domain/WaterJetTopologyCatalog.cs` (ADR-0017
-decisions 5 and 7) still carries the superseded `NonSensorGap` placement for WJ1/WJ3 pending the
-Owner-local .NET pass. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
+longer describes a matrix position. Owner placement disposition (Canonical Topology
+Adoption): the fine-grained placement of **all eight** Water Jets is `UNRESOLVED` with **no**
+placement anchors — WJ1 / WJ3 keep the revoked-gap disposition and the stale anchors formerly
+carried by WJ2, WJ4, WJ5, WJ6, WJ7 and WJ8 (which described the opposite installed tier) are
+removed. No anchor is inferred, mirrored, transferred or generated; Target-zone Sensor IDs
+are never installed-position anchors. Only the fine-grained placement is unresolved: the
+canonical installed wall / tier above and Target Coverage are authoritative, and current
+wording must never present the wall / tier itself as unknown. The approved table lives in
+`packages/domain/WaterJetTopologyCatalog.cs`; ADR-0017 decisions 5 and 7 are superseded in
+this respect by the Adoption (see the ADR-0017 addendum). Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 
 ### 2.7 GalilController
 

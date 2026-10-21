@@ -9,7 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MOTION_ALL_REFUSAL_REASONS, MOTION_AXIS_IDS, MOTION_AXIS_ROLE, MOTION_AXIS_SENSE, MOTION_BRAKE_OUTPUT,
-  MOTION_CABINETS, MOTION_COMMISSIONING_DESIGN, MOTION_GATE_CLOSED, MOTION_GATE_REASON, MOTION_INTENTS,
+  MOTION_CABINETS, MOTION_COMMISSIONING_DESIGN, MOTION_COMMISSIONING_DESIGN_ID,
+  MOTION_COMMISSIONING_DESIGN_ID_HISTORICAL_REV1, MOTION_GATE_CLOSED, MOTION_GATE_REASON, MOTION_INTENTS,
   MOTION_LIMIT_SIGNAL_ROLES, MOTION_NOT_VERIFIED_CLAIMS, MOTION_REFUSAL_WORDING, MOTION_STANDING_REFUSAL_REASONS,
   MOTION_STATUS_WORDING, MOTION_WATER_JET_BINDINGS, axisWording, axisPresentation,
   canonicalMotionCommissioningText, motionCommissioningDesign,
@@ -18,6 +19,16 @@ import {
 
 test('the design projection is frozen, valid and carries the whole topology', () => {
   assert.equal(validateMotionCommissioningDesign(MOTION_COMMISSIONING_DESIGN), true);
+  // Canonical Topology Adoption: REV2 is the current design identity; REV1 is retained
+  // as explicitly historical identity only and is never the published design.
+  assert.equal(MOTION_COMMISSIONING_DESIGN_ID, 'MOTION_COMMISSIONING_DESIGN_REV2');
+  assert.equal(MOTION_COMMISSIONING_DESIGN.designId, 'MOTION_COMMISSIONING_DESIGN_REV2');
+  assert.equal(MOTION_COMMISSIONING_DESIGN_ID_HISTORICAL_REV1, 'MOTION_COMMISSIONING_DESIGN_REV1');
+  assert.notEqual(MOTION_COMMISSIONING_DESIGN.designId, MOTION_COMMISSIONING_DESIGN_ID_HISTORICAL_REV1);
+  // A design carrying the historical REV1 identity must never validate as current.
+  const rev1Design = motionCommissioningDesign();
+  rev1Design.designId = MOTION_COMMISSIONING_DESIGN_ID_HISTORICAL_REV1;
+  assert.equal(validateMotionCommissioningDesign(rev1Design), false);
   assert.equal(MOTION_COMMISSIONING_DESIGN.controllers.length, 4);
   assert.equal(MOTION_COMMISSIONING_DESIGN.axes.length, 16);
   assert.equal(MOTION_COMMISSIONING_DESIGN.waterJets.length, 8);
@@ -80,9 +91,9 @@ test('the canonical mapping is explicit data: no parity rule and no cabinet rule
   const horizontal = (waterJetId) => MOTION_COMMISSIONING_DESIGN.waterJets
     .find((row) => row.waterJetId === waterJetId).horizontalAxisId;
 
-  // The canonical values the Owner ruled.
-  assert.equal(horizontal('WJ2'), 'C');
-  assert.equal(horizontal('WJ4'), 'A');
+  // The canonical values the Owner ruled under REV2.
+  assert.equal(horizontal('WJ2'), 'A');
+  assert.equal(horizontal('WJ4'), 'C');
 
   // No cabinet-derived formula: the two Water Jets of every cabinet take different axis pairs.
   for (const cabinet of MOTION_CABINETS) {
@@ -170,6 +181,11 @@ test('the WJ2 / WJ4 Drawing discrepancy is recorded as evidence only and changes
   assert.equal(note.physicalResolution, 'NOT_PHYSICALLY_RESOLVED');
   assert.ok(note.statement.length > 0);
   assert.ok(note.effect.length > 0);
+  // The statement is explicitly historical: REV1 is superseded for current allocation,
+  // REV2 is current, and no physical resolution is claimed.
+  assert.ok(note.statement.includes('superseded OWNER_CONFIRMED_REV1 allocation'));
+  assert.ok(note.statement.includes('OWNER_CONFIRMED_REV2'));
+  assert.ok(note.statement.includes('NOT_PHYSICALLY_RESOLVED'));
 
   // Evidence only: the note does not make any row ambiguous and does not reopen a decision.
   for (const row of MOTION_COMMISSIONING_DESIGN.waterJets) {
@@ -185,7 +201,7 @@ test('the canonical text is deterministic, complete and carries no address', () 
   const second = canonicalMotionCommissioningText();
   assert.equal(first, second);
   assert.equal(first, canonicalMotionCommissioningText(motionCommissioningDesign()));
-  assert.match(first, /^MOTION COMMISSIONING DESIGN MOTION_COMMISSIONING_DESIGN_REV1/);
+  assert.match(first, /^MOTION COMMISSIONING DESIGN MOTION_COMMISSIONING_DESIGN_REV2/);
   assert.match(first, /GATE CLOSED - MOTION_COMMISSIONING_GATE_NOT_OPEN/);
   assert.match(first, /CONTROLLERS 4/);
   assert.match(first, /AXES 16/);

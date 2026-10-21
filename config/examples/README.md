@@ -36,17 +36,25 @@ measurements, 240 physical TC channels, 24 unassigned.
 - `sensor-parameters.migrated.example.json` has been **regenerated** to that baseline
   with `tools/migrated-example/generate.mjs` (`--write`): 108 logical positions (all
   `SENSOR`, no `gapAnchorForWaterJetId`), 108 Sensor configurations with dense
-  scanOrder 1–108 (I7 scan 79 → WJ1/IV1, I16 scan 88 → WJ3/IV3), the same per-Sensor
+  scanOrder 1–108 (canonical assignments per the Canonical Topology Adoption,
+  2026-10-21: I7 scan 79 → WJ5/IV5, I16 scan 88 → WJ7/IV7; per-Water-Jet counts
+  10/8/10/8/20/16/20/16), the same per-Sensor
   formulas the synthetic CSV (`tests/config.tests/SyntheticSensorParameterCsv.cs`)
   feeds the importer (dirty bounds 15+(s%10) … 65+(s%10), threshold 55+(s%20),
   enabled s%17≠0 → six Disabled Sensors at scan 17/34/51/68/85/102, cleaningCount s%4),
-  and `placementKind: UNRESOLVED` with `placementAnchors: []` for WJ1/WJ3 (Owner ruling:
-  installed position pending authoritative layout; nothing inferred from the former
-  gap). Proof: `--legacy-proof` reproduces the previously committed 106-form file
+  and `placementKind: UNRESOLVED` with `placementAnchors: []` for **all eight** Water
+  Jets (Owner disposition: only the fine-grained placement is pending authoritative
+  layout — canonical wall/tier confirmed; nothing inferred from the former gap or any
+  stale anchor). Equipment rows and assignments come from the canonical table in
+  `tools/fixture-generator/generate.mjs`; the frozen historical table serves
+  `--legacy-proof` only and is never Product authority. Proof: `--legacy-proof` reproduces the previously committed 106-form file
   **byte-identically**, and a second `--write` run produces no diff. The .NET importer
   and `SensorParameterMigrationTests` were corrected to the same form; the Owner-local
   `MigratedExampleShapeTests` / importer run **PASSED** at PR #21 head `041b2863…` (full .NET
   455 / 455; `docs/STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md` §13). The file was never hand-edited.
+  The Canonical Topology Adoption regeneration (2026-10-21) reuses the same generator and
+  proofs; its Owner-local .NET validation is pending and is not claimed here.
+  `sensor-map.example.json` is unchanged by the Adoption (re-verified byte-identical).
 
 Stage 0.3A-3 Checkpoint B added `sensor-parameters.migrated.example.json`: the
 canonical shape of the migrated legacy sensor parameters (ADR-0017) — 108

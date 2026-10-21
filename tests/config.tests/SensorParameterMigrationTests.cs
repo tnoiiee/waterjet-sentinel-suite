@@ -10,7 +10,10 @@ namespace Wjss.Config.Tests;
 /// Stage 0.3A-3 Checkpoint B invariant tests for the legacy sensor-parameter migration
 /// (ADR-0017; approved planned tests T1–T20), corrected to the Owner critical topology
 /// correction (Stage 0.4C-K3): 108 Sensors, 216 structural TC sides, I7 and I16 normal Product
-/// Sensors in ordinal position, no NON_SENSOR_GAP vocabulary, WJ1 / WJ3 placement UNRESOLVED.
+/// Sensors in ordinal position, no NON_SENSOR_GAP vocabulary; and to the Canonical
+/// Topology Adoption (2026-10-21): WJ1–WJ4 installed / targeting the UPPER tier,
+/// WJ5–WJ8 the LOWER tier, fine-grained placement UNRESOLVED with no anchors for all
+/// eight Water Jets, canonical default assignments 10 / 8 / 10 / 8 / 20 / 16 / 20 / 16.
 /// All fixtures are synthetic public-safe rows built by <see cref="SyntheticSensorParameterCsv"/>;
 /// the Owner CSV never enters Git.
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local test run is the arbiter).
@@ -95,8 +98,8 @@ public sealed class SensorParameterMigrationTests
         Assert.Equal(3, i7.WallColumn);
         Assert.True(i7.Enabled);
         Assert.Equal(15 + (79 % 10), i7.DiffLowerBound);
-        Assert.Equal("WJ1", i7.AssignedWaterJetId);
-        Assert.Equal("IV1", i7.AssignedIsolationValveId);
+        Assert.Equal("WJ5", i7.AssignedWaterJetId);
+        Assert.Equal("IV5", i7.AssignedIsolationValveId);
 
         var i16 = result.Sensors.Single(s => s.SensorId == "I16");
         Assert.Equal(88, i16.ScanOrder);
@@ -104,8 +107,8 @@ public sealed class SensorParameterMigrationTests
         Assert.Equal(16, i16.LogicalColumn);
         Assert.Equal(3, i16.WallColumn);
         Assert.True(i16.Enabled);
-        Assert.Equal("WJ3", i16.AssignedWaterJetId);
-        Assert.Equal("IV3", i16.AssignedIsolationValveId);
+        Assert.Equal("WJ7", i16.AssignedWaterJetId);
+        Assert.Equal("IV7", i16.AssignedIsolationValveId);
 
         // The gap-anchor property no longer exists on any canonical record.
         Assert.DoesNotContain(typeof(LogicalPositionRecord).GetProperties(), p => p.Name == "GapAnchorForWaterJetId");
@@ -173,14 +176,14 @@ public sealed class SensorParameterMigrationTests
         WaterJetPlacementKind Kind, string[] Anchors, Wall TargetWall, Region TargetRegion, string Valve)[]
         ApprovedTopology =
         [
-            ("WJ1", Wall.FRONT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.REAR, Region.LOWER, "IV1"),
-            ("WJ2", Wall.LEFT, Region.LOWER, WaterJetPlacementKind.BETWEEN_HORIZONTAL, ["J2", "J3"], Wall.RIGHT, Region.LOWER, "IV2"),
-            ("WJ3", Wall.REAR, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.LOWER, "IV3"),
-            ("WJ4", Wall.RIGHT, Region.LOWER, WaterJetPlacementKind.BETWEEN_HORIZONTAL, ["J11", "J12"], Wall.LEFT, Region.LOWER, "IV4"),
-            ("WJ5", Wall.FRONT, Region.UPPER, WaterJetPlacementKind.BETWEEN_VERTICAL, ["G+216", "G+116"], Wall.REAR, Region.UPPER, "IV5"),
-            ("WJ6", Wall.LEFT, Region.UPPER, WaterJetPlacementKind.JUNCTION, ["G+102", "G+202", "G+203"], Wall.RIGHT, Region.UPPER, "IV6"),
-            ("WJ7", Wall.REAR, Region.UPPER, WaterJetPlacementKind.BETWEEN_VERTICAL, ["G+207", "G+107"], Wall.FRONT, Region.UPPER, "IV7"),
-            ("WJ8", Wall.RIGHT, Region.UPPER, WaterJetPlacementKind.JUNCTION, ["G+111", "G+211", "G+212"], Wall.LEFT, Region.UPPER, "IV8"),
+            ("WJ1", Wall.FRONT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.REAR, Region.UPPER, "IV1"),
+            ("WJ2", Wall.LEFT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.RIGHT, Region.UPPER, "IV2"),
+            ("WJ3", Wall.REAR, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.UPPER, "IV3"),
+            ("WJ4", Wall.RIGHT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.LEFT, Region.UPPER, "IV4"),
+            ("WJ5", Wall.FRONT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.REAR, Region.LOWER, "IV5"),
+            ("WJ6", Wall.LEFT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.RIGHT, Region.LOWER, "IV6"),
+            ("WJ7", Wall.REAR, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.LOWER, "IV7"),
+            ("WJ8", Wall.RIGHT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.LEFT, Region.LOWER, "IV8"),
         ];
 
     [Fact]
@@ -205,7 +208,7 @@ public sealed class SensorParameterMigrationTests
     // ---- T7 ------------------------------------------------------------------
 
     [Fact]
-    public void Device_Ordinal_Maps_Directly_Including_Rear_Lower_To_WJ1()
+    public void Device_Ordinal_Maps_Directly_Including_Rear_Lower_To_WJ5()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
@@ -217,16 +220,36 @@ public sealed class SensorParameterMigrationTests
             Assert.Equal($"IV{expectedOrdinal}", sensor.AssignedIsolationValveId);
         }
 
-        // Owner worked example: Rear-lower sensors carry device ordinal 1 → WJ1, which is
-        // installed at FRONT lower and sprays across to REAR lower, paired valve IV1.
+        // Owner worked example (canonical topology): Rear-lower sensors carry device
+        // ordinal 5 → WJ5, which is installed at FRONT lower and sprays across to REAR
+        // lower, paired valve IV5.
         var i6 = result.Sensors.Single(s => s.SensorId == "I6");
         Assert.Equal(Wall.REAR, i6.Wall);
-        Assert.Equal("WJ1", i6.AssignedWaterJetId);
-        Assert.Equal("IV1", i6.AssignedIsolationValveId);
-        var wj1 = result.WaterJets.Single(w => w.WaterJetId == "WJ1");
-        Assert.Equal(Wall.FRONT, wj1.InstalledWall);
-        Assert.Equal(Region.LOWER, wj1.InstalledRegion);
-        Assert.Equal(Wall.REAR, wj1.TargetWall);
+        Assert.Equal("WJ5", i6.AssignedWaterJetId);
+        Assert.Equal("IV5", i6.AssignedIsolationValveId);
+        var wj5 = result.WaterJets.Single(w => w.WaterJetId == "WJ5");
+        Assert.Equal(Wall.FRONT, wj5.InstalledWall);
+        Assert.Equal(Region.LOWER, wj5.InstalledRegion);
+        Assert.Equal(Wall.REAR, wj5.TargetWall);
+    }
+
+    [Fact]
+    public void Canonical_Default_Assignment_Counts_Per_WaterJet_Are_10_8_10_8_20_16_20_16()
+    {
+        var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
+
+        // Canonical zone populations by physical Sensor wall / tier: Rear/Upper 10,
+        // Right/Upper 8, Front/Upper 10, Left/Upper 8, Rear/Lower 20, Right/Lower 16,
+        // Front/Lower 20, Left/Lower 16 — assigned to WJ1..WJ8 respectively (IVn paired).
+        var expectedCounts = new[] { 10, 8, 10, 8, 20, 16, 20, 16 };
+        for (var n = 1; n <= 8; n++)
+        {
+            Assert.Equal(
+                expectedCounts[n - 1],
+                result.Sensors.Count(s => s.AssignedWaterJetId == $"WJ{n}" && s.AssignedIsolationValveId == $"IV{n}"));
+        }
+
+        Assert.Equal(108, result.Sensors.Count);
     }
 
     // ---- T8 ------------------------------------------------------------------
@@ -764,6 +787,9 @@ public sealed class SensorParameterMigrationTests
 /// </summary>
 public sealed class TopologyValidatorTests
 {
+    private static readonly string[] ExpectedUnresolvedPlacementWaterJetIds =
+        ["WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8"];
+
     private static SensorParameterMigrationResult AcceptedResult() =>
         SensorParameterCsvImporter.Import(SyntheticSensorParameterCsv.Build()).Result!;
 
@@ -889,6 +915,31 @@ public sealed class TopologyValidatorTests
                 .ToArray(),
         };
         Assert.Equal(MigrationRefusalCodes.TopoTargetWallContradiction, RefusalCodeOf(mutated));
+    }
+
+    [Fact]
+    public void Resolved_Placement_Kind_Refuses_Under_The_Current_Disposition()
+    {
+        // Canonical Topology Adoption: the fine-grained placement of every Water Jet is
+        // UNRESOLVED with no anchors; reintroducing a resolved kind (even anchor-free)
+        // is refused fail-closed rather than silently accepted.
+        var accepted = AcceptedResult();
+        var mutated = accepted with
+        {
+            WaterJets = accepted.WaterJets
+                .Select(w => w.WaterJetId == "WJ2" ? w with { PlacementKind = WaterJetPlacementKind.JUNCTION } : w)
+                .ToArray(),
+        };
+        Assert.Equal(MigrationRefusalCodes.TopoTargetWallContradiction, RefusalCodeOf(mutated));
+
+        Assert.All(
+            accepted.WaterJets,
+            w =>
+            {
+                Assert.Equal(WaterJetPlacementKind.UNRESOLVED, w.PlacementKind);
+                Assert.Empty(w.PlacementAnchors);
+            });
+        Assert.Equal(ExpectedUnresolvedPlacementWaterJetIds, WaterJetTopologyCatalog.UnresolvedPlacementWaterJetIds.ToArray());
     }
 
     [Fact]

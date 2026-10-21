@@ -10,9 +10,13 @@
 //
 // Owner critical topology correction (Stage 0.4C-K3): all 108 logical positions are Product
 // Sensors (I7 and I16 included), 108 Sensor configurations with dense scanOrder 1–108, no
-// gapAnchorForWaterJetId key, WJ1 / WJ3 placement UNRESOLVED with no anchors. `--legacy-proof`
-// rebuilds the superseded 106-Sensor form and must be byte-identical to the file committed at
-// PR #21 commit 7dc7c691 (port proof). The corrected form is never hand-edited.
+// gapAnchorForWaterJetId key. Canonical Topology Adoption (2026-10-21): the equipment rows
+// and every Sensor assignment come from the canonical table in
+// tools/fixture-generator/generate.mjs (WJ1-WJ4 clean the UPPER tier, WJ5-WJ8 the LOWER;
+// fine-grained placement UNRESOLVED with no anchors for all eight Water Jets), while
+// `--legacy-proof` still rebuilds the superseded 106-Sensor form over the frozen
+// historical table and must be byte-identical to the file committed at PR #21 commit
+// 7dc7c691 (port proof). The current form is never hand-edited.
 //
 // Usage:
 //   node tools/migrated-example/generate.mjs            # print the corrected example

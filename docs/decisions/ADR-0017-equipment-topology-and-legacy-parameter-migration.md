@@ -1,5 +1,62 @@
 # ADR-0017 — Equipment Topology Decision and Legacy Parameter Migration Specification
 
+> **Addendum — Canonical Topology Adoption (Owner decision, 2026-10-21).** This addendum is
+> the current decision record for equipment topology; the original ADR body below (including
+> the 2026-10-12 supersession note) is preserved unedited as history and must not be read as
+> current installed-topology truth where this addendum differs.
+>
+> **Superseded for current authority by this addendum:** the installed wall / region and
+> Target Coverage rows of decisions 5 and 7 (WJ1–WJ4 LOWER tier, WJ5–WJ8 UPPER tier), the
+> "approved targets" list in decision 5, every per-Sensor assignment consequence of those
+> rows (including worked examples of the form "rear-lower ⇒ WJ1/IV1"), the fine-grained
+> placement kinds/anchors recorded for WJ2, WJ4, WJ5, WJ6, WJ7 and WJ8, and the
+> "(replacement placement vocabulary: open Owner decision)" status — that decision is now
+> taken below. The motion-side counterpart (`OWNER_CONFIRMED_REV1` WJ/WSB/axis allocation)
+> is likewise superseded for current allocation and publication by `OWNER_CONFIRMED_REV2`;
+> REV1 remains the historical identity of the earlier revision and its evidence.
+>
+> **Current canonical installed topology (Owner-confirmed):** WJ1 FRONT/UPPER → REAR/UPPER
+> (WSB2, axes A/B); WJ2 LEFT/UPPER → RIGHT/UPPER (WSB1, A/B); WJ3 REAR/UPPER → FRONT/UPPER
+> (WSB1, C/D); WJ4 RIGHT/UPPER → LEFT/UPPER (WSB2, C/D); WJ5 FRONT/LOWER → REAR/LOWER
+> (WSB3, A/B); WJ6 LEFT/LOWER → RIGHT/LOWER (WSB4, A/B); WJ7 REAR/LOWER → FRONT/LOWER
+> (WSB3, C/D); WJ8 RIGHT/LOWER → LEFT/LOWER (WSB4, C/D). Target Coverage is always the
+> opposite wall in the same tier. A/C are Horizontal, B/D Vertical; brake-output catalogue
+> identity A→1, B→2, C→3, D→4 is unchanged (no Manual C/D operation and no output 3/4
+> write is authorized by this addendum; Manual Motion remains WSB1 A/B + outputs 1/2,
+> diagnostically WJ2 under REV2).
+>
+> **Canonical default assignments:** by physical Sensor wall / tier — Rear/Upper 10 →
+> WJ1/IV1, Right/Upper 8 → WJ2/IV2, Front/Upper 10 → WJ3/IV3, Left/Upper 8 → WJ4/IV4,
+> Rear/Lower 20 → WJ5/IV5, Right/Lower 16 → WJ6/IV6, Front/Lower 20 → WJ7/IV7,
+> Left/Lower 16 → WJ8/IV8 (108 total; I7 → WJ5/IV5, I16 → WJ7/IV7). All 108 assigned
+> WJ/IV values differ from the pre-adoption table. The legacy semantics of this ADR are
+> unchanged: `cannon` is the Assigned Cleaning Device ID, `cannon n → WJn`, WJn ↔ IVn,
+> assignment follows Target Coverage responsibility and is never inferred from the
+> Sensor's own wall. (The private Owner CSV is not in Git; its per-row values were not
+> inspected by the Adoption and no Sensor-specific override, confirmation modal,
+> configured/effective assignment model or provenance model is decided here.)
+>
+> **Placement disposition (Owner decision):** the *fine-grained* placement of **all
+> eight** Water Jets is `UNRESOLVED` with **no placement anchors**. WJ1 / WJ3 keep the
+> revoked-gap disposition; WJ2, WJ4, WJ5, WJ6, WJ7 and WJ8 become `UNRESOLVED` because
+> their former anchors described the opposite installed tier. No replacement anchor may
+> be inferred, mirrored, transferred or generated, and Target-zone Sensor IDs are never
+> installed-position anchors. Only the fine-grained placement is unresolved — the
+> canonical installed wall / tier and Target Coverage above are authoritative, and
+> current-facing wording must say exactly that.
+>
+> **Unchanged by this addendum:** 108 Product Sensors and their identities/coordinates,
+> 216 assigned / 240 physical / 24 unassigned TC measurements, the physical
+> Sensor-to-SDS/Cabinet/module/channel mapping, I7/I16 as normal Sensors, the migration
+> schema/validation/deferred-field/public-boundary rules of this ADR, queue and safety
+> semantics, and every Hardware / Production authorization boundary. The Drawing rev1
+> evidence note `MOTION-EVIDENCE-01` remains recorded historical evidence; the physical
+> installation remains `NOT_PHYSICALLY_RESOLVED` and this addendum asserts nothing about
+> installed wiring. Implementation: one consolidated Source pass (catalogues, validators,
+> generators with current/historical separation, regenerated fixtures/examples, tests and
+> current-facing docs); the .NET validation of that pass is the Owner-local gate of
+> record and is not claimed by this addendum.
+
 > **Superseded topology note (Owner critical topology correction, 2026-10-12).** This document predates the correction and retains, as a dated historical record, the belief that logical positions I7 and I16 were `NON_SENSOR_GAP` positions (106 Sensors / 212 channels; Sensor sequence skipping I7 and I16; WJ3 / WJ1 "at the I7 / I16 gap anchor"). Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements. 108 × 2 = 216; 240 physical TC channels − 216 = 24 unassigned. The text below is retained unedited and must not be used as a current baseline; the current record is [`STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`](../STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md).
 
 - **Status:** ACCEPTED — **SUPERSEDED IN PART by the Owner critical topology correction

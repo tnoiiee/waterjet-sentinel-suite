@@ -3,6 +3,19 @@
 **Status: DEVELOPMENT CHECKPOINT RECORD. NOT Owner-reviewed. NOT merged. No hardware action has
 been taken and none is authorized by this document.**
 
+> **Canonical Topology Adoption supersession (2026-10-21).** The Water Jet → WSB cabinet →
+> axis-pair allocation, the §2 table, the §3 evidence-note wording and the motion topology
+> revision identity in this record are superseded for current authority by the Owner
+> Canonical Topology Adoption: current identity `OWNER_CONFIRMED_REV2` /
+> `MOTION_COMMISSIONING_DESIGN_REV2` with WJ1 = A,B (WSB2), WJ2 = A,B (WSB1), WJ3 = C,D (WSB1),
+> WJ4 = C,D (WSB2), WJ5 = A,B (WSB3), WJ6 = A,B (WSB4), WJ7 = C,D (WSB3), WJ8 = C,D (WSB4).
+> `OWNER_CONFIRMED_REV1` / `MOTION_COMMISSIONING_DESIGN_REV1` remain the historical identity
+> of the earlier allocation and of this record's dated §15 history; the dated record below
+> is preserved, and the current-facing §2 / §3 statements are corrected in place. The
+> adoption changes no gate, refusal, axis-role (A/C Horizontal, B/D Vertical) or brake-output
+> (A→1, B→2, C→3, D→4) fact, and authorizes no motion, no C/D Manual Motion and no
+> output 3/4 write.
+
 Scope-gate authority line (unchanged from the approved motion foundation Scope):
 
 `APPLICATION-OWNED SOFTWARE FOUNDATION ONLY / NO CONTROLLER CONNECTION / NO CONTROLLER READ /
@@ -43,14 +56,14 @@ any kind. There is no code path in this revision that can produce a controller c
 | --- | --- | --- |
 | Axis role | A and C are the **Horizontal Axis**; B and D are the **Vertical Axis** | Owner-confirmed |
 | Brake output | axis A → output 1, B → output 2, C → output 3, D → output 4 | Owner-confirmed |
-| WJ1 (WSB1) | A, B | Owner-confirmed |
-| WJ2 (WSB1) | C, D | **Canonical** — Owner-confirmed; the Drawing rev1 discrepancy is recorded as evidence only (§3) |
-| WJ3 (WSB2) | C, D | Owner-confirmed |
-| WJ4 (WSB2) | A, B | **Canonical** — Owner-confirmed; the Drawing rev1 discrepancy is recorded as evidence only (§3) |
-| WJ5 (WSB3) | C, D | Owner-confirmed |
-| WJ6 (WSB3) | A, B | Owner-confirmed |
-| WJ7 (WSB4) | A, B | Owner-confirmed |
-| WJ8 (WSB4) | C, D | Owner-confirmed |
+| WJ1 (WSB2) | A, B | Owner-confirmed (REV2) |
+| WJ2 (WSB1) | A, B | **Canonical (REV2)** — Owner-confirmed; the Drawing rev1 discrepancy against the superseded REV1 row is recorded as evidence only (§3) |
+| WJ3 (WSB1) | C, D | Owner-confirmed (REV2) |
+| WJ4 (WSB2) | C, D | **Canonical (REV2)** — Owner-confirmed; the Drawing rev1 discrepancy against the superseded REV1 row is recorded as evidence only (§3) |
+| WJ5 (WSB3) | A, B | Owner-confirmed (REV2) |
+| WJ6 (WSB4) | A, B | Owner-confirmed (REV2) |
+| WJ7 (WSB3) | C, D | Owner-confirmed (REV2) |
+| WJ8 (WSB4) | C, D | Owner-confirmed (already canonical under REV1; unchanged) |
 | Controller model | DMC-B140-M (four axes) | Owner-provided WSB cabinet drawing |
 | Controllers | four, one per WSB cabinet | **Inferred** — see §3 |
 | Position sense | axis A: encoder; axes B, C, D: installed switch set | Owner-confirmed |
@@ -63,11 +76,11 @@ physical controller axis letter (A/B/C/D) may appear **only as diagnostic identi
 ("Horizontal Axis · C"), never instead of it.
 
 The eight Water Jet rows are **explicit data, not a rule**. The mapping is not derived from a parity
-rule, from the Water Jet ordinal, or from the cabinet: the two even Water Jets WJ2 (C,D) and WJ4
-(A,B) take different axis pairs, the two odd Water Jets WJ5 (C,D) and WJ7 (A,B) take different axis
-pairs, and the two Water Jets of WSB1 (A,B and C,D) take different axis pairs. No odd/even formula
-and no cabinet-derived formula reproduces this table, so none is implemented; tests assert the exact
-eight rows instead.
+rule, from the Water Jet ordinal, or from the cabinet: the two even Water Jets WJ2 (A,B) and WJ4
+(C,D) take different axis pairs, the two odd Water Jets WJ5 (A,B) and WJ7 (C,D) take different axis
+pairs, and the two Water Jets of WSB1 (WJ2 = A,B and WJ3 = C,D) take different axis pairs. No
+odd/even formula and no cabinet-derived formula reproduces this table, so none is implemented;
+tests assert the exact eight rows instead.
 
 ---
 
@@ -76,7 +89,7 @@ eight rows instead.
 | Item | Status | Why it is not confirmed |
 | --- | --- | --- |
 | One controller per WSB cabinet | `INFERRED_FROM_OWNER_CONFIRMED_MAPPING` | It follows from the confirmed Water Jet allocation (each WSB drives exactly one A,B pair and one C,D pair), but the Owner has not separately confirmed the controller count per cabinet. |
-| WJ2 / WJ4 Drawing rev1 discrepancy | `DRAWING_REV1_CONFLICT_RECORDED`, `EVIDENCE_ONLY_NOT_CANONICAL`, `NOT_PHYSICALLY_RESOLVED` | The Drawing rev1 expectation for these two Water Jets was the other axis pair on the same cabinet. **The Owner has ruled the canonical allocation** (WJ2 = C,D; WJ4 = A,B), so this is **not** an open decision and **not** ambiguity: it is recorded evidence. The note is published with the catalogue, never suppressed, and it changes no mapping: all eight rows publish `CONFIRMED_OWNER` with `OWNER_CONFIRMED` provenance. The discrepancy itself has **NOT** been physically resolved on the installation, and this revision does not claim that it has. |
+| WJ2 / WJ4 Drawing rev1 discrepancy | `DRAWING_REV1_CONFLICT_RECORDED`, `EVIDENCE_ONLY_NOT_CANONICAL`, `NOT_PHYSICALLY_RESOLVED` | Historical note against the superseded REV1 allocation: under `OWNER_CONFIRMED_REV1`, WJ2 = C,D on WSB1 and WJ4 = A,B on WSB2, while the Drawing rev1 expectation for these two Water Jets was the other axis pair on the same cabinet. The current canonical allocation is `OWNER_CONFIRMED_REV2` (WJ2 = A,B on WSB1; WJ4 = C,D on WSB2), so this remains **not** an open decision and **not** ambiguity: it is recorded historical evidence. The note is published with the catalogue, never suppressed, and it changes no mapping: all eight rows publish `CONFIRMED_OWNER` with `OWNER_CONFIRMED` provenance. The physical installation has **NOT** been resolved, and nothing in the REV2 adoption asserts which allocation the installed wiring matches. |
 | Limit input polarity | `UNCONFIRMED` on all sixteen axes | The switches are installed and their behaviour on the existing hardware is real, but the electrical meaning is established only by reading the Legacy implementation and the Drawing against the installation. Until then the polarity is never assumed active high or active low. |
 | Counts → millimetre conversion | `UNRESOLVED`, per axis, `MEASURED_DURING_COMMISSIONING` | No conversion is published. Values are counts and controller units only. |
 | Motion parameters (speeds, accelerations, limits) | `NOT_CONFIGURED` / `NOT_COMMISSIONED` | Nothing has been measured or configured in the Product. The Legacy Jog Speed is carried as a display value with status `LEGACY_CANDIDATE_UNVERIFIED`. |

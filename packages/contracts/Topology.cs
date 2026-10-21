@@ -21,18 +21,25 @@ namespace Wjss.Contracts;
 public enum Region { UPPER, LOWER }
 
 /// <summary>
-/// How a Water Jet is physically mounted, per the Owner-approved topology table (ADR-0017
-/// decision 5) as corrected by the Owner Water Jet installed-position ruling (Stage 0.4C-K3):
-/// the former "mounted at the I16 / I7 gap" placements of WJ1 / WJ3 are revoked together
-/// with the gap positions themselves, and no replacement anchor is inferred.
+/// The fine-grained mounting placement of a Water Jet. Under the current Owner placement
+/// disposition (Stage 0.4C-K3 installed-position ruling, completed by the Canonical
+/// Topology Adoption, 2026-10-21) the fine-grained placement of ALL EIGHT Water Jets is
+/// <see cref="UNRESOLVED"/>: the former "mounted at the I16 / I7 gap" placements of
+/// WJ1 / WJ3 are revoked together with the gap positions themselves, and the stale
+/// anchors formerly carried by WJ2, WJ4, WJ5, WJ6, WJ7 and WJ8 described the opposite
+/// installed tier, so they are removed. No replacement anchor is inferred, mirrored or
+/// transferred. The resolved kinds below remain defined vocabulary for a future
+/// authoritative layout; they are not current Product truth, and the canonical
+/// installed wall / region of every Water Jet is authoritative regardless.
 /// </summary>
 public enum WaterJetPlacementKind
 {
     /// <summary>
-    /// Installed position pending authoritative equipment layout. The placement formerly
-    /// depended on a NON_SENSOR_GAP position that is now a Product Sensor; no wall coordinate,
-    /// Sensor anchor, target wall, target Sensor, legacy cannon value or Assigned Cleaning
-    /// Device ID may be used to infer a replacement. Carries no placement anchors.
+    /// Fine-grained installed placement pending authoritative equipment layout (the
+    /// canonical installed wall / region is confirmed; only the placement and its anchors
+    /// are unresolved). No wall coordinate, Sensor anchor, target wall, target Sensor,
+    /// legacy cannon value or Assigned Cleaning Device ID may be used to infer a
+    /// replacement. Carries no placement anchors.
     /// </summary>
     UNRESOLVED,
 
@@ -112,10 +119,12 @@ public sealed record WaterJetConfiguration
 
     /// <summary>
     /// Logical position ids anchoring the placement, per the approved topology table.
-    /// JUNCTION placements list the distinct endpoints of the vertical and horizontal
-    /// anchor pairs in first-appearance order. An <see cref="WaterJetPlacementKind.UNRESOLVED"/>
-    /// placement carries NO anchors: no Sensor position is inferred as a replacement for the
-    /// revoked gap anchors.
+    /// Under the current Owner placement disposition every Water Jet is
+    /// <see cref="WaterJetPlacementKind.UNRESOLVED"/> and this list is EMPTY for all
+    /// eight: no Sensor position is inferred, mirrored or transferred as a replacement
+    /// anchor. (For a future authoritative layout, JUNCTION placements would list the
+    /// distinct endpoints of the vertical and horizontal anchor pairs in
+    /// first-appearance order.)
     /// </summary>
     public required IReadOnlyList<string> PlacementAnchors { get; init; }
 

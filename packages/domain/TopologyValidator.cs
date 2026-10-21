@@ -278,19 +278,18 @@ public static class TopologyValidator
     {
         foreach (var waterJet in waterJets)
         {
-            if (waterJet.PlacementKind == WaterJetPlacementKind.UNRESOLVED && waterJet.PlacementAnchors.Count != 0)
+            if (waterJet.PlacementKind != WaterJetPlacementKind.UNRESOLVED)
             {
                 return Refuse(
                     MigrationRefusalCodes.TopoTargetWallContradiction,
-                    $"Water Jet '{waterJet.WaterJetId}' has an UNRESOLVED installed position and must carry no placement anchors; found [{string.Join(", ", waterJet.PlacementAnchors)}].");
+                    $"Water Jet '{waterJet.WaterJetId}' carries the resolved placement kind '{waterJet.PlacementKind}', but under the current Owner placement disposition the fine-grained placement of every Water Jet is UNRESOLVED (only the canonical installed wall / region is authoritative; no placement anchor may be inferred, mirrored or transferred).");
             }
 
-            if (waterJet.PlacementKind != WaterJetPlacementKind.UNRESOLVED
-                && waterJet.PlacementAnchors.Any(anchor => !CanonicalSensorMap.IsProductSensorId(anchor)))
+            if (waterJet.PlacementAnchors.Count != 0)
             {
                 return Refuse(
                     MigrationRefusalCodes.TopoTargetWallContradiction,
-                    $"Water Jet '{waterJet.WaterJetId}' anchors on a position that is not a Product Sensor: [{string.Join(", ", waterJet.PlacementAnchors)}].");
+                    $"Water Jet '{waterJet.WaterJetId}' has an UNRESOLVED fine-grained placement and must carry no placement anchors; found [{string.Join(", ", waterJet.PlacementAnchors)}].");
             }
 
             var expectedTarget = waterJet.InstalledWall switch

@@ -21,16 +21,25 @@ namespace Wjss.Contracts;
 ///   <item>Axis A and C are Horizontal; axis B and D are Vertical. The Operator wording is
 ///   "Horizontal Axis" / "Vertical Axis"; nothing else is ever displayed.</item>
 ///   <item>Brake output allocation: axis A to output 1, B to output 2, C to output 3, D to output 4.</item>
-///   <item>Water Jet axis allocation: WJ1/WSB1 = A,B; WJ2/WSB1 = C,D; WJ3/WSB2 = C,D;
-///   WJ4/WSB2 = A,B; WJ5/WSB3 = C,D; WJ6/WSB3 = A,B; WJ7/WSB4 = A,B; WJ8/WSB4 = C,D.</item>
+///   <item>Water Jet axis allocation under the current canonical topology
+///   (<see cref="MotionTopologyRevision"/>, OWNER_CONFIRMED_REV2, adopted by the Owner
+///   Canonical Topology Adoption of 2026-10-21): WJ1/WSB2 = A,B; WJ2/WSB1 = A,B;
+///   WJ3/WSB1 = C,D; WJ4/WSB2 = C,D; WJ5/WSB3 = A,B; WJ6/WSB4 = A,B; WJ7/WSB3 = C,D;
+///   WJ8/WSB4 = C,D. This supersedes, for current allocation and publication only, the
+///   superseded OWNER_CONFIRMED_REV1 allocation (WJ1/WSB1 = A,B; WJ2/WSB1 = C,D;
+///   WJ3/WSB2 = C,D; WJ4/WSB2 = A,B; WJ5/WSB3 = C,D; WJ6/WSB3 = A,B; WJ7/WSB4 = A,B;
+///   WJ8/WSB4 = C,D), which remains the historical identity of the earlier revision and
+///   is never rewritten as if REV2 had always existed.</item>
 ///   <item>Each WSB cabinet holds one four-axis controller, so the controller identity is the WSB
 ///   cabinet identity. That one-controller-per-cabinet reading is INFERRED from the confirmed
 ///   Water Jet allocation above, not separately confirmed by the Owner.</item>
-///   <item>WJ2 = C,D and WJ4 = A,B. The Owner has ruled this allocation CANONICAL and
-///   <see cref="MappingConfirmedOwner"/>. A Drawing rev1 discrepancy for the same two Water Jets is
-///   recorded as evidence metadata only (<see cref="DrawingEvidenceRecorded"/>,
+///   <item>Under REV2, WJ2 = A,B on WSB1 and WJ4 = C,D on WSB2, both CANONICAL and
+///   <see cref="MappingConfirmedOwner"/>. The Drawing rev1 discrepancy recorded against
+///   the superseded REV1 allocation for the same two Water Jets remains evidence
+///   metadata only (<see cref="DrawingEvidenceRecorded"/>,
 ///   <see cref="EvidenceClassificationEvidenceOnly"/>); it is not canonical ambiguity, it does not
-///   override the confirmed mapping, and it is <see cref="PhysicalResolutionNotResolved"/>.
+///   override the confirmed mapping, and it is <see cref="PhysicalResolutionNotResolved"/>:
+///   the REV2 adoption does not assert which allocation the installed wiring matches.
 ///   The mapping is explicit data: no parity rule, no odd/even formula and no cabinet-derived
 ///   formula derives any row.</item>
 /// </list>
@@ -51,8 +60,22 @@ public static class MotionVocabulary
     /// <summary>Provenance of the projection: composed by the Application model, never by a device read.</summary>
     public const string Source = "APPLICATION_OWNED_MOTION_COMMISSIONING_MODEL";
 
-    /// <summary>Revision of the Owner-confirmed axis mapping carried by this section.</summary>
-    public const string MotionTopologyRevision = "OWNER_CONFIRMED_REV1";
+    /// <summary>
+    /// Revision of the Owner-confirmed axis mapping carried by this section: the current
+    /// canonical topology (Canonical Topology Adoption, 2026-10-21). Current validators,
+    /// publication and projection require exactly this identity.
+    /// </summary>
+    public const string MotionTopologyRevision = "OWNER_CONFIRMED_REV2";
+
+    /// <summary>
+    /// HISTORICAL ONLY — the superseded motion topology revision. REV1 remains the
+    /// historical identity of the earlier WJ / WSB / axis allocation and of the
+    /// historical evidence recorded under it; it is superseded only for current
+    /// allocation, publication and projection. No current Product path may publish or
+    /// require this value, and historical evidence is never rewritten as if REV2 had
+    /// always existed.
+    /// </summary>
+    public const string HistoricalMotionTopologyRevisionRev1 = "OWNER_CONFIRMED_REV1";
 
     // ------------------------------------------------------------------ axis identity and role
 
@@ -737,8 +760,8 @@ public sealed record MotionControllerProjection
 /// which physical axis is the Horizontal Axis and which is the Vertical Axis.
 ///
 /// The allocation is EXPLICIT DATA. No parity rule, no odd/even Water Jet formula and no
-/// cabinet-derived axis formula is permitted to derive a row: WJ2 = C,D and WJ4 = A,B are confirmed
-/// values, the same as every other row.
+/// cabinet-derived axis formula is permitted to derive a row: WJ2 = A,B and WJ4 = C,D (REV2) are
+/// confirmed values, the same as every other row.
 ///
 /// The physical axis letter is the diagnostic identity of the controller axis. The Operator-facing
 /// identity is the role: "Horizontal Axis" / "Vertical Axis". The letter never replaces the role.

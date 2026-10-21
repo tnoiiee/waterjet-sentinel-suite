@@ -31,11 +31,14 @@ export type LogicalPositionKind = 'SENSOR';
 /**
  * How a Water Jet is physically mounted (Owner-approved topology table). The superseded
  * 'NON_SENSOR_GAP' placement (WJ1 at I16, WJ3 at I7) is removed by the Owner critical topology
- * correction. Owner WJ installed-position ruling: WJ1 and WJ3 are 'UNRESOLVED' ("Installed
- * position pending authoritative layout") with an empty placementAnchors array until layout
- * evidence exists; no coordinate or anchor is inferred from I7, I16, a former gap, a Sensor
- * wall, the target wall, a target Sensor, the legacy cannon value or the Assigned Cleaning
- * Device ID. Installed Position is not Target Coverage; targets are unchanged.
+ * correction. Owner placement disposition (completed by the Canonical Topology Adoption,
+ * 2026-10-21): the fine-grained placement of ALL EIGHT Water Jets is 'UNRESOLVED'
+ * ("Fine-grained installed placement pending authoritative layout") with an empty
+ * placementAnchors array until layout evidence exists; the canonical installed wall/tier
+ * is confirmed, and no coordinate or anchor is inferred, mirrored or transferred from I7,
+ * I16, a former gap, a Sensor wall, the target wall, a target Sensor, the legacy cannon
+ * value or the Assigned Cleaning Device ID. The resolved kinds remain defined vocabulary.
+ * Installed Position is not Target Coverage.
  */
 export type WaterJetPlacementKind = 'BETWEEN_HORIZONTAL' | 'BETWEEN_VERTICAL' | 'JUNCTION' | 'UNRESOLVED';
 export type Quality = 'GOOD' | 'UNCERTAIN' | 'BAD' | 'STALE' | 'DISABLED';
@@ -599,8 +602,9 @@ export interface MotionAxisProjection {
 }
 
 /**
- * The CANONICAL Owner-confirmed axis allocation of one Water Jet: WJ1 = A,B; WJ2 = C,D;
- * WJ3 = C,D; WJ4 = A,B; WJ5 = C,D; WJ6 = A,B; WJ7 = A,B; WJ8 = C,D.
+ * The CANONICAL Owner-confirmed REV2 axis allocation of one Water Jet: WJ1 = A,B;
+ * WJ2 = A,B; WJ3 = C,D; WJ4 = C,D; WJ5 = A,B; WJ6 = A,B; WJ7 = C,D; WJ8 = C,D
+ * (the REV1 allocation is superseded for current publication and remains historical).
  *
  * The allocation is explicit data: no parity rule, no odd/even Water Jet formula and no
  * cabinet-derived axis formula derives any row. The physical axis letter is the diagnostic identity

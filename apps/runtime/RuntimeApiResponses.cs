@@ -29,9 +29,11 @@ public sealed record RuntimeWaterJetView
     public required IReadOnlyList<string> PlacementAnchors { get; init; }
 
     /// <summary>
-    /// Read-only operator wording for an UNRESOLVED installed position (Owner ruling:
-    /// WJ1 / WJ3 installed position is pending authoritative layout evidence; nothing is
-    /// inferred from the former I7 / I16 gaps). Null for every resolved placement.
+    /// Read-only operator wording for an UNRESOLVED fine-grained placement (Owner
+    /// disposition: for all eight Water Jets only the fine-grained placement / anchors
+    /// are pending authoritative layout evidence — the canonical installed wall / region
+    /// is confirmed, and nothing is inferred from the former I7 / I16 gaps or from any
+    /// stale anchor). Null for every resolved placement.
     /// </summary>
     public string? InstalledPositionNote { get; init; }
 
