@@ -434,9 +434,9 @@ public sealed class MotionCommissioningTests
         Assert.Equal(ExpectedWaterJetIds.Length, confirmedRows);
 
         // And the two rows the discrepancy names, stated in the text exactly as the Owner ruled them.
-        Assert.Contains($"W2 WJ2 cabinet WSB1 controller MC-WSB1 horizontal C vertical D{confirmedRow}",
+        Assert.Contains($"W2 WJ2 cabinet WSB1 controller MC-WSB1 horizontal A vertical B{confirmedRow}",
             first.CanonicalText, StringComparison.Ordinal);
-        Assert.Contains($"W4 WJ4 cabinet WSB2 controller MC-WSB2 horizontal A vertical B{confirmedRow}",
+        Assert.Contains($"W4 WJ4 cabinet WSB2 controller MC-WSB2 horizontal C vertical D{confirmedRow}",
             first.CanonicalText, StringComparison.Ordinal);
     }
 
