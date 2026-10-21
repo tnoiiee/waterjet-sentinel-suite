@@ -211,6 +211,10 @@ internal sealed class MotionStopTrialInvocation
             : MotionStopTrialVocabulary.OwnerConsentRejected;
     }
 
-    private static string AxisToken(MotionStopAxis axis) =>
-        axis == MotionStopAxis.A ? "A" : "B";
+    private static string? AxisToken(MotionStopAxis axis) => axis switch
+    {
+        MotionStopAxis.A => "A",
+        MotionStopAxis.B => "B",
+        _ => null,
+    };
 }

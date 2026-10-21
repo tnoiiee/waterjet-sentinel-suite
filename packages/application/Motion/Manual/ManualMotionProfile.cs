@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Wjss.Contracts;
+using Wjss.Domain;
 
 namespace Wjss.Runtime.Core.Motion.Manual;
 
@@ -20,7 +21,7 @@ public enum ManualMotionProfileSource
 /// </summary>
 public sealed class ManualMotionAxisProfile
 {
-    /// <summary>The brake output number (1 for Axis A, 2 for Axis B; must equal the Owner-confirmed allocation).</summary>
+    /// <summary>The brake output number (1 for Axis A, 2 for Axis B, 3 for Axis C, 4 for Axis D; must equal the Owner-confirmed allocation).</summary>
     public int? BrakeOutput { get; init; }
 
     /// <summary>Which output action releases the brake. NOT_CONFIGURED refuses every brake release.</summary>
@@ -151,11 +152,19 @@ public sealed class ManualMotionProfile
     /// <summary>The Axis B (Vertical) profile, or null when Axis B is not allowed.</summary>
     public ManualMotionAxisProfile? AxisB { get; init; }
 
+    /// <summary>The Axis C (Horizontal) profile, or null when Axis C is not allowed.</summary>
+    public ManualMotionAxisProfile? AxisC { get; init; }
+
+    /// <summary>The Axis D (Vertical) profile, or null when Axis D is not allowed.</summary>
+    public ManualMotionAxisProfile? AxisD { get; init; }
+
     /// <summary>The profile of one axis, or null when the axis is not allowed by this profile.</summary>
     public ManualMotionAxisProfile? For(ManualMotionAxis axis) => axis switch
     {
         ManualMotionAxis.A => AxisA,
         ManualMotionAxis.B => AxisB,
+        ManualMotionAxis.C => AxisC,
+        ManualMotionAxis.D => AxisD,
         _ => null,
     };
 
@@ -175,6 +184,8 @@ public sealed class ManualMotionProfile
         JogMaximumHoldMilliseconds = 15000,
         AxisA = SimulationAxis(1),
         AxisB = SimulationAxis(2),
+        AxisC = SimulationAxis(3),
+        AxisD = SimulationAxis(4),
     };
 
     private static ManualMotionAxisProfile SimulationAxis(int brakeOutput) => new()
@@ -245,6 +256,8 @@ public static class ManualMotionTopology
     {
         ManualMotionAxis.A => MotionVocabulary.AxisA,
         ManualMotionAxis.B => MotionVocabulary.AxisB,
+        ManualMotionAxis.C => MotionVocabulary.AxisC,
+        ManualMotionAxis.D => MotionVocabulary.AxisD,
         _ => string.Empty,
     };
 
@@ -260,7 +273,7 @@ public static class ManualMotionTopology
         return MotionVocabulary.StatusText.TryGetValue(identity.AxisRole, out var label) ? label : string.Empty;
     }
 
-    /// <summary>The Owner-confirmed brake output number of one axis (1 or 2), or 0 when none is allocated.</summary>
+    /// <summary>The Owner-confirmed brake output number of one axis (1 to 4), or 0 when none is allocated.</summary>
     public static int ConfirmedBrakeOutput(ManualMotionAxis axis)
     {
         var identity = MotionTopologyCatalog.FindAxis(ControllerId, AxisLetter(axis));
@@ -279,7 +292,76 @@ public static class ManualMotionTopology
             return 2;
         }
 
+        if (string.Equals(identity.BrakeOutputIdentity, MotionVocabulary.BrakeOutput3, StringComparison.Ordinal))
+        {
+            return 3;
+        }
+
+        if (string.Equals(identity.BrakeOutputIdentity, MotionVocabulary.BrakeOutput4, StringComparison.Ordinal))
+        {
+            return 4;
+        }
+
         return 0;
+    }
+
+    /// <summary>The cabinet identity (WSB) of one axis, from the motion catalogue binding.</summary>
+    public static string CabinetId(ManualMotionAxis axis) => BindingFor(axis)?.CabinetId ?? string.Empty;
+
+    /// <summary>The canonical Water Jet identity (for example WJ2 or WJ3) of one axis, from the motion catalogue binding.</summary>
+    public static string WaterJetId(ManualMotionAxis axis) => BindingFor(axis)?.WaterJetId ?? string.Empty;
+
+    /// <summary>
+    /// The canonical installed position wording of the Water Jet of one axis (wall / tier), projected
+    /// from the canonical Water Jet topology. Diagnostic identity only; never an authorization.
+    /// </summary>
+    public static string InstalledPosition(ManualMotionAxis axis)
+    {
+        var waterJet = WaterJetFor(axis);
+        return waterJet is null
+            ? string.Empty
+            : string.Concat(waterJet.InstalledWall.ToString(), " / ", waterJet.InstalledRegion.ToString());
+    }
+
+    /// <summary>
+    /// The canonical target coverage wording of the Water Jet of one axis (wall / tier), projected
+    /// from the canonical Water Jet topology. Diagnostic identity only; never an authorization.
+    /// </summary>
+    public static string TargetCoverage(ManualMotionAxis axis)
+    {
+        var waterJet = WaterJetFor(axis);
+        return waterJet is null
+            ? string.Empty
+            : string.Concat(waterJet.TargetWall.ToString(), " / ", waterJet.TargetRegion.ToString());
+    }
+
+    private static MotionWaterJetAxisBinding? BindingFor(ManualMotionAxis axis)
+    {
+        var letter = AxisLetter(axis);
+        if (letter.Length == 0)
+        {
+            return null;
+        }
+
+        var bindings = MotionTopologyCatalog.WaterJetBindings;
+        for (var index = 0; index < bindings.Count; index++)
+        {
+            var binding = bindings[index];
+            if (string.Equals(binding.ControllerId, ControllerId, StringComparison.Ordinal)
+                && (string.Equals(binding.HorizontalAxisId, letter, StringComparison.Ordinal)
+                    || string.Equals(binding.VerticalAxisId, letter, StringComparison.Ordinal)))
+            {
+                return binding;
+            }
+        }
+
+        return null;
+    }
+
+    private static WaterJetConfiguration? WaterJetFor(ManualMotionAxis axis)
+    {
+        var waterJetId = WaterJetId(axis);
+        return waterJetId.Length == 0 ? null : WaterJetTopologyCatalog.FindWaterJet(waterJetId);
     }
 }
 
@@ -433,6 +515,8 @@ public static class ManualMotionProfileParser
 
         ManualMotionAxisProfile? axisA = null;
         ManualMotionAxisProfile? axisB = null;
+        ManualMotionAxisProfile? axisC = null;
+        ManualMotionAxisProfile? axisD = null;
         var seenAxes = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in axes.EnumerateObject())
         {
@@ -450,6 +534,14 @@ public static class ManualMotionProfileParser
             {
                 axis = ManualMotionAxis.B;
             }
+            else if (string.Equals(property.Name, MotionVocabulary.AxisC, StringComparison.Ordinal))
+            {
+                axis = ManualMotionAxis.C;
+            }
+            else if (string.Equals(property.Name, MotionVocabulary.AxisD, StringComparison.Ordinal))
+            {
+                axis = ManualMotionAxis.D;
+            }
             else
             {
                 return ManualMotionProfileResult.Refused(ManualMotionCodes.ProfileAxisUnsupported);
@@ -461,13 +553,20 @@ public static class ManualMotionProfileParser
                 return ManualMotionProfileResult.Refused(axisRefusal ?? ManualMotionCodes.ProfileValueInvalid);
             }
 
-            if (axis == ManualMotionAxis.A)
+            switch (axis)
             {
-                axisA = axisProfile;
-            }
-            else
-            {
-                axisB = axisProfile;
+                case ManualMotionAxis.A:
+                    axisA = axisProfile;
+                    break;
+                case ManualMotionAxis.B:
+                    axisB = axisProfile;
+                    break;
+                case ManualMotionAxis.C:
+                    axisC = axisProfile;
+                    break;
+                default:
+                    axisD = axisProfile;
+                    break;
             }
         }
 
@@ -481,6 +580,8 @@ public static class ManualMotionProfileParser
             JogMaximumHoldMilliseconds = maximumHold,
             AxisA = axisA,
             AxisB = axisB,
+            AxisC = axisC,
+            AxisD = axisD,
         });
     }
 
@@ -498,7 +599,7 @@ public static class ManualMotionProfileParser
             return shapeRefusal;
         }
 
-        if (!TryReadInt(element, "brakeOutput", 1, 2, out var brakeOutput)
+        if (!TryReadInt(element, "brakeOutput", 1, 4, out var brakeOutput)
             || !TryReadReleaseAction(element, out var releaseAction)
             || !TryReadMilliseconds(element, "brakeSettleMilliseconds", out var settle)
             || !TryReadInt(element, "jogSpeed", 1, int.MaxValue, out var jogSpeed)

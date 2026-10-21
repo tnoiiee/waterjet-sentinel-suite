@@ -1,5 +1,19 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **WSB1 Manual Motion Phase 1A software expansion (2026-10-22; software only).** The isolated
+> Manual Motion Commissioning software now covers WSB1 Axis A/B/C/D (A/C Horizontal, B/D Vertical;
+> brake outputs A→1, B→2, C→3, D→4; A/B diagnostically WJ2, C/D diagnostically WJ3) with the same
+> closed typed command/Stop/read boundaries and one-active-operation lifecycle as Axis A. The C1
+> Stop Trial remains explicitly A/B-only. The completed hardware record is unchanged: the Axis A
+> Hardware Trial is FINAL PASS (Owner record); **no B/C/D hardware trial or authorization exists** —
+> B/C/D wiring and route continuity rest on the Legacy Actual Run evidence. Home/DP/DE/Move real
+> commissioning values remain `NOT_CONFIGURED` (Phase 2); Cleaning Path is Phase 3; WSB2–WSB4
+> remain unauthorized (Phase 1B). No topology statement below changes: this block supersedes only
+> the "Manual Motion WSB1 A/B with outputs 1/2 only" software-scope wording of the 2026-10-21
+> position, without deleting that dated record. **Validation position: .NET restore/build/test NOT
+> RUN in the Agent environment (no .NET SDK) — the Owner-local exact-head gate is the validation of
+> record; no native load, Controller contact or Hardware use occurred for Phase 1A.**
+
 > **Canonical Topology Adoption (2026-10-21; current equipment-topology position — supersedes
 > every contrary WJ/IV tier, Target Coverage, assignment, WSB/axis-allocation, REV1-current and
 > placement statement below without deleting any dated record).** Implemented in Source on

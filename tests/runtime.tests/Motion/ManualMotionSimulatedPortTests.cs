@@ -61,6 +61,8 @@ public sealed class ManualMotionSimulatedPortTests
             JogMaximumHoldMilliseconds = 15000,
             AxisA = Axis(1),
             AxisB = Axis(2),
+            AxisC = Axis(3),
+            AxisD = Axis(4),
         };
     }
 
@@ -245,6 +247,71 @@ public sealed class ManualMotionSimulatedPortTests
         Assert.True(opened.Opened);
         var read = invalidating.Read(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.A, 0));
         Assert.NotEqual(opened.PortGeneration, read.PortGeneration);
+    }
+
+    [Fact]
+    public void Axes_C_And_D_Move_Independently_With_Their_Own_Brake_Outputs()
+    {
+        var clock = new TestClock(Instant);
+        var port = new ManualMotionSimulatedPort(clock, ManualMotionProfile.CreateSimulationProfile());
+        port.Open();
+
+        // Synthetic start positions: A 12000, B -8000, C 5000, D -3000.
+        Assert.Equal(12000m, ReadTp(port, ManualMotionAxis.A));
+        Assert.Equal(-8000m, ReadTp(port, ManualMotionAxis.B));
+        Assert.Equal(5000m, ReadTp(port, ManualMotionAxis.C));
+        Assert.Equal(-3000m, ReadTp(port, ManualMotionAxis.D));
+
+        // Releasing the Axis C brake (output 3) changes only output 3.
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.C, brakeOutput: 3));
+        var output3 = port.Read(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.C, 3));
+        var output4 = port.Read(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.D, 4));
+        Assert.True(output3.Succeeded);
+        Assert.True(output4.Succeeded);
+        Assert.Equal(1m, output3.Value);
+        Assert.Equal(0m, output4.Value);
+
+        // A C jog moves only C.
+        port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, ManualMotionAxis.C, operand: 2000));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.C));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(7000m, ReadTp(port, ManualMotionAxis.C));
+        Assert.Equal(12000m, ReadTp(port, ManualMotionAxis.A));
+        Assert.Equal(-8000m, ReadTp(port, ManualMotionAxis.B));
+        Assert.Equal(-3000m, ReadTp(port, ManualMotionAxis.D));
+
+        // Stop C, then a negative D jog moves only D.
+        port.Execute(Command(ManualMotionPortCommandKind.Stop, ManualMotionAxis.C));
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.D, brakeOutput: 4));
+        port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, ManualMotionAxis.D, operand: -2000));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.D));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(-5000m, ReadTp(port, ManualMotionAxis.D));
+        Assert.Equal(7000m, ReadTp(port, ManualMotionAxis.C));
+        Assert.Equal(12000m, ReadTp(port, ManualMotionAxis.A));
+        Assert.Equal(-8000m, ReadTp(port, ManualMotionAxis.B));
+    }
+
+    [Fact]
+    public void An_Out_Of_Domain_Axis_Or_Brake_Output_Is_Refused_By_The_Simulated_Port()
+    {
+        var clock = new TestClock(Instant);
+        var port = new ManualMotionSimulatedPort(clock, ManualMotionProfile.CreateSimulationProfile());
+        port.Open();
+
+        var command = port.Execute(Command(ManualMotionPortCommandKind.Begin, (ManualMotionAxis)99));
+        Assert.False(command.Accepted);
+        Assert.Equal(ManualMotionSimulatedPort.CodeRefused, command.Code);
+
+        var brake = port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.C, brakeOutput: 5));
+        Assert.False(brake.Accepted);
+        Assert.Equal(ManualMotionSimulatedPort.CodeRefused, brake.Code);
+
+        var read = port.Read(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.C, 5));
+        Assert.False(read.Succeeded);
+
+        var axisRead = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, (ManualMotionAxis)99, 0));
+        Assert.False(axisRead.Succeeded);
     }
 
     [Fact]

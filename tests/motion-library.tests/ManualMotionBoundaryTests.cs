@@ -273,6 +273,30 @@ public sealed class ManualMotionBoundaryTests
     }
 
     [Fact]
+    public void The_Form_Shows_Four_Axis_Panels_And_Derives_No_Topology_Itself()
+    {
+        var form = Read("apps/motion-commissioning/ManualMotionForm.cs");
+
+        // Four independent axis panels, one per closed axis.
+        Assert.Contains("new(ManualMotionAxis.A)", form, StringComparison.Ordinal);
+        Assert.Contains("new(ManualMotionAxis.B)", form, StringComparison.Ordinal);
+        Assert.Contains("new(ManualMotionAxis.C)", form, StringComparison.Ordinal);
+        Assert.Contains("new(ManualMotionAxis.D)", form, StringComparison.Ordinal);
+        Assert.Contains("snapshot.Axes.Count >= 4", form, StringComparison.Ordinal);
+
+        // The identity line is composed only from snapshot fields: the window names no Water Jet
+        // literal and no topology catalogue, so it can derive no WSB/WJ identity of its own.
+        Assert.Contains("IdentityText(axis)", form, StringComparison.Ordinal);
+        Assert.Contains("axis.CabinetId", form, StringComparison.Ordinal);
+        Assert.Contains("axis.WaterJetId", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("WJ1", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("WJ2", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("WJ3", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("MotionTopologyCatalog", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("WaterJetTopologyCatalog", form, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Only_The_Approved_Owner_Names_The_Existing_Typed_Stop_Types()
     {
         // The commissioning adapter adds no second Stop path: within this slice, only the controller

@@ -107,7 +107,12 @@ internal sealed class MotionStopTrialOutcome
         EndpointCode = MotionControllerIdentityVocabulary.EndpointConfigured,
         NativeConfigurationCode = MotionLibraryProbeVocabulary.ConfigurationRedacted,
         NativeProofCode = MotionStopTrialVocabulary.NativeProofNotAttempted,
-        Axis = axis == MotionStopAxis.A ? "A" : "B",
+        Axis = axis switch
+        {
+            MotionStopAxis.A => "A",
+            MotionStopAxis.B => "B",
+            _ => null,
+        },
         OpenAttempted = false,
         OpenClassification = MotionStopTrialVocabulary.OpenNotAttempted,
         StopCode = MotionStopTrialVocabulary.StopNotDispatched,

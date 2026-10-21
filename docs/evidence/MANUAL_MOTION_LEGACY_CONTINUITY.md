@@ -41,6 +41,17 @@ new typed design:
 | Absolute Move configures acceleration, speed and deceleration, loads an absolute target and begins. | Retained as AC/SP/DC/PA/BG only. A verified session Home, fresh observations, Owner-local native bounds and TP/RP tolerance verification are required. |
 | Feedback reads status, two position values and outputs. | Retained through the approved typed B2 observation intents, restricted to A/B status, TP, RP and outputs 1/2. Raw observations stay separate from interpretation. |
 
+**Phase 1A addendum (2026-10-22, software only).** The dispositions above
+were written for the PR #34 A/B slice and are unchanged as a record. Phase
+1A widens the same closed typed design to Axis C (Horizontal, brake output
+3) and Axis D (Vertical, brake output 4): the per-axis Stop, the brake →
+jog → Begin ordering and the B2 status/TP/RP/output reads now cover A–D and
+outputs 1–4 through the same single plans, with no second Stop path and no
+new command shape. This addendum records no new Legacy finding and no
+hardware activity: B/C/D wiring and route continuity continue to rest on
+the Legacy Actual Run evidence summarized in this document, and the only
+completed WJSS hardware trial remains Axis A (FINAL PASS, Owner record).
+
 ## 3. Corrections and deliberate non-ports
 
 The WJSS slice does not reproduce the Legacy implementation structure. In

@@ -4,8 +4,10 @@ using Wjss.Runtime.Core.Motion.Manual;
 namespace Wjss.MotionCommissioning;
 
 /// <summary>
-/// The Owner-local Manual Motion Commissioning window for WSB1 Axis A (Horizontal) and Axis B
-/// (Vertical).
+/// The Owner-local Manual Motion Commissioning window for the WSB1 axes A (Horizontal), B
+/// (Vertical), C (Horizontal) and D (Vertical), shown as four independent axis panels in a 2x2 grid.
+/// The Operator wording is role-first (Horizontal / Vertical); the controller axis letter and the
+/// canonical WSB / Water Jet identity of each axis are diagnostic context from the snapshot only.
 ///
 /// The window owns no motion lifecycle. Every control posts one typed request to the Application
 /// session, and every displayed value comes from the session snapshot. There is no raw command entry,
@@ -37,6 +39,8 @@ internal sealed class ManualMotionForm : Form
     private readonly ListBox _logList = new();
     private readonly AxisControls _axisA = new(ManualMotionAxis.A);
     private readonly AxisControls _axisB = new(ManualMotionAxis.B);
+    private readonly AxisControls _axisC = new(ManualMotionAxis.C);
+    private readonly AxisControls _axisD = new(ManualMotionAxis.D);
 
     private ActivePress? _activePress;
     private long _pressSequence;
@@ -53,6 +57,8 @@ internal sealed class ManualMotionForm : Form
         BuildLayout();
         WireAxis(_axisA);
         WireAxis(_axisB);
+        WireAxis(_axisC);
+        WireAxis(_axisD);
 
         Deactivate += (_, _) => EndActivePress(ManualMotionJogEndReason.Deactivated);
         _refreshTimer.Interval = RefreshIntervalMilliseconds;
@@ -118,12 +124,15 @@ internal sealed class ManualMotionForm : Form
         _operationLine.AutoEllipsis = true;
         _operationLine.TextAlign = ContentAlignment.MiddleLeft;
 
-        var axes = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+        var axes = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
         axes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
         axes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-        axes.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+        axes.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+        axes.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
         axes.Controls.Add(_axisA.Group, 0, 0);
         axes.Controls.Add(_axisB.Group, 1, 0);
+        axes.Controls.Add(_axisC.Group, 0, 1);
+        axes.Controls.Add(_axisD.Group, 1, 1);
 
         _logList.Dock = DockStyle.Fill;
         _logList.IntegralHeight = false;
@@ -134,8 +143,8 @@ internal sealed class ManualMotionForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 72F));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 28F));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 78F));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 22F));
         root.Controls.Add(_modeBanner, 0, 0);
         root.Controls.Add(_sessionLine, 0, 1);
         root.Controls.Add(_operationLine, 0, 2);
@@ -297,10 +306,12 @@ internal sealed class ManualMotionForm : Form
             _operationLine.Text = OperationText(snapshot.ActiveOperation);
         }
 
-        if (snapshot.Axes.Count >= 2)
+        if (snapshot.Axes.Count >= 4)
         {
             RenderAxis(_axisA, snapshot.Axes[0], snapshot, _closeRequested);
             RenderAxis(_axisB, snapshot.Axes[1], snapshot, _closeRequested);
+            RenderAxis(_axisC, snapshot.Axes[2], snapshot, _closeRequested);
+            RenderAxis(_axisD, snapshot.Axes[3], snapshot, _closeRequested);
         }
 
         AppendNewLogEntries(snapshot.Log);
@@ -312,6 +323,8 @@ internal sealed class ManualMotionForm : Form
         controls.Group.Text = axis.AllowedByProfile
             ? controls.Title
             : string.Concat(controls.Title, "   (NOT ALLOWED BY PROFILE)");
+
+        controls.Identity.Text = IdentityText(axis);
 
         controls.StateGrid.Display(axis);
 
@@ -411,6 +424,19 @@ internal sealed class ManualMotionForm : Form
 
     private static string Dash(string value) => value.Length == 0 ? "-" : value;
 
+    private static string IdentityText(ManualMotionAxisSnapshot axis) => string.Concat(
+        Dash(axis.CabinetId),
+        " / ",
+        Dash(axis.WaterJetId),
+        "   installed ",
+        Dash(axis.InstalledPosition),
+        "   targets ",
+        Dash(axis.TargetCoverage),
+        "   brake output ",
+        axis.BrakeOutputNumber > 0
+            ? axis.BrakeOutputNumber.ToString(CultureInfo.InvariantCulture)
+            : "none allocated");
+
     private sealed record ActivePress(ManualMotionAxis Axis, long PressId);
 
     /// <summary>The controls of one axis panel. Not a control type itself, so it declares no designer-visible property.</summary>
@@ -442,6 +468,16 @@ internal sealed class ManualMotionForm : Form
             };
             StateGrid = new ManualMotionAxisStateGrid();
 
+            // Diagnostic identity line: the text is composed only from snapshot fields (canonical
+            // catalog projections). This window derives no topology and no Water Jet identity itself.
+            Identity = new Label
+            {
+                Dock = DockStyle.Fill,
+                AutoEllipsis = true,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(4, 0, 4, 2),
+            };
+
             var commands = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true };
             commands.Controls.Add(BrakeRelease);
             commands.Controls.Add(BrakeApply);
@@ -462,14 +498,16 @@ internal sealed class ManualMotionForm : Form
             move.Controls.Add(Target);
             move.Controls.Add(Move);
 
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
-            layout.Controls.Add(commands, 0, 0);
-            layout.Controls.Add(move, 0, 1);
-            layout.Controls.Add(StateGrid, 0, 2);
+            layout.Controls.Add(Identity, 0, 0);
+            layout.Controls.Add(commands, 0, 1);
+            layout.Controls.Add(move, 0, 2);
+            layout.Controls.Add(StateGrid, 0, 3);
             Group.Controls.Add(layout);
         }
 
@@ -500,6 +538,8 @@ internal sealed class ManualMotionForm : Form
         internal NumericUpDown Target { get; }
 
         internal ManualMotionAxisStateGrid StateGrid { get; }
+
+        internal Label Identity { get; }
 
         private static Button CreateButton(string text) => new()
         {

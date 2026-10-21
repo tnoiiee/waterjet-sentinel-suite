@@ -49,7 +49,7 @@ internal sealed class MotionStopTrialSession
                 axis: AxisToken(_axis));
         }
 
-        if (!MotionStopCommandPlan.IsDefined(_axis))
+        if (!IsTrialAxis(_axis))
         {
             return MotionStopTrialOutcome.RefusedBeforeNative(
                 MotionStopOutcomeCodes.AxisOutOfDomain,
@@ -553,6 +553,15 @@ internal sealed class MotionStopTrialSession
             outcome.RefusalCode = refusalCode;
         }
     }
+
+    /// <summary>
+    /// The Trial axis allowlist. The shared Stop domain covers A/B/C/D for Manual Motion, but this
+    /// Trial remains explicitly A/B-only: Axis C, Axis D and every out-of-domain value are refused
+    /// here, before Gate A, kernel creation, native load, Controller open or dispatch. The widened
+    /// <see cref="MotionStopCommandPlan.IsDefined"/> is therefore never the Trial authorization.
+    /// </summary>
+    private static bool IsTrialAxis(MotionStopAxis axis) =>
+        axis is MotionStopAxis.A or MotionStopAxis.B;
 
     private static string? AxisToken(MotionStopAxis axis) => axis switch
     {

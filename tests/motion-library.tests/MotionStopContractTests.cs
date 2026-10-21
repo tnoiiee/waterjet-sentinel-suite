@@ -148,7 +148,7 @@ public sealed class MotionStopContractTests
     // ------------------------------------------------------------------ closed domain and templates
 
     [Fact]
-    public void Axis_A_And_Axis_B_Map_Only_To_Their_Exact_Templates()
+    public void Every_Axis_Maps_Only_To_Its_Exact_Template()
     {
         Assert.True(MotionStopCommandPlan.TryGetTemplate(MotionStopAxis.A, out var a));
         Assert.Equal("ST A", a);
@@ -156,7 +156,13 @@ public sealed class MotionStopContractTests
         Assert.True(MotionStopCommandPlan.TryGetTemplate(MotionStopAxis.B, out var b));
         Assert.Equal("ST B", b);
 
-        Assert.Equal(2, Enum.GetValues<MotionStopAxis>().Length);
+        Assert.True(MotionStopCommandPlan.TryGetTemplate(MotionStopAxis.C, out var c));
+        Assert.Equal("ST C", c);
+
+        Assert.True(MotionStopCommandPlan.TryGetTemplate(MotionStopAxis.D, out var d));
+        Assert.Equal("ST D", d);
+
+        Assert.Equal(4, Enum.GetValues<MotionStopAxis>().Length);
     }
 
     [Fact]
@@ -170,7 +176,7 @@ public sealed class MotionStopContractTests
     }
 
     [Fact]
-    public void Axis_C_D_Empty_Combined_And_Other_Values_Are_Refused_And_Never_Dispatched()
+    public void Empty_Combined_And_Other_Values_Are_Refused_And_Never_Dispatched()
     {
         using var dispatch = new FakeDispatchKernel(new List<string>());
         var session = new MotionStopSession(dispatch);
@@ -178,9 +184,8 @@ public sealed class MotionStopContractTests
         var refused = new[]
         {
             default(MotionStopAxis),
-            (MotionStopAxis)3,
-            (MotionStopAxis)4,
-            MotionStopAxis.A | MotionStopAxis.B,
+            MotionStopAxis.A | MotionStopAxis.D,
+            (MotionStopAxis)5,
             (MotionStopAxis)99,
             (MotionStopAxis)(-1),
         };
@@ -234,6 +239,30 @@ public sealed class MotionStopContractTests
 
         Assert.Equal(MotionStopOutcomeCodes.Dispatched, outcome.Code);
         Assert.Equal(new[] { MotionStopAxis.B }, dispatch.Dispatched);
+    }
+
+    [Fact]
+    public void An_Accepted_Axis_C_Stop_Dispatches_Only_Axis_C()
+    {
+        using var dispatch = new FakeDispatchKernel(new List<string>());
+        var session = new MotionStopSession(dispatch);
+
+        var outcome = session.Stop(MotionStopAxis.C);
+
+        Assert.Equal(MotionStopOutcomeCodes.Dispatched, outcome.Code);
+        Assert.Equal(new[] { MotionStopAxis.C }, dispatch.Dispatched);
+    }
+
+    [Fact]
+    public void An_Accepted_Axis_D_Stop_Dispatches_Only_Axis_D()
+    {
+        using var dispatch = new FakeDispatchKernel(new List<string>());
+        var session = new MotionStopSession(dispatch);
+
+        var outcome = session.Stop(MotionStopAxis.D);
+
+        Assert.Equal(MotionStopOutcomeCodes.Dispatched, outcome.Code);
+        Assert.Equal(new[] { MotionStopAxis.D }, dispatch.Dispatched);
     }
 
     [Fact]

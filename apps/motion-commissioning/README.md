@@ -1,7 +1,8 @@
 # WJSS Manual Motion Commissioning application
 
 This is an isolated Owner-local Windows application for the WSB1 manual
-commissioning software slice: Axis A (Horizontal) and Axis B (Vertical) only.
+commissioning software slice: Axis A (Horizontal), Axis B (Vertical),
+Axis C (Horizontal) and Axis D (Vertical).
 It is not part of Runtime, API, Kiosk, Operations Preview, Production, an
 automatic sequence or the application Motion gate, and no other project
 references it.
@@ -50,7 +51,7 @@ permits it, and one bounded absolute Move target at a time. It displays raw
 TP/RP/status/output observations separately from profile-based
 interpretation and a codes-only operation log.
 
-There is no raw command box, command file, simultaneous A/B operation,
+There is no raw command box, command file, simultaneous multi-axis operation,
 automatic sequence, cleaning path, standby return, engineering-unit
 conversion, drive enable/disable write, relative move, output-bank write,
 retry, reconnect, replay or discovery. A dispatched Stop is never shown as a

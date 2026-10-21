@@ -6,9 +6,9 @@ namespace Wjss.Runtime.Core.Motion.Manual;
 /// value directly.
 /// </summary>
 /// <param name="Kind">The closed command kind.</param>
-/// <param name="Axis">The closed A/B axis.</param>
+/// <param name="Axis">The closed A/B/C/D axis.</param>
 /// <param name="Operand">The typed native integer operand; zero when the kind carries none.</param>
-/// <param name="BrakeOutput">The configured brake output (1 or 2) for brake kinds; zero otherwise.</param>
+/// <param name="BrakeOutput">The configured brake output (1 to 4) for brake kinds; zero otherwise.</param>
 public sealed record ManualMotionPortCommand(
     ManualMotionPortCommandKind Kind,
     ManualMotionAxis Axis,
@@ -17,8 +17,8 @@ public sealed record ManualMotionPortCommand(
 
 /// <summary>One typed read for a port.</summary>
 /// <param name="Kind">The closed read kind.</param>
-/// <param name="Axis">The closed A/B axis.</param>
-/// <param name="BrakeOutput">The configured brake output (1 or 2) for the brake-output read; zero otherwise.</param>
+/// <param name="Axis">The closed A/B/C/D axis.</param>
+/// <param name="BrakeOutput">The configured brake output (1 to 4) for the brake-output read; zero otherwise.</param>
 public sealed record ManualMotionPortRead(
     ManualMotionReadKind Kind,
     ManualMotionAxis Axis,

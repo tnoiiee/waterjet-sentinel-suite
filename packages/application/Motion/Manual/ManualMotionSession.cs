@@ -5,8 +5,9 @@ using Wjss.Time;
 namespace Wjss.Runtime.Core.Motion.Manual;
 
 /// <summary>
-/// The Application-owned Manual Motion Commissioning session for WSB1 Axis A (Horizontal) and Axis B
-/// (Vertical). It owns the operation lifecycle; the UI only posts typed requests and reads snapshots.
+/// The Application-owned Manual Motion Commissioning session for the WSB1 axes A/B/C/D (A and C
+/// Horizontal, B and D Vertical). It owns the operation lifecycle; the UI only posts typed requests
+/// and reads snapshots.
 ///
 /// Threading contract:
 ///   - every Request* member and <see cref="Snapshot"/> are safe from any thread: a request is only
@@ -34,6 +35,15 @@ public sealed class ManualMotionSession
     private const int MaximumTransitionsPerStep = 16;
 
     private static readonly ManualMotionAxisProfile EmptyAxisProfile = new();
+
+    private static readonly ManualMotionAxis[] AllAxes =
+    {
+        ManualMotionAxis.A,
+        ManualMotionAxis.B,
+        ManualMotionAxis.C,
+        ManualMotionAxis.D,
+    };
+
     private static readonly ReadOnlyCollection<string> NotAllowedItems = Array.AsReadOnly(new[] { "axis is not listed in the profile" });
 
     private readonly IManualMotionPort _port;
@@ -43,6 +53,8 @@ public sealed class ManualMotionSession
     private readonly ConcurrentQueue<Request> _requests = new();
     private readonly AxisRuntime _axisA = new(ManualMotionAxis.A);
     private readonly AxisRuntime _axisB = new(ManualMotionAxis.B);
+    private readonly AxisRuntime _axisC = new(ManualMotionAxis.C);
+    private readonly AxisRuntime _axisD = new(ManualMotionAxis.D);
     private readonly List<ManualMotionLogEntry> _log = new();
     private readonly Queue<ManualMotionAxis> _pendingStops = new();
 
@@ -509,10 +521,15 @@ public sealed class ManualMotionSession
 
     private string? CheckOtherAxisNotMoving(ManualMotionAxis axis, DateTimeOffset now)
     {
-        var other = axis == ManualMotionAxis.A ? ManualMotionAxis.B : ManualMotionAxis.A;
-        return InterpretMotion(other, now) == ManualMotionInterpretation.Active
-            ? ManualMotionCodes.OtherAxisMovingObserved
-            : null;
+        foreach (var other in AllAxes)
+        {
+            if (other != axis && InterpretMotion(other, now) == ManualMotionInterpretation.Active)
+            {
+                return ManualMotionCodes.OtherAxisMovingObserved;
+            }
+        }
+
+        return null;
     }
 
     private bool ObservationTimingConfigured =>
@@ -1456,7 +1473,7 @@ public sealed class ManualMotionSession
     /// </summary>
     private List<ManualMotionPortRead> ObservationPlan()
     {
-        var plan = new List<ManualMotionPortRead>(8);
+        var plan = new List<ManualMotionPortRead>(16);
         if (_active is not null)
         {
             var axis = _active.Axis;
@@ -1477,8 +1494,11 @@ public sealed class ManualMotionSession
             return plan;
         }
 
-        AddIdleReads(plan, ManualMotionAxis.A);
-        AddIdleReads(plan, ManualMotionAxis.B);
+        foreach (var axis in AllAxes)
+        {
+            AddIdleReads(plan, axis);
+        }
+
         return plan;
     }
 
@@ -1633,7 +1653,13 @@ public sealed class ManualMotionSession
 
     private ManualMotionSnapshot BuildSnapshot(DateTimeOffset now)
     {
-        var axes = new List<ManualMotionAxisSnapshot>(2) { AxisSnapshot(_axisA, now), AxisSnapshot(_axisB, now) };
+        var axes = new List<ManualMotionAxisSnapshot>(4)
+        {
+            AxisSnapshot(_axisA, now),
+            AxisSnapshot(_axisB, now),
+            AxisSnapshot(_axisC, now),
+            AxisSnapshot(_axisD, now),
+        };
         var start = Math.Max(0, _log.Count - PublishedLogEntries);
         var log = _log.GetRange(start, _log.Count - start);
         var active = _active;
@@ -1671,6 +1697,11 @@ public sealed class ManualMotionSession
             Axis = runtime.Axis,
             AxisLetter = ManualMotionTopology.AxisLetter(runtime.Axis),
             RoleLabel = ManualMotionTopology.RoleLabel(runtime.Axis),
+            CabinetId = ManualMotionTopology.CabinetId(runtime.Axis),
+            WaterJetId = ManualMotionTopology.WaterJetId(runtime.Axis),
+            InstalledPosition = ManualMotionTopology.InstalledPosition(runtime.Axis),
+            TargetCoverage = ManualMotionTopology.TargetCoverage(runtime.Axis),
+            BrakeOutputNumber = ManualMotionTopology.ConfirmedBrakeOutput(runtime.Axis),
             AllowedByProfile = p is not null,
             BrakeCommandState = runtime.BrakeCommandState,
             BrakeOutput = ObservationSnapshot(runtime.BrakeOutput, now),
@@ -1704,7 +1735,14 @@ public sealed class ManualMotionSession
 
     private ManualMotionAxisProfile AxisProfile(ManualMotionAxis axis) => _profile?.For(axis) ?? EmptyAxisProfile;
 
-    private AxisRuntime Runtime(ManualMotionAxis axis) => axis == ManualMotionAxis.B ? _axisB : _axisA;
+    private AxisRuntime Runtime(ManualMotionAxis axis) => axis switch
+    {
+        ManualMotionAxis.A => _axisA,
+        ManualMotionAxis.B => _axisB,
+        ManualMotionAxis.C => _axisC,
+        ManualMotionAxis.D => _axisD,
+        _ => throw new ArgumentOutOfRangeException(nameof(axis), axis, "axis is outside the closed A/B/C/D domain"),
+    };
 
     private static TimeSpan Milliseconds(int value) => TimeSpan.FromTicks(value * TimeSpan.TicksPerMillisecond);
 
