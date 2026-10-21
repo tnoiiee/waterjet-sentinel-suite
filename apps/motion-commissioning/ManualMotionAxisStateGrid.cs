@@ -75,8 +75,8 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
             axis.BrakeOutput,
             "logical state, UNCONFIRMED (no wiring or polarity meaning)");
         DisplayObservation(StatusWordRow, axis.StatusWord, "native status bits");
-        DisplayInterpretation(MotionBitRow, axis.Motion, axis.InterpretationOwnerAttested);
-        DisplayInterpretation(HomeInputRow, axis.HomeInput, axis.InterpretationOwnerAttested);
+        DisplayInterpretation(MotionBitRow, axis.Motion, axis.MotionInterpretationConfigured);
+        DisplayInterpretation(HomeInputRow, axis.HomeInput, axis.HomeInterpretationConfigured);
         DisplayObservation(PositionTpRow, axis.PositionTp, "native units, label unresolved");
         DisplayObservation(PositionRpRow, axis.PositionRp, "native units, label unresolved");
         SetValue(HomeStateRow, axis.HomeState.ToString());
@@ -142,7 +142,7 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
     private void DisplayInterpretation(
         int row,
         ManualMotionInterpretation interpretation,
-        bool ownerAttested)
+        bool configured)
     {
         SetValue(
             row,
@@ -154,7 +154,7 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
             });
         SetDetail(
             row,
-            ownerAttested
+            configured
                 ? "(Owner-attested profile bit; not vendor- or hardware-verified)"
                 : "(bit NOT_CONFIGURED)");
     }
