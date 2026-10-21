@@ -787,6 +787,9 @@ public sealed class SensorParameterMigrationTests
 /// </summary>
 public sealed class TopologyValidatorTests
 {
+    private static readonly string[] ExpectedUnresolvedPlacementWaterJetIds =
+        ["WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8"];
+
     private static SensorParameterMigrationResult AcceptedResult() =>
         SensorParameterCsvImporter.Import(SyntheticSensorParameterCsv.Build()).Result!;
 
@@ -936,7 +939,7 @@ public sealed class TopologyValidatorTests
                 Assert.Equal(WaterJetPlacementKind.UNRESOLVED, w.PlacementKind);
                 Assert.Empty(w.PlacementAnchors);
             });
-        Assert.Equal(ExpectedWaterJetIdOrder, WaterJetTopologyCatalog.UnresolvedPlacementWaterJetIds.ToArray());
+        Assert.Equal(ExpectedUnresolvedPlacementWaterJetIds, WaterJetTopologyCatalog.UnresolvedPlacementWaterJetIds.ToArray());
     }
 
     [Fact]
