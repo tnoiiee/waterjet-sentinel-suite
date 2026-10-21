@@ -1203,7 +1203,7 @@ public sealed class ManualMotionSessionTests
         harness.OpenSession();
 
         harness.StepOnce(1000);
-        Assert.Equal(1, harness.Reads.Count);
+        Assert.Single(harness.Reads);
 
         harness.Drive(3);
         Assert.Equal(4, harness.Reads.Count);
