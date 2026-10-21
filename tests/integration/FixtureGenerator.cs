@@ -14,9 +14,16 @@ namespace Wjss.FixtureEmission.Tests;
 ///
 /// Owner critical topology correction (Stage 0.4C-K3): every one of the 108 logical
 /// positions is a Product Sensor (I7 and I16 included; 216 channels; synthetic device
-/// distribution 14 x 4 + 13 x 4). <c>tools/fixture-generator/generate.mjs</c> is the Node
-/// mirror of <see cref="BuildSnapshot"/> and was proven byte-identical against the
-/// previously committed .NET output before the corrected fixture was regenerated with it.
+/// distribution 14 x 4 + 13 x 4). Canonical Topology Adoption (2026-10-21): the Water Jet
+/// rows and every Sensor assignment flow from the canonical
+/// <see cref="WaterJetTopologyCatalog"/> (read below), so no table in this generator
+/// changes: WJ1–WJ4 clean the UPPER tier and WJ5–WJ8 the LOWER tier, and every Sensor's
+/// assigned WJ/IV follows. <c>tools/fixture-generator/generate.mjs</c> is the Node mirror
+/// of <see cref="BuildSnapshot"/> and <see cref="BuildBasicDelta"/>; it was proven
+/// byte-identical against previously committed .NET output (its <c>--legacy-proof</c>
+/// modes, over a separate frozen historical table that is never Product authority)
+/// before the adopted fixtures were regenerated with it. This C# generator remains the
+/// authoritative owner and the parity tests remain the final gate.
 /// </summary>
 internal static class FixtureGenerator
 {

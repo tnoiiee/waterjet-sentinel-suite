@@ -571,6 +571,27 @@ placement description of WJ1/WJ3, formerly "at the I16 / I7 gap anchor", is an o
 decision). Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements. Record:
 [`STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`](STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md).
 
+*Canonical Topology Adoption (2026-10-21):* the "replacement placement description … open Owner
+decision" wording above is now closed history. **Current wording:** the canonical installed
+topology is WJ1 FRONT/UPPER, WJ2 LEFT/UPPER, WJ3 REAR/UPPER, WJ4 RIGHT/UPPER, WJ5 FRONT/LOWER,
+WJ6 LEFT/LOWER, WJ7 REAR/LOWER, WJ8 RIGHT/LOWER, each with opposite-wall same-tier Target
+Coverage (WJ1 → REAR/UPPER … WJ8 → LEFT/LOWER) and WJn ↔ IVn pairing; canonical default
+assignment by physical Sensor wall / tier is Rear/Upper 10 → WJ1/IV1, Right/Upper 8 → WJ2/IV2,
+Front/Upper 10 → WJ3/IV3, Left/Upper 8 → WJ4/IV4, Rear/Lower 20 → WJ5/IV5, Right/Lower 16 →
+WJ6/IV6, Front/Lower 20 → WJ7/IV7, Left/Lower 16 → WJ8/IV8 (108 total; I7 → WJ5/IV5,
+I16 → WJ7/IV7). The fine-grained placement of **all eight** Water Jets is `UNRESOLVED` with no
+placement anchors (no anchor inferred, mirrored or transferred; only the fine-grained
+placement is unresolved — the canonical wall / tier is confirmed). Motion identity is
+`OWNER_CONFIRMED_REV2` / `MOTION_COMMISSIONING_DESIGN_REV2` (WJ1 = A,B on WSB2; WJ2 = A,B on
+WSB1; WJ3 = C,D on WSB1; WJ4 = C,D on WSB2; WJ5 = A,B on WSB3; WJ6 = A,B on WSB4; WJ7 = C,D on
+WSB3; WJ8 = C,D on WSB4); REV1 remains historical identity only. The 108 / 216 / 240 / 24
+Sensor and TC baseline, the Sensor sequence, physical Sensor-to-SDS/Cabinet/module/channel
+mapping and every safety / sequencing rule are unchanged. No Cleaning Path model, Sensor
+override, C/D Manual Motion, output 3/4 write, Hardware use or Production integration is
+authorized by the Adoption; the .NET validation of the Adoption is the pending Owner-local
+gate. Record: [`decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md`](decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md)
+addendum and [`CURRENT_STATE.md`](CURRENT_STATE.md).
+
 Stages 0.3 through 0.8 are a **candidate** decomposition. The Owner may merge, split,
 reorder, or replace them. They are recorded here so that work is not invented ad hoc, not
 because they are approved. Stage 0.3 and later remain `[PROPOSED]` and are `[NOT AUTHORIZED]`

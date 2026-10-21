@@ -83,15 +83,16 @@ public sealed class MigratedExampleShapeTests
         var i7 = sensors.Single(s => JsonNodeExtensions.RequireString(s, "sensorId") == "I7");
         Assert.Equal(79, JsonNodeExtensions.RequireInt(i7, "scanOrder"));
         Assert.Equal("REAR", JsonNodeExtensions.RequireString(i7, "wall"));
-        Assert.Equal("WJ1", JsonNodeExtensions.RequireString(i7, "assignedWaterJetId"));
+        Assert.Equal("WJ5", JsonNodeExtensions.RequireString(i7, "assignedWaterJetId"));
         var i16 = sensors.Single(s => JsonNodeExtensions.RequireString(s, "sensorId") == "I16");
         Assert.Equal(88, JsonNodeExtensions.RequireInt(i16, "scanOrder"));
         Assert.Equal("FRONT", JsonNodeExtensions.RequireString(i16, "wall"));
-        Assert.Equal("WJ3", JsonNodeExtensions.RequireString(i16, "assignedWaterJetId"));
+        Assert.Equal("WJ7", JsonNodeExtensions.RequireString(i16, "assignedWaterJetId"));
 
-        // WJ1 / WJ3 installed position is UNRESOLVED with no anchors (nothing inferred from
-        // a former gap); Target Coverage is unchanged.
-        foreach (var unresolvedId in new[] { "WJ1", "WJ3" })
+        // Canonical Topology Adoption: the fine-grained placement of ALL EIGHT Water Jets
+        // is UNRESOLVED with no anchors (nothing inferred from a former gap or any stale
+        // anchor); canonical installed wall / tier and Target Coverage are authoritative.
+        foreach (var unresolvedId in new[] { "WJ1", "WJ2", "WJ3", "WJ4", "WJ5", "WJ6", "WJ7", "WJ8" })
         {
             var waterJet = JsonNodeExtensions.RequireArray(node, "waterJets")
                 .Single(w => JsonNodeExtensions.RequireString(w, "waterJetId") == unresolvedId);
@@ -120,16 +121,18 @@ public sealed class MigratedExampleShapeTests
             var logicalRow = JsonNodeExtensions.RequireInt(sensor, "logicalRow");
             var region = logicalRow <= 2 ? "UPPER" : "LOWER";
             var wall = JsonNodeExtensions.RequireString(sensor, "wall");
+            // Canonical Target Coverage (Canonical Topology Adoption): WJ1-WJ4 clean the
+            // UPPER tier, WJ5-WJ8 the LOWER tier, each from the opposite wall.
             var expectedOrdinal = (wall, region) switch
             {
-                ("REAR", "LOWER") => 1,
-                ("RIGHT", "LOWER") => 2,
-                ("FRONT", "LOWER") => 3,
-                ("LEFT", "LOWER") => 4,
-                ("REAR", "UPPER") => 5,
-                ("RIGHT", "UPPER") => 6,
-                ("FRONT", "UPPER") => 7,
-                ("LEFT", "UPPER") => 8,
+                ("REAR", "UPPER") => 1,
+                ("RIGHT", "UPPER") => 2,
+                ("FRONT", "UPPER") => 3,
+                ("LEFT", "UPPER") => 4,
+                ("REAR", "LOWER") => 5,
+                ("RIGHT", "LOWER") => 6,
+                ("FRONT", "LOWER") => 7,
+                ("LEFT", "LOWER") => 8,
                 _ => throw new InvalidOperationException("synthetic example left the canonical grid"),
             };
             Assert.Equal($"WJ{expectedOrdinal}", JsonNodeExtensions.RequireString(sensor, "assignedWaterJetId"));

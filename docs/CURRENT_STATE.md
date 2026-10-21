@@ -1,5 +1,35 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Canonical Topology Adoption (2026-10-21; current equipment-topology position — supersedes
+> every contrary WJ/IV tier, Target Coverage, assignment, WSB/axis-allocation, REV1-current and
+> placement statement below without deleting any dated record).** Implemented in Source on
+> branch `arena/a6b9d5d8-waterjet-sentinel-suite` from `main`
+> `b0e9eb93d3e7f2112a3ef3b2b8c5f0fedf3e3289` as one consolidated pass for Owner review (not
+> merged at authoring). Canonical installed topology: WJ1 FRONT/UPPER → REAR/UPPER (WSB2 A/B),
+> WJ2 LEFT/UPPER → RIGHT/UPPER (WSB1 A/B), WJ3 REAR/UPPER → FRONT/UPPER (WSB1 C/D),
+> WJ4 RIGHT/UPPER → LEFT/UPPER (WSB2 C/D), WJ5 FRONT/LOWER → REAR/LOWER (WSB3 A/B),
+> WJ6 LEFT/LOWER → RIGHT/LOWER (WSB4 A/B), WJ7 REAR/LOWER → FRONT/LOWER (WSB3 C/D),
+> WJ8 RIGHT/LOWER → LEFT/LOWER (WSB4 C/D); A/C Horizontal, B/D Vertical; brake-output catalogue
+> identity A→1, B→2, C→3, D→4 unchanged; WJn ↔ IVn unchanged. Canonical default assignments
+> (by physical Sensor wall / tier): 10/8/10/8/20/16/20/16 to WJ1..WJ8 — all 108 assigned
+> WJ/IV values change versus the pre-adoption baseline; I7 → WJ5/IV5, I16 → WJ7/IV7. Motion
+> identity: `OWNER_CONFIRMED_REV2` / `MOTION_COMMISSIONING_DESIGN_REV2` current; REV1 retained
+> as historical identity only (evidence note `MOTION-EVIDENCE-01` explicitly superseded for
+> current allocation, physical installation still `NOT_PHYSICALLY_RESOLVED`). Fine-grained
+> placement: **all eight** Water Jets `UNRESOLVED` with no anchors (canonical wall / tier
+> confirmed; no anchor inferred, mirrored or transferred). Unchanged: 108 Sensors / 216
+> assigned / 240 physical / 24 spare, the Sensor sequence, physical SDS/Cabinet/module/channel
+> mapping, queue/sequencing/safety semantics, Manual Motion WSB1 A/B with outputs 1/2 only
+> (diagnostically WJ2 under REV2). Generated `snapshot.seed0.json`, `delta.basic.json` and
+> `sensor-parameters.migrated.example.json` were regenerated only through their generator
+> owners (current/historical separation: frozen historical tables serve byte-identical
+> `--legacy-proof` modes only and are never Product authority); `sensor-map.example.json` is
+> unchanged. **Validation position: .NET restore/build/test and C# fixture parity NOT RUN in
+> the Agent environment (no .NET SDK) — the Owner-local exact-head gate is pending and no
+> .NET result is claimed; no native load, Controller contact or Hardware use occurred.** No
+> Sensor override, Cleaning Path, C/D Manual Motion, output 3/4 write, multi-WSB motion,
+> Hardware commissioning or Production integration is authorized or implemented.
+>
 > **Checkpoint identifier (2026-10-18; PR #34 integrated WSB1 Manual Motion Commissioning
 > vertical slice, software only):** branch `arena/49344b63-waterjet-sentinel-suite`;
 > implementation checkpoint commit `40e25cabf89222c33ce3803434671c04e1932f4a`. This checkpoint

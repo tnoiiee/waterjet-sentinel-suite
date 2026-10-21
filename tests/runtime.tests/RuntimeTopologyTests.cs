@@ -13,10 +13,11 @@ namespace Wjss.Runtime.Core.Tests;
 /// exactly 8 Water Jets and 8 Isolation Valves in ordinal order, WJn ↔ IVn
 /// pairing asserted in both directions, installed position separate from target
 /// coverage (the legacy cleaning-device ordinal maps directly to WJn — a
-/// rear-lower Sensor is assigned WJ1 even though WJ1 installs on the front-lower
+/// rear-lower Sensor is assigned WJ5 even though WJ5 installs on the front-lower
 /// wall), per-Sensor assignments derived only through the pairing, the corrected
 /// Sensors I7 / I16 never presented as Water Jet identities or placement anchors (Owner
-/// critical topology correction: WJ1 / WJ3 installed position UNRESOLVED), and the
+/// critical topology correction; Canonical Topology Adoption 2026-10-21: canonical
+/// installed wall / tier with fine-grained placement UNRESOLVED for all eight), and the
 /// Snapshot/Delta split: the process-lifetime topology is established by the
 /// Snapshot and preserved unchanged by Delta application, never emitted
 /// per-tick. Every value is synthetic; no Production value appears.
@@ -32,14 +33,14 @@ public sealed class RuntimeTopologyTests
     // (installed wall, installed region, placement kind, target wall, target region) per ordinal.
     private static readonly (Wall InstalledWall, Region InstalledRegion, WaterJetPlacementKind Placement, Wall TargetWall, Region TargetRegion)[] ExpectedTopology =
     [
+        (Wall.FRONT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.REAR, Region.UPPER),
+        (Wall.LEFT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.RIGHT, Region.UPPER),
+        (Wall.REAR, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.FRONT, Region.UPPER),
+        (Wall.RIGHT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.LEFT, Region.UPPER),
         (Wall.FRONT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.REAR, Region.LOWER),
-        (Wall.LEFT, Region.LOWER, WaterJetPlacementKind.BETWEEN_HORIZONTAL, Wall.RIGHT, Region.LOWER),
+        (Wall.LEFT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.RIGHT, Region.LOWER),
         (Wall.REAR, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.FRONT, Region.LOWER),
-        (Wall.RIGHT, Region.LOWER, WaterJetPlacementKind.BETWEEN_HORIZONTAL, Wall.LEFT, Region.LOWER),
-        (Wall.FRONT, Region.UPPER, WaterJetPlacementKind.BETWEEN_VERTICAL, Wall.REAR, Region.UPPER),
-        (Wall.LEFT, Region.UPPER, WaterJetPlacementKind.JUNCTION, Wall.RIGHT, Region.UPPER),
-        (Wall.REAR, Region.UPPER, WaterJetPlacementKind.BETWEEN_VERTICAL, Wall.FRONT, Region.UPPER),
-        (Wall.RIGHT, Region.UPPER, WaterJetPlacementKind.JUNCTION, Wall.LEFT, Region.UPPER),
+        (Wall.RIGHT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.LEFT, Region.LOWER),
     ];
 
     // The corrected Product Sensors (former gap positions): I7 at row 5 column 7 (REAR),
@@ -95,14 +96,10 @@ public sealed class RuntimeTopologyTests
             Assert.Equal(expected.TargetWall, waterJet.TargetWall);
             Assert.Equal(expected.TargetRegion, waterJet.TargetRegion);
             Assert.NotEqual(waterJet.InstalledWall, waterJet.TargetWall);
-            if (waterJet.PlacementKind == WaterJetPlacementKind.UNRESOLVED)
-            {
-                Assert.Empty(waterJet.PlacementAnchors);
-            }
-            else
-            {
-                Assert.NotEmpty(waterJet.PlacementAnchors);
-            }
+            // Current Owner disposition: every fine-grained placement is UNRESOLVED and
+            // anchor-free; only the canonical installed wall / region above is authority.
+            Assert.Equal(WaterJetPlacementKind.UNRESOLVED, waterJet.PlacementKind);
+            Assert.Empty(waterJet.PlacementAnchors);
         }
     }
 
@@ -125,11 +122,12 @@ public sealed class RuntimeTopologyTests
     }
 
     [Fact]
-    public void Rear_Lower_Sensors_Are_Assigned_WJ1_Even_Though_WJ1_Installs_On_The_Front_Lower_Wall()
+    public void Rear_Lower_Sensors_Are_Assigned_WJ5_Even_Though_WJ5_Installs_On_The_Front_Lower_Wall()
     {
-        // The binding legacy-assignment example: a rear-lower Sensor with legacy
-        // cleaning-device ordinal 1 is assigned WJ1/IV1 directly (never remapped by
-        // wall), while WJ1 itself installs front-lower and targets rear-lower.
+        // The binding legacy-assignment example (canonical topology): a rear-lower
+        // Sensor with legacy cleaning-device ordinal 5 is assigned WJ5/IV5 directly
+        // (never remapped by wall), while WJ5 itself installs front-lower and targets
+        // rear-lower.
         var state = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
 
         var rearLowerSensors = state.Sensors
@@ -138,13 +136,13 @@ public sealed class RuntimeTopologyTests
         Assert.True(rearLowerSensors.Length > 0);
         Assert.All(rearLowerSensors, sensor =>
         {
-            Assert.Equal("WJ1", sensor.AssignedWaterJetId);
-            Assert.Equal("IV1", sensor.AssignedIsolationValveId);
+            Assert.Equal("WJ5", sensor.AssignedWaterJetId);
+            Assert.Equal("IV5", sensor.AssignedIsolationValveId);
         });
 
-        var wj1 = state.WaterJets.Single(w => w.WaterJetId == "WJ1");
-        Assert.Equal(Wall.FRONT, wj1.InstalledWall);
-        Assert.Equal(Wall.REAR, wj1.TargetWall);
+        var wj5 = state.WaterJets.Single(w => w.WaterJetId == "WJ5");
+        Assert.Equal(Wall.FRONT, wj5.InstalledWall);
+        Assert.Equal(Wall.REAR, wj5.TargetWall);
     }
 
     [Fact]
@@ -164,19 +162,20 @@ public sealed class RuntimeTopologyTests
         }
 
         // Sensor identities and equipment identities are disjoint, and no Water Jet anchors
-        // on I7 or I16 (nothing is inferred from a former gap): WJ1 and WJ3 are UNRESOLVED
-        // with no anchors; Target Coverage is unchanged.
+        // on I7 or I16 (nothing is inferred from a former gap): ALL EIGHT Water Jets are
+        // UNRESOLVED with no anchors under the current disposition; canonical Target
+        // Coverage is the opposite wall in the same tier.
         var waterJetIds = state.WaterJets.Select(w => w.WaterJetId).ToArray();
         Assert.All(ExpectedCorrectedSensors, expected => Assert.DoesNotContain(expected.SensorId, waterJetIds));
-        Assert.All(state.WaterJets, w => Assert.DoesNotContain(w.PlacementAnchors, anchor => anchor is "I7" or "I16"));
+        Assert.All(state.WaterJets, w =>
+        {
+            Assert.Equal(WaterJetPlacementKind.UNRESOLVED, w.PlacementKind);
+            Assert.Empty(w.PlacementAnchors);
+        });
         var wj1 = state.WaterJets.Single(w => w.WaterJetId == "WJ1");
         var wj3 = state.WaterJets.Single(w => w.WaterJetId == "WJ3");
-        Assert.Equal(WaterJetPlacementKind.UNRESOLVED, wj1.PlacementKind);
-        Assert.Equal(WaterJetPlacementKind.UNRESOLVED, wj3.PlacementKind);
-        Assert.Empty(wj1.PlacementAnchors);
-        Assert.Empty(wj3.PlacementAnchors);
-        Assert.Equal((Wall.REAR, Region.LOWER), (wj1.TargetWall, wj1.TargetRegion));
-        Assert.Equal((Wall.FRONT, Region.LOWER), (wj3.TargetWall, wj3.TargetRegion));
+        Assert.Equal((Wall.REAR, Region.UPPER), (wj1.TargetWall, wj1.TargetRegion));
+        Assert.Equal((Wall.FRONT, Region.UPPER), (wj3.TargetWall, wj3.TargetRegion));
     }
 
     [Fact]

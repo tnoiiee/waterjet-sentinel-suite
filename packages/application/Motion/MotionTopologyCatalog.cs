@@ -5,7 +5,10 @@ namespace Wjss.Runtime.Core.Motion;
 /// <summary>
 /// The Owner-confirmed motion topology: four motion controllers (one per WSB cabinet), the sixteen
 /// controller axes, the eight CANONICAL Water Jet axis allocations and the one Drawing evidence
-/// note. All eight allocations are CONFIRMED_OWNER: WJ2 = C,D and WJ4 = A,B included.
+/// note. All eight allocations are CONFIRMED_OWNER under the current canonical topology
+/// (OWNER_CONFIRMED_REV2, Canonical Topology Adoption 2026-10-21): WJ2 = A,B on WSB1 and
+/// WJ4 = C,D on WSB2 included. The superseded OWNER_CONFIRMED_REV1 allocation is historical
+/// identity only and is never published as current.
 ///
 /// Every entry is DATA received from the Owner or read from the Owner-provided cabinet drawing.
 /// Nothing here is derived from a device read, from the Legacy source (which is not available to
@@ -63,24 +66,27 @@ public static class MotionTopologyCatalog
     /// <summary>The eight Water Jet axis allocations, in Water Jet ordinal order.</summary>
     public static IReadOnlyList<MotionWaterJetAxisBinding> WaterJetBindings { get; } =
     [
-        Binding("WJ1", "WSB1", "MC-WSB1", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ2", "WSB1", "MC-WSB1", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ3", "WSB2", "MC-WSB2", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ4", "WSB2", "MC-WSB2", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ5", "WSB3", "MC-WSB3", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ6", "WSB3", "MC-WSB3", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
-        Binding("WJ7", "WSB4", "MC-WSB4", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
+        Binding("WJ1", "WSB2", "MC-WSB2", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
+        Binding("WJ2", "WSB1", "MC-WSB1", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
+        Binding("WJ3", "WSB1", "MC-WSB1", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
+        Binding("WJ4", "WSB2", "MC-WSB2", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
+        Binding("WJ5", "WSB3", "MC-WSB3", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
+        Binding("WJ6", "WSB4", "MC-WSB4", MotionVocabulary.AxisA, MotionVocabulary.AxisB, MotionVocabulary.MappingConfirmedOwner),
+        Binding("WJ7", "WSB3", "MC-WSB3", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
         Binding("WJ8", "WSB4", "MC-WSB4", MotionVocabulary.AxisC, MotionVocabulary.AxisD, MotionVocabulary.MappingConfirmedOwner),
     ];
 
     /// <summary>
     /// The one recorded Drawing discrepancy, carried as EVIDENCE METADATA ONLY.
     ///
-    /// The Owner has ruled the canonical allocation (WJ2 = C,D, WJ4 = A,B). This note records that
-    /// the Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same
-    /// cabinet, so the discrepancy is not silently lost. The note does not make the mapping
-    /// ambiguous, does not override the canonical allocation and does not open the authorization
-    /// gate; and it states explicitly that the discrepancy has NOT been physically resolved.
+    /// Under the superseded OWNER_CONFIRMED_REV1 allocation WJ2 = C,D and WJ4 = A,B, while the
+    /// Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same
+    /// cabinet. The current canonical allocation (OWNER_CONFIRMED_REV2) gives WJ2 = A,B on WSB1
+    /// and WJ4 = C,D on WSB2. This note keeps the earlier discrepancy from being silently lost;
+    /// it does not make the mapping ambiguous, does not override the canonical allocation and
+    /// does not open the authorization gate; and it states explicitly that the physical
+    /// installation has NOT been resolved: nothing here asserts which allocation the installed
+    /// wiring matches.
     /// </summary>
     public static IReadOnlyList<MotionMappingEvidenceNote> MappingEvidenceNotes { get; } =
     [
@@ -89,7 +95,7 @@ public static class MotionTopologyCatalog
             EvidenceId = MotionVocabulary.EvidenceNoteIdWj2Wj4,
             WaterJetIds = ["WJ2", "WJ4"],
             CabinetIds = ["WSB1", "WSB2"],
-            Statement = "The canonical allocation gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. The Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The Owner has ruled the canonical allocation.",
+            Statement = "Historical evidence note (superseded for current allocation by OWNER_CONFIRMED_REV2): under the superseded OWNER_CONFIRMED_REV1 allocation, WJ2 held the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2, while the Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The current canonical allocation (OWNER_CONFIRMED_REV2) gives WJ2 the A,B axis pair on WSB1 and WJ4 the C,D axis pair on WSB2. This note records the earlier discrepancy only; the physical installation remains NOT_PHYSICALLY_RESOLVED, and nothing here asserts which allocation the installed wiring matches.",
             Status = MotionVocabulary.DrawingEvidenceRecorded,
             Classification = MotionVocabulary.EvidenceClassificationEvidenceOnly,
             Effect = "This note changes no Product mapping: all eight Water Jets publish CONFIRMED_OWNER with OWNER_CONFIRMED provenance, WJ2 and WJ4 included. The note exists so the Drawing discrepancy is not lost. It does not open the authorization gate and it does not authorise any motion.",

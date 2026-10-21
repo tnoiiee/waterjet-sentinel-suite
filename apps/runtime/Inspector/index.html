@@ -593,10 +593,11 @@
         var overlay = document.createElement("span");
         overlay.className = "wm-overlay";
         overlay.textContent = "Installed here: " + installed.map(function (w) {
-          // Owner ruling: an UNRESOLVED installed position (WJ1, WJ3) is shown as pending
-          // authoritative layout and never anchored to I7 / I16 or any former gap.
+          // Owner disposition: an UNRESOLVED fine-grained placement (all WJ1-WJ8) is shown
+          // as pending authoritative layout with the canonical wall/tier confirmed, and is
+          // never anchored to I7 / I16, any former gap, or any stale anchor.
           var placement = w.placementKind === "UNRESOLVED"
-            ? (w.installedPositionNote || "installed position pending authoritative layout")
+            ? (w.installedPositionNote || "fine-grained installed placement pending authoritative layout (canonical wall/tier confirmed; no placement anchors)")
             : w.placementKind.toLowerCase().replace(/_/g, " ") + " at " + w.placementAnchors.join(" + ");
           return w.waterJetId + " (" + placement + ") + " + w.dedicatedIsolationValveId +
             " \u2192 sprays the opposite wall: " + w.targetWall + " " + w.targetRegion.toLowerCase();
@@ -661,7 +662,7 @@
       cell(w.installedWall + " " + w.installedRegion.toLowerCase());
       cell(w.placementKind);
       cell(w.placementKind === "UNRESOLVED"
-        ? (w.installedPositionNote || "Installed position pending authoritative layout")
+        ? (w.installedPositionNote || "Fine-grained installed placement pending authoritative layout (canonical wall/tier confirmed; no placement anchors)")
         : w.placementAnchors.join(" + "));
       cell(w.targetWall + " " + w.targetRegion.toLowerCase() + " (opposite wall)");
       cell("topology reference \u00b7 control not authorized \u00b7 acquisition deferred", "topo-status");

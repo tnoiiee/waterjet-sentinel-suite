@@ -836,9 +836,12 @@ The selected UI technology must support, at minimum:
   the U-shaped layout unchanged except that logical **I7** (Rear wall) and **I16** (Front wall)
   are populated as ordinary Sensor cells. No position is rendered as a non-Sensor gap. A Water
   Jet stays a separate equipment entity with an **Installed Position** that is distinct from its
-  **Target Coverage** (WJ1 installed FRONT/LOWER, targets REAR/LOWER; WJ3 installed REAR/LOWER,
-  targets FRONT/LOWER; the replacement placement description of WJ1/WJ3 is an open Owner
-  decision) — see [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-the-two-non_sensor_gap-positions-owner-confirmed).
+  **Target Coverage** (canonical installed topology, Owner Canonical Topology Adoption
+  2026-10-21: WJ1 installed FRONT/UPPER, targets REAR/UPPER; WJ3 installed REAR/UPPER,
+  targets FRONT/UPPER — WJ1–WJ4 UPPER tier, WJ5–WJ8 LOWER tier, each covering the opposite
+  wall in the same tier; the fine-grained placement of all eight is `UNRESOLVED` with no
+  placement anchors, and only that fine-grained placement is unresolved) — see
+  [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-the-two-non_sensor_gap-positions-owner-confirmed).
   Historical: "106 Sensor cells inside 108 logical positions with two `NON_SENSOR_GAP` positions
   (I7 → WJ3, I16 → WJ1)". Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 - Wall-level **Dirty and Cleaner counts** (section 26).

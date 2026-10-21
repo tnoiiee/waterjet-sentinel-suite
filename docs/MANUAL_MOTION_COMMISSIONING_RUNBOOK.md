@@ -13,6 +13,16 @@ simultaneous A/B motion, automatic sequence, cleaning path, standby return,
 Runtime/API/Kiosk/Preview live motion or Production composition in this
 scope.
 
+**Diagnostic identity (Canonical Topology Adoption, 2026-10-21).** Under the
+canonical topology (`OWNER_CONFIRMED_REV2`), the WSB1 Axis A / Axis B pair is
+diagnostically the axis pair of **WJ2** — installed LEFT / UPPER, Target
+Coverage RIGHT / UPPER, Axis A Horizontal, Axis B Vertical. This is an
+identity clarification only: this runbook and the software address **WSB1
+Axis A/B and brake outputs 1/2 only**. There is no Water Jet selection, no
+Axis C/D path, no brake output 3/4 write, no WJ3 Manual Motion and no
+Cleaning Path execution, and the clarification authorizes no hardware
+activity.
+
 **Validation position at authoring.** The authoring sandbox has no .NET SDK.
 Restore, build, .NET tests and lock generation were therefore **NOT RUN**
 there. No native DLL was loaded, no endpoint was contacted and no Controller

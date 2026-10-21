@@ -24,12 +24,13 @@ public sealed class SequencingKernelTests
         ["SYN-S01", "SYN-S02", "SYN-S03", "SYN-S04", "SYN-S05", "SYN-S06", "SYN-S07", "SYN-S08", "SYN-S09", "SYN-S10"];
 
     // Owner critical topology correction: I7 and I16 are ordinary Product Sensors. They
-    // join the synthetic topology with their approved assignments (I7 REAR-LOWER → WJ1/IV1,
-    // I16 FRONT-LOWER → WJ3/IV3) and no special handling anywhere in the kernel.
+    // join the synthetic topology with their canonical assignments (Canonical Topology
+    // Adoption: I7 REAR-LOWER → WJ5/IV5, I16 FRONT-LOWER → WJ7/IV7) and no special
+    // handling anywhere in the kernel.
     private static readonly SequencingSensorAssignment[] CorrectedSensorAssignments =
     [
-        new("I7", "WJ1", "IV1"),
-        new("I16", "WJ3", "IV3"),
+        new("I7", "WJ5", "IV5"),
+        new("I16", "WJ7", "IV7"),
     ];
 
     private static readonly string[] ForbiddenQueueVocabulary =
@@ -375,8 +376,8 @@ public sealed class SequencingKernelTests
         var dispatched = Dispatch(Start(i16.State, 3).State, 4);
         Assert.Equal(SequencingOutcome.APPLIED, dispatched.Outcome);
         Assert.Equal("I7", RequireJob(dispatched.State).TargetSensorId);
-        Assert.Equal("WJ1", RequireJob(dispatched.State).JetId);
-        Assert.Equal("IV1", RequireJob(dispatched.State).ValveId);
+        Assert.Equal("WJ5", RequireJob(dispatched.State).JetId);
+        Assert.Equal("IV5", RequireJob(dispatched.State).ValveId);
     }
 
     [Theory]

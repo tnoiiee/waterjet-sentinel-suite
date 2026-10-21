@@ -7,8 +7,9 @@ namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
 /// The manual motion commissioning foundation: the closed authorization gate, the refusal of every
-/// motion intent on every axis, the CANONICAL Owner-confirmed axis allocation of all eight Water
-/// Jets (WJ2 = C,D and WJ4 = A,B included), the Drawing rev1 discrepancy recorded as evidence only,
+/// motion intent on every axis, the CANONICAL Owner-confirmed REV2 axis allocation of all eight
+/// Water Jets (WJ2 = A,B on WSB1 and WJ4 = C,D on WSB2 included; REV1 retained as historical
+/// identity only), the Drawing rev1 discrepancy recorded as evidence only,
 /// the published not-configured / not-commissioned state, and the deterministic canonical text.
 ///
 /// These tests prove the SOFTWARE position of this revision. They prove nothing about hardware: no
@@ -19,13 +20,13 @@ public sealed class MotionCommissioningTests
     /// <summary>The Owner-confirmed Water Jet axis allocation, in Water Jet ordinal order.</summary>
     private static readonly (string WaterJetId, string CabinetId, string Horizontal, string Vertical)[] ExpectedBindings =
     [
-        ("WJ1", "WSB1", "A", "B"),
-        ("WJ2", "WSB1", "C", "D"),
-        ("WJ3", "WSB2", "C", "D"),
-        ("WJ4", "WSB2", "A", "B"),
-        ("WJ5", "WSB3", "C", "D"),
-        ("WJ6", "WSB3", "A", "B"),
-        ("WJ7", "WSB4", "A", "B"),
+        ("WJ1", "WSB2", "A", "B"),
+        ("WJ2", "WSB1", "A", "B"),
+        ("WJ3", "WSB1", "C", "D"),
+        ("WJ4", "WSB2", "C", "D"),
+        ("WJ5", "WSB3", "A", "B"),
+        ("WJ6", "WSB4", "A", "B"),
+        ("WJ7", "WSB3", "C", "D"),
         ("WJ8", "WSB4", "C", "D"),
     ];
 
@@ -151,6 +152,16 @@ public sealed class MotionCommissioningTests
         Assert.Equal(MotionVocabulary.SectionId, projection.SectionId);
         Assert.Equal(MotionVocabulary.Source, projection.Source);
         Assert.Equal(MotionVocabulary.MotionTopologyRevision, projection.MotionTopologyRevision);
+
+        // Canonical Topology Adoption: the current publication identity is REV2; REV1
+        // survives only as the explicitly historical identity and is never published.
+        Assert.Equal("OWNER_CONFIRMED_REV2", MotionVocabulary.MotionTopologyRevision);
+        Assert.Equal("OWNER_CONFIRMED_REV2", projection.MotionTopologyRevision);
+        Assert.Equal("OWNER_CONFIRMED_REV1", MotionVocabulary.HistoricalMotionTopologyRevisionRev1);
+        Assert.NotEqual(
+            MotionVocabulary.HistoricalMotionTopologyRevisionRev1,
+            projection.MotionTopologyRevision);
+        Assert.Contains("(OWNER_CONFIRMED_REV2)", projection.CanonicalText, StringComparison.Ordinal);
 
         var cabinets = projection.Controllers.Select(controller => controller.Identity.CabinetId).ToArray();
         Assert.Equal(ExpectedCabinetIds, cabinets);
@@ -315,11 +326,12 @@ public sealed class MotionCommissioningTests
         Assert.Equal(8, catalogue.WaterJets.Count);
         Assert.Equal(ExpectedWaterJetIds, catalogue.WaterJets.Select(binding => binding.WaterJetId).ToArray());
 
-        // No cabinet-derived axis formula: WSB1 and WSB2 each carry both axis pairs.
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ2"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ3"), HorizontalOf(catalogue, "WJ4"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ6"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ7"), HorizontalOf(catalogue, "WJ8"));
+        // No cabinet-derived axis formula: every cabinet carries both axis pairs
+        // (WSB1: WJ2/WJ3, WSB2: WJ1/WJ4, WSB3: WJ5/WJ7, WSB4: WJ6/WJ8 under REV2).
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ2"), HorizontalOf(catalogue, "WJ3"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ4"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ7"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ6"), HorizontalOf(catalogue, "WJ8"));
 
         // No odd/even parity formula: the even Water Jets disagree with each other, and so do the
         // odd ones.
@@ -341,11 +353,11 @@ public sealed class MotionCommissioningTests
         Assert.Equal(8, catalogue.WaterJets.Count(binding => binding.HorizontalAxisId is "A" or "C"));
         Assert.Equal(8, catalogue.WaterJets.Count(binding => binding.VerticalAxisId is "B" or "D"));
 
-        // And the canonical values the Owner ruled: WJ2 = C,D and WJ4 = A,B.
-        Assert.Equal("C", HorizontalOf(catalogue, "WJ2"));
-        Assert.Equal("D", VerticalOf(catalogue, "WJ2"));
-        Assert.Equal("A", HorizontalOf(catalogue, "WJ4"));
-        Assert.Equal("B", VerticalOf(catalogue, "WJ4"));
+        // And the canonical values the Owner ruled under REV2: WJ2 = A,B and WJ4 = C,D.
+        Assert.Equal("A", HorizontalOf(catalogue, "WJ2"));
+        Assert.Equal("B", VerticalOf(catalogue, "WJ2"));
+        Assert.Equal("C", HorizontalOf(catalogue, "WJ4"));
+        Assert.Equal("D", VerticalOf(catalogue, "WJ4"));
     }
 
     [Fact]
@@ -362,6 +374,13 @@ public sealed class MotionCommissioningTests
         Assert.Equal(MotionVocabulary.PhysicalResolutionNotResolved, note.PhysicalResolution);
         Assert.False(string.IsNullOrWhiteSpace(note.Statement));
         Assert.False(string.IsNullOrWhiteSpace(note.Effect));
+
+        // The statement is explicitly historical: the discrepancy belongs to the
+        // superseded REV1 allocation, current authority is REV2, and the physical
+        // installation is never claimed resolved.
+        Assert.Contains("superseded OWNER_CONFIRMED_REV1 allocation", note.Statement, StringComparison.Ordinal);
+        Assert.Contains("OWNER_CONFIRMED_REV2", note.Statement, StringComparison.Ordinal);
+        Assert.Contains("NOT_PHYSICALLY_RESOLVED", note.Statement, StringComparison.Ordinal);
 
         // Evidence only: the note does not make any row ambiguous and does not override the Owner.
         Assert.All(catalogue.WaterJets, binding => Assert.Equal(MotionVocabulary.MappingConfirmedOwner, binding.MappingStatus));
