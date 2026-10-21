@@ -332,4 +332,91 @@ public sealed class ManualMotionSimulatedPortTests
 
         Assert.Equal(RunOnce(), RunOnce());
     }
+
+    [Fact]
+    public void Move_A_And_Move_B_Progress_During_The_Same_Interval_With_Axis_Specific_Positions()
+    {
+        var clock = new TestClock(Instant);
+        var port = new ManualMotionSimulatedPort(clock, ManualMotionProfile.CreateSimulationProfile());
+        port.Open();
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.A, brakeOutput: 1));
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.B, brakeOutput: 2));
+
+        // Two bounded absolute moves armed and begun on their own axes.
+        port.Execute(Command(ManualMotionPortCommandKind.Acceleration, ManualMotionAxis.A, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.Speed, ManualMotionAxis.A, operand: 4000));
+        port.Execute(Command(ManualMotionPortCommandKind.Deceleration, ManualMotionAxis.A, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.PositionAbsolute, ManualMotionAxis.A, operand: -11000));
+        port.Execute(Command(ManualMotionPortCommandKind.Acceleration, ManualMotionAxis.B, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.Speed, ManualMotionAxis.B, operand: 4000));
+        port.Execute(Command(ManualMotionPortCommandKind.Deceleration, ManualMotionAxis.B, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.PositionAbsolute, ManualMotionAxis.B, operand: -6000));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.A));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.B));
+
+        clock.Advance(TimeSpan.FromMilliseconds(500));
+        var tpA = ReadTp(port, ManualMotionAxis.A);
+        var tpB = ReadTp(port, ManualMotionAxis.B);
+
+        // Both axes moved during the same interval, each toward its own target.
+        Assert.True(tpA < 12000m && tpA > -11000m, "Axis A must progress during the shared interval");
+        Assert.True(tpB > -8000m && tpB < -6000m, "Axis B must progress during the shared interval");
+        Assert.NotEqual(tpA, tpB);
+    }
+
+    [Fact]
+    public void Home_A_And_Jog_B_Progress_Independently_And_Stop_A_Never_Stops_B()
+    {
+        var clock = new TestClock(Instant);
+        var port = new ManualMotionSimulatedPort(clock, ManualMotionProfile.CreateSimulationProfile());
+        port.Open();
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.A, brakeOutput: 1));
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.B, brakeOutput: 2));
+
+        port.Execute(Command(ManualMotionPortCommandKind.HomeSpeed, ManualMotionAxis.A, operand: 1500));
+        port.Execute(Command(ManualMotionPortCommandKind.Home, ManualMotionAxis.A));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.A));
+        port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, ManualMotionAxis.B, operand: 2000));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.B));
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var tpA = ReadTp(port, ManualMotionAxis.A);
+        Assert.Equal(10500m, tpA);
+        Assert.Equal(-6000m, ReadTp(port, ManualMotionAxis.B));
+
+        // Stop A halts only A; the Jog on B keeps running.
+        port.Execute(Command(ManualMotionPortCommandKind.Stop, ManualMotionAxis.A));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(10500m, ReadTp(port, ManualMotionAxis.A));
+        Assert.Equal(-4000m, ReadTp(port, ManualMotionAxis.B));
+    }
+
+    [Fact]
+    public void Move_C_And_Move_D_Progress_Independently_And_Stop_C_Never_Stops_D()
+    {
+        var clock = new TestClock(Instant);
+        var port = new ManualMotionSimulatedPort(clock, ManualMotionProfile.CreateSimulationProfile());
+        port.Open();
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.C, brakeOutput: 3));
+        port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.D, brakeOutput: 4));
+
+        port.Execute(Command(ManualMotionPortCommandKind.Acceleration, ManualMotionAxis.C, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.Speed, ManualMotionAxis.C, operand: 4000));
+        port.Execute(Command(ManualMotionPortCommandKind.Deceleration, ManualMotionAxis.C, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.PositionAbsolute, ManualMotionAxis.C, operand: 2000));
+        port.Execute(Command(ManualMotionPortCommandKind.Acceleration, ManualMotionAxis.D, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.Speed, ManualMotionAxis.D, operand: 4000));
+        port.Execute(Command(ManualMotionPortCommandKind.Deceleration, ManualMotionAxis.D, operand: 10000));
+        port.Execute(Command(ManualMotionPortCommandKind.PositionAbsolute, ManualMotionAxis.D, operand: -1000));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.C));
+        port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.D));
+
+        clock.Advance(TimeSpan.FromMilliseconds(250));
+        port.Execute(Command(ManualMotionPortCommandKind.Stop, ManualMotionAxis.C));
+        clock.Advance(TimeSpan.FromMilliseconds(750));
+
+        // Axis C froze at its stop position; Axis D continued to its own target on its own output.
+        Assert.Equal(4000m, ReadTp(port, ManualMotionAxis.C));
+        Assert.Equal(-1000m, ReadTp(port, ManualMotionAxis.D));
+    }
 }

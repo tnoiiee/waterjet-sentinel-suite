@@ -1,5 +1,23 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **WSB1 Manual Motion Phase 1A per-axis operation independence (2026-10-22; software only).** The
+> Manual Motion session lifecycle is now independent per axis on WSB1 A/B/C/D: at most one active
+> operation per axis, and multiple axes may hold active operations during the same interval (for
+> example Home A while Jog C, or Move A while Move B). This supersedes only the
+> "one-active-operation lifecycle" wording of the Phase 1A software-expansion block below, without
+> deleting that dated record. Controller calls remain serialized through the single controller owner
+> and the one-native-call-per-Step rule: independent motion is per-axis lifecycle overlap with
+> interleaved typed calls, never coordinated trajectory control, synchronized Begin, interpolation or
+> any combined-axis command. Stop remains per-axis (Stop A touches only Axis A); session close and a
+> communication fault handle every active axis deterministically; hold-to-run Jog presses and
+> heartbeats are per axis. The commissioned Legacy workflow requires Horizontal/Vertical command
+> independence, which this model restores. Phase 1A and this repair prove software behaviour in
+> simulation only: **no B/C/D Hardware execution occurred and none is authorized**; coordinated
+> trajectory, Cleaning Path, multi-WSB and Production remain unauthorized; Phase 2 (Home/DP/DE/Move
+> real commissioning) and Phase 3 (Cleaning Path) remain separately gated. **Validation position:
+> .NET restore/build/test NOT RUN in the Agent environment (no .NET SDK) — the Owner-local exact-head
+> gate is the validation of record; no native load, Controller contact or Hardware use occurred.**
+
 > **WSB1 Manual Motion Phase 1A software expansion (2026-10-22; software only).** The isolated
 > Manual Motion Commissioning software now covers WSB1 Axis A/B/C/D (A/C Horizontal, B/D Vertical;
 > brake outputs A→1, B→2, C→3, D→4; A/B diagnostically WJ2, C/D diagnostically WJ3) with the same

@@ -160,14 +160,14 @@ public enum ManualMotionSessionState
     /// <summary>A communication or native fault occurred; no further command is issued automatically and nothing reconnects.</summary>
     Faulted = 4,
 
-    /// <summary>Close was requested; an active motion operation is being stopped before the port is closed.</summary>
+    /// <summary>Close was requested; every active motion operation is being stopped before the port is closed.</summary>
     Closing = 5,
 
     /// <summary>The port was closed. A closed session never reopens.</summary>
     Closed = 6,
 }
 
-/// <summary>The kind of the single active operation of a session.</summary>
+/// <summary>The kind of one axis operation of a session.</summary>
 public enum ManualMotionOperationKind
 {
     /// <summary>No operation.</summary>
@@ -198,7 +198,7 @@ public enum ManualMotionOperationKind
     Move = 8,
 }
 
-/// <summary>The phase of the active operation. At most one port call is made per session step.</summary>
+/// <summary>The phase of one axis operation. At most one port call is made per session step.</summary>
 public enum ManualMotionOperationPhase
 {
     /// <summary>No active operation.</summary>
@@ -428,10 +428,13 @@ public static class ManualMotionCodes
     /// <summary>The axis is not listed in the Owner-local profile.</summary>
     public const string AxisNotAllowedByProfile = "AXIS_NOT_ALLOWED_BY_PROFILE";
 
-    /// <summary>Another operation is active; one operation (and one axis in motion) at a time.</summary>
+    /// <summary>Another operation is already active on this axis; at most one operation per axis.</summary>
     public const string OperationInProgress = "OPERATION_IN_PROGRESS";
 
-    /// <summary>A fresh observation shows another axis moving.</summary>
+    /// <summary>
+    /// Retained code vocabulary (no longer returned by the session): a fresh observation of another
+    /// axis moving is not a refusal basis, because different axes operate independently.
+    /// </summary>
     public const string OtherAxisMovingObserved = "OTHER_AXIS_MOVING_OBSERVED";
 
     /// <summary>A fresh observation shows the axis moving.</summary>

@@ -10,9 +10,14 @@ is invoked with real Owner-local values.
 **Scope lock.** WSB1 only. Axis A is Horizontal and uses brake output 1;
 Axis B is Vertical and uses brake output 2; Axis C is Horizontal and uses
 brake output 3; Axis D is Vertical and uses brake output 4. There is no
-WSB2–WSB4, simultaneous multi-axis motion, automatic sequence, cleaning
-path, standby return, Runtime/API/Kiosk/Preview live motion or Production
-composition in this scope. Software support for Axis B/C/D was added in
+WSB2–WSB4, coordinated simultaneous multi-axis motion (no synchronized
+Begin, interpolation, contouring, gearing or combined-axis command),
+automatic sequence, cleaning path, standby return,
+Runtime/API/Kiosk/Preview live motion or Production composition in this
+scope. Independent per-axis operations may overlap in time: two axes may
+each hold an active operation in the same interval because their typed
+calls are interleaved one at a time through the single serialized
+controller path. Software support for Axis B/C/D was added in
 Phase 1A (2026-10-22) as software only: the completed hardware record
 remains the Axis A Hardware Trial (FINAL PASS, Owner record). No B/C/D
 hardware trial or hardware authorization exists in this runbook; B/C/D
@@ -81,11 +86,27 @@ The axis workflow is deliberately ordered:
    false. A Stop timeout does **not** make the software invent a stopped
    state and does **not** automatically claim a brake application.
 
-One operation may be active at a time. A communications fault moves the
-session to `FAULTED`; there is no retry, reconnect or replay. A stale
-generation result is rejected. Native calls are serialized by one
-controller-wide gate in hardware-capable composition, and final cleanup is
-invalidate → close → release primary module → release companion module.
+Manual Motion operations are independent per axis: at most one operation
+per axis, and multiple axes (A/B/C/D) may hold active operations during the
+same interval. An active operation on Axis A never blocks an otherwise
+valid operation on B, C or D (and likewise for every other axis); same-axis
+exclusion remains mandatory — while one axis runs, Home, Jog, Move, DP, DE
+and standalone Brake on THAT axis are refused, while Stop on that axis stays
+accepted. Stop is per axis and touches only the requested axis. Hold-to-run
+Jog presses and their heartbeats are per axis. Session close stops every
+active motion operation and awaits each axis independently; a communication
+or native fault is session-global and terminally represents every active
+operation, with one serialized best-effort Stop per axis whose motion
+began. This independent per-axis motion is NOT coordinated trajectory
+control: there is no synchronized Begin, interpolation, contouring,
+combined-axis Stop or automatic Cleaning Path, and no simultaneous start or
+arrival is ever promised. The Legacy commissioned workflow requires
+Horizontal/Vertical command independence; this model restores it. A
+communications fault moves the session to `FAULTED`; there is no retry,
+reconnect or replay. A stale generation result is rejected. Native calls
+are serialized by one controller-wide gate in hardware-capable composition,
+and final cleanup is invalidate → close → release primary module → release
+companion module.
 
 The software cannot express a drive-readiness write (no SH/MO), a relative
 move (no PR), an output-bank write (no OP), a burn/save command (no BN),

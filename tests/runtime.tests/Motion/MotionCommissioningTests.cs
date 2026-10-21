@@ -572,6 +572,32 @@ public sealed class MotionCommissioningTests
         Assert.DoesNotContain("NativeLibrary", form, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void The_Window_Tracks_Operations_And_Jog_Presses_Per_Axis()
+    {
+        var form = ReadAppSource("apps/motion-commissioning/ManualMotionForm.cs");
+
+        // The operation header lists every axis deterministically and hides no StopRequested.
+        Assert.Contains("OperationText(snapshot.ActiveOperations)", form, StringComparison.Ordinal);
+        Assert.Contains("Active operations: ", form, StringComparison.Ordinal);
+        Assert.Contains(": none", form, StringComparison.Ordinal);
+        Assert.Contains("STOP REQUESTED", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("ActiveOperation ", form, StringComparison.Ordinal);
+
+        // Enablement is per axis: the panel consults its own operation only, never a global idle.
+        Assert.Contains("var idle = operation is null;", form, StringComparison.Ordinal);
+        Assert.DoesNotContain("ActiveOperation is null", form, StringComparison.Ordinal);
+
+        // Hold-to-run presses are stored per axis; every active press heartbeats each tick, and
+        // capture loss or deactivation releases all of them safely.
+        Assert.Contains("_activePresses", form, StringComparison.Ordinal);
+        Assert.Contains("private static int PressIndex(ManualMotionAxis axis)", form, StringComparison.Ordinal);
+        Assert.Contains("EndAllActivePresses(ManualMotionJogEndReason.Deactivated)", form, StringComparison.Ordinal);
+        Assert.Contains("EndAllActivePresses(ManualMotionJogEndReason.Released)", form, StringComparison.Ordinal);
+        Assert.Contains("foreach (var press in _activePresses)", form, StringComparison.Ordinal);
+        Assert.Contains("RequestJogHeartbeat(press.Axis, press.PressId)", form, StringComparison.Ordinal);
+    }
+
     private static string ReadAppSource(string relativePath) =>
         File.ReadAllText(Path.Combine(RepositoryRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar)))
             .ReplaceLineEndings("\n");

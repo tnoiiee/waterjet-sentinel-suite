@@ -102,7 +102,7 @@ public sealed class ManualMotionAxisSnapshot
     public required IReadOnlyList<string> NotConfigured { get; init; }
 }
 
-/// <summary>The published state of the single active operation.</summary>
+/// <summary>The published state of one active axis operation.</summary>
 public sealed class ManualMotionOperationSnapshot
 {
     /// <summary>The session-local operation number.</summary>
@@ -173,8 +173,12 @@ public sealed class ManualMotionSnapshot
     /// <summary>The code of the port close, or empty before the close.</summary>
     public required string CloseCode { get; init; }
 
-    /// <summary>The active operation, or null.</summary>
-    public ManualMotionOperationSnapshot? ActiveOperation { get; init; }
+    /// <summary>
+    /// The active operations: zero to four, at most one per axis, in stable A/B/C/D order. An
+    /// inactive axis has no entry; no placeholder operation is fabricated. The collection is
+    /// read-only, and each entry keeps its own ID, axis, kind, phase and StopRequested state.
+    /// </summary>
+    public required IReadOnlyList<ManualMotionOperationSnapshot> ActiveOperations { get; init; }
 
     /// <summary>Axis A, Axis B, Axis C, then Axis D (stable order).</summary>
     public required IReadOnlyList<ManualMotionAxisSnapshot> Axes { get; init; }

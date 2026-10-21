@@ -52,6 +52,19 @@ hardware activity: B/C/D wiring and route continuity continue to rest on
 the Legacy Actual Run evidence summarized in this document, and the only
 completed WJSS hardware trial remains Axis A (FINAL PASS, Owner record).
 
+**Phase 1A per-axis independence addendum (2026-10-22, software only).**
+The commissioned Legacy workflow runs Horizontal and Vertical axes with
+independent command lifecycles on the shared controller, and the WSB1
+software model now matches that requirement: at most one active operation
+per axis, several axes active during the same interval, per-axis Stop and
+per-axis hold-to-run Jog, with every controller call still serialized
+through the single owner (one native call per Step, no overlap). This is
+independent per-axis motion, not coordinated trajectory control: no
+synchronized Begin, interpolation or combined-axis command is introduced,
+and no combined-axis Stop replaces the typed per-axis Stops. No new Legacy
+finding and no hardware activity are recorded here; B/C/D Hardware execution
+remains unauthorized.
+
 ## 3. Corrections and deliberate non-ports
 
 The WJSS slice does not reproduce the Legacy implementation structure. In
@@ -59,8 +72,9 @@ particular:
 
 - no caller-built command string crosses the Application, UI or adapter
   boundary; the sole new template surface is one internal closed plan;
-- one long-lived owner, one active operation, one controller-wide native
-  gate and generation fencing replace concurrent unfenced dispatch;
+- one long-lived owner, at most one active operation per axis, one
+  controller-wide native gate and generation fencing replace concurrent
+  unfenced dispatch;
 - a communication fault ends the session as `FAULTED`; there is no retry,
   reconnect, replay, discovery or silent continuation;
 - output and position values are never repaired, defaulted or converted to

@@ -47,12 +47,15 @@ operation values for control.
 The window is driven only by redacted Application snapshots. It provides
 individual brake release/apply commands, hold-to-run Jog +/-, per-axis Stop,
 Home, define position zero, define dual zero where the Owner-local profile
-permits it, and one bounded absolute Move target at a time. It displays raw
-TP/RP/status/output observations separately from profile-based
-interpretation and a codes-only operation log.
+permits it, and one bounded absolute Move target per axis. Operations are
+independent per axis: at most one operation per axis, and several axes may
+hold active operations during the same interval (each panel is enabled from
+its own axis state only). It displays raw TP/RP/status/output observations
+separately from profile-based interpretation and a codes-only operation log.
 
-There is no raw command box, command file, simultaneous multi-axis operation,
-automatic sequence, cleaning path, standby return, engineering-unit
+There is no raw command box, command file, coordinated simultaneous
+multi-axis motion (no synchronized Begin, interpolation or combined-axis
+command), automatic sequence, cleaning path, standby return, engineering-unit
 conversion, drive enable/disable write, relative move, output-bank write,
 retry, reconnect, replay or discovery. A dispatched Stop is never shown as a
 confirmed stop; `StopConfirmed` remains false.

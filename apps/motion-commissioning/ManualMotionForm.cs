@@ -13,11 +13,12 @@ namespace Wjss.MotionCommissioning;
 /// session, and every displayed value comes from the session snapshot. There is no raw command entry,
 /// no generic output number and no command construction here.
 ///
-/// Hold-to-run Jog: MouseDown starts a press; MouseUp, lost pointer capture and window deactivation
-/// end it; while the press is held a heartbeat is posted at the refresh cadence, and the session
-/// stops the Jog on its own when the heartbeat expires or the maximum hold duration is reached.
-/// Closing the window requests the session close (an active motion operation is stopped first, then
-/// the port is invalidated, closed and unloaded) before the window goes away.
+/// Hold-to-run Jog: MouseDown starts a press on its axis; MouseUp, lost pointer capture and window
+/// deactivation end it; while a press is held a heartbeat is posted at the refresh cadence for every
+/// active press, and the session stops each Jog on its own axis when its heartbeat expires or its
+/// maximum hold duration is reached. Closing the window requests the session close (every active
+/// motion operation is stopped first, then the port is invalidated, closed and unloaded) before the
+/// window goes away.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build and review are the validation of record).
 /// </summary>
@@ -43,7 +44,9 @@ internal sealed class ManualMotionForm : Form
     private readonly AxisControls _axisD = new(ManualMotionAxis.D);
     private readonly BufferedTableLayoutPanel _axesLayout = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
 
-    private ActivePress? _activePress;
+    // Hold-to-run press state is per axis: at most one active press per axis, heartbeats are posted
+    // for every active press each tick, and a release (or capture loss) ends only its own axis.
+    private readonly ActivePress?[] _activePresses = new ActivePress?[4];
     private long _pressSequence;
     private long _lastLogSequence;
     private bool _closeRequested;
@@ -74,7 +77,7 @@ internal sealed class ManualMotionForm : Form
         // The size/move drag loop raises ResizeBegin/ResizeEnd for both moving and resizing.
         ResizeBegin += (_, _) => _interactiveResize = true;
         ResizeEnd += (_, _) => OnInteractiveResizeEnd();
-        Deactivate += (_, _) => EndActivePress(ManualMotionJogEndReason.Deactivated);
+        Deactivate += (_, _) => EndAllActivePresses(ManualMotionJogEndReason.Deactivated);
         _refreshTimer.Interval = RefreshIntervalMilliseconds;
         _refreshTimer.Tick += (_, _) => OnRefreshTick();
         _refreshTimer.Start();
@@ -91,7 +94,7 @@ internal sealed class ManualMotionForm : Form
             {
                 _closeRequested = true;
                 _closeRequestedAt = DateTimeOffset.UtcNow;
-                EndActivePress(ManualMotionJogEndReason.Released);
+                EndAllActivePresses(ManualMotionJogEndReason.Released);
                 _session.RequestClose();
                 _operationLine.Text = "Closing: stopping any active motion, then invalidating, closing and unloading the port...";
             }
@@ -246,48 +249,68 @@ internal sealed class ManualMotionForm : Form
 
     private void BeginPress(ManualMotionAxis axis, ManualMotionJogDirection direction)
     {
-        if (_activePress is not null || _closeRequested)
+        if (_closeRequested || PressFor(axis) is not null)
         {
+            // At most one active press per axis; a close releases everything instead of starting.
             return;
         }
 
         _pressSequence++;
-        _activePress = new ActivePress(axis, _pressSequence);
+        _activePresses[PressIndex(axis)] = new ActivePress(axis, _pressSequence, direction);
         _session.RequestJogStart(axis, direction, _pressSequence);
     }
 
     private void EndPress(ManualMotionAxis axis, ManualMotionJogEndReason reason)
     {
-        var press = _activePress;
-        if (press is null || press.Axis != axis)
-        {
-            return;
-        }
-
-        _activePress = null;
-        _session.RequestJogRelease(press.Axis, press.PressId, reason);
-    }
-
-    private void EndActivePress(ManualMotionJogEndReason reason)
-    {
-        var press = _activePress;
+        // A release ends only its own axis press; it never releases or stops another axis.
+        var press = PressFor(axis);
         if (press is null)
         {
             return;
         }
 
-        _activePress = null;
+        _activePresses[PressIndex(axis)] = null;
         _session.RequestJogRelease(press.Axis, press.PressId, reason);
     }
 
+    private void EndAllActivePresses(ManualMotionJogEndReason reason)
+    {
+        // Capture loss and window deactivation end every applicable press safely.
+        for (var index = 0; index < _activePresses.Length; index++)
+        {
+            var press = _activePresses[index];
+            if (press is null)
+            {
+                continue;
+            }
+
+            _activePresses[index] = null;
+            _session.RequestJogRelease(press.Axis, press.PressId, reason);
+        }
+    }
+
+    private ActivePress? PressFor(ManualMotionAxis axis) => _activePresses[PressIndex(axis)];
+
+    private static int PressIndex(ManualMotionAxis axis) => axis switch
+    {
+        ManualMotionAxis.A => 0,
+        ManualMotionAxis.B => 1,
+        ManualMotionAxis.C => 2,
+        ManualMotionAxis.D => 3,
+        _ => throw new ArgumentOutOfRangeException(nameof(axis), axis, "axis is outside the closed A/B/C/D domain"),
+    };
+
     private void OnRefreshTick()
     {
-        // The hold-to-run heartbeat is posted first and unconditionally: presentation coalescing
-        // during an interactive resize never delays or suppresses it.
-        var press = _activePress;
-        if (press is not null)
+        // The hold-to-run heartbeats are posted first and unconditionally for every active press:
+        // presentation coalescing during an interactive resize never delays or suppresses them, and
+        // each heartbeat carries its own axis and press ID so it never keeps another axis alive.
+        foreach (var press in _activePresses)
         {
-            _session.RequestJogHeartbeat(press.Axis, press.PressId);
+            if (press is not null)
+            {
+                _session.RequestJogHeartbeat(press.Axis, press.PressId);
+            }
         }
 
         var snapshot = _session.Snapshot;
@@ -350,7 +373,7 @@ internal sealed class ManualMotionForm : Form
 
         if (!_closeRequested)
         {
-            _operationLine.Text = OperationText(snapshot.ActiveOperation);
+            _operationLine.Text = OperationText(snapshot.ActiveOperations);
         }
 
         if (snapshot.Axes.Count >= 4)
@@ -360,10 +383,10 @@ internal sealed class ManualMotionForm : Form
             _axesLayout.SuspendLayout();
             try
             {
-                RenderAxis(_axisA, snapshot.Axes[0], snapshot, _closeRequested);
-                RenderAxis(_axisB, snapshot.Axes[1], snapshot, _closeRequested);
-                RenderAxis(_axisC, snapshot.Axes[2], snapshot, _closeRequested);
-                RenderAxis(_axisD, snapshot.Axes[3], snapshot, _closeRequested);
+                RenderAxis(_axisA, snapshot.Axes[0], OperationFor(snapshot, ManualMotionAxis.A), PressFor(ManualMotionAxis.A), snapshot, _closeRequested);
+                RenderAxis(_axisB, snapshot.Axes[1], OperationFor(snapshot, ManualMotionAxis.B), PressFor(ManualMotionAxis.B), snapshot, _closeRequested);
+                RenderAxis(_axisC, snapshot.Axes[2], OperationFor(snapshot, ManualMotionAxis.C), PressFor(ManualMotionAxis.C), snapshot, _closeRequested);
+                RenderAxis(_axisD, snapshot.Axes[3], OperationFor(snapshot, ManualMotionAxis.D), PressFor(ManualMotionAxis.D), snapshot, _closeRequested);
             }
             finally
             {
@@ -374,7 +397,13 @@ internal sealed class ManualMotionForm : Form
         AppendNewLogEntries(snapshot.Log);
     }
 
-    private static void RenderAxis(AxisControls controls, ManualMotionAxisSnapshot axis, ManualMotionSnapshot snapshot, bool closing)
+    private static void RenderAxis(
+        AxisControls controls,
+        ManualMotionAxisSnapshot axis,
+        ManualMotionOperationSnapshot? operation,
+        ActivePress? press,
+        ManualMotionSnapshot snapshot,
+        bool closing)
     {
         // The title, group caption and canonical identity line are stable for the whole session:
         // assign each only when its text actually changes, never as per-tick layout churn.
@@ -400,8 +429,12 @@ internal sealed class ManualMotionForm : Form
 
         controls.StateGrid.Display(axis);
 
+        // Enablement is per axis: this panel is gated only by its OWN operation state, so an active
+        // operation on another axis never disables these controls. Starting a second operation on a
+        // busy axis stays impossible (the session refuses it); Stop remains reachable in Ready,
+        // Closing and Faulted under the existing typed rules.
         var ready = snapshot.State == ManualMotionSessionState.Ready && !closing;
-        var idle = snapshot.ActiveOperation is null;
+        var idle = operation is null;
         var allowed = axis.AllowedByProfile;
         controls.BrakeRelease.Enabled = ready && idle && allowed;
         controls.BrakeApply.Enabled = ready && idle && allowed;
@@ -411,12 +444,26 @@ internal sealed class ManualMotionForm : Form
         controls.Move.Enabled = ready && idle && allowed;
         controls.Target.Enabled = ready && allowed;
 
-        // Jog buttons are never disabled in the middle of a press, so MouseUp and capture loss always arrive.
-        controls.JogNegative.Enabled = ready && allowed;
-        controls.JogPositive.Enabled = ready && allowed;
+        // A held press keeps only its own button enabled, so MouseUp and capture loss always arrive
+        // for it; without a held press a busy axis disables both Jog buttons.
+        controls.JogNegative.Enabled = ready && allowed && (idle || press is { Direction: ManualMotionJogDirection.Negative });
+        controls.JogPositive.Enabled = ready && allowed && (idle || press is { Direction: ManualMotionJogDirection.Positive });
         controls.Stop.Enabled = snapshot.State is ManualMotionSessionState.Ready
             or ManualMotionSessionState.Closing
             or ManualMotionSessionState.Faulted;
+    }
+
+    private static ManualMotionOperationSnapshot? OperationFor(ManualMotionSnapshot snapshot, ManualMotionAxis axis)
+    {
+        foreach (var operation in snapshot.ActiveOperations)
+        {
+            if (operation.Axis == axis)
+            {
+                return operation;
+            }
+        }
+
+        return null;
     }
 
     private void AppendNewLogEntries(IReadOnlyList<ManualMotionLogEntry> entries)
@@ -475,23 +522,37 @@ internal sealed class ManualMotionForm : Form
         return string.Concat(source, " / ", snapshot.ProfileCode);
     }
 
-    private static string OperationText(ManualMotionOperationSnapshot? operation)
+    private static string OperationText(IReadOnlyList<ManualMotionOperationSnapshot> operations)
     {
-        if (operation is null)
+        // Deterministic compact header over ALL active operations: one entry per axis in stable
+        // A/B/C/D order, each with its own ID, kind and phase, and StopRequested is never hidden.
+        var parts = new List<string>(4);
+        foreach (var axis in new[] { ManualMotionAxis.A, ManualMotionAxis.B, ManualMotionAxis.C, ManualMotionAxis.D })
         {
-            return "Active operation: none";
+            ManualMotionOperationSnapshot? found = null;
+            foreach (var operation in operations)
+            {
+                if (operation.Axis == axis)
+                {
+                    found = operation;
+                    break;
+                }
+            }
+
+            parts.Add(found is null
+                ? string.Concat(axis.ToString(), ": none")
+                : string.Concat(
+                    axis.ToString(),
+                    ": #",
+                    found.Id.ToString(CultureInfo.InvariantCulture),
+                    " ",
+                    found.Kind.ToString(),
+                    " ",
+                    found.Phase.ToString(),
+                    found.StopRequested ? " STOP REQUESTED" : string.Empty));
         }
 
-        return string.Concat(
-            "Active operation #",
-            operation.Id.ToString(CultureInfo.InvariantCulture),
-            ": ",
-            operation.Kind.ToString(),
-            " on Axis ",
-            operation.Axis.ToString(),
-            "   Phase: ",
-            operation.Phase.ToString(),
-            operation.StopRequested ? "   STOP REQUESTED" : string.Empty);
+        return string.Concat("Active operations: ", string.Join(" | ", parts));
     }
 
     private static string Dash(string value) => value.Length == 0 ? "-" : value;
@@ -509,7 +570,7 @@ internal sealed class ManualMotionForm : Form
             ? axis.BrakeOutputNumber.ToString(CultureInfo.InvariantCulture)
             : "none allocated");
 
-    private sealed record ActivePress(ManualMotionAxis Axis, long PressId);
+    private sealed record ActivePress(ManualMotionAxis Axis, long PressId, ManualMotionJogDirection Direction);
 
     /// <summary>
     /// A layout container whose own painting is double-buffered, so interactive resizing repaints
