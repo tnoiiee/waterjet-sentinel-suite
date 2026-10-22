@@ -132,6 +132,8 @@ public sealed class ManualMotionProfileTests
 
         Assert.NotNull(profile.For(ManualMotionAxis.A));
         Assert.Null(profile.For(ManualMotionAxis.B));
+        Assert.Null(profile.For(ManualMotionAxis.C));
+        Assert.Null(profile.For(ManualMotionAxis.D));
     }
 
     [Fact]
@@ -164,7 +166,75 @@ public sealed class ManualMotionProfileTests
             ManualMotionProfileParser.Parse(ReplaceInProfile("\"controller\": \"WSB1\"", "\"controller\": \"WSB2\"")).Code);
         Assert.Equal(
             ManualMotionCodes.ProfileAxisUnsupported,
-            ManualMotionProfileParser.Parse(ReplaceInProfile("\"B\": {", "\"C\": {")).Code);
+            ManualMotionProfileParser.Parse(ReplaceInProfile("\"B\": {", "\"E\": {")).Code);
+    }
+
+    [Fact]
+    public void Axes_C_And_D_Are_Accepted_With_Their_Owner_Confirmed_Brake_Outputs()
+    {
+        // A self-contained C/D profile (line-ending invariant, like the one-axis profile above).
+        const string axesCandD = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "C": {
+                  "brakeOutput": 3
+                },
+                "D": {
+                  "brakeOutput": 4
+                }
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(axesCandD);
+
+        Assert.True(result.Accepted);
+        var profile = Assert.IsType<ManualMotionProfile>(result.Profile);
+        Assert.Equal(3, Assert.IsType<ManualMotionAxisProfile>(profile.AxisC).BrakeOutput);
+        Assert.Equal(4, Assert.IsType<ManualMotionAxisProfile>(profile.AxisD).BrakeOutput);
+        Assert.NotNull(profile.For(ManualMotionAxis.C));
+        Assert.NotNull(profile.For(ManualMotionAxis.D));
+        Assert.Null(profile.For(ManualMotionAxis.A));
+        Assert.Null(profile.For(ManualMotionAxis.B));
+    }
+
+    [Fact]
+    public void A_C_Or_D_Brake_Output_That_Differs_From_The_Allocation_Is_Refused()
+    {
+        const string axisCWrongOutput = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "C": {
+                  "brakeOutput": 2
+                }
+              }
+            }
+            """;
+        const string axisDWrongOutput = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "D": {
+                  "brakeOutput": 3
+                }
+              }
+            }
+            """;
+
+        Assert.Equal(
+            ManualMotionCodes.ProfileBrakeOutputAllocationMismatch,
+            ManualMotionProfileParser.Parse(axisCWrongOutput).Code);
+        Assert.Equal(
+            ManualMotionCodes.ProfileBrakeOutputAllocationMismatch,
+            ManualMotionProfileParser.Parse(axisDWrongOutput).Code);
     }
 
     [Fact]
@@ -235,8 +305,12 @@ public sealed class ManualMotionProfileTests
         Assert.Equal("WSB1", profile.ControllerId);
         Assert.Empty(Assert.IsType<ManualMotionAxisProfile>(profile.AxisA).NotConfiguredItems());
         Assert.Empty(Assert.IsType<ManualMotionAxisProfile>(profile.AxisB).NotConfiguredItems());
+        Assert.Empty(Assert.IsType<ManualMotionAxisProfile>(profile.AxisC).NotConfiguredItems());
+        Assert.Empty(Assert.IsType<ManualMotionAxisProfile>(profile.AxisD).NotConfiguredItems());
         Assert.Equal(ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.A), profile.AxisA!.BrakeOutput);
         Assert.Equal(ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.B), profile.AxisB!.BrakeOutput);
+        Assert.Equal(ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.C), profile.AxisC!.BrakeOutput);
+        Assert.Equal(ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.D), profile.AxisD!.BrakeOutput);
     }
 
     [Fact]
@@ -244,9 +318,40 @@ public sealed class ManualMotionProfileTests
     {
         Assert.Equal("Horizontal", ManualMotionTopology.RoleLabel(ManualMotionAxis.A));
         Assert.Equal("Vertical", ManualMotionTopology.RoleLabel(ManualMotionAxis.B));
+        Assert.Equal("Horizontal", ManualMotionTopology.RoleLabel(ManualMotionAxis.C));
+        Assert.Equal("Vertical", ManualMotionTopology.RoleLabel(ManualMotionAxis.D));
         Assert.Equal(1, ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.A));
         Assert.Equal(2, ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.B));
+        Assert.Equal(3, ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.C));
+        Assert.Equal(4, ManualMotionTopology.ConfirmedBrakeOutput(ManualMotionAxis.D));
         Assert.Equal("A", ManualMotionTopology.AxisLetter(ManualMotionAxis.A));
         Assert.Equal("B", ManualMotionTopology.AxisLetter(ManualMotionAxis.B));
+        Assert.Equal("C", ManualMotionTopology.AxisLetter(ManualMotionAxis.C));
+        Assert.Equal("D", ManualMotionTopology.AxisLetter(ManualMotionAxis.D));
+    }
+
+    [Fact]
+    public void The_Topology_Projects_The_Canonical_Water_Jet_Identity_Of_Every_Axis()
+    {
+        // WSB1 Axis A/B serve WJ2 (installed LEFT/UPPER, targets RIGHT/UPPER); Axis C/D serve WJ3
+        // (installed REAR/UPPER, targets FRONT/UPPER). No axis is ever WJ1.
+        Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.A));
+        Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.B));
+        Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.C));
+        Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.D));
+
+        Assert.Equal("WJ2", ManualMotionTopology.WaterJetId(ManualMotionAxis.A));
+        Assert.Equal("WJ2", ManualMotionTopology.WaterJetId(ManualMotionAxis.B));
+        Assert.Equal("WJ3", ManualMotionTopology.WaterJetId(ManualMotionAxis.C));
+        Assert.Equal("WJ3", ManualMotionTopology.WaterJetId(ManualMotionAxis.D));
+
+        Assert.Equal("LEFT / UPPER", ManualMotionTopology.InstalledPosition(ManualMotionAxis.A));
+        Assert.Equal("RIGHT / UPPER", ManualMotionTopology.TargetCoverage(ManualMotionAxis.A));
+        Assert.Equal("LEFT / UPPER", ManualMotionTopology.InstalledPosition(ManualMotionAxis.B));
+        Assert.Equal("RIGHT / UPPER", ManualMotionTopology.TargetCoverage(ManualMotionAxis.B));
+        Assert.Equal("REAR / UPPER", ManualMotionTopology.InstalledPosition(ManualMotionAxis.C));
+        Assert.Equal("FRONT / UPPER", ManualMotionTopology.TargetCoverage(ManualMotionAxis.C));
+        Assert.Equal("REAR / UPPER", ManualMotionTopology.InstalledPosition(ManualMotionAxis.D));
+        Assert.Equal("FRONT / UPPER", ManualMotionTopology.TargetCoverage(ManualMotionAxis.D));
     }
 }

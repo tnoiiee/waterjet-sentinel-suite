@@ -35,9 +35,12 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
     private readonly Label[] _values = new Label[StateRowCount];
     private readonly ManualMotionTimestampCell?[] _timestamps = new ManualMotionTimestampCell?[StateRowCount];
     private readonly Label?[] _details = new Label?[StateRowCount];
+    private readonly ToolTip _toolTip = new();
 
     internal ManualMotionAxisStateGrid()
     {
+        // Buffer this grid's own painting so an interactive resize repaints it without tearing.
+        DoubleBuffered = true;
         Dock = DockStyle.Fill;
         ColumnCount = 4;
         RowCount = StateRowCount;
@@ -48,10 +51,10 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
         SuspendLayout();
         try
         {
-            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20F));
-            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F));
-            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 23F));
-            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42F));
+            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 19F));
+            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16F));
+            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25F));
+            ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
 
             for (var row = 0; row < StateRowCount; row++)
             {
@@ -94,12 +97,15 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
 
     private void AddRow(int row)
     {
-        Controls.Add(CreateFieldLabel(FieldText(row)), 0, row);
+        var field = CreateFieldLabel(FieldText(row));
+        Controls.Add(field, 0, row);
+        _toolTip.SetToolTip(field, field.Text);
 
         var value = CreateLabel(InitialValue(row), monospace: row != DriveReadinessRow);
         Controls.Add(value, 1, row);
         SetColumnSpan(value, ValueSpan(row));
         _values[row] = value;
+        _toolTip.SetToolTip(value, value.Text);
 
         if (HasTimestamp(row))
         {
@@ -113,6 +119,7 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
             var detail = CreateLabel(InitialDetail(row), monospace: false);
             Controls.Add(detail, 3, row);
             _details[row] = detail;
+            _toolTip.SetToolTip(detail, detail.Text);
         }
     }
 
@@ -165,12 +172,25 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
 
     private void SetDetail(int row, string text) => SetText(_details[row], text);
 
-    private static void SetText(Control? control, string text)
+    private void SetText(Control? control, string text)
     {
         if (control is not null && !string.Equals(control.Text, text, StringComparison.Ordinal))
         {
             control.Text = text;
+
+            // A narrow cell ellipsizes its text; the complete current text stays available here.
+            _toolTip.SetToolTip(control, text);
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _toolTip.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     private static Label CreateFieldLabel(string text)
@@ -187,6 +207,10 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
             Text = text,
             Dock = DockStyle.Fill,
             AutoSize = false,
+
+            // One line, clipped with an ellipsis at the cell edge: long field, value or detail
+            // text can never wrap into a second clipped line or paint over an adjacent column.
+            AutoEllipsis = true,
             Margin = new Padding(3, 0, 3, 0),
             Padding = new Padding(2, 0, 2, 0),
             TextAlign = ContentAlignment.MiddleLeft,

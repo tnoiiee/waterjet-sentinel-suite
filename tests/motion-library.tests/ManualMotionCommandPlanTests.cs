@@ -13,9 +13,9 @@ namespace Wjss.MotionLibrary.Tests;
 /// </summary>
 public sealed class ManualMotionCommandPlanTests
 {
-    private static readonly string[] ExpectedPlanAxisNames = { "A", "B" };
+    private static readonly string[] ExpectedPlanAxisNames = { "A", "B", "C", "D" };
 
-    private static readonly string[] ExpectedBrakeOutputNames = { "None", "Output1", "Output2" };
+    private static readonly string[] ExpectedBrakeOutputNames = { "None", "Output1", "Output2", "Output3", "Output4" };
 
     private static string Render(ManualMotionPlanCommand command)
     {
@@ -34,12 +34,16 @@ public sealed class ManualMotionCommandPlanTests
     [Theory]
     [InlineData("A", 1)]
     [InlineData("B", 2)]
+    [InlineData("C", 3)]
+    [InlineData("D", 4)]
     public void Brake_Output_Allocation_Is_The_Owner_Confirmed_Mapping(string axis, int output)
     {
         var planAxis = axis switch
         {
             "A" => ManualMotionPlanAxis.A,
             "B" => ManualMotionPlanAxis.B,
+            "C" => ManualMotionPlanAxis.C,
+            "D" => ManualMotionPlanAxis.D,
             _ => throw new ArgumentOutOfRangeException(nameof(axis), axis, null),
         };
 
@@ -101,6 +105,58 @@ public sealed class ManualMotionCommandPlanTests
             "PAA=-3000",
             Render(new ManualMotionPlanCommand(
                 ManualMotionPlanCommandKind.PositionAbsolute, ManualMotionPlanAxis.A, ManualMotionBrakeOutput.None, -3000)));
+        Assert.Equal(
+            "SB 3",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.BrakeOutputSet, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.Output3, 0)));
+        Assert.Equal(
+            "CB 4",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.BrakeOutputClear, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.Output4, 0)));
+        Assert.Equal(
+            "JGC=2000",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.JogSpeed, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.None, 2000)));
+        Assert.Equal(
+            "JGD=-2000",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.JogSpeed, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.None, -2000)));
+        Assert.Equal(
+            "BG" + "C",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.Begin, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.None, 0)));
+        Assert.Equal(
+            "HVD=1500",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.HomeSpeed, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.None, 1500)));
+        Assert.Equal(
+            "HM" + "C",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.Home, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.None, 0)));
+        Assert.Equal(
+            "DPD=0",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.DefinePositionZero, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.None, 0)));
+        Assert.Equal(
+            "DEC=0",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.DefineDualZero, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.None, 0)));
+        Assert.Equal(
+            "ACC=20000",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.Acceleration, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.None, 20000)));
+        Assert.Equal(
+            "SPD=4000",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.Speed, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.None, 4000)));
+        Assert.Equal(
+            "DCD=20000",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.Deceleration, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.None, 20000)));
+        Assert.Equal(
+            "PAC=-3000",
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.PositionAbsolute, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.None, -3000)));
     }
 
     [Fact]
@@ -129,7 +185,7 @@ public sealed class ManualMotionCommandPlanTests
         Assert.Equal(
             ManualMotionControllerCodes.AxisOutOfDomain,
             Refuse(new ManualMotionPlanCommand(
-                ManualMotionPlanCommandKind.Begin, (ManualMotionPlanAxis)3, ManualMotionBrakeOutput.None, 0)));
+                ManualMotionPlanCommandKind.Begin, (ManualMotionPlanAxis)5, ManualMotionBrakeOutput.None, 0)));
         Assert.Equal(
             ManualMotionControllerCodes.CommandOutOfDomain,
             Refuse(new ManualMotionPlanCommand(
@@ -163,6 +219,22 @@ public sealed class ManualMotionCommandPlanTests
             ManualMotionControllerCodes.OperandOutOfRange,
             Refuse(new ManualMotionPlanCommand(
                 ManualMotionPlanCommandKind.Begin, ManualMotionPlanAxis.A, ManualMotionBrakeOutput.Output1, 0)));
+        Assert.Equal(
+            ManualMotionControllerCodes.OutputOutOfDomain,
+            Refuse(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.BrakeOutputSet, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.Output4, 0)));
+        Assert.Equal(
+            ManualMotionControllerCodes.OutputOutOfDomain,
+            Refuse(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.BrakeOutputSet, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.Output3, 0)));
+        Assert.Equal(
+            ManualMotionControllerCodes.OutputOutOfDomain,
+            Refuse(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.BrakeOutputClear, ManualMotionPlanAxis.C, ManualMotionBrakeOutput.Output1, 0)));
+        Assert.Equal(
+            ManualMotionControllerCodes.OutputOutOfDomain,
+            Refuse(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.BrakeOutputClear, ManualMotionPlanAxis.D, ManualMotionBrakeOutput.None, 0)));
     }
 
     [Fact]

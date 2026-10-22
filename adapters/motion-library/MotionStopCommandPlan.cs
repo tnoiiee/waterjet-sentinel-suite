@@ -1,14 +1,13 @@
 namespace Wjss.Adapters.MotionLibrary;
 
 /// <summary>
-/// The closed axis domain of the C1 Stop-only software foundation: exactly Axis A (Horizontal) and
-/// Axis B (Vertical), Owner-approved for both WSB1 axes.
+/// The closed axis domain of the typed per-axis Stop: exactly Axis A (Horizontal), Axis B
+/// (Vertical), Axis C (Horizontal) and Axis D (Vertical), Owner-approved for the four WSB1 axes.
 ///
 /// The enumeration starts at 1 on purpose. A default-initialized value (0) is not a member, so an
 /// empty or defaulted axis is refused instead of silently becoming Axis A. Every other value is
-/// refused as well, including values that would represent Axis C, Axis D, a combined A+B value or
-/// a multi-axis Stop. No Flags attribute is applied, so the enumeration cannot express a
-/// combination.
+/// refused as well, including any value that would represent a combined or multi-axis Stop. No
+/// Flags attribute is applied, so the enumeration cannot express a combination.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
 /// </summary>
@@ -19,6 +18,12 @@ internal enum MotionStopAxis
 
     /// <summary>Axis B: the Vertical axis.</summary>
     B = 2,
+
+    /// <summary>Axis C: the Horizontal axis.</summary>
+    C = 3,
+
+    /// <summary>Axis D: the Vertical axis.</summary>
+    D = 4,
 }
 
 /// <summary>
@@ -40,9 +45,9 @@ internal static class MotionStopCommandPlan
     /// <summary>The fixed size of the reply buffer for one native Stop dispatch.</summary>
     internal const int MaximumReplyBytes = 32;
 
-    /// <summary>True only for the two members of the closed axis domain.</summary>
+    /// <summary>True only for the four members of the closed axis domain.</summary>
     internal static bool IsDefined(MotionStopAxis axis) =>
-        axis == MotionStopAxis.A || axis == MotionStopAxis.B;
+        axis is MotionStopAxis.A or MotionStopAxis.B or MotionStopAxis.C or MotionStopAxis.D;
 
     /// <summary>
     /// Resolves the exact template for one axis. Returns false, with an empty template, for any
@@ -57,6 +62,12 @@ internal static class MotionStopCommandPlan
                 return true;
             case MotionStopAxis.B:
                 template = "ST B";
+                return true;
+            case MotionStopAxis.C:
+                template = "ST C";
+                return true;
+            case MotionStopAxis.D:
+                template = "ST D";
                 return true;
             default:
                 template = string.Empty;

@@ -1,4 +1,4 @@
-# Manual Motion Commissioning Runbook — WSB1 A/B
+# Manual Motion Commissioning Runbook — WSB1 A/B/C/D
 
 **Document class:** OWNER-LOCAL SOFTWARE VALIDATION AND COMMISSIONING
 BOUNDARY RECORD. This runbook covers the isolated
@@ -8,20 +8,35 @@ authorize the exact physical WSB1 activity before the hardware-capable mode
 is invoked with real Owner-local values.
 
 **Scope lock.** WSB1 only. Axis A is Horizontal and uses brake output 1;
-Axis B is Vertical and uses brake output 2. There is no WSB2–WSB4, Axis C/D,
-simultaneous A/B motion, automatic sequence, cleaning path, standby return,
+Axis B is Vertical and uses brake output 2; Axis C is Horizontal and uses
+brake output 3; Axis D is Vertical and uses brake output 4. There is no
+WSB2–WSB4, coordinated simultaneous multi-axis motion (no synchronized
+Begin, interpolation, contouring, gearing or combined-axis command),
+automatic sequence, cleaning path, standby return,
 Runtime/API/Kiosk/Preview live motion or Production composition in this
-scope.
+scope. Independent per-axis operations may overlap in time: two axes may
+each hold an active operation in the same interval because their typed
+calls are interleaved one at a time through the single serialized
+controller path. Software support for Axis B/C/D was added in
+Phase 1A (2026-10-22) as software only: the completed hardware record
+remains the Axis A Hardware Trial (FINAL PASS, Owner record). No B/C/D
+hardware trial or hardware authorization exists in this runbook; B/C/D
+wiring and route continuity rest on the Legacy Actual Run evidence (see
+`docs/evidence/MANUAL_MOTION_LEGACY_CONTINUITY.md`), and hardware use of
+any axis still requires the separate Owner Scope Gate.
 
-**Diagnostic identity (Canonical Topology Adoption, 2026-10-21).** Under the
-canonical topology (`OWNER_CONFIRMED_REV2`), the WSB1 Axis A / Axis B pair is
-diagnostically the axis pair of **WJ2** — installed LEFT / UPPER, Target
-Coverage RIGHT / UPPER, Axis A Horizontal, Axis B Vertical. This is an
-identity clarification only: this runbook and the software address **WSB1
-Axis A/B and brake outputs 1/2 only**. There is no Water Jet selection, no
-Axis C/D path, no brake output 3/4 write, no WJ3 Manual Motion and no
-Cleaning Path execution, and the clarification authorizes no hardware
-activity.
+**Diagnostic identity (Canonical Topology Adoption, 2026-10-21; Phase 1A,
+2026-10-22).** Under the canonical topology (`OWNER_CONFIRMED_REV2`), the
+WSB1 Axis A / Axis B pair is diagnostically the axis pair of **WJ2** —
+installed LEFT / UPPER, Target Coverage RIGHT / UPPER, Axis A Horizontal,
+Axis B Vertical — and the WSB1 Axis C / Axis D pair is diagnostically the
+axis pair of **WJ3** — installed REAR / UPPER, Target Coverage FRONT /
+UPPER, Axis C Horizontal, Axis D Vertical. The software addresses **WSB1
+Axis A/B/C/D and brake outputs 1–4**. There is still no Water Jet
+selection and no Cleaning Path execution (Cleaning Path is Phase 3);
+Home/DP/DE/Move real commissioning values remain `NOT_CONFIGURED` until
+the Phase 2 profile gate; WSB2–WSB4 remain unauthorized (Phase 1B); and
+none of this authorizes hardware activity.
 
 **Validation position at authoring.** The authoring sandbox has no .NET SDK.
 Restore, build, .NET tests and lock generation were therefore **NOT RUN**
@@ -67,15 +82,31 @@ The axis workflow is deliberately ordered:
    by observation of inactivity and TP/RP within the configured tolerance,
    then brake apply. No relative target exists.
 6. **Stop:** Stop pre-empts ordinary work and uses the previously approved
-   typed A/B Stop path. It is dispatch only. `StopConfirmed` is always
+   typed per-axis Stop path (A/B/C/D). It is dispatch only. `StopConfirmed` is always
    false. A Stop timeout does **not** make the software invent a stopped
    state and does **not** automatically claim a brake application.
 
-One operation may be active at a time. A communications fault moves the
-session to `FAULTED`; there is no retry, reconnect or replay. A stale
-generation result is rejected. Native calls are serialized by one
-controller-wide gate in hardware-capable composition, and final cleanup is
-invalidate → close → release primary module → release companion module.
+Manual Motion operations are independent per axis: at most one operation
+per axis, and multiple axes (A/B/C/D) may hold active operations during the
+same interval. An active operation on Axis A never blocks an otherwise
+valid operation on B, C or D (and likewise for every other axis); same-axis
+exclusion remains mandatory — while one axis runs, Home, Jog, Move, DP, DE
+and standalone Brake on THAT axis are refused, while Stop on that axis stays
+accepted. Stop is per axis and touches only the requested axis. Hold-to-run
+Jog presses and their heartbeats are per axis. Session close stops every
+active motion operation and awaits each axis independently; a communication
+or native fault is session-global and terminally represents every active
+operation, with one serialized best-effort Stop per axis whose motion
+began. This independent per-axis motion is NOT coordinated trajectory
+control: there is no synchronized Begin, interpolation, contouring,
+combined-axis Stop or automatic Cleaning Path, and no simultaneous start or
+arrival is ever promised. The Legacy commissioned workflow requires
+Horizontal/Vertical command independence; this model restores it. A
+communications fault moves the session to `FAULTED`; there is no retry,
+reconnect or replay. A stale generation result is rejected. Native calls
+are serialized by one controller-wide gate in hardware-capable composition,
+and final cleanup is invalidate → close → release primary module → release
+companion module.
 
 The software cannot express a drive-readiness write (no SH/MO), a relative
 move (no PR), an output-bank write (no OP), a burn/save command (no BN),

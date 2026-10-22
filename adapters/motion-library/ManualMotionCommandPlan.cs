@@ -3,9 +3,9 @@ using System.Globalization;
 namespace Wjss.Adapters.MotionLibrary;
 
 /// <summary>
-/// The closed axis domain of the WSB1 Manual Motion Commissioning plan: Axis A (Horizontal) and Axis B
-/// (Vertical). The enumeration starts at 1, so a defaulted value is refused. Axis C, Axis D and any
-/// combined or multi-axis value cannot be expressed.
+/// The closed axis domain of the WSB1 Manual Motion Commissioning plan: Axis A (Horizontal), Axis B
+/// (Vertical), Axis C (Horizontal) and Axis D (Vertical). The enumeration starts at 1, so a
+/// defaulted value is refused. Any combined or multi-axis value cannot be expressed.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
 /// </summary>
@@ -16,11 +16,18 @@ internal enum ManualMotionPlanAxis
 
     /// <summary>Axis B: the Vertical Axis.</summary>
     B = 2,
+
+    /// <summary>Axis C: the Horizontal Axis.</summary>
+    C = 3,
+
+    /// <summary>Axis D: the Vertical Axis.</summary>
+    D = 4,
 }
 
 /// <summary>
 /// The closed brake-output domain of the plan. The Owner-confirmed allocation is fixed: Axis A uses
-/// output 1 and Axis B uses output 2. No other output, and no generic output number, can be expressed.
+/// output 1, Axis B uses output 2, Axis C uses output 3 and Axis D uses output 4. No other output,
+/// and no generic output number, can be expressed.
 /// </summary>
 internal enum ManualMotionBrakeOutput
 {
@@ -32,11 +39,17 @@ internal enum ManualMotionBrakeOutput
 
     /// <summary>Output 2: the brake output of Axis B.</summary>
     Output2 = 2,
+
+    /// <summary>Output 3: the brake output of Axis C.</summary>
+    Output3 = 3,
+
+    /// <summary>Output 4: the brake output of Axis D.</summary>
+    Output4 = 4,
 }
 
 /// <summary>
 /// The closed command kinds of the plan. The typed Stop is deliberately absent: Stop is dispatched
-/// only through the existing typed A/B Stop plan and session, never through this plan.
+/// only through the existing typed per-axis Stop plan and session, never through this plan.
 /// </summary>
 internal enum ManualMotionPlanCommandKind
 {
@@ -79,7 +92,7 @@ internal enum ManualMotionPlanCommandKind
 
 /// <summary>One typed plan command. It has no text member and no public constructor path to text.</summary>
 /// <param name="Kind">The closed command kind.</param>
-/// <param name="Axis">The closed A/B axis.</param>
+/// <param name="Axis">The closed A/B/C/D axis.</param>
 /// <param name="Output">The closed brake output for brake kinds; <see cref="ManualMotionBrakeOutput.None"/> otherwise.</param>
 /// <param name="Operand">The typed native integer operand; zero when the kind carries none.</param>
 internal readonly record struct ManualMotionPlanCommand(
@@ -112,15 +125,17 @@ internal static class ManualMotionCommandPlan
     /// <summary>The fixed size of the reply buffer for one native dispatch.</summary>
     internal const int MaximumReplyBytes = 32;
 
-    /// <summary>True only for the two members of the closed axis domain.</summary>
+    /// <summary>True only for the four members of the closed axis domain.</summary>
     internal static bool IsDefined(ManualMotionPlanAxis axis) =>
-        axis == ManualMotionPlanAxis.A || axis == ManualMotionPlanAxis.B;
+        axis is ManualMotionPlanAxis.A or ManualMotionPlanAxis.B or ManualMotionPlanAxis.C or ManualMotionPlanAxis.D;
 
     /// <summary>The Owner-confirmed brake output of one axis.</summary>
     internal static ManualMotionBrakeOutput BrakeOutputOf(ManualMotionPlanAxis axis) => axis switch
     {
         ManualMotionPlanAxis.A => ManualMotionBrakeOutput.Output1,
         ManualMotionPlanAxis.B => ManualMotionBrakeOutput.Output2,
+        ManualMotionPlanAxis.C => ManualMotionBrakeOutput.Output3,
+        ManualMotionPlanAxis.D => ManualMotionBrakeOutput.Output4,
         _ => ManualMotionBrakeOutput.None,
     };
 
@@ -137,7 +152,13 @@ internal static class ManualMotionCommandPlan
             return false;
         }
 
-        var axis = command.Axis == ManualMotionPlanAxis.A ? "A" : "B";
+        var axis = command.Axis switch
+        {
+            ManualMotionPlanAxis.A => "A",
+            ManualMotionPlanAxis.B => "B",
+            ManualMotionPlanAxis.C => "C",
+            _ => "D",
+        };
         string rendered;
         switch (command.Kind)
         {
@@ -155,7 +176,13 @@ internal static class ManualMotionCommandPlan
                     return false;
                 }
 
-                var output = command.Output == ManualMotionBrakeOutput.Output1 ? "1" : "2";
+                var output = command.Output switch
+                {
+                    ManualMotionBrakeOutput.Output1 => "1",
+                    ManualMotionBrakeOutput.Output2 => "2",
+                    ManualMotionBrakeOutput.Output3 => "3",
+                    _ => "4",
+                };
                 rendered = command.Kind == ManualMotionPlanCommandKind.BrakeOutputSet
                     ? string.Concat("SB ", output)
                     : string.Concat("CB ", output);

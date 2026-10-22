@@ -39,7 +39,7 @@ internal static class ManualMotionControllerCodes
     /// <summary>A native result returned after the owner generation advanced; it is not accepted.</summary>
     internal const string ResultStaleRejected = "MANUAL_MOTION_RESULT_STALE_REJECTED";
 
-    /// <summary>The axis is outside the closed A/B domain.</summary>
+    /// <summary>The axis is outside the closed A/B/C/D domain.</summary>
     internal const string AxisOutOfDomain = "MANUAL_MOTION_AXIS_OUT_OF_DOMAIN";
 
     /// <summary>The command kind is outside the closed plan.</summary>
@@ -66,7 +66,7 @@ internal static class ManualMotionControllerCodes
     /// <summary>The read value is outside the accepted shape of its kind; nothing was repaired.</summary>
     internal const string ReadValueOutOfRange = "MANUAL_MOTION_READ_VALUE_OUT_OF_RANGE";
 
-    /// <summary>The read target is outside the closed WSB1 A/B read set.</summary>
+    /// <summary>The read target is outside the closed WSB1 A/B/C/D read set.</summary>
     internal const string ReadTargetOutOfDomain = "MANUAL_MOTION_READ_TARGET_OUT_OF_DOMAIN";
 
     /// <summary>Invalidation, handle close and module release were all proven.</summary>
@@ -97,7 +97,7 @@ internal static class ManualMotionControllerCodes
     internal const string PreconditionEvaluationFailed = "MANUAL_MOTION_PRECONDITION_EVALUATION_FAILED";
 }
 
-/// <summary>The closed WSB1 A/B read set of the commissioning path, mapped onto the existing typed B2 reads.</summary>
+/// <summary>The closed WSB1 A/B/C/D read set of the commissioning path, mapped onto the existing typed B2 reads.</summary>
 internal enum ManualMotionReadTarget
 {
     /// <summary>The raw status word of Axis A.</summary>
@@ -123,6 +123,30 @@ internal enum ManualMotionReadTarget
 
     /// <summary>The logical state of output 2 (the Axis B brake output), UNCONFIRMED.</summary>
     Output2 = 8,
+
+    /// <summary>The raw status word of Axis C.</summary>
+    StatusC = 9,
+
+    /// <summary>The raw status word of Axis D.</summary>
+    StatusD = 10,
+
+    /// <summary>The first raw position read (TP) of Axis C; label unresolved.</summary>
+    TpC = 11,
+
+    /// <summary>The first raw position read (TP) of Axis D; label unresolved.</summary>
+    TpD = 12,
+
+    /// <summary>The second raw position read (RP) of Axis C; label unresolved.</summary>
+    RpC = 13,
+
+    /// <summary>The second raw position read (RP) of Axis D; label unresolved.</summary>
+    RpD = 14,
+
+    /// <summary>The logical state of output 3 (the Axis C brake output), UNCONFIRMED.</summary>
+    Output3 = 15,
+
+    /// <summary>The logical state of output 4 (the Axis D brake output), UNCONFIRMED.</summary>
+    Output4 = 16,
 }
 
 /// <summary>The redacted outcome of the single controller open.</summary>

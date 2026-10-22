@@ -506,6 +506,50 @@ public sealed class ManualMotionControllerOwnerTests
     }
 
     [Fact]
+    public void C_And_D_Reads_Map_To_Their_Typed_B2_Intents_And_Stops_Dispatch_Per_Axis()
+    {
+        var rig = new OwnerRig();
+        Assert.True(rig.Owner.Open().Opened);
+
+        var intents = new List<MotionObservationIntent>();
+        rig.ReadKernel.Handler = intent =>
+        {
+            intents.Add(intent);
+            return ObservationReadResult.FromValue(
+                intent is MotionObservationIntent.AxisStatusC or MotionObservationIntent.AxisStatusD ? "64" : "1");
+        };
+
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.StatusC).Succeeded);
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.TpC).Succeeded);
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.RpC).Succeeded);
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.Output3).Succeeded);
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.StatusD).Succeeded);
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.TpD).Succeeded);
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.RpD).Succeeded);
+        Assert.True(rig.Owner.Read(ManualMotionReadTarget.Output4).Succeeded);
+
+        Assert.Equal(
+            new[]
+            {
+                MotionObservationIntent.AxisStatusC,
+                MotionObservationIntent.CommandPositionC,
+                MotionObservationIntent.ActualPositionC,
+                MotionObservationIntent.DigitalOutput3,
+                MotionObservationIntent.AxisStatusD,
+                MotionObservationIntent.CommandPositionD,
+                MotionObservationIntent.ActualPositionD,
+                MotionObservationIntent.DigitalOutput4,
+            },
+            intents.ToArray());
+
+        var stopC = rig.Owner.Stop(ManualMotionPlanAxis.C);
+        Assert.True(stopC.Dispatched);
+        var stopD = rig.Owner.Stop(ManualMotionPlanAxis.D);
+        Assert.True(stopD.Dispatched);
+        Assert.Equal(new[] { MotionStopAxis.C, MotionStopAxis.D }, rig.StopKernel.DispatchedAxes.ToArray());
+    }
+
+    [Fact]
     public async Task Native_Calls_Are_Serialized_Controller_Wide()
     {
         var rig = new OwnerRig();

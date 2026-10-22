@@ -411,14 +411,59 @@ public sealed class MotionStopTrialSessionTests
     {
         var kernel = new FakeControllerKernel();
         var dispatch = new FakeStopDispatchKernel(kernel);
-        var session = CreateSession((MotionStopAxis)3, kernel, dispatch);
+        var session = CreateSession((MotionStopAxis)5, kernel, dispatch);
 
         var outcome = session.Run();
 
         Assert.Equal(MotionStopTrialVocabulary.PreconditionRefused, outcome.PreconditionCode);
         Assert.Equal(MotionStopOutcomeCodes.AxisOutOfDomain, outcome.RefusalCode);
         Assert.Equal(MotionStopTrialVocabulary.NativeProofNotAttempted, outcome.NativeProofCode);
+        Assert.Null(outcome.Axis);
         Assert.Empty(kernel.Log);
+        Assert.Empty(dispatch.DispatchedAxes);
+    }
+
+    [Fact]
+    public void Axis_C_Is_A_Shared_Stop_Member_But_Is_Refused_By_The_Trial_Before_Gate_A()
+    {
+        // The shared Stop domain covers Axis C for Manual Motion; the Trial allowlist does not.
+        // A direct C request must refuse before Gate A and must never be recorded as Axis B.
+        Assert.True(MotionStopCommandPlan.IsDefined(MotionStopAxis.C));
+
+        var kernel = new FakeControllerKernel();
+        var dispatch = new FakeStopDispatchKernel(kernel);
+        var session = CreateSession(MotionStopAxis.C, kernel, dispatch);
+
+        var outcome = session.Run();
+
+        Assert.Equal(MotionStopTrialVocabulary.PreconditionRefused, outcome.PreconditionCode);
+        Assert.Equal(MotionStopOutcomeCodes.AxisOutOfDomain, outcome.RefusalCode);
+        Assert.Equal(MotionStopTrialVocabulary.NativeProofNotAttempted, outcome.NativeProofCode);
+        Assert.Null(outcome.Axis);
+        Assert.NotEqual("B", outcome.Axis);
+        Assert.Empty(kernel.Log);
+        Assert.Equal(0, kernel.OpenCount);
+        Assert.Empty(dispatch.DispatchedAxes);
+    }
+
+    [Fact]
+    public void Axis_D_Is_A_Shared_Stop_Member_But_Is_Refused_By_The_Trial_Before_Gate_A()
+    {
+        Assert.True(MotionStopCommandPlan.IsDefined(MotionStopAxis.D));
+
+        var kernel = new FakeControllerKernel();
+        var dispatch = new FakeStopDispatchKernel(kernel);
+        var session = CreateSession(MotionStopAxis.D, kernel, dispatch);
+
+        var outcome = session.Run();
+
+        Assert.Equal(MotionStopTrialVocabulary.PreconditionRefused, outcome.PreconditionCode);
+        Assert.Equal(MotionStopOutcomeCodes.AxisOutOfDomain, outcome.RefusalCode);
+        Assert.Equal(MotionStopTrialVocabulary.NativeProofNotAttempted, outcome.NativeProofCode);
+        Assert.Null(outcome.Axis);
+        Assert.NotEqual("B", outcome.Axis);
+        Assert.Empty(kernel.Log);
+        Assert.Equal(0, kernel.OpenCount);
         Assert.Empty(dispatch.DispatchedAxes);
     }
 

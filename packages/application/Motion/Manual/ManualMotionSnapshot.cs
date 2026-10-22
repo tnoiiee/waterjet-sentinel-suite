@@ -32,6 +32,21 @@ public sealed class ManualMotionAxisSnapshot
     /// <summary>The Operator role wording: Horizontal or Vertical.</summary>
     public required string RoleLabel { get; init; }
 
+    /// <summary>The cabinet identity of the axis (diagnostic identity from the canonical catalogue; never an authorization).</summary>
+    public required string CabinetId { get; init; }
+
+    /// <summary>The canonical Water Jet identity of the axis (diagnostic identity from the canonical catalogue).</summary>
+    public required string WaterJetId { get; init; }
+
+    /// <summary>The canonical installed position wording (wall / tier) of the Water Jet of the axis.</summary>
+    public required string InstalledPosition { get; init; }
+
+    /// <summary>The canonical target coverage wording (wall / tier) of the Water Jet of the axis.</summary>
+    public required string TargetCoverage { get; init; }
+
+    /// <summary>The Owner-confirmed brake output number allocated to the axis (1 to 4), or 0 when none is allocated.</summary>
+    public required int BrakeOutputNumber { get; init; }
+
     /// <summary>True when the Owner-local profile lists this axis.</summary>
     public required bool AllowedByProfile { get; init; }
 
@@ -87,7 +102,7 @@ public sealed class ManualMotionAxisSnapshot
     public required IReadOnlyList<string> NotConfigured { get; init; }
 }
 
-/// <summary>The published state of the single active operation.</summary>
+/// <summary>The published state of one active axis operation.</summary>
 public sealed class ManualMotionOperationSnapshot
 {
     /// <summary>The session-local operation number.</summary>
@@ -158,10 +173,14 @@ public sealed class ManualMotionSnapshot
     /// <summary>The code of the port close, or empty before the close.</summary>
     public required string CloseCode { get; init; }
 
-    /// <summary>The active operation, or null.</summary>
-    public ManualMotionOperationSnapshot? ActiveOperation { get; init; }
+    /// <summary>
+    /// The active operations: zero to four, at most one per axis, in stable A/B/C/D order. An
+    /// inactive axis has no entry; no placeholder operation is fabricated. The collection is
+    /// read-only, and each entry keeps its own ID, axis, kind, phase and StopRequested state.
+    /// </summary>
+    public required IReadOnlyList<ManualMotionOperationSnapshot> ActiveOperations { get; init; }
 
-    /// <summary>Axis A then Axis B.</summary>
+    /// <summary>Axis A, Axis B, Axis C, then Axis D (stable order).</summary>
     public required IReadOnlyList<ManualMotionAxisSnapshot> Axes { get; init; }
 
     /// <summary>The most recent redacted log entries, oldest first.</summary>

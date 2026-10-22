@@ -15,7 +15,13 @@ public sealed class ManualMotionSimulationOptions
     /// <summary>The synthetic start position of Axis B, in simulated counts.</summary>
     public decimal StartPositionB { get; init; } = -8000m;
 
-    /// <summary>The synthetic physical position of the simulated home switch of both axes.</summary>
+    /// <summary>The synthetic start position of Axis C, in simulated counts.</summary>
+    public decimal StartPositionC { get; init; } = 5000m;
+
+    /// <summary>The synthetic start position of Axis D, in simulated counts.</summary>
+    public decimal StartPositionD { get; init; } = -3000m;
+
+    /// <summary>The synthetic physical position of the simulated home switch of every axis.</summary>
     public decimal HomeSwitchPosition { get; init; }
 
     /// <summary>Half the width of the simulated home switch window.</summary>
@@ -97,7 +103,9 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
     private readonly ManualMotionSimulationOptions _options;
     private readonly SimulatedAxis _axisA;
     private readonly SimulatedAxis _axisB;
-    private readonly int[] _outputs = new int[3];
+    private readonly SimulatedAxis _axisC;
+    private readonly SimulatedAxis _axisD;
+    private readonly int[] _outputs = new int[5];
     private readonly List<ManualMotionPortCommand> _executed = new();
 
     private bool _opened;
@@ -118,12 +126,16 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         _options = options ?? new ManualMotionSimulationOptions();
         _axisA = new SimulatedAxis(profile.AxisA, 1, _options.StartPositionA);
         _axisB = new SimulatedAxis(profile.AxisB, 2, _options.StartPositionB);
+        _axisC = new SimulatedAxis(profile.AxisC, 3, _options.StartPositionC);
+        _axisD = new SimulatedAxis(profile.AxisD, 4, _options.StartPositionD);
 
-        // Both simulated brakes start in their APPLY state, for either release polarity: with a
+        // Every simulated brake starts in its APPLY state, for either release polarity: with a
         // clear-output release the apply state is the SET output, so a zeroed output array would
         // otherwise model an already-released brake and let motion progress before any release.
         _outputs[_axisA.BrakeOutput] = _axisA.ReleaseAction == ManualMotionBrakeReleaseAction.SetOutput ? 0 : 1;
         _outputs[_axisB.BrakeOutput] = _axisB.ReleaseAction == ManualMotionBrakeReleaseAction.SetOutput ? 0 : 1;
+        _outputs[_axisC.BrakeOutput] = _axisC.ReleaseAction == ManualMotionBrakeReleaseAction.SetOutput ? 0 : 1;
+        _outputs[_axisD.BrakeOutput] = _axisD.ReleaseAction == ManualMotionBrakeReleaseAction.SetOutput ? 0 : 1;
     }
 
     /// <inheritdoc/>
@@ -181,6 +193,8 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             var now = _clock.UtcNow;
             _axisA.LastUpdate = now;
             _axisB.LastUpdate = now;
+            _axisC.LastUpdate = now;
+            _axisD.LastUpdate = now;
             return new ManualMotionPortOpenResult(true, CodeOpened, _generation);
         }
     }
@@ -272,16 +286,28 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         }
     }
 
-    private SimulatedAxis AxisOf(ManualMotionAxis axis) => axis == ManualMotionAxis.B ? _axisB : _axisA;
+    private SimulatedAxis? AxisOf(ManualMotionAxis axis) => axis switch
+    {
+        ManualMotionAxis.A => _axisA,
+        ManualMotionAxis.B => _axisB,
+        ManualMotionAxis.C => _axisC,
+        ManualMotionAxis.D => _axisD,
+        _ => null,
+    };
 
     private bool Apply(ManualMotionPortCommand command)
     {
         var axis = AxisOf(command.Axis);
+        if (axis is null)
+        {
+            return false;
+        }
+
         switch (command.Kind)
         {
             case ManualMotionPortCommandKind.BrakeOutputSet:
             case ManualMotionPortCommandKind.BrakeOutputClear:
-                if (command.BrakeOutput is not (1 or 2))
+                if (command.BrakeOutput is not (1 or 2 or 3 or 4))
                 {
                     return false;
                 }
@@ -385,6 +411,8 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
     {
         AdvanceAxis(_axisA, now);
         AdvanceAxis(_axisB, now);
+        AdvanceAxis(_axisC, now);
+        AdvanceAxis(_axisD, now);
     }
 
     private void AdvanceAxis(SimulatedAxis axis, DateTimeOffset now)
@@ -448,6 +476,12 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
     private bool TryReadValue(ManualMotionPortRead read, out decimal value)
     {
         var axis = AxisOf(read.Axis);
+        if (axis is null)
+        {
+            value = 0m;
+            return false;
+        }
+
         switch (read.Kind)
         {
             case ManualMotionReadKind.StatusWord:
@@ -460,7 +494,7 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 return true;
 
             case ManualMotionReadKind.BrakeOutputState:
-                if (read.BrakeOutput is not (1 or 2))
+                if (read.BrakeOutput is not (1 or 2 or 3 or 4))
                 {
                     value = 0m;
                     return false;

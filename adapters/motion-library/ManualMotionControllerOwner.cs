@@ -13,7 +13,7 @@ namespace Wjss.Adapters.MotionLibrary;
 ///      export are resolved (the command export through the existing seam);
 ///   4. direct mode is selected once, before the single open with the validated address only;
 ///   5. three boundaries are bound to the one handle: the existing typed B2 read kernel, the existing
-///      typed A/B Stop session and the typed commissioning command carrier;
+///      typed per-axis Stop session and the typed commissioning command carrier;
 ///   6. close invalidates every boundary first, then closes the handle, then releases the primary and
 ///      the companion module. Nothing is closed or unloaded after a failed invalidation.
 ///
@@ -287,6 +287,12 @@ internal sealed class ManualMotionControllerOwner
                     break;
                 case ManualMotionPlanAxis.B:
                     stopAxis = MotionStopAxis.B;
+                    break;
+                case ManualMotionPlanAxis.C:
+                    stopAxis = MotionStopAxis.C;
+                    break;
+                case ManualMotionPlanAxis.D:
+                    stopAxis = MotionStopAxis.D;
                     break;
                 default:
                     return new ManualMotionDispatchResult(false, false, false, ManualMotionControllerCodes.AxisOutOfDomain, _generation);
@@ -607,6 +613,30 @@ internal sealed class ManualMotionControllerOwner
             case ManualMotionReadTarget.Output2:
                 intent = MotionObservationIntent.DigitalOutput2;
                 return true;
+            case ManualMotionReadTarget.StatusC:
+                intent = MotionObservationIntent.AxisStatusC;
+                return true;
+            case ManualMotionReadTarget.StatusD:
+                intent = MotionObservationIntent.AxisStatusD;
+                return true;
+            case ManualMotionReadTarget.TpC:
+                intent = MotionObservationIntent.CommandPositionC;
+                return true;
+            case ManualMotionReadTarget.TpD:
+                intent = MotionObservationIntent.CommandPositionD;
+                return true;
+            case ManualMotionReadTarget.RpC:
+                intent = MotionObservationIntent.ActualPositionC;
+                return true;
+            case ManualMotionReadTarget.RpD:
+                intent = MotionObservationIntent.ActualPositionD;
+                return true;
+            case ManualMotionReadTarget.Output3:
+                intent = MotionObservationIntent.DigitalOutput3;
+                return true;
+            case ManualMotionReadTarget.Output4:
+                intent = MotionObservationIntent.DigitalOutput4;
+                return true;
             default:
                 intent = default;
                 return false;
@@ -614,10 +644,12 @@ internal sealed class ManualMotionControllerOwner
     }
 
     private static bool IsStatusTarget(ManualMotionReadTarget target) =>
-        target is ManualMotionReadTarget.StatusA or ManualMotionReadTarget.StatusB;
+        target is ManualMotionReadTarget.StatusA or ManualMotionReadTarget.StatusB
+            or ManualMotionReadTarget.StatusC or ManualMotionReadTarget.StatusD;
 
     private static bool IsOutputTarget(ManualMotionReadTarget target) =>
-        target is ManualMotionReadTarget.Output1 or ManualMotionReadTarget.Output2;
+        target is ManualMotionReadTarget.Output1 or ManualMotionReadTarget.Output2
+            or ManualMotionReadTarget.Output3 or ManualMotionReadTarget.Output4;
 
     private static byte[] ToAddressBuffer(string address)
     {

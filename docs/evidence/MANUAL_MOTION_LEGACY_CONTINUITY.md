@@ -41,6 +41,30 @@ new typed design:
 | Absolute Move configures acceleration, speed and deceleration, loads an absolute target and begins. | Retained as AC/SP/DC/PA/BG only. A verified session Home, fresh observations, Owner-local native bounds and TP/RP tolerance verification are required. |
 | Feedback reads status, two position values and outputs. | Retained through the approved typed B2 observation intents, restricted to A/B status, TP, RP and outputs 1/2. Raw observations stay separate from interpretation. |
 
+**Phase 1A addendum (2026-10-22, software only).** The dispositions above
+were written for the PR #34 A/B slice and are unchanged as a record. Phase
+1A widens the same closed typed design to Axis C (Horizontal, brake output
+3) and Axis D (Vertical, brake output 4): the per-axis Stop, the brake →
+jog → Begin ordering and the B2 status/TP/RP/output reads now cover A–D and
+outputs 1–4 through the same single plans, with no second Stop path and no
+new command shape. This addendum records no new Legacy finding and no
+hardware activity: B/C/D wiring and route continuity continue to rest on
+the Legacy Actual Run evidence summarized in this document, and the only
+completed WJSS hardware trial remains Axis A (FINAL PASS, Owner record).
+
+**Phase 1A per-axis independence addendum (2026-10-22, software only).**
+The commissioned Legacy workflow runs Horizontal and Vertical axes with
+independent command lifecycles on the shared controller, and the WSB1
+software model now matches that requirement: at most one active operation
+per axis, several axes active during the same interval, per-axis Stop and
+per-axis hold-to-run Jog, with every controller call still serialized
+through the single owner (one native call per Step, no overlap). This is
+independent per-axis motion, not coordinated trajectory control: no
+synchronized Begin, interpolation or combined-axis command is introduced,
+and no combined-axis Stop replaces the typed per-axis Stops. No new Legacy
+finding and no hardware activity are recorded here; B/C/D Hardware execution
+remains unauthorized.
+
 ## 3. Corrections and deliberate non-ports
 
 The WJSS slice does not reproduce the Legacy implementation structure. In
@@ -48,8 +72,9 @@ particular:
 
 - no caller-built command string crosses the Application, UI or adapter
   boundary; the sole new template surface is one internal closed plan;
-- one long-lived owner, one active operation, one controller-wide native
-  gate and generation fencing replace concurrent unfenced dispatch;
+- one long-lived owner, at most one active operation per axis, one
+  controller-wide native gate and generation fencing replace concurrent
+  unfenced dispatch;
 - a communication fault ends the session as `FAULTED`; there is no retry,
   reconnect, replay, discovery or silent continuation;
 - output and position values are never repaired, defaulted or converted to

@@ -127,13 +127,15 @@ public sealed class MotionStopBoundaryTests
     }
 
     [Fact]
-    public void The_Template_Plan_Holds_Exactly_The_Two_Axis_Templates_And_Nothing_Else()
+    public void The_Template_Plan_Holds_Exactly_The_Four_Axis_Templates_And_Nothing_Else()
     {
         var text = ReadRepositoryFile(TemplatePlanFile);
 
-        Assert.Equal(2, Regex.Count(text, "template = \"ST [AB]\";", RegexOptions.CultureInvariant));
+        Assert.Equal(4, Regex.Count(text, "template = \"ST [ABCD]\";", RegexOptions.CultureInvariant));
         Assert.Contains("template = \"ST A\";", text, StringComparison.Ordinal);
         Assert.Contains("template = \"ST B\";", text, StringComparison.Ordinal);
+        Assert.Contains("template = \"ST C\";", text, StringComparison.Ordinal);
+        Assert.Contains("template = \"ST D\";", text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -218,6 +220,8 @@ public sealed class MotionStopBoundaryTests
         Assert.Contains("internal static bool TryGetTemplate(MotionStopAxis axis, out string template)", plan, StringComparison.Ordinal);
         Assert.Contains("case MotionStopAxis.A:\n                template = \"ST A\";", plan, StringComparison.Ordinal);
         Assert.Contains("case MotionStopAxis.B:\n                template = \"ST B\";", plan, StringComparison.Ordinal);
+        Assert.Contains("case MotionStopAxis.C:\n                template = \"ST C\";", plan, StringComparison.Ordinal);
+        Assert.Contains("case MotionStopAxis.D:\n                template = \"ST D\";", plan, StringComparison.Ordinal);
         Assert.Contains("internal MotionStopOutcome Stop(MotionStopAxis axis)", session, StringComparison.Ordinal);
         Assert.Contains("reply = _kernel.Dispatch(axis);", session, StringComparison.Ordinal);
         Assert.Contains("MotionStopNativeReply Dispatch(MotionStopAxis axis);", dispatch, StringComparison.Ordinal);

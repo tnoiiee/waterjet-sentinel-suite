@@ -2,11 +2,12 @@ namespace Wjss.Runtime.Core.Motion.Manual;
 
 /// <summary>
 /// The closed axis domain of the WSB1 Manual Motion Commissioning slice: exactly Axis A (the
-/// Horizontal Axis) and Axis B (the Vertical Axis), Owner-confirmed for WSB1.
+/// Horizontal Axis), Axis B (the Vertical Axis), Axis C (the Horizontal Axis) and Axis D (the
+/// Vertical Axis), Owner-confirmed for WSB1.
 ///
 /// The enumeration starts at 1 on purpose: a default-initialized value (0) is not a member, so an
-/// empty or defaulted axis is refused instead of silently becoming Axis A. Axis C, Axis D and every
-/// other controller are outside this slice.
+/// empty or defaulted axis is refused instead of silently becoming Axis A. Every other controller
+/// is outside this slice. The stable snapshot order is A, B, C, D.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
 /// </summary>
@@ -17,6 +18,12 @@ public enum ManualMotionAxis
 
     /// <summary>Axis B: the Vertical Axis of WSB1.</summary>
     B = 2,
+
+    /// <summary>Axis C: the Horizontal Axis of WSB1.</summary>
+    C = 3,
+
+    /// <summary>Axis D: the Vertical Axis of WSB1.</summary>
+    D = 4,
 }
 
 /// <summary>The two hold-to-run Jog directions. The sign of the native jog speed carries the direction.</summary>
@@ -61,7 +68,7 @@ public enum ManualMotionPortMode
 /// </summary>
 public enum ManualMotionPortCommandKind
 {
-    /// <summary>Set the logical state of the configured brake output (one of the two WSB1 brake outputs).</summary>
+    /// <summary>Set the logical state of the configured brake output (one of the four WSB1 brake outputs).</summary>
     BrakeOutputSet = 1,
 
     /// <summary>Clear the logical state of the configured brake output.</summary>
@@ -153,14 +160,14 @@ public enum ManualMotionSessionState
     /// <summary>A communication or native fault occurred; no further command is issued automatically and nothing reconnects.</summary>
     Faulted = 4,
 
-    /// <summary>Close was requested; an active motion operation is being stopped before the port is closed.</summary>
+    /// <summary>Close was requested; every active motion operation is being stopped before the port is closed.</summary>
     Closing = 5,
 
     /// <summary>The port was closed. A closed session never reopens.</summary>
     Closed = 6,
 }
 
-/// <summary>The kind of the single active operation of a session.</summary>
+/// <summary>The kind of one axis operation of a session.</summary>
 public enum ManualMotionOperationKind
 {
     /// <summary>No operation.</summary>
@@ -191,7 +198,7 @@ public enum ManualMotionOperationKind
     Move = 8,
 }
 
-/// <summary>The phase of the active operation. At most one port call is made per session step.</summary>
+/// <summary>The phase of one axis operation. At most one port call is made per session step.</summary>
 public enum ManualMotionOperationPhase
 {
     /// <summary>No active operation.</summary>
@@ -372,7 +379,7 @@ public static class ManualMotionCodes
     /// <summary>The profile names a controller other than WSB1.</summary>
     public const string ProfileControllerUnsupported = "PROFILE_CONTROLLER_UNSUPPORTED";
 
-    /// <summary>The profile names an axis other than A or B.</summary>
+    /// <summary>The profile names an axis other than A, B, C or D.</summary>
     public const string ProfileAxisUnsupported = "PROFILE_AXIS_UNSUPPORTED";
 
     /// <summary>The profile brake output does not equal the Owner-confirmed allocation of that axis.</summary>
@@ -415,16 +422,19 @@ public static class ManualMotionCodes
 
     // ---------------------------------------------------------------------------- refusals
 
-    /// <summary>The axis is outside the closed A/B domain.</summary>
+    /// <summary>The axis is outside the closed A/B/C/D domain.</summary>
     public const string AxisOutOfDomain = "AXIS_OUT_OF_DOMAIN";
 
     /// <summary>The axis is not listed in the Owner-local profile.</summary>
     public const string AxisNotAllowedByProfile = "AXIS_NOT_ALLOWED_BY_PROFILE";
 
-    /// <summary>Another operation is active; one operation (and one axis in motion) at a time.</summary>
+    /// <summary>Another operation is already active on this axis; at most one operation per axis.</summary>
     public const string OperationInProgress = "OPERATION_IN_PROGRESS";
 
-    /// <summary>A fresh observation shows the other axis moving.</summary>
+    /// <summary>
+    /// Retained code vocabulary (no longer returned by the session): a fresh observation of another
+    /// axis moving is not a refusal basis, because different axes operate independently.
+    /// </summary>
     public const string OtherAxisMovingObserved = "OTHER_AXIS_MOVING_OBSERVED";
 
     /// <summary>A fresh observation shows the axis moving.</summary>

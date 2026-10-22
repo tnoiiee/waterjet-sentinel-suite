@@ -6,7 +6,7 @@ namespace Wjss.MotionCommissioning;
 /// <summary>
 /// The HARDWARE-CAPABLE port: it maps the Application's closed typed commands and reads onto the
 /// motion-library controller owner. It is a pure enum mapping: the typed Stop goes to the existing
-/// typed A/B Stop session, every other command goes to the closed commissioning plan, and no text,
+/// typed per-axis Stop session, every other command goes to the closed commissioning plan, and no text,
 /// buffer, handle or native detail crosses this type in either direction.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
@@ -59,6 +59,8 @@ internal sealed class MotionLibraryManualMotionPort : IManualMotionPort
             {
                 1 => ManualMotionBrakeOutput.Output1,
                 2 => ManualMotionBrakeOutput.Output2,
+                3 => ManualMotionBrakeOutput.Output3,
+                4 => ManualMotionBrakeOutput.Output4,
                 _ => ManualMotionBrakeOutput.None,
             };
             result = _owner.Dispatch(new ManualMotionPlanCommand(kind, axis, output, command.Operand));
@@ -97,6 +99,12 @@ internal sealed class MotionLibraryManualMotionPort : IManualMotionPort
                 return true;
             case ManualMotionAxis.B:
                 mapped = ManualMotionPlanAxis.B;
+                return true;
+            case ManualMotionAxis.C:
+                mapped = ManualMotionPlanAxis.C;
+                return true;
+            case ManualMotionAxis.D:
+                mapped = ManualMotionPlanAxis.D;
                 return true;
             default:
                 mapped = default;
@@ -162,6 +170,14 @@ internal sealed class MotionLibraryManualMotionPort : IManualMotionPort
             (ManualMotionReadKind.PositionRp, ManualMotionAxis.B) => ManualMotionReadTarget.RpB,
             (ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.A) when read.BrakeOutput == 1 => ManualMotionReadTarget.Output1,
             (ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.B) when read.BrakeOutput == 2 => ManualMotionReadTarget.Output2,
+            (ManualMotionReadKind.StatusWord, ManualMotionAxis.C) => ManualMotionReadTarget.StatusC,
+            (ManualMotionReadKind.StatusWord, ManualMotionAxis.D) => ManualMotionReadTarget.StatusD,
+            (ManualMotionReadKind.PositionTp, ManualMotionAxis.C) => ManualMotionReadTarget.TpC,
+            (ManualMotionReadKind.PositionTp, ManualMotionAxis.D) => ManualMotionReadTarget.TpD,
+            (ManualMotionReadKind.PositionRp, ManualMotionAxis.C) => ManualMotionReadTarget.RpC,
+            (ManualMotionReadKind.PositionRp, ManualMotionAxis.D) => ManualMotionReadTarget.RpD,
+            (ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.C) when read.BrakeOutput == 3 => ManualMotionReadTarget.Output3,
+            (ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.D) when read.BrakeOutput == 4 => ManualMotionReadTarget.Output4,
             _ => default,
         };
 

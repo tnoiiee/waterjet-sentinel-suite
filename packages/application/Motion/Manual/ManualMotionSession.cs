@@ -5,19 +5,22 @@ using Wjss.Time;
 namespace Wjss.Runtime.Core.Motion.Manual;
 
 /// <summary>
-/// The Application-owned Manual Motion Commissioning session for WSB1 Axis A (Horizontal) and Axis B
-/// (Vertical). It owns the operation lifecycle; the UI only posts typed requests and reads snapshots.
+/// The Application-owned Manual Motion Commissioning session for the WSB1 axes A/B/C/D (A and C
+/// Horizontal, B and D Vertical). It owns the operation lifecycle; the UI only posts typed requests
+/// and reads snapshots.
 ///
 /// Threading contract:
 ///   - every Request* member and <see cref="Snapshot"/> are safe from any thread: a request is only
 ///     enqueued and is applied by the next <see cref="Step"/>;
 ///   - <see cref="Step"/> is called by exactly one driver thread; a concurrent call is a programming
 ///     error and throws;
-///   - one step makes at most one port call (the protective Stop on a fault is the single
+///   - one step makes at most one port call (the protective Stops on a fault are the only
 ///     exception), so the controller sees one native operation at a time.
 ///
 /// Behaviour that is fixed by construction:
-///   - one active operation at a time, so at most one axis is in motion within this session;
+///   - at most one active operation per axis; different axes may hold active operations during the
+///     same interval, and their typed calls are interleaved deterministically through this one
+///     session (this is independent per-axis motion, never coordinated trajectory control);
 ///   - Stop pre-empts a multi-step Jog, Home or Move between command steps;
 ///   - an observation never issues a command; completion is decided only by the operation lifecycle;
 ///   - a refused read leaves no value behind it: nothing is fabricated, and an old value goes stale;
@@ -34,6 +37,15 @@ public sealed class ManualMotionSession
     private const int MaximumTransitionsPerStep = 16;
 
     private static readonly ManualMotionAxisProfile EmptyAxisProfile = new();
+
+    private static readonly ManualMotionAxis[] AllAxes =
+    {
+        ManualMotionAxis.A,
+        ManualMotionAxis.B,
+        ManualMotionAxis.C,
+        ManualMotionAxis.D,
+    };
+
     private static readonly ReadOnlyCollection<string> NotAllowedItems = Array.AsReadOnly(new[] { "axis is not listed in the profile" });
 
     private readonly IManualMotionPort _port;
@@ -43,6 +55,8 @@ public sealed class ManualMotionSession
     private readonly ConcurrentQueue<Request> _requests = new();
     private readonly AxisRuntime _axisA = new(ManualMotionAxis.A);
     private readonly AxisRuntime _axisB = new(ManualMotionAxis.B);
+    private readonly AxisRuntime _axisC = new(ManualMotionAxis.C);
+    private readonly AxisRuntime _axisD = new(ManualMotionAxis.D);
     private readonly List<ManualMotionLogEntry> _log = new();
     private readonly Queue<ManualMotionAxis> _pendingStops = new();
 
@@ -54,14 +68,7 @@ public sealed class ManualMotionSession
     private long _callSequence;
     private long _logSequence;
     private long _operationSequence;
-    private OperationRuntime? _active;
-    private DateTimeOffset _nextObservationCycleDue;
-    private List<ManualMotionPortRead>? _observationCycle;
-    private int _observationCycleIndex;
-    private DateTimeOffset _observationCycleStartedAt;
-    private long _observationCycleOperationId;
-    private bool _observationCycleStopPriority;
-    private bool _observationCycleMotionBegun;
+    private int _advanceCursor;
     private bool _closeRequested;
     private bool _portClosed;
     private string _openCode = string.Empty;
@@ -101,7 +108,10 @@ public sealed class ManualMotionSession
         }
 
         var now = clock.UtcNow;
-        _nextObservationCycleDue = now;
+        foreach (var axis in AllAxes)
+        {
+            Runtime(axis).CycleDueAt = now;
+        }
         if (_state == ManualMotionSessionState.ProfileRefused)
         {
             AppendLog(now, null, ManualMotionOperationKind.None, _profileCode);
@@ -151,7 +161,7 @@ public sealed class ManualMotionSession
     /// <summary>Requests one absolute bounded Move of one axis to a native-unit target.</summary>
     public void RequestMove(ManualMotionAxis axis, int target) => Enqueue(new Request(RequestKind.Move, axis) { Target = target });
 
-    /// <summary>Requests the session close: an active motion operation is stopped first, then the port is closed.</summary>
+    /// <summary>Requests the session close: every active motion operation is stopped first, then the port is closed.</summary>
     public void RequestClose() => Enqueue(new Request(RequestKind.Close, ManualMotionAxis.A));
 
     // ------------------------------------------------------------------------------ driver
@@ -178,8 +188,10 @@ public sealed class ManualMotionSession
             catch (Exception)
             {
                 // A software defect must never leave motion unsupervised: the session faults, makes
-                // one protective Stop attempt for an active motion operation and issues nothing else.
-                FaultSession(now, _active?.Axis, _active?.Kind ?? ManualMotionOperationKind.None, ManualMotionCodes.SessionFaulted);
+                // one protective Stop attempt per active axis that began motion, and issues nothing
+                // else. A defect is attributed to no single axis: the fault handler terminates every
+                // active operation truthfully.
+                FaultSession(now, null, ManualMotionOperationKind.None, ManualMotionCodes.SessionFaulted);
             }
 
             Volatile.Write(ref _snapshot, BuildSnapshot(now));
@@ -256,7 +268,7 @@ public sealed class ManualMotionSession
             return;
         }
 
-        if (_active is not null && AdvanceActive(now))
+        if (AdvanceActives(now))
         {
             return;
         }
@@ -266,7 +278,7 @@ public sealed class ManualMotionSession
             return;
         }
 
-        if (_active is null && _state == ManualMotionSessionState.Closing)
+        if (!HasAnyActiveOperation && _state == ManualMotionSessionState.Closing)
         {
             ClosePort(now, keepState: false);
             return;
@@ -310,9 +322,16 @@ public sealed class ManualMotionSession
         if (_state == ManualMotionSessionState.Ready)
         {
             _state = ManualMotionSessionState.Closing;
-            if (_active is not null && IsMotionOperation(_active.Kind))
+
+            // Every active motion operation is stopped through its own lifecycle; the per-axis Stops
+            // are dispatched one at a time by the ordinary fair advancement, and each axis brake is
+            // applied only after that same axis is observed inactive.
+            foreach (var op in ActiveOperationsInAxisOrder())
             {
-                RequestOperationStop(_active, StopReason.SessionClosing);
+                if (IsMotionOperation(op.Kind))
+                {
+                    RequestOperationStop(op, StopReason.SessionClosing);
+                }
             }
         }
 
@@ -321,8 +340,9 @@ public sealed class ManualMotionSession
 
     private void ApplyJogHeartbeat(Request request, DateTimeOffset now)
     {
-        if (_active is { Kind: ManualMotionOperationKind.Jog } jog
-            && jog.Axis == request.Axis
+        // The press must match this axis's own Jog operation and press ID exactly: a stale or wrong
+        // press ID never refreshes any axis, and a heartbeat for one axis never keeps another alive.
+        if (ActiveFor(request.Axis) is { Kind: ManualMotionOperationKind.Jog } jog
             && jog.PressId == request.PressId
             && !jog.StopRequested)
         {
@@ -332,8 +352,9 @@ public sealed class ManualMotionSession
 
     private void ApplyJogRelease(Request request)
     {
-        if (_active is { Kind: ManualMotionOperationKind.Jog } jog
-            && jog.Axis == request.Axis
+        // A release ends only the matching press on the requested axis; it never releases or stops
+        // a Jog on any other axis.
+        if (ActiveFor(request.Axis) is { Kind: ManualMotionOperationKind.Jog } jog
             && jog.PressId == request.PressId)
         {
             var reason = request.Reason switch
@@ -355,9 +376,12 @@ public sealed class ManualMotionSession
             return;
         }
 
-        if (_active is not null && _active.Axis == request.Axis && IsMotionOperation(_active.Kind))
+        // Stop is per-axis: an active motion operation of the requested axis is stopped through its
+        // own lifecycle, and no operation on any other axis is touched.
+        var active = ActiveFor(request.Axis);
+        if (active is not null && IsMotionOperation(active.Kind))
         {
-            RequestOperationStop(_active, StopReason.Operator);
+            RequestOperationStop(active, StopReason.Operator);
             return;
         }
 
@@ -410,7 +434,9 @@ public sealed class ManualMotionSession
             return ManualMotionCodes.AxisNotAllowedByProfile;
         }
 
-        return _active is not null ? ManualMotionCodes.OperationInProgress : null;
+        // Same-axis exclusion only: a request is refused while THIS axis already has an active
+        // operation. An active operation on another axis never refuses this request.
+        return ActiveFor(axis) is not null ? ManualMotionCodes.OperationInProgress : null;
     }
 
     private string? CheckOperationPreconditions(Request request, ManualMotionOperationKind kind, DateTimeOffset now)
@@ -430,8 +456,7 @@ public sealed class ManualMotionSession
                         ? ManualMotionCodes.JogTimingNotConfigured
                         : null)
                     ?? (p.StopTimeoutMilliseconds is null ? ManualMotionCodes.StopTimeoutNotConfigured : null)
-                    ?? CheckStationary(axis, p, now)
-                    ?? CheckOtherAxisNotMoving(axis, now);
+                    ?? CheckStationary(axis, p, now);
 
             case ManualMotionOperationKind.Home:
                 return CheckBrakeConfigured(p, requireSettle: true)
@@ -440,7 +465,6 @@ public sealed class ManualMotionSession
                     ?? (p.HomeStatusBit is null || p.HomeActiveValue is null ? ManualMotionCodes.HomeFeedbackNotConfigured : null)
                     ?? (p.PositionTolerance is null ? ManualMotionCodes.PositionToleranceNotConfigured : null)
                     ?? CheckStationary(axis, p, now)
-                    ?? CheckOtherAxisNotMoving(axis, now)
                     ?? (InterpretHome(axis, now) == ManualMotionInterpretation.Active ? ManualMotionCodes.HomeInputAlreadyActive : null);
 
             case ManualMotionOperationKind.DefinePositionZero:
@@ -462,8 +486,7 @@ public sealed class ManualMotionSession
                     ?? (p.PositionTolerance is null ? ManualMotionCodes.PositionToleranceNotConfigured : null)
                     ?? (p.StopTimeoutMilliseconds is null ? ManualMotionCodes.StopTimeoutNotConfigured : null)
                     ?? CheckBrakeConfigured(p, requireSettle: true)
-                    ?? CheckStationary(axis, p, now)
-                    ?? CheckOtherAxisNotMoving(axis, now);
+                    ?? CheckStationary(axis, p, now);
 
             default:
                 return ManualMotionCodes.SessionNotReady;
@@ -505,14 +528,6 @@ public sealed class ManualMotionSession
             ManualMotionInterpretation.Active => ManualMotionCodes.AxisMovingObserved,
             _ => ManualMotionCodes.ObservationNotFresh,
         };
-    }
-
-    private string? CheckOtherAxisNotMoving(ManualMotionAxis axis, DateTimeOffset now)
-    {
-        var other = axis == ManualMotionAxis.A ? ManualMotionAxis.B : ManualMotionAxis.A;
-        return InterpretMotion(other, now) == ManualMotionInterpretation.Active
-            ? ManualMotionCodes.OtherAxisMovingObserved
-            : null;
     }
 
     private bool ObservationTimingConfigured =>
@@ -580,7 +595,7 @@ public sealed class ManualMotionSession
         }
 
         op.PhaseStartedAt = now;
-        _active = op;
+        SetActive(axis, op);
         AppendLog(now, axis, kind, ManualMotionCodes.OperationStarted);
     }
 
@@ -601,30 +616,45 @@ public sealed class ManualMotionSession
 
     // ------------------------------------------------------------------- operation lifecycle
 
-    private bool AdvanceActive(DateTimeOffset now)
+    private bool AdvanceActives(DateTimeOffset now)
     {
-        for (var transitions = 0; transitions < MaximumTransitionsPerStep; transitions++)
+        // Deterministic fair advancement in A/B/C/D round-robin order: every active axis advances
+        // its own lifecycle in turn, and the cursor rotates past the axis that consumed the step's
+        // single port call, so no axis permanently monopolizes the driver and a long operation on
+        // one axis never blocks another axis's commands or supervision. Advancement always precedes
+        // observation work, so an urgent Stop, timeout or capture-loss transition is never queued
+        // behind a read.
+        var transitions = 0;
+        for (var scanned = 0; scanned < AllAxes.Length; scanned++)
         {
-            var op = _active;
+            var axis = AllAxes[(_advanceCursor + scanned) % AllAxes.Length];
+            var op = ActiveFor(axis);
             if (op is null)
             {
-                return false;
+                continue;
             }
 
-            var progress = AdvanceOnce(op, now);
-            if (progress == Progress.CalledPort)
+            while (transitions < MaximumTransitionsPerStep)
             {
-                return true;
-            }
+                transitions++;
+                var progress = AdvanceOnce(op, now);
+                if (progress == Progress.CalledPort)
+                {
+                    _advanceCursor = (IndexFor(axis) + 1) % AllAxes.Length;
+                    return true;
+                }
 
-            if (progress == Progress.Waiting)
-            {
-                return false;
+                if (progress == Progress.Waiting)
+                {
+                    break;
+                }
             }
         }
 
         return false;
     }
+
+    private static int IndexFor(ManualMotionAxis axis) => (int)axis - 1;
 
     private Progress AdvanceOnce(OperationRuntime op, DateTimeOffset now) => op.Phase switch
     {
@@ -788,16 +818,20 @@ public sealed class ManualMotionSession
         }
 
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.Begin, op.Axis, 0, 0));
+
+        // A refused, faulted or unclassified begin may still have started motion: the call reached
+        // (or may have reached) the controller, so the may-have-begun state is recorded BEFORE the
+        // result classification. A faulted begin must therefore receive the protective Stop of the
+        // fault cleanup exactly like a refused one, and the supervised Stop path runs before the
+        // brake is applied.
+        op.MotionBegun = true;
+        op.BeginSequence = outcome.Sequence;
+        op.BeginAt = now;
         if (Interrupted(outcome, now, op))
         {
             return Progress.CalledPort;
         }
 
-        // A refused or unclassified begin may still have started motion, so it is stopped through the
-        // same supervised Stop path before the brake is applied.
-        op.MotionBegun = true;
-        op.BeginSequence = outcome.Sequence;
-        op.BeginAt = now;
         if (!outcome.Accepted)
         {
             op.EndCode = ManualMotionCodes.MotionCommandRefused;
@@ -886,6 +920,10 @@ public sealed class ManualMotionSession
         }
 
         var runtime = Runtime(op.Axis);
+
+        // The dispatch is recorded as attempted before the call: if this very call faults, fault
+        // cleanup must never protective-repeat it (no retry of an already-attempted Stop).
+        op.StopCommandAttempted = true;
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.Stop, op.Axis, 0, 0));
         if (Interrupted(outcome, now, op))
         {
@@ -1067,10 +1105,9 @@ public sealed class ManualMotionSession
     {
         Runtime(op.Axis).LastOutcomeCode = code;
         AppendLog(now, op.Axis, op.Kind, code);
-        if (ReferenceEquals(_active, op))
-        {
-            _active = null;
-        }
+
+        // Completing one axis clears only that axis slot; no other axis operation is touched.
+        ClearActive(op.Axis, op);
     }
 
     private void ClearHome(AxisRuntime runtime, DateTimeOffset now, OperationRuntime op)
@@ -1208,7 +1245,10 @@ public sealed class ManualMotionSession
         _portGeneration = result.PortGeneration;
         _generation++;
         _state = ManualMotionSessionState.Ready;
-        _nextObservationCycleDue = now;
+        foreach (var axis in AllAxes)
+        {
+            Runtime(axis).CycleDueAt = now;
+        }
         AppendLog(now, null, ManualMotionOperationKind.None, ManualMotionCodes.SessionOpened);
     }
 
@@ -1257,21 +1297,37 @@ public sealed class ManualMotionSession
 
     private void FaultSession(DateTimeOffset now, ManualMotionAxis? axis, ManualMotionOperationKind operation, string code)
     {
-        _observationCycle = null;
-        var active = _active;
-        _active = null;
-        if (active is not null)
+        // A communication or native fault is session-global because all axes share one controller
+        // connection: every active operation is terminally represented (never left pending), and one
+        // serialized best-effort typed Stop is attempted for every axis whose motion may already have
+        // begun while the boundary is still usable. No stopped state is fabricated and no brake is
+        // applied without an observed inactive state.
+        foreach (var a in AllAxes)
         {
-            var runtime = Runtime(active.Axis);
+            ResetObservationCycle(Runtime(a));
+        }
+
+        var actives = ActiveOperationsInAxisOrder();
+        foreach (var op in actives)
+        {
+            ClearActive(op.Axis, op);
+            var runtime = Runtime(op.Axis);
             runtime.LastOutcomeCode = code;
             if (runtime.HomeState == ManualMotionHomeState.Homing)
             {
                 runtime.HomeState = ManualMotionHomeState.HomeFailed;
             }
+        }
 
-            if (active.MotionBegun && _state != ManualMotionSessionState.Faulted && !_portClosed)
+        foreach (var op in actives)
+        {
+            // The fault cleanup decides per operation: never began (no Stop), may have begun but
+            // never attempted its Stop (exactly one protective Stop), or already attempted its Stop
+            // (never protective-repeated). Every attempt stays serialized and its failure is only
+            // recorded.
+            if (op.MotionBegun && !op.StopCommandAttempted && _state != ManualMotionSessionState.Faulted && !_portClosed)
             {
-                ProtectiveStop(active.Axis, now);
+                ProtectiveStop(op.Axis, now);
             }
         }
 
@@ -1326,81 +1382,157 @@ public sealed class ManualMotionSession
     // ------------------------------------------------------------------------ observation
 
     /// <summary>
-    /// Advances the priority-tiered complete observation cycle by at most one read.
+    /// Advances the deterministic multi-axis observation scheduler by at most one read.
     ///
-    /// The profile observation interval is the cadence between the STARTS of complete cycles,
-    /// never a delay between the reads of one cycle: once a cycle starts, its remaining reads are
-    /// eligible on the following steps, one read per step, so every kind of an allowed axis is
-    /// refreshed once per cycle. Status is always first. This method is reached only after the
-    /// step has served pending Stops and the active operation, so an urgent lifecycle is never
-    /// queued behind a cycle remainder; a context change (an operation starting or ending,
-    /// motion beginning after an accepted Begin, or post-Stop supervision beginning) discards
-    /// the remainder and the next observation starts a
-    /// fresh Status-first cycle. An overrun cycle starts no catch-up burst: the next cycle
-    /// becomes due one interval after this cycle started and still advances one read per step.
+    /// Each profile-allowed axis owns its own complete Status-first cycle (Status, then TP, RP and
+    /// the configured brake-output state), and the profile observation interval is the cadence
+    /// between the STARTS of one axis's cycles, never a delay between the reads of one cycle. An
+    /// axis awaiting its stopped state after a Stop supervises with a Status-only cycle that has the
+    /// highest observation priority and alternates fairly with any other axis in the same state; the
+    /// remaining reads go to the least-recently-served eligible axis (ties break on the A/B/C/D
+    /// order), so complete cycles interleave across axes, no axis monopolizes consecutive reads, and
+    /// a just-rebased axis is served before any older rotation. This method is reached only after
+    /// the step has served pending Stops and
+    /// the active operations, so an urgent lifecycle is never queued behind a cycle remainder; a
+    /// context change (an operation starting or ending on that axis, motion beginning after an
+    /// accepted Begin, or post-Stop supervision beginning) rebases ONLY that axis's cycle, and the
+    /// other axes keep their observation progress. An overrun cycle starts no catch-up burst: the
+    /// next cycle becomes due one interval after this cycle started and still advances one read per
+    /// step.
     /// </summary>
     private void Observe(DateTimeOffset now)
     {
         var interval = _profile?.ObservationIntervalMilliseconds;
         if (interval is null || !ObservationTimingConfigured)
         {
-            _observationCycle = null;
-            _nextObservationCycleDue = DateTimeOffset.MaxValue;
+            foreach (var a in AllAxes)
+            {
+                ResetObservationCycle(Runtime(a));
+            }
+
             return;
         }
 
-        var operation = _active;
-        var operationId = operation?.Id ?? 0;
-        var motionBegun = operation?.MotionBegun ?? false;
-        var stopPriority = operation is { Phase: ManualMotionOperationPhase.AwaitingStopped };
-
-        if (_observationCycle is not null
-            && (operationId != _observationCycleOperationId
-                || motionBegun != _observationCycleMotionBegun
-                || stopPriority != _observationCycleStopPriority))
+        foreach (var a in AllAxes)
         {
-            _observationCycle = null;
-            _nextObservationCycleDue = now;
+            var runtime = Runtime(a);
+            var op = runtime.Active;
+            var operationId = op?.Id ?? 0;
+            var motionBegun = op?.MotionBegun ?? false;
+            var stopPriority = op is { Phase: ManualMotionOperationPhase.AwaitingStopped };
+            if (runtime.CycleReads is not null
+                && (operationId != runtime.CycleOperationId
+                    || motionBegun != runtime.CycleMotionBegun
+                    || stopPriority != runtime.CycleStopPriority))
+            {
+                // Post-Begin and Stop-supervision rebases apply to this axis only: the discarded
+                // remainder belongs to this axis, and its next cycle starts Status-first at once.
+                // The axis becomes the most urgent observation candidate, so a post-Begin Status
+                // and position refresh is never queued behind an idle axis's rotation.
+                runtime.CycleReads = null;
+                runtime.CycleDueAt = now;
+                runtime.LastServedAt = null;
+            }
         }
 
-        var cycle = _observationCycle;
-        if (cycle is null)
+        var serve = NextObservationAxis(now);
+        if (serve is null)
         {
-            if (now < _nextObservationCycleDue)
+            return;
+        }
+
+        var axis = serve.Value;
+        var served = Runtime(axis);
+        if (served.CycleReads is null)
+        {
+            var plan = ObservationPlan(axis, served.Active is { Phase: ManualMotionOperationPhase.AwaitingStopped });
+            if (plan.Count == 0)
             {
+                served.CycleDueAt = now + Milliseconds(interval.Value);
                 return;
             }
 
-            cycle = ObservationPlan();
-            if (cycle.Count == 0)
-            {
-                _nextObservationCycleDue = now + Milliseconds(interval.Value);
-                return;
-            }
+            served.CycleReads = plan;
 
-            _observationCycle = cycle;
-            _observationCycleIndex = 0;
-            _observationCycleStartedAt = now;
-            _observationCycleOperationId = operationId;
-            _observationCycleMotionBegun = motionBegun;
-            _observationCycleStopPriority = stopPriority;
+            served.CycleIndex = 0;
+            served.CycleStartedAt = now;
+            served.CycleOperationId = served.Active?.Id ?? 0;
+            served.CycleMotionBegun = served.Active?.MotionBegun ?? false;
+            served.CycleStopPriority = served.Active is { Phase: ManualMotionOperationPhase.AwaitingStopped };
         }
 
-        var read = cycle[_observationCycleIndex];
+        var read = served.CycleReads[served.CycleIndex];
+        served.LastServedAt = now;
         ExecuteObservationRead(read, now);
 
-        if (_observationCycle is null)
+        if (served.CycleReads is null)
         {
-            // The read faulted the session and the cycle was discarded with it.
+            // The read faulted the session and every cycle was discarded with it.
             return;
         }
 
-        _observationCycleIndex++;
-        if (_observationCycleIndex >= cycle.Count)
+        served.CycleIndex++;
+        if (served.CycleIndex >= served.CycleReads.Count)
         {
-            _observationCycle = null;
-            _nextObservationCycleDue = _observationCycleStartedAt + Milliseconds(interval.Value);
+            served.CycleReads = null;
+            served.CycleDueAt = served.CycleStartedAt + Milliseconds(interval.Value);
         }
+    }
+
+    private static void ResetObservationCycle(AxisRuntime runtime)
+    {
+        runtime.CycleReads = null;
+        runtime.CycleDueAt = DateTimeOffset.MaxValue;
+    }
+
+    private ManualMotionAxis? NextObservationAxis(DateTimeOffset now)
+    {
+        // Levels: a Status read for an axis awaiting stopped state comes first (fair alternation),
+        // then the remaining axes. Within each level the least-recently-served axis wins and ties
+        // break on the stable A/B/C/D order, so reads interleave across axes instead of letting one
+        // axis monopolize a run of reads, a just-rebased axis is served at once, and idle axes keep
+        // rotating beside active axes instead of being starved behind them.
+        return PickObservationAxis(now, awaitingStoppedOnly: true)
+            ?? PickObservationAxis(now, awaitingStoppedOnly: false);
+    }
+
+    private ManualMotionAxis? PickObservationAxis(DateTimeOffset now, bool awaitingStoppedOnly)
+    {
+        ManualMotionAxis? chosen = null;
+        DateTimeOffset? chosenServedAt = null;
+        foreach (var axis in AllAxes)
+        {
+            var runtime = Runtime(axis);
+            if (_profile?.For(axis) is null)
+            {
+                continue;
+            }
+
+            var awaitingStopped = runtime.Active is { Phase: ManualMotionOperationPhase.AwaitingStopped };
+            if (awaitingStoppedOnly ? !awaitingStopped : awaitingStopped)
+            {
+                continue;
+            }
+
+            // An in-flight cycle stays eligible so each axis keeps its Status-first per-cycle order;
+            // a due cycle is eligible at its cadence. Eligibility never jumps a cycle ahead of one.
+            if (runtime.CycleReads is null && now < runtime.CycleDueAt)
+            {
+                continue;
+            }
+
+            // null means "never served since the last rebase": the most urgent candidate.
+            var servedAt = runtime.LastServedAt;
+            if (chosen is null
+                || (servedAt is null && chosenServedAt is not null)
+                || (servedAt is not null && chosenServedAt is not null && servedAt < chosenServedAt))
+            {
+                chosen = axis;
+                chosenServedAt = servedAt;
+            }
+        }
+
+        return chosen;
     }
 
     private void ExecuteObservationRead(ManualMotionPortRead read, DateTimeOffset now)
@@ -1448,55 +1580,33 @@ public sealed class ManualMotionSession
     }
 
     /// <summary>
-    /// The complete read set of one observation cycle, in deterministic order: Status first, then
-    /// TP, RP and the configured brake-output state. While an operation runs the cycle covers its
-    /// axis only; while the stopped state after a Stop is awaited, Status evidence has sole
-    /// priority and the cycle is the Status read alone. The plan derives from the profile-allowed
-    /// axes and their configured outputs — no axis is hard-coded.
+    /// The complete read set of one observation cycle of one axis, in deterministic order: Status
+    /// first, then TP, RP and the configured brake-output state. While that axis awaits its stopped
+    /// state after a Stop, Status evidence has sole priority for that axis and its cycle is the
+    /// Status read alone. The plan derives from the profile-allowed axis and its configured outputs
+    /// — no axis is hard-coded.
     /// </summary>
-    private List<ManualMotionPortRead> ObservationPlan()
+    private List<ManualMotionPortRead> ObservationPlan(ManualMotionAxis axis, bool stopPriority)
     {
-        var plan = new List<ManualMotionPortRead>(8);
-        if (_active is not null)
-        {
-            var axis = _active.Axis;
-            if (_profile?.For(axis) is { } p)
-            {
-                plan.Add(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, axis, 0));
-                if (_active.Phase != ManualMotionOperationPhase.AwaitingStopped)
-                {
-                    plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
-                    plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
-                    if (p.BrakeOutput is int output)
-                    {
-                        plan.Add(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, axis, output));
-                    }
-                }
-            }
-
-            return plan;
-        }
-
-        AddIdleReads(plan, ManualMotionAxis.A);
-        AddIdleReads(plan, ManualMotionAxis.B);
-        return plan;
-    }
-
-    private void AddIdleReads(List<ManualMotionPortRead> plan, ManualMotionAxis axis)
-    {
+        var plan = new List<ManualMotionPortRead>(4);
         var p = _profile?.For(axis);
         if (p is null)
         {
-            return;
+            return plan;
         }
 
         plan.Add(new ManualMotionPortRead(ManualMotionReadKind.StatusWord, axis, 0));
-        plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
-        plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
-        if (p.BrakeOutput is int output)
+        if (!stopPriority)
         {
-            plan.Add(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, axis, output));
+            plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
+            plan.Add(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
+            if (p.BrakeOutput is int output)
+            {
+                plan.Add(new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, axis, output));
+            }
         }
+
+        return plan;
     }
 
     private static bool ValueFitsKind(ManualMotionReadKind kind, decimal value) => kind switch
@@ -1633,10 +1743,29 @@ public sealed class ManualMotionSession
 
     private ManualMotionSnapshot BuildSnapshot(DateTimeOffset now)
     {
-        var axes = new List<ManualMotionAxisSnapshot>(2) { AxisSnapshot(_axisA, now), AxisSnapshot(_axisB, now) };
+        var axes = new List<ManualMotionAxisSnapshot>(4)
+        {
+            AxisSnapshot(_axisA, now),
+            AxisSnapshot(_axisB, now),
+            AxisSnapshot(_axisC, now),
+            AxisSnapshot(_axisD, now),
+        };
         var start = Math.Max(0, _log.Count - PublishedLogEntries);
         var log = _log.GetRange(start, _log.Count - start);
-        var active = _active;
+        var actives = ActiveOperationsInAxisOrder();
+        var activeSnapshots = new List<ManualMotionOperationSnapshot>(actives.Count);
+        foreach (var active in actives)
+        {
+            activeSnapshots.Add(new ManualMotionOperationSnapshot
+            {
+                Id = active.Id,
+                Kind = active.Kind,
+                Axis = active.Axis,
+                Phase = active.Phase,
+                StartedAt = active.StartedAt,
+                StopRequested = active.StopRequested,
+            });
+        }
 
         return new ManualMotionSnapshot
         {
@@ -1647,17 +1776,7 @@ public sealed class ManualMotionSession
             ProfileCode = _profileCode,
             OpenCode = _openCode,
             CloseCode = _closeCode,
-            ActiveOperation = active is null
-                ? null
-                : new ManualMotionOperationSnapshot
-                {
-                    Id = active.Id,
-                    Kind = active.Kind,
-                    Axis = active.Axis,
-                    Phase = active.Phase,
-                    StartedAt = active.StartedAt,
-                    StopRequested = active.StopRequested,
-                },
+            ActiveOperations = activeSnapshots.AsReadOnly(),
             Axes = axes.AsReadOnly(),
             Log = log.AsReadOnly(),
         };
@@ -1671,6 +1790,11 @@ public sealed class ManualMotionSession
             Axis = runtime.Axis,
             AxisLetter = ManualMotionTopology.AxisLetter(runtime.Axis),
             RoleLabel = ManualMotionTopology.RoleLabel(runtime.Axis),
+            CabinetId = ManualMotionTopology.CabinetId(runtime.Axis),
+            WaterJetId = ManualMotionTopology.WaterJetId(runtime.Axis),
+            InstalledPosition = ManualMotionTopology.InstalledPosition(runtime.Axis),
+            TargetCoverage = ManualMotionTopology.TargetCoverage(runtime.Axis),
+            BrakeOutputNumber = ManualMotionTopology.ConfirmedBrakeOutput(runtime.Axis),
             AllowedByProfile = p is not null,
             BrakeCommandState = runtime.BrakeCommandState,
             BrakeOutput = ObservationSnapshot(runtime.BrakeOutput, now),
@@ -1704,7 +1828,72 @@ public sealed class ManualMotionSession
 
     private ManualMotionAxisProfile AxisProfile(ManualMotionAxis axis) => _profile?.For(axis) ?? EmptyAxisProfile;
 
-    private AxisRuntime Runtime(ManualMotionAxis axis) => axis == ManualMotionAxis.B ? _axisB : _axisA;
+    private AxisRuntime Runtime(ManualMotionAxis axis) => axis switch
+    {
+        ManualMotionAxis.A => _axisA,
+        ManualMotionAxis.B => _axisB,
+        ManualMotionAxis.C => _axisC,
+        ManualMotionAxis.D => _axisD,
+        _ => throw new ArgumentOutOfRangeException(nameof(axis), axis, "axis is outside the closed A/B/C/D domain"),
+    };
+
+    // ------------------------------------------------------------------ per-axis operation slots
+
+    /// <summary>The active operation of one axis, or null when that axis is idle. Fail-closed lookup.</summary>
+    private OperationRuntime? ActiveFor(ManualMotionAxis axis) => Runtime(axis).Active;
+
+    /// <summary>Binds one new operation to its axis slot. The slot must be empty (same-axis exclusion).</summary>
+    private void SetActive(ManualMotionAxis axis, OperationRuntime operation)
+    {
+        var runtime = Runtime(axis);
+        if (runtime.Active is not null)
+        {
+            throw new InvalidOperationException("one operation per axis: the axis slot was still occupied");
+        }
+
+        runtime.Active = operation;
+    }
+
+    /// <summary>Clears the axis slot only when it still holds the expected operation.</summary>
+    private void ClearActive(ManualMotionAxis axis, OperationRuntime expectedOperation)
+    {
+        var runtime = Runtime(axis);
+        if (ReferenceEquals(runtime.Active, expectedOperation))
+        {
+            runtime.Active = null;
+        }
+    }
+
+    /// <summary>Every active operation, in stable A/B/C/D order.</summary>
+    private List<OperationRuntime> ActiveOperationsInAxisOrder()
+    {
+        var actives = new List<OperationRuntime>(4);
+        foreach (var axis in AllAxes)
+        {
+            if (Runtime(axis).Active is { } op)
+            {
+                actives.Add(op);
+            }
+        }
+
+        return actives;
+    }
+
+    private bool HasAnyActiveOperation
+    {
+        get
+        {
+            foreach (var axis in AllAxes)
+            {
+                if (Runtime(axis).Active is not null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 
     private static TimeSpan Milliseconds(int value) => TimeSpan.FromTicks(value * TimeSpan.TicksPerMillisecond);
 
@@ -1810,6 +1999,33 @@ public sealed class ManualMotionSession
 
         public Observation BrakeOutput { get; } = new();
 
+        /// <summary>The one operation slot of this axis; null when the axis is idle.</summary>
+        public OperationRuntime? Active { get; set; }
+
+        /// <summary>The in-flight observation cycle reads of this axis; null when no cycle is running.</summary>
+        public List<ManualMotionPortRead>? CycleReads { get; set; }
+
+        /// <summary>The read index inside the in-flight cycle of this axis.</summary>
+        public int CycleIndex { get; set; }
+
+        /// <summary>When the in-flight cycle of this axis started.</summary>
+        public DateTimeOffset CycleStartedAt { get; set; }
+
+        /// <summary>When the next cycle of this axis becomes due.</summary>
+        public DateTimeOffset CycleDueAt { get; set; }
+
+        /// <summary>The operation ID context of the in-flight cycle of this axis.</summary>
+        public long CycleOperationId { get; set; }
+
+        /// <summary>The post-Begin context of the in-flight cycle of this axis.</summary>
+        public bool CycleMotionBegun { get; set; }
+
+        /// <summary>The post-Stop supervision context of the in-flight cycle of this axis.</summary>
+        public bool CycleStopPriority { get; set; }
+
+        /// <summary>When this axis was last served an observation read; null when never (most urgent).</summary>
+        public DateTimeOffset? LastServedAt { get; set; }
+
         public Observation For(ManualMotionReadKind kind) => kind switch
         {
             ManualMotionReadKind.StatusWord => Status,
@@ -1847,6 +2063,9 @@ public sealed class ManualMotionSession
         public bool StopRequested { get; set; }
 
         public StopReason StopReason { get; set; }
+
+        /// <summary>True once this operation attempted its ordinary Stop dispatch (never repeated).</summary>
+        public bool StopCommandAttempted { get; set; }
 
         public string? EndCode { get; set; }
 
