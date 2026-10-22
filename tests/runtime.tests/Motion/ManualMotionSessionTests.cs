@@ -2239,8 +2239,8 @@ public sealed class ManualMotionSessionTests
         Assert.Equal(ManualMotionCodes.MoveAbortedSessionClosing, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
         Assert.Equal(ManualMotionCodes.MoveAbortedSessionClosing, harness.Axis(ManualMotionAxis.B).LastOutcomeCode);
         var stops = harness.Port.ExecutedCommands.Where(command => command.Kind == ManualMotionPortCommandKind.Stop).ToList();
-        Assert.Single(stops.Where(command => command.Axis == ManualMotionAxis.A));
-        Assert.Single(stops.Where(command => command.Axis == ManualMotionAxis.B));
+        Assert.Single(stops, command => command.Axis == ManualMotionAxis.A);
+        Assert.Single(stops, command => command.Axis == ManualMotionAxis.B);
 
         // Each axis brake is applied only after that same axis was observed inactive.
         Assert.Contains(
@@ -2338,10 +2338,16 @@ public sealed class ManualMotionSessionTests
 
         // Cleanup is deterministic and truthful: one protective Stop for the axis that began motion,
         // none for the axis that never began, no fabricated stop state and no automatic brake apply.
-        Assert.Single(harness.Port.ExecutedCommands.Where(command =>
-            command.Kind == ManualMotionPortCommandKind.Stop && command.Axis == ManualMotionAxis.A));
-        Assert.Empty(harness.Port.ExecutedCommands.Where(command =>
-            command.Kind == ManualMotionPortCommandKind.Stop && command.Axis == ManualMotionAxis.B));
+        Assert.Single(
+            harness.Port.ExecutedCommands,
+            command =>
+                command.Kind == ManualMotionPortCommandKind.Stop
+                && command.Axis == ManualMotionAxis.A);
+        Assert.DoesNotContain(
+            harness.Port.ExecutedCommands,
+            command =>
+                command.Kind == ManualMotionPortCommandKind.Stop
+                && command.Axis == ManualMotionAxis.B);
         Assert.False(harness.Axis(ManualMotionAxis.A).StopConfirmed);
         Assert.False(harness.Axis(ManualMotionAxis.B).StopConfirmed);
         Assert.DoesNotContain(harness.Port.ExecutedCommands, command => command.Kind == ManualMotionPortCommandKind.BrakeOutputClear);
