@@ -69,7 +69,6 @@ public sealed class ManualMotionSession
     private long _logSequence;
     private long _operationSequence;
     private int _advanceCursor;
-    private int _observationCursor;
     private bool _closeRequested;
     private bool _portClosed;
     private string _openCode = string.Empty;
@@ -819,16 +818,20 @@ public sealed class ManualMotionSession
         }
 
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.Begin, op.Axis, 0, 0));
+
+        // A refused, faulted or unclassified begin may still have started motion: the call reached
+        // (or may have reached) the controller, so the may-have-begun state is recorded BEFORE the
+        // result classification. A faulted begin must therefore receive the protective Stop of the
+        // fault cleanup exactly like a refused one, and the supervised Stop path runs before the
+        // brake is applied.
+        op.MotionBegun = true;
+        op.BeginSequence = outcome.Sequence;
+        op.BeginAt = now;
         if (Interrupted(outcome, now, op))
         {
             return Progress.CalledPort;
         }
 
-        // A refused or unclassified begin may still have started motion, so it is stopped through the
-        // same supervised Stop path before the brake is applied.
-        op.MotionBegun = true;
-        op.BeginSequence = outcome.Sequence;
-        op.BeginAt = now;
         if (!outcome.Accepted)
         {
             op.EndCode = ManualMotionCodes.MotionCommandRefused;
@@ -917,6 +920,10 @@ public sealed class ManualMotionSession
         }
 
         var runtime = Runtime(op.Axis);
+
+        // The dispatch is recorded as attempted before the call: if this very call faults, fault
+        // cleanup must never protective-repeat it (no retry of an already-attempted Stop).
+        op.StopDispatchAttempted = true;
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.Stop, op.Axis, 0, 0));
         if (Interrupted(outcome, now, op))
         {
@@ -1314,7 +1321,11 @@ public sealed class ManualMotionSession
 
         foreach (var op in actives)
         {
-            if (op.MotionBegun && _state != ManualMotionSessionState.Faulted && !_portClosed)
+            // The fault cleanup decides per operation: never began (no Stop), may have begun but
+            // never attempted its Stop (exactly one protective Stop), or already attempted its Stop
+            // (never protective-repeated). Every attempt stays serialized and its failure is only
+            // recorded.
+            if (op.MotionBegun && !op.StopDispatchAttempted && _state != ManualMotionSessionState.Faulted && !_portClosed)
             {
                 ProtectiveStop(op.Axis, now);
             }
@@ -1378,8 +1389,10 @@ public sealed class ManualMotionSession
     /// between the STARTS of one axis's cycles, never a delay between the reads of one cycle. An
     /// axis awaiting its stopped state after a Stop supervises with a Status-only cycle that has the
     /// highest observation priority and alternates fairly with any other axis in the same state; the
-    /// remaining axes then continue in fair A/B/C/D order, an already-started cycle finishing before
-    /// the next axis starts. This method is reached only after the step has served pending Stops and
+    /// remaining reads go to the least-recently-served eligible axis (ties break on the A/B/C/D
+    /// order), so complete cycles interleave across axes, no axis monopolizes consecutive reads, and
+    /// a just-rebased axis is served before any older rotation. This method is reached only after
+    /// the step has served pending Stops and
     /// the active operations, so an urgent lifecycle is never queued behind a cycle remainder; a
     /// context change (an operation starting or ending on that axis, motion beginning after an
     /// accepted Begin, or post-Stop supervision beginning) rebases ONLY that axis's cycle, and the
@@ -1414,8 +1427,11 @@ public sealed class ManualMotionSession
             {
                 // Post-Begin and Stop-supervision rebases apply to this axis only: the discarded
                 // remainder belongs to this axis, and its next cycle starts Status-first at once.
+                // The axis becomes the most urgent observation candidate, so a post-Begin Status
+                // and position refresh is never queued behind an idle axis's rotation.
                 runtime.CycleReads = null;
                 runtime.CycleDueAt = now;
+                runtime.LastServedAt = null;
             }
         }
 
@@ -1446,6 +1462,7 @@ public sealed class ManualMotionSession
         }
 
         var read = served.CycleReads[served.CycleIndex];
+        served.LastServedAt = now;
         ExecuteObservationRead(read, now);
 
         if (served.CycleReads is null)
@@ -1471,19 +1488,20 @@ public sealed class ManualMotionSession
     private ManualMotionAxis? NextObservationAxis(DateTimeOffset now)
     {
         // Levels: a Status read for an axis awaiting stopped state comes first (fair alternation),
-        // then the fair rotation over the remaining axes. Idle-axis work shares the same rotation
-        // instead of being starved behind active axes, so a soon-requested idle axis always keeps
-        // truthful fresh observations; no axis permanently monopolizes reads.
+        // then the remaining axes. Within each level the least-recently-served axis wins and ties
+        // break on the stable A/B/C/D order, so reads interleave across axes instead of letting one
+        // axis monopolize a run of reads, a just-rebased axis is served at once, and idle axes keep
+        // rotating beside active axes instead of being starved behind them.
         return PickObservationAxis(now, awaitingStoppedOnly: true)
             ?? PickObservationAxis(now, awaitingStoppedOnly: false);
     }
 
     private ManualMotionAxis? PickObservationAxis(DateTimeOffset now, bool awaitingStoppedOnly)
     {
-        ManualMotionAxis? dueCandidate = null;
-        for (var scanned = 0; scanned < AllAxes.Length; scanned++)
+        ManualMotionAxis? chosen = null;
+        DateTimeOffset? chosenServedAt = null;
+        foreach (var axis in AllAxes)
         {
-            var axis = AllAxes[(_observationCursor + scanned) % AllAxes.Length];
             var runtime = Runtime(axis);
             if (_profile?.For(axis) is null)
             {
@@ -1496,26 +1514,25 @@ public sealed class ManualMotionSession
                 continue;
             }
 
-            if (runtime.CycleReads is not null)
+            // An in-flight cycle stays eligible so each axis keeps its Status-first per-cycle order;
+            // a due cycle is eligible at its cadence. Eligibility never jumps a cycle ahead of one.
+            if (runtime.CycleReads is null && now < runtime.CycleDueAt)
             {
-                // An already-started cycle finishes before the next axis starts: the read order of
-                // each axis stays Status-first and complete.
-                _observationCursor = (IndexFor(axis) + 1) % AllAxes.Length;
-                return axis;
+                continue;
             }
 
-            if (now >= runtime.CycleDueAt && dueCandidate is null)
+            // null means "never served since the last rebase": the most urgent candidate.
+            var servedAt = runtime.LastServedAt;
+            if (chosen is null
+                || (servedAt is null && chosenServedAt is not null)
+                || (servedAt is not null && chosenServedAt is not null && servedAt < chosenServedAt))
             {
-                dueCandidate = axis;
+                chosen = axis;
+                chosenServedAt = servedAt;
             }
         }
 
-        if (dueCandidate is not null)
-        {
-            _observationCursor = (IndexFor(dueCandidate.Value) + 1) % AllAxes.Length;
-        }
-
-        return dueCandidate;
+        return chosen;
     }
 
     private void ExecuteObservationRead(ManualMotionPortRead read, DateTimeOffset now)
@@ -2006,6 +2023,9 @@ public sealed class ManualMotionSession
         /// <summary>The post-Stop supervision context of the in-flight cycle of this axis.</summary>
         public bool CycleStopPriority { get; set; }
 
+        /// <summary>When this axis was last served an observation read; null when never (most urgent).</summary>
+        public DateTimeOffset? LastServedAt { get; set; }
+
         public Observation For(ManualMotionReadKind kind) => kind switch
         {
             ManualMotionReadKind.StatusWord => Status,
@@ -2043,6 +2063,9 @@ public sealed class ManualMotionSession
         public bool StopRequested { get; set; }
 
         public StopReason StopReason { get; set; }
+
+        /// <summary>True once this operation attempted its ordinary Stop dispatch (never repeated).</summary>
+        public bool StopDispatchAttempted { get; set; }
 
         public string? EndCode { get; set; }
 

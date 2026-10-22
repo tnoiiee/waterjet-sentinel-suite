@@ -197,6 +197,8 @@ public sealed class ManualMotionSessionTests
         JogMaximumHoldMilliseconds = jogMaximumHoldMilliseconds ?? source.JogMaximumHoldMilliseconds,
         AxisA = axisA ?? source.AxisA,
         AxisB = omitAxisB ? null : axisB ?? source.AxisB,
+        AxisC = source.AxisC,
+        AxisD = source.AxisD,
     };
 
     private static List<ManualMotionPortCommandKind> KindsAfter(Harness harness, int skip) =>
@@ -643,7 +645,10 @@ public sealed class ManualMotionSessionTests
 
         harness.Session.RequestJogStart(ManualMotionAxis.A, ManualMotionJogDirection.Positive, 7);
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A)?.Phase == ManualMotionOperationPhase.Running);
-        for (var index = 0; index < 6; index++)
+
+        // Hold the press until the session publishes the post-Begin positive position observation:
+        // the release follows a fresh observed displacement, never an assumed number of Steps.
+        for (var index = 0; index < 40 && !(harness.Axis(ManualMotionAxis.A).PositionTp.Value > 12000m); index++)
         {
             harness.Session.RequestJogHeartbeat(ManualMotionAxis.A, 7);
             harness.Drive(1, 50);
@@ -678,8 +683,13 @@ public sealed class ManualMotionSessionTests
 
         harness.Session.RequestJogStart(ManualMotionAxis.B, ManualMotionJogDirection.Negative, 9);
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.B)?.Phase == ManualMotionOperationPhase.Running);
-        harness.Session.RequestJogHeartbeat(ManualMotionAxis.B, 9);
-        harness.Drive(2, 50);
+
+        // Hold the press until the post-Begin negative position observation is published.
+        for (var index = 0; index < 40 && !(harness.Axis(ManualMotionAxis.B).PositionTp.Value < -8000m); index++)
+        {
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.B, 9);
+            harness.Drive(1, 50);
+        }
 
         harness.Session.RequestJogRelease(ManualMotionAxis.B, 9, ManualMotionJogEndReason.CaptureLost);
         harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
@@ -698,7 +708,9 @@ public sealed class ManualMotionSessionTests
 
         harness.Session.RequestJogStart(ManualMotionAxis.C, ManualMotionJogDirection.Positive, 21);
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.C)?.Phase == ManualMotionOperationPhase.Running);
-        for (var index = 0; index < 6; index++)
+
+        // Hold the press until the post-Begin positive position observation is published.
+        for (var index = 0; index < 40 && !(harness.Axis(ManualMotionAxis.C).PositionTp.Value > 5000m); index++)
         {
             harness.Session.RequestJogHeartbeat(ManualMotionAxis.C, 21);
             harness.Drive(1, 50);
@@ -735,8 +747,13 @@ public sealed class ManualMotionSessionTests
 
         harness.Session.RequestJogStart(ManualMotionAxis.D, ManualMotionJogDirection.Negative, 23);
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.D)?.Phase == ManualMotionOperationPhase.Running);
-        harness.Session.RequestJogHeartbeat(ManualMotionAxis.D, 23);
-        harness.Drive(2, 50);
+
+        // Hold the press until the post-Begin negative position observation is published.
+        for (var index = 0; index < 40 && !(harness.Axis(ManualMotionAxis.D).PositionTp.Value < -3000m); index++)
+        {
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.D, 23);
+            harness.Drive(1, 50);
+        }
 
         harness.Session.RequestJogRelease(ManualMotionAxis.D, 23, ManualMotionJogEndReason.CaptureLost);
         harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
@@ -1380,24 +1397,27 @@ public sealed class ManualMotionSessionTests
         harness.OpenSession();
         harness.Drive(16, 25);
 
+        // The least-recently-served arbitration interleaves complete cycles across axes while each
+        // axis keeps its own Status-first order: the four Status reads come first, then TP, RP and
+        // the brake outputs, in stable A/B/C/D tie-breaking order.
         Assert.Equal(
             new[]
             {
                 new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.A, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.A, 1),
                 new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.B, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.B, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.B, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.B, 2),
                 new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.C, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.C, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.C, 0),
-                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.C, 3),
                 new ManualMotionPortRead(ManualMotionReadKind.StatusWord, ManualMotionAxis.D, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.B, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.C, 0),
                 new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.D, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.B, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.C, 0),
                 new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.D, 0),
+                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.A, 1),
+                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.B, 2),
+                new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.C, 3),
                 new ManualMotionPortRead(ManualMotionReadKind.BrakeOutputState, ManualMotionAxis.D, 4),
             },
             harness.Reads.Take(16).ToArray());
@@ -1830,11 +1850,28 @@ public sealed class ManualMotionSessionTests
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.B)?.Phase == ManualMotionOperationPhase.Running);
 
         harness.Session.RequestMove(ManualMotionAxis.D, -1500);
-        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.D)?.Phase == ManualMotionOperationPhase.Running);
+        harness.Drive(1);
+        Assert.True(
+            ActiveOf(harness.Snapshot, ManualMotionAxis.D) is not null,
+            string.Concat("Move D must be accepted while Jog B runs; refusal code: ", harness.Axis(ManualMotionAxis.D).LastOutcomeCode));
+
+        // Hold-to-run contract: Jog B needs its own heartbeats while Move D progresses, and both
+        // operations advance independently until each completes on its own lifecycle.
+        for (var index = 0;
+             index < 80 && ActiveOf(harness.Snapshot, ManualMotionAxis.D)?.Phase != ManualMotionOperationPhase.Running;
+             index++)
+        {
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.B, 63);
+            harness.Drive(1, 25);
+        }
+        Assert.Equal(ManualMotionOperationPhase.Running, ActiveOf(harness.Snapshot, ManualMotionAxis.D)?.Phase);
         Assert.NotNull(ActiveOf(harness.Snapshot, ManualMotionAxis.B));
 
-        // Move D completes while the Jog keeps running on B until its own release.
-        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.D) is null, maximumSteps: 1200);
+        for (var index = 0; index < 120 && ActiveOf(harness.Snapshot, ManualMotionAxis.D) is not null; index++)
+        {
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.B, 63);
+            harness.Drive(1, 25);
+        }
         Assert.Equal(ManualMotionCodes.MoveCompletedPositionVerified, harness.Axis(ManualMotionAxis.D).LastOutcomeCode);
         Assert.NotNull(ActiveOf(harness.Snapshot, ManualMotionAxis.B));
 
@@ -2153,6 +2190,19 @@ public sealed class ManualMotionSessionTests
             snapshot => snapshot.ActiveOperations.Count == 4
                 && snapshot.ActiveOperations.All(operation => operation.Phase == ManualMotionOperationPhase.Running),
             maximumSteps: 400);
+
+        // The measurement window opens only after the first COMPLETE fresh observation set of the
+        // four active axes: the post-Begin rebases and the startup command calls may legitimately
+        // delay reads, so the window never counts never-read or pre-rebase values as stale.
+        for (var step = 0; step < 40 && !QuadObservationsFresh(harness); step++)
+        {
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.A, 701);
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.B, 702);
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.C, 703);
+            harness.Session.RequestJogHeartbeat(ManualMotionAxis.D, 704);
+            harness.StepOnce();
+        }
+        Assert.True(QuadObservationsFresh(harness), "the first complete fresh four-axis observation set never arrived");
         var readsAtRunning = harness.Reads.Count;
 
         for (var step = 0; step < 60; step++)
@@ -2233,12 +2283,15 @@ public sealed class ManualMotionSessionTests
             ActiveOf(snapshot, ManualMotionAxis.A)?.Phase == ManualMotionOperationPhase.Running
             && ActiveOf(snapshot, ManualMotionAxis.B)?.Phase == ManualMotionOperationPhase.Running);
 
+        // The setup Homes dispatched their own supervised Stops; the close phase is measured on its
+        // own so exactly one close Stop per active axis is pinned without erasing the Home lifecycle.
+        var stopBaseline = harness.Port.ExecutedCommands.Count;
         harness.Session.RequestClose();
         harness.DriveUntil(snapshot => snapshot.State == ManualMotionSessionState.Closed, maximumSteps: 400);
 
         Assert.Equal(ManualMotionCodes.MoveAbortedSessionClosing, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
         Assert.Equal(ManualMotionCodes.MoveAbortedSessionClosing, harness.Axis(ManualMotionAxis.B).LastOutcomeCode);
-        var stops = harness.Port.ExecutedCommands.Where(command => command.Kind == ManualMotionPortCommandKind.Stop).ToList();
+        var stops = harness.Port.ExecutedCommands.Skip(stopBaseline).Where(command => command.Kind == ManualMotionPortCommandKind.Stop).ToList();
         Assert.Single(stops, command => command.Axis == ManualMotionAxis.A);
         Assert.Single(stops, command => command.Axis == ManualMotionAxis.B);
 
@@ -2357,6 +2410,83 @@ public sealed class ManualMotionSessionTests
         harness.DriveUntil(snapshot => snapshot.State == ManualMotionSessionState.Closed, maximumSteps: 100);
         Assert.Equal(1, harness.Port.OpenCount);
         Assert.Equal(1, harness.Port.CloseCount);
+    }
+
+    [Fact]
+    public void A_Fault_During_Stop_Supervision_Never_Repeats_The_Already_Attempted_Stop()
+    {
+        var clock = new TestClock(Instant);
+        var stopAttempted = false;
+        var port = new FakePort
+        {
+            ExecuteHandler = command =>
+            {
+                if (command.Kind == ManualMotionPortCommandKind.Stop)
+                {
+                    stopAttempted = true;
+                }
+
+                return new ManualMotionPortCommandResult(true, false, true, "FAKE_DISPATCHED", 1);
+            },
+            ReadHandler = read => stopAttempted
+                ? new ManualMotionPortReadResult(false, true, 0m, "FAKE_FAULT", 1)
+                : new ManualMotionPortReadResult(
+                    true,
+                    false,
+                    read.Kind == ManualMotionReadKind.StatusWord ? 128m : 0m,
+                    "FAKE_READ",
+                    1),
+        };
+        var session = new ManualMotionSession(
+            port,
+            ManualMotionProfileResult.FromProfile(ManualMotionProfile.CreateSimulationProfile()),
+            clock);
+
+        session.Step();
+        for (var index = 0; index < 16; index++)
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(25));
+            session.Step();
+        }
+
+        session.RequestJogStart(ManualMotionAxis.A, ManualMotionJogDirection.Positive, 971);
+        for (var index = 0;
+             index < 40 && ActiveOf(session.Snapshot, ManualMotionAxis.A)?.Phase != ManualMotionOperationPhase.Running;
+             index++)
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(25));
+            session.Step();
+        }
+        Assert.Equal(ManualMotionOperationPhase.Running, ActiveOf(session.Snapshot, ManualMotionAxis.A)?.Phase);
+
+        // The supervised Stop dispatches once; the next observation then faults the shared
+        // connection while the axis is still being supervised.
+        session.RequestJogRelease(ManualMotionAxis.A, 971, ManualMotionJogEndReason.Released);
+        for (var index = 0; index < 40 && session.Snapshot.State != ManualMotionSessionState.Faulted; index++)
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(25));
+            session.Step();
+        }
+
+        Assert.Equal(ManualMotionSessionState.Faulted, session.Snapshot.State);
+        Assert.Single(port.Executed, command => command.Kind == ManualMotionPortCommandKind.Stop);
+        Assert.False(session.Snapshot.Axes[0].StopConfirmed);
+    }
+
+    private static bool QuadObservationsFresh(RecordingHarness harness)
+    {
+        foreach (var axis in new[] { ManualMotionAxis.A, ManualMotionAxis.B, ManualMotionAxis.C, ManualMotionAxis.D })
+        {
+            if (!harness.Axis(axis).StatusWord.Fresh
+                || !harness.Axis(axis).PositionTp.Fresh
+                || !harness.Axis(axis).PositionRp.Fresh
+                || !harness.Axis(axis).BrakeOutput.Fresh)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static void AssertCycleKinds(IEnumerable<ManualMotionReadKind> kinds)
