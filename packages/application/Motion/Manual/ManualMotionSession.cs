@@ -923,7 +923,7 @@ public sealed class ManualMotionSession
 
         // The dispatch is recorded as attempted before the call: if this very call faults, fault
         // cleanup must never protective-repeat it (no retry of an already-attempted Stop).
-        op.StopDispatchAttempted = true;
+        op.StopCommandAttempted = true;
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.Stop, op.Axis, 0, 0));
         if (Interrupted(outcome, now, op))
         {
@@ -1325,7 +1325,7 @@ public sealed class ManualMotionSession
             // never attempted its Stop (exactly one protective Stop), or already attempted its Stop
             // (never protective-repeated). Every attempt stays serialized and its failure is only
             // recorded.
-            if (op.MotionBegun && !op.StopDispatchAttempted && _state != ManualMotionSessionState.Faulted && !_portClosed)
+            if (op.MotionBegun && !op.StopCommandAttempted && _state != ManualMotionSessionState.Faulted && !_portClosed)
             {
                 ProtectiveStop(op.Axis, now);
             }
@@ -2065,7 +2065,7 @@ public sealed class ManualMotionSession
         public StopReason StopReason { get; set; }
 
         /// <summary>True once this operation attempted its ordinary Stop dispatch (never repeated).</summary>
-        public bool StopDispatchAttempted { get; set; }
+        public bool StopCommandAttempted { get; set; }
 
         public string? EndCode { get; set; }
 
