@@ -354,7 +354,11 @@ public sealed class ManualMotionSimulatedPortTests
         port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.A));
         port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.B));
 
-        clock.Advance(TimeSpan.FromMilliseconds(500));
+        // At 4000 units/s, 250 ms moves each axis 1000 units, proving that both axes progress
+        // concurrently while remaining strictly between start and target (A: 12000 -> 11000 toward
+        // -11000; B: -8000 -> -7000 toward -6000). A 500 ms window would land Axis B exactly on its
+        // -6000 target, which is completion, not in-flight progress.
+        clock.Advance(TimeSpan.FromMilliseconds(250));
         var tpA = ReadTp(port, ManualMotionAxis.A);
         var tpB = ReadTp(port, ManualMotionAxis.B);
 
