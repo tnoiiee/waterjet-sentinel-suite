@@ -298,7 +298,7 @@ public static class CleaningPathStoreParser
     }
 
     private static void ReadPoints(
-        IReadOnlyDictionary<string, JsonElement> pathProperties,
+        Dictionary<string, JsonElement> pathProperties,
         bool canonicalShape,
         int pathIndex,
         string? sensorId,
@@ -421,7 +421,7 @@ public static class CleaningPathStoreParser
     private readonly record struct CoordinateDraft(int Millimetres, int Native);
 
     private static CoordinateDraft? ReadCoordinate(
-        IReadOnlyDictionary<string, JsonElement> pointProperties,
+        Dictionary<string, JsonElement> pointProperties,
         string propertyName,
         CleaningPathCoordinateIdentity identity,
         int pathIndex,
@@ -486,7 +486,7 @@ public static class CleaningPathStoreParser
         return new CoordinateDraft((int)value, native);
     }
 
-    private static void ValidateSchema(IReadOnlyDictionary<string, JsonElement> root, List<CleaningPathValidationError> errors)
+    private static void ValidateSchema(Dictionary<string, JsonElement> root, List<CleaningPathValidationError> errors)
     {
         if (!root.TryGetValue(SchemaProperty, out var schema))
         {
