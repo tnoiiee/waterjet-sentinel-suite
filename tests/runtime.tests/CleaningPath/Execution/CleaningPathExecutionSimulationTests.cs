@@ -54,8 +54,8 @@ public sealed class CleaningPathExecutionSimulationTests
         foreach (var point in result.Points)
         {
             Assert.Equal(CleaningPathPointState.Verified, point.State);
-            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Horizontal.MoveOutcome);
-            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Vertical.MoveOutcome);
+            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Horizontal.MotionOutcome);
+            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Vertical.MotionOutcome);
         }
     }
 
@@ -239,7 +239,9 @@ public sealed class CleaningPathExecutionSimulationTests
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
         Assert.Equal("COMMUNICATION_FAULT", result.Points[0].FailureCode);
-        Assert.Empty(result.Points.Where(point => point.State == CleaningPathPointState.Verified));
+        Assert.DoesNotContain(
+            result.Points,
+            point => point.State == CleaningPathPointState.Verified);
     }
 
     // 11
@@ -275,7 +277,7 @@ public sealed class CleaningPathExecutionSimulationTests
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
         Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
-        Assert.Equal(CleaningPathMotionOutcome.MoveTimeout, result.Points[0].Horizontal.MoveOutcome);
+        Assert.Equal(CleaningPathMotionOutcome.MoveTimeout, result.Points[0].Horizontal.MotionOutcome);
     }
 
     // 13
@@ -289,7 +291,7 @@ public sealed class CleaningPathExecutionSimulationTests
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
         Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
-        Assert.Equal(CleaningPathMotionOutcome.MoveTimeout, result.Points[0].Vertical.MoveOutcome);
+        Assert.Equal(CleaningPathMotionOutcome.MoveTimeout, result.Points[0].Vertical.MotionOutcome);
     }
 
     // 14
@@ -306,7 +308,9 @@ public sealed class CleaningPathExecutionSimulationTests
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
         Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
-        Assert.Empty(result.Points.Where(point => point.State == CleaningPathPointState.Verified));
+        Assert.DoesNotContain(
+            result.Points,
+            point => point.State == CleaningPathPointState.Verified);
     }
 
     // 15
@@ -321,7 +325,7 @@ public sealed class CleaningPathExecutionSimulationTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathCleanupState.Succeeded, result.CleanupState);
-        Assert.Equal(CleaningPathMotionOutcome.MoveAbortedByOperator, result.Points[0].Vertical.MoveOutcome);
+        Assert.Equal(CleaningPathMotionOutcome.MoveAbortedByOperator, result.Points[0].Vertical.MotionOutcome);
         Assert.Equal(CleaningPathMotionOutcome.StopIssued, result.Points[0].Vertical.CleanupOutcome);
         Assert.True(result.Points[0].Vertical.StopRequestedOnce);
     }
@@ -415,7 +419,7 @@ public sealed class CleaningPathExecutionSimulationTests
 
         // The motion result is preserved unchanged; the cleanup failure never converts it to a
         // verified point and never erases the typed per-axis motion outcome.
-        Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, result.Points[0].Horizontal.MoveOutcome);
+        Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, result.Points[0].Horizontal.MotionOutcome);
         Assert.Equal(CleaningPathMotionOutcome.BrakeApplyRefused, result.Points[0].Horizontal.CleanupOutcome);
     }
 
@@ -583,8 +587,8 @@ public sealed class CleaningPathExecutionSimulationTests
 
         foreach (var point in result.Points)
         {
-            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Horizontal.MoveOutcome);
-            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Vertical.MoveOutcome);
+            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Horizontal.MotionOutcome);
+            Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, point.Vertical.MotionOutcome);
             Assert.False(string.IsNullOrEmpty(point.Horizontal.MotionOutcomeSourceCode));
             Assert.False(string.IsNullOrEmpty(point.Vertical.MotionOutcomeSourceCode));
         }
@@ -660,7 +664,9 @@ public sealed class CleaningPathExecutionSimulationTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Empty(result.Points.Where(point => point.State == CleaningPathPointState.Verified));
+        Assert.DoesNotContain(
+            result.Points,
+            point => point.State == CleaningPathPointState.Verified);
         Assert.Empty(harness.Coordinator.Current!.VerifiedLedger);
         Assert.Null(result.Handoff);
     }

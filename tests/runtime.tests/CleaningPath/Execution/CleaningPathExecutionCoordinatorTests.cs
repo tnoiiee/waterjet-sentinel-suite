@@ -25,7 +25,7 @@ public sealed class CleaningPathExecutionCoordinatorTests
     private sealed class FakeAxisFrameState
     {
         internal bool MoveActive;
-        internal bool StopRequested;
+        internal bool StopRequested = false;
         internal CleaningPathMotionOutcome LastOutcome = CleaningPathMotionOutcome.None;
         internal string? LastOutcomeSourceCode;
         internal CleaningPathMotionBitState Motion = CleaningPathMotionBitState.Inactive;
@@ -64,7 +64,7 @@ public sealed class CleaningPathExecutionCoordinatorTests
         internal bool Allowed = true;
         internal bool MoveReady = true;
         internal bool Ready = true;
-        internal bool Faulted;
+        internal bool Faulted = false;
 
         public bool SessionReady => Ready;
         public bool SessionFaulted => Faulted;
@@ -218,7 +218,9 @@ public sealed class CleaningPathExecutionCoordinatorTests
         Assert.NotNull(coordinator.Result);
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, coordinator.Result!.Status);
         Assert.Equal(CleaningPathExecutionCodes.VerificationRefusedObservationMismatch, coordinator.Result!.Code);
-        Assert.Empty(coordinator.Result!.Points.Where(point => point.State == CleaningPathPointState.Verified));
+        Assert.DoesNotContain(
+            coordinator.Result!.Points,
+            point => point.State == CleaningPathPointState.Verified);
     }
 
     [Fact]
@@ -296,8 +298,8 @@ public sealed class CleaningPathExecutionCoordinatorTests
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
         Assert.Equal(CleaningPathExecutionCodes.PathAborted, result.Code);
         Assert.Single(result.Points);
-        Assert.Equal(CleaningPathMotionOutcome.MoveAbortedByOperator, result.Points[0].Horizontal.MoveOutcome);
-        Assert.Equal(CleaningPathMotionOutcome.MoveAbortedByOperator, result.Points[0].Vertical.MoveOutcome);
+        Assert.Equal(CleaningPathMotionOutcome.MoveAbortedByOperator, result.Points[0].Horizontal.MotionOutcome);
+        Assert.Equal(CleaningPathMotionOutcome.MoveAbortedByOperator, result.Points[0].Vertical.MotionOutcome);
         Assert.Equal(CleaningPathCleanupState.Succeeded, result.CleanupState);
     }
 }

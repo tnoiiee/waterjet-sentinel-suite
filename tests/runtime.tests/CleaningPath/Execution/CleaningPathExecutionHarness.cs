@@ -64,8 +64,8 @@ internal sealed class CleaningPathExecutionHarness
     internal SensorConfigurationRecord SensorConfiguration { get; }
     internal CleaningPathResolutionResult Resolution { get; }
 
-    internal CleaningPathExecutionRole HorizontalRole => CleaningPathExecutionRole.Horizontal;
-    internal CleaningPathExecutionRole VerticalRole => CleaningPathExecutionRole.Vertical;
+    internal static CleaningPathExecutionRole HorizontalRole => CleaningPathExecutionRole.Horizontal;
+    internal static CleaningPathExecutionRole VerticalRole => CleaningPathExecutionRole.Vertical;
 
     internal void Drive(int steps, int millisecondsPerStep = 25)
     {
@@ -204,10 +204,10 @@ internal sealed class CleaningPathExecutionHarness
             ObservationFreshnessMilliseconds = simulation.ObservationFreshnessMilliseconds,
             JogHeartbeatTimeoutMilliseconds = simulation.JogHeartbeatTimeoutMilliseconds,
             JogMaximumHoldMilliseconds = simulation.JogMaximumHoldMilliseconds,
-            AxisA = PathAxis(1, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisA),
-            AxisB = PathAxis(2, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisB),
-            AxisC = PathAxis(3, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisC),
-            AxisD = PathAxis(4, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisD),
+            AxisA = PathAxis(1, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisA ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis A.")),
+            AxisB = PathAxis(2, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisB ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis B.")),
+            AxisC = PathAxis(3, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisC ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis C.")),
+            AxisD = PathAxis(4, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisD ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis D.")),
         };
     }
 
