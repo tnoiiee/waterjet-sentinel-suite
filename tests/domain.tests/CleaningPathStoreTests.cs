@@ -19,6 +19,8 @@ public sealed class CleaningPathStoreTests
 {
     private const string CanonicalSchema = "wjss.cleaning-path-store/1";
 
+    private static readonly int[] WrongPointOrder = [2, 1, 3, 4, 5, 6];
+
     // ---------------------------------------------------------------- builders (synthetic only)
 
     private static string DefaultPointJson(string pointId, int ordinal) =>
@@ -547,7 +549,7 @@ public sealed class CleaningPathStoreTests
 
         var wrongOrder = CleaningPathStoreParser.Parse(BuildStore(pathOverride: sensor =>
             string.Equals(sensor, "G1", StringComparison.Ordinal)
-                ? "{\"sensorId\":\"G1\",\"points\":[" + string.Join(",", new[] { 2, 1, 3, 4, 5, 6 }.Select(k => DefaultPointJson("P" + k.ToString(CultureInfo.InvariantCulture), k))) + "]}"
+                ? "{\"sensorId\":\"G1\",\"points\":[" + string.Join(",", WrongPointOrder.Select(k => DefaultPointJson("P" + k.ToString(CultureInfo.InvariantCulture), k))) + "]}"
                 : null));
         Assert.False(wrongOrder.Accepted);
         Assert.Contains(wrongOrder.Errors, e => e.Code == CleaningPathCodes.PointOrderInvalid);
