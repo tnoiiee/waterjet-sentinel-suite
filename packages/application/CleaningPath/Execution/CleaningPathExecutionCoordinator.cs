@@ -250,7 +250,7 @@ public sealed class CleaningPathExecutionCoordinator
         return true;
     }
 
-    private CleaningPathExecutionStartOutcome RefuseStart(string code) => new(false, code, null);
+    private static CleaningPathExecutionStartOutcome RefuseStart(string code) => new(false, code, null);
 
     // ------------------------------------------------------------------------------ points
 
