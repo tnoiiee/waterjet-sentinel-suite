@@ -1,5 +1,47 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Phase 3A Cleaning Path store loading and read-only resolution (2026-10-23; software only).** The
+> Product now loads and validates Owner-local Cleaning Path data and resolves it read-only for later
+> phases, with NO motion, Pump, Isolation-Valve, queue-dispatch or Hardware execution capability.
+> Implemented in Source on branch `arena/108caa24-waterjet-sentinel-suite` from `main`
+> `07077a3077cfb58618fc44fcd9fa155553112b31`, implementation checkpoint `9618a60` (8 files;
+> Owner review/merge pending — never merged at authoring). CHANGED: new domain coordinate contract
+> and immutable snapshot (integer millimetres 0–280 inclusive parsed as decimal; mathematically
+> whole millimetres only — 125/125.0/125.00 accepted, 125.5 refused; native = integerMillimetres ×
+> 10000 with checked overflow; Centre 125/125 mm = 1250000/1250000 native; no rounding, clamping,
+> default or silent correction), a strict complete-file parser/validator (schema identity
+> `wjss.cleaning-path-store/1`; exactly 108 canonical Sensor paths × P1–P6 once each in canonical
+> order; duplicate/unknown/missing identities and properties, wrong types, fractional, negative,
+> above-maximum and overflowing values all refused; every independently discoverable error
+> aggregated as structured Product data — stable code, Sensor/point/coordinate identity, offending
+> value in invariant form, reason, allowed contract; ANY error refuses the whole file and no
+> snapshot is created — no partial path set and no skipped point), an immutable validated snapshot
+> (source `OwnerLocalFile`, schema identity, load timestamp, immutable path map), a bounded
+> read-once store loader named by `WJSS_CLEANING_PATH_STORE` (fully qualified Owner-local file path
+> only; 256 KiB size bound; read once and never written; no location or value disclosure; no
+> deterministic fallback), a pure read-only resolver (canonical/default assigned Water Jet or a
+> validated per-entry Effective-WJ override with provenance; paired IV via WJn ↔ IVn; WSB,
+> controller, H/V axes and brake outputs derived from the canonical Equipment/Motion catalogs only;
+> P1–P6 never change with Effective WJ; invalid resolution refused fail-closed with stable codes and
+> no fallback to another WJ/IV/WSB/axis), a Legacy Actual-Run-shaped migration/validation
+> inspection entry (positional P1–P6; X = Horizontal, Z = Vertical; out-of-range Legacy values
+> reported precisely and never auto-corrected), and focused synthetic tests only. UNCHANGED:
+> canonical Equipment topology, Sensor sequence/count (108; I7/I16 in normal ordinal position),
+> Sensor assignment authority and QueueEntry (the override is request/result data only), Manual
+> Motion, TP/RP acceptance, Home/DP/DE/Jog/Stop/Brake, command plans, Motion Library adapter,
+> Controller reads/writes, motion profiles, Pump/IV behaviour, Safe Return execution, Cleaning Path
+> execution state machine, P1–P6 progression, queue dispatch, AutoSequence, countdown, assignment
+> settings UI, Runtime API/Kiosk, Hardware/native execution, generated files and packages.lock.json.
+> NOT VERIFIED: .NET restore/build/test NOT RUN in the Agent environment (no .NET SDK) — the
+> Owner-local exact-head gate is the validation of record; executed Agent-side validations only:
+> boundary-scan S1–S9 clean (`node tools/boundary-scan/boundary-scan.mjs`) and `git diff --check`
+> clean; no simulation, native load, Controller contact or Hardware use occurred. Phase 3B
+> (parallel independent H/V Moves — Owner-locked design, not implemented in 3A), Phase 3C
+> (Isolation-Valve readiness), Phase 3D (pump-outlet AI-003 readiness) and Phase 3E (Ready Zone
+> 3-stage rules) remain separately gated and untouched. Owner-local restore/build/test: clear
+> `WJSS_CLEANING_PATH_STORE` and all `WJSS_*` / Manual Motion variables first unless a fixture
+> store is intended.
+
 > **WSB1 Manual Motion Phase 1A per-axis operation independence (2026-10-22; software only).** The
 > Manual Motion session lifecycle is now independent per axis on WSB1 A/B/C/D: at most one active
 > operation per axis, and multiple axes may hold active operations during the same interval (for
