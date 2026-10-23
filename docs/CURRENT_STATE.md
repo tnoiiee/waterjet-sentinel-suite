@@ -1,5 +1,60 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Phase 3B Simulation-only parallel-independent Cleaning Path execution foundation (2026-10-23;
+> software only).** The Product now executes an accepted immutable Phase 3A path snapshot through
+> strict ordered points P1–P6 in Simulation only, using the existing typed Manual Motion operations
+> as the sole motion source. For every point the Horizontal and Vertical Moves are independent
+> per-axis operations whose lifecycles may overlap in time (no synchronized Begin, no interpolation,
+> no coordinated trajectory, no guaranteed simultaneous arrival); one point becomes Verified only
+> when BOTH axes report `MOVE_COMPLETED_POSITION_VERIFIED` with final inactive, current and fresh
+> observations, and Pn+1 never starts before both axes verify Pn (no point is skipped or repeated).
+> The failure model captures the original failure unchanged, blocks every later point, stops the
+> remaining active axis exactly once through the typed boundary, supervises it through the existing
+> lifecycle and records the cleanup outcome separately from the original cause. After verified P6
+> the execution ends in the typed state `PATH_COMPLETE_AWAITING_SAFE_RETURN` and exposes a typed
+> handoff only (execution/Sensor/Effective-WJ identity, both axis identities, the fixed Centre
+> contract Horizontal = Vertical = 125 mm = 1250000 native, coordinate-truth and cleanup state) —
+> **no Centre Move is executed, no Pump or Isolation Valve behavior is composed, no Queue or Job is
+> dispatched**. Implemented in Source on branch `arena/d8ed3339-waterjet-sentinel-suite` from
+> `main` `aef2cf0e2ca15c819ba7e35596bd398ae291f7f9` (the PR #38 merge commit), implementation
+> checkpoint `2d9c512` (7 files; Owner review/merge pending — never merged at authoring).
+> CHANGED: application-level Cleaning Path execution contracts (typed per-axis, combined-point and
+> path states; adapter-neutral per-axis outcome vocabulary; immutable execution snapshot with
+> evidence sequence and verified-point ledger; typed post-P6 handoff), a pure deterministic
+> execution coordinator (complete start guards: accepted snapshot and resolver result, exactly
+> P1–P6, native targets within 0–2800000, distinct H/V axes, axes allowed and Move-ready, no
+> unresolved operation; deterministic Horizontal-then-Vertical request order; fail-closed
+> verification — a typed success without the final observations never verifies; abort/close
+> semantics with exactly-once Stop per active axis), a typed Manual Motion boundary adapter over
+> exactly the two resolved axes, a narrowly extended simulated port (optional per-axis
+> simulation-only fault injection: ignored Stop, command fault/refusal, read fault or refusal while
+> moving, mechanical stall, RP divergence — existing behavior unchanged when unset), and focused
+> Runtime Core tests: 4 coordinator tests plus the complete 30-scenario simulation matrix (success
+> paths, per-axis completion order, bounded start skew of at most 2 serialized call slots, Pn+1
+> blocking, one-axis timeout/fault/TP-RP contradiction/stale observation, supervised Stop and
+> stop-not-observed cleanup, brake-apply ordering and refusal, abort/close, refused snapshot and
+> out-of-range target start refusals, override and resolver immutability, unrelated-axis absence,
+> combined evidence, handoff state, no Centre Move, no Pump/IV operation, TP≠RP fail-closed).
+> UNCHANGED: Phase 3A behavior (contracts, parser, store loader, resolver, tests), ManualMotionSession,
+> ManualMotionPort, ManualMotionSnapshot, ManualMotionProfile and every Move acceptance rule
+> (MoveReached, TP/RP acceptance, freshness, sequence, Move/Stop timeouts, brake lifecycle, command
+> rendering, profile semantics), canonical Equipment/Motion topology and catalogs (no copied
+> topology: the execution snapshot carries derived identities for evidence only), QueueEntry,
+> SequencingKernel/ActiveCleaningJobState, Pump/IV contracts and behavior, Safe Return execution,
+> Queue/AutoSequence/countdown, Runtime API/Kiosk/Operations Preview, Motion Library adapter, native
+> adapters, Hardware boundaries, project files, package references, package locks, generated files,
+> Phase 3C–3E, Production behavior. The real Legacy path set (108 paths / 648 points / 1296
+> coordinates; 62 Vertical values above 280 mm on G1–G18) remains converted-but-REFUSED as an
+> Owner-local negative-validation sample: no runtime snapshot exists and Phase 3B executes synthetic
+> accepted paths only. NOT VERIFIED: .NET restore/build/test NOT RUN in the Agent environment (no
+> .NET SDK) — the Owner-local exact-head gate is the validation of record; executed Agent-side
+> validations only: boundary-scan S1–S9 clean, `git diff --check` clean, exact allowlist changed-path
+> proof; no real Owner-local path execution, no Centre return, no Pump/IV composition, no Hardware
+> contact. Owner-local restore/build/test: clear TargetPath, `WJSS_CLEANING_PATH_STORE` and all
+> `WJSS_*` / Manual Motion / fixture / simulator-scenario variables first. Phase 3B remains
+> SUBMITTED FOR OWNER REVIEW; the Mandatory Safe Return motion lifecycle (Centre return) and
+> Phase 3C/3D/3E remain separately gated.
+
 > **Phase 3A Cleaning Path store loading and read-only resolution (2026-10-23; software only).** The
 > Product now loads and validates Owner-local Cleaning Path data and resolves it read-only for later
 > phases, with NO motion, Pump, Isolation-Valve, queue-dispatch or Hardware execution capability.
