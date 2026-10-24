@@ -18,6 +18,15 @@ namespace Wjss.Runtime.Core.Tests;
 
 public sealed class CleaningPathCompositionLifecycleTests
 {
+    private static readonly string[] ExpectedEquipmentBoundaryMemberNames =
+    {
+        "ReadLowerLimitDetected",
+        "ReadPumpOutletPressure",
+        "ReadUpperLimitDetected",
+        "ReadValveOutletPressure",
+        "RequestValve",
+    };
+
     private static CleaningPathCompositionHarness RunAcceptedOpenHarness(
         string assignedWaterJetId = "WJ4",
         string assignedIsolationValveId = "IV4",
@@ -202,16 +211,7 @@ public sealed class CleaningPathCompositionLifecycleTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(
-            new[]
-            {
-                "ReadLowerLimitDetected",
-                "ReadPumpOutletPressure",
-                "ReadUpperLimitDetected",
-                "ReadValveOutletPressure",
-                "RequestValve",
-            },
-            names);
+        Assert.Equal(ExpectedEquipmentBoundaryMemberNames, names);
 
         // The only command member is the typed paired-IV request: no Pump start, stop or output
         // command exists anywhere in the typed equipment contract.
