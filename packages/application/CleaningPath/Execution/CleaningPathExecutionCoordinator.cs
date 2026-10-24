@@ -201,6 +201,7 @@ public sealed class CleaningPathExecutionCoordinator
         }
 
         _status = CleaningPathExecutionStatus.Aborting;
+        _failureCode ??= CleaningPathExecutionCodes.PathAborted;
         Record(CleaningPathExecutionCodes.KindAbortRequested, CleaningPathExecutionCodes.PathAborted, null, null, null);
         StopRemainingActiveAxes();
         Publish();
@@ -216,6 +217,7 @@ public sealed class CleaningPathExecutionCoordinator
 
         _closeRequested = true;
         _status = CleaningPathExecutionStatus.Closing;
+        _failureCode ??= CleaningPathExecutionCodes.PathClosed;
         Record(CleaningPathExecutionCodes.KindCloseRequested, CleaningPathExecutionCodes.PathClosed, null, null, null);
         StopRemainingActiveAxes();
         _boundary.RequestClose();
@@ -388,12 +390,18 @@ public sealed class CleaningPathExecutionCoordinator
 
     private void OnPointFailure(string failureCode, string? sourceCode, AxisState cause)
     {
-        // The original failure is captured exactly once and is never overwritten by cleanup.
+        // The original failure is captured exactly once and is never overwritten by cleanup. An
+        // already-established requested path cause (PATH_ABORTED or PATH_CLOSED) is likewise never
+        // overwritten: a subordinate cancellation outcome stays typed per-axis evidence only.
         if (!_failureHandled)
         {
             _failureHandled = true;
-            _failureCode = failureCode;
-            _failureSourceCode = sourceCode;
+            if (_failureCode is null)
+            {
+                _failureCode = failureCode;
+                _failureSourceCode = sourceCode;
+            }
+
             Record(CleaningPathExecutionCodes.KindPointFailed, failureCode, CurrentPointId, cause.Role, sourceCode);
         }
 

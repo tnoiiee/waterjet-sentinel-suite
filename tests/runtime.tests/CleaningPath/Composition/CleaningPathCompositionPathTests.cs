@@ -146,8 +146,21 @@ public sealed class CleaningPathCompositionPathTests
     [Fact]
     public void Primary_Failure_Separate_From_Motion_And_Valve_Cleanup()
     {
-        var harness = RunAcceptedOpenHarness();
+        // The Vertical Move timeout is materially shorter than the unchanged default Horizontal
+        // Move timeout (500 ms against 20000 ms), so it becomes the first primary failure while a
+        // stalled Horizontal axis is still active and genuinely requires the exactly-once Stop.
+        var harness = new CleaningPathCompositionHarness(verticalMoveTimeoutMilliseconds: 500);
+        Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
+        harness.Equipment.UpperLimitDetected = true;
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
         harness.DriveUntil(() => harness.Composition.Current!.CurrentPointId == JobPhase.P2);
+
+        // Both P2 operations are already requested but not yet processed by the next boundary
+        // step: stalling both resolved axes (C = Horizontal, D = Vertical) keeps the Horizontal
+        // axis active until the shorter Vertical Move timeout fires first (MOVE_TIMEOUT).
+        harness.Port.ConfigureAxisSimulationOptions(
+            ManualMotionAxis.C,
+            new ManualMotionAxisSimulationOptions { MotionStalled = true });
         harness.Port.ConfigureAxisSimulationOptions(
             ManualMotionAxis.D,
             new ManualMotionAxisSimulationOptions { MotionStalled = true });
