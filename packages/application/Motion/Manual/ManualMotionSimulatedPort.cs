@@ -50,6 +50,47 @@ public sealed class ManualMotionSimulationOptions
 
     /// <summary>After this many port calls, the port generation advances so later results are stale for the session.</summary>
     public int? InvalidateGenerationAfterCalls { get; init; }
+
+    /// <summary>Optional per-axis overrides for Axis A; null keeps the global option behavior.</summary>
+    public ManualMotionAxisSimulationOptions? AxisA { get; init; }
+
+    /// <summary>Optional per-axis overrides for Axis B; null keeps the global option behavior.</summary>
+    public ManualMotionAxisSimulationOptions? AxisB { get; init; }
+
+    /// <summary>Optional per-axis overrides for Axis C; null keeps the global option behavior.</summary>
+    public ManualMotionAxisSimulationOptions? AxisC { get; init; }
+
+    /// <summary>Optional per-axis overrides for Axis D; null keeps the global option behavior.</summary>
+    public ManualMotionAxisSimulationOptions? AxisD { get; init; }
+}
+
+/// <summary>
+/// Narrow per-axis fault-injection options for the simulated port (Phase 3B simulation scenarios).
+/// Every member is optional and simulation-only: an absent member keeps the global option behavior,
+/// and no value here is ever a commissioned value — the record is synthetic test data only.
+/// </summary>
+public sealed class ManualMotionAxisSimulationOptions
+{
+    /// <summary>When true, a typed Stop for this axis is accepted but ignored (the axis keeps moving).</summary>
+    public bool StopIgnored { get; init; }
+
+    /// <summary>When set, a command of this kind dispatched to this axis reports a simulated fault.</summary>
+    public ManualMotionPortCommandKind? FaultOnCommand { get; init; }
+
+    /// <summary>When set, a command of this kind dispatched to this axis is refused (not a fault).</summary>
+    public ManualMotionPortCommandKind? RefuseCommand { get; init; }
+
+    /// <summary>When true, reads of this axis report a simulated fault while a Position Move is engaged on it (never during Home or other lifecycles).</summary>
+    public bool FaultOnReadWhileMoving { get; init; }
+
+    /// <summary>When set, reads of this kind on this axis are refused while a Position Move is engaged on it (previous values go stale).</summary>
+    public ManualMotionReadKind? RefuseReadKindWhileMoving { get; init; }
+
+    /// <summary>When true, this axis never physically advances during a Position Move (a mechanical stall); supervision times out. Home and Jog are unaffected.</summary>
+    public bool MotionStalled { get; init; }
+
+    /// <summary>Synthetic RP divergence added to this axis's RP reads only (TP remains the physical position).</summary>
+    public decimal RpBias { get; init; }
 }
 
 /// <summary>
@@ -124,10 +165,10 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
 
         _clock = clock;
         _options = options ?? new ManualMotionSimulationOptions();
-        _axisA = new SimulatedAxis(profile.AxisA, 1, _options.StartPositionA);
-        _axisB = new SimulatedAxis(profile.AxisB, 2, _options.StartPositionB);
-        _axisC = new SimulatedAxis(profile.AxisC, 3, _options.StartPositionC);
-        _axisD = new SimulatedAxis(profile.AxisD, 4, _options.StartPositionD);
+        _axisA = new SimulatedAxis(profile.AxisA, 1, _options.StartPositionA, _options.AxisA);
+        _axisB = new SimulatedAxis(profile.AxisB, 2, _options.StartPositionB, _options.AxisB);
+        _axisC = new SimulatedAxis(profile.AxisC, 3, _options.StartPositionC, _options.AxisC);
+        _axisD = new SimulatedAxis(profile.AxisD, 4, _options.StartPositionD, _options.AxisD);
 
         // Every simulated brake starts in its APPLY state, for either release polarity: with a
         // clear-output release the apply state is the SET output, so a zeroed output array would
@@ -215,6 +256,17 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             CountCall();
             _executed.Add(command);
 
+            var axisOptions = AxisOptionsOf(command.Axis);
+            if (axisOptions?.FaultOnCommand is ManualMotionPortCommandKind axisFault && axisFault == command.Kind)
+            {
+                return new ManualMotionPortCommandResult(false, true, true, CodeFault, _generation);
+            }
+
+            if (axisOptions?.RefuseCommand is ManualMotionPortCommandKind axisRefuse && axisRefuse == command.Kind)
+            {
+                return new ManualMotionPortCommandResult(false, false, true, CodeRefused, _generation);
+            }
+
             if (_options.FaultOnCommand == command.Kind)
             {
                 return new ManualMotionPortCommandResult(false, true, true, CodeFault, _generation);
@@ -244,6 +296,19 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
 
             Advance(_clock.UtcNow);
             CountCall();
+
+            var axisOptions = AxisOptionsOf(read.Axis);
+            if (axisOptions?.FaultOnReadWhileMoving == true && AxisOf(read.Axis)?.PositionMoveEngaged == true)
+            {
+                return new ManualMotionPortReadResult(false, true, 0m, CodeFault, _generation);
+            }
+
+            if (axisOptions?.RefuseReadKindWhileMoving is ManualMotionReadKind axisRefuse
+                && axisRefuse == read.Kind
+                && AxisOf(read.Axis)?.PositionMoveEngaged == true)
+            {
+                return new ManualMotionPortReadResult(false, false, 0m, CodeReadRefused, _generation);
+            }
 
             if (_options.FaultReadAfterCount is int limit && _successfulReads >= limit)
             {
@@ -295,6 +360,30 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         _ => null,
     };
 
+    private ManualMotionAxisSimulationOptions? AxisOptionsOf(ManualMotionAxis axis) => AxisOf(axis)?.Options;
+
+    /// <summary>
+    /// Replaces (or clears) the per-axis simulation options of one axis. Simulation-only delayed
+    /// activation seam: a test double may run Open and Home with the default behavior and activate
+    /// Phase 3B scenario options afterwards, before the intended Position Move requests. Absent
+    /// per-axis options preserve every existing behavior; nothing here is ever a commissioned
+    /// value and no Hardware or native path is touched.
+    /// </summary>
+    public void ConfigureAxisSimulationOptions(ManualMotionAxis axis, ManualMotionAxisSimulationOptions? options)
+    {
+        var simulatedAxis = AxisOf(axis);
+        if (simulatedAxis is null)
+        {
+            return;
+        }
+
+        simulatedAxis.Options = options;
+        simulatedAxis.PositionMoveEngaged = false;
+    }
+
+    private bool StopIgnoredFor(ManualMotionAxis axis) =>
+        AxisOptionsOf(axis)?.StopIgnored == true || _options.StopIgnored;
+
     private bool Apply(ManualMotionPortCommand command)
     {
         var axis = AxisOf(command.Axis);
@@ -323,26 +412,30 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
 
                 axis.JogSpeed = command.Operand;
                 axis.Armed = SimulatedMode.Jog;
+                axis.PositionMoveEngaged = false;
                 return true;
 
             case ManualMotionPortCommandKind.Begin:
                 return Begin(axis);
 
             case ManualMotionPortCommandKind.Stop:
-                if (!_options.StopIgnored)
+                if (!StopIgnoredFor(command.Axis))
                 {
                     axis.Mode = SimulatedMode.Idle;
                     axis.Armed = SimulatedMode.Idle;
+                    axis.PositionMoveEngaged = false;
                 }
 
                 return true;
 
             case ManualMotionPortCommandKind.HomeSpeed:
                 axis.HomeSpeed = command.Operand;
+                axis.PositionMoveEngaged = false;
                 return command.Operand > 0;
 
             case ManualMotionPortCommandKind.Home:
                 axis.Armed = SimulatedMode.Home;
+                axis.PositionMoveEngaged = false;
                 return true;
 
             case ManualMotionPortCommandKind.DefinePositionZero:
@@ -356,9 +449,11 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                     axis.Offset = axis.Physical;
                 }
 
+                axis.PositionMoveEngaged = false;
                 return true;
 
             case ManualMotionPortCommandKind.DefineDualZero:
+                axis.PositionMoveEngaged = false;
                 return axis.Mode == SimulatedMode.Idle;
 
             case ManualMotionPortCommandKind.Acceleration:
@@ -390,14 +485,17 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         {
             case SimulatedMode.Jog:
                 axis.Mode = SimulatedMode.Jog;
+                axis.PositionMoveEngaged = false;
                 break;
             case SimulatedMode.Position:
                 axis.PhysicalTarget = axis.PendingTarget + axis.Offset;
                 axis.Mode = SimulatedMode.Position;
+                axis.PositionMoveEngaged = true;
                 break;
             case SimulatedMode.Home:
                 axis.PhysicalTarget = _options.HomeSwitchPosition;
                 axis.Mode = SimulatedMode.Home;
+                axis.PositionMoveEngaged = false;
                 break;
             default:
                 return false;
@@ -420,6 +518,14 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         var elapsed = now - axis.LastUpdate;
         axis.LastUpdate = now;
         if (elapsed <= TimeSpan.Zero || axis.Mode == SimulatedMode.Idle || !BrakeReleased(axis))
+        {
+            return;
+        }
+
+        // A per-axis mechanical stall of a Position Move: the axis is commanded and reported busy,
+        // but never physically advances, so every completion condition fails closed and supervision
+        // times out. Home and Jog progression are never affected.
+        if (axis.Options?.MotionStalled == true && axis.Mode == SimulatedMode.Position)
         {
             return;
         }
@@ -489,8 +595,14 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 return true;
 
             case ManualMotionReadKind.PositionTp:
-            case ManualMotionReadKind.PositionRp:
                 value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero);
+                return true;
+
+            case ManualMotionReadKind.PositionRp:
+                // The optional per-axis bias makes RP disagree with TP deterministically (a TP/RP
+                // contradiction scenario); with no bias RP equals TP exactly as before.
+                value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero)
+                    + (axis.Options?.RpBias ?? 0m);
                 return true;
 
             case ManualMotionReadKind.BrakeOutputState:
@@ -528,8 +640,13 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
 
     private sealed class SimulatedAxis
     {
-        public SimulatedAxis(ManualMotionAxisProfile? profile, int defaultBrakeOutput, decimal startPosition)
+        public SimulatedAxis(
+            ManualMotionAxisProfile? profile,
+            int defaultBrakeOutput,
+            decimal startPosition,
+            ManualMotionAxisSimulationOptions? options = null)
         {
+            Options = options;
             BrakeOutput = profile?.BrakeOutput ?? defaultBrakeOutput;
             ReleaseAction = profile?.BrakeReleaseAction ?? ManualMotionBrakeReleaseAction.SetOutput;
             MotionBit = profile?.MotionStatusBit ?? SyntheticMotionBit;
@@ -539,6 +656,15 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             HomeActiveValue = profile?.HomeActiveValue ?? 1;
             Physical = startPosition;
         }
+
+        public ManualMotionAxisSimulationOptions? Options { get; set; }
+
+        /// <summary>
+        /// True from the Begin of a Position Move until an effective Stop, Home, Jog or zero
+        /// definition re-primitives the axis: the Phase 3B read options apply to the whole Move
+        /// operation (including a parked-but-unverified state), never to Home or other lifecycles.
+        /// </summary>
+        public bool PositionMoveEngaged { get; set; }
 
         public int BrakeOutput { get; }
 
