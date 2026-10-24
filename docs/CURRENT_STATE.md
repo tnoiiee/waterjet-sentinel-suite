@@ -1,5 +1,37 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Phase 3C Pump-ready and paired-Isolation-Valve Simulation composition (2026-10-25; software
+> only).** The Product now composes the accepted immutable Phase 3A resolution, the canonical
+> Equipment / Motion derivations, one AI-003 Pump Outlet Pressure readiness gate and the paired
+> Isolation Valve (WJn to IVn) around the existing typed Phase 3B execution coordinator (composed,
+> never duplicated): before P1 a valid AI-003 Pump Outlet observation must satisfy the existing
+> strict Pump-ready rule (pressure strictly greater than the configured setpoint; 15.00 bar is not
+> ready, 15.01 bar is ready) or the start is refused fail-closed with the exact pressure-quality and
+> source evidence preserved (AI-002 Pump Inlet is diagnostic/trend only and can never satisfy the
+> gate); P1 runs through the unchanged Phase 3B dual-axis execution; only when BOTH axes verify P1
+> is the paired IV commanded open and supervised through the existing Sequencing pressure / Valve
+> classifier (Upper limit + paired-IV outlet pressure + Low/High thresholds + supervision window;
+> existing threshold-edge semantics preserved unchanged); P2 through P6 start only after the
+> accepted open result through the new optional typed point-advance gate (a null gate preserves the
+> standalone Phase 3B behavior exactly); after dual-verified P6 the paired IV is commanded closed
+> and its classification is recorded for the Mandatory Safe Return phase. Every terminal publishes a
+> typed Mandatory Safe Return handoff: the success terminal is
+> `PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` (path and paired-IV sequence completed,
+> awaiting Mandatory Safe Return — never a completed Cleaning Job, never a completed Safe Return);
+> failure terminals preserve the first primary cause unchanged, block every later point, stop the
+> remaining active axis exactly once through the Phase 3B boundary, fence the paired IV closed when
+> it may be open or unknown, and record motion cleanup and Valve cleanup separately; Abort and
+> Close never begin the next point and preserve the requested terminal cause. **No Centre Move is
+> commanded, no Pump command exists in this scope, no Queue / AutoSequence / Kiosk / Runtime API
+> control is connected, no hardware or native path is referenced and no Physical behavior is
+> claimed.** Implemented in Source on branch `arena/3995906c-waterjet-sentinel-suite` from `main`
+> `696e135cce01bdc1ec34328f973bbd5ef4aed71a` (the PR #39 merge commit, merge tree `e962c499`),
+> implementation checkpoint `a893671` (10 files: 2 narrow additive Phase 3B seams + 8 new
+> composition contracts / coordinator / harness / 57 focused tests across Pump gate, paired-IV
+> open, P2–P6 gating, P6 / close and lifecycle / authority matrices; Owner review/merge pending —
+> never merged at authoring). Owner-local executable validation, Simulation Manual Review, Hardware
+> behavior, Production behavior and merge readiness are NOT VERIFIED. NO HARDWARE. NO PRODUCTION.
+
 > **Phase 3B Simulation-only parallel-independent Cleaning Path execution foundation (2026-10-23;
 > software only).** The Product now executes an accepted immutable Phase 3A path snapshot through
 > strict ordered points P1–P6 in Simulation only, using the existing typed Manual Motion operations

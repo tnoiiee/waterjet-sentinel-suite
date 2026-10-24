@@ -56,13 +56,19 @@ public sealed class CleaningPathExecutionCoordinator
     private bool _started;
     private bool _failureHandled;
     private bool _closeRequested;
+    private readonly ICleaningPathPointAdvanceGate? _pointAdvanceGate;
+    private bool _pointAdvancePending;
 
-    public CleaningPathExecutionCoordinator(ICleaningPathMotionBoundary boundary, IClock clock)
+    public CleaningPathExecutionCoordinator(
+        ICleaningPathMotionBoundary boundary,
+        IClock clock,
+        ICleaningPathPointAdvanceGate? pointAdvanceGate = null)
     {
         ArgumentNullException.ThrowIfNull(boundary);
         ArgumentNullException.ThrowIfNull(clock);
         _boundary = boundary;
         _clock = clock;
+        _pointAdvanceGate = pointAdvanceGate;
     }
 
     /// <summary>The immutable execution snapshot republished after every step (null before Start).</summary>
@@ -153,6 +159,7 @@ public sealed class CleaningPathExecutionCoordinator
         _resolution = resolution;
         _targets = targets;
         _started = true;
+        _status = CleaningPathExecutionStatus.Running;
         _startedAt = _clock.UtcNow;
         _executionId = "CPX" + Interlocked.Increment(ref _executionCounter).ToString(CultureInfo.InvariantCulture);
         _horizontal = new AxisState(CleaningPathExecutionRole.Horizontal, resolved.HorizontalAxisId, resolved.HorizontalBrakeOutputId);
@@ -194,6 +201,7 @@ public sealed class CleaningPathExecutionCoordinator
         }
 
         _status = CleaningPathExecutionStatus.Aborting;
+        _failureCode ??= CleaningPathExecutionCodes.PathAborted;
         Record(CleaningPathExecutionCodes.KindAbortRequested, CleaningPathExecutionCodes.PathAborted, null, null, null);
         StopRemainingActiveAxes();
         Publish();
@@ -209,6 +217,7 @@ public sealed class CleaningPathExecutionCoordinator
 
         _closeRequested = true;
         _status = CleaningPathExecutionStatus.Closing;
+        _failureCode ??= CleaningPathExecutionCodes.PathClosed;
         Record(CleaningPathExecutionCodes.KindCloseRequested, CleaningPathExecutionCodes.PathClosed, null, null, null);
         StopRemainingActiveAxes();
         _boundary.RequestClose();
@@ -381,12 +390,18 @@ public sealed class CleaningPathExecutionCoordinator
 
     private void OnPointFailure(string failureCode, string? sourceCode, AxisState cause)
     {
-        // The original failure is captured exactly once and is never overwritten by cleanup.
+        // The original failure is captured exactly once and is never overwritten by cleanup. An
+        // already-established requested path cause (PATH_ABORTED or PATH_CLOSED) is likewise never
+        // overwritten: a subordinate cancellation outcome stays typed per-axis evidence only.
         if (!_failureHandled)
         {
             _failureHandled = true;
-            _failureCode = failureCode;
-            _failureSourceCode = sourceCode;
+            if (_failureCode is null)
+            {
+                _failureCode = failureCode;
+                _failureSourceCode = sourceCode;
+            }
+
             Record(CleaningPathExecutionCodes.KindPointFailed, failureCode, CurrentPointId, cause.Role, sourceCode);
         }
 
@@ -432,6 +447,12 @@ public sealed class CleaningPathExecutionCoordinator
         if (_failureHandled)
         {
             FinalizeFailure();
+            return;
+        }
+
+        if (_pointAdvancePending)
+        {
+            TryStartPendingPoint();
             return;
         }
 
@@ -546,7 +567,31 @@ public sealed class CleaningPathExecutionCoordinator
             return;
         }
 
-        StartPoint(_currentPointIndex + 1);
+        _pointAdvancePending = true;
+        TryStartPendingPoint();
+    }
+
+    /// <summary>
+    /// Starts the next point when the optional composed-execution gate allows it; otherwise the
+    /// coordinator holds between verified points and requests no Move. A null gate allows the
+    /// advance immediately, preserving the standalone Phase 3B behavior.
+    /// </summary>
+    private void TryStartPendingPoint()
+    {
+        if (!_pointAdvancePending || Result is not null)
+        {
+            return;
+        }
+
+        var nextIndex = _currentPointIndex + 1;
+        if (_pointAdvanceGate is not null
+            && !_pointAdvanceGate.PointStartAllowed(_targets[nextIndex].PointId))
+        {
+            return;
+        }
+
+        _pointAdvancePending = false;
+        StartPoint(nextIndex);
     }
 
     private void FinalizeFailure()
@@ -565,8 +610,14 @@ public sealed class CleaningPathExecutionCoordinator
         if (_status is CleaningPathExecutionStatus.Aborting or CleaningPathExecutionStatus.Closing)
         {
             FinalizeCleanup();
-            _pointState = CleaningPathPointState.Failed;
-            _finishedPoints.Add(BuildPointRecord(CleaningPathPointState.Failed));
+            if (_pointState != CleaningPathPointState.Verified)
+            {
+                // A held, already-verified point is never re-recorded as failed: an Abort or Close
+                // between gated points is a path-level terminal cause, not a point failure.
+                _pointState = CleaningPathPointState.Failed;
+                _finishedPoints.Add(BuildPointRecord(CleaningPathPointState.Failed));
+            }
+
             _status = CleaningPathExecutionStatus.PathFailed;
             if (_failureCode is null)
             {

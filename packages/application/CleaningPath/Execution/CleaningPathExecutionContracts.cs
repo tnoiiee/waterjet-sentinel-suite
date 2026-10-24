@@ -334,3 +334,17 @@ public interface ICleaningPathMotionBoundary
     /// <summary>Advances the underlying session by one driver step (one serialized port call at most).</summary>
     void Step();
 }
+
+/// <summary>
+/// Optional typed point-advance gate for composed executions (Phase 3C composition). The execution
+/// coordinator consults it before starting any point after the first: while it withholds allowance
+/// the coordinator holds between verified points and requests no Move. A null gate preserves the
+/// standalone Phase 3B behavior exactly (the next point starts immediately after both axes verify
+/// the current one). The gate never observes or mutates motion state and never extends the
+/// P1–P6 point set.
+/// </summary>
+public interface ICleaningPathPointAdvanceGate
+{
+    /// <summary>True when the coordinator may request the two Moves of the next point.</summary>
+    bool PointStartAllowed(JobPhase pointId);
+}
