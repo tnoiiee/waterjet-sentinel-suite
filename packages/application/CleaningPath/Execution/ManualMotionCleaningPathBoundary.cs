@@ -18,6 +18,13 @@ public sealed class ManualMotionCleaningPathBoundary : ICleaningPathMotionBounda
     private readonly ManualMotionAxis _horizontal;
     private readonly ManualMotionAxis _vertical;
     private long _lastDrainedLogSequence;
+    private bool _windowActive;
+    private CleaningPathMotionOutcome _horizontalOutcome = CleaningPathMotionOutcome.None;
+    private string? _horizontalOutcomeSource;
+    private CleaningPathMotionOutcome _verticalOutcome = CleaningPathMotionOutcome.None;
+    private string? _verticalOutcomeSource;
+    private bool _horizontalMoveStartedInWindow;
+    private bool _verticalMoveStartedInWindow;
 
     public ManualMotionCleaningPathBoundary(ManualMotionSession session, string horizontalAxisId, string verticalAxisId)
     {
@@ -25,6 +32,38 @@ public sealed class ManualMotionCleaningPathBoundary : ICleaningPathMotionBounda
         _session = session;
         _horizontal = AxisFor(horizontalAxisId);
         _vertical = AxisFor(verticalAxisId);
+    }
+
+    /// <inheritdoc/>
+    public bool BeginExecutionEvidenceWindow()
+    {
+        var snapshot = _session.Snapshot;
+        if (snapshot.State is ManualMotionSessionState.Faulted or ManualMotionSessionState.Closed or ManualMotionSessionState.Closing)
+        {
+            return false;
+        }
+
+        // The current log sequence becomes the historical baseline: every earlier entry remains in
+        // the Manual Motion history unchanged, but no earlier entry can reach this execution and no
+        // sticky per-axis outcome that existed before this point can be adopted as a Move result.
+        var baseline = _lastDrainedLogSequence;
+        foreach (var entry in snapshot.Log)
+        {
+            if (entry.Sequence > baseline)
+            {
+                baseline = entry.Sequence;
+            }
+        }
+
+        _lastDrainedLogSequence = baseline;
+        _horizontalOutcome = CleaningPathMotionOutcome.None;
+        _horizontalOutcomeSource = null;
+        _verticalOutcome = CleaningPathMotionOutcome.None;
+        _verticalOutcomeSource = null;
+        _horizontalMoveStartedInWindow = false;
+        _verticalMoveStartedInWindow = false;
+        _windowActive = true;
+        return true;
     }
 
     /// <inheritdoc/>
@@ -98,8 +137,8 @@ public sealed class ManualMotionCleaningPathBoundary : ICleaningPathMotionBounda
             role,
             moveActive,
             stopRequested,
-            OutcomeFor(axis.LastOutcomeCode),
-            axis.LastOutcomeCode.Length == 0 ? null : axis.LastOutcomeCode,
+            ScopedOutcomeFor(role),
+            ScopedOutcomeSourceFor(role),
             MotionFor(axis.Motion),
             axis.PositionTp.Value,
             axis.PositionRp.Value,
@@ -113,8 +152,13 @@ public sealed class ManualMotionCleaningPathBoundary : ICleaningPathMotionBounda
     /// <inheritdoc/>
     public IReadOnlyList<CleaningPathMotionEvent> DrainEvents()
     {
-        var snapshot = _session.Snapshot;
         var drained = new List<CleaningPathMotionEvent>();
+        if (!_windowActive)
+        {
+            return drained;
+        }
+
+        var snapshot = _session.Snapshot;
         foreach (var entry in snapshot.Log)
         {
             if (entry.Sequence <= _lastDrainedLogSequence)
@@ -122,22 +166,121 @@ public sealed class ManualMotionCleaningPathBoundary : ICleaningPathMotionBounda
                 continue;
             }
 
+            // Sequence is consumed for every later entry (the Manual Motion history is never
+            // deleted or rewritten); only execution-relevant evidence is published.
             _lastDrainedLogSequence = entry.Sequence;
             if (RoleFor(entry.Axis) is not CleaningPathExecutionRole role)
             {
                 continue;
             }
 
+            var outcome = OutcomeFor(entry.Code);
+            if (!IsExecutionEvidence(entry.Operation, outcome))
+            {
+                continue;
+            }
+
+            UpdateScopedOutcome(role, outcome, entry.Code, entry.Operation);
             drained.Add(new CleaningPathMotionEvent(
                 entry.Sequence,
                 entry.At,
                 role,
-                OutcomeFor(entry.Code),
+                outcome,
                 entry.Code));
         }
 
+        ApplySessionFaultFallback();
         return drained;
     }
+
+    /// <summary>
+    /// Execution-relevant evidence is Move lifecycle evidence, Stop lifecycle evidence used to
+    /// supervise or clean up a Move, and session-fault evidence attributable to the active
+    /// execution. Historical or unrelated operation kinds (Home, Jog, zero definitions, standalone
+    /// brake or pre-execution Stops) are never published to the Cleaning Path execution.
+    /// </summary>
+    private static bool IsExecutionEvidence(ManualMotionOperationKind operation, CleaningPathMotionOutcome outcome) =>
+        operation is ManualMotionOperationKind.Move
+            or ManualMotionOperationKind.Stop
+            || (operation == ManualMotionOperationKind.None
+                && outcome is CleaningPathMotionOutcome.CommunicationFault
+                    or CleaningPathMotionOutcome.StaleResultRejected
+                    or CleaningPathMotionOutcome.SessionFaulted);
+
+    private void UpdateScopedOutcome(CleaningPathExecutionRole role, CleaningPathMotionOutcome outcome, string sourceCode, ManualMotionOperationKind operation)
+    {
+        if (operation == ManualMotionOperationKind.Move)
+        {
+            if (role == CleaningPathExecutionRole.Horizontal)
+            {
+                _horizontalMoveStartedInWindow = true;
+            }
+            else
+            {
+                _verticalMoveStartedInWindow = true;
+            }
+        }
+
+        if (role == CleaningPathExecutionRole.Horizontal)
+        {
+            _horizontalOutcome = outcome;
+            _horizontalOutcomeSource = sourceCode;
+        }
+        else
+        {
+            _verticalOutcome = outcome;
+            _verticalOutcomeSource = sourceCode;
+        }
+    }
+
+    /// <summary>
+    /// A session-wide fault terminates every active operation and attributes one logged entry only;
+    /// the other active axis's sticky code was overwritten by the fault but produced no entry. That
+    /// axis's current-Move outcome may adopt the fault result only while the window is active, its
+    /// Move was started inside the window, the session is faulted and the sticky code maps to a
+    /// fault outcome — never a historical Home or pre-window result.
+    /// </summary>
+    private void ApplySessionFaultFallback()
+    {
+        if (!_windowActive || !SessionFaulted)
+        {
+            return;
+        }
+
+        if (_horizontalMoveStartedInWindow
+            && _horizontalOutcome is CleaningPathMotionOutcome.OperationStarted or CleaningPathMotionOutcome.None)
+        {
+            var sticky = AxisSnapshot(CleaningPathExecutionRole.Horizontal)?.LastOutcomeCode ?? string.Empty;
+            var stickyOutcome = OutcomeFor(sticky);
+            if (stickyOutcome is CleaningPathMotionOutcome.CommunicationFault
+                or CleaningPathMotionOutcome.StaleResultRejected
+                or CleaningPathMotionOutcome.SessionFaulted)
+            {
+                _horizontalOutcome = stickyOutcome;
+                _horizontalOutcomeSource = sticky;
+            }
+        }
+
+        if (_verticalMoveStartedInWindow
+            && _verticalOutcome is CleaningPathMotionOutcome.OperationStarted or CleaningPathMotionOutcome.None)
+        {
+            var sticky = AxisSnapshot(CleaningPathExecutionRole.Vertical)?.LastOutcomeCode ?? string.Empty;
+            var stickyOutcome = OutcomeFor(sticky);
+            if (stickyOutcome is CleaningPathMotionOutcome.CommunicationFault
+                or CleaningPathMotionOutcome.StaleResultRejected
+                or CleaningPathMotionOutcome.SessionFaulted)
+            {
+                _verticalOutcome = stickyOutcome;
+                _verticalOutcomeSource = sticky;
+            }
+        }
+    }
+
+    private CleaningPathMotionOutcome ScopedOutcomeFor(CleaningPathExecutionRole role) =>
+        role == CleaningPathExecutionRole.Horizontal ? _horizontalOutcome : _verticalOutcome;
+
+    private string? ScopedOutcomeSourceFor(CleaningPathExecutionRole role) =>
+        role == CleaningPathExecutionRole.Horizontal ? _horizontalOutcomeSource : _verticalOutcomeSource;
 
     /// <inheritdoc/>
     public void RequestMove(CleaningPathExecutionRole role, int targetNative) =>

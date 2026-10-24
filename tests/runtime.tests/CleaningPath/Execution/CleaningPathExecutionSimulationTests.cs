@@ -671,3 +671,241 @@ public sealed class CleaningPathExecutionSimulationTests
         Assert.Null(result.Handoff);
     }
 }
+
+/// <summary>
+/// Focused regression coverage for the three proven Phase 3B integration defect classes: the
+/// missing Cleaning Path execution evidence window, sticky prior-axis outcomes not fenced from the
+/// current Move, and per-axis simulation options activated before Home. The original 30 simulation
+/// scenarios and 4 coordinator tests remain unchanged; these cases pin the repaired contracts.
+/// Simulation only; every value is synthetic; a simulated result is never hardware evidence.
+///
+/// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
+/// </summary>
+public sealed class CleaningPathExecutionRegressionTests
+{
+    private const string HomeCompletionCode = "HOME_COMPLETED_ZERO_VERIFIED";
+
+    private static ManualMotionAxisSnapshot AxisOf(CleaningPathExecutionHarness harness, ManualMotionAxis axis)
+    {
+        foreach (var candidate in harness.Session.Snapshot.Axes)
+        {
+            if (candidate.Axis == axis)
+            {
+                return candidate;
+            }
+        }
+
+        throw new InvalidOperationException("the expected axis is not present in the session snapshot");
+    }
+
+    private static CleaningPathExecutionResult RunToCompletion(CleaningPathExecutionHarness harness)
+    {
+        harness.OpenAndObserve();
+        harness.HomeRoles();
+        Assert.True(harness.Start().Started);
+        harness.DriveUntilTerminal();
+        return harness.Coordinator.Result!;
+    }
+
+    // 1 — HOME EVENT WINDOW
+    [Fact]
+    public void Home_Evidence_Is_Never_Published_As_Execution_Move_Evidence()
+    {
+        var harness = new CleaningPathExecutionHarness();
+        var result = RunToCompletion(harness);
+
+        Assert.Equal(CleaningPathExecutionStatus.PathCompleteAwaitingSafeReturn, result.Status);
+        foreach (var executionEvent in result.Events)
+        {
+            Assert.DoesNotContain(HomeCompletionCode, executionEvent.SourceCode ?? string.Empty);
+        }
+
+        Assert.Equal(12, result.Events.Count(e => e.Kind == CleaningPathExecutionCodes.KindMoveAccepted));
+        Assert.All(
+            result.Events.Where(e => e.Kind == CleaningPathExecutionCodes.KindMoveAccepted),
+            e => Assert.Equal("OPERATION_STARTED", e.SourceCode));
+    }
+
+    // 2 — STICKY HOME OUTCOME
+    [Fact]
+    public void Sticky_Home_Outcome_Is_Fenced_From_P1_Move()
+    {
+        var harness = new CleaningPathExecutionHarness();
+        harness.OpenAndObserve();
+        harness.HomeRoles();
+
+        // The session intentionally keeps the historical Home result on both axes.
+        Assert.Equal(HomeCompletionCode, AxisOf(harness, ManualMotionAxis.C).LastOutcomeCode);
+        Assert.Equal(HomeCompletionCode, AxisOf(harness, ManualMotionAxis.D).LastOutcomeCode);
+
+        Assert.True(harness.Start().Started);
+        harness.Drive(8);
+
+        // The execution-scoped outcome knows only the current Move; the sticky Home result can
+        // never be adopted as the P1 Move outcome, and the session history is left unchanged.
+        Assert.True(
+            harness.Boundary.Frame(CleaningPathExecutionRole.Horizontal).LastOutcome
+                is CleaningPathMotionOutcome.None
+                or CleaningPathMotionOutcome.OperationStarted,
+            "a historical Home outcome must never appear as the current Move outcome");
+        Assert.True(
+            harness.Boundary.Frame(CleaningPathExecutionRole.Vertical).LastOutcome
+                is CleaningPathMotionOutcome.None
+                or CleaningPathMotionOutcome.OperationStarted,
+            "a historical Home outcome must never appear as the current Move outcome");
+        Assert.Equal(HomeCompletionCode, AxisOf(harness, ManualMotionAxis.C).LastOutcomeCode);
+    }
+
+    // 3 — MOVE EVIDENCE AFTER WINDOW
+    [Fact]
+    public void Move_Evidence_After_Window_Is_Consumed_Normally()
+    {
+        var harness = new CleaningPathExecutionHarness();
+        var result = RunToCompletion(harness);
+
+        Assert.Equal(12, result.Events.Count(e => e.Kind == CleaningPathExecutionCodes.KindMoveRequested));
+        Assert.Equal(12, result.Events.Count(e => e.Kind == CleaningPathExecutionCodes.KindMoveAccepted));
+        Assert.Equal(6, result.Events.Count(e => e.Kind == CleaningPathExecutionCodes.KindExecutionPhaseVerified));
+        Assert.Equal(CleaningPathExecutionStatus.PathCompleteAwaitingSafeReturn, result.Status);
+    }
+
+    // 4 — SESSION FAULT AFTER WINDOW
+    [Fact]
+    public void Session_Fault_After_Window_Preserves_The_Current_Failure()
+    {
+        var harness = new CleaningPathExecutionHarness(
+            options: CleaningPathExecutionHarness.OptionsWith("C", new ManualMotionAxisSimulationOptions
+            {
+                FaultOnCommand = ManualMotionPortCommandKind.Acceleration,
+            }));
+        var result = RunToCompletion(harness);
+
+        Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
+        Assert.Equal("COMMUNICATION_FAULT", result.Points[0].FailureCode);
+    }
+
+    // 5 — MOTION STALL DELAYED ACTIVATION
+    [Fact]
+    public void Motion_Stall_Activates_After_Home_Only()
+    {
+        var harness = new CleaningPathExecutionHarness(
+            options: CleaningPathExecutionHarness.OptionsWith("C", new ManualMotionAxisSimulationOptions { MotionStalled = true }),
+            horizontalMoveTimeoutMilliseconds: 3000);
+        harness.OpenAndObserve();
+        harness.HomeRoles();
+
+        // Home completed normally before activation.
+        Assert.Equal(ManualMotionHomeState.Homed, AxisOf(harness, ManualMotionAxis.C).HomeState);
+        Assert.Equal(ManualMotionHomeState.Homed, AxisOf(harness, ManualMotionAxis.D).HomeState);
+
+        Assert.True(harness.Start().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
+        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionHomeState.Homed, AxisOf(harness, ManualMotionAxis.C).HomeState);
+    }
+
+    // 6 — RP BIAS DELAYED ACTIVATION
+    [Fact]
+    public void RP_Bias_Activates_After_Home_Only()
+    {
+        var harness = new CleaningPathExecutionHarness(
+            options: CleaningPathExecutionHarness.OptionsWith("C", new ManualMotionAxisSimulationOptions { RpBias = 5000m }));
+        harness.OpenAndObserve();
+        harness.HomeRoles();
+
+        // Home and its TP/RP zero verification completed normally before activation.
+        Assert.Equal(ManualMotionHomeState.Homed, AxisOf(harness, ManualMotionAxis.C).HomeState);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerified, AxisOf(harness, ManualMotionAxis.C).CoordinateState);
+
+        Assert.True(harness.Start().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
+        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Empty(result.Points.Where(point => point.State == CleaningPathPointState.Verified));
+    }
+
+    // 7 — READ FAULT DELAYED ACTIVATION
+    [Fact]
+    public void Read_Fault_Activates_After_Home_Only()
+    {
+        var harness = new CleaningPathExecutionHarness(
+            options: CleaningPathExecutionHarness.OptionsWith("C", new ManualMotionAxisSimulationOptions
+            {
+                FaultOnReadWhileMoving = true,
+            }));
+        harness.OpenAndObserve();
+        harness.HomeRoles();
+        Assert.Equal(ManualMotionHomeState.Homed, AxisOf(harness, ManualMotionAxis.C).HomeState);
+
+        Assert.True(harness.Start().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
+        Assert.Equal("COMMUNICATION_FAULT", result.Points[0].FailureCode);
+    }
+
+    // 8 — STOP-IGNORED DELAYED ACTIVATION
+    [Fact]
+    public void Stop_Ignored_Activates_After_Home_Only()
+    {
+        var harness = new CleaningPathExecutionHarness(
+            options: new ManualMotionSimulationOptions
+            {
+                AxisC = new ManualMotionAxisSimulationOptions { MotionStalled = true },
+                AxisD = new ManualMotionAxisSimulationOptions { StopIgnored = true },
+            },
+            verticalSpeed: 4000,
+            horizontalMoveTimeoutMilliseconds: 3000);
+        harness.OpenAndObserve();
+        harness.HomeRoles();
+
+        // Home's internal completion Stop was effective before activation (Homed proves it).
+        Assert.Equal(ManualMotionHomeState.Homed, AxisOf(harness, ManualMotionAxis.D).HomeState);
+
+        Assert.True(harness.Start().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
+        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(CleaningPathMotionOutcome.StopNotObservedWithinTimeout, result.Points[0].Vertical.CleanupOutcome);
+        Assert.Equal(CleaningPathCleanupState.Failed, result.CleanupState);
+    }
+
+    // 9 — NO HISTORY DELETION
+    [Fact]
+    public void Manual_Motion_History_Is_Never_Deleted()
+    {
+        var harness = new CleaningPathExecutionHarness();
+        RunToCompletion(harness);
+
+        Assert.Contains(
+            harness.Session.Snapshot.Log,
+            entry => entry.Code == HomeCompletionCode);
+    }
+
+    // 10 — CURRENT P6 HANDOFF
+    [Fact]
+    public void P6_Handoff_Is_Reached_Without_Historical_Contamination()
+    {
+        var harness = new CleaningPathExecutionHarness();
+        var result = RunToCompletion(harness);
+
+        Assert.Equal(CleaningPathExecutionStatus.PathCompleteAwaitingSafeReturn, result.Status);
+        Assert.NotNull(result.Handoff);
+        Assert.Equal(6, result.Points.Count);
+        Assert.All(result.Points, point => Assert.Equal(CleaningPathPointState.Verified, point.State));
+        Assert.Equal(1250000, result.Handoff!.HorizontalCentreNative);
+        Assert.Equal(1250000, result.Handoff!.VerticalCentreNative);
+        foreach (var executionEvent in result.Events)
+        {
+            Assert.DoesNotContain(HomeCompletionCode, executionEvent.SourceCode ?? string.Empty);
+        }
+    }
+}

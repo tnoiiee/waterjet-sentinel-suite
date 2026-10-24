@@ -70,6 +70,7 @@ public sealed class CleaningPathExecutionCoordinatorTests
         public bool SessionFaulted => Faulted;
         public bool AxisAllowed(CleaningPathExecutionRole role) => Allowed;
         public bool AxisMoveReady(CleaningPathExecutionRole role) => MoveReady;
+        public bool BeginExecutionEvidenceWindow() => true;
 
         public CleaningPathMotionAxisFrame Frame(CleaningPathExecutionRole role) =>
             (role == CleaningPathExecutionRole.Horizontal ? Horizontal : Vertical).ToFrame(role);

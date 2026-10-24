@@ -130,6 +130,9 @@ public static class CleaningPathExecutionCodes
     public const string StartRefusedUnresolvedOperation = "START_REFUSED_UNRESOLVED_OPERATION";
     public const string StartRefusedExecutionActive = "START_REFUSED_EXECUTION_ACTIVE";
 
+    /// <summary>START_REFUSED when the execution evidence window cannot be established safely.</summary>
+    public const string StartRefusedEvidenceWindowUnavailable = "START_REFUSED_EVIDENCE_WINDOW_UNAVAILABLE";
+
     // ------------------------------------------------------------------ execution evidence kinds
     public const string KindExecutionStarted = "EXECUTION_STARTED";
     public const string KindMoveRequested = "MOVE_REQUESTED";
@@ -301,6 +304,17 @@ public interface ICleaningPathMotionBoundary
 
     /// <summary>True when the role's axis is Move-ready: Homed, idle and with fresh current observations.</summary>
     bool AxisMoveReady(CleaningPathExecutionRole role);
+
+    /// <summary>
+    /// Begins the typed execution evidence window of one Cleaning Path execution. The current
+    /// Manual Motion log sequence becomes the historical baseline: every earlier entry stays in the
+    /// Manual Motion history unchanged but is unavailable to this execution, sticky per-axis
+    /// outcomes that existed before the window can never be adopted as a current Move result, and
+    /// only Move / Move-cleanup-Stop / session-fault evidence generated after the window flows to
+    /// the coordinator. Returns false when the window cannot be established safely; the caller must
+    /// then refuse the start fail-closed and request no axis Move.
+    /// </summary>
+    bool BeginExecutionEvidenceWindow();
 
     /// <summary>The current typed observation frame of one role.</summary>
     CleaningPathMotionAxisFrame Frame(CleaningPathExecutionRole role);

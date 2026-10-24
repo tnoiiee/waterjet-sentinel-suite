@@ -140,6 +140,15 @@ public sealed class CleaningPathExecutionCoordinator
             return RefuseStart(CleaningPathExecutionCodes.StartRefusedAxisNotMoveReady);
         }
 
+        // The execution evidence window is established only after every start precondition passes
+        // and immediately before the P1 Move requests: earlier Manual Motion history stays intact
+        // but can never reach this execution. A refused window refuses the start fail-closed and no
+        // axis Move is requested.
+        if (!_boundary.BeginExecutionEvidenceWindow())
+        {
+            return RefuseStart(CleaningPathExecutionCodes.StartRefusedEvidenceWindowUnavailable);
+        }
+
         _snapshot = snapshot;
         _resolution = resolution;
         _targets = targets;

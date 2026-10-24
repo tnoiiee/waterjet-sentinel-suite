@@ -24,6 +24,8 @@ internal sealed class CleaningPathExecutionHarness
 
     private static readonly DateTimeOffset Instant = new(2026, 10, 23, 6, 0, 0, TimeSpan.Zero);
 
+    private readonly ManualMotionSimulationOptions? _scenarioOptions;
+
     internal CleaningPathExecutionHarness(
         ManualMotionSimulationOptions? options = null,
         int horizontalSpeed = 400000,
@@ -36,7 +38,8 @@ internal sealed class CleaningPathExecutionHarness
     {
         Clock = new TestClock(Instant);
         Profile = CreatePathProfile(horizontalSpeed, verticalSpeed, horizontalMoveTimeoutMilliseconds, verticalMoveTimeoutMilliseconds);
-        Port = new ManualMotionSimulatedPort(Clock, Profile, options);
+        _scenarioOptions = options;
+        Port = new ManualMotionSimulatedPort(Clock, Profile, WithoutAxisOptions(options));
         Session = new ManualMotionSession(Port, ManualMotionProfileResult.FromProfile(Profile), Clock);
 
         StoreSnapshot = SyntheticCleaningPathStores.ValidSnapshot();
@@ -105,7 +108,50 @@ internal sealed class CleaningPathExecutionHarness
         _ => ManualMotionAxis.D,
     };
 
-    internal CleaningPathExecutionStartOutcome Start() => Coordinator.Start(StoreSnapshot, Resolution);
+    internal CleaningPathExecutionStartOutcome Start()
+    {
+        // Delayed per-axis scenario activation: Open and Home always run with the default simulator
+        // behavior; the Phase 3B per-axis options activate only after both resolved axes are proven
+        // Move-ready and immediately before the Cleaning Path P1 Move requests.
+        ActivateScenarioOptions();
+        return Coordinator.Start(StoreSnapshot, Resolution);
+    }
+
+    /// <summary>Activates the configured per-axis scenario options (simulation-only; deterministic).</summary>
+    internal void ActivateScenarioOptions()
+    {
+        if (_scenarioOptions is null)
+        {
+            return;
+        }
+
+        Port.ConfigureAxisSimulationOptions(ManualMotionAxis.A, _scenarioOptions.AxisA);
+        Port.ConfigureAxisSimulationOptions(ManualMotionAxis.B, _scenarioOptions.AxisB);
+        Port.ConfigureAxisSimulationOptions(ManualMotionAxis.C, _scenarioOptions.AxisC);
+        Port.ConfigureAxisSimulationOptions(ManualMotionAxis.D, _scenarioOptions.AxisD);
+    }
+
+    /// <summary>The construction-time options: every global/default member preserved, per-axis options deferred.</summary>
+    private static ManualMotionSimulationOptions? WithoutAxisOptions(ManualMotionSimulationOptions? options) =>
+        options is null
+            ? null
+            : new ManualMotionSimulationOptions
+            {
+                StartPositionA = options.StartPositionA,
+                StartPositionB = options.StartPositionB,
+                StartPositionC = options.StartPositionC,
+                StartPositionD = options.StartPositionD,
+                HomeSwitchPosition = options.HomeSwitchPosition,
+                HomeSwitchHalfWidth = options.HomeSwitchHalfWidth,
+                HomeReachable = options.HomeReachable,
+                StopIgnored = options.StopIgnored,
+                ZeroDefinitionIgnored = options.ZeroDefinitionIgnored,
+                FaultOnCommand = options.FaultOnCommand,
+                RefuseCommand = options.RefuseCommand,
+                RefuseReadKind = options.RefuseReadKind,
+                FaultReadAfterCount = options.FaultReadAfterCount,
+                InvalidateGenerationAfterCalls = options.InvalidateGenerationAfterCalls,
+            };
 
     internal void DriveUntil(Func<bool> done, int maximumSteps = 6000, int millisecondsPerStep = 25)
     {
