@@ -209,23 +209,80 @@ internal sealed class CleaningPathExecutionHarness
         return matching;
     }
 
-    /// <summary>The first dispatch index of the Move Begin command of one role, or -1.</summary>
-    internal int BeginIndexOf(CleaningPathExecutionRole role)
+    /// <summary>
+    /// The dispatch indices of the typed Move Begin commands of one axis letter, in dispatch order.
+    /// A Move Begin is classified by the typed per-axis command lifecycle PositionAbsolute followed
+    /// by Begin; the setup Home lifecycle arms its Begin with the typed Home command instead and is
+    /// never classified as a Move Begin. Each P1–P6 cycle arms its own Move Begin independently.
+    /// </summary>
+    internal IReadOnlyList<int> MoveBeginIndicesOf(string axisLetter) =>
+        BeginIndicesArmedBy(axisLetter, ManualMotionPortCommandKind.PositionAbsolute);
+
+    /// <summary>The dispatch indices of the typed Move Begin commands of one role, in dispatch order.</summary>
+    internal IReadOnlyList<int> MoveBeginIndicesOf(CleaningPathExecutionRole role) =>
+        MoveBeginIndicesOf(AxisLetterOf(role));
+
+    /// <summary>
+    /// The dispatch indices of the typed Home Begin commands of one axis letter, in dispatch order.
+    /// A Home Begin is classified by the typed per-axis command lifecycle Home followed by Begin.
+    /// </summary>
+    internal IReadOnlyList<int> HomeBeginIndicesOf(string axisLetter) =>
+        BeginIndicesArmedBy(axisLetter, ManualMotionPortCommandKind.Home);
+
+    /// <summary>
+    /// The dispatch indices of the Begin commands of one axis letter armed by one typed plan command
+    /// (PositionAbsolute for a Move, Home for a Home). The plan command arms the classification; the
+    /// next Begin of that axis consumes it and the marker is cleared, so every P1–P6 Move cycle and
+    /// the one setup Home lifecycle are classified from typed command identity alone (never by
+    /// skipping the first Begin, by list position or by code text).
+    /// </summary>
+    private IReadOnlyList<int> BeginIndicesArmedBy(string axisLetter, ManualMotionPortCommandKind armKind)
     {
-        var axis = role == CleaningPathExecutionRole.Horizontal
-            ? Resolution.Resolution!.HorizontalAxisId
-            : Resolution.Resolution!.VerticalAxisId;
+        var indices = new List<int>();
+        var armed = false;
         for (var index = 0; index < Port.ExecutedCommands.Count; index++)
         {
             var command = Port.ExecutedCommands[index];
-            if (command.Kind == ManualMotionPortCommandKind.Begin && LetterOf(command.Axis) == axis)
+            if (LetterOf(command.Axis) != axisLetter)
             {
-                return index;
+                continue;
+            }
+
+            if (command.Kind == armKind)
+            {
+                armed = true;
+            }
+            else if (command.Kind == ManualMotionPortCommandKind.Home
+                || command.Kind == ManualMotionPortCommandKind.PositionAbsolute)
+            {
+                // The other typed plan command re-identifies the pending Begin.
+                armed = false;
+            }
+            else if (command.Kind == ManualMotionPortCommandKind.Begin)
+            {
+                if (armed)
+                {
+                    indices.Add(index);
+                }
+
+                armed = false;
             }
         }
 
-        return -1;
+        return indices;
     }
+
+    /// <summary>The first dispatch index of the Move Begin command of one role, or -1.</summary>
+    internal int BeginIndexOf(CleaningPathExecutionRole role)
+    {
+        var moveBegins = MoveBeginIndicesOf(role);
+        return moveBegins.Count > 0 ? moveBegins[0] : -1;
+    }
+
+    private string AxisLetterOf(CleaningPathExecutionRole role) =>
+        role == CleaningPathExecutionRole.Horizontal
+            ? Resolution.Resolution!.HorizontalAxisId
+            : Resolution.Resolution!.VerticalAxisId;
 
     internal static string LetterOf(ManualMotionAxis axis) => axis switch
     {

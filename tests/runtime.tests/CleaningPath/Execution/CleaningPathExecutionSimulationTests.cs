@@ -104,14 +104,23 @@ public sealed class CleaningPathExecutionSimulationTests
         var harness = new CleaningPathExecutionHarness();
         RunToCompletion(harness);
 
+        // The typed P1 Move Begin indices (PositionAbsolute -> Begin) of the two resolved axes,
+        // never the setup Home Begins (Home -> Begin) of the same axes.
+        var horizontalMoveBegins = harness.MoveBeginIndicesOf(CleaningPathExecutionRole.Horizontal);
+        var verticalMoveBegins = harness.MoveBeginIndicesOf(CleaningPathExecutionRole.Vertical);
+        Assert.NotEmpty(horizontalMoveBegins);
+        Assert.NotEmpty(verticalMoveBegins);
         var horizontalBegin = harness.BeginIndexOf(CleaningPathExecutionRole.Horizontal);
         var verticalBegin = harness.BeginIndexOf(CleaningPathExecutionRole.Vertical);
         Assert.True(horizontalBegin >= 0);
         Assert.True(verticalBegin >= 0);
+        Assert.Equal(horizontalMoveBegins[0], horizontalBegin);
+        Assert.Equal(verticalMoveBegins[0], verticalBegin);
 
         // Deterministic request order (Horizontal then Vertical) through one serialized owner: the
-        // Horizontal Begin always precedes the Vertical Begin by at most two serialized call slots
-        // (one fair-rotation gap plus the settle-gate offset). No synchronized Begin exists.
+        // Horizontal P1 Move Begin always precedes the Vertical P1 Move Begin by at most two
+        // serialized call slots (one fair-rotation gap plus the settle-gate offset). No synchronized
+        // Begin exists.
         Assert.True(horizontalBegin < verticalBegin);
         Assert.True(verticalBegin - horizontalBegin <= 2, $"start skew {verticalBegin - horizontalBegin} call slots exceeded the bounded contract");
 
@@ -358,9 +367,14 @@ public sealed class CleaningPathExecutionSimulationTests
         var harness = new CleaningPathExecutionHarness();
         RunToCompletion(harness);
 
-        // For each axis the per-axis command stream is six cycles: brake release, motion commands,
-        // Begin, and exactly one brake apply after that Begin (the session applies the brake only
-        // after the inactive observation) and before the next cycle's Begin.
+        // For each resolved path axis the complete per-axis command trace is one setup Home
+        // lifecycle plus the six P1–P6 Move lifecycles. A Begin is classified by its typed plan
+        // identity: the Home lifecycle arms its Begin with the typed Home command (HomeSpeed, Home,
+        // Begin), each Move lifecycle arms its Begin with the typed PositionAbsolute command
+        // (Acceleration, Speed, Deceleration, PositionAbsolute, Begin). Per lifecycle the stream is
+        // brake release, plan commands, Begin, and exactly one brake apply after that Begin (the
+        // session applies the brake only after the inactive observation) and before the next
+        // cycle's Begin.
         foreach (var letter in new[] { "C", "D" })
         {
             var begins = new List<int>();
@@ -384,18 +398,30 @@ public sealed class CleaningPathExecutionSimulationTests
                 }
             }
 
-            Assert.Equal(6, begins.Count);
+            var moveBegins = harness.MoveBeginIndicesOf(letter);
+            var homeBegins = harness.HomeBeginIndicesOf(letter);
 
-            // The setup Home of this axis also applies its brake; only the six applies after the
-            // first Move Begin belong to path execution.
-            var pathApplies = applies.Where(index => index > begins[0]).ToList();
+            // Typed regression proof: the setup Home Begin is identified by the typed Home -> Begin
+            // lifecycle and is never counted as a Move Begin (7 generic Begins = 6 Move + 1 Home).
+            Assert.Equal(7, begins.Count);
+            Assert.Equal(6, moveBegins.Count);
+            Assert.Equal(1, homeBegins.Count);
+            Assert.Equal(
+                begins.Where(index => !moveBegins.Contains(index)).ToList(),
+                homeBegins.ToList());
+
+            // The setup Home lifecycle of this axis also applies its brake, exactly once and before
+            // the first path Move Begin; that Home apply is never paired with a path Move cycle.
+            // Only the six applies after the first Move Begin belong to path execution.
+            Assert.Equal(1, applies.Count(index => index < moveBegins[0]));
+            var pathApplies = applies.Where(index => index > moveBegins[0]).ToList();
             Assert.Equal(6, pathApplies.Count);
             for (var cycle = 0; cycle < 6; cycle++)
             {
-                Assert.True(begins[cycle] < pathApplies[cycle]);
+                Assert.True(moveBegins[cycle] < pathApplies[cycle]);
                 if (cycle < 5)
                 {
-                    Assert.True(pathApplies[cycle] < begins[cycle + 1]);
+                    Assert.True(pathApplies[cycle] < moveBegins[cycle + 1]);
                 }
             }
         }
