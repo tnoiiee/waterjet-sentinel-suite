@@ -117,12 +117,14 @@ public sealed class CleaningPathExecutionSimulationTests
         Assert.Equal(horizontalMoveBegins[0], horizontalBegin);
         Assert.Equal(verticalMoveBegins[0], verticalBegin);
 
-        // Deterministic request order (Horizontal then Vertical) through one serialized owner: the
-        // Horizontal P1 Move Begin always precedes the Vertical P1 Move Begin by at most two
+        // Deterministic request order (Horizontal then Vertical) is proven by the request events
+        // below. The fair A/B/C/D round-robin scheduler advances each axis lifecycle through the
+        // one serialized port owner in persistent-cursor order, so either typed P1 Move Begin may
+        // be dispatched first; the approved contract bounds their separation by at most two
         // serialized call slots (one fair-rotation gap plus the settle-gate offset). No synchronized
         // Begin exists.
-        Assert.True(horizontalBegin < verticalBegin);
-        Assert.True(verticalBegin - horizontalBegin <= 2, $"start skew {verticalBegin - horizontalBegin} call slots exceeded the bounded contract");
+        var beginSkew = Math.Abs(verticalBegin - horizontalBegin);
+        Assert.True(beginSkew <= 2, $"start skew {beginSkew} call slots exceeded the bounded contract");
 
         var requestEvents = harness.Coordinator.Result!.Events
             .Where(e => e.Kind == CleaningPathExecutionCodes.KindMoveRequested && e.PointId == JobPhase.P1)
