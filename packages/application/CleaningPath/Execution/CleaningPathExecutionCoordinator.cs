@@ -159,6 +159,7 @@ public sealed class CleaningPathExecutionCoordinator
         _resolution = resolution;
         _targets = targets;
         _started = true;
+        _status = CleaningPathExecutionStatus.Running;
         _startedAt = _clock.UtcNow;
         _executionId = "CPX" + Interlocked.Increment(ref _executionCounter).ToString(CultureInfo.InvariantCulture);
         _horizontal = new AxisState(CleaningPathExecutionRole.Horizontal, resolved.HorizontalAxisId, resolved.HorizontalBrakeOutputId);
