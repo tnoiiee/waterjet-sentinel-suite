@@ -826,7 +826,9 @@ public sealed class CleaningPathExecutionRegressionTests
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
         Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
-        Assert.Empty(result.Points.Where(point => point.State == CleaningPathPointState.Verified));
+        Assert.DoesNotContain(
+            result.Points,
+            point => point.State == CleaningPathPointState.Verified);
     }
 
     // 7 — READ FAULT DELAYED ACTIVATION
