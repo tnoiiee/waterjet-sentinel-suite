@@ -405,7 +405,7 @@ public sealed class CleaningPathExecutionSimulationTests
             // lifecycle and is never counted as a Move Begin (7 generic Begins = 6 Move + 1 Home).
             Assert.Equal(7, begins.Count);
             Assert.Equal(6, moveBegins.Count);
-            Assert.Equal(1, homeBegins.Count);
+            Assert.Single(homeBegins);
             Assert.Equal(
                 begins.Where(index => !moveBegins.Contains(index)).ToList(),
                 homeBegins.ToList());

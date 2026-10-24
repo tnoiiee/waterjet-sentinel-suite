@@ -236,7 +236,7 @@ internal sealed class CleaningPathExecutionHarness
     /// the one setup Home lifecycle are classified from typed command identity alone (never by
     /// skipping the first Begin, by list position or by code text).
     /// </summary>
-    private IReadOnlyList<int> BeginIndicesArmedBy(string axisLetter, ManualMotionPortCommandKind armKind)
+    private List<int> BeginIndicesArmedBy(string axisLetter, ManualMotionPortCommandKind armKind)
     {
         var indices = new List<int>();
         var armed = false;
