@@ -149,7 +149,11 @@ public sealed class CleaningPathCompositionPathTests
         // The Vertical Move timeout is materially shorter than the unchanged default Horizontal
         // Move timeout (500 ms against 20000 ms), so it becomes the first primary failure while a
         // stalled Horizontal axis is still active and genuinely requires the exactly-once Stop.
-        var harness = new CleaningPathCompositionHarness(verticalMoveTimeoutMilliseconds: 500);
+        // Vertical speed 400000 lets the P1 Vertical Move (110000 native from the homed zero)
+        // complete in 275 ms, inside the 500 ms timeout that runs from each operation's Begin.
+        var harness = new CleaningPathCompositionHarness(
+            verticalSpeed: 400000,
+            verticalMoveTimeoutMilliseconds: 500);
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
         harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
