@@ -126,7 +126,7 @@ internal sealed class H1DryCommissioningForm : Form
         _tick.Start();
     }
 
-    private Control BuildBanner() => new Label
+    private static Label BuildBanner() => new Label
     {
         Dock = DockStyle.Fill,
         Text = "DRY / NO WATER — H1 WSB1 COMMISSIONING — NO PUMP COMMAND, NO PHYSICAL VALVE COMMAND, NO QUEUE",
@@ -136,7 +136,7 @@ internal sealed class H1DryCommissioningForm : Form
         TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
     };
 
-    private Control BuildSelectionPanel()
+    private FlowLayoutPanel BuildSelectionPanel()
     {
         var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = true };
         panel.Controls.Add(new Label { Text = "Selected Sensor:", AutoSize = true, Padding = new Padding(8, 12, 0, 0) });
@@ -154,7 +154,7 @@ internal sealed class H1DryCommissioningForm : Form
         return panel;
     }
 
-    private Control BuildIdentityPanel()
+    private TableLayoutPanel BuildIdentityPanel()
     {
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 5 };
         panel.Controls.Add(NewCaptionLabel("Canonical / default WJ:"), 0, 0);
@@ -172,7 +172,7 @@ internal sealed class H1DryCommissioningForm : Form
         return panel;
     }
 
-    private Control BuildRunAndLivePanel()
+    private TableLayoutPanel BuildRunAndLivePanel()
     {
         var panel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 7 };
         panel.Controls.Add(NewCaptionLabel("Current phase:"), 0, 0);
@@ -194,7 +194,7 @@ internal sealed class H1DryCommissioningForm : Form
         return panel;
     }
 
-    private Control BuildGuardAndControlPanel()
+    private FlowLayoutPanel BuildGuardAndControlPanel()
     {
         var panel = new FlowLayoutPanel { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight, WrapContents = true };
         foreach (var box in GuardBoxes())
