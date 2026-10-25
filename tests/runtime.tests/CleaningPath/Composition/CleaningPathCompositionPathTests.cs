@@ -146,14 +146,13 @@ public sealed class CleaningPathCompositionPathTests
     [Fact]
     public void Primary_Failure_Separate_From_Motion_And_Valve_Cleanup()
     {
-        // The Vertical Move timeout is materially shorter than the unchanged default Horizontal
-        // Move timeout (500 ms against 20000 ms), so it becomes the first primary failure while a
-        // stalled Horizontal axis is still active and genuinely requires the exactly-once Stop.
-        // Vertical speed 400000 lets the P1 Vertical Move (110000 native from the homed zero)
-        // complete in 275 ms, inside the 500 ms timeout that runs from each operation's Begin.
-        var harness = new CleaningPathCompositionHarness(
-            verticalSpeed: 400000,
-            verticalMoveTimeoutMilliseconds: 500);
+        // Normal validated path profile on both P2 axes (equal 20000 ms Move timeouts). The
+        // deterministic Horizontal-first request and begin order gives the stalled Horizontal
+        // operation the first MOVE_TIMEOUT while the Vertical operation remains active and
+        // requires exactly-once Stop; that Stop is supervised to inactive with brake apply. The
+        // test proves the separation of primary failure, motion cleanup and Valve cleanup, and
+        // does not depend on which role owns the MOVE_TIMEOUT.
+        var harness = new CleaningPathCompositionHarness();
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
         harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
@@ -161,7 +160,8 @@ public sealed class CleaningPathCompositionPathTests
 
         // Both P2 operations are already requested but not yet processed by the next boundary
         // step: stalling both resolved axes (C = Horizontal, D = Vertical) keeps the Horizontal
-        // axis active until the shorter Vertical Move timeout fires first (MOVE_TIMEOUT).
+        // operation active until its MOVE_TIMEOUT fires first; the Vertical operation is then
+        // stopped exactly once and supervised to inactive with brake apply.
         harness.Port.ConfigureAxisSimulationOptions(
             ManualMotionAxis.C,
             new ManualMotionAxisSimulationOptions { MotionStalled = true });
