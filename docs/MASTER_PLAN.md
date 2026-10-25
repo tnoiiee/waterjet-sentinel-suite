@@ -52,6 +52,24 @@ version: **no application version exists**, and the documentation versioning pol
 | Validated implementation head | `00eb3c6c6ad581067aeef79b5c40b4dbb309194e` |
 | Branch | `arena/5fcb82bf-waterjet-sentinel-suite` |
 
+- **Current position (2026-10-25; supersedes the K-era position fields above as current-facing
+  truth — those fields remain dated history).** The approved merged baseline is `main`
+  `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2` (the PR #40 merge commit; Parent 1
+  `696e135cce01bdc1ec34328f973bbd5ef4aed71a`, Parent 2 / final PR #40 head
+  `eff2ce5b549c5ff390e5ed220e75fd2208e43509`, merge tree
+  `2715f8bd3b2ce97675bdfb00401dd00730ddb397`; PR #40 Phase 3C Pump-ready and paired-IV
+  Simulation composition is MERGED). The Owner-authorized Product Critical Path is
+  **H1 — WSB1 Real Galil Dry Cleaning-Path Commissioning** (Home → DP/DE → dual-axis Move →
+  selected Sensor P1→P6 → Centre 125 mm / 125 mm → Stop / Abort / Brake / cleanup; dry — no
+  Pump command, no physical Isolation Valve command, no water, no Queue / AutoSequence, no
+  Production), the Owner working label over the `0.4D-G1`–`0.4D-G5` Galil and motion stage
+  family (formal IDs unchanged). A standalone Simulation-only Phase 3D is **SUPERSEDED** as the
+  immediate objective. H2 Physical Pump/IV I/O Commissioning (NEXT), H3 Single Real Cleaning Job,
+  H4 Sequential Multi-Job/Queue and H5 Production Readiness remain **NOT AUTHORIZED**; every
+  later stage requires explicit Owner authorization, and real Hardware execution remains fenced
+  behind a separate explicit Owner authorization for the exact validated PR head and exact
+  reviewed trial procedure.
+
 - The K6 implementation was authored in Arena; **Owner-local automated validation is the
   authoritative evidence** and has passed.
 - **K6 is MERGED** (PR #24, merge commit `f356b162…`, 2026-10-14); canonical documentation promotion is complete.
@@ -228,7 +246,24 @@ Genuine decisions that remain open and are **not** resolved by this document:
 
 ## 5. Critical Path
 
-Current critical path, as conditional steps — none of which is authorized by this document:
+Current critical path (Owner-authorized 2026-10-25), as conditional steps on the Hardware
+Critical Path working labels mapped to the formal stage families (formal IDs unchanged):
+
+1. **H1 — WSB1 Real Galil Dry Cleaning-Path Commissioning — CURRENT, OWNER-AUTHORIZED.** Home →
+   DP/DE → dual-axis Move → selected Sensor P1→P6 → Centre 125 mm / 125 mm → Stop / Abort /
+   Brake / cleanup on WSB1, dry (no Pump command, no physical IV command, no water, no
+   Queue / AutoSequence, no Production). Documentation realignment, exact-source inspection, H1
+   Product implementation, deterministic Simulation validation, Owner-local software validation
+   preparation and exact real-Hardware trial preparation are authorized in the current PR; real
+   Hardware execution requires separate explicit Owner authorization for the exact validated PR
+   head and the exact reviewed trial procedure. (Formal family: `0.4D-G1`–`0.4D-G5`.)
+2. **H2 — Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
+3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
+4. **H4 — Sequential Multi-Job/Queue — PLANNED, NOT AUTHORIZED.** (Formal family `0.4E-I3`.)
+5. **H5 — Production Readiness — FUTURE, NOT AUTHORIZED.** (Formal family `0.5A-P1`–`0.5A-P4`.)
+
+Historical critical-path record (preserved verbatim as dated history; superseded as the current
+position by the H1 Owner authorization above):
 
 1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**
@@ -305,6 +340,14 @@ Implemented delivery and evidence for K6: see
 | `0.4D-G3` | Galil Controlled Motion Test Foundation | PLANNED - NOT AUTHORIZED | Foundation for controlled Galil motion test | 0.4D-G2 |
 | `0.4D-G4` | Galil Axis Functional Test | PLANNED - NOT AUTHORIZED | Galil axis functional test | 0.4D-G3 |
 | `0.4D-G5` | Galil Motion and Mandatory Safe Return Closeout | PLANNED - NOT AUTHORIZED | Close out Galil motion and mandatory safe return | 0.4D-G4 |
+
+The `0.4D-G` family above is the formal-stage home of the current Owner-authorized Product
+Critical Path under the **H1 — WSB1 Real Galil Dry Cleaning-Path Commissioning** working label
+(2026-10-25): dry commissioning of Home, DP/DE, dual-axis Move, selected-Sensor P1→P6, Centre
+125 mm / 125 mm and Stop / Abort / Brake / cleanup on WSB1, through existing typed boundaries.
+The formal stage IDs and the per-stage statuses above remain stable (dated planning record);
+H1's authorization covers the dry commissioning scope only, and no stage closeout or later
+stage is authorized by that appearance.
 
 | Stage | Title | Status | Brief purpose | Preceding dependency |
 | --- | --- | --- | --- | --- |

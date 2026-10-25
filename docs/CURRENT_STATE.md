@@ -1,5 +1,37 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H1 WSB1 Real Galil Dry Cleaning-Path Commissioning — current Owner-authorized Product
+> Critical Path (2026-10-25).** The approved merged baseline is `main`
+> `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2` (the PR #40 merge commit; Parent 1
+> `696e135cce01bdc1ec34328f973bbd5ef4aed71a`, Parent 2 / final PR #40 head
+> `eff2ce5b549c5ff390e5ed220e75fd2208e43509`, merge tree
+> `2715f8bd3b2ce97675bdfb00401dd00730ddb397`). **PR #40 (Phase 3C Pump-ready and paired-IV
+> Simulation composition) is MERGED**; the "Owner review/merge pending — never merged at
+> authoring" wording inside the dated Phase 3A–3C blocks below is authoring-time history and is
+> superseded as to merge status only. The current Owner-authorized Product Critical Path is
+> **H1 — WSB1 REAL GALIL DRY CLEANING-PATH COMMISSIONING**: Home → DP/DE → dual-axis Move →
+> selected Sensor P1→P6 → Centre 125 mm / 125 mm → Stop / Abort / Brake / cleanup, through the
+> existing typed Manual Motion and Cleaning Path boundaries on WSB1 (Galil A/B/C/D). **H1 is
+> dry: no Pump command, no physical Isolation Valve command, no water, no Queue, no AutoSequence,
+> no next-job countdown, no Production.** A standalone Simulation-only Phase 3D is
+> **SUPERSEDED** as the immediate objective; the merged Phase 3A–3C Simulation capability
+> remains the deterministic validation foundation and existing Motion / Hardware evidence must be
+> reused, not rebuilt (accepted real evidence: WSB1 Galil identity connection, read-only
+> observed-state acquisition, WSB1/WJ2 Axis A representative real Galil trial; Home, DP, DE,
+> Move Absolute, dual-axis Move, P1→P6, Centre return and the full H1 dry Cleaning Path have NOT
+> passed on Hardware and remain H1 targets). Hardware Critical Path working labels:
+> **H1 WSB1 Real Galil Dry Cleaning-Path Commissioning — CURRENT, OWNER-AUTHORIZED**;
+> **H2 Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED**; **H3 Single Real Cleaning
+> Job — PLANNED, NOT AUTHORIZED**; **H4 Sequential Multi-Job/Queue — PLANNED, NOT AUTHORIZED**;
+> **H5 Production Readiness — FUTURE, NOT AUTHORIZED**. H1–H5 are Owner working labels mapped to
+> the formal roadmap stages (H1 ↔ `0.4D-G1`–`0.4D-G5` Galil and motion family; H4 ↔ `0.4E-I3`;
+> H5 ↔ `0.5A-P1`–`0.5A-P4`; the exact formal mapping of H2 and H3 remains `[OPEN]`); formal
+> roadmap IDs remain stable unless exact inspection proves a correction is required. Real
+> Hardware execution remains fenced behind a separate explicit Owner authorization for the exact
+> validated PR head and exact reviewed trial procedure; every later stage (H2–H5) requires
+> explicit Owner authorization. NO HARDWARE EXECUTED; Pump/IV physical control, water and
+> Production remain NOT AUTHORIZED.
+
 > **Phase 3C Pump-ready and paired-Isolation-Valve Simulation composition (2026-10-25; software
 > only).** The Product now composes the accepted immutable Phase 3A resolution, the canonical
 > Equipment / Motion derivations, one AI-003 Pump Outlet Pressure readiness gate and the paired
@@ -555,6 +587,28 @@ WRITE/CONTROL NOT AUTHORIZED
   unauthorized.
 
 ## 7. Current Critical Path
+
+The Owner-authorized Product Critical Path is the Hardware Critical Path, using the H1–H5
+working labels mapped to the formal roadmap stages (see
+[`MASTER_PLAN.md`](MASTER_PLAN.md) sections 4, 5 and 7). Every stage below H1 requires a
+separate explicit Owner authorization.
+
+1. **H1 — WSB1 Real Galil Dry Cleaning-Path Commissioning — CURRENT, OWNER-AUTHORIZED
+   (2026-10-25).** Home → DP/DE → dual-axis Move → selected Sensor P1→P6 → Centre 125 mm /
+   125 mm → Stop / Abort / Brake / cleanup on WSB1 through the existing typed boundaries. Dry
+   only: no Pump command, no physical Isolation Valve command, no water, no Queue / AutoSequence,
+   no Production. Documentation realignment, exact-source inspection, H1 Product implementation,
+   deterministic Simulation validation, Owner-local software validation preparation and exact
+   real-Hardware trial preparation are authorized in the current PR. Real Hardware execution is
+   fenced behind a separate explicit Owner authorization for the exact validated PR head and the
+   exact reviewed trial procedure. (Formal stage family: `0.4D-G1`–`0.4D-G5`.)
+2. **H2 — Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
+3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
+4. **H4 — Sequential Multi-Job/Queue — PLANNED, NOT AUTHORIZED.** (Formal family `0.4E-I3`.)
+5. **H5 — Production Readiness — FUTURE, NOT AUTHORIZED.** (Formal family `0.5A-P1`–`0.5A-P4`.)
+
+Historical K-era critical-path record (preserved verbatim as dated history; superseded as the
+current position by the H1 Owner authorization above):
 
 1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**
