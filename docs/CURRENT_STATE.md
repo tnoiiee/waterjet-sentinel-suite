@@ -40,6 +40,35 @@
 > exact-head Owner authorization ("AUTHORIZE H1 REAL GALIL DRY TRIAL ON EXACT PR HEAD <SHA> USING
 > THE REVIEWED H1 TRIAL PROCEDURE"). H2–H5 remain NOT AUTHORIZED. NO HARDWARE. NO PRODUCTION.
 
+> **H1 Fast Repair — Commission/Home separated from Run Path (2026-10-26; Owner-approved; software
+> only; HARDWARE NOT EXECUTED).** Commissioning inside H1 is now two explicitly separated actions.
+> **Commission/Home** (`H1DryCommissioningCoordinator.StartCommission`) invokes the existing typed
+> Home lifecycle on both resolved axes (independent per axis; each carrying the typed
+> position-zero definition DP=0 and its TP/RP zero verification), proves coordinate establishment
+> and terminates `Commissioned` (`H1_COMMISSION_COMPLETE_COORDINATES_VERIFIED`) without running
+> any path point. **Run Path** (`StartPath`) never dispatches Home: it requires the
+> session-scoped coordinate readiness (both resolved axes `Homed` + `ZeroVerified` in this
+> session), refuses with the typed `H1_START_REFUSED_COORDINATE_READINESS_ABSENT` directing the
+> Operator to Commission/Home when absent, and only then runs P1→P6 through the unchanged Phase 3B
+> execution coordinator plus the dry Centre return. The operator surface exposes the two actions
+> as separate controls with a live readiness display. The `HOME_INPUT_ALREADY_ACTIVE` permanent
+> Homing block is repaired: every applied Home request outcome is now detected by per-request
+> session-log sequence correlation (the session logs exactly one Home-kind entry per applied
+> request), so an H1 Home attempt against an already-active Home input always reaches the typed
+> terminal failure `H1_FAILED_HOME` with the typed primary cause and can no longer remain in
+> Homing indefinitely; the session-layer refusal itself is unchanged and still dispatches no
+> native Home command. An active Home input is never treated as a completed Home and never proves
+> readiness; no back-off motion and no automatic already-at-home acceptance was added. A new
+> process or session requires Commission/Home again (readiness is session-scoped; nothing is
+> persisted). Production, Runtime, Queue and AutoSequence integration remains NOT IMPLEMENTED and
+> NOT AUTHORIZED; the core execution layer still consumes Move-ready state only and never dispatches
+> Home. Dated history is preserved; the 2026-10-25 records above describe the pre-repair single
+> Start flow and are superseded on this point only by this block. NOT VERIFIED: .NET
+> restore/build/test NOT RUN in the Author environment (no .NET SDK) — the Owner-local exact-head
+> gate remains the validation of record; the boundary scan passed in the Author environment.
+> Hardware must be re-authorized on the new exact PR HEAD after Owner-local validation; an
+> authorization frozen on any earlier head does not cover it. NO HARDWARE. NO PRODUCTION.
+
 > **H1 WSB1 Real Galil Dry Cleaning-Path Commissioning — current Owner-authorized Product
 > Critical Path (2026-10-25).** The approved merged baseline is `main`
 > `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2` (the PR #40 merge commit; Parent 1

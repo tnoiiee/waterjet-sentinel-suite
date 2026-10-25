@@ -12,9 +12,12 @@ namespace Wjss.MotionCommissioning;
 /// <summary>
 /// The H1 dry Cleaning Path commissioning operator surface (WSB1 only). It shows the selected
 /// identity and its provenance, the fixed P1–P6 and Centre contracts, the live per-axis typed
-/// observations and the run evidence, and it exposes exactly three fail-closed controls: Start
-/// (enabled only when every typed precondition is satisfied), Abort and Close. The surface carries
-/// a permanent DRY / NO WATER banner and exposes no raw command input of any kind.
+/// observations, the session coordinate readiness and the run evidence, and it exposes exactly
+/// four fail-closed controls: Commission / Home (the explicit typed Home lifecycle that establishes
+/// the session-scoped coordinates), Run Path (P1–P6 plus the dry Centre return; it never dispatches
+/// Home and is enabled only when every typed precondition including the coordinate readiness is
+/// satisfied), Abort and Close. The surface carries a permanent DRY / NO WATER banner and exposes
+/// no raw command input of any kind.
 ///
 /// The two resolved axes are driven through the existing typed Manual Motion session only; this
 /// form never writes a device output directly and never bypasses the typed lifecycles.
@@ -47,6 +50,7 @@ internal sealed class H1DryCommissioningForm : Form
     private readonly Label _safeReturnValue = NewValueLabel();
     private readonly Label _horizontalLiveValue = NewValueLabel();
     private readonly Label _verticalLiveValue = NewValueLabel();
+    private readonly Label _readinessValue = NewValueLabel();
     private readonly CheckBox _identityAttested = NewGuardBox("Controller identity proven this session");
     private readonly CheckBox _endpointAttested = NewGuardBox("Owner-local endpoint configured");
     private readonly CheckBox _profileAttested = NewGuardBox("Owner-local motion profile configured");
@@ -56,7 +60,8 @@ internal sealed class H1DryCommissioningForm : Form
     private readonly CheckBox _queueAttested = NewGuardBox("No Queue / AutoSequence / next-job path connected");
     private readonly CheckBox _abortAttested = NewGuardBox("Physical abort accessible to the Operator");
     private readonly CheckBox _observerAttested = NewGuardBox("Owner present as Operator/Observer");
-    private readonly Button _startButton = new();
+    private readonly Button _commissionButton = new();
+    private readonly Button _runPathButton = new();
     private readonly Button _abortButton = new();
     private readonly Button _closeButton = new();
 
@@ -111,9 +116,12 @@ internal sealed class H1DryCommissioningForm : Form
 
         _overrideSelector.SelectedIndex = 0;
         _overrideSelector.SelectedIndexChanged += (_, _) => RefreshIdentity();
-        _startButton.Text = "Start";
-        _startButton.Enabled = false;
-        _startButton.Click += (_, _) => StartRun();
+        _commissionButton.Text = "Commission / Home";
+        _commissionButton.Enabled = false;
+        _commissionButton.Click += (_, _) => CommissionAndHome();
+        _runPathButton.Text = "Run Path (no Home)";
+        _runPathButton.Enabled = false;
+        _runPathButton.Click += (_, _) => RunPath();
         _abortButton.Text = "Abort";
         _abortButton.Enabled = false;
         _abortButton.Click += (_, _) => _coordinator?.Abort();
@@ -191,6 +199,8 @@ internal sealed class H1DryCommissioningForm : Form
         panel.Controls.Add(_horizontalLiveValue, 1, 3);
         panel.Controls.Add(NewCaptionLabel("Vertical axis (live):"), 0, 4);
         panel.Controls.Add(_verticalLiveValue, 1, 4);
+        panel.Controls.Add(NewCaptionLabel("Coordinate readiness:"), 0, 5);
+        panel.Controls.Add(_readinessValue, 1, 5);
         return panel;
     }
 
@@ -204,10 +214,12 @@ internal sealed class H1DryCommissioningForm : Form
             panel.Controls.Add(box);
         }
 
-        _startButton.Width = 160;
+        _commissionButton.Width = 200;
+        _runPathButton.Width = 200;
         _abortButton.Width = 160;
         _closeButton.Width = 160;
-        panel.Controls.Add(_startButton);
+        panel.Controls.Add(_commissionButton);
+        panel.Controls.Add(_runPathButton);
         panel.Controls.Add(_abortButton);
         panel.Controls.Add(_closeButton);
         return panel;
@@ -317,6 +329,22 @@ internal sealed class H1DryCommissioningForm : Form
         _verticalLiveValue.Text = resolved is null
             ? "NO AXIS RESOLVED"
             : LiveText(resolved.VerticalAxisId);
+        _readinessValue.Text = CoordinateReadinessText(resolved);
+    }
+
+    private string CoordinateReadinessText(ResolvedCleaningPath? resolved)
+    {
+        if (resolved is null)
+        {
+            return "UNKNOWN (no axis resolved)";
+        }
+
+        // Session-scoped readiness only: both resolved axes must be Homed with a verified zero in
+        // this session. The Home switch state alone never proves readiness, and a new process or
+        // session requires Commission/Home again.
+        return CoordinateReadiness(resolved)
+            ? "READY (both axes session Homed + ZeroVerified; Run Path will not Home)"
+            : "NOT READY (run Commission / Home first; Run Path never Homes automatically)";
     }
 
     private ManualMotionAxisSnapshot? AxisSnapshotFor(string axisLetter)
@@ -366,33 +394,102 @@ internal sealed class H1DryCommissioningForm : Form
         var guardsSatisfied = GuardBoxes().TrueForAll(static box => box.Checked);
         var resolved = TryResolve();
         var active = _coordinator?.Active == true;
-        _startButton.Enabled = guardsSatisfied && resolved is not null && !active;
+        var ready = CoordinateReadiness(resolved);
+        _commissionButton.Enabled = guardsSatisfied && resolved is not null && !active;
+        _runPathButton.Enabled = guardsSatisfied && resolved is not null && !active && ready;
         _abortButton.Enabled = active;
         _closeButton.Enabled = active;
     }
 
-    private void StartRun()
+    private bool CoordinateReadiness(ResolvedCleaningPath? resolved)
     {
-        var resolved = TryResolve();
         if (resolved is null)
         {
-            return;
+            return false;
         }
 
-        var configuration = _sensorConfigurations.FirstOrDefault(
-            candidate => string.Equals(candidate.SensorId, resolved.SensorId, StringComparison.Ordinal));
-        if (configuration is null)
+        var horizontal = AxisSnapshotFor(resolved.HorizontalAxisId);
+        var vertical = AxisSnapshotFor(resolved.VerticalAxisId);
+        return horizontal?.HomeState == ManualMotionHomeState.Homed
+            && horizontal?.CoordinateState == ManualMotionCoordinateState.ZeroVerified
+            && vertical?.HomeState == ManualMotionHomeState.Homed
+            && vertical?.CoordinateState == ManualMotionCoordinateState.ZeroVerified;
+    }
+
+    /// <summary>Starts the Commission/Home action: the explicit typed Home lifecycle per axis.</summary>
+    private void CommissionAndHome()
+    {
+        var request = CreateStartRequest();
+        if (request is null)
         {
             return;
         }
 
         var boundary = new ManualMotionCleaningPathBoundary(
             _session,
-            resolved.HorizontalAxisId,
-            resolved.VerticalAxisId);
+            request.Resolution!.Resolution!.HorizontalAxisId,
+            request.Resolution.Resolution.VerticalAxisId);
         _coordinator = new H1DryCommissioningCoordinator(_session, boundary, _clock);
 
-        var outcome = _coordinator.Start(new H1DryCommissioningRequest
+        var outcome = _coordinator.StartCommission(request);
+        if (!outcome.Started)
+        {
+            _ = MessageBox.Show(
+                "Commission / Home refused. Code: " + outcome.Code,
+                Text,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+    }
+
+    /// <summary>Starts the Run Path action: P1 through P6 and the dry Centre return, never Home.</summary>
+    private void RunPath()
+    {
+        var request = CreateStartRequest();
+        if (request is null)
+        {
+            return;
+        }
+
+        var boundary = new ManualMotionCleaningPathBoundary(
+            _session,
+            request.Resolution!.Resolution!.HorizontalAxisId,
+            request.Resolution.Resolution.VerticalAxisId);
+        _coordinator = new H1DryCommissioningCoordinator(_session, boundary, _clock);
+
+        var outcome = _coordinator.StartPath(request);
+        if (!outcome.Started)
+        {
+            var guidance = string.Equals(
+                outcome.Code,
+                H1DryCommissioningCodes.StartRefusedCoordinateReadinessAbsent,
+                StringComparison.Ordinal)
+                ? " Coordinate readiness is absent: start Commission / Home first. Run Path never dispatches Home automatically."
+                : string.Empty;
+            _ = MessageBox.Show(
+                "Run Path refused. Code: " + outcome.Code + "." + guidance,
+                Text,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
+    }
+
+    private H1DryCommissioningRequest? CreateStartRequest()
+    {
+        var resolved = TryResolve();
+        if (resolved is null)
+        {
+            return null;
+        }
+
+        var configuration = _sensorConfigurations.FirstOrDefault(
+            candidate => string.Equals(candidate.SensorId, resolved.SensorId, StringComparison.Ordinal));
+        if (configuration is null)
+        {
+            return null;
+        }
+
+        return new H1DryCommissioningRequest
         {
             PathStore = _pathStore,
             Resolution = CleaningPathResolver.Resolve(
@@ -416,16 +513,7 @@ internal sealed class H1DryCommissioningForm : Form
                 PhysicalAbortAccessible = _abortAttested.Checked,
                 OperatorObserverPresent = _observerAttested.Checked,
             },
-        });
-
-        if (!outcome.Started)
-        {
-            _ = MessageBox.Show(
-                "Start refused. Code: " + outcome.Code,
-                Text,
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-        }
+        };
     }
 
     private List<CheckBox> GuardBoxes() =>

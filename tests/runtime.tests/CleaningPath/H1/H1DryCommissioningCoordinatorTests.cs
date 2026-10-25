@@ -10,8 +10,11 @@ namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
 /// Focused deterministic tests of the H1 dry Cleaning Path commissioning run on WSB1, through the
-/// typed Manual Motion and Cleaning Path boundaries over the simulated port. Every value is
-/// synthetic test data; a simulated result is never hardware evidence. The deeper motion mechanics
+/// typed Manual Motion and Cleaning Path boundaries over the simulated port. Commissioning is two
+/// explicitly separated actions: Commission/Home (the typed Home lifecycle and coordinate
+/// establishment) and Run Path (P1 through P6 plus the dry Centre return, which never dispatches
+/// Home and requires the session-scoped coordinate readiness). Every value is synthetic test
+/// data; a simulated result is never hardware evidence. The deeper motion mechanics
 /// (MoveReached, TP/RP acceptance, freshness, brake lifecycle, stop supervision) are protected by
 /// the existing Manual Motion and Phase 3B suites, which these tests consume unchanged.
 ///
@@ -27,9 +30,9 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
 
-        var outcome = harness.Start();
+        var outcome = harness.CommissionThenStartPath();
         Assert.True(outcome.Started);
-        Assert.Equal(H1DryCommissioningCodes.KindRunStarted, outcome.Code);
+        Assert.Equal(H1DryCommissioningCodes.KindPathRunStarted, outcome.Code);
         harness.DriveUntilTerminal();
 
         var result = harness.Coordinator.Result!;
@@ -50,9 +53,12 @@ public sealed class H1DryCommissioningCoordinatorTests
             assignedIsolationValveId: H1DryCommissioningHarness.OtherCabinetValveId);
         harness.OpenAndObserve();
 
-        var outcome = harness.Start();
+        var outcome = harness.StartPath();
         Assert.False(outcome.Started);
         Assert.Equal(H1DryCommissioningCodes.StartRefusedUnsupportedWsb, outcome.Code);
+        var commissionOutcome = harness.StartCommission();
+        Assert.False(commissionOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedUnsupportedWsb, commissionOutcome.Code);
         Assert.Null(harness.Coordinator.Result);
         Assert.Empty(harness.Port.ExecutedCommands);
     }
@@ -77,7 +83,7 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = new H1DryCommissioningHarness(overrideWaterJetId: H1DryCommissioningHarness.Wsb1WaterJetId);
         harness.OpenAndObserve();
 
-        var outcome = harness.Start();
+        var outcome = harness.CommissionThenStartPath();
         Assert.True(outcome.Started);
         harness.DriveUntilTerminal();
 
@@ -92,7 +98,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness(overrideWaterJetId: H1DryCommissioningHarness.Wsb1WaterJetId);
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntilTerminal();
 
         var expected = harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points;
@@ -110,7 +116,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
 
         var midRun = harness.Coordinator.Current!.Identity;
         harness.DriveUntilTerminal();
@@ -129,7 +135,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntilTerminal();
 
         Assert.Equal(H1DryCommissioningPhase.Completed, harness.Coordinator.Result!.TerminalPhase);
@@ -216,9 +222,12 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = new H1DryCommissioningHarness();
         harness.OpenWithoutObservationCadence();
 
-        var outcome = harness.Start();
-        Assert.False(outcome.Started);
-        Assert.Equal(H1DryCommissioningCodes.StartRefusedObservationNotFresh, outcome.Code);
+        var pathOutcome = harness.StartPath();
+        Assert.False(pathOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedObservationNotFresh, pathOutcome.Code);
+        var commissionOutcome = harness.StartCommission();
+        Assert.False(commissionOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedObservationNotFresh, commissionOutcome.Code);
     }
 
     [Fact]
@@ -229,9 +238,12 @@ public sealed class H1DryCommissioningCoordinatorTests
         harness.Session.RequestHome(ManualMotionAxis.A);
         harness.Drive(2);
 
-        var outcome = harness.Start();
-        Assert.False(outcome.Started);
-        Assert.Equal(H1DryCommissioningCodes.StartRefusedAxisOperationActive, outcome.Code);
+        var pathOutcome = harness.StartPath();
+        Assert.False(pathOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedAxisOperationActive, pathOutcome.Code);
+        var commissionOutcome = harness.StartCommission();
+        Assert.False(commissionOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedAxisOperationActive, commissionOutcome.Code);
     }
 
     [Fact]
@@ -239,11 +251,14 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.StartCommission().Started);
 
-        var second = harness.Start();
-        Assert.False(second.Started);
-        Assert.Equal(H1DryCommissioningCodes.StartRefusedRunActive, second.Code);
+        var pathOutcome = harness.StartPath();
+        Assert.False(pathOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedRunActive, pathOutcome.Code);
+        var commissionOutcome = harness.StartCommission();
+        Assert.False(commissionOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedRunActive, commissionOutcome.Code);
     }
 
     [Fact]
@@ -252,16 +267,20 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
 
-        var outcome = harness.Coordinator.Start(new H1DryCommissioningRequest
+        var request = new H1DryCommissioningRequest
         {
             PathStore = null,
             Resolution = null,
             SelectedSensorId = string.Empty,
             Guards = H1DryCommissioningHarness.AllGuardsTrue,
-        });
+        };
 
-        Assert.False(outcome.Started);
-        Assert.Equal(H1DryCommissioningCodes.StartRefusedRequestIncomplete, outcome.Code);
+        var pathOutcome = harness.Coordinator.StartPath(request);
+        Assert.False(pathOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedRequestIncomplete, pathOutcome.Code);
+        var commissionOutcome = harness.Coordinator.StartCommission(request);
+        Assert.False(commissionOutcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedRequestIncomplete, commissionOutcome.Code);
     }
 
     // --------------------------------------------------------------------- Home and DP / DE
@@ -269,7 +288,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     [Fact]
     public void Both_Axes_Home_With_Typed_Position_Zero_Verified()
     {
-        var harness = RunFullSuccess();
+        var harness = CommissionedHarness();
 
         var result = harness.Coordinator.Result!;
         Assert.True(result.HorizontalCoordinate.HomeVerified);
@@ -281,12 +300,17 @@ public sealed class H1DryCommissioningCoordinatorTests
 
         // The accepted Home contract carries the typed position-zero definition per axis exactly once.
         Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero).Count);
+
+        // Commission/Home is separate from Run Path: no path Move and no path result exists.
+        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
+        Assert.Null(result.PathResult);
+        Assert.Equal(H1DrySafeReturnState.NotPublished, result.DrySafeReturn);
     }
 
     [Fact]
     public void Dual_Zero_Stays_Optional_Not_Dispatched()
     {
-        var harness = RunFullSuccess();
+        var harness = CommissionedHarness();
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(H1DryCommissioningCodes.DualZeroOptionalNotDispatched, result.HorizontalCoordinate.DualZeroDispositionCode);
@@ -328,7 +352,7 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = new H1DryCommissioningHarness(
             options: new ManualMotionSimulationOptions { HomeReachable = false });
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.StartCommission().Started);
         harness.DriveUntilTerminal();
 
         var result = harness.Coordinator.Result!;
@@ -346,7 +370,7 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = new H1DryCommissioningHarness(
             options: new ManualMotionSimulationOptions { HomeReachable = false });
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.StartCommission().Started);
         harness.DriveUntilTerminal();
 
         // No Move, no zero redefinition and no second Home cycle ever runs after the failed Home.
@@ -354,6 +378,168 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero));
         Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.Home).Count);
         Assert.Equal(H1DrySafeReturnState.NotPublished, harness.Coordinator.Result!.DrySafeReturn);
+    }
+
+    // ------------------------------------------------------- separated actions and readiness
+
+    [Fact]
+    public void Run_Path_After_Commission_Dispatches_No_Home()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        harness.CommissionOnly();
+        var commandsAtPathStart = harness.Port.ExecutedCommands.Count;
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.Home).Count);
+
+        var outcome = harness.StartPath();
+        Assert.True(outcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.KindPathRunStarted, outcome.Code);
+        harness.DriveUntilTerminal();
+        Assert.Equal(H1DryCommissioningPhase.Completed, harness.Coordinator.Result!.TerminalPhase);
+
+        // Run Path never dispatches Home: no Home command exists after the path start, and the
+        // path itself moved through P1 to P6 and the Centre return.
+        Assert.True(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute).Count > 0);
+        for (var index = commandsAtPathStart; index < harness.Port.ExecutedCommands.Count; index++)
+        {
+            Assert.NotEqual(ManualMotionPortCommandKind.Home, harness.Port.ExecutedCommands[index].Kind);
+        }
+
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.Home).Count);
+    }
+
+    [Fact]
+    public void Run_Path_Refuses_Without_Coordinate_Readiness()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+
+        var outcome = harness.StartPath();
+        Assert.False(outcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedCoordinateReadinessAbsent, outcome.Code);
+        Assert.Null(harness.Coordinator.Result);
+        Assert.False(harness.Coordinator.Active);
+
+        // Neither Home nor P1 nor any other motion request is made: refusal happens first.
+        Assert.Empty(harness.Port.ExecutedCommands);
+    }
+
+    [Fact]
+    public void Run_Path_Refuses_When_Only_One_Axis_Is_Commissioned()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+
+        // One session-scoped Home on the horizontal axis only: the vertical axis stays NotHomed.
+        // The wait includes the full end of the Home operation (brake applied after inactive), so
+        // the refusal reason proven here is the coordinate readiness, not an active operation.
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(
+            () => harness.Session.Snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed
+                && harness.Session.Snapshot.Axes[0].CoordinateState == ManualMotionCoordinateState.ZeroVerified
+                && harness.Session.Snapshot.ActiveOperations.Count == 0);
+        var commandsAtRefusal = harness.Port.ExecutedCommands.Count;
+
+        var outcome = harness.StartPath();
+        Assert.False(outcome.Started);
+        Assert.Equal(H1DryCommissioningCodes.StartRefusedCoordinateReadinessAbsent, outcome.Code);
+        Assert.Null(harness.Coordinator.Result);
+        Assert.Equal(commandsAtRefusal, harness.Port.ExecutedCommands.Count);
+    }
+
+    [Fact]
+    public void Home_Input_Already_Active_Reaches_Terminal_Failure()
+    {
+        var harness = new H1DryCommissioningHarness(
+            options: new ManualMotionSimulationOptions { StartPositionA = 0m });
+        harness.OpenAndObserve();
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Session.Snapshot.Axes[0].HomeInput);
+
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunFailedHome, result.Code);
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, result.PrimaryFailureCode);
+        Assert.False(result.HorizontalCoordinate.HomeVerified);
+
+        // No native Home command is dispatched to the axis whose Home input is already active.
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.Home))
+        {
+            Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
+        }
+
+        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
+    }
+
+    [Fact]
+    public void Home_Input_Already_Active_At_Baseline_Reaches_Terminal_Failure()
+    {
+        var harness = new H1DryCommissioningHarness(
+            options: new ManualMotionSimulationOptions { StartPositionA = 0m });
+        harness.OpenAndObserve();
+
+        // A prior refused Home attempt leaves the typed refusal code as the axis outcome baseline:
+        // the new refusal cannot be distinguished by the outcome code alone.
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.Drive(2);
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, harness.Session.Snapshot.Axes[0].LastOutcomeCode);
+
+        Assert.True(harness.StartCommission().Started);
+
+        // Bounded liveness: the applied refusal is detected by per-request correlation and the
+        // run reaches its typed terminal failure; it never remains in Homing indefinitely.
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunFailedHome, result.Code);
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, result.PrimaryFailureCode);
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.Home))
+        {
+            Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
+        }
+    }
+
+    [Fact]
+    public void Second_Commission_While_Axes_Rest_On_The_Home_Input_Fails_Closed()
+    {
+        var harness = CommissionedHarness();
+        var homeCount = harness.CommandsOf(ManualMotionPortCommandKind.Home).Count;
+
+        // After a verified Home both axes rest on their Home switches: a second Commission/Home
+        // is refused fail-closed and the active input is never treated as a completed Home.
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunFailedHome, result.Code);
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, result.PrimaryFailureCode);
+        Assert.Equal(homeCount, harness.CommandsOf(ManualMotionPortCommandKind.Home).Count);
+    }
+
+    [Fact]
+    public void Run_B_Canonical_Route_Commissions_And_Runs_The_Path()
+    {
+        var harness = new H1DryCommissioningHarness(
+            sensor: "G+214",
+            assignedWaterJetId: "WJ2",
+            assignedIsolationValveId: "IV2");
+        harness.OpenAndObserve();
+
+        var resolved = harness.Resolution.Resolution!;
+        Assert.Equal("WSB1", resolved.CabinetId);
+        Assert.Equal("C", resolved.HorizontalAxisId);
+        Assert.Equal("D", resolved.VerticalAxisId);
+        Assert.Equal("WJ2", resolved.EffectiveWaterJetId);
+
+        Assert.True(harness.CommissionThenStartPath().Started);
+        harness.DriveUntilTerminal();
+        Assert.Equal(H1DryCommissioningPhase.Completed, harness.Coordinator.Result!.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunComplete, harness.Coordinator.Result.Code);
+        Assert.Empty(harness.UnrelatedAxisCommands());
     }
 
     // ------------------------------------------------------------------------------ P1 to P6
@@ -408,7 +594,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntil(() => harness.Coordinator.Current!.CurrentPointId == "P2");
         harness.Port.ConfigureAxisSimulationOptions(
             ManualMotionAxis.B,
@@ -511,7 +697,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntil(() => harness.Coordinator.Current!.Phase == H1DryCommissioningPhase.CentreReturn);
         harness.Port.ConfigureAxisSimulationOptions(
             ManualMotionAxis.B,
@@ -534,7 +720,7 @@ public sealed class H1DryCommissioningCoordinatorTests
                 AxisB = new ManualMotionAxisSimulationOptions { MotionStalled = true },
             });
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntilTerminal();
 
         Assert.Equal(H1DryCommissioningPhase.Failed, harness.Coordinator.Result!.TerminalPhase);
@@ -556,7 +742,7 @@ public sealed class H1DryCommissioningCoordinatorTests
             },
             verticalSpeed: 4000);
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntilTerminal();
 
         var result = harness.Coordinator.Result!;
@@ -584,7 +770,7 @@ public sealed class H1DryCommissioningCoordinatorTests
             },
             verticalSpeed: 4000);
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntilTerminal();
 
         var result = harness.Coordinator.Result!;
@@ -601,7 +787,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntil(() => harness.Coordinator.Current!.CurrentPointId == "P2");
         harness.Coordinator.Abort();
         harness.DriveUntilTerminal();
@@ -619,7 +805,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntil(() => harness.Coordinator.Current!.CurrentPointId == "P3");
         harness.Coordinator.RequestClose();
         harness.DriveUntilTerminal();
@@ -648,7 +834,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntil(() => harness.Coordinator.Current!.CurrentPointId == "P2");
         harness.Coordinator.Abort();
         harness.DriveUntilTerminal();
@@ -709,18 +895,31 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
 
-        var outcome = harness.Start(mutate(H1DryCommissioningHarness.AllGuardsTrue));
-        Assert.False(outcome.Started);
-        Assert.Equal(expectedCode, outcome.Code);
+        // Both explicitly separated actions prove the same common fail-closed preconditions.
+        var pathOutcome = harness.StartPath(mutate(H1DryCommissioningHarness.AllGuardsTrue));
+        Assert.False(pathOutcome.Started);
+        Assert.Equal(expectedCode, pathOutcome.Code);
+        var commissionOutcome = harness.StartCommission(mutate(H1DryCommissioningHarness.AllGuardsTrue));
+        Assert.False(commissionOutcome.Started);
+        Assert.Equal(expectedCode, commissionOutcome.Code);
         Assert.Null(harness.Coordinator.Result);
         Assert.Empty(harness.Port.ExecutedCommands);
+    }
+
+    /// <summary>One harness whose Commission/Home action completed with verified coordinates.</summary>
+    private static H1DryCommissioningHarness CommissionedHarness()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        harness.CommissionOnly();
+        return harness;
     }
 
     private static H1DryCommissioningHarness RunFullSuccess()
     {
         var harness = new H1DryCommissioningHarness();
         harness.OpenAndObserve();
-        Assert.True(harness.Start().Started);
+        Assert.True(harness.CommissionThenStartPath().Started);
         harness.DriveUntilTerminal();
         Assert.Equal(H1DryCommissioningPhase.Completed, harness.Coordinator.Result!.TerminalPhase);
         return harness;

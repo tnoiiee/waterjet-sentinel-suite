@@ -12,17 +12,26 @@ namespace Wjss.Runtime.Core.CleaningPath.H1;
 ///
 /// It composes the existing typed boundaries and never duplicates them: Phase 3A resolution and
 /// path data, the canonical Motion topology catalog, the fixed Centre contract and the typed Manual
-/// Motion session. The run sequence is Home (independent per axis, each carrying the typed
-/// position-zero definition and its zero verification), coordinate establishment, P1 through P6
-/// through the existing typed path execution coordinator, and the dry Centre return on the fixed
-/// Centre contract. The typed dual-zero definition stays optional and separately authorized: it is
-/// recorded in Product state and never required here.
+/// Motion session. Commissioning is two explicitly separated actions. Commission/Home
+/// (StartCommission) invokes the existing typed Home lifecycle on both resolved axes
+/// (independent per axis, each carrying the typed position-zero definition and its zero
+/// verification), proves the coordinate establishment, and terminates Commissioned without
+/// running any path point. Run Path (StartPath) never dispatches Home: it requires the
+/// session-scoped coordinate readiness (both resolved axes Homed with a verified zero), refuses
+/// with a typed reason directing the Operator to Commission/Home when that readiness is absent,
+/// and only then runs P1 through P6 through the existing typed path execution coordinator and
+/// the dry Centre return on the fixed Centre contract. An active Home input never proves
+/// readiness and is never treated as a completed Home. The typed dual-zero definition stays
+/// optional and separately authorized: it is recorded in Product state and never required here.
 ///
 /// Failure behavior is fail-closed and evidence-preserving: the first genuine primary cause is
 /// retained, no later point may start, every remaining active axis is stopped exactly once and
 /// supervised to inactive with brake applied afterwards, cleanup evidence is recorded separately,
-/// and no dry Safe Return completion is ever fabricated. Owner Abort and Close preserve typed
-/// causes and block any further run until an explicit new Start.
+/// and no dry Safe Return completion is ever fabricated. A Home request that the session refuses
+/// (for example an already-active Home input) is detected by per-request log-sequence
+/// correlation, so the run always reaches a typed terminal failure and never remains in Homing
+/// indefinitely. Owner Abort and Close preserve typed causes and block any further run until an
+/// explicit new start action.
 ///
 /// The surface of this type exposes NO Pump command, NO physical Isolation Valve command and NO
 /// Queue / AutoSequence path of any kind: dry motion only.
@@ -31,6 +40,19 @@ public sealed class H1DryCommissioningCoordinator
 {
     private const string SupportedCabinetId = "WSB1";
 
+    /// <summary>The explicitly separated commissioning actions this coordinator can run.</summary>
+    private enum RunKind
+    {
+        /// <summary>No action has started.</summary>
+        None = 0,
+
+        /// <summary>Commission/Home: the typed Home lifecycle and coordinate establishment only.</summary>
+        Commission = 1,
+
+        /// <summary>Run Path: P1 through P6 and the dry Centre return on established coordinates.</summary>
+        Path = 2,
+    }
+
     private readonly ManualMotionSession _session;
     private readonly ManualMotionCleaningPathBoundary _boundary;
     private readonly IClock _clock;
@@ -38,6 +60,7 @@ public sealed class H1DryCommissioningCoordinator
     private CleaningPathExecutionCoordinator _path;
     private bool _started;
     private long _runCounter;
+    private RunKind _runKind;
 
     private H1DryCommissioningPhase _phase = H1DryCommissioningPhase.NotStarted;
     private string _runId = string.Empty;
@@ -48,10 +71,17 @@ public sealed class H1DryCommissioningCoordinator
     private H1DrySafeReturnState _drySafeReturn = H1DrySafeReturnState.NotPublished;
 
     private readonly bool[] _homeSeen = new bool[2];
-    private readonly string[] _homeBaseline = new string[2] { string.Empty, string.Empty };
     private readonly bool[] _homeSettled = new bool[2];
     private readonly bool[] _homeFailed = new bool[2];
     private readonly string[] _homeOutcomeCode = new string[2] { string.Empty, string.Empty };
+
+    /// <summary>
+    /// The session log sequence watermark captured when Commission/Home dispatches its Home
+    /// requests. Home-kind entries with a greater sequence are the per-request outcome evidence of
+    /// this run, independent of the axis outcome-code value.
+    /// </summary>
+    private long _homeLogWatermark;
+
     private readonly bool[] _axisStopRequested = new bool[2];
     private readonly H1AxisCentreRecord?[] _centreRecords = new H1AxisCentreRecord?[2];
     private readonly CleaningPathMotionOutcome[] _centreOutcome = new CleaningPathMotionOutcome[2];
@@ -87,18 +117,87 @@ public sealed class H1DryCommissioningCoordinator
     public bool Active => _started && Result is null;
 
     /// <summary>
-    /// Starts one H1 dry commissioning run. Every precondition is proven fail-closed before any
-    /// motion request: guards, accepted Phase 3A snapshot and resolution, selected Sensor match,
-    /// WSB1-only admission, canonical route match against the Motion topology catalog, a ready and
+    /// Starts the Commission/Home action: the existing typed Home lifecycle on both resolved axes
+    /// and the coordinate establishment. Every precondition is proven fail-closed before any motion
+    /// request: guards, accepted Phase 3A snapshot and resolution, selected Sensor match, WSB1-only
+    /// admission, canonical route match against the Motion topology catalog, a ready and
     /// not-faulted session with no active axis operation, and current/fresh Status, TP, RP and
     /// Brake-output observations on both resolved axes. The first unmet precondition refuses the
-    /// start with a typed code and the machine is left untouched.
+    /// start with a typed code and the machine is left untouched. The run terminates Commissioned
+    /// when both axes are Homed with a verified zero; no path point ever runs in this action.
     /// </summary>
-    public H1DryCommissioningStartOutcome Start(H1DryCommissioningRequest request)
+    public H1DryCommissioningStartOutcome StartCommission(H1DryCommissioningRequest request)
+    {
+        var admission = AdmitStart(request);
+        if (!admission.Accepted)
+        {
+            return new H1DryCommissioningStartOutcome(false, admission.RefusalCode!);
+        }
+
+        var resolved = admission.Resolution!;
+        BeginRun(request, resolved, RunKind.Commission);
+        _phase = H1DryCommissioningPhase.Homing;
+
+        var horizontal = AxisEnumFor(resolved.HorizontalAxisId);
+        var vertical = AxisEnumFor(resolved.VerticalAxisId);
+        _homeLogWatermark = CurrentLogSequence();
+
+        // Deterministic Horizontal-first request order; the two Home lifecycles remain independent
+        // per axis with no synchronized Begin and no combined-axis command.
+        _session.RequestHome(horizontal);
+        _session.RequestHome(vertical);
+
+        Publish();
+        return new H1DryCommissioningStartOutcome(true, H1DryCommissioningCodes.KindCommissionStarted);
+    }
+
+    /// <summary>
+    /// Starts the Run Path action: P1 through P6 and the dry Centre return through the existing
+    /// typed path execution coordinator. This action NEVER dispatches Home. It requires the
+    /// session-scoped coordinate readiness established by an explicit Commission/Home run: both
+    /// resolved axes must be Homed with a verified zero in this session. When that readiness is
+    /// absent the start is refused with the typed coordinate-readiness reason directing the
+    /// Operator to Commission/Home, and no Home, P1 or other motion request is made. The Home
+    /// switch state alone never proves readiness. All other start preconditions are identical to
+    /// Commission/Home and are proven fail-closed first.
+    /// </summary>
+    public H1DryCommissioningStartOutcome StartPath(H1DryCommissioningRequest request)
+    {
+        var admission = AdmitStart(request);
+        if (!admission.Accepted)
+        {
+            return new H1DryCommissioningStartOutcome(false, admission.RefusalCode!);
+        }
+
+        var resolved = admission.Resolution!;
+        var horizontal = AxisSnapshot(AxisEnumFor(resolved.HorizontalAxisId));
+        var vertical = AxisSnapshot(AxisEnumFor(resolved.VerticalAxisId));
+        if (horizontal?.HomeState != ManualMotionHomeState.Homed
+            || horizontal?.CoordinateState != ManualMotionCoordinateState.ZeroVerified
+            || vertical?.HomeState != ManualMotionHomeState.Homed
+            || vertical?.CoordinateState != ManualMotionCoordinateState.ZeroVerified)
+        {
+            return new H1DryCommissioningStartOutcome(
+                false,
+                H1DryCommissioningCodes.StartRefusedCoordinateReadinessAbsent);
+        }
+
+        BeginRun(request, resolved, RunKind.Path);
+        _phase = H1DryCommissioningPhase.CoordinateEstablishment;
+
+        Publish();
+        return new H1DryCommissioningStartOutcome(true, H1DryCommissioningCodes.KindPathRunStarted);
+    }
+
+    /// <summary>
+    /// Proves every common start precondition without mutating any state. The first unmet
+    /// precondition refuses with its typed code; only an accepted admission may begin a run.
+    /// </summary>
+    private StartAdmission AdmitStart(H1DryCommissioningRequest request)
     {
         if (_started && Result is null)
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedRunActive);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedRunActive);
         }
 
         if (request is null
@@ -107,24 +206,24 @@ public sealed class H1DryCommissioningCoordinator
             || string.IsNullOrWhiteSpace(request.SelectedSensorId)
             || request.Guards is null)
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedRequestIncomplete);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedRequestIncomplete);
         }
 
         var guardRefusal = CheckGuards(request.Guards);
         if (guardRefusal is not null)
         {
-            return new H1DryCommissioningStartOutcome(false, guardRefusal);
+            return StartAdmission.Refuse(guardRefusal);
         }
 
         if (request.PathStore.SourceKind != CleaningPathSourceKind.OwnerLocalFile
             || !string.Equals(request.PathStore.Schema, CleaningPathStoreParser.SchemaIdentifier, StringComparison.Ordinal))
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedSnapshotNotAccepted);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedSnapshotNotAccepted);
         }
 
         if (!request.Resolution.Accepted || request.Resolution.Resolution is null)
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedResolutionNotAccepted);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedResolutionNotAccepted);
         }
 
         var resolved = request.Resolution.Resolution;
@@ -132,13 +231,13 @@ public sealed class H1DryCommissioningCoordinator
             || !string.Equals(resolved.Path.SensorId, request.SelectedSensorId, StringComparison.Ordinal)
             || request.PathStore.PathFor(request.SelectedSensorId) is null)
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedSensorMismatch);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedSensorMismatch);
         }
 
         // H1 supports only WSB1: a selected Effective WJ outside WSB1 is refused fail-closed.
         if (!string.Equals(resolved.CabinetId, SupportedCabinetId, StringComparison.Ordinal))
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedUnsupportedWsb);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedUnsupportedWsb);
         }
 
         // The canonical route must match the selected Effective WJ exactly: the Motion topology
@@ -150,33 +249,38 @@ public sealed class H1DryCommissioningCoordinator
             || !string.Equals(binding.HorizontalAxisId, resolved.HorizontalAxisId, StringComparison.Ordinal)
             || !string.Equals(binding.VerticalAxisId, resolved.VerticalAxisId, StringComparison.Ordinal))
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedCanonicalRouteMismatch);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedCanonicalRouteMismatch);
         }
 
         if (_boundary.SessionFaulted)
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedSessionFaulted);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedSessionFaulted);
         }
 
         if (!_boundary.SessionReady)
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedSessionNotReady);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedSessionNotReady);
         }
 
         if (_session.Snapshot.ActiveOperations.Count > 0
             || _boundary.Frame(CleaningPathExecutionRole.Horizontal).MoveActive
             || _boundary.Frame(CleaningPathExecutionRole.Vertical).MoveActive)
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedAxisOperationActive);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedAxisOperationActive);
         }
 
         if (!ObservationsCurrent(AxisEnumFor(resolved.HorizontalAxisId))
             || !ObservationsCurrent(AxisEnumFor(resolved.VerticalAxisId)))
         {
-            return new H1DryCommissioningStartOutcome(false, H1DryCommissioningCodes.StartRefusedObservationNotFresh);
+            return StartAdmission.Refuse(H1DryCommissioningCodes.StartRefusedObservationNotFresh);
         }
 
-        // Every precondition is proven: only now does the machine take the run.
+        return StartAdmission.Accept(resolved);
+    }
+
+    /// <summary>Every precondition is proven: only now does the machine take the run.</summary>
+    private void BeginRun(H1DryCommissioningRequest request, ResolvedCleaningPath resolved, RunKind kind)
+    {
         ResetRunState();
         Result = null;
         _request = request;
@@ -185,20 +289,15 @@ public sealed class H1DryCommissioningCoordinator
         _runId = "H1R" + Interlocked.Increment(ref _runCounter).ToString(System.Globalization.CultureInfo.InvariantCulture);
         _path = new CleaningPathExecutionCoordinator(_boundary, _clock);
         _started = true;
-        _phase = H1DryCommissioningPhase.Homing;
+        _runKind = kind;
+    }
 
-        var horizontal = AxisEnumFor(resolved.HorizontalAxisId);
-        var vertical = AxisEnumFor(resolved.VerticalAxisId);
-        _homeBaseline[0] = AxisSnapshot(horizontal)?.LastOutcomeCode ?? string.Empty;
-        _homeBaseline[1] = AxisSnapshot(vertical)?.LastOutcomeCode ?? string.Empty;
+    /// <summary>The fail-closed admission result of one start attempt; it mutates nothing.</summary>
+    private sealed record StartAdmission(bool Accepted, string? RefusalCode, ResolvedCleaningPath? Resolution)
+    {
+        public static StartAdmission Refuse(string code) => new(false, code, null);
 
-        // Deterministic Horizontal-first request order; the two Home lifecycles remain independent
-        // per axis with no synchronized Begin and no combined-axis command.
-        _session.RequestHome(horizontal);
-        _session.RequestHome(vertical);
-
-        Publish();
-        return new H1DryCommissioningStartOutcome(true, H1DryCommissioningCodes.KindRunStarted);
+        public static StartAdmission Accept(ResolvedCleaningPath resolution) => new(true, null, resolution);
     }
 
     /// <summary>
@@ -358,13 +457,36 @@ public sealed class H1DryCommissioningCoordinator
             return;
         }
 
-        if (!_homeSeen[index] && string.Equals(snapshot.LastOutcomeCode, _homeBaseline[index], StringComparison.Ordinal))
+        if (!_homeSeen[index])
         {
-            // The Home request has not been applied yet; nothing has happened and nothing is fabricated.
+            // Per-request outcome correlation by the session log sequence: the session records
+            // exactly one Home-kind entry for every applied Home request (OPERATION_STARTED on
+            // acceptance, the typed refusal code otherwise), so the first Home-kind entry of this
+            // axis after the start watermark is the outcome of THIS run's request even when the
+            // axis outcome code is unchanged from before the request. The published log window is
+            // far larger than the entries one session step can produce, and this coordinator
+            // re-scans every step, so an applied request cannot be missed.
+            var entry = FirstHomeEntrySince(axis);
+            if (entry is null)
+            {
+                // The Home request has not been applied yet; nothing has happened and nothing is fabricated.
+                return;
+            }
+
+            _homeSeen[index] = true;
+            _homeOutcomeCode[index] = entry.Code;
+            if (!string.Equals(entry.Code, ManualMotionCodes.OperationStarted, StringComparison.Ordinal))
+            {
+                // The applied request was refused before any native Home dispatch (for example an
+                // already-active Home input): fail closed with the exact typed refusal code. The
+                // run can never remain in Homing after an applied refusal.
+                _homeFailed[index] = true;
+                _primaryFailure ??= entry.Code;
+            }
+
             return;
         }
 
-        _homeSeen[index] = true;
         _homeOutcomeCode[index] = snapshot.LastOutcomeCode;
         if (snapshot.HomeState == ManualMotionHomeState.Homed
             && snapshot.CoordinateState == ManualMotionCoordinateState.ZeroVerified
@@ -378,6 +500,29 @@ public sealed class H1DryCommissioningCoordinator
         // continuation and becomes the first primary cause when none was recorded yet.
         _homeFailed[index] = true;
         _primaryFailure ??= snapshot.LastOutcomeCode;
+    }
+
+    /// <summary>The first Home-kind log entry of one axis after the Commission/Home watermark.</summary>
+    private ManualMotionLogEntry? FirstHomeEntrySince(ManualMotionAxis axis)
+    {
+        foreach (var entry in _session.Snapshot.Log)
+        {
+            if (entry.Sequence > _homeLogWatermark
+                && entry.Axis == axis
+                && entry.Operation == ManualMotionOperationKind.Home)
+            {
+                return entry;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The newest session log sequence, used as the Commission/Home watermark.</summary>
+    private long CurrentLogSequence()
+    {
+        var log = _session.Snapshot.Log;
+        return log.Count == 0 ? 0 : log[^1].Sequence;
     }
 
     private void StepCoordinateEstablishment()
@@ -408,6 +553,15 @@ public sealed class H1DryCommissioningCoordinator
         {
             _primaryFailure ??= H1DryCommissioningCodes.CoordinateEstablishmentRefused;
             _pendingTerminal = (H1DryCommissioningPhase.Failed, H1DryCommissioningCodes.RunFailedCoordinateEstablishment);
+            return;
+        }
+
+        if (_runKind == RunKind.Commission)
+        {
+            // The Commission/Home action ends here: both axes are Homed with a verified zero in
+            // this session, the coordinate readiness is established for a later explicit Run Path,
+            // and no path point may start in this action.
+            Finish(H1DryCommissioningPhase.Commissioned, H1DryCommissioningCodes.CommissionComplete);
             return;
         }
 
@@ -658,8 +812,8 @@ public sealed class H1DryCommissioningCoordinator
         Array.Clear(_axisStopRequested);
         Array.Clear(_centreRecords);
         Array.Clear(_centreOutcome);
-        _homeBaseline[0] = string.Empty;
-        _homeBaseline[1] = string.Empty;
+        _homeLogWatermark = 0;
+        _runKind = RunKind.None;
         _homeOutcomeCode[0] = string.Empty;
         _homeOutcomeCode[1] = string.Empty;
         _centreOutcomeSource[0] = string.Empty;

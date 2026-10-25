@@ -36,6 +36,12 @@ public enum H1DryCommissioningPhase
 
     /// <summary>The session close was requested; the typed close cause is preserved.</summary>
     Closed = 9,
+
+    /// <summary>
+    /// The Commission/Home run completed: both resolved axes proved Homed with a verified zero in
+    /// this session and no path point ran. A later explicit Run Path consumes that readiness.
+    /// </summary>
+    Commissioned = 10,
 }
 
 /// <summary>
@@ -89,9 +95,11 @@ public static class H1DryCommissioningCodes
     public const string StartRefusedSessionFaulted = "H1_START_REFUSED_SESSION_FAULTED";
     public const string StartRefusedAxisOperationActive = "H1_START_REFUSED_AXIS_OPERATION_ACTIVE";
     public const string StartRefusedObservationNotFresh = "H1_START_REFUSED_OBSERVATION_NOT_FRESH";
+    public const string StartRefusedCoordinateReadinessAbsent = "H1_START_REFUSED_COORDINATE_READINESS_ABSENT";
 
     // ------------------------------------------------------------------------------ event kinds
-    public const string KindRunStarted = "H1_RUN_STARTED";
+    public const string KindCommissionStarted = "H1_COMMISSION_STARTED";
+    public const string KindPathRunStarted = "H1_PATH_RUN_STARTED";
     public const string KindHomeRequested = "H1_HOME_REQUESTED";
     public const string KindCoordinateEstablished = "H1_COORDINATE_ESTABLISHED";
     public const string KindPathExecutionStarted = "H1_PATH_EXECUTION_STARTED";
@@ -110,6 +118,7 @@ public static class H1DryCommissioningCodes
 
     // ------------------------------------------------------------------------------- terminals
     public const string RunComplete = "H1_DRY_CLEANING_PATH_COMMISSIONING_COMPLETE";
+    public const string CommissionComplete = "H1_COMMISSION_COMPLETE_COORDINATES_VERIFIED";
     public const string RunFailed = "H1_FAILED";
     public const string RunFailedHome = "H1_FAILED_HOME";
     public const string RunFailedCoordinateEstablishment = "H1_FAILED_COORDINATE_ESTABLISHMENT";

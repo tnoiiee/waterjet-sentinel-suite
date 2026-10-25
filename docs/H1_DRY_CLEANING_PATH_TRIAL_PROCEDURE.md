@@ -121,6 +121,21 @@ Centre 125/125 → terminal cleanup and session/run close.
   full-path session of each run each begin with the full Home sequence of this section on that
   session's resolved axes, followed by verification that both axes are inactive with Brake
   applied, before any Move is requested.
+- **Software mapping (Fast H1 Repair, Owner-approved 2026-10-26):** the Home sequence of each
+  fresh session is started through the explicit **Commission / Home** action of the H1 surface,
+  and every Move / path step of this procedure (T2, T3, T4, T5) is started through the separate
+  **Run Path** action. **Run Path never dispatches Home**: it requires the session-scoped
+  coordinate readiness (both resolved axes `Homed` with `ZeroVerified` **in that session**) and
+  refuses with `H1_START_REFUSED_COORDINATE_READINESS_ABSENT`, directing the Operator to
+  Commission/Home, when that readiness is absent. A new process or session always requires
+  Commission/Home again. An **active Home input never proves coordinate readiness** and is never
+  treated as a completed Home: a Home attempt against an already-active Home input is refused
+  fail-closed (`HOME_INPUT_ALREADY_ACTIVE`, no native Home command dispatched) and the H1
+  commissioning run reaches its typed terminal failure (`H1_FAILED_HOME` with the typed primary
+  cause); it can no longer remain blocked in the Homing phase. Recovery is explicit: with the
+  axes safely at rest and Brake applied, move the affected axis off the Home input through the
+  existing safe manual means and start Commission/Home again — this repair deliberately adds no
+  back-off motion and no automatic already-at-home acceptance.
 - **Dual-zero definition (DE=0): OPTIONAL and separately authorized — EXCLUDED from both
   Run A and Run B and from every session of this trial.** The exact Source contract:
   profile-permitted only (`dualZeroPermitted`), dispatch-only, its effect is **UNVERIFIED**
@@ -269,6 +284,10 @@ per-axis Stop; DP=0 (the Home completion branch).
 10. Exact frozen PR head of section 19 confirmed.
 11. The Owner has explicitly started this session after reviewing the prior session's terminal
     and cleanup evidence (no automatic transition; section 5).
+12. For every Run Path start of this procedure (T2, T3, T4, T5): the session-scoped coordinate
+    readiness of section 3 is present — both resolved axes `Homed` with `ZeroVerified` in this
+    session through the explicit Commission/Home action. Run Path never Homes automatically; a
+    readiness refusal is resolved by Commission/Home, never by bypassing it.
 
 **Run B sessions additionally:** the inter-run gate of section 11 is fully satisfied.
 
@@ -596,16 +615,30 @@ The T0 Owner-local values (P1 coordinates, directions, displacements and section
 configuration) are recorded at T0 on the Owner-local machine and reviewed by the Owner before
 enabling motion; they are not execution blockers of this procedure.
 
+- **Fast H1 Repair — RESOLVED (Owner-approved 2026-10-26):** Commission/Home and Run Path are
+  two explicitly separated H1 commissioning actions. Run Path never dispatches Home
+  automatically; it consumes the existing session-scoped coordinate readiness (both resolved
+  axes `Homed` + `ZeroVerified`) and refuses with the typed reason
+  `H1_START_REFUSED_COORDINATE_READINESS_ABSENT` directing the Operator to Commission/Home when
+  that readiness is absent. The `HOME_INPUT_ALREADY_ACTIVE` permanent Homing block is repaired:
+  every applied Home request outcome is detected by per-request session-log correlation, so an
+  H1 Home attempt always reaches a typed terminal failure and can no longer remain in Homing
+  indefinitely. No back-off motion, no automatic already-at-home acceptance and no Production /
+  Runtime / Queue / AutoSequence integration is added. The software change is a descendant of
+  `7910c09792789aa7809e985f3f38c044a5d0892d` on PR #41; dated history is preserved.
+
 ## 19. Hardware execution gate and required authorization
 
 Do not execute any H1-A or H1-B session until: implementation is complete; final Owner-local
 software validation passes on the exact head (`0f93542535df3160354e7e774e8b30cd48a6d4b5` is
 the software-validated Product head of record; this procedure is a documentation-only
-descendant); this procedure is delivered and reviewed; the Owner has reviewed the actual T0 P1
-coordinates, calculated directions and displacements for **both** routes; the physical area is
-safe with continuous visibility and physical abort access; and the Owner explicitly authorizes
-the exact head + this procedure + both locked runs. No Source or configuration change may occur
-afterward.
+descendant; the Fast H1 Repair of section 18 requires its own Owner-local validation and a
+**new** authorization on the new exact PR head — an authorization frozen on any earlier head
+does not cover it); this procedure is delivered and reviewed; the Owner has reviewed the actual
+T0 P1 coordinates, calculated directions and displacements for **both** routes; the physical
+area is safe with continuous visibility and physical abort access; and the Owner explicitly
+authorizes the exact head + this procedure + both locked runs. No Source or configuration
+change may occur afterward.
 
 Required authorization wording (equivalent):
 

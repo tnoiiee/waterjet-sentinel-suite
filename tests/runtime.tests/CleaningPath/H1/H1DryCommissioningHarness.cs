@@ -88,14 +88,45 @@ internal sealed class H1DryCommissioningHarness
         OperatorObserverPresent = true,
     };
 
-    internal H1DryCommissioningStartOutcome Start(H1DryCommissioningGuards? guards = null) =>
-        Coordinator.Start(new H1DryCommissioningRequest
+    internal H1DryCommissioningStartOutcome StartCommission(H1DryCommissioningGuards? guards = null) =>
+        Coordinator.StartCommission(new H1DryCommissioningRequest
         {
             PathStore = StoreSnapshot,
             Resolution = Resolution,
             SelectedSensorId = SelectedSensor,
             Guards = guards ?? AllGuardsTrue,
         });
+
+    internal H1DryCommissioningStartOutcome StartPath(H1DryCommissioningGuards? guards = null) =>
+        Coordinator.StartPath(new H1DryCommissioningRequest
+        {
+            PathStore = StoreSnapshot,
+            Resolution = Resolution,
+            SelectedSensorId = SelectedSensor,
+            Guards = guards ?? AllGuardsTrue,
+        });
+
+    /// <summary>
+    /// Runs Commission/Home to its terminal on a fresh harness and asserts the Commissioned
+    /// outcome with both axes session-scoped Homed plus ZeroVerified.
+    /// </summary>
+    internal void CommissionOnly()
+    {
+        Assert.True(StartCommission().Started);
+        DriveUntilTerminal();
+        Assert.Equal(H1DryCommissioningPhase.Commissioned, Coordinator.Result!.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.CommissionComplete, Coordinator.Result.Code);
+    }
+
+    /// <summary>
+    /// The explicit two-action operator flow on one session: Commission/Home to its terminal,
+    /// then Run Path on the established session-scoped coordinate readiness.
+    /// </summary>
+    internal H1DryCommissioningStartOutcome CommissionThenStartPath(H1DryCommissioningGuards? guards = null)
+    {
+        CommissionOnly();
+        return StartPath(guards);
+    }
 
     internal void Drive(int steps, int millisecondsPerStep = 25)
     {
