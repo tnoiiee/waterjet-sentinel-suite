@@ -638,8 +638,10 @@ Owner-local gate. Record:
 addendum and [`CURRENT_STATE.md`](CURRENT_STATE.md).
 
 *Canonical Topology Adoption (2026-10-21; superseded for current authority by the 2026-10-25
-adoption above; retained as history):* the "replacement placement description … open Owner
-decision" wording above is now closed history. **Current wording:** the canonical installed
+adoption above; retained as history — HISTORICAL / SUPERSEDED: DO NOT USE FOR CURRENT RUNTIME,
+PROFILE, COMMISSIONING, OR HARDWARE):* the "replacement placement description … open Owner
+decision" wording above is now closed history. **Wording at that 2026-10-21 checkpoint
+(historical):** the canonical installed
 topology is WJ1 FRONT/UPPER, WJ2 LEFT/UPPER, WJ3 REAR/UPPER, WJ4 RIGHT/UPPER, WJ5 FRONT/LOWER,
 WJ6 LEFT/LOWER, WJ7 REAR/LOWER, WJ8 RIGHT/LOWER, each with opposite-wall same-tier Target
 Coverage (WJ1 → REAR/UPPER … WJ8 → LEFT/LOWER) and WJn ↔ IVn pairing; canonical default

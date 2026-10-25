@@ -55,6 +55,11 @@ gates run in the Author sandbox: commissioning 239/239, contracts-ts 56/56, Ops 
 
 ### 2026-10-21 — Canonical Topology Adoption (software/data only; no hardware authorization; superseded as the current equipment topology by the 2026-10-25 adoption above)
 
+> **HISTORICAL RECORD (2026-10-21 checkpoint) — SUPERSEDED as the current equipment topology and
+> as the current motion identity by the 2026-10-25 adoption entry above. DO NOT USE FOR CURRENT
+> RUNTIME, PROFILE, COMMISSIONING, OR HARDWARE; the sole current authority is the 2026-10-25
+> entry above.**
+
 **Status: SOURCE-AUTHORED ON THE SESSION BRANCH; .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in
 the Agent sandbox; the Owner-local .NET gate — locked restore, build, full test suite and the
 authoritative C# `FixtureParityTests` — remains pending and no .NET result is claimed). NO NATIVE
@@ -97,7 +102,10 @@ nothing is hard-coded). The WJ2/WJ4 Drawing evidence note remains `NOT_PHYSICALL
 evidence-only, reworded as a superseded-REV1 record; nothing asserts which allocation installed
 wiring matches. Manual Motion execution is unchanged (WSB1 A/B, outputs 1/2, A/B Stop only); the
 runbook now merely clarifies that WSB1 A/B is diagnostically WJ2 (Upper Left, Target Coverage
-Right/Upper). No Manual C/D, output 3/4 write, WJ selection or Cleaning Path surface was added.
+Right/Upper) — a 2026-10-21 REV2-checkpoint statement, superseded 2026-10-25: under the current
+canonical topology, WSB1 A/B is WJ1/IV1, and "WJ2" there is that Water Jet's legacy equipment
+identity, not the current WJ identity. No Manual C/D, output 3/4 write, WJ selection or Cleaning
+Path surface was added.
 
 **Generators and generated resources.** The fixture generator now strictly separates the current
 canonical equipment/assignment table from a frozen, explicitly historical/non-Product table used

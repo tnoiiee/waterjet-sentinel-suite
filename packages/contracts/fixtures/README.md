@@ -69,7 +69,7 @@ carried by the fixtures (Owner-approved canonical Equipment topology adoption):
   Owner-local C# `FixtureParityTests` gate for this regeneration is PENDING; no .NET result
   is claimed in this README.
 
-## Canonical Topology Adoption (2026-10-21) — superseded as current by the 2026-10-25 adoption above; retained as the dated record
+## Canonical Topology Adoption (2026-10-21) — superseded as current by the 2026-10-25 adoption above; retained as the dated record (HISTORICAL — DO NOT USE FOR CURRENT RUNTIME, PROFILE, COMMISSIONING, OR HARDWARE)
 
 The 108 / 216 / 240 / 24 baseline above is unchanged. What changed is the **equipment
 topology** carried by the fixtures (Owner Canonical Topology Adoption):

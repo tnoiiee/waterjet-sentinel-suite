@@ -19,7 +19,8 @@ been taken and none is authorized by this document.**
 
 > **Canonical Topology Adoption supersession (2026-10-21; superseded for current authority by
 > the Owner-approved canonical Equipment topology adoption of 2026-10-25 above; retained as
-> history).** The Water Jet → WSB cabinet →
+> history — HISTORICAL / SUPERSEDED: DO NOT USE FOR CURRENT RUNTIME, PROFILE, COMMISSIONING, OR
+> HARDWARE).** The Water Jet → WSB cabinet →
 > axis-pair allocation, the §2 table, the §3 evidence-note wording and the motion topology
 > revision identity in this record are superseded for current authority by the Owner
 > Canonical Topology Adoption: current identity `OWNER_CONFIRMED_REV2` /
@@ -106,7 +107,7 @@ tests assert the exact eight rows instead.
 | Item | Status | Why it is not confirmed |
 | --- | --- | --- |
 | One controller per WSB cabinet | `INFERRED_FROM_OWNER_CONFIRMED_MAPPING` | It follows from the confirmed Water Jet allocation (each WSB drives exactly one A,B pair and one C,D pair), but the Owner has not separately confirmed the controller count per cabinet. |
-| WJ2 / WJ4 Drawing rev1 discrepancy | `DRAWING_REV1_CONFLICT_RECORDED`, `EVIDENCE_ONLY_NOT_CANONICAL`, `NOT_PHYSICALLY_RESOLVED` | Historical note against the superseded REV1 allocation: under `OWNER_CONFIRMED_REV1`, WJ2 = C,D on WSB1 and WJ4 = A,B on WSB2, while the Drawing rev1 expectation for these two Water Jets was the other axis pair on the same cabinet. The current canonical allocation is `OWNER_CONFIRMED_REV2` (WJ2 = A,B on WSB1; WJ4 = C,D on WSB2), so this remains **not** an open decision and **not** ambiguity: it is recorded historical evidence. The note is published with the catalogue, never suppressed, and it changes no mapping: all eight rows publish `CONFIRMED_OWNER` with `OWNER_CONFIRMED` provenance. The physical installation has **NOT** been resolved, and nothing in the REV2 adoption asserts which allocation the installed wiring matches. |
+| WJ2 / WJ4 Drawing rev1 discrepancy | `DRAWING_REV1_CONFLICT_RECORDED`, `EVIDENCE_ONLY_NOT_CANONICAL`, `NOT_PHYSICALLY_RESOLVED` | Historical note against the superseded REV1 allocation: under `OWNER_CONFIRMED_REV1`, WJ2 = C,D on WSB1 and WJ4 = A,B on WSB2, while the Drawing rev1 expectation for these two Water Jets was the other axis pair on the same cabinet. The current canonical allocation is `OWNER_CANONICAL_TOPOLOGY_2026_10_25` (WJ2 = C,D on WSB1; WJ4 = A,B on WSB2 — the same axis-pair placement as the superseded REV1 allocation), so this remains **not** an open decision and **not** ambiguity: it is recorded historical evidence. The note is published with the catalogue, never suppressed, and it changes no mapping: all eight rows publish `CONFIRMED_OWNER` with `OWNER_CONFIRMED` provenance. The physical installation has **NOT** been resolved, and nothing in the REV2 adoption or the current canonical allocation asserts which allocation the installed wiring matches. |
 | Limit input polarity | `UNCONFIRMED` on all sixteen axes | The switches are installed and their behaviour on the existing hardware is real, but the electrical meaning is established only by reading the Legacy implementation and the Drawing against the installation. Until then the polarity is never assumed active high or active low. |
 | Counts → millimetre conversion | `UNRESOLVED`, per axis, `MEASURED_DURING_COMMISSIONING` | No conversion is published. Values are counts and controller units only. |
 | Motion parameters (speeds, accelerations, limits) | `NOT_CONFIGURED` / `NOT_COMMISSIONED` | Nothing has been measured or configured in the Product. The Legacy Jog Speed is carried as a display value with status `LEGACY_CANDIDATE_UNVERIFIED`. |

@@ -235,7 +235,9 @@
 
 > **Canonical Topology Adoption (2026-10-21; superseded as the current equipment-topology\n> position by the Owner-approved canonical Equipment topology adoption of 2026-10-25 recorded\n> above; retained unedited below as the dated record — supersedes
 > every contrary WJ/IV tier, Target Coverage, assignment, WSB/axis-allocation, REV1-current and
-> placement statement below without deleting any dated record).** Implemented in Source on
+> placement statement below without deleting any dated record. HISTORICAL / SUPERSEDED — DO NOT
+> USE FOR CURRENT RUNTIME, PROFILE, COMMISSIONING, OR HARDWARE; the sole current authority is
+> the 2026-10-25 adoption blockquote at the top of this document).** Implemented in Source on
 > branch `arena/a6b9d5d8-waterjet-sentinel-suite` from `main`
 > `b0e9eb93d3e7f2112a3ef3b2b8c5f0fedf3e3289` as one consolidated pass for Owner review (not
 > merged at authoring). Canonical installed topology: WJ1 FRONT/UPPER → REAR/UPPER (WSB2 A/B),

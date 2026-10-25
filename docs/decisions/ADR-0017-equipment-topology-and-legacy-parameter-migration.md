@@ -28,6 +28,13 @@
 > separation, regenerated fixtures/examples, explicit test expectations, H1 synthetic route,
 > current-facing docs); the .NET validation of that pass is the Owner-local gate of record.
 
+> **HISTORICAL RECORDS BELOW — SUPERSEDED for current equipment-topology, WSB/axis-allocation,
+> default-assignment and current-identity authority by the 2026-10-25 addendum above (the sole
+> current decision record). DO NOT USE FOR CURRENT RUNTIME, PROFILE, COMMISSIONING, OR HARDWARE.**
+> The 2026-10-21 addendum, the 2026-10-12 superseded-topology note and the original 2026-10-08
+> ADR body below are retained unedited as dated history; where they describe themselves or their
+> rows as "current", that reflects their checkpoint date only.
+
 > **Addendum — Canonical Topology Adoption (Owner decision, 2026-10-21; superseded as the
 > current decision record for installed wall / region, Target Coverage, WSB/axis allocation,
 > default assignments and current-identity authority by the 2026-10-25 addendum above; retained
