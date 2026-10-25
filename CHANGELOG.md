@@ -13,7 +13,47 @@
 
 ## 2. Current Stage / Unreleased
 
-### 2026-10-21 — Canonical Topology Adoption (software/data only; no hardware authorization)
+### 2026-10-25 — Owner-approved canonical Equipment topology adoption + H1 synthetic route repair (software/data only; no hardware authorization)
+
+**Status: SOURCE-AUTHORED ON PR #41 (`arena/7968e33e-waterjet-sentinel-suite`); .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in
+the Author sandbox; the Owner-local .NET gate — locked restore, builds, full test suite and the
+authoritative C# `FixtureParityTests` — remains pending and no .NET result is claimed). Node
+gates run in the Author sandbox: commissioning 239/239, contracts-ts 56/56, Ops Preview motion
+22/22, generators deterministic. NO NATIVE LOAD, NO CONTROLLER CONTACT, NO HARDWARE USE.**
+
+- **Owner decision (2026-10-25).** The canonical Equipment topology is adopted as the sole
+  current authority: WJ1 (legacy WJ2) IV1 LEFT/UPPER → RIGHT/UPPER, WSB1 A/B; WJ2 (legacy WJ3)
+  IV2 REAR/UPPER → FRONT/UPPER, WSB1 C/D; WJ3 (legacy WJ4) IV3 RIGHT/UPPER → LEFT/UPPER, WSB2
+  C/D; WJ4 (legacy WJ1) IV4 FRONT/UPPER → REAR/UPPER, WSB2 A/B; WJ5 (legacy WJ5) IV5
+  FRONT/LOWER → REAR/LOWER, WSB3 A/B; WJ6 (legacy WJ7) IV6 REAR/LOWER → FRONT/LOWER, WSB3 C/D;
+  WJ7 (legacy WJ6) IV7 LEFT/LOWER → RIGHT/LOWER, WSB4 A/B; WJ8 (legacy WJ8) IV8 RIGHT/LOWER →
+  LEFT/LOWER, WSB4 C/D. A/C Horizontal, B/D Vertical; WJn ↔ IVn; Target Coverage is the
+  opposite wall in the same tier. The Legacy WJ identity column is historical equipment identity
+  only; `cannon n → WJn` direct import is unchanged. No REV3 exists: current identities are
+  `OWNER_CANONICAL_TOPOLOGY_2026_10_25` (.NET) and `MOTION_COMMISSIONING_DESIGN_2026_10_25`
+  (JS); `OWNER_CONFIRMED_REV2` / `OWNER_CONFIRMED_REV1` and `MOTION_COMMISSIONING_DESIGN_REV2`
+  / `MOTION_COMMISSIONING_DESIGN_REV1` are retained as historical identities only.
+- **Changed:** `WaterJetTopologyCatalog` rows; `MotionTopologyCatalog` bindings + evidence-note
+  wording; `MotionVocabulary` dated/historical identity constants; commissioning JS design
+  (identity, bindings, evidence); contracts-ts mirrors (`TARGET_COVERAGE`,
+  `MOTION_WATER_JET_BINDINGS`, revision constants); fixture/migrated-example generator tables;
+  `apps/ops-preview/public/app.mjs` comment; explicit topology test expectations (config,
+  resolver, composition, execution, motion, runtime, api, commissioning JS, contracts-ts,
+  Ops Preview); H1 synthetic route (`G+210` → WJ1/IV1, WSB1 A/B default; `G+201` → WJ3/IV3,
+  WSB2 C/D unsupported-WSB); current-facing documentation + ADR-0017 2026-10-25 addendum.
+- **Regenerated (generators only):** `snapshot.seed0.json`, `delta.basic.json`,
+  `sensor-parameters.migrated.example.json` — canonical default assignments are now
+  8/10/8/10/20/20/16/16 per WJ1..WJ8 (I7 → WJ5/IV5 unchanged; I16 → WJ6/IV6); determinism and
+  `--legacy-proof` byte-identity proven; `sensor-map.example.json` unchanged.
+- **Unchanged:** 108 Sensors / 216 assigned / 240 physical / 24 spare; Sensor sequence,
+  coordinates, I7/I16 status; SDS/Cabinet/channel mapping; P1–P6; Centre 125/125; WJn ↔ IVn;
+  `cannon n → WJn` direct; Manual Motion lifecycles; gclib typed boundary; Pump/IV/Queue
+  exclusions; H2–H5; Production; all Hardware boundaries (accepted Hardware evidence remains
+  applicable — physical wiring, mechanical route and Galil A/B/C/D semantics unchanged; the
+  later H1 real Galil dry trial on one Owner-selected WSB1 route remains required and
+  separately authorized).
+
+### 2026-10-21 — Canonical Topology Adoption (software/data only; no hardware authorization; superseded as the current equipment topology by the 2026-10-25 adoption above)
 
 **Status: SOURCE-AUTHORED ON THE SESSION BRANCH; .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in
 the Agent sandbox; the Owner-local .NET gate — locked restore, build, full test suite and the

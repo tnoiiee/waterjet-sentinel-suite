@@ -32,8 +32,8 @@ internal sealed class CleaningPathExecutionHarness
         int verticalSpeed = 200000,
         int horizontalMoveTimeoutMilliseconds = 20000,
         int verticalMoveTimeoutMilliseconds = 20000,
-        string assignedWaterJetId = "WJ4",
-        string assignedIsolationValveId = "IV4",
+        string assignedWaterJetId = "WJ3",
+        string assignedIsolationValveId = "IV3",
         string? overrideWaterJetId = null)
     {
         Clock = new TestClock(Instant);

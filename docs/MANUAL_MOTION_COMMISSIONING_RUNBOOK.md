@@ -25,12 +25,13 @@ wiring and route continuity rest on the Legacy Actual Run evidence (see
 `docs/evidence/MANUAL_MOTION_LEGACY_CONTINUITY.md`), and hardware use of
 any axis still requires the separate Owner Scope Gate.
 
-**Diagnostic identity (Canonical Topology Adoption, 2026-10-21; Phase 1A,
-2026-10-22).** Under the canonical topology (`OWNER_CONFIRMED_REV2`), the
-WSB1 Axis A / Axis B pair is diagnostically the axis pair of **WJ2** —
+**Diagnostic identity (Owner-approved canonical Equipment topology adoption, 2026-10-25;
+recorded 2026-10-22 under the superseded table).** Under the current canonical topology
+(`OWNER_CANONICAL_TOPOLOGY_2026_10_25`), the
+WSB1 Axis A / Axis B pair is diagnostically the axis pair of **WJ1** —
 installed LEFT / UPPER, Target Coverage RIGHT / UPPER, Axis A Horizontal,
 Axis B Vertical — and the WSB1 Axis C / Axis D pair is diagnostically the
-axis pair of **WJ3** — installed REAR / UPPER, Target Coverage FRONT /
+axis pair of **WJ2** — installed REAR / UPPER, Target Coverage FRONT /
 UPPER, Axis C Horizontal, Axis D Vertical. The software addresses **WSB1
 Axis A/B/C/D and brake outputs 1–4**. There is still no Water Jet
 selection and no Cleaning Path execution (Cleaning Path is Phase 3);

@@ -13,8 +13,10 @@ namespace Wjss.Runtime.Core.Tests;
 /// Deterministic test harness for the H1 dry Cleaning Path commissioning scenarios: one real
 /// Manual Motion session over the deterministic simulated port, the typed Manual Motion Cleaning
 /// Path boundary and the H1 dry commissioning coordinator, driven by one clock at 25 ms per step.
-/// The selected Sensor is assigned to WJ2 (WSB1, axes A/B) so the WSB1-only admission is exercised
-/// on every run unless a test intentionally selects another Water Jet. Every value is synthetic
+/// The default selected Sensor is G+210 (RIGHT/UPPER), canonically assigned WJ1 (WSB1, axes A/B),
+/// so the WSB1-only admission is exercised on every run unless a test intentionally selects
+/// another route: the unsupported-WSB scenario uses G+201 (LEFT/UPPER), canonically assigned
+/// WJ3 (WSB2, axes C/D). Every value is synthetic
 /// test data; no Owner-local path, no real coordinate and no Hardware value appears here. A
 /// simulated result is never hardware evidence.
 ///
@@ -22,16 +24,18 @@ namespace Wjss.Runtime.Core.Tests;
 /// </summary>
 internal sealed class H1DryCommissioningHarness
 {
-    internal const string Sensor = "G+201";
-    internal const string Wsb1WaterJetId = "WJ2";
-    internal const string Wsb1ValveId = "IV2";
-    internal const string OtherCabinetWaterJetId = "WJ4";
-    internal const string OtherCabinetValveId = "IV4";
+    internal const string Sensor = "G+210";
+    internal const string Wsb1WaterJetId = "WJ1";
+    internal const string Wsb1ValveId = "IV1";
+    internal const string UnsupportedCabinetSensor = "G+201";
+    internal const string OtherCabinetWaterJetId = "WJ3";
+    internal const string OtherCabinetValveId = "IV3";
 
     private static readonly DateTimeOffset Instant = new(2026, 10, 25, 6, 0, 0, TimeSpan.Zero);
 
     internal H1DryCommissioningHarness(
         ManualMotionSimulationOptions? options = null,
+        string sensor = Sensor,
         string assignedWaterJetId = Wsb1WaterJetId,
         string assignedIsolationValveId = Wsb1ValveId,
         string? overrideWaterJetId = null,
@@ -43,12 +47,13 @@ internal sealed class H1DryCommissioningHarness
         Port = new ManualMotionSimulatedPort(Clock, Profile, options);
         Session = new ManualMotionSession(Port, ManualMotionProfileResult.FromProfile(Profile), Clock);
 
+        SelectedSensor = sensor;
         StoreSnapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        SensorConfiguration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, assignedWaterJetId, assignedIsolationValveId);
+        SensorConfiguration = SyntheticCleaningPathStores.SensorConfiguration(sensor, assignedWaterJetId, assignedIsolationValveId);
         Resolution = CleaningPathResolver.Resolve(
             StoreSnapshot,
             SensorConfiguration,
-            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = overrideWaterJetId });
+            new CleaningPathResolutionRequest { SensorId = sensor, RequestedOverrideWaterJetId = overrideWaterJetId });
 
         Assert.True(Resolution.Accepted);
         Boundary = new ManualMotionCleaningPathBoundary(
@@ -87,7 +92,7 @@ internal sealed class H1DryCommissioningHarness
         {
             PathStore = StoreSnapshot,
             Resolution = Resolution,
-            SelectedSensorId = Sensor,
+            SelectedSensorId = SelectedSensor,
             Guards = guards ?? AllGuardsTrue,
         });
 

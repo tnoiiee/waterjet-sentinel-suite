@@ -45,6 +45,7 @@ public sealed class H1DryCommissioningCoordinatorTests
     public void Start_Refuses_Selected_Water_Jet_Outside_Wsb1()
     {
         var harness = new H1DryCommissioningHarness(
+            sensor: H1DryCommissioningHarness.UnsupportedCabinetSensor,
             assignedWaterJetId: H1DryCommissioningHarness.OtherCabinetWaterJetId,
             assignedIsolationValveId: H1DryCommissioningHarness.OtherCabinetValveId);
         harness.OpenAndObserve();

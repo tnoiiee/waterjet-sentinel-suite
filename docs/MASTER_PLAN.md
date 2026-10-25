@@ -614,7 +614,31 @@ placement description of WJ1/WJ3, formerly "at the I16 / I7 gap anchor", is an o
 decision). Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements. Record:
 [`STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md`](STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md).
 
-*Canonical Topology Adoption (2026-10-21):* the "replacement placement description … open Owner
+*Owner-approved canonical Equipment topology adoption (2026-10-25):* supersedes the 2026-10-21
+Canonical Topology Adoption paragraph below for current installed-position / Target-Coverage /
+WSB-axis-allocation / default-assignment / identity authority (that paragraph is retained as
+history). **Current wording:** the canonical table is WJ1 (legacy WJ2) IV1 installed LEFT/UPPER
+→ RIGHT/UPPER on WSB1 A/B; WJ2 (legacy WJ3) IV2 REAR/UPPER → FRONT/UPPER on WSB1 C/D; WJ3
+(legacy WJ4) IV3 RIGHT/UPPER → LEFT/UPPER on WSB2 C/D; WJ4 (legacy WJ1) IV4 FRONT/UPPER →
+REAR/UPPER on WSB2 A/B; WJ5 (legacy WJ5) IV5 FRONT/LOWER → REAR/LOWER on WSB3 A/B; WJ6 (legacy
+WJ7) IV6 REAR/LOWER → FRONT/LOWER on WSB3 C/D; WJ7 (legacy WJ6) IV7 LEFT/LOWER → RIGHT/LOWER on
+WSB4 A/B; WJ8 (legacy WJ8) IV8 RIGHT/LOWER → LEFT/LOWER on WSB4 C/D; A/C Horizontal, B/D
+Vertical; canonical default assignment by physical Sensor wall / tier is Right/Upper 8 →
+WJ1/IV1, Front/Upper 10 → WJ2/IV2, Left/Upper 8 → WJ3/IV3, Rear/Upper 10 → WJ4/IV4,
+Rear/Lower 20 → WJ5/IV5, Front/Lower 20 → WJ6/IV6, Right/Lower 16 → WJ7/IV7, Left/Lower 16 →
+WJ8/IV8 (108 total; I7 → WJ5/IV5, I16 → WJ6/IV6). The Legacy WJ identity column is historical
+equipment identity only; `cannon n → WJn` direct import is unchanged. Motion identity is
+`OWNER_CANONICAL_TOPOLOGY_2026_10_25` / `MOTION_COMMISSIONING_DESIGN_2026_10_25`; REV2 and REV1
+remain historical identities only. The H1 synthetic default route is G+210 → WJ1/IV1, WSB1 A/B.
+The 108 / 216 / 240 / 24 baseline, the Sensor sequence, physical
+Sensor-to-SDS/Cabinet/module/channel mapping and every safety / sequencing rule are unchanged;
+no Hardware matrix is repeated and the .NET validation of the adoption is the pending
+Owner-local gate. Record:
+[`decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md`](decisions/ADR-0017-equipment-topology-and-legacy-parameter-migration.md)
+addendum and [`CURRENT_STATE.md`](CURRENT_STATE.md).
+
+*Canonical Topology Adoption (2026-10-21; superseded for current authority by the 2026-10-25
+adoption above; retained as history):* the "replacement placement description … open Owner
 decision" wording above is now closed history. **Current wording:** the canonical installed
 topology is WJ1 FRONT/UPPER, WJ2 LEFT/UPPER, WJ3 REAR/UPPER, WJ4 RIGHT/UPPER, WJ5 FRONT/LOWER,
 WJ6 LEFT/LOWER, WJ7 REAR/LOWER, WJ8 RIGHT/LOWER, each with opposite-wall same-tier Target

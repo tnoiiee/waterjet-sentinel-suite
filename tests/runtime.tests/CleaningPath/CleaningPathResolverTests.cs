@@ -13,7 +13,7 @@ namespace Wjss.Runtime.Core.Tests;
 /// Sensor configuration and the validated snapshot. Scenario values are synthetic (a recorded
 /// default that contradicts canonical coverage stands in for a stale assignment); every derived
 /// identity comes from the committed canonical catalogs. The "G+201" Sensor is LEFT/UPPER
-/// (row 1, column 1) and is covered by WJ4 (target LEFT/UPPER; WSB2 / MC-WSB2 / C / D).
+/// (row 1, column 1) and is covered by WJ3 (target LEFT/UPPER; WSB2 / MC-WSB2 / C / D).
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
 /// </summary>
@@ -25,7 +25,7 @@ public sealed class CleaningPathResolverTests
     public void Canonical_Assignment_Is_Used_When_No_Override_Is_Proposed()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ4", "IV4");
+        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ3", "IV3");
 
         var result = CleaningPathResolver.Resolve(
             snapshot,
@@ -35,8 +35,8 @@ public sealed class CleaningPathResolverTests
         Assert.True(result.Accepted);
         Assert.Equal(CleaningPathCodes.ResolutionAccepted, result.Code);
         var resolution = result.Resolution!;
-        Assert.Equal("WJ4", resolution.EffectiveWaterJetId);
-        Assert.Equal("WJ4", resolution.CanonicalAssignedWaterJetId);
+        Assert.Equal("WJ3", resolution.EffectiveWaterJetId);
+        Assert.Equal("WJ3", resolution.CanonicalAssignedWaterJetId);
         Assert.Null(resolution.RequestedOverrideWaterJetId);
         Assert.Equal(EffectiveWaterJetProvenance.CANONICAL_ASSIGNMENT, resolution.EffectiveWjProvenance);
     }
@@ -55,13 +55,13 @@ public sealed class CleaningPathResolverTests
         var result = CleaningPathResolver.Resolve(
             snapshot,
             configuration,
-            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ4" });
+            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ3" });
 
         Assert.True(result.Accepted);
         var resolution = result.Resolution!;
-        Assert.Equal("WJ4", resolution.EffectiveWaterJetId);
+        Assert.Equal("WJ3", resolution.EffectiveWaterJetId);
         Assert.Equal("WJ2", resolution.CanonicalAssignedWaterJetId);
-        Assert.Equal("WJ4", resolution.RequestedOverrideWaterJetId);
+        Assert.Equal("WJ3", resolution.RequestedOverrideWaterJetId);
         Assert.Equal(EffectiveWaterJetProvenance.ENTRY_WJ_OVERRIDE, resolution.EffectiveWjProvenance);
 
         // Nothing but the routing identity changes: the Sensor-owned path and Centre are untouched.
@@ -80,7 +80,7 @@ public sealed class CleaningPathResolverTests
         var withOverride = CleaningPathResolver.Resolve(
             snapshot,
             configuration,
-            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ4" });
+            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ3" });
 
         // The no-override resolution refuses (the synthetic default contradicts coverage); the
         // override resolution succeeds — and both leave the snapshot path identical.
@@ -107,12 +107,12 @@ public sealed class CleaningPathResolverTests
         var result = CleaningPathResolver.Resolve(
             snapshot,
             configuration,
-            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ4" });
+            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ3" });
 
         Assert.True(result.Accepted);
-        Assert.Equal("IV4", result.Resolution!.DerivedIsolationValveId);
+        Assert.Equal("IV3", result.Resolution!.DerivedIsolationValveId);
         Assert.Equal(
-            WaterJetTopologyCatalog.FindWaterJet("WJ4")!.DedicatedIsolationValveId,
+            WaterJetTopologyCatalog.FindWaterJet("WJ3")!.DedicatedIsolationValveId,
             result.Resolution!.DerivedIsolationValveId);
     }
 
@@ -120,7 +120,7 @@ public sealed class CleaningPathResolverTests
     public void Wsb_Axes_And_Brakes_Are_Derived_From_Canonical_Catalogs()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ4", "IV4");
+        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ3", "IV3");
 
         var result = CleaningPathResolver.Resolve(
             snapshot, configuration, new CleaningPathResolutionRequest { SensorId = Sensor });
@@ -128,7 +128,7 @@ public sealed class CleaningPathResolverTests
         Assert.True(result.Accepted);
         var resolution = result.Resolution!;
 
-        var binding = MotionTopologyCatalog.FindWaterJetBinding("WJ4");
+        var binding = MotionTopologyCatalog.FindWaterJetBinding("WJ3");
         Assert.NotNull(binding);
         Assert.Equal(binding!.CabinetId, resolution.CabinetId);
         Assert.Equal(binding.ControllerId, resolution.ControllerId);
@@ -140,7 +140,7 @@ public sealed class CleaningPathResolverTests
         Assert.Equal(horizontalAxis.BrakeOutputIdentity, resolution.HorizontalBrakeOutputId);
         Assert.Equal(verticalAxis.BrakeOutputIdentity, resolution.VerticalBrakeOutputId);
 
-        // Canonical values of record for WJ4 (Owner-confirmed allocation).
+        // Canonical values of record for WJ3 (Owner-confirmed allocation).
         Assert.Equal("WSB2", resolution.CabinetId);
         Assert.Equal("MC-WSB2", resolution.ControllerId);
         Assert.Equal("C", resolution.HorizontalAxisId);
@@ -153,7 +153,7 @@ public sealed class CleaningPathResolverTests
     public void Invalid_Wj_Override_Is_Refused_Without_Fallback()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ4", "IV4");
+        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ3", "IV3");
 
         var result = CleaningPathResolver.Resolve(
             snapshot,
@@ -169,9 +169,9 @@ public sealed class CleaningPathResolverTests
     public void Topology_Incompatible_Override_Is_Refused_Without_Fallback()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ4", "IV4");
+        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ3", "IV3");
 
-        // WJ2 exists but its target coverage (RIGHT/UPPER) does not include this Sensor (LEFT/UPPER).
+        // WJ2 exists but its target coverage (FRONT/UPPER) does not include this Sensor (LEFT/UPPER).
         var result = CleaningPathResolver.Resolve(
             snapshot,
             configuration,
@@ -203,7 +203,7 @@ public sealed class CleaningPathResolverTests
     public void Provenance_Is_Retained_For_Both_Selection_Paths()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        var canonicalConfiguration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ4", "IV4");
+        var canonicalConfiguration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ3", "IV3");
         var overrideConfiguration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ2", "IV2");
 
         var canonical = CleaningPathResolver.Resolve(
@@ -211,7 +211,7 @@ public sealed class CleaningPathResolverTests
         var overridden = CleaningPathResolver.Resolve(
             snapshot,
             overrideConfiguration,
-            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ4" });
+            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ3" });
 
         Assert.True(canonical.Accepted);
         Assert.True(overridden.Accepted);
@@ -231,7 +231,7 @@ public sealed class CleaningPathResolverTests
         var result = CleaningPathResolver.Resolve(
             snapshot,
             configuration,
-            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ4" });
+            new CleaningPathResolutionRequest { SensorId = Sensor, RequestedOverrideWaterJetId = "WJ3" });
 
         Assert.True(result.Accepted);
         Assert.Equal(configurationBefore, configuration);
@@ -243,7 +243,7 @@ public sealed class CleaningPathResolverTests
     public void Unknown_Sensor_Mismatched_Configuration_And_Missing_Snapshot_Path_Are_Refused()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ4", "IV4");
+        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ3", "IV3");
 
         var unknownSensor = CleaningPathResolver.Resolve(
             snapshot, configuration, new CleaningPathResolutionRequest { SensorId = "X9" });
@@ -252,7 +252,7 @@ public sealed class CleaningPathResolverTests
 
         var mismatch = CleaningPathResolver.Resolve(
             snapshot,
-            SyntheticCleaningPathStores.SensorConfiguration("G1", "WJ4", "IV4"),
+            SyntheticCleaningPathStores.SensorConfiguration("G1", "WJ3", "IV3"),
             new CleaningPathResolutionRequest { SensorId = Sensor });
         Assert.False(mismatch.Accepted);
         Assert.Equal(CleaningPathCodes.SensorConfigurationIdMismatch, mismatch.Code);
@@ -272,7 +272,7 @@ public sealed class CleaningPathResolverTests
     public void Centre_Contract_Is_Fixed_In_The_Resolution()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
-        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ4", "IV4");
+        var configuration = SyntheticCleaningPathStores.SensorConfiguration(Sensor, "WJ3", "IV3");
 
         var result = CleaningPathResolver.Resolve(
             snapshot, configuration, new CleaningPathResolutionRequest { SensorId = Sensor });

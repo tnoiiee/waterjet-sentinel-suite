@@ -57,10 +57,11 @@ test('snapshot.seed0.json passes validation on the 108-Sensor baseline', () => {
 
 test('all eight fine-grained placements are UNRESOLVED with no anchors; canonical targets; anchors and resolved kinds are refused', () => {
   const snapshot = fixture('snapshot.seed0.json');
-  // Canonical Target Coverage: WJ1-WJ4 clean the UPPER tier, WJ5-WJ8 the LOWER tier.
+  // Canonical Target Coverage (Owner-approved canonical Equipment topology adoption, 2026-10-25):
+  // WJ1-WJ4 clean the UPPER tier, WJ5-WJ8 the LOWER tier.
   const expectedTargets = [
-    ['WJ1', 'REAR', 'UPPER'], ['WJ2', 'RIGHT', 'UPPER'], ['WJ3', 'FRONT', 'UPPER'], ['WJ4', 'LEFT', 'UPPER'],
-    ['WJ5', 'REAR', 'LOWER'], ['WJ6', 'RIGHT', 'LOWER'], ['WJ7', 'FRONT', 'LOWER'], ['WJ8', 'LEFT', 'LOWER'],
+    ['WJ1', 'RIGHT', 'UPPER'], ['WJ2', 'FRONT', 'UPPER'], ['WJ3', 'LEFT', 'UPPER'], ['WJ4', 'REAR', 'UPPER'],
+    ['WJ5', 'REAR', 'LOWER'], ['WJ6', 'FRONT', 'LOWER'], ['WJ7', 'RIGHT', 'LOWER'], ['WJ8', 'LEFT', 'LOWER'],
   ];
   expectedTargets.forEach(([id, targetWall, targetRegion], index) => {
     const jet = snapshot.waterJets[index];
@@ -83,9 +84,9 @@ test('all eight fine-grained placements are UNRESOLVED with no anchors; canonica
   assert.ok(validateEnvelope(resolved).issues.some((i) => i.includes('placementKind must be UNRESOLVED in the current canonical topology')));
 });
 
-test('canonical default assignments: 10/8/10/8/20/16/20/16 per WJ, I7 to WJ5/IV5 and I16 to WJ7/IV7', () => {
+test('canonical default assignments: 8/10/8/10/20/20/16/16 per WJ, I7 to WJ5/IV5 and I16 to WJ6/IV6', () => {
   const snapshot = fixture('snapshot.seed0.json');
-  const expected = { WJ1: 10, WJ2: 8, WJ3: 10, WJ4: 8, WJ5: 20, WJ6: 16, WJ7: 20, WJ8: 16 };
+  const expected = { WJ1: 8, WJ2: 10, WJ3: 8, WJ4: 10, WJ5: 20, WJ6: 20, WJ7: 16, WJ8: 16 };
   for (const [id, count] of Object.entries(expected)) {
     const own = snapshot.sensors.filter((s) => s.assignedWaterJetId === id);
     assert.equal(own.length, count, id);
@@ -95,11 +96,11 @@ test('canonical default assignments: 10/8/10/8/20/16/20/16 per WJ, I7 to WJ5/IV5
   assert.equal(i7.assignedWaterJetId, 'WJ5');
   assert.equal(i7.assignedIsolationValveId, 'IV5');
   const i16 = snapshot.sensors.find((s) => s.sensorId === 'I16');
-  assert.equal(i16.assignedWaterJetId, 'WJ7');
-  assert.equal(i16.assignedIsolationValveId, 'IV7');
+  assert.equal(i16.assignedWaterJetId, 'WJ6');
+  assert.equal(i16.assignedIsolationValveId, 'IV6');
   // The delta carries the same canonical assignment for its two LEFT/UPPER Sensors.
   const delta = fixture('delta.basic.json');
-  assert.ok(delta.sensors.every((s) => s.assignedWaterJetId === 'WJ4' && s.assignedIsolationValveId === 'IV4'));
+  assert.ok(delta.sensors.every((s) => s.assignedWaterJetId === 'WJ3' && s.assignedIsolationValveId === 'IV3'));
 });
 
 test('delta.basic.json passes and is gapless', () => {

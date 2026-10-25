@@ -94,16 +94,16 @@ public sealed class RuntimeApiTopologyTests
         Assert.Contains("canonical wall/tier confirmed", WaterJetTopologyCatalog.UnresolvedPlacementWording, StringComparison.Ordinal);
 
         var wj1 = topology.WaterJets.Single(w => w.WaterJetId == "WJ1");
-        Assert.Equal(Wall.FRONT, wj1.InstalledWall);
+        Assert.Equal(Wall.LEFT, wj1.InstalledWall);
         Assert.Equal(Region.UPPER, wj1.InstalledRegion);
-        Assert.Equal(Wall.REAR, wj1.TargetWall);
+        Assert.Equal(Wall.RIGHT, wj1.TargetWall);
         Assert.Equal(Region.UPPER, wj1.TargetRegion);
         Assert.Equal("IV1", wj1.DedicatedIsolationValveId);
 
         var wj3 = topology.WaterJets.Single(w => w.WaterJetId == "WJ3");
-        Assert.Equal(Wall.REAR, wj3.InstalledWall);
+        Assert.Equal(Wall.RIGHT, wj3.InstalledWall);
         Assert.Equal(Region.UPPER, wj3.InstalledRegion);
-        Assert.Equal(Wall.FRONT, wj3.TargetWall);
+        Assert.Equal(Wall.LEFT, wj3.TargetWall);
         Assert.Equal(Region.UPPER, wj3.TargetRegion);
         Assert.Equal("IV3", wj3.DedicatedIsolationValveId);
     }

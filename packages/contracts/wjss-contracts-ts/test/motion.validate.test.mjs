@@ -80,19 +80,24 @@ test('a confirmed limit polarity or an available signal state is refused', () =>
 });
 
 test('the Owner-confirmed allocation is required exactly, and the conflict cannot be dropped', () => {
-  // The revoked REV1 axis for WJ2 (horizontal C) is refused under the current REV2
-  // allocation (WJ2 horizontal A on WSB1), as is a revoked REV1 cabinet for WJ1.
+  // The revoked REV2 axis for WJ2 (horizontal A) is refused under the current
+  // adopted allocation (WJ2 horizontal C on WSB1), as is the revoked REV2 cabinet for WJ1
+  // (WSB2, the cabinet WJ1 held under REV2).
   const swappedAxes = canonicalMotionCatalogue();
-  swappedAxes.waterJets[1].horizontalAxisId = 'C';
+  swappedAxes.waterJets[1].horizontalAxisId = 'A';
   assert.equal(validMotionCommissioningCatalogue(swappedAxes), false);
 
   const revokedCabinet = canonicalMotionCatalogue();
-  revokedCabinet.waterJets[0].cabinetId = 'WSB1';
-  revokedCabinet.waterJets[0].controllerId = 'MC-WSB1';
+  revokedCabinet.waterJets[0].cabinetId = 'WSB2';
+  revokedCabinet.waterJets[0].controllerId = 'MC-WSB2';
   assert.equal(validMotionCommissioningCatalogue(revokedCabinet), false);
 
-  // REV1 remains historical identity only: a catalogue publishing it as the current
-  // topology revision is refused.
+  // REV2 and REV1 remain historical identity only: a catalogue publishing either as the
+  // current topology revision is refused.
+  const historicalRevisionRev2 = canonicalMotionCatalogue();
+  historicalRevisionRev2.motionTopologyRevision = 'OWNER_CONFIRMED_REV2';
+  assert.equal(validMotionCommissioningCatalogue(historicalRevisionRev2), false);
+
   const historicalRevision = canonicalMotionCatalogue();
   historicalRevision.motionTopologyRevision = 'OWNER_CONFIRMED_REV1';
   assert.equal(validMotionCommissioningCatalogue(historicalRevision), false);

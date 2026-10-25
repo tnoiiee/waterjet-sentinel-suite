@@ -36,9 +36,9 @@ measurements, 240 physical TC channels, 24 unassigned.
 - `sensor-parameters.migrated.example.json` has been **regenerated** to that baseline
   with `tools/migrated-example/generate.mjs` (`--write`): 108 logical positions (all
   `SENSOR`, no `gapAnchorForWaterJetId`), 108 Sensor configurations with dense
-  scanOrder 1–108 (canonical assignments per the Canonical Topology Adoption,
-  2026-10-21: I7 scan 79 → WJ5/IV5, I16 scan 88 → WJ7/IV7; per-Water-Jet counts
-  10/8/10/8/20/16/20/16), the same per-Sensor
+  scanOrder 1–108 (canonical assignments per the Owner-approved canonical Equipment
+  topology adoption, 2026-10-25: I7 scan 79 → WJ5/IV5, I16 scan 88 → WJ6/IV6; per-Water-Jet counts
+  8/10/8/10/20/20/16/16), the same per-Sensor
   formulas the synthetic CSV (`tests/config.tests/SyntheticSensorParameterCsv.cs`)
   feeds the importer (dirty bounds 15+(s%10) … 65+(s%10), threshold 55+(s%20),
   enabled s%17≠0 → six Disabled Sensors at scan 17/34/51/68/85/102, cleaningCount s%4),
@@ -52,9 +52,10 @@ measurements, 240 physical TC channels, 24 unassigned.
   and `SensorParameterMigrationTests` were corrected to the same form; the Owner-local
   `MigratedExampleShapeTests` / importer run **PASSED** at PR #21 head `041b2863…` (full .NET
   455 / 455; `docs/STAGE_0.4C-K3_TOPOLOGY_CORRECTION.md` §13). The file was never hand-edited.
-  The Canonical Topology Adoption regeneration (2026-10-21) reuses the same generator and
-  proofs; its Owner-local .NET validation is pending and is not claimed here.
-  `sensor-map.example.json` is unchanged by the Adoption (re-verified byte-identical).
+  The Canonical Topology Adoption regeneration (2026-10-21) and the Owner-approved canonical
+  Equipment topology adoption regeneration (2026-10-25) reuse the same generator and
+  proofs; their Owner-local .NET validation is pending and is not claimed here.
+  `sensor-map.example.json` is unchanged by both adoptions (re-verified byte-identical).
 
 Stage 0.3A-3 Checkpoint B added `sensor-parameters.migrated.example.json`: the
 canonical shape of the migrated legacy sensor parameters (ADR-0017) — 108

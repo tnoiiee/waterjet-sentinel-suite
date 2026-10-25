@@ -41,20 +41,22 @@ export const TOPOLOGY = Object.freeze({
 });
 
 /**
- * Canonical target coverage (Canonical Topology Adoption, 2026-10-21): WJ1-WJ4 clean the
+ * Canonical target coverage (Owner-approved canonical Equipment topology adoption,
+ * 2026-10-25): WJ1-WJ4 clean the
  * UPPER tier and WJ5-WJ8 the LOWER tier, each from the opposite wall in the same tier.
  * Assignment follows the TARGET wall/region (legacy cleaning-device ordinal maps directly
- * to WJn). The pre-adoption coverage (LOWER for WJ1-WJ4, UPPER for WJ5-WJ8) is superseded
- * for current authority and survives only in frozen historical generator proof data.
+ * to WJn). The pre-adoption coverage tables (LOWER for WJ1-WJ4 / UPPER for WJ5-WJ8, and
+ * the 2026-10-21 rows) are superseded
+ * for current authority and survive only in frozen historical generator proof data.
  */
 export const TARGET_COVERAGE = [
-  ['REAR', 'UPPER', 'WJ1'],
-  ['RIGHT', 'UPPER', 'WJ2'],
-  ['FRONT', 'UPPER', 'WJ3'],
-  ['LEFT', 'UPPER', 'WJ4'],
+  ['RIGHT', 'UPPER', 'WJ1'],
+  ['FRONT', 'UPPER', 'WJ2'],
+  ['LEFT', 'UPPER', 'WJ3'],
+  ['REAR', 'UPPER', 'WJ4'],
   ['REAR', 'LOWER', 'WJ5'],
-  ['RIGHT', 'LOWER', 'WJ6'],
-  ['FRONT', 'LOWER', 'WJ7'],
+  ['FRONT', 'LOWER', 'WJ6'],
+  ['RIGHT', 'LOWER', 'WJ7'],
   ['LEFT', 'LOWER', 'WJ8'],
 ];
 const COVERAGE_BY_ID = new Map(TARGET_COVERAGE.map(([w, r, id]) => [id, `${w}|${r}`]));
@@ -114,11 +116,18 @@ const ISOLATION_VALVE_IDS = WATER_JET_IDS.map((id) => `IV${id.slice(2)}`);
 export const MOTION_SECTION_ID = 'MOTION_COMMISSIONING_FOUNDATION';
 export const MOTION_SECTION_REVISION = 1;
 export const MOTION_SOURCE = 'APPLICATION_OWNED_MOTION_COMMISSIONING_MODEL';
-/** Current canonical motion topology revision (Canonical Topology Adoption, 2026-10-21). */
-export const MOTION_TOPOLOGY_REVISION = 'OWNER_CONFIRMED_REV2';
+/** Current canonical motion topology revision (Owner-approved canonical Equipment topology adoption, 2026-10-25). */
+export const MOTION_TOPOLOGY_REVISION = 'OWNER_CANONICAL_TOPOLOGY_2026_10_25';
+/**
+ * HISTORICAL ONLY: the superseded motion topology revision REV2 (Canonical Topology
+ * Adoption, 2026-10-21). REV2 remains the historical identity of its allocation and its
+ * evidence; current validators require the dated current identity.
+ */
+export const MOTION_TOPOLOGY_REVISION_HISTORICAL_REV2 = 'OWNER_CONFIRMED_REV2';
 /**
  * HISTORICAL ONLY: the superseded motion topology revision. REV1 remains the historical
- * identity of the earlier allocation and its evidence; current validators require REV2.
+ * identity of the earlier allocation and its evidence; current validators require the
+ * dated current identity.
  */
 export const MOTION_TOPOLOGY_REVISION_HISTORICAL_REV1 = 'OWNER_CONFIRMED_REV1';
 export const MOTION_GATE_CLOSED = 'CLOSED';
@@ -143,15 +152,15 @@ export const MOTION_AXIS_IDS = Object.freeze(['A', 'B', 'C', 'D']);
 export const MOTION_AXIS_ROLE = Object.freeze({ A: 'HORIZONTAL', B: 'VERTICAL', C: 'HORIZONTAL', D: 'VERTICAL' });
 /** Brake output allocation: A-1, B-2, C-3, D-4 (Owner-confirmed). */
 export const MOTION_BRAKE_OUTPUT = Object.freeze({ A: 'OUTPUT_1', B: 'OUTPUT_2', C: 'OUTPUT_3', D: 'OUTPUT_4' });
-/** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the Owner-confirmed REV2 allocation. */
+/** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the Owner-confirmed current allocation. */
 export const MOTION_WATER_JET_BINDINGS = Object.freeze([
-  ['WJ1', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ2', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ3', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
-  ['WJ4', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ1', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ2', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ3', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ4', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ5', 'WSB3', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ6', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ7', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ6', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ7', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ8', 'WSB4', 'C', 'D', 'CONFIRMED_OWNER'],
 ]);
 export const MOTION_LIMIT_SIGNAL_ROLES = Object.freeze(['REVERSE', 'HOME', 'FORWARD']);
@@ -521,7 +530,7 @@ export function validTcAcquisition(tc) {
  *
  * The catalogue is accepted ONLY in the state this software revision can actually publish: the
  * authorization gate CLOSED, four controllers, sixteen axes, the CANONICAL Owner-confirmed Water Jet
- * axis allocation for all eight Water Jets (REV2: WJ2 = A,B and WJ4 = C,D included), the WJ2 / WJ4 Drawing
+ * axis allocation for all eight Water Jets (current canonical topology: WJ2 = C,D and WJ4 = A,B included), the WJ2 / WJ4 Drawing
  * rev1 discrepancy recorded as evidence only and never as ambiguity, the Jog Speed as a display
  * value in controller units, and no axis homed, connected, commissioned or authorized to move.
  * A catalogue that claims a configured endpoint, a ready controller, a homed axis, an executable

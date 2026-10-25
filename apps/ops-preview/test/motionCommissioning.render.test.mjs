@@ -103,11 +103,11 @@ test('all eight Water Jets render the canonical mapping: role first, physical ax
     assert.match(vertical[index], /^Vertical Axis · [ABCD]$/);
   });
 
-  // The canonical REV2 values for the two Water Jets of the recorded Drawing discrepancy.
-  assert.equal(horizontal[1], 'Horizontal Axis · A');
-  assert.equal(vertical[1], 'Vertical Axis · B');
-  assert.equal(horizontal[3], 'Horizontal Axis · C');
-  assert.equal(vertical[3], 'Vertical Axis · D');
+  // The canonical adopted (2026-10-25) values for the two Water Jets of the recorded Drawing discrepancy.
+  assert.equal(horizontal[1], 'Horizontal Axis · C');
+  assert.equal(vertical[1], 'Vertical Axis · D');
+  assert.equal(horizontal[3], 'Horizontal Axis · A');
+  assert.equal(vertical[3], 'Vertical Axis · B');
 
   // Every row is canonically confirmed with Owner-confirmed provenance: no open decision survives.
   for (const status of column('motion-waterjets-body', 'Mapping status')) {

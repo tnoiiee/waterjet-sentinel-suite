@@ -1683,8 +1683,9 @@ function renderMotionCommissioning() {
   // the screen ("Horizontal Axis" / "Vertical Axis"); the physical controller axis letter is
   // appended to it as diagnostic identity only ("Horizontal Axis · C"), never used instead of the
   // role. The vendor name is deliberately not printed in the served UI.
-  // Every row is explicit data with Owner-confirmed provenance under OWNER_CONFIRMED_REV2:
-  // WJ2 = A,B (WSB1) and WJ4 = C,D (WSB2) included.
+  // Every row is explicit data with Owner-confirmed provenance under the current canonical
+  // topology (Owner-approved canonical Equipment topology adoption, 2026-10-25):
+  // WJ2 = C,D (WSB1) and WJ4 = A,B (WSB2) included.
   $('motion-waterjets-body').append(motionTable(
     ['Water Jet', 'Cabinet', 'Controller', 'Horizontal Axis', 'Vertical Axis', 'Mapping status', 'Provenance'],
     design.waterJets.map((waterJet) => [

@@ -24,7 +24,7 @@
 
 | Field | Value |
 | --- | --- |
-| Selected Sensor (one only) | `[OWNER SELECTS]` |
+| Selected Sensor (one only) | `[OWNER SELECTS; under the adopted canonical Equipment topology (2026-10-25) the WSB1 routes are G+210 (Right / Upper) → canonical WJ1 / IV1, axes A/B (Horizontal A, Vertical B), and G+214 (Front / Upper) → canonical WJ2 / IV2, axes C/D (Horizontal C, Vertical D)]` |
 | Canonical / default Water Jet | `[derived by the typed resolver; record the resolved value]` |
 | Configured Effective-WJ override (if any) | `[none, or the exact WJ identity entered on the surface]` |
 | Effective Water Jet | `[resolved value with provenance]` |

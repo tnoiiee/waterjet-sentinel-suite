@@ -10,7 +10,8 @@
 //
 // Owner critical topology correction (Stage 0.4C-K3): all 108 logical positions are Product
 // Sensors (I7 and I16 included), 108 Sensor configurations with dense scanOrder 1–108, no
-// gapAnchorForWaterJetId key. Canonical Topology Adoption (2026-10-21): the equipment rows
+// gapAnchorForWaterJetId key. Owner-approved canonical Equipment topology adoption
+// (2026-10-25): the equipment rows
 // and every Sensor assignment come from the canonical table in
 // tools/fixture-generator/generate.mjs (WJ1-WJ4 clean the UPPER tier, WJ5-WJ8 the LOWER;
 // fine-grained placement UNRESOLVED with no anchors for all eight Water Jets), while

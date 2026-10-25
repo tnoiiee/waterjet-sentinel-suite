@@ -132,10 +132,10 @@ sequence is exactly, in this order and with no holes, replacement identities or 
   installed wall, and *not* a "nearest or same-wall Water Jet". Assignment follows responsibility
   for the **target** wall and region, so a Rear-lower Sensor (I7 included) is assigned WJ5 even
   though WJ5 is installed on the Front-lower wall. Canonical default assignment by physical
-  Sensor wall / tier: Rear/Upper → WJ1/IV1 (10 Sensors), Right/Upper → WJ2/IV2 (8),
-  Front/Upper → WJ3/IV3 (10), Left/Upper → WJ4/IV4 (8), Rear/Lower → WJ5/IV5 (20),
-  Right/Lower → WJ6/IV6 (16), Front/Lower → WJ7/IV7 (20), Left/Lower → WJ8/IV8 (16) —
-  108 in total, I7 → WJ5/IV5 and I16 → WJ7/IV7 included.
+  Sensor wall / tier: Right/Upper → WJ1/IV1 (8 Sensors), Front/Upper → WJ2/IV2 (10),
+  Left/Upper → WJ3/IV3 (8), Rear/Upper → WJ4/IV4 (10), Rear/Lower → WJ5/IV5 (20),
+  Front/Lower → WJ6/IV6 (20), Right/Lower → WJ7/IV7 (16), Left/Lower → WJ8/IV8 (16) —
+  108 in total, I7 → WJ5/IV5 and I16 → WJ6/IV6 included.
 - Wall rows are the logical rows; there is no rotation or reversal. The question of row
   alignment across walls of unequal height is resolved by this matrix.
 - The labels are a logical reference. They do **not** define Modbus addresses, register maps,
@@ -148,7 +148,8 @@ sequence is exactly, in this order and with no holes, replacement identities or 
   inside dated historical records and in ADR-0017's own supersession history. Superseded by the Owner critical topology correction: I7 and I16 are normal Product Sensors. The authoritative current baseline is 108 Sensors and 216 assigned Product TC measurements.
 - *.NET status:* the .NET contracts, domain catalogue, importer, runtime, synthetic map and
   fixtures encode the corrected 108 / 216 baseline (Owner-validated at Stage 0.4C-K3) and,
-  as of the Canonical Topology Adoption (2026-10-21), the canonical installed topology,
+  as of the Owner-approved canonical Equipment topology adoption (2026-10-25), the canonical
+  installed topology,
   canonical Target Coverage, canonical default assignments and the all-`UNRESOLVED`
   fine-grained placement disposition. The Adoption's own .NET build / test / fixture-parity
   validation is the pending Owner-local gate (no .NET SDK in the Agent environment); no
@@ -208,18 +209,19 @@ reserved for the duration of a Cleaning Job. `[OWNER CONFIRMED]`
 **Installed Position and Target Coverage are separate attributes.** A Water Jet is installed on
 one wall and covers the *opposite* wall in the matching region:
 
-Canonical installed topology (Owner Canonical Topology Adoption, 2026-10-21). For every row
+Canonical installed topology (Owner-approved canonical Equipment topology adoption,
+2026-10-25). For every row
 the *fine-grained* placement is `UNRESOLVED` with no placement anchors (see below):
 
 | Water Jet | Installed Position (canonical wall / tier) | Target Coverage | Dedicated Isolation Valve |
 | --- | --- | --- | --- |
-| WJ1 | FRONT / UPPER | REAR / UPPER | IV1 |
-| WJ2 | LEFT / UPPER | RIGHT / UPPER | IV2 |
-| WJ3 | REAR / UPPER | FRONT / UPPER | IV3 |
-| WJ4 | RIGHT / UPPER | LEFT / UPPER | IV4 |
+| WJ1 | LEFT / UPPER | RIGHT / UPPER | IV1 |
+| WJ2 | REAR / UPPER | FRONT / UPPER | IV2 |
+| WJ3 | RIGHT / UPPER | LEFT / UPPER | IV3 |
+| WJ4 | FRONT / UPPER | REAR / UPPER | IV4 |
 | WJ5 | FRONT / LOWER | REAR / LOWER | IV5 |
-| WJ6 | LEFT / LOWER | RIGHT / LOWER | IV6 |
-| WJ7 | REAR / LOWER | FRONT / LOWER | IV7 |
+| WJ6 | REAR / LOWER | FRONT / LOWER | IV6 |
+| WJ7 | LEFT / LOWER | RIGHT / LOWER | IV7 |
 | WJ8 | RIGHT / LOWER | LEFT / LOWER | IV8 |
 
 No matrix position is a Water Jet or any other equipment; I7 and I16 are Sensors (Owner

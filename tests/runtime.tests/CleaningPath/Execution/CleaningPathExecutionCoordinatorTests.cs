@@ -111,7 +111,7 @@ public sealed class CleaningPathExecutionCoordinatorTests
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
         var resolution = CleaningPathResolver.Resolve(
             snapshot,
-            SyntheticCleaningPathStores.SensorConfiguration("G+201", "WJ4", "IV4"),
+            SyntheticCleaningPathStores.SensorConfiguration("G+201", "WJ3", "IV3"),
             new CleaningPathResolutionRequest { SensorId = "G+201" });
         Assert.True(resolution.Accepted);
         return (coordinator, boundary, snapshot, resolution);
@@ -175,11 +175,11 @@ public sealed class CleaningPathExecutionCoordinatorTests
             SensorId = "G+201",
             Path = path,
             Centre = snapshot.Centre,
-            CanonicalAssignedWaterJetId = "WJ4",
+            CanonicalAssignedWaterJetId = "WJ3",
             RequestedOverrideWaterJetId = null,
-            EffectiveWaterJetId = "WJ4",
+            EffectiveWaterJetId = "WJ3",
             EffectiveWjProvenance = EffectiveWaterJetProvenance.CANONICAL_ASSIGNMENT,
-            DerivedIsolationValveId = "IV4",
+            DerivedIsolationValveId = "IV3",
             CabinetId = "WSB2",
             ControllerId = "MC-WSB2",
             HorizontalAxisId = "C",

@@ -10,18 +10,19 @@
 // Owner-confirmed facts carried here (never derived, never inferred from another layer):
 //   - Axis A and C are the Horizontal Axis; axis B and D are the Vertical Axis.
 //   - Brake outputs: A to output 1, B to output 2, C to output 3, D to output 4.
-//   - The CANONICAL Water Jet mapping (MOTION_COMMISSIONING_DESIGN_REV2 / OWNER_CONFIRMED_REV2,
-//     Canonical Topology Adoption 2026-10-21): WJ1 = A,B (WSB2) | WJ2 = A,B (WSB1) |
-//     WJ3 = C,D (WSB1) | WJ4 = C,D (WSB2) | WJ5 = A,B (WSB3) | WJ6 = A,B (WSB4) |
-//     WJ7 = C,D (WSB3) | WJ8 = C,D (WSB4). Every row is explicit data: the two even
+//   - The CANONICAL Water Jet mapping (MOTION_COMMISSIONING_DESIGN_2026_10_25 /
+//     OWNER_CANONICAL_TOPOLOGY_2026_10_25, Owner-approved canonical Equipment topology
+//     adoption, 2026-10-25): WJ1 = A,B (WSB1) | WJ2 = C,D (WSB1) |
+//     WJ3 = C,D (WSB2) | WJ4 = A,B (WSB2) | WJ5 = A,B (WSB3) | WJ6 = C,D (WSB3) |
+//     WJ7 = A,B (WSB4) | WJ8 = C,D (WSB4). Every row is explicit data: the two
 //     Water Jets WJ2 and WJ4 take different axis pairs, and the two Water Jets of WSB1 take
 //     different axis pairs, so no parity rule and no cabinet rule can derive this table.
-//     The REV1 mapping this supersedes remains the historical identity of the earlier
-//     revision; it is never presented as current.
+//     The REV2 and REV1 mappings this supersedes remain the historical identities of the
+//     earlier revisions; they are never presented as current.
 //   - Under the superseded REV1 allocation, the Drawing rev1 expectation for WJ2 / WJ4 was
 //     the other axis pair on the same cabinet. That earlier discrepancy is recorded as
-//     EVIDENCE ONLY and is NOT physically resolved: REV2 does not assert which allocation
-//     the installed wiring matches.
+//     EVIDENCE ONLY and is NOT physically resolved: the current adoption does not assert
+//     which allocation the installed wiring matches.
 // One controller per WSB cabinet is INFERRED from that allocation, and is marked as an inference.
 //
 // This catalogue is STATIC: it never changes with a Runtime revision, it is not carried by the
@@ -33,12 +34,19 @@
 // configured. The Operator-facing axis wording is "Horizontal Axis" / "Vertical Axis" only.
 
 export const MOTION_COMMISSIONING_DESIGN_SCHEMA = 'wjss.motion-commissioning-design/1';
-/** Current canonical design identity (Canonical Topology Adoption, 2026-10-21). */
-export const MOTION_COMMISSIONING_DESIGN_ID = 'MOTION_COMMISSIONING_DESIGN_REV2';
+/** Current canonical design identity (Owner-approved canonical Equipment topology adoption, 2026-10-25). */
+export const MOTION_COMMISSIONING_DESIGN_ID = 'MOTION_COMMISSIONING_DESIGN_2026_10_25';
+/**
+ * HISTORICAL ONLY: the superseded design identity REV2 (Canonical Topology Adoption,
+ * 2026-10-21). REV2 remains the historical identity of its allocation and its
+ * publication/projection; current design publication and validation use
+ * MOTION_COMMISSIONING_DESIGN_2026_10_25.
+ */
+export const MOTION_COMMISSIONING_DESIGN_ID_HISTORICAL_REV2 = 'MOTION_COMMISSIONING_DESIGN_REV2';
 /**
  * HISTORICAL ONLY: the superseded design identity. REV1 remains the historical identity
  * of the earlier allocation and its publication/projection; current design publication
- * and validation use MOTION_COMMISSIONING_DESIGN_REV2.
+ * and validation use MOTION_COMMISSIONING_DESIGN_2026_10_25.
  */
 export const MOTION_COMMISSIONING_DESIGN_ID_HISTORICAL_REV1 = 'MOTION_COMMISSIONING_DESIGN_REV1';
 
@@ -138,15 +146,15 @@ export const MOTION_BRAKE_OUTPUT = Object.freeze({ A: 'OUTPUT_1', B: 'OUTPUT_2',
 /** The three installed limit inputs of an axis, in Reverse, Home, Forward order. */
 export const MOTION_LIMIT_SIGNAL_ROLES = Object.freeze(['REVERSE', 'HOME', 'FORWARD']);
 
-/** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the confirmed REV2 allocation. */
+/** [WaterJetId, CabinetId, HorizontalAxisId, VerticalAxisId, MappingStatus] - the confirmed current allocation. */
 export const MOTION_WATER_JET_BINDINGS = Object.freeze([
-  ['WJ1', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ2', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ3', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
-  ['WJ4', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ1', 'WSB1', 'A', 'B', 'CONFIRMED_OWNER'],
+  ['WJ2', 'WSB1', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ3', 'WSB2', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ4', 'WSB2', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ5', 'WSB3', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ6', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
-  ['WJ7', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ6', 'WSB3', 'C', 'D', 'CONFIRMED_OWNER'],
+  ['WJ7', 'WSB4', 'A', 'B', 'CONFIRMED_OWNER'],
   ['WJ8', 'WSB4', 'C', 'D', 'CONFIRMED_OWNER'],
 ]);
 
@@ -169,19 +177,21 @@ export const MOTION_NOT_VERIFIED_CLAIMS = Object.freeze([
  * The one recorded Drawing discrepancy, carried as EVIDENCE METADATA ONLY.
  *
  * The discrepancy was recorded against the superseded OWNER_CONFIRMED_REV1 allocation
- * (WJ2 = C,D; WJ4 = A,B). The current canonical allocation is OWNER_CONFIRMED_REV2
- * (WJ2 = A,B on WSB1; WJ4 = C,D on WSB2), so this is NOT an open decision and NOT
+ * (WJ2 = C,D; WJ4 = A,B). The superseded OWNER_CONFIRMED_REV2 allocation matched the
+ * Drawing rev1 expectation for the same two Water Jets (WJ2 = A,B on WSB1; WJ4 = C,D on
+ * WSB2); the current canonical allocation (OWNER_CANONICAL_TOPOLOGY_2026_10_25) again
+ * gives WJ2 = C,D on WSB1 and WJ4 = A,B on WSB2, so this is NOT an open decision and NOT
  * ambiguity. The note exists so the earlier discrepancy is not silently lost. It changes
  * no mapping, does not override the Owner, does not open the authorization gate, and
- * states explicitly that the physical installation has NOT been resolved: REV2 does not
- * assert which allocation the installed wiring matches.
+ * states explicitly that the physical installation has NOT been resolved: the current
+ * adoption does not assert which allocation the installed wiring matches.
  */
 export const MOTION_MAPPING_EVIDENCE_NOTES = Object.freeze([
   {
     evidenceId: 'MOTION-EVIDENCE-01',
     waterJetIds: Object.freeze(['WJ2', 'WJ4']),
     cabinetIds: Object.freeze(['WSB1', 'WSB2']),
-    statement: 'Historical evidence note (superseded for current allocation by OWNER_CONFIRMED_REV2): under the superseded OWNER_CONFIRMED_REV1 allocation, WJ2 held the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2, while the Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The current canonical allocation (OWNER_CONFIRMED_REV2) gives WJ2 the A,B axis pair on WSB1 and WJ4 the C,D axis pair on WSB2. This note records the earlier discrepancy only; the physical installation remains NOT_PHYSICALLY_RESOLVED, and nothing here asserts which allocation the installed wiring matches.',
+    statement: 'Historical evidence note (superseded for current allocation by OWNER_CANONICAL_TOPOLOGY_2026_10_25): under the superseded OWNER_CONFIRMED_REV1 allocation, WJ2 held the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2, while the Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The superseded OWNER_CONFIRMED_REV2 allocation matched that Drawing rev1 expectation (WJ2 the A,B axis pair on WSB1; WJ4 the C,D axis pair on WSB2). The current canonical allocation (OWNER_CANONICAL_TOPOLOGY_2026_10_25, Owner-approved canonical Equipment topology adoption, 2026-10-25) again gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. This note records the earlier discrepancy only; the physical installation remains NOT_PHYSICALLY_RESOLVED, and nothing here asserts which allocation the installed wiring matches.',
     status: 'DRAWING_REV1_CONFLICT_RECORDED',
     classification: 'EVIDENCE_ONLY_NOT_CANONICAL',
     effect: 'This note changes no Product mapping: all eight Water Jets publish CONFIRMED_OWNER with OWNER_CONFIRMED provenance, WJ2 and WJ4 included. The note exists so the Drawing discrepancy is not lost. It does not open the authorization gate and it does not authorise any motion.',
@@ -406,8 +416,10 @@ export async function motionCommissioningFingerprint(design = MOTION_COMMISSIONI
 export function validateMotionCommissioningDesign(design) {
   if (design === null || typeof design !== 'object' || Array.isArray(design)) return false;
   if (design.schema !== MOTION_COMMISSIONING_DESIGN_SCHEMA) return false;
-  // Current publication identity is REV2 (Canonical Topology Adoption). The REV1
-  // designId is a historical identity only and must never validate as current.
+  // Current publication identity is the dated current identity
+  // (Owner-approved canonical Equipment topology adoption, 2026-10-25). The REV2 and
+  // REV1 designIds are historical identities only and must never validate as current,
+  // and any unknown identity is refused fail-closed.
   if (design.designId !== MOTION_COMMISSIONING_DESIGN_ID) return false;
   if (design.authorizationGateState !== MOTION_GATE_CLOSED) return false;
   if (!Array.isArray(design.authorizationGateReasons) || design.authorizationGateReasons.length !== 1

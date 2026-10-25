@@ -28,8 +28,8 @@ public sealed class CleaningPathCompositionLifecycleTests
     };
 
     private static CleaningPathCompositionHarness RunAcceptedOpenHarness(
-        string assignedWaterJetId = "WJ4",
-        string assignedIsolationValveId = "IV4",
+        string assignedWaterJetId = "WJ3",
+        string assignedIsolationValveId = "IV3",
         string? overrideWaterJetId = null)
     {
         var harness = new CleaningPathCompositionHarness(
@@ -38,7 +38,7 @@ public sealed class CleaningPathCompositionLifecycleTests
             overrideWaterJetId: overrideWaterJetId);
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 16);
         return harness;
     }
 
@@ -46,35 +46,35 @@ public sealed class CleaningPathCompositionLifecycleTests
     {
         harness.DriveUntil(() => harness.Composition.Current!.Status == CleaningPathCompositionStatus.SupervisingValveClose);
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.DriveUntilTerminal();
     }
 
     [Fact]
     public void Effective_Wj_Override_Derives_Paired_Iv_Wsb_And_Axes()
     {
-        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ4");
+        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ3");
         RunAcceptedClose(harness);
 
         var identity = harness.Composition.Result!.Handoff.Identity;
         Assert.Equal("WJ2", identity.CanonicalAssignedWaterJetId);
-        Assert.Equal("WJ4", identity.EffectiveWaterJetId);
+        Assert.Equal("WJ3", identity.EffectiveWaterJetId);
         Assert.Equal(EffectiveWaterJetProvenance.ENTRY_WJ_OVERRIDE, identity.EffectiveWjProvenance);
 
         // The paired valve, cabinet, controller and axes come from the canonical derivations of the
         // EFFECTIVE Water Jet: WJ4 pairs IV4 and runs C / D on WSB2.
-        Assert.Equal("IV4", identity.DerivedIsolationValveId);
+        Assert.Equal("IV3", identity.DerivedIsolationValveId);
         Assert.Equal("WSB2", identity.CabinetId);
         Assert.Equal("MC-WSB2", identity.ControllerId);
         Assert.Equal("C", identity.HorizontalAxisId);
         Assert.Equal("D", identity.VerticalAxisId);
-        Assert.All(harness.Equipment.ValveCommands, request => Assert.Equal("IV4", request.ValveId));
+        Assert.All(harness.Equipment.ValveCommands, request => Assert.Equal("IV3", request.ValveId));
     }
 
     [Fact]
     public void Effective_Wj_Override_Does_Not_Mutate_P1_Through_P6()
     {
-        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ4");
+        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ3");
         var pathBefore = harness.StoreSnapshot.PathFor(CleaningPathCompositionHarness.Sensor)!;
         RunAcceptedClose(harness);
 
@@ -95,16 +95,16 @@ public sealed class CleaningPathCompositionLifecycleTests
         Assert.Equal(EffectiveWaterJetProvenance.CANONICAL_ASSIGNMENT, canonical.Composition.Result!.Handoff.Identity.EffectiveWjProvenance);
         Assert.Null(canonical.Composition.Result.Handoff.Identity.RequestedOverrideWaterJetId);
 
-        var overridden = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ4");
+        var overridden = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ3");
         RunAcceptedClose(overridden);
         Assert.Equal(EffectiveWaterJetProvenance.ENTRY_WJ_OVERRIDE, overridden.Composition.Result!.Handoff.Identity.EffectiveWjProvenance);
-        Assert.Equal("WJ4", overridden.Composition.Result.Handoff.Identity.RequestedOverrideWaterJetId);
+        Assert.Equal("WJ3", overridden.Composition.Result.Handoff.Identity.RequestedOverrideWaterJetId);
     }
 
     [Fact]
     public void Active_Composition_Cannot_Mutate_Assignment_Or_Path()
     {
-        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ4");
+        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ3");
         var pathBefore = harness.StoreSnapshot.PathFor(CleaningPathCompositionHarness.Sensor)!;
         var resolutionBefore = harness.Resolution.Resolution!;
         RunAcceptedClose(harness);
@@ -112,7 +112,7 @@ public sealed class CleaningPathCompositionLifecycleTests
         Assert.Same(pathBefore, harness.StoreSnapshot.PathFor(CleaningPathCompositionHarness.Sensor));
         Assert.Same(resolutionBefore, harness.Resolution.Resolution);
         Assert.Equal("WJ2", harness.Resolution.Resolution!.CanonicalAssignedWaterJetId);
-        Assert.Equal("WJ4", harness.Resolution.Resolution!.EffectiveWaterJetId);
+        Assert.Equal("WJ3", harness.Resolution.Resolution!.EffectiveWaterJetId);
     }
 
     [Fact]
@@ -121,10 +121,10 @@ public sealed class CleaningPathCompositionLifecycleTests
         var harness = new CleaningPathCompositionHarness();
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.DriveUntil(() => harness.Equipment.ValveCommands.Count == 2);
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.DriveUntilTerminal();
 
         var handoff = harness.Composition.Result!.Handoff;
@@ -140,7 +140,7 @@ public sealed class CleaningPathCompositionLifecycleTests
         var harness = RunAcceptedOpenHarness();
         harness.DriveUntil(() => harness.Composition.Current!.CurrentPointId == JobPhase.P2);
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.Composition.Abort();
         harness.DriveUntilTerminal();
 
@@ -157,7 +157,7 @@ public sealed class CleaningPathCompositionLifecycleTests
         var harness = RunAcceptedOpenHarness();
         harness.DriveUntil(() => harness.Composition.Current!.CurrentPointId == JobPhase.P2);
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.Composition.RequestClose();
         harness.DriveUntilTerminal();
 
@@ -174,7 +174,7 @@ public sealed class CleaningPathCompositionLifecycleTests
         var harness = RunAcceptedOpenHarness();
         harness.DriveUntil(() => harness.Composition.Current!.CurrentPointId == JobPhase.P2);
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.Composition.Abort();
         harness.DriveUntilTerminal();
 
@@ -191,7 +191,7 @@ public sealed class CleaningPathCompositionLifecycleTests
         var harness = RunAcceptedOpenHarness();
         harness.DriveUntil(() => harness.Composition.Current!.CurrentPointId == JobPhase.P2);
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.Composition.RequestClose();
         harness.DriveUntilTerminal();
 
@@ -288,11 +288,11 @@ public sealed class CleaningPathCompositionLifecycleTests
     [Fact]
     public void Composition_Identity_Immutable_During_Active_Run()
     {
-        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ4");
+        var harness = RunAcceptedOpenHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ3");
         var identityBefore = harness.Composition.Current!.Identity;
         harness.DriveUntil(() => harness.Composition.Current!.CurrentPointId == JobPhase.P2);
 
         Assert.Same(identityBefore, harness.Composition.Current!.Identity);
-        Assert.Equal("IV4", harness.Composition.Current!.Identity.DerivedIsolationValveId);
+        Assert.Equal("IV3", harness.Composition.Current!.Identity.DerivedIsolationValveId);
     }
 }

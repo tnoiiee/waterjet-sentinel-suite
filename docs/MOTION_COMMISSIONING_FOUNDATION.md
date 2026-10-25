@@ -3,7 +3,23 @@
 **Status: DEVELOPMENT CHECKPOINT RECORD. NOT Owner-reviewed. NOT merged. No hardware action has
 been taken and none is authorized by this document.**
 
-> **Canonical Topology Adoption supersession (2026-10-21).** The Water Jet → WSB cabinet →
+> **Owner-approved canonical Equipment topology adoption supersession (2026-10-25).** The Water
+> Jet → WSB cabinet → axis-pair allocation, the §2 table, the §3 evidence-note wording and the
+> motion topology revision identity in this record are superseded for current authority by the
+> Owner-approved canonical Equipment topology adoption: current identity
+> `OWNER_CANONICAL_TOPOLOGY_2026_10_25` / `MOTION_COMMISSIONING_DESIGN_2026_10_25` with
+> WJ1 = A,B (WSB1), WJ2 = C,D (WSB1), WJ3 = C,D (WSB2), WJ4 = A,B (WSB2), WJ5 = A,B (WSB3),
+> WJ6 = C,D (WSB3), WJ7 = A,B (WSB4), WJ8 = C,D (WSB4). `OWNER_CONFIRMED_REV2` /
+> `OWNER_CONFIRMED_REV1` and `MOTION_COMMISSIONING_DESIGN_REV2` /
+> `MOTION_COMMISSIONING_DESIGN_REV1` remain the historical identities of the earlier
+> allocations and of this record's dated §15 history; the dated record below is preserved, and
+> the current-facing §2 / §3 statements are corrected in place. The adoption changes no gate,
+> refusal, axis-role (A/C Horizontal, B/D Vertical) or brake-output (A→1, B→2, C→3, D→4) fact,
+> and authorizes no motion beyond the existing scope.
+
+> **Canonical Topology Adoption supersession (2026-10-21; superseded for current authority by
+> the Owner-approved canonical Equipment topology adoption of 2026-10-25 above; retained as
+> history).** The Water Jet → WSB cabinet →
 > axis-pair allocation, the §2 table, the §3 evidence-note wording and the motion topology
 > revision identity in this record are superseded for current authority by the Owner
 > Canonical Topology Adoption: current identity `OWNER_CONFIRMED_REV2` /
@@ -56,14 +72,14 @@ any kind. There is no code path in this revision that can produce a controller c
 | --- | --- | --- |
 | Axis role | A and C are the **Horizontal Axis**; B and D are the **Vertical Axis** | Owner-confirmed |
 | Brake output | axis A → output 1, B → output 2, C → output 3, D → output 4 | Owner-confirmed |
-| WJ1 (WSB2) | A, B | Owner-confirmed (REV2) |
-| WJ2 (WSB1) | A, B | **Canonical (REV2)** — Owner-confirmed; the Drawing rev1 discrepancy against the superseded REV1 row is recorded as evidence only (§3) |
-| WJ3 (WSB1) | C, D | Owner-confirmed (REV2) |
-| WJ4 (WSB2) | C, D | **Canonical (REV2)** — Owner-confirmed; the Drawing rev1 discrepancy against the superseded REV1 row is recorded as evidence only (§3) |
-| WJ5 (WSB3) | A, B | Owner-confirmed (REV2) |
-| WJ6 (WSB4) | A, B | Owner-confirmed (REV2) |
-| WJ7 (WSB3) | C, D | Owner-confirmed (REV2) |
-| WJ8 (WSB4) | C, D | Owner-confirmed (already canonical under REV1; unchanged) |
+| WJ1 (WSB1) | A, B | Owner-confirmed (current canonical topology, 2026-10-25) |
+| WJ2 (WSB1) | C, D | **Canonical (current)** — Owner-confirmed; the Drawing rev1 discrepancy recorded against the superseded REV1 row is evidence only (§3) |
+| WJ3 (WSB2) | C, D | Owner-confirmed (current canonical topology, 2026-10-25) |
+| WJ4 (WSB2) | A, B | **Canonical (current)** — Owner-confirmed; the Drawing rev1 discrepancy recorded against the superseded REV1 row is evidence only (§3) |
+| WJ5 (WSB3) | A, B | Owner-confirmed (current canonical topology, 2026-10-25) |
+| WJ6 (WSB3) | C, D | Owner-confirmed (current canonical topology, 2026-10-25) |
+| WJ7 (WSB4) | A, B | Owner-confirmed (current canonical topology, 2026-10-25) |
+| WJ8 (WSB4) | C, D | Owner-confirmed (canonical under every recorded allocation; unchanged) |
 | Controller model | DMC-B140-M (four axes) | Owner-provided WSB cabinet drawing |
 | Controllers | four, one per WSB cabinet | **Inferred** — see §3 |
 | Position sense | axis A: encoder; axes B, C, D: installed switch set | Owner-confirmed |
@@ -76,9 +92,10 @@ physical controller axis letter (A/B/C/D) may appear **only as diagnostic identi
 ("Horizontal Axis · C"), never instead of it.
 
 The eight Water Jet rows are **explicit data, not a rule**. The mapping is not derived from a parity
-rule, from the Water Jet ordinal, or from the cabinet: the two even Water Jets WJ2 (A,B) and WJ4
-(C,D) take different axis pairs, the two odd Water Jets WJ5 (A,B) and WJ7 (C,D) take different axis
-pairs, and the two Water Jets of WSB1 (WJ2 = A,B and WJ3 = C,D) take different axis pairs. No
+rule, from the Water Jet ordinal, or from the cabinet: among the even Water Jets WJ2 (C,D) and
+WJ4 (A,B) take different axis pairs, among the odd Water Jets WJ1 (A,B) and WJ3 (C,D) take
+different axis pairs while WJ5 (A,B) and WJ7 (A,B) agree where any alternating rule would
+disagree, and the two Water Jets of every WSB cabinet take different axis pairs. No
 odd/even formula and no cabinet-derived formula reproduces this table, so none is implemented;
 tests assert the exact eight rows instead.
 
