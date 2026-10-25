@@ -70,6 +70,7 @@ internal sealed class H1DryCommissioningHarness
     internal ManualMotionCleaningPathBoundary Boundary { get; }
     internal H1DryCommissioningCoordinator Coordinator { get; }
     internal CleaningPathSnapshot StoreSnapshot { get; }
+    internal string SelectedSensor { get; }
     internal SensorConfigurationRecord SensorConfiguration { get; }
     internal CleaningPathResolutionResult Resolution { get; }
 
