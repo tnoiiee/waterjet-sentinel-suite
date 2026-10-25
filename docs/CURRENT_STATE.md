@@ -1,5 +1,44 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H1 WSB1 dry Cleaning Path commissioning — implementation record (2026-10-25; software only;
+> HARDWARE NOT EXECUTED).** The Product now owns the H1 dry commissioning run for WSB1 through the
+> existing typed boundaries only (composed, never duplicated): one deterministic run coordinator
+> (`H1DryCommissioningCoordinator`) sequences typed Home per axis (independent; each carrying the
+> typed position-zero definition and its zero verification), coordinate establishment, P1→P6
+> through the existing Phase 3B path execution coordinator (null point-advance gate), and the dry
+> Centre return on the fixed Centre contract (125 mm / 125 mm = 1250000 / 1250000 native). WSB1-only
+> admission and the canonical route match are fail-closed against the canonical Motion topology
+> catalog; every start precondition is typed (controller identity, Owner-local endpoint and
+> profile, dry mode, Pump/physical-IV/Queue-AutoSequence command paths unavailable, physical abort
+> accessible, Operator/Observer, ready session with no active operation and current/fresh Status,
+> TP, RP and Brake-output observations). The typed dual-zero definition is recorded in Product
+> state as optional and separately authorized (profile-permitted, dispatch-only, effect UNVERIFIED,
+> clears the homed claim) and is never required by the run. Failure/Abort/Close preserve the first
+> primary cause or typed request cause, block later points, stop every remaining active axis
+> exactly once through the typed lifecycle (supervised to inactive; Brake applied after inactive),
+> record cleanup separately, and publish the typed dry Safe Return completion only after both
+> Centre axes verify — never a Pump, Valve, physical Cleaning Job or Production completion. The
+> H1 operator surface (existing `apps/motion-commissioning`, additive `h1-simulated` /
+> `h1-wsb1-hardware` modes) shows DRY / NO WATER prominently, the selected identity with
+> provenance and informational paired IV, the P1–P6 and Centre contracts, live per-axis typed
+> observations and the run evidence, with fail-closed Start/Abort/Close controls and no raw
+> command input. New Owner-local variable `WJSS_SENSOR_PARAMETER_CSV` names the migrated
+> sensor-parameter CSV (the canonical assignment source; read once; never committed). Checkpoint
+> chain on branch `arena/7968e33e-waterjet-sentinel-suite` (PR #41 open, unmerged, base `main`
+> `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2`): documentation realignment `edb57254`; H1
+> implementation + focused tests `c803335fc4957dfa2064d839328188d609f8046e` (6 files: 2 new
+> Product files, 2 new focused test files (~34 tests), the new operator surface and the additive
+> host modes). The exact H1 real-Hardware trial procedure is prepared for Owner review in
+> [`H1_DRY_CLEANING_PATH_TRIAL_PROCEDURE.md`](H1_DRY_CLEANING_PATH_TRIAL_PROCEDURE.md) (H1-T0
+> read-only identity → T1 Home and coordinate establishment → T2 representative dual-axis Move →
+> T3 selected-Sensor P1→P6 → T4 Centre return → T5 Owner-approved Stop/Abort evidence). NOT
+> VERIFIED: .NET restore/build/test NOT RUN in the Author environment (no .NET SDK) — the
+> Owner-local exact-head gate is the validation of record; Home, DP/DE, dual-axis Move, P1→P6,
+> Centre return and Stop/Abort Hardware behavior, Pump/IV Hardware behavior, integrated Cleaning
+> Job and Production remain NOT VERIFIED. Real Hardware execution stays fenced behind the separate
+> exact-head Owner authorization ("AUTHORIZE H1 REAL GALIL DRY TRIAL ON EXACT PR HEAD <SHA> USING
+> THE REVIEWED H1 TRIAL PROCEDURE"). H2–H5 remain NOT AUTHORIZED. NO HARDWARE. NO PRODUCTION.
+
 > **H1 WSB1 Real Galil Dry Cleaning-Path Commissioning — current Owner-authorized Product
 > Critical Path (2026-10-25).** The approved merged baseline is `main`
 > `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2` (the PR #40 merge commit; Parent 1
