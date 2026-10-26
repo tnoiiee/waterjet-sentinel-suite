@@ -36,6 +36,15 @@ public sealed class ManualMotionSimulationOptions
     /// <summary>When true, the simulated zero definition is acknowledged but changes nothing (a zero-verification-failure scenario).</summary>
     public bool ZeroDefinitionIgnored { get; init; }
 
+    /// <summary>
+    /// When true, a simulated dual-zero definition clears only that axis's RP divergence while its
+    /// TP reading keeps the physical-position basis. This models the Owner-observed Hardware
+    /// behaviour in which the dual (encoder) definition moved one position value to zero and left
+    /// the other far from it, so the strengthened both-reads zero verification still fails closed.
+    /// Off by default: with no divergence configured this option changes nothing.
+    /// </summary>
+    public bool RpBiasClearedByDualZero { get; init; }
+
     /// <summary>A command kind that reports a simulated communication fault.</summary>
     public ManualMotionPortCommandKind? FaultOnCommand { get; init; }
 
@@ -454,7 +463,17 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
 
             case ManualMotionPortCommandKind.DefineDualZero:
                 axis.PositionMoveEngaged = false;
-                return axis.Mode == SimulatedMode.Idle;
+                if (axis.Mode != SimulatedMode.Idle)
+                {
+                    return false;
+                }
+
+                if (_options.RpBiasClearedByDualZero)
+                {
+                    axis.RpDivergenceCleared = true;
+                }
+
+                return true;
 
             case ManualMotionPortCommandKind.Acceleration:
             case ManualMotionPortCommandKind.Deceleration:
@@ -602,7 +621,7 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 // The optional per-axis bias makes RP disagree with TP deterministically (a TP/RP
                 // contradiction scenario); with no bias RP equals TP exactly as before.
                 value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero)
-                    + (axis.Options?.RpBias ?? 0m);
+                    + (axis.RpDivergenceCleared ? 0m : axis.Options?.RpBias ?? 0m);
                 return true;
 
             case ManualMotionReadKind.BrakeOutputState:
@@ -665,6 +684,12 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         /// operation (including a parked-but-unverified state), never to Home or other lifecycles.
         /// </summary>
         public bool PositionMoveEngaged { get; set; }
+
+        /// <summary>
+        /// Set when a simulated dual-zero definition cleared this axis's RP divergence; the TP
+        /// reading is unaffected, so a TP/RP contradiction can be reproduced deterministically.
+        /// </summary>
+        public bool RpDivergenceCleared { get; set; }
 
         public int BrakeOutput { get; }
 

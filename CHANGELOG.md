@@ -13,6 +13,48 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-26 — H1 Home-carried reset-encoder correction (Owner decision; software only; no hardware authorization)
+
+**Status: SOURCE-AUTHORED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`), on top of the
+merged baseline `bfd2867` and the investigation commit `25389cd`; .NET RESTORE/BUILD/TEST NOT RUN
+(no .NET SDK in the Author environment; the Owner-local gate remains the validation of record).
+Node boundary scan and its self-tests ran in the Author environment. NO NATIVE LOAD, NO CONTROLLER
+CONTACT, NO HARDWARE USE.**
+
+- **Owner decision (2026-10-26).** The H1 Home conditions and the both-reads TP/RP zero-verification
+  requirement are correct and were kept unchanged. The defect was that the Home-carried zero
+  establishment dispatched the position definition (`DP<axis>=0`) only, while the exact Legacy
+  Source proves the commissioned Reset Encoder sequence is `DP<axis>=0` then `DE<axis>=0`. H1 must
+  use the complete sequence after a successful Home, followed by the existing fresh TP/RP
+  verification.
+- **Corrected classification.** `PROVEN H1 COMMAND-SEQUENCE DEFECT`; root-cause confidence
+  `STRONGLY SUPPORTED BY` the exact current WJSS command sequence, the exact Legacy Reset Encoder
+  sequence and the Owner Hardware observation (H1 reached zero verification, RP became zero, TP
+  remained far from zero, run ended `HOME_ZERO_VERIFICATION_FAILED`). Final causal confirmation
+  requires the separately authorized Hardware re-trial on the corrected head; no Hardware proof is
+  claimed.
+- **Changed:** the Manual Motion session's zero-establishing lifecycle now dispatches the typed
+  position-zero definition and then the typed dual-zero definition for a Home operation as one
+  contiguous native pair (new operation phase `DefiningDualZero`, new typed codes
+  `HOME_ZERO_SEQUENCE_DISPATCHED` / `HOME_DUAL_ZERO_REFUSED`), with the zero-verification watermark
+  taken from the **last** command so no earlier reading can verify zero; the deterministic
+  simulated port gained one opt-in `RpBiasClearedByDualZero` scenario option; H1 coordinate evidence
+  reports `H1_DUAL_ZERO_DISPATCHED_IN_HOME_SEQUENCE` / `H1_DUAL_ZERO_REFUSED_IN_HOME_SEQUENCE`; the
+  focused Manual Motion and H1 suites were extended and the affected expectations updated; the
+  Legacy-equivalence investigation record, the H1 trial procedure and the Manual Motion runbook were
+  corrected.
+- **Unchanged:** the Home motion sequence (brake release, settle, home speed, home search, begin),
+  the Stop supervision, the brake lifecycle, the Move lifecycle, the Centre return (125 mm / 125 mm),
+  both position reads and the `PositionTolerance`, the standalone define-position-zero and
+  define-dual-zero semantics, the profile permission semantics, the Run Path readiness rule and its
+  prohibition on Home/DP/DE, the canonical topology, P1→P6 order, abort/close/cleanup, and every
+  Pump, physical Isolation Valve, water, Queue and Production exclusion. No dependency, package or
+  lock file changed.
+- **Not verified:** the corrected sequence is proven at Source level and under deterministic
+  simulation only. Real-Hardware H1 behavior — including which of the two position values each
+  definition command actually zeroes on this machine — remains `NOT VERIFIED` until the separately
+  authorized Owner-local Real Galil H1 re-trial on the exact corrected head.
+
 ### 2026-10-25 — Owner-approved canonical Equipment topology adoption + H1 synthetic route repair (software/data only; no hardware authorization)
 
 **Status: SOURCE-AUTHORED ON PR #41 (`arena/7968e33e-waterjet-sentinel-suite`); .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in

@@ -21,6 +21,15 @@ paraphrase of behaviour, and all Legacy numeric constants are referred to by nam
 H1 or Manual Motion divergence from the Legacy application, and whether H1 must therefore
 reproduce the Legacy reset-encoder sequence.
 
+**Owner decision (supersedes the §4 determination of the first pass).** The Owner has ruled that
+the H1 Home conditions and the TP/RP zero-verification requirement are correct and must remain,
+that the missing dual-zero definition inside the Home-carried zero establishment is the defect,
+and that H1 must use the complete Legacy reset-encoder sequence after a successful Home. The
+first-pass determination recorded in §4 is retained verbatim as dated history and is explicitly
+superseded; §4.5 records the corrected classification and §8 the correction that was made. **A
+Hardware re-trial on the corrected exact head is still required before any physical confirmation
+is claimed.**
+
 ---
 
 ## 1. Evidence of record and pack integrity
@@ -127,8 +136,9 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
 | Inter-command delay | none | none within each action |
 | Post-command verification | none — no position read is taken after either command | position definition verifies fresh TP **and** RP against zero within the configured tolerance; encoder definition is dispatch-only and reported as effect-unverified |
 | Failure handling | one generic message; the exception propagates to the caller | typed refusal codes; no vendor text; session state preserved |
-| Effect on the coordinate claim | not modelled | both actions clear the session's Home claim |
-| Classification | **LEGACY-EQUIVALENCE GAP** — the Legacy one-action reset exists as two separate WJSS actions, and no WJSS action claims reset-encoder equivalence. | |
+| Effect on the coordinate claim | not modelled | both standalone actions clear the session's Home claim |
+| Where the sequence now runs | the Operator reset button only | the Home lifecycle of the Manual Motion session carries the same pair, in the Legacy order, when the Owner-local profile permits the dual-zero definition; the standalone actions remain available and unchanged |
+| Classification | **RESOLVED by the authorized correction** — the Legacy command pair is now composed into the WJSS Home lifecycle as one contiguous native pair, `DP<axis>=0` then `DE<axis>=0`, with the Owner-approved fresh TP/RP verification as an additive strengthening. No standalone WJSS action claims reset-encoder equivalence, and none is added. | |
 
 ### 3.2 Home
 
@@ -138,11 +148,11 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
 | Sequence | brake release, fixed wait, home speed, home search, begin | brake release, configured settle, home speed, home search, begin — one command per step |
 | Brake | released by the helper before the sequence | released before the sequence; polarity from the Owner-local profile |
 | Completion detection | **only** the poll loop seeing the home bit; no timeout, no resolution | the profile-decoded home bit observed after this operation's begin, bounded by the configured Home timeout |
-| On completion | stop, fixed wait, position definition, clear the homing flag | supervised stop, wait for an observation that the axis is inactive, position definition, fresh TP/RP zero verification, brake apply |
-| Encoder definition | **never** | **never** (unchanged by this investigation) |
+| On completion | stop, fixed wait, position definition, clear the homing flag | supervised stop, wait for an observation that the axis is inactive, position definition, **then the encoder definition** (the Legacy Reset Encoder pair), fresh TP/RP zero verification, brake apply |
+| Encoder definition | **never in the Home handler** — the Legacy Application sends it only from its separate reset-encoder action | **carried by the Home lifecycle** as the second half of the Owner-approved composition, which is why the two Legacy operations must be distinguished |
 | Failure path | none — the axis stays in the homing state; no brake re-apply | bounded timeout, `.HomeFailed`, brake apply after an observed stop |
 | Already-active home input | no such check; the sequence is dispatched regardless | `HOME_INPUT_ALREADY_ACTIVE` refusal before any native Home dispatch, fail-closed, bounded by observation freshness |
-| Classification | order **EQUIVALENT**; completion, timing, bounds and failure are **DELIBERATE STRENGTHENING**. The position-definition-only completion is **EQUIVALENT**. | |
+| Classification | Home **motion** order is **EQUIVALENT**; completion, timing, bounds and failure are **DELIBERATE STRENGTHENING**; the completion command pair is the Legacy Reset Encoder sequence composed in, which is a deliberate composition of two Legacy operations rather than a Legacy Home behaviour; the both-reads verification is an **Owner-approved strengthening** with no Legacy counterpart. | |
 
 ### 3.3 Jog
 
@@ -257,6 +267,11 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
 
 ## 4. Determination on the dual-zero question
 
+> **Dated history — superseded.** Sections 4.1 to 4.3 are the first-pass determination of
+> 2026-10-26 and are preserved verbatim. The Owner decision recorded in the header and in section
+> 4.5 supersedes 4.2 and 4.3. Section 4.1 (source facts) and 4.4 (the nature of the post-command
+> verification) remain accurate and are not superseded.
+
 ### 4.1 What is proven at source level
 
 - **P-1.** The Legacy reset-encoder action is a position definition followed by an encoder
@@ -307,13 +322,55 @@ Restated in the Owner's own vocabulary, the composite answer is:
 It is therefore **not** proven that H1 must reproduce the Legacy reset-encoder sequence, and the
 conditional implementation was correctly not made.
 
+*End of the superseded first-pass determination.*
+
 ### 4.4 Why the requested post-command verification is not Legacy equivalence
 
 The instruction attached a requirement to take fresh TP and RP observations after the final command
 and verify both within tolerance. That requirement is **good practice, but it is not Legacy
 equivalence**: the Legacy reset path takes no position reading at all after either definition. Any
 combined reset would therefore be a WJSS strengthening built on a Legacy command shape — one more
-reason it cannot be adopted as a "correction" without an Owner decision.
+reason it could not be adopted without an Owner decision.
+
+The Owner has since taken that decision: the fresh post-definition TP/RP verification is retained as
+an **Owner-approved WJSS safety strengthening**, and the Legacy command shape is composed beneath
+it. The two are not the same thing, and the correction treats them separately: the *command
+sequence* is Legacy-equivalent, the *verification* is a deliberate WJSS strengthening.
+
+### 4.5 Corrected determination — PROVEN H1 COMMAND-SEQUENCE DEFECT
+
+**Classification: `PROVEN H1 COMMAND-SEQUENCE DEFECT`.**
+
+The first pass framed the question as "is the omission of `DE` the cause of a divergence?" and
+answered "no divergence is recorded". That framing was incomplete in one decisive respect, and the
+Owner's Hardware evidence supplies the missing effect: **H1 already requires a zero proof from both
+position reads, so the run cannot succeed on a single definition whenever the two reads are not
+independently zeroed by one command.** The defect is therefore not "a difference from Legacy" but
+**an internal contradiction between the H1 contract and the H1 lifecycle**:
+
+| Element | Evidence |
+| --- | --- |
+| The H1 contract requires `Homed` + `ZeroVerified` from **both** TP and RP within tolerance. | committed contract and tests |
+| The Home-carried zero establishment dispatched **only** the position definition. | exact WJSS Source at `25389cd` |
+| The Legacy commissioned reset-encoder sequence is the position definition **then** the encoder definition. | exact Legacy Source pack (§2, §3.1) |
+| On the current implementation H1 reached zero verification, RP became zero, TP stayed at roughly 42,000 to 43,000 native units, and the run ended `HOME_ZERO_VERIFICATION_FAILED`. | Owner Hardware observation |
+
+**Root-cause confidence: `STRONGLY SUPPORTED BY`** the exact current WJSS command sequence, the exact
+Legacy Reset Encoder sequence, and the Owner Hardware observation. **Final causal confirmation still
+requires the separately authorized Hardware re-trial after this correction; no Hardware proof is
+claimed before that re-trial.**
+
+Two related conclusions are corrected with it:
+
+1. **Legacy Home and the Legacy Reset Encoder are separate operations.** The Legacy home-complete
+   branch sends a stop, a fixed wait and a position definition only; it never sends the encoder
+   definition. The Legacy reset-encoder action is the only place the two definitions appear together.
+   Reproducing the reset-encoder *command pair* inside the WJSS Home lifecycle is therefore a
+   deliberate **composition of two Legacy operations into one WJSS lifecycle**, authorized by the
+   Owner, not a claim that Legacy Home contained it.
+2. **H1 intentionally composes Home with the commissioned Legacy Reset Encoder sequence**: stop and
+   inactive verification, then `DP<axis>=0`, then `DE<axis>=0`, then fresh TP/RP verification. The
+   missing `DE` was a defect **relative to the H1 contract**, not a divergence from Legacy Home.
 
 ---
 
@@ -353,6 +410,11 @@ Owner decision in §6 was anticipated.
 
 ## 6. Owner decisions requested
 
+> **Resolution status.** **D-A is RESOLVED** by the Owner decision recorded in the header and in
+> section 4.5: H1 must use the complete Legacy Reset Encoder sequence after a successful Home, and
+> the fresh TP/RP verification is retained. **D-B is ANSWERED** by the Owner Hardware observation
+> recorded in section 4.5. **D-C and D-D remain OPEN** and do not block this correction.
+
 1. **D-A — Reset-encoder surface (blocking this question only).** Should WJSS gain a single typed
    "reset encoder" action that reproduces the Legacy combined definition, as a strengthening with
    fresh post-command TP and RP verification, or should the two existing separate actions remain the
@@ -373,35 +435,56 @@ Owner decision in §6 was anticipated.
 
 ---
 
-## 7. What was not done, and why
+## 7. What the first pass did not do, and what the correction changed
 
-- **No code, test, contract, profile, documentation-of-record, dependency or lock file was
-  modified.** The conditional implementation was not triggered: the correction is not proven and an
-  Owner decision is required.
-- **No implementation Scope was expanded.** The material differences in §5 are reported, not
-  actioned.
-- **No hardware was used.** No endpoint was contacted, no library loaded, no command dispatched.
-- **No evidence package was recreated** and the earlier baseline documents were not amended.
+The first pass changed no code and used no Hardware; that statement remains true of the first pass
+and is preserved as dated history. The correction that followed the Owner decision changed exactly
+the Home-carried zero establishment and its evidence:
+
+- the typed operation lifecycle gained one phase and one dispatch step so that a Home operation
+  sends the position definition and then the encoder definition as one contiguous native pair;
+- the zero-verification watermark moved from the position definition to the **last**
+  zero-establishing command, so a reading taken before the encoder definition can never verify zero;
+- the advance-order rule keeps the axis's encoder definition immediately after its accepted
+  position definition, so no other axis's command can be interleaved between them;
+- H1 records the composition as such (`H1_DUAL_ZERO_DISPATCHED_IN_HOME_SEQUENCE` /
+  `H1_DUAL_ZERO_REFUSED_IN_HOME_SEQUENCE`) instead of reporting the encoder definition as an
+  optional, unrelated manual define;
+- the standalone define-position-zero and define-dual-zero operations are unchanged;
+- no material difference in §5 was repaired, because none is inseparable from this correction.
+
+**No Hardware was used in the correction either.** No endpoint was contacted, no library loaded and
+no command dispatched.
 
 ---
 
-## 8. Impact analysis — what a future authorized change would touch
+## 8. Scope of the authorized correction
 
-Recorded so that a later authorized pass is scoped from evidence rather than from guesswork. None of
-this was performed.
+The first pass recorded an impact analysis for a future authorized change. The Owner decision made
+that change authorized, and the correction followed it exactly; this section records what was
+touched and what deliberately was not.
 
-- the closed command plan already renders both definition shapes, so no new template is required;
-- the operation lifecycle would need one combined operation kind, or an ordered second definition
-  inside the existing zero-definition lifecycle, with the verification watermark taken from the
-  **last** command rather than the first (the current verification is keyed to the position
-  definition's sequence, which would be stale if an encoder definition followed it);
-- the zero-verification step would need to keep its "fresh TP and RP after the final command"
-  semantics, which is the one strengthening the instruction required;
-- the Home lifecycle, the H1 Run Path, the Centre return and the Run Path readiness rule would be
-  unaffected, because none of them may dispatch a reset-encoder sequence;
-- the accepted H1 contract §3 and the pinned tests would have to be amended under the same
-  authorization, and the dual-zero disposition code used by H1 would have to distinguish "not
-  permitted" from "permitted but still excluded from the run".
+**Touched:**
+
+- the operation lifecycle's zero establishment, as described in section 7;
+- the closed typed vocabulary: one new operation phase and two new typed outcome codes, with no new
+  command kind, no new mnemonic and no raw command text;
+- the H1 coordinate evidence mapping and its disposition codes;
+- the deterministic simulated port: one opt-in option that reproduces the Owner-observed split
+  between the two position values, so the defect and its absence are both testable;
+- the focused tests that pin the sequence, the order, the refusal paths and the watermark;
+- the documents named in section 9 of the correction report.
+
+**Deliberately untouched:**
+
+- the closed command plan: both definition shapes were already rendered, so no template changed;
+- the Home motion behavior (brake release, settle, home speed, home search, begin), the Stop
+  supervision, the brake lifecycle, the Move lifecycle and the Centre return;
+- the position tolerance, the zero-verification predicate and both position reads;
+- the standalone Manual Motion operations and the profile permission semantics;
+- the Run Path readiness rule, which still requires a session-scoped `Homed` + `ZeroVerified` and
+  still dispatches no Home, no position definition and no encoder definition;
+- every dependency, package and lock file.
 
 ---
 
@@ -410,14 +493,35 @@ this was performed.
 1. The effect of either definition command on the installed controller is **NOT VERIFIED**; the
    vendor command reference is not in the evidence of record.
 2. Whether the position and encoder definitions differ in effect on this machine is **NOT VERIFIED**.
-3. Whether any physical symptom exists is **NOT VERIFIED**; no hardware evidence is recorded.
+   The Owner Hardware observation of section 4.5 is the evidence that one command left a position
+   value at zero and the other left it far from zero *in the current implementation*; which command
+   produced which value is confirmed only by the Hardware re-trial.
+3. **The corrected sequence is NOT Hardware-confirmed.** It is proven at Source level and covered by
+   deterministic simulated tests only. A separately authorized Real Galil H1 re-trial on the exact
+   corrected head is required before any physical confirmation is claimed.
 4. Status-word bit order, polarity and meaning remain `UNCONFIRMED` as recorded in the previous
    baseline §G.1 and are not advanced by this document.
 5. Brake-output electrical polarity remains `UNCONFIRMED`.
-6. No build, no test execution and no gate was run for this document: it is a documentation-only
-   record, and the sandbox has no .NET SDK. The Owner-local locked restore, build and test suite
-   remain the validation of record for the software as it stands.
-7. This document makes no statement about any physical outcome of any command.
+6. No build, no test execution and no .NET gate was run in the Author environment: it has no .NET
+   SDK. The Owner-local locked restore, build and test suite remain the validation of record for the
+   software as corrected.
+7. This document makes no statement about any physical outcome of any command, before or after the
+   correction.
+
+---
+
+## 9A. Required Hardware re-trial
+
+The correction is a Software closeout only. The physical confirmation it enables must be obtained
+separately, on the exact corrected head, under its own authorization:
+
+- the trial must run the full H1 Commission/Home on the real controller and record, per axis, the
+  native command sequence actually dispatched (position definition, then encoder definition);
+- it must record the two position readings taken after the encoder definition and their relation to
+  the configured tolerance;
+- it must record whether the run reaches `HOME_COMPLETED_ZERO_VERIFIED` and `Homed` +
+  `ZeroVerified`, and every terminal code if it does not;
+- any result is Owner evidence. A simulated pass is never Hardware evidence and never commissioning.
 
 ---
 

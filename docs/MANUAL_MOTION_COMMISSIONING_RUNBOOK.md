@@ -55,7 +55,9 @@ The Application session exposes only typed requests:
 - Home for one axis;
 - define position zero (DP semantics) for one axis;
 - define dual zero (DE semantics) for one axis, only when explicitly
-  permitted by the Owner-local profile; its effect remains unverified;
+  permitted by the Owner-local profile; its effect remains unverified. The
+  same permission also enables the Home-carried reset-encoder composition
+  (`DP<axis>=0` then `DE<axis>=0`), which is not a separate Operator action;
 - one bounded absolute Move for one axis after a verified Home in the same
   session;
 - raw status, TP, RP and brake-output observations, shown separately from
@@ -72,8 +74,12 @@ The axis workflow is deliberately ordered:
    hold or session close enters the supervised Stop path; the brake is
    applied only after the profile's stopped-observation rule is satisfied.
 3. **Home:** brake release → settle → Home speed → Home search → Begin.
-   A fresh active home input enters Stop → define position zero → TP/RP
-   zero verification → brake apply. No Home is claimed from dispatch alone.
+   A fresh active home input enters Stop → define position zero → define dual
+   zero → TP/RP zero verification → brake apply. No Home is claimed from
+   dispatch alone. The position-zero and dual-zero definitions are the exact
+   Legacy Reset Encoder sequence (`DP<axis>=0` then `DE<axis>=0`) carried by
+   the Home lifecycle as one contiguous native pair, gated by the profile's
+   dual-zero permission; the standalone define actions are unchanged.
 4. **Manual zero:** define position zero is accepted only when the session
    can verify TP/RP near zero afterward. Manual DP/DE clears the
    session's prior Home claim because it changes the coordinate basis.
@@ -226,9 +232,18 @@ Run this section on the exact PR head before review/merge. Do **not** set
 or the real Gate A values for this software-only validation. Fake-kernel and
 simulated-port tests must not load a native module or contact a Controller.
 
+Clear every `WJSS_*` process variable that the current Source reads, **in the
+same PowerShell process** as the commands below, so no stale Owner-local value
+leaks into a software-only run. The names below are the ones actually present
+in Source; do not add or guess others.
+
 ```powershell
 git rev-parse HEAD
 git status --porcelain
+
+Get-ChildItem Env: |
+    Where-Object { $_.Name -like 'WJSS_*' } |
+    ForEach-Object { Remove-Item -Path ("Env:" + $_.Name) -ErrorAction SilentlyContinue }
 
 dotnet restore WaterJetSentinelSuite.sln
 

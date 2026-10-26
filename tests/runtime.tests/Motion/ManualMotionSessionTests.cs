@@ -903,7 +903,7 @@ public sealed class ManualMotionSessionTests
     }
 
     [Fact]
-    public void Home_Completes_With_Stop_Then_Dp_Zero_Verified_Then_Brake_Apply()
+    public void Home_Completes_With_Stop_Then_Dp_Zero_Then_De_Zero_Verified_Then_Brake_Apply()
     {
         var harness = new Harness();
         harness.OpenAndObserve();
@@ -924,6 +924,7 @@ public sealed class ManualMotionSessionTests
                 ManualMotionPortCommandKind.Begin,
                 ManualMotionPortCommandKind.Stop,
                 ManualMotionPortCommandKind.DefinePositionZero,
+                ManualMotionPortCommandKind.DefineDualZero,
                 ManualMotionPortCommandKind.BrakeOutputClear,
             },
             harness.Port.ExecutedCommands.Select(command => command.Kind).ToArray());
@@ -2508,5 +2509,337 @@ public sealed class ManualMotionSessionTests
         {
             Assert.Equal(expected[(offset + index) % expected.Length], list[index]);
         }
+    }
+
+    // ------------------------------------------- Home-carried reset-encoder composition (DP then DE)
+
+    /// <summary>
+    /// A minimal deterministic port for the Home-carried reset-encoder composition. It reports the
+    /// Home bit active and the motion bit inactive on the synthetic simulation bit layout, records
+    /// every command and read in dispatch order, and can refuse either definition or report a zero
+    /// position only for readings taken BEFORE the dual-zero definition. Every value is synthetic.
+    /// </summary>
+    private sealed class ZeroSequencePort : IManualMotionPort
+    {
+        private bool _dualZeroDispatched;
+
+        internal bool RefusePositionZero { get; init; }
+
+        internal bool RefuseDualZero { get; init; }
+
+        /// <summary>When true, TP/RP read zero only until the dual-zero definition was dispatched.</summary>
+        internal bool ZeroReadsOnlyBeforeDualZero { get; init; }
+
+        internal List<ManualMotionPortCommand> Executed { get; } = new();
+
+        internal List<ManualMotionPortRead> Reads { get; } = new();
+
+        public ManualMotionPortMode Mode => ManualMotionPortMode.Simulated;
+
+        public ManualMotionPortOpenResult Open() => new(true, "SYNTHETIC_OPENED", 1);
+
+        public ManualMotionPortCommandResult Execute(ManualMotionPortCommand command)
+        {
+            Executed.Add(command);
+            if (command.Kind == ManualMotionPortCommandKind.DefinePositionZero && RefusePositionZero)
+            {
+                return new ManualMotionPortCommandResult(false, false, true, "SYNTHETIC_REFUSED", 1);
+            }
+
+            if (command.Kind == ManualMotionPortCommandKind.DefineDualZero)
+            {
+                if (RefuseDualZero)
+                {
+                    return new ManualMotionPortCommandResult(false, false, true, "SYNTHETIC_REFUSED", 1);
+                }
+
+                _dualZeroDispatched = true;
+            }
+
+            return new ManualMotionPortCommandResult(true, false, true, "SYNTHETIC_DISPATCHED", 1);
+        }
+
+        public ManualMotionPortReadResult Read(ManualMotionPortRead read)
+        {
+            Reads.Add(read);
+            switch (read.Kind)
+            {
+                // Home bit 3 active, motion bit 6 inactive on the synthetic simulation layout.
+                case ManualMotionReadKind.StatusWord:
+                    return new ManualMotionPortReadResult(true, false, 8m, "SYNTHETIC_READ", 1);
+
+                case ManualMotionReadKind.PositionTp:
+                case ManualMotionReadKind.PositionRp:
+                {
+                    var atZero = !ZeroReadsOnlyBeforeDualZero || !_dualZeroDispatched;
+                    return new ManualMotionPortReadResult(true, false, atZero ? 0m : 9000m, "SYNTHETIC_READ", 1);
+                }
+
+                default:
+                    return new ManualMotionPortReadResult(true, false, 0m, "SYNTHETIC_READ", 1);
+            }
+        }
+
+        public ManualMotionPortCloseResult Close() => new(true, true, true, "SYNTHETIC_CLOSED");
+    }
+
+    private sealed class ZeroSequenceHarness
+    {
+        internal ZeroSequenceHarness(ZeroSequencePort port, ManualMotionProfile? profile = null)
+        {
+            Profile = profile ?? ManualMotionProfile.CreateSimulationProfile();
+            Port = port;
+            Session = new ManualMotionSession(Port, ManualMotionProfileResult.FromProfile(Profile), Clock);
+        }
+
+        internal TestClock Clock { get; } = new(Instant);
+
+        internal ManualMotionProfile Profile { get; }
+
+        internal ZeroSequencePort Port { get; }
+
+        internal ManualMotionSession Session { get; }
+
+        internal ManualMotionSnapshot Snapshot => Session.Snapshot;
+
+        internal void OpenSession()
+        {
+            Session.Step();
+
+            // Enough steps for the deterministic observation scheduler to publish a current Status,
+            // TP and RP reading for every one of the four axes.
+            Drive(24);
+            Assert.Equal(ManualMotionSessionState.Ready, Snapshot.State);
+        }
+
+        internal void Drive(int steps, int millisecondsPerStep = 10)
+        {
+            for (var index = 0; index < steps; index++)
+            {
+                Clock.Advance(TimeSpan.FromMilliseconds(millisecondsPerStep));
+                Session.Step();
+            }
+        }
+
+        internal void DriveUntil(Func<ManualMotionSnapshot, bool> done, int maximumSteps = 4000, int millisecondsPerStep = 10)
+        {
+            for (var index = 0; index < maximumSteps && !done(Snapshot); index++)
+            {
+                Drive(1, millisecondsPerStep);
+            }
+
+            Assert.True(done(Snapshot), "the session did not reach the expected state within the step budget");
+        }
+
+        internal ManualMotionAxisSnapshot Axis(ManualMotionAxis axis) => Snapshot.Axes[(int)axis - 1];
+    }
+
+    [Fact]
+    public void Every_Axis_Home_Carries_Dp_Then_De_In_That_Order()
+    {
+        // The typed routing is the same for all four controller axes: A, B, C and D each emit the
+        // position-zero definition immediately followed by the dual-zero definition.
+        foreach (var axis in new[] { ManualMotionAxis.A, ManualMotionAxis.B, ManualMotionAxis.C, ManualMotionAxis.D })
+        {
+            var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+            harness.OpenSession();
+
+            harness.Session.RequestHome(axis);
+            harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+                && snapshot.Axes[(int)axis - 1].HomeState == ManualMotionHomeState.Homed);
+
+            var definitions = harness.Port.Executed
+                .Where(command => command.Kind is ManualMotionPortCommandKind.DefinePositionZero
+                    or ManualMotionPortCommandKind.DefineDualZero)
+                .ToList();
+
+            // Exactly one of each, in the Legacy order, and adjacent in the dispatch stream.
+            Assert.Equal(
+                new[] { ManualMotionPortCommandKind.DefinePositionZero, ManualMotionPortCommandKind.DefineDualZero },
+                definitions.Select(command => command.Kind).ToArray());
+            Assert.All(definitions, command => Assert.Equal(axis, command.Axis));
+            Assert.All(definitions, command => Assert.Equal(0, command.Operand));
+
+            var indices = harness.Port.Executed
+                .Select((command, index) => (command, index))
+                .Where(entry => entry.command.Kind is ManualMotionPortCommandKind.DefinePositionZero
+                    or ManualMotionPortCommandKind.DefineDualZero)
+                .Select(entry => entry.index)
+                .ToArray();
+            Assert.Equal(indices[0] + 1, indices[1]);
+        }
+    }
+
+    [Fact]
+    public void Dual_Zero_Is_Never_Dispatched_Before_The_Position_Zero()
+    {
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+        harness.OpenSession();
+
+        // Stop the session while the dual-zero definition is still due, then confirm the ordering.
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+
+        var kinds = harness.Port.Executed.Select(command => command.Kind).ToList();
+        var positionZero = kinds.IndexOf(ManualMotionPortCommandKind.DefinePositionZero);
+        var dualZero = kinds.IndexOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(positionZero >= 0);
+        Assert.True(dualZero > positionZero, "the dual-zero definition was dispatched before the position zero");
+    }
+
+    [Fact]
+    public void Observations_Taken_Before_The_Dual_Zero_Definition_Cannot_Verify_Zero()
+    {
+        // Readings are zero only until the dual-zero definition is dispatched, then far from zero.
+        // An implementation that accepted a reading taken after DP but before DE would publish a
+        // verified Home; the corrected lifecycle must fail closed instead.
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort { ZeroReadsOnlyBeforeDualZero = true });
+        harness.OpenSession();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, axis.CoordinateState);
+
+        // The failure is genuinely a post-dual-zero verification failure: both definitions were
+        // dispatched, in order, and verified readings of the two positions still existed.
+        var kinds = harness.Port.Executed.Select(command => command.Kind).ToList();
+        var positionZeroIndex = kinds.IndexOf(ManualMotionPortCommandKind.DefinePositionZero);
+        var dualZeroIndex = kinds.IndexOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(positionZeroIndex >= 0);
+        Assert.True(dualZeroIndex > positionZeroIndex);
+        Assert.Contains(harness.Port.Reads, read => read.Kind == ManualMotionReadKind.PositionTp);
+        Assert.Contains(harness.Port.Reads, read => read.Kind == ManualMotionReadKind.PositionRp);
+    }
+
+    [Fact]
+    public void Position_Zero_Alone_Never_Publishes_A_Verified_Zero()
+    {
+        // While the dual-zero definition is still due, the axis carries only a dispatched position
+        // zero: it is not Homed and no verified coordinate has been published.
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+        harness.OpenSession();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot =>
+            ActiveOf(snapshot, ManualMotionAxis.A)?.Phase == ManualMotionOperationPhase.DefiningDualZero);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCoordinateState.ZeroDispatched, axis.CoordinateState);
+        Assert.NotEqual(ManualMotionHomeState.Homed, axis.HomeState);
+        Assert.Contains(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefinePositionZero);
+        Assert.DoesNotContain(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    [Fact]
+    public void Position_Zero_Refusal_Prevents_The_Dual_Zero_Definition()
+    {
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort { RefusePositionZero = true });
+        harness.OpenSession();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.PositionZeroRefused, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Contains(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefinePositionZero);
+        Assert.DoesNotContain(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    [Fact]
+    public void Dual_Zero_Refusal_Fails_The_Home_Closed_With_A_Typed_Outcome()
+    {
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort { RefuseDualZero = true });
+        harness.OpenSession();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeDualZeroRefused, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Equal(ManualMotionDualZeroState.Refused, axis.DualZeroState);
+        Assert.NotEqual(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(nameof(ManualMotionDualZeroState.Refused), axis.DualZeroState.ToString());
+
+        // Two definitions attempted, no third: the refusal is terminal for this Home.
+        Assert.Single(harness.Port.Executed.Where(command => command.Kind == ManualMotionPortCommandKind.DefineDualZero));
+    }
+
+    [Fact]
+    public void Home_Without_Dual_Zero_Permission_Keeps_The_Position_Only_Sequence()
+    {
+        // The existing profile permission is retained as the gate of the Home-carried composition:
+        // a profile that does not permit the dual-zero definition keeps the position-only sequence.
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        var source = simulation.AxisA ?? throw new InvalidOperationException("Axis A is required.");
+        var profile = new ManualMotionProfile
+        {
+            Source = simulation.Source,
+            ControllerId = simulation.ControllerId,
+            ObservationIntervalMilliseconds = simulation.ObservationIntervalMilliseconds,
+            ObservationFreshnessMilliseconds = simulation.ObservationFreshnessMilliseconds,
+            JogHeartbeatTimeoutMilliseconds = simulation.JogHeartbeatTimeoutMilliseconds,
+            JogMaximumHoldMilliseconds = simulation.JogMaximumHoldMilliseconds,
+            AxisA = new ManualMotionAxisProfile
+            {
+                BrakeOutput = source.BrakeOutput,
+                BrakeReleaseAction = source.BrakeReleaseAction,
+                BrakeSettleMilliseconds = source.BrakeSettleMilliseconds,
+                JogSpeed = source.JogSpeed,
+                HomeSpeed = source.HomeSpeed,
+                HomeTimeoutMilliseconds = source.HomeTimeoutMilliseconds,
+                MoveAcceleration = source.MoveAcceleration,
+                MoveSpeed = source.MoveSpeed,
+                MoveDeceleration = source.MoveDeceleration,
+                MoveMinimumTarget = source.MoveMinimumTarget,
+                MoveMaximumTarget = source.MoveMaximumTarget,
+                PositionTolerance = source.PositionTolerance,
+                MotionTimeoutMilliseconds = source.MotionTimeoutMilliseconds,
+                StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
+                MotionStatusBit = source.MotionStatusBit,
+                MotionActiveValue = source.MotionActiveValue,
+                HomeStatusBit = source.HomeStatusBit,
+                HomeActiveValue = source.HomeActiveValue,
+                DualZeroPermitted = false,
+            },
+        };
+
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort(), profile);
+        harness.OpenSession();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+        Assert.Contains(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefinePositionZero);
+        Assert.DoesNotContain(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+        Assert.Equal(ManualMotionDualZeroState.NotDispatched, axis.DualZeroState);
+    }
+
+    [Fact]
+    public void Standalone_Define_Position_Zero_Still_Emits_No_Dual_Zero()
+    {
+        // The Owner-approved composition belongs to Home only: the standalone manual define keeps
+        // its previous single-command semantics even when the profile permits a dual-zero define.
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+        harness.OpenSession();
+
+        harness.Session.RequestDefinePositionZero(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].CoordinateState == ManualMotionCoordinateState.ZeroVerified);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.PositionZeroVerified, axis.LastOutcomeCode);
+        Assert.Equal(
+            new[] { ManualMotionPortCommandKind.DefinePositionZero },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+        Assert.Equal(ManualMotionDualZeroState.NotDispatched, axis.DualZeroState);
     }
 }

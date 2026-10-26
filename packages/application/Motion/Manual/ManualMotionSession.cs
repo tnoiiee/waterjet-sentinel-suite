@@ -550,6 +550,7 @@ public sealed class ManualMotionSession
 
             case ManualMotionOperationKind.DefinePositionZero:
                 CaptureZeroVerification(op, p);
+                CaptureDualZeroIntent(op, p);
                 op.Phase = ManualMotionOperationPhase.DefiningZero;
                 break;
 
@@ -570,6 +571,7 @@ public sealed class ManualMotionSession
             case ManualMotionOperationKind.Home:
                 CaptureMotion(op, p);
                 CaptureZeroVerification(op, p);
+                CaptureDualZeroIntent(op, p);
                 op.HomeBit = p.HomeStatusBit ?? 0;
                 op.HomeActive = p.HomeActiveValue ?? 0;
                 op.RunTimeout = Milliseconds(p.HomeTimeoutMilliseconds ?? 0);
@@ -614,6 +616,15 @@ public sealed class ManualMotionSession
         op.StopTimeout = Milliseconds(p.StopTimeoutMilliseconds ?? 0);
     }
 
+    /// <summary>
+    /// Captures the Home-carried dual-zero definition intent from the profile. The intent is only
+    /// honoured by a Home operation; the standalone define-position-zero operation never carries it.
+    /// </summary>
+    private static void CaptureDualZeroIntent(OperationRuntime op, ManualMotionAxisProfile p)
+    {
+        op.DualZeroDefinitionRequired = p.DualZeroPermitted;
+    }
+
     // ------------------------------------------------------------------- operation lifecycle
 
     private bool AdvanceActives(DateTimeOffset now)
@@ -640,7 +651,17 @@ public sealed class ManualMotionSession
                 var progress = AdvanceOnce(op, now);
                 if (progress == Progress.CalledPort)
                 {
-                    _advanceCursor = (IndexFor(axis) + 1) % AllAxes.Length;
+                    // The Owner-approved Home-carried reset-encoder composition is one contiguous
+                    // native pair on the axis: when the position-zero definition was just accepted
+                    // and the dual-zero definition is now due, the advance cursor stays on this axis
+                    // so the very next port call of the session is that axis's dual-zero definition.
+                    // No other axis's command can therefore occur between DP and DE. The only
+                    // commands that still pre-empt the pair are the existing pending-Stop, capture
+                    // loss, close and fault-cleanup paths, which are served before active
+                    // advancement and are never deferred behind zero establishment.
+                    _advanceCursor = op.Phase == ManualMotionOperationPhase.DefiningDualZero
+                        ? IndexFor(axis)
+                        : (IndexFor(axis) + 1) % AllAxes.Length;
                     return true;
                 }
 
@@ -667,6 +688,7 @@ public sealed class ManualMotionSession
         ManualMotionOperationPhase.Stopping => DoStopping(op, now),
         ManualMotionOperationPhase.AwaitingStopped => DoAwaitingStopped(op, now),
         ManualMotionOperationPhase.DefiningZero => DoDefiningZero(op, now),
+        ManualMotionOperationPhase.DefiningDualZero => DoDefiningDualZero(op, now),
         ManualMotionOperationPhase.VerifyingZero => DoVerifyingZero(op, now),
         ManualMotionOperationPhase.ApplyingBrake => DoApplyingBrake(op, now),
         _ => CompleteWithoutCall(op, now, ManualMotionCodes.AbortedBeforeMotion),
@@ -997,6 +1019,50 @@ public sealed class ManualMotionSession
             ClearHome(runtime, now, op);
         }
 
+        op.ZeroSequence = outcome.Sequence;
+        op.ZeroAt = now;
+
+        // The Owner-approved Home-carried composition: a Home operation continues into the second
+        // half of the exact Legacy reset-encoder sequence (define position zero, then define dual
+        // zero) when the profile permits the dual-zero definition. The standalone define-position-zero
+        // operation does not continue: its semantics are unchanged.
+        if (op.Kind == ManualMotionOperationKind.Home && op.DualZeroDefinitionRequired)
+        {
+            SetPhase(op, ManualMotionOperationPhase.DefiningDualZero, now);
+            return Progress.CalledPort;
+        }
+
+        SetPhase(op, ManualMotionOperationPhase.VerifyingZero, now);
+        return Progress.CalledPort;
+    }
+
+    /// <summary>
+    /// The second half of the Owner-approved Home-carried reset-encoder composition: the typed
+    /// define-dual-zero command for the same axis, dispatched as the single next command after the
+    /// accepted define-position-zero. A refusal fails the Home closed with a typed code and never
+    /// becomes a zero proof; the verification watermark is then taken from THIS command, so no
+    /// position reading taken before the dual-zero definition can satisfy the zero verification.
+    /// </summary>
+    private Progress DoDefiningDualZero(OperationRuntime op, DateTimeOffset now)
+    {
+        var runtime = Runtime(op.Axis);
+        var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.DefineDualZero, op.Axis, 0, 0));
+        if (Interrupted(outcome, now, op))
+        {
+            return Progress.CalledPort;
+        }
+
+        if (!outcome.Accepted)
+        {
+            runtime.DualZeroState = ManualMotionDualZeroState.Refused;
+            runtime.CoordinateState = ManualMotionCoordinateState.Undefined;
+            runtime.HomeState = ManualMotionHomeState.HomeFailed;
+            op.EndCode = ManualMotionCodes.HomeDualZeroRefused;
+            SetPhase(op, ManualMotionOperationPhase.ApplyingBrake, now);
+            return Progress.CalledPort;
+        }
+
+        runtime.DualZeroState = ManualMotionDualZeroState.DispatchedUnverified;
         op.ZeroSequence = outcome.Sequence;
         op.ZeroAt = now;
         SetPhase(op, ManualMotionOperationPhase.VerifyingZero, now);
@@ -2081,9 +2147,20 @@ public sealed class ManualMotionSession
 
         public DateTimeOffset StopIssuedAt { get; set; }
 
+        /// <summary>
+        /// The dispatch sequence of the LAST zero-establishing command of this operation: the
+        /// position-zero definition for a standalone define, and the dual-zero definition for the
+        /// Home-carried composition. Every zero verification reading must be strictly newer.
+        /// </summary>
         public long ZeroSequence { get; set; }
 
         public DateTimeOffset ZeroAt { get; set; }
+
+        /// <summary>
+        /// True when this operation carries the Owner-approved Home-carried dual-zero definition,
+        /// captured from the profile permission at start. False for every standalone define.
+        /// </summary>
+        public bool DualZeroDefinitionRequired { get; set; }
 
         public bool HomeDetected { get; set; }
 

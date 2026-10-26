@@ -298,8 +298,10 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, result.HorizontalCoordinate.HomeOutcomeCode);
         Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, result.VerticalCoordinate.HomeOutcomeCode);
 
-        // The accepted Home contract carries the typed position-zero definition per axis exactly once.
+        // The accepted Home contract carries the Owner-approved reset-encoder composition per axis:
+        // the typed position-zero definition exactly once, then the typed dual-zero definition.
         Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero).Count);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
 
         // Commission/Home is separate from Run Path: no path Move and no path result exists.
         Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
@@ -308,16 +310,121 @@ public sealed class H1DryCommissioningCoordinatorTests
     }
 
     [Fact]
-    public void Dual_Zero_Stays_Optional_Not_Dispatched()
+    public void Dual_Zero_Completes_The_Home_Carried_Reset_Encoder_Sequence()
     {
         var harness = CommissionedHarness();
 
+        // Every successfully homed axis carries the Owner-approved composition, and the run records
+        // it as dispatched-in-Home-sequence rather than as an optional, unrelated manual define.
         var result = harness.Coordinator.Result!;
-        Assert.Equal(H1DryCommissioningCodes.DualZeroOptionalNotDispatched, result.HorizontalCoordinate.DualZeroDispositionCode);
-        Assert.Equal(H1DryCommissioningCodes.DualZeroOptionalNotDispatched, result.VerticalCoordinate.DualZeroDispositionCode);
-        Assert.Equal(nameof(ManualMotionDualZeroState.NotDispatched), result.HorizontalCoordinate.DualZeroState);
-        Assert.Equal(nameof(ManualMotionDualZeroState.NotDispatched), result.VerticalCoordinate.DualZeroState);
-        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero));
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.HorizontalCoordinate.DualZeroDispositionCode);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.VerticalCoordinate.DualZeroDispositionCode);
+        Assert.Equal(nameof(ManualMotionDualZeroState.DispatchedUnverified), result.HorizontalCoordinate.DualZeroState);
+        Assert.Equal(nameof(ManualMotionDualZeroState.DispatchedUnverified), result.VerticalCoordinate.DualZeroState);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
+    }
+
+    [Fact]
+    public void Home_Carried_Sequence_Emits_Position_Zero_Then_Dual_Zero_For_Every_Axis()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        // Assert the native rendering and the dispatch order of the pair for every WSB1 axis, not
+        // only the interpreter state: the sequence is DP then DE on the same axis, with no other
+        // command of that axis between them.
+        foreach (var letter in new[] { "A", "B", "C", "D" })
+        {
+            var indices = new List<int>();
+            var kinds = new List<ManualMotionPortCommandKind>();
+            for (var index = 0; index < harness.Port.ExecutedCommands.Count; index++)
+            {
+                var command = harness.Port.ExecutedCommands[index];
+                if (!string.Equals(CleaningPathExecutionHarness.LetterOf(command.Axis), letter, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (command.Kind == ManualMotionPortCommandKind.DefinePositionZero
+                    || command.Kind == ManualMotionPortCommandKind.DefineDualZero)
+                {
+                    indices.Add(index);
+                    kinds.Add(command.Kind);
+                }
+            }
+
+            if (letter is "C" or "D")
+            {
+                // Only the two resolved WSB1 roles of this run are homed; C and D are not dispatched.
+                Assert.Empty(kinds);
+                continue;
+            }
+
+            Assert.Equal(
+                new[] { ManualMotionPortCommandKind.DefinePositionZero, ManualMotionPortCommandKind.DefineDualZero },
+                kinds);
+            Assert.Equal(indices[0] + 1, indices[1]);
+        }
+    }
+
+    [Fact]
+    public void Dual_Zero_Refusal_Fails_The_Home_Closed()
+    {
+        var harness = new H1DryCommissioningHarness(
+            options: new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { RefuseCommand = ManualMotionPortCommandKind.DefineDualZero },
+            });
+        harness.OpenAndObserve();
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunFailedHome, result.Code);
+        Assert.Equal(ManualMotionCodes.HomeDualZeroRefused, result.PrimaryFailureCode);
+        Assert.False(result.HorizontalCoordinate.HomeVerified);
+        Assert.False(result.HorizontalCoordinate.CoordinateZeroVerified);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroRefusedInHomeSequence, result.HorizontalCoordinate.DualZeroDispositionCode);
+
+        // The refusal is terminal for this axis: no Move, no path point and no second Home sequence.
+        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
+        Assert.Null(result.PathResult);
+        Assert.Equal(H1DrySafeReturnState.NotPublished, result.DrySafeReturn);
+    }
+
+    [Fact]
+    public void Position_Zero_Refusal_Prevents_The_Dual_Zero_Definition()
+    {
+        var harness = new H1DryCommissioningHarness(
+            options: new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { RefuseCommand = ManualMotionPortCommandKind.DefinePositionZero },
+            });
+        harness.OpenAndObserve();
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(ManualMotionCodes.PositionZeroRefused, result.PrimaryFailureCode);
+        Assert.False(result.HorizontalCoordinate.CoordinateZeroVerified);
+
+        // A refused position definition never reaches the dual-zero definition on that axis: the
+        // only dual-zero definition dispatched is the one carried by the other (healthy) axis.
+        var horizontalDualZero = 0;
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero))
+        {
+            if (string.Equals(CleaningPathExecutionHarness.LetterOf(command.Axis), "A", StringComparison.Ordinal))
+            {
+                horizontalDualZero++;
+            }
+        }
+
+        Assert.Equal(0, horizontalDualZero);
+        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
     }
 
     [Fact]
@@ -397,15 +504,21 @@ public sealed class H1DryCommissioningCoordinatorTests
         harness.DriveUntilTerminal();
         Assert.Equal(H1DryCommissioningPhase.Completed, harness.Coordinator.Result!.TerminalPhase);
 
-        // Run Path never dispatches Home: no Home command exists after the path start, and the
-        // path itself moved through P1 to P6 and the Centre return.
+        // Run Path never dispatches Home and never dispatches a zero-establishing command: no Home,
+        // position-zero or dual-zero command exists after the path start, and the path itself moved
+        // through P1 to P6 and the Centre return.
         Assert.True(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute).Count > 0);
         for (var index = commandsAtPathStart; index < harness.Port.ExecutedCommands.Count; index++)
         {
-            Assert.NotEqual(ManualMotionPortCommandKind.Home, harness.Port.ExecutedCommands[index].Kind);
+            var kind = harness.Port.ExecutedCommands[index].Kind;
+            Assert.NotEqual(ManualMotionPortCommandKind.Home, kind);
+            Assert.NotEqual(ManualMotionPortCommandKind.DefinePositionZero, kind);
+            Assert.NotEqual(ManualMotionPortCommandKind.DefineDualZero, kind);
         }
 
         Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.Home).Count);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero).Count);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
     }
 
     [Fact]
@@ -464,8 +577,20 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, result.PrimaryFailureCode);
         Assert.False(result.HorizontalCoordinate.HomeVerified);
 
-        // No native Home command is dispatched to the axis whose Home input is already active.
+        // No native Home command is dispatched to the axis whose Home input is already active, and
+        // therefore no zero-establishing command of that axis either: the composed reset-encoder
+        // pair is reachable only through a Home that actually ran.
         foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.Home))
+        {
+            Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
+        }
+
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero))
+        {
+            Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
+        }
+
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero))
         {
             Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
         }

@@ -236,6 +236,14 @@ public enum ManualMotionOperationPhase
 
     /// <summary>A single typed command is due (brake-only and dual-zero operations).</summary>
     Dispatching = 11,
+
+    /// <summary>
+    /// The define-dual-zero command of the Owner-approved Home-carried reset-encoder composition is
+    /// due. Only a Home operation reaches this phase: it runs immediately after the accepted
+    /// define-position-zero command, so no unrelated native command can occur between the two. The
+    /// standalone define-position-zero operation never reaches this phase and is unchanged.
+    /// </summary>
+    DefiningDualZero = 12,
 }
 
 /// <summary>
@@ -583,6 +591,12 @@ public static class ManualMotionCodes
     /// <summary>Define-dual-zero was refused.</summary>
     public const string DualZeroRefused = "DUAL_ZERO_REFUSED";
 
+    /// <summary>
+    /// The Home-carried reset-encoder sequence was refused at its dual-zero definition. The Home
+    /// fails closed: no position read is accepted as a zero proof and the axis is not Homed.
+    /// </summary>
+    public const string HomeDualZeroRefused = "HOME_DUAL_ZERO_REFUSED";
+
     /// <summary>Move completed: not moving and both position reads within the tolerance of the target.</summary>
     public const string MoveCompletedPositionVerified = "MOVE_COMPLETED_POSITION_VERIFIED";
 
@@ -622,6 +636,7 @@ public static class ManualMotionCodes
         HomeCompletedZeroVerified => "Home completed and zero was verified by position reads under the Owner-attested profile interpretation. Not hardware evidence.",
         HomeCompletedZeroNotVerified => "Home completed but zero could not be verified.",
         DualZeroDispatchedEffectUnverified => "The dual-zero definition was dispatched. Its effect is UNVERIFIED.",
+        HomeDualZeroRefused => "The Home-carried reset-encoder sequence was refused at its dual-zero definition. The Home failed closed and no zero was verified.",
         MoveCompletedPositionVerified => "Move completed: not moving and both position reads within the configured tolerance of the target.",
         CoordinateRedefinedHomeCleared => "A manual coordinate definition cleared the session Home state of the axis.",
         _ => "See the code. No command text, reply text or native detail is recorded.",

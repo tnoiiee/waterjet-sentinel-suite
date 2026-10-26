@@ -1,5 +1,32 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H1 Home-carried reset-encoder correction (2026-10-26; Owner decision; software only; HARDWARE
+> NOT EXECUTED; supersedes only the statements below that describe the Home-carried zero
+> establishment as position-definition-only or the dual-zero definition as excluded from H1; every
+> other dated record is preserved).** The H1 Home conditions and the both-reads TP/RP
+> zero-verification requirement were upheld by the Owner and are unchanged. The defect was that the
+> Home-carried zero establishment dispatched the position definition only, while the exact Legacy
+> Source proves the commissioned Reset Encoder sequence is `DP<axis>=0` then `DE<axis>=0`; H1 now
+> uses the complete sequence after a successful Home, followed by the existing fresh TP/RP
+> verification. Classification: `PROVEN H1 COMMAND-SEQUENCE DEFECT`, root-cause confidence
+> `STRONGLY SUPPORTED BY` the exact current WJSS command sequence, the exact Legacy Reset Encoder
+> sequence and the Owner Hardware observation (H1 reached zero verification, RP became zero, TP
+> remained far from zero, run ended `HOME_ZERO_VERIFICATION_FAILED`). Implemented in Source on branch
+> `arena/2d058a61-waterjet-sentinel-suite` (PR #43 open, unmerged): one new typed operation phase and
+> two typed outcome codes, the verification watermark moved to the last zero-establishing command,
+> H1 evidence codes `H1_DUAL_ZERO_DISPATCHED_IN_HOME_SEQUENCE` /
+> `H1_DUAL_ZERO_REFUSED_IN_HOME_SEQUENCE`, one opt-in simulated-port scenario option, extended
+> focused tests and the corrected investigation record, H1 trial procedure and Manual Motion
+> runbook. Unchanged: the Home motion sequence, Stop supervision, brake lifecycle, Move lifecycle,
+> Centre 125 mm / 125 mm, both position reads and `PositionTolerance`, the standalone define
+> operations and profile permission semantics, the Run Path rule (no Home, no DP, no DE), P1→P6
+> order, abort/close/cleanup and every Pump / physical IV / water / Queue / Production exclusion; no
+> dependency, package or lock file changed. **Validation position: .NET restore/build/test NOT RUN in
+> the Author environment (no .NET SDK) — the Owner-local exact-head gate is the validation of
+> record; the Node boundary scan and its self-tests passed in the Author environment.** The corrected
+> sequence is proven at Source level and under deterministic simulation only: Real Galil H1 Hardware
+> behavior remains NOT VERIFIED until the separately authorized Owner-local re-trial on the exact
+> corrected head. NO HARDWARE. NO PRODUCTION.
 > **Owner-approved canonical Equipment topology adoption (2026-10-25; current equipment-topology\n> position — supersedes every contrary installed-position, Target Coverage, WSB/axis-allocation,\n> assignment-count, REV2-current and dated-identity statement below without deleting any dated\n> record; software only; HARDWARE NOT EXECUTED).** Implemented in Source on branch\n> `arena/7968e33e-waterjet-sentinel-suite` (PR #41 open, unmerged) inside the H1 pass. Canonical\n> table: WJ1 (legacy WJ2) IV1 installed LEFT/UPPER → targets RIGHT/UPPER, WSB1, A/B; WJ2 (legacy\n> WJ3) IV2 REAR/UPPER → FRONT/UPPER, WSB1, C/D; WJ3 (legacy WJ4) IV3 RIGHT/UPPER → LEFT/UPPER,\n> WSB2, C/D; WJ4 (legacy WJ1) IV4 FRONT/UPPER → REAR/UPPER, WSB2, A/B; WJ5 (legacy WJ5) IV5\n> FRONT/LOWER → REAR/LOWER, WSB3, A/B; WJ6 (legacy WJ7) IV6 REAR/LOWER → FRONT/LOWER, WSB3, C/D;\n> WJ7 (legacy WJ6) IV7 LEFT/LOWER → RIGHT/LOWER, WSB4, A/B; WJ8 (legacy WJ8) IV8 RIGHT/LOWER →\n> LEFT/LOWER, WSB4, C/D. A/C Horizontal, B/D Vertical; WJn ↔ IVn; Target Coverage is always the\n> opposite wall in the same tier. The Legacy WJ identity column is historical equipment identity\n> only, distinct from the legacy cannon identity; `cannon n → WJn` direct import is unchanged. The\n> H1 synthetic default route is corrected to G+210 (RIGHT/UPPER) → canonical WJ1/IV1, WSB1\n> A/B (Horizontal A, Vertical B), with G+201 (LEFT/UPPER) → WJ3/IV3, WSB2 C/D as the\n> unsupported-WSB refusal scenario. Dated current identities: .NET `MotionTopologyRevision =\n> OWNER_CANONICAL_TOPOLOGY_2026_10_25` and JS `MOTION_COMMISSIONING_DESIGN_ID =\n> MOTION_COMMISSIONING_DESIGN_2026_10_25`; `OWNER_CONFIRMED_REV2` / `OWNER_CONFIRMED_REV1` and\n> `MOTION_COMMISSIONING_DESIGN_REV2` / `MOTION_COMMISSIONING_DESIGN_REV1` retained as historical\n> identities only. Canonical default assignments by physical Sensor wall / tier: 8/10/8/10/20/20/\n> 16/16 to WJ1..WJ8 (108 total); I7 → WJ5/IV5 unchanged; I16 → WJ6/IV6 (was WJ7 under the\n> superseded table). `snapshot.seed0.json`, `delta.basic.json` and\n> `sensor-parameters.migrated.example.json` were regenerated only through their generator owners\n> (deterministic; frozen historical tables and `--legacy-proof` byte-identity preserved);\n> `sensor-map.example.json` unchanged. Unchanged: 108 Sensors / 216 assigned / 240 physical /\n> 24 spare, the Sensor sequence and coordinates, I7/I16 Product-Sensor status, physical\n> SDS/Cabinet/module/channel mapping, P1–P6 and Centre 125/125, WJn ↔ IVn pairing, queue and\n> safety semantics, Manual Motion command lifecycles, the gclib typed boundary and every Hardware\n> / Production authorization boundary. Physical wiring, the mechanical route and Galil A/B/C/D\n> physical semantics are unchanged; no Hardware matrix is repeated and no Hardware is executed.\n> **Validation position: .NET restore/build/test and C# fixture parity NOT RUN in the Author\n> environment (no .NET SDK) — the Owner-local exact-head gate is the validation of record;\n> Node suites (commissioning 239/239, contracts-ts 56/56, Ops Preview motion 22/22) and the\n> boundary scan passed in the Author environment.** No REV3 exists. NO HARDWARE. NO PRODUCTION.\n
 > **H1 WSB1 dry Cleaning Path commissioning — implementation record (2026-10-25; software only;
 > HARDWARE NOT EXECUTED).** The Product now owns the H1 dry commissioning run for WSB1 through the

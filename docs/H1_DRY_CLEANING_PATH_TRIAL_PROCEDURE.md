@@ -113,9 +113,16 @@ Centre 125/125 → terminal cleanup and session/run close.
 ## 3. Coordinate establishment — the exact accepted DP/DE contract (every motion-capable fresh session)
 
 - **Home (per axis, independent, no synchronized Begin):** the typed Home lifecycle dispatches the
-  commissioned Home sequence and completes through the typed **position-zero definition (DP=0)**
-  and its **zero verification by position reads** (TP and RP within the configured tolerance).
-  Only `HOME_COMPLETED_ZERO_VERIFIED` establishes the Move-capable coordinate state.
+  commissioned Home sequence and completes through the Owner-approved **Home-carried reset-encoder
+  composition**: after the supervised Stop and the inactive observation, the typed
+  **position-zero definition (`DP<axis>=0`)**, then the typed **dual-zero definition
+  (`DE<axis>=0`)**, as one contiguous native pair with no unrelated native command between them, and
+  then its **zero verification by fresh position reads** whose observation evidence is strictly newer
+  than the dual-zero definition (TP **and** RP within the configured tolerance).
+  Only `HOME_COMPLETED_ZERO_VERIFIED` establishes the Move-capable coordinate state. Dispatch alone
+  never establishes it; a refused position-zero definition prevents the dual-zero definition on that
+  axis, and a refused dual-zero definition fails the Home closed with a typed code
+  (`HOME_DUAL_ZERO_REFUSED`).
 - **Home and coordinate establishment are repeated in every motion-capable fresh session.** The
   representative Move session, the Stop evidence session, the Abort evidence session and the
   full-path session of each run each begin with the full Home sequence of this section on that
@@ -136,15 +143,24 @@ Centre 125/125 → terminal cleanup and session/run close.
   axes safely at rest and Brake applied, move the affected axis off the Home input through the
   existing safe manual means and start Commission/Home again — this repair deliberately adds no
   back-off motion and no automatic already-at-home acceptance.
-- **Dual-zero definition (DE=0): OPTIONAL and separately authorized — EXCLUDED from both
-  Run A and Run B and from every session of this trial.** The exact Source contract:
-  profile-permitted only (`dualZeroPermitted`), dispatch-only, its effect is **UNVERIFIED**
-  (`DUAL_ZERO_DISPATCHED_EFFECT_UNVERIFIED`), and it **clears the homed coordinate claim** (any
-  later Move is then refused until a fresh Home). It is therefore **recorded in Product state
-  and NOT executed by any session of this trial**. If the Owner separately wants the Legacy
-  reset-encoder behavior (position define then encoder define), it is a separate,
-  separately-authorized step after the H1 run evidence is complete.
-- No encoder-reset sequence is invented anywhere in this procedure.
+- **Dual-zero definition (`DE=0`) inside a Home — REQUIRED by the Home lifecycle (Owner decision
+  2026-10-26).** The H1 Home conditions and the both-reads zero-verification requirement are
+  correct and unchanged; the defect they exposed was that the Home-carried zero establishment sent
+  the position definition only. The exact Legacy Source proves the commissioned reset-encoder
+  sequence is `DP<axis>=0` then `DE<axis>=0`, so the Home lifecycle now dispatches both, in that
+  order, before verification. The sequence is profile-gated (`dualZeroPermitted`): a profile that
+  does not permit the dual-zero definition keeps the position-only sequence, and the Owner-local
+  commissioning profile must permit it for this procedure.
+- **The standalone dual-zero definition remains a separate, optional, dispatch-only manual action.**
+  Its effect stays **UNVERIFIED** (`DUAL_ZERO_DISPATCHED_EFFECT_UNVERIFIED`) and it still **clears
+  the homed coordinate claim** (any later Move is then refused until a fresh Home). This procedure
+  does not use it as a manual step; the encoder definition it needs is carried by Home.
+- **The both-reads verification is an Owner-approved WJSS strengthening, not a Legacy behaviour.**
+  The Legacy reset path takes no position reading at all; H1 keeps requiring fresh TP **and** RP
+  within tolerance, and this is deliberately *not* weakened.
+- **Hardware confirmation of the corrected sequence is still outstanding.** The sequence is proven
+  at Source level and under deterministic simulation only. A separately authorized Real Galil H1
+  re-trial on the exact corrected head is required before any physical confirmation is claimed.
 
 ## 4. Representative Move target — Owner decision (both runs)
 
@@ -206,7 +222,7 @@ Never commit these values.
 | Brake outputs and release action (A–D) | profile (Owner-confirmed allocation 1/2/3/4) | `[RECORD — Run A operates outputs 1 (A) and 2 (B) only; Run B operates outputs 3 (C) and 4 (D) only]` |
 | Home speed / Home supervision timeout | profile | `[RECORD]` |
 | Move acceleration / speed / deceleration | profile | `[RECORD]` |
-| Dual-zero permission per axis | profile | `[RECORD — expected not permitted for either run]` |
+| Dual-zero permission per axis | profile | `[RECORD — REQUIRED for both runs: the Home-carried reset-encoder composition needs it]` |
 | Move target bounds | profile | `[RECORD]` |
 
 ## 7. Stop and Abort evidence method — Owner decision (same method for both routes)
@@ -255,7 +271,8 @@ per-axis Stop; DP=0 (the Home completion branch).
 - **Run B issues these families on axes C and D only** (brake outputs 3 and 4).
 - **No A/B command may occur during Run B. No C/D command may occur during Run A.** Any
   unrelated axis or output command is an immediate STOP condition.
-- DE=0 exists in the plan but is excluded from both runs and every session (section 3).
+- DE=0 is dispatched only as the second command of the Home-carried reset-encoder composition
+  (section 3). No standalone DE=0 step exists in these routes.
 - **No raw command input exists on the surface; no raw Galil command is authorized.** Any
   unexpected command family, any command on an unrelated axis, or any Pump/Valve/output command
   is a STOP condition.
@@ -311,8 +328,8 @@ per-axis Stop; DP=0 (the Home completion branch).
 - Complete the Home-carried **DP=0** and its **zero verification**: each axis independently
   `HOME_COMPLETED_ZERO_VERIFIED`, TP and RP zero within tolerance.
 - Verify both axes inactive with Brake applied after inactive.
-- Record the DP/DE disposition of section 3 (expected: Home-carried DP verified; DE not
-  dispatched).
+- Record the DP/DE disposition of section 3 (expected: Home-carried `DP=0` then `DE=0`
+  dispatched, in that order, with the both-reads zero verification passing afterwards).
 - This sequence is repeated at the start of the H1-A-T2, H1-A-T3, H1-A-T4 and H1-A-T5 sessions.
 
 ### H1-A-T2 — Completed bounded representative Move to G+210 P1 (fresh session)
@@ -427,8 +444,8 @@ be carried into Run B as Run B evidence.
 - Complete the Home-carried **DP=0** and its **zero verification**: each axis independently
   `HOME_COMPLETED_ZERO_VERIFIED`, TP and RP zero within tolerance.
 - Verify both axes inactive with Brake applied after inactive.
-- Record the DP/DE disposition of section 3 (expected: Home-carried DP verified; DE not
-  dispatched).
+- Record the DP/DE disposition of section 3 (expected: Home-carried `DP=0` then `DE=0`
+  dispatched, in that order, with the both-reads zero verification passing afterwards).
 - This sequence is repeated at the start of the H1-B-T2, H1-B-T3, H1-B-T4 and H1-B-T5 sessions.
 
 ### H1-B-T2 — Completed bounded representative Move to G+214 P1 (fresh session)
@@ -585,7 +602,8 @@ run's Sensor P1, software Stop evidence, operator Abort evidence, the run's own 
 P1→P6, Centre return to 125 mm / 125 mm, Brake lifecycle and cleanup — each in the separate
 fresh sessions of section 5.
 
-Both routes exclude: **DE=0**; Pump; physical Isolation Valve actuation; water; Queue;
+Both routes exclude: a **standalone DE=0** manual step (the Home-carried composition of section 3
+is required and is not a standalone step); Pump; physical Isolation Valve actuation; water; Queue;
 AutoSequence; next-job countdown; Production; WSB2–WSB4; Effective-WJ overrides; any Sensor
 other than G+210 and G+214; simultaneous execution; **coordinated trajectory**;
 **synchronized Begin**; **raw Galil commands**.
