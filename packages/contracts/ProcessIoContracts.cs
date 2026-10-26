@@ -264,7 +264,7 @@ public static class ProcessIoEngineering
 /// </summary>
 public static class ProcessIoBindings
 {
-    private static readonly IReadOnlyDictionary<string, (string Device, ProcessIoArea Area, int Address, string Direction)> Table =
+    private static readonly Dictionary<string, (string Device, ProcessIoArea Area, int Address, string Direction)> Table =
         new Dictionary<string, (string, ProcessIoArea, int, string)>
         {
             ["AI-001+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 8, "READ"),
@@ -344,13 +344,14 @@ public static class ProcessIoBindings
 /// <summary>Adoption classification per bound row (LEGACY_EXACT or LEGACY_DERIVED).</summary>
 public static class ProcessIoLegacyProvenance
 {
-    private static readonly IReadOnlySet<string> Derived = new HashSet<string>
-    {
-        "DI-001", "DI-002", "DI-008", "DI-009", "DI-010", "DI-011",
-        "DI-021", "DI-022", "DI-023", "DI-024", "DI-025", "DI-026", "DI-027", "DI-028",
-        "DI-029", "DI-030", "DI-031", "DI-032", "DI-033", "DI-034", "DI-035", "DI-036",
-        "DO-023", "DO-024", "DO-025", "DO-026", "DO-027", "DO-028", "DO-029", "DO-030",
-    };
+    private static readonly HashSet<string> Derived =
+        new()
+        {
+            "DI-001", "DI-002", "DI-008", "DI-009", "DI-010", "DI-011",
+            "DI-021", "DI-022", "DI-023", "DI-024", "DI-025", "DI-026", "DI-027", "DI-028",
+            "DI-029", "DI-030", "DI-031", "DI-032", "DI-033", "DI-034", "DI-035", "DI-036",
+            "DO-023", "DO-024", "DO-025", "DO-026", "DO-027", "DO-028", "DO-029", "DO-030",
+        };
 
     public static string AdoptionFor(string tag) => Derived.Contains(tag) ? "LEGACY_DERIVED" : "LEGACY_EXACT";
 
