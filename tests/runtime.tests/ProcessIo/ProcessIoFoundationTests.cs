@@ -141,10 +141,18 @@ public sealed class ProcessIoFoundationTests
         session.Open(At);
         var rows = LoadCommittedCatalogue();
         var unbound = rows.First(r => r.Tag == "DO-031");
-        var spare = rows.First(r => r.SourceClassification == "SPARE" && r.BindingState == ProcessIoBindingState.UNBOUND);
+        var bound = rows.First(r => r.Tag == "DO-023");
+        var boundExcluded = bound with { CommissioningState = ProcessIoCommissioningState.EXCLUDED };
         var auth = new ProcessIoWriteAuthorization { PhysicalWriteAuthorized = true };
-        Assert.Equal(ProcessIoRefusals.WriteRefusedUnbound, session.AdmitWrite(unbound, auth, At).Code);
-        Assert.Equal(ProcessIoRefusals.WriteRefusedExcluded, session.AdmitWrite(spare, auth, At).Code);
+
+        var unboundAdmission = session.AdmitWrite(unbound, auth, At);
+        Assert.False(unboundAdmission.Admitted);
+        Assert.Equal(ProcessIoRefusals.WriteRefusedUnbound, unboundAdmission.Code);
+
+        var excludedAdmission = session.AdmitWrite(boundExcluded, auth, At);
+        Assert.False(excludedAdmission.Admitted);
+        Assert.Equal(ProcessIoRefusals.WriteRefusedExcluded, excludedAdmission.Code);
+
         Assert.Empty(transport.Writes);
     }
 
