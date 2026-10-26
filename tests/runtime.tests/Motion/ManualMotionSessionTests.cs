@@ -2778,7 +2778,7 @@ public sealed class ManualMotionSessionTests
         Assert.Equal(nameof(ManualMotionDualZeroState.Refused), axis.DualZeroState.ToString());
 
         // Two definitions attempted, no third: the refusal is terminal for this Home.
-        Assert.Single(harness.Port.Executed.Where(command => command.Kind == ManualMotionPortCommandKind.DefineDualZero));
+        Assert.Single(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
     }
 
     [Fact]
@@ -2826,7 +2826,7 @@ public sealed class ManualMotionSessionTests
         harness.Session.RequestDefineDualZero(ManualMotionAxis.A);
         harness.Drive(1);
         Assert.Equal(ManualMotionCodes.DualZeroNotPermittedByProfile, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
-        Assert.Single(harness.Port.Executed.Where(command => command.Kind == ManualMotionPortCommandKind.DefineDualZero));
+        Assert.Single(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
     }
 
     /// <summary>
