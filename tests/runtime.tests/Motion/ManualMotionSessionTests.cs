@@ -105,6 +105,14 @@ public sealed class ManualMotionSessionTests
         internal ManualMotionAxisSnapshot Axis(ManualMotionAxis axis) =>
             Snapshot.Axes[(int)axis - 1];
 
+        /// <summary>
+        /// The sequence of the newest published log entry, or 0 when nothing is published. The log is
+        /// a bounded window of the most recent entries, so a watermark is only ever used for the
+        /// "strictly newer" comparison the session itself uses.
+        /// </summary>
+        internal long LastLogSequence =>
+            Snapshot.Log.Count == 0 ? 0 : Snapshot.Log[Snapshot.Log.Count - 1].Sequence;
+
         internal void HomeAxis(ManualMotionAxis axis)
         {
             Session.RequestHome(axis);
@@ -1010,14 +1018,26 @@ public sealed class ManualMotionSessionTests
         harness.OpenAndObserve();
         harness.HomeAxis(ManualMotionAxis.B);
         var beforeDualZero = harness.Port.ExecutedCommands.Count;
+        var logBefore = harness.LastLogSequence;
 
         harness.Session.RequestDefineDualZero(ManualMotionAxis.B);
+
+        // The standalone request must be proven consumed before the outcome is read. A wait on
+        // DualZeroState alone is no longer sufficient: the Home-carried composition already left it
+        // at DispatchedUnverified, so that predicate is true before the queued request is applied and
+        // would accept the Home outcome instead. The completion code below is logged only by the
+        // standalone operation - the Home-carried composition reports the Home outcome instead.
         harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
-            && snapshot.Axes[1].DualZeroState == ManualMotionDualZeroState.DispatchedUnverified);
+            && snapshot.Log.Any(entry => entry.Sequence > logBefore
+                && entry.Axis == ManualMotionAxis.B
+                && entry.Code == ManualMotionCodes.DualZeroDispatchedEffectUnverified));
 
         var axis = harness.Axis(ManualMotionAxis.B);
         Assert.Equal(ManualMotionCodes.DualZeroDispatchedEffectUnverified, axis.LastOutcomeCode);
         Assert.Equal(ManualMotionHomeState.NotHomed, axis.HomeState);
+
+        // Exactly one additional dispatch, and it is the standalone dual-zero definition: the Home
+        // that already ran is not re-dispatched.
         Assert.Equal(
             new[] { ManualMotionPortCommandKind.DefineDualZero },
             KindsAfter(harness, beforeDualZero).ToArray());
@@ -2520,12 +2540,20 @@ public sealed class ManualMotionSessionTests
     /// input would time out), while the motion bit reads inactive throughout. It records every command
     /// and read in dispatch order, and can refuse either definition or report a zero position only
     /// for readings taken BEFORE the dual-zero definition. Every value is synthetic.
+    ///
+    /// The port carries no sequence of its own: a port result reports only the port generation, which
+    /// must stay at the single generation the session opened (any other value is a stale result and is
+    /// rejected). Sequencing belongs to the session, which owns one monotonic call sequence shared by
+    /// commands and reads. This port therefore records the interleaved call order so a test can prove
+    /// which readings were taken after a given command.
     /// </summary>
     private sealed class ZeroSequencePort : IManualMotionPort
     {
         private bool _dualZeroDispatched;
 
         private bool _homeInputActive;
+
+        private int _callOrdinal;
 
         internal bool RefusePositionZero { get; init; }
 
@@ -2538,6 +2566,54 @@ public sealed class ManualMotionSessionTests
 
         internal List<ManualMotionPortRead> Reads { get; } = new();
 
+        /// <summary>Every command in the interleaved port-call order of this port.</summary>
+        internal List<(int Ordinal, ManualMotionPortCommandKind Kind)> CommandCalls { get; } = new();
+
+        /// <summary>Every read in the interleaved port-call order of this port.</summary>
+        internal List<(int Ordinal, ManualMotionReadKind Kind)> ReadCalls { get; } = new();
+
+        /// <summary>The interleaved call ordinal of the first command of one kind.</summary>
+        internal int OrdinalOf(ManualMotionPortCommandKind kind)
+        {
+            foreach (var call in CommandCalls)
+            {
+                if (call.Kind == kind)
+                {
+                    return call.Ordinal;
+                }
+            }
+
+            throw new InvalidOperationException("The port never received a command of that kind.");
+        }
+
+        /// <summary>True when a read of one kind was taken strictly after the given call ordinal.</summary>
+        internal bool ReadAfter(int ordinal, ManualMotionReadKind kind)
+        {
+            foreach (var call in ReadCalls)
+            {
+                if (call.Kind == kind && call.Ordinal > ordinal)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>True when a read of one kind was taken strictly before the given call ordinal.</summary>
+        internal bool ReadBefore(int ordinal, ManualMotionReadKind kind)
+        {
+            foreach (var call in ReadCalls)
+            {
+                if (call.Kind == kind && call.Ordinal < ordinal)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public ManualMotionPortMode Mode => ManualMotionPortMode.Simulated;
 
         public ManualMotionPortOpenResult Open() => new(true, "SYNTHETIC_OPENED", 1);
@@ -2545,6 +2621,7 @@ public sealed class ManualMotionSessionTests
         public ManualMotionPortCommandResult Execute(ManualMotionPortCommand command)
         {
             Executed.Add(command);
+            CommandCalls.Add((++_callOrdinal, command.Kind));
             if (command.Kind == ManualMotionPortCommandKind.DefinePositionZero && RefusePositionZero)
             {
                 return new ManualMotionPortCommandResult(false, false, true, "SYNTHETIC_REFUSED", 1);
@@ -2573,6 +2650,7 @@ public sealed class ManualMotionSessionTests
         public ManualMotionPortReadResult Read(ManualMotionPortRead read)
         {
             Reads.Add(read);
+            ReadCalls.Add((++_callOrdinal, read.Kind));
             switch (read.Kind)
             {
                 // Home bit 3 (8) only once the Home search is armed; motion bit 6 inactive.
@@ -2643,6 +2721,20 @@ public sealed class ManualMotionSessionTests
         }
 
         internal ManualMotionAxisSnapshot Axis(ManualMotionAxis axis) => Snapshot.Axes[(int)axis - 1];
+
+        /// <summary>
+        /// Drives one Home request from enqueue to its finished state and proves the request was
+        /// actually consumed: the Home operation must be observed active after the enqueue and then
+        /// observed gone. A wait that rests only on an idle session is already true before the queued
+        /// request is applied, so it would accept the terminal state with the request still pending
+        /// and let the assertions read the pre-request outcome.
+        /// </summary>
+        internal void HomeToTerminal(ManualMotionAxis axis)
+        {
+            Session.RequestHome(axis);
+            DriveUntil(snapshot => ActiveOf(snapshot, axis) is not null);
+            DriveUntil(snapshot => ActiveOf(snapshot, axis) is null);
+        }
     }
 
     [Fact]
@@ -2655,9 +2747,8 @@ public sealed class ManualMotionSessionTests
             var harness = new ZeroSequenceHarness(new ZeroSequencePort());
             harness.OpenSession();
 
-            harness.Session.RequestHome(axis);
-            harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
-                && snapshot.Axes[(int)axis - 1].HomeState == ManualMotionHomeState.Homed);
+            harness.HomeToTerminal(axis);
+            Assert.Equal(ManualMotionHomeState.Homed, harness.Axis(axis).HomeState);
 
             var definitions = harness.Port.Executed
                 .Where(command => command.Kind is ManualMotionPortCommandKind.DefinePositionZero
@@ -2707,8 +2798,10 @@ public sealed class ManualMotionSessionTests
         var harness = new ZeroSequenceHarness(new ZeroSequencePort { ZeroReadsOnlyBeforeDualZero = true });
         harness.OpenSession();
 
-        harness.Session.RequestHome(ManualMotionAxis.A);
-        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
+        // The wait proves the queued Home was consumed: the operation is observed active and then
+        // observed finished. An idle-session predicate alone is already true before the queued
+        // request is applied and would let the assertions read the unchanged pre-request outcome.
+        harness.HomeToTerminal(ManualMotionAxis.A);
 
         var axis = harness.Axis(ManualMotionAxis.A);
         Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, axis.LastOutcomeCode);
@@ -2716,14 +2809,24 @@ public sealed class ManualMotionSessionTests
         Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, axis.CoordinateState);
 
         // The failure is genuinely a post-dual-zero verification failure: both definitions were
-        // dispatched, in order, and verified readings of the two positions still existed.
+        // dispatched, in order, and the position readings used by the verification were taken in the
+        // real port-call stream strictly AFTER the dual-zero definition, not before it.
         var kinds = harness.Port.Executed.Select(command => command.Kind).ToList();
         var positionZeroIndex = kinds.IndexOf(ManualMotionPortCommandKind.DefinePositionZero);
         var dualZeroIndex = kinds.IndexOf(ManualMotionPortCommandKind.DefineDualZero);
         Assert.True(positionZeroIndex >= 0);
         Assert.True(dualZeroIndex > positionZeroIndex);
-        Assert.Contains(harness.Port.Reads, read => read.Kind == ManualMotionReadKind.PositionTp);
-        Assert.Contains(harness.Port.Reads, read => read.Kind == ManualMotionReadKind.PositionRp);
+
+        var dualZeroOrdinal = harness.Port.OrdinalOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(
+            harness.Port.ReadBefore(dualZeroOrdinal, ManualMotionReadKind.PositionTp),
+            "the scenario requires TP readings taken before the dual-zero definition");
+        Assert.True(
+            harness.Port.ReadAfter(dualZeroOrdinal, ManualMotionReadKind.PositionTp),
+            "a TP reading must be taken strictly after the dual-zero definition");
+        Assert.True(
+            harness.Port.ReadAfter(dualZeroOrdinal, ManualMotionReadKind.PositionRp),
+            "an RP reading must be taken strictly after the dual-zero definition");
     }
 
     [Fact]
@@ -2751,8 +2854,7 @@ public sealed class ManualMotionSessionTests
         var harness = new ZeroSequenceHarness(new ZeroSequencePort { RefusePositionZero = true });
         harness.OpenSession();
 
-        harness.Session.RequestHome(ManualMotionAxis.A);
-        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
+        harness.HomeToTerminal(ManualMotionAxis.A);
 
         var axis = harness.Axis(ManualMotionAxis.A);
         Assert.Equal(ManualMotionCodes.PositionZeroRefused, axis.LastOutcomeCode);
@@ -2767,8 +2869,7 @@ public sealed class ManualMotionSessionTests
         var harness = new ZeroSequenceHarness(new ZeroSequencePort { RefuseDualZero = true });
         harness.OpenSession();
 
-        harness.Session.RequestHome(ManualMotionAxis.A);
-        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0);
+        harness.HomeToTerminal(ManualMotionAxis.A);
 
         var axis = harness.Axis(ManualMotionAxis.A);
         Assert.Equal(ManualMotionCodes.HomeDualZeroRefused, axis.LastOutcomeCode);
@@ -2794,9 +2895,8 @@ public sealed class ManualMotionSessionTests
         var harness = new ZeroSequenceHarness(new ZeroSequencePort(), profile);
         harness.OpenSession();
 
-        harness.Session.RequestHome(ManualMotionAxis.A);
-        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
-            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+        harness.HomeToTerminal(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.Homed, harness.Axis(ManualMotionAxis.A).HomeState);
 
         var axis = harness.Axis(ManualMotionAxis.A);
         Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
@@ -2822,9 +2922,12 @@ public sealed class ManualMotionSessionTests
         Assert.Equal(0, harness.Port.Executed[6].Operand);
 
         // The permission still governs the STANDALONE dual-zero action on exactly this profile: the
-        // Home-carried composition is the only thing that stopped reading it.
+        // Home-carried composition is the only thing that stopped reading it. The wait is
+        // request-specific: the refusal code cannot be present before the request is applied, because
+        // the Home outcome was published there instead.
         harness.Session.RequestDefineDualZero(ManualMotionAxis.A);
-        harness.Drive(1);
+        harness.DriveUntil(snapshot =>
+            snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.DualZeroNotPermittedByProfile);
         Assert.Equal(ManualMotionCodes.DualZeroNotPermittedByProfile, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
         Assert.Single(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
     }
