@@ -1056,7 +1056,9 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = RunFullSuccess();
 
         // Every dispatched command is one member of the closed typed manual motion plan: brake
-        // output set/clear, home speed, Home, Begin, position-zero definition and Move setup.
+        // output set/clear, home speed, Home, Begin, the Home-carried position-zero definition and
+        // dual-zero definition, and Move setup. The list stays explicit and closed on purpose: any
+        // command family that is not named here - including any future kind - fails this test.
         foreach (var command in harness.Port.ExecutedCommands)
         {
             Assert.True(
@@ -1066,6 +1068,7 @@ public sealed class H1DryCommissioningCoordinatorTests
                     or ManualMotionPortCommandKind.Home
                     or ManualMotionPortCommandKind.Begin
                     or ManualMotionPortCommandKind.DefinePositionZero
+                    or ManualMotionPortCommandKind.DefineDualZero
                     or ManualMotionPortCommandKind.Acceleration
                     or ManualMotionPortCommandKind.Speed
                     or ManualMotionPortCommandKind.Deceleration
