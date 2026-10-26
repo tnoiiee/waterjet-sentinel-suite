@@ -1,5 +1,31 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H2 Physical Process-I/O Product software foundation — implementation record (2026-10-27;
+> software only; HARDWARE NOT EXECUTED).** The complete H2 Physical Process-I/O software
+> foundation covering all 111 rows of the adopted inventory is implemented on PR #42 from the
+> Exact Legacy Source pack (`repomix-output-exact-lagacy-source-pack.md`, SHA-256
+> `9dc7bf513a8e62e2bd76a77ec8af12aea9f25a47a63eb4379b1c9e00dc14fd1c`, 3,362,177 bytes,
+> verified outside the repository tree; the commissioned functional reference for the unchanged
+> Hardware). Components implemented: (1) complete typed catalogue integration
+> (`ProcessIoCatalogueLoader` / `@wjss/process-io/catalogue`) consuming the committed
+> normalized inventory (DI 40 / DO 32 / AI 36 / AO 2 / End module 1; USED 105 / SPARE 6; 108
+> tagged / 3 untagged; all 111 rows preserved in complete source order; spare and unresolved
+> rows fail-closed excluded); (2) exact Legacy physical bindings, function codes (FC01/FC03/FC05/FC16),
+> transport shape (port 502, unitId 1, timeouts 1000 ms, poll 200 ms) and conversions (WC/IV
+> pressure 0..40 bar, pump outlet two-stage 4..20 mA -> 0..40 bar per Owner ruling AI-003 sole
+> Pump-ready authority, water level, AO pump speed reference 0..20 mA -> raw 0..32767); (3) typed
+> session with generation counter, stale-response rejection, reconnect fencing, exactly-once write
+> admission, no write after Close/Stop; (4) commanded / effective / read-back separation; (5)
+> physical-capable configuration validation (fail-closed; missing/invalid endpoints refuse before
+> network I/O; zero network I/O on refusal); (6) deterministic Simulation covering all four I/O
+> classes with 23 scenarios; (7) commissioning-surface view model with full filtering/searching.
+> Legacy defects deliberately not copied: raw coil/register write grids, untyped monitor tables,
+> missing lifecycle ownership, missing cleanup, unseparated commanded read-back, inline simulation
+> data. Validation: 65/65 tests in `packages/process-io`, 15/15 generator tests, boundary scan 0
+> findings (S1–S9), relevant Node suites green; C# tests in `tests/runtime.tests/ProcessIo/`.
+> Hardware execution remains NOT AUTHORIZED; every physical trial requires separate exact-head
+> Owner authorization. H1 and PR #43 are outside this Scope. NO HARDWARE. NO PRODUCTION.
+
 > **H2 Physical Process-I/O evidence adoption + H2 Final Scope Gate (2026-10-26; evidence and
 > read-only analysis only; NO HARDWARE; NO PRODUCT RUNTIME CHANGE).** The exact
 > Owner-supplied connected-source artifact
