@@ -216,7 +216,7 @@ public sealed class ProcessIoFoundationTests
     [Fact]
     public void Transport_Boundary_Covers_All_Four_Io_Classes()
     {
-        IProcessIoTransport transport = new SimulatedProcessIoTransport();
+        var transport = new SimulatedProcessIoTransport();
         transport.WriteCoil(ProcessIoDevices.PumpRack, 6, true);
         transport.WriteRegisters(ProcessIoDevices.PumpRack, 0, new ushort[] { 100 });
         Assert.True(transport.ReadCoil(ProcessIoDevices.PumpRack, 6));
