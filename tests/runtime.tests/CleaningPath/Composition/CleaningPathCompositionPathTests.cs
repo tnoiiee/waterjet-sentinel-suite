@@ -20,7 +20,7 @@ public sealed class CleaningPathCompositionPathTests
         var harness = new CleaningPathCompositionHarness();
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 16);
         return harness;
     }
 
@@ -28,7 +28,7 @@ public sealed class CleaningPathCompositionPathTests
     {
         harness.DriveUntil(() => harness.Composition.Current!.Status == CleaningPathCompositionStatus.SupervisingValveClose);
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.DriveUntilTerminal();
     }
 
@@ -133,10 +133,10 @@ public sealed class CleaningPathCompositionPathTests
         // The paired IV was commanded open, so its state may be open: a cleanup close is fenced.
         var cleanupClose = harness.Equipment.ValveCommands[1];
         Assert.Equal(CleaningPathValveCommandKind.Close, cleanupClose.Kind);
-        Assert.Equal("IV4", cleanupClose.ValveId);
+        Assert.Equal("IV3", cleanupClose.ValveId);
 
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.DriveUntilTerminal();
 
         Assert.Equal(CleaningPathCleanupState.Succeeded, harness.Composition.Result!.Handoff.ValveCleanupState);
@@ -155,7 +155,7 @@ public sealed class CleaningPathCompositionPathTests
         var harness = new CleaningPathCompositionHarness();
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 16);
         harness.DriveUntil(() => harness.Composition.Current!.CurrentPointId == JobPhase.P2);
 
         // Both P2 operations are already requested but not yet processed by the next boundary
@@ -169,7 +169,7 @@ public sealed class CleaningPathCompositionPathTests
             ManualMotionAxis.D,
             new ManualMotionAxisSimulationOptions { MotionStalled = true });
         harness.Equipment.LowerLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 0.5);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 0.5);
         harness.DriveUntilTerminal();
 
         var handoff = harness.Composition.Result!.Handoff;
@@ -185,7 +185,7 @@ public sealed class CleaningPathCompositionPathTests
         RunAcceptedClose(harness);
 
         Assert.Empty(harness.Motion.UnrelatedAxisCommands());
-        Assert.All(harness.Equipment.ValveCommands, request => Assert.Equal("IV4", request.ValveId));
+        Assert.All(harness.Equipment.ValveCommands, request => Assert.Equal("IV3", request.ValveId));
     }
 
     [Fact]

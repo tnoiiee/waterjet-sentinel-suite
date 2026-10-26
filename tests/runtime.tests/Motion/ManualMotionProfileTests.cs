@@ -333,17 +333,17 @@ public sealed class ManualMotionProfileTests
     [Fact]
     public void The_Topology_Projects_The_Canonical_Water_Jet_Identity_Of_Every_Axis()
     {
-        // WSB1 Axis A/B serve WJ2 (installed LEFT/UPPER, targets RIGHT/UPPER); Axis C/D serve WJ3
-        // (installed REAR/UPPER, targets FRONT/UPPER). No axis is ever WJ1.
+        // WSB1 Axis A/B serve WJ1 (installed LEFT/UPPER, targets RIGHT/UPPER); Axis C/D serve WJ2
+        // (installed REAR/UPPER, targets FRONT/UPPER). No axis is ever WJ3.
         Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.A));
         Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.B));
         Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.C));
         Assert.Equal("WSB1", ManualMotionTopology.CabinetId(ManualMotionAxis.D));
 
-        Assert.Equal("WJ2", ManualMotionTopology.WaterJetId(ManualMotionAxis.A));
-        Assert.Equal("WJ2", ManualMotionTopology.WaterJetId(ManualMotionAxis.B));
-        Assert.Equal("WJ3", ManualMotionTopology.WaterJetId(ManualMotionAxis.C));
-        Assert.Equal("WJ3", ManualMotionTopology.WaterJetId(ManualMotionAxis.D));
+        Assert.Equal("WJ1", ManualMotionTopology.WaterJetId(ManualMotionAxis.A));
+        Assert.Equal("WJ1", ManualMotionTopology.WaterJetId(ManualMotionAxis.B));
+        Assert.Equal("WJ2", ManualMotionTopology.WaterJetId(ManualMotionAxis.C));
+        Assert.Equal("WJ2", ManualMotionTopology.WaterJetId(ManualMotionAxis.D));
 
         Assert.Equal("LEFT / UPPER", ManualMotionTopology.InstalledPosition(ManualMotionAxis.A));
         Assert.Equal("RIGHT / UPPER", ManualMotionTopology.TargetCoverage(ManualMotionAxis.A));

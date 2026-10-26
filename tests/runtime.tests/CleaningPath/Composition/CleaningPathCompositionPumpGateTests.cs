@@ -42,7 +42,7 @@ public sealed class CleaningPathCompositionPumpGateTests
 
         // Both P1 Move plans exist and the paired-IV open is requested only after both axes verify.
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 16);
         harness.DriveUntil(() => harness.Composition.Current!.Status == CleaningPathCompositionStatus.SupervisingValveOpen);
         Assert.Equal(2, PositionAbsoluteCount(harness));
         Assert.Single(harness.Equipment.ValveCommands);
@@ -199,7 +199,7 @@ public sealed class CleaningPathCompositionPumpGateTests
         Assert.True(outcome.Started);
 
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 16);
         for (var index = 0; index < 2000 && harness.Composition.Current!.Status != CleaningPathCompositionStatus.SupervisingValveOpen; index++)
         {
             Assert.Empty(harness.Equipment.ValveCommands);

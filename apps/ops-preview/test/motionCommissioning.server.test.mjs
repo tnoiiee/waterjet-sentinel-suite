@@ -82,32 +82,32 @@ test('the catalogue carries the whole confirmed topology, the canonical mapping 
     const horizontal = (id) => catalogue.waterJets.find((row) => row.waterJetId === id).horizontalAxisId;
     const vertical = (id) => catalogue.waterJets.find((row) => row.waterJetId === id).verticalAxisId;
     assert.equal(horizontal('WJ1'), 'A');
-    assert.equal(horizontal('WJ2'), 'A');
+    assert.equal(horizontal('WJ2'), 'C');
     assert.equal(horizontal('WJ3'), 'C');
-    assert.equal(horizontal('WJ4'), 'C');
+    assert.equal(horizontal('WJ4'), 'A');
     assert.equal(horizontal('WJ5'), 'A');
-    assert.equal(horizontal('WJ6'), 'A');
-    assert.equal(horizontal('WJ7'), 'C');
+    assert.equal(horizontal('WJ6'), 'C');
+    assert.equal(horizontal('WJ7'), 'A');
     assert.equal(horizontal('WJ8'), 'C');
-    // REV2 cabinet allocation: WJ1/WJ4 on WSB2, WJ2/WJ3 on WSB1, WJ5/WJ7 on WSB3,
-    // WJ6/WJ8 on WSB4 (the revoked REV1 cabinets must not reappear).
+    // Adopted (2026-10-25) cabinet allocation: WJ1/WJ2 on WSB1, WJ3/WJ4 on WSB2,
+    // WJ5/WJ6 on WSB3, WJ7/WJ8 on WSB4 (the revoked REV2 and REV1 cabinets must not reappear).
     const cabinetOf = (id) => catalogue.waterJets.find((row) => row.waterJetId === id).cabinetId;
-    assert.equal(cabinetOf('WJ1'), 'WSB2');
+    assert.equal(cabinetOf('WJ1'), 'WSB1');
     assert.equal(cabinetOf('WJ2'), 'WSB1');
-    assert.equal(cabinetOf('WJ3'), 'WSB1');
+    assert.equal(cabinetOf('WJ3'), 'WSB2');
     assert.equal(cabinetOf('WJ4'), 'WSB2');
     assert.equal(cabinetOf('WJ5'), 'WSB3');
-    assert.equal(cabinetOf('WJ6'), 'WSB4');
-    assert.equal(cabinetOf('WJ7'), 'WSB3');
+    assert.equal(cabinetOf('WJ6'), 'WSB3');
+    assert.equal(cabinetOf('WJ7'), 'WSB4');
     assert.equal(cabinetOf('WJ8'), 'WSB4');
     for (const row of catalogue.waterJets) {
       assert.equal(row.mappingStatus, 'CONFIRMED_OWNER', row.waterJetId);
       assert.equal(row.mappingBasis, 'OWNER_CONFIRMED', row.waterJetId);
       assert.notEqual(row.horizontalAxisId, row.verticalAxisId);
     }
-    // The two Water Jets of the recorded Drawing note, under REV2: WJ2 = A,B and WJ4 = C,D.
-    assert.equal(vertical('WJ2'), 'B');
-    assert.equal(vertical('WJ4'), 'D');
+    // The two Water Jets of the recorded Drawing note, under the adopted table: WJ2 = C,D and WJ4 = A,B.
+    assert.equal(vertical('WJ2'), 'D');
+    assert.equal(vertical('WJ4'), 'B');
 
     // Explicit data: no cabinet rule and no odd/even rule can produce this table.
     for (const cabinet of ['WSB1', 'WSB2', 'WSB3', 'WSB4']) {
@@ -115,9 +115,10 @@ test('the catalogue carries the whole confirmed topology, the canonical mapping 
       assert.notEqual(first.horizontalAxisId, second.horizontalAxisId, cabinet);
     }
     assert.notEqual(horizontal('WJ2'), horizontal('WJ4'));
+    assert.notEqual(horizontal('WJ4'), horizontal('WJ6'));
     assert.notEqual(horizontal('WJ1'), horizontal('WJ3'));
-    assert.notEqual(horizontal('WJ5'), horizontal('WJ7'));
-    assert.notEqual(horizontal('WJ6'), horizontal('WJ8'));
+    assert.notEqual(horizontal('WJ3'), horizontal('WJ5'));
+    assert.equal(horizontal('WJ5'), horizontal('WJ7'));
   });
 });
 
@@ -172,8 +173,8 @@ test('the Product-side catalogue mirror of the same Owner-confirmed data validat
   const mirrored = canonicalMotionCatalogue();
   assert.equal(validMotionCommissioningCatalogue(mirrored), true);
   assert.deepEqual(mirrored.waterJets.map((row) => [row.waterJetId, row.horizontalAxisId, row.verticalAxisId]),
-    [['WJ1', 'A', 'B'], ['WJ2', 'A', 'B'], ['WJ3', 'C', 'D'], ['WJ4', 'C', 'D'],
-      ['WJ5', 'A', 'B'], ['WJ6', 'A', 'B'], ['WJ7', 'C', 'D'], ['WJ8', 'C', 'D']]);
+    [['WJ1', 'A', 'B'], ['WJ2', 'C', 'D'], ['WJ3', 'C', 'D'], ['WJ4', 'A', 'B'],
+      ['WJ5', 'A', 'B'], ['WJ6', 'C', 'D'], ['WJ7', 'A', 'B'], ['WJ8', 'C', 'D']]);
   for (const row of mirrored.waterJets) {
     assert.equal(row.mappingStatus, 'CONFIRMED_OWNER', row.waterJetId);
     assert.equal(row.mappingBasis, 'OWNER_CONFIRMED', row.waterJetId);

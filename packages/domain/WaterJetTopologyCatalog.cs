@@ -4,17 +4,23 @@ namespace Wjss.Domain;
 
 /// <summary>
 /// The Owner-approved Water Jet / Isolation Valve topology: the canonical installed
-/// topology adopted by the Owner Canonical Topology Adoption (2026-10-21), superseding
-/// the installed wall / region and target rows approved earlier in ADR-0017 decisions 5
-/// and 7 (the ADR-0017 addendum records the supersession; the earlier table is history).
+/// topology adopted by the Owner-approved canonical Equipment topology adoption
+/// (2026-10-25), superseding the installed wall / region and target rows adopted by the
+/// Owner Canonical Topology Adoption (2026-10-21) and the earlier ADR-0017 decisions 5
+/// and 7 (the ADR-0017 addendum records the supersession chain; the earlier tables are
+/// history).
 ///
 /// Installed position and target coverage are SEPARATE concepts: a Water Jet is installed
 /// on one wall and sprays the OPPOSITE wall (LEFT↔RIGHT, FRONT↔REAR) in the matching
 /// region. The pairing is mandatory one-to-one with matching ordinals: WJn ↔ IVn.
 /// Canonical installed topology: WJ1–WJ4 are the UPPER tier and WJ5–WJ8 the LOWER tier
-/// (WJ1 FRONT/UPPER, WJ2 LEFT/UPPER, WJ3 REAR/UPPER, WJ4 RIGHT/UPPER, WJ5 FRONT/LOWER,
-/// WJ6 LEFT/LOWER, WJ7 REAR/LOWER, WJ8 RIGHT/LOWER), each targeting the opposite wall in
-/// the same tier.
+/// (WJ1 LEFT/UPPER, WJ2 REAR/UPPER, WJ3 RIGHT/UPPER, WJ4 FRONT/UPPER, WJ5 FRONT/LOWER,
+/// WJ6 REAR/LOWER, WJ7 LEFT/LOWER, WJ8 RIGHT/LOWER), each targeting the opposite wall in
+/// the same tier. The historical Legacy WJ identity of each Water Jet (WJ1 = legacy WJ2,
+/// WJ2 = legacy WJ3, WJ3 = legacy WJ4, WJ4 = legacy WJ1, WJ5 = legacy WJ5, WJ6 = legacy
+/// WJ7, WJ7 = legacy WJ6, WJ8 = legacy WJ8) is historical equipment identity ONLY: it is
+/// distinct from the legacy cannon identity, and legacy <c>cannon n</c> continues to map
+/// DIRECTLY to canonical WJn (no cannon permutation exists).
 ///
 /// Owner placement disposition (Canonical Topology Adoption, incorporating the Stage
 /// 0.4C-K3 installed-position ruling): logical I7 and I16 are Product Sensors, so the
@@ -58,44 +64,44 @@ public static class WaterJetTopologyCatalog
         new WaterJetConfiguration
         {
             WaterJetId = "WJ1",
-            InstalledWall = Wall.FRONT,
-            InstalledRegion = Region.UPPER,
-            PlacementKind = WaterJetPlacementKind.UNRESOLVED,
-            PlacementAnchors = [],
-            TargetWall = Wall.REAR,
-            TargetRegion = Region.UPPER,
-            DedicatedIsolationValveId = "IV1",
-        },
-        new WaterJetConfiguration
-        {
-            WaterJetId = "WJ2",
             InstalledWall = Wall.LEFT,
             InstalledRegion = Region.UPPER,
             PlacementKind = WaterJetPlacementKind.UNRESOLVED,
             PlacementAnchors = [],
             TargetWall = Wall.RIGHT,
             TargetRegion = Region.UPPER,
-            DedicatedIsolationValveId = "IV2",
+            DedicatedIsolationValveId = "IV1",
         },
         new WaterJetConfiguration
         {
-            WaterJetId = "WJ3",
+            WaterJetId = "WJ2",
             InstalledWall = Wall.REAR,
             InstalledRegion = Region.UPPER,
             PlacementKind = WaterJetPlacementKind.UNRESOLVED,
             PlacementAnchors = [],
             TargetWall = Wall.FRONT,
             TargetRegion = Region.UPPER,
-            DedicatedIsolationValveId = "IV3",
+            DedicatedIsolationValveId = "IV2",
         },
         new WaterJetConfiguration
         {
-            WaterJetId = "WJ4",
+            WaterJetId = "WJ3",
             InstalledWall = Wall.RIGHT,
             InstalledRegion = Region.UPPER,
             PlacementKind = WaterJetPlacementKind.UNRESOLVED,
             PlacementAnchors = [],
             TargetWall = Wall.LEFT,
+            TargetRegion = Region.UPPER,
+            DedicatedIsolationValveId = "IV3",
+        },
+        new WaterJetConfiguration
+        {
+            WaterJetId = "WJ4",
+            InstalledWall = Wall.FRONT,
+            InstalledRegion = Region.UPPER,
+            PlacementKind = WaterJetPlacementKind.UNRESOLVED,
+            PlacementAnchors = [],
+            TargetWall = Wall.REAR,
             TargetRegion = Region.UPPER,
             DedicatedIsolationValveId = "IV4",
         },
@@ -113,22 +119,22 @@ public static class WaterJetTopologyCatalog
         new WaterJetConfiguration
         {
             WaterJetId = "WJ6",
-            InstalledWall = Wall.LEFT,
+            InstalledWall = Wall.REAR,
             InstalledRegion = Region.LOWER,
             PlacementKind = WaterJetPlacementKind.UNRESOLVED,
             PlacementAnchors = [],
-            TargetWall = Wall.RIGHT,
+            TargetWall = Wall.FRONT,
             TargetRegion = Region.LOWER,
             DedicatedIsolationValveId = "IV6",
         },
         new WaterJetConfiguration
         {
             WaterJetId = "WJ7",
-            InstalledWall = Wall.REAR,
+            InstalledWall = Wall.LEFT,
             InstalledRegion = Region.LOWER,
             PlacementKind = WaterJetPlacementKind.UNRESOLVED,
             PlacementAnchors = [],
-            TargetWall = Wall.FRONT,
+            TargetWall = Wall.RIGHT,
             TargetRegion = Region.LOWER,
             DedicatedIsolationValveId = "IV7",
         },

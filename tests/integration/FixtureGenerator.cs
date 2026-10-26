@@ -14,7 +14,8 @@ namespace Wjss.FixtureEmission.Tests;
 ///
 /// Owner critical topology correction (Stage 0.4C-K3): every one of the 108 logical
 /// positions is a Product Sensor (I7 and I16 included; 216 channels; synthetic device
-/// distribution 14 x 4 + 13 x 4). Canonical Topology Adoption (2026-10-21): the Water Jet
+/// distribution 14 x 4 + 13 x 4). Owner-approved canonical Equipment topology adoption
+/// (2026-10-25): the Water Jet
 /// rows and every Sensor assignment flow from the canonical
 /// <see cref="WaterJetTopologyCatalog"/> (read below), so no table in this generator
 /// changes: WJ1–WJ4 clean the UPPER tier and WJ5–WJ8 the LOWER tier, and every Sensor's

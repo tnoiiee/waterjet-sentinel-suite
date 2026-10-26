@@ -836,9 +836,9 @@ The selected UI technology must support, at minimum:
   the U-shaped layout unchanged except that logical **I7** (Rear wall) and **I16** (Front wall)
   are populated as ordinary Sensor cells. No position is rendered as a non-Sensor gap. A Water
   Jet stays a separate equipment entity with an **Installed Position** that is distinct from its
-  **Target Coverage** (canonical installed topology, Owner Canonical Topology Adoption
-  2026-10-21: WJ1 installed FRONT/UPPER, targets REAR/UPPER; WJ3 installed REAR/UPPER,
-  targets FRONT/UPPER — WJ1–WJ4 UPPER tier, WJ5–WJ8 LOWER tier, each covering the opposite
+  **Target Coverage** (canonical installed topology, Owner-approved canonical Equipment topology
+  adoption 2026-10-25: WJ1 installed LEFT/UPPER, targets RIGHT/UPPER; WJ3 installed RIGHT/UPPER,
+  targets LEFT/UPPER — WJ1–WJ4 UPPER tier, WJ5–WJ8 LOWER tier, each covering the opposite
   wall in the same tier; the fine-grained placement of all eight is `UNRESOLVED` with no
   placement anchors, and only that fine-grained placement is unresolved) — see
   [`DOMAIN_MODEL.md` §2.2.1](DOMAIN_MODEL.md#221-logical-sensor-matrix-and-the-two-non_sensor_gap-positions-owner-confirmed).

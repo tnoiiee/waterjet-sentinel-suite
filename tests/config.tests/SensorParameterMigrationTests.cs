@@ -10,10 +10,11 @@ namespace Wjss.Config.Tests;
 /// Stage 0.3A-3 Checkpoint B invariant tests for the legacy sensor-parameter migration
 /// (ADR-0017; approved planned tests T1–T20), corrected to the Owner critical topology
 /// correction (Stage 0.4C-K3): 108 Sensors, 216 structural TC sides, I7 and I16 normal Product
-/// Sensors in ordinal position, no NON_SENSOR_GAP vocabulary; and to the Canonical
-/// Topology Adoption (2026-10-21): WJ1–WJ4 installed / targeting the UPPER tier,
+/// Sensors in ordinal position, no NON_SENSOR_GAP vocabulary; and to the Owner-approved
+/// canonical Equipment topology adoption (2026-10-25): WJ1–WJ4 installed / targeting the
+/// UPPER tier,
 /// WJ5–WJ8 the LOWER tier, fine-grained placement UNRESOLVED with no anchors for all
-/// eight Water Jets, canonical default assignments 10 / 8 / 10 / 8 / 20 / 16 / 20 / 16.
+/// eight Water Jets, canonical default assignments 8 / 10 / 8 / 10 / 20 / 20 / 16 / 16.
 /// All fixtures are synthetic public-safe rows built by <see cref="SyntheticSensorParameterCsv"/>;
 /// the Owner CSV never enters Git.
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local test run is the arbiter).
@@ -107,8 +108,8 @@ public sealed class SensorParameterMigrationTests
         Assert.Equal(16, i16.LogicalColumn);
         Assert.Equal(3, i16.WallColumn);
         Assert.True(i16.Enabled);
-        Assert.Equal("WJ7", i16.AssignedWaterJetId);
-        Assert.Equal("IV7", i16.AssignedIsolationValveId);
+        Assert.Equal("WJ6", i16.AssignedWaterJetId);
+        Assert.Equal("IV6", i16.AssignedIsolationValveId);
 
         // The gap-anchor property no longer exists on any canonical record.
         Assert.DoesNotContain(typeof(LogicalPositionRecord).GetProperties(), p => p.Name == "GapAnchorForWaterJetId");
@@ -176,13 +177,13 @@ public sealed class SensorParameterMigrationTests
         WaterJetPlacementKind Kind, string[] Anchors, Wall TargetWall, Region TargetRegion, string Valve)[]
         ApprovedTopology =
         [
-            ("WJ1", Wall.FRONT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.REAR, Region.UPPER, "IV1"),
-            ("WJ2", Wall.LEFT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.RIGHT, Region.UPPER, "IV2"),
-            ("WJ3", Wall.REAR, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.UPPER, "IV3"),
-            ("WJ4", Wall.RIGHT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.LEFT, Region.UPPER, "IV4"),
+            ("WJ1", Wall.LEFT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.RIGHT, Region.UPPER, "IV1"),
+            ("WJ2", Wall.REAR, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.UPPER, "IV2"),
+            ("WJ3", Wall.RIGHT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.LEFT, Region.UPPER, "IV3"),
+            ("WJ4", Wall.FRONT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, [], Wall.REAR, Region.UPPER, "IV4"),
             ("WJ5", Wall.FRONT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.REAR, Region.LOWER, "IV5"),
-            ("WJ6", Wall.LEFT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.RIGHT, Region.LOWER, "IV6"),
-            ("WJ7", Wall.REAR, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.LOWER, "IV7"),
+            ("WJ6", Wall.REAR, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.FRONT, Region.LOWER, "IV6"),
+            ("WJ7", Wall.LEFT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.RIGHT, Region.LOWER, "IV7"),
             ("WJ8", Wall.RIGHT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, [], Wall.LEFT, Region.LOWER, "IV8"),
         ];
 
@@ -234,14 +235,14 @@ public sealed class SensorParameterMigrationTests
     }
 
     [Fact]
-    public void Canonical_Default_Assignment_Counts_Per_WaterJet_Are_10_8_10_8_20_16_20_16()
+    public void Canonical_Default_Assignment_Counts_Per_WaterJet_Are_8_10_8_10_20_20_16_16()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
-        // Canonical zone populations by physical Sensor wall / tier: Rear/Upper 10,
-        // Right/Upper 8, Front/Upper 10, Left/Upper 8, Rear/Lower 20, Right/Lower 16,
-        // Front/Lower 20, Left/Lower 16 — assigned to WJ1..WJ8 respectively (IVn paired).
-        var expectedCounts = new[] { 10, 8, 10, 8, 20, 16, 20, 16 };
+        // Canonical zone populations by physical Sensor wall / tier: Right/Upper 8,
+        // Front/Upper 10, Left/Upper 8, Rear/Upper 10, Rear/Lower 20, Front/Lower 20,
+        // Right/Lower 16, Left/Lower 16 — assigned to WJ1..WJ8 respectively (IVn paired).
+        var expectedCounts = new[] { 8, 10, 8, 10, 20, 20, 16, 16 };
         for (var n = 1; n <= 8; n++)
         {
             Assert.Equal(

@@ -87,7 +87,7 @@ public sealed class MigratedExampleShapeTests
         var i16 = sensors.Single(s => JsonNodeExtensions.RequireString(s, "sensorId") == "I16");
         Assert.Equal(88, JsonNodeExtensions.RequireInt(i16, "scanOrder"));
         Assert.Equal("FRONT", JsonNodeExtensions.RequireString(i16, "wall"));
-        Assert.Equal("WJ7", JsonNodeExtensions.RequireString(i16, "assignedWaterJetId"));
+        Assert.Equal("WJ6", JsonNodeExtensions.RequireString(i16, "assignedWaterJetId"));
 
         // Canonical Topology Adoption: the fine-grained placement of ALL EIGHT Water Jets
         // is UNRESOLVED with no anchors (nothing inferred from a former gap or any stale
@@ -121,17 +121,18 @@ public sealed class MigratedExampleShapeTests
             var logicalRow = JsonNodeExtensions.RequireInt(sensor, "logicalRow");
             var region = logicalRow <= 2 ? "UPPER" : "LOWER";
             var wall = JsonNodeExtensions.RequireString(sensor, "wall");
-            // Canonical Target Coverage (Canonical Topology Adoption): WJ1-WJ4 clean the
+            // Canonical Target Coverage (Owner-approved canonical Equipment topology
+            // adoption, 2026-10-25): WJ1-WJ4 clean the
             // UPPER tier, WJ5-WJ8 the LOWER tier, each from the opposite wall.
             var expectedOrdinal = (wall, region) switch
             {
-                ("REAR", "UPPER") => 1,
-                ("RIGHT", "UPPER") => 2,
-                ("FRONT", "UPPER") => 3,
-                ("LEFT", "UPPER") => 4,
+                ("REAR", "UPPER") => 4,
+                ("RIGHT", "UPPER") => 1,
+                ("FRONT", "UPPER") => 2,
+                ("LEFT", "UPPER") => 3,
                 ("REAR", "LOWER") => 5,
-                ("RIGHT", "LOWER") => 6,
-                ("FRONT", "LOWER") => 7,
+                ("RIGHT", "LOWER") => 7,
+                ("FRONT", "LOWER") => 6,
                 ("LEFT", "LOWER") => 8,
                 _ => throw new InvalidOperationException("synthetic example left the canonical grid"),
             };

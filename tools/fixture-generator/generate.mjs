@@ -16,7 +16,8 @@
 // newline are not contract content — they are matched here only to keep generated diffs
 // limited to genuine content changes.
 //
-// CANONICAL TOPOLOGY ADOPTION (2026-10-21) — current/historical separation: current
+// CANONICAL TOPOLOGY ADOPTION (Owner-approved canonical Equipment topology adoption,
+// 2026-10-25) — current/historical separation: current
 // output is generated ONLY from CANONICAL_WATER_JET_TABLE (canonical installed wall/tier
 // and Target Coverage; fine-grained placement UNRESOLVED with no anchors for all eight
 // Water Jets). The pre-adoption equipment table survives ONLY as
@@ -58,19 +59,20 @@ const WALL_COLUMNS = Object.freeze({ LEFT: [1, 4], REAR: [5, 9], RIGHT: [10, 13]
 
 // ---- Equipment tables (installed wall / region, placement, target coverage, WJn <-> IVn) ----
 //
-// CURRENT Product authority: the canonical table adopted by the Owner Canonical Topology
-// Adoption (2026-10-21), mirroring packages/domain/WaterJetTopologyCatalog.cs. WJ1-WJ4 are
+// CURRENT Product authority: the canonical table adopted by the Owner-approved canonical
+// Equipment topology adoption (2026-10-25), mirroring packages/domain/WaterJetTopologyCatalog.cs.
+// WJ1-WJ4 are
 // installed on the UPPER tier and WJ5-WJ8 on the LOWER tier; every Water Jet targets the
 // opposite wall in the same tier; the fine-grained placement of all eight is UNRESOLVED
 // with NO anchors (no anchor is inferred, mirrored or transferred).
 const CANONICAL_WATER_JET_TABLE = Object.freeze([
-  { waterJetId: 'WJ1', installedWall: 'FRONT', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'REAR', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV1' },
-  { waterJetId: 'WJ2', installedWall: 'LEFT', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'RIGHT', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV2' },
-  { waterJetId: 'WJ3', installedWall: 'REAR', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'FRONT', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV3' },
-  { waterJetId: 'WJ4', installedWall: 'RIGHT', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'LEFT', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV4' },
+  { waterJetId: 'WJ1', installedWall: 'LEFT', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'RIGHT', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV1' },
+  { waterJetId: 'WJ2', installedWall: 'REAR', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'FRONT', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV2' },
+  { waterJetId: 'WJ3', installedWall: 'RIGHT', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'LEFT', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV3' },
+  { waterJetId: 'WJ4', installedWall: 'FRONT', installedRegion: 'UPPER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'REAR', targetRegion: 'UPPER', dedicatedIsolationValveId: 'IV4' },
   { waterJetId: 'WJ5', installedWall: 'FRONT', installedRegion: 'LOWER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'REAR', targetRegion: 'LOWER', dedicatedIsolationValveId: 'IV5' },
-  { waterJetId: 'WJ6', installedWall: 'LEFT', installedRegion: 'LOWER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'RIGHT', targetRegion: 'LOWER', dedicatedIsolationValveId: 'IV6' },
-  { waterJetId: 'WJ7', installedWall: 'REAR', installedRegion: 'LOWER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'FRONT', targetRegion: 'LOWER', dedicatedIsolationValveId: 'IV7' },
+  { waterJetId: 'WJ6', installedWall: 'REAR', installedRegion: 'LOWER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'FRONT', targetRegion: 'LOWER', dedicatedIsolationValveId: 'IV6' },
+  { waterJetId: 'WJ7', installedWall: 'LEFT', installedRegion: 'LOWER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'RIGHT', targetRegion: 'LOWER', dedicatedIsolationValveId: 'IV7' },
   { waterJetId: 'WJ8', installedWall: 'RIGHT', installedRegion: 'LOWER', placementKind: 'UNRESOLVED', placementAnchors: [], targetWall: 'LEFT', targetRegion: 'LOWER', dedicatedIsolationValveId: 'IV8' },
 ]);
 

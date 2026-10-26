@@ -112,18 +112,19 @@ internal static class SyntheticSensorParameterCsv
     /// <summary>
     /// The cleaning-device ordinal whose Water Jet TARGETS the given wall and region —
     /// the direct ordinal mapping required by ADR-0017 (the sensor's wall is the target
-    /// wall, never the installed wall), under the canonical installed topology adopted
-    /// 2026-10-21 (WJ1–WJ4 UPPER tier, WJ5–WJ8 LOWER tier).
+    /// wall, never the installed wall; cannon n maps directly to WJn), under the canonical
+    /// installed topology adopted by the Owner-approved canonical Equipment topology
+    /// adoption (2026-10-25) (WJ1–WJ4 UPPER tier, WJ5–WJ8 LOWER tier).
     /// </summary>
     public static int DeviceOrdinalForTarget(Wall wall, Region region) => (wall, region) switch
     {
-        (Wall.REAR, Region.UPPER) => 1,   // WJ1 installed FRONT UPPER
-        (Wall.RIGHT, Region.UPPER) => 2,  // WJ2 installed LEFT UPPER
-        (Wall.FRONT, Region.UPPER) => 3,  // WJ3 installed REAR UPPER
-        (Wall.LEFT, Region.UPPER) => 4,   // WJ4 installed RIGHT UPPER
+        (Wall.REAR, Region.UPPER) => 4,   // WJ4 installed FRONT UPPER
+        (Wall.RIGHT, Region.UPPER) => 1,  // WJ1 installed LEFT UPPER
+        (Wall.FRONT, Region.UPPER) => 2,  // WJ2 installed REAR UPPER
+        (Wall.LEFT, Region.UPPER) => 3,   // WJ3 installed RIGHT UPPER
         (Wall.REAR, Region.LOWER) => 5,   // WJ5 installed FRONT LOWER
-        (Wall.RIGHT, Region.LOWER) => 6,  // WJ6 installed LEFT LOWER
-        (Wall.FRONT, Region.LOWER) => 7,  // WJ7 installed REAR LOWER
+        (Wall.RIGHT, Region.LOWER) => 7,  // WJ7 installed LEFT LOWER
+        (Wall.FRONT, Region.LOWER) => 6,  // WJ6 installed REAR LOWER
         (Wall.LEFT, Region.LOWER) => 8,   // WJ8 installed RIGHT LOWER
         _ => throw new ArgumentOutOfRangeException(nameof(wall)),
     };

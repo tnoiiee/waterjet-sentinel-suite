@@ -466,15 +466,15 @@ public sealed class ManualMotionSessionTests
         Assert.Equal(-3000m, harness.Axis(ManualMotionAxis.D).PositionTp.Value);
 
         // The snapshot carries the four axes in the stable A, B, C, D order with the canonical
-        // catalogue identity of each axis (A/B serve WJ2, C/D serve WJ3, all on WSB1).
+        // catalogue identity of each axis (A/B serve WJ1, C/D serve WJ2, all on WSB1).
         Assert.Equal(
             new[] { ManualMotionAxis.A, ManualMotionAxis.B, ManualMotionAxis.C, ManualMotionAxis.D },
             harness.Snapshot.Axes.Select(axis => axis.Axis).ToArray());
         Assert.Equal("WSB1", harness.Axis(ManualMotionAxis.C).CabinetId);
-        Assert.Equal("WJ2", harness.Axis(ManualMotionAxis.A).WaterJetId);
-        Assert.Equal("WJ2", harness.Axis(ManualMotionAxis.B).WaterJetId);
-        Assert.Equal("WJ3", harness.Axis(ManualMotionAxis.C).WaterJetId);
-        Assert.Equal("WJ3", harness.Axis(ManualMotionAxis.D).WaterJetId);
+        Assert.Equal("WJ1", harness.Axis(ManualMotionAxis.A).WaterJetId);
+        Assert.Equal("WJ1", harness.Axis(ManualMotionAxis.B).WaterJetId);
+        Assert.Equal("WJ2", harness.Axis(ManualMotionAxis.C).WaterJetId);
+        Assert.Equal("WJ2", harness.Axis(ManualMotionAxis.D).WaterJetId);
         Assert.Equal("REAR / UPPER", harness.Axis(ManualMotionAxis.C).InstalledPosition);
         Assert.Equal("FRONT / UPPER", harness.Axis(ManualMotionAxis.D).TargetCoverage);
         Assert.Equal(3, harness.Axis(ManualMotionAxis.C).BrakeOutputNumber);
@@ -835,7 +835,7 @@ public sealed class ManualMotionSessionTests
         Assert.True(harness.Axis(ManualMotionAxis.A).AllowedByProfile);
         Assert.False(harness.Axis(ManualMotionAxis.C).AllowedByProfile);
         Assert.False(harness.Axis(ManualMotionAxis.D).AllowedByProfile);
-        Assert.Equal("WJ3", harness.Axis(ManualMotionAxis.C).WaterJetId);
+        Assert.Equal("WJ2", harness.Axis(ManualMotionAxis.C).WaterJetId);
         Assert.Equal(4, harness.Snapshot.Axes.Count);
 
         harness.Session.RequestBrakeRelease(ManualMotionAxis.C);

@@ -34,8 +34,8 @@ internal sealed class CleaningPathCompositionHarness
     internal CleaningPathCompositionHarness(
         ManualMotionSimulationOptions? options = null,
         int verticalMoveTimeoutMilliseconds = 20000,
-        string assignedWaterJetId = "WJ4",
-        string assignedIsolationValveId = "IV4",
+        string assignedWaterJetId = "WJ3",
+        string assignedIsolationValveId = "IV3",
         string? overrideWaterJetId = null)
     {
         _motion = new CleaningPathExecutionHarness(

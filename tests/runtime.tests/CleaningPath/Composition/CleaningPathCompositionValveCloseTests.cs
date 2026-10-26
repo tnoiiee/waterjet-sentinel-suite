@@ -23,7 +23,7 @@ public sealed class CleaningPathCompositionValveCloseTests
         var harness = new CleaningPathCompositionHarness();
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 16);
         harness.DriveUntil(() => harness.Composition.Current!.Status == CleaningPathCompositionStatus.SupervisingValveClose);
         return harness;
     }
@@ -41,7 +41,7 @@ public sealed class CleaningPathCompositionValveCloseTests
         var harness = new CleaningPathCompositionHarness();
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
-        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV4", 16);
+        harness.Equipment.ValveSample = CleaningPathCompositionHarness.ValveSample("IV3", 16);
         harness.DriveUntil(() => harness.Equipment.ValveCommands.Count == 2);
 
         // The close command exists exactly when all six points were planned and P6 is verified.
@@ -54,7 +54,7 @@ public sealed class CleaningPathCompositionValveCloseTests
     public void Lower_Detected_Pressure_Below_Low_Confirms_Closed()
     {
         var harness = RunToCloseSupervision();
-        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV4", 0.5));
+        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV3", 0.5));
 
         var close = harness.Composition.Result!.Handoff.ValveCloseSupervision!;
         Assert.Equal(ValveCloseResolution.LOWER_LIMIT_CONFIRMED, close.Assessment.Close);
@@ -65,7 +65,7 @@ public sealed class CleaningPathCompositionValveCloseTests
     public void Missing_Lower_Plus_Pressure_Below_Low_Records_Lower_Fault()
     {
         var harness = RunToCloseSupervision();
-        FinishClose(harness, lower: false, CleaningPathCompositionHarness.ValveSample("IV4", 0.5));
+        FinishClose(harness, lower: false, CleaningPathCompositionHarness.ValveSample("IV3", 0.5));
 
         var close = harness.Composition.Result!.Handoff.ValveCloseSupervision!;
         Assert.Equal(ValveCloseResolution.CLOSED_BY_PRESSURE, close.Assessment.Close);
@@ -77,7 +77,7 @@ public sealed class CleaningPathCompositionValveCloseTests
     public void Middle_Band_Is_Leak_Suspected()
     {
         var harness = RunToCloseSupervision();
-        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV4", 8));
+        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV3", 8));
 
         var close = harness.Composition.Result!.Handoff.ValveCloseSupervision!;
         Assert.Equal(ValveCloseResolution.LEAK_SUSPECTED, close.Assessment.Close);
@@ -88,7 +88,7 @@ public sealed class CleaningPathCompositionValveCloseTests
     public void Pressure_At_Or_Above_High_Is_Not_Fully_Closed()
     {
         var harness = RunToCloseSupervision();
-        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV4", 15));
+        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV3", 15));
 
         var close = harness.Composition.Result!.Handoff.ValveCloseSupervision!;
         Assert.Equal(ValveCloseResolution.NOT_FULLY_CLOSED, close.Assessment.Close);
@@ -99,7 +99,7 @@ public sealed class CleaningPathCompositionValveCloseTests
     public void Lower_Detected_Cannot_Override_Pressure_Contradiction()
     {
         var harness = RunToCloseSupervision();
-        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV4", 16));
+        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV3", 16));
 
         // The Lower limit never overrides pressure at or above High into a clean closed result.
         var close = harness.Composition.Result!.Handoff.ValveCloseSupervision!;
@@ -113,12 +113,12 @@ public sealed class CleaningPathCompositionValveCloseTests
         var invalidSamples = new PressureSample?[]
         {
             null,
-            CleaningPathCompositionHarness.ValveSample("IV4", null),
-            CleaningPathCompositionHarness.ValveSample("IV4", double.NaN),
-            CleaningPathCompositionHarness.ValveSample("IV4", double.NegativeInfinity),
-            CleaningPathCompositionHarness.ValveSample("IV4", 0.5, PressureQuality.BAD),
-            CleaningPathCompositionHarness.ValveSample("IV4", 0.5, stale: true),
-            CleaningPathCompositionHarness.ValveSample("IV4", 0.5, sourceId: "IV2_OUTLET"),
+            CleaningPathCompositionHarness.ValveSample("IV3", null),
+            CleaningPathCompositionHarness.ValveSample("IV3", double.NaN),
+            CleaningPathCompositionHarness.ValveSample("IV3", double.NegativeInfinity),
+            CleaningPathCompositionHarness.ValveSample("IV3", 0.5, PressureQuality.BAD),
+            CleaningPathCompositionHarness.ValveSample("IV3", 0.5, stale: true),
+            CleaningPathCompositionHarness.ValveSample("IV3", 0.5, sourceId: "IV2_OUTLET"),
         };
 
         foreach (var sample in invalidSamples)
@@ -136,7 +136,7 @@ public sealed class CleaningPathCompositionValveCloseTests
     public void Terminal_Awaits_Safe_Return_Even_When_Close_Is_Not_Confirmed()
     {
         var harness = RunToCloseSupervision();
-        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV4", 16));
+        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV3", 16));
 
         // The close classification is recorded evidence for the Mandatory Safe Return phase; the
         // composition terminal itself means only "awaiting Mandatory Safe Return".
@@ -151,7 +151,7 @@ public sealed class CleaningPathCompositionValveCloseTests
     public void No_Centre_Move_Occurs()
     {
         var harness = RunToCloseSupervision();
-        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV4", 0.5));
+        FinishClose(harness, lower: true, CleaningPathCompositionHarness.ValveSample("IV3", 0.5));
 
         // Every dispatched absolute Move belongs to the Sensor path targets; the named Centre
         // contract (1250000 / 1250000 native) is never dispatched as a Move.

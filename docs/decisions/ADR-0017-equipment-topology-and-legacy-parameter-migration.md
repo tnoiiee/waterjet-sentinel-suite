@@ -1,6 +1,44 @@
 # ADR-0017 — Equipment Topology Decision and Legacy Parameter Migration Specification
 
-> **Addendum — Canonical Topology Adoption (Owner decision, 2026-10-21).** This addendum is
+> **Addendum — Owner-approved canonical Equipment topology adoption (Owner decision, 2026-10-25).**
+> This addendum is the current decision record for equipment topology. Canonical table: WJ1
+> (Legacy identity WJ2) IV1, installed LEFT/UPPER, Target Coverage RIGHT/UPPER, WSB1, axes A/B;
+> WJ2 (Legacy WJ3) IV2, REAR/UPPER, FRONT/UPPER, WSB1, C/D; WJ3 (Legacy WJ4) IV3, RIGHT/UPPER,
+> LEFT/UPPER, WSB2, C/D; WJ4 (Legacy WJ1) IV4, FRONT/UPPER, REAR/UPPER, WSB2, A/B; WJ5 (Legacy
+> WJ5) IV5, FRONT/LOWER, REAR/LOWER, WSB3, A/B; WJ6 (Legacy WJ7) IV6, REAR/LOWER, FRONT/LOWER,
+> WSB3, C/D; WJ7 (Legacy WJ6) IV7, LEFT/LOWER, RIGHT/LOWER, WSB4, A/B; WJ8 (Legacy WJ8) IV8,
+> RIGHT/LOWER, LEFT/LOWER, WSB4, C/D. A/C Horizontal, B/D Vertical; WJn ↔ IVn; Target Coverage
+> is always the opposite wall in the same tier. The Legacy WJ identity column is historical
+> equipment identity only, distinct from the legacy cannon identity; `cannon n → WJn` direct
+> import is unchanged. Canonical default assignments by physical Sensor wall / tier:
+> 8/10/8/10/20/20/16/16 to WJ1..WJ8; I7 → WJ5/IV5 (unchanged); I16 → WJ6/IV6. Motion identity
+> tokens: the current .NET identity is `OWNER_CANONICAL_TOPOLOGY_2026_10_25` and the current JS
+> design identity is `MOTION_COMMISSIONING_DESIGN_2026_10_25`; `OWNER_CONFIRMED_REV2` /
+> `OWNER_CONFIRMED_REV1` and `MOTION_COMMISSIONING_DESIGN_REV2` /
+> `MOTION_COMMISSIONING_DESIGN_REV1` are retained as historical identities only and are never
+> published as current. This supersedes, for current installed wall / region, Target Coverage,
+> WSB/axis allocation, default-assignment and current-identity authority only, the 2026-10-21
+> Canonical Topology Adoption addendum below and every earlier row; those records remain
+> unedited history below. Unchanged: 108 Sensors / 216 assigned / 240 physical / 24 unassigned,
+> the Sensor sequence and coordinates, I7/I16 Product-Sensor status, the physical
+> Sensor-to-SDS/Cabinet/module/channel mapping, the migration schema / validation /
+> deferred-field / public-boundary rules of this ADR, queue and safety semantics, and every
+> Hardware / Production authorization boundary. Implementation: one consolidated Source pass on
+> PR #41 (catalogues, identity contracts, mirrors, generators with current/historical
+> separation, regenerated fixtures/examples, explicit test expectations, H1 synthetic route,
+> current-facing docs); the .NET validation of that pass is the Owner-local gate of record.
+
+> **HISTORICAL RECORDS BELOW — SUPERSEDED for current equipment-topology, WSB/axis-allocation,
+> default-assignment and current-identity authority by the 2026-10-25 addendum above (the sole
+> current decision record). DO NOT USE FOR CURRENT RUNTIME, PROFILE, COMMISSIONING, OR HARDWARE.**
+> The 2026-10-21 addendum, the 2026-10-12 superseded-topology note and the original 2026-10-08
+> ADR body below are retained unedited as dated history; where they describe themselves or their
+> rows as "current", that reflects their checkpoint date only.
+
+> **Addendum — Canonical Topology Adoption (Owner decision, 2026-10-21; superseded as the
+> current decision record for installed wall / region, Target Coverage, WSB/axis allocation,
+> default assignments and current-identity authority by the 2026-10-25 addendum above; retained
+> unedited as history).** This addendum is
 > the current decision record for equipment topology; the original ADR body below (including
 > the 2026-10-12 supersession note) is preserved unedited as history and must not be read as
 > current installed-topology truth where this addendum differs.

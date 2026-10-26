@@ -33,13 +33,13 @@ public sealed class RuntimeTopologyTests
     // (installed wall, installed region, placement kind, target wall, target region) per ordinal.
     private static readonly (Wall InstalledWall, Region InstalledRegion, WaterJetPlacementKind Placement, Wall TargetWall, Region TargetRegion)[] ExpectedTopology =
     [
-        (Wall.FRONT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.REAR, Region.UPPER),
         (Wall.LEFT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.RIGHT, Region.UPPER),
         (Wall.REAR, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.FRONT, Region.UPPER),
         (Wall.RIGHT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.LEFT, Region.UPPER),
+        (Wall.FRONT, Region.UPPER, WaterJetPlacementKind.UNRESOLVED, Wall.REAR, Region.UPPER),
         (Wall.FRONT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.REAR, Region.LOWER),
-        (Wall.LEFT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.RIGHT, Region.LOWER),
         (Wall.REAR, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.FRONT, Region.LOWER),
+        (Wall.LEFT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.RIGHT, Region.LOWER),
         (Wall.RIGHT, Region.LOWER, WaterJetPlacementKind.UNRESOLVED, Wall.LEFT, Region.LOWER),
     ];
 
@@ -174,8 +174,8 @@ public sealed class RuntimeTopologyTests
         });
         var wj1 = state.WaterJets.Single(w => w.WaterJetId == "WJ1");
         var wj3 = state.WaterJets.Single(w => w.WaterJetId == "WJ3");
-        Assert.Equal((Wall.REAR, Region.UPPER), (wj1.TargetWall, wj1.TargetRegion));
-        Assert.Equal((Wall.FRONT, Region.UPPER), (wj3.TargetWall, wj3.TargetRegion));
+        Assert.Equal((Wall.RIGHT, Region.UPPER), (wj1.TargetWall, wj1.TargetRegion));
+        Assert.Equal((Wall.LEFT, Region.UPPER), (wj3.TargetWall, wj3.TargetRegion));
     }
 
     [Fact]

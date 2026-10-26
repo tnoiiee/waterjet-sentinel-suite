@@ -517,7 +517,7 @@ public sealed class CleaningPathExecutionSimulationTests
         Assert.False(byWrongSource.Started);
         Assert.Equal(CleaningPathExecutionCodes.StartRefusedSnapshotNotAccepted, byWrongSource.Code);
 
-        var mismatchedConfiguration = SyntheticCleaningPathStores.SensorConfiguration("G1", "WJ4", "IV4");
+        var mismatchedConfiguration = SyntheticCleaningPathStores.SensorConfiguration("G1", "WJ3", "IV3");
         var refusedResolution = CleaningPathResolver.Resolve(
             harness.StoreSnapshot,
             mismatchedConfiguration,
@@ -567,13 +567,13 @@ public sealed class CleaningPathExecutionSimulationTests
     [Fact]
     public void Effective_WJ_Override_Does_Not_Mutate_P1_Through_P6()
     {
-        var harness = new CleaningPathExecutionHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ4");
+        var harness = new CleaningPathExecutionHarness(assignedWaterJetId: "WJ2", assignedIsolationValveId: "IV2", overrideWaterJetId: "WJ3");
         var pathBefore = harness.StoreSnapshot.PathFor(CleaningPathExecutionHarness.Sensor)!;
         var result = Completed(harness);
 
         AssertPathCompleted(result);
         Assert.Equal("WJ2", harness.Resolution.Resolution!.CanonicalAssignedWaterJetId);
-        Assert.Equal("WJ4", harness.Resolution.Resolution!.EffectiveWaterJetId);
+        Assert.Equal("WJ3", harness.Resolution.Resolution!.EffectiveWaterJetId);
         Assert.Same(pathBefore, harness.StoreSnapshot.PathFor(CleaningPathExecutionHarness.Sensor));
         for (var index = 0; index < 6; index++)
         {
@@ -594,7 +594,7 @@ public sealed class CleaningPathExecutionSimulationTests
         Assert.Same(resolutionBefore, harness.Resolution);
         Assert.Same(resolvedBefore, harness.Resolution.Resolution);
         Assert.Equal(resolvedBefore, harness.Resolution.Resolution);
-        Assert.Equal("IV4", harness.Resolution.Resolution!.DerivedIsolationValveId);
+        Assert.Equal("IV3", harness.Resolution.Resolution!.DerivedIsolationValveId);
     }
 
     // 25
@@ -632,7 +632,7 @@ public sealed class CleaningPathExecutionSimulationTests
         Assert.Equal(CleaningPathExecutionStatus.PathCompleteAwaitingSafeReturn, result.Status);
         Assert.NotNull(result.Handoff);
         Assert.Equal(CleaningPathExecutionHarness.Sensor, result.Handoff!.SensorId);
-        Assert.Equal("WJ4", result.Handoff!.EffectiveWaterJetId);
+        Assert.Equal("WJ3", result.Handoff!.EffectiveWaterJetId);
         Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, result.Handoff!.HorizontalFinalOutcome);
         Assert.Equal(CleaningPathMotionOutcome.MoveCompletedPositionVerified, result.Handoff!.VerticalFinalOutcome);
     }

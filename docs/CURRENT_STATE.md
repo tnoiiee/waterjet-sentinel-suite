@@ -1,5 +1,106 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Owner-approved canonical Equipment topology adoption (2026-10-25; current equipment-topology\n> position — supersedes every contrary installed-position, Target Coverage, WSB/axis-allocation,\n> assignment-count, REV2-current and dated-identity statement below without deleting any dated\n> record; software only; HARDWARE NOT EXECUTED).** Implemented in Source on branch\n> `arena/7968e33e-waterjet-sentinel-suite` (PR #41 open, unmerged) inside the H1 pass. Canonical\n> table: WJ1 (legacy WJ2) IV1 installed LEFT/UPPER → targets RIGHT/UPPER, WSB1, A/B; WJ2 (legacy\n> WJ3) IV2 REAR/UPPER → FRONT/UPPER, WSB1, C/D; WJ3 (legacy WJ4) IV3 RIGHT/UPPER → LEFT/UPPER,\n> WSB2, C/D; WJ4 (legacy WJ1) IV4 FRONT/UPPER → REAR/UPPER, WSB2, A/B; WJ5 (legacy WJ5) IV5\n> FRONT/LOWER → REAR/LOWER, WSB3, A/B; WJ6 (legacy WJ7) IV6 REAR/LOWER → FRONT/LOWER, WSB3, C/D;\n> WJ7 (legacy WJ6) IV7 LEFT/LOWER → RIGHT/LOWER, WSB4, A/B; WJ8 (legacy WJ8) IV8 RIGHT/LOWER →\n> LEFT/LOWER, WSB4, C/D. A/C Horizontal, B/D Vertical; WJn ↔ IVn; Target Coverage is always the\n> opposite wall in the same tier. The Legacy WJ identity column is historical equipment identity\n> only, distinct from the legacy cannon identity; `cannon n → WJn` direct import is unchanged. The\n> H1 synthetic default route is corrected to G+210 (RIGHT/UPPER) → canonical WJ1/IV1, WSB1\n> A/B (Horizontal A, Vertical B), with G+201 (LEFT/UPPER) → WJ3/IV3, WSB2 C/D as the\n> unsupported-WSB refusal scenario. Dated current identities: .NET `MotionTopologyRevision =\n> OWNER_CANONICAL_TOPOLOGY_2026_10_25` and JS `MOTION_COMMISSIONING_DESIGN_ID =\n> MOTION_COMMISSIONING_DESIGN_2026_10_25`; `OWNER_CONFIRMED_REV2` / `OWNER_CONFIRMED_REV1` and\n> `MOTION_COMMISSIONING_DESIGN_REV2` / `MOTION_COMMISSIONING_DESIGN_REV1` retained as historical\n> identities only. Canonical default assignments by physical Sensor wall / tier: 8/10/8/10/20/20/\n> 16/16 to WJ1..WJ8 (108 total); I7 → WJ5/IV5 unchanged; I16 → WJ6/IV6 (was WJ7 under the\n> superseded table). `snapshot.seed0.json`, `delta.basic.json` and\n> `sensor-parameters.migrated.example.json` were regenerated only through their generator owners\n> (deterministic; frozen historical tables and `--legacy-proof` byte-identity preserved);\n> `sensor-map.example.json` unchanged. Unchanged: 108 Sensors / 216 assigned / 240 physical /\n> 24 spare, the Sensor sequence and coordinates, I7/I16 Product-Sensor status, physical\n> SDS/Cabinet/module/channel mapping, P1–P6 and Centre 125/125, WJn ↔ IVn pairing, queue and\n> safety semantics, Manual Motion command lifecycles, the gclib typed boundary and every Hardware\n> / Production authorization boundary. Physical wiring, the mechanical route and Galil A/B/C/D\n> physical semantics are unchanged; no Hardware matrix is repeated and no Hardware is executed.\n> **Validation position: .NET restore/build/test and C# fixture parity NOT RUN in the Author\n> environment (no .NET SDK) — the Owner-local exact-head gate is the validation of record;\n> Node suites (commissioning 239/239, contracts-ts 56/56, Ops Preview motion 22/22) and the\n> boundary scan passed in the Author environment.** No REV3 exists. NO HARDWARE. NO PRODUCTION.\n
+> **H1 WSB1 dry Cleaning Path commissioning — implementation record (2026-10-25; software only;
+> HARDWARE NOT EXECUTED).** The Product now owns the H1 dry commissioning run for WSB1 through the
+> existing typed boundaries only (composed, never duplicated): one deterministic run coordinator
+> (`H1DryCommissioningCoordinator`) sequences typed Home per axis (independent; each carrying the
+> typed position-zero definition and its zero verification), coordinate establishment, P1→P6
+> through the existing Phase 3B path execution coordinator (null point-advance gate), and the dry
+> Centre return on the fixed Centre contract (125 mm / 125 mm = 1250000 / 1250000 native). WSB1-only
+> admission and the canonical route match are fail-closed against the canonical Motion topology
+> catalog; every start precondition is typed (controller identity, Owner-local endpoint and
+> profile, dry mode, Pump/physical-IV/Queue-AutoSequence command paths unavailable, physical abort
+> accessible, Operator/Observer, ready session with no active operation and current/fresh Status,
+> TP, RP and Brake-output observations). The typed dual-zero definition is recorded in Product
+> state as optional and separately authorized (profile-permitted, dispatch-only, effect UNVERIFIED,
+> clears the homed claim) and is never required by the run. Failure/Abort/Close preserve the first
+> primary cause or typed request cause, block later points, stop every remaining active axis
+> exactly once through the typed lifecycle (supervised to inactive; Brake applied after inactive),
+> record cleanup separately, and publish the typed dry Safe Return completion only after both
+> Centre axes verify — never a Pump, Valve, physical Cleaning Job or Production completion. The
+> H1 operator surface (existing `apps/motion-commissioning`, additive `h1-simulated` /
+> `h1-wsb1-hardware` modes) shows DRY / NO WATER prominently, the selected identity with
+> provenance and informational paired IV, the P1–P6 and Centre contracts, live per-axis typed
+> observations and the run evidence, with fail-closed Start/Abort/Close controls and no raw
+> command input. New Owner-local variable `WJSS_SENSOR_PARAMETER_CSV` names the migrated
+> sensor-parameter CSV (the canonical assignment source; read once; never committed). Checkpoint
+> chain on branch `arena/7968e33e-waterjet-sentinel-suite` (PR #41 open, unmerged, base `main`
+> `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2`): documentation realignment `edb57254`; H1
+> implementation + focused tests `c803335fc4957dfa2064d839328188d609f8046e` (6 files: 2 new
+> Product files, 2 new focused test files (~34 tests), the new operator surface and the additive
+> host modes). The exact H1 real-Hardware trial procedure is prepared for Owner review in
+> [`H1_DRY_CLEANING_PATH_TRIAL_PROCEDURE.md`](H1_DRY_CLEANING_PATH_TRIAL_PROCEDURE.md) (H1-T0
+> read-only identity → T1 Home and coordinate establishment → T2 representative dual-axis Move →
+> T3 selected-Sensor P1→P6 → T4 Centre return → T5 Owner-approved Stop/Abort evidence). NOT
+> VERIFIED: .NET restore/build/test NOT RUN in the Author environment (no .NET SDK) — the
+> Owner-local exact-head gate is the validation of record; Home, DP/DE, dual-axis Move, P1→P6,
+> Centre return and Stop/Abort Hardware behavior, Pump/IV Hardware behavior, integrated Cleaning
+> Job and Production remain NOT VERIFIED. Real Hardware execution stays fenced behind the separate
+> exact-head Owner authorization ("AUTHORIZE H1 REAL GALIL DRY TRIAL ON EXACT PR HEAD <SHA> USING
+> THE REVIEWED H1 TRIAL PROCEDURE"). H2–H5 remain NOT AUTHORIZED. NO HARDWARE. NO PRODUCTION.
+
+> **H1 Fast Repair — Commission/Home separated from Run Path (2026-10-26; Owner-approved; software
+> only; HARDWARE NOT EXECUTED).** Commissioning inside H1 is now two explicitly separated actions.
+> **Commission/Home** (`H1DryCommissioningCoordinator.StartCommission`) invokes the existing typed
+> Home lifecycle on both resolved axes (independent per axis; each carrying the typed
+> position-zero definition DP=0 and its TP/RP zero verification), proves coordinate establishment
+> and terminates `Commissioned` (`H1_COMMISSION_COMPLETE_COORDINATES_VERIFIED`) without running
+> any path point. **Run Path** (`StartPath`) never dispatches Home: it requires the
+> session-scoped coordinate readiness (both resolved axes `Homed` + `ZeroVerified` in this
+> session), refuses with the typed `H1_START_REFUSED_COORDINATE_READINESS_ABSENT` directing the
+> Operator to Commission/Home when absent, and only then runs P1→P6 through the unchanged Phase 3B
+> execution coordinator plus the dry Centre return. The operator surface exposes the two actions
+> as separate controls with a live readiness display. The `HOME_INPUT_ALREADY_ACTIVE` permanent
+> Homing block is repaired: every applied Home request outcome is now detected by per-request
+> session-log sequence correlation (the session logs exactly one Home-kind entry per applied
+> request), so an H1 Home attempt against an already-active Home input always reaches the typed
+> terminal failure `H1_FAILED_HOME` with the typed primary cause and can no longer remain in
+> Homing indefinitely; the session-layer refusal itself is unchanged and still dispatches no
+> native Home command. An active Home input is never treated as a completed Home and never proves
+> readiness; no back-off motion and no automatic already-at-home acceptance was added. A new
+> process or session requires Commission/Home again (readiness is session-scoped; nothing is
+> persisted). Production, Runtime, Queue and AutoSequence integration remains NOT IMPLEMENTED and
+> NOT AUTHORIZED; the core execution layer still consumes Move-ready state only and never dispatches
+> Home. Dated history is preserved; the 2026-10-25 records above describe the pre-repair single
+> Start flow and are superseded on this point only by this block. NOT VERIFIED: .NET
+> restore/build/test NOT RUN in the Author environment (no .NET SDK) — the Owner-local exact-head
+> gate remains the validation of record; the boundary scan passed in the Author environment.
+> Hardware must be re-authorized on the new exact PR HEAD after Owner-local validation; an
+> authorization frozen on any earlier head does not cover it. NO HARDWARE. NO PRODUCTION.
+
+> **H1 WSB1 Real Galil Dry Cleaning-Path Commissioning — current Owner-authorized Product
+> Critical Path (2026-10-25).** The approved merged baseline is `main`
+> `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2` (the PR #40 merge commit; Parent 1
+> `696e135cce01bdc1ec34328f973bbd5ef4aed71a`, Parent 2 / final PR #40 head
+> `eff2ce5b549c5ff390e5ed220e75fd2208e43509`, merge tree
+> `2715f8bd3b2ce97675bdfb00401dd00730ddb397`). **PR #40 (Phase 3C Pump-ready and paired-IV
+> Simulation composition) is MERGED**; the "Owner review/merge pending — never merged at
+> authoring" wording inside the dated Phase 3A–3C blocks below is authoring-time history and is
+> superseded as to merge status only. The current Owner-authorized Product Critical Path is
+> **H1 — WSB1 REAL GALIL DRY CLEANING-PATH COMMISSIONING**: Home → DP/DE → dual-axis Move →
+> selected Sensor P1→P6 → Centre 125 mm / 125 mm → Stop / Abort / Brake / cleanup, through the
+> existing typed Manual Motion and Cleaning Path boundaries on WSB1 (Galil A/B/C/D). **H1 is
+> dry: no Pump command, no physical Isolation Valve command, no water, no Queue, no AutoSequence,
+> no next-job countdown, no Production.** A standalone Simulation-only Phase 3D is
+> **SUPERSEDED** as the immediate objective; the merged Phase 3A–3C Simulation capability
+> remains the deterministic validation foundation and existing Motion / Hardware evidence must be
+> reused, not rebuilt (accepted real evidence: WSB1 Galil identity connection, read-only
+> observed-state acquisition, WSB1/WJ2 Axis A representative real Galil trial; Home, DP, DE,
+> Move Absolute, dual-axis Move, P1→P6, Centre return and the full H1 dry Cleaning Path have NOT
+> passed on Hardware and remain H1 targets). Hardware Critical Path working labels:
+> **H1 WSB1 Real Galil Dry Cleaning-Path Commissioning — CURRENT, OWNER-AUTHORIZED**;
+> **H2 Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED**; **H3 Single Real Cleaning
+> Job — PLANNED, NOT AUTHORIZED**; **H4 Sequential Multi-Job/Queue — PLANNED, NOT AUTHORIZED**;
+> **H5 Production Readiness — FUTURE, NOT AUTHORIZED**. H1–H5 are Owner working labels mapped to
+> the formal roadmap stages (H1 ↔ `0.4D-G1`–`0.4D-G5` Galil and motion family; H4 ↔ `0.4E-I3`;
+> H5 ↔ `0.5A-P1`–`0.5A-P4`; the exact formal mapping of H2 and H3 remains `[OPEN]`); formal
+> roadmap IDs remain stable unless exact inspection proves a correction is required. Real
+> Hardware execution remains fenced behind a separate explicit Owner authorization for the exact
+> validated PR head and exact reviewed trial procedure; every later stage (H2–H5) requires
+> explicit Owner authorization. NO HARDWARE EXECUTED; Pump/IV physical control, water and
+> Production remain NOT AUTHORIZED.
+
 > **Phase 3C Pump-ready and paired-Isolation-Valve Simulation composition (2026-10-25; software
 > only).** The Product now composes the accepted immutable Phase 3A resolution, the canonical
 > Equipment / Motion derivations, one AI-003 Pump Outlet Pressure readiness gate and the paired
@@ -161,9 +262,11 @@
 > RUN in the Agent environment (no .NET SDK) — the Owner-local exact-head gate is the validation of
 > record; no native load, Controller contact or Hardware use occurred for Phase 1A.**
 
-> **Canonical Topology Adoption (2026-10-21; current equipment-topology position — supersedes
+> **Canonical Topology Adoption (2026-10-21; superseded as the current equipment-topology\n> position by the Owner-approved canonical Equipment topology adoption of 2026-10-25 recorded\n> above; retained unedited below as the dated record — supersedes
 > every contrary WJ/IV tier, Target Coverage, assignment, WSB/axis-allocation, REV1-current and
-> placement statement below without deleting any dated record).** Implemented in Source on
+> placement statement below without deleting any dated record. HISTORICAL / SUPERSEDED — DO NOT
+> USE FOR CURRENT RUNTIME, PROFILE, COMMISSIONING, OR HARDWARE; the sole current authority is
+> the 2026-10-25 adoption blockquote at the top of this document).** Implemented in Source on
 > branch `arena/a6b9d5d8-waterjet-sentinel-suite` from `main`
 > `b0e9eb93d3e7f2112a3ef3b2b8c5f0fedf3e3289` as one consolidated pass for Owner review (not
 > merged at authoring). Canonical installed topology: WJ1 FRONT/UPPER → REAR/UPPER (WSB2 A/B),
@@ -555,6 +658,28 @@ WRITE/CONTROL NOT AUTHORIZED
   unauthorized.
 
 ## 7. Current Critical Path
+
+The Owner-authorized Product Critical Path is the Hardware Critical Path, using the H1–H5
+working labels mapped to the formal roadmap stages (see
+[`MASTER_PLAN.md`](MASTER_PLAN.md) sections 4, 5 and 7). Every stage below H1 requires a
+separate explicit Owner authorization.
+
+1. **H1 — WSB1 Real Galil Dry Cleaning-Path Commissioning — CURRENT, OWNER-AUTHORIZED
+   (2026-10-25).** Home → DP/DE → dual-axis Move → selected Sensor P1→P6 → Centre 125 mm /
+   125 mm → Stop / Abort / Brake / cleanup on WSB1 through the existing typed boundaries. Dry
+   only: no Pump command, no physical Isolation Valve command, no water, no Queue / AutoSequence,
+   no Production. Documentation realignment, exact-source inspection, H1 Product implementation,
+   deterministic Simulation validation, Owner-local software validation preparation and exact
+   real-Hardware trial preparation are authorized in the current PR. Real Hardware execution is
+   fenced behind a separate explicit Owner authorization for the exact validated PR head and the
+   exact reviewed trial procedure. (Formal stage family: `0.4D-G1`–`0.4D-G5`.)
+2. **H2 — Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
+3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
+4. **H4 — Sequential Multi-Job/Queue — PLANNED, NOT AUTHORIZED.** (Formal family `0.4E-I3`.)
+5. **H5 — Production Readiness — FUTURE, NOT AUTHORIZED.** (Formal family `0.5A-P1`–`0.5A-P4`.)
+
+Historical K-era critical-path record (preserved verbatim as dated history; superseded as the
+current position by the H1 Owner authorization above):
 
 1. Final canonical documentation and complete source review. — **DONE** (K6)
 2. Atomic Replacement completed and validated. — **DONE**

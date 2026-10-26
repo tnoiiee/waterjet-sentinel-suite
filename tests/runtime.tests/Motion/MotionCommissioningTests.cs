@@ -7,8 +7,9 @@ namespace Wjss.Runtime.Core.Tests;
 
 /// <summary>
 /// The manual motion commissioning foundation: the closed authorization gate, the refusal of every
-/// motion intent on every axis, the CANONICAL Owner-confirmed REV2 axis allocation of all eight
-/// Water Jets (WJ2 = A,B on WSB1 and WJ4 = C,D on WSB2 included; REV1 retained as historical
+/// motion intent on every axis, the CANONICAL Owner-confirmed axis allocation of all eight
+/// Water Jets under the Owner-approved canonical Equipment topology adoption (2026-10-25)
+/// (WJ2 = C,D on WSB1 and WJ4 = A,B on WSB2 included; REV2 and REV1 retained as historical
 /// identity only), the Drawing rev1 discrepancy recorded as evidence only,
 /// the published not-configured / not-commissioned state, and the deterministic canonical text.
 ///
@@ -20,13 +21,13 @@ public sealed class MotionCommissioningTests
     /// <summary>The Owner-confirmed Water Jet axis allocation, in Water Jet ordinal order.</summary>
     private static readonly (string WaterJetId, string CabinetId, string Horizontal, string Vertical)[] ExpectedBindings =
     [
-        ("WJ1", "WSB2", "A", "B"),
-        ("WJ2", "WSB1", "A", "B"),
-        ("WJ3", "WSB1", "C", "D"),
-        ("WJ4", "WSB2", "C", "D"),
+        ("WJ1", "WSB1", "A", "B"),
+        ("WJ2", "WSB1", "C", "D"),
+        ("WJ3", "WSB2", "C", "D"),
+        ("WJ4", "WSB2", "A", "B"),
         ("WJ5", "WSB3", "A", "B"),
-        ("WJ6", "WSB4", "A", "B"),
-        ("WJ7", "WSB3", "C", "D"),
+        ("WJ6", "WSB3", "C", "D"),
+        ("WJ7", "WSB4", "A", "B"),
         ("WJ8", "WSB4", "C", "D"),
     ];
 
@@ -153,15 +154,20 @@ public sealed class MotionCommissioningTests
         Assert.Equal(MotionVocabulary.Source, projection.Source);
         Assert.Equal(MotionVocabulary.MotionTopologyRevision, projection.MotionTopologyRevision);
 
-        // Canonical Topology Adoption: the current publication identity is REV2; REV1
-        // survives only as the explicitly historical identity and is never published.
-        Assert.Equal("OWNER_CONFIRMED_REV2", MotionVocabulary.MotionTopologyRevision);
-        Assert.Equal("OWNER_CONFIRMED_REV2", projection.MotionTopologyRevision);
+        // Owner-approved canonical Equipment topology adoption (2026-10-25): the current
+        // publication identity is the dated identity; REV2 and REV1
+        // survive only as explicitly historical identities and are never published.
+        Assert.Equal("OWNER_CANONICAL_TOPOLOGY_2026_10_25", MotionVocabulary.MotionTopologyRevision);
+        Assert.Equal("OWNER_CANONICAL_TOPOLOGY_2026_10_25", projection.MotionTopologyRevision);
+        Assert.Equal("OWNER_CONFIRMED_REV2", MotionVocabulary.HistoricalMotionTopologyRevisionRev2);
         Assert.Equal("OWNER_CONFIRMED_REV1", MotionVocabulary.HistoricalMotionTopologyRevisionRev1);
+        Assert.NotEqual(
+            MotionVocabulary.HistoricalMotionTopologyRevisionRev2,
+            projection.MotionTopologyRevision);
         Assert.NotEqual(
             MotionVocabulary.HistoricalMotionTopologyRevisionRev1,
             projection.MotionTopologyRevision);
-        Assert.Contains("(OWNER_CONFIRMED_REV2)", projection.CanonicalText, StringComparison.Ordinal);
+        Assert.Contains("(OWNER_CANONICAL_TOPOLOGY_2026_10_25)", projection.CanonicalText, StringComparison.Ordinal);
 
         var cabinets = projection.Controllers.Select(controller => controller.Identity.CabinetId).ToArray();
         Assert.Equal(ExpectedCabinetIds, cabinets);
@@ -312,11 +318,11 @@ public sealed class MotionCommissioningTests
     }
 
     /// <summary>
-    /// The canonical allocation is EXPLICIT DATA, not a rule. The two Water Jets of WSB1 take
-    /// different axis pairs and the two Water Jets of WSB2 take different axis pairs, so no
-    /// cabinet-derived formula can produce the table; and the even Water Jets WJ2 and WJ4 take
-    /// different axis pairs while the odd Water Jets WJ5 and WJ7 also take different axis pairs, so
-    /// no odd/even parity formula can produce it either.
+    /// The canonical allocation is EXPLICIT DATA, not a rule. The two Water Jets of each WSB
+    /// cabinet take different axis pairs, so no cabinet-derived formula can produce the table;
+    /// and among the even Water Jets WJ2 and WJ4 disagree while among the odd Water Jets WJ1
+    /// and WJ3 disagree, and WJ5 and WJ7 agree against any alternating reading, so no
+    /// odd/even parity formula can produce it either.
     /// </summary>
     [Fact]
     public void The_Canonical_Allocation_Is_Explicit_Data_And_No_Parity_Or_Cabinet_Formula_Produces_It()
@@ -327,18 +333,19 @@ public sealed class MotionCommissioningTests
         Assert.Equal(ExpectedWaterJetIds, catalogue.WaterJets.Select(binding => binding.WaterJetId).ToArray());
 
         // No cabinet-derived axis formula: every cabinet carries both axis pairs
-        // (WSB1: WJ2/WJ3, WSB2: WJ1/WJ4, WSB3: WJ5/WJ7, WSB4: WJ6/WJ8 under REV2).
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ2"), HorizontalOf(catalogue, "WJ3"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ4"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ7"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ6"), HorizontalOf(catalogue, "WJ8"));
+        // (WSB1: WJ1/WJ2, WSB2: WJ3/WJ4, WSB3: WJ5/WJ6, WSB4: WJ7/WJ8).
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ2"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ3"), HorizontalOf(catalogue, "WJ4"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ6"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ7"), HorizontalOf(catalogue, "WJ8"));
 
-        // No odd/even parity formula: the even Water Jets disagree with each other, and so do the
-        // odd ones.
+        // No odd/even parity formula: the even Water Jets disagree with each other, and so do
+        // the odd ones; and the last odd pair agrees where any alternating rule would disagree.
         Assert.NotEqual(HorizontalOf(catalogue, "WJ2"), HorizontalOf(catalogue, "WJ4"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ6"), HorizontalOf(catalogue, "WJ8"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ4"), HorizontalOf(catalogue, "WJ6"));
         Assert.NotEqual(HorizontalOf(catalogue, "WJ1"), HorizontalOf(catalogue, "WJ3"));
-        Assert.NotEqual(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ7"));
+        Assert.NotEqual(HorizontalOf(catalogue, "WJ3"), HorizontalOf(catalogue, "WJ5"));
+        Assert.Equal(HorizontalOf(catalogue, "WJ5"), HorizontalOf(catalogue, "WJ7"));
 
         // Every Water Jet still carries exactly one Horizontal Axis and exactly one Vertical Axis.
         Assert.All(catalogue.WaterJets, binding =>
@@ -353,11 +360,11 @@ public sealed class MotionCommissioningTests
         Assert.Equal(8, catalogue.WaterJets.Count(binding => binding.HorizontalAxisId is "A" or "C"));
         Assert.Equal(8, catalogue.WaterJets.Count(binding => binding.VerticalAxisId is "B" or "D"));
 
-        // And the canonical values the Owner ruled under REV2: WJ2 = A,B and WJ4 = C,D.
-        Assert.Equal("A", HorizontalOf(catalogue, "WJ2"));
-        Assert.Equal("B", VerticalOf(catalogue, "WJ2"));
-        Assert.Equal("C", HorizontalOf(catalogue, "WJ4"));
-        Assert.Equal("D", VerticalOf(catalogue, "WJ4"));
+        // And the canonical values the Owner ruled under the adopted table: WJ2 = C,D and WJ4 = A,B.
+        Assert.Equal("C", HorizontalOf(catalogue, "WJ2"));
+        Assert.Equal("D", VerticalOf(catalogue, "WJ2"));
+        Assert.Equal("A", HorizontalOf(catalogue, "WJ4"));
+        Assert.Equal("B", VerticalOf(catalogue, "WJ4"));
     }
 
     [Fact]
@@ -376,10 +383,11 @@ public sealed class MotionCommissioningTests
         Assert.False(string.IsNullOrWhiteSpace(note.Effect));
 
         // The statement is explicitly historical: the discrepancy belongs to the
-        // superseded REV1 allocation, current authority is REV2, and the physical
-        // installation is never claimed resolved.
+        // superseded REV1 allocation, current authority is the dated identity, and the
+        // physical installation is never claimed resolved.
         Assert.Contains("superseded OWNER_CONFIRMED_REV1 allocation", note.Statement, StringComparison.Ordinal);
         Assert.Contains("OWNER_CONFIRMED_REV2", note.Statement, StringComparison.Ordinal);
+        Assert.Contains("OWNER_CANONICAL_TOPOLOGY_2026_10_25", note.Statement, StringComparison.Ordinal);
         Assert.Contains("NOT_PHYSICALLY_RESOLVED", note.Statement, StringComparison.Ordinal);
 
         // Evidence only: the note does not make any row ambiguous and does not override the Owner.
@@ -434,9 +442,9 @@ public sealed class MotionCommissioningTests
         Assert.Equal(ExpectedWaterJetIds.Length, confirmedRows);
 
         // And the two rows the discrepancy names, stated in the text exactly as the Owner ruled them.
-        Assert.Contains($"W2 WJ2 cabinet WSB1 controller MC-WSB1 horizontal A vertical B{confirmedRow}",
+        Assert.Contains($"W2 WJ2 cabinet WSB1 controller MC-WSB1 horizontal C vertical D{confirmedRow}",
             first.CanonicalText, StringComparison.Ordinal);
-        Assert.Contains($"W4 WJ4 cabinet WSB2 controller MC-WSB2 horizontal C vertical D{confirmedRow}",
+        Assert.Contains($"W4 WJ4 cabinet WSB2 controller MC-WSB2 horizontal A vertical B{confirmedRow}",
             first.CanonicalText, StringComparison.Ordinal);
     }
 

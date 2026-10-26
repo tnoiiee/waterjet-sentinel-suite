@@ -21,7 +21,20 @@ for CP-0 (status reconciliation) and CP-1 (pure GlobalQueue and AutoSequence gat
 `[NOT AUTHORIZED]`. The 0.3A-1 Owner-local validation and the 0.3A-2 checkpoints are recorded in
 [`CURRENT_STATE.md`](CURRENT_STATE.md) and the [plan](STAGE_0.3A_PLAN.md) (its status note
 was reconciled 2026-10-08).
-Production device access `[NOT AUTHORIZED]`. This roadmap authorises
+Production device access `[NOT AUTHORIZED]`. **Update 2026-10-25:** the approved merged baseline
+is `main` `f9e6e9adfef210f483fd3bfc7471936bbd7f34b2` (PR #40 merge; Phase 3A–3C Cleaning Path
+Simulation capability MERGED). The current Owner-authorized Product Critical Path is the
+Hardware Critical Path working label **H1 — WSB1 Real Galil Dry Cleaning-Path Commissioning**
+(Home → DP/DE → dual-axis Move → selected Sensor P1→P6 → Centre 125/125 → Stop/Abort/Brake/
+cleanup; dry — no Pump, no physical IV, no water, no Queue/AutoSequence, no Production), mapped
+to the `0.4D-G1`–`0.4D-G5` Galil and motion stages in [`MASTER_PLAN.md`](MASTER_PLAN.md);
+formal stage IDs remain stable. A standalone Simulation-only Phase 3D is **SUPERSEDED** as the
+immediate objective. **H2 Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED**; **H3
+Single Real Cleaning Job — PLANNED, NOT AUTHORIZED**; **H4 Sequential Multi-Job/Queue — PLANNED,
+NOT AUTHORIZED**; **H5 Production Readiness — FUTURE, NOT AUTHORIZED**. Every later stage
+requires explicit Owner authorization, and real Hardware execution remains fenced behind a
+separate explicit Owner authorization for the exact validated PR head and exact reviewed trial
+procedure. This roadmap authorises
 nothing.
 
 This roadmap describes *intended capability sequence*. It is not a schedule, not a

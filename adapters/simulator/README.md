@@ -34,9 +34,9 @@ The map implements the Owner-approved topology — `CanonicalSensorMap` in
   ordinal** (`WJn` ↔ `IVn`). They are not Sensor-matrix slots and are not derived from them.
 - **Installed Position and Target Coverage are separate concepts.** A Water Jet is installed
   on one wall and covers the **opposite** wall in the matching region (canonical installed
-  topology, Owner Canonical Topology Adoption 2026-10-21): **WJ1 is installed Front-upper,
-  covers the Rear-upper target area and pairs with IV1**; **WJ3 is installed Rear-upper,
-  covers the Front-upper target area and pairs with IV3** — WJ1–WJ4 UPPER tier, WJ5–WJ8
+  topology, Owner-approved canonical Equipment topology adoption 2026-10-25): **WJ1 is installed Left-upper,
+  covers the Right-upper target area and pairs with IV1**; **WJ3 is installed Right-upper,
+  covers the Left-upper target area and pairs with IV3** — WJ1–WJ4 UPPER tier, WJ5–WJ8
   LOWER tier. The former placement description "at the I16 / I7 gap anchor" is superseded
   (I7 and I16 are Sensors); the fine-grained placement of all eight Water Jets is
   `UNRESOLVED` with no placement anchors (canonical wall / tier confirmed).

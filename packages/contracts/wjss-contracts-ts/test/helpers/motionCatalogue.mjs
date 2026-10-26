@@ -85,7 +85,7 @@ export function canonicalMotionCatalogue() {
     sectionId: 'MOTION_COMMISSIONING_FOUNDATION',
     sectionRevision: 1,
     source: 'APPLICATION_OWNED_MOTION_COMMISSIONING_MODEL',
-    motionTopologyRevision: 'OWNER_CONFIRMED_REV2',
+    motionTopologyRevision: 'OWNER_CANONICAL_TOPOLOGY_2026_10_25',
     authorizationGateState: MOTION_GATE_CLOSED,
     authorizationGateReasons: [MOTION_GATE_REASON],
     motionIntents: [...MOTION_INTENTS],
@@ -138,7 +138,7 @@ export function canonicalMotionCatalogue() {
       evidenceId: 'MOTION-EVIDENCE-01',
       waterJetIds: ['WJ2', 'WJ4'],
       cabinetIds: ['WSB1', 'WSB2'],
-      statement: 'Historical evidence note (superseded for current allocation by OWNER_CONFIRMED_REV2): under the superseded OWNER_CONFIRMED_REV1 allocation, WJ2 held the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2, while the Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The current canonical allocation (OWNER_CONFIRMED_REV2) gives WJ2 the A,B axis pair on WSB1 and WJ4 the C,D axis pair on WSB2. This note records the earlier discrepancy only; the physical installation remains NOT_PHYSICALLY_RESOLVED, and nothing here asserts which allocation the installed wiring matches.',
+      statement: 'Historical evidence note (superseded for current allocation by OWNER_CANONICAL_TOPOLOGY_2026_10_25): under the superseded OWNER_CONFIRMED_REV1 allocation, WJ2 held the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2, while the Drawing rev1 expectation for the same two Water Jets was the other axis pair on the same cabinet. The superseded OWNER_CONFIRMED_REV2 allocation matched that Drawing rev1 expectation (WJ2 the A,B axis pair on WSB1; WJ4 the C,D axis pair on WSB2). The current canonical allocation (OWNER_CANONICAL_TOPOLOGY_2026_10_25, Owner-approved canonical Equipment topology adoption, 2026-10-25) again gives WJ2 the C,D axis pair on WSB1 and WJ4 the A,B axis pair on WSB2. This note records the earlier discrepancy only; the physical installation remains NOT_PHYSICALLY_RESOLVED, and nothing here asserts which allocation the installed wiring matches.',
       status: 'DRAWING_REV1_CONFLICT_RECORDED',
       classification: 'EVIDENCE_ONLY_NOT_CANONICAL',
       effect: 'This note changes no Product mapping: all eight Water Jets publish CONFIRMED_OWNER with OWNER_CONFIRMED provenance, WJ2 and WJ4 included.',
@@ -158,7 +158,7 @@ export function canonicalMotionCatalogue() {
       'NO_MOTION_COMMAND_ISSUED', 'NO_UNIT_CONVERSION_VERIFIED', 'NO_HARDWARE_VERIFICATION',
     ],
     statusLegend: MOTION_ALL_REFUSAL_REASONS.map((code) => `${code} - wording`),
-    canonicalText: 'MOTION COMMISSIONING FOUNDATION rev 1 (OWNER_CONFIRMED_REV2)\nGATE CLOSED\n',
+    canonicalText: 'MOTION COMMISSIONING FOUNDATION rev 1 (OWNER_CANONICAL_TOPOLOGY_2026_10_25)\nGATE CLOSED\n',
     fingerprint: 'a'.repeat(64),
   };
 }
