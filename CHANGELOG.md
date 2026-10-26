@@ -35,8 +35,8 @@ CONTACT, NO HARDWARE USE.**
   claimed.
 - **Changed:** the Manual Motion session's zero-establishing lifecycle now dispatches the typed
   position-zero definition and then the typed dual-zero definition for a Home operation as one
-  contiguous native pair (new operation phase `DefiningDualZero`, new typed codes
-  `HOME_ZERO_SEQUENCE_DISPATCHED` / `HOME_DUAL_ZERO_REFUSED`), with the zero-verification watermark
+  contiguous native pair (new operation phase `DefiningDualZero`, new typed code
+  `HOME_DUAL_ZERO_REFUSED`), with the zero-verification watermark
   taken from the **last** command so no earlier reading can verify zero; the deterministic
   simulated port gained one opt-in `RpBiasClearedByDualZero` scenario option; H1 coordinate evidence
   reports `H1_DUAL_ZERO_DISPATCHED_IN_HOME_SEQUENCE` / `H1_DUAL_ZERO_REFUSED_IN_HOME_SEQUENCE`; the
@@ -46,10 +46,23 @@ CONTACT, NO HARDWARE USE.**
 - **Unchanged:** the Home motion sequence (brake release, settle, home speed, home search, begin),
   the Stop supervision, the brake lifecycle, the Move lifecycle, the Centre return (125 mm / 125 mm),
   both position reads and the `PositionTolerance`, the standalone define-position-zero and
-  define-dual-zero semantics, the profile permission semantics, the Run Path readiness rule and its
-  prohibition on Home/DP/DE, the canonical topology, P1→P6 order, abort/close/cleanup, and every
-  Pump, physical Isolation Valve, water, Queue and Production exclusion. No dependency, package or
+  define-dual-zero semantics (including the standalone `dualZeroPermitted` gate), the Run Path
+  readiness rule and its prohibition on Home/DP/DE, the canonical topology, P1→P6 order,
+  abort/close/cleanup, and every Pump, physical Isolation Valve, water, Queue and Production
+  exclusion. No dependency, package or
   lock file changed.
+- **Correction to the correction (Owner decision, same day; same branch and PR).** An earlier draft
+  of this entry gated the Home-carried pair on the standalone `dualZeroPermitted` profile permission.
+  The Owner's Hardware profile declares `dualZeroPermitted=false`, so that gate would have left H1
+  emitting the position definition alone and reproduced the proven defect on the repaired run. The
+  gate is removed: the Home-carried pair is dispatched **unconditionally** for a Home that reaches
+  zero establishment and reads no permission. `dualZeroPermitted` continues to gate the **standalone**
+  Define Dual Zero action exactly as before, and standalone Define Position Zero is unchanged. The H1
+  per-axis disposition code `H1_DUAL_ZERO_OPTIONAL_NOT_DISPATCHED` is renamed
+  `H1_DUAL_ZERO_NOT_DISPATCHED` so the evidence no longer calls a mandatory composition optional.
+  New focused tests assert the complete pair under a profile with `dualZeroPermitted=false`, for
+  every resolved H1 axis, adjacent in the dispatch stream, and assert the standalone action is still
+  refused under that same profile.
 - **Not verified:** the corrected sequence is proven at Source level and under deterministic
   simulation only. Real-Hardware H1 behavior — including which of the two position values each
   definition command actually zeroes on this machine — remains `NOT VERIFIED` until the separately

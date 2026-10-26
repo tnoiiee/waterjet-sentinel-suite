@@ -550,7 +550,6 @@ public sealed class ManualMotionSession
 
             case ManualMotionOperationKind.DefinePositionZero:
                 CaptureZeroVerification(op, p);
-                CaptureDualZeroIntent(op, p);
                 op.Phase = ManualMotionOperationPhase.DefiningZero;
                 break;
 
@@ -571,7 +570,6 @@ public sealed class ManualMotionSession
             case ManualMotionOperationKind.Home:
                 CaptureMotion(op, p);
                 CaptureZeroVerification(op, p);
-                CaptureDualZeroIntent(op, p);
                 op.HomeBit = p.HomeStatusBit ?? 0;
                 op.HomeActive = p.HomeActiveValue ?? 0;
                 op.RunTimeout = Milliseconds(p.HomeTimeoutMilliseconds ?? 0);
@@ -614,15 +612,6 @@ public sealed class ManualMotionSession
         op.HasZeroVerification = p.PositionTolerance is not null && p.StopTimeoutMilliseconds is not null;
         op.Tolerance = p.PositionTolerance ?? 0;
         op.StopTimeout = Milliseconds(p.StopTimeoutMilliseconds ?? 0);
-    }
-
-    /// <summary>
-    /// Captures the Home-carried dual-zero definition intent from the profile. The intent is only
-    /// honoured by a Home operation; the standalone define-position-zero operation never carries it.
-    /// </summary>
-    private static void CaptureDualZeroIntent(OperationRuntime op, ManualMotionAxisProfile p)
-    {
-        op.DualZeroDefinitionRequired = p.DualZeroPermitted;
     }
 
     // ------------------------------------------------------------------- operation lifecycle
@@ -1022,11 +1011,15 @@ public sealed class ManualMotionSession
         op.ZeroSequence = outcome.Sequence;
         op.ZeroAt = now;
 
-        // The Owner-approved Home-carried composition: a Home operation continues into the second
-        // half of the exact Legacy reset-encoder sequence (define position zero, then define dual
-        // zero) when the profile permits the dual-zero definition. The standalone define-position-zero
-        // operation does not continue: its semantics are unchanged.
-        if (op.Kind == ManualMotionOperationKind.Home && op.DualZeroDefinitionRequired)
+        // The Owner-approved Home-carried composition is a mandatory part of the H1 Home zero
+        // establishment, not an optional manual action: a Home operation ALWAYS continues into the
+        // second half of the exact Legacy reset-encoder sequence (define position zero, then define
+        // dual zero). It deliberately reads no profile permission. The standalone dual-zero
+        // permission (`dualZeroPermitted`) governs the standalone Define Dual Zero action only, and
+        // the Owner's Hardware profile declares it false - gating this composition on it would leave
+        // H1 emitting the position definition alone and reproduce the proven command-sequence
+        // defect. The standalone define-position-zero operation never continues: unchanged.
+        if (op.Kind == ManualMotionOperationKind.Home)
         {
             SetPhase(op, ManualMotionOperationPhase.DefiningDualZero, now);
             return Progress.CalledPort;
@@ -2155,12 +2148,6 @@ public sealed class ManualMotionSession
         public long ZeroSequence { get; set; }
 
         public DateTimeOffset ZeroAt { get; set; }
-
-        /// <summary>
-        /// True when this operation carries the Owner-approved Home-carried dual-zero definition,
-        /// captured from the profile permission at start. False for every standalone define.
-        /// </summary>
-        public bool DualZeroDefinitionRequired { get; set; }
 
         public bool HomeDetected { get; set; }
 

@@ -310,6 +310,77 @@ public sealed class H1DryCommissioningCoordinatorTests
     }
 
     [Fact]
+    public void Home_Carried_Sequence_Does_Not_Depend_On_The_Standalone_Dual_Zero_Permission()
+    {
+        // The Owner's Hardware profile declares dualZeroPermitted=false on every axis. Gating the
+        // Home-carried reset-encoder composition on that permission would leave the repaired Hardware
+        // run emitting the position definition alone and reproduce the proven defect, so this test
+        // asserts the complete pair under exactly that condition.
+        var harness = new H1DryCommissioningHarness(dualZeroPermitted: false);
+        Assert.False(((ManualMotionAxisProfile)harness.Profile.AxisA!).DualZeroPermitted);
+        Assert.False(((ManualMotionAxisProfile)harness.Profile.AxisB!).DualZeroPermitted);
+
+        harness.OpenAndObserve();
+        harness.CommissionOnly();
+
+        // H1 still commissions and still verifies zero from both reads.
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Commissioned, result.TerminalPhase);
+        Assert.True(result.HorizontalCoordinate.CoordinateZeroVerified);
+        Assert.True(result.VerticalCoordinate.CoordinateZeroVerified);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.HorizontalCoordinate.DualZeroDispositionCode);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.VerticalCoordinate.DualZeroDispositionCode);
+
+        // The canonical WSB1 route resolves Horizontal to axis A and Vertical to axis B; only those
+        // two roles are homed by this run.
+        Assert.Equal("A", result.HorizontalCoordinate.AxisId);
+        Assert.Equal("B", result.VerticalCoordinate.AxisId);
+
+        // Exactly one DP and one DE per resolved axis, DP immediately followed by DE, in the Legacy
+        // order, with no other command between them.
+        foreach (var letter in new[] { "A", "B" })
+        {
+            var kinds = new List<ManualMotionPortCommandKind>();
+            var indices = new List<int>();
+            for (var index = 0; index < harness.Port.ExecutedCommands.Count; index++)
+            {
+                var command = harness.Port.ExecutedCommands[index];
+                if (!string.Equals(CleaningPathExecutionHarness.LetterOf(command.Axis), letter, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (command.Kind == ManualMotionPortCommandKind.DefinePositionZero
+                    || command.Kind == ManualMotionPortCommandKind.DefineDualZero)
+                {
+                    indices.Add(index);
+                    kinds.Add(command.Kind);
+                }
+            }
+
+            Assert.Equal(
+                new[] { ManualMotionPortCommandKind.DefinePositionZero, ManualMotionPortCommandKind.DefineDualZero },
+                kinds);
+            Assert.Equal(indices[0] + 1, indices[1]);
+            Assert.Equal(0, harness.Port.ExecutedCommands[indices[0]].Operand);
+            Assert.Equal(0, harness.Port.ExecutedCommands[indices[1]].Operand);
+        }
+
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
+
+        // The permission still governs the STANDALONE dual-zero action on this same session: the
+        // Home-carried composition is the only thing that stopped reading it.
+        var before = harness.Port.ExecutedCommands.Count;
+        harness.Session.RequestDefineDualZero(ManualMotionAxis.A);
+        harness.Clock.Advance(TimeSpan.FromMilliseconds(25));
+        harness.Boundary.Step();
+        Assert.Equal(
+            ManualMotionCodes.DualZeroNotPermittedByProfile,
+            harness.Session.Snapshot.Axes[0].LastOutcomeCode);
+        Assert.Equal(before, harness.Port.ExecutedCommands.Count);
+    }
+
+    [Fact]
     public void Dual_Zero_Completes_The_Home_Carried_Reset_Encoder_Sequence()
     {
         var harness = CommissionedHarness();

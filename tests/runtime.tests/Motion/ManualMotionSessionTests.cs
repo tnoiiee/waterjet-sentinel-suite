@@ -2514,14 +2514,18 @@ public sealed class ManualMotionSessionTests
     // ------------------------------------------- Home-carried reset-encoder composition (DP then DE)
 
     /// <summary>
-    /// A minimal deterministic port for the Home-carried reset-encoder composition. It reports the
-    /// Home bit active and the motion bit inactive on the synthetic simulation bit layout, records
-    /// every command and read in dispatch order, and can refuse either definition or report a zero
-    /// position only for readings taken BEFORE the dual-zero definition. Every value is synthetic.
+    /// A minimal deterministic port for the Home-carried reset-encoder composition. On the synthetic
+    /// simulation bit layout the Home bit reads INACTIVE until the Home search is armed by Begin and
+    /// ACTIVE afterwards (an already-active input would refuse Home, and a search that never sees the
+    /// input would time out), while the motion bit reads inactive throughout. It records every command
+    /// and read in dispatch order, and can refuse either definition or report a zero position only
+    /// for readings taken BEFORE the dual-zero definition. Every value is synthetic.
     /// </summary>
     private sealed class ZeroSequencePort : IManualMotionPort
     {
         private bool _dualZeroDispatched;
+
+        private bool _homeInputActive;
 
         internal bool RefusePositionZero { get; init; }
 
@@ -2556,6 +2560,13 @@ public sealed class ManualMotionSessionTests
                 _dualZeroDispatched = true;
             }
 
+            if (command.Kind == ManualMotionPortCommandKind.Begin)
+            {
+                // The armed Home search reaches the switch: the Home input becomes active only after
+                // Begin, so the fresh post-Begin Status observation is what completes the search.
+                _homeInputActive = true;
+            }
+
             return new ManualMotionPortCommandResult(true, false, true, "SYNTHETIC_DISPATCHED", 1);
         }
 
@@ -2564,9 +2575,9 @@ public sealed class ManualMotionSessionTests
             Reads.Add(read);
             switch (read.Kind)
             {
-                // Home bit 3 active, motion bit 6 inactive on the synthetic simulation layout.
+                // Home bit 3 (8) only once the Home search is armed; motion bit 6 inactive.
                 case ManualMotionReadKind.StatusWord:
-                    return new ManualMotionPortReadResult(true, false, 8m, "SYNTHETIC_READ", 1);
+                    return new ManualMotionPortReadResult(true, false, _homeInputActive ? 8m : 0m, "SYNTHETIC_READ", 1);
 
                 case ManualMotionReadKind.PositionTp:
                 case ManualMotionReadKind.PositionRp:
@@ -2771,13 +2782,62 @@ public sealed class ManualMotionSessionTests
     }
 
     [Fact]
-    public void Home_Without_Dual_Zero_Permission_Keeps_The_Position_Only_Sequence()
+    public void Home_Dispatches_The_Dual_Zero_Even_When_The_Profile_Does_Not_Permit_It()
     {
-        // The existing profile permission is retained as the gate of the Home-carried composition:
-        // a profile that does not permit the dual-zero definition keeps the position-only sequence.
+        // The Owner's Hardware profile declares dualZeroPermitted=false. The Home-carried
+        // reset-encoder composition is part of the H1 Home contract and must NOT depend on that
+        // permission: gating it on the permission would leave Home emitting the position definition
+        // alone and reproduce the proven command-sequence defect on the repaired Hardware run.
+        var profile = ProfileWithoutDualZeroPermission();
+        Assert.False(profile.AxisA!.DualZeroPermitted);
+
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort(), profile);
+        harness.OpenSession();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(ManualMotionDualZeroState.DispatchedUnverified, axis.DualZeroState);
+
+        // The exact native sequence: the pair is present, adjacent and in the Legacy order, with no
+        // command between the position definition and the dual-zero definition.
+        Assert.Equal(
+            new[]
+            {
+                ManualMotionPortCommandKind.BrakeOutputSet,
+                ManualMotionPortCommandKind.HomeSpeed,
+                ManualMotionPortCommandKind.Home,
+                ManualMotionPortCommandKind.Begin,
+                ManualMotionPortCommandKind.Stop,
+                ManualMotionPortCommandKind.DefinePositionZero,
+                ManualMotionPortCommandKind.DefineDualZero,
+                ManualMotionPortCommandKind.BrakeOutputClear,
+            },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+        Assert.Equal(0, harness.Port.Executed[5].Operand);
+        Assert.Equal(0, harness.Port.Executed[6].Operand);
+
+        // The permission still governs the STANDALONE dual-zero action on exactly this profile: the
+        // Home-carried composition is the only thing that stopped reading it.
+        harness.Session.RequestDefineDualZero(ManualMotionAxis.A);
+        harness.Drive(1);
+        Assert.Equal(ManualMotionCodes.DualZeroNotPermittedByProfile, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Single(harness.Port.Executed.Where(command => command.Kind == ManualMotionPortCommandKind.DefineDualZero));
+    }
+
+    /// <summary>
+    /// The built-in simulation profile with the standalone dual-zero permission switched off, which
+    /// is the condition the Owner's Hardware profile declares.
+    /// </summary>
+    private static ManualMotionProfile ProfileWithoutDualZeroPermission()
+    {
         var simulation = ManualMotionProfile.CreateSimulationProfile();
         var source = simulation.AxisA ?? throw new InvalidOperationException("Axis A is required.");
-        var profile = new ManualMotionProfile
+        return new ManualMotionProfile
         {
             Source = simulation.Source,
             ControllerId = simulation.ControllerId,
@@ -2808,19 +2868,6 @@ public sealed class ManualMotionSessionTests
                 DualZeroPermitted = false,
             },
         };
-
-        var harness = new ZeroSequenceHarness(new ZeroSequencePort(), profile);
-        harness.OpenSession();
-
-        harness.Session.RequestHome(ManualMotionAxis.A);
-        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
-            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
-
-        var axis = harness.Axis(ManualMotionAxis.A);
-        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
-        Assert.Contains(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefinePositionZero);
-        Assert.DoesNotContain(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
-        Assert.Equal(ManualMotionDualZeroState.NotDispatched, axis.DualZeroState);
     }
 
     [Fact]

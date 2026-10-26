@@ -148,9 +148,11 @@ Centre 125/125 → terminal cleanup and session/run close.
   correct and unchanged; the defect they exposed was that the Home-carried zero establishment sent
   the position definition only. The exact Legacy Source proves the commissioned reset-encoder
   sequence is `DP<axis>=0` then `DE<axis>=0`, so the Home lifecycle now dispatches both, in that
-  order, before verification. The sequence is profile-gated (`dualZeroPermitted`): a profile that
-  does not permit the dual-zero definition keeps the position-only sequence, and the Owner-local
-  commissioning profile must permit it for this procedure.
+  order, before verification. **The pair is not profile-gated.** It is part of the H1 Home contract
+  and is dispatched unconditionally for a Home that reaches zero establishment; the standalone
+  `dualZeroPermitted` permission is not read here, because gating on it would leave H1 emitting the
+  position definition alone under a profile that declares `dualZeroPermitted=false` and reproduce
+  the defect. That permission continues to govern the **standalone** Define Dual Zero action only.
 - **The standalone dual-zero definition remains a separate, optional, dispatch-only manual action.**
   Its effect stays **UNVERIFIED** (`DUAL_ZERO_DISPATCHED_EFFECT_UNVERIFIED`) and it still **clears
   the homed coordinate claim** (any later Move is then refused until a fresh Home). This procedure
@@ -222,7 +224,7 @@ Never commit these values.
 | Brake outputs and release action (A–D) | profile (Owner-confirmed allocation 1/2/3/4) | `[RECORD — Run A operates outputs 1 (A) and 2 (B) only; Run B operates outputs 3 (C) and 4 (D) only]` |
 | Home speed / Home supervision timeout | profile | `[RECORD]` |
 | Move acceleration / speed / deceleration | profile | `[RECORD]` |
-| Dual-zero permission per axis | profile | `[RECORD — REQUIRED for both runs: the Home-carried reset-encoder composition needs it]` |
+| Dual-zero permission per axis | profile | `[RECORD — informational only for the H1 run: the Home-carried reset-encoder pair is dispatched regardless of this value; false is acceptable]` |
 | Move target bounds | profile | `[RECORD]` |
 
 ## 7. Stop and Abort evidence method — Owner decision (same method for both routes)

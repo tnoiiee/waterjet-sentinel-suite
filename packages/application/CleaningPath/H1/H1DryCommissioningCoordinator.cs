@@ -910,8 +910,10 @@ public sealed class H1DryCommissioningCoordinator
             ManualMotionDualZeroState.Refused => H1DryCommissioningCodes.DualZeroRefusedInHomeSequence,
 
             // No dual-zero definition was dispatched in this session (for example a Home that ended
-            // before zero establishment). Nothing is claimed.
-            _ => H1DryCommissioningCodes.DualZeroOptionalNotDispatched,
+            // before zero establishment). The composition is never optional for a Home that reaches
+            // zero establishment; this disposition only records that it was not reached. Nothing is
+            // claimed.
+            _ => H1DryCommissioningCodes.DualZeroNotDispatched,
         };
         return new H1AxisCoordinateEvidence(
             axisId,

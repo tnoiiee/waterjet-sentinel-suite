@@ -137,7 +137,7 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
 | Post-command verification | none — no position read is taken after either command | position definition verifies fresh TP **and** RP against zero within the configured tolerance; encoder definition is dispatch-only and reported as effect-unverified |
 | Failure handling | one generic message; the exception propagates to the caller | typed refusal codes; no vendor text; session state preserved |
 | Effect on the coordinate claim | not modelled | both standalone actions clear the session's Home claim |
-| Where the sequence now runs | the Operator reset button only | the Home lifecycle of the Manual Motion session carries the same pair, in the Legacy order, when the Owner-local profile permits the dual-zero definition; the standalone actions remain available and unchanged |
+| Where the sequence now runs | the Operator reset button only | the Home lifecycle of the Manual Motion session carries the same pair, in the Legacy order, **unconditionally** for a Home that reaches zero establishment — the standalone `dualZeroPermitted` permission is not consulted, because H1's contract requires the pair; the standalone actions remain available and unchanged, and the standalone dual-zero action remains permission-gated |
 | Classification | **RESOLVED by the authorized correction** — the Legacy command pair is now composed into the WJSS Home lifecycle as one contiguous native pair, `DP<axis>=0` then `DE<axis>=0`, with the Owner-approved fresh TP/RP verification as an additive strengthening. No standalone WJSS action claims reset-encoder equivalence, and none is added. | |
 
 ### 3.2 Home
@@ -269,8 +269,10 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
 
 > **Dated history — superseded.** Sections 4.1 to 4.3 are the first-pass determination of
 > 2026-10-26 and are preserved verbatim. The Owner decision recorded in the header and in section
-> 4.5 supersedes 4.2 and 4.3. Section 4.1 (source facts) and 4.4 (the nature of the post-command
-> verification) remain accurate and are not superseded.
+> 4.5 supersedes 4.2 and 4.3. Within 4.1, the **Legacy** facts P-1 to P-3 remain accurate, and 4.4
+> (the nature of the post-command verification) remains accurate; P-4 is accurate for the standalone
+> action, and **P-5, P-6 and P-7 described the pre-correction WJSS Source and the pre-correction
+> contract and are superseded by the correction** (see the post-correction status note below).
 
 ### 4.1 What is proven at source level
 
@@ -282,8 +284,9 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
 - **P-3.** The Legacy cleaning-path execution performs no home sequence and no position or encoder
   definition of any kind.
 - **P-4.** WJSS already contains both definitions as separate typed operations, each with its own
-  command shape, its own lifecycle and its own reported state; the encoder definition is present,
-  permitted only by the Owner-local profile, and reported as effect-unverified.
+  command shape, its own lifecycle and its own reported state; as a standalone action the encoder
+  definition is present, permitted only by the Owner-local profile, and reported as
+  effect-unverified.
 - **P-5.** WJSS dispatches the position definition and never the encoder definition from the Home
   lifecycle, from the H1 path and from the Centre return — which is what the Legacy home completion
   and the Legacy path do as well.
@@ -295,6 +298,13 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
   pinned as brake, home speed, home search, begin, stop, position definition, brake; the H1 run is
   pinned as exactly two position definitions and zero encoder definitions; a Home failure is pinned
   as never sending an encoder definition.
+
+**Post-correction status (2026-10-26, later the same day).** P-5, P-6 and P-7 are superseded. The
+Owner decision required the Home-carried zero establishment to dispatch the complete Legacy
+reset-encoder pair, so the Home lifecycle now dispatches `DP<axis>=0` then `DE<axis>=0` — the pair
+is **not** optional, **not** excluded from a session and **not** gated by the standalone
+`dualZeroPermitted` permission. The committed tests now pin the pair instead of pinning its absence.
+P-1 to P-3 (the Legacy facts) and P-4 (the standalone WJSS action) are unchanged.
 
 ### 4.2 The five-way classification applied
 
@@ -470,6 +480,12 @@ touched and what deliberately was not.
 - the closed typed vocabulary: one new operation phase and two new typed outcome codes, with no new
   command kind, no new mnemonic and no raw command text;
 - the H1 coordinate evidence mapping and its disposition codes;
+- **the composition reads no profile permission.** A Home that reaches zero establishment always
+  dispatches the pair. The standalone `dualZeroPermitted` permission continues to gate the standalone
+  Define Dual Zero action only, which is why the Owner's Hardware profile may keep
+  `dualZeroPermitted=false` and still satisfy the H1 contract. This is deliberate: an earlier draft
+  of the correction reused the standalone permission as the gate, which would have left H1 emitting
+  the position definition alone under the Owner's actual profile and reproduced the defect;
 - the deterministic simulated port: one opt-in option that reproduces the Owner-observed split
   between the two position values, so the defect and its absence are both testable;
 - the focused tests that pin the sequence, the order, the refusal paths and the watermark;
@@ -481,7 +497,8 @@ touched and what deliberately was not.
 - the Home motion behavior (brake release, settle, home speed, home search, begin), the Stop
   supervision, the brake lifecycle, the Move lifecycle and the Centre return;
 - the position tolerance, the zero-verification predicate and both position reads;
-- the standalone Manual Motion operations and the profile permission semantics;
+- the standalone Manual Motion operations, and the profile permission semantics that still gate the
+  standalone Define Dual Zero action (the Home-carried pair deliberately does not read them);
 - the Run Path readiness rule, which still requires a session-scoped `Homed` + `ZeroVerified` and
   still dispatches no Home, no position definition and no encoder definition;
 - every dependency, package and lock file.

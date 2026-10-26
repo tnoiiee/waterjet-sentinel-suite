@@ -112,7 +112,11 @@ public static class H1DryCommissioningCodes
     public const string HomePhaseStarted = "H1_HOME_PHASE_STARTED";
     public const string CoordinateEstablishmentVerified = "H1_COORDINATE_ESTABLISHMENT_VERIFIED";
     public const string CoordinateEstablishmentRefused = "H1_COORDINATE_ESTABLISHMENT_REFUSED";
-    public const string DualZeroOptionalNotDispatched = "H1_DUAL_ZERO_OPTIONAL_NOT_DISPATCHED";
+    /// <summary>
+    /// No dual-zero definition was dispatched for this axis in this session, because the Home ended
+    /// before zero establishment. The composition itself is never optional for an H1 Home.
+    /// </summary>
+    public const string DualZeroNotDispatched = "H1_DUAL_ZERO_NOT_DISPATCHED";
     public const string DualZeroDispatchedEffectUnverified = "H1_DUAL_ZERO_DISPATCHED_EFFECT_UNVERIFIED";
 
     /// <summary>

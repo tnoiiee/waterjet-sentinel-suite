@@ -55,9 +55,10 @@ The Application session exposes only typed requests:
 - Home for one axis;
 - define position zero (DP semantics) for one axis;
 - define dual zero (DE semantics) for one axis, only when explicitly
-  permitted by the Owner-local profile; its effect remains unverified. The
-  same permission also enables the Home-carried reset-encoder composition
-  (`DP<axis>=0` then `DE<axis>=0`), which is not a separate Operator action;
+  permitted by the Owner-local profile; its effect remains unverified. That
+  permission does **not** gate the Home-carried reset-encoder composition
+  (`DP<axis>=0` then `DE<axis>=0`), which is part of the Home contract, runs
+  unconditionally and is not a separate Operator action;
 - one bounded absolute Move for one axis after a verified Home in the same
   session;
 - raw status, TP, RP and brake-output observations, shown separately from
@@ -78,8 +79,10 @@ The axis workflow is deliberately ordered:
    zero → TP/RP zero verification → brake apply. No Home is claimed from
    dispatch alone. The position-zero and dual-zero definitions are the exact
    Legacy Reset Encoder sequence (`DP<axis>=0` then `DE<axis>=0`) carried by
-   the Home lifecycle as one contiguous native pair, gated by the profile's
-   dual-zero permission; the standalone define actions are unchanged.
+   the Home lifecycle as one contiguous native pair, **always**, independently
+   of the profile's standalone dual-zero permission (a profile declaring
+   `dualZeroPermitted=false` still gets the pair); the standalone define
+   actions are unchanged.
 4. **Manual zero:** define position zero is accepted only when the session
    can verify TP/RP near zero afterward. Manual DP/DE clears the
    session's prior Home claim because it changes the coordinate basis.

@@ -17,8 +17,11 @@
 > H1 evidence codes `H1_DUAL_ZERO_DISPATCHED_IN_HOME_SEQUENCE` /
 > `H1_DUAL_ZERO_REFUSED_IN_HOME_SEQUENCE`, one opt-in simulated-port scenario option, extended
 > focused tests and the corrected investigation record, H1 trial procedure and Manual Motion
-> runbook. Unchanged: the Home motion sequence, Stop supervision, brake lifecycle, Move lifecycle,
-> Centre 125 mm / 125 mm, both position reads and `PositionTolerance`, the standalone define
+> runbook. The Home-carried `DP<axis>=0` → `DE<axis>=0` pair is **unconditional**: it does not read
+> the standalone `dualZeroPermitted` profile permission, so a profile that declares it `false` (the
+> Owner's Hardware profile) still gets the complete pair; that permission continues to gate the
+> standalone Define Dual Zero action only. Unchanged: the Home motion sequence, Stop supervision,
+> brake lifecycle, Move lifecycle, Centre 125 mm / 125 mm, both position reads and `PositionTolerance`, the standalone define
 > operations and profile permission semantics, the Run Path rule (no Home, no DP, no DE), P1→P6
 > order, abort/close/cleanup and every Pump / physical IV / water / Queue / Production exclusion; no
 > dependency, package or lock file changed. **Validation position: .NET restore/build/test NOT RUN in
