@@ -1,5 +1,44 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H2 Physical Process-I/O evidence adoption + H2 Final Scope Gate (2026-10-26; evidence and
+> read-only analysis only; NO HARDWARE; NO PRODUCT RUNTIME CHANGE).** The exact
+> Owner-supplied connected-source artifact
+> `WAGO_IO_Mapping_Exact_Excel_Cyberpunk_PositiveIOSlot_2026-10-22.html` (Google Drive file
+> id `1GPig0jsZCLNbdgvBNR6a0LeXUdDHUjQd`, 36,667 bytes, SHA-256
+> `28245ad207a24078902fca48f4fa2622fbca631bd92f660aa4faf1681f4c5299`, modified
+> 2026-10-22) is adopted byte-identically at
+> [`docs/evidence/WAGO_IO_Mapping_Exact_Excel_Cyberpunk_PositiveIOSlot_2026-10-22.html`](evidence/WAGO_IO_Mapping_Exact_Excel_Cyberpunk_PositiveIOSlot_2026-10-22.html)
+> with a complete provenance record
+> ([`docs/evidence/process-io-source-provenance-2026-10-22.md`](evidence/process-io-source-provenance-2026-10-22.md),
+> including full disclosure of the connector's per-fetch cloud-proxy injection and its
+> cryptographic reversal; provider SHA-256/MD5/SHA-1/size all matched), a deterministic
+> generator-owned normalized inventory
+> ([`docs/evidence/process-io-inventory-2026-10-22.csv`](evidence/process-io-inventory-2026-10-22.csv),
+> 111 rows in complete source order: DI 40 / DO 32 / AI 36 / AO 2 / End module 1; USED 105 /
+> SPARE 6; 108 tagged / 3 untagged; rows kept verbatim including `+`-suffixed analog tags,
+> Thai notes and the 17 unresolved `XXX รอพี่ยิมตอบ` rows) produced by
+> `tools/process-io-evidence/generate.mjs` (fail-closed; hash-gated; `--check` parity; 15
+> focused tests). The artifact's own declared filter (`Filtered I/O Slot less than 0, equal
+> to 0, and blank`) excludes exactly the 3 non-process modules (RackSlots 1/2/12 — coupler
+> and the two power supplies); its Slot/I-O-Slot pairs match the committed 23-slot
+> authoritative rack topology exactly. The read-only **H2 Final Scope Gate** analysis is at
+> [`docs/H2_FINAL_SCOPE_GATE_REPORT.md`](H2_FINAL_SCOPE_GATE_REPORT.md): complete grouped
+> analysis of all 111 rows (Pump/Inverter, pump inlet/outlet pressure per Owner ruling
+> AI-002 diagnostic-only / AI-003 sole Pump-ready, IV1–IV8 outlet pressure + limits ordinal,
+> WSB limits, air solenoids, tank/boiler valve banks, 0-20 mA blower currents, breaker
+> status, unresolved and spare rows); typed Modbus architecture proposal (12 typed
+> boundaries, no raw UI); process-image/function-code/endpoint status **UNRESOLVED** (no
+> evidence in the artifact; none invented; TC cabinet endpoints not reused); H2-A…H2-Final
+> phasing with H2-B typed read-only observation as the proposed first Product coding scope.
+> **Evidence states: no row is VERIFIED; USED ≠ safe to actuate; spares and unresolved rows
+> are fail-closed excluded.** Owner decisions D1–D8 are listed in the report §29 (process-
+> image/FC evidence, endpoint provisioning, unresolved identities incl. DO-031/AI-020…AI-035
+> and the `+` suffix, workbook version authority, H2-B authorization). Validation in the
+> Author environment: retrieval/byte-identity proof, generator parity, 15/15 focused tests,
+> boundary scan 0 findings, relevant Node suites green; **no C# Source changed — no .NET
+> validation claimed**. H2–H5 remain **NOT AUTHORIZED**; this task authorizes evidence
+> adoption and read-only analysis only. NO HARDWARE. NO PRODUCTION.
+
 > **Owner-approved canonical Equipment topology adoption (2026-10-25; current equipment-topology\n> position — supersedes every contrary installed-position, Target Coverage, WSB/axis-allocation,\n> assignment-count, REV2-current and dated-identity statement below without deleting any dated\n> record; software only; HARDWARE NOT EXECUTED).** Implemented in Source on branch\n> `arena/7968e33e-waterjet-sentinel-suite` (PR #41 open, unmerged) inside the H1 pass. Canonical\n> table: WJ1 (legacy WJ2) IV1 installed LEFT/UPPER → targets RIGHT/UPPER, WSB1, A/B; WJ2 (legacy\n> WJ3) IV2 REAR/UPPER → FRONT/UPPER, WSB1, C/D; WJ3 (legacy WJ4) IV3 RIGHT/UPPER → LEFT/UPPER,\n> WSB2, C/D; WJ4 (legacy WJ1) IV4 FRONT/UPPER → REAR/UPPER, WSB2, A/B; WJ5 (legacy WJ5) IV5\n> FRONT/LOWER → REAR/LOWER, WSB3, A/B; WJ6 (legacy WJ7) IV6 REAR/LOWER → FRONT/LOWER, WSB3, C/D;\n> WJ7 (legacy WJ6) IV7 LEFT/LOWER → RIGHT/LOWER, WSB4, A/B; WJ8 (legacy WJ8) IV8 RIGHT/LOWER →\n> LEFT/LOWER, WSB4, C/D. A/C Horizontal, B/D Vertical; WJn ↔ IVn; Target Coverage is always the\n> opposite wall in the same tier. The Legacy WJ identity column is historical equipment identity\n> only, distinct from the legacy cannon identity; `cannon n → WJn` direct import is unchanged. The\n> H1 synthetic default route is corrected to G+210 (RIGHT/UPPER) → canonical WJ1/IV1, WSB1\n> A/B (Horizontal A, Vertical B), with G+201 (LEFT/UPPER) → WJ3/IV3, WSB2 C/D as the\n> unsupported-WSB refusal scenario. Dated current identities: .NET `MotionTopologyRevision =\n> OWNER_CANONICAL_TOPOLOGY_2026_10_25` and JS `MOTION_COMMISSIONING_DESIGN_ID =\n> MOTION_COMMISSIONING_DESIGN_2026_10_25`; `OWNER_CONFIRMED_REV2` / `OWNER_CONFIRMED_REV1` and\n> `MOTION_COMMISSIONING_DESIGN_REV2` / `MOTION_COMMISSIONING_DESIGN_REV1` retained as historical\n> identities only. Canonical default assignments by physical Sensor wall / tier: 8/10/8/10/20/20/\n> 16/16 to WJ1..WJ8 (108 total); I7 → WJ5/IV5 unchanged; I16 → WJ6/IV6 (was WJ7 under the\n> superseded table). `snapshot.seed0.json`, `delta.basic.json` and\n> `sensor-parameters.migrated.example.json` were regenerated only through their generator owners\n> (deterministic; frozen historical tables and `--legacy-proof` byte-identity preserved);\n> `sensor-map.example.json` unchanged. Unchanged: 108 Sensors / 216 assigned / 240 physical /\n> 24 spare, the Sensor sequence and coordinates, I7/I16 Product-Sensor status, physical\n> SDS/Cabinet/module/channel mapping, P1–P6 and Centre 125/125, WJn ↔ IVn pairing, queue and\n> safety semantics, Manual Motion command lifecycles, the gclib typed boundary and every Hardware\n> / Production authorization boundary. Physical wiring, the mechanical route and Galil A/B/C/D\n> physical semantics are unchanged; no Hardware matrix is repeated and no Hardware is executed.\n> **Validation position: .NET restore/build/test and C# fixture parity NOT RUN in the Author\n> environment (no .NET SDK) — the Owner-local exact-head gate is the validation of record;\n> Node suites (commissioning 239/239, contracts-ts 56/56, Ops Preview motion 22/22) and the\n> boundary scan passed in the Author environment.** No REV3 exists. NO HARDWARE. NO PRODUCTION.\n
 > **H1 WSB1 dry Cleaning Path commissioning — implementation record (2026-10-25; software only;
 > HARDWARE NOT EXECUTED).** The Product now owns the H1 dry commissioning run for WSB1 through the
