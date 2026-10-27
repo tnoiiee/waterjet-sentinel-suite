@@ -13,6 +13,48 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-27 — TP/RP pulse-domain normalization (Owner-confirmed relationship; software only; no Hardware authorization)
+
+**Status: SOURCE-AUTHORED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`) on top of the block-1
+report; .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in the Author environment; the Owner-local gate
+remains the validation of record). NO NATIVE LOAD, NO CONTROLLER CONTACT, NO HARDWARE USE.**
+
+- **Owner-confirmed physical relationship (final).** Encoder resolution **10,000 pulses/revolution**;
+  stepping-drive setting **5,000 pulses/revolution**; therefore the encoder (theoretical) readback has
+  exactly twice the count density of the drive (reference) readback, `RawTP = 2 × RawRP`. This is why the
+  commissioned Legacy function divided TP by two — the division normalizes the encoder domain into the
+  reference (drive) domain.
+- **Classification: `PROVEN WJSS TP/RP DOMAIN-MISMATCH DEFECT`.** WJSS kept both readings raw, correctly,
+  and then compared the raw theoretical reading with the raw reference reading and with a third-domain
+  target, without first accounting for the two pulse domains. On this machine the completion predicate
+  could not be satisfied, so `MOVE_COMPLETED_POSITION_VERIFIED` was unreachable.
+- **Correction.** One shared helper, `ManualMotionPulseDomain`, named the two physical values and derived
+  the density from them; the completion predicate now normalizes each observation into the reference
+  domain (`rawTheoretical × DrivePulsesPerRevolution / EncoderPulsesPerRevolution`) before the existing
+  tolerance comparison. No unexplained `/ 2` exists in the Product. Both raw observations are preserved
+  and independently published, no reading is aliased or fabricated, and the `PA` command path is
+  untouched.
+- **Diagnostics.** The H1 surface distinguishes `TPraw`, `RPraw`, `TPnorm`, `RPnorm`, the comparison
+  target and the tolerance; the Manual Motion grid shows each raw reading beside its normalized operand
+  and states which domain each is in; an active Move publishes `ComparisonTarget` /
+  `ComparisonTolerance`.
+- **Fail-closed preserved.** A Move whose normalized operands still disagree beyond the tolerance ends
+  with the new typed code `MOVE_REFUSED_TP_RP_DOMAIN_DISAGREEMENT` (mapped into the timeout supervisor
+  family, where it always belongs, with the specific code carried in the evidence), the first primary
+  failure is preserved, the point never verifies or advances, and the existing bounded Stop, Brake and
+  cleanup are unchanged.
+- **Superseded.** The block-1 request for inferred counts-per-millimetre confirmation is withdrawn; the
+  correction is built only from the two confirmed pulses-per-revolution values.
+- **One item left open, outside this correction.** On the Owner's evidence the two normalized operands
+  now agree with each other, but both remain an exact factor of ten from the native command target. That
+  factor is the drive's command-to-feedback relationship; it is not one of the confirmed pulse values, it
+  is absent from the Legacy pack and absent from WJSS, so it is neither guessed nor applied. A Hardware
+  re-trial on this head will show the operands agreeing and will still fail the target comparison unless
+  that value is supplied — recorded in the investigation record §12.5.
+- **Validation.** Node boundary scan `0 findings (S1-S9 clean)`; boundary self-tests `33/33`;
+  `git diff --check` clean. `.NET` **NOT RUN**; **HARDWARE NOT EXECUTED**. An exact-head Hardware re-trial
+  remains required after the Owner-local software gate.
+
 ### 2026-10-27 — H1 physical-Hardware TP/RP discrepancy investigation, block 1 (report only; no Source change; no Hardware authorization)
 
 **Status: DETERMINATION COMMITTED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`), on top of

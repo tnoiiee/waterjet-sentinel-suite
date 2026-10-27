@@ -856,6 +856,115 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.True(lastPointTarget < firstCentreTarget, "the Centre Move must follow every P1–P6 Move");
     }
 
+    // ----------------------------------------------------------------------------------------
+    // Confirmed pulse-domain normalization inside the H1 path (Owner-confirmed 2026-10-27).
+    //
+    // The two position readbacks are 2:1 apart by construction, so a point can only verify once the
+    // theoretical operand has been normalized into the reference (drive) domain. These tests prove the
+    // normalization is what gates P1, that a failed P1 never reaches P2, and that the verified P1-P6 and
+    // Centre behaviour is unchanged.
+    // ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Horizontal_P1_Observations_Agree_In_The_Comparison_Domain_After_Normalization()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        Assert.True(harness.CommissionThenStartPath().Started);
+
+        // Stop the run at the instant the path verifies its first point, so the published readings are
+        // P1's own observations.
+        harness.DriveUntil(() => harness.Coordinator.Current?.VerifiedLedger.Count >= 1);
+
+        var p1 = harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points[0];
+        var axis = harness.Session.Snapshot.Axes.First(a => a.AxisLetter == harness.Resolution.Resolution!.HorizontalAxisId);
+        var tolerance = harness.Profile.AxisA!.PositionTolerance!.Value;
+
+        // Raw readings are still 2:1 apart: the encoder domain is intact and nothing was overwritten.
+        Assert.Equal(axis.PositionRp.Value * 2m, axis.PositionTp.Value);
+
+        // Normalized, the horizontal P1 observation sits on the commanded target.
+        Assert.True(Math.Abs((axis.PositionTpNormalized ?? decimal.MinValue) - p1.HorizontalNative) <= tolerance);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? decimal.MinValue) - p1.HorizontalNative) <= tolerance);
+    }
+
+    [Fact]
+    public void Vertical_P1_Observations_Agree_In_The_Comparison_Domain_After_Normalization()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        Assert.True(harness.CommissionThenStartPath().Started);
+
+        harness.DriveUntil(() => harness.Coordinator.Current?.VerifiedLedger.Count >= 1);
+
+        var p1 = harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points[0];
+        var axis = harness.Session.Snapshot.Axes.First(a => a.AxisLetter == harness.Resolution.Resolution!.VerticalAxisId);
+        var tolerance = harness.Profile.AxisB!.PositionTolerance!.Value;
+
+        Assert.Equal(axis.PositionRp.Value * 2m, axis.PositionTp.Value);
+        Assert.True(Math.Abs((axis.PositionTpNormalized ?? decimal.MinValue) - p1.VerticalNative) <= tolerance);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? decimal.MinValue) - p1.VerticalNative) <= tolerance);
+    }
+
+    [Fact]
+    public void A_Point_Whose_Readbacks_Are_In_One_Domain_Fails_At_P1_And_Never_Commands_P2()
+    {
+        // The horizontal axis reports both readbacks in one domain, which contradicts the confirmed
+        // relationship: TP normalizes to half the target while RP sits on it, so P1 cannot verify.
+        var harness = new H1DryCommissioningHarness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { EncoderCountsPerDriveCount = 1 },
+        });
+        harness.OpenAndObserve();
+        Assert.True(harness.CommissionThenStartPath().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunFailedPathExecution, result.Code);
+
+        // No point was verified, and the failure is attributed rather than swallowed.
+        Assert.Empty(result.VerifiedLedger);
+        Assert.NotNull(result.PrimaryFailureCode);
+
+        // No point after P1 was ever commanded: no absolute move carries a P2 to P6 target on either axis.
+        var points = harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points;
+        var laterTargets = new HashSet<int>();
+        for (var index = 1; index < points.Count; index++)
+        {
+            laterTargets.Add(points[index].HorizontalNative);
+            laterTargets.Add(points[index].VerticalNative);
+        }
+
+        var absolute = harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute);
+        Assert.NotEmpty(absolute);
+        foreach (var command in absolute)
+        {
+            Assert.False(
+                laterTargets.Contains(command.Operand),
+                "an absolute move was dispatched for a point after the failed P1");
+        }
+    }
+
+    [Fact]
+    public void The_Verified_P1_To_P6_Run_And_The_Centre_Return_Are_Unchanged_By_The_Normalization()
+    {
+        var harness = RunFullSuccess();
+        var result = harness.Coordinator.Result!;
+
+        Assert.Equal(H1DryCommissioningPhase.Completed, result.TerminalPhase);
+        Assert.Equal(6, result.VerifiedLedger.Count);
+        Assert.Equal(
+            harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points.Select(point => point.PointId).ToArray(),
+            result.VerifiedLedger.ToArray());
+
+        var centre = result.CentreReturn!;
+        Assert.Equal(CleaningPathUnits.SafeReturnCentre.HorizontalNative, centre.HorizontalTargetNative);
+        Assert.Equal(CleaningPathUnits.SafeReturnCentre.VerticalNative, centre.VerticalTargetNative);
+        Assert.True(centre.Horizontal.Verified);
+        Assert.True(centre.Vertical.Verified);
+    }
+
     [Fact]
     public void Centre_Targets_Exactly_The_Fixed_Centre_Contract()
     {

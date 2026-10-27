@@ -356,6 +356,11 @@ public sealed class ManualMotionCleaningPathBoundary : ICleaningPathMotionBounda
     {
         ManualMotionCodes.OperationStarted => CleaningPathMotionOutcome.OperationStarted,
         ManualMotionCodes.MoveCompletedPositionVerified => CleaningPathMotionOutcome.MoveCompletedPositionVerified,
+        // The domain-disagreement code is only ever assigned when a Move reached its own motion timeout,
+        // so it belongs to the timeout supervisor family and every cleanup, refusal and fail-closed path
+        // that a timeout takes is exactly the right path for it. The more specific code still travels
+        // beside the outcome in the evidence (SourceCode / FailureSourceCode), so nothing is lost.
+        ManualMotionCodes.MoveRefusedTpRpDomainDisagreement => CleaningPathMotionOutcome.MoveTimeout,
         ManualMotionCodes.MoveTimeout => CleaningPathMotionOutcome.MoveTimeout,
         ManualMotionCodes.MoveAbortedByOperator => CleaningPathMotionOutcome.MoveAbortedByOperator,
         ManualMotionCodes.MoveAbortedSessionClosing => CleaningPathMotionOutcome.MoveAbortedSessionClosing,

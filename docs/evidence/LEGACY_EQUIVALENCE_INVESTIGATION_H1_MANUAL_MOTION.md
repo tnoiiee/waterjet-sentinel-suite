@@ -794,3 +794,95 @@ scale factor.
 For completeness, and unchanged by this section: no Product Source, test or configuration was modified
 by block 1; the exact Legacy identifiers, the exact expression and the exact call sites are reported to
 the Owner outside this document, in keeping with §10 and the public-repository boundary.
+
+---
+
+## 12. Owner-confirmed pulse-domain relationship and the authorized correction (2026-10-27)
+
+Owner-supplied, on the record, and **final** — these are the exact values the correction is built on:
+
+| Fact | Value |
+| --- | --- |
+| Physical encoder resolution | **10,000 pulses per revolution** |
+| Stepping-drive pulses-per-revolution setting | **5,000 pulses per revolution** |
+| Resulting relationship between the readbacks | the encoder (theoretical) domain has exactly **twice** the count density of the stepping-drive (reference) domain, so **RawTP = 2 × RawRP** |
+| Why the commissioned Legacy function divided TP by two | exactly this: the division normalizes the encoder-domain theoretical reading into the reference (drive) domain |
+
+### 12.1 What the Legacy division was
+
+`ComparisonTP = RawTP × DrivePulsesPerRevolution / EncoderPulsesPerRevolution = RawTP × 5,000 / 10,000 = RawTP / 2`
+and `ComparisonRP = RawRP`. The Legacy `/ 2` was therefore never an arbitrary constant or a display
+convenience: it was the rational normalization of one reading into the other's domain, encoded as a
+literal because the Legacy source had no named pulse-domain values to express it with.
+
+### 12.2 The defect, as classified
+
+**`PROVEN WJSS TP/RP DOMAIN-MISMATCH DEFECT`.** WJSS preserved both readings raw — a correct decision —
+and then compared the **raw** theoretical reading with the **raw** reference reading and with a target in
+a third domain, without first accounting for the different pulse domains. On this machine that
+comparison cannot be satisfied, so `MOVE_COMPLETED_POSITION_VERIFIED` was unreachable and every Move fell
+to its timeout.
+
+This supersedes §11.6's stated class (`inseparable position-domain defect`) as the **name** of the defect.
+§11.6's underlying findings are unchanged and still hold: the readings are 2:1 apart, the command
+amplitude is Legacy-equivalent and is not the defect, and the defect is not a parse, render or formatting
+artefact. §11.11's scale-independence argument applied to the **pre-normalization** predicate and is
+resolved by normalizing one operand into the other's domain, which is exactly what the confirmed values
+now authorize.
+
+### 12.3 Superseded request
+
+§11.10 asked the Owner to confirm inferred counts-per-millimetre values. **That request is superseded and
+withdrawn.** The correction is built from the two confirmed pulses-per-revolution values above, through
+the exact rational relationship, and no counts-per-millimetre value is needed, requested or assumed.
+
+### 12.4 What was implemented (single shared rule)
+
+| Requirement | Implementation |
+| --- | --- |
+| Raw readings preserved independently | the two observations are still stored, published and shown raw; nothing is overwritten or aliased |
+| Explicitly named pulse-domain normalization | `ManualMotionPulseDomain` with `EncoderPulsesPerRevolution = 10,000`, `DrivePulsesPerRevolution = 5,000`, and the density **derived** from them |
+| Exact rational relationship, no unexplained `/ 2` | `NormalizeTheoretical(raw) = raw × DrivePulsesPerRevolution / EncoderPulsesPerRevolution`; `NormalizeReference(raw) = raw`, written out rather than implied |
+| Completion requires both normalized operands within tolerance of the target | `MoveReached` normalizes each observation before `WithinTolerance` |
+| Target and tolerance in one domain | `op.Target` and `op.Tolerance` are unchanged and are published per active Move as `ComparisonTarget` / `ComparisonTolerance` beside the normalized operands |
+| One shared implementation for standalone Move, H1 P1–P6, Centre return, and axes A–D | the rule lives in the session's single completion predicate; every caller and every axis passes through it |
+| Fail closed, block advancement, preserve the first failure, keep bounded Stop/Brake/cleanup | a Move that ends with the normalized operands still disagreeing is reported as `MOVE_REFUSED_TP_RP_DOMAIN_DISAGREEMENT` through the unchanged timeout/Stop/brake/cleanup path; the point never verifies and never advances |
+| Fresh post-Move readings still required | unchanged: currency, freshness and the Begin watermark are all still required |
+| Diagnostics distinguish the six values | the H1 surface shows `TPraw`, `RPraw`, `TPnorm`, `RPnorm`, `target` and `tol`; the Manual Motion grid shows the raw value and appends its normalized operand with its domain |
+| PA generation untouched | no command path was modified; a test pins that the dispatched operand is exactly the requested native target |
+
+**Unchanged and deliberately so:** the Home-carried `DP` then `DE` pair, the fresh TP/RP zero
+verification, Run Path without Home, the P1→P6 order, the fixed 125/125 Centre, and every Brake, Stop,
+Abort and Close behaviour.
+
+### 12.5 One remaining item, stated exactly — outside this correction
+
+The confirmed relationship closes the **theoretical-versus-reference** half of the comparison. It does
+not, by itself, close the **reading-versus-target** half, and the Owner's own evidence shows why:
+
+| Quantity | Owner evidence, expressed in counts | Relation to the native command target |
+| --- | --- | --- |
+| `RawTP` | 2 × `RawRP` | — |
+| `ComparisonTP` = `RawTP / 2` | equals `RawRP` to within the settling residual | 10 × the native target |
+| `ComparisonRP` | the reference reading | 10 × the native target |
+| Commanded target (180 mm × 10,000/mm) | the `PA` operand actually dispatched | 1 × |
+
+So after this correction the two operands finally agree **with each other**, which is the defect named
+in §12.2 and the whole of what the confirmed values authorize. They still sit an exact **factor of ten**
+away from the target the Product commands and compares against. That factor is a property of the drive's
+command-to-feedback relationship (an electronic-gearing or count-multiplication setting) — it is **not**
+one of the two confirmed pulses-per-revolution values, it appears nowhere in the Legacy pack, and it
+appears nowhere in WJSS. It is therefore **not** guessed here, **not** applied here and **not** folded
+into the tolerance.
+
+Consequence, stated plainly: a Hardware re-trial on this head will show the normalized operands agreeing
+and will still fail the target comparison at P1 unless that one drive setting is supplied. Two
+consequences belong with it, because they are inseparable: the configured `positionTolerance` is in native
+units, so if the comparison is moved into the feedback domain the tolerance must move with it; and no
+further correction is written until the Owner rules on that single value.
+
+### 12.6 Hardware
+
+**HARDWARE NOT EXECUTED in this pass.** No native load, no controller contact, no command dispatched. An
+exact-head Hardware re-trial remains **required** after Software validation, and its result is the only
+evidence that this correction works on the machine.

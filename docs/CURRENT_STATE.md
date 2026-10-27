@@ -1,5 +1,28 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **TP/RP pulse-domain normalization (2026-10-27; Owner-confirmed physical relationship; software only;
+> HARDWARE NOT EXECUTED; supersedes the block-1 banner below wherever that banner describes the defect as
+> unresolved or the counts-per-millimetre confirmation as outstanding).** The Owner confirmed the physical
+> relationship: encoder **10,000 pulses/revolution**, stepping-drive setting **5,000 pulses/revolution**,
+> so the encoder (theoretical) readback has exactly twice the count density of the drive (reference)
+> readback — `RawTP = 2 × RawRP` — which is precisely why the commissioned Legacy function divided TP by
+> two. Classification: **`PROVEN WJSS TP/RP DOMAIN-MISMATCH DEFECT`**: WJSS kept both readings raw
+> (correct) and then compared them without first accounting for their different pulse domains. Corrected
+> with **one shared rule** (`ManualMotionPulseDomain`) that derives the density from the two confirmed
+> values and normalizes each observation into the reference domain before the existing tolerance
+> comparison — no unexplained `/ 2`, both raw readings preserved and independently published, no alias or
+> fabricated fallback, `PA` generation untouched, Home `DP`→`DE`, fresh zero verification, Run Path
+> without Home, P1→P6, the 125/125 Centre and every Brake/Stop/Abort/Close behaviour unchanged. A Move
+> whose normalized operands still disagree fails closed with `MOVE_REFUSED_TP_RP_DOMAIN_DISAGREEMENT` and
+> never verifies or advances. Diagnostics distinguish `TPraw`, `RPraw`, `TPnorm`, `RPnorm`, the comparison
+> target and the tolerance. **One item is left open and is NOT guessed:** on the Owner's evidence the two
+> normalized operands now agree with each other but both remain an exact factor of ten from the native
+> command target — a drive command-to-feedback property that is not one of the confirmed pulse values and
+> appears in neither the Legacy pack nor WJSS, so a Hardware re-trial on this head will still fail the
+> target comparison until that value is supplied (investigation record §12.5). The withdrawn request for
+> inferred counts-per-millimetre confirmation is superseded. `.NET` NOT RUN; HARDWARE NOT EXECUTED; an
+> exact-head Hardware re-trial remains required after the Owner-local software gate.
+
 > **H1 physical-Hardware TP/RP discrepancy investigation, block 1 (2026-10-27; REPORT ONLY; no Source
 > change; HARDWARE NOT EXECUTED in this pass; supersedes no code statement below).** The Owner's
 > Hardware evidence is not a tolerance or display effect and is not a residual of the Home-carried

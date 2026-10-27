@@ -15,6 +15,251 @@ public sealed class ManualMotionSessionTests
 {
     private static readonly DateTimeOffset Instant = new(2026, 10, 18, 0, 0, 0, TimeSpan.Zero);
 
+    // ----------------------------------------------------------------------------------------
+    // Confirmed pulse-domain normalization (Owner-confirmed 2026-10-27).
+    //
+    // Physical encoder resolution 10,000 pulses/rev; stepping-drive setting 5,000 pulses/rev; the
+    // encoder (theoretical) readback therefore carries exactly twice the count density of the drive
+    // (reference) readback, RawTP = 2 x RawRP. The comparison operand is
+    //   RawTP * DrivePulsesPerRevolution / EncoderPulsesPerRevolution
+    // and RawRP is unchanged. These tests pin the relationship, the exact Owner evidence arithmetic,
+    // and every fail-closed path that depends on it.
+    // ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_Confirmed_Pulse_Per_Revolution_Values_Are_The_Single_Source_Of_The_Normalization()
+    {
+        Assert.Equal(10000, ManualMotionPulseDomain.EncoderPulsesPerRevolution);
+        Assert.Equal(5000, ManualMotionPulseDomain.DrivePulsesPerRevolution);
+
+        // The density is derived from the two physical values, so it can never disagree with them.
+        Assert.Equal(
+            ManualMotionPulseDomain.EncoderPulsesPerRevolution / ManualMotionPulseDomain.DrivePulsesPerRevolution,
+            ManualMotionPulseDomain.EncoderCountsPerDriveCount);
+        Assert.Equal(2, ManualMotionPulseDomain.EncoderCountsPerDriveCount);
+
+        // The normalization is the exact rational relationship, not a literal divisor.
+        Assert.Equal(
+            7m,
+            ManualMotionPulseDomain.NormalizeTheoretical(14m));
+        var expected = 35999997m * ManualMotionPulseDomain.DrivePulsesPerRevolution / ManualMotionPulseDomain.EncoderPulsesPerRevolution;
+        Assert.Equal(expected, ManualMotionPulseDomain.NormalizeTheoretical(35999997m));
+    }
+
+    [Theory]
+    [InlineData(35999997L, "17999998.5")] // the Owner's Horizontal evidence
+    [InlineData(39999997L, "19999998.5")] // the Owner's Vertical evidence
+    public void A_Raw_Theoretical_Reading_Normalizes_Into_The_Reference_Domain(long rawTheoretical, string expectedText)
+    {
+        var expected = decimal.Parse(expectedText, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(expected, ManualMotionPulseDomain.NormalizeTheoretical(rawTheoretical));
+    }
+
+    [Theory]
+    [InlineData(18000000L)]
+    [InlineData(20000000L)]
+    public void A_Raw_Reference_Reading_Is_Unchanged_By_Normalization(long rawReference)
+    {
+        Assert.Equal((decimal)rawReference, ManualMotionPulseDomain.NormalizeReference(rawReference));
+    }
+
+    [Theory]
+    [InlineData(35999997L, 18000000L)] // Horizontal P1 evidence
+    [InlineData(39999997L, 20000000L)] // Vertical P1 evidence
+    public void The_Owner_Evidence_Pair_Agrees_Within_The_Configured_Tolerance_Only_After_Normalization(
+        long rawTheoretical,
+        long rawReference)
+    {
+        var tolerance = ManualMotionProfile.CreateSimulationProfile().AxisA!.PositionTolerance!.Value;
+
+        var normalizedTheoretical = ManualMotionPulseDomain.NormalizeTheoretical(rawTheoretical);
+        var normalizedReference = ManualMotionPulseDomain.NormalizeReference(rawReference);
+
+        // The two raw readings can never agree: they are 2:1 apart by construction.
+        Assert.False(ManualMotionPulseDomain.DomainsAgree(rawTheoretical, rawReference, tolerance));
+
+        // Normalized, they agree to one and a half counts, which is inside the tolerance.
+        Assert.True(ManualMotionPulseDomain.DomainsAgree(normalizedTheoretical, normalizedReference, tolerance));
+        Assert.Equal(1.5m, Math.Abs(normalizedTheoretical - normalizedReference));
+    }
+
+    [Fact]
+    public void Both_Raw_Readings_Are_Published_Independently_And_Neither_Is_An_Alias_Of_The_Other()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(24000m, axis.PositionTp.Value);
+        Assert.Equal(12000m, axis.PositionRp.Value);
+
+        // No aliasing: the two raw observations are different values from two separate reads.
+        Assert.NotEqual(axis.PositionTp.Value, axis.PositionRp.Value);
+
+        // The normalized operands are derived from their own raw observation and from nothing else.
+        Assert.Equal(ManualMotionPulseDomain.NormalizeTheoretical(axis.PositionTp.Value!.Value), axis.PositionTpNormalized);
+        Assert.Equal(ManualMotionPulseDomain.NormalizeReference(axis.PositionRp.Value!.Value), axis.PositionRpNormalized);
+
+        // The raw theoretical observation is never overwritten by its normalized form.
+        Assert.NotEqual(axis.PositionTp.Value, axis.PositionTpNormalized);
+    }
+
+    [Fact]
+    public void A_Refused_Theoretical_Read_Publishes_No_Normalized_Value_And_Is_Never_Filled_From_The_Reference_Read()
+    {
+        var harness = new Harness(new ManualMotionSimulationOptions { RefuseReadKind = ManualMotionReadKind.PositionTp });
+        harness.OpenAndObserve();
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Null(axis.PositionTp.Value);
+        Assert.Null(axis.PositionTpNormalized);
+
+        // The reference observation is still published on its own: nothing was fabricated for TP from it.
+        Assert.NotNull(axis.PositionRp.Value);
+        Assert.NotNull(axis.PositionRpNormalized);
+    }
+
+    [Fact]
+    public void A_Controller_Whose_Readbacks_Share_One_Domain_Fails_Point_Completion_Even_When_It_Reaches_The_Target()
+    {
+        // A 1:1 controller contradicts the confirmed relationship: TP is not the encoder-domain value, so
+        // after normalization it sits at half the target while the reference read sits at the target.
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { EncoderCountsPerDriveCount = 1 },
+        });
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null, maximumSteps: 2000);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+
+        // The axis arrived and is not moving: inactivity alone did not complete the point.
+        Assert.Equal(ManualMotionInterpretation.Inactive, axis.Motion);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? 99999m) - -5000m) <= 2m);
+
+        // The theoretical operand is in the wrong domain, so completion is refused ...
+        Assert.False(Math.Abs((axis.PositionTpNormalized ?? 99999m) - -5000m) <= 2m);
+        Assert.NotEqual(ManualMotionCodes.MoveCompletedPositionVerified, axis.LastOutcomeCode);
+
+        // ... and the two normalized operands disagreeing with each other is reported as its own failure.
+        Assert.Equal(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, axis.LastOutcomeCode);
+    }
+
+    [Fact]
+    public void A_Target_That_Is_Not_Reached_Fails_Even_When_Both_Normalized_Readings_Agree_With_Each_Other()
+    {
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { MotionStalled = true },
+        });
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null, maximumSteps: 2000);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+
+        // The two normalized operands agree with each other ...
+        Assert.True(ManualMotionPulseDomain.DomainsAgree(
+            axis.PositionTpNormalized!.Value,
+            axis.PositionRpNormalized!.Value,
+            2));
+
+        // ... and the point still does not complete, because the target is what both disagree with.
+        Assert.False(Math.Abs(axis.PositionRpNormalized.Value - -5000m) <= 2m);
+        Assert.NotEqual(ManualMotionCodes.MoveCompletedPositionVerified, axis.LastOutcomeCode);
+
+        // Mutual agreement therefore reports the ordinary supervision outcome, not the domain code.
+        Assert.NotEqual(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, axis.LastOutcomeCode);
+    }
+
+    [Fact]
+    public void A_Stale_Theoretical_Reading_Cannot_Satisfy_Point_Completion()
+    {
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { RefuseReadKindWhileMoving = ManualMotionReadKind.PositionTp },
+        });
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null, maximumSteps: 2000);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.False(axis.PositionTp.Fresh);
+        Assert.NotEqual(ManualMotionCodes.MoveCompletedPositionVerified, axis.LastOutcomeCode);
+    }
+
+    [Theory]
+    [InlineData(ManualMotionAxis.A, -5000)]
+    [InlineData(ManualMotionAxis.B, 3000)]
+    [InlineData(ManualMotionAxis.C, 2500)]
+    [InlineData(ManualMotionAxis.D, -1500)]
+    public void Every_Axis_Uses_The_Same_Shared_Normalization_Before_Comparison(ManualMotionAxis axis, int target)
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+        harness.HomeAxis(axis);
+
+        harness.Session.RequestMove(axis, target);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, axis) is null
+                && snapshot.Axes[(int)axis - 1].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+
+        var snapshot = harness.Axis(axis);
+
+        // Raw readings keep their own domains: the theoretical value is still the encoder-domain count.
+        Assert.Equal(snapshot.PositionRp.Value * 2m, snapshot.PositionTp.Value);
+
+        // The comparison operands are in one domain and both sit on the target.
+        Assert.Equal(snapshot.PositionRp.Value, snapshot.PositionRpNormalized);
+        Assert.Equal(snapshot.PositionTp.Value / 2m, snapshot.PositionTpNormalized);
+        Assert.True(Math.Abs((snapshot.PositionTpNormalized ?? 99999m) - target) <= 2m);
+        Assert.True(Math.Abs((snapshot.PositionRpNormalized ?? 99999m) - target) <= 2m);
+    }
+
+    [Fact]
+    public void The_Comparison_Target_And_Tolerance_Are_Published_In_The_Comparison_Domain()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A)?.Phase == ManualMotionOperationPhase.Running);
+
+        var operation = ActiveOf(harness.Snapshot, ManualMotionAxis.A)!;
+        Assert.Equal(-5000, operation.ComparisonTarget!.Value);
+        Assert.Equal(2, operation.ComparisonTolerance!.Value);
+    }
+
+    [Fact]
+    public void The_Pulse_Domain_Normalization_Never_Changes_The_Command_Operand()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+        var before = harness.Port.ExecutedCommands.Count;
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null);
+
+        var absolute = harness.Port.ExecutedCommands
+            .Skip(before)
+            .Where(command => command.Kind == ManualMotionPortCommandKind.PositionAbsolute)
+            .ToList();
+
+        // Exactly one absolute command, carrying the requested native target unchanged: normalization is a
+        // read-side comparison rule and never rewrites the command amplitude.
+        Assert.Single(absolute);
+        Assert.Equal(-5000, absolute[0].Operand);
+    }
+
     private sealed class FakePort : IManualMotionPort
     {
         internal long Generation { get; init; } = 1;
@@ -468,10 +713,24 @@ public sealed class ManualMotionSessionTests
         Assert.Equal("Vertical", harness.Axis(ManualMotionAxis.D).RoleLabel);
         Assert.True(harness.Axis(ManualMotionAxis.A).AllowedByProfile);
         Assert.True(harness.Axis(ManualMotionAxis.A).PositionTp.Fresh);
-        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
-        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionTp.Value);
-        Assert.Equal(5000m, harness.Axis(ManualMotionAxis.C).PositionTp.Value);
-        Assert.Equal(-3000m, harness.Axis(ManualMotionAxis.D).PositionTp.Value);
+        // The simulated controller models the Owner-confirmed 2:1 pulse-domain relationship, so every
+        // raw theoretical reading carries the encoder-domain density while the reference reading does not.
+        // Both the raw observation and its normalized comparison operand are published, and neither is
+        // derived from the other at publication time beyond the stated normalization.
+        Assert.Equal(24000m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+        Assert.Equal(-16000m, harness.Axis(ManualMotionAxis.B).PositionTp.Value);
+        Assert.Equal(10000m, harness.Axis(ManualMotionAxis.C).PositionTp.Value);
+        Assert.Equal(-6000m, harness.Axis(ManualMotionAxis.D).PositionTp.Value);
+        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionTpNormalized);
+        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionTpNormalized);
+        Assert.Equal(5000m, harness.Axis(ManualMotionAxis.C).PositionTpNormalized);
+        Assert.Equal(-3000m, harness.Axis(ManualMotionAxis.D).PositionTpNormalized);
+        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionRp.Value);
+        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionRp.Value);
+        Assert.Equal(5000m, harness.Axis(ManualMotionAxis.C).PositionRp.Value);
+        Assert.Equal(-3000m, harness.Axis(ManualMotionAxis.D).PositionRp.Value);
+        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionRpNormalized);
+        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionRpNormalized);
 
         // The snapshot carries the four axes in the stable A, B, C, D order with the canonical
         // catalogue identity of each axis (A/B serve WJ1, C/D serve WJ2, all on WSB1).
@@ -1084,8 +1343,12 @@ public sealed class ManualMotionSessionTests
             && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
 
         var axis = harness.Axis(ManualMotionAxis.B);
-        Assert.True(Math.Abs((axis.PositionTp.Value ?? 99999m) - -3000m) <= 2m);
-        Assert.True(Math.Abs((axis.PositionRp.Value ?? 99999m) - -3000m) <= 2m);
+        Assert.True(Math.Abs((axis.PositionTpNormalized ?? 99999m) - -3000m) <= 2m);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? 99999m) - -3000m) <= 2m);
+
+        // The raw theoretical observation is still the encoder-domain value: it is the normalized
+        // operand, not the raw one, that lives in the target's domain.
+        Assert.True(Math.Abs((axis.PositionTp.Value ?? 99999m) - -6000m) <= 2m);
         Assert.Equal(
             new[]
             {
@@ -1833,8 +2096,8 @@ public sealed class ManualMotionSessionTests
 
         Assert.Equal(ManualMotionCodes.MoveCompletedPositionVerified, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
         Assert.Equal(ManualMotionCodes.MoveCompletedPositionVerified, harness.Axis(ManualMotionAxis.B).LastOutcomeCode);
-        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.A).PositionTp.Value ?? 99999m) - -5000m) <= 2m);
-        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.B).PositionTp.Value ?? 99999m) - 5000m) <= 2m);
+        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.A).PositionTpNormalized ?? 99999m) - -5000m) <= 2m);
+        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.B).PositionTpNormalized ?? 99999m) - 5000m) <= 2m);
     }
 
     [Fact]

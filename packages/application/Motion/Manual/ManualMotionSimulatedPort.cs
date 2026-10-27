@@ -100,6 +100,13 @@ public sealed class ManualMotionAxisSimulationOptions
 
     /// <summary>Synthetic RP divergence added to this axis's RP reads only (TP remains the physical position).</summary>
     public decimal RpBias { get; init; }
+
+    /// <summary>
+    /// Synthetic override of the encoder-to-drive count density for this axis, in tests only. Null keeps
+    /// the Owner-confirmed relationship of <see cref="ManualMotionPulseDomain"/> (2:1); a value of 1 models
+    /// a controller whose two readbacks share one domain, which is the control case that must still pass.
+    /// </summary>
+    public int? EncoderCountsPerDriveCount { get; init; }
 }
 
 /// <summary>
@@ -614,7 +621,11 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 return true;
 
             case ManualMotionReadKind.PositionTp:
-                value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero);
+                // The theoretical (encoder) readback carries the confirmed encoder-domain count density,
+                // so the simulated controller reports the 2:1 relationship the real machine reports.
+                // Normalization before comparison is therefore exercised by every simulated Move.
+                value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero)
+                    * (axis.Options?.EncoderCountsPerDriveCount ?? ManualMotionPulseDomain.EncoderCountsPerDriveCount);
                 return true;
 
             case ManualMotionReadKind.PositionRp:

@@ -91,6 +91,14 @@ The axis workflow is deliberately ordered:
    acceleration → speed → deceleration → absolute target → Begin, followed
    by observation of inactivity and TP/RP within the configured tolerance,
    then brake apply. No relative target exists.
+   **Pulse domains.** The two position readbacks are not in the same domain:
+   the encoder (`TP`) domain carries twice the count density of the stepping-drive
+   (`RP`) domain — Owner-confirmed at 10,000 and 5,000 pulses per revolution — so the
+   theoretical reading is normalized into the reference domain
+   (`raw × drive pulses / encoder pulses`) before it is compared. Both raw readings are
+   still shown exactly as read, beside their normalized operands and the comparison
+   target and tolerance, and a Move whose normalized operands still disagree fails
+   closed rather than completing. Normalization never changes the commanded target.
 6. **Stop:** Stop pre-empts ordinary work and uses the previously approved
    typed per-axis Stop path (A/B/C/D). It is dispatch only. `StopConfirmed` is always
    false. A Stop timeout does **not** make the software invent a stopped

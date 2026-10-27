@@ -603,6 +603,14 @@ public static class ManualMotionCodes
     /// <summary>Move ended because the configured motion timeout elapsed.</summary>
     public const string MoveTimeout = "MOVE_TIMEOUT";
 
+    /// <summary>
+    /// Move ended with the two position readings still disagreeing with EACH OTHER beyond the tolerance
+    /// after both were normalized into the same reference (drive) domain. Reported separately from
+    /// <see cref="MoveTimeout"/> and <see cref="MoveCompletedPositionVerified"/> so the Operator can tell a
+    /// pulse-domain contradiction from a Move that simply did not arrive.
+    /// </summary>
+    public const string MoveRefusedTpRpDomainDisagreement = "MOVE_REFUSED_TP_RP_DOMAIN_DISAGREEMENT";
+
     /// <summary>Move ended because the Operator pressed Stop.</summary>
     public const string MoveAbortedByOperator = "MOVE_ABORTED_BY_OPERATOR";
 
@@ -638,6 +646,7 @@ public static class ManualMotionCodes
         DualZeroDispatchedEffectUnverified => "The dual-zero definition was dispatched. Its effect is UNVERIFIED.",
         HomeDualZeroRefused => "The Home-carried reset-encoder sequence was refused at its dual-zero definition. The Home failed closed and no zero was verified.",
         MoveCompletedPositionVerified => "Move completed: not moving and both position reads within the configured tolerance of the target.",
+        MoveRefusedTpRpDomainDisagreement => "Move ended with the normalized theoretical and reference positions still disagreeing beyond the tolerance. No point completed.",
         CoordinateRedefinedHomeCleared => "A manual coordinate definition cleared the session Home state of the axis.",
         _ => "See the code. No command text, reply text or native detail is recorded.",
     };

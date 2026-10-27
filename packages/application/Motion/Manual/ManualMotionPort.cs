@@ -102,3 +102,55 @@ public interface IManualMotionPort
     /// <summary>Invalidates, closes and releases. Idempotent.</summary>
     ManualMotionPortCloseResult Close();
 }
+
+/// <summary>
+/// The confirmed physical pulse-domain relationship between the two position readbacks of one axis,
+/// and the single normalization the Product applies before any comparison.
+///
+/// Owner-confirmed (2026-10-27): the physical encoder resolution is 10,000 pulses per revolution and
+/// the stepping-drive pulses-per-revolution setting is 5,000 pulses per revolution, so the theoretical
+/// (encoder) readback has exactly twice the count density of the reference (drive) readback:
+/// RawTP = 2 x RawRP. The commissioned Legacy function divided TP by two for exactly this reason, so
+/// the division it performed is the normalization this type makes explicit.
+///
+/// The normalization is the exact rational relationship between the two physical values, never a
+/// literal divisor: <c>rawTheoretical * DrivePulsesPerRevolution / EncoderPulsesPerRevolution</c>. A raw
+/// observation is never overwritten or mutated; a caller passes a raw value and receives a derived one,
+/// so the encoder-domain value and the reference-domain value remain independently available.
+/// </summary>
+public static class ManualMotionPulseDomain
+{
+    /// <summary>The Owner-confirmed physical encoder resolution, in pulses per revolution.</summary>
+    public const int EncoderPulsesPerRevolution = 10_000;
+
+    /// <summary>The Owner-confirmed stepping-drive pulses-per-revolution setting.</summary>
+    public const int DrivePulsesPerRevolution = 5_000;
+
+    /// <summary>
+    /// The encoder-domain count density relative to the reference (drive) domain. It is derived from
+    /// the two physical values, so it can never drift away from them.
+    /// </summary>
+    public const int EncoderCountsPerDriveCount = EncoderPulsesPerRevolution / DrivePulsesPerRevolution;
+
+    /// <summary>
+    /// Normalizes one raw theoretical (encoder-domain) reading into the reference (drive) domain that
+    /// the comparison target and the comparison tolerance are expressed in.
+    /// </summary>
+    public static decimal NormalizeTheoretical(decimal rawTheoretical) =>
+        rawTheoretical * DrivePulsesPerRevolution / EncoderPulsesPerRevolution;
+
+    /// <summary>
+    /// Normalizes one raw reference (drive-domain) reading. The identity is written out explicitly so
+    /// that "the reference reading is already in the reference domain" is a stated fact of the code
+    /// rather than an omission a later reader has to assume.
+    /// </summary>
+    public static decimal NormalizeReference(decimal rawReference) => rawReference;
+
+    /// <summary>
+    /// True when the two normalized values agree with EACH OTHER within the tolerance. This is a
+    /// separate question from whether either agrees with the commanded target, and the two are reported
+    /// as separate outcomes.
+    /// </summary>
+    public static bool DomainsAgree(decimal normalizedTheoretical, decimal normalizedReference, int tolerance) =>
+        Math.Abs(normalizedTheoretical - normalizedReference) <= tolerance;
+}

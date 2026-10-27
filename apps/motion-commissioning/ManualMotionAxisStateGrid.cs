@@ -80,8 +80,19 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
         DisplayObservation(StatusWordRow, axis.StatusWord, "native status bits");
         DisplayInterpretation(MotionBitRow, axis.Motion, axis.MotionInterpretationConfigured);
         DisplayInterpretation(HomeInputRow, axis.HomeInput, axis.HomeInterpretationConfigured);
-        DisplayObservation(PositionTpRow, axis.PositionTp, "native units, label unresolved");
-        DisplayObservation(PositionRpRow, axis.PositionRp, "native units, label unresolved");
+        // The two raw controller observations are shown exactly as read. The normalized theoretical value
+        // is shown beside TP because it is the value a Move is compared against, and the drive domain is
+        // stated so that no reader confuses the encoder-domain count with the reference-domain count.
+        DisplayObservation(PositionTpRow, axis.PositionTp, "raw encoder-domain count, label unresolved");
+        DisplayObservation(PositionRpRow, axis.PositionRp, "raw reference (drive)-domain count, label unresolved");
+        AppendNormalizedDetail(
+            PositionTpRow,
+            axis.PositionTpNormalized,
+            "normalized to the reference (drive) domain, the value a Move is compared against");
+        AppendNormalizedDetail(
+            PositionRpRow,
+            axis.PositionRpNormalized,
+            "already the reference (drive)-domain comparison operand");
         SetValue(HomeStateRow, axis.HomeState.ToString());
         SetValue(CoordinateRow, axis.CoordinateState.ToString());
         SetValue(DualZeroRow, axis.DualZeroState.ToString());
@@ -164,6 +175,19 @@ internal sealed class ManualMotionAxisStateGrid : TableLayoutPanel
             configured
                 ? "(Owner-attested profile bit; not vendor- or hardware-verified)"
                 : "(bit NOT_CONFIGURED)");
+    }
+
+    /// <summary>
+    /// Appends the normalized comparison operand to the detail line of an already-displayed raw reading,
+    /// so the raw value and the value the comparison uses are both on screen and cannot be confused.
+    /// </summary>
+    private void AppendNormalizedDetail(int row, decimal? normalized, string note)
+    {
+        var text = normalized is decimal value
+            ? string.Concat("normalized ", value.ToString(CultureInfo.InvariantCulture), "  ", note)
+            : string.Concat("no normalized value  ", note);
+        var current = _details[row]?.Text ?? string.Empty;
+        SetDetail(row, current.Length == 0 ? text : string.Concat(current, "  |  ", text));
     }
 
     private void SetValue(int row, string text) => SetText(_values[row], text);

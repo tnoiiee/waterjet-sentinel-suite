@@ -77,6 +77,20 @@ public sealed class ManualMotionAxisSnapshot
     /// <summary>The second raw position read (RP), label unresolved.</summary>
     public required ManualMotionReadingSnapshot PositionRp { get; init; }
 
+    /// <summary>
+    /// The theoretical reading normalized into the reference (drive) domain, or null when no theoretical
+    /// reading has ever been observed. Derived on demand from the raw observation and never written back
+    /// into it, so the raw encoder-domain value above and this normalized value are both published.
+    /// </summary>
+    public decimal? PositionTpNormalized { get; init; }
+
+    /// <summary>
+    /// The reference reading expressed in the reference (drive) domain. It is the identity of the raw
+    /// reference observation, published explicitly so that both comparison operands appear next to the
+    /// comparison target and the comparison tolerance.
+    /// </summary>
+    public decimal? PositionRpNormalized { get; init; }
+
     /// <summary>The session Home state.</summary>
     public required ManualMotionHomeState HomeState { get; init; }
 
@@ -122,6 +136,16 @@ public sealed class ManualMotionOperationSnapshot
 
     /// <summary>True once a typed Stop was requested for this operation.</summary>
     public required bool StopRequested { get; init; }
+
+    /// <summary>
+    /// The comparison target, in the reference (drive) domain, for a Position Move; null for every other
+    /// operation kind. The tolerance beside it is expressed in the same domain, so a reader can check the
+    /// comparison the session actually performs without recomputing it.
+    /// </summary>
+    public int? ComparisonTarget { get; init; }
+
+    /// <summary>The comparison tolerance in the reference (drive) domain; null for a non-Move operation.</summary>
+    public int? ComparisonTolerance { get; init; }
 }
 
 /// <summary>One redacted session log entry: codes and fixed texts only.</summary>

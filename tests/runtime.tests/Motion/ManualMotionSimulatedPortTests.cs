@@ -19,11 +19,40 @@ public sealed class ManualMotionSimulatedPortTests
         int operand = 0,
         int brakeOutput = 0) => new(kind, axis, operand, brakeOutput);
 
-    private static decimal ReadTp(ManualMotionSimulatedPort port, ManualMotionAxis axis = ManualMotionAxis.A)
+    [Fact]
+    public void The_Simulated_Controller_Reports_The_Confirmed_Two_To_One_Pulse_Domain_Relationship()
+    {
+        var port = new ManualMotionSimulatedPort(new TestClock(Instant), ManualMotionProfile.CreateSimulationProfile());
+        Assert.True(port.Open().Opened);
+
+        foreach (var axis in new[] { ManualMotionAxis.A, ManualMotionAxis.B, ManualMotionAxis.C, ManualMotionAxis.D })
+        {
+            var theoretical = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
+            var reference = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
+
+            Assert.True(theoretical.Succeeded);
+            Assert.True(reference.Succeeded);
+
+            // Encoder (theoretical) counts are exactly twice the drive (reference) counts on every axis.
+            Assert.Equal(
+                reference.Value * ManualMotionPulseDomain.EncoderCountsPerDriveCount,
+                theoretical.Value);
+
+            // Normalizing the theoretical reading reproduces the reference reading exactly.
+            Assert.Equal(reference.Value, ManualMotionPulseDomain.NormalizeTheoretical(theoretical.Value));
+        }
+    }
+
+    /// <summary>
+    /// The simulated axis's theoretical reading expressed in the reference (drive) domain, which is the
+    /// domain the position assertions in this file are written in. The raw encoder-domain value is the
+    /// confirmed 2:1 multiple of it; that relationship is pinned separately below.
+    /// </summary>
+    private static decimal ReadTpInReferenceDomain(ManualMotionSimulatedPort port, ManualMotionAxis axis = ManualMotionAxis.A)
     {
         var result = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
         Assert.True(result.Succeeded);
-        return result.Value;
+        return ManualMotionPulseDomain.NormalizeTheoretical(result.Value);
     }
 
     private static ManualMotionProfile ClearOutputProfile()
@@ -102,11 +131,11 @@ public sealed class ManualMotionSimulatedPortTests
         port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, operand: 2000));
         port.Execute(Command(ManualMotionPortCommandKind.Begin));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(12000m, ReadTp(port));
+        Assert.Equal(12000m, ReadTpInReferenceDomain(port));
 
         port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, brakeOutput: 1));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(14000m, ReadTp(port));
+        Assert.Equal(14000m, ReadTpInReferenceDomain(port));
     }
 
     [Fact]
@@ -125,11 +154,11 @@ public sealed class ManualMotionSimulatedPortTests
         port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, operand: 2000));
         port.Execute(Command(ManualMotionPortCommandKind.Begin));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(12000m, ReadTp(port));
+        Assert.Equal(12000m, ReadTpInReferenceDomain(port));
 
         port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputClear, brakeOutput: 1));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(14000m, ReadTp(port));
+        Assert.Equal(14000m, ReadTpInReferenceDomain(port));
     }
 
     [Fact]
@@ -142,11 +171,11 @@ public sealed class ManualMotionSimulatedPortTests
         port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, operand: 2000));
         port.Execute(Command(ManualMotionPortCommandKind.Begin));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(14000m, ReadTp(port));
+        Assert.Equal(14000m, ReadTpInReferenceDomain(port));
 
         port.Execute(Command(ManualMotionPortCommandKind.Stop));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(14000m, ReadTp(port));
+        Assert.Equal(14000m, ReadTpInReferenceDomain(port));
 
         var ignoringClock = new TestClock(Instant);
         var ignoring = new ManualMotionSimulatedPort(
@@ -160,7 +189,7 @@ public sealed class ManualMotionSimulatedPortTests
         ignoringClock.Advance(TimeSpan.FromSeconds(1));
         ignoring.Execute(Command(ManualMotionPortCommandKind.Stop));
         ignoringClock.Advance(TimeSpan.FromSeconds(1));
-        Assert.True(ReadTp(ignoring) > 14000m);
+        Assert.True(ReadTpInReferenceDomain(ignoring) > 14000m);
     }
 
     [Fact]
@@ -189,7 +218,7 @@ public sealed class ManualMotionSimulatedPortTests
         var port = new ManualMotionSimulatedPort(clock, ManualMotionProfile.CreateSimulationProfile());
         port.Open();
         port.Execute(Command(ManualMotionPortCommandKind.DefinePositionZero));
-        Assert.Equal(0m, ReadTp(port));
+        Assert.Equal(0m, ReadTpInReferenceDomain(port));
 
         var ignoring = new ManualMotionSimulatedPort(
             new TestClock(Instant),
@@ -197,7 +226,7 @@ public sealed class ManualMotionSimulatedPortTests
             new ManualMotionSimulationOptions { ZeroDefinitionIgnored = true });
         ignoring.Open();
         ignoring.Execute(Command(ManualMotionPortCommandKind.DefinePositionZero));
-        Assert.Equal(12000m, ReadTp(ignoring));
+        Assert.Equal(12000m, ReadTpInReferenceDomain(ignoring));
     }
 
     [Fact]
@@ -257,10 +286,10 @@ public sealed class ManualMotionSimulatedPortTests
         port.Open();
 
         // Synthetic start positions: A 12000, B -8000, C 5000, D -3000.
-        Assert.Equal(12000m, ReadTp(port, ManualMotionAxis.A));
-        Assert.Equal(-8000m, ReadTp(port, ManualMotionAxis.B));
-        Assert.Equal(5000m, ReadTp(port, ManualMotionAxis.C));
-        Assert.Equal(-3000m, ReadTp(port, ManualMotionAxis.D));
+        Assert.Equal(12000m, ReadTpInReferenceDomain(port, ManualMotionAxis.A));
+        Assert.Equal(-8000m, ReadTpInReferenceDomain(port, ManualMotionAxis.B));
+        Assert.Equal(5000m, ReadTpInReferenceDomain(port, ManualMotionAxis.C));
+        Assert.Equal(-3000m, ReadTpInReferenceDomain(port, ManualMotionAxis.D));
 
         // Releasing the Axis C brake (output 3) changes only output 3.
         port.Execute(Command(ManualMotionPortCommandKind.BrakeOutputSet, ManualMotionAxis.C, brakeOutput: 3));
@@ -275,10 +304,10 @@ public sealed class ManualMotionSimulatedPortTests
         port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, ManualMotionAxis.C, operand: 2000));
         port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.C));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(7000m, ReadTp(port, ManualMotionAxis.C));
-        Assert.Equal(12000m, ReadTp(port, ManualMotionAxis.A));
-        Assert.Equal(-8000m, ReadTp(port, ManualMotionAxis.B));
-        Assert.Equal(-3000m, ReadTp(port, ManualMotionAxis.D));
+        Assert.Equal(7000m, ReadTpInReferenceDomain(port, ManualMotionAxis.C));
+        Assert.Equal(12000m, ReadTpInReferenceDomain(port, ManualMotionAxis.A));
+        Assert.Equal(-8000m, ReadTpInReferenceDomain(port, ManualMotionAxis.B));
+        Assert.Equal(-3000m, ReadTpInReferenceDomain(port, ManualMotionAxis.D));
 
         // Stop C, then a negative D jog moves only D.
         port.Execute(Command(ManualMotionPortCommandKind.Stop, ManualMotionAxis.C));
@@ -286,10 +315,10 @@ public sealed class ManualMotionSimulatedPortTests
         port.Execute(Command(ManualMotionPortCommandKind.JogSpeed, ManualMotionAxis.D, operand: -2000));
         port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.D));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(-5000m, ReadTp(port, ManualMotionAxis.D));
-        Assert.Equal(7000m, ReadTp(port, ManualMotionAxis.C));
-        Assert.Equal(12000m, ReadTp(port, ManualMotionAxis.A));
-        Assert.Equal(-8000m, ReadTp(port, ManualMotionAxis.B));
+        Assert.Equal(-5000m, ReadTpInReferenceDomain(port, ManualMotionAxis.D));
+        Assert.Equal(7000m, ReadTpInReferenceDomain(port, ManualMotionAxis.C));
+        Assert.Equal(12000m, ReadTpInReferenceDomain(port, ManualMotionAxis.A));
+        Assert.Equal(-8000m, ReadTpInReferenceDomain(port, ManualMotionAxis.B));
     }
 
     [Fact]
@@ -327,7 +356,7 @@ public sealed class ManualMotionSimulatedPortTests
             port.Execute(Command(ManualMotionPortCommandKind.Begin));
             clock.Advance(TimeSpan.FromMilliseconds(1375));
             port.Execute(Command(ManualMotionPortCommandKind.Stop));
-            return ReadTp(port);
+            return ReadTpInReferenceDomain(port);
         }
 
         Assert.Equal(RunOnce(), RunOnce());
@@ -359,8 +388,8 @@ public sealed class ManualMotionSimulatedPortTests
         // -11000; B: -8000 -> -7000 toward -6000). A 500 ms window would land Axis B exactly on its
         // -6000 target, which is completion, not in-flight progress.
         clock.Advance(TimeSpan.FromMilliseconds(250));
-        var tpA = ReadTp(port, ManualMotionAxis.A);
-        var tpB = ReadTp(port, ManualMotionAxis.B);
+        var tpA = ReadTpInReferenceDomain(port, ManualMotionAxis.A);
+        var tpB = ReadTpInReferenceDomain(port, ManualMotionAxis.B);
 
         // Both axes moved during the same interval, each toward its own target.
         Assert.True(tpA < 12000m && tpA > -11000m, "Axis A must progress during the shared interval");
@@ -384,15 +413,15 @@ public sealed class ManualMotionSimulatedPortTests
         port.Execute(Command(ManualMotionPortCommandKind.Begin, ManualMotionAxis.B));
 
         clock.Advance(TimeSpan.FromSeconds(1));
-        var tpA = ReadTp(port, ManualMotionAxis.A);
+        var tpA = ReadTpInReferenceDomain(port, ManualMotionAxis.A);
         Assert.Equal(10500m, tpA);
-        Assert.Equal(-6000m, ReadTp(port, ManualMotionAxis.B));
+        Assert.Equal(-6000m, ReadTpInReferenceDomain(port, ManualMotionAxis.B));
 
         // Stop A halts only A; the Jog on B keeps running.
         port.Execute(Command(ManualMotionPortCommandKind.Stop, ManualMotionAxis.A));
         clock.Advance(TimeSpan.FromSeconds(1));
-        Assert.Equal(10500m, ReadTp(port, ManualMotionAxis.A));
-        Assert.Equal(-4000m, ReadTp(port, ManualMotionAxis.B));
+        Assert.Equal(10500m, ReadTpInReferenceDomain(port, ManualMotionAxis.A));
+        Assert.Equal(-4000m, ReadTpInReferenceDomain(port, ManualMotionAxis.B));
     }
 
     [Fact]
@@ -420,7 +449,7 @@ public sealed class ManualMotionSimulatedPortTests
         clock.Advance(TimeSpan.FromMilliseconds(750));
 
         // Axis C froze at its stop position; Axis D continued to its own target on its own output.
-        Assert.Equal(4000m, ReadTp(port, ManualMotionAxis.C));
-        Assert.Equal(-1000m, ReadTp(port, ManualMotionAxis.D));
+        Assert.Equal(4000m, ReadTpInReferenceDomain(port, ManualMotionAxis.C));
+        Assert.Equal(-1000m, ReadTpInReferenceDomain(port, ManualMotionAxis.D));
     }
 }

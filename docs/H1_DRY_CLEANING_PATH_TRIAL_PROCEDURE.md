@@ -341,6 +341,10 @@ per-axis Stop; DP=0 (the Home completion branch).
   the Owner-local G+210 Cleaning Path store; section 4 bounds and review).
 - Verify both axes independently (typed completion + fresh inactive Status + TP + RP in
   tolerance + Brake after inactive).
+- Record, per axis, the six values the surface now distinguishes: **Raw TP**, **Raw RP**,
+  **Normalized TP**, **Normalized RP**, the **comparison target** and the **tolerance**. Normalized
+  TP is the raw theoretical reading scaled by drive pulses ÷ encoder pulses (Owner-confirmed
+  10,000 / 5,000, a 2:1 domain), and it is the operand a point is verified against.
 - Record the representative Move evidence. **Representative Move evidence does not allow the
   full path to start automatically**; the Owner explicitly starts the next session.
 - Close the session through the typed boundary.

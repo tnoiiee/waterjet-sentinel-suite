@@ -897,7 +897,9 @@ public sealed class ManualMotionSession
             case ManualMotionOperationKind.Move:
                 if (elapsed > op.RunTimeout)
                 {
-                    return StopFromRunning(op, now, StopReason.Timeout);
+                    // The timeout is the terminal event; the reported code distinguishes a timeout in
+                    // which the two normalized readings disagreed from every other timeout.
+                    return StopFromRunning(op, now, StopReason.Timeout, ClassifyMoveEnd(op, now));
                 }
 
                 if (MoveReached(op, now))
@@ -914,12 +916,62 @@ public sealed class ManualMotionSession
         }
     }
 
-    private static Progress StopFromRunning(OperationRuntime op, DateTimeOffset now, StopReason reason)
+    private static Progress StopFromRunning(OperationRuntime op, DateTimeOffset now, StopReason reason, string? specificEndCode = null)
     {
         RequestOperationStop(op, reason);
-        op.EndCode ??= EndCodeForStop(op.Kind, op.StopReason);
+        // The FIRST primary failure is preserved: a specific code supplied by the caller wins, and no
+        // later transition overwrites an end code that was already recorded.
+        op.EndCode ??= specificEndCode ?? EndCodeForStop(op.Kind, op.StopReason);
         SetPhase(op, ManualMotionOperationPhase.Stopping, now);
         return Progress.Transitioned;
+    }
+
+    /// <summary>
+    /// End-code classification for a Move that has reached its timeout. When both readings are current,
+    /// fresh and normalized into the same domain, a disagreement between THOSE TWO VALUES is reported as
+    /// its own primary failure, because it is a different fault from a Move that simply did not arrive.
+    /// The classification never suppresses the timeout, never fabricates a reading and never changes the
+    /// Stop, brake or cleanup path.
+    /// </summary>
+    private string? ClassifyMoveEnd(OperationRuntime op, DateTimeOffset now)
+    {
+        if (!TryReadBothNormalized(Runtime(op.Axis), op.BeginSequence, now, out var normalizedTheoretical, out var normalizedReference))
+        {
+            return null;
+        }
+
+        return ManualMotionPulseDomain.DomainsAgree(normalizedTheoretical, normalizedReference, op.Tolerance)
+            ? null
+            : ManualMotionCodes.MoveRefusedTpRpDomainDisagreement;
+    }
+
+    /// <summary>
+    /// Reads both observations of one runtime through the same currency, freshness and watermark
+    /// conditions the completion predicate uses, then normalizes each into the reference (drive) domain.
+    /// </summary>
+    private bool TryReadBothNormalized(
+        AxisRuntime runtime,
+        long afterSequence,
+        DateTimeOffset now,
+        out decimal normalizedTheoretical,
+        out decimal normalizedReference)
+    {
+        normalizedTheoretical = 0m;
+        normalizedReference = 0m;
+
+        if (runtime.PositionTp.Sequence <= afterSequence || !IsFresh(runtime.PositionTp, now) || runtime.PositionTp.Value is not decimal theoretical)
+        {
+            return false;
+        }
+
+        if (runtime.PositionRp.Sequence <= afterSequence || !IsFresh(runtime.PositionRp, now) || runtime.PositionRp.Value is not decimal reference)
+        {
+            return false;
+        }
+
+        normalizedTheoretical = ManualMotionPulseDomain.NormalizeTheoretical(theoretical);
+        normalizedReference = ManualMotionPulseDomain.NormalizeReference(reference);
+        return true;
     }
 
     private Progress DoStopping(OperationRuntime op, DateTimeOffset now)
@@ -1741,6 +1793,13 @@ public sealed class ManualMotionSession
         return true;
     }
 
+    /// <summary>
+    /// A point completes only when the axis is observed not moving AND both readings, each normalized
+    /// into the reference (drive) domain, are within the tolerance of the target. The two readbacks live
+    /// in different pulse domains, so normalizing is a precondition of the comparison, not a refinement
+    /// of it: comparing the raw theoretical reading with a drive-domain target is the defect this
+    /// normalization removes. Neither raw observation is mutated by this method.
+    /// </summary>
     private bool MoveReached(OperationRuntime op, DateTimeOffset now)
     {
         if (StatusBitObservedAfter(op.Axis, op.BeginSequence, now, op.MotionBit, op.MotionActive) != false)
@@ -1749,18 +1808,24 @@ public sealed class ManualMotionSession
         }
 
         var runtime = Runtime(op.Axis);
-        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, op.Target, op.Tolerance)
-            && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, op.Target, op.Tolerance);
+        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, op.Target, op.Tolerance, ManualMotionPulseDomain.NormalizeTheoretical)
+            && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, op.Target, op.Tolerance, ManualMotionPulseDomain.NormalizeReference);
     }
 
-    private bool WithinTolerance(Observation observation, long afterSequence, DateTimeOffset now, int target, int tolerance)
+    private bool WithinTolerance(
+        Observation observation,
+        long afterSequence,
+        DateTimeOffset now,
+        int target,
+        int tolerance,
+        Func<decimal, decimal> normalize)
     {
         if (observation.Sequence <= afterSequence || !IsFresh(observation, now) || observation.Value is not decimal value)
         {
             return false;
         }
 
-        return Math.Abs(value - target) <= tolerance;
+        return Math.Abs(normalize(value) - target) <= tolerance;
     }
 
     private bool? ZeroReading(Observation observation, long afterSequence, DateTimeOffset now, int tolerance)
@@ -1823,6 +1888,8 @@ public sealed class ManualMotionSession
                 Phase = active.Phase,
                 StartedAt = active.StartedAt,
                 StopRequested = active.StopRequested,
+                ComparisonTarget = active.Kind == ManualMotionOperationKind.Move ? active.Target : null,
+                ComparisonTolerance = active.Kind == ManualMotionOperationKind.Move ? active.Tolerance : null,
             });
         }
 
@@ -1868,6 +1935,12 @@ public sealed class ManualMotionSession
                 && p.HomeActiveValue is not null,
             PositionTp = ObservationSnapshot(runtime.PositionTp, now),
             PositionRp = ObservationSnapshot(runtime.PositionRp, now),
+            PositionTpNormalized = runtime.PositionTp.Value is decimal rawTheoretical
+                ? ManualMotionPulseDomain.NormalizeTheoretical(rawTheoretical)
+                : null,
+            PositionRpNormalized = runtime.PositionRp.Value is decimal rawReference
+                ? ManualMotionPulseDomain.NormalizeReference(rawReference)
+                : null,
             HomeState = runtime.HomeState,
             CoordinateState = runtime.CoordinateState,
             DualZeroState = runtime.DualZeroState,
