@@ -760,3 +760,37 @@ decisions: (a) the configured `positionTolerance` is expressed in native units, 
 meaning changes with the answer — at the implied reference scale the source default of 2 units would
 be a fraction of a micrometre; and (b) no correction is written, no test expectation is changed and no
 Hardware trial is authorised until the value is supplied and the tolerance decision is made.
+
+### 11.11 The halving is per-reading, and no single scale factor can repair W-6
+
+Two exact-source facts, added after the block-1 report, and they are what make the class and the
+blocked correction precise rather than approximate.
+
+**F-1 — the halving is applied to the theoretical reading only.** In the Legacy source the *commanded
+amplitude* is derived from the millimetre target by the common scale factor and is sent as the
+absolute-position operand; **no division by two appears in it**. The division by two appears on exactly
+one quantity: the readback assigned to the theoretical position. The commanded target and the
+theoretical readback are therefore **not** in the same derived unit by construction — Legacy's own two
+expressions disagree by a factor of two, deliberately, and only the readback is corrected.
+
+**F-2 — consequently, no single readback scale can satisfy W-6 on this machine.** W-6 requires
+`|Tp − N| ≤ tol` **and** `|Rp − N| ≤ tol` simultaneously, with one `N` and one `tol`. Suppose any
+per-reading scale `sTp`, `sRp` were applied so that both readings are expressed correctly in the
+command domain. That fixes each reading's *value*; it cannot change their *ratio*. With `Tp = 2 · Rp`
+(R-3), `sTp·Tp = sRp·Rp` only if `sTp = sRp/2`, and in that event both readings are equal — but the
+condition W-6 actually needs is that each sits within `tol` of `N`, and §11.5's R-1/R-2 place them 10 ×
+and 20 × away in the *same* direction. A common scale moves both further from `N`, not closer, and a
+per-reading scale that brings one to `N` leaves the other at `N` **or** at `2N` depending on which one
+is fitted. **The predicate is unsatisfiable for this machine at any scale, not merely at the current
+one.**
+
+That is why the class is *inseparable position-domain*: the defect is not "the scale is wrong" — a
+wrong scale is repairable by one number — it is that WJSS verifies **two readings that are not equal to
+each other** against **one** target, in a predicate whose only Legacy precedent is a surface that
+*halves one of them* before showing it. Any correction must therefore decide **which** reading the
+Move is verified against, or normalize the two into one domain, and that decision is irreducible to a
+scale factor.
+
+For completeness, and unchanged by this section: no Product Source, test or configuration was modified
+by block 1; the exact Legacy identifiers, the exact expression and the exact call sites are reported to
+the Owner outside this document, in keeping with §10 and the public-repository boundary.
