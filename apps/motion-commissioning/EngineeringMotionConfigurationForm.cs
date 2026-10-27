@@ -36,7 +36,7 @@ internal sealed class EngineeringMotionConfigurationForm : Form
     private static readonly Color EditableBanner = Color.FromArgb(20, 70, 125);
     private static readonly Color LockedBanner = Color.FromArgb(140, 30, 30);
 
-    private static readonly IReadOnlyList<EngineeringRow> Rows = new[]
+    private static readonly EngineeringRow[] Rows = new[]
     {
         new EngineeringRow(EngineeringSetting.EncoderPulsesPerRevolution, "Encoder pulses per revolution (counts/rev)", false, 1m, 10000000m, 0),
         new EngineeringRow(EngineeringSetting.DrivePulsesPerRevolution, "Drive pulses per revolution (counts/rev)", false, 1m, 10000000m, 0),
@@ -73,9 +73,9 @@ internal sealed class EngineeringMotionConfigurationForm : Form
         SeedFromProfile();
 
         _refreshTimer.Interval = RefreshIntervalMilliseconds;
-        _refreshTimer.Tick += (_, _) => Refresh();
+        _refreshTimer.Tick += (_, _) => RefreshEngineeringState();
         _refreshTimer.Start();
-        Refresh();
+        RefreshEngineeringState();
     }
 
     protected override void Dispose(bool disposing)
@@ -112,7 +112,7 @@ internal sealed class EngineeringMotionConfigurationForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = Axes.Length + 1,
-            RowCount = Rows.Count + 1,
+            RowCount = Rows.Length + 1,
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 36F));
         for (var index = 0; index < Axes.Length; index++)
@@ -129,7 +129,7 @@ internal sealed class EngineeringMotionConfigurationForm : Form
                 0);
         }
 
-        for (var row = 0; row < Rows.Count; row++)
+        for (var row = 0; row < Rows.Length; row++)
         {
             var spec = Rows[row];
             grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -224,7 +224,7 @@ internal sealed class EngineeringMotionConfigurationForm : Form
         {
             var editors = EditorsFor(axis);
             var values = new decimal?[5];
-            for (var index = 0; index < EditableRows.Count; index++)
+            for (var index = 0; index < EditableRows.Length; index++)
             {
                 var row = EditableRows[index];
                 if (!editors.TryRead(row, out values[index], out var refusal))
@@ -244,7 +244,7 @@ internal sealed class EngineeringMotionConfigurationForm : Form
             var current = candidate.For(axis) ?? new ManualMotionAxisProfile();
             candidate = candidate.WithAxis(
                 axis,
-                current.WithEngineering(values[0], ToInt(values[1]), values[2], values[3], values[4]));
+                current.WithEngineering(ToInt(values[0]), ToInt(values[1]), values[2], values[3], values[4]));
         }
 
         var result = _session.ApplyEngineeringSettings(ManualMotionProfileResult.FromProfile(candidate));
@@ -254,10 +254,15 @@ internal sealed class EngineeringMotionConfigurationForm : Form
                 result.Generation.ToString(CultureInfo.InvariantCulture),
                 ". Every later operation is planned against this immutable snapshot.")
             : string.Concat("Refused ", result.Code, ": ", ManualMotionCodes.DetailFor(result.Code));
-        Refresh();
+        RefreshEngineeringState();
     }
 
-    private void Refresh()
+    /// <summary>
+    /// Re-reads the session snapshot into this window's banner, editors and derived values. It is NOT a
+    /// repaint: Control.Refresh() already means that on a Form, so this method is deliberately named for
+    /// what it does instead of hiding the inherited member.
+    /// </summary>
+    private void RefreshEngineeringState()
     {
         var snapshot = _session.Snapshot;
         var editable = _session.EngineeringSettingsEditable && _session.Profile is not null;
@@ -310,8 +315,8 @@ internal sealed class EngineeringMotionConfigurationForm : Form
             : null;
     }
 
-    private static IReadOnlyList<EngineeringRow> EditableRows { get; } =
-        Rows.Where(row => !row.IsDerived).ToArray();
+    private static EngineeringRow[] EditableRows { get; } =
+        Rows.Where(static row => !row.IsDerived).ToArray();
 
     private static int? ToInt(decimal? value) => value is { } raw && raw >= int.MinValue && raw <= int.MaxValue
         ? decimal.ToInt32(raw)
