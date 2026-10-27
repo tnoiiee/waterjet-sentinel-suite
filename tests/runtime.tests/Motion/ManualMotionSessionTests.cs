@@ -92,7 +92,7 @@ public sealed class ManualMotionSessionTests
     [InlineData(20000000L)]
     public void A_Raw_Reference_Reading_Is_Unchanged_By_Normalization(long rawReference)
     {
-        Assert.Equal((decimal)rawReference, CommissionedDomain().NormalizeReference(rawReference));
+        Assert.Equal((decimal)rawReference, ManualMotionPulseDomain.NormalizeReference(rawReference));
     }
 
     [Theory]
@@ -106,7 +106,7 @@ public sealed class ManualMotionSessionTests
         var tolerance = 2m;
 
         var normalizedTheoretical = domain.NormalizeTheoretical(rawTheoretical);
-        var normalizedReference = domain.NormalizeReference(rawReference);
+        var normalizedReference = ManualMotionPulseDomain.NormalizeReference(rawReference);
 
         // The two raw readings can never agree: they are 2:1 apart by construction.
         Assert.False(ManualMotionPulseDomain.DomainsAgree(rawTheoretical, rawReference, (decimal)tolerance));
@@ -182,7 +182,7 @@ public sealed class ManualMotionSessionTests
 
         // F10/F11: both readings arrive at the comparison target in one domain.
         Assert.Equal(comparisonTarget, decimal.ToInt64(domain.NormalizeTheoretical(expectedRawTheoretical)));
-        Assert.Equal(comparisonTarget, decimal.ToInt64(domain.NormalizeReference(expectedReference)));
+        Assert.Equal(comparisonTarget, decimal.ToInt64(ManualMotionPulseDomain.NormalizeReference(expectedReference)));
     }
 
     [Fact]

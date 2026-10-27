@@ -998,7 +998,7 @@ public sealed class ManualMotionSession
         }
 
         normalizedTheoretical = domain.NormalizeTheoretical(theoretical);
-        normalizedReference = domain.NormalizeReference(reference);
+        normalizedReference = ManualMotionPulseDomain.NormalizeReference(reference);
         return true;
     }
 
@@ -1846,7 +1846,7 @@ public sealed class ManualMotionSession
 
         var runtime = Runtime(op.Axis);
         return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, comparisonTarget, comparisonTolerance, domain.NormalizeTheoretical)
-            && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, comparisonTarget, comparisonTolerance, domain.NormalizeReference);
+            && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, comparisonTarget, comparisonTolerance, ManualMotionPulseDomain.NormalizeReference);
     }
 
     /// <summary>
@@ -2012,8 +2012,8 @@ public sealed class ManualMotionSession
                 ? tpDomain.NormalizeTheoretical(rawTheoretical)
                 : null,
             PositionRpNormalized = runtime.PositionRp.Value is decimal rawReference
-                && EngineeringAxis(runtime.Axis)?.PulseDomain() is { } rpDomain
-                ? rpDomain.NormalizeReference(rawReference)
+                && EngineeringAxis(runtime.Axis)?.PulseDomain() is not null
+                ? ManualMotionPulseDomain.NormalizeReference(rawReference)
                 : null,
             HomeState = runtime.HomeState,
             CoordinateState = runtime.CoordinateState,

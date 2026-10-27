@@ -202,7 +202,7 @@ public readonly record struct ManualMotionPulseDomain
     /// that "the reference reading is already in the reference domain" is a stated fact of the code
     /// rather than an omission a later reader has to assume.
     /// </summary>
-    public decimal NormalizeReference(decimal rawReference) => rawReference;
+    public static decimal NormalizeReference(decimal rawReference) => rawReference;
 
     /// <summary>True when the target of a command count converts into the reference domain exactly.</summary>
     public bool TryConvertCommandTargetToReference(int commandTarget, out decimal referenceTarget)
