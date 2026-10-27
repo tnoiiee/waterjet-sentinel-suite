@@ -954,8 +954,19 @@ public sealed class H1DryCommissioningCoordinatorTests
 
         Assert.Equal(H1DryCommissioningPhase.Completed, result.TerminalPhase);
         Assert.Equal(6, result.VerifiedLedger.Count);
+
+        // The ledger is a typed point identity (JobPhase), while the store's point identity is the raw
+        // JSON text (string PointId). The expected sequence is therefore converted with the SAME
+        // conversion the Product itself applies to a store point id, and case-sensitive: a stored id of
+        // "p1" or "P 1" must not be accepted as P1 just because Enum.Parse could be made lenient.
+        var expectedLedger = harness.StoreSnapshot
+            .PathFor(H1DryCommissioningHarness.Sensor)!
+            .Points
+            .Select(point => Enum.Parse<JobPhase>(point.PointId, ignoreCase: false))
+            .ToArray();
+
         Assert.Equal(
-            harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points.Select(point => point.PointId).ToArray(),
+            expectedLedger,
             result.VerifiedLedger.ToArray());
 
         var centre = result.CentreReturn!;
