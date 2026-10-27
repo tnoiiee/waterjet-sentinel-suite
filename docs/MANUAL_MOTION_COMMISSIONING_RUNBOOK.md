@@ -183,7 +183,12 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "encoderPulsesPerRevolution": null,
+      "drivePulsesPerRevolution": null,
+      "mechanicalGearRatio": null,
+      "pitchMillimetresPerRevolution": null,
+      "positionToleranceMillimetres": null
     },
     "B": {
       "brakeOutput": 2,
@@ -204,7 +209,12 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "encoderPulsesPerRevolution": null,
+      "drivePulsesPerRevolution": null,
+      "mechanicalGearRatio": null,
+      "pitchMillimetresPerRevolution": null,
+      "positionToleranceMillimetres": null
     }
   }
 }
@@ -231,6 +241,25 @@ separate hardware commissioning gate. In particular:
 - `moveMinimumTarget` must be below `moveMaximumTarget` when both are
   configured, and the two status-bit numbers must differ when both are
   configured.
+- The five engineering settings are per-axis data, never Product constants, and every axis
+  carries its own: `encoderPulsesPerRevolution` and `drivePulsesPerRevolution` (integer counts
+  per motor revolution), `mechanicalGearRatio` (output revolutions per motor revolution, so
+  `0.1` is a 1:10 reduction), `pitchMillimetresPerRevolution` (millimetres of travel per output
+  revolution) and `positionToleranceMillimetres` (the Move comparison tolerance, in
+  millimetres). Each is optional; an axis missing any of the first four has no conversion and
+  every Move on it is refused with `MOVE_PULSE_DOMAIN_NOT_CONFIGURED`, and an axis missing
+  `positionToleranceMillimetres` is refused the same way. Values must be positive and carry at
+  most seven decimal places. There is no divide-by-two, multiplier or gearing key: the
+  theoretical-to-reference relationship is derived as `drive / encoder` and displayed read-only.
+- The derived quantities (TP normalization ratio, PA command units per millimetre, TP feedback
+  units per millimetre, RP feedback units per millimetre) are **not** profile keys. They are
+  computed from the five settings and shown read-only in the Engineering Motion Configuration
+  window. The formulas, units and expected P1/P2 values are in
+  [`docs/evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md`](evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md).
+- An accepted settings change is captured as an immutable session snapshot. It cannot be changed
+  while anything is in flight (Home, Move, H1 Commission, Run Path, P1 to P6, the Centre return,
+  Abort cleanup or Close cleanup); the refusal code is
+  `ENGINEERING_SETTINGS_LOCKED_WHILE_ACTIVE`.
 - An axis may be omitted entirely; it is then not allowed by the profile.
 
 Git ignore patterns cover `**/*.wjss-manual-motion-profile.json`, but that is

@@ -104,39 +104,97 @@ public interface IManualMotionPort
 }
 
 /// <summary>
-/// The confirmed physical pulse-domain relationship between the two position readbacks of one axis,
-/// and the single normalization the Product applies before any comparison.
+/// The per-axis pulse-domain and mechanical configuration of ONE axis, and the single conversion the
+/// Product applies before any comparison.
 ///
-/// Owner-confirmed (2026-10-27): the physical encoder resolution is 10,000 pulses per revolution and
-/// the stepping-drive pulses-per-revolution setting is 5,000 pulses per revolution, so the theoretical
-/// (encoder) readback has exactly twice the count density of the reference (drive) readback:
-/// RawTP = 2 x RawRP. The commissioned Legacy function divided TP by two for exactly this reason, so
-/// the division it performed is the normalization this type makes explicit.
+/// NOTHING here is a Product constant. Every value comes from the axis profile of the Owner-local
+/// Motion Configuration, because they are flexible per-axis engineering settings: two axes of the same
+/// cabinet may legitimately differ. A missing or nonsensical value makes the axis's conversion
+/// unavailable, and an axis whose conversion is unavailable refuses every motion operation that would
+/// require a comparison rather than assuming a value.
 ///
-/// The normalization is the exact rational relationship between the two physical values, never a
-/// literal divisor: <c>rawTheoretical * DrivePulsesPerRevolution / EncoderPulsesPerRevolution</c>. A raw
-/// observation is never overwritten or mutated; a caller passes a raw value and receives a derived one,
-/// so the encoder-domain value and the reference-domain value remain independently available.
+/// The dimensional model, in the exact terms the commissioned Legacy Source used:
+///
+///   millimetresPerMotorRevolution = mechanicalGearRatio x pitchMillimetresPerRevolution
+///   paCommandUnitsPerMillimetre   = drivePulsesPerRevolution / millimetresPerMotorRevolution
+///   rpFeedbackUnitsPerMillimetre  = drivePulsesPerRevolution / millimetresPerMotorRevolution
+///   tpFeedbackUnitsPerMillimetre  = encoderPulsesPerRevolution / millimetresPerMotorRevolution
+///   tpNormalizationRatio          = drivePulsesPerRevolution / encoderPulsesPerRevolution
+///
+/// The Legacy formulas are these quantities, restated:
+///   command = mm / (ratio / pulsesRev) / pitch   is  mm x paCommandUnitsPerMillimetre
+///   rpMm    = counts x (ratio / pulsesRev) x pitch is  counts / rpFeedbackUnitsPerMillimetre
+///   tpMm    = counts x (ratio / pulsesRev) x pitch / 2 is counts / tpFeedbackUnitsPerMillimetre
+///
+/// The theoretical (encoder) readback carries a different count density from the reference (drive)
+/// readback, so it is normalized into the reference domain before it is ever compared. Raw
+/// observations are never overwritten or mutated: a caller passes a raw value and receives a derived
+/// one, so both domains stay independently available.
 /// </summary>
-public static class ManualMotionPulseDomain
+public readonly record struct ManualMotionPulseDomain
 {
-    /// <summary>The Owner-confirmed physical encoder resolution, in pulses per revolution.</summary>
-    public const int EncoderPulsesPerRevolution = 10_000;
+    private ManualMotionPulseDomain(
+        int encoderPulsesPerRevolution,
+        int drivePulsesPerRevolution,
+        decimal mechanicalGearRatio,
+        decimal pitchMillimetresPerRevolution)
+    {
+        EncoderPulsesPerRevolution = encoderPulsesPerRevolution;
+        DrivePulsesPerRevolution = drivePulsesPerRevolution;
+        MechanicalGearRatio = mechanicalGearRatio;
+        PitchMillimetresPerRevolution = pitchMillimetresPerRevolution;
+    }
 
-    /// <summary>The Owner-confirmed stepping-drive pulses-per-revolution setting.</summary>
-    public const int DrivePulsesPerRevolution = 5_000;
+    /// <summary>The encoder counts produced by one motor revolution, from the axis profile.</summary>
+    public int EncoderPulsesPerRevolution { get; }
+
+    /// <summary>The drive pulses consumed by one motor revolution, from the axis profile.</summary>
+    public int DrivePulsesPerRevolution { get; }
 
     /// <summary>
-    /// The encoder-domain count density relative to the reference (drive) domain. It is derived from
-    /// the two physical values, so it can never drift away from them.
+    /// The mechanical reduction expressed as OUTPUT revolutions per MOTOR revolution, from the axis
+    /// profile. 0.1 is a 1:10 reduction: ten motor revolutions per one output revolution.
     /// </summary>
-    public const int EncoderCountsPerDriveCount = EncoderPulsesPerRevolution / DrivePulsesPerRevolution;
+    public decimal MechanicalGearRatio { get; }
+
+    /// <summary>The travel, in millimetres, produced by one OUTPUT revolution, from the axis profile.</summary>
+    public decimal PitchMillimetresPerRevolution { get; }
+
+    /// <summary>Travel in millimetres produced by one motor revolution.</summary>
+    public decimal MillimetresPerMotorRevolution => MechanicalGearRatio * PitchMillimetresPerRevolution;
+
+    /// <summary>The derived read-only ratio that normalizes a theoretical reading into the drive domain.</summary>
+    public decimal TpNormalizationRatio => (decimal)DrivePulsesPerRevolution / EncoderPulsesPerRevolution;
+
+    /// <summary>The derived command unit count a millimetre of travel corresponds to.</summary>
+    public decimal PaCommandUnitsPerMillimetre => DrivePulsesPerRevolution / MillimetresPerMotorRevolution;
+
+    /// <summary>The derived reference (drive) feedback count a millimetre of travel corresponds to.</summary>
+    public decimal RpFeedbackUnitsPerMillimetre => DrivePulsesPerRevolution / MillimetresPerMotorRevolution;
+
+    /// <summary>The derived theoretical (encoder) feedback count a millimetre of travel corresponds to.</summary>
+    public decimal TpFeedbackUnitsPerMillimetre => EncoderPulsesPerRevolution / MillimetresPerMotorRevolution;
+
+    /// <summary>
+    /// True when the command unit and the reference feedback unit are the same count density. When they
+    /// are, the commanded target needs no further conversion to be compared against the reference
+    /// readback. When they are not, the two densities differ and the difference is reported rather than
+    /// silently absorbed by a multiplier.
+    /// </summary>
+    public bool CommandAndReferenceShareCountDensity => PaCommandUnitsPerMillimetre == RpFeedbackUnitsPerMillimetre;
+
+    /// <summary>
+    /// The factor that converts a commanded count into a reference-feedback count. It is 1 whenever the
+    /// two densities agree, and it is derived from the profile, never guessed and never literal.
+    /// </summary>
+    public decimal ReferenceCountsPerCommandCount =>
+        PaCommandUnitsPerMillimetre == 0m ? 0m : RpFeedbackUnitsPerMillimetre / PaCommandUnitsPerMillimetre;
 
     /// <summary>
     /// Normalizes one raw theoretical (encoder-domain) reading into the reference (drive) domain that
     /// the comparison target and the comparison tolerance are expressed in.
     /// </summary>
-    public static decimal NormalizeTheoretical(decimal rawTheoretical) =>
+    public decimal NormalizeTheoretical(decimal rawTheoretical) =>
         rawTheoretical * DrivePulsesPerRevolution / EncoderPulsesPerRevolution;
 
     /// <summary>
@@ -144,13 +202,56 @@ public static class ManualMotionPulseDomain
     /// that "the reference reading is already in the reference domain" is a stated fact of the code
     /// rather than an omission a later reader has to assume.
     /// </summary>
-    public static decimal NormalizeReference(decimal rawReference) => rawReference;
+    public decimal NormalizeReference(decimal rawReference) => rawReference;
+
+    /// <summary>True when the target of a command count converts into the reference domain exactly.</summary>
+    public bool TryConvertCommandTargetToReference(int commandTarget, out decimal referenceTarget)
+    {
+        referenceTarget = commandTarget * ReferenceCountsPerCommandCount;
+        return CommandAndReferenceShareCountDensity;
+    }
+
+    /// <summary>
+    /// Builds the domain of one axis from its profile values. Any missing, zero, negative or
+    /// nonsensical combination refuses the whole conversion: the caller then refuses the motion
+    /// operation that would have needed it.
+    /// </summary>
+    public static bool TryCreate(
+        int? encoderPulsesPerRevolution,
+        int? drivePulsesPerRevolution,
+        decimal? mechanicalGearRatio,
+        decimal? pitchMillimetresPerRevolution,
+        out ManualMotionPulseDomain domain)
+    {
+        domain = default;
+
+        if (encoderPulsesPerRevolution is not > 0
+            || drivePulsesPerRevolution is not > 0
+            || mechanicalGearRatio is not > 0m
+            || pitchMillimetresPerRevolution is not > 0m)
+        {
+            return false;
+        }
+
+        var millimetresPerMotorRevolution = mechanicalGearRatio.Value * pitchMillimetresPerRevolution.Value;
+        if (millimetresPerMotorRevolution <= 0m)
+        {
+            return false;
+        }
+
+        domain = new ManualMotionPulseDomain(
+            encoderPulsesPerRevolution.Value,
+            drivePulsesPerRevolution.Value,
+            mechanicalGearRatio.Value,
+            pitchMillimetresPerRevolution.Value);
+        return true;
+    }
 
     /// <summary>
     /// True when the two normalized values agree with EACH OTHER within the tolerance. This is a
     /// separate question from whether either agrees with the commanded target, and the two are reported
     /// as separate outcomes.
     /// </summary>
-    public static bool DomainsAgree(decimal normalizedTheoretical, decimal normalizedReference, int tolerance) =>
+    public static bool DomainsAgree(decimal normalizedTheoretical, decimal normalizedReference, decimal tolerance) =>
         Math.Abs(normalizedTheoretical - normalizedReference) <= tolerance;
 }

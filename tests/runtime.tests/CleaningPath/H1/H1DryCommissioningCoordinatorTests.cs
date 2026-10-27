@@ -1194,6 +1194,41 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(ManualMotionPortMode.Simulated, harness.Session.Mode);
     }
 
+    [Fact]
+    public void The_Engineering_Motion_Configuration_Cannot_Change_During_Commission_Or_The_Run_Path()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+
+        // Idle between operations the settings are editable, and the capture can be advanced.
+        Assert.True(harness.Session.EngineeringSettingsEditable);
+        var idle = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(harness.Profile));
+        Assert.True(idle.Accepted);
+        var capturedGeneration = harness.Session.Snapshot.Engineering.Generation;
+
+        // Commission/Home in flight: the settings are locked and the change changes nothing.
+        Assert.True(harness.StartCommission().Started);
+        Assert.False(harness.Session.EngineeringSettingsEditable);
+        var refusedInCommission = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(harness.Profile));
+        Assert.False(refusedInCommission.Accepted);
+        Assert.Equal(ManualMotionCodes.EngineeringSettingsLockedWhileActive, refusedInCommission.Code);
+        Assert.Equal(capturedGeneration, harness.Session.Snapshot.Engineering.Generation);
+
+        harness.DriveUntilTerminal();
+        Assert.Equal(H1DryCommissioningPhase.Commissioned, harness.Coordinator.Result!.TerminalPhase);
+
+        // Run Path in flight, through P1 and beyond: still locked, still the same capture.
+        Assert.True(harness.StartPath().Started);
+        Assert.False(harness.Session.EngineeringSettingsEditable);
+        var refusedInPath = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(harness.Profile));
+        Assert.False(refusedInPath.Accepted);
+        Assert.Equal(ManualMotionCodes.EngineeringSettingsLockedWhileActive, refusedInPath.Code);
+        Assert.Equal(capturedGeneration, harness.Session.Snapshot.Engineering.Generation);
+    }
+
     // ------------------------------------------------------------------------------- helpers
 
     private static void AssertStartRefusedWith(

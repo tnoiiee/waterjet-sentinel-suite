@@ -16,34 +16,66 @@ public sealed class ManualMotionSessionTests
     private static readonly DateTimeOffset Instant = new(2026, 10, 18, 0, 0, 0, TimeSpan.Zero);
 
     // ----------------------------------------------------------------------------------------
-    // Confirmed pulse-domain normalization (Owner-confirmed 2026-10-27).
+    // Profile-driven pulse-domain and mechanical conversion (Owner-confirmed 2026-10-27).
     //
-    // Physical encoder resolution 10,000 pulses/rev; stepping-drive setting 5,000 pulses/rev; the
-    // encoder (theoretical) readback therefore carries exactly twice the count density of the drive
-    // (reference) readback, RawTP = 2 x RawRP. The comparison operand is
-    //   RawTP * DrivePulsesPerRevolution / EncoderPulsesPerRevolution
-    // and RawRP is unchanged. These tests pin the relationship, the exact Owner evidence arithmetic,
-    // and every fail-closed path that depends on it.
+    // The five conversion inputs are FLEXIBLE PER-AXIS ENGINEERING SETTINGS carried by the axis
+    // profile; none of them is a Product constant. These tests build domains from explicit profile
+    // values, so the same Source serves the commissioned 10,000 / 5,000 pair, any other valid pair and
+    // an axis-by-axis mixture, and they pin the exact dimensional model:
+    //
+    //   mm per motor revolution = gearRatio x pitch
+    //   paCommandUnitsPerMillimetre = drivePpr / (gearRatio x pitch)
+    //   rpFeedbackUnitsPerMillimetre = drivePpr / (gearRatio x pitch)
+    //   tpFeedbackUnitsPerMillimetre = encoderPpr / (gearRatio x pitch)
+    //   tpNormalizationRatio = drivePpr / encoderPpr
     // ----------------------------------------------------------------------------------------
 
-    [Fact]
-    public void The_Confirmed_Pulse_Per_Revolution_Values_Are_The_Single_Source_Of_The_Normalization()
+    /// <summary>The domain built from the exact commissioned values, for the arithmetic proofs.</summary>
+    private static ManualMotionPulseDomain CommissionedDomain()
     {
-        Assert.Equal(10000, ManualMotionPulseDomain.EncoderPulsesPerRevolution);
-        Assert.Equal(5000, ManualMotionPulseDomain.DrivePulsesPerRevolution);
+        Assert.True(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 5m, out var domain));
+        return domain;
+    }
 
-        // The density is derived from the two physical values, so it can never disagree with them.
-        Assert.Equal(
-            ManualMotionPulseDomain.EncoderPulsesPerRevolution / ManualMotionPulseDomain.DrivePulsesPerRevolution,
-            ManualMotionPulseDomain.EncoderCountsPerDriveCount);
-        Assert.Equal(2, ManualMotionPulseDomain.EncoderCountsPerDriveCount);
+    [Fact]
+    public void The_Commissioned_Pulse_And_Mechanical_Values_Come_From_The_Profile_And_Derive_The_Known_Quantities()
+    {
+        var ok = ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 5m, out var domain);
+        Assert.True(ok);
 
-        // The normalization is the exact rational relationship, not a literal divisor.
-        Assert.Equal(
-            7m,
-            ManualMotionPulseDomain.NormalizeTheoretical(14m));
-        var expected = 35999997m * ManualMotionPulseDomain.DrivePulsesPerRevolution / ManualMotionPulseDomain.EncoderPulsesPerRevolution;
-        Assert.Equal(expected, ManualMotionPulseDomain.NormalizeTheoretical(35999997m));
+        // The two physical values and the two mechanical values are carried, not compiled in.
+        Assert.Equal(10000, domain.EncoderPulsesPerRevolution);
+        Assert.Equal(5000, domain.DrivePulsesPerRevolution);
+        Assert.Equal(0.1m, domain.MechanicalGearRatio);
+        Assert.Equal(5m, domain.PitchMillimetresPerRevolution);
+
+        // 10,000 / 5,000 derives exactly one half: this is the Legacy divide-by-two, made explicit.
+        Assert.Equal(0.5m, domain.TpNormalizationRatio);
+
+        // 0.1 x 5 = 0.5 mm per motor revolution, and the four derived values follow from it.
+        Assert.Equal(0.5m, domain.MillimetresPerMotorRevolution);
+        Assert.Equal(10000m, domain.PaCommandUnitsPerMillimetre);
+        Assert.Equal(10000m, domain.RpFeedbackUnitsPerMillimetre);
+        Assert.Equal(20000m, domain.TpFeedbackUnitsPerMillimetre);
+    }
+
+    [Fact]
+    public void Another_Valid_Pulse_Pair_Derives_A_Different_Ratio_With_No_Source_Change()
+    {
+        // 4,000 / 1,000 derives 0.25 with no edit anywhere in the Product: the settings are data.
+        Assert.True(ManualMotionPulseDomain.TryCreate(4000, 1000, 0.1m, 5m, out var domain));
+        Assert.Equal(0.25m, domain.TpNormalizationRatio);
+        Assert.Equal(1000m, domain.PaCommandUnitsPerMillimetre);
+
+        // 1:1 derives the identity.
+        Assert.True(ManualMotionPulseDomain.TryCreate(5000, 5000, 0.1m, 5m, out var unity));
+        Assert.Equal(1m, unity.TpNormalizationRatio);
+        Assert.Equal(5000m, unity.NormalizeTheoretical(5000m));
+
+        // The mechanical values are equally data: halving the pitch doubles every units-per-mm value.
+        Assert.True(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 2.5m, out var shortPitch));
+        Assert.Equal(20000m, shortPitch.PaCommandUnitsPerMillimetre);
+        Assert.Equal(40000m, shortPitch.TpFeedbackUnitsPerMillimetre);
     }
 
     [Theory]
@@ -52,7 +84,7 @@ public sealed class ManualMotionSessionTests
     public void A_Raw_Theoretical_Reading_Normalizes_Into_The_Reference_Domain(long rawTheoretical, string expectedText)
     {
         var expected = decimal.Parse(expectedText, System.Globalization.CultureInfo.InvariantCulture);
-        Assert.Equal(expected, ManualMotionPulseDomain.NormalizeTheoretical(rawTheoretical));
+        Assert.Equal(expected, CommissionedDomain().NormalizeTheoretical(rawTheoretical));
     }
 
     [Theory]
@@ -60,28 +92,173 @@ public sealed class ManualMotionSessionTests
     [InlineData(20000000L)]
     public void A_Raw_Reference_Reading_Is_Unchanged_By_Normalization(long rawReference)
     {
-        Assert.Equal((decimal)rawReference, ManualMotionPulseDomain.NormalizeReference(rawReference));
+        Assert.Equal((decimal)rawReference, CommissionedDomain().NormalizeReference(rawReference));
     }
 
     [Theory]
     [InlineData(35999997L, 18000000L)] // Horizontal P1 evidence
     [InlineData(39999997L, 20000000L)] // Vertical P1 evidence
-    public void The_Owner_Evidence_Pair_Agrees_Within_The_Configured_Tolerance_Only_After_Normalization(
+    public void The_Owner_Evidence_Pair_Agrees_Only_After_Normalization(
         long rawTheoretical,
         long rawReference)
     {
-        var tolerance = ManualMotionProfile.CreateSimulationProfile().AxisA!.PositionTolerance!.Value;
+        var domain = CommissionedDomain();
+        var tolerance = 2m;
 
-        var normalizedTheoretical = ManualMotionPulseDomain.NormalizeTheoretical(rawTheoretical);
-        var normalizedReference = ManualMotionPulseDomain.NormalizeReference(rawReference);
+        var normalizedTheoretical = domain.NormalizeTheoretical(rawTheoretical);
+        var normalizedReference = domain.NormalizeReference(rawReference);
 
         // The two raw readings can never agree: they are 2:1 apart by construction.
-        Assert.False(ManualMotionPulseDomain.DomainsAgree(rawTheoretical, rawReference, tolerance));
+        Assert.False(ManualMotionPulseDomain.DomainsAgree(rawTheoretical, rawReference, (decimal)tolerance));
 
         // Normalized, they agree to one and a half counts, which is inside the tolerance.
         Assert.True(ManualMotionPulseDomain.DomainsAgree(normalizedTheoretical, normalizedReference, tolerance));
         Assert.Equal(1.5m, Math.Abs(normalizedTheoretical - normalizedReference));
     }
+
+    [Fact]
+    public void An_Incomplete_Or_Nonsensical_Conversion_Is_Refused_And_Never_Defaulted()
+    {
+        // Every one of the four inputs is required, and a zero or negative value refuses the conversion.
+        Assert.False(ManualMotionPulseDomain.TryCreate(null, 5000, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, null, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, null, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, null, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(0, 5000, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 0, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, 0m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 0m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(-10000, 5000, 0.1m, 5m, out _));
+
+        // A refused conversion yields no domain at all: there is nothing to assume, and the profile
+        // reports the axis as not-configured instead of inventing a relationship.
+        Assert.False(ManualMotionPulseDomain.TryCreate(null, null, null, null, out var refused));
+        Assert.Equal(0, refused.EncoderPulsesPerRevolution);
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // The dimensional ledger, as arithmetic: docs/evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md.
+    // Each assertion is one row of that ledger, so a change to any derived quantity breaks a test
+    // that names the quantity rather than a test that compares opaque numbers.
+    // ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_Ledger_Derives_Every_Quantity_From_The_Commissioned_Pair()
+    {
+        var domain = CommissionedDomain();
+
+        Assert.Equal(0.5m, domain.MillimetresPerMotorRevolution);          // F1 = 0.1 x 5
+        Assert.Equal(0.5m, domain.TpNormalizationRatio);                    // F2 = 5000 / 10000
+        Assert.Equal(10000m, domain.PaCommandUnitsPerMillimetre);           // F3 = 5000 / 0.5
+        Assert.Equal(10000m, domain.RpFeedbackUnitsPerMillimetre);          // F4 = 5000 / 0.5
+        Assert.Equal(20000m, domain.TpFeedbackUnitsPerMillimetre);          // F5 = 10000 / 0.5
+        Assert.True(domain.CommandAndReferenceShareCountDensity);           // F6
+        Assert.Equal(1m, domain.ReferenceCountsPerCommandCount);            // F7
+    }
+
+    [Theory]
+    // Point, axis letter, millimetres, commanded PA operand, expected RP, expected raw TP.
+    [InlineData("P1 Horizontal", 180, 1800000, 1800000, 3600000)]
+    [InlineData("P2 Vertical", 200, 2000000, 2000000, 4000000)]
+    public void The_P1_And_P2_Targets_Resolve_To_One_Comparison_Domain(
+        string point,
+        int millimetres,
+        long commandedOperand,
+        long expectedReference,
+        long expectedRawTheoretical)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(point));
+        var domain = CommissionedDomain();
+
+        // F3: the commanded operand is millimetres times command units per millimetre.
+        Assert.Equal(commandedOperand, decimal.ToInt64(millimetres * domain.PaCommandUnitsPerMillimetre));
+
+        // F8/F7: the comparison target equals the expected reference reading, with no factor between them.
+        var comparisonTarget = decimal.ToInt64(commandedOperand * domain.ReferenceCountsPerCommandCount);
+        Assert.Equal(expectedReference, comparisonTarget);
+
+        // F5: the raw theoretical reading the encoder produces for that distance.
+        Assert.Equal(expectedRawTheoretical, decimal.ToInt64(millimetres * domain.TpFeedbackUnitsPerMillimetre));
+
+        // F10/F11: both readings arrive at the comparison target in one domain.
+        Assert.Equal(comparisonTarget, decimal.ToInt64(domain.NormalizeTheoretical(expectedRawTheoretical)));
+        Assert.Equal(comparisonTarget, decimal.ToInt64(domain.NormalizeReference(expectedReference)));
+    }
+
+    [Fact]
+    public void The_Hardware_Of_Record_Is_Self_Consistent_At_Ten_Times_The_Millimetre_Scale()
+    {
+        // The evidence pair (raw TP 35,999,997 and raw RP 18,000,000) is reproduced here as arithmetic
+        // only. The 1.5-count difference is explained by F2 alone; the MAGNITUDE corresponds to 1,800 mm
+        // under the commissioned pair, which is exactly the open profile question recorded in section 5
+        // of the ledger. Nothing in the conversion absorbs that factor.
+        var domain = CommissionedDomain();
+        const decimal rawTheoretical = 35999997m;
+        const decimal rawReference = 18000000m;
+
+        var normalizedTheoretical = domain.NormalizeTheoretical(rawTheoretical);
+        Assert.Equal(17999998.5m, normalizedTheoretical);
+        Assert.Equal(1.5m, rawReference - normalizedTheoretical);
+        Assert.Equal(1800m, rawReference / domain.RpFeedbackUnitsPerMillimetre);
+        Assert.Equal(1800m, rawTheoretical / domain.TpFeedbackUnitsPerMillimetre);
+
+        // The tolerance conversion is in the same domain: millimetres x RP units/mm.
+        Assert.Equal(1000m, 0.1m * domain.RpFeedbackUnitsPerMillimetre);
+    }
+
+    [Fact]
+    public void An_Axis_Without_A_Conversion_Refuses_The_Move_Before_Anything_Is_Dispatched()
+    {
+        var profile = ManualMotionProfile.CreateSimulationProfile();
+        var withoutConversion = new ManualMotionProfile
+        {
+            Source = profile.Source,
+            ControllerId = profile.ControllerId,
+            ObservationIntervalMilliseconds = profile.ObservationIntervalMilliseconds,
+            ObservationFreshnessMilliseconds = profile.ObservationFreshnessMilliseconds,
+            JogHeartbeatTimeoutMilliseconds = profile.JogHeartbeatTimeoutMilliseconds,
+            JogMaximumHoldMilliseconds = profile.JogMaximumHoldMilliseconds,
+            AxisA = WithoutConversion(profile.AxisA!),
+            AxisB = profile.AxisB,
+            AxisC = profile.AxisC,
+            AxisD = profile.AxisD,
+        };
+
+        var harness = new Harness(profile: withoutConversion);
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+        var before = harness.Port.ExecutedCommands.Count;
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.Drive(4);
+
+        Assert.Equal(ManualMotionCodes.MovePulseDomainNotConfigured, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Equal(before, harness.Port.ExecutedCommands.Count);
+    }
+
+    private static ManualMotionAxisProfile WithoutConversion(ManualMotionAxisProfile axis) => new()
+    {
+        BrakeOutput = axis.BrakeOutput,
+        BrakeReleaseAction = axis.BrakeReleaseAction,
+        BrakeSettleMilliseconds = axis.BrakeSettleMilliseconds,
+        JogSpeed = axis.JogSpeed,
+        HomeSpeed = axis.HomeSpeed,
+        HomeTimeoutMilliseconds = axis.HomeTimeoutMilliseconds,
+        MoveAcceleration = axis.MoveAcceleration,
+        MoveSpeed = axis.MoveSpeed,
+        MoveDeceleration = axis.MoveDeceleration,
+        MoveMinimumTarget = axis.MoveMinimumTarget,
+        MoveMaximumTarget = axis.MoveMaximumTarget,
+        PositionTolerance = axis.PositionTolerance,
+        MotionTimeoutMilliseconds = axis.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = axis.StopTimeoutMilliseconds,
+        MotionStatusBit = axis.MotionStatusBit,
+        MotionActiveValue = axis.MotionActiveValue,
+        HomeStatusBit = axis.HomeStatusBit,
+        HomeActiveValue = axis.HomeActiveValue,
+        DualZeroPermitted = axis.DualZeroPermitted,
+        PositionToleranceMillimetres = axis.PositionToleranceMillimetres,
+    };
 
     [Fact]
     public void Both_Raw_Readings_Are_Published_Independently_And_Neither_Is_An_Alias_Of_The_Other()
@@ -96,9 +273,11 @@ public sealed class ManualMotionSessionTests
         // No aliasing: the two raw observations are different values from two separate reads.
         Assert.NotEqual(axis.PositionTp.Value, axis.PositionRp.Value);
 
-        // The normalized operands are derived from their own raw observation and from nothing else.
-        Assert.Equal(ManualMotionPulseDomain.NormalizeTheoretical(axis.PositionTp.Value!.Value), axis.PositionTpNormalized);
-        Assert.Equal(ManualMotionPulseDomain.NormalizeReference(axis.PositionRp.Value!.Value), axis.PositionRpNormalized);
+        // The normalized operands are derived from their own raw observation and from nothing else, using
+        // THIS axis's own profile conversion.
+        var domain = harness.Snapshot.Engineering.Axes[0];
+        Assert.Equal(axis.PositionTp.Value!.Value * domain.TpNormalizationRatio!.Value, axis.PositionTpNormalized);
+        Assert.Equal(axis.PositionRp.Value, axis.PositionRpNormalized);
 
         // The raw theoretical observation is never overwritten by its normalized form.
         Assert.NotEqual(axis.PositionTp.Value, axis.PositionTpNormalized);
@@ -173,7 +352,9 @@ public sealed class ManualMotionSessionTests
         Assert.False(Math.Abs(axis.PositionRpNormalized.Value - -5000m) <= 2m);
         Assert.NotEqual(ManualMotionCodes.MoveCompletedPositionVerified, axis.LastOutcomeCode);
 
-        // Mutual agreement therefore reports the ordinary supervision outcome, not the domain code.
+        // Mutual agreement with a target that was never reached is its own reported outcome: the
+        // readbacks are consistent, the target is not reconciled, and no point completes on it.
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, axis.LastOutcomeCode);
         Assert.NotEqual(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, axis.LastOutcomeCode);
     }
 
@@ -200,7 +381,7 @@ public sealed class ManualMotionSessionTests
     [InlineData(ManualMotionAxis.B, 3000)]
     [InlineData(ManualMotionAxis.C, 2500)]
     [InlineData(ManualMotionAxis.D, -1500)]
-    public void Every_Axis_Uses_The_Same_Shared_Normalization_Before_Comparison(ManualMotionAxis axis, int target)
+    public void Every_Axis_Normalizes_Through_Its_Own_Profile_Before_Comparison(ManualMotionAxis axis, int target)
     {
         var harness = new Harness();
         harness.OpenAndObserve();
@@ -234,8 +415,13 @@ public sealed class ManualMotionSessionTests
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A)?.Phase == ManualMotionOperationPhase.Running);
 
         var operation = ActiveOf(harness.Snapshot, ManualMotionAxis.A)!;
-        Assert.Equal(-5000, operation.ComparisonTarget!.Value);
-        Assert.Equal(2, operation.ComparisonTolerance!.Value);
+
+        // The published pair is exactly what the session compares with: the commanded native target
+        // converted by the derived reference counts per command count, and the millimetre tolerance
+        // converted by the derived RP units per millimetre. For the simulation pair both factors are
+        // 1 and 1000 respectively, which is why the numbers equal the authored ones.
+        Assert.Equal(-5000m, operation.ComparisonTarget!.Value);
+        Assert.Equal(2m, operation.ComparisonTolerance!.Value);
     }
 
     [Fact]
@@ -259,6 +445,136 @@ public sealed class ManualMotionSessionTests
         Assert.Single(absolute);
         Assert.Equal(-5000, absolute[0].Operand);
     }
+
+    [Fact]
+    public void The_Active_Session_Captures_The_Conversion_As_An_Immutable_Snapshot()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        var engineering = harness.Snapshot.Engineering;
+        Assert.Equal(1, engineering.Generation);
+        Assert.Equal(4, engineering.Axes.Count);
+
+        var axisA = engineering.Axes[0];
+        Assert.Equal(ManualMotionAxis.A, axisA.Axis);
+        Assert.Equal(1000, axisA.EncoderPulsesPerRevolution);
+        Assert.Equal(500, axisA.DrivePulsesPerRevolution);
+        Assert.Equal(0.1m, axisA.MechanicalGearRatio);
+        Assert.Equal(5m, axisA.PitchMillimetresPerRevolution);
+        Assert.True(axisA.ConversionConfigured);
+
+        // The snapshot is the same object graph on every read: nothing is recomputed from live state.
+        Assert.Same(engineering, harness.Snapshot.Engineering);
+        Assert.Same(axisA, harness.Snapshot.Engineering.Axes[0]);
+    }
+
+    [Fact]
+    public void An_Engineering_Settings_Change_Is_Accepted_Only_While_Nothing_Is_In_Flight()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        // Idle: an accepted change advances the capture generation and is republished.
+        var idle = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(ManualMotionProfile.CreateSimulationProfile()));
+        Assert.True(idle.Accepted);
+        Assert.Equal(2, harness.Snapshot.Engineering.Generation);
+
+        // In flight: Home is active, so the change is refused and nothing is applied.
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+
+        var refusedWhileHoming = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(ManualMotionProfile.CreateSimulationProfile()));
+        Assert.False(refusedWhileHoming.Accepted);
+        Assert.Equal(ManualMotionCodes.EngineeringSettingsLockedWhileActive, refusedWhileHoming.Code);
+        Assert.Equal(2, harness.Snapshot.Engineering.Generation);
+        Assert.False(harness.Session.EngineeringSettingsEditable);
+    }
+
+    [Fact]
+    public void A_Refused_Profile_Cannot_Become_The_Session_Configuration()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        var refused = harness.Session.ApplyEngineeringSettings(ManualMotionProfileResult.Refused(ManualMotionCodes.ProfileValueInvalid));
+        Assert.False(refused.Accepted);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refused.Code);
+        Assert.Equal(1, harness.Snapshot.Engineering.Generation);
+    }
+
+    [Fact]
+    public void Each_Axis_Carries_Its_Own_Conversion_And_Is_Compared_With_It()
+    {
+        // Axis A keeps the simulation pair; Axis B is given a different, still valid, pair. The Product
+        // needs no change to handle either: the comparison follows the axis's own profile.
+        var profile = ManualMotionProfile.CreateSimulationProfile();
+        var mixed = new ManualMotionProfile
+        {
+            Source = profile.Source,
+            ControllerId = profile.ControllerId,
+            ObservationIntervalMilliseconds = profile.ObservationIntervalMilliseconds,
+            ObservationFreshnessMilliseconds = profile.ObservationFreshnessMilliseconds,
+            JogHeartbeatTimeoutMilliseconds = profile.JogHeartbeatTimeoutMilliseconds,
+            JogMaximumHoldMilliseconds = profile.JogMaximumHoldMilliseconds,
+            AxisA = profile.AxisA,
+            AxisB = WithConversion(profile.AxisB!, encoderPulsesPerRevolution: 1000, drivePulsesPerRevolution: 250),
+            AxisC = profile.AxisC,
+            AxisD = profile.AxisD,
+        };
+
+        var harness = new Harness(profile: mixed);
+        harness.OpenAndObserve();
+
+        Assert.Equal(500, harness.Snapshot.Engineering.Axes[0].DrivePulsesPerRevolution);
+        Assert.Equal(250, harness.Snapshot.Engineering.Axes[1].DrivePulsesPerRevolution);
+        Assert.Equal(0.5m, harness.Snapshot.Engineering.Axes[0].TpNormalizationRatio);
+        Assert.Equal(0.25m, harness.Snapshot.Engineering.Axes[1].TpNormalizationRatio);
+
+        // Both axes still complete a Move: the density changed, the rule did not.
+        harness.HomeAxis(ManualMotionAxis.A);
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+
+        harness.HomeAxis(ManualMotionAxis.B);
+        harness.Session.RequestMove(ManualMotionAxis.B, -3000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.B) is null
+            && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+    }
+
+    private static ManualMotionAxisProfile WithConversion(
+        ManualMotionAxisProfile axis,
+        int encoderPulsesPerRevolution,
+        int drivePulsesPerRevolution) => new()
+    {
+        BrakeOutput = axis.BrakeOutput,
+        BrakeReleaseAction = axis.BrakeReleaseAction,
+        BrakeSettleMilliseconds = axis.BrakeSettleMilliseconds,
+        JogSpeed = axis.JogSpeed,
+        HomeSpeed = axis.HomeSpeed,
+        HomeTimeoutMilliseconds = axis.HomeTimeoutMilliseconds,
+        MoveAcceleration = axis.MoveAcceleration,
+        MoveSpeed = axis.MoveSpeed,
+        MoveDeceleration = axis.MoveDeceleration,
+        MoveMinimumTarget = axis.MoveMinimumTarget,
+        MoveMaximumTarget = axis.MoveMaximumTarget,
+        PositionTolerance = axis.PositionTolerance,
+        MotionTimeoutMilliseconds = axis.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = axis.StopTimeoutMilliseconds,
+        MotionStatusBit = axis.MotionStatusBit,
+        MotionActiveValue = axis.MotionActiveValue,
+        HomeStatusBit = axis.HomeStatusBit,
+        HomeActiveValue = axis.HomeActiveValue,
+        DualZeroPermitted = axis.DualZeroPermitted,
+        EncoderPulsesPerRevolution = encoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = drivePulsesPerRevolution,
+        MechanicalGearRatio = axis.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = axis.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = axis.PositionToleranceMillimetres,
+    };
 
     private sealed class FakePort : IManualMotionPort
     {
@@ -401,6 +717,11 @@ public sealed class ManualMotionSessionTests
             MoveMinimumTarget = source.MoveMinimumTarget,
             MoveMaximumTarget = source.MoveMaximumTarget,
             PositionTolerance = source.PositionTolerance,
+            EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+            DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+            MechanicalGearRatio = source.MechanicalGearRatio,
+            PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+            PositionToleranceMillimetres = source.PositionToleranceMillimetres,
             MotionTimeoutMilliseconds = motionTimeoutMilliseconds ?? source.MotionTimeoutMilliseconds,
             StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
             MotionStatusBit = source.MotionStatusBit,
@@ -432,6 +753,11 @@ public sealed class ManualMotionSessionTests
         HomeStatusBit = source.HomeStatusBit,
         HomeActiveValue = source.HomeActiveValue,
         DualZeroPermitted = source.DualZeroPermitted,
+        EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+        MechanicalGearRatio = source.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = source.PositionToleranceMillimetres,
     };
 
     private static ManualMotionProfile ProfileWith(
@@ -571,6 +897,11 @@ public sealed class ManualMotionSessionTests
         HomeStatusBit = source.HomeStatusBit,
         HomeActiveValue = source.HomeActiveValue,
         DualZeroPermitted = source.DualZeroPermitted,
+        EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+        MechanicalGearRatio = source.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = source.PositionToleranceMillimetres,
     };
 
     /// <summary>
@@ -713,8 +1044,8 @@ public sealed class ManualMotionSessionTests
         Assert.Equal("Vertical", harness.Axis(ManualMotionAxis.D).RoleLabel);
         Assert.True(harness.Axis(ManualMotionAxis.A).AllowedByProfile);
         Assert.True(harness.Axis(ManualMotionAxis.A).PositionTp.Fresh);
-        // The simulated controller models the Owner-confirmed 2:1 pulse-domain relationship, so every
-        // raw theoretical reading carries the encoder-domain density while the reference reading does not.
+        // The simulated port models the 2:1 count density of the profile it was opened with, so every raw
+        // theoretical reading carries the encoder-domain density while the reference reading does not.
         // Both the raw observation and its normalized comparison operand are published, and neither is
         // derived from the other at publication time beyond the stated normalization.
         Assert.Equal(24000m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
@@ -3225,6 +3556,11 @@ public sealed class ManualMotionSessionTests
                 MoveMinimumTarget = source.MoveMinimumTarget,
                 MoveMaximumTarget = source.MoveMaximumTarget,
                 PositionTolerance = source.PositionTolerance,
+            EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+            DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+            MechanicalGearRatio = source.MechanicalGearRatio,
+            PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+            PositionToleranceMillimetres = source.PositionToleranceMillimetres,
                 MotionTimeoutMilliseconds = source.MotionTimeoutMilliseconds,
                 StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
                 MotionStatusBit = source.MotionStatusBit,

@@ -41,7 +41,12 @@ public sealed class ManualMotionProfileTests
               "motionActiveValue": 0,
               "homeStatusBit": 2,
               "homeActiveValue": 1,
-              "dualZeroPermitted": true
+              "dualZeroPermitted": true,
+              "encoderPulsesPerRevolution": 10000,
+              "drivePulsesPerRevolution": 5000,
+              "mechanicalGearRatio": 0.1,
+              "pitchMillimetresPerRevolution": 5,
+              "positionToleranceMillimetres": 0.001
             },
             "B": {
               "brakeOutput": 2
@@ -353,5 +358,97 @@ public sealed class ManualMotionProfileTests
         Assert.Equal("FRONT / UPPER", ManualMotionTopology.TargetCoverage(ManualMotionAxis.C));
         Assert.Equal("REAR / UPPER", ManualMotionTopology.InstalledPosition(ManualMotionAxis.D));
         Assert.Equal("FRONT / UPPER", ManualMotionTopology.TargetCoverage(ManualMotionAxis.D));
+    }
+
+    [Fact]
+    public void The_Five_Engineering_Settings_Are_Parsed_Per_Axis_And_Derive_The_Known_Quantities()
+    {
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(CompleteProfile).Profile);
+        var axisA = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
+
+        Assert.Equal(10000, axisA.EncoderPulsesPerRevolution);
+        Assert.Equal(5000, axisA.DrivePulsesPerRevolution);
+        Assert.Equal(0.1m, axisA.MechanicalGearRatio);
+        Assert.Equal(5m, axisA.PitchMillimetresPerRevolution);
+        Assert.Equal(0.001m, axisA.PositionToleranceMillimetres);
+
+        var domain = Assert.IsType<ManualMotionPulseDomain>(axisA.PulseDomain());
+        Assert.Equal(0.5m, domain.TpNormalizationRatio);
+        Assert.Equal(10000m, domain.PaCommandUnitsPerMillimetre);
+        Assert.Equal(10000m, domain.RpFeedbackUnitsPerMillimetre);
+        Assert.Equal(20000m, domain.TpFeedbackUnitsPerMillimetre);
+        Assert.True(domain.CommandAndReferenceShareCountDensity);
+
+        // Axis B declares no engineering settings: its conversion is simply unavailable, and the axis
+        // reports exactly which values are missing rather than inheriting Axis A's.
+        var axisB = Assert.IsType<ManualMotionAxisProfile>(profile.AxisB);
+        Assert.Null(axisB.PulseDomain());
+        Assert.Contains("encoderPulsesPerRevolution", axisB.NotConfiguredItems(), StringComparer.Ordinal);
+        Assert.Contains("drivePulsesPerRevolution", axisB.NotConfiguredItems(), StringComparer.Ordinal);
+        Assert.Contains("mechanicalGearRatio", axisB.NotConfiguredItems(), StringComparer.Ordinal);
+        Assert.Contains("pitchMillimetresPerRevolution", axisB.NotConfiguredItems(), StringComparer.Ordinal);
+        Assert.Contains("positionToleranceMillimetres", axisB.NotConfiguredItems(), StringComparer.Ordinal);
+    }
+
+    [Fact]
+    public void Per_Axis_Engineering_Settings_Are_Independent_On_One_Profile()
+    {
+        var json = ReplaceInProfile(
+            "\"drivePulsesPerRevolution\": 5000,",
+            "\"drivePulsesPerRevolution\": 2500,");
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(json).Profile);
+
+        // The same profile now derives a different ratio for Axis A: the value is data, not Source.
+        var domain = Assert.IsType<ManualMotionPulseDomain>(profile.AxisA!.PulseDomain());
+        Assert.Equal(0.25m, domain.TpNormalizationRatio);
+        Assert.Equal(5000m, domain.PaCommandUnitsPerMillimetre);
+    }
+
+    [Theory]
+    [InlineData("\"encoderPulsesPerRevolution\": 10000,", "\"encoderPulsesPerRevolution\": 0,")]
+    [InlineData("\"drivePulsesPerRevolution\": 5000,", "\"drivePulsesPerRevolution\": -1,")]
+    [InlineData("\"mechanicalGearRatio\": 0.1,", "\"mechanicalGearRatio\": 0,")]
+    [InlineData("\"pitchMillimetresPerRevolution\": 5,", "\"pitchMillimetresPerRevolution\": -5,")]
+    [InlineData("\"positionToleranceMillimetres\": 0.001", "\"positionToleranceMillimetres\": 0")]
+    [InlineData("\"mechanicalGearRatio\": 0.1,", "\"mechanicalGearRatio\": \"0.1\",")]
+    public void An_Invalid_Engineering_Setting_Refuses_The_Whole_Profile(string from, string to)
+    {
+        Assert.Equal(
+            ManualMotionCodes.ProfileValueInvalid,
+            ManualMotionProfileParser.Parse(ReplaceInProfile(from, to)).Code);
+    }
+
+    [Fact]
+    public void An_Unknown_Engineering_Setting_Refuses_The_Profile()
+    {
+        Assert.Equal(
+            ManualMotionCodes.ProfilePropertyUnknown,
+            ManualMotionProfileParser.Parse(ReplaceInProfile(
+                "\"mechanicalGearRatio\": 0.1,",
+                "\"mechanicalGearRatio\": 0.1,\n              \"tpDivideBy\": 2,")).Code);
+    }
+
+    [Fact]
+    public void A_Profile_Without_The_Engineering_Settings_Still_Parses_And_Reports_Them_Not_Configured()
+    {
+        // Absent is NOT an error at the schema level: the axis simply has no conversion, which refuses the
+        // motion operations that need one and changes nothing else. Every setting is optional precisely so
+        // a partially commissioned axis can be observed without being assumed.
+        const string minimal = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {}
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(minimal);
+        Assert.True(result.Accepted);
+        var axisA = Assert.IsType<ManualMotionProfile>(result.Profile).AxisA!;
+        Assert.Null(axisA.PulseDomain());
+        Assert.Contains("encoderPulsesPerRevolution", axisA.NotConfiguredItems(), StringComparer.Ordinal);
     }
 }

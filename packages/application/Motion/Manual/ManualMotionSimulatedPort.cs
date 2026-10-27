@@ -102,9 +102,9 @@ public sealed class ManualMotionAxisSimulationOptions
     public decimal RpBias { get; init; }
 
     /// <summary>
-    /// Synthetic override of the encoder-to-drive count density for this axis, in tests only. Null keeps
-    /// the Owner-confirmed relationship of <see cref="ManualMotionPulseDomain"/> (2:1); a value of 1 models
-    /// a controller whose two readbacks share one domain, which is the control case that must still pass.
+    /// Synthetic override of the encoder-to-drive count density for this axis, in tests only. Null reports
+    /// the density implied by this axis's own profile (encoder pulses / drive pulses); a value of 1 models
+    /// a controller whose two readbacks share one domain, which contradicts that profile and must fail.
     /// </summary>
     public int? EncoderCountsPerDriveCount { get; init; }
 }
@@ -605,6 +605,23 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         return axis.ReleaseAction == ManualMotionBrakeReleaseAction.SetOutput ? state == 1 : state == 0;
     }
 
+    /// <summary>
+    /// The encoder-to-drive count density of one simulated axis, taken from its own profile. An axis whose
+    /// profile declares no such relationship is simulated as 1:1, which is the honest simulation of "the
+    /// profile says nothing".
+    /// </summary>
+    private static int ProfileCountDensity(SimulatedAxis axis)
+    {
+        var domain = axis.Profile?.PulseDomain();
+        if (domain is not { } available || available.DrivePulsesPerRevolution == 0)
+        {
+            return 1;
+        }
+
+        var density = available.EncoderPulsesPerRevolution / available.DrivePulsesPerRevolution;
+        return density <= 0 ? 1 : density;
+    }
+
     private bool TryReadValue(ManualMotionPortRead read, out decimal value)
     {
         var axis = AxisOf(read.Axis);
@@ -621,11 +638,12 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 return true;
 
             case ManualMotionReadKind.PositionTp:
-                // The theoretical (encoder) readback carries the confirmed encoder-domain count density,
-                // so the simulated controller reports the 2:1 relationship the real machine reports.
-                // Normalization before comparison is therefore exercised by every simulated Move.
+                // The theoretical (encoder) readback carries the count density of THIS axis's profile,
+                // so the simulated controller reports the same encoder-to-drive relationship the profile
+                // declares. Normalization before comparison is therefore exercised by every simulated
+                // Move, and changing the profile changes the simulated reading with no source change.
                 value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero)
-                    * (axis.Options?.EncoderCountsPerDriveCount ?? ManualMotionPulseDomain.EncoderCountsPerDriveCount);
+                    * (axis.Options?.EncoderCountsPerDriveCount ?? ProfileCountDensity(axis));
                 return true;
 
             case ManualMotionReadKind.PositionRp:
@@ -677,6 +695,7 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             ManualMotionAxisSimulationOptions? options = null)
         {
             Options = options;
+            Profile = profile;
             BrakeOutput = profile?.BrakeOutput ?? defaultBrakeOutput;
             ReleaseAction = profile?.BrakeReleaseAction ?? ManualMotionBrakeReleaseAction.SetOutput;
             MotionBit = profile?.MotionStatusBit ?? SyntheticMotionBit;
@@ -686,6 +705,9 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             HomeActiveValue = profile?.HomeActiveValue ?? 1;
             Physical = startPosition;
         }
+
+        /// <summary>The profile of this simulated axis, which supplies its own count density.</summary>
+        public ManualMotionAxisProfile? Profile { get; }
 
         public ManualMotionAxisSimulationOptions? Options { get; set; }
 

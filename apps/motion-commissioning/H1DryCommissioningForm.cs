@@ -417,8 +417,8 @@ internal sealed class H1DryCommissioningForm : Form
             ? value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + " " + Freshness(raw)
             : "- " + Freshness(raw);
 
-    private static string Format(int? value) =>
-        value?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "-";
+    private static string Format(decimal? value) =>
+        value?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "-";
 
     private static string Reading(ManualMotionReadingSnapshot reading) =>
         (reading.Value?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "-")

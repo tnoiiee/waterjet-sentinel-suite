@@ -881,6 +881,22 @@ consequences belong with it, because they are inseparable: the configured `posit
 units, so if the comparison is moved into the feedback domain the tolerance must move with it; and no
 further correction is written until the Owner rules on that single value.
 
+### 12.5.1 Resolution of the open item (supersedes the ruling request above)
+
+The five conversion inputs are no longer Product constants and no longer a ruling the Owner owes the
+implementation: they are **per-axis profile settings**
+(`encoderPulsesPerRevolution`, `drivePulsesPerRevolution`, `mechanicalGearRatio`,
+`pitchMillimetresPerRevolution`, `positionToleranceMillimetres`), independent on A, B, C and D, captured
+as an immutable session snapshot and displayed with the four derived quantities. The factor of ten named
+above is therefore not something to be guessed into the conversion: it is a claim that the profile in
+effect during the sample had a millimetres-per-motor-revolution of 5 rather than 0.5, i.e. a ratio of 1
+rather than 0.1, or a different pitch. `docs/evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md` records
+the twelve formulas, their units, their authority, the expected P1 (180 mm → 1,800,000) and P2 (200 mm →
+2,000,000) values, and the arithmetic that shows the sample is self-consistent at ten times the
+millimetre scale. The fail-closed behaviour is unchanged: a Move whose readbacks agree with each other but
+not with the target reports `MOVE_TARGET_NOT_REACHED_READBACKS_AGREE` and completes no point, so P1 never
+advances to P2 on an unreconciled scale.
+
 ### 12.6 Hardware
 
 **HARDWARE NOT EXECUTED in this pass.** No native load, no controller contact, no command dispatched. An

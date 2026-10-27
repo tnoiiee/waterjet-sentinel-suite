@@ -78,6 +78,88 @@ public sealed class ManualMotionAxisProfile
     /// <summary>True only when the Owner-local profile explicitly permits the dual-zero definition on this axis.</summary>
     public bool DualZeroPermitted { get; init; }
 
+    /// <summary>
+    /// The encoder counts produced by one motor revolution on this axis. A flexible per-axis engineering
+    /// setting, not a Product constant: two axes may differ. NOT_CONFIGURED refuses motion that needs the
+    /// conversion.
+    /// </summary>
+    public int? EncoderPulsesPerRevolution { get; init; }
+
+    /// <summary>
+    /// The drive pulses consumed by one motor revolution on this axis. A flexible per-axis engineering
+    /// setting, not a Product constant.
+    /// </summary>
+    public int? DrivePulsesPerRevolution { get; init; }
+
+    /// <summary>
+    /// The mechanical reduction of this axis, as OUTPUT revolutions per MOTOR revolution (0.1 is the
+    /// 1:10 reduction: ten motor revolutions per output revolution). A flexible per-axis setting.
+    /// </summary>
+    public decimal? MechanicalGearRatio { get; init; }
+
+    /// <summary>The travel, in millimetres, produced by one OUTPUT revolution of this axis.</summary>
+    public decimal? PitchMillimetresPerRevolution { get; init; }
+
+    /// <summary>
+    /// The Move comparison tolerance, in MILLIMETRES of travel. It is converted into the reference
+    /// (drive) count domain through this axis's own derived units per millimetre, so the tolerance is
+    /// stated in the same engineering unit as the target whenever the conversion is available.
+    /// </summary>
+    public decimal? PositionToleranceMillimetres { get; init; }
+
+    /// <summary>
+    /// The axis's pulse-domain conversion, or null when any of its four engineering settings is missing
+    /// or nonsensical. A null conversion refuses every motion operation that would need it.
+    /// </summary>
+    /// <returns>The conversion when it is available.</returns>
+    public ManualMotionPulseDomain? PulseDomain() =>
+        ManualMotionPulseDomain.TryCreate(
+            EncoderPulsesPerRevolution,
+            DrivePulsesPerRevolution,
+            MechanicalGearRatio,
+            PitchMillimetresPerRevolution,
+            out var domain)
+            ? domain
+            : null;
+
+    /// <summary>
+    /// Returns this axis profile with its five engineering settings replaced and every other value kept.
+    /// It is the only way the configuration UI builds a candidate: no unrelated value is ever rebuilt,
+    /// defaulted or lost in a settings change.
+    /// </summary>
+    public ManualMotionAxisProfile WithEngineering(
+        int? encoderPulsesPerRevolution,
+        int? drivePulsesPerRevolution,
+        decimal? mechanicalGearRatio,
+        decimal? pitchMillimetresPerRevolution,
+        decimal? positionToleranceMillimetres) => new()
+    {
+        BrakeOutput = BrakeOutput,
+        BrakeReleaseAction = BrakeReleaseAction,
+        BrakeSettleMilliseconds = BrakeSettleMilliseconds,
+        JogSpeed = JogSpeed,
+        HomeSpeed = HomeSpeed,
+        HomeTimeoutMilliseconds = HomeTimeoutMilliseconds,
+        MoveAcceleration = MoveAcceleration,
+        MoveSpeed = MoveSpeed,
+        MoveDeceleration = MoveDeceleration,
+        MoveMinimumTarget = MoveMinimumTarget,
+        MoveMaximumTarget = MoveMaximumTarget,
+        PositionTolerance = PositionTolerance,
+        MotionTimeoutMilliseconds = MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = StopTimeoutMilliseconds,
+        MotionStatusBit = MotionStatusBit,
+        MotionActiveValue = MotionActiveValue,
+        HomeStatusBit = HomeStatusBit,
+        HomeActiveValue = HomeActiveValue,
+        DualZeroPermitted = DualZeroPermitted,
+        EncoderPulsesPerRevolution = encoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = drivePulsesPerRevolution,
+        MechanicalGearRatio = mechanicalGearRatio,
+        PitchMillimetresPerRevolution = pitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = positionToleranceMillimetres,
+    };
+
     /// <summary>The profile property names that are NOT_CONFIGURED for this axis, in schema order.</summary>
     public IReadOnlyList<string> NotConfiguredItems()
     {
@@ -109,10 +191,24 @@ public sealed class ManualMotionAxisProfile
             missing.Add("dualZeroPermitted");
         }
 
+        AddIfMissing(missing, EncoderPulsesPerRevolution, "encoderPulsesPerRevolution");
+        AddIfMissing(missing, DrivePulsesPerRevolution, "drivePulsesPerRevolution");
+        AddIfMissing(missing, MechanicalGearRatio, "mechanicalGearRatio");
+        AddIfMissing(missing, PitchMillimetresPerRevolution, "pitchMillimetresPerRevolution");
+        AddIfMissing(missing, PositionToleranceMillimetres, "positionToleranceMillimetres");
+
         return missing;
     }
 
     private static void AddIfMissing(List<string> missing, int? value, string name)
+    {
+        if (value is null)
+        {
+            missing.Add(name);
+        }
+    }
+
+    private static void AddIfMissing(List<string> missing, decimal? value, string name)
     {
         if (value is null)
         {
@@ -168,6 +264,21 @@ public sealed class ManualMotionProfile
         _ => null,
     };
 
+    /// <summary>Returns this profile with one axis replaced and every other axis and session value kept.</summary>
+    public ManualMotionProfile WithAxis(ManualMotionAxis axis, ManualMotionAxisProfile? axisProfile) => new()
+    {
+        Source = Source,
+        ControllerId = ControllerId,
+        ObservationIntervalMilliseconds = ObservationIntervalMilliseconds,
+        ObservationFreshnessMilliseconds = ObservationFreshnessMilliseconds,
+        JogHeartbeatTimeoutMilliseconds = JogHeartbeatTimeoutMilliseconds,
+        JogMaximumHoldMilliseconds = JogMaximumHoldMilliseconds,
+        AxisA = axis == ManualMotionAxis.A ? axisProfile : AxisA,
+        AxisB = axis == ManualMotionAxis.B ? axisProfile : AxisB,
+        AxisC = axis == ManualMotionAxis.C ? axisProfile : AxisC,
+        AxisD = axis == ManualMotionAxis.D ? axisProfile : AxisD,
+    };
+
     /// <summary>
     /// The built-in SIMULATION profile. Every value is synthetic and chosen only so the simulated
     /// lifecycle can be reviewed: the status-bit layout in particular is deliberately arbitrary and is
@@ -209,6 +320,16 @@ public sealed class ManualMotionProfile
         HomeStatusBit = 3,
         HomeActiveValue = 1,
         DualZeroPermitted = true,
+
+        // SYNTHETIC simulation-only engineering settings. They are deliberately NOT the commissioned
+        // machine's values: a simulated profile must never be able to configure the hardware path, and
+        // these numbers encode the same 2:1 readback relationship with clearly fake magnitudes so the
+        // normalization is exercised by every simulated Move.
+        EncoderPulsesPerRevolution = 1000,
+        DrivePulsesPerRevolution = 500,
+        MechanicalGearRatio = 0.1m,
+        PitchMillimetresPerRevolution = 5m,
+        PositionToleranceMillimetres = 0.002m,
     };
 }
 
@@ -382,6 +503,9 @@ public static class ManualMotionProfileParser
     /// <summary>The largest accepted profile text, in characters.</summary>
     public const int MaximumProfileLength = 65536;
 
+    /// <summary>The most decimal places an engineering setting may carry.</summary>
+    public const int MaximumEngineeringDecimalPlaces = 7;
+
     private const string SchemaProperty = "schema";
     private const string ControllerProperty = "controller";
     private const string SessionProperty = "session";
@@ -431,6 +555,11 @@ public static class ManualMotionProfileParser
         "homeStatusBit",
         "homeActiveValue",
         "dualZeroPermitted",
+        "encoderPulsesPerRevolution",
+        "drivePulsesPerRevolution",
+        "mechanicalGearRatio",
+        "pitchMillimetresPerRevolution",
+        "positionToleranceMillimetres",
     };
 
     /// <summary>Reads one Owner-local profile text. Never throws for malformed input.</summary>
@@ -617,7 +746,12 @@ public static class ManualMotionProfileParser
             || !TryReadInt(element, "motionActiveValue", 0, 1, out var motionActive)
             || !TryReadInt(element, "homeStatusBit", 0, 7, out var homeBit)
             || !TryReadInt(element, "homeActiveValue", 0, 1, out var homeActive)
-            || !TryReadBoolean(element, "dualZeroPermitted", out var dualZeroPermitted))
+            || !TryReadBoolean(element, "dualZeroPermitted", out var dualZeroPermitted)
+            || !TryReadInt(element, "encoderPulsesPerRevolution", 1, 10_000_000, out var encoderPulsesPerRevolution)
+            || !TryReadInt(element, "drivePulsesPerRevolution", 1, 10_000_000, out var drivePulsesPerRevolution)
+            || !TryReadDecimal(element, "mechanicalGearRatio", 0.0000001m, 1_000_000m, out var mechanicalGearRatio)
+            || !TryReadDecimal(element, "pitchMillimetresPerRevolution", 0.0000001m, 1_000_000m, out var pitchMillimetresPerRevolution)
+            || !TryReadDecimal(element, "positionToleranceMillimetres", 0.0000001m, 1_000_000m, out var positionToleranceMillimetres))
         {
             return ManualMotionCodes.ProfileValueInvalid;
         }
@@ -658,6 +792,11 @@ public static class ManualMotionProfileParser
             HomeStatusBit = homeBit,
             HomeActiveValue = homeActive,
             DualZeroPermitted = dualZeroPermitted,
+            EncoderPulsesPerRevolution = encoderPulsesPerRevolution,
+            DrivePulsesPerRevolution = drivePulsesPerRevolution,
+            MechanicalGearRatio = mechanicalGearRatio,
+            PitchMillimetresPerRevolution = pitchMillimetresPerRevolution,
+            PositionToleranceMillimetres = positionToleranceMillimetres,
         };
 
         return null;
@@ -699,6 +838,44 @@ public static class ManualMotionProfileParser
         }
 
         if (parsed < minimum || parsed > maximum)
+        {
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads one optional decimal property. A value is accepted only when it is a JSON number inside the
+    /// closed range: the profile never rounds, clamps or reinterprets an engineering setting.
+    /// </summary>
+    private static bool TryReadDecimal(
+        JsonElement element,
+        string name,
+        decimal minimum,
+        decimal maximum,
+        out decimal? value)
+    {
+        value = null;
+        if (!element.TryGetProperty(name, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.Number || !property.TryGetDecimal(out var parsed))
+        {
+            return false;
+        }
+
+        if (parsed < minimum || parsed > maximum)
+        {
+            return false;
+        }
+
+        // Refuse more precision than the schema carries, so a value can never be silently rounded by
+        // the reader into something the file did not say.
+        if (decimal.Round(parsed, MaximumEngineeringDecimalPlaces) != parsed)
         {
             return false;
         }

@@ -20,28 +20,100 @@ public sealed class ManualMotionSimulatedPortTests
         int brakeOutput = 0) => new(kind, axis, operand, brakeOutput);
 
     [Fact]
-    public void The_Simulated_Controller_Reports_The_Confirmed_Two_To_One_Pulse_Domain_Relationship()
+    public void The_Simulated_Controller_Reports_The_Count_Density_Of_Each_Axis_Profile()
     {
-        var port = new ManualMotionSimulatedPort(new TestClock(Instant), ManualMotionProfile.CreateSimulationProfile());
+        var profile = ManualMotionProfile.CreateSimulationProfile();
+        var port = new ManualMotionSimulatedPort(new TestClock(Instant), profile);
         Assert.True(port.Open().Opened);
 
         foreach (var axis in new[] { ManualMotionAxis.A, ManualMotionAxis.B, ManualMotionAxis.C, ManualMotionAxis.D })
         {
+            var domain = Assert.IsType<ManualMotionPulseDomain>(profile.For(axis)!.PulseDomain());
             var theoretical = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
             var reference = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
 
             Assert.True(theoretical.Succeeded);
             Assert.True(reference.Succeeded);
 
-            // Encoder (theoretical) counts are exactly twice the drive (reference) counts on every axis.
+            // The encoder (theoretical) reading is the profile's density multiple of the drive reading.
             Assert.Equal(
-                reference.Value * ManualMotionPulseDomain.EncoderCountsPerDriveCount,
+                reference.Value * domain.EncoderPulsesPerRevolution / domain.DrivePulsesPerRevolution,
                 theoretical.Value);
 
             // Normalizing the theoretical reading reproduces the reference reading exactly.
-            Assert.Equal(reference.Value, ManualMotionPulseDomain.NormalizeTheoretical(theoretical.Value));
+            Assert.Equal(reference.Value, domain.NormalizeTheoretical(theoretical.Value));
         }
     }
+
+    [Fact]
+    public void Changing_The_Profile_Changes_The_Simulated_Readback_With_No_Source_Change()
+    {
+        // A 4:1 profile reports four encoder counts per drive count; a 1:1 profile reports one. Neither
+        // needs a Source change, which is the point of the settings being data.
+        var fourToOne = WithDensity(ManualMotionProfile.CreateSimulationProfile(), encoderPulsesPerRevolution: 4000, drivePulsesPerRevolution: 1000);
+        var unity = WithDensity(ManualMotionProfile.CreateSimulationProfile(), encoderPulsesPerRevolution: 1000, drivePulsesPerRevolution: 1000);
+
+        var portFour = new ManualMotionSimulatedPort(new TestClock(Instant), fourToOne);
+        var portUnity = new ManualMotionSimulatedPort(new TestClock(Instant), unity);
+        Assert.True(portFour.Open().Opened);
+        Assert.True(portUnity.Open().Opened);
+
+        var fourTp = portFour.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0));
+        var fourRp = portFour.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0));
+        var unityTp = portUnity.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0));
+        var unityRp = portUnity.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0));
+
+        Assert.Equal(fourRp.Value * 4m, fourTp.Value);
+        Assert.Equal(unityRp.Value, unityTp.Value);
+    }
+
+    private static ManualMotionProfile WithDensity(
+        ManualMotionProfile profile,
+        int encoderPulsesPerRevolution,
+        int drivePulsesPerRevolution) => new()
+    {
+        Source = profile.Source,
+        ControllerId = profile.ControllerId,
+        ObservationIntervalMilliseconds = profile.ObservationIntervalMilliseconds,
+        ObservationFreshnessMilliseconds = profile.ObservationFreshnessMilliseconds,
+        JogHeartbeatTimeoutMilliseconds = profile.JogHeartbeatTimeoutMilliseconds,
+        JogMaximumHoldMilliseconds = profile.JogMaximumHoldMilliseconds,
+        AxisA = WithDensity(profile.AxisA!, encoderPulsesPerRevolution, drivePulsesPerRevolution),
+        AxisB = profile.AxisB,
+        AxisC = profile.AxisC,
+        AxisD = profile.AxisD,
+    };
+
+    private static ManualMotionAxisProfile WithDensity(
+        ManualMotionAxisProfile axis,
+        int encoderPulsesPerRevolution,
+        int drivePulsesPerRevolution) => new()
+    {
+        BrakeOutput = axis.BrakeOutput,
+        BrakeReleaseAction = axis.BrakeReleaseAction,
+        BrakeSettleMilliseconds = axis.BrakeSettleMilliseconds,
+        JogSpeed = axis.JogSpeed,
+        HomeSpeed = axis.HomeSpeed,
+        HomeTimeoutMilliseconds = axis.HomeTimeoutMilliseconds,
+        MoveAcceleration = axis.MoveAcceleration,
+        MoveSpeed = axis.MoveSpeed,
+        MoveDeceleration = axis.MoveDeceleration,
+        MoveMinimumTarget = axis.MoveMinimumTarget,
+        MoveMaximumTarget = axis.MoveMaximumTarget,
+        PositionTolerance = axis.PositionTolerance,
+        MotionTimeoutMilliseconds = axis.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = axis.StopTimeoutMilliseconds,
+        MotionStatusBit = axis.MotionStatusBit,
+        MotionActiveValue = axis.MotionActiveValue,
+        HomeStatusBit = axis.HomeStatusBit,
+        HomeActiveValue = axis.HomeActiveValue,
+        DualZeroPermitted = axis.DualZeroPermitted,
+        EncoderPulsesPerRevolution = encoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = drivePulsesPerRevolution,
+        MechanicalGearRatio = axis.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = axis.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = axis.PositionToleranceMillimetres,
+    };
 
     /// <summary>
     /// The simulated axis's theoretical reading expressed in the reference (drive) domain, which is the
@@ -52,7 +124,9 @@ public sealed class ManualMotionSimulatedPortTests
     {
         var result = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, axis, 0));
         Assert.True(result.Succeeded);
-        return ManualMotionPulseDomain.NormalizeTheoretical(result.Value);
+        var domain = Assert.IsType<ManualMotionPulseDomain>(
+            ManualMotionProfile.CreateSimulationProfile().For(axis)!.PulseDomain());
+        return domain.NormalizeTheoretical(result.Value);
     }
 
     private static ManualMotionProfile ClearOutputProfile()
@@ -78,6 +152,11 @@ public sealed class ManualMotionSimulatedPortTests
             HomeStatusBit = 3,
             HomeActiveValue = 1,
             DualZeroPermitted = true,
+            EncoderPulsesPerRevolution = 1000,
+            DrivePulsesPerRevolution = 500,
+            MechanicalGearRatio = 0.1m,
+            PitchMillimetresPerRevolution = 5m,
+            PositionToleranceMillimetres = 0.002m,
         };
 
         return new ManualMotionProfile

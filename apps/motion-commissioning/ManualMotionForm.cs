@@ -43,6 +43,7 @@ internal sealed class ManualMotionForm : Form
     private readonly AxisControls _axisC = new(ManualMotionAxis.C);
     private readonly AxisControls _axisD = new(ManualMotionAxis.D);
     private readonly BufferedTableLayoutPanel _axesLayout = new() { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
+    private readonly Button _engineeringSettings = new();
 
     // Hold-to-run press state is per axis: at most one active press per axis, heartbeats are posted
     // for every active press each tick, and a release (or capture loss) ends only its own axis.
@@ -160,18 +161,33 @@ internal sealed class ManualMotionForm : Form
         _logList.IntegralHeight = false;
         _logList.Font = new Font("Consolas", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
-        var root = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5 };
+        // The Engineering Motion Configuration is one window for all four axes, not a control per panel:
+        // its five settings are independent per axis and must be comparable across axes at a glance.
+        _engineeringSettings.Text = "Engineering settings (per-axis conversion)...";
+        _engineeringSettings.AutoSize = true;
+        _engineeringSettings.Margin = new Padding(0, 2, 0, 2);
+        _engineeringSettings.Click += (_, _) =>
+        {
+            using var engineering = new EngineeringMotionConfigurationForm(_session);
+            engineering.ShowDialog(this);
+        };
+        var engineeringLine = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false };
+        engineeringLine.Controls.Add(_engineeringSettings);
+
+        var root = new BufferedTableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 52F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 26F));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 32F));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 78F));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 22F));
         root.Controls.Add(_modeBanner, 0, 0);
         root.Controls.Add(_sessionLine, 0, 1);
         root.Controls.Add(_operationLine, 0, 2);
-        root.Controls.Add(_axesLayout, 0, 3);
-        root.Controls.Add(_logList, 0, 4);
+        root.Controls.Add(engineeringLine, 0, 3);
+        root.Controls.Add(_axesLayout, 0, 4);
+        root.Controls.Add(_logList, 0, 5);
         Controls.Add(root);
     }
 

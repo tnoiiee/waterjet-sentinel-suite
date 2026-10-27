@@ -55,9 +55,33 @@ separately from profile-based interpretation and a codes-only operation log.
 
 There is no raw command box, command file, coordinated simultaneous
 multi-axis motion (no synchronized Begin, interpolation or combined-axis
-command), automatic sequence, cleaning path, standby return, engineering-unit
-conversion, drive enable/disable write, relative move, output-bank write,
-retry, reconnect, replay or discovery. A dispatched Stop is never shown as a
+command), automatic sequence, cleaning path, standby return, drive
+enable/disable write, relative move, output-bank write, retry, reconnect,
+replay or discovery.
+
+## Engineering Motion Configuration
+
+One window, opened from the main window, holds the five per-axis conversion
+settings of all four axes side by side: encoder pulses per revolution, drive
+pulses per revolution, mechanical gear ratio, pitch in millimetres per output
+revolution, and the Move position tolerance in millimetres. Each is
+independent per axis and each is optional; an empty field means
+`NOT_CONFIGURED` and is captured as absent rather than coerced to a number.
+
+The four derived values (TP normalization ratio, PA command units per
+millimetre, TP feedback units per millimetre, RP feedback units per
+millimetre) are displayed read-only. There is deliberately no editable
+divide-by-two or multiplier field: the theoretical-to-reference relationship
+is the axis's own drive-over-encoder ratio, so a control cannot express a
+factor the model does not derive.
+
+Apply posts one typed candidate to the Application session, which validates
+it and captures it as an immutable snapshot; every later operation is planned
+against that snapshot. While anything is in flight the change is refused
+(`ENGINEERING_SETTINGS_LOCKED_WHILE_ACTIVE`) and the window says so instead of
+queueing or retrying. The derivation, its units and its expected P1/P2 values
+are in
+[`docs/evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md`](../../docs/evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md). A dispatched Stop is never shown as a
 confirmed stop; `StopConfirmed` remains false.
 
 Closing the window requests the Application session's supervised Stop/brake

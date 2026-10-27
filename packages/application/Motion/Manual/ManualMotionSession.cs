@@ -52,6 +52,9 @@ public sealed class ManualMotionSession
     private readonly IClock _clock;
     private readonly ManualMotionProfile? _profile;
     private readonly string _profileCode;
+    private long _engineeringGeneration = 1;
+    private DateTimeOffset _engineeringCapturedAt;
+    private ManualMotionProfile? _engineeringProfile;
     private readonly ConcurrentQueue<Request> _requests = new();
     private readonly AxisRuntime _axisA = new(ManualMotionAxis.A);
     private readonly AxisRuntime _axisB = new(ManualMotionAxis.B);
@@ -116,6 +119,9 @@ public sealed class ManualMotionSession
         {
             AppendLog(now, null, ManualMotionOperationKind.None, _profileCode);
         }
+
+        _engineeringProfile = _profile;
+        _engineeringCapturedAt = now;
 
         _snapshot = BuildSnapshot(now);
     }
@@ -475,6 +481,12 @@ public sealed class ManualMotionSession
                     ?? CheckStationary(axis, p, now);
 
             case ManualMotionOperationKind.Move:
+                // The Move needs this axis's own conversion and its millimetre tolerance: without them
+                // there is no comparison domain, so the request is refused rather than approximated.
+                var moveConversion = EngineeringAxis(axis);
+                var moveConversionReady = moveConversion is not null
+                    && moveConversion.PositionToleranceMillimetres is not null
+                    && moveConversion.PulseDomain() is not null;
                 return (Runtime(axis).HomeState != ManualMotionHomeState.Homed ? ManualMotionCodes.MoveRequiresHomed : null)
                     ?? (p.MoveAcceleration is null || p.MoveSpeed is null || p.MoveDeceleration is null || p.MotionTimeoutMilliseconds is null
                         ? ManualMotionCodes.MoveParametersNotConfigured
@@ -483,7 +495,7 @@ public sealed class ManualMotionSession
                     ?? (request.Target < (p.MoveMinimumTarget ?? 0) || request.Target > (p.MoveMaximumTarget ?? 0)
                         ? ManualMotionCodes.MoveTargetOutOfBounds
                         : null)
-                    ?? (p.PositionTolerance is null ? ManualMotionCodes.PositionToleranceNotConfigured : null)
+                    ?? (moveConversionReady ? null : ManualMotionCodes.MovePulseDomainNotConfigured)
                     ?? (p.StopTimeoutMilliseconds is null ? ManualMotionCodes.StopTimeoutNotConfigured : null)
                     ?? CheckBrakeConfigured(p, requireSettle: true)
                     ?? CheckStationary(axis, p, now);
@@ -580,7 +592,9 @@ public sealed class ManualMotionSession
 
             case ManualMotionOperationKind.Move:
                 CaptureMotion(op, p);
-                op.Tolerance = p.PositionTolerance ?? 0;
+                // No native-count tolerance is captured for a Move: completion is decided by
+                // PositionToleranceMillimetres converted into the reference domain (F9 of the ledger).
+                // The legacy native tolerance stays where it belongs, on zero verification.
                 op.RunTimeout = Milliseconds(p.MotionTimeoutMilliseconds ?? 0);
                 op.Target = request.Target;
                 op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Acceleration, axis, p.MoveAcceleration ?? 0, 0));
@@ -935,14 +949,27 @@ public sealed class ManualMotionSession
     /// </summary>
     private string? ClassifyMoveEnd(OperationRuntime op, DateTimeOffset now)
     {
-        if (!TryReadBothNormalized(Runtime(op.Axis), op.BeginSequence, now, out var normalizedTheoretical, out var normalizedReference))
+        if (!TryComparisonOperands(op, out var domain, out var comparisonTarget, out var comparisonTolerance))
         {
             return null;
         }
 
-        return ManualMotionPulseDomain.DomainsAgree(normalizedTheoretical, normalizedReference, op.Tolerance)
-            ? null
-            : ManualMotionCodes.MoveRefusedTpRpDomainDisagreement;
+        if (!TryReadBothNormalized(Runtime(op.Axis), op.BeginSequence, now, domain, out var normalizedTheoretical, out var normalizedReference))
+        {
+            return null;
+        }
+
+        // The two readbacks are asked two separate questions, and the answers are reported separately:
+        // do they agree with each other, and does either agree with the target?
+        if (!ManualMotionPulseDomain.DomainsAgree(normalizedTheoretical, normalizedReference, comparisonTolerance))
+        {
+            return ManualMotionCodes.MoveRefusedTpRpDomainDisagreement;
+        }
+
+        var targetAgreed = Math.Abs(normalizedTheoretical - comparisonTarget) <= comparisonTolerance
+            && Math.Abs(normalizedReference - comparisonTarget) <= comparisonTolerance;
+
+        return targetAgreed ? null : ManualMotionCodes.MoveTargetNotReachedReadbacksAgree;
     }
 
     /// <summary>
@@ -953,6 +980,7 @@ public sealed class ManualMotionSession
         AxisRuntime runtime,
         long afterSequence,
         DateTimeOffset now,
+        ManualMotionPulseDomain domain,
         out decimal normalizedTheoretical,
         out decimal normalizedReference)
     {
@@ -969,8 +997,8 @@ public sealed class ManualMotionSession
             return false;
         }
 
-        normalizedTheoretical = ManualMotionPulseDomain.NormalizeTheoretical(theoretical);
-        normalizedReference = ManualMotionPulseDomain.NormalizeReference(reference);
+        normalizedTheoretical = domain.NormalizeTheoretical(theoretical);
+        normalizedReference = domain.NormalizeReference(reference);
         return true;
     }
 
@@ -1795,10 +1823,14 @@ public sealed class ManualMotionSession
 
     /// <summary>
     /// A point completes only when the axis is observed not moving AND both readings, each normalized
-    /// into the reference (drive) domain, are within the tolerance of the target. The two readbacks live
-    /// in different pulse domains, so normalizing is a precondition of the comparison, not a refinement
-    /// of it: comparing the raw theoretical reading with a drive-domain target is the defect this
-    /// normalization removes. Neither raw observation is mutated by this method.
+    /// into the reference (drive) domain, are within the tolerance of the target expressed in THAT SAME
+    /// domain. The two readbacks carry different pulse domains, so normalizing is a precondition of the
+    /// comparison, not a refinement of it. Neither raw observation is mutated by this method.
+    ///
+    /// Every quantity the comparison uses is derived from the axis profile: the normalization ratio, the
+    /// target conversion and the tolerance conversion. Nothing is a Product constant and nothing is
+    /// assumed: an axis whose conversion is unavailable never reaches this method, because its Move is
+    /// refused before dispatch.
     /// </summary>
     private bool MoveReached(OperationRuntime op, DateTimeOffset now)
     {
@@ -1807,17 +1839,51 @@ public sealed class ManualMotionSession
             return false;
         }
 
+        if (!TryComparisonOperands(op, out var domain, out var comparisonTarget, out var comparisonTolerance))
+        {
+            return false;
+        }
+
         var runtime = Runtime(op.Axis);
-        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, op.Target, op.Tolerance, ManualMotionPulseDomain.NormalizeTheoretical)
-            && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, op.Target, op.Tolerance, ManualMotionPulseDomain.NormalizeReference);
+        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, comparisonTarget, comparisonTolerance, domain.NormalizeTheoretical)
+            && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, comparisonTarget, comparisonTolerance, domain.NormalizeReference);
+    }
+
+    /// <summary>
+    /// Resolves the single comparison domain of one operation's axis: the conversion, the commanded
+    /// target converted into the reference (drive) count domain, and the millimetre tolerance converted
+    /// into the same domain. It refuses when the conversion is unavailable.
+    /// </summary>
+    private bool TryComparisonOperands(
+        OperationRuntime op,
+        out ManualMotionPulseDomain domain,
+        out decimal comparisonTarget,
+        out decimal comparisonTolerance)
+    {
+        comparisonTarget = 0m;
+        comparisonTolerance = 0m;
+
+        var axisProfile = EngineeringAxis(op.Axis);
+        if (axisProfile is null
+            || axisProfile.PositionToleranceMillimetres is not { } toleranceMillimetres
+            || axisProfile.PulseDomain() is not { } availableDomain)
+        {
+            domain = default;
+            return false;
+        }
+
+        domain = availableDomain;
+        comparisonTarget = op.Target * domain.ReferenceCountsPerCommandCount;
+        comparisonTolerance = toleranceMillimetres * domain.RpFeedbackUnitsPerMillimetre;
+        return true;
     }
 
     private bool WithinTolerance(
         Observation observation,
         long afterSequence,
         DateTimeOffset now,
-        int target,
-        int tolerance,
+        decimal target,
+        decimal tolerance,
         Func<decimal, decimal> normalize)
     {
         if (observation.Sequence <= afterSequence || !IsFresh(observation, now) || observation.Value is not decimal value)
@@ -1888,8 +1954,12 @@ public sealed class ManualMotionSession
                 Phase = active.Phase,
                 StartedAt = active.StartedAt,
                 StopRequested = active.StopRequested,
-                ComparisonTarget = active.Kind == ManualMotionOperationKind.Move ? active.Target : null,
-                ComparisonTolerance = active.Kind == ManualMotionOperationKind.Move ? active.Tolerance : null,
+                ComparisonTarget = active.Kind == ManualMotionOperationKind.Move && TryComparisonOperands(active, out _, out var moveTarget, out _)
+                    ? moveTarget
+                    : null,
+                ComparisonTolerance = active.Kind == ManualMotionOperationKind.Move && TryComparisonOperands(active, out _, out _, out var moveTolerance)
+                    ? moveTolerance
+                    : null,
             });
         }
 
@@ -1904,6 +1974,7 @@ public sealed class ManualMotionSession
             CloseCode = _closeCode,
             ActiveOperations = activeSnapshots.AsReadOnly(),
             Axes = axes.AsReadOnly(),
+            Engineering = BuildEngineeringSnapshot(),
             Log = log.AsReadOnly(),
         };
     }
@@ -1935,11 +2006,14 @@ public sealed class ManualMotionSession
                 && p.HomeActiveValue is not null,
             PositionTp = ObservationSnapshot(runtime.PositionTp, now),
             PositionRp = ObservationSnapshot(runtime.PositionRp, now),
+            Engineering = EngineeringSnapshot(runtime.Axis),
             PositionTpNormalized = runtime.PositionTp.Value is decimal rawTheoretical
-                ? ManualMotionPulseDomain.NormalizeTheoretical(rawTheoretical)
+                && EngineeringAxis(runtime.Axis)?.PulseDomain() is { } tpDomain
+                ? tpDomain.NormalizeTheoretical(rawTheoretical)
                 : null,
             PositionRpNormalized = runtime.PositionRp.Value is decimal rawReference
-                ? ManualMotionPulseDomain.NormalizeReference(rawReference)
+                && EngineeringAxis(runtime.Axis)?.PulseDomain() is { } rpDomain
+                ? rpDomain.NormalizeReference(rawReference)
                 : null,
             HomeState = runtime.HomeState,
             CoordinateState = runtime.CoordinateState,
@@ -1958,7 +2032,109 @@ public sealed class ManualMotionSession
         LastRefusalCode = observation.LastRefusalCode,
     };
 
+    // ------------------------------------------------------------ engineering motion configuration
+
+    private ManualMotionEngineeringSnapshot BuildEngineeringSnapshot() => new()
+    {
+        Generation = _engineeringGeneration,
+        CapturedAt = _engineeringCapturedAt,
+        Axes = new List<ManualMotionAxisEngineeringSnapshot>
+        {
+            EngineeringSnapshot(ManualMotionAxis.A),
+            EngineeringSnapshot(ManualMotionAxis.B),
+            EngineeringSnapshot(ManualMotionAxis.C),
+            EngineeringSnapshot(ManualMotionAxis.D),
+        }.AsReadOnly(),
+    };
+
+    private ManualMotionAxisEngineeringSnapshot EngineeringSnapshot(ManualMotionAxis axis)
+    {
+        var axisProfile = EngineeringAxis(axis);
+        var domain = axisProfile?.PulseDomain();
+        return new ManualMotionAxisEngineeringSnapshot
+        {
+            Axis = axis,
+            EncoderPulsesPerRevolution = axisProfile?.EncoderPulsesPerRevolution,
+            DrivePulsesPerRevolution = axisProfile?.DrivePulsesPerRevolution,
+            MechanicalGearRatio = axisProfile?.MechanicalGearRatio,
+            PitchMillimetresPerRevolution = axisProfile?.PitchMillimetresPerRevolution,
+            PositionToleranceMillimetres = axisProfile?.PositionToleranceMillimetres,
+            TpNormalizationRatio = domain?.TpNormalizationRatio,
+            PaCommandUnitsPerMillimetre = domain?.PaCommandUnitsPerMillimetre,
+            TpFeedbackUnitsPerMillimetre = domain?.TpFeedbackUnitsPerMillimetre,
+            RpFeedbackUnitsPerMillimetre = domain?.RpFeedbackUnitsPerMillimetre,
+            CommandAndReferenceShareCountDensity = domain?.CommandAndReferenceShareCountDensity ?? false,
+            ConversionConfigured = domain is not null,
+            NotConfigured = axisProfile is null
+                ? new[] { "axes" }
+                : axisProfile.NotConfiguredItems(),
+        };
+    }
+
+    /// <summary>
+    /// The profile this session was constructed with, exactly as accepted (or null when the constructed
+    /// profile was refused). It is the only source the configuration surface may seed an edit from: the
+    /// profile is immutable, so reading it can never let a caller change a running session, and every
+    /// candidate built from it is validated again before it can be captured.
+    /// </summary>
+    public ManualMotionProfile? Profile => _profile;
+
+    /// <summary>
+    /// True only while nothing is in flight: no operation is active on any axis, no Close is requested
+    /// and the session is Ready. This is the single gate that forbids an engineering-settings change
+    /// during Home, Move, H1 Commission, Run Path, P1 to P6, the Centre return, Abort cleanup or Close
+    /// cleanup — each of those states has an active operation or a pending close.
+    /// </summary>
+    public bool EngineeringSettingsEditable =>
+        _state == ManualMotionSessionState.Ready
+        && !_closeRequested
+        && ActiveOperationsInAxisOrder().Count == 0;
+
+    /// <summary>
+    /// Captures a new Engineering Motion Configuration and, when it is accepted, adopts it as the
+    /// immutable snapshot every later operation is planned against. The change is refused outright when
+    /// anything is in flight, when the profile itself would be refused, or when any supplied axis would
+    /// lose a setting the running session already depends on. Nothing is applied partially.
+    /// </summary>
+    public ManualMotionEngineeringChangeResult ApplyEngineeringSettings(ManualMotionProfileResult candidate)
+    {
+        ArgumentNullException.ThrowIfNull(candidate);
+
+        if (!EngineeringSettingsEditable)
+        {
+            return ManualMotionEngineeringChangeResult.Refused(ManualMotionCodes.EngineeringSettingsLockedWhileActive);
+        }
+
+        if (!candidate.Accepted || candidate.Profile is null)
+        {
+            return ManualMotionEngineeringChangeResult.Refused(
+                candidate.Code.Length == 0 ? ManualMotionCodes.ProfileNotProvided : candidate.Code);
+        }
+
+        if (_port.Mode == ManualMotionPortMode.HardwareCapable
+            && candidate.Profile.Source == ManualMotionProfileSource.SimulationBuiltIn)
+        {
+            return ManualMotionEngineeringChangeResult.Refused(ManualMotionCodes.ProfileSimulationSourceRefusedForHardware);
+        }
+
+        var now = _clock.UtcNow;
+        _engineeringProfile = candidate.Profile;
+        _engineeringGeneration++;
+        _engineeringCapturedAt = now;
+        AppendLog(now, null, ManualMotionOperationKind.None, ManualMotionCodes.EngineeringSettingsCaptured);
+        Volatile.Write(ref _snapshot, BuildSnapshot(now));
+        return ManualMotionEngineeringChangeResult.Captured(_engineeringGeneration);
+    }
+
     private ManualMotionAxisProfile AxisProfile(ManualMotionAxis axis) => _profile?.For(axis) ?? EmptyAxisProfile;
+
+    /// <summary>
+    /// The axis profile that AUTHORISES the conversion: always the accepted engineering capture, never a
+    /// live control and never the profile the session was constructed with once a capture exists. Motion
+    /// parameters, limits, bits and timeouts keep coming from the constructed profile; the five conversion
+    /// settings come only from here, so an accepted change has exactly one authoritative copy.
+    /// </summary>
+    private ManualMotionAxisProfile? EngineeringAxis(ManualMotionAxis axis) => (_engineeringProfile ?? _profile)?.For(axis);
 
     private AxisRuntime Runtime(ManualMotionAxis axis) => axis switch
     {
