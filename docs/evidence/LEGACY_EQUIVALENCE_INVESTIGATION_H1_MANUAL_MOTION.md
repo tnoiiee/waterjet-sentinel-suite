@@ -204,10 +204,10 @@ Vocabulary for the **cause question** is the Owner's five-way set, used in §4.
 | --- | --- | --- |
 | Read shapes | first position read and second position read, each with the axis letter after a single space | identical shapes, in a closed immutable intent table |
 | Order | status, then the two position reads, per axis | status first, then the position reads, per axis |
-| Scaling | the two values are scaled by different expressions (a known Legacy defect) | both stay raw native values; no conversion |
+| Scaling | the two values are scaled by different expressions — the theoretical value is halved, the reference value is not. See §11.9: the halving is the compensation for a 2:1 readback relationship, not an arbitrary Legacy defect | both stay raw native values; no conversion |
 | Parse failure | becomes zero | refused or reported unavailable; never zero |
 | Use in completion | not used by the move or home helpers | the sole basis of every zero, move and centre verification |
-| Classification | shapes and order **EQUIVALENT**; scaling and parse behaviour are **DELIBERATE NON-PORT**. | |
+| Classification | shapes and order **EQUIVALENT**; scaling and parse behaviour are **DELIBERATE NON-PORT** — harmless for the zero-relative verification and **fatal for the target-relative move verification** (§11.6). | |
 
 ### 3.8 H1 path execution (P1 to P6)
 
@@ -550,3 +550,208 @@ value, no delay value, no vendor error text and no production profile value. Com
 recorded as mnemonics with a placeholder axis or output, which is the same convention already
 committed in the closed command plan and in the previous baseline. The pack itself is not committed
 and was not committed at any point in this investigation.
+
+---
+
+## 11. Physical-Hardware TP/RP discrepancy investigation (2026-10-27; H1 block 1)
+
+This section is a **new determination layered on top of §§1–10**. It does not rewrite any earlier
+record; where it contradicts an earlier *judgement* that judgement is named and corrected in place
+(§11.9 corrects §3.7).
+
+It was opened by an Owner Hardware observation on the commissioned machine: at the H1 path step, on
+both axes, freshly acquired and after `HOME_COMPLETED_ZERO_VERIFIED`, the **theoretical** reading is
+not equal to the **reference** reading — it is twice the reference reading — while the Owner states
+that the Legacy application shows the two as one value for the same function. The Owner instructed
+that this must not be dismissed as rounding, tolerance or display noise, and that no interpretation
+of `DP`, `DE`, `PA` scaling, profile ratio, gearing, TP/RP meaning or UI formatting may be assumed
+until the exact Source proves it.
+
+**No command was sent to any controller in this pass. No hardware was used. `.NET` restore, build and
+test are NOT RUN (no .NET SDK in the Author environment); the Owner-local gate remains the validation
+of record.**
+
+### 11.1 Evidence of record and handling
+
+| Item | Value |
+| --- | --- |
+| Exact Legacy Source pack | the Owner-supplied `repomix` pack, 3,362,177 bytes, 57,439 lines, 35 `## File:` sections, SHA-256 `9dc7bf513a8e62e2bd76a77ec8af12aea9f25a47a63eb4379b1c9e00dc14fd1c` |
+| Where it is held | outside the working tree, in the Author environment's temporary storage; **not** staged, **not** committed, **not** in git history (public-repository boundary) |
+| WJSS head inspected | `c91b1b0` on `arena/2d058a61-waterjet-sentinel-suite` (parent `b6aae49`; base `bfd2867`) |
+| Owner Hardware evidence | Owner-reported, on the commissioned machine (WJ1, sensor G+210, cabinet WSB1 / controller MC-WSB1; A = Horizontal, B = Vertical; the readings were taken at path point 1, after its Move and under the Owner-declared millimetre targets of that point, which are not reproduced here); both axes `FRESH`; both axes `HOME_COMPLETED_ZERO_VERIFIED` before the readings |
+| Reporting convention | the Owner's exact counts are Owner evidence and are **not** reproduced here; every fact below is stated as the exact relation between them, which is what carries the proof, in keeping with §10 |
+
+### 11.2 What the exact Legacy Source does
+
+Six facts, each read from the exact pack and each stated here in the same redacted convention as §10 —
+as behaviour and as relations between the two readings, with no Legacy identifier, no Legacy source
+line and no Legacy constant value reproduced.
+
+| # | Legacy fact | Where it lives |
+| --- | --- | --- |
+| L-1 | The **theoretical** reading is converted to millimetres by the common scale factor and then **divided by two**, as two consecutive statements in the same method | the archived status-and-position acquisition method |
+| L-2 | The **reference** reading is converted to millimetres by the same common scale factor and is **not** divided; the millimetre display is derived from the reference reading only, with an inline note saying so | the same acquisition method |
+| L-3 | The **reference** reading is published raw and is what the reference label on the operator surface is given | the status-event handler |
+| L-4 | The **theoretical** reading is published **halved** to its own label, beside a millimetre label derived from the reference reading | the same handler |
+| L-5 | Move completion is decided from the motion status bit transitions plus a shared completion counter that is incremented inside the status handler. **The Legacy move path never compares either position reading to the commanded target**, and its home path does not either | the status-event handler |
+| L-6 | The commanded amplitude is the millimetre target divided by the common scale factor and sent as the absolute-position command; with the pack's own constants that is the millimetre target × 10,000, which is the WJSS native unit | the absolute-move helper |
+
+Two consequences follow arithmetically, and they are the whole of the Legacy behaviour:
+
+- **L-3 and L-4 mean the Legacy's two operator-facing labels coincide numerically if and only if the
+  theoretical reading is exactly twice the reference reading.** The halving is therefore not a display
+  nicety: it is the only thing that makes the Legacy surfaces present one position value, and it works
+  on exactly one premise — a 2:1 relationship between the two readings.
+- **L-6 places the Legacy command amplitude in the same unit as the WJSS native unit** (W-1, W-3):
+  both send the millimetre target × 10,000.
+
+The pack declares its three conversion constants with an explicit "example" annotation, and the pack's
+only motion configuration file carries jog speed, jog ratio, acceleration, speed, deceleration, home
+speed, two standby coordinates and an axis map. **No counts-per-millimetre, encoder resolution, gear
+ratio, lead, pitch or feedback-scale value appears anywhere in the pack.**
+
+### 11.3 What WJSS does
+
+| # | WJSS fact | Exact source |
+| --- | --- | --- |
+| W-1 | The native unit is 10,000 per millimetre; the largest accepted native coordinate is that × 280 | `CleaningPathContracts.cs`, `NativePerMillimetre`, `MaximumNative` |
+| W-2 | The path target reaches the session unchanged: the boundary forwards `targetNative`, and the operation stores it as `op.Target` | `ManualMotionCleaningPathBoundary.RequestMove`; `ManualMotionSession.RequestMove` / the operation setup |
+| W-3 | The operand is rendered verbatim: `rendered = string.Concat("PA", axis, "=", Operand(command.Operand))` with `Operand(int value) => value.ToString(InvariantCulture)` | `ManualMotionCommandPlan` |
+| W-4 | Reads are issued as `TP {axis}` and `RP {axis}` and the reply is accepted only as one strictly shaped numeric token: printable ASCII, no comma, no `?`, at most ten integer digits and four fraction digits, parsed with `NumberStyles.AllowLeadingSign \| NumberStyles.AllowDecimalPoint` under `InvariantCulture`, magnitude bounded at 1e10 | `MotionObservationCommandPlan.TryNormalizeValueText` / `TryParseValue`; `ManualMotionControllerOwner.Read` |
+| W-5 | Nothing between the port and the execution frame converts a reading: the port maps typed enums only, and the frame carries `PositionTp.Value` and `PositionRp.Value` unchanged | `MotionLibraryManualMotionPort.TryMapRead`; `ManualMotionCleaningPathBoundary.Frame` |
+| W-6 | **Move completion requires both readings to be within the tolerance of the target**: `WithinTolerance(PositionTp, …, op.Target, op.Tolerance) && WithinTolerance(PositionRp, …, op.Target, op.Tolerance)`, where `WithinTolerance` is `Math.Abs(value - target) <= tolerance` over the raw decimal | `ManualMotionSession.MoveReached` / `WithinTolerance` |
+| W-7 | The tolerance is the configured profile value, with a source default of 2 native units | `ManualMotionProfile.PositionTolerance` and its qualified default |
+| W-8 | **Zero verification is zero-relative**: `Math.Abs(value) <= tolerance`. It never references a target and therefore never compares two domains | `ManualMotionSession`, the zero-verification reads |
+| W-9 | The H1 surface prints both readings raw, with no conversion: `"TP " + Reading(…)`, `"RP " + Reading(…)`, `Value.ToString("0.####", InvariantCulture)` | `H1DryCommissioningForm`, `LiveText` / `Reading` |
+| W-10 | The H1 coordinator does not recompute the numeric comparison; it mirrors the session's typed `MOVE_COMPLETED_POSITION_VERIFIED` and adds freshness and inactivity | `H1DryCommissioningCoordinator.StepCentreReturn` and the path mirror |
+
+**Therefore — and this is the load-bearing step — the only numeric comparison in the Product between a
+reading and a commanded position is W-6, and it compares two different controller readbacks to a
+target that lives in the command unit of W-1/W-3.**
+
+### 11.4 The single comparison domain, stated once
+
+| Quantity | Domain it is actually in | Proven by |
+| --- | --- | --- |
+| Path target, Move target, `PA` operand, tolerance | WJSS native units, 10,000 per millimetre — **the same unit Legacy commands** | W-1, W-2, W-3 = L-6 |
+| `RP` readback | not the native unit on this machine: **10 × the native target**, exactly, on both axes | §11.5 R-1 |
+| `TP` readback | **2 × the `RP` reading**, on both axes | §11.5 R-2, R-3 |
+
+There is no conversion between these three columns anywhere in Source (W-5, W-9), and W-4 excludes the
+possibility that the difference is manufactured while the reply is parsed.
+
+### 11.5 Owner Hardware evidence, expressed as exact relations
+
+Let `N` be the native target of the point (10,000 × the millimetre target), `Rp` the reference reading
+and `Tp` the theoretical reading, on one axis.
+
+| # | Relation | Status |
+| --- | --- | --- |
+| R-1 | `Rp = 10 × N` **exactly**, on both axes | Owner evidence; exact on both axes |
+| R-2 | `Tp = 20 × N − 3` on both axes | Owner evidence; the same 3-unit residual on both axes |
+| R-3 | `Tp = 2 × Rp − 3`, i.e. **`Tp : Rp = 2 : 1` on both axes** | follows from R-1 and R-2 |
+| R-4 | The 2:1 ratio of R-3 is the ratio that L-1's halving encodes, and the 10 × of R-1 is not present anywhere in the Legacy pack | L-1, L-2, §11.2 |
+
+The 3-unit residual is a settling difference measured in the theoretical domain; at the resolution
+implied by R-2 it is not a rounding artefact of any Product surface, and it is recorded as such rather
+than dismissed.
+
+### 11.6 Determination
+
+**PRIMARY DETERMINATION (Owner's class): an inseparable position-domain defect.**
+
+Supporting determinations, in the Owner's five-way cause vocabulary:
+
+| Question | Answer | Basis |
+| --- | --- | --- |
+| Is the Legacy halving an arbitrary Legacy defect? | **No — it is the compensation for a real 2:1 readback relationship, and the Owner Hardware evidence reproduces that ratio exactly on both axes** | L-1, L-2, R-3 |
+| Is the WJSS command amplitude wrong? | **No — it is identical to the Legacy amplitude for the same millimetre target** | W-1, W-3 = L-6 |
+| Is the difference a parse, render or formatting artefact? | **No — excluded by Source, not by preference** | W-4, W-9 |
+| Is the difference the missing `DE` definition corrected at `b55c3b4`? | **No — and the correction is corroborated**: zero verification is zero-relative (W-8) and therefore domain-free, which is why the `DP` + `DE` pair now reaches `HOME_COMPLETED_ZERO_VERIFIED` on this machine while the move comparison still cannot satisfy W-6 | W-8, W-6, Owner evidence |
+| Does W-6 pass on this machine? | **No, and it cannot**: it requires two readbacks in a 2:1 relation to each other, both an exact multiple (10 × and 20 ×) away from the target, to sit within ±2 native units of that target | W-6, W-7, R-1…R-3 |
+| What is the Product defect, stated once? | **The deliberate non-port of the Legacy scaling (§3.7) was carried into a numeric verification that compares two different controller readback domains to a target in a third domain.** On hardware, `MOVE_COMPLETED_POSITION_VERIFIED` is unreachable, so every Move ends in its timeout and the H1 path fails closed at the path step | §3.7, W-6, W-10 |
+
+**Confidence, stated separately from the class.**
+
+- The **2:1 relationship and its identity with L-1's halving**: **HIGH**. It is pinned by an exact
+  Legacy literal, reproduced exactly on two independent axes, and independently consistent with the
+  earlier Hardware trial in which the reference reading went to zero while the theoretical reading did
+  not.
+- The **10 × offset between the reference readback and the command unit**: **HIGH as a measurement,
+  NOT VERIFIED as configuration.** It is exact and identical on both axes, but no value in the pack
+  states it, and §11.2's constants are annotated as examples, so it is an Actual-Run value and not a
+  derivable constant.
+- The **physical cause** of either factor (drive gearing, encoder resolution, motor/actuator
+  relationship, controller feedback mode): **NOT DETERMINED, and deliberately not named**, because the
+  Owner instruction forbids assuming any of them and the pack contains no such value.
+
+### 11.7 Root-cause question ledger
+
+Every row is answered from exact Source or from the Owner evidence; none is inferred.
+
+| # | Question | Answer |
+| --- | --- | --- |
+| 1 | Is `DP<axis>=0` issued in the H1 Home sequence? | **Yes** — and it is unconditional |
+| 2 | Is `DE<axis>=0` issued after it? | **Yes** — the `b55c3b4` correction, corroborated by `HOME_COMPLETED_ZERO_VERIFIED` in the Owner evidence |
+| 3 | Does the missing `DE` explain the TP/RP difference at the path step? | **No** — zero verification is domain-free (W-8); the correction is confirmed by the zero result |
+| 4 | Is the `PA` operand scaled or converted by WJSS? | **No** — rendered verbatim (W-3) |
+| 5 | Does the WJSS `PA` amplitude differ from Legacy's for the same millimetre target? | **No** — identical (W-1/W-3 = L-6) |
+| 6 | Is a profile ratio or multiplier applied to the readback? | **No** — nothing between port and frame (W-5) |
+| 7 | Is a gearing, encoder ratio, pitch or pulses-per-revolution value applied? | **No** — no such value exists in WJSS Source and none is applied |
+| 8 | Does the Profile's `positionTolerance` scale the readings? | **No** — it is a comparison bound only (W-6, W-7) |
+| 9 | Is the difference a rounding or truncation artefact? | **No** — the readings are carried as decimals and printed with `0.####` (W-9); R-2's residual is not rounding |
+| 10 | Is the difference a UI formatting artefact? | **No** — the surface prints the value it was given (W-9) |
+| 11 | Could the reply parser inflate or shift the number? | **No** — one strictly shaped token, invariant parse, no thousands separator, bounded magnitude (W-4) |
+| 12 | Are both readings fresh at the point they are compared? | **Yes** — freshness is required by W-6 and again by W-10 |
+| 13 | Are TP and RP independent acquisitions (neither aliased nor derived from the other)? | **Yes** — two separate reads, two separate targets, no aliasing anywhere (W-4, W-5) |
+| 14 | Is TP and RP meaning interchangeable? | **No** — already recorded as `RAW_OBSERVED` in the baseline, and R-3 proves the two are not the same quantity |
+| 15 | Does Legacy compare either reading to the commanded target? | **No** — completion is a status-bit machine (L-5) |
+| 16 | Does Legacy show TP and RP as one value? | **Yes, by construction** — the halved theoretical label and the reference-derived millimetre label coincide whenever `Tp = 2 × Rp` (L-3, L-4, R-3) |
+| 17 | Is the observed 2:1 specific to one axis, one direction or one cabinet? | **No** — identical on both axes of the same trial; C and D were not observed |
+| 18 | Is the 10 × offset specific to one axis? | **No** — exact on both axes of the same trial |
+| 19 | Can the correction be derived from the pack alone? | **No** — the pack's constants are examples and yield 10,000 counts per millimetre for both readings, which contradicts R-1 |
+| 20 | Can the correction be made without a new Owner value? | **No** — see §11.8. Any implementation would encode a measured factor as a Product constant, which is exactly the "magic multiplier" the Owner prohibited |
+
+### 11.8 What this pass deliberately did not change
+
+No Product Source, no command plan, no rendering, no Home sequence, no Stop, brake or Move lifecycle,
+no Centre coordinate, no tolerance, no verification predicate, no `DP`/`DE` semantics, no Run Path
+readiness, no test, no dependency and no lock file was changed. **A correction was prepared and then
+withheld**, because it is not provable from the evidence of record without encoding a number the Owner
+has prohibited guessing.
+
+A correction that would be written *if* the value were supplied — recorded so the work is not repeated
+— is: carry one explicit, configured readback scale per reading (`TP` and `RP`) into exactly one
+documented comparison domain, express the Move tolerance in that same domain, and leave the
+zero-relative verification (W-8) untouched because it is already domain-free. It is **not** written
+here as an implementation, and nothing in this section authorises it.
+
+### 11.9 Correction to §3.7
+
+§3.7 recorded the Legacy scaling asymmetry as "a known Legacy defect" and classified the WJSS
+non-port of it as a deliberate non-port with no consequence. The first half is **corrected**: the
+halving is not arbitrary — it is the exact compensation for the 2:1 readback relationship that the
+Owner Hardware evidence now reproduces on both axes, and it is the mechanism by which Legacy presents
+one position value. The second half is **incomplete, not wrong in itself**: the non-port is harmless
+wherever the comparison is zero-relative (W-8) and fatal wherever it is target-relative (W-6). §3.7's
+row must be read together with this section.
+
+### 11.10 Owner decision boundary — the one value required
+
+The correction is blocked, deliberately, at the Owner's decision boundary. Only one value is required,
+and it is not guessed here:
+
+> **For axes A and B on MC-WSB1: the Actual-Run controller counts per millimetre of the `RP`
+> (reference) readback and of the `TP` (theoretical) readback as configured for the machine the
+> Legacy application ran against.**
+
+The relations derived in §11.5 imply that this value would be 10 × and 20 × the WJSS native unit
+respectively — equivalently 100,000 and 200,000 counts per millimetre — with the 2:1 ratio already
+corroborated by L-1. **That arithmetic is an implication of the Owner's readings, not a confirmed
+configuration value, and it is not applied anywhere in Source.**
+
+Two consequences belong with the same answer, because they are inseparable from it and are also Owner
+decisions: (a) the configured `positionTolerance` is expressed in native units, so its physical
+meaning changes with the answer — at the implied reference scale the source default of 2 units would
+be a fraction of a micrometre; and (b) no correction is written, no test expectation is changed and no
+Hardware trial is authorised until the value is supplied and the tolerance decision is made.

@@ -13,6 +13,44 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-27 — H1 physical-Hardware TP/RP discrepancy investigation, block 1 (report only; no Source change; no Hardware authorization)
+
+**Status: DETERMINATION COMMITTED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`), on top of
+`c91b1b0`; NO PRODUCT SOURCE, TEST, DEPENDENCY OR LOCK CHANGE; .NET RESTORE/BUILD/TEST NOT RUN (no
+.NET SDK in the Author environment; the Owner-local gate remains the validation of record). NO NATIVE
+LOAD, NO CONTROLLER CONTACT, NO HARDWARE USE IN THIS PASS.**
+
+- **Owner evidence treated as real.** On the commissioned machine, on both axes, freshly acquired and
+  after `HOME_COMPLETED_ZERO_VERIFIED`, the theoretical reading is twice the reference reading while
+  the Owner reports the Legacy application shows one value for the same function. It is not rounding,
+  tolerance, parsing or display noise: the reply path accepts one strictly shaped numeric token under
+  the invariant culture with no thousands separator and a bounded magnitude, and the H1 surface prints
+  the value it was given.
+- **Exact Legacy determination.** The theoretical reading is converted and then **halved**; the
+  reference reading is converted without halving and is also published raw. The Legacy surfaces
+  therefore coincide exactly when the theoretical reading is twice the reference reading — the
+  halving is the compensation for that relationship, not an arbitrary defect. Legacy never compares
+  either reading to the commanded target; its move completion is a status-bit machine.
+- **Exact WJSS determination.** The native unit and the `PA` operand are Legacy-equivalent, so the
+  commanded amplitude is **not** the defect. The defect is that the deliberate non-port of the Legacy
+  scaling was carried into the one target-relative comparison in the Product, which requires both raw
+  readbacks to sit within the tolerance of a target expressed in a third domain. Zero verification is
+  zero-relative and therefore domain-free, which is why the `b55c3b4` `DP` then `DE` correction now
+  reaches `HOME_COMPLETED_ZERO_VERIFIED` on this machine while the move comparison still cannot pass.
+- **Classification: an inseparable position-domain defect.** Confidence stated separately: the 2:1
+  relation **HIGH** (exact Legacy literal, reproduced exactly on two independent axes, consistent with
+  the earlier trial in which the reference reading reached zero and the theoretical reading did not);
+  the reference readback's absolute scale **HIGH as a measurement, NOT VERIFIED as configuration**
+  (10 × the native target on both axes; no such value exists in the Legacy pack, whose constants are
+  annotated as examples).
+- **Correction withheld at the Owner decision boundary.** One value is required — the Actual-Run
+  counts per millimetre of the `RP` and `TP` readbacks for axes A and B on MC-WSB1 — together with the
+  `positionTolerance` decision that is inseparable from it. No multiplier is guessed, no reading is
+  aliased, no verification is weakened, no test expectation is changed and no Hardware trial is
+  authorised.
+- **Records updated (directly affected only):** the investigation record §11 and its corrected §3.7,
+  and this changelog. Everything else in the dated records is preserved.
+
 ### 2026-10-26 — H1 Home-carried reset-encoder correction (Owner decision; software only; no hardware authorization)
 
 **Status: SOURCE-AUTHORED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`), on top of the

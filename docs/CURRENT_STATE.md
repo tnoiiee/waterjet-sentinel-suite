@@ -1,5 +1,25 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H1 physical-Hardware TP/RP discrepancy investigation, block 1 (2026-10-27; REPORT ONLY; no Source
+> change; HARDWARE NOT EXECUTED in this pass; supersedes no code statement below).** The Owner's
+> Hardware evidence is not a tolerance or display effect and is not a residual of the Home-carried
+> `DE` correction, which the same evidence corroborates (`HOME_COMPLETED_ZERO_VERIFIED`). Exact
+> Legacy Source proves the theoretical reading is converted and halved while the reference reading is
+> not, so the Legacy application presents **one** position value whenever the theoretical reading is
+> twice the reference reading; the Owner's evidence reproduces that 2:1 relation exactly on both
+> axes. WJSS keeps both readings raw (deliberate non-port) **and** compares both of them to the
+> command-domain target within ±`positionTolerance`, which no source conversion reconciles; on this
+> machine that predicate cannot be satisfied, so `MOVE_COMPLETED_POSITION_VERIFIED` is unreachable.
+> The commanded amplitude is Legacy-equivalent and is not the defect. **Classification: an
+> inseparable position-domain defect** (class), with the 2:1 relation **HIGH** confidence and the
+> reference readback's absolute scale **NOT VERIFIED as configuration** — it is 10 × the native
+> target on both axes, and no such value exists in the Legacy pack, whose constants are annotated as
+> examples. The correction is **withheld at the Owner decision boundary**: one value is required (the
+> Actual-Run counts per millimetre of the `RP` and `TP` readbacks for A and B), together with the
+> tolerance decision that is inseparable from it. Record:
+> [`docs/evidence/LEGACY_EQUIVALENCE_INVESTIGATION_H1_MANUAL_MOTION.md`](evidence/LEGACY_EQUIVALENCE_INVESTIGATION_H1_MANUAL_MOTION.md)
+> §11. `PROVEN H1 COMMAND-SEQUENCE DEFECT` for the `DE` correction below is unchanged.
+
 > **H1 Home-carried reset-encoder correction (2026-10-26; Owner decision; software only; HARDWARE
 > NOT EXECUTED; supersedes only the statements below that describe the Home-carried zero
 > establishment as position-definition-only or the dual-zero definition as excluded from H1; every
