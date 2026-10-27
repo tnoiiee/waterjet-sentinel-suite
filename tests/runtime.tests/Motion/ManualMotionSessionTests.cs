@@ -65,7 +65,12 @@ public sealed class ManualMotionSessionTests
         // 4,000 / 1,000 derives 0.25 with no edit anywhere in the Product: the settings are data.
         Assert.True(ManualMotionPulseDomain.TryCreate(4000, 1000, 0.1m, 5m, out var domain));
         Assert.Equal(0.25m, domain.TpNormalizationRatio);
-        Assert.Equal(1000m, domain.PaCommandUnitsPerMillimetre);
+
+        // The command density does NOT follow the normalization ratio: it is the DRIVE pulses per
+        // revolution divided by the travel of one motor revolution, here 1,000 / (0.1 x 5) = 2,000.
+        // Expecting 1,000 would have meant dividing by the encoder count instead of the drive count.
+        Assert.Equal(0.5m, domain.MillimetresPerMotorRevolution);
+        Assert.Equal(2000m, domain.PaCommandUnitsPerMillimetre);
 
         // 1:1 derives the identity.
         Assert.True(ManualMotionPulseDomain.TryCreate(5000, 5000, 0.1m, 5m, out var unity));
@@ -200,7 +205,15 @@ public sealed class ManualMotionSessionTests
         Assert.Equal(17999998.5m, normalizedTheoretical);
         Assert.Equal(1.5m, rawReference - normalizedTheoretical);
         Assert.Equal(1800m, rawReference / domain.RpFeedbackUnitsPerMillimetre);
-        Assert.Equal(1800m, rawTheoretical / domain.TpFeedbackUnitsPerMillimetre);
+
+        // The theoretical distance is NOT exactly 1,800 mm: the encoder stopped three counts short of
+        // its commanded multiple, so dividing by the encoder density leaves that residual visible
+        // (35,999,997 / 20,000 = 1,799.99985). Rounding it to 1,800 would erase the very discrepancy
+        // this evidence is recorded for.
+        Assert.Equal(1799.99985m, rawTheoretical / domain.TpFeedbackUnitsPerMillimetre);
+        Assert.NotEqual(
+            rawReference / domain.RpFeedbackUnitsPerMillimetre,
+            rawTheoretical / domain.TpFeedbackUnitsPerMillimetre);
 
         // The tolerance conversion is in the same domain: millimetres x RP units/mm.
         Assert.Equal(1000m, 0.1m * domain.RpFeedbackUnitsPerMillimetre);
@@ -311,7 +324,14 @@ public sealed class ManualMotionSessionTests
         harness.HomeAxis(ManualMotionAxis.A);
 
         harness.Session.RequestMove(ManualMotionAxis.A, -5000);
-        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null, maximumSteps: 2000);
+        // A queued request is not an active operation, so "no active operation" is already true before
+        // the first Step. Wait for the Move to BECOME active, then for the exact terminal outcome; a
+        // bare null wait here would return immediately and assert on the pre-Move snapshot.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+                && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveRefusedTpRpDomainDisagreement,
+            maximumSteps: 2000);
 
         var axis = harness.Axis(ManualMotionAxis.A);
 
@@ -338,7 +358,12 @@ public sealed class ManualMotionSessionTests
         harness.HomeAxis(ManualMotionAxis.A);
 
         harness.Session.RequestMove(ManualMotionAxis.A, -5000);
-        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null, maximumSteps: 2000);
+        // Same queued-request race: prove the Move actually became active before waiting for its end.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+                && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveTargetNotReachedReadbacksAgree,
+            maximumSteps: 2000);
 
         var axis = harness.Axis(ManualMotionAxis.A);
 
@@ -369,6 +394,10 @@ public sealed class ManualMotionSessionTests
         harness.HomeAxis(ManualMotionAxis.A);
 
         harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        // The staleness this test proves only exists DURING a Move: the simulated port refuses the TP
+        // read while the position move is engaged. Without the initial active wait the Move never ran
+        // and the assertion below would read the fresh pre-Move observation instead.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null, maximumSteps: 2000);
 
         var axis = harness.Axis(ManualMotionAxis.A);
@@ -433,7 +462,11 @@ public sealed class ManualMotionSessionTests
         var before = harness.Port.ExecutedCommands.Count;
 
         harness.Session.RequestMove(ManualMotionAxis.A, -5000);
-        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null);
+        // Wait for the Move to become active first: only then can the null wait mean "it finished".
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+                && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
 
         var absolute = harness.Port.ExecutedCommands
             .Skip(before)
@@ -1707,9 +1740,30 @@ public sealed class ManualMotionSessionTests
         harness.HomeAxis(ManualMotionAxis.B);
         var beforeMove = harness.Port.ExecutedCommands.Count;
 
+        var moveRequestedAt = harness.Clock.UtcNow;
         harness.Session.RequestMove(ManualMotionAxis.B, 15000);
+        // Queued-then-active again: the Move has to become active before its end can be observed.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.B) is not null);
+
+        // The Move times out while the axis is still travelling, and the session classifies that timeout
+        // from fresh normalized readbacks. Both readbacks are in one domain here and the axis is far
+        // short of 15,000, so the reported primary failure is the target-not-reconciled code, not the
+        // generic MOVE_TIMEOUT and not the TP/RP-disagreement code.
         harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
-            && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveTimeout);
+            && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveTargetNotReachedReadbacksAgree);
+
+        // Timeout-trigger evidence from the existing clock and log surfaces only: ClassifyMoveEnd is
+        // reached exclusively from the Move timeout branch, and the operation cannot terminate this way
+        // before its own configured 300 ms motion timeout has elapsed.
+        Assert.True(
+            harness.Clock.UtcNow - moveRequestedAt >= TimeSpan.FromMilliseconds(300),
+            "the Move ended before its configured motion timeout elapsed, so the timeout did not trigger it");
+        Assert.Contains(
+            harness.Snapshot.Log,
+            entry => entry.Axis == ManualMotionAxis.B && entry.Code == ManualMotionCodes.MoveTargetNotReachedReadbacksAgree);
+        Assert.DoesNotContain(
+            harness.Snapshot.Log,
+            entry => entry.Axis == ManualMotionAxis.B && entry.Code == ManualMotionCodes.MoveCompletedPositionVerified);
 
         var segment = KindsAfter(harness, beforeMove);
         Assert.Contains(ManualMotionPortCommandKind.Stop, segment);
