@@ -608,7 +608,12 @@ Two consequences follow arithmetically, and they are the whole of the Legacy beh
 The pack declares its three conversion constants with an explicit "example" annotation, and the pack's
 only motion configuration file carries jog speed, jog ratio, acceleration, speed, deceleration, home
 speed, two standby coordinates and an axis map. **No counts-per-millimetre, encoder resolution, gear
-ratio, lead, pitch or feedback-scale value appears anywhere in the pack.**
+ratio, lead, pitch or feedback-scale value appears anywhere in the pack.** The pack also contains no
+controller-configuration command of any kind — no motor-type, gearing, resolution, engineering-unit
+or feedback-mode setup exists in it at all; the Legacy application issues motion commands and reads
+and never configures the controller. The controller's configuration therefore lies **outside the
+Legacy Source entirely**, which is the precise reason the missing value cannot be recovered from the
+pack and must come from the Owner.
 
 ### 11.3 What WJSS does
 
