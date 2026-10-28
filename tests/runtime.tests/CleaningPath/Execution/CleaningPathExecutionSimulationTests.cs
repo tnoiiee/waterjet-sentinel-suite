@@ -209,7 +209,7 @@ public sealed class CleaningPathExecutionSimulationTests
         harness.DriveUntilTerminal();
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.Points[0].FailureCode);
         Assert.Equal(CleaningPathPointState.Failed, result.Points[0].State);
     }
 
@@ -233,7 +233,7 @@ public sealed class CleaningPathExecutionSimulationTests
         harness.DriveUntilTerminal();
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.Points[0].FailureCode);
     }
 
     // 10
@@ -287,7 +287,7 @@ public sealed class CleaningPathExecutionSimulationTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, result.Points[0].FailureCode);
         Assert.Equal(CleaningPathMotionOutcome.MoveTimeout, result.Points[0].Horizontal.MotionOutcome);
     }
 
@@ -301,7 +301,7 @@ public sealed class CleaningPathExecutionSimulationTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, result.Points[0].FailureCode);
         Assert.Equal(CleaningPathMotionOutcome.MoveTimeout, result.Points[0].Vertical.MotionOutcome);
     }
 
@@ -357,7 +357,7 @@ public sealed class CleaningPathExecutionSimulationTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.Points[0].FailureCode);
         Assert.Equal(CleaningPathMotionOutcome.StopNotObservedWithinTimeout, result.Points[0].Vertical.CleanupOutcome);
         Assert.Equal(CleaningPathCleanupState.Failed, result.CleanupState);
     }
@@ -832,7 +832,7 @@ public sealed class CleaningPathExecutionRegressionTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.Points[0].FailureCode);
         Assert.Equal(ManualMotionHomeState.Homed, AxisOf(harness, ManualMotionAxis.C).HomeState);
     }
 
@@ -854,7 +854,7 @@ public sealed class CleaningPathExecutionRegressionTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, result.Points[0].FailureCode);
         Assert.DoesNotContain(
             result.Points,
             point => point.State == CleaningPathPointState.Verified);
@@ -904,7 +904,7 @@ public sealed class CleaningPathExecutionRegressionTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, result.Status);
-        Assert.Equal("MOVE_TIMEOUT", result.Points[0].FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.Points[0].FailureCode);
         Assert.Equal(CleaningPathMotionOutcome.StopNotObservedWithinTimeout, result.Points[0].Vertical.CleanupOutcome);
         Assert.Equal(CleaningPathCleanupState.Failed, result.CleanupState);
     }

@@ -799,7 +799,7 @@ public sealed class H1DryCommissioningCoordinatorTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
-        Assert.Equal("MOVE_TIMEOUT", result.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.PrimaryFailureCode);
         Assert.Equal(JobPhase.P1, Assert.Single(result.VerifiedLedger));
 
         // P1 and P2 requested their Moves; P3 never started.
@@ -1024,7 +1024,7 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
         Assert.Equal(H1DryCommissioningCodes.RunFailedCentreReturn, result.Code);
         Assert.Equal(H1DrySafeReturnState.NotPublished, result.DrySafeReturn);
-        Assert.Equal("MOVE_TIMEOUT", result.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.PrimaryFailureCode);
     }
 
     [Fact]
@@ -1063,17 +1063,18 @@ public sealed class H1DryCommissioningCoordinatorTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
-        Assert.Equal("MOVE_TIMEOUT", result.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.PrimaryFailureCode);
 
-        // The stalled Horizontal axis takes the first MOVE_TIMEOUT; the still-active Vertical axis
-        // is stopped exactly once, supervised to inactive with brake applied, and its cleanup is
-        // recorded separately from the primary failure.
+        // The stalled Horizontal axis takes the first failed-Move classification: its timeout was
+        // classified from two fresh readbacks that agree with each other and are short of the
+        // target. The still-active Vertical axis is stopped exactly once, supervised to inactive
+        // with brake applied, and its cleanup is recorded separately from the primary failure.
         var pathResult = result.PathResult!;
         Assert.Equal(CleaningPathCleanupState.Succeeded, pathResult.CleanupState);
         var failedPoint = Assert.Single(pathResult.Points);
         Assert.True(failedPoint.Vertical.StopRequestedOnce);
         Assert.Equal(CleaningPathMotionOutcome.StopIssued, failedPoint.Vertical.CleanupOutcome);
-        Assert.Equal("MOVE_TIMEOUT", failedPoint.FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, failedPoint.FailureCode);
     }
 
     [Fact]
@@ -1218,8 +1219,13 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.True(idle.Accepted);
         var capturedGeneration = harness.Session.Snapshot.Engineering.Generation;
 
-        // Commission/Home in flight: the settings are locked and the change changes nothing.
+        // Commission/Home in flight: the settings are locked and the change changes nothing. An
+        // accepted start only QUEUES the two Home requests, so the lock is proven from the active
+        // lifecycle the session actually began - never from the acceptance of the request, and never
+        // by waiting on EngineeringSettingsEditable itself.
         Assert.True(harness.StartCommission().Started);
+        harness.DriveUntil(() => harness.Session.Snapshot.ActiveOperations.Any(operation =>
+            operation.Kind == ManualMotionOperationKind.Home));
         Assert.False(harness.Session.EngineeringSettingsEditable);
         var refusedInCommission = harness.Session.ApplyEngineeringSettings(
             ManualMotionProfileResult.FromProfile(harness.Profile));
@@ -1230,8 +1236,13 @@ public sealed class H1DryCommissioningCoordinatorTests
         harness.DriveUntilTerminal();
         Assert.Equal(H1DryCommissioningPhase.Commissioned, harness.Coordinator.Result!.TerminalPhase);
 
-        // Run Path in flight, through P1 and beyond: still locked, still the same capture.
+        // Run Path in flight, through P1 and beyond: still locked, still the same capture. The same
+        // queued-start rule applies here: StartPath publishes the path phase and requests the P1
+        // Moves, but the session only begins an operation on a later step.
         Assert.True(harness.StartPath().Started);
+        harness.DriveUntil(() => harness.Coordinator.Current!.Phase == H1DryCommissioningPhase.PathExecution
+            && harness.Session.Snapshot.ActiveOperations.Any(operation =>
+                operation.Kind == ManualMotionOperationKind.Move));
         Assert.False(harness.Session.EngineeringSettingsEditable);
         var refusedInPath = harness.Session.ApplyEngineeringSettings(
             ManualMotionProfileResult.FromProfile(harness.Profile));
