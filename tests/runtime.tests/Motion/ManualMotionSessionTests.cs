@@ -1734,8 +1734,22 @@ public sealed class ManualMotionSessionTests
     public void Move_Timeout_Stops_Through_The_Supervised_Stop_Path()
     {
         var source = ManualMotionProfile.CreateSimulationProfile();
+        // A 300 ms motion timeout AND a mechanical stall: without the stall the simulated axis really
+        // travels (4,000 native units/s over 25 ms steps), the TP and RP observations are separate port
+        // calls rather than one atomic sample, and the two readings land on different positions a
+        // fraction of a count apart - which the session correctly reports as a TP/RP disagreement.
+        // Stalling the axis keeps this test about the timeout supervision path itself: the Move stays
+        // active and far short of 15,000 while both readbacks stay mutually consistent.
         var axisB = CloneAxis(source.AxisB!, motionTimeoutMilliseconds: 300);
-        var harness = new Harness(profile: ProfileWith(source, axisB: axisB));
+        var harness = new Harness(
+            new ManualMotionSimulationOptions
+            {
+                AxisB = new ManualMotionAxisSimulationOptions
+                {
+                    MotionStalled = true,
+                },
+            },
+            profile: ProfileWith(source, axisB: axisB));
         harness.OpenAndObserve();
         harness.HomeAxis(ManualMotionAxis.B);
         var beforeMove = harness.Port.ExecutedCommands.Count;
@@ -1745,9 +1759,10 @@ public sealed class ManualMotionSessionTests
         // Queued-then-active again: the Move has to become active before its end can be observed.
         harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.B) is not null);
 
-        // The Move times out while the axis is still travelling, and the session classifies that timeout
-        // from fresh normalized readbacks. Both readbacks are in one domain here and the axis is far
-        // short of 15,000, so the reported primary failure is the target-not-reconciled code, not the
+        // The Move stays active/busy until its 300 ms timeout fires while the simulated mechanical
+        // position is stalled, and the session classifies that timeout from fresh normalized readbacks.
+        // Because nothing advances, both readbacks agree with each other exactly, and because neither
+        // reaches 15,000 the reported primary failure is the target-not-reconciled code - not the
         // generic MOVE_TIMEOUT and not the TP/RP-disagreement code.
         harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
             && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveTargetNotReachedReadbacksAgree);
