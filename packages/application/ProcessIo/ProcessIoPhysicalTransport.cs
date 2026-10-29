@@ -322,14 +322,17 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
         string operation,
         int address)
     {
-        if (_disposed) throw new ObjectDisposedException(nameof(ProcessIoPhysicalTransport));
+        ObjectDisposedException.ThrowIf(_disposed, this);
         if (!_endpoints.TryGetValue(deviceKey, out var config))
         {
             throw new InvalidOperationException($"No endpoint configuration configured for device key '{deviceKey}'.");
         }
         if (config.UnitId < ProcessIoTransportShape.MinUnitId || config.UnitId > ProcessIoTransportShape.MaxUnitId)
         {
-            throw new ArgumentOutOfRangeException(nameof(config.UnitId), $"Unit ID {config.UnitId} is out of valid physical range (1-247).");
+            throw new ArgumentOutOfRangeException(
+                nameof(deviceKey),
+                config.UnitId,
+                $"Unit ID {config.UnitId} is outside the valid physical range 1-247 for device '{deviceKey}'.");
         }
 
         Interlocked.Increment(ref _networkAttempts);

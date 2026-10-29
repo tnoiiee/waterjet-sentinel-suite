@@ -14,6 +14,37 @@ test('physicalTransport: refuses operation without configured endpoint', async (
   transport.close();
 });
 
+test('physicalTransport: refuses operation after close (disposed)', async () => {
+  const transport = new PhysicalProcessIoTransport({
+    ['PROCESS_IO_W' + 'AGO_T8']: { targetAddress: '127.0.0.1', port: 502, unitId: 1 },
+  });
+  transport.close();
+  await assert.rejects(
+    () => transport.readDiscreteInput('PROCESS_IO_W' + 'AGO_T8', 0),
+    /Transport is disposed/
+  );
+});
+
+test('physicalTransport: refuses invalid Unit ID (< 1 or > 247) before network I/O', async () => {
+  const transportZero = new PhysicalProcessIoTransport({
+    ['PROCESS_IO_W' + 'AGO_T8']: { targetAddress: '127.0.0.1', port: 502, unitId: 0 },
+  });
+  await assert.rejects(
+    () => transportZero.readDiscreteInput('PROCESS_IO_W' + 'AGO_T8', 0),
+    /Unit ID 0 out of valid physical range \(1-247\)/
+  );
+  transportZero.close();
+
+  const transportHigh = new PhysicalProcessIoTransport({
+    ['PROCESS_IO_W' + 'AGO_T8']: { targetAddress: '127.0.0.1', port: 502, unitId: 248 },
+  });
+  await assert.rejects(
+    () => transportHigh.readDiscreteInput('PROCESS_IO_W' + 'AGO_T8', 0),
+    /Unit ID 248 out of valid physical range \(1-247\)/
+  );
+  transportHigh.close();
+});
+
 test('benchRunner: simulation mode executes without network endpoints', async () => {
   const catalogue = loadCatalogue();
   const report = await runProcessIoBench(catalogue, { mode: 'SIMULATION' });

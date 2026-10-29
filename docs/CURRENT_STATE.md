@@ -1,5 +1,12 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H2 Physical Process-I/O Release compile/analyzer repair pass (2026-10-30; software compile repair; HARDWARE NOT EXECUTED / NOT VERIFIED).**
+> In preparation for Owner-local SDK 10.0.403 Release build on PR #42, three compiler/analyzer defects were resolved in exact minimal form:
+> (1) CA1513 in `ProcessIoPhysicalTransport.cs`: Replaced explicit `new ObjectDisposedException(...)` throw with `ObjectDisposedException.ThrowIf(_disposed, this)` while preserving disposed-state fail-closed semantics;
+> (2) CA2208 in `ProcessIoPhysicalTransport.cs`: Corrected parameter name from `nameof(config.UnitId)` to method parameter `nameof(deviceKey)` in `ArgumentOutOfRangeException(nameof(deviceKey), config.UnitId, ...)` since UnitId is not an `Execute` method parameter; preserved invalid Unit ID actual value, device key diagnostic context, and strict 1-247 range enforcement before network I/O;
+> (3) CA1846 in `ProcessIoFoundation.cs`: Replaced `tag.Substring(5, 1)` with allocation-free span `tag.AsSpan(5, 1)` in span-based `int.TryParse`, preserving exact AI tag classification, pressure mapping, and engineering conversion across all AI identities (AI-001+ through AI-036);
+> (4) Test & Validation: Added comprehensive unit tests in C# and Node covering `ObjectDisposedException` on post-disposal invocation, Unit ID boundary validation (1-247) throwing `ArgumentOutOfRangeException` with valid `deviceKey` param name before network attempts, and AI engineering classification preservation across all AI tags. Validation: 87/87 tests in `packages/process-io`, all boundary tests clean (0 findings, S1–S9 clean), `git diff --check` clean. Hardware status remains: `PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED`. PR #42 remains OPEN and NOT MERGED (`PR #42 MERGE: HOLD`). NO HARDWARE. NO MERGE.
+
 > **H2 Physical Process-I/O Legacy Rev2 Addendum reconciliation & hardware bench gap closure (2026-10-30;
 > software implementation and bench test harness; HARDWARE NOT EXECUTED / NOT VERIFIED).**
 > Following authoritative verification of the Owner mapping workbook `WAGO_T8_Analog_Digital_Modbus_Mapping 1.xlsx`

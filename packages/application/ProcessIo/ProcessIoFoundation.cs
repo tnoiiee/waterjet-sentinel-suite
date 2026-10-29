@@ -282,7 +282,7 @@ public sealed class ProcessIoSession
             eng["level"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WaterTankLevel(raw), Unit = "level_units" };
             eng["percent"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WaterTankLevelPercent(raw), Unit = "%" };
         }
-        else if (tag == "AI-002+" || (tag.StartsWith("AI-00", StringComparison.Ordinal) && int.TryParse(tag.Substring(5, 1), out int n) && n >= 4))
+        else if (tag == "AI-002+" || (tag.StartsWith("AI-00", StringComparison.Ordinal) && int.TryParse(tag.AsSpan(5, 1), out int n) && n >= 4))
         {
             eng["bar"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WcPressureBar(raw), Unit = "bar" };
         }

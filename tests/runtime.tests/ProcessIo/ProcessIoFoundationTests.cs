@@ -217,4 +217,51 @@ public sealed class ProcessIoFoundationTests
         Assert.True(transport.ReadDiscreteInput(ProcessIoDevices.RackT8, 0));
         Assert.Equal((ushort)200, transport.ReadInputRegister(ProcessIoDevices.RackT8, 0));
     }
+
+    [Fact]
+    public void Analog_Input_Observations_Preserve_Engineering_Classification_Across_Ai_Tags()
+    {
+        var transport = new SimulatedProcessIoTransport();
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(At);
+        var rows = LoadCommittedCatalogue();
+
+        for (int i = 0; i < 36; i++)
+        {
+            transport.SeedInputRegister(ProcessIoDevices.RackT8, i, 16384);
+        }
+
+        var ai001 = rows.First(r => r.Tag == "AI-001+");
+        Assert.True(session.TryReadAnalogInput("AI-001+", ai001, At, out var obs001));
+        Assert.Equal("ENGINEERING", obs001.Scaling);
+        Assert.True(obs001.Engineering.ContainsKey("level"));
+        Assert.True(obs001.Engineering.ContainsKey("percent"));
+
+        var ai002 = rows.First(r => r.Tag == "AI-002+");
+        Assert.True(session.TryReadAnalogInput("AI-002+", ai002, At, out var obs002));
+        Assert.Equal("ENGINEERING", obs002.Scaling);
+        Assert.True(obs002.Engineering.ContainsKey("bar"));
+
+        var ai003 = rows.First(r => r.Tag == "AI-003+");
+        Assert.True(session.TryReadAnalogInput("AI-003+", ai003, At, out var obs003));
+        Assert.Equal("ENGINEERING", obs003.Scaling);
+        Assert.True(obs003.Engineering.ContainsKey("bar"));
+
+        for (int i = 4; i <= 9; i++)
+        {
+            string tag = $"AI-{i:D3}+";
+            var row = rows.First(r => r.Tag == tag);
+            Assert.True(session.TryReadAnalogInput(tag, row, At, out var obs));
+            Assert.Equal("ENGINEERING", obs.Scaling);
+            Assert.True(obs.Engineering.ContainsKey("bar"));
+        }
+
+        var ai012 = rows.First(r => r.Tag == "AI-012");
+        Assert.True(session.TryReadAnalogInput("AI-012", ai012, At, out var obs012));
+        Assert.Equal("RAW_ONLY", obs012.Scaling);
+        Assert.Empty(obs012.Engineering);
+
+        var ai036 = rows.First(r => r.Tag == "AI-036");
+        Assert.False(session.TryReadAnalogInput("AI-036", ai036, At, out _));
+    }
 }

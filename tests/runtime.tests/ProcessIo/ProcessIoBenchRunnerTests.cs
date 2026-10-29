@@ -25,6 +25,44 @@ public sealed class ProcessIoBenchRunnerTests
     }
 
     [Fact]
+    public void Physical_Transport_Refuses_When_Disposed_With_ObjectDisposedException()
+    {
+        var transport = new ProcessIoPhysicalTransport(new Dictionary<string, ProcessIoEndpointConfig>
+        {
+            [ProcessIoDevices.RackT8] = new() { TargetAddress = "127.0.0.1", Port = 502, UnitId = 1 }
+        });
+        transport.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => transport.ReadDiscreteInput(ProcessIoDevices.RackT8, 0));
+        Assert.Equal(0, transport.NetworkAttempts);
+    }
+
+    [Fact]
+    public void Physical_Transport_Refuses_Invalid_Unit_Id_With_ArgumentOutOfRangeException_Before_Network_Io()
+    {
+        using var transportZero = new ProcessIoPhysicalTransport(new Dictionary<string, ProcessIoEndpointConfig>
+        {
+            [ProcessIoDevices.RackT8] = new() { TargetAddress = "127.0.0.1", Port = 502, UnitId = 0 }
+        });
+        var exZero = Assert.Throws<ArgumentOutOfRangeException>(() => transportZero.ReadDiscreteInput(ProcessIoDevices.RackT8, 0));
+        Assert.Equal("deviceKey", exZero.ParamName);
+        Assert.Equal((byte)0, exZero.ActualValue);
+        Assert.Contains("1-247", exZero.Message);
+        Assert.Contains(ProcessIoDevices.RackT8, exZero.Message);
+        Assert.Equal(0, transportZero.NetworkAttempts);
+
+        using var transportHigh = new ProcessIoPhysicalTransport(new Dictionary<string, ProcessIoEndpointConfig>
+        {
+            [ProcessIoDevices.RackT8] = new() { TargetAddress = "127.0.0.1", Port = 502, UnitId = 248 }
+        });
+        var exHigh = Assert.Throws<ArgumentOutOfRangeException>(() => transportHigh.ReadDiscreteInput(ProcessIoDevices.RackT8, 0));
+        Assert.Equal("deviceKey", exHigh.ParamName);
+        Assert.Equal((byte)248, exHigh.ActualValue);
+        Assert.Contains("1-247", exHigh.Message);
+        Assert.Contains(ProcessIoDevices.RackT8, exHigh.Message);
+        Assert.Equal(0, transportHigh.NetworkAttempts);
+    }
+
+    [Fact]
     public void Bench_Runner_Simulation_Mode_Completes_With_Cleanup_Audit()
     {
         string csv = LoadCommittedCatalogueCsv();
