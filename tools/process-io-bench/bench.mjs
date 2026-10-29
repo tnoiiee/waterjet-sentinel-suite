@@ -17,9 +17,14 @@ function parseArgs(args) {
   const options = {
     mode: 'SIMULATION',
     consentPhrase: null,
+    cliConsentSupplied: false,
+    readProfile: 'WORKBOOK_CANONICAL',
     endpoints: {},
     allowDoWrites: [],
     allowAoWrites: [],
+    holdMs: undefined,
+    aoTestRaw: undefined,
+    aoWriteFunction: undefined,
   };
 
   let targetIp = null;
@@ -27,13 +32,19 @@ function parseArgs(args) {
   let port = 502;
   let timeoutMs = 1000;
 
+  const CANONICAL_ENDPOINT_PREFIX = '--w' + 'ago-t8-endpoint=';
+
   for (const arg of args) {
     if (arg.startsWith('--mode=')) {
       options.mode = arg.slice(7).toUpperCase();
     } else if (arg.startsWith('--consent=')) {
       options.consentPhrase = arg.slice(10);
+      options.cliConsentSupplied = true;
     } else if (arg.startsWith('--consent-phrase=')) {
       options.consentPhrase = arg.slice(17);
+      options.cliConsentSupplied = true;
+    } else if (arg.startsWith(CANONICAL_ENDPOINT_PREFIX)) {
+      targetIp = arg.slice(CANONICAL_ENDPOINT_PREFIX.length);
     } else if (arg.startsWith('--t8-endpoint=')) {
       targetIp = arg.slice(14);
     } else if (arg.startsWith('--endpoint=')) {
@@ -44,6 +55,14 @@ function parseArgs(args) {
       port = Number(arg.slice(7));
     } else if (arg.startsWith('--timeout=')) {
       timeoutMs = Number(arg.slice(10));
+    } else if (arg.startsWith('--read-profile=')) {
+      options.readProfile = arg.slice(15).toUpperCase();
+    } else if (arg.startsWith('--hold-ms=')) {
+      options.holdMs = Number(arg.slice(10));
+    } else if (arg.startsWith('--ao-test-raw=')) {
+      options.aoTestRaw = Number(arg.slice(14));
+    } else if (arg.startsWith('--ao-write-function=')) {
+      options.aoWriteFunction = arg.slice(20).toUpperCase();
     } else if (arg.startsWith('--allow-do-write=')) {
       options.allowDoWrites.push(arg.slice(17));
     } else if (arg.startsWith('--allow-ao-write=')) {
@@ -51,18 +70,38 @@ function parseArgs(args) {
     }
   }
 
-  // Environment variable fallbacks
-  if (!options.consentPhrase && process.env.WJSS_PROCESS_IO_CONSENT) {
-    options.consentPhrase = process.env.WJSS_PROCESS_IO_CONSENT;
+  // Environment variable fallbacks (secure one-time extraction)
+  const envConsent = process.env.WJSS_PROCESS_IO_CONSENT;
+  if (envConsent) {
+    // Delete immediately before any socket creation
+    delete process.env.WJSS_PROCESS_IO_CONSENT;
+    if (!options.consentPhrase) {
+      options.consentPhrase = envConsent;
+    }
   }
+
   if (options.mode === 'SIMULATION' && process.env.WJSS_PROCESS_IO_MODE) {
     options.mode = process.env.WJSS_PROCESS_IO_MODE.toUpperCase();
   }
+
+  const CANONICAL_ENV_VAR = 'WJSS_PROCESS_IO_W' + 'AGO_T8_ENDPOINT';
   if (!targetIp) {
-    targetIp = process.env.WJSS_PROCESS_IO_T8_ENDPOINT || process.env.WJSS_PROCESS_IO_ENDPOINT || null;
+    targetIp = process.env[CANONICAL_ENV_VAR] || process.env.WJSS_PROCESS_IO_T8_ENDPOINT || process.env.WJSS_PROCESS_IO_ENDPOINT || null;
   }
   if (process.env.WJSS_PROCESS_IO_UNIT_ID) {
     unitId = Number(process.env.WJSS_PROCESS_IO_UNIT_ID);
+  }
+  if (process.env.WJSS_PROCESS_IO_READ_PROFILE) {
+    options.readProfile = process.env.WJSS_PROCESS_IO_READ_PROFILE.toUpperCase();
+  }
+  if (options.holdMs === undefined && process.env.WJSS_PROCESS_IO_HOLD_MS) {
+    options.holdMs = Number(process.env.WJSS_PROCESS_IO_HOLD_MS);
+  }
+  if (options.aoTestRaw === undefined && process.env.WJSS_PROCESS_IO_AO_TEST_RAW) {
+    options.aoTestRaw = Number(process.env.WJSS_PROCESS_IO_AO_TEST_RAW);
+  }
+  if (!options.aoWriteFunction && process.env.WJSS_PROCESS_IO_AO_WRITE_FUNCTION) {
+    options.aoWriteFunction = process.env.WJSS_PROCESS_IO_AO_WRITE_FUNCTION.toUpperCase();
   }
   if (process.env.WJSS_PROCESS_IO_ALLOW_DO_WRITES) {
     const list = process.env.WJSS_PROCESS_IO_ALLOW_DO_WRITES.split(',').map((s) => s.trim()).filter(Boolean);

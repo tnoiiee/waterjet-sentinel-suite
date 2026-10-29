@@ -22,7 +22,10 @@ public static class ProcessIoDevices
 public static class ProcessIoTransportShape
 {
     public const int Port = 502;
+    public const int DefaultUnitId = 1;
     public const int UnitId = 1;
+    public const int MinUnitId = 1;
+    public const int MaxUnitId = 247;
     public const int ConnectTimeoutMs = 1000;
     public const int ReadTimeoutMs = 1000;
     public const int WriteTimeoutMs = 1000;
@@ -30,6 +33,24 @@ public static class ProcessIoTransportShape
     public const int ConnectionCheckIntervalMs = 5000;
     public const int ReadGroupStart = 0;
     public const int ReadGroupCount = 40;
+    public const int MinDoHoldMs = 100;
+    public const int MaxDoHoldMs = 2000;
+}
+
+/// <summary>Explicit read profiles for Process-I/O observation.</summary>
+public static class ProcessIoReadProfiles
+{
+    public const string WorkbookCanonical = "WORKBOOK_CANONICAL";
+    public const string LegacyProductionCompat = "LEGACY_PRODUCTION_COMPAT";
+}
+
+/// <summary>Canonical consent phrases for physical Process-I/O commissioning modes.</summary>
+public static class ProcessIoConsentPhrases
+{
+    public const string PhysicalDiAiRead = "I AUTHORIZE READ ONLY PROCESS IO BENCH TRIAL";
+    public const string PhysicalDoSingle = "I AUTHORIZE SINGLE DO PROCESS IO BENCH TRIAL";
+    public const string PhysicalAoSingle = "I AUTHORIZE SINGLE AO PROCESS IO BENCH TRIAL";
+    public const string PhysicalFullSelectedSequence = "I AUTHORIZE FULL SELECTED PROCESS IO BENCH SEQUENCE";
 }
 
 /// <summary>Function codes proven on the authoritative T8 memory map.</summary>
@@ -38,9 +59,11 @@ public static class ProcessIoFunctionCodes
     public const string DiStateRead = "FC02";
     public const string DoReadBack = "FC01";
     public const string DoCommand = "FC05";
+    public const string DoMultipleCommand = "FC15";
     public const string AiRawRead = "FC04";
     public const string AoReadBack = "FC03";
     public const string AoCommand = "FC06";
+    public const string AoMultipleCommand = "FC16";
 }
 
 /// <summary>Raw representation proven by the T8 runtime (ushort words, 0..32767 full scale).</summary>

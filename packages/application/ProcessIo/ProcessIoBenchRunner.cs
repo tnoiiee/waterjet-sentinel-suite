@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Wjss.Contracts;
 
 namespace Wjss.Runtime.Core.ProcessIo;
@@ -19,6 +20,11 @@ public sealed record ProcessIoBenchConfig
 {
     public ProcessIoBenchMode Mode { get; init; } = ProcessIoBenchMode.SIMULATION;
     public string? ConsentPhrase { get; init; }
+    public bool CliConsentSupplied { get; init; }
+    public string ReadProfile { get; init; } = ProcessIoReadProfiles.WorkbookCanonical;
+    public int? HoldMs { get; init; }
+    public ushort? AoTestRaw { get; init; }
+    public string? AoWriteFunction { get; init; }
     public Dictionary<string, ProcessIoEndpointConfig> Endpoints { get; init; } = new(StringComparer.Ordinal);
     public List<string> AllowDoWrites { get; init; } = new();
     public List<string> AllowAoWrites { get; init; } = new();
@@ -27,6 +33,7 @@ public sealed record ProcessIoBenchConfig
 public sealed record ProcessIoBenchReport
 {
     public required string Mode { get; init; }
+    public required string ReadProfile { get; init; }
     public required bool Accepted { get; init; }
     public required string OutcomeCode { get; init; }
     public required string Detail { get; init; }
@@ -45,10 +52,10 @@ public sealed record ProcessIoBenchReport
 /// </summary>
 public static class ProcessIoBenchRunner
 {
-    public const string ConsentRead = "AUTHORIZE_PHYSICAL_READ_ONLY_COMMISSIONING";
-    public const string ConsentDoSingle = "AUTHORIZE_PHYSICAL_DO_SINGLE_COMMISSIONING";
-    public const string ConsentAoSingle = "AUTHORIZE_PHYSICAL_AO_SINGLE_COMMISSIONING";
-    public const string ConsentFull = "AUTHORIZE_PHYSICAL_BENCH_COMMISSIONING_DISCONNECTED_OUTPUTS";
+    public const string ConsentRead = ProcessIoConsentPhrases.PhysicalDiAiRead;
+    public const string ConsentDoSingle = ProcessIoConsentPhrases.PhysicalDoSingle;
+    public const string ConsentAoSingle = ProcessIoConsentPhrases.PhysicalAoSingle;
+    public const string ConsentFull = ProcessIoConsentPhrases.PhysicalFullSelectedSequence;
 
     public static ProcessIoBenchReport Run(string catalogueCsv, ProcessIoBenchConfig config)
     {
@@ -56,7 +63,41 @@ public static class ProcessIoBenchRunner
         var cleanupAudit = new List<string>();
         var summary = new Dictionary<string, string>(StringComparer.Ordinal);
 
+        if (config.Mode == ProcessIoBenchMode.PHYSICAL_TEST)
+        {
+            return new ProcessIoBenchReport
+            {
+                Mode = config.Mode.ToString(),
+                ReadProfile = config.ReadProfile,
+                Accepted = false,
+                OutcomeCode = "MODE_DEPRECATED",
+                Detail = "Mode PHYSICAL_TEST is deprecated and refused. Use explicit physical modes: PHYSICAL_DI_AI_READ, PHYSICAL_DO_SINGLE, PHYSICAL_AO_SINGLE, PHYSICAL_FULL_SELECTED_SEQUENCE.",
+                StartedAt = startedAt,
+                CompletedAt = DateTimeOffset.UtcNow,
+                Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                Summary = summary,
+                CleanupAudit = cleanupAudit,
+            };
+        }
+
         bool isPhysical = config.Mode != ProcessIoBenchMode.SIMULATION;
+
+        if (isPhysical && config.CliConsentSupplied)
+        {
+            return new ProcessIoBenchReport
+            {
+                Mode = config.Mode.ToString(),
+                ReadProfile = config.ReadProfile,
+                Accepted = false,
+                OutcomeCode = "CLI_CONSENT_REFUSED_USE_ENV",
+                Detail = "Consent for physical modes must be provided via WJSS_PROCESS_IO_CONSENT environment variable, not command-line arguments, to prevent exposure in process table and shell history.",
+                StartedAt = startedAt,
+                CompletedAt = DateTimeOffset.UtcNow,
+                Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                Summary = summary,
+                CleanupAudit = cleanupAudit,
+            };
+        }
 
         if (isPhysical)
         {
@@ -66,7 +107,6 @@ public static class ProcessIoBenchRunner
                 ProcessIoBenchMode.PHYSICAL_DO_SINGLE => ConsentDoSingle,
                 ProcessIoBenchMode.PHYSICAL_AO_SINGLE => ConsentAoSingle,
                 ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE => ConsentFull,
-                ProcessIoBenchMode.PHYSICAL_TEST => ConsentFull,
                 _ => string.Empty,
             };
 
@@ -75,6 +115,7 @@ public static class ProcessIoBenchRunner
                 return new ProcessIoBenchReport
                 {
                     Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
                     Accepted = false,
                     OutcomeCode = "CONSENT_REFUSED",
                     Detail = $"Physical bench execution for mode {config.Mode} requires exact Owner consent phrase.",
@@ -91,9 +132,157 @@ public static class ProcessIoBenchRunner
                 return new ProcessIoBenchReport
                 {
                     Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
                     Accepted = false,
                     OutcomeCode = "ENDPOINTS_UNCONFIGURED",
                     Detail = "Physical bench execution requires configured target endpoints.",
+                    StartedAt = startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                    Summary = summary,
+                    CleanupAudit = cleanupAudit,
+                };
+            }
+
+            foreach (var (devKey, ep) in config.Endpoints)
+            {
+                if (ep.UnitId < ProcessIoTransportShape.MinUnitId || ep.UnitId > ProcessIoTransportShape.MaxUnitId)
+                {
+                    return new ProcessIoBenchReport
+                    {
+                        Mode = config.Mode.ToString(),
+                        ReadProfile = config.ReadProfile,
+                        Accepted = false,
+                        OutcomeCode = "UNIT_ID_INVALID",
+                        Detail = $"Endpoint {devKey} specifies Unit ID {ep.UnitId}, which is outside valid physical range ({ProcessIoTransportShape.MinUnitId}-{ProcessIoTransportShape.MaxUnitId}).",
+                        StartedAt = startedAt,
+                        CompletedAt = DateTimeOffset.UtcNow,
+                        Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                        Summary = summary,
+                        CleanupAudit = cleanupAudit,
+                    };
+                }
+            }
+        }
+
+        if (config.ReadProfile != ProcessIoReadProfiles.WorkbookCanonical &&
+            config.ReadProfile != ProcessIoReadProfiles.LegacyProductionCompat)
+        {
+            return new ProcessIoBenchReport
+            {
+                Mode = config.Mode.ToString(),
+                ReadProfile = config.ReadProfile,
+                Accepted = false,
+                OutcomeCode = "INVALID_READ_PROFILE",
+                Detail = $"Read profile '{config.ReadProfile}' is not recognized. Valid profiles: {ProcessIoReadProfiles.WorkbookCanonical}, {ProcessIoReadProfiles.LegacyProductionCompat}.",
+                StartedAt = startedAt,
+                CompletedAt = DateTimeOffset.UtcNow,
+                Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                Summary = summary,
+                CleanupAudit = cleanupAudit,
+            };
+        }
+
+        if (config.Mode == ProcessIoBenchMode.PHYSICAL_DO_SINGLE)
+        {
+            if (config.HoldMs == null)
+            {
+                return new ProcessIoBenchReport
+                {
+                    Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
+                    Accepted = false,
+                    OutcomeCode = "HOLD_MS_REQUIRED",
+                    Detail = "PHYSICAL_DO_SINGLE mode requires HoldMs parameter (100-2000 ms).",
+                    StartedAt = startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                    Summary = summary,
+                    CleanupAudit = cleanupAudit,
+                };
+            }
+
+            if (config.HoldMs.Value < ProcessIoTransportShape.MinDoHoldMs || config.HoldMs.Value > ProcessIoTransportShape.MaxDoHoldMs)
+            {
+                return new ProcessIoBenchReport
+                {
+                    Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
+                    Accepted = false,
+                    OutcomeCode = "HOLD_MS_INVALID",
+                    Detail = $"HoldMs value {config.HoldMs.Value} is outside valid range ({ProcessIoTransportShape.MinDoHoldMs}-{ProcessIoTransportShape.MaxDoHoldMs} ms).",
+                    StartedAt = startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                    Summary = summary,
+                    CleanupAudit = cleanupAudit,
+                };
+            }
+        }
+
+        if (config.Mode == ProcessIoBenchMode.PHYSICAL_AO_SINGLE)
+        {
+            if (config.AoTestRaw == null)
+            {
+                return new ProcessIoBenchReport
+                {
+                    Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
+                    Accepted = false,
+                    OutcomeCode = "AO_RAW_REQUIRED",
+                    Detail = "PHYSICAL_AO_SINGLE mode requires AoTestRaw parameter (0-32767).",
+                    StartedAt = startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                    Summary = summary,
+                    CleanupAudit = cleanupAudit,
+                };
+            }
+
+            if (config.AoTestRaw.Value > 32767)
+            {
+                return new ProcessIoBenchReport
+                {
+                    Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
+                    Accepted = false,
+                    OutcomeCode = "AO_RAW_INVALID",
+                    Detail = $"AoTestRaw value {config.AoTestRaw.Value} is outside valid range (0-32767).",
+                    StartedAt = startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                    Summary = summary,
+                    CleanupAudit = cleanupAudit,
+                };
+            }
+
+            if (string.IsNullOrEmpty(config.AoWriteFunction))
+            {
+                return new ProcessIoBenchReport
+                {
+                    Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
+                    Accepted = false,
+                    OutcomeCode = "AO_WRITE_FUNCTION_REQUIRED",
+                    Detail = "PHYSICAL_AO_SINGLE mode requires AoWriteFunction parameter (FC06 or FC16).",
+                    StartedAt = startedAt,
+                    CompletedAt = DateTimeOffset.UtcNow,
+                    Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
+                    Summary = summary,
+                    CleanupAudit = cleanupAudit,
+                };
+            }
+
+            string fc = config.AoWriteFunction.ToUpperInvariant();
+            if (fc != "FC06" && fc != "FC16")
+            {
+                return new ProcessIoBenchReport
+                {
+                    Mode = config.Mode.ToString(),
+                    ReadProfile = config.ReadProfile,
+                    Accepted = false,
+                    OutcomeCode = "AO_WRITE_FUNCTION_INVALID",
+                    Detail = $"AoWriteFunction value '{config.AoWriteFunction}' is invalid. Allowed: FC06, FC16.",
                     StartedAt = startedAt,
                     CompletedAt = DateTimeOffset.UtcNow,
                     Ledger = Array.Empty<ProcessIoTransportLedgerEntry>(),
@@ -123,42 +312,67 @@ public static class ProcessIoBenchRunner
             session.Open(startedAt);
 
             // Phase 1: Cyclic Reads
-            int diReadCount = 0;
-            int aiReadCount = 0;
-
             bool shouldRead = config.Mode == ProcessIoBenchMode.SIMULATION ||
                               config.Mode == ProcessIoBenchMode.PHYSICAL_DI_AI_READ ||
-                              config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE ||
-                              config.Mode == ProcessIoBenchMode.PHYSICAL_TEST;
+                              config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE;
 
             if (shouldRead)
             {
-                foreach (var row in catalogue.Where(r => r.BindingState != ProcessIoBindingState.UNBOUND && r.Binding != null))
+                if (config.ReadProfile == ProcessIoReadProfiles.WorkbookCanonical)
                 {
-                    if (row.Binding!.Direction == "READ")
+                    int diReadCount = 0;
+                    int aiReadCount = 0;
+                    int doReadBackCount = 0;
+                    int aoReadBackCount = 0;
+
+                    foreach (var row in catalogue.Where(r => r.BindingState != ProcessIoBindingState.UNBOUND && r.Binding != null))
                     {
-                        if (row.Binding.Area == ProcessIoArea.DiscreteInput || row.IoClass == "DI")
+                        if (row.Binding!.Direction == "READ")
                         {
-                            bool bit = transport.ReadDiscreteInput(row.Binding.DeviceKey, row.Binding.Address);
-                            diReadCount++;
-                        }
-                        else if (row.Binding.Area == ProcessIoArea.InputRegister || row.IoClass == "AI")
-                        {
-                            ushort word = transport.ReadInputRegister(row.Binding.DeviceKey, row.Binding.Address);
-                            aiReadCount++;
+                            if (row.Binding.Area == ProcessIoArea.DiscreteInput || row.IoClass == "DI")
+                            {
+                                bool bit = transport.ReadDiscreteInput(row.Binding.DeviceKey, row.Binding.Address);
+                                diReadCount++;
+                            }
+                            else if (row.Binding.Area == ProcessIoArea.InputRegister || row.IoClass == "AI")
+                            {
+                                ushort word = transport.ReadInputRegister(row.Binding.DeviceKey, row.Binding.Address);
+                                aiReadCount++;
+                            }
                         }
                     }
+
+                    for (int addr = 512; addr <= 543; addr++)
+                    {
+                        transport.ReadCoil(ProcessIoDevices.RackT8, addr);
+                        doReadBackCount++;
+                    }
+                    for (int addr = 512; addr <= 513; addr++)
+                    {
+                        transport.ReadRegister(ProcessIoDevices.RackT8, addr);
+                        aoReadBackCount++;
+                    }
+
+                    summary["DI_READS_PERFORMED"] = diReadCount.ToString();
+                    summary["AI_READS_PERFORMED"] = aiReadCount.ToString();
+                    summary["DO_READBACKS_PERFORMED"] = doReadBackCount.ToString();
+                    summary["AO_READBACKS_PERFORMED"] = aoReadBackCount.ToString();
+                }
+                else if (config.ReadProfile == ProcessIoReadProfiles.LegacyProductionCompat)
+                {
+                    transport.ReadCoilsBulk(ProcessIoDevices.RackT8, 0, 100);
+                    transport.ReadHoldingRegistersBulk(ProcessIoDevices.RackT8, 0, 100);
+
+                    summary["LEGACY_COILS_READ"] = "100";
+                    summary["LEGACY_HOLDING_REGISTERS_READ"] = "100";
                 }
             }
-            summary["DI_READS_PERFORMED"] = diReadCount.ToString();
-            summary["AI_READS_PERFORMED"] = aiReadCount.ToString();
 
             // Phase 2: Sequential DO Trials
             int doTestedCount = 0;
             bool shouldTestDo = config.Mode == ProcessIoBenchMode.SIMULATION ||
                                config.Mode == ProcessIoBenchMode.PHYSICAL_DO_SINGLE ||
-                               config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE ||
-                               config.Mode == ProcessIoBenchMode.PHYSICAL_TEST;
+                               config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE;
 
             if (shouldTestDo)
             {
@@ -175,7 +389,7 @@ public static class ProcessIoBenchRunner
                     if (doCandidates.Count == 0)
                         throw new InvalidOperationException($"Allowed DO tag '{config.AllowDoWrites[0]}' is not a writable DO channel.");
                 }
-                else if (config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE || config.Mode == ProcessIoBenchMode.PHYSICAL_TEST)
+                else if (config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE)
                 {
                     if (config.AllowDoWrites.Count == 0)
                         doCandidates.Clear();
@@ -192,16 +406,29 @@ public static class ProcessIoBenchRunner
                         throw new InvalidOperationException($"Write admission refused for DO row {row.Tag}: {admission.Code}");
                     }
 
+                    int holdMs = config.HoldMs ?? 100;
                     if (isPhysical)
                     {
                         transport.WriteCoil(row.Binding!.DeviceKey, row.Binding.Address, true);
                         transport.ReadCoil(row.Binding.DeviceKey, 512 + row.Binding.Address);
+
+                        var swHold = System.Diagnostics.Stopwatch.StartNew();
+                        Thread.Sleep(holdMs);
+                        swHold.Stop();
+                        summary["REQUESTED_HOLD_MS"] = holdMs.ToString();
+                        summary["OBSERVED_HOLD_MS"] = ((int)swHold.ElapsedMilliseconds).ToString();
+
                         transport.WriteCoil(row.Binding.DeviceKey, row.Binding.Address, false);
                         transport.ReadCoil(row.Binding.DeviceKey, 512 + row.Binding.Address);
                     }
                     else
                     {
                         session.DispatchDigitalOutput(DateTimeOffset.UtcNow, admission.Token, row, true);
+                        if (config.HoldMs != null)
+                        {
+                            summary["REQUESTED_HOLD_MS"] = holdMs.ToString();
+                            summary["OBSERVED_HOLD_MS"] = holdMs.ToString();
+                        }
                         transport.WriteCoil(row.Binding!.DeviceKey, row.Binding.Address, false);
                     }
 
@@ -215,8 +442,7 @@ public static class ProcessIoBenchRunner
             int aoTestedCount = 0;
             bool shouldTestAo = config.Mode == ProcessIoBenchMode.SIMULATION ||
                                config.Mode == ProcessIoBenchMode.PHYSICAL_AO_SINGLE ||
-                               config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE ||
-                               config.Mode == ProcessIoBenchMode.PHYSICAL_TEST;
+                               config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE;
 
             if (shouldTestAo)
             {
@@ -233,7 +459,7 @@ public static class ProcessIoBenchRunner
                     if (aoCandidates.Count == 0)
                         throw new InvalidOperationException($"Allowed AO tag '{config.AllowAoWrites[0]}' is not a writable AO channel.");
                 }
-                else if (config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE || config.Mode == ProcessIoBenchMode.PHYSICAL_TEST)
+                else if (config.Mode == ProcessIoBenchMode.PHYSICAL_FULL_SELECTED_SEQUENCE)
                 {
                     if (config.AllowAoWrites.Count == 0)
                         aoCandidates.Clear();
@@ -250,19 +476,33 @@ public static class ProcessIoBenchRunner
                         throw new InvalidOperationException($"Write admission refused for AO row {row.Tag}: {admission.Code}");
                     }
 
+                    ushort rawVal = config.AoTestRaw ?? 0;
+                    string aoFc = config.AoWriteFunction?.ToUpperInvariant() ?? "FC06";
+
                     if (isPhysical)
                     {
-                        transport.WriteSingleRegister(row.Binding!.DeviceKey, row.Binding.Address, 6553);
+                        if (aoFc == "FC16")
+                            transport.WriteRegisters(row.Binding!.DeviceKey, row.Binding.Address, new ushort[] { rawVal });
+                        else
+                            transport.WriteSingleRegister(row.Binding!.DeviceKey, row.Binding.Address, rawVal);
+
                         transport.ReadRegister(row.Binding.DeviceKey, 512 + row.Binding.Address);
-                        transport.WriteSingleRegister(row.Binding.DeviceKey, row.Binding.Address, 0);
+
+                        if (aoFc == "FC16")
+                            transport.WriteRegisters(row.Binding.DeviceKey, row.Binding.Address, new ushort[] { 0 });
+                        else
+                            transport.WriteSingleRegister(row.Binding.DeviceKey, row.Binding.Address, 0);
+
                         transport.ReadRegister(row.Binding.DeviceKey, 512 + row.Binding.Address);
                     }
                     else
                     {
-                        session.DispatchAnalogOutput(DateTimeOffset.UtcNow, admission.Token, row, 4.0);
+                        session.DispatchAnalogOutput(DateTimeOffset.UtcNow, admission.Token, row, rawVal);
                         transport.WriteRegisters(row.Binding!.DeviceKey, row.Binding.Address, new ushort[] { 0 });
                     }
 
+                    summary["AO_WRITE_FUNCTION"] = aoFc;
+                    summary["AO_TEST_RAW"] = rawVal.ToString();
                     cleanupAudit.Add($"AO_CLEANUP_SAFE_RETURN:{row.Tag}:{row.Binding!.DeviceKey}:{row.Binding.Address}:0");
                     aoTestedCount++;
                 }
@@ -276,6 +516,7 @@ public static class ProcessIoBenchRunner
             return new ProcessIoBenchReport
             {
                 Mode = config.Mode.ToString(),
+                ReadProfile = config.ReadProfile,
                 Accepted = true,
                 OutcomeCode = "SUCCESS",
                 Detail = $"Process-I/O hardware bench completed successfully in {config.Mode} mode.",
@@ -291,6 +532,7 @@ public static class ProcessIoBenchRunner
             return new ProcessIoBenchReport
             {
                 Mode = config.Mode.ToString(),
+                ReadProfile = config.ReadProfile,
                 Accepted = false,
                 OutcomeCode = "EXECUTION_FAILED",
                 Detail = ex.Message,

@@ -105,6 +105,62 @@ export class PhysicalProcessIoTransport {
     });
   }
 
+  async readCoilsBulk(deviceKey, startAddress, quantity) {
+    return this._execute(deviceKey, startAddress, 'READ_COILS_BULK', (txId, unitId) => {
+      // FC01: Read Coils bulk
+      const buf = Buffer.alloc(12);
+      buf.writeUInt16BE(txId, 0);
+      buf.writeUInt16BE(0, 2);
+      buf.writeUInt16BE(6, 4);
+      buf.writeUInt8(unitId, 6);
+      buf.writeUInt8(0x01, 7);
+      buf.writeUInt16BE(startAddress, 8);
+      buf.writeUInt16BE(quantity, 10);
+      const byteCount = Math.ceil(quantity / 8);
+      return {
+        request: buf,
+        expectedResponseBytes: 9 + byteCount,
+        expectedFc: 0x01,
+        parse: (res) => {
+          const bits = [];
+          for (let i = 0; i < quantity; i++) {
+            const byteIdx = 9 + Math.floor(i / 8);
+            const bitIdx = i % 8;
+            bits.push((res[byteIdx] & (1 << bitIdx)) !== 0);
+          }
+          return bits;
+        },
+      };
+    });
+  }
+
+  async readHoldingRegistersBulk(deviceKey, startAddress, quantity) {
+    return this._execute(deviceKey, startAddress, 'READ_HOLDING_REGISTERS_BULK', (txId, unitId) => {
+      // FC03: Read Holding Registers bulk
+      const buf = Buffer.alloc(12);
+      buf.writeUInt16BE(txId, 0);
+      buf.writeUInt16BE(0, 2);
+      buf.writeUInt16BE(6, 4);
+      buf.writeUInt8(unitId, 6);
+      buf.writeUInt8(0x03, 7);
+      buf.writeUInt16BE(startAddress, 8);
+      buf.writeUInt16BE(quantity, 10);
+      const byteCount = quantity * 2;
+      return {
+        request: buf,
+        expectedResponseBytes: 9 + byteCount,
+        expectedFc: 0x03,
+        parse: (res) => {
+          const regs = [];
+          for (let i = 0; i < quantity; i++) {
+            regs.push(res.readUInt16BE(9 + i * 2));
+          }
+          return regs;
+        },
+      };
+    });
+  }
+
   async writeCoil(deviceKey, address, value) {
     return this._execute(deviceKey, address, 'WRITE_COIL', (txId, unitId) => {
       // FC05: Write Single Coil
@@ -179,6 +235,9 @@ export class PhysicalProcessIoTransport {
 
     const txId = ++this.txCounter;
     const unitId = endpoint.unitId ?? 1;
+    if (typeof unitId !== 'number' || !Number.isInteger(unitId) || unitId < 1 || unitId > 247) {
+      throw new Error(`Unit ID ${unitId} out of valid physical range (1-247)`);
+    }
     const { request, expectedResponseBytes, expectedFc, parse } = builder(txId, unitId);
     const start = Date.now();
 

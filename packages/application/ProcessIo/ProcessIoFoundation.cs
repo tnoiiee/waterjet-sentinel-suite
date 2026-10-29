@@ -24,11 +24,17 @@ public interface IProcessIoTransport
     /// <summary>Read one digital output process-image read-back bit (FC01 coil read).</summary>
     bool ReadCoil(string deviceKey, int coilAddress);
 
+    /// <summary>Read coils in bulk (FC01 coil read).</summary>
+    IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity);
+
     /// <summary>Read one analog-input raw word (FC04 input register read).</summary>
     ushort ReadInputRegister(string deviceKey, int registerAddress);
 
     /// <summary>Read one analog output process-image read-back word (FC03 holding register read).</summary>
     ushort ReadRegister(string deviceKey, int registerAddress);
+
+    /// <summary>Read holding registers in bulk (FC03 holding register read).</summary>
+    IReadOnlyList<ushort> ReadHoldingRegistersBulk(string deviceKey, int startAddress, int quantity);
 
     /// <summary>Write one digital output (FC05). Only ever called after typed admission.</summary>
     void WriteCoil(string deviceKey, int coilAddress, bool value);
@@ -64,11 +70,31 @@ public sealed class SimulatedProcessIoTransport : IProcessIoTransport
     public bool ReadCoil(string deviceKey, int coilAddress)
         => _coils.TryGetValue((deviceKey, coilAddress), out var v) && v;
 
+    public IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity)
+    {
+        var list = new List<bool>(quantity);
+        for (int i = 0; i < quantity; i++)
+        {
+            list.Add(_coils.TryGetValue((deviceKey, startAddress + i), out var v) && v);
+        }
+        return list;
+    }
+
     public ushort ReadInputRegister(string deviceKey, int registerAddress)
         => _inputRegisters.TryGetValue((deviceKey, registerAddress), out var v) ? v : (ushort)0;
 
     public ushort ReadRegister(string deviceKey, int registerAddress)
         => _holdingRegisters.TryGetValue((deviceKey, registerAddress), out var v) ? v : (ushort)0;
+
+    public IReadOnlyList<ushort> ReadHoldingRegistersBulk(string deviceKey, int startAddress, int quantity)
+    {
+        var list = new List<ushort>(quantity);
+        for (int i = 0; i < quantity; i++)
+        {
+            list.Add(_holdingRegisters.TryGetValue((deviceKey, startAddress + i), out var v) ? v : (ushort)0);
+        }
+        return list;
+    }
 
     public void WriteCoil(string deviceKey, int coilAddress, bool value)
     {

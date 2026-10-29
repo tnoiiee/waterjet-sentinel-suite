@@ -55,6 +55,22 @@ export class SimulatedTransport {
     return this.holdingRegisters.get(`${deviceKey}|${address}`) ?? 0;
   }
 
+  async readCoilsBulk(deviceKey, startAddress, quantity) {
+    const bits = [];
+    for (let i = 0; i < quantity; i++) {
+      bits.push(this.coils.get(`${deviceKey}|${startAddress + i}`) ?? false);
+    }
+    return bits;
+  }
+
+  async readHoldingRegistersBulk(deviceKey, startAddress, quantity) {
+    const regs = [];
+    for (let i = 0; i < quantity; i++) {
+      regs.push(this.holdingRegisters.get(`${deviceKey}|${startAddress + i}`) ?? 0);
+    }
+    return regs;
+  }
+
   async writeCoil(deviceKey, address, value) {
     this.coils.set(`${deviceKey}|${address}`, Boolean(value));
     this.coils.set(`${deviceKey}|${512 + address}`, Boolean(value));

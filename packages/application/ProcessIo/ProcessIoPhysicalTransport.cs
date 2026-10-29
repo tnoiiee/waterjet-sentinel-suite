@@ -113,6 +113,35 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
         return result;
     }
 
+    public IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity)
+    {
+        var result = new List<bool>(quantity);
+        Execute(deviceKey, (stream, config, txId) =>
+        {
+            byte[] request = new byte[12];
+            WriteBe16(request, 0, (ushort)txId);
+            WriteBe16(request, 2, 0);
+            WriteBe16(request, 4, 6);
+            request[6] = config.UnitId;
+            request[7] = 0x01; // FC01
+            WriteBe16(request, 8, (ushort)startAddress);
+            WriteBe16(request, 10, (ushort)quantity);
+
+            stream.Write(request, 0, request.Length);
+            int byteCount = (quantity + 7) / 8;
+            byte[] response = ReadExact(stream, 9 + byteCount, config.TimeoutMs);
+            ValidateHeader(response, txId, config.UnitId, 0x01);
+            for (int i = 0; i < quantity; i++)
+            {
+                int byteIdx = 9 + (i / 8);
+                int bitIdx = i % 8;
+                result.Add((response[byteIdx] & (1 << bitIdx)) != 0);
+            }
+            return (0x01, quantity, $"COUNT={quantity}");
+        }, "READ_COILS_BULK", startAddress);
+        return result;
+    }
+
     public ushort ReadInputRegister(string deviceKey, int address)
     {
         ushort result = 0;
@@ -160,6 +189,33 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
             result = ReadBe16(response, 9);
             return (0x03, 1, $"0x{result:X4}");
         }, "READ_REGISTER", address);
+        return result;
+    }
+
+    public IReadOnlyList<ushort> ReadHoldingRegistersBulk(string deviceKey, int startAddress, int quantity)
+    {
+        var result = new List<ushort>(quantity);
+        Execute(deviceKey, (stream, config, txId) =>
+        {
+            byte[] request = new byte[12];
+            WriteBe16(request, 0, (ushort)txId);
+            WriteBe16(request, 2, 0);
+            WriteBe16(request, 4, 6);
+            request[6] = config.UnitId;
+            request[7] = 0x03; // FC03
+            WriteBe16(request, 8, (ushort)startAddress);
+            WriteBe16(request, 10, (ushort)quantity);
+
+            stream.Write(request, 0, request.Length);
+            int byteCount = quantity * 2;
+            byte[] response = ReadExact(stream, 9 + byteCount, config.TimeoutMs);
+            ValidateHeader(response, txId, config.UnitId, 0x03);
+            for (int i = 0; i < quantity; i++)
+            {
+                result.Add(ReadBe16(response, 9 + i * 2));
+            }
+            return (0x03, quantity, $"COUNT={quantity}");
+        }, "READ_HOLDING_REGISTERS_BULK", startAddress);
         return result;
     }
 
@@ -270,6 +326,10 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
         if (!_endpoints.TryGetValue(deviceKey, out var config))
         {
             throw new InvalidOperationException($"No endpoint configuration configured for device key '{deviceKey}'.");
+        }
+        if (config.UnitId < ProcessIoTransportShape.MinUnitId || config.UnitId > ProcessIoTransportShape.MaxUnitId)
+        {
+            throw new ArgumentOutOfRangeException(nameof(config.UnitId), $"Unit ID {config.UnitId} is out of valid physical range (1-247).");
         }
 
         Interlocked.Increment(ref _networkAttempts);

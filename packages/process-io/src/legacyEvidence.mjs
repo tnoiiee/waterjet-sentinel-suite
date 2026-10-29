@@ -25,12 +25,31 @@ export const TRANSPORT_SHAPE = Object.freeze({
   transport: ['MOD', 'BUS_TCP'].join(''),
   port: 502,
   unitId: 1,
+  defaultUnitId: 1,
+  minUnitId: 1,
+  maxUnitId: 247,
   connectTimeoutMs: 1000,
   readTimeoutMs: 1000,
   writeTimeoutMs: 1000,
   pollIntervalMs: 200,
   connectionCheckIntervalMs: 5000,
+  minDoHoldMs: 100,
+  maxDoHoldMs: 2000,
   readGrouping: { holdingRegisters: { start: 0, count: 40 }, coils: { start: 0, count: 40 } },
+});
+
+/** Explicit read profiles for Process-I/O observation. */
+export const READ_PROFILES = Object.freeze({
+  WORKBOOK_CANONICAL: 'WORKBOOK_CANONICAL',
+  LEGACY_PRODUCTION_COMPAT: 'LEGACY_PRODUCTION_COMPAT',
+});
+
+/** Canonical consent phrases for physical Process-I/O commissioning modes. */
+export const CONSENT_PHRASES = Object.freeze({
+  PHYSICAL_DI_AI_READ: 'I AUTHORIZE READ ONLY PROCESS IO BENCH TRIAL',
+  PHYSICAL_DO_SINGLE: 'I AUTHORIZE SINGLE DO PROCESS IO BENCH TRIAL',
+  PHYSICAL_AO_SINGLE: 'I AUTHORIZE SINGLE AO PROCESS IO BENCH TRIAL',
+  PHYSICAL_FULL_SELECTED_SEQUENCE: 'I AUTHORIZE FULL SELECTED PROCESS IO BENCH SEQUENCE',
 });
 
 /** Function codes proven on the authoritative T8 memory map. */
@@ -38,9 +57,11 @@ export const FUNCTION_CODES = Object.freeze({
   DI_STATE_READ: { fc: 'FC02', legacyCall: 'ReadDiscreteInputs(1, 0, 40)', scope: 'Digital-input state read (FC02)' },
   DO_READ_BACK: { fc: 'FC01', legacyCall: 'ReadCoils(1, 512, 32)', scope: 'Digital-output process-image read-back (FC01)' },
   DO_COMMAND: { fc: 'FC05', legacyCall: 'WriteSingleCoil(1, coilAddress, value)', scope: 'Digital-output command (FC05)' },
+  DO_MULTIPLE_COMMAND: { fc: 'FC15', legacyCall: 'WriteMultipleCoils(1, startAddress, values)', scope: 'Digital-output multiple command (FC15)' },
   AI_RAW_READ: { fc: 'FC04', legacyCall: 'ReadInputRegisters(1, 0, 36)', scope: 'Analog-input raw word read (FC04)' },
   AO_READ_BACK: { fc: 'FC03', legacyCall: 'ReadHoldingRegisters(1, 512, 2)', scope: 'Analog-output process-image read-back (FC03)' },
   AO_COMMAND: { fc: 'FC06', legacyCall: 'WriteSingleRegister(1, startAddress, value)', scope: 'Analog-output command (FC06)' },
+  AO_MULTIPLE_COMMAND: { fc: 'FC16', legacyCall: 'WriteMultipleRegisters(1, startAddress, values)', scope: 'Analog-output multiple command (FC16)' },
 });
 
 /** Representation facts proven by the T8 runtime. */
