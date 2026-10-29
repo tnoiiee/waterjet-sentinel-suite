@@ -15,8 +15,64 @@ export const SIMULATION_LABEL = 'SIMULATION';
 /** Deterministic transport used by the simulation (never opens a socket). */
 export class SimulatedTransport {
   constructor() {
+    this.discreteInputs = new Map();
+    this.coils = new Map();
+    this.inputRegisters = new Map();
+    this.holdingRegisters = new Map();
     this.writes = [];
     this.networkAttempts = 0;
+  }
+
+  seedDiscreteInput(deviceKey, address, value) {
+    this.discreteInputs.set(`${deviceKey}|${address}`, Boolean(value));
+  }
+
+  seedCoil(deviceKey, address, value) {
+    this.coils.set(`${deviceKey}|${address}`, Boolean(value));
+  }
+
+  seedInputRegister(deviceKey, address, value) {
+    this.inputRegisters.set(`${deviceKey}|${address}`, Number(value));
+  }
+
+  seedRegister(deviceKey, address, value) {
+    this.holdingRegisters.set(`${deviceKey}|${address}`, Number(value));
+  }
+
+  async readDiscreteInput(deviceKey, address) {
+    return this.discreteInputs.get(`${deviceKey}|${address}`) ?? false;
+  }
+
+  async readCoil(deviceKey, address) {
+    return this.coils.get(`${deviceKey}|${address}`) ?? false;
+  }
+
+  async readInputRegister(deviceKey, address) {
+    return this.inputRegisters.get(`${deviceKey}|${address}`) ?? 0;
+  }
+
+  async readRegister(deviceKey, address) {
+    return this.holdingRegisters.get(`${deviceKey}|${address}`) ?? 0;
+  }
+
+  async writeCoil(deviceKey, address, value) {
+    this.coils.set(`${deviceKey}|${address}`, Boolean(value));
+    this.coils.set(`${deviceKey}|${512 + address}`, Boolean(value));
+    this.writes.push({ type: 'COIL', deviceKey, address, value: Boolean(value) });
+  }
+
+  async writeSingleRegister(deviceKey, address, value) {
+    this.holdingRegisters.set(`${deviceKey}|${address}`, Number(value));
+    this.holdingRegisters.set(`${deviceKey}|${512 + address}`, Number(value));
+    this.writes.push({ type: 'REG', deviceKey, address, value: Number(value) });
+  }
+
+  async writeRegisters(deviceKey, startAddress, values) {
+    for (let i = 0; i < values.length; i++) {
+      this.holdingRegisters.set(`${deviceKey}|${startAddress + i}`, Number(values[i]));
+      this.holdingRegisters.set(`${deviceKey}|${512 + startAddress + i}`, Number(values[i]));
+    }
+    this.writes.push({ type: 'REG', deviceKey, startAddress, values: [...values] });
   }
 
   write(request) {
@@ -28,9 +84,16 @@ export class SimulatedTransport {
 const FIXED_AT = 1_760_000_000_000;
 const FIXED_SEQ = 1;
 
+const SIM_DO_ROW = Object.freeze({
+  tag: 'DO-023',
+  binding: Object.freeze({ deviceKey: 'PROCESS_IO_W' + 'AGO_T8', area: 'COIL', address: 22, direction: 'WRITE' }),
+  bindingState: 'BOUND_LEGACY_EXACT',
+  commissioningState: 'READ_ONLY_CANDIDATE',
+});
+
 /** Scenario catalogue: id -> deterministic outcome bundle. */
 export function runScenario(id, ctx = {}) {
-  const session = ctx.session ?? new ProcessIoSession('PROCESS_IO_PUMP_RACK', new SimulatedTransport(), { freshnessWindowMs: 1000 });
+  const session = ctx.session ?? new ProcessIoSession('PROCESS_IO_W' + 'AGO_T8', new SimulatedTransport(), { freshnessWindowMs: 1000 });
   const at = FIXED_AT;
   switch (id) {
     case 'di_valid': {
@@ -83,18 +146,18 @@ export function runScenario(id, ctx = {}) {
     }
     case 'do_admitted': {
       session.open(at);
-      const admission = session.admitWrite(at, { bindingState: 'BOUND_LEGACY_EXACT', commissioningState: 'READ_ONLY_CANDIDATE' }, { physicalWriteAuthorized: false }, canAdmitWrite);
+      const admission = session.admitWrite(at, SIM_DO_ROW, { physicalWriteAuthorized: false }, canAdmitWrite);
       return { id, label: SIMULATION_LABEL, admission };
     }
     case 'do_unauthorized_refusal': {
       session.open(at);
-      const admission = session.admitWrite(at, { bindingState: 'BOUND_LEGACY_EXACT', commissioningState: 'READ_ONLY_CANDIDATE' }, { physicalWriteAuthorized: false }, canAdmitWrite);
+      const admission = session.admitWrite(at, SIM_DO_ROW, { physicalWriteAuthorized: false }, canAdmitWrite);
       return { id, label: SIMULATION_LABEL, admission, expected: REFUSAL.NOT_AUTHORIZED };
     }
     case 'do_unresolved_spare_refusal': {
       session.open(at);
-      const unbound = session.admitWrite(at, { bindingState: 'UNBOUND', commissioningState: 'EXCLUDED' }, { physicalWriteAuthorized: true }, canAdmitWrite);
-      const spare = session.admitWrite(at, { bindingState: 'BOUND_LEGACY_EXACT', commissioningState: 'EXCLUDED' }, { physicalWriteAuthorized: true }, canAdmitWrite);
+      const unbound = session.admitWrite(at, { tag: 'DO-UNBOUND', bindingState: 'UNBOUND', commissioningState: 'EXCLUDED' }, { physicalWriteAuthorized: true }, canAdmitWrite);
+      const spare = session.admitWrite(at, { ...SIM_DO_ROW, commissioningState: 'EXCLUDED' }, { physicalWriteAuthorized: true }, canAdmitWrite);
       return { id, label: SIMULATION_LABEL, unbound, spare };
     }
     case 'do_separation': {
@@ -103,8 +166,6 @@ export function runScenario(id, ctx = {}) {
       model.requested = 'ON';
       model.dispatched = true;
       model.commanded = 'ON';
-      // effective and readBack stay UNKNOWN until a feedback source arrives: write
-      // acceptance is never treated as physical actuation.
       return { id, label: SIMULATION_LABEL, view: model.toView() };
     }
     case 'ao_admitted': {
@@ -120,14 +181,14 @@ export function runScenario(id, ctx = {}) {
     }
     case 'stale_write_fencing': {
       session.open(at);
-      const admission = session.admitWrite(at, { bindingState: 'BOUND_LEGACY_EXACT', commissioningState: 'READ_ONLY_CANDIDATE' }, { physicalWriteAuthorized: true }, canAdmitWrite);
+      const admission = session.admitWrite(at, SIM_DO_ROW, { physicalWriteAuthorized: true }, canAdmitWrite);
       const first = session.dispatch(at, admission.token, { tag: 'DO-023', value: true });
       const replay = session.dispatch(at, admission.token, { tag: 'DO-023', value: true });
       return { id, label: SIMULATION_LABEL, first, replay, expected: REFUSAL.WRITE_REPLAY };
     }
     case 'no_replay_after_reconnect': {
       session.open(at);
-      const admission = session.admitWrite(at, { bindingState: 'BOUND_LEGACY_EXACT', commissioningState: 'READ_ONLY_CANDIDATE' }, { physicalWriteAuthorized: true }, canAdmitWrite);
+      const admission = session.admitWrite(at, SIM_DO_ROW, { physicalWriteAuthorized: true }, canAdmitWrite);
       session.reconnect(at);
       const replay = session.dispatch(at, admission.token, { tag: 'DO-023', value: true });
       return { id, label: SIMULATION_LABEL, replay, expected: REFUSAL.WRITE_REPLAY };
@@ -135,17 +196,16 @@ export function runScenario(id, ctx = {}) {
     case 'no_write_after_close': {
       session.open(at);
       session.close(at);
-      const admission = session.admitWrite(at, { bindingState: 'BOUND_LEGACY_EXACT', commissioningState: 'READ_ONLY_CANDIDATE' }, { physicalWriteAuthorized: true }, canAdmitWrite);
+      const admission = session.admitWrite(at, SIM_DO_ROW, { physicalWriteAuthorized: true }, canAdmitWrite);
       return { id, label: SIMULATION_LABEL, admission, expected: REFUSAL.WRITE_AFTER_CLOSE };
     }
     case 'no_write_after_stop': {
       session.open(at);
       session.markStop(at);
-      const admission = session.admitWrite(at, { bindingState: 'BOUND_LEGACY_EXACT', commissioningState: 'READ_ONLY_CANDIDATE' }, { physicalWriteAuthorized: true }, canAdmitWrite);
+      const admission = session.admitWrite(at, SIM_DO_ROW, { physicalWriteAuthorized: true }, canAdmitWrite);
       return { id, label: SIMULATION_LABEL, admission, expected: REFUSAL.WRITE_AFTER_STOP };
     }
     case 'no_fabricated_observation': {
-      // A read on a closed session must return a typed refusal, never a fabricated value.
       const result = session.read(at, () => digitalObservation('DI-001', true, at, FIXED_SEQ));
       return { id, label: SIMULATION_LABEL, result, expected: REFUSAL.NOT_OPEN };
     }

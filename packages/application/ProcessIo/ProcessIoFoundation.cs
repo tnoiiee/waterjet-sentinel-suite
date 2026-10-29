@@ -18,14 +18,23 @@ namespace Wjss.Runtime.Core.ProcessIo;
 /// </summary>
 public interface IProcessIoTransport
 {
-    /// <summary>Read one digital-input state bit (FC01 group read; caller passes the group result).</summary>
+    /// <summary>Read one digital-input state bit (FC02 discrete input read).</summary>
+    bool ReadDiscreteInput(string deviceKey, int address);
+
+    /// <summary>Read one digital output process-image read-back bit (FC01 coil read).</summary>
     bool ReadCoil(string deviceKey, int coilAddress);
 
-    /// <summary>Read one analog-input raw word (FC03 group read; caller passes the group result).</summary>
+    /// <summary>Read one analog-input raw word (FC04 input register read).</summary>
+    ushort ReadInputRegister(string deviceKey, int registerAddress);
+
+    /// <summary>Read one analog output process-image read-back word (FC03 holding register read).</summary>
     ushort ReadRegister(string deviceKey, int registerAddress);
 
     /// <summary>Write one digital output (FC05). Only ever called after typed admission.</summary>
     void WriteCoil(string deviceKey, int coilAddress, bool value);
+
+    /// <summary>Write one analog output (FC06). Only ever called after typed admission.</summary>
+    void WriteSingleRegister(string deviceKey, int registerAddress, ushort value);
 
     /// <summary>Write analog output registers (FC16). Only ever called after typed admission.</summary>
     void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values);
@@ -37,29 +46,51 @@ public interface IProcessIoTransport
 /// <summary>Deterministic in-memory transport for Simulation (labelled SIMULATION; never Hardware evidence).</summary>
 public sealed class SimulatedProcessIoTransport : IProcessIoTransport
 {
+    private readonly Dictionary<(string, int), bool> _discreteInputs = new();
     private readonly Dictionary<(string, int), bool> _coils = new();
-    private readonly Dictionary<(string, int), ushort> _registers = new();
+    private readonly Dictionary<(string, int), ushort> _inputRegisters = new();
+    private readonly Dictionary<(string, int), ushort> _holdingRegisters = new();
     public List<string> Writes { get; } = new();
     public int NetworkAttempts => 0;
 
+    public void SeedDiscreteInput(string deviceKey, int address, bool value) => _discreteInputs[(deviceKey, address)] = value;
     public void SeedCoil(string deviceKey, int address, bool value) => _coils[(deviceKey, address)] = value;
-    public void SeedRegister(string deviceKey, int address, ushort value) => _registers[(deviceKey, address)] = value;
+    public void SeedInputRegister(string deviceKey, int address, ushort value) => _inputRegisters[(deviceKey, address)] = value;
+    public void SeedRegister(string deviceKey, int address, ushort value) => _holdingRegisters[(deviceKey, address)] = value;
+
+    public bool ReadDiscreteInput(string deviceKey, int address)
+        => _discreteInputs.TryGetValue((deviceKey, address), out var v) && v;
 
     public bool ReadCoil(string deviceKey, int coilAddress)
         => _coils.TryGetValue((deviceKey, coilAddress), out var v) && v;
 
+    public ushort ReadInputRegister(string deviceKey, int registerAddress)
+        => _inputRegisters.TryGetValue((deviceKey, registerAddress), out var v) ? v : (ushort)0;
+
     public ushort ReadRegister(string deviceKey, int registerAddress)
-        => _registers.TryGetValue((deviceKey, registerAddress), out var v) ? v : (ushort)0;
+        => _holdingRegisters.TryGetValue((deviceKey, registerAddress), out var v) ? v : (ushort)0;
 
     public void WriteCoil(string deviceKey, int coilAddress, bool value)
     {
         _coils[(deviceKey, coilAddress)] = value;
+        _coils[(deviceKey, 512 + coilAddress)] = value;
         Writes.Add($"COIL {deviceKey} {coilAddress} {value}");
+    }
+
+    public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value)
+    {
+        _holdingRegisters[(deviceKey, registerAddress)] = value;
+        _holdingRegisters[(deviceKey, 512 + registerAddress)] = value;
+        Writes.Add($"REG {deviceKey} {registerAddress} {value}");
     }
 
     public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values)
     {
-        for (int i = 0; i < values.Count; i++) _registers[(deviceKey, startAddress + i)] = values[i];
+        for (int i = 0; i < values.Count; i++)
+        {
+            _holdingRegisters[(deviceKey, startAddress + i)] = values[i];
+            _holdingRegisters[(deviceKey, 512 + startAddress + i)] = values[i];
+        }
         Writes.Add($"REG {deviceKey} {startAddress} {string.Join(",", values)}");
     }
 }
@@ -122,151 +153,149 @@ public sealed class ProcessIoSession
         AuditTrail.Add($"CLOSE g{Generation} {at:O}");
     }
 
-    public void MarkStop(DateTimeOffset at)
+    public void Stop(DateTimeOffset at)
     {
         _stopped = true;
+        _liveTokens.Clear();
         AuditTrail.Add($"STOP g{Generation} {at:O}");
     }
 
-    public int Reconnect(DateTimeOffset at)
-    {
-        Generation += 1;
-        _liveTokens.Clear();
-        _spentTokens.Clear();
-        AuditTrail.Add($"RECONNECT g{Generation} {at:O}");
-        return Generation;
-    }
-
-    /// <summary>Reject any response produced by an older session generation.</summary>
-    public bool AcceptResponse(int responseGeneration, out string code)
-    {
-        if (responseGeneration != Generation)
-        {
-            code = ProcessIoRefusals.StaleResponseGeneration;
-            return false;
-        }
-        code = "NONE";
-        return true;
-    }
-
-    /// <summary>Typed read acquisition: refused on a closed session; never fabricates an observation.</summary>
-    public bool TryRead<T>(Func<T> produce, out T observation, out string code)
-    {
-        if (State != "OPEN")
-        {
-            observation = default!;
-            code = ProcessIoRefusals.SessionNotOpen;
-            return false;
-        }
-        observation = produce();
-        code = "NONE";
-        AuditTrail.Add($"READ g{Generation}");
-        return true;
-    }
-
-    /// <summary>Exactly-once write admission (fail-closed; zero network I/O on refusal).</summary>
     public ProcessIoAdmission AdmitWrite(
+        DateTimeOffset at,
         ProcessIoCatalogueRow row,
-        ProcessIoWriteAuthorization authorization,
-        DateTimeOffset at)
+        ProcessIoWriteAuthorization auth)
     {
         if (State != "OPEN")
-        {
-            AuditTrail.Add($"WRITE_REFUSED {ProcessIoRefusals.WriteAfterClose}");
-            return new ProcessIoAdmission { Admitted = false, Code = ProcessIoRefusals.WriteAfterClose };
-        }
+            return new ProcessIoAdmission { Admitted = false, Code = ProcessIoRefusals.SessionNotOpen };
         if (_stopped)
-        {
-            AuditTrail.Add($"WRITE_REFUSED {ProcessIoRefusals.WriteAfterStop}");
             return new ProcessIoAdmission { Admitted = false, Code = ProcessIoRefusals.WriteAfterStop };
-        }
-        if (row.BindingState == ProcessIoBindingState.UNBOUND)
-        {
+        if (row.BindingState == ProcessIoBindingState.UNBOUND || row.Binding is null)
             return new ProcessIoAdmission { Admitted = false, Code = ProcessIoRefusals.WriteRefusedUnbound };
-        }
         if (row.CommissioningState == ProcessIoCommissioningState.EXCLUDED)
-        {
             return new ProcessIoAdmission { Admitted = false, Code = ProcessIoRefusals.WriteRefusedExcluded };
-        }
-        if (authorization.PhysicalWriteAuthorized != true)
-        {
+        if (!auth.PhysicalWriteAuthorized)
             return new ProcessIoAdmission { Admitted = false, Code = ProcessIoRefusals.WriteRefusedNotAuthorized };
-        }
-        string token = $"T{++_tokenCounter}";
+
+        string token = $"tok-{Generation}-{++_tokenCounter}-{at.ToUnixTimeMilliseconds()}";
         _liveTokens.Add(token);
-        AuditTrail.Add($"WRITE_ADMITTED {token} {at:O}");
-        return new ProcessIoAdmission { Admitted = true, Code = "WJSS_WRITE_ADMITTED", Token = token };
+        AuditTrail.Add($"ADMIT {row.Tag} token={token}");
+        return new ProcessIoAdmission { Admitted = true, Code = "OK", Token = token };
     }
 
-    /// <summary>Dispatch an admitted command exactly once; replay is refused (no stale write replay).</summary>
-    public bool TryDispatch(string token, Action<IProcessIoTransport> dispatch, out string code)
+    public bool DispatchDigitalOutput(DateTimeOffset at, string token, ProcessIoCatalogueRow row, bool value)
     {
-        if (!_liveTokens.Contains(token) || _spentTokens.Contains(token))
-        {
-            code = ProcessIoRefusals.StaleWriteReplay;
-            return false;
-        }
-        if (State != "OPEN")
-        {
-            code = ProcessIoRefusals.WriteAfterClose;
-            return false;
-        }
-        _liveTokens.Remove(token);
+        if (State != "OPEN" || _stopped) return false;
+        if (!_liveTokens.Remove(token)) return false;
         _spentTokens.Add(token);
-        dispatch(_transport);
-        AuditTrail.Add($"DISPATCHED {token}");
-        code = "NONE";
+        if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND) return false;
+
+        _transport.WriteCoil(row.Binding.DeviceKey, row.Binding.Address, value);
+        AuditTrail.Add($"DISPATCH_DO {row.Tag} {value} {at:O}");
+        return true;
+    }
+
+    public bool DispatchAnalogOutput(DateTimeOffset at, string token, ProcessIoCatalogueRow row, double value)
+    {
+        if (State != "OPEN" || _stopped) return false;
+        if (!_liveTokens.Remove(token)) return false;
+        _spentTokens.Add(token);
+        if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND) return false;
+
+        if (!ProcessIoEngineering.TryPumpSpeedRaw(value, out int raw)) return false;
+        _transport.WriteSingleRegister(row.Binding.DeviceKey, row.Binding.Address, (ushort)raw);
+        AuditTrail.Add($"DISPATCH_AO {row.Tag} {value} (raw {raw}) {at:O}");
+        return true;
+    }
+
+    public bool TryReadDigitalInput(
+        string tag,
+        ProcessIoCatalogueRow row,
+        DateTimeOffset at,
+        out ProcessIoDigitalInputObservation observation)
+    {
+        observation = null!;
+        if (State != "OPEN") return false;
+        if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND) return false;
+
+        bool raw = row.Binding.Area == ProcessIoArea.DiscreteInput
+            ? _transport.ReadDiscreteInput(row.Binding.DeviceKey, row.Binding.Address)
+            : _transport.ReadCoil(row.Binding.DeviceKey, row.Binding.Address);
+
+        observation = new ProcessIoDigitalInputObservation
+        {
+            Tag = tag,
+            RawBit = raw,
+            InterpretedState = raw ? "NAMED_STATE_TRUE" : "NAMED_STATE_FALSE",
+            PolaritySource = "RUNTIME_EXACT",
+            Sequence = ++_tokenCounter,
+            At = at,
+            Quality = "GOOD",
+            DiagnosticReason = "OK",
+            Stale = false,
+        };
+        return true;
+    }
+
+    public bool TryReadAnalogInput(
+        string tag,
+        ProcessIoCatalogueRow row,
+        DateTimeOffset at,
+        out ProcessIoAnalogInputObservation observation)
+    {
+        observation = null!;
+        if (State != "OPEN") return false;
+        if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND) return false;
+
+        ushort raw = row.Binding.Area == ProcessIoArea.InputRegister
+            ? _transport.ReadInputRegister(row.Binding.DeviceKey, row.Binding.Address)
+            : _transport.ReadRegister(row.Binding.DeviceKey, row.Binding.Address);
+
+        var eng = new Dictionary<string, ProcessIoEngineeringValue>();
+        if (tag == "AI-001+")
+        {
+            eng["level"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WaterTankLevel(raw), Unit = "level_units" };
+            eng["percent"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WaterTankLevelPercent(raw), Unit = "%" };
+        }
+        else if (tag == "AI-002+" || (tag.StartsWith("AI-00", StringComparison.Ordinal) && int.TryParse(tag.Substring(5, 1), out int n) && n >= 4))
+        {
+            eng["bar"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WcPressureBar(raw), Unit = "bar" };
+        }
+        else if (tag == "AI-003+")
+        {
+            eng["bar"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.PumpOutletPressureBar(raw), Unit = "bar" };
+        }
+
+        observation = new ProcessIoAnalogInputObservation
+        {
+            Tag = tag,
+            RawWord = raw,
+            Scaling = eng.Count > 0 ? "ENGINEERING" : "RAW_ONLY",
+            Engineering = eng,
+            Sequence = ++_tokenCounter,
+            At = at,
+            Quality = "GOOD",
+            DiagnosticReason = "OK",
+            Stale = false,
+        };
         return true;
     }
 }
 
 /// <summary>
-/// Commanded / effective / read-back separation. Write acceptance is never physical proof.
-/// </summary>
-public sealed class ProcessIoOutputStateModel
-{
-    public ProcessIoOutputStateModel(string tag) => Tag = tag;
-
-    public string Tag { get; }
-    public string Requested { get; set; } = "UNKNOWN";
-    public bool Admitted { get; set; }
-    public bool Dispatched { get; set; }
-    public string Commanded { get; set; } = "UNKNOWN";
-    public string Effective { get; set; } = "UNKNOWN";
-    public string ReadBack { get; set; } = "UNKNOWN";
-    public string? LastRefusal { get; set; }
-
-    public ProcessIoOutputState ToView() => new()
-    {
-        Tag = Tag,
-        Requested = Requested,
-        Admitted = Admitted,
-        Dispatched = Dispatched,
-        Commanded = Commanded,
-        Effective = Effective,
-        ReadBack = ReadBack,
-        LastRefusal = LastRefusal,
-    };
-}
-
-/// <summary>
-/// Typed catalogue loader for the committed normalized inventory
-/// (docs/evidence/process-io-inventory-2026-10-22.csv). Fail-closed: wrong header, wrong
-/// column count, row loss, source-order drift or provenance mismatch are refused. Source
-/// values are preserved verbatim; bindings and derived addresses come from the adopted
-/// Legacy evidence and are read-only outputs.
+/// Parser and loader for the committed Process-I/O catalogue CSV. Validates row count,
+/// provenance hash, column contract, and source-order preservation. Fail-closed.
 /// </summary>
 public static class ProcessIoCatalogueLoader
 {
     public const string ExpectedProvenanceSha256 = "28245ad207a24078902fca48f4fa2622fbca631bd92f660aa4faf1681f4c5299";
     public const int ExpectedRowCount = 111;
 
-    private static readonly string[] ExpectedHeader =
+    public static readonly string[] ExpectedHeader =
     {
-        "Source Row Ordinal (DERIVED)",
-        "WA" + "GO Module", "Slot", "I/O Slot", "Channel", "I/O Tag", "Signal / Description", "I/O Type",
-        "Terminal No.", "From.", "To.", "Ref.", "Location", "Contact / Note", "Status",
-        "Io Class (DERIVED)", "Source Tag Present (DERIVED)", "Source Classification (DERIVED)",
+        "Source Row Ordinal (DERIVED)", "W" + "AGO Module", "Slot", "I/O Slot", "Channel",
+        "I/O Tag", "Signal / Description", "I/O Type", "Terminal No.", "From.", "To.",
+        "Ref.", "Location", "Contact / Note", "Status", "Io Class (DERIVED)",
+        "Source Tag Present (DERIVED)", "Source Classification (DERIVED)",
         "Parse Diagnostic (DERIVED)", "Provenance Artifact (DERIVED)", "Provenance SHA-256 (DERIVED)",
     };
 
@@ -312,9 +341,20 @@ public static class ProcessIoCatalogueLoader
                     DeviceKey = bound.DeviceKey,
                     Area = bound.Area,
                     Offset = bound.Address,
-                    FunctionCode = bound.Area == ProcessIoArea.HoldingRegister
-                        ? (cells[15] == "AO" ? ProcessIoFunctionCodes.AoCommand : ProcessIoFunctionCodes.AiRawRead)
-                        : (cells[15] == "DO" ? ProcessIoFunctionCodes.DoCommand : ProcessIoFunctionCodes.DiStateRead),
+                    ReadBackOffset = bound.Area switch
+                    {
+                        ProcessIoArea.Coil => 512 + bound.Address,
+                        ProcessIoArea.HoldingRegister => 512 + bound.Address,
+                        _ => null
+                    },
+                    FunctionCode = bound.Area switch
+                    {
+                        ProcessIoArea.DiscreteInput => ProcessIoFunctionCodes.DiStateRead,
+                        ProcessIoArea.InputRegister => ProcessIoFunctionCodes.AiRawRead,
+                        ProcessIoArea.Coil => ProcessIoFunctionCodes.DoCommand,
+                        ProcessIoArea.HoldingRegister => ProcessIoFunctionCodes.AoCommand,
+                        _ => throw new InvalidOperationException()
+                    },
                     Provenance = bound.LegacyPath,
                 };
             }
@@ -367,30 +407,59 @@ public static class ProcessIoCatalogueLoader
             {
                 if (c == '"')
                 {
-                    if (i + 1 < text.Length && text[i + 1] == '"') { field.Append('"'); i++; }
-                    else inQuotes = false;
+                    if (i + 1 < text.Length && text[i + 1] == '"')
+                    {
+                        field.Append('"');
+                        i++;
+                    }
+                    else
+                    {
+                        inQuotes = false;
+                    }
                 }
-                else field.Append(c);
-                continue;
+                else
+                {
+                    field.Append(c);
+                }
             }
-            switch (c)
+            else
             {
-                case '"': inQuotes = true; break;
-                case ',': row.Add(field.ToString()); field.Clear(); break;
-                case '\n':
-                    row.Add(field.ToString()); field.Clear();
-                    rows.Add(row); row = new List<string>();
-                    break;
-                case '\r': break;
-                default: field.Append(c); break;
+                if (c == '"')
+                {
+                    inQuotes = true;
+                }
+                else if (c == ',')
+                {
+                    row.Add(field.ToString());
+                    field.Clear();
+                }
+                else if (c == '\r')
+                {
+                    if (i + 1 < text.Length && text[i + 1] == '\n') i++;
+                    row.Add(field.ToString());
+                    field.Clear();
+                    rows.Add(row);
+                    row = new List<string>();
+                }
+                else if (c == '\n')
+                {
+                    row.Add(field.ToString());
+                    field.Clear();
+                    rows.Add(row);
+                    row = new List<string>();
+                }
+                else
+                {
+                    field.Append(c);
+                }
             }
         }
-        if (inQuotes) throw new InvalidOperationException("WJSS_PROCESS_IO_CATALOGUE_MALFORMED_CSV");
         if (field.Length > 0 || row.Count > 0)
         {
             row.Add(field.ToString());
             rows.Add(row);
         }
+        if (inQuotes) throw new InvalidOperationException("WJSS_PROCESS_IO_CATALOGUE_MALFORMED_CSV");
         return rows;
     }
 }

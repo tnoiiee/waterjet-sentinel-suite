@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Xunit;
-using Wjss.Contracts.ProcessIo;
+using Wjss.Contracts;
 using Wjss.Runtime.Core.ProcessIo;
 
 namespace Wjss.Runtime.Core.Tests.ProcessIo;
@@ -21,7 +21,7 @@ public sealed class ProcessIoBenchRunnerTests
     public void Physical_Transport_Refuses_Without_Configured_Endpoint()
     {
         using var transport = new ProcessIoPhysicalTransport(new Dictionary<string, ProcessIoEndpointConfig>());
-        Assert.Throws<InvalidOperationException>(() => transport.ReadCoil(ProcessIoDevices.PumpRack, 0));
+        Assert.Throws<InvalidOperationException>(() => transport.ReadDiscreteInput(ProcessIoDevices.RackT8, 0));
     }
 
     [Fact]
@@ -33,11 +33,12 @@ public sealed class ProcessIoBenchRunnerTests
 
         Assert.True(report.Accepted);
         Assert.Equal("SIMULATION", report.Mode);
-        Assert.Equal("TRIAL_ACCEPTED", report.OutcomeCode);
-        Assert.Equal("22", report.Summary["DI_READS_PERFORMED"]);
-        Assert.Equal("14", report.Summary["AI_READS_PERFORMED"]);
-        Assert.Equal("15", report.Summary["DO_CHANNELS_TESTED"]);
-        Assert.Equal(16, report.CleanupAudit.Count);
+        Assert.Equal("SUCCESS", report.OutcomeCode);
+        Assert.Equal("40", report.Summary["DI_READS_PERFORMED"]);
+        Assert.Equal("36", report.Summary["AI_READS_PERFORMED"]);
+        Assert.Equal("31", report.Summary["DO_CHANNELS_TESTED"]);
+        Assert.Equal("1", report.Summary["AO_CHANNELS_TESTED"]);
+        Assert.Equal(32, report.CleanupAudit.Count);
     }
 
     [Fact]
@@ -50,7 +51,7 @@ public sealed class ProcessIoBenchRunnerTests
             ConsentPhrase = "INVALID_CONSENT",
             Endpoints = new Dictionary<string, ProcessIoEndpointConfig>
             {
-                [ProcessIoDevices.PumpRack] = new() { TargetAddress = "127.0.0.1", Port = 502 }
+                [ProcessIoDevices.RackT8] = new() { TargetAddress = "127.0.0.1", Port = 502 }
             }
         };
         var report = ProcessIoBenchRunner.Run(csv, config);
@@ -66,7 +67,7 @@ public sealed class ProcessIoBenchRunnerTests
         var config = new ProcessIoBenchConfig
         {
             Mode = ProcessIoBenchMode.PHYSICAL_TEST,
-            ConsentPhrase = ProcessIoBenchRunner.RequiredConsentPhrase,
+            ConsentPhrase = ProcessIoBenchRunner.ConsentFull,
             Endpoints = new Dictionary<string, ProcessIoEndpointConfig>()
         };
         var report = ProcessIoBenchRunner.Run(csv, config);

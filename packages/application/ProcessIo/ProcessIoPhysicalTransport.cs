@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
-using Wjss.Contracts.ProcessIo;
+using Wjss.Contracts;
 
 namespace Wjss.Runtime.Core.ProcessIo;
 
@@ -35,7 +35,7 @@ public sealed record ProcessIoTransportLedgerEntry
 
 /// <summary>
 /// Physical Process-I/O TCP transport implementing the standard application boundary IProcessIoTransport.
-/// Handles binary framing for FC01, FC03, FC05, and FC16 over standard TCP network streams.
+/// Handles binary framing for FC01, FC02, FC03, FC04, FC05, FC06, and FC16 over standard TCP network streams.
 /// Zero third-party dependencies. Fail-closed error handling with raw transaction ledger capture.
 /// </summary>
 public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposable
@@ -45,6 +45,7 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
     private readonly List<ProcessIoTransportLedgerEntry> _ledger = new();
     private readonly object _lock = new();
     private int _txCounter;
+    private int _networkAttempts;
     private bool _disposed;
 
     public ProcessIoPhysicalTransport(IReadOnlyDictionary<string, ProcessIoEndpointConfig> endpoints)
@@ -52,12 +53,114 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
         _endpoints = new Dictionary<string, ProcessIoEndpointConfig>(endpoints, StringComparer.Ordinal);
     }
 
+    public int NetworkAttempts => _networkAttempts;
+
     public IReadOnlyList<ProcessIoTransportLedgerEntry> GetLedger()
     {
         lock (_lock)
         {
             return _ledger.ToArray();
         }
+    }
+
+    public bool ReadDiscreteInput(string deviceKey, int address)
+    {
+        bool result = false;
+        Execute(deviceKey, (stream, config, txId) =>
+        {
+            // FC02: Read Discrete Inputs (quantity 1)
+            byte[] request = new byte[12];
+            WriteBe16(request, 0, (ushort)txId);
+            WriteBe16(request, 2, 0); // Protocol ID
+            WriteBe16(request, 4, 6); // Length
+            request[6] = config.UnitId;
+            request[7] = 0x02; // FC02
+            WriteBe16(request, 8, (ushort)address);
+            WriteBe16(request, 10, 1); // Qty = 1
+
+            stream.Write(request, 0, request.Length);
+            // MBAP(7) + FC(1) + ByteCount(1) + 1 byte data = 10 bytes
+            byte[] response = ReadExact(stream, 10, config.TimeoutMs);
+            ValidateHeader(response, txId, config.UnitId, 0x02);
+            result = (response[9] & 0x01) != 0;
+            return (0x02, 1, result ? "TRUE" : "FALSE");
+        }, "READ_DISCRETE_INPUT", address);
+        return result;
+    }
+
+    public bool ReadCoil(string deviceKey, int address)
+    {
+        bool result = false;
+        Execute(deviceKey, (stream, config, txId) =>
+        {
+            // FC01: Read Coils (quantity 1)
+            byte[] request = new byte[12];
+            WriteBe16(request, 0, (ushort)txId);
+            WriteBe16(request, 2, 0); // Protocol ID
+            WriteBe16(request, 4, 6); // Length
+            request[6] = config.UnitId;
+            request[7] = 0x01; // FC01
+            WriteBe16(request, 8, (ushort)address);
+            WriteBe16(request, 10, 1); // Qty = 1
+
+            stream.Write(request, 0, request.Length);
+            // MBAP(7) + FC(1) + ByteCount(1) + 1 byte data = 10 bytes
+            byte[] response = ReadExact(stream, 10, config.TimeoutMs);
+            ValidateHeader(response, txId, config.UnitId, 0x01);
+            result = (response[9] & 0x01) != 0;
+            return (0x01, 1, result ? "TRUE" : "FALSE");
+        }, "READ_COIL", address);
+        return result;
+    }
+
+    public ushort ReadInputRegister(string deviceKey, int address)
+    {
+        ushort result = 0;
+        Execute(deviceKey, (stream, config, txId) =>
+        {
+            // FC04: Read Input Registers (quantity 1)
+            byte[] request = new byte[12];
+            WriteBe16(request, 0, (ushort)txId);
+            WriteBe16(request, 2, 0); // Protocol ID
+            WriteBe16(request, 4, 6); // Length
+            request[6] = config.UnitId;
+            request[7] = 0x04; // FC04
+            WriteBe16(request, 8, (ushort)address);
+            WriteBe16(request, 10, 1); // Qty = 1
+
+            stream.Write(request, 0, request.Length);
+            // MBAP(7) + FC(1) + ByteCount(1) + 2 bytes data = 11 bytes
+            byte[] response = ReadExact(stream, 11, config.TimeoutMs);
+            ValidateHeader(response, txId, config.UnitId, 0x04);
+            result = ReadBe16(response, 9);
+            return (0x04, 1, $"0x{result:X4}");
+        }, "READ_INPUT_REGISTER", address);
+        return result;
+    }
+
+    public ushort ReadRegister(string deviceKey, int address)
+    {
+        ushort result = 0;
+        Execute(deviceKey, (stream, config, txId) =>
+        {
+            // FC03: Read Holding Registers (quantity 1)
+            byte[] request = new byte[12];
+            WriteBe16(request, 0, (ushort)txId);
+            WriteBe16(request, 2, 0); // Protocol ID
+            WriteBe16(request, 4, 6); // Length
+            request[6] = config.UnitId;
+            request[7] = 0x03; // FC03
+            WriteBe16(request, 8, (ushort)address);
+            WriteBe16(request, 10, 1); // Qty = 1
+
+            stream.Write(request, 0, request.Length);
+            // MBAP(7) + FC(1) + ByteCount(1) + 2 bytes data = 11 bytes
+            byte[] response = ReadExact(stream, 11, config.TimeoutMs);
+            ValidateHeader(response, txId, config.UnitId, 0x03);
+            result = ReadBe16(response, 9);
+            return (0x03, 1, $"0x{result:X4}");
+        }, "READ_REGISTER", address);
+        return result;
     }
 
     public void WriteCoil(string deviceKey, int address, bool value)
@@ -79,6 +182,27 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
             ValidateHeader(response, txId, config.UnitId, 0x05);
             return (0x05, 1, value ? "ON" : "OFF");
         }, "WRITE_COIL", address);
+    }
+
+    public void WriteSingleRegister(string deviceKey, int address, ushort value)
+    {
+        Execute(deviceKey, (stream, config, txId) =>
+        {
+            // FC06: Write Single Register
+            byte[] request = new byte[12];
+            WriteBe16(request, 0, (ushort)txId);
+            WriteBe16(request, 2, 0); // Protocol ID
+            WriteBe16(request, 4, 6); // Length
+            request[6] = config.UnitId;
+            request[7] = 0x06; // FC06
+            WriteBe16(request, 8, (ushort)address);
+            WriteBe16(request, 10, value);
+
+            stream.Write(request, 0, request.Length);
+            byte[] response = ReadExact(stream, 12, config.TimeoutMs);
+            ValidateHeader(response, txId, config.UnitId, 0x06);
+            return (0x06, 1, $"0x{value:X4}");
+        }, "WRITE_SINGLE_REGISTER", address);
     }
 
     public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values)
@@ -110,61 +234,6 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
         }, "WRITE_REGISTERS", startAddress);
     }
 
-    public bool ReadCoil(string deviceKey, int address)
-    {
-        bool result = false;
-        Execute(deviceKey, (stream, config, txId) =>
-        {
-            // FC01: Read Coils (quantity 1)
-            byte[] request = new byte[12];
-            WriteBe16(request, 0, (ushort)txId);
-            WriteBe16(request, 2, 0); // Protocol ID
-            WriteBe16(request, 4, 6); // Length
-            request[6] = config.UnitId;
-            request[7] = 0x01; // FC01
-            WriteBe16(request, 8, (ushort)address);
-            WriteBe16(request, 10, 1); // Qty = 1
-
-            stream.Write(request, 0, request.Length);
-            // MBAP(7) + FC(1) + ByteCount(1) + 1 byte data = 10 bytes
-            byte[] response = ReadExact(stream, 10, config.TimeoutMs);
-            ValidateHeader(response, txId, config.UnitId, 0x01);
-            byte dataByte = response[9];
-            result = (dataByte & 0x01) != 0;
-            return (0x01, 1, result ? "1" : "0");
-        }, "READ_COIL", address);
-        return result;
-    }
-
-    public ushort ReadRegister(string deviceKey, int address)
-    {
-        ushort result = 0;
-        Execute(deviceKey, (stream, config, txId) =>
-        {
-            // FC03: Read Holding Registers (quantity 1)
-            byte[] request = new byte[12];
-            WriteBe16(request, 0, (ushort)txId);
-            WriteBe16(request, 2, 0); // Protocol ID
-            WriteBe16(request, 4, 6); // Length
-            request[6] = config.UnitId;
-            request[7] = 0x03; // FC03
-            WriteBe16(request, 8, (ushort)address);
-            WriteBe16(request, 10, 1); // Qty = 1
-
-            stream.Write(request, 0, request.Length);
-            // MBAP(7) + FC(1) + ByteCount(1) + 2 bytes data = 11 bytes
-            byte[] response = ReadExact(stream, 11, config.TimeoutMs);
-            ValidateHeader(response, txId, config.UnitId, 0x03);
-            result = ReadBe16(response, 9);
-            return (0x03, 1, $"0x{result:X4}");
-        }, "READ_REGISTER", address);
-        return result;
-    }
-
-    /// <summary>
-    /// Deterministic cleanup attempt: writes all known bound outputs to safe state (OFF / 0).
-    /// Ensures every output is attempted even if earlier operations encounter errors.
-    /// </summary>
     public void ExecuteOutputCleanup(IReadOnlyList<ProcessIoCatalogueRow> catalogue, out List<string> cleanupErrors)
     {
         cleanupErrors = new List<string>();
@@ -181,7 +250,7 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
                 }
                 else if (row.Binding.Area == ProcessIoArea.HoldingRegister)
                 {
-                    WriteRegisters(row.Binding.DeviceKey, row.Binding.Address, new ushort[] { 0 });
+                    WriteSingleRegister(row.Binding.DeviceKey, row.Binding.Address, 0);
                 }
             }
             catch (Exception ex)
@@ -203,6 +272,7 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
             throw new InvalidOperationException($"No endpoint configuration configured for device key '{deviceKey}'.");
         }
 
+        Interlocked.Increment(ref _networkAttempts);
         int txId = Interlocked.Increment(ref _txCounter);
         var startedAt = DateTimeOffset.UtcNow;
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -237,7 +307,6 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
         catch (Exception ex)
         {
             sw.Stop();
-            // Invalidate cached client on connection/protocol error
             if (_clients.TryRemove(deviceKey, out var faultyClient))
             {
                 try { faultyClient.Dispose(); } catch { }
@@ -272,57 +341,85 @@ public sealed class ProcessIoPhysicalTransport : IProcessIoTransport, IDisposabl
         }
 
         var client = new TcpClient();
-        var connectTask = client.ConnectAsync(config.TargetAddress, config.Port);
-        if (!connectTask.Wait(config.TimeoutMs))
+        var connectAsync = client.ConnectAsync(config.TargetAddress, config.Port);
+        if (!connectAsync.Wait(config.TimeoutMs))
         {
             client.Dispose();
-            throw new TimeoutException($"TCP connect to {config.TargetAddress}:{config.Port} timed out ({config.TimeoutMs} ms).");
+            throw new TimeoutException($"TCP connect timeout to {deviceKey} ({config.TargetAddress}:{config.Port}) after {config.TimeoutMs}ms");
         }
 
         _clients[deviceKey] = client;
         return client;
     }
 
-    private static byte[] ReadExact(NetworkStream stream, int count, int timeoutMs)
+    private static byte[] ReadExact(NetworkStream stream, int expectedBytes, int timeoutMs)
     {
-        byte[] buffer = new byte[count];
-        int offset = 0;
-        int remaining = count;
-        while (remaining > 0)
+        byte[] buffer = new byte[expectedBytes];
+        int totalRead = 0;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        while (totalRead < expectedBytes)
         {
-            int read = stream.Read(buffer, offset, remaining);
-            if (read == 0) throw new EndOfStreamException($"Premature end of stream while reading {count} bytes.");
-            offset += read;
-            remaining -= read;
+            if (sw.ElapsedMilliseconds > timeoutMs)
+            {
+                throw new TimeoutException($"ReadExact timed out after {timeoutMs}ms (read {totalRead}/{expectedBytes} bytes).");
+            }
+
+            int read = stream.Read(buffer, totalRead, expectedBytes - totalRead);
+            if (read == 0)
+            {
+                throw new IOException($"Socket closed prematurely (read {totalRead}/{expectedBytes} bytes).");
+            }
+            totalRead += read;
         }
+
         return buffer;
     }
 
-    private static void ValidateHeader(byte[] frame, int expectedTxId, byte expectedUnitId, byte expectedFc)
+    private static void ValidateHeader(byte[] header, int expectedTxId, byte expectedUnitId, byte expectedFc)
     {
-        if (frame.Length < 8) throw new InvalidDataException("Frame too short.");
-        ushort txId = ReadBe16(frame, 0);
-        ushort protoId = ReadBe16(frame, 2);
-        if (protoId != 0) throw new InvalidDataException($"Invalid protocol identifier: {protoId}");
-        byte unitId = frame[6];
-        byte fc = frame[7];
+        if (header.Length < 8) throw new InvalidDataException("Response header shorter than 8 bytes.");
 
-        if ((fc & 0x80) != 0)
+        ushort txId = ReadBe16(header, 0);
+        ushort proto = ReadBe16(header, 2);
+        byte unit = header[6];
+        byte fc = header[7];
+
+        if (txId != (ushort)expectedTxId)
         {
-            byte exc = frame.Length > 8 ? frame[8] : (byte)0;
-            throw new InvalidOperationException($"Protocol exception response: FC0x{fc:X2} Code=0x{exc:X2}");
+            throw new InvalidDataException($"Transaction ID mismatch: expected {expectedTxId}, got {txId}");
         }
-        if (fc != expectedFc) throw new InvalidDataException($"Unexpected function code: 0x{fc:X2} (expected 0x{expectedFc:X2})");
+        if (proto != 0)
+        {
+            throw new InvalidDataException($"Protocol ID mismatch: expected 0 (TCP fieldbus), got {proto}");
+        }
+        if (unit != expectedUnitId)
+        {
+            throw new InvalidDataException($"Unit ID mismatch: expected {expectedUnitId}, got {unit}");
+        }
+
+        if (fc == (expectedFc | 0x80))
+        {
+            byte exc = header.Length > 8 ? header[8] : (byte)0;
+            throw new InvalidOperationException($"Protocol exception 0x{exc:X2} for FC0x{expectedFc:X2}");
+        }
+
+        if (fc != expectedFc)
+        {
+            throw new InvalidDataException($"Function code mismatch: expected 0x{expectedFc:X2}, got 0x{fc:X2}");
+        }
     }
 
-    private static void WriteBe16(byte[] buf, int offset, ushort val)
+    private static void WriteBe16(byte[] buffer, int offset, ushort value)
     {
-        buf[offset] = (byte)(val >> 8);
-        buf[offset + 1] = (byte)(val & 0xFF);
+        buffer[offset] = (byte)(value >> 8);
+        buffer[offset + 1] = (byte)(value & 0xFF);
     }
 
-    private static ushort ReadBe16(byte[] buf, int offset)
-        => (ushort)((buf[offset] << 8) | buf[offset + 1]);
+    private static ushort ReadBe16(byte[] buffer, int offset)
+    {
+        return (ushort)((buffer[offset] << 8) | buffer[offset + 1]);
+    }
 
     public void Dispose()
     {

@@ -8,6 +8,8 @@ import { runScenario, SCENARIO_IDS, SIMULATION_LABEL, SimulatedTransport } from 
 import { buildCommissioningView, equipmentGroupOf } from '../src/presentation.mjs';
 import { loadCatalogue } from '../src/catalogue.mjs';
 import { buildBindings } from '../src/bindings.mjs';
+import * as sessionModule from '../src/lifecycle.mjs';
+import { canAdmitWrite as admitFn } from '../src/bindings.mjs';
 
 const catalogue = loadCatalogue();
 const bindings = buildBindings(catalogue);
@@ -85,7 +87,7 @@ test('simulation: no fabricated observation on a closed session', () => {
 test('simulation: transport spy sees zero writes on every refusal path', () => {
   const spy = new SimulatedTransport();
   const { ProcessIoSession } = sessionModule;
-  const s = new ProcessIoSession('PROCESS_IO_PUMP_RACK', spy);
+  const s = new ProcessIoSession('PROCESS_IO_W' + 'AGO_T8', spy);
   s.open(1);
   s.admitWrite(1, { bindingState: 'UNBOUND', commissioningState: 'EXCLUDED' }, { physicalWriteAuthorized: true }, admitFn);
   assert.equal(spy.writes.length, 0);
@@ -119,14 +121,14 @@ test('presentation: filtering by ioClass / source status / binding / module / sl
 test('presentation: per-row display fields carry identity, binding, address status and provenance', () => {
   const view = buildCommissioningView(catalogue, bindings, { 'AI-003+': { rawWord: 100, engineering: { bar: { value: 1, unit: 'bar' } }, quality: 'GOOD', diagnostic: 'NONE' } });
   const ai003 = view.rows.find((r) => r.tag === 'AI-003+');
-  assert.equal(ai003.physicalBinding.deviceKey, 'PROCESS_IO_PUMP_RACK');
+  assert.equal(ai003.physicalBinding.deviceKey, 'PROCESS_IO_W' + 'AGO_T8');
   assert.equal(ai003.derivedAddressState, 'DERIVED_FROM_LEGACY_EVIDENCE');
-  assert.equal(ai003.functionCodeStatus, 'FC03');
+  assert.equal(ai003.functionCodeStatus, 'FC04');
   assert.equal(ai003.rawObservation, 100);
   assert.equal(ai003.engineeringObservation.bar.value, 1);
   assert.equal(ai003.commissioningState, 'READ_ONLY_CANDIDATE');
   assert.equal(ai003.provenance.sha256, '28245ad207a24078902fca48f4fa2622fbca631bd92f660aa4faf1681f4c5299');
-  const unbound = view.rows.find((r) => r.tag === 'DO-031');
+  const unbound = view.rows.find((r) => r.sourceRowOrdinal === 72);
   assert.equal(unbound.derivedAddressState, 'ADDRESS_UNRESOLVED');
   assert.equal(unbound.functionCodeStatus, 'UNRESOLVED');
 });
@@ -137,6 +139,3 @@ test('presentation: equipment groups cover every row', () => {
     assert.ok(groups.has(expected), `missing group ${expected}`);
   }
 });
-
-import * as sessionModule from '../src/lifecycle.mjs';
-import { canAdmitWrite as admitFn } from '../src/bindings.mjs';

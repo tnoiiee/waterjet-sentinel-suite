@@ -1,5 +1,5 @@
 // H2 Physical Process-I/O — standard TCP socket transport.
-// Handles binary framing for FC01, FC03, FC05, and FC16 over standard TCP streams (node:net).
+// Handles binary framing for FC01, FC02, FC03, FC04, FC05, FC06, and FC16 over standard TCP streams (node:net).
 // Zero third-party dependencies. Fail-closed error handling with transaction ledger capture.
 
 import net from 'node:net';
@@ -17,6 +17,94 @@ export class PhysicalProcessIoTransport {
     return [...this.ledger];
   }
 
+  getRedactedLedger() {
+    return this.ledger.map((entry) => ({
+      ...entry,
+      deviceKey: entry.deviceKey,
+      endpoint: entry.endpoint ? entry.endpoint.replace(/\d+$/, 'xxx') : undefined,
+    }));
+  }
+
+  async readDiscreteInput(deviceKey, address) {
+    return this._execute(deviceKey, address, 'READ_DISCRETE_INPUT', (txId, unitId) => {
+      // FC02: Read Discrete Inputs (qty 1)
+      const buf = Buffer.alloc(12);
+      buf.writeUInt16BE(txId, 0);
+      buf.writeUInt16BE(0, 2); // Protocol ID
+      buf.writeUInt16BE(6, 4); // Length
+      buf.writeUInt8(unitId, 6);
+      buf.writeUInt8(0x02, 7); // FC02
+      buf.writeUInt16BE(address, 8);
+      buf.writeUInt16BE(1, 10);
+      return {
+        request: buf,
+        expectedResponseBytes: 10,
+        expectedFc: 0x02,
+        parse: (res) => (res[9] & 0x01) !== 0,
+      };
+    });
+  }
+
+  async readCoil(deviceKey, address) {
+    return this._execute(deviceKey, address, 'READ_COIL', (txId, unitId) => {
+      // FC01: Read Coils (qty 1)
+      const buf = Buffer.alloc(12);
+      buf.writeUInt16BE(txId, 0);
+      buf.writeUInt16BE(0, 2);
+      buf.writeUInt16BE(6, 4);
+      buf.writeUInt8(unitId, 6);
+      buf.writeUInt8(0x01, 7);
+      buf.writeUInt16BE(address, 8);
+      buf.writeUInt16BE(1, 10);
+      return {
+        request: buf,
+        expectedResponseBytes: 10,
+        expectedFc: 0x01,
+        parse: (res) => (res[9] & 0x01) !== 0,
+      };
+    });
+  }
+
+  async readInputRegister(deviceKey, address) {
+    return this._execute(deviceKey, address, 'READ_INPUT_REGISTER', (txId, unitId) => {
+      // FC04: Read Input Registers (qty 1)
+      const buf = Buffer.alloc(12);
+      buf.writeUInt16BE(txId, 0);
+      buf.writeUInt16BE(0, 2);
+      buf.writeUInt16BE(6, 4);
+      buf.writeUInt8(unitId, 6);
+      buf.writeUInt8(0x04, 7); // FC04
+      buf.writeUInt16BE(address, 8);
+      buf.writeUInt16BE(1, 10);
+      return {
+        request: buf,
+        expectedResponseBytes: 11,
+        expectedFc: 0x04,
+        parse: (res) => res.readUInt16BE(9),
+      };
+    });
+  }
+
+  async readRegister(deviceKey, address) {
+    return this._execute(deviceKey, address, 'READ_REGISTER', (txId, unitId) => {
+      // FC03: Read Holding Registers (qty 1)
+      const buf = Buffer.alloc(12);
+      buf.writeUInt16BE(txId, 0);
+      buf.writeUInt16BE(0, 2);
+      buf.writeUInt16BE(6, 4);
+      buf.writeUInt8(unitId, 6);
+      buf.writeUInt8(0x03, 7); // FC03
+      buf.writeUInt16BE(address, 8);
+      buf.writeUInt16BE(1, 10);
+      return {
+        request: buf,
+        expectedResponseBytes: 11,
+        expectedFc: 0x03,
+        parse: (res) => res.readUInt16BE(9),
+      };
+    });
+  }
+
   async writeCoil(deviceKey, address, value) {
     return this._execute(deviceKey, address, 'WRITE_COIL', (txId, unitId) => {
       // FC05: Write Single Coil
@@ -25,10 +113,25 @@ export class PhysicalProcessIoTransport {
       buf.writeUInt16BE(0, 2); // Protocol ID
       buf.writeUInt16BE(6, 4); // Length
       buf.writeUInt8(unitId, 6);
-      buf.writeUInt8(0x05, 7);
+      buf.writeUInt8(0x05, 7); // FC05
       buf.writeUInt16BE(address, 8);
       buf.writeUInt16BE(value ? 0xFF00 : 0x0000, 10);
       return { request: buf, expectedResponseBytes: 12, expectedFc: 0x05, parse: () => value };
+    });
+  }
+
+  async writeSingleRegister(deviceKey, address, value) {
+    return this._execute(deviceKey, address, 'WRITE_SINGLE_REGISTER', (txId, unitId) => {
+      // FC06: Write Single Register
+      const buf = Buffer.alloc(12);
+      buf.writeUInt16BE(txId, 0);
+      buf.writeUInt16BE(0, 2);
+      buf.writeUInt16BE(6, 4);
+      buf.writeUInt8(unitId, 6);
+      buf.writeUInt8(0x06, 7); // FC06
+      buf.writeUInt16BE(address, 8);
+      buf.writeUInt16BE(value, 10);
+      return { request: buf, expectedResponseBytes: 12, expectedFc: 0x06, parse: () => value };
     });
   }
 
@@ -53,60 +156,17 @@ export class PhysicalProcessIoTransport {
     });
   }
 
-  async readCoil(deviceKey, address) {
-    return this._execute(deviceKey, address, 'READ_COIL', (txId, unitId) => {
-      // FC01: Read Coils (qty 1)
-      const buf = Buffer.alloc(12);
-      buf.writeUInt16BE(txId, 0);
-      buf.writeUInt16BE(0, 2);
-      buf.writeUInt16BE(6, 4);
-      buf.writeUInt8(unitId, 6);
-      buf.writeUInt8(0x01, 7);
-      buf.writeUInt16BE(address, 8);
-      buf.writeUInt16BE(1, 10);
-      return {
-        request: buf,
-        expectedResponseBytes: 10,
-        expectedFc: 0x01,
-        parse: (res) => (res[9] & 0x01) !== 0,
-      };
-    });
-  }
-
-  async readRegister(deviceKey, address) {
-    return this._execute(deviceKey, address, 'READ_REGISTER', (txId, unitId) => {
-      // FC03: Read Holding Registers (qty 1)
-      const buf = Buffer.alloc(12);
-      buf.writeUInt16BE(txId, 0);
-      buf.writeUInt16BE(0, 2);
-      buf.writeUInt16BE(6, 4);
-      buf.writeUInt8(unitId, 6);
-      buf.writeUInt8(0x03, 7);
-      buf.writeUInt16BE(address, 8);
-      buf.writeUInt16BE(1, 10);
-      return {
-        request: buf,
-        expectedResponseBytes: 11,
-        expectedFc: 0x03,
-        parse: (res) => res.readUInt16BE(9),
-      };
-    });
-  }
-
-  async executeOutputCleanup(catalogue) {
+  async executeOutputCleanup(touchedOutputs = []) {
     const errors = [];
-    for (const row of catalogue) {
-      if (row.bindingState === 'UNBOUND' || !row.binding) continue;
-      if (row.binding.direction !== 'WRITE') continue;
-
+    for (const item of touchedOutputs) {
       try {
-        if (row.binding.area === 'COIL') {
-          await this.writeCoil(row.binding.deviceKey, row.binding.address, false);
-        } else if (row.binding.area === 'HOLDING_REGISTER') {
-          await this.writeRegisters(row.binding.deviceKey, row.binding.address, [0]);
+        if (item.area === 'COIL' || item.ioClass === 'DO') {
+          await this.writeCoil(item.deviceKey, item.address, false);
+        } else if (item.area === 'HOLDING_REGISTER' || item.ioClass === 'AO') {
+          await this.writeSingleRegister(item.deviceKey, item.address, 0);
         }
       } catch (err) {
-        errors.push(`CLEANUP_FAILED for ${row.tag}: ${err.message}`);
+        errors.push(`CLEANUP_FAILED for ${item.tag ?? item.address}: ${err.message}`);
       }
     }
     return errors;
@@ -119,59 +179,73 @@ export class PhysicalProcessIoTransport {
 
     const txId = ++this.txCounter;
     const unitId = endpoint.unitId ?? 1;
-    const timeoutMs = endpoint.timeoutMs ?? 1000;
     const { request, expectedResponseBytes, expectedFc, parse } = builder(txId, unitId);
+    const start = Date.now();
 
-    const startedAt = Date.now();
+    const ledgerEntry = {
+      transactionId: txId,
+      deviceKey,
+      operation,
+      functionCode: `FC${expectedFc.toString(16).padStart(2, '0').toUpperCase()}`,
+      address,
+      quantity: 1,
+      payloadSummary: '',
+      status: 'PENDING',
+      elapsedMs: 0,
+      timestamp: new Date(start).toISOString(),
+      diagnostic: null,
+    };
+
     try {
       const socket = await this._getSocket(deviceKey, endpoint);
-      const response = await this._sendAndReceive(socket, request, expectedResponseBytes, timeoutMs);
-      this._validateHeader(response, txId, unitId, expectedFc);
-      const result = parse(response);
+      const resBuf = await this._sendAndReceive(socket, request, expectedResponseBytes, endpoint.timeoutMs ?? 1000);
 
-      this.ledger.push({
-        transactionId: txId,
-        deviceKey,
-        operation,
-        functionCode: `FC${expectedFc.toString(10).padStart(2, '0')}`,
-        address,
-        status: 'SUCCESS',
-        elapsedMs: Date.now() - startedAt,
-        timestamp: new Date(startedAt).toISOString(),
-      });
+      // Validate header
+      const resTxId = resBuf.readUInt16BE(0);
+      const resProto = resBuf.readUInt16BE(2);
+      const resUnitId = resBuf.readUInt8(6);
+      const resFc = resBuf.readUInt8(7);
+
+      if (resTxId !== txId || resProto !== 0 || resUnitId !== unitId) {
+        throw new Error(`Protocol header mismatch: tx=${resTxId}/${txId}, proto=${resProto}, unit=${resUnitId}/${unitId}`);
+      }
+
+      if (resFc === (expectedFc | 0x80)) {
+        const excCode = resBuf.readUInt8(8);
+        throw new Error(`Protocol exception 0x${excCode.toString(16).padStart(2, '0')} for ${operation}`);
+      }
+
+      if (resFc !== expectedFc) {
+        throw new Error(`Unexpected function code in response: 0x${resFc.toString(16)} expected 0x${expectedFc.toString(16)}`);
+      }
+
+      const result = parse(resBuf);
+      ledgerEntry.status = 'SUCCESS';
+      ledgerEntry.payloadSummary = typeof result === 'boolean' ? (result ? 'TRUE' : 'FALSE') : String(result);
+      ledgerEntry.elapsedMs = Date.now() - start;
+      this.ledger.push(ledgerEntry);
       return result;
     } catch (err) {
-      this.ledger.push({
-        transactionId: txId,
-        deviceKey,
-        operation,
-        functionCode: `FC${expectedFc.toString(10).padStart(2, '0')}`,
-        address,
-        status: 'ERROR',
-        elapsedMs: Date.now() - startedAt,
-        timestamp: new Date(startedAt).toISOString(),
-        diagnostic: err.message,
-      });
-      // Invalidate faulty connection
-      const existing = this.connections.get(deviceKey);
-      if (existing) {
-        existing.destroy();
-        this.connections.delete(deviceKey);
-      }
+      ledgerEntry.status = 'FAILED';
+      ledgerEntry.diagnostic = err.message;
+      ledgerEntry.elapsedMs = Date.now() - start;
+      this.ledger.push(ledgerEntry);
       throw err;
     }
   }
 
   async _getSocket(deviceKey, endpoint) {
     let socket = this.connections.get(deviceKey);
-    if (socket && !socket.destroyed) return socket;
+    if (socket && !socket.destroyed && socket.writable) return socket;
 
-    return new Promise((resolve, reject) => {
-      const targetAddress = endpoint.targetAddress ?? endpoint.address;
-      const port = endpoint.port ?? 502;
-      const s = net.createConnection({ host: targetAddress, port, timeout: endpoint.timeoutMs ?? 1000 }, () => {
+    socket = await new Promise((resolve, reject) => {
+      const s = new net.Socket();
+      const timeout = endpoint.timeoutMs ?? 1000;
+      s.setTimeout(timeout);
+
+      s.once('connect', () => {
         s.removeAllListeners('error');
-        this.connections.set(deviceKey, s);
+        s.removeAllListeners('timeout');
         resolve(s);
       });
       s.once('error', (err) => {
@@ -180,29 +254,27 @@ export class PhysicalProcessIoTransport {
       });
       s.once('timeout', () => {
         s.destroy();
-        reject(new Error(`TCP connect timeout (${endpoint.timeoutMs ?? 1000} ms)`));
+        reject(new Error(`Connection timeout to ${deviceKey}`));
       });
+
+      s.connect(endpoint.port ?? 502, endpoint.targetAddress);
     });
+
+    this.connections.set(deviceKey, socket);
+    return socket;
   }
 
-  _sendAndReceive(socket, request, expectedBytes, timeoutMs) {
+  async _sendAndReceive(socket, request, expectedBytes, timeoutMs) {
     return new Promise((resolve, reject) => {
       let chunks = [];
-      let total = 0;
-      let timer;
-
-      const cleanup = () => {
-        if (timer) clearTimeout(timer);
-        socket.removeListener('data', onData);
-        socket.removeListener('error', onError);
-      };
+      let totalBytes = 0;
 
       const onData = (data) => {
         chunks.push(data);
-        total += data.length;
-        if (total >= expectedBytes) {
+        totalBytes += data.length;
+        if (totalBytes >= expectedBytes) {
           cleanup();
-          resolve(Buffer.concat(chunks, total));
+          resolve(Buffer.concat(chunks, totalBytes));
         }
       };
 
@@ -211,34 +283,35 @@ export class PhysicalProcessIoTransport {
         reject(err);
       };
 
-      timer = setTimeout(() => {
+      const onTimeout = () => {
         cleanup();
-        reject(new Error(`TCP read timeout (${timeoutMs} ms)`));
-      }, timeoutMs);
+        reject(new Error(`Socket read timeout (${timeoutMs}ms)`));
+      };
 
+      const cleanup = () => {
+        socket.removeListener('data', onData);
+        socket.removeListener('error', onError);
+        socket.removeListener('timeout', onTimeout);
+      };
+
+      socket.setTimeout(timeoutMs);
       socket.on('data', onData);
       socket.once('error', onError);
-      socket.write(request);
-    });
-  }
+      socket.once('timeout', onTimeout);
 
-  _validateHeader(frame, expectedTxId, expectedUnitId, expectedFc) {
-    if (frame.length < 8) throw new Error('Frame too short');
-    const txId = frame.readUInt16BE(0);
-    const protoId = frame.readUInt16BE(2);
-    if (protoId !== 0) throw new Error(`Invalid protocol id: ${protoId}`);
-    const fc = frame[7];
-    if ((fc & 0x80) !== 0) {
-      const exc = frame[8] ?? 0;
-      throw new Error(`Protocol exception response: FC0x${fc.toString(16)} Code=0x${exc.toString(16)}`);
-    }
-    if (fc !== expectedFc) throw new Error(`Unexpected FC: 0x${fc.toString(16)} (expected 0x${expectedFc.toString(16)})`);
+      socket.write(request, (err) => {
+        if (err) {
+          cleanup();
+          reject(err);
+        }
+      });
+    });
   }
 
   close() {
     this.closed = true;
-    for (const [, socket] of this.connections) {
-      try { socket.destroy(); } catch {}
+    for (const socket of this.connections.values()) {
+      if (!socket.destroyed) socket.destroy();
     }
     this.connections.clear();
   }

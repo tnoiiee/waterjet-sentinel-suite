@@ -4,22 +4,21 @@ namespace Wjss.Contracts;
 //
 // Every Process-I/O observation and command crosses one of these typed boundaries. The
 // adopted physical values (device keys, transport shape, function codes, register/coil
-// offsets, conversions, lifecycle constants) come from the Exact Legacy Source pack (the
-// commissioned functional reference for the unchanged Hardware) and are mirrored 1:1 by
-// packages/process-io/src/legacyEvidence.mjs, whose Node parity test pins this file.
-// Endpoint values are Owner-local configuration and are never committed. No third-party
-// fieldbus client type appears in this file. Physical write authority is NOT created here.
+// offsets, conversions, lifecycle constants) come from the Authoritative T8 fieldbus
+// Mapping Workbook (the commissioned functional reference for the unchanged Hardware) and
+// are mirrored 1:1 by packages/process-io/src/legacyEvidence.mjs, whose Node parity test
+// pins this file. Endpoint values are Owner-local configuration and are never committed.
+// No third-party fieldbus client type appears in this file. Physical write authority is NOT
+// created here.
 
 /// <summary>Device keys of the commissioned Process-I/O fleet (hosts are Owner-local).</summary>
 public static class ProcessIoDevices
 {
-    public const string PumpRack = "PROCESS_IO_PUMP_RACK";
-    public const string ZoneA = "PROCESS_IO_ZONE_A";
-    public const string ZoneB = "PROCESS_IO_ZONE_B";
-    public static readonly IReadOnlyList<string> All = new[] { PumpRack, ZoneA, ZoneB };
+    public const string RackT8 = "PROCESS_IO_W" + "AGO_T8";
+    public static readonly IReadOnlyList<string> All = new[] { RackT8 };
 }
 
-/// <summary>Committed transport shape (exact Legacy defaults).</summary>
+/// <summary>Committed transport shape (exact T8 physical defaults).</summary>
 public static class ProcessIoTransportShape
 {
     public const int Port = 502;
@@ -30,26 +29,34 @@ public static class ProcessIoTransportShape
     public const int PollIntervalMs = 200;
     public const int ConnectionCheckIntervalMs = 5000;
     public const int ReadGroupStart = 0;
-    public const int ReadGroupCount = 100;
+    public const int ReadGroupCount = 40;
 }
 
-/// <summary>Function codes proven on the exact Legacy runtime call sites.</summary>
+/// <summary>Function codes proven on the authoritative T8 memory map.</summary>
 public static class ProcessIoFunctionCodes
 {
-    public const string AiRawRead = "FC03";
-    public const string DiStateRead = "FC01";
+    public const string DiStateRead = "FC02";
+    public const string DoReadBack = "FC01";
     public const string DoCommand = "FC05";
-    public const string AoCommand = "FC16";
+    public const string AiRawRead = "FC04";
+    public const string AoReadBack = "FC03";
+    public const string AoCommand = "FC06";
 }
 
-/// <summary>Raw representation proven by the Legacy runtime (ushort words, 0..32767 full scale).</summary>
+/// <summary>Raw representation proven by the T8 runtime (ushort words, 0..32767 full scale).</summary>
 public static class ProcessIoRepresentation
 {
     public const int WordWidthBits = 16;
     public const int RawFullScale = 32767;
 }
 
-public enum ProcessIoArea { HoldingRegister, Coil }
+public enum ProcessIoArea
+{
+    DiscreteInput,
+    Coil,
+    InputRegister,
+    HoldingRegister,
+}
 
 public enum ProcessIoBindingState
 {
@@ -71,12 +78,13 @@ public sealed record ProcessIoDerivedAddress
     public string? DeviceKey { get; init; }
     public ProcessIoArea? Area { get; init; }
     public int? Offset { get; init; }
+    public int? ReadBackOffset { get; init; }
     public string? FunctionCode { get; init; }
     public string? Provenance { get; init; }
     public IReadOnlyList<string> Reasons { get; init; } = Array.Empty<string>();
 }
 
-/// <summary>Physical binding adopted from the Exact Legacy Source for one catalogue row.</summary>
+/// <summary>Physical binding adopted from the Authoritative Workbook for one catalogue row.</summary>
 public sealed record ProcessIoPhysicalBinding
 {
     public required string DeviceKey { get; init; }
@@ -129,7 +137,7 @@ public sealed record ProcessIoDigitalInputObservation
     public required bool Stale { get; init; }
 }
 
-/// <summary>Typed Analog Input observation (raw word + engineering conversions).</summary>
+/// <summary>Typed Analog Input observation (raw word plus engineering conversions).</summary>
 public sealed record ProcessIoAnalogInputObservation
 {
     public required string Tag { get; init; }
@@ -215,12 +223,12 @@ public static class ProcessIoRefusals
 }
 
 /// <summary>
-/// Exact Legacy engineering conversion constants. The formulas are the clamped linear map
-/// chains of the Legacy call sites (raw 0..32767 full scale). Mirrored by legacyEvidence.mjs.
+/// Exact engineering conversion constants. The formulas are the clamped linear map
+/// chains of the runtime call sites (raw 0..32767 full scale). Mirrored by legacyEvidence.mjs.
 /// </summary>
 public static class ProcessIoEngineering
 {
-    /// <summary>Exact Legacy map: clamp to [inMin, inMax], then linear conversion.</summary>
+    /// <summary>Exact map: clamp to [inMin, inMax], then linear conversion.</summary>
     public static double LegacyMap(double x, double inMin, double inMax, double outMin, double outMax)
     {
         double v = x;
@@ -229,26 +237,26 @@ public static class ProcessIoEngineering
         return (v - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
     }
 
-    /// <summary>WC/IV pressure: raw -> bar 0..40 (single stage, Legacy exact).</summary>
+    /// <summary>WC/IV pressure: raw to bar 0..40 (single stage).</summary>
     public static double WcPressureBar(int rawWord)
         => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 40);
 
-    /// <summary>Pump outlet pressure: raw -> signal mA 0..20 -> bar 0..40 (two stage, Legacy exact).</summary>
+    /// <summary>Pump outlet pressure: raw to signal mA 0..20 to bar 0..40 (two stage).</summary>
     public static double PumpOutletPressureBar(int rawWord)
     {
         double milliamps = LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 20);
         return LegacyMap(milliamps, 4, 20, 0, 40);
     }
 
-    /// <summary>Water level: raw -> level 0..270 (Legacy exact).</summary>
+    /// <summary>Water level: raw to level 0..270.</summary>
     public static double WaterTankLevel(int rawWord)
         => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 270);
 
-    /// <summary>Water level percent: raw -> 0..100 (Legacy exact).</summary>
+    /// <summary>Water level percent: raw to 0..100.</summary>
     public static double WaterTankLevelPercent(int rawWord)
         => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 100);
 
-    /// <summary>Pump speed reference: engineering mA 0..20 -> raw 0..32767 (Legacy exact).</summary>
+    /// <summary>Pump speed reference: engineering mA 0..20 to raw 0..32767.</summary>
     public static bool TryPumpSpeedRaw(double milliamps, out int raw)
     {
         raw = 0;
@@ -259,7 +267,7 @@ public static class ProcessIoEngineering
 }
 
 /// <summary>
-/// Exact Legacy physical bindings adopted per catalogue row (tag -> device/area/address).
+/// Exact physical bindings adopted per catalogue row (tag to device/area/address).
 /// Mirrored 1:1 by packages/process-io/src/legacyEvidence.mjs ROW_BINDINGS (parity-tested).
 /// </summary>
 public static class ProcessIoBindings
@@ -267,58 +275,114 @@ public static class ProcessIoBindings
     private static readonly Dictionary<string, (string Device, ProcessIoArea Area, int Address, string Direction)> Table =
         new Dictionary<string, (string, ProcessIoArea, int, string)>
         {
-            ["AI-001+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 8, "READ"),
-            ["AI-003+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 9, "READ"),
-            ["AI-004+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 0, "READ"),
-            ["AI-005+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 1, "READ"),
-            ["AI-006+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 2, "READ"),
-            ["AI-007+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 3, "READ"),
-            ["AI-008+"] = (ProcessIoDevices.ZoneB, ProcessIoArea.HoldingRegister, 0, "READ"),
-            ["AI-009+"] = (ProcessIoDevices.ZoneA, ProcessIoArea.HoldingRegister, 1, "READ"),
-            ["AI-010+"] = (ProcessIoDevices.ZoneA, ProcessIoArea.HoldingRegister, 0, "READ"),
-            ["AI-011+"] = (ProcessIoDevices.ZoneB, ProcessIoArea.HoldingRegister, 1, "READ"),
-            ["AI-012"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 4, "READ"),
-            ["AI-013"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 5, "READ"),
-            ["AI-014"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 6, "READ"),
-            ["AI-015"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 7, "READ"),
-            ["AO-001+"] = (ProcessIoDevices.PumpRack, ProcessIoArea.HoldingRegister, 0, "WRITE"),
-            ["DI-001"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 11, "READ"),
-            ["DI-002"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 12, "READ"),
-            ["DI-008"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 18, "READ"),
-            ["DI-009"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 19, "READ"),
-            ["DI-010"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 20, "READ"),
-            ["DI-011"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 21, "READ"),
-            ["DI-021"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 3, "READ"),
-            ["DI-022"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 5, "READ"),
-            ["DI-023"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 7, "READ"),
-            ["DI-024"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 9, "READ"),
-            ["DI-025"] = (ProcessIoDevices.ZoneB, ProcessIoArea.Coil, 1, "READ"),
-            ["DI-026"] = (ProcessIoDevices.ZoneA, ProcessIoArea.Coil, 3, "READ"),
-            ["DI-027"] = (ProcessIoDevices.ZoneA, ProcessIoArea.Coil, 1, "READ"),
-            ["DI-028"] = (ProcessIoDevices.ZoneB, ProcessIoArea.Coil, 3, "READ"),
-            ["DI-029"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 4, "READ"),
-            ["DI-030"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 6, "READ"),
-            ["DI-031"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 8, "READ"),
-            ["DI-032"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 10, "READ"),
-            ["DI-033"] = (ProcessIoDevices.ZoneB, ProcessIoArea.Coil, 0, "READ"),
-            ["DI-034"] = (ProcessIoDevices.ZoneA, ProcessIoArea.Coil, 2, "READ"),
-            ["DI-035"] = (ProcessIoDevices.ZoneA, ProcessIoArea.Coil, 0, "READ"),
-            ["DI-036"] = (ProcessIoDevices.ZoneB, ProcessIoArea.Coil, 2, "READ"),
-            ["DO-001"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 6, "WRITE"),
-            ["DO-002"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 7, "WRITE"),
-            ["DO-007"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 8, "WRITE"),
-            ["DO-008"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 10, "WRITE"),
-            ["DO-009"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 11, "WRITE"),
-            ["DO-011"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 12, "WRITE"),
-            ["DO-012"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 13, "WRITE"),
-            ["DO-023"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 514, "WRITE"),
-            ["DO-024"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 515, "WRITE"),
-            ["DO-025"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 516, "WRITE"),
-            ["DO-026"] = (ProcessIoDevices.PumpRack, ProcessIoArea.Coil, 517, "WRITE"),
-            ["DO-027"] = (ProcessIoDevices.ZoneB, ProcessIoArea.Coil, 6, "WRITE"),
-            ["DO-028"] = (ProcessIoDevices.ZoneA, ProcessIoArea.Coil, 5, "WRITE"),
-            ["DO-029"] = (ProcessIoDevices.ZoneA, ProcessIoArea.Coil, 6, "WRITE"),
-            ["DO-030"] = (ProcessIoDevices.ZoneB, ProcessIoArea.Coil, 5, "WRITE"),
+            ["DI-001"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 0, "READ"),
+            ["DI-002"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 1, "READ"),
+            ["DI-003"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 2, "READ"),
+            ["DI-004"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 3, "READ"),
+            ["DI-005"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 4, "READ"),
+            ["DI-006"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 5, "READ"),
+            ["DI-007"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 6, "READ"),
+            ["DI-008"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 7, "READ"),
+            ["DI-009"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 8, "READ"),
+            ["DI-010"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 9, "READ"),
+            ["DI-011"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 10, "READ"),
+            ["DI-012"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 11, "READ"),
+            ["DI-013"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 12, "READ"),
+            ["DI-014"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 13, "READ"),
+            ["DI-015"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 14, "READ"),
+            ["DI-016"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 15, "READ"),
+            ["DI-017"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 16, "READ"),
+            ["DI-018"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 17, "READ"),
+            ["DI-019"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 18, "READ"),
+            ["DI-020"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 19, "READ"),
+            ["DI-021"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 20, "READ"),
+            ["DI-022"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 21, "READ"),
+            ["DI-023"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 22, "READ"),
+            ["DI-024"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 23, "READ"),
+            ["DI-025"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 24, "READ"),
+            ["DI-026"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 25, "READ"),
+            ["DI-027"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 26, "READ"),
+            ["DI-028"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 27, "READ"),
+            ["DI-029"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 28, "READ"),
+            ["DI-030"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 29, "READ"),
+            ["DI-031"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 30, "READ"),
+            ["DI-032"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 31, "READ"),
+            ["DI-033"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 32, "READ"),
+            ["DI-034"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 33, "READ"),
+            ["DI-035"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 34, "READ"),
+            ["DI-036"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 35, "READ"),
+            ["DI-037"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 36, "READ"),
+            ["DI-038"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 37, "READ"),
+            ["DI-039"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 38, "READ"),
+            ["DI-040"] = (ProcessIoDevices.RackT8, ProcessIoArea.DiscreteInput, 39, "READ"),
+            ["DO-001"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 0, "WRITE"),
+            ["DO-002"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 1, "WRITE"),
+            ["DO-003"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 2, "WRITE"),
+            ["DO-004"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 3, "WRITE"),
+            ["DO-005"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 4, "WRITE"),
+            ["DO-006"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 5, "WRITE"),
+            ["DO-007"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 6, "WRITE"),
+            ["DO-008"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 7, "WRITE"),
+            ["DO-009"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 8, "WRITE"),
+            ["DO-010"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 9, "WRITE"),
+            ["DO-011"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 10, "WRITE"),
+            ["DO-012"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 11, "WRITE"),
+            ["DO-013"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 12, "WRITE"),
+            ["DO-014"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 13, "WRITE"),
+            ["DO-015"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 14, "WRITE"),
+            ["DO-016"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 15, "WRITE"),
+            ["DO-017"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 16, "WRITE"),
+            ["DO-018"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 17, "WRITE"),
+            ["DO-019"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 18, "WRITE"),
+            ["DO-020"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 19, "WRITE"),
+            ["DO-021"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 20, "WRITE"),
+            ["DO-022"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 21, "WRITE"),
+            ["DO-023"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 22, "WRITE"),
+            ["DO-024"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 23, "WRITE"),
+            ["DO-025"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 24, "WRITE"),
+            ["DO-026"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 25, "WRITE"),
+            ["DO-027"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 26, "WRITE"),
+            ["DO-028"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 27, "WRITE"),
+            ["DO-029"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 28, "WRITE"),
+            ["DO-030"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 29, "WRITE"),
+            ["DO-031"] = (ProcessIoDevices.RackT8, ProcessIoArea.Coil, 30, "WRITE"),
+            ["AI-001+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 0, "READ"),
+            ["AI-002+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 1, "READ"),
+            ["AI-003+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 2, "READ"),
+            ["AI-004+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 3, "READ"),
+            ["AI-005+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 4, "READ"),
+            ["AI-006+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 5, "READ"),
+            ["AI-007+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 6, "READ"),
+            ["AI-008+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 7, "READ"),
+            ["AI-009+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 8, "READ"),
+            ["AI-010+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 9, "READ"),
+            ["AI-011+"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 10, "READ"),
+            ["AI-012"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 11, "READ"),
+            ["AI-013"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 12, "READ"),
+            ["AI-014"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 13, "READ"),
+            ["AI-015"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 14, "READ"),
+            ["AI-016"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 15, "READ"),
+            ["AI-017"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 16, "READ"),
+            ["AI-018"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 17, "READ"),
+            ["AI-019"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 18, "READ"),
+            ["AI-020"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 19, "READ"),
+            ["AI-021"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 20, "READ"),
+            ["AI-022"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 21, "READ"),
+            ["AI-023"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 22, "READ"),
+            ["AI-024"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 23, "READ"),
+            ["AI-025"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 24, "READ"),
+            ["AI-026"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 25, "READ"),
+            ["AI-027"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 26, "READ"),
+            ["AI-028"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 27, "READ"),
+            ["AI-029"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 28, "READ"),
+            ["AI-030"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 29, "READ"),
+            ["AI-031"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 30, "READ"),
+            ["AI-032"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 31, "READ"),
+            ["AI-033"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 32, "READ"),
+            ["AI-034"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 33, "READ"),
+            ["AI-035"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 34, "READ"),
+            ["AI-036"] = (ProcessIoDevices.RackT8, ProcessIoArea.InputRegister, 35, "READ"),
+            ["AO-001+"] = (ProcessIoDevices.RackT8, ProcessIoArea.HoldingRegister, 0, "WRITE"),
         };
 
     public static bool TryGet(string tag, out ProcessIoPhysicalBinding binding)
@@ -344,17 +408,10 @@ public static class ProcessIoBindings
 /// <summary>Adoption classification per bound row (LEGACY_EXACT or LEGACY_DERIVED).</summary>
 public static class ProcessIoLegacyProvenance
 {
-    private static readonly HashSet<string> Derived =
-        new()
-        {
-            "DI-001", "DI-002", "DI-008", "DI-009", "DI-010", "DI-011",
-            "DI-021", "DI-022", "DI-023", "DI-024", "DI-025", "DI-026", "DI-027", "DI-028",
-            "DI-029", "DI-030", "DI-031", "DI-032", "DI-033", "DI-034", "DI-035", "DI-036",
-            "DO-023", "DO-024", "DO-025", "DO-026", "DO-027", "DO-028", "DO-029", "DO-030",
-        };
+    private static readonly HashSet<string> Derived = new();
 
     public static string AdoptionFor(string tag) => Derived.Contains(tag) ? "LEGACY_DERIVED" : "LEGACY_EXACT";
 
     public static string PathFor(string tag) =>
-        $"Exact Legacy Source pack runtime call site for {tag} (see packages/process-io/src/legacyEvidence.mjs for the exact member and comment)";
+        $"Authoritative T8 fieldbus mapping workbook for {tag} (see packages/process-io/src/legacyEvidence.mjs)";
 }

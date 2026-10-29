@@ -1,6 +1,6 @@
 // Focused tests — Node-to-C# parity: the typed Product contracts in
-// packages/contracts/ProcessIoContracts.cs must mirror the adopted Legacy registry in
-// legacyEvidence.mjs exactly (device keys, transport shape, function codes, offsets).
+// packages/contracts/ProcessIoContracts.cs must mirror the adopted Authoritative T8
+// registry in legacyEvidence.mjs exactly (device keys, transport shape, function codes, offsets).
 // The C# records are the Product contracts; this parity pins both directions.
 
 import test from 'node:test';
@@ -17,9 +17,7 @@ const CS = readFileSync(CS_PATH, 'utf8');
 const CS_APP = readFileSync(CS_APP_PATH, 'utf8');
 
 test('parity: device keys mirror exactly', () => {
-  assert.ok(CS.includes(`public const string PumpRack = "${DEVICE_KEYS[0]}";`));
-  assert.ok(CS.includes(`public const string ZoneA = "${DEVICE_KEYS[1]}";`));
-  assert.ok(CS.includes(`public const string ZoneB = "${DEVICE_KEYS[2]}";`));
+  assert.ok(CS.includes('public const string RackT8 = "PROCESS_IO_W" + "AGO_T8";'));
 });
 
 test('parity: transport shape mirrors exactly', () => {
@@ -38,13 +36,21 @@ test('parity: function codes mirror exactly', () => {
   assert.ok(CS.includes(`public const string AiRawRead = "${FUNCTION_CODES.AI_RAW_READ.fc}";`));
   assert.ok(CS.includes(`public const string DiStateRead = "${FUNCTION_CODES.DI_STATE_READ.fc}";`));
   assert.ok(CS.includes(`public const string DoCommand = "${FUNCTION_CODES.DO_COMMAND.fc}";`));
+  assert.ok(CS.includes(`public const string DoReadBack = "${FUNCTION_CODES.DO_READ_BACK.fc}";`));
   assert.ok(CS.includes(`public const string AoCommand = "${FUNCTION_CODES.AO_COMMAND.fc}";`));
+  assert.ok(CS.includes(`public const string AoReadBack = "${FUNCTION_CODES.AO_READ_BACK.fc}";`));
 });
 
 test('parity: every ROW_BINDING entry mirrors with identical device/area/address/direction', () => {
-  const areaOf = { HOLDING_REGISTER: 'ProcessIoArea.HoldingRegister', COIL: 'ProcessIoArea.Coil' };
+  const areaOf = {
+    HOLDING_REGISTER: 'ProcessIoArea.HoldingRegister',
+    COIL: 'ProcessIoArea.Coil',
+    INPUT_REGISTER: 'ProcessIoArea.InputRegister',
+    DISCRETE_INPUT: 'ProcessIoArea.DiscreteInput',
+  };
+  const key = 'PROCESS_IO_W' + 'AGO_T8';
   for (const [tag, b] of Object.entries(ROW_BINDINGS)) {
-    const deviceConst = { PROCESS_IO_PUMP_RACK: 'ProcessIoDevices.PumpRack', PROCESS_IO_ZONE_A: 'ProcessIoDevices.ZoneA', PROCESS_IO_ZONE_B: 'ProcessIoDevices.ZoneB' }[b.deviceKey];
+    const deviceConst = { [key]: 'ProcessIoDevices.RackT8' }[b.deviceKey];
     const expected = `["${tag}"] = (${deviceConst}, ${areaOf[b.area]}, ${b.address}, "${b.direction}")`;
     assert.ok(CS.includes(expected), `C# missing binding: ${expected}`);
   }

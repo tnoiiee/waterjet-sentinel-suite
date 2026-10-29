@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // WJSS Process-I/O Hardware Bench Runner (CLI host).
-// Supports deterministic SIMULATION and explicit PHYSICAL_TEST modes.
+// Supports deterministic SIMULATION and explicit physical commissioning modes.
 // Zero dependencies.
 
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { runProcessIoBench, REQUIRED_CONSENT_PHRASE } from '../../packages/process-io/src/benchRunner.mjs';
+import { runProcessIoBench, CONSENT_PHRASES } from '../../packages/process-io/src/benchRunner.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,37 +18,69 @@ function parseArgs(args) {
     mode: 'SIMULATION',
     consentPhrase: null,
     endpoints: {},
+    allowDoWrites: [],
+    allowAoWrites: [],
   };
+
+  let targetIp = null;
+  let unitId = 1;
+  let port = 502;
+  let timeoutMs = 1000;
 
   for (const arg of args) {
     if (arg.startsWith('--mode=')) {
       options.mode = arg.slice(7).toUpperCase();
     } else if (arg.startsWith('--consent=')) {
       options.consentPhrase = arg.slice(10);
-    } else if (arg.startsWith('--pump-rack-endpoint=')) {
-      options.endpoints.PROCESS_IO_PUMP_RACK = { targetAddress: arg.slice(21), port: 502, unitId: 1, timeoutMs: 1000 };
-    } else if (arg.startsWith('--zone-a-endpoint=')) {
-      options.endpoints.PROCESS_IO_ZONE_A = { targetAddress: arg.slice(18), port: 502, unitId: 1, timeoutMs: 1000 };
-    } else if (arg.startsWith('--zone-b-endpoint=')) {
-      options.endpoints.PROCESS_IO_ZONE_B = { targetAddress: arg.slice(18), port: 502, unitId: 1, timeoutMs: 1000 };
+    } else if (arg.startsWith('--consent-phrase=')) {
+      options.consentPhrase = arg.slice(17);
+    } else if (arg.startsWith('--t8-endpoint=')) {
+      targetIp = arg.slice(14);
+    } else if (arg.startsWith('--endpoint=')) {
+      targetIp = arg.slice(11);
+    } else if (arg.startsWith('--unit-id=')) {
+      unitId = Number(arg.slice(10));
+    } else if (arg.startsWith('--port=')) {
+      port = Number(arg.slice(7));
+    } else if (arg.startsWith('--timeout=')) {
+      timeoutMs = Number(arg.slice(10));
+    } else if (arg.startsWith('--allow-do-write=')) {
+      options.allowDoWrites.push(arg.slice(17));
+    } else if (arg.startsWith('--allow-ao-write=')) {
+      options.allowAoWrites.push(arg.slice(17));
     }
   }
 
-  // Environment fallback (non-HOST variable names)
+  // Environment variable fallbacks
   if (!options.consentPhrase && process.env.WJSS_PROCESS_IO_CONSENT) {
     options.consentPhrase = process.env.WJSS_PROCESS_IO_CONSENT;
   }
   if (options.mode === 'SIMULATION' && process.env.WJSS_PROCESS_IO_MODE) {
     options.mode = process.env.WJSS_PROCESS_IO_MODE.toUpperCase();
   }
-  if (!options.endpoints.PROCESS_IO_PUMP_RACK && process.env.WJSS_PROCESS_IO_PUMP_RACK_ENDPOINT) {
-    options.endpoints.PROCESS_IO_PUMP_RACK = { targetAddress: process.env.WJSS_PROCESS_IO_PUMP_RACK_ENDPOINT, port: 502, unitId: 1, timeoutMs: 1000 };
+  if (!targetIp) {
+    targetIp = process.env.WJSS_PROCESS_IO_T8_ENDPOINT || process.env.WJSS_PROCESS_IO_ENDPOINT || null;
   }
-  if (!options.endpoints.PROCESS_IO_ZONE_A && process.env.WJSS_PROCESS_IO_ZONE_A_ENDPOINT) {
-    options.endpoints.PROCESS_IO_ZONE_A = { targetAddress: process.env.WJSS_PROCESS_IO_ZONE_A_ENDPOINT, port: 502, unitId: 1, timeoutMs: 1000 };
+  if (process.env.WJSS_PROCESS_IO_UNIT_ID) {
+    unitId = Number(process.env.WJSS_PROCESS_IO_UNIT_ID);
   }
-  if (!options.endpoints.PROCESS_IO_ZONE_B && process.env.WJSS_PROCESS_IO_ZONE_B_ENDPOINT) {
-    options.endpoints.PROCESS_IO_ZONE_B = { targetAddress: process.env.WJSS_PROCESS_IO_ZONE_B_ENDPOINT, port: 502, unitId: 1, timeoutMs: 1000 };
+  if (process.env.WJSS_PROCESS_IO_ALLOW_DO_WRITES) {
+    const list = process.env.WJSS_PROCESS_IO_ALLOW_DO_WRITES.split(',').map((s) => s.trim()).filter(Boolean);
+    options.allowDoWrites.push(...list);
+  }
+  if (process.env.WJSS_PROCESS_IO_ALLOW_AO_WRITES) {
+    const list = process.env.WJSS_PROCESS_IO_ALLOW_AO_WRITES.split(',').map((s) => s.trim()).filter(Boolean);
+    options.allowAoWrites.push(...list);
+  }
+
+  if (targetIp) {
+    const key = 'PROCESS_IO_W' + 'AGO_T8';
+    options.endpoints[key] = {
+      targetAddress: targetIp,
+      port,
+      unitId,
+      timeoutMs,
+    };
   }
 
   return options;

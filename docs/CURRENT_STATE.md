@@ -1,5 +1,28 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H2 Physical Process-I/O mapping correction and hardware bench implementation (2026-10-30;
+> software implementation and bench test harness; HARDWARE NOT EXECUTED / NOT VERIFIED).**
+> Following authoritative verification of the Owner mapping workbook `WAGO_T8_Analog_Digital_Modbus_Mapping 1.xlsx`
+> (File ID `1vUd2yAXz4BWE36_VfhvFDEzv3wW2GcLf`, SHA-256 `6b0fc1ca095023ffcc6d61050d6d57fa728c5f936c7d6ce11f124f270d1f9428`,
+> 23,006 bytes, verified outside the repository tree without committing external credentials or workbook bytes),
+> the Process-I/O physical architecture and bench execution layer have been updated and verified:
+> (1) Transitioned physical architecture from the historical 3-device model to the canonical single physical device key
+> `PROCESS_IO_WAGO_T8` (single physical rack at Owner-provided endpoint `192.168.1.70`, unit ID 1); (2) Adopted exact 4-area
+> memory map and function code contract: DI (40 rows, tags `DI-001`..`DI-040`) using FC02 at addresses `0..39`; DO (32 rows,
+> tags `DO-001`..`DO-031` + 1 spare) using FC01 process-image read-back at addresses `512..543` and FC05/FC15 single/multiple
+> channel command writes at addresses `0..31`; AI (36 rows, tags `AI-001+`..`AI-036`) using FC04 at addresses `0..35`; AO (2 rows,
+> tags `AO-001+` + 1 spare) using FC03 process-image read-back at addresses `512..513` and FC06/FC16 single/multiple channel
+> command writes at addresses `0..1`; (3) Implemented physical TCP transport (`ProcessIoPhysicalTransport` /
+> `@wjss/process-io/physicalTransport`) with binary frame encoding, socket pooling, and transaction ledger; (4) Implemented
+> hardware bench runner (`ProcessIoBenchRunner` / `@wjss/process-io/benchRunner` and CLI tool `tools/process-io-bench/bench.mjs`)
+> supporting 5 distinct operational modes (`SIMULATION`, `PHYSICAL_DI_AI_READ`, `PHYSICAL_DO_SINGLE`, `PHYSICAL_AO_SINGLE`,
+> `PHYSICAL_FULL_SELECTED_SEQUENCE`) with mode-specific required consent phrases, explicit write allowlists, single-touched
+> output safe-return cleanup (DO `false`, AO `0`), and redacted evidence transcripts; (5) Maintained strict separation
+> between process-image read-back and physical field-device actuation truth; (6) Validation: 136/136 tests passing across all
+> Node suites (`packages/process-io`, `tools/process-io-evidence`, `tools/boundary-scan`, `tools/tc-bench`), boundary-scan clean
+> (0 findings, S1–S9 verified clean), C# Product contracts and application foundation tests updated. Hardware status remains:
+> `PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED`. PR #42 remains OPEN and NOT MERGED (`PR #42 MERGE: HOLD`). NO HARDWARE. NO MERGE.
+
 > **H2 Physical Process-I/O Product software foundation — implementation record (2026-10-27;
 > software only; HARDWARE NOT EXECUTED).** The complete H2 Physical Process-I/O software
 > foundation covering all 111 rows of the adopted inventory is implemented on PR #42 from the

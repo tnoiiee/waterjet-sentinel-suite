@@ -1,7 +1,7 @@
 // H2 Physical Process-I/O — typed physical-binding registry and fail-closed validation.
 //
 // Separates catalogue identity (source rows) from physical binding (device + area + address,
-// adopted from the Exact Legacy Source) and from derived process-image addressing. Every
+// adopted from the Authoritative T8 Mapping) and from derived process-image addressing. Every
 // validation is fail-closed: module identity/capacity, I/O class, channel range, signal-type
 // compatibility, duplicate binding, process-image overlap, source-row identity and physical
 // binding uniqueness. Rows without an evidenced binding keep bindingState UNBOUND /
@@ -19,7 +19,13 @@ export class BindingError extends Error {
   }
 }
 
-const CLASS_OF_AREA = { HOLDING_REGISTER: ['AI', 'AO'], COIL: ['DI', 'DO'] };
+const CLASS_OF_AREA = {
+  HOLDING_REGISTER: ['AI', 'AO'],
+  COIL: ['DI', 'DO'],
+  DISCRETE_INPUT: ['DI'],
+  INPUT_REGISTER: ['AI'],
+};
+
 const DIRECTION_OF_AREA = { AI: 'READ', DI: 'READ', AO: 'WRITE', DO: 'WRITE' };
 
 /** Module channel capacity per coupler I/O module model (from the adopted rack topology). */
@@ -47,6 +53,7 @@ export function deriveAddress(binding, ioClass) {
     deviceKey: binding.deviceKey,
     area: binding.area,
     offset: binding.address,
+    readBackOffset: binding.area === 'COIL' ? 512 + binding.address : binding.area === 'HOLDING_REGISTER' ? 512 + binding.address : null,
     functionCode: fc,
     provenance: binding.legacyPath,
   });
@@ -55,8 +62,7 @@ export function deriveAddress(binding, ioClass) {
 /**
  * Build the complete binding view over a catalogue. Returns per-row binding/address records
  * plus a findings list. Hard failures (duplicate physical binding, capacity violations,
- * class/area mismatch) throw BindingError; disclosed Legacy conflicts are findings, not
- * failures (each side keeps its own typed record; nothing is actuated by this pass).
+ * class/area mismatch) throw BindingError.
  */
 export function buildBindings(catalogue) {
   const rows = [];
@@ -89,7 +95,7 @@ export function buildBindings(catalogue) {
     if (binding) {
       if (!DEVICE_KEYS.includes(binding.deviceKey)) throw new BindingError('DEVICE_KEY', `${tag}: unknown device key`);
       const areaClasses = CLASS_OF_AREA[binding.area];
-      if (!areaClasses.includes(ioClass)) {
+      if (!areaClasses || !areaClasses.includes(ioClass)) {
         throw new BindingError('SIGNAL_TYPE_MISMATCH', `${tag}: ${ioClass} bound to ${binding.area}`);
       }
       if (binding.direction !== DIRECTION_OF_AREA[ioClass]) {
@@ -118,23 +124,28 @@ export function buildBindings(catalogue) {
       module,
       slot: row.source.Slot,
       ioSlot: row.source['I/O Slot'],
-      channel: channelText,
+      channel: row.source.Channel,
+      sourceStatus: row.source.Status,
+      sourceClassification: classification,
+      binding,
       bindingState,
-      binding: binding ?? null,
       address,
-      commandShape: OUTPUT_COMMAND_SHAPE[tag] ?? null,
-      readBack: READ_BACK_SOURCES[tag] ?? null,
       commissioningState,
+      rawRow: row,
     }));
   }
 
-  for (const [key, list] of crossDirection) {
-    if (list.length > 1) {
+  // Cross-direction conflict check
+  for (const [key, entries] of crossDirection.entries()) {
+    const reads = entries.filter((e) => e.direction === 'READ');
+    const writes = entries.filter((e) => e.direction === 'WRITE');
+    if (reads.length > 0 && writes.length > 0) {
       findings.push(Object.freeze({
         code: 'LEGACY_ADDRESS_OVERLAP_DISCLOSED',
         addressKey: key,
-        members: Object.freeze(list.map((x) => `${x.tag}(${x.direction})`)),
-        note: 'Exact Legacy runtime call sites bind this address on both the read and the write side; both typed records are adopted per call site and the overlap is disclosed. No physical execution occurs in this pass.',
+        members: Object.freeze(entries.map((e) => `${e.tag}(${e.direction})`)),
+        classification: 'DISCLOSED_LEGACY_CONFLICT',
+        detail: `disclosed Legacy address reuse on ${key}`,
       }));
     }
   }
@@ -142,12 +153,16 @@ export function buildBindings(catalogue) {
   return Object.freeze({ rows: Object.freeze(rows), findings: Object.freeze(findings) });
 }
 
-/** Fail-closed admission predicate: a row may only enter a write path when bound, non-spare and explicitly authorized. */
-export function canAdmitWrite(rowBinding, authorization) {
-  if (!rowBinding || rowBinding.bindingState === 'UNBOUND') return { admitted: false, code: 'WJSS_WRITE_REFUSED_UNBOUND' };
-  if (rowBinding.commissioningState === 'EXCLUDED') return { admitted: false, code: 'WJSS_WRITE_REFUSED_EXCLUDED' };
-  if (!authorization || authorization.physicalWriteAuthorized !== true) {
-    return { admitted: false, code: 'WJSS_WRITE_REFUSED_NOT_AUTHORIZED' };
+/** Fail-closed write authorization check: refuses unbound or excluded rows. */
+export function canAdmitWrite(row, authorization) {
+  if (!row || !row.binding || row.bindingState === 'UNBOUND') {
+    return Object.freeze({ admitted: false, code: 'WJSS_WRITE_REFUSED_UNBOUND', detail: 'no physical binding' });
   }
-  return { admitted: true, code: 'WJSS_WRITE_ADMITTED' };
+  if (row.commissioningState === 'EXCLUDED') {
+    return Object.freeze({ admitted: false, code: 'WJSS_WRITE_REFUSED_EXCLUDED', detail: 'row excluded from commissioning' });
+  }
+  if (!authorization || !authorization.physicalWriteAuthorized) {
+    return Object.freeze({ admitted: false, code: 'WJSS_WRITE_REFUSED_NOT_AUTHORIZED', detail: 'physical write authority not created' });
+  }
+  return Object.freeze({ admitted: true, code: 'OK', detail: authorization.basis ?? 'authorized' });
 }
