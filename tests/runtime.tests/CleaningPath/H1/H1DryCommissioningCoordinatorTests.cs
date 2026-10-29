@@ -298,8 +298,10 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, result.HorizontalCoordinate.HomeOutcomeCode);
         Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, result.VerticalCoordinate.HomeOutcomeCode);
 
-        // The accepted Home contract carries the typed position-zero definition per axis exactly once.
+        // The accepted Home contract carries the Owner-approved reset-encoder composition per axis:
+        // the typed position-zero definition exactly once, then the typed dual-zero definition.
         Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero).Count);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
 
         // Commission/Home is separate from Run Path: no path Move and no path result exists.
         Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
@@ -308,16 +310,192 @@ public sealed class H1DryCommissioningCoordinatorTests
     }
 
     [Fact]
-    public void Dual_Zero_Stays_Optional_Not_Dispatched()
+    public void Home_Carried_Sequence_Does_Not_Depend_On_The_Standalone_Dual_Zero_Permission()
+    {
+        // The Owner's Hardware profile declares dualZeroPermitted=false on every axis. Gating the
+        // Home-carried reset-encoder composition on that permission would leave the repaired Hardware
+        // run emitting the position definition alone and reproduce the proven defect, so this test
+        // asserts the complete pair under exactly that condition.
+        var harness = new H1DryCommissioningHarness(dualZeroPermitted: false);
+        Assert.False(((ManualMotionAxisProfile)harness.Profile.AxisA!).DualZeroPermitted);
+        Assert.False(((ManualMotionAxisProfile)harness.Profile.AxisB!).DualZeroPermitted);
+
+        harness.OpenAndObserve();
+        harness.CommissionOnly();
+
+        // H1 still commissions and still verifies zero from both reads.
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Commissioned, result.TerminalPhase);
+        Assert.True(result.HorizontalCoordinate.CoordinateZeroVerified);
+        Assert.True(result.VerticalCoordinate.CoordinateZeroVerified);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.HorizontalCoordinate.DualZeroDispositionCode);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.VerticalCoordinate.DualZeroDispositionCode);
+
+        // The canonical WSB1 route resolves Horizontal to axis A and Vertical to axis B; only those
+        // two roles are homed by this run.
+        Assert.Equal("A", result.HorizontalCoordinate.AxisId);
+        Assert.Equal("B", result.VerticalCoordinate.AxisId);
+
+        // Exactly one DP and one DE per resolved axis, DP immediately followed by DE, in the Legacy
+        // order, with no other command between them.
+        foreach (var letter in new[] { "A", "B" })
+        {
+            var kinds = new List<ManualMotionPortCommandKind>();
+            var indices = new List<int>();
+            for (var index = 0; index < harness.Port.ExecutedCommands.Count; index++)
+            {
+                var command = harness.Port.ExecutedCommands[index];
+                if (!string.Equals(CleaningPathExecutionHarness.LetterOf(command.Axis), letter, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (command.Kind == ManualMotionPortCommandKind.DefinePositionZero
+                    || command.Kind == ManualMotionPortCommandKind.DefineDualZero)
+                {
+                    indices.Add(index);
+                    kinds.Add(command.Kind);
+                }
+            }
+
+            Assert.Equal(
+                new[] { ManualMotionPortCommandKind.DefinePositionZero, ManualMotionPortCommandKind.DefineDualZero },
+                kinds);
+            Assert.Equal(indices[0] + 1, indices[1]);
+            Assert.Equal(0, harness.Port.ExecutedCommands[indices[0]].Operand);
+            Assert.Equal(0, harness.Port.ExecutedCommands[indices[1]].Operand);
+        }
+
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
+
+        // The permission still governs the STANDALONE dual-zero action on this same session: the
+        // Home-carried composition is the only thing that stopped reading it.
+        var before = harness.Port.ExecutedCommands.Count;
+        harness.Session.RequestDefineDualZero(ManualMotionAxis.A);
+        harness.Clock.Advance(TimeSpan.FromMilliseconds(25));
+        harness.Boundary.Step();
+        Assert.Equal(
+            ManualMotionCodes.DualZeroNotPermittedByProfile,
+            harness.Session.Snapshot.Axes[0].LastOutcomeCode);
+        Assert.Equal(before, harness.Port.ExecutedCommands.Count);
+    }
+
+    [Fact]
+    public void Dual_Zero_Completes_The_Home_Carried_Reset_Encoder_Sequence()
     {
         var harness = CommissionedHarness();
 
+        // Every successfully homed axis carries the Owner-approved composition, and the run records
+        // it as dispatched-in-Home-sequence rather than as an optional, unrelated manual define.
         var result = harness.Coordinator.Result!;
-        Assert.Equal(H1DryCommissioningCodes.DualZeroOptionalNotDispatched, result.HorizontalCoordinate.DualZeroDispositionCode);
-        Assert.Equal(H1DryCommissioningCodes.DualZeroOptionalNotDispatched, result.VerticalCoordinate.DualZeroDispositionCode);
-        Assert.Equal(nameof(ManualMotionDualZeroState.NotDispatched), result.HorizontalCoordinate.DualZeroState);
-        Assert.Equal(nameof(ManualMotionDualZeroState.NotDispatched), result.VerticalCoordinate.DualZeroState);
-        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero));
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.HorizontalCoordinate.DualZeroDispositionCode);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence, result.VerticalCoordinate.DualZeroDispositionCode);
+        Assert.Equal(nameof(ManualMotionDualZeroState.DispatchedUnverified), result.HorizontalCoordinate.DualZeroState);
+        Assert.Equal(nameof(ManualMotionDualZeroState.DispatchedUnverified), result.VerticalCoordinate.DualZeroState);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
+    }
+
+    [Fact]
+    public void Home_Carried_Sequence_Emits_Position_Zero_Then_Dual_Zero_For_Every_Axis()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        // Assert the native rendering and the dispatch order of the pair for every WSB1 axis, not
+        // only the interpreter state: the sequence is DP then DE on the same axis, with no other
+        // command of that axis between them.
+        foreach (var letter in new[] { "A", "B", "C", "D" })
+        {
+            var indices = new List<int>();
+            var kinds = new List<ManualMotionPortCommandKind>();
+            for (var index = 0; index < harness.Port.ExecutedCommands.Count; index++)
+            {
+                var command = harness.Port.ExecutedCommands[index];
+                if (!string.Equals(CleaningPathExecutionHarness.LetterOf(command.Axis), letter, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (command.Kind == ManualMotionPortCommandKind.DefinePositionZero
+                    || command.Kind == ManualMotionPortCommandKind.DefineDualZero)
+                {
+                    indices.Add(index);
+                    kinds.Add(command.Kind);
+                }
+            }
+
+            if (letter is "C" or "D")
+            {
+                // Only the two resolved WSB1 roles of this run are homed; C and D are not dispatched.
+                Assert.Empty(kinds);
+                continue;
+            }
+
+            Assert.Equal(
+                new[] { ManualMotionPortCommandKind.DefinePositionZero, ManualMotionPortCommandKind.DefineDualZero },
+                kinds);
+            Assert.Equal(indices[0] + 1, indices[1]);
+        }
+    }
+
+    [Fact]
+    public void Dual_Zero_Refusal_Fails_The_Home_Closed()
+    {
+        var harness = new H1DryCommissioningHarness(
+            options: new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { RefuseCommand = ManualMotionPortCommandKind.DefineDualZero },
+            });
+        harness.OpenAndObserve();
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunFailedHome, result.Code);
+        Assert.Equal(ManualMotionCodes.HomeDualZeroRefused, result.PrimaryFailureCode);
+        Assert.False(result.HorizontalCoordinate.HomeVerified);
+        Assert.False(result.HorizontalCoordinate.CoordinateZeroVerified);
+        Assert.Equal(H1DryCommissioningCodes.DualZeroRefusedInHomeSequence, result.HorizontalCoordinate.DualZeroDispositionCode);
+
+        // The refusal is terminal for this axis: no Move, no path point and no second Home sequence.
+        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
+        Assert.Null(result.PathResult);
+        Assert.Equal(H1DrySafeReturnState.NotPublished, result.DrySafeReturn);
+    }
+
+    [Fact]
+    public void Position_Zero_Refusal_Prevents_The_Dual_Zero_Definition()
+    {
+        var harness = new H1DryCommissioningHarness(
+            options: new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { RefuseCommand = ManualMotionPortCommandKind.DefinePositionZero },
+            });
+        harness.OpenAndObserve();
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(ManualMotionCodes.PositionZeroRefused, result.PrimaryFailureCode);
+        Assert.False(result.HorizontalCoordinate.CoordinateZeroVerified);
+
+        // A refused position definition never reaches the dual-zero definition on that axis: the
+        // only dual-zero definition dispatched is the one carried by the other (healthy) axis.
+        var horizontalDualZero = 0;
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero))
+        {
+            if (string.Equals(CleaningPathExecutionHarness.LetterOf(command.Axis), "A", StringComparison.Ordinal))
+            {
+                horizontalDualZero++;
+            }
+        }
+
+        Assert.Equal(0, horizontalDualZero);
+        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
     }
 
     [Fact]
@@ -397,15 +575,21 @@ public sealed class H1DryCommissioningCoordinatorTests
         harness.DriveUntilTerminal();
         Assert.Equal(H1DryCommissioningPhase.Completed, harness.Coordinator.Result!.TerminalPhase);
 
-        // Run Path never dispatches Home: no Home command exists after the path start, and the
-        // path itself moved through P1 to P6 and the Centre return.
+        // Run Path never dispatches Home and never dispatches a zero-establishing command: no Home,
+        // position-zero or dual-zero command exists after the path start, and the path itself moved
+        // through P1 to P6 and the Centre return.
         Assert.True(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute).Count > 0);
         for (var index = commandsAtPathStart; index < harness.Port.ExecutedCommands.Count; index++)
         {
-            Assert.NotEqual(ManualMotionPortCommandKind.Home, harness.Port.ExecutedCommands[index].Kind);
+            var kind = harness.Port.ExecutedCommands[index].Kind;
+            Assert.NotEqual(ManualMotionPortCommandKind.Home, kind);
+            Assert.NotEqual(ManualMotionPortCommandKind.DefinePositionZero, kind);
+            Assert.NotEqual(ManualMotionPortCommandKind.DefineDualZero, kind);
         }
 
         Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.Home).Count);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero).Count);
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
     }
 
     [Fact]
@@ -464,8 +648,20 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, result.PrimaryFailureCode);
         Assert.False(result.HorizontalCoordinate.HomeVerified);
 
-        // No native Home command is dispatched to the axis whose Home input is already active.
+        // No native Home command is dispatched to the axis whose Home input is already active, and
+        // therefore no zero-establishing command of that axis either: the composed reset-encoder
+        // pair is reachable only through a Home that actually ran.
         foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.Home))
+        {
+            Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
+        }
+
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero))
+        {
+            Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
+        }
+
+        foreach (var command in harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero))
         {
             Assert.NotEqual("A", CleaningPathExecutionHarness.LetterOf(command.Axis));
         }
@@ -603,7 +799,7 @@ public sealed class H1DryCommissioningCoordinatorTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
-        Assert.Equal("MOVE_TIMEOUT", result.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.PrimaryFailureCode);
         Assert.Equal(JobPhase.P1, Assert.Single(result.VerifiedLedger));
 
         // P1 and P2 requested their Moves; P3 never started.
@@ -660,6 +856,126 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.True(lastPointTarget < firstCentreTarget, "the Centre Move must follow every P1–P6 Move");
     }
 
+    // ----------------------------------------------------------------------------------------
+    // Confirmed pulse-domain normalization inside the H1 path (Owner-confirmed 2026-10-27).
+    //
+    // The two position readbacks are 2:1 apart by construction, so a point can only verify once the
+    // theoretical operand has been normalized into the reference (drive) domain. These tests prove the
+    // normalization is what gates P1, that a failed P1 never reaches P2, and that the verified P1-P6 and
+    // Centre behaviour is unchanged.
+    // ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Horizontal_P1_Observations_Agree_In_The_Comparison_Domain_After_Normalization()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        Assert.True(harness.CommissionThenStartPath().Started);
+
+        // Stop the run at the instant the path verifies its first point, so the published readings are
+        // P1's own observations.
+        harness.DriveUntil(() => harness.Coordinator.Current?.VerifiedLedger.Count >= 1);
+
+        var p1 = harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points[0];
+        var axis = harness.Session.Snapshot.Axes.First(a => a.AxisLetter == harness.Resolution.Resolution!.HorizontalAxisId);
+        var tolerance = harness.Profile.AxisA!.PositionTolerance!.Value;
+
+        // Raw readings are still 2:1 apart: the encoder domain is intact and nothing was overwritten.
+        Assert.Equal(axis.PositionRp.Value * 2m, axis.PositionTp.Value);
+
+        // Normalized, the horizontal P1 observation sits on the commanded target.
+        Assert.True(Math.Abs((axis.PositionTpNormalized ?? decimal.MinValue) - p1.HorizontalNative) <= tolerance);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? decimal.MinValue) - p1.HorizontalNative) <= tolerance);
+    }
+
+    [Fact]
+    public void Vertical_P1_Observations_Agree_In_The_Comparison_Domain_After_Normalization()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+        Assert.True(harness.CommissionThenStartPath().Started);
+
+        harness.DriveUntil(() => harness.Coordinator.Current?.VerifiedLedger.Count >= 1);
+
+        var p1 = harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points[0];
+        var axis = harness.Session.Snapshot.Axes.First(a => a.AxisLetter == harness.Resolution.Resolution!.VerticalAxisId);
+        var tolerance = harness.Profile.AxisB!.PositionTolerance!.Value;
+
+        Assert.Equal(axis.PositionRp.Value * 2m, axis.PositionTp.Value);
+        Assert.True(Math.Abs((axis.PositionTpNormalized ?? decimal.MinValue) - p1.VerticalNative) <= tolerance);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? decimal.MinValue) - p1.VerticalNative) <= tolerance);
+    }
+
+    [Fact]
+    public void A_Point_Whose_Readbacks_Are_In_One_Domain_Fails_At_P1_And_Never_Commands_P2()
+    {
+        // The horizontal axis reports both readbacks in one domain, which contradicts the confirmed
+        // relationship: TP normalizes to half the target while RP sits on it, so P1 cannot verify.
+        var harness = new H1DryCommissioningHarness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { EncoderCountsPerDriveCount = 1 },
+        });
+        harness.OpenAndObserve();
+        Assert.True(harness.CommissionThenStartPath().Started);
+        harness.DriveUntilTerminal();
+
+        var result = harness.Coordinator.Result!;
+        Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
+        Assert.Equal(H1DryCommissioningCodes.RunFailedPathExecution, result.Code);
+
+        // No point was verified, and the failure is attributed rather than swallowed.
+        Assert.Empty(result.VerifiedLedger);
+        Assert.NotNull(result.PrimaryFailureCode);
+
+        // No point after P1 was ever commanded: no absolute move carries a P2 to P6 target on either axis.
+        var points = harness.StoreSnapshot.PathFor(H1DryCommissioningHarness.Sensor)!.Points;
+        var laterTargets = new HashSet<int>();
+        for (var index = 1; index < points.Count; index++)
+        {
+            laterTargets.Add(points[index].HorizontalNative);
+            laterTargets.Add(points[index].VerticalNative);
+        }
+
+        var absolute = harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute);
+        Assert.NotEmpty(absolute);
+        foreach (var command in absolute)
+        {
+            Assert.False(
+                laterTargets.Contains(command.Operand),
+                "an absolute move was dispatched for a point after the failed P1");
+        }
+    }
+
+    [Fact]
+    public void The_Verified_P1_To_P6_Run_And_The_Centre_Return_Are_Unchanged_By_The_Normalization()
+    {
+        var harness = RunFullSuccess();
+        var result = harness.Coordinator.Result!;
+
+        Assert.Equal(H1DryCommissioningPhase.Completed, result.TerminalPhase);
+        Assert.Equal(6, result.VerifiedLedger.Count);
+
+        // The ledger is a typed point identity (JobPhase), while the store's point identity is the raw
+        // JSON text (string PointId). The expected sequence is therefore converted with the SAME
+        // conversion the Product itself applies to a store point id, and case-sensitive: a stored id of
+        // "p1" or "P 1" must not be accepted as P1 just because Enum.Parse could be made lenient.
+        var expectedLedger = harness.StoreSnapshot
+            .PathFor(H1DryCommissioningHarness.Sensor)!
+            .Points
+            .Select(point => Enum.Parse<JobPhase>(point.PointId, ignoreCase: false))
+            .ToArray();
+
+        Assert.Equal(
+            expectedLedger,
+            result.VerifiedLedger.ToArray());
+
+        var centre = result.CentreReturn!;
+        Assert.Equal(CleaningPathUnits.SafeReturnCentre.HorizontalNative, centre.HorizontalTargetNative);
+        Assert.Equal(CleaningPathUnits.SafeReturnCentre.VerticalNative, centre.VerticalTargetNative);
+        Assert.True(centre.Horizontal.Verified);
+        Assert.True(centre.Vertical.Verified);
+    }
+
     [Fact]
     public void Centre_Targets_Exactly_The_Fixed_Centre_Contract()
     {
@@ -708,7 +1024,7 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
         Assert.Equal(H1DryCommissioningCodes.RunFailedCentreReturn, result.Code);
         Assert.Equal(H1DrySafeReturnState.NotPublished, result.DrySafeReturn);
-        Assert.Equal("MOVE_TIMEOUT", result.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.PrimaryFailureCode);
     }
 
     [Fact]
@@ -747,17 +1063,18 @@ public sealed class H1DryCommissioningCoordinatorTests
 
         var result = harness.Coordinator.Result!;
         Assert.Equal(H1DryCommissioningPhase.Failed, result.TerminalPhase);
-        Assert.Equal("MOVE_TIMEOUT", result.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, result.PrimaryFailureCode);
 
-        // The stalled Horizontal axis takes the first MOVE_TIMEOUT; the still-active Vertical axis
-        // is stopped exactly once, supervised to inactive with brake applied, and its cleanup is
-        // recorded separately from the primary failure.
+        // The stalled Horizontal axis takes the first failed-Move classification: its timeout was
+        // classified from two fresh readbacks that agree with each other and are short of the
+        // target. The still-active Vertical axis is stopped exactly once, supervised to inactive
+        // with brake applied, and its cleanup is recorded separately from the primary failure.
         var pathResult = result.PathResult!;
         Assert.Equal(CleaningPathCleanupState.Succeeded, pathResult.CleanupState);
         var failedPoint = Assert.Single(pathResult.Points);
         Assert.True(failedPoint.Vertical.StopRequestedOnce);
         Assert.Equal(CleaningPathMotionOutcome.StopIssued, failedPoint.Vertical.CleanupOutcome);
-        Assert.Equal("MOVE_TIMEOUT", failedPoint.FailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, failedPoint.FailureCode);
     }
 
     [Fact]
@@ -860,7 +1177,9 @@ public sealed class H1DryCommissioningCoordinatorTests
         var harness = RunFullSuccess();
 
         // Every dispatched command is one member of the closed typed manual motion plan: brake
-        // output set/clear, home speed, Home, Begin, position-zero definition and Move setup.
+        // output set/clear, home speed, Home, Begin, the Home-carried position-zero definition and
+        // dual-zero definition, and Move setup. The list stays explicit and closed on purpose: any
+        // command family that is not named here - including any future kind - fails this test.
         foreach (var command in harness.Port.ExecutedCommands)
         {
             Assert.True(
@@ -870,6 +1189,7 @@ public sealed class H1DryCommissioningCoordinatorTests
                     or ManualMotionPortCommandKind.Home
                     or ManualMotionPortCommandKind.Begin
                     or ManualMotionPortCommandKind.DefinePositionZero
+                    or ManualMotionPortCommandKind.DefineDualZero
                     or ManualMotionPortCommandKind.Acceleration
                     or ManualMotionPortCommandKind.Speed
                     or ManualMotionPortCommandKind.Deceleration
@@ -884,6 +1204,51 @@ public sealed class H1DryCommissioningCoordinatorTests
     {
         var harness = new H1DryCommissioningHarness();
         Assert.Equal(ManualMotionPortMode.Simulated, harness.Session.Mode);
+    }
+
+    [Fact]
+    public void The_Engineering_Motion_Configuration_Cannot_Change_During_Commission_Or_The_Run_Path()
+    {
+        var harness = new H1DryCommissioningHarness();
+        harness.OpenAndObserve();
+
+        // Idle between operations the settings are editable, and the capture can be advanced.
+        Assert.True(harness.Session.EngineeringSettingsEditable);
+        var idle = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(harness.Profile));
+        Assert.True(idle.Accepted);
+        var capturedGeneration = harness.Session.Snapshot.Engineering.Generation;
+
+        // Commission/Home in flight: the settings are locked and the change changes nothing. An
+        // accepted start only QUEUES the two Home requests, so the lock is proven from the active
+        // lifecycle the session actually began - never from the acceptance of the request, and never
+        // by waiting on EngineeringSettingsEditable itself.
+        Assert.True(harness.StartCommission().Started);
+        harness.DriveUntil(() => harness.Session.Snapshot.ActiveOperations.Any(operation =>
+            operation.Kind == ManualMotionOperationKind.Home));
+        Assert.False(harness.Session.EngineeringSettingsEditable);
+        var refusedInCommission = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(harness.Profile));
+        Assert.False(refusedInCommission.Accepted);
+        Assert.Equal(ManualMotionCodes.EngineeringSettingsLockedWhileActive, refusedInCommission.Code);
+        Assert.Equal(capturedGeneration, harness.Session.Snapshot.Engineering.Generation);
+
+        harness.DriveUntilTerminal();
+        Assert.Equal(H1DryCommissioningPhase.Commissioned, harness.Coordinator.Result!.TerminalPhase);
+
+        // Run Path in flight, through P1 and beyond: still locked, still the same capture. The same
+        // queued-start rule applies here: StartPath publishes the path phase and requests the P1
+        // Moves, but the session only begins an operation on a later step.
+        Assert.True(harness.StartPath().Started);
+        harness.DriveUntil(() => harness.Coordinator.Current!.Phase == H1DryCommissioningPhase.PathExecution
+            && harness.Session.Snapshot.ActiveOperations.Any(operation =>
+                operation.Kind == ManualMotionOperationKind.Move));
+        Assert.False(harness.Session.EngineeringSettingsEditable);
+        var refusedInPath = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(harness.Profile));
+        Assert.False(refusedInPath.Accepted);
+        Assert.Equal(ManualMotionCodes.EngineeringSettingsLockedWhileActive, refusedInPath.Code);
+        Assert.Equal(capturedGeneration, harness.Session.Snapshot.Engineering.Generation);
     }
 
     // ------------------------------------------------------------------------------- helpers

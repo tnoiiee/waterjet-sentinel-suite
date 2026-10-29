@@ -13,6 +13,141 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-10-27 — TP/RP pulse-domain normalization (Owner-confirmed relationship; software only; no Hardware authorization)
+
+**Status: SOURCE-AUTHORED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`) on top of the block-1
+report; .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in the Author environment; the Owner-local gate
+remains the validation of record). NO NATIVE LOAD, NO CONTROLLER CONTACT, NO HARDWARE USE.**
+
+- **Owner-confirmed physical relationship (final).** Encoder resolution **10,000 pulses/revolution**;
+  stepping-drive setting **5,000 pulses/revolution**; therefore the encoder (theoretical) readback has
+  exactly twice the count density of the drive (reference) readback, `RawTP = 2 × RawRP`. This is why the
+  commissioned Legacy function divided TP by two — the division normalizes the encoder domain into the
+  reference (drive) domain.
+- **Classification: `PROVEN WJSS TP/RP DOMAIN-MISMATCH DEFECT`.** WJSS kept both readings raw, correctly,
+  and then compared the raw theoretical reading with the raw reference reading and with a third-domain
+  target, without first accounting for the two pulse domains. On this machine the completion predicate
+  could not be satisfied, so `MOVE_COMPLETED_POSITION_VERIFIED` was unreachable.
+- **Correction.** One shared helper, `ManualMotionPulseDomain`, named the two physical values and derived
+  the density from them; the completion predicate now normalizes each observation into the reference
+  domain (`rawTheoretical × DrivePulsesPerRevolution / EncoderPulsesPerRevolution`) before the existing
+  tolerance comparison. No unexplained `/ 2` exists in the Product. Both raw observations are preserved
+  and independently published, no reading is aliased or fabricated, and the `PA` command path is
+  untouched.
+- **Diagnostics.** The H1 surface distinguishes `TPraw`, `RPraw`, `TPnorm`, `RPnorm`, the comparison
+  target and the tolerance; the Manual Motion grid shows each raw reading beside its normalized operand
+  and states which domain each is in; an active Move publishes `ComparisonTarget` /
+  `ComparisonTolerance`.
+- **Fail-closed preserved.** A Move whose normalized operands still disagree beyond the tolerance ends
+  with the new typed code `MOVE_REFUSED_TP_RP_DOMAIN_DISAGREEMENT` (mapped into the timeout supervisor
+  family, where it always belongs, with the specific code carried in the evidence), the first primary
+  failure is preserved, the point never verifies or advances, and the existing bounded Stop, Brake and
+  cleanup are unchanged.
+- **Superseded.** The block-1 request for inferred counts-per-millimetre confirmation is withdrawn; the
+  correction is built only from the two confirmed pulses-per-revolution values.
+- **One item left open, outside this correction.** On the Owner's evidence the two normalized operands
+  now agree with each other, but both remain an exact factor of ten from the native command target. That
+  factor is the drive's command-to-feedback relationship; it is not one of the confirmed pulse values, it
+  is absent from the Legacy pack and absent from WJSS, so it is neither guessed nor applied. A Hardware
+  re-trial on this head will show the operands agreeing and will still fail the target comparison unless
+  that value is supplied — recorded in the investigation record §12.5.
+- **Validation.** Node boundary scan `0 findings (S1-S9 clean)`; boundary self-tests `33/33`;
+  `git diff --check` clean. `.NET` **NOT RUN**; **HARDWARE NOT EXECUTED**. An exact-head Hardware re-trial
+  remains required after the Owner-local software gate.
+
+### 2026-10-27 — H1 physical-Hardware TP/RP discrepancy investigation, block 1 (report only; no Source change; no Hardware authorization)
+
+**Status: DETERMINATION COMMITTED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`), on top of
+`c91b1b0`; NO PRODUCT SOURCE, TEST, DEPENDENCY OR LOCK CHANGE; .NET RESTORE/BUILD/TEST NOT RUN (no
+.NET SDK in the Author environment; the Owner-local gate remains the validation of record). NO NATIVE
+LOAD, NO CONTROLLER CONTACT, NO HARDWARE USE IN THIS PASS.**
+
+- **Owner evidence treated as real.** On the commissioned machine, on both axes, freshly acquired and
+  after `HOME_COMPLETED_ZERO_VERIFIED`, the theoretical reading is twice the reference reading while
+  the Owner reports the Legacy application shows one value for the same function. It is not rounding,
+  tolerance, parsing or display noise: the reply path accepts one strictly shaped numeric token under
+  the invariant culture with no thousands separator and a bounded magnitude, and the H1 surface prints
+  the value it was given.
+- **Exact Legacy determination.** The theoretical reading is converted and then **halved**; the
+  reference reading is converted without halving and is also published raw. The Legacy surfaces
+  therefore coincide exactly when the theoretical reading is twice the reference reading — the
+  halving is the compensation for that relationship, not an arbitrary defect. Legacy never compares
+  either reading to the commanded target; its move completion is a status-bit machine.
+- **Exact WJSS determination.** The native unit and the `PA` operand are Legacy-equivalent, so the
+  commanded amplitude is **not** the defect. The defect is that the deliberate non-port of the Legacy
+  scaling was carried into the one target-relative comparison in the Product, which requires both raw
+  readbacks to sit within the tolerance of a target expressed in a third domain. Zero verification is
+  zero-relative and therefore domain-free, which is why the `b55c3b4` `DP` then `DE` correction now
+  reaches `HOME_COMPLETED_ZERO_VERIFIED` on this machine while the move comparison still cannot pass.
+- **Classification: an inseparable position-domain defect.** Confidence stated separately: the 2:1
+  relation **HIGH** (exact Legacy literal, reproduced exactly on two independent axes, consistent with
+  the earlier trial in which the reference reading reached zero and the theoretical reading did not);
+  the reference readback's absolute scale **HIGH as a measurement, NOT VERIFIED as configuration**
+  (10 × the native target on both axes; no such value exists in the Legacy pack, whose constants are
+  annotated as examples).
+- **Correction withheld at the Owner decision boundary.** One value is required — the Actual-Run
+  counts per millimetre of the `RP` and `TP` readbacks for axes A and B on MC-WSB1 — together with the
+  `positionTolerance` decision that is inseparable from it. No multiplier is guessed, no reading is
+  aliased, no verification is weakened, no test expectation is changed and no Hardware trial is
+  authorised.
+- **Records updated (directly affected only):** the investigation record §11 and its corrected §3.7,
+  and this changelog. Everything else in the dated records is preserved.
+
+### 2026-10-26 — H1 Home-carried reset-encoder correction (Owner decision; software only; no hardware authorization)
+
+**Status: SOURCE-AUTHORED ON PR #43 (`arena/2d058a61-waterjet-sentinel-suite`), on top of the
+merged baseline `bfd2867` and the investigation commit `25389cd`; .NET RESTORE/BUILD/TEST NOT RUN
+(no .NET SDK in the Author environment; the Owner-local gate remains the validation of record).
+Node boundary scan and its self-tests ran in the Author environment. NO NATIVE LOAD, NO CONTROLLER
+CONTACT, NO HARDWARE USE.**
+
+- **Owner decision (2026-10-26).** The H1 Home conditions and the both-reads TP/RP zero-verification
+  requirement are correct and were kept unchanged. The defect was that the Home-carried zero
+  establishment dispatched the position definition (`DP<axis>=0`) only, while the exact Legacy
+  Source proves the commissioned Reset Encoder sequence is `DP<axis>=0` then `DE<axis>=0`. H1 must
+  use the complete sequence after a successful Home, followed by the existing fresh TP/RP
+  verification.
+- **Corrected classification.** `PROVEN H1 COMMAND-SEQUENCE DEFECT`; root-cause confidence
+  `STRONGLY SUPPORTED BY` the exact current WJSS command sequence, the exact Legacy Reset Encoder
+  sequence and the Owner Hardware observation (H1 reached zero verification, RP became zero, TP
+  remained far from zero, run ended `HOME_ZERO_VERIFICATION_FAILED`). Final causal confirmation
+  requires the separately authorized Hardware re-trial on the corrected head; no Hardware proof is
+  claimed.
+- **Changed:** the Manual Motion session's zero-establishing lifecycle now dispatches the typed
+  position-zero definition and then the typed dual-zero definition for a Home operation as one
+  contiguous native pair (new operation phase `DefiningDualZero`, new typed code
+  `HOME_DUAL_ZERO_REFUSED`), with the zero-verification watermark
+  taken from the **last** command so no earlier reading can verify zero; the deterministic
+  simulated port gained one opt-in `RpBiasClearedByDualZero` scenario option; H1 coordinate evidence
+  reports `H1_DUAL_ZERO_DISPATCHED_IN_HOME_SEQUENCE` / `H1_DUAL_ZERO_REFUSED_IN_HOME_SEQUENCE`; the
+  focused Manual Motion and H1 suites were extended and the affected expectations updated; the
+  Legacy-equivalence investigation record, the H1 trial procedure and the Manual Motion runbook were
+  corrected.
+- **Unchanged:** the Home motion sequence (brake release, settle, home speed, home search, begin),
+  the Stop supervision, the brake lifecycle, the Move lifecycle, the Centre return (125 mm / 125 mm),
+  both position reads and the `PositionTolerance`, the standalone define-position-zero and
+  define-dual-zero semantics (including the standalone `dualZeroPermitted` gate), the Run Path
+  readiness rule and its prohibition on Home/DP/DE, the canonical topology, P1→P6 order,
+  abort/close/cleanup, and every Pump, physical Isolation Valve, water, Queue and Production
+  exclusion. No dependency, package or
+  lock file changed.
+- **Correction to the correction (Owner decision, same day; same branch and PR).** An earlier draft
+  of this entry gated the Home-carried pair on the standalone `dualZeroPermitted` profile permission.
+  The Owner's Hardware profile declares `dualZeroPermitted=false`, so that gate would have left H1
+  emitting the position definition alone and reproduced the proven defect on the repaired run. The
+  gate is removed: the Home-carried pair is dispatched **unconditionally** for a Home that reaches
+  zero establishment and reads no permission. `dualZeroPermitted` continues to gate the **standalone**
+  Define Dual Zero action exactly as before, and standalone Define Position Zero is unchanged. The H1
+  per-axis disposition code `H1_DUAL_ZERO_OPTIONAL_NOT_DISPATCHED` is renamed
+  `H1_DUAL_ZERO_NOT_DISPATCHED` so the evidence no longer calls a mandatory composition optional.
+  New focused tests assert the complete pair under a profile with `dualZeroPermitted=false`, for
+  every resolved H1 axis, adjacent in the dispatch stream, and assert the standalone action is still
+  refused under that same profile.
+- **Not verified:** the corrected sequence is proven at Source level and under deterministic
+  simulation only. Real-Hardware H1 behavior — including which of the two position values each
+  definition command actually zeroes on this machine — remains `NOT VERIFIED` until the separately
+  authorized Owner-local Real Galil H1 re-trial on the exact corrected head.
+
 ### 2026-10-25 — Owner-approved canonical Equipment topology adoption + H1 synthetic route repair (software/data only; no hardware authorization)
 
 **Status: SOURCE-AUTHORED ON PR #41 (`arena/7968e33e-waterjet-sentinel-suite`); .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in

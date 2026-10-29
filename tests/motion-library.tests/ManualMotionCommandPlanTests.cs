@@ -50,6 +50,33 @@ public sealed class ManualMotionCommandPlanTests
         Assert.Equal(output, (int)ManualMotionCommandPlan.BrakeOutputOf(planAxis));
     }
 
+    [Theory]
+    [InlineData("A", 1800000)]
+    [InlineData("B", 2000000)]
+    [InlineData("C", 2800000)]
+    [InlineData("D", 0)]
+    public void The_Absolute_Target_Operand_Is_Rendered_Verbatim_In_The_Command_Domain(string axis, int operand)
+    {
+        // The TP/RP pulse-domain normalization is a read-side comparison rule. It never rescales, rounds
+        // or rewrites the commanded amplitude: the operand the session requested is the operand rendered,
+        // character for character.
+        var planAxis = axis switch
+        {
+            "A" => ManualMotionPlanAxis.A,
+            "B" => ManualMotionPlanAxis.B,
+            "C" => ManualMotionPlanAxis.C,
+            _ => ManualMotionPlanAxis.D,
+        };
+
+        Assert.Equal(
+            "PA" + axis + "=" + operand.ToString(CultureInfo.InvariantCulture),
+            Render(new ManualMotionPlanCommand(
+                ManualMotionPlanCommandKind.PositionAbsolute,
+                planAxis,
+                ManualMotionBrakeOutput.None,
+                operand)));
+    }
+
     [Fact]
     public void Every_Approved_Template_Renders_Exactly()
     {

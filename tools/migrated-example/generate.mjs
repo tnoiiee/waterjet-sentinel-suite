@@ -27,7 +27,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { sensorIdFor, wallForColumn, regionForLogicalRow, waterJets, ISOLATION_VALVES, CORRECTED as FIXTURE_CORRECTED, LEGACY_SUPERSEDED as FIXTURE_LEGACY } from '../fixture-generator/generate.mjs';
+import { sensorIdFor, wallForColumn, waterJets, ISOLATION_VALVES, CORRECTED as FIXTURE_CORRECTED, LEGACY_SUPERSEDED as FIXTURE_LEGACY } from '../fixture-generator/generate.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TARGET = path.resolve(HERE, '../../config/examples/sensor-parameters.migrated.example.json');
@@ -83,7 +83,7 @@ export function buildMigratedExample(profile) {
     if (isGap) continue;
 
     scanOrder += 1;
-    const region = regionForLogicalRow(logicalRow);
+    const region = profile.fixtureProfile.regionForRow(logicalRow);
     const assigned = jets.filter((w) => w.targetWall === wall && w.targetRegion === region);
     if (assigned.length !== 1) throw new Error(`no single Water Jet targets ${wall}/${region}`);
     const lower = 15 + (scanOrder % 10);

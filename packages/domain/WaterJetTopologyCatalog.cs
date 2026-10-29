@@ -167,11 +167,15 @@ public static class WaterJetTopologyCatalog
     private static readonly Dictionary<string, WaterJetConfiguration> WaterJetsById =
         WaterJets.ToDictionary(w => w.WaterJetId, StringComparer.Ordinal);
 
-    /// <summary>Vertical region of a logical row: rows 1–2 (G+2xx, G+1xx) are UPPER; rows 3–6 (G, H, I, J) are LOWER.</summary>
+    /// <summary>
+    /// Vertical region of a logical row (Owner-authoritative tier boundary, 2026-10-29): rows 1–3
+    /// (G+2xx, G+1xx and G) are UPPER; rows 4–6 (H, I and J) are LOWER. This is the single shared
+    /// derivation every consumer uses; no other tier table exists anywhere in the Product.
+    /// </summary>
     public static Region RegionForLogicalRow(int logicalRow) => logicalRow switch
     {
-        1 or 2 => Region.UPPER,
-        3 or 4 or 5 or 6 => Region.LOWER,
+        1 or 2 or 3 => Region.UPPER,
+        4 or 5 or 6 => Region.LOWER,
         _ => throw new ArgumentOutOfRangeException(nameof(logicalRow), "logical row must be 1-6"),
     };
 

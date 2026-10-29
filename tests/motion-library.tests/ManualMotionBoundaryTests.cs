@@ -68,7 +68,14 @@ public sealed class ManualMotionBoundaryTests
         "Owner-attested profile bit; not vendor- or hardware-verified",
         "bit NOT_CONFIGURED",
         "no drive or motor interpretation (UNCONFIRMED)",
-        "native units, label unresolved",
+        // The two raw controller observations state their own domain, and the two normalized
+        // values state which domain they belong to and why they are comparable to a Move target.
+        // The generic "native units" wording was intentionally replaced by these four domain
+        // statements; the test pins the replacement rather than the superseded text.
+        "raw encoder-domain count, label unresolved",
+        "raw reference (drive)-domain count, label unresolved",
+        "normalized to the reference (drive) domain, the value a Move is compared against",
+        "already the reference (drive)-domain comparison operand",
         "effect UNVERIFIED",
         "dispatch only; StopConfirmed = ",
         "NO VALUE READ",

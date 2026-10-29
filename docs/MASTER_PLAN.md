@@ -623,10 +623,11 @@ history). **Current wording:** the canonical table is WJ1 (legacy WJ2) IV1 insta
 REAR/UPPER on WSB2 A/B; WJ5 (legacy WJ5) IV5 FRONT/LOWER → REAR/LOWER on WSB3 A/B; WJ6 (legacy
 WJ7) IV6 REAR/LOWER → FRONT/LOWER on WSB3 C/D; WJ7 (legacy WJ6) IV7 LEFT/LOWER → RIGHT/LOWER on
 WSB4 A/B; WJ8 (legacy WJ8) IV8 RIGHT/LOWER → LEFT/LOWER on WSB4 C/D; A/C Horizontal, B/D
-Vertical; canonical default assignment by physical Sensor wall / tier is Right/Upper 8 →
-WJ1/IV1, Front/Upper 10 → WJ2/IV2, Left/Upper 8 → WJ3/IV3, Rear/Upper 10 → WJ4/IV4,
-Rear/Lower 20 → WJ5/IV5, Front/Lower 20 → WJ6/IV6, Right/Lower 16 → WJ7/IV7, Left/Lower 16 →
-WJ8/IV8 (108 total; I7 → WJ5/IV5, I16 → WJ6/IV6). The Legacy WJ identity column is historical
+Vertical; canonical default assignment by physical Sensor wall / tier is Right/Upper 12 →
+WJ1/IV1, Front/Upper 15 → WJ2/IV2, Left/Upper 12 → WJ3/IV3, Rear/Upper 15 → WJ4/IV4,
+Rear/Lower 15 → WJ5/IV5, Front/Lower 15 → WJ6/IV6, Right/Lower 12 → WJ7/IV7, Left/Lower 12 →
+WJ8/IV8 (108 total; I7 → WJ5/IV5, I16 → WJ6/IV6). Owner-authoritative tier boundary (2026-10-29):
+logical rows 1–3 (G+2xx, G+1xx and G) are UPPER, rows 4–6 (H, I and J) are LOWER. The Legacy WJ identity column is historical
 equipment identity only; `cannon n → WJn` direct import is unchanged. Motion identity is
 `OWNER_CANONICAL_TOPOLOGY_2026_10_25` / `MOTION_COMMISSIONING_DESIGN_2026_10_25`; REV2 and REV1
 remain historical identities only. The H1 synthetic default route is G+210 → WJ1/IV1, WSB1 A/B.

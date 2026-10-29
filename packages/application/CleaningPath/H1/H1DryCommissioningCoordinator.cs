@@ -21,8 +21,10 @@ namespace Wjss.Runtime.Core.CleaningPath.H1;
 /// with a typed reason directing the Operator to Commission/Home when that readiness is absent,
 /// and only then runs P1 through P6 through the existing typed path execution coordinator and
 /// the dry Centre return on the fixed Centre contract. An active Home input never proves
-/// readiness and is never treated as a completed Home. The typed dual-zero definition stays
-/// optional and separately authorized: it is recorded in Product state and never required here.
+/// readiness and is never treated as a completed Home. Each axis establishes its zero with the
+/// Owner-approved Home-carried reset-encoder composition: the typed position-zero definition, then
+/// the typed dual-zero definition, then fresh position reads strictly newer than the dual-zero
+/// definition, both within the configured tolerance. Dispatch alone never proves a Home.
 ///
 /// Failure behavior is fail-closed and evidence-preserving: the first genuine primary cause is
 /// retained, no later point may start, every remaining active axis is stopped exactly once and
@@ -541,11 +543,12 @@ public sealed class H1DryCommissioningCoordinator
             return;
         }
 
-        // The exact accepted contract: the typed Home lifecycle already applied the typed
-        // position-zero definition and verified zero by position reads, so the required coordinate
-        // state is proven here. The dual-zero definition stays optional and separately authorized
-        // (profile-permitted, dispatch-only, effect UNVERIFIED, clears the homed claim) and is only
-        // recorded; this run never requires it and never invents an encoder-reset sequence.
+        // The exact accepted contract: the typed Home lifecycle already applied the Owner-approved
+        // Home-carried reset-encoder composition (the typed position-zero definition, then the typed
+        // dual-zero definition) and verified zero by position reads whose evidence is strictly newer
+        // than the dual-zero definition, so the required coordinate state is proven here. A Home
+        // that ended before the dual-zero definition, or whose dual-zero definition was refused, or
+        // whose reads did not verify, is not Homed and is refused by the check below.
         if (horizontal.HomeState != ManualMotionHomeState.Homed
             || vertical.HomeState != ManualMotionHomeState.Homed
             || horizontal.CoordinateState != ManualMotionCoordinateState.ZeroVerified
@@ -897,9 +900,21 @@ public sealed class H1DryCommissioningCoordinator
         var roleLabel = index == 0 ? "Horizontal" : "Vertical";
         var snapshot = AxisSnapshot(AxisEnumFor(axisId));
         var dualZeroState = (snapshot?.DualZeroState ?? ManualMotionDualZeroState.NotDispatched).ToString();
-        var disposition = snapshot?.DualZeroState is null or ManualMotionDualZeroState.NotDispatched
-            ? H1DryCommissioningCodes.DualZeroOptionalNotDispatched
-            : H1DryCommissioningCodes.DualZeroDispatchedEffectUnverified;
+        var disposition = snapshot?.DualZeroState switch
+        {
+            // The Home-carried reset-encoder composition dispatched the dual-zero definition after
+            // the position-zero definition and proved zero from strictly newer position reads.
+            ManualMotionDualZeroState.DispatchedUnverified => H1DryCommissioningCodes.DualZeroDispatchedInHomeSequence,
+
+            // The composition was refused at its dual-zero definition: the Home failed closed.
+            ManualMotionDualZeroState.Refused => H1DryCommissioningCodes.DualZeroRefusedInHomeSequence,
+
+            // No dual-zero definition was dispatched in this session (for example a Home that ended
+            // before zero establishment). The composition is never optional for a Home that reaches
+            // zero establishment; this disposition only records that it was not reached. Nothing is
+            // claimed.
+            _ => H1DryCommissioningCodes.DualZeroNotDispatched,
+        };
         return new H1AxisCoordinateEvidence(
             axisId,
             roleLabel,

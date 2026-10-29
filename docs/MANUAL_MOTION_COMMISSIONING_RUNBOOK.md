@@ -55,7 +55,10 @@ The Application session exposes only typed requests:
 - Home for one axis;
 - define position zero (DP semantics) for one axis;
 - define dual zero (DE semantics) for one axis, only when explicitly
-  permitted by the Owner-local profile; its effect remains unverified;
+  permitted by the Owner-local profile; its effect remains unverified. That
+  permission does **not** gate the Home-carried reset-encoder composition
+  (`DP<axis>=0` then `DE<axis>=0`), which is part of the Home contract, runs
+  unconditionally and is not a separate Operator action;
 - one bounded absolute Move for one axis after a verified Home in the same
   session;
 - raw status, TP, RP and brake-output observations, shown separately from
@@ -72,8 +75,14 @@ The axis workflow is deliberately ordered:
    hold or session close enters the supervised Stop path; the brake is
    applied only after the profile's stopped-observation rule is satisfied.
 3. **Home:** brake release → settle → Home speed → Home search → Begin.
-   A fresh active home input enters Stop → define position zero → TP/RP
-   zero verification → brake apply. No Home is claimed from dispatch alone.
+   A fresh active home input enters Stop → define position zero → define dual
+   zero → TP/RP zero verification → brake apply. No Home is claimed from
+   dispatch alone. The position-zero and dual-zero definitions are the exact
+   Legacy Reset Encoder sequence (`DP<axis>=0` then `DE<axis>=0`) carried by
+   the Home lifecycle as one contiguous native pair, **always**, independently
+   of the profile's standalone dual-zero permission (a profile declaring
+   `dualZeroPermitted=false` still gets the pair); the standalone define
+   actions are unchanged.
 4. **Manual zero:** define position zero is accepted only when the session
    can verify TP/RP near zero afterward. Manual DP/DE clears the
    session's prior Home claim because it changes the coordinate basis.
@@ -82,6 +91,14 @@ The axis workflow is deliberately ordered:
    acceleration → speed → deceleration → absolute target → Begin, followed
    by observation of inactivity and TP/RP within the configured tolerance,
    then brake apply. No relative target exists.
+   **Pulse domains.** The two position readbacks are not in the same domain:
+   the encoder (`TP`) domain carries twice the count density of the stepping-drive
+   (`RP`) domain — Owner-confirmed at 10,000 and 5,000 pulses per revolution — so the
+   theoretical reading is normalized into the reference domain
+   (`raw × drive pulses / encoder pulses`) before it is compared. Both raw readings are
+   still shown exactly as read, beside their normalized operands and the comparison
+   target and tolerance, and a Move whose normalized operands still disagree fails
+   closed rather than completing. Normalization never changes the commanded target.
 6. **Stop:** Stop pre-empts ordinary work and uses the previously approved
    typed per-axis Stop path (A/B/C/D). It is dispatch only. `StopConfirmed` is always
    false. A Stop timeout does **not** make the software invent a stopped
@@ -166,7 +183,12 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "encoderPulsesPerRevolution": null,
+      "drivePulsesPerRevolution": null,
+      "mechanicalGearRatio": null,
+      "pitchMillimetresPerRevolution": null,
+      "positionToleranceMillimetres": null
     },
     "B": {
       "brakeOutput": 2,
@@ -187,7 +209,12 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "encoderPulsesPerRevolution": null,
+      "drivePulsesPerRevolution": null,
+      "mechanicalGearRatio": null,
+      "pitchMillimetresPerRevolution": null,
+      "positionToleranceMillimetres": null
     }
   }
 }
@@ -214,6 +241,25 @@ separate hardware commissioning gate. In particular:
 - `moveMinimumTarget` must be below `moveMaximumTarget` when both are
   configured, and the two status-bit numbers must differ when both are
   configured.
+- The five engineering settings are per-axis data, never Product constants, and every axis
+  carries its own: `encoderPulsesPerRevolution` and `drivePulsesPerRevolution` (integer counts
+  per motor revolution), `mechanicalGearRatio` (output revolutions per motor revolution, so
+  `0.1` is a 1:10 reduction), `pitchMillimetresPerRevolution` (millimetres of travel per output
+  revolution) and `positionToleranceMillimetres` (the Move comparison tolerance, in
+  millimetres). Each is optional; an axis missing any of the first four has no conversion and
+  every Move on it is refused with `MOVE_PULSE_DOMAIN_NOT_CONFIGURED`, and an axis missing
+  `positionToleranceMillimetres` is refused the same way. Values must be positive and carry at
+  most seven decimal places. There is no divide-by-two, multiplier or gearing key: the
+  theoretical-to-reference relationship is derived as `drive / encoder` and displayed read-only.
+- The derived quantities (TP normalization ratio, PA command units per millimetre, TP feedback
+  units per millimetre, RP feedback units per millimetre) are **not** profile keys. They are
+  computed from the five settings and shown read-only in the Engineering Motion Configuration
+  window. The formulas, units and expected P1/P2 values are in
+  [`docs/evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md`](evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md).
+- An accepted settings change is captured as an immutable session snapshot. It cannot be changed
+  while anything is in flight (Home, Move, H1 Commission, Run Path, P1 to P6, the Centre return,
+  Abort cleanup or Close cleanup); the refusal code is
+  `ENGINEERING_SETTINGS_LOCKED_WHILE_ACTIVE`.
 - An axis may be omitted entirely; it is then not allowed by the profile.
 
 Git ignore patterns cover `**/*.wjss-manual-motion-profile.json`, but that is
@@ -226,9 +272,18 @@ Run this section on the exact PR head before review/merge. Do **not** set
 or the real Gate A values for this software-only validation. Fake-kernel and
 simulated-port tests must not load a native module or contact a Controller.
 
+Clear every `WJSS_*` process variable that the current Source reads, **in the
+same PowerShell process** as the commands below, so no stale Owner-local value
+leaks into a software-only run. The names below are the ones actually present
+in Source; do not add or guess others.
+
 ```powershell
 git rev-parse HEAD
 git status --porcelain
+
+Get-ChildItem Env: |
+    Where-Object { $_.Name -like 'WJSS_*' } |
+    ForEach-Object { Remove-Item -Path ("Env:" + $_.Name) -ErrorAction SilentlyContinue }
 
 dotnet restore WaterJetSentinelSuite.sln
 

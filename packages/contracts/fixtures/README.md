@@ -56,10 +56,12 @@ carried by the fixtures (Owner-approved canonical Equipment topology adoption):
   This supersedes the 2026-10-21 rows below for current authority; that section remains the
   dated record of that pass.
 - Canonical default assignments follow Target Coverage by physical Sensor wall / tier:
-  8 / 10 / 8 / 10 / 20 / 20 / 16 / 16 Sensors to WJ1…WJ8 (IVn paired); I7 → WJ5/IV5 and
-  I16 → WJ6/IV6. All 108 assigned WJ/IV values in `snapshot.seed0.json` (and the migrated
-  example) differ from the 2026-10-21 files; `delta.basic.json` Sensors move WJ4/IV4 →
-  WJ3/IV3.
+  12 / 15 / 12 / 15 / 15 / 15 / 12 / 12 Sensors to WJ1…WJ8 (IVn paired); I7 → WJ5/IV5 and
+  I16 → WJ6/IV6. The tier boundary is Owner-authoritative (2026-10-29): logical rows 1–3
+  (G+2xx, G+1xx and G) are UPPER, rows 4–6 (H, I and J) are LOWER, so G1–G18 are UPPER Sensors
+  cleaned by WJ1–WJ4 and H/I/J stay LOWER under WJ5–WJ8. All 108 assigned WJ/IV values in `snapshot.seed0.json` (and the migrated
+  example) differ from the 2026-10-21 files; `delta.basic.json` Sensors moved WJ4/IV4 →
+  WJ3/IV3 in the 2026-10-25 pass and are byte-identical (still WJ3/IV3) under this correction.
 - The all-`UNRESOLVED` fine-grained placement disposition, the current/historical generator
   separation and the `--legacy-proof` byte-identity proofs are unchanged from the 2026-10-21
   section below.

@@ -36,6 +36,15 @@ public sealed class ManualMotionSimulationOptions
     /// <summary>When true, the simulated zero definition is acknowledged but changes nothing (a zero-verification-failure scenario).</summary>
     public bool ZeroDefinitionIgnored { get; init; }
 
+    /// <summary>
+    /// When true, a simulated dual-zero definition clears only that axis's RP divergence while its
+    /// TP reading keeps the physical-position basis. This models the Owner-observed Hardware
+    /// behaviour in which the dual (encoder) definition moved one position value to zero and left
+    /// the other far from it, so the strengthened both-reads zero verification still fails closed.
+    /// Off by default: with no divergence configured this option changes nothing.
+    /// </summary>
+    public bool RpBiasClearedByDualZero { get; init; }
+
     /// <summary>A command kind that reports a simulated communication fault.</summary>
     public ManualMotionPortCommandKind? FaultOnCommand { get; init; }
 
@@ -91,6 +100,13 @@ public sealed class ManualMotionAxisSimulationOptions
 
     /// <summary>Synthetic RP divergence added to this axis's RP reads only (TP remains the physical position).</summary>
     public decimal RpBias { get; init; }
+
+    /// <summary>
+    /// Synthetic override of the encoder-to-drive count density for this axis, in tests only. Null reports
+    /// the density implied by this axis's own profile (encoder pulses / drive pulses); a value of 1 models
+    /// a controller whose two readbacks share one domain, which contradicts that profile and must fail.
+    /// </summary>
+    public int? EncoderCountsPerDriveCount { get; init; }
 }
 
 /// <summary>
@@ -454,7 +470,17 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
 
             case ManualMotionPortCommandKind.DefineDualZero:
                 axis.PositionMoveEngaged = false;
-                return axis.Mode == SimulatedMode.Idle;
+                if (axis.Mode != SimulatedMode.Idle)
+                {
+                    return false;
+                }
+
+                if (_options.RpBiasClearedByDualZero)
+                {
+                    axis.RpDivergenceCleared = true;
+                }
+
+                return true;
 
             case ManualMotionPortCommandKind.Acceleration:
             case ManualMotionPortCommandKind.Deceleration:
@@ -579,6 +605,23 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         return axis.ReleaseAction == ManualMotionBrakeReleaseAction.SetOutput ? state == 1 : state == 0;
     }
 
+    /// <summary>
+    /// The encoder-to-drive count density of one simulated axis, taken from its own profile. An axis whose
+    /// profile declares no such relationship is simulated as 1:1, which is the honest simulation of "the
+    /// profile says nothing".
+    /// </summary>
+    private static int ProfileCountDensity(SimulatedAxis axis)
+    {
+        var domain = axis.Profile?.PulseDomain();
+        if (domain is not { } available || available.DrivePulsesPerRevolution == 0)
+        {
+            return 1;
+        }
+
+        var density = available.EncoderPulsesPerRevolution / available.DrivePulsesPerRevolution;
+        return density <= 0 ? 1 : density;
+    }
+
     private bool TryReadValue(ManualMotionPortRead read, out decimal value)
     {
         var axis = AxisOf(read.Axis);
@@ -595,14 +638,19 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 return true;
 
             case ManualMotionReadKind.PositionTp:
-                value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero);
+                // The theoretical (encoder) readback carries the count density of THIS axis's profile,
+                // so the simulated controller reports the same encoder-to-drive relationship the profile
+                // declares. Normalization before comparison is therefore exercised by every simulated
+                // Move, and changing the profile changes the simulated reading with no source change.
+                value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero)
+                    * (axis.Options?.EncoderCountsPerDriveCount ?? ProfileCountDensity(axis));
                 return true;
 
             case ManualMotionReadKind.PositionRp:
                 // The optional per-axis bias makes RP disagree with TP deterministically (a TP/RP
                 // contradiction scenario); with no bias RP equals TP exactly as before.
                 value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero)
-                    + (axis.Options?.RpBias ?? 0m);
+                    + (axis.RpDivergenceCleared ? 0m : axis.Options?.RpBias ?? 0m);
                 return true;
 
             case ManualMotionReadKind.BrakeOutputState:
@@ -647,6 +695,7 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             ManualMotionAxisSimulationOptions? options = null)
         {
             Options = options;
+            Profile = profile;
             BrakeOutput = profile?.BrakeOutput ?? defaultBrakeOutput;
             ReleaseAction = profile?.BrakeReleaseAction ?? ManualMotionBrakeReleaseAction.SetOutput;
             MotionBit = profile?.MotionStatusBit ?? SyntheticMotionBit;
@@ -657,6 +706,9 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             Physical = startPosition;
         }
 
+        /// <summary>The profile of this simulated axis, which supplies its own count density.</summary>
+        public ManualMotionAxisProfile? Profile { get; }
+
         public ManualMotionAxisSimulationOptions? Options { get; set; }
 
         /// <summary>
@@ -665,6 +717,12 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         /// operation (including a parked-but-unverified state), never to Home or other lifecycles.
         /// </summary>
         public bool PositionMoveEngaged { get; set; }
+
+        /// <summary>
+        /// Set when a simulated dual-zero definition cleared this axis's RP divergence; the TP
+        /// reading is unaffected, so a TP/RP contradiction can be reproduced deterministically.
+        /// </summary>
+        public bool RpDivergenceCleared { get; set; }
 
         public int BrakeOutput { get; }
 

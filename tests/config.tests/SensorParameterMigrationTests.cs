@@ -14,7 +14,9 @@ namespace Wjss.Config.Tests;
 /// canonical Equipment topology adoption (2026-10-25): WJ1–WJ4 installed / targeting the
 /// UPPER tier,
 /// WJ5–WJ8 the LOWER tier, fine-grained placement UNRESOLVED with no anchors for all
-/// eight Water Jets, canonical default assignments 8 / 10 / 8 / 10 / 20 / 20 / 16 / 16.
+/// eight Water Jets; and to the Owner-authoritative logical-row tier boundary (2026-10-29):
+/// rows 1-3 (G+2xx, G+1xx and G) are UPPER and rows 4-6 (H, I and J) are LOWER, giving canonical
+/// default assignments 12 / 15 / 12 / 15 / 15 / 15 / 12 / 12.
 /// All fixtures are synthetic public-safe rows built by <see cref="SyntheticSensorParameterCsv"/>;
 /// the Owner CSV never enters Git.
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local test run is the arbiter).
@@ -235,14 +237,16 @@ public sealed class SensorParameterMigrationTests
     }
 
     [Fact]
-    public void Canonical_Default_Assignment_Counts_Per_WaterJet_Are_8_10_8_10_20_20_16_16()
+    public void Canonical_Default_Assignment_Counts_Per_WaterJet_Are_12_15_12_15_15_15_12_12()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
-        // Canonical zone populations by physical Sensor wall / tier: Right/Upper 8,
-        // Front/Upper 10, Left/Upper 8, Rear/Upper 10, Rear/Lower 20, Front/Lower 20,
-        // Right/Lower 16, Left/Lower 16 — assigned to WJ1..WJ8 respectively (IVn paired).
-        var expectedCounts = new[] { 8, 10, 8, 10, 20, 20, 16, 16 };
+        // Canonical zone populations by physical Sensor wall / tier under the Owner-authoritative
+        // logical-row tier boundary (2026-10-29: rows 1-3, G+2xx / G+1xx / G, are UPPER and rows
+        // 4-6, H / I / J, are LOWER): Right/Upper 12, Front/Upper 15, Left/Upper 12, Rear/Upper 15,
+        // Rear/Lower 15, Front/Lower 15, Right/Lower 12, Left/Lower 12 — assigned to WJ1..WJ8
+        // respectively (IVn paired). Each tier holds 54 of the 108 Sensors.
+        var expectedCounts = new[] { 12, 15, 12, 15, 15, 15, 12, 12 };
         for (var n = 1; n <= 8; n++)
         {
             Assert.Equal(
@@ -251,6 +255,62 @@ public sealed class SensorParameterMigrationTests
         }
 
         Assert.Equal(108, result.Sensors.Count);
+        Assert.Equal(
+            result.Sensors.Count(s => s.LogicalRow is >= 1 and <= 3),
+            result.Sensors.Count(s => WaterJetTopologyCatalog.RegionForLogicalRow(s.LogicalRow) == Region.UPPER));
+        Assert.Equal(54, result.Sensors.Count(s => s.LogicalRow is >= 1 and <= 3));
+        Assert.Equal(54, result.Sensors.Count(s => s.LogicalRow is >= 4 and <= 6));
+    }
+
+    [Fact]
+    public void Canonical_G_Row_Cannon_Assignments_Are_Accepted_Under_Upper_Tier_Coverage()
+    {
+        // The importer derives each record's tier from its logical row through the single shared
+        // WaterJetTopologyCatalog.RegionForLogicalRow derivation. G1-G18 are logical row 3, so their
+        // cannon must name an UPPER-tier Water Jet (WJ1-WJ4); the synthetic fixture supplies exactly
+        // that, and the whole 108-record file is accepted with no refusal.
+        var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
+
+        var expected = new (string SensorId, Wall Wall, string WaterJetId)[]
+        {
+            ("G1", Wall.LEFT, "WJ3"),
+            ("G5", Wall.REAR, "WJ4"),
+            ("G10", Wall.RIGHT, "WJ1"),
+            ("G14", Wall.FRONT, "WJ2"),
+        };
+
+        foreach (var (sensorId, wall, waterJetId) in expected)
+        {
+            var sensor = result.Sensors.Single(s => s.SensorId == sensorId);
+            Assert.Equal(3, sensor.LogicalRow);
+            Assert.Equal(wall, sensor.Wall);
+            Assert.Equal(Region.UPPER, WaterJetTopologyCatalog.RegionForLogicalRow(sensor.LogicalRow));
+            Assert.Equal(waterJetId, sensor.AssignedWaterJetId);
+            Assert.Equal($"IV{waterJetId[2..]}", sensor.AssignedIsolationValveId);
+        }
+
+        // Every G-row Sensor is covered by an UPPER-tier Water Jet, and every H/I/J Sensor by a
+        // LOWER-tier one: the tier correction is exercised across the whole matrix, not one row.
+        Assert.All(
+            result.Sensors.Where(s => s.SensorId.StartsWith('G')),
+            sensor => Assert.Equal(Region.UPPER, WaterJetTopologyCatalog.FindWaterJet(sensor.AssignedWaterJetId)!.TargetRegion));
+        Assert.All(
+            result.Sensors.Where(s => s.SensorId.StartsWith('H') || s.SensorId.StartsWith('I') || s.SensorId.StartsWith('J')),
+            sensor => Assert.Equal(Region.LOWER, WaterJetTopologyCatalog.FindWaterJet(sensor.AssignedWaterJetId)!.TargetRegion));
+    }
+
+    [Fact]
+    public void A_Genuine_Target_Tier_Contradiction_Is_Still_Refused()
+    {
+        // Under the corrected boundary a G-row Sensor is UPPER, so a LOWER-tier cannon contradicts
+        // its own logical row: the importer must refuse rather than silently re-map the cannon. This
+        // is a genuine contradiction, not a stale expectation (the same cell with an UPPER cannon is
+        // accepted by Canonical_G_Row_Cannon_Assignments_Are_Accepted_Under_Upper_Tier_Coverage).
+        var row = SyntheticSensorParameterCsv.RowOfLogicalId("G1");
+        Assert.Equal("3", SyntheticSensorParameterCsv.BuildRows()[row + 1][5]);
+        Assert.Equal(
+            MigrationRefusalCodes.TopoTargetWallContradiction,
+            RefusalCodeOf(SyntheticSensorParameterCsv.WithCell(row, 5, "8")));
     }
 
     // ---- T8 ------------------------------------------------------------------
@@ -799,6 +859,28 @@ public sealed class TopologyValidatorTests
         var refusal = TopologyValidator.Validate(result);
         Assert.NotNull(refusal);
         return refusal.Code;
+    }
+
+    [Fact]
+    public void Validator_Uses_The_Corrected_Tier_Derivation_For_A_G_Row_Sensor()
+    {
+        // G1 is logical row 3 and therefore UPPER under the Owner-authoritative boundary. The
+        // validator recomputes the tier from the logical row through the shared derivation, so a
+        // LOWER-tier assignment contradicts it. Under the revoked rows-3-6-are-LOWER mapping this
+        // exact mutation was ACCEPTED, which is why it is the discriminating case.
+        var accepted = AcceptedResult();
+        var lowerTierMutated = accepted with
+        {
+            Sensors = accepted.Sensors
+                .Select(s => s.SensorId == "G1"
+                    ? s with { AssignedWaterJetId = "WJ8", AssignedIsolationValveId = "IV8" }
+                    : s)
+                .ToArray(),
+        };
+
+        Assert.Equal(3, accepted.Sensors.Single(s => s.SensorId == "G1").LogicalRow);
+        Assert.Equal("WJ3", accepted.Sensors.Single(s => s.SensorId == "G1").AssignedWaterJetId);
+        Assert.Equal(MigrationRefusalCodes.TopoTargetWallContradiction, RefusalCodeOf(lowerTierMutated));
     }
 
     [Fact]

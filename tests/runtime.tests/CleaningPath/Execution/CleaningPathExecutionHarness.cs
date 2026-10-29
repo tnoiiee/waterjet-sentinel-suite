@@ -296,7 +296,8 @@ internal sealed class CleaningPathExecutionHarness
         int horizontalSpeed,
         int verticalSpeed,
         int horizontalMoveTimeoutMilliseconds = 20000,
-        int verticalMoveTimeoutMilliseconds = 20000)
+        int verticalMoveTimeoutMilliseconds = 20000,
+        bool dualZeroPermitted = true)
     {
         var simulation = ManualMotionProfile.CreateSimulationProfile();
         return new ManualMotionProfile
@@ -307,10 +308,10 @@ internal sealed class CleaningPathExecutionHarness
             ObservationFreshnessMilliseconds = simulation.ObservationFreshnessMilliseconds,
             JogHeartbeatTimeoutMilliseconds = simulation.JogHeartbeatTimeoutMilliseconds,
             JogMaximumHoldMilliseconds = simulation.JogMaximumHoldMilliseconds,
-            AxisA = PathAxis(1, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisA ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis A.")),
-            AxisB = PathAxis(2, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisB ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis B.")),
-            AxisC = PathAxis(3, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisC ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis C.")),
-            AxisD = PathAxis(4, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisD ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis D.")),
+            AxisA = PathAxis(1, horizontalSpeed, horizontalMoveTimeoutMilliseconds, dualZeroPermitted, simulation.AxisA ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis A.")),
+            AxisB = PathAxis(2, verticalSpeed, verticalMoveTimeoutMilliseconds, dualZeroPermitted, simulation.AxisB ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis B.")),
+            AxisC = PathAxis(3, horizontalSpeed, horizontalMoveTimeoutMilliseconds, dualZeroPermitted, simulation.AxisC ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis C.")),
+            AxisD = PathAxis(4, verticalSpeed, verticalMoveTimeoutMilliseconds, dualZeroPermitted, simulation.AxisD ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis D.")),
         };
     }
 
@@ -323,6 +324,7 @@ internal sealed class CleaningPathExecutionHarness
         int brakeOutput,
         int moveSpeed,
         int moveTimeoutMilliseconds,
+        bool dualZeroPermitted,
         ManualMotionAxisProfile simulation) => new()
     {
         BrakeOutput = brakeOutput,
@@ -337,13 +339,18 @@ internal sealed class CleaningPathExecutionHarness
         MoveMinimumTarget = 0,
         MoveMaximumTarget = CleaningPathUnits.MaximumNative,
         PositionTolerance = simulation.PositionTolerance,
+        EncoderPulsesPerRevolution = simulation.EncoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = simulation.DrivePulsesPerRevolution,
+        MechanicalGearRatio = simulation.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = simulation.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = simulation.PositionToleranceMillimetres,
         MotionTimeoutMilliseconds = moveTimeoutMilliseconds,
         StopTimeoutMilliseconds = simulation.StopTimeoutMilliseconds,
         MotionStatusBit = simulation.MotionStatusBit,
         MotionActiveValue = simulation.MotionActiveValue,
         HomeStatusBit = simulation.HomeStatusBit,
         HomeActiveValue = simulation.HomeActiveValue,
-        DualZeroPermitted = simulation.DualZeroPermitted,
+        DualZeroPermitted = dualZeroPermitted,
     };
 
     /// <summary>Per-axis simulation overrides for one axis letter (A..D), simulation-only.</summary>

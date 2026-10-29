@@ -112,8 +112,26 @@ public static class H1DryCommissioningCodes
     public const string HomePhaseStarted = "H1_HOME_PHASE_STARTED";
     public const string CoordinateEstablishmentVerified = "H1_COORDINATE_ESTABLISHMENT_VERIFIED";
     public const string CoordinateEstablishmentRefused = "H1_COORDINATE_ESTABLISHMENT_REFUSED";
-    public const string DualZeroOptionalNotDispatched = "H1_DUAL_ZERO_OPTIONAL_NOT_DISPATCHED";
+    /// <summary>
+    /// No dual-zero definition was dispatched for this axis in this session, because the Home ended
+    /// before zero establishment. The composition itself is never optional for an H1 Home.
+    /// </summary>
+    public const string DualZeroNotDispatched = "H1_DUAL_ZERO_NOT_DISPATCHED";
     public const string DualZeroDispatchedEffectUnverified = "H1_DUAL_ZERO_DISPATCHED_EFFECT_UNVERIFIED";
+
+    /// <summary>
+    /// The Owner-approved Home-carried reset-encoder composition ran: the position-zero definition
+    /// and then the dual-zero definition were dispatched for this axis, in that order, as one
+    /// contiguous native pair, and the zero proof was taken from position reads strictly newer than
+    /// the dual-zero definition.
+    /// </summary>
+    public const string DualZeroDispatchedInHomeSequence = "H1_DUAL_ZERO_DISPATCHED_IN_HOME_SEQUENCE";
+
+    /// <summary>
+    /// The Owner-approved Home-carried reset-encoder composition was refused at its dual-zero
+    /// definition. The Home failed closed and no zero was verified.
+    /// </summary>
+    public const string DualZeroRefusedInHomeSequence = "H1_DUAL_ZERO_REFUSED_IN_HOME_SEQUENCE";
     public const string CentreReturnStarted = "H1_CENTRE_RETURN_STARTED";
 
     // ------------------------------------------------------------------------------- terminals
@@ -210,11 +228,13 @@ public sealed record H1DryCommissioningRequest
 public sealed record H1DryCommissioningStartOutcome(bool Started, string Code);
 
 /// <summary>
-/// The per-axis coordinate evidence of the run. The DP / DE distinction of the exact accepted
-/// contract is preserved: the Home lifecycle dispatches the typed position-zero definition and
-/// verifies zero by position reads; the dual-zero definition stays optional and separately
-/// authorized (profile-permitted, dispatch-only, effect UNVERIFIED, and it clears the homed
-/// coordinate claim), so it is recorded here and never required by this run.
+/// The per-axis coordinate evidence of the run. The Home lifecycle carries the Owner-approved
+/// reset-encoder composition: the typed position-zero definition, then the typed dual-zero
+/// definition, then fresh position reads whose evidence is strictly newer than the dual-zero
+/// definition. Only when both reads are within the configured tolerance is the axis published
+/// Homed with ZeroVerified. The dual-zero definition inside a Home composes the Home lifecycle; the
+/// standalone dual-zero operation keeps its separate, profile-permitted, dispatch-only semantics
+/// and its effect stays UNVERIFIED. The dual-zero disposition is recorded per axis.
 /// </summary>
 public sealed record H1AxisCoordinateEvidence(
     string AxisId,

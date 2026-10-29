@@ -15,6 +15,600 @@ public sealed class ManualMotionSessionTests
 {
     private static readonly DateTimeOffset Instant = new(2026, 10, 18, 0, 0, 0, TimeSpan.Zero);
 
+    // ----------------------------------------------------------------------------------------
+    // Profile-driven pulse-domain and mechanical conversion (Owner-confirmed 2026-10-27).
+    //
+    // The five conversion inputs are FLEXIBLE PER-AXIS ENGINEERING SETTINGS carried by the axis
+    // profile; none of them is a Product constant. These tests build domains from explicit profile
+    // values, so the same Source serves the commissioned 10,000 / 5,000 pair, any other valid pair and
+    // an axis-by-axis mixture, and they pin the exact dimensional model:
+    //
+    //   mm per motor revolution = gearRatio x pitch
+    //   paCommandUnitsPerMillimetre = drivePpr / (gearRatio x pitch)
+    //   rpFeedbackUnitsPerMillimetre = drivePpr / (gearRatio x pitch)
+    //   tpFeedbackUnitsPerMillimetre = encoderPpr / (gearRatio x pitch)
+    //   tpNormalizationRatio = drivePpr / encoderPpr
+    // ----------------------------------------------------------------------------------------
+
+    /// <summary>The domain built from the exact commissioned values, for the arithmetic proofs.</summary>
+    private static ManualMotionPulseDomain CommissionedDomain()
+    {
+        Assert.True(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 5m, out var domain));
+        return domain;
+    }
+
+    [Fact]
+    public void The_Commissioned_Pulse_And_Mechanical_Values_Come_From_The_Profile_And_Derive_The_Known_Quantities()
+    {
+        var ok = ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 5m, out var domain);
+        Assert.True(ok);
+
+        // The two physical values and the two mechanical values are carried, not compiled in.
+        Assert.Equal(10000, domain.EncoderPulsesPerRevolution);
+        Assert.Equal(5000, domain.DrivePulsesPerRevolution);
+        Assert.Equal(0.1m, domain.MechanicalGearRatio);
+        Assert.Equal(5m, domain.PitchMillimetresPerRevolution);
+
+        // 10,000 / 5,000 derives exactly one half: this is the Legacy divide-by-two, made explicit.
+        Assert.Equal(0.5m, domain.TpNormalizationRatio);
+
+        // 0.1 x 5 = 0.5 mm per motor revolution, and the four derived values follow from it.
+        Assert.Equal(0.5m, domain.MillimetresPerMotorRevolution);
+        Assert.Equal(10000m, domain.PaCommandUnitsPerMillimetre);
+        Assert.Equal(10000m, domain.RpFeedbackUnitsPerMillimetre);
+        Assert.Equal(20000m, domain.TpFeedbackUnitsPerMillimetre);
+    }
+
+    [Fact]
+    public void Another_Valid_Pulse_Pair_Derives_A_Different_Ratio_With_No_Source_Change()
+    {
+        // 4,000 / 1,000 derives 0.25 with no edit anywhere in the Product: the settings are data.
+        Assert.True(ManualMotionPulseDomain.TryCreate(4000, 1000, 0.1m, 5m, out var domain));
+        Assert.Equal(0.25m, domain.TpNormalizationRatio);
+
+        // The command density does NOT follow the normalization ratio: it is the DRIVE pulses per
+        // revolution divided by the travel of one motor revolution, here 1,000 / (0.1 x 5) = 2,000.
+        // Expecting 1,000 would have meant dividing by the encoder count instead of the drive count.
+        Assert.Equal(0.5m, domain.MillimetresPerMotorRevolution);
+        Assert.Equal(2000m, domain.PaCommandUnitsPerMillimetre);
+
+        // 1:1 derives the identity.
+        Assert.True(ManualMotionPulseDomain.TryCreate(5000, 5000, 0.1m, 5m, out var unity));
+        Assert.Equal(1m, unity.TpNormalizationRatio);
+        Assert.Equal(5000m, unity.NormalizeTheoretical(5000m));
+
+        // The mechanical values are equally data: halving the pitch doubles every units-per-mm value.
+        Assert.True(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 2.5m, out var shortPitch));
+        Assert.Equal(20000m, shortPitch.PaCommandUnitsPerMillimetre);
+        Assert.Equal(40000m, shortPitch.TpFeedbackUnitsPerMillimetre);
+    }
+
+    [Theory]
+    [InlineData(35999997L, "17999998.5")] // the Owner's Horizontal evidence
+    [InlineData(39999997L, "19999998.5")] // the Owner's Vertical evidence
+    public void A_Raw_Theoretical_Reading_Normalizes_Into_The_Reference_Domain(long rawTheoretical, string expectedText)
+    {
+        var expected = decimal.Parse(expectedText, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(expected, CommissionedDomain().NormalizeTheoretical(rawTheoretical));
+    }
+
+    [Theory]
+    [InlineData(18000000L)]
+    [InlineData(20000000L)]
+    public void A_Raw_Reference_Reading_Is_Unchanged_By_Normalization(long rawReference)
+    {
+        Assert.Equal((decimal)rawReference, ManualMotionPulseDomain.NormalizeReference(rawReference));
+    }
+
+    [Theory]
+    [InlineData(35999997L, 18000000L)] // Horizontal P1 evidence
+    [InlineData(39999997L, 20000000L)] // Vertical P1 evidence
+    public void The_Owner_Evidence_Pair_Agrees_Only_After_Normalization(
+        long rawTheoretical,
+        long rawReference)
+    {
+        var domain = CommissionedDomain();
+        var tolerance = 2m;
+
+        var normalizedTheoretical = domain.NormalizeTheoretical(rawTheoretical);
+        var normalizedReference = ManualMotionPulseDomain.NormalizeReference(rawReference);
+
+        // The two raw readings can never agree: they are 2:1 apart by construction.
+        Assert.False(ManualMotionPulseDomain.DomainsAgree(rawTheoretical, rawReference, (decimal)tolerance));
+
+        // Normalized, they agree to one and a half counts, which is inside the tolerance.
+        Assert.True(ManualMotionPulseDomain.DomainsAgree(normalizedTheoretical, normalizedReference, tolerance));
+        Assert.Equal(1.5m, Math.Abs(normalizedTheoretical - normalizedReference));
+    }
+
+    [Fact]
+    public void An_Incomplete_Or_Nonsensical_Conversion_Is_Refused_And_Never_Defaulted()
+    {
+        // Every one of the four inputs is required, and a zero or negative value refuses the conversion.
+        Assert.False(ManualMotionPulseDomain.TryCreate(null, 5000, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, null, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, null, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, null, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(0, 5000, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 0, 0.1m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, 0m, 5m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(10000, 5000, 0.1m, 0m, out _));
+        Assert.False(ManualMotionPulseDomain.TryCreate(-10000, 5000, 0.1m, 5m, out _));
+
+        // A refused conversion yields no domain at all: there is nothing to assume, and the profile
+        // reports the axis as not-configured instead of inventing a relationship.
+        Assert.False(ManualMotionPulseDomain.TryCreate(null, null, null, null, out var refused));
+        Assert.Equal(0, refused.EncoderPulsesPerRevolution);
+    }
+
+    // ----------------------------------------------------------------------------------------
+    // The dimensional ledger, as arithmetic: docs/evidence/H1_MOTION_CONVERSION_DIMENSIONAL_LEDGER.md.
+    // Each assertion is one row of that ledger, so a change to any derived quantity breaks a test
+    // that names the quantity rather than a test that compares opaque numbers.
+    // ----------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_Ledger_Derives_Every_Quantity_From_The_Commissioned_Pair()
+    {
+        var domain = CommissionedDomain();
+
+        Assert.Equal(0.5m, domain.MillimetresPerMotorRevolution);          // F1 = 0.1 x 5
+        Assert.Equal(0.5m, domain.TpNormalizationRatio);                    // F2 = 5000 / 10000
+        Assert.Equal(10000m, domain.PaCommandUnitsPerMillimetre);           // F3 = 5000 / 0.5
+        Assert.Equal(10000m, domain.RpFeedbackUnitsPerMillimetre);          // F4 = 5000 / 0.5
+        Assert.Equal(20000m, domain.TpFeedbackUnitsPerMillimetre);          // F5 = 10000 / 0.5
+        Assert.True(domain.CommandAndReferenceShareCountDensity);           // F6
+        Assert.Equal(1m, domain.ReferenceCountsPerCommandCount);            // F7
+    }
+
+    [Theory]
+    // Point, axis letter, millimetres, commanded PA operand, expected RP, expected raw TP.
+    [InlineData("P1 Horizontal", 180, 1800000, 1800000, 3600000)]
+    [InlineData("P2 Vertical", 200, 2000000, 2000000, 4000000)]
+    public void The_P1_And_P2_Targets_Resolve_To_One_Comparison_Domain(
+        string point,
+        int millimetres,
+        long commandedOperand,
+        long expectedReference,
+        long expectedRawTheoretical)
+    {
+        Assert.False(string.IsNullOrWhiteSpace(point));
+        var domain = CommissionedDomain();
+
+        // F3: the commanded operand is millimetres times command units per millimetre.
+        Assert.Equal(commandedOperand, decimal.ToInt64(millimetres * domain.PaCommandUnitsPerMillimetre));
+
+        // F8/F7: the comparison target equals the expected reference reading, with no factor between them.
+        var comparisonTarget = decimal.ToInt64(commandedOperand * domain.ReferenceCountsPerCommandCount);
+        Assert.Equal(expectedReference, comparisonTarget);
+
+        // F5: the raw theoretical reading the encoder produces for that distance.
+        Assert.Equal(expectedRawTheoretical, decimal.ToInt64(millimetres * domain.TpFeedbackUnitsPerMillimetre));
+
+        // F10/F11: both readings arrive at the comparison target in one domain.
+        Assert.Equal(comparisonTarget, decimal.ToInt64(domain.NormalizeTheoretical(expectedRawTheoretical)));
+        Assert.Equal(comparisonTarget, decimal.ToInt64(ManualMotionPulseDomain.NormalizeReference(expectedReference)));
+    }
+
+    [Fact]
+    public void The_Hardware_Of_Record_Is_Self_Consistent_At_Ten_Times_The_Millimetre_Scale()
+    {
+        // The evidence pair (raw TP 35,999,997 and raw RP 18,000,000) is reproduced here as arithmetic
+        // only. The 1.5-count difference is explained by F2 alone; the MAGNITUDE corresponds to 1,800 mm
+        // under the commissioned pair, which is exactly the open profile question recorded in section 5
+        // of the ledger. Nothing in the conversion absorbs that factor.
+        var domain = CommissionedDomain();
+        const decimal rawTheoretical = 35999997m;
+        const decimal rawReference = 18000000m;
+
+        var normalizedTheoretical = domain.NormalizeTheoretical(rawTheoretical);
+        Assert.Equal(17999998.5m, normalizedTheoretical);
+        Assert.Equal(1.5m, rawReference - normalizedTheoretical);
+        Assert.Equal(1800m, rawReference / domain.RpFeedbackUnitsPerMillimetre);
+
+        // The theoretical distance is NOT exactly 1,800 mm: the encoder stopped three counts short of
+        // its commanded multiple, so dividing by the encoder density leaves that residual visible
+        // (35,999,997 / 20,000 = 1,799.99985). Rounding it to 1,800 would erase the very discrepancy
+        // this evidence is recorded for.
+        Assert.Equal(1799.99985m, rawTheoretical / domain.TpFeedbackUnitsPerMillimetre);
+        Assert.NotEqual(
+            rawReference / domain.RpFeedbackUnitsPerMillimetre,
+            rawTheoretical / domain.TpFeedbackUnitsPerMillimetre);
+
+        // The tolerance conversion is in the same domain: millimetres x RP units/mm.
+        Assert.Equal(1000m, 0.1m * domain.RpFeedbackUnitsPerMillimetre);
+    }
+
+    [Fact]
+    public void An_Axis_Without_A_Conversion_Refuses_The_Move_Before_Anything_Is_Dispatched()
+    {
+        var profile = ManualMotionProfile.CreateSimulationProfile();
+        var withoutConversion = new ManualMotionProfile
+        {
+            Source = profile.Source,
+            ControllerId = profile.ControllerId,
+            ObservationIntervalMilliseconds = profile.ObservationIntervalMilliseconds,
+            ObservationFreshnessMilliseconds = profile.ObservationFreshnessMilliseconds,
+            JogHeartbeatTimeoutMilliseconds = profile.JogHeartbeatTimeoutMilliseconds,
+            JogMaximumHoldMilliseconds = profile.JogMaximumHoldMilliseconds,
+            AxisA = WithoutConversion(profile.AxisA!),
+            AxisB = profile.AxisB,
+            AxisC = profile.AxisC,
+            AxisD = profile.AxisD,
+        };
+
+        var harness = new Harness(profile: withoutConversion);
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+        var before = harness.Port.ExecutedCommands.Count;
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.Drive(4);
+
+        Assert.Equal(ManualMotionCodes.MovePulseDomainNotConfigured, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Equal(before, harness.Port.ExecutedCommands.Count);
+    }
+
+    private static ManualMotionAxisProfile WithoutConversion(ManualMotionAxisProfile axis) => new()
+    {
+        BrakeOutput = axis.BrakeOutput,
+        BrakeReleaseAction = axis.BrakeReleaseAction,
+        BrakeSettleMilliseconds = axis.BrakeSettleMilliseconds,
+        JogSpeed = axis.JogSpeed,
+        HomeSpeed = axis.HomeSpeed,
+        HomeTimeoutMilliseconds = axis.HomeTimeoutMilliseconds,
+        MoveAcceleration = axis.MoveAcceleration,
+        MoveSpeed = axis.MoveSpeed,
+        MoveDeceleration = axis.MoveDeceleration,
+        MoveMinimumTarget = axis.MoveMinimumTarget,
+        MoveMaximumTarget = axis.MoveMaximumTarget,
+        PositionTolerance = axis.PositionTolerance,
+        MotionTimeoutMilliseconds = axis.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = axis.StopTimeoutMilliseconds,
+        MotionStatusBit = axis.MotionStatusBit,
+        MotionActiveValue = axis.MotionActiveValue,
+        HomeStatusBit = axis.HomeStatusBit,
+        HomeActiveValue = axis.HomeActiveValue,
+        DualZeroPermitted = axis.DualZeroPermitted,
+        PositionToleranceMillimetres = axis.PositionToleranceMillimetres,
+    };
+
+    [Fact]
+    public void Both_Raw_Readings_Are_Published_Independently_And_Neither_Is_An_Alias_Of_The_Other()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(24000m, axis.PositionTp.Value);
+        Assert.Equal(12000m, axis.PositionRp.Value);
+
+        // No aliasing: the two raw observations are different values from two separate reads.
+        Assert.NotEqual(axis.PositionTp.Value, axis.PositionRp.Value);
+
+        // The normalized operands are derived from their own raw observation and from nothing else, using
+        // THIS axis's own profile conversion.
+        var domain = harness.Snapshot.Engineering.Axes[0];
+        Assert.Equal(axis.PositionTp.Value!.Value * domain.TpNormalizationRatio!.Value, axis.PositionTpNormalized);
+        Assert.Equal(axis.PositionRp.Value, axis.PositionRpNormalized);
+
+        // The raw theoretical observation is never overwritten by its normalized form.
+        Assert.NotEqual(axis.PositionTp.Value, axis.PositionTpNormalized);
+    }
+
+    [Fact]
+    public void A_Refused_Theoretical_Read_Publishes_No_Normalized_Value_And_Is_Never_Filled_From_The_Reference_Read()
+    {
+        var harness = new Harness(new ManualMotionSimulationOptions { RefuseReadKind = ManualMotionReadKind.PositionTp });
+        harness.OpenAndObserve();
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Null(axis.PositionTp.Value);
+        Assert.Null(axis.PositionTpNormalized);
+
+        // The reference observation is still published on its own: nothing was fabricated for TP from it.
+        Assert.NotNull(axis.PositionRp.Value);
+        Assert.NotNull(axis.PositionRpNormalized);
+    }
+
+    [Fact]
+    public void A_Controller_Whose_Readbacks_Share_One_Domain_Fails_Point_Completion_Even_When_It_Reaches_The_Target()
+    {
+        // A 1:1 controller contradicts the confirmed relationship: TP is not the encoder-domain value, so
+        // after normalization it sits at half the target while the reference read sits at the target.
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { EncoderCountsPerDriveCount = 1 },
+        });
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        // A queued request is not an active operation, so "no active operation" is already true before
+        // the first Step. Wait for the Move to BECOME active, then for the exact terminal outcome; a
+        // bare null wait here would return immediately and assert on the pre-Move snapshot.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+                && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveRefusedTpRpDomainDisagreement,
+            maximumSteps: 2000);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+
+        // The axis arrived and is not moving: inactivity alone did not complete the point.
+        Assert.Equal(ManualMotionInterpretation.Inactive, axis.Motion);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? 99999m) - -5000m) <= 2m);
+
+        // The theoretical operand is in the wrong domain, so completion is refused ...
+        Assert.False(Math.Abs((axis.PositionTpNormalized ?? 99999m) - -5000m) <= 2m);
+        Assert.NotEqual(ManualMotionCodes.MoveCompletedPositionVerified, axis.LastOutcomeCode);
+
+        // ... and the two normalized operands disagreeing with each other is reported as its own failure.
+        Assert.Equal(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, axis.LastOutcomeCode);
+    }
+
+    [Fact]
+    public void A_Target_That_Is_Not_Reached_Fails_Even_When_Both_Normalized_Readings_Agree_With_Each_Other()
+    {
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { MotionStalled = true },
+        });
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        // Same queued-request race: prove the Move actually became active before waiting for its end.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+                && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveTargetNotReachedReadbacksAgree,
+            maximumSteps: 2000);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+
+        // The two normalized operands agree with each other ...
+        Assert.True(ManualMotionPulseDomain.DomainsAgree(
+            axis.PositionTpNormalized!.Value,
+            axis.PositionRpNormalized!.Value,
+            2));
+
+        // ... and the point still does not complete, because the target is what both disagree with.
+        Assert.False(Math.Abs(axis.PositionRpNormalized.Value - -5000m) <= 2m);
+        Assert.NotEqual(ManualMotionCodes.MoveCompletedPositionVerified, axis.LastOutcomeCode);
+
+        // Mutual agreement with a target that was never reached is its own reported outcome: the
+        // readbacks are consistent, the target is not reconciled, and no point completes on it.
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, axis.LastOutcomeCode);
+        Assert.NotEqual(ManualMotionCodes.MoveRefusedTpRpDomainDisagreement, axis.LastOutcomeCode);
+    }
+
+    [Fact]
+    public void A_Stale_Theoretical_Reading_Cannot_Satisfy_Point_Completion()
+    {
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { RefuseReadKindWhileMoving = ManualMotionReadKind.PositionTp },
+        });
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        // The staleness this test proves only exists DURING a Move: the simulated port refuses the TP
+        // read while the position move is engaged. Without the initial active wait the Move never ran
+        // and the assertion below would read the fresh pre-Move observation instead.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null, maximumSteps: 2000);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.False(axis.PositionTp.Fresh);
+        Assert.NotEqual(ManualMotionCodes.MoveCompletedPositionVerified, axis.LastOutcomeCode);
+    }
+
+    [Theory]
+    [InlineData(ManualMotionAxis.A, -5000)]
+    [InlineData(ManualMotionAxis.B, 3000)]
+    [InlineData(ManualMotionAxis.C, 2500)]
+    [InlineData(ManualMotionAxis.D, -1500)]
+    public void Every_Axis_Normalizes_Through_Its_Own_Profile_Before_Comparison(ManualMotionAxis axis, int target)
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+        harness.HomeAxis(axis);
+
+        harness.Session.RequestMove(axis, target);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, axis) is null
+                && snapshot.Axes[(int)axis - 1].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+
+        var snapshot = harness.Axis(axis);
+
+        // Raw readings keep their own domains: the theoretical value is still the encoder-domain count.
+        Assert.Equal(snapshot.PositionRp.Value * 2m, snapshot.PositionTp.Value);
+
+        // The comparison operands are in one domain and both sit on the target.
+        Assert.Equal(snapshot.PositionRp.Value, snapshot.PositionRpNormalized);
+        Assert.Equal(snapshot.PositionTp.Value / 2m, snapshot.PositionTpNormalized);
+        Assert.True(Math.Abs((snapshot.PositionTpNormalized ?? 99999m) - target) <= 2m);
+        Assert.True(Math.Abs((snapshot.PositionRpNormalized ?? 99999m) - target) <= 2m);
+    }
+
+    [Fact]
+    public void The_Comparison_Target_And_Tolerance_Are_Published_In_The_Comparison_Domain()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A)?.Phase == ManualMotionOperationPhase.Running);
+
+        var operation = ActiveOf(harness.Snapshot, ManualMotionAxis.A)!;
+
+        // The published pair is exactly what the session compares with: the commanded native target
+        // converted by the derived reference counts per command count, and the millimetre tolerance
+        // converted by the derived RP units per millimetre. For the simulation pair both factors are
+        // 1 and 1000 respectively, which is why the numbers equal the authored ones.
+        Assert.Equal(-5000m, operation.ComparisonTarget!.Value);
+        Assert.Equal(2m, operation.ComparisonTolerance!.Value);
+    }
+
+    [Fact]
+    public void The_Pulse_Domain_Normalization_Never_Changes_The_Command_Operand()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+        var before = harness.Port.ExecutedCommands.Count;
+
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        // Wait for the Move to become active first: only then can the null wait mean "it finished".
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+        harness.DriveUntil(
+            snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+                && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+
+        var absolute = harness.Port.ExecutedCommands
+            .Skip(before)
+            .Where(command => command.Kind == ManualMotionPortCommandKind.PositionAbsolute)
+            .ToList();
+
+        // Exactly one absolute command, carrying the requested native target unchanged: normalization is a
+        // read-side comparison rule and never rewrites the command amplitude.
+        Assert.Single(absolute);
+        Assert.Equal(-5000, absolute[0].Operand);
+    }
+
+    [Fact]
+    public void The_Active_Session_Captures_The_Conversion_As_An_Immutable_Snapshot()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        var engineering = harness.Snapshot.Engineering;
+        Assert.Equal(1, engineering.Generation);
+        Assert.Equal(4, engineering.Axes.Count);
+
+        var axisA = engineering.Axes[0];
+        Assert.Equal(ManualMotionAxis.A, axisA.Axis);
+        Assert.Equal(1000, axisA.EncoderPulsesPerRevolution);
+        Assert.Equal(500, axisA.DrivePulsesPerRevolution);
+        Assert.Equal(0.1m, axisA.MechanicalGearRatio);
+        Assert.Equal(5m, axisA.PitchMillimetresPerRevolution);
+        Assert.True(axisA.ConversionConfigured);
+
+        // The snapshot is the same object graph on every read: nothing is recomputed from live state.
+        Assert.Same(engineering, harness.Snapshot.Engineering);
+        Assert.Same(axisA, harness.Snapshot.Engineering.Axes[0]);
+    }
+
+    [Fact]
+    public void An_Engineering_Settings_Change_Is_Accepted_Only_While_Nothing_Is_In_Flight()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        // Idle: an accepted change advances the capture generation and is republished.
+        var idle = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(ManualMotionProfile.CreateSimulationProfile()));
+        Assert.True(idle.Accepted);
+        Assert.Equal(2, harness.Snapshot.Engineering.Generation);
+
+        // In flight: Home is active, so the change is refused and nothing is applied.
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is not null);
+
+        var refusedWhileHoming = harness.Session.ApplyEngineeringSettings(
+            ManualMotionProfileResult.FromProfile(ManualMotionProfile.CreateSimulationProfile()));
+        Assert.False(refusedWhileHoming.Accepted);
+        Assert.Equal(ManualMotionCodes.EngineeringSettingsLockedWhileActive, refusedWhileHoming.Code);
+        Assert.Equal(2, harness.Snapshot.Engineering.Generation);
+        Assert.False(harness.Session.EngineeringSettingsEditable);
+    }
+
+    [Fact]
+    public void A_Refused_Profile_Cannot_Become_The_Session_Configuration()
+    {
+        var harness = new Harness();
+        harness.OpenAndObserve();
+
+        var refused = harness.Session.ApplyEngineeringSettings(ManualMotionProfileResult.Refused(ManualMotionCodes.ProfileValueInvalid));
+        Assert.False(refused.Accepted);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refused.Code);
+        Assert.Equal(1, harness.Snapshot.Engineering.Generation);
+    }
+
+    [Fact]
+    public void Each_Axis_Carries_Its_Own_Conversion_And_Is_Compared_With_It()
+    {
+        // Axis A keeps the simulation pair; Axis B is given a different, still valid, pair. The Product
+        // needs no change to handle either: the comparison follows the axis's own profile.
+        var profile = ManualMotionProfile.CreateSimulationProfile();
+        var mixed = new ManualMotionProfile
+        {
+            Source = profile.Source,
+            ControllerId = profile.ControllerId,
+            ObservationIntervalMilliseconds = profile.ObservationIntervalMilliseconds,
+            ObservationFreshnessMilliseconds = profile.ObservationFreshnessMilliseconds,
+            JogHeartbeatTimeoutMilliseconds = profile.JogHeartbeatTimeoutMilliseconds,
+            JogMaximumHoldMilliseconds = profile.JogMaximumHoldMilliseconds,
+            AxisA = profile.AxisA,
+            AxisB = WithConversion(profile.AxisB!, encoderPulsesPerRevolution: 1000, drivePulsesPerRevolution: 250),
+            AxisC = profile.AxisC,
+            AxisD = profile.AxisD,
+        };
+
+        var harness = new Harness(profile: mixed);
+        harness.OpenAndObserve();
+
+        Assert.Equal(500, harness.Snapshot.Engineering.Axes[0].DrivePulsesPerRevolution);
+        Assert.Equal(250, harness.Snapshot.Engineering.Axes[1].DrivePulsesPerRevolution);
+        Assert.Equal(0.5m, harness.Snapshot.Engineering.Axes[0].TpNormalizationRatio);
+        Assert.Equal(0.25m, harness.Snapshot.Engineering.Axes[1].TpNormalizationRatio);
+
+        // Both axes still complete a Move: the density changed, the rule did not.
+        harness.HomeAxis(ManualMotionAxis.A);
+        harness.Session.RequestMove(ManualMotionAxis.A, -5000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+
+        harness.HomeAxis(ManualMotionAxis.B);
+        harness.Session.RequestMove(ManualMotionAxis.B, -3000);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.B) is null
+            && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+    }
+
+    private static ManualMotionAxisProfile WithConversion(
+        ManualMotionAxisProfile axis,
+        int encoderPulsesPerRevolution,
+        int drivePulsesPerRevolution) => new()
+    {
+        BrakeOutput = axis.BrakeOutput,
+        BrakeReleaseAction = axis.BrakeReleaseAction,
+        BrakeSettleMilliseconds = axis.BrakeSettleMilliseconds,
+        JogSpeed = axis.JogSpeed,
+        HomeSpeed = axis.HomeSpeed,
+        HomeTimeoutMilliseconds = axis.HomeTimeoutMilliseconds,
+        MoveAcceleration = axis.MoveAcceleration,
+        MoveSpeed = axis.MoveSpeed,
+        MoveDeceleration = axis.MoveDeceleration,
+        MoveMinimumTarget = axis.MoveMinimumTarget,
+        MoveMaximumTarget = axis.MoveMaximumTarget,
+        PositionTolerance = axis.PositionTolerance,
+        MotionTimeoutMilliseconds = axis.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = axis.StopTimeoutMilliseconds,
+        MotionStatusBit = axis.MotionStatusBit,
+        MotionActiveValue = axis.MotionActiveValue,
+        HomeStatusBit = axis.HomeStatusBit,
+        HomeActiveValue = axis.HomeActiveValue,
+        DualZeroPermitted = axis.DualZeroPermitted,
+        EncoderPulsesPerRevolution = encoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = drivePulsesPerRevolution,
+        MechanicalGearRatio = axis.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = axis.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = axis.PositionToleranceMillimetres,
+    };
+
     private sealed class FakePort : IManualMotionPort
     {
         internal long Generation { get; init; } = 1;
@@ -105,6 +699,14 @@ public sealed class ManualMotionSessionTests
         internal ManualMotionAxisSnapshot Axis(ManualMotionAxis axis) =>
             Snapshot.Axes[(int)axis - 1];
 
+        /// <summary>
+        /// The sequence of the newest published log entry, or 0 when nothing is published. The log is
+        /// a bounded window of the most recent entries, so a watermark is only ever used for the
+        /// "strictly newer" comparison the session itself uses.
+        /// </summary>
+        internal long LastLogSequence =>
+            Snapshot.Log.Count == 0 ? 0 : Snapshot.Log[Snapshot.Log.Count - 1].Sequence;
+
         internal void HomeAxis(ManualMotionAxis axis)
         {
             Session.RequestHome(axis);
@@ -148,6 +750,11 @@ public sealed class ManualMotionSessionTests
             MoveMinimumTarget = source.MoveMinimumTarget,
             MoveMaximumTarget = source.MoveMaximumTarget,
             PositionTolerance = source.PositionTolerance,
+            EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+            DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+            MechanicalGearRatio = source.MechanicalGearRatio,
+            PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+            PositionToleranceMillimetres = source.PositionToleranceMillimetres,
             MotionTimeoutMilliseconds = motionTimeoutMilliseconds ?? source.MotionTimeoutMilliseconds,
             StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
             MotionStatusBit = source.MotionStatusBit,
@@ -179,6 +786,11 @@ public sealed class ManualMotionSessionTests
         HomeStatusBit = source.HomeStatusBit,
         HomeActiveValue = source.HomeActiveValue,
         DualZeroPermitted = source.DualZeroPermitted,
+        EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+        MechanicalGearRatio = source.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = source.PositionToleranceMillimetres,
     };
 
     private static ManualMotionProfile ProfileWith(
@@ -318,6 +930,11 @@ public sealed class ManualMotionSessionTests
         HomeStatusBit = source.HomeStatusBit,
         HomeActiveValue = source.HomeActiveValue,
         DualZeroPermitted = source.DualZeroPermitted,
+        EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+        DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+        MechanicalGearRatio = source.MechanicalGearRatio,
+        PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+        PositionToleranceMillimetres = source.PositionToleranceMillimetres,
     };
 
     /// <summary>
@@ -460,10 +1077,24 @@ public sealed class ManualMotionSessionTests
         Assert.Equal("Vertical", harness.Axis(ManualMotionAxis.D).RoleLabel);
         Assert.True(harness.Axis(ManualMotionAxis.A).AllowedByProfile);
         Assert.True(harness.Axis(ManualMotionAxis.A).PositionTp.Fresh);
-        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
-        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionTp.Value);
-        Assert.Equal(5000m, harness.Axis(ManualMotionAxis.C).PositionTp.Value);
-        Assert.Equal(-3000m, harness.Axis(ManualMotionAxis.D).PositionTp.Value);
+        // The simulated port models the 2:1 count density of the profile it was opened with, so every raw
+        // theoretical reading carries the encoder-domain density while the reference reading does not.
+        // Both the raw observation and its normalized comparison operand are published, and neither is
+        // derived from the other at publication time beyond the stated normalization.
+        Assert.Equal(24000m, harness.Axis(ManualMotionAxis.A).PositionTp.Value);
+        Assert.Equal(-16000m, harness.Axis(ManualMotionAxis.B).PositionTp.Value);
+        Assert.Equal(10000m, harness.Axis(ManualMotionAxis.C).PositionTp.Value);
+        Assert.Equal(-6000m, harness.Axis(ManualMotionAxis.D).PositionTp.Value);
+        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionTpNormalized);
+        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionTpNormalized);
+        Assert.Equal(5000m, harness.Axis(ManualMotionAxis.C).PositionTpNormalized);
+        Assert.Equal(-3000m, harness.Axis(ManualMotionAxis.D).PositionTpNormalized);
+        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionRp.Value);
+        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionRp.Value);
+        Assert.Equal(5000m, harness.Axis(ManualMotionAxis.C).PositionRp.Value);
+        Assert.Equal(-3000m, harness.Axis(ManualMotionAxis.D).PositionRp.Value);
+        Assert.Equal(12000m, harness.Axis(ManualMotionAxis.A).PositionRpNormalized);
+        Assert.Equal(-8000m, harness.Axis(ManualMotionAxis.B).PositionRpNormalized);
 
         // The snapshot carries the four axes in the stable A, B, C, D order with the canonical
         // catalogue identity of each axis (A/B serve WJ1, C/D serve WJ2, all on WSB1).
@@ -903,7 +1534,7 @@ public sealed class ManualMotionSessionTests
     }
 
     [Fact]
-    public void Home_Completes_With_Stop_Then_Dp_Zero_Verified_Then_Brake_Apply()
+    public void Home_Completes_With_Stop_Then_Dp_Zero_Then_De_Zero_Verified_Then_Brake_Apply()
     {
         var harness = new Harness();
         harness.OpenAndObserve();
@@ -924,6 +1555,7 @@ public sealed class ManualMotionSessionTests
                 ManualMotionPortCommandKind.Begin,
                 ManualMotionPortCommandKind.Stop,
                 ManualMotionPortCommandKind.DefinePositionZero,
+                ManualMotionPortCommandKind.DefineDualZero,
                 ManualMotionPortCommandKind.BrakeOutputClear,
             },
             harness.Port.ExecutedCommands.Select(command => command.Kind).ToArray());
@@ -1009,14 +1641,26 @@ public sealed class ManualMotionSessionTests
         harness.OpenAndObserve();
         harness.HomeAxis(ManualMotionAxis.B);
         var beforeDualZero = harness.Port.ExecutedCommands.Count;
+        var logBefore = harness.LastLogSequence;
 
         harness.Session.RequestDefineDualZero(ManualMotionAxis.B);
+
+        // The standalone request must be proven consumed before the outcome is read. A wait on
+        // DualZeroState alone is no longer sufficient: the Home-carried composition already left it
+        // at DispatchedUnverified, so that predicate is true before the queued request is applied and
+        // would accept the Home outcome instead. The completion code below is logged only by the
+        // standalone operation - the Home-carried composition reports the Home outcome instead.
         harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
-            && snapshot.Axes[1].DualZeroState == ManualMotionDualZeroState.DispatchedUnverified);
+            && snapshot.Log.Any(entry => entry.Sequence > logBefore
+                && entry.Axis == ManualMotionAxis.B
+                && entry.Code == ManualMotionCodes.DualZeroDispatchedEffectUnverified));
 
         var axis = harness.Axis(ManualMotionAxis.B);
         Assert.Equal(ManualMotionCodes.DualZeroDispatchedEffectUnverified, axis.LastOutcomeCode);
         Assert.Equal(ManualMotionHomeState.NotHomed, axis.HomeState);
+
+        // Exactly one additional dispatch, and it is the standalone dual-zero definition: the Home
+        // that already ran is not re-dispatched.
         Assert.Equal(
             new[] { ManualMotionPortCommandKind.DefineDualZero },
             KindsAfter(harness, beforeDualZero).ToArray());
@@ -1063,8 +1707,12 @@ public sealed class ManualMotionSessionTests
             && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
 
         var axis = harness.Axis(ManualMotionAxis.B);
-        Assert.True(Math.Abs((axis.PositionTp.Value ?? 99999m) - -3000m) <= 2m);
-        Assert.True(Math.Abs((axis.PositionRp.Value ?? 99999m) - -3000m) <= 2m);
+        Assert.True(Math.Abs((axis.PositionTpNormalized ?? 99999m) - -3000m) <= 2m);
+        Assert.True(Math.Abs((axis.PositionRpNormalized ?? 99999m) - -3000m) <= 2m);
+
+        // The raw theoretical observation is still the encoder-domain value: it is the normalized
+        // operand, not the raw one, that lives in the target's domain.
+        Assert.True(Math.Abs((axis.PositionTp.Value ?? 99999m) - -6000m) <= 2m);
         Assert.Equal(
             new[]
             {
@@ -1086,15 +1734,51 @@ public sealed class ManualMotionSessionTests
     public void Move_Timeout_Stops_Through_The_Supervised_Stop_Path()
     {
         var source = ManualMotionProfile.CreateSimulationProfile();
+        // A 300 ms motion timeout AND a mechanical stall: without the stall the simulated axis really
+        // travels (4,000 native units/s over 25 ms steps), the TP and RP observations are separate port
+        // calls rather than one atomic sample, and the two readings land on different positions a
+        // fraction of a count apart - which the session correctly reports as a TP/RP disagreement.
+        // Stalling the axis keeps this test about the timeout supervision path itself: the Move stays
+        // active and far short of 15,000 while both readbacks stay mutually consistent.
         var axisB = CloneAxis(source.AxisB!, motionTimeoutMilliseconds: 300);
-        var harness = new Harness(profile: ProfileWith(source, axisB: axisB));
+        var harness = new Harness(
+            new ManualMotionSimulationOptions
+            {
+                AxisB = new ManualMotionAxisSimulationOptions
+                {
+                    MotionStalled = true,
+                },
+            },
+            profile: ProfileWith(source, axisB: axisB));
         harness.OpenAndObserve();
         harness.HomeAxis(ManualMotionAxis.B);
         var beforeMove = harness.Port.ExecutedCommands.Count;
 
+        var moveRequestedAt = harness.Clock.UtcNow;
         harness.Session.RequestMove(ManualMotionAxis.B, 15000);
+        // Queued-then-active again: the Move has to become active before its end can be observed.
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.B) is not null);
+
+        // The Move stays active/busy until its 300 ms timeout fires while the simulated mechanical
+        // position is stalled, and the session classifies that timeout from fresh normalized readbacks.
+        // Because nothing advances, both readbacks agree with each other exactly, and because neither
+        // reaches 15,000 the reported primary failure is the target-not-reconciled code - not the
+        // generic MOVE_TIMEOUT and not the TP/RP-disagreement code.
         harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
-            && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveTimeout);
+            && snapshot.Axes[1].LastOutcomeCode == ManualMotionCodes.MoveTargetNotReachedReadbacksAgree);
+
+        // Timeout-trigger evidence from the existing clock and log surfaces only: ClassifyMoveEnd is
+        // reached exclusively from the Move timeout branch, and the operation cannot terminate this way
+        // before its own configured 300 ms motion timeout has elapsed.
+        Assert.True(
+            harness.Clock.UtcNow - moveRequestedAt >= TimeSpan.FromMilliseconds(300),
+            "the Move ended before its configured motion timeout elapsed, so the timeout did not trigger it");
+        Assert.Contains(
+            harness.Snapshot.Log,
+            entry => entry.Axis == ManualMotionAxis.B && entry.Code == ManualMotionCodes.MoveTargetNotReachedReadbacksAgree);
+        Assert.DoesNotContain(
+            harness.Snapshot.Log,
+            entry => entry.Axis == ManualMotionAxis.B && entry.Code == ManualMotionCodes.MoveCompletedPositionVerified);
 
         var segment = KindsAfter(harness, beforeMove);
         Assert.Contains(ManualMotionPortCommandKind.Stop, segment);
@@ -1812,8 +2496,8 @@ public sealed class ManualMotionSessionTests
 
         Assert.Equal(ManualMotionCodes.MoveCompletedPositionVerified, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
         Assert.Equal(ManualMotionCodes.MoveCompletedPositionVerified, harness.Axis(ManualMotionAxis.B).LastOutcomeCode);
-        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.A).PositionTp.Value ?? 99999m) - -5000m) <= 2m);
-        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.B).PositionTp.Value ?? 99999m) - 5000m) <= 2m);
+        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.A).PositionTpNormalized ?? 99999m) - -5000m) <= 2m);
+        Assert.True(Math.Abs((harness.Axis(ManualMotionAxis.B).PositionTpNormalized ?? 99999m) - 5000m) <= 2m);
     }
 
     [Fact]
@@ -2508,5 +3192,472 @@ public sealed class ManualMotionSessionTests
         {
             Assert.Equal(expected[(offset + index) % expected.Length], list[index]);
         }
+    }
+
+    // ------------------------------------------- Home-carried reset-encoder composition (DP then DE)
+
+    /// <summary>
+    /// A minimal deterministic port for the Home-carried reset-encoder composition. On the synthetic
+    /// simulation bit layout the Home bit reads INACTIVE until the Home search is armed by Begin and
+    /// ACTIVE afterwards (an already-active input would refuse Home, and a search that never sees the
+    /// input would time out), while the motion bit reads inactive throughout. It records every command
+    /// and read in dispatch order, and can refuse either definition or report a zero position only
+    /// for readings taken BEFORE the dual-zero definition. Every value is synthetic.
+    ///
+    /// The port carries no sequence of its own: a port result reports only the port generation, which
+    /// must stay at the single generation the session opened (any other value is a stale result and is
+    /// rejected). Sequencing belongs to the session, which owns one monotonic call sequence shared by
+    /// commands and reads. This port therefore records the interleaved call order so a test can prove
+    /// which readings were taken after a given command.
+    /// </summary>
+    private sealed class ZeroSequencePort : IManualMotionPort
+    {
+        private bool _dualZeroDispatched;
+
+        private bool _homeInputActive;
+
+        private int _callOrdinal;
+
+        internal bool RefusePositionZero { get; init; }
+
+        internal bool RefuseDualZero { get; init; }
+
+        /// <summary>When true, TP/RP read zero only until the dual-zero definition was dispatched.</summary>
+        internal bool ZeroReadsOnlyBeforeDualZero { get; init; }
+
+        internal List<ManualMotionPortCommand> Executed { get; } = new();
+
+        internal List<ManualMotionPortRead> Reads { get; } = new();
+
+        /// <summary>Every command in the interleaved port-call order of this port.</summary>
+        internal List<(int Ordinal, ManualMotionPortCommandKind Kind)> CommandCalls { get; } = new();
+
+        /// <summary>Every read in the interleaved port-call order of this port.</summary>
+        internal List<(int Ordinal, ManualMotionReadKind Kind)> ReadCalls { get; } = new();
+
+        /// <summary>The interleaved call ordinal of the first command of one kind.</summary>
+        internal int OrdinalOf(ManualMotionPortCommandKind kind)
+        {
+            foreach (var call in CommandCalls)
+            {
+                if (call.Kind == kind)
+                {
+                    return call.Ordinal;
+                }
+            }
+
+            throw new InvalidOperationException("The port never received a command of that kind.");
+        }
+
+        /// <summary>True when a read of one kind was taken strictly after the given call ordinal.</summary>
+        internal bool ReadAfter(int ordinal, ManualMotionReadKind kind)
+        {
+            foreach (var call in ReadCalls)
+            {
+                if (call.Kind == kind && call.Ordinal > ordinal)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>True when a read of one kind was taken strictly before the given call ordinal.</summary>
+        internal bool ReadBefore(int ordinal, ManualMotionReadKind kind)
+        {
+            foreach (var call in ReadCalls)
+            {
+                if (call.Kind == kind && call.Ordinal < ordinal)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public ManualMotionPortMode Mode => ManualMotionPortMode.Simulated;
+
+        public ManualMotionPortOpenResult Open() => new(true, "SYNTHETIC_OPENED", 1);
+
+        public ManualMotionPortCommandResult Execute(ManualMotionPortCommand command)
+        {
+            Executed.Add(command);
+            CommandCalls.Add((++_callOrdinal, command.Kind));
+            if (command.Kind == ManualMotionPortCommandKind.DefinePositionZero && RefusePositionZero)
+            {
+                return new ManualMotionPortCommandResult(false, false, true, "SYNTHETIC_REFUSED", 1);
+            }
+
+            if (command.Kind == ManualMotionPortCommandKind.DefineDualZero)
+            {
+                if (RefuseDualZero)
+                {
+                    return new ManualMotionPortCommandResult(false, false, true, "SYNTHETIC_REFUSED", 1);
+                }
+
+                _dualZeroDispatched = true;
+            }
+
+            if (command.Kind == ManualMotionPortCommandKind.Begin)
+            {
+                // The armed Home search reaches the switch: the Home input becomes active only after
+                // Begin, so the fresh post-Begin Status observation is what completes the search.
+                _homeInputActive = true;
+            }
+
+            return new ManualMotionPortCommandResult(true, false, true, "SYNTHETIC_DISPATCHED", 1);
+        }
+
+        public ManualMotionPortReadResult Read(ManualMotionPortRead read)
+        {
+            Reads.Add(read);
+            ReadCalls.Add((++_callOrdinal, read.Kind));
+            switch (read.Kind)
+            {
+                // Home bit 3 (8) only once the Home search is armed; motion bit 6 inactive.
+                case ManualMotionReadKind.StatusWord:
+                    return new ManualMotionPortReadResult(true, false, _homeInputActive ? 8m : 0m, "SYNTHETIC_READ", 1);
+
+                case ManualMotionReadKind.PositionTp:
+                case ManualMotionReadKind.PositionRp:
+                {
+                    var atZero = !ZeroReadsOnlyBeforeDualZero || !_dualZeroDispatched;
+                    return new ManualMotionPortReadResult(true, false, atZero ? 0m : 9000m, "SYNTHETIC_READ", 1);
+                }
+
+                default:
+                    return new ManualMotionPortReadResult(true, false, 0m, "SYNTHETIC_READ", 1);
+            }
+        }
+
+        public ManualMotionPortCloseResult Close() => new(true, true, true, "SYNTHETIC_CLOSED");
+    }
+
+    private sealed class ZeroSequenceHarness
+    {
+        internal ZeroSequenceHarness(ZeroSequencePort port, ManualMotionProfile? profile = null)
+        {
+            Profile = profile ?? ManualMotionProfile.CreateSimulationProfile();
+            Port = port;
+            Session = new ManualMotionSession(Port, ManualMotionProfileResult.FromProfile(Profile), Clock);
+        }
+
+        internal TestClock Clock { get; } = new(Instant);
+
+        internal ManualMotionProfile Profile { get; }
+
+        internal ZeroSequencePort Port { get; }
+
+        internal ManualMotionSession Session { get; }
+
+        internal ManualMotionSnapshot Snapshot => Session.Snapshot;
+
+        internal void OpenSession()
+        {
+            Session.Step();
+
+            // Enough steps for the deterministic observation scheduler to publish a current Status,
+            // TP and RP reading for every one of the four axes.
+            Drive(24);
+            Assert.Equal(ManualMotionSessionState.Ready, Snapshot.State);
+        }
+
+        internal void Drive(int steps, int millisecondsPerStep = 10)
+        {
+            for (var index = 0; index < steps; index++)
+            {
+                Clock.Advance(TimeSpan.FromMilliseconds(millisecondsPerStep));
+                Session.Step();
+            }
+        }
+
+        internal void DriveUntil(Func<ManualMotionSnapshot, bool> done, int maximumSteps = 4000, int millisecondsPerStep = 10)
+        {
+            for (var index = 0; index < maximumSteps && !done(Snapshot); index++)
+            {
+                Drive(1, millisecondsPerStep);
+            }
+
+            Assert.True(done(Snapshot), "the session did not reach the expected state within the step budget");
+        }
+
+        internal ManualMotionAxisSnapshot Axis(ManualMotionAxis axis) => Snapshot.Axes[(int)axis - 1];
+
+        /// <summary>
+        /// Drives one Home request from enqueue to its finished state and proves the request was
+        /// actually consumed: the Home operation must be observed active after the enqueue and then
+        /// observed gone. A wait that rests only on an idle session is already true before the queued
+        /// request is applied, so it would accept the terminal state with the request still pending
+        /// and let the assertions read the pre-request outcome.
+        /// </summary>
+        internal void HomeToTerminal(ManualMotionAxis axis)
+        {
+            Session.RequestHome(axis);
+            DriveUntil(snapshot => ActiveOf(snapshot, axis) is not null);
+            DriveUntil(snapshot => ActiveOf(snapshot, axis) is null);
+        }
+    }
+
+    [Fact]
+    public void Every_Axis_Home_Carries_Dp_Then_De_In_That_Order()
+    {
+        // The typed routing is the same for all four controller axes: A, B, C and D each emit the
+        // position-zero definition immediately followed by the dual-zero definition.
+        foreach (var axis in new[] { ManualMotionAxis.A, ManualMotionAxis.B, ManualMotionAxis.C, ManualMotionAxis.D })
+        {
+            var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+            harness.OpenSession();
+
+            harness.HomeToTerminal(axis);
+            Assert.Equal(ManualMotionHomeState.Homed, harness.Axis(axis).HomeState);
+
+            var definitions = harness.Port.Executed
+                .Where(command => command.Kind is ManualMotionPortCommandKind.DefinePositionZero
+                    or ManualMotionPortCommandKind.DefineDualZero)
+                .ToList();
+
+            // Exactly one of each, in the Legacy order, and adjacent in the dispatch stream.
+            Assert.Equal(
+                new[] { ManualMotionPortCommandKind.DefinePositionZero, ManualMotionPortCommandKind.DefineDualZero },
+                definitions.Select(command => command.Kind).ToArray());
+            Assert.All(definitions, command => Assert.Equal(axis, command.Axis));
+            Assert.All(definitions, command => Assert.Equal(0, command.Operand));
+
+            var indices = harness.Port.Executed
+                .Select((command, index) => (command, index))
+                .Where(entry => entry.command.Kind is ManualMotionPortCommandKind.DefinePositionZero
+                    or ManualMotionPortCommandKind.DefineDualZero)
+                .Select(entry => entry.index)
+                .ToArray();
+            Assert.Equal(indices[0] + 1, indices[1]);
+        }
+    }
+
+    [Fact]
+    public void Dual_Zero_Is_Never_Dispatched_Before_The_Position_Zero()
+    {
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+        harness.OpenSession();
+
+        // Stop the session while the dual-zero definition is still due, then confirm the ordering.
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+
+        var kinds = harness.Port.Executed.Select(command => command.Kind).ToList();
+        var positionZero = kinds.IndexOf(ManualMotionPortCommandKind.DefinePositionZero);
+        var dualZero = kinds.IndexOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(positionZero >= 0);
+        Assert.True(dualZero > positionZero, "the dual-zero definition was dispatched before the position zero");
+    }
+
+    [Fact]
+    public void Observations_Taken_Before_The_Dual_Zero_Definition_Cannot_Verify_Zero()
+    {
+        // Readings are zero only until the dual-zero definition is dispatched, then far from zero.
+        // An implementation that accepted a reading taken after DP but before DE would publish a
+        // verified Home; the corrected lifecycle must fail closed instead.
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort { ZeroReadsOnlyBeforeDualZero = true });
+        harness.OpenSession();
+
+        // The wait proves the queued Home was consumed: the operation is observed active and then
+        // observed finished. An idle-session predicate alone is already true before the queued
+        // request is applied and would let the assertions read the unchanged pre-request outcome.
+        harness.HomeToTerminal(ManualMotionAxis.A);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, axis.CoordinateState);
+
+        // The failure is genuinely a post-dual-zero verification failure: both definitions were
+        // dispatched, in order, and the position readings used by the verification were taken in the
+        // real port-call stream strictly AFTER the dual-zero definition, not before it.
+        var kinds = harness.Port.Executed.Select(command => command.Kind).ToList();
+        var positionZeroIndex = kinds.IndexOf(ManualMotionPortCommandKind.DefinePositionZero);
+        var dualZeroIndex = kinds.IndexOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(positionZeroIndex >= 0);
+        Assert.True(dualZeroIndex > positionZeroIndex);
+
+        var dualZeroOrdinal = harness.Port.OrdinalOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(
+            harness.Port.ReadBefore(dualZeroOrdinal, ManualMotionReadKind.PositionTp),
+            "the scenario requires TP readings taken before the dual-zero definition");
+        Assert.True(
+            harness.Port.ReadAfter(dualZeroOrdinal, ManualMotionReadKind.PositionTp),
+            "a TP reading must be taken strictly after the dual-zero definition");
+        Assert.True(
+            harness.Port.ReadAfter(dualZeroOrdinal, ManualMotionReadKind.PositionRp),
+            "an RP reading must be taken strictly after the dual-zero definition");
+    }
+
+    [Fact]
+    public void Position_Zero_Alone_Never_Publishes_A_Verified_Zero()
+    {
+        // While the dual-zero definition is still due, the axis carries only a dispatched position
+        // zero: it is not Homed and no verified coordinate has been published.
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+        harness.OpenSession();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot =>
+            ActiveOf(snapshot, ManualMotionAxis.A)?.Phase == ManualMotionOperationPhase.DefiningDualZero);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCoordinateState.ZeroDispatched, axis.CoordinateState);
+        Assert.NotEqual(ManualMotionHomeState.Homed, axis.HomeState);
+        Assert.Contains(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefinePositionZero);
+        Assert.DoesNotContain(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    [Fact]
+    public void Position_Zero_Refusal_Prevents_The_Dual_Zero_Definition()
+    {
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort { RefusePositionZero = true });
+        harness.OpenSession();
+
+        harness.HomeToTerminal(ManualMotionAxis.A);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.PositionZeroRefused, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Contains(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefinePositionZero);
+        Assert.DoesNotContain(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    [Fact]
+    public void Dual_Zero_Refusal_Fails_The_Home_Closed_With_A_Typed_Outcome()
+    {
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort { RefuseDualZero = true });
+        harness.OpenSession();
+
+        harness.HomeToTerminal(ManualMotionAxis.A);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeDualZeroRefused, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Equal(ManualMotionDualZeroState.Refused, axis.DualZeroState);
+        Assert.NotEqual(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(nameof(ManualMotionDualZeroState.Refused), axis.DualZeroState.ToString());
+
+        // Two definitions attempted, no third: the refusal is terminal for this Home.
+        Assert.Single(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    [Fact]
+    public void Home_Dispatches_The_Dual_Zero_Even_When_The_Profile_Does_Not_Permit_It()
+    {
+        // The Owner's Hardware profile declares dualZeroPermitted=false. The Home-carried
+        // reset-encoder composition is part of the H1 Home contract and must NOT depend on that
+        // permission: gating it on the permission would leave Home emitting the position definition
+        // alone and reproduce the proven command-sequence defect on the repaired Hardware run.
+        var profile = ProfileWithoutDualZeroPermission();
+        Assert.False(profile.AxisA!.DualZeroPermitted);
+
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort(), profile);
+        harness.OpenSession();
+
+        harness.HomeToTerminal(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.Homed, harness.Axis(ManualMotionAxis.A).HomeState);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(ManualMotionDualZeroState.DispatchedUnverified, axis.DualZeroState);
+
+        // The exact native sequence: the pair is present, adjacent and in the Legacy order, with no
+        // command between the position definition and the dual-zero definition.
+        Assert.Equal(
+            new[]
+            {
+                ManualMotionPortCommandKind.BrakeOutputSet,
+                ManualMotionPortCommandKind.HomeSpeed,
+                ManualMotionPortCommandKind.Home,
+                ManualMotionPortCommandKind.Begin,
+                ManualMotionPortCommandKind.Stop,
+                ManualMotionPortCommandKind.DefinePositionZero,
+                ManualMotionPortCommandKind.DefineDualZero,
+                ManualMotionPortCommandKind.BrakeOutputClear,
+            },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+        Assert.Equal(0, harness.Port.Executed[5].Operand);
+        Assert.Equal(0, harness.Port.Executed[6].Operand);
+
+        // The permission still governs the STANDALONE dual-zero action on exactly this profile: the
+        // Home-carried composition is the only thing that stopped reading it. The wait is
+        // request-specific: the refusal code cannot be present before the request is applied, because
+        // the Home outcome was published there instead.
+        harness.Session.RequestDefineDualZero(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot =>
+            snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.DualZeroNotPermittedByProfile);
+        Assert.Equal(ManualMotionCodes.DualZeroNotPermittedByProfile, harness.Axis(ManualMotionAxis.A).LastOutcomeCode);
+        Assert.Single(harness.Port.Executed, command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    /// <summary>
+    /// The built-in simulation profile with the standalone dual-zero permission switched off, which
+    /// is the condition the Owner's Hardware profile declares.
+    /// </summary>
+    private static ManualMotionProfile ProfileWithoutDualZeroPermission()
+    {
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        var source = simulation.AxisA ?? throw new InvalidOperationException("Axis A is required.");
+        return new ManualMotionProfile
+        {
+            Source = simulation.Source,
+            ControllerId = simulation.ControllerId,
+            ObservationIntervalMilliseconds = simulation.ObservationIntervalMilliseconds,
+            ObservationFreshnessMilliseconds = simulation.ObservationFreshnessMilliseconds,
+            JogHeartbeatTimeoutMilliseconds = simulation.JogHeartbeatTimeoutMilliseconds,
+            JogMaximumHoldMilliseconds = simulation.JogMaximumHoldMilliseconds,
+            AxisA = new ManualMotionAxisProfile
+            {
+                BrakeOutput = source.BrakeOutput,
+                BrakeReleaseAction = source.BrakeReleaseAction,
+                BrakeSettleMilliseconds = source.BrakeSettleMilliseconds,
+                JogSpeed = source.JogSpeed,
+                HomeSpeed = source.HomeSpeed,
+                HomeTimeoutMilliseconds = source.HomeTimeoutMilliseconds,
+                MoveAcceleration = source.MoveAcceleration,
+                MoveSpeed = source.MoveSpeed,
+                MoveDeceleration = source.MoveDeceleration,
+                MoveMinimumTarget = source.MoveMinimumTarget,
+                MoveMaximumTarget = source.MoveMaximumTarget,
+                PositionTolerance = source.PositionTolerance,
+            EncoderPulsesPerRevolution = source.EncoderPulsesPerRevolution,
+            DrivePulsesPerRevolution = source.DrivePulsesPerRevolution,
+            MechanicalGearRatio = source.MechanicalGearRatio,
+            PitchMillimetresPerRevolution = source.PitchMillimetresPerRevolution,
+            PositionToleranceMillimetres = source.PositionToleranceMillimetres,
+                MotionTimeoutMilliseconds = source.MotionTimeoutMilliseconds,
+                StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
+                MotionStatusBit = source.MotionStatusBit,
+                MotionActiveValue = source.MotionActiveValue,
+                HomeStatusBit = source.HomeStatusBit,
+                HomeActiveValue = source.HomeActiveValue,
+                DualZeroPermitted = false,
+            },
+        };
+    }
+
+    [Fact]
+    public void Standalone_Define_Position_Zero_Still_Emits_No_Dual_Zero()
+    {
+        // The Owner-approved composition belongs to Home only: the standalone manual define keeps
+        // its previous single-command semantics even when the profile permits a dual-zero define.
+        var harness = new ZeroSequenceHarness(new ZeroSequencePort());
+        harness.OpenSession();
+
+        harness.Session.RequestDefinePositionZero(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].CoordinateState == ManualMotionCoordinateState.ZeroVerified);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.PositionZeroVerified, axis.LastOutcomeCode);
+        Assert.Equal(
+            new[] { ManualMotionPortCommandKind.DefinePositionZero },
+            harness.Port.Executed.Select(command => command.Kind).ToArray());
+        Assert.Equal(ManualMotionDualZeroState.NotDispatched, axis.DualZeroState);
     }
 }

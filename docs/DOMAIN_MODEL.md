@@ -132,10 +132,13 @@ sequence is exactly, in this order and with no holes, replacement identities or 
   installed wall, and *not* a "nearest or same-wall Water Jet". Assignment follows responsibility
   for the **target** wall and region, so a Rear-lower Sensor (I7 included) is assigned WJ5 even
   though WJ5 is installed on the Front-lower wall. Canonical default assignment by physical
-  Sensor wall / tier: Right/Upper → WJ1/IV1 (8 Sensors), Front/Upper → WJ2/IV2 (10),
-  Left/Upper → WJ3/IV3 (8), Rear/Upper → WJ4/IV4 (10), Rear/Lower → WJ5/IV5 (20),
-  Front/Lower → WJ6/IV6 (20), Right/Lower → WJ7/IV7 (16), Left/Lower → WJ8/IV8 (16) —
-  108 in total, I7 → WJ5/IV5 and I16 → WJ6/IV6 included.
+  Sensor wall / tier: Right/Upper → WJ1/IV1 (12 Sensors), Front/Upper → WJ2/IV2 (15),
+  Left/Upper → WJ3/IV3 (12), Rear/Upper → WJ4/IV4 (15), Rear/Lower → WJ5/IV5 (15),
+  Front/Lower → WJ6/IV6 (15), Right/Lower → WJ7/IV7 (12), Left/Lower → WJ8/IV8 (12) —
+  108 in total, I7 → WJ5/IV5 and I16 → WJ6/IV6 included. The tier boundary is
+  Owner-authoritative (2026-10-29): logical rows 1–3 (G+2xx, G+1xx and G) are UPPER, rows 4–6
+  (H, I and J) are LOWER; `WaterJetTopologyCatalog.RegionForLogicalRow` is the single shared
+  derivation.
 - Wall rows are the logical rows; there is no rotation or reversal. The question of row
   alignment across walls of unequal height is resolved by this matrix.
 - The labels are a logical reference. They do **not** define Modbus addresses, register maps,

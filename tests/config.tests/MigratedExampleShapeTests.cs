@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Wjss.Config.Examples.Tests; // ConfigTestPaths — shared repository-root discovery
 using Wjss.Contracts;
+using Wjss.Domain;
 using Xunit;
 
 namespace Wjss.Config.Tests;
@@ -119,7 +120,10 @@ public sealed class MigratedExampleShapeTests
         foreach (var sensor in JsonNodeExtensions.RequireArray(node, "sensors"))
         {
             var logicalRow = JsonNodeExtensions.RequireInt(sensor, "logicalRow");
-            var region = logicalRow <= 2 ? "UPPER" : "LOWER";
+            // The tier is NEVER re-derived here: the committed example is checked against the one
+            // shared Product derivation (Owner-authoritative boundary of 2026-10-29, rows 1-3 UPPER
+            // and rows 4-6 LOWER), so a duplicated table in a test can never drift from it again.
+            var region = WaterJetTopologyCatalog.RegionForLogicalRow(logicalRow).ToString();
             var wall = JsonNodeExtensions.RequireString(sensor, "wall");
             // Canonical Target Coverage (Owner-approved canonical Equipment topology
             // adoption, 2026-10-25): WJ1-WJ4 clean the

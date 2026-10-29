@@ -84,9 +84,13 @@ test('all eight fine-grained placements are UNRESOLVED with no anchors; canonica
   assert.ok(validateEnvelope(resolved).issues.some((i) => i.includes('placementKind must be UNRESOLVED in the current canonical topology')));
 });
 
-test('canonical default assignments: 8/10/8/10/20/20/16/16 per WJ, I7 to WJ5/IV5 and I16 to WJ6/IV6', () => {
+test('canonical default assignments: 12/15/12/15/15/15/12/12 per WJ, I7 to WJ5/IV5 and I16 to WJ6/IV6', () => {
   const snapshot = fixture('snapshot.seed0.json');
-  const expected = { WJ1: 8, WJ2: 10, WJ3: 8, WJ4: 10, WJ5: 20, WJ6: 20, WJ7: 16, WJ8: 16 };
+  // Owner-authoritative tier boundary (2026-10-29): logical rows 1-3 (G+2xx, G+1xx and G) are
+  // UPPER, rows 4-6 (H, I and J) are LOWER, so the UPPER tier carries 54 Sensors and the LOWER
+  // tier 54. Per Water Jet: RIGHT/FRONT/LEFT/REAR Upper = 12/15/12/15, REAR/FRONT/RIGHT/LEFT
+  // Lower = 15/15/12/12.
+  const expected = { WJ1: 12, WJ2: 15, WJ3: 12, WJ4: 15, WJ5: 15, WJ6: 15, WJ7: 12, WJ8: 12 };
   for (const [id, count] of Object.entries(expected)) {
     const own = snapshot.sensors.filter((s) => s.assignedWaterJetId === id);
     assert.equal(own.length, count, id);
@@ -98,6 +102,15 @@ test('canonical default assignments: 8/10/8/10/20/20/16/16 per WJ, I7 to WJ5/IV5
   const i16 = snapshot.sensors.find((s) => s.sensorId === 'I16');
   assert.equal(i16.assignedWaterJetId, 'WJ6');
   assert.equal(i16.assignedIsolationValveId, 'IV6');
+  // The corrected boundary, pinned by logical row: G1-G18 are UPPER Sensors cleaned by WJ1-WJ4,
+  // H/I/J Sensors stay LOWER and cleaned by WJ5-WJ8.
+  const assignedTo = (sensorId) => snapshot.sensors.find((s) => s.sensorId === sensorId).assignedWaterJetId;
+  assert.deepEqual(
+    ['G1', 'G5', 'G10', 'G14', 'G18'].map(assignedTo),
+    ['WJ3', 'WJ4', 'WJ1', 'WJ2', 'WJ2']);
+  assert.deepEqual(
+    ['H1', 'H5', 'H10', 'H14', 'I1', 'I7', 'I10', 'I16', 'J1', 'J5', 'J10', 'J14'].map(assignedTo),
+    ['WJ8', 'WJ5', 'WJ7', 'WJ6', 'WJ8', 'WJ5', 'WJ7', 'WJ6', 'WJ8', 'WJ5', 'WJ7', 'WJ6']);
   // The delta carries the same canonical assignment for its two LEFT/UPPER Sensors.
   const delta = fixture('delta.basic.json');
   assert.ok(delta.sensors.every((s) => s.assignedWaterJetId === 'WJ3' && s.assignedIsolationValveId === 'IV3'));

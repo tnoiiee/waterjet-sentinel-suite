@@ -159,6 +159,30 @@ public sealed class RuntimeApiTopologyTests
                     waterJet.TargetRegion);
             }
 
+            // Owner-authoritative tier boundary (2026-10-29): G1-G18 are logical row 3 and
+            // therefore UPPER, so the published projection must show them cleaned by WJ1-WJ4.
+            foreach (var (sensorId, waterJetId) in new[]
+                     {
+                         ("G1", "WJ3"), ("G5", "WJ4"), ("G10", "WJ1"), ("G14", "WJ2"),
+                     })
+            {
+                var view = ViewOf(runtime.State.Sensors.Single(sensor => sensor.SensorId == sensorId));
+                Assert.Equal(waterJetId, view.AssignedWaterJetId);
+                Assert.Equal($"IV{waterJetId[2..]}", view.AssignedIsolationValveId);
+            }
+
+            Assert.All(
+                runtime.State.Sensors.Where(sensor => sensor.SensorId.StartsWith('G')),
+                sensor => Assert.Equal(
+                    Region.UPPER,
+                    WaterJetTopologyCatalog.FindWaterJet(sensor.AssignedWaterJetId)!.TargetRegion));
+            Assert.All(
+                runtime.State.Sensors.Where(sensor =>
+                    sensor.SensorId.StartsWith('H') || sensor.SensorId.StartsWith('I') || sensor.SensorId.StartsWith('J')),
+                sensor => Assert.Equal(
+                    Region.LOWER,
+                    WaterJetTopologyCatalog.FindWaterJet(sensor.AssignedWaterJetId)!.TargetRegion));
+
             // The binding legacy example (canonical topology): rear-lower Sensors are
             // cleaned by WJ5/IV5, which installs on the front-lower wall (assignment is
             // responsibility, never location).

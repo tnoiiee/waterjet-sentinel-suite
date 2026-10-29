@@ -102,3 +102,156 @@ public interface IManualMotionPort
     /// <summary>Invalidates, closes and releases. Idempotent.</summary>
     ManualMotionPortCloseResult Close();
 }
+
+/// <summary>
+/// The per-axis pulse-domain and mechanical configuration of ONE axis, and the single conversion the
+/// Product applies before any comparison.
+///
+/// NOTHING here is a Product constant. Every value comes from the axis profile of the Owner-local
+/// Motion Configuration, because they are flexible per-axis engineering settings: two axes of the same
+/// cabinet may legitimately differ. A missing or nonsensical value makes the axis's conversion
+/// unavailable, and an axis whose conversion is unavailable refuses every motion operation that would
+/// require a comparison rather than assuming a value.
+///
+/// The dimensional model, in the exact terms the commissioned Legacy Source used:
+///
+///   millimetresPerMotorRevolution = mechanicalGearRatio x pitchMillimetresPerRevolution
+///   paCommandUnitsPerMillimetre   = drivePulsesPerRevolution / millimetresPerMotorRevolution
+///   rpFeedbackUnitsPerMillimetre  = drivePulsesPerRevolution / millimetresPerMotorRevolution
+///   tpFeedbackUnitsPerMillimetre  = encoderPulsesPerRevolution / millimetresPerMotorRevolution
+///   tpNormalizationRatio          = drivePulsesPerRevolution / encoderPulsesPerRevolution
+///
+/// The Legacy formulas are these quantities, restated:
+///   command = mm / (ratio / pulsesRev) / pitch   is  mm x paCommandUnitsPerMillimetre
+///   rpMm    = counts x (ratio / pulsesRev) x pitch is  counts / rpFeedbackUnitsPerMillimetre
+///   tpMm    = counts x (ratio / pulsesRev) x pitch / 2 is counts / tpFeedbackUnitsPerMillimetre
+///
+/// The theoretical (encoder) readback carries a different count density from the reference (drive)
+/// readback, so it is normalized into the reference domain before it is ever compared. Raw
+/// observations are never overwritten or mutated: a caller passes a raw value and receives a derived
+/// one, so both domains stay independently available.
+/// </summary>
+public readonly record struct ManualMotionPulseDomain
+{
+    private ManualMotionPulseDomain(
+        int encoderPulsesPerRevolution,
+        int drivePulsesPerRevolution,
+        decimal mechanicalGearRatio,
+        decimal pitchMillimetresPerRevolution)
+    {
+        EncoderPulsesPerRevolution = encoderPulsesPerRevolution;
+        DrivePulsesPerRevolution = drivePulsesPerRevolution;
+        MechanicalGearRatio = mechanicalGearRatio;
+        PitchMillimetresPerRevolution = pitchMillimetresPerRevolution;
+    }
+
+    /// <summary>The encoder counts produced by one motor revolution, from the axis profile.</summary>
+    public int EncoderPulsesPerRevolution { get; }
+
+    /// <summary>The drive pulses consumed by one motor revolution, from the axis profile.</summary>
+    public int DrivePulsesPerRevolution { get; }
+
+    /// <summary>
+    /// The mechanical reduction expressed as OUTPUT revolutions per MOTOR revolution, from the axis
+    /// profile. 0.1 is a 1:10 reduction: ten motor revolutions per one output revolution.
+    /// </summary>
+    public decimal MechanicalGearRatio { get; }
+
+    /// <summary>The travel, in millimetres, produced by one OUTPUT revolution, from the axis profile.</summary>
+    public decimal PitchMillimetresPerRevolution { get; }
+
+    /// <summary>Travel in millimetres produced by one motor revolution.</summary>
+    public decimal MillimetresPerMotorRevolution => MechanicalGearRatio * PitchMillimetresPerRevolution;
+
+    /// <summary>The derived read-only ratio that normalizes a theoretical reading into the drive domain.</summary>
+    public decimal TpNormalizationRatio => (decimal)DrivePulsesPerRevolution / EncoderPulsesPerRevolution;
+
+    /// <summary>The derived command unit count a millimetre of travel corresponds to.</summary>
+    public decimal PaCommandUnitsPerMillimetre => DrivePulsesPerRevolution / MillimetresPerMotorRevolution;
+
+    /// <summary>The derived reference (drive) feedback count a millimetre of travel corresponds to.</summary>
+    public decimal RpFeedbackUnitsPerMillimetre => DrivePulsesPerRevolution / MillimetresPerMotorRevolution;
+
+    /// <summary>The derived theoretical (encoder) feedback count a millimetre of travel corresponds to.</summary>
+    public decimal TpFeedbackUnitsPerMillimetre => EncoderPulsesPerRevolution / MillimetresPerMotorRevolution;
+
+    /// <summary>
+    /// True when the command unit and the reference feedback unit are the same count density. When they
+    /// are, the commanded target needs no further conversion to be compared against the reference
+    /// readback. When they are not, the two densities differ and the difference is reported rather than
+    /// silently absorbed by a multiplier.
+    /// </summary>
+    public bool CommandAndReferenceShareCountDensity => PaCommandUnitsPerMillimetre == RpFeedbackUnitsPerMillimetre;
+
+    /// <summary>
+    /// The factor that converts a commanded count into a reference-feedback count. It is 1 whenever the
+    /// two densities agree, and it is derived from the profile, never guessed and never literal.
+    /// </summary>
+    public decimal ReferenceCountsPerCommandCount =>
+        PaCommandUnitsPerMillimetre == 0m ? 0m : RpFeedbackUnitsPerMillimetre / PaCommandUnitsPerMillimetre;
+
+    /// <summary>
+    /// Normalizes one raw theoretical (encoder-domain) reading into the reference (drive) domain that
+    /// the comparison target and the comparison tolerance are expressed in.
+    /// </summary>
+    public decimal NormalizeTheoretical(decimal rawTheoretical) =>
+        rawTheoretical * DrivePulsesPerRevolution / EncoderPulsesPerRevolution;
+
+    /// <summary>
+    /// Normalizes one raw reference (drive-domain) reading. The identity is written out explicitly so
+    /// that "the reference reading is already in the reference domain" is a stated fact of the code
+    /// rather than an omission a later reader has to assume.
+    /// </summary>
+    public static decimal NormalizeReference(decimal rawReference) => rawReference;
+
+    /// <summary>True when the target of a command count converts into the reference domain exactly.</summary>
+    public bool TryConvertCommandTargetToReference(int commandTarget, out decimal referenceTarget)
+    {
+        referenceTarget = commandTarget * ReferenceCountsPerCommandCount;
+        return CommandAndReferenceShareCountDensity;
+    }
+
+    /// <summary>
+    /// Builds the domain of one axis from its profile values. Any missing, zero, negative or
+    /// nonsensical combination refuses the whole conversion: the caller then refuses the motion
+    /// operation that would have needed it.
+    /// </summary>
+    public static bool TryCreate(
+        int? encoderPulsesPerRevolution,
+        int? drivePulsesPerRevolution,
+        decimal? mechanicalGearRatio,
+        decimal? pitchMillimetresPerRevolution,
+        out ManualMotionPulseDomain domain)
+    {
+        domain = default;
+
+        if (encoderPulsesPerRevolution is not > 0
+            || drivePulsesPerRevolution is not > 0
+            || mechanicalGearRatio is not > 0m
+            || pitchMillimetresPerRevolution is not > 0m)
+        {
+            return false;
+        }
+
+        var millimetresPerMotorRevolution = mechanicalGearRatio.Value * pitchMillimetresPerRevolution.Value;
+        if (millimetresPerMotorRevolution <= 0m)
+        {
+            return false;
+        }
+
+        domain = new ManualMotionPulseDomain(
+            encoderPulsesPerRevolution.Value,
+            drivePulsesPerRevolution.Value,
+            mechanicalGearRatio.Value,
+            pitchMillimetresPerRevolution.Value);
+        return true;
+    }
+
+    /// <summary>
+    /// True when the two normalized values agree with EACH OTHER within the tolerance. This is a
+    /// separate question from whether either agrees with the commanded target, and the two are reported
+    /// as separate outcomes.
+    /// </summary>
+    public static bool DomainsAgree(decimal normalizedTheoretical, decimal normalizedReference, decimal tolerance) =>
+        Math.Abs(normalizedTheoretical - normalizedReference) <= tolerance;
+}

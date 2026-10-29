@@ -368,6 +368,11 @@ internal sealed class H1DryCommissioningForm : Form
             return "NO AXIS RESOLVED";
         }
 
+        // The four position entries are deliberately distinct: the two RAW controller observations are
+        // reported exactly as read, and the two NORMALIZED values in the comparison (drive) domain are
+        // reported beside them. A reader never has to guess which value a Move was verified against.
+        var comparison = ComparisonText(axisLetter);
+
         return string.Join(
             " | ",
             snapshot.RoleLabel,
@@ -376,11 +381,44 @@ internal sealed class H1DryCommissioningForm : Form
             "coverage " + snapshot.TargetCoverage,
             "life " + snapshot.HomeState + "/" + snapshot.CoordinateState + "/" + snapshot.StopState,
             "status " + Freshness(snapshot.StatusWord),
-            "TP " + Reading(snapshot.PositionTp),
-            "RP " + Reading(snapshot.PositionRp),
+            "TPraw " + Reading(snapshot.PositionTp),
+            "RPraw " + Reading(snapshot.PositionRp),
+            "TPnorm " + Normalized(snapshot.PositionTpNormalized, snapshot.PositionTp),
+            "RPnorm " + Normalized(snapshot.PositionRpNormalized, snapshot.PositionRp),
+            comparison,
             "brake " + snapshot.BrakeCommandState + " out " + Freshness(snapshot.BrakeOutput),
             "last " + snapshot.LastOutcomeCode);
     }
+
+    /// <summary>
+    /// The comparison the session is actually performing on this axis: the target and the tolerance, both
+    /// in the reference (drive) domain, taken from the active Move operation. When no Move is active the
+    /// entry states that explicitly rather than showing a stale target.
+    /// </summary>
+    private string ComparisonText(string axisLetter)
+    {
+        var axis = AxisSnapshotFor(axisLetter)?.Axis;
+        if (axis is ManualMotionAxis resolvedAxis)
+        {
+            foreach (var operation in _session.Snapshot.ActiveOperations)
+            {
+                if (operation.Kind == ManualMotionOperationKind.Move && operation.Axis == resolvedAxis)
+                {
+                    return "target " + Format(operation.ComparisonTarget) + " tol " + Format(operation.ComparisonTolerance) + " (drive domain)";
+                }
+            }
+        }
+
+        return "target - tol - (no active Move)";
+    }
+
+    private static string Normalized(decimal? normalized, ManualMotionReadingSnapshot raw) =>
+        normalized is decimal value
+            ? value.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + " " + Freshness(raw)
+            : "- " + Freshness(raw);
+
+    private static string Format(decimal? value) =>
+        value?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "-";
 
     private static string Reading(ManualMotionReadingSnapshot reading) =>
         (reading.Value?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? "-")

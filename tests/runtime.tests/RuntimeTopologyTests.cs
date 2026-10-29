@@ -122,6 +122,53 @@ public sealed class RuntimeTopologyTests
     }
 
     [Fact]
+    public void Synthetic_Sensor_Map_Assigns_G_Row_Sensors_To_The_Upper_Tier_Water_Jets()
+    {
+        // SyntheticSensorMap derives each Sensor's Water Jet from
+        // WaterJetTopologyCatalog.RegionForLogicalRow, so the Owner-authoritative boundary
+        // (2026-10-29: rows 1-3 UPPER, rows 4-6 LOWER) decides which tier cleans G1-G18.
+        var state = RuntimeTestFixture.ComposeInitial(SyntheticSeed.DefaultSeed);
+
+        var expected = new (string SensorId, Wall Wall, string WaterJetId, string ValveId)[]
+        {
+            ("G1", Wall.LEFT, "WJ3", "IV3"),
+            ("G5", Wall.REAR, "WJ4", "IV4"),
+            ("G10", Wall.RIGHT, "WJ1", "IV1"),
+            ("G14", Wall.FRONT, "WJ2", "IV2"),
+        };
+
+        foreach (var (sensorId, wall, waterJetId, valveId) in expected)
+        {
+            var sensor = state.Sensors.Single(candidate => candidate.SensorId == sensorId);
+            Assert.Equal(3, sensor.LogicalRow);
+            Assert.Equal(wall, sensor.Wall);
+            Assert.Equal(waterJetId, sensor.AssignedWaterJetId);
+            Assert.Equal(valveId, sensor.AssignedIsolationValveId);
+        }
+
+        // Every G-row Sensor is cleaned by an UPPER-tier Water Jet and every H/I/J Sensor by a
+        // LOWER-tier one; G+2xx and G+1xx stay UPPER.
+        Assert.All(
+            state.Sensors.Where(sensor => sensor.SensorId.StartsWith('G')),
+            sensor => Assert.Equal(
+                Region.UPPER,
+                WaterJetTopologyCatalog.FindWaterJet(sensor.AssignedWaterJetId)!.TargetRegion));
+        Assert.All(
+            state.Sensors.Where(sensor => sensor.SensorId.StartsWith('H') || sensor.SensorId.StartsWith('I') || sensor.SensorId.StartsWith('J')),
+            sensor => Assert.Equal(
+                Region.LOWER,
+                WaterJetTopologyCatalog.FindWaterJet(sensor.AssignedWaterJetId)!.TargetRegion));
+
+        // The corrected boundary, not a per-row table: the tier of every Sensor is exactly the
+        // shared derivation of its own logical row.
+        Assert.All(
+            state.Sensors,
+            sensor => Assert.Equal(
+                WaterJetTopologyCatalog.RegionForLogicalRow(sensor.LogicalRow),
+                WaterJetTopologyCatalog.FindWaterJet(sensor.AssignedWaterJetId)!.TargetRegion));
+    }
+
+    [Fact]
     public void Rear_Lower_Sensors_Are_Assigned_WJ5_Even_Though_WJ5_Installs_On_The_Front_Lower_Wall()
     {
         // The binding legacy-assignment example (canonical topology): a rear-lower

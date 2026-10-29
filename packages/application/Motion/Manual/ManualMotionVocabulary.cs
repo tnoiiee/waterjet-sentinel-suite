@@ -236,6 +236,14 @@ public enum ManualMotionOperationPhase
 
     /// <summary>A single typed command is due (brake-only and dual-zero operations).</summary>
     Dispatching = 11,
+
+    /// <summary>
+    /// The define-dual-zero command of the Owner-approved Home-carried reset-encoder composition is
+    /// due. Only a Home operation reaches this phase: it runs immediately after the accepted
+    /// define-position-zero command, so no unrelated native command can occur between the two. The
+    /// standalone define-position-zero operation never reaches this phase and is unchanged.
+    /// </summary>
+    DefiningDualZero = 12,
 }
 
 /// <summary>
@@ -583,11 +591,45 @@ public static class ManualMotionCodes
     /// <summary>Define-dual-zero was refused.</summary>
     public const string DualZeroRefused = "DUAL_ZERO_REFUSED";
 
+    /// <summary>
+    /// The Home-carried reset-encoder sequence was refused at its dual-zero definition. The Home
+    /// fails closed: no position read is accepted as a zero proof and the axis is not Homed.
+    /// </summary>
+    public const string HomeDualZeroRefused = "HOME_DUAL_ZERO_REFUSED";
+
     /// <summary>Move completed: not moving and both position reads within the tolerance of the target.</summary>
     public const string MoveCompletedPositionVerified = "MOVE_COMPLETED_POSITION_VERIFIED";
 
     /// <summary>Move ended because the configured motion timeout elapsed.</summary>
     public const string MoveTimeout = "MOVE_TIMEOUT";
+
+    /// <summary>
+    /// The axis's pulse-domain conversion is not available from its profile (a missing or nonsensical
+    /// encoder / drive pulses-per-revolution, mechanical ratio or pitch), so the Move was refused before
+    /// anything was dispatched. A conversion is never assumed and never defaulted.
+    /// </summary>
+    public const string MovePulseDomainNotConfigured = "MOVE_PULSE_DOMAIN_NOT_CONFIGURED";
+
+    /// <summary>
+    /// Move ended with the two normalized readings agreeing with EACH OTHER but neither within tolerance
+    /// of the comparison target. This is the outcome the P1 Hardware evidence produces: the readbacks are
+    /// consistent in one domain, and the target is not in that domain. No point completes on it.
+    /// </summary>
+    public const string MoveTargetNotReachedReadbacksAgree = "MOVE_TARGET_NOT_REACHED_READBACKS_AGREE";
+
+    /// <summary>An Engineering Motion Configuration change was refused because an operation is in flight.</summary>
+    public const string EngineeringSettingsLockedWhileActive = "ENGINEERING_SETTINGS_LOCKED_WHILE_ACTIVE";
+
+    /// <summary>The Engineering Motion Configuration of the session was captured; the snapshot is now this one.</summary>
+    public const string EngineeringSettingsCaptured = "ENGINEERING_SETTINGS_CAPTURED";
+
+    /// <summary>
+    /// Move ended with the two position readings still disagreeing with EACH OTHER beyond the tolerance
+    /// after both were normalized into the same reference (drive) domain. Reported separately from
+    /// <see cref="MoveTimeout"/> and <see cref="MoveCompletedPositionVerified"/> so the Operator can tell a
+    /// pulse-domain contradiction from a Move that simply did not arrive.
+    /// </summary>
+    public const string MoveRefusedTpRpDomainDisagreement = "MOVE_REFUSED_TP_RP_DOMAIN_DISAGREEMENT";
 
     /// <summary>Move ended because the Operator pressed Stop.</summary>
     public const string MoveAbortedByOperator = "MOVE_ABORTED_BY_OPERATOR";
@@ -622,8 +664,44 @@ public static class ManualMotionCodes
         HomeCompletedZeroVerified => "Home completed and zero was verified by position reads under the Owner-attested profile interpretation. Not hardware evidence.",
         HomeCompletedZeroNotVerified => "Home completed but zero could not be verified.",
         DualZeroDispatchedEffectUnverified => "The dual-zero definition was dispatched. Its effect is UNVERIFIED.",
+        HomeDualZeroRefused => "The Home-carried reset-encoder sequence was refused at its dual-zero definition. The Home failed closed and no zero was verified.",
         MoveCompletedPositionVerified => "Move completed: not moving and both position reads within the configured tolerance of the target.",
+        MoveRefusedTpRpDomainDisagreement => "Move ended with the normalized theoretical and reference positions still disagreeing beyond the tolerance. No point completed.",
+        MovePulseDomainNotConfigured => "The axis pulse-domain conversion is not configured. The Move was refused; nothing was dispatched and no value was assumed.",
+        MoveTargetNotReachedReadbacksAgree => "The two normalized positions agree with each other but neither is within tolerance of the comparison target. The target domain is not reconciled. No point completed.",
+        EngineeringSettingsLockedWhileActive => "An operation is in flight. The Engineering Motion Configuration cannot change during Home, Move, H1 Commission, Run Path, P1 to P6, the Centre return, Abort cleanup or Close cleanup.",
+        EngineeringSettingsCaptured => "The Engineering Motion Configuration was captured. Every later operation is planned against this immutable snapshot.",
         CoordinateRedefinedHomeCleared => "A manual coordinate definition cleared the session Home state of the axis.",
         _ => "See the code. No command text, reply text or native detail is recorded.",
     };
+}
+
+/// <summary>
+/// The result of one attempt to change the Engineering Motion Configuration. A refusal carries the
+/// canonical code and changes nothing; an acceptance carries the new capture generation.
+/// </summary>
+public sealed class ManualMotionEngineeringChangeResult
+{
+    private ManualMotionEngineeringChangeResult(bool accepted, string code, long generation)
+    {
+        Accepted = accepted;
+        Code = code;
+        Generation = generation;
+    }
+
+    /// <summary>True when the settings were captured and are now the session snapshot.</summary>
+    public bool Accepted { get; }
+
+    /// <summary>The canonical code of the result.</summary>
+    public string Code { get; }
+
+    /// <summary>The capture generation after the change; zero when refused.</summary>
+    public long Generation { get; }
+
+    /// <summary>An accepted change at one capture generation.</summary>
+    public static ManualMotionEngineeringChangeResult Captured(long generation) =>
+        new(true, ManualMotionCodes.EngineeringSettingsCaptured, generation);
+
+    /// <summary>A refused change with its canonical code.</summary>
+    public static ManualMotionEngineeringChangeResult Refused(string code) => new(false, code, 0);
 }

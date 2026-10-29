@@ -116,7 +116,7 @@ public sealed class CleaningPathCompositionPathTests
         harness.DriveUntilTerminal();
 
         Assert.Equal(CleaningPathCompositionStatus.FailedAwaitingSafeReturn, harness.Composition.Result!.Status);
-        Assert.Equal("MOVE_TIMEOUT", harness.Composition.Result.Handoff.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, harness.Composition.Result.Handoff.PrimaryFailureCode);
         Assert.Equal(CleaningPathExecutionStatus.PathFailed, harness.Composition.Result.PathResult!.Status);
     }
 
@@ -148,10 +148,12 @@ public sealed class CleaningPathCompositionPathTests
     {
         // Normal validated path profile on both P2 axes (equal 20000 ms Move timeouts). The
         // deterministic Horizontal-first request and begin order gives the stalled Horizontal
-        // operation the first MOVE_TIMEOUT while the Vertical operation remains active and
-        // requires exactly-once Stop; that Stop is supervised to inactive with brake apply. The
-        // test proves the separation of primary failure, motion cleanup and Valve cleanup, and
-        // does not depend on which role owns the MOVE_TIMEOUT.
+        // operation the first failed-Move classification while the Vertical operation remains
+        // active and requires exactly-once Stop; that Stop is supervised to inactive with brake
+        // apply. The stalled axis never advances, so its timeout is classified from fresh
+        // readbacks that agree with each other and stay short of the target. The test proves the
+        // separation of primary failure, motion cleanup and Valve cleanup, and does not depend on
+        // which role owns that first classification.
         var harness = new CleaningPathCompositionHarness();
         Assert.True(harness.OpenHomeStart(CleaningPathCompositionHarness.PumpSample(16)).Started);
         harness.Equipment.UpperLimitDetected = true;
@@ -160,8 +162,9 @@ public sealed class CleaningPathCompositionPathTests
 
         // Both P2 operations are already requested but not yet processed by the next boundary
         // step: stalling both resolved axes (C = Horizontal, D = Vertical) keeps the Horizontal
-        // operation active until its MOVE_TIMEOUT fires first; the Vertical operation is then
-        // stopped exactly once and supervised to inactive with brake apply.
+        // operation active until its Move timeout fires first and is classified as
+        // MOVE_TARGET_NOT_REACHED_READBACKS_AGREE; the Vertical operation is then stopped exactly
+        // once and supervised to inactive with brake apply.
         harness.Port.ConfigureAxisSimulationOptions(
             ManualMotionAxis.C,
             new ManualMotionAxisSimulationOptions { MotionStalled = true });
@@ -173,7 +176,7 @@ public sealed class CleaningPathCompositionPathTests
         harness.DriveUntilTerminal();
 
         var handoff = harness.Composition.Result!.Handoff;
-        Assert.Equal("MOVE_TIMEOUT", handoff.PrimaryFailureCode);
+        Assert.Equal(ManualMotionCodes.MoveTargetNotReachedReadbacksAgree, handoff.PrimaryFailureCode);
         Assert.Equal(CleaningPathCleanupState.Succeeded, handoff.MotionCleanupState);
         Assert.Equal(CleaningPathCleanupState.Succeeded, handoff.ValveCleanupState);
     }

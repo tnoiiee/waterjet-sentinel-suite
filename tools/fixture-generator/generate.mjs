@@ -100,6 +100,7 @@ const HISTORICAL_FROZEN_WATER_JET_TABLE = Object.freeze([
  */
 export const CORRECTED = Object.freeze({
   sensorLocations: 108,
+  regionForRow: regionForLogicalRow,
   nonSensorGapSlots: Object.freeze([]),
   deviceCounts: Object.freeze([14, 14, 14, 14, 13, 13, 13, 13]),
   emitsGapAnchorKey: false,
@@ -116,6 +117,7 @@ export const CORRECTED = Object.freeze({
  */
 export const LEGACY_SUPERSEDED = Object.freeze({
   sensorLocations: 106,
+  regionForRow: historicalRegionForLogicalRow,
   nonSensorGapSlots: Object.freeze([
     Object.freeze({ logicalId: 'I7', anchorWaterJetId: 'WJ3', row: 5, column: 7 }),
     Object.freeze({ logicalId: 'I16', anchorWaterJetId: 'WJ1', row: 5, column: 16 }),
@@ -170,7 +172,23 @@ export function sensorIdFor(row, column) {
   }
 }
 
+/**
+ * Vertical region of a logical row — the Node mirror of
+ * WaterJetTopologyCatalog.RegionForLogicalRow. Owner-authoritative tier boundary (2026-10-29):
+ * rows 1-3 (G+2xx, G+1xx and G) are UPPER; rows 4-6 (H, I and J) are LOWER.
+ */
 export function regionForLogicalRow(row) {
+  if (row >= 1 && row <= 3) return 'UPPER';
+  if (row >= 4 && row <= 6) return 'LOWER';
+  throw new RangeError('logical row must be 1-6');
+}
+
+/**
+ * HISTORICAL ONLY — the superseded pre-2026-10-29 boundary (rows 1-2 UPPER, rows 3-6 LOWER).
+ * Referenced ONLY by the LEGACY_SUPERSEDED proof profile, because the superseded files this port
+ * is proven against were generated under it. Current Product generation never calls it.
+ */
+function historicalRegionForLogicalRow(row) {
   if (row === 1 || row === 2) return 'UPPER';
   if (row >= 3 && row <= 6) return 'LOWER';
   throw new RangeError('logical row must be 1-6');
@@ -234,7 +252,7 @@ export function buildSensor(profile, scanOrder, inQueue, isJobTarget) {
   const score = scoreFor(scanOrder);
   const uncertain = scanOrder % 7 === 0;
   const { deviceId, index } = deviceFor(profile.deviceCounts, scanOrder);
-  const region = regionForLogicalRow(row);
+  const region = profile.regionForRow(row);
   const assignedList = waterJets(profile).filter((w) => w.targetWall === wall && w.targetRegion === region);
   if (assignedList.length !== 1) throw new Error(`no single Water Jet targets ${wall}/${region}`);
   const assigned = assignedList[0];
