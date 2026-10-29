@@ -17,7 +17,7 @@ namespace Wjss.Contracts;
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the gate).
 /// </summary>
 
-/// <summary>Vertical region of the boiler wall. Rows 1–2 (G+2xx, G+1xx) are UPPER; rows 3–6 (G, H, I, J) are LOWER.</summary>
+/// <summary>Vertical region of the boiler wall. Rows 1–3 (G+2xx, G+1xx and G) are UPPER; rows 4–6 (H, I and J) are LOWER. The derivation itself lives in <c>WaterJetTopologyCatalog.RegionForLogicalRow</c>.</summary>
 public enum Region { UPPER, LOWER }
 
 /// <summary>

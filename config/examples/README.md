@@ -38,7 +38,8 @@ measurements, 240 physical TC channels, 24 unassigned.
   `SENSOR`, no `gapAnchorForWaterJetId`), 108 Sensor configurations with dense
   scanOrder 1–108 (canonical assignments per the Owner-approved canonical Equipment
   topology adoption, 2026-10-25: I7 scan 79 → WJ5/IV5, I16 scan 88 → WJ6/IV6; per-Water-Jet counts
-  8/10/8/10/20/20/16/16), the same per-Sensor
+  12/15/12/15/15/15/12/12 under the Owner-authoritative tier boundary of 2026-10-29 — logical rows
+  1–3 (G+2xx, G+1xx and G) UPPER, rows 4–6 (H, I and J) LOWER), the same per-Sensor
   formulas the synthetic CSV (`tests/config.tests/SyntheticSensorParameterCsv.cs`)
   feeds the importer (dirty bounds 15+(s%10) … 65+(s%10), threshold 55+(s%20),
   enabled s%17≠0 → six Disabled Sensors at scan 17/34/51/68/85/102, cleaningCount s%4),

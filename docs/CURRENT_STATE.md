@@ -1,5 +1,27 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Logical-row tier boundary correction (2026-10-29; Owner-authoritative; software only; HARDWARE NOT
+> EXECUTED on the corrected head).** The Owner corrected the tier boundary of the six logical rows:
+> **rows 1–3 — G+201–G+218, G+101–G+118 and G1–G18 — are UPPER; rows 4–6 — H1–H18, I1–I18 and
+> J1–J18 — are LOWER.** The previous Product mapping, which classified logical row 3 (G1–G18) as
+> LOWER, is revoked. `WaterJetTopologyCatalog.RegionForLogicalRow` is the single shared derivation and
+> now returns UPPER for rows 1–3 and LOWER for rows 4–6, refusing anything outside 1–6; it is not
+> duplicated in Manual Motion, H1, the CSV profiles, the Cleaning Path stores or the UI. Canonical
+> default assignments therefore become **12 / 15 / 12 / 15 / 15 / 15 / 12 / 12** Sensors to WJ1…WJ8
+> (Right/Upper 12, Front/Upper 15, Left/Upper 12, Rear/Upper 15, Rear/Lower 15, Front/Lower 15,
+> Right/Lower 12, Left/Lower 12; 108 total), with G1–G18 cleaned by WJ1–WJ4 and H/I/J unchanged under
+> WJ5–WJ8; I7 → WJ5/IV5 and I16 → WJ6/IV6 are unchanged. Wall columns, the WJ1–WJ8 installed topology,
+> the IV1–IV8 pairing, WSB/Galil axes, P1–P6, Centre 125/125, Home DP→DE, Manual Motion, and every
+> Hardware/Production boundary are unchanged; no cannon value changed. Generated fixtures and the
+> committed example were regenerated only through their generators
+> (`snapshot.seed0.json`, `sensor-parameters.migrated.example.json`; `delta.basic.json` and
+> `sensor-map.example.json` unchanged), the TypeScript contract mirror follows the same boundary, and
+> the dated 2026-10-25 adoption record below is retained as history without being rewritten. This
+> correction removed the `TOPO_TARGET_WALL_CONTRADICTION` refusal seen at H1 Hardware startup, where
+> the importer compared G-row UPPER cannons against the stale LOWER derivation; no Hardware motion,
+> Brake output, Home, DP, DE or Run Path executed in that attempt. `.NET` NOT RUN in the Author
+> environment (no SDK) — the Owner-local exact-head gate is the validation of record.
+
 > **TP/RP pulse-domain normalization (2026-10-27; Owner-confirmed physical relationship; software only;
 > HARDWARE NOT EXECUTED; supersedes the block-1 banner below wherever that banner describes the defect as
 > unresolved or the counts-per-millimetre confirmation as outstanding).** The Owner confirmed the physical

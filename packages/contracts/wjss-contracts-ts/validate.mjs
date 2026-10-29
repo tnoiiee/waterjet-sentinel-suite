@@ -78,10 +78,14 @@ export function wallForColumn(col) {
   throw new Error(`bad column ${col}`);
 }
 
-/** Vertical region of a logical row: rows 1-2 (G+2xx, G+1xx) are UPPER; rows 3-6 (G, H, I, J) are LOWER. */
+/**
+ * Vertical region of a logical row — mirror of WaterJetTopologyCatalog.RegionForLogicalRow.
+ * Owner-authoritative tier boundary (2026-10-29): rows 1-3 (G+2xx, G+1xx and G) are UPPER;
+ * rows 4-6 (H, I and J) are LOWER.
+ */
 export function regionForLogicalRow(row) {
-  if (row === 1 || row === 2) return 'UPPER';
-  if (row >= 3 && row <= 6) return 'LOWER';
+  if (row >= 1 && row <= 3) return 'UPPER';
+  if (row >= 4 && row <= 6) return 'LOWER';
   throw new Error(`bad row ${row}`);
 }
 

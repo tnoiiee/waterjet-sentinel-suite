@@ -269,6 +269,36 @@ public sealed class CleaningPathResolverTests
     }
 
     [Fact]
+    public void Canonical_Assignment_Uses_The_Owner_Authoritative_Tier_Boundary()
+    {
+        // "G1" is logical row 3. Under the Owner-authoritative boundary (2026-10-29) rows 1-3 are
+        // UPPER, so the canonical UPPER-tier assignment WJ3/IV3 resolves, while the LOWER-tier
+        // WJ8/IV8 that the revoked rows-3-6-are-LOWER mapping would have accepted is refused.
+        // The resolver derives the tier only through WaterJetTopologyCatalog.RegionForLogicalRow.
+        var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
+        var configuration = SyntheticCleaningPathStores.SensorConfiguration("G1", "WJ3", "IV3");
+        Assert.Equal(3, configuration.LogicalRow);
+        Assert.Equal(Wall.LEFT, configuration.Wall);
+
+        var canonical = CleaningPathResolver.Resolve(
+            snapshot,
+            configuration,
+            new CleaningPathResolutionRequest { SensorId = "G1" });
+        Assert.True(canonical.Accepted);
+        Assert.Equal(CleaningPathCodes.ResolutionAccepted, canonical.Code);
+        Assert.Equal("WJ3", canonical.Resolution!.EffectiveWaterJetId);
+        Assert.Equal("WJ3", canonical.Resolution!.CanonicalAssignedWaterJetId);
+        Assert.Equal(EffectiveWaterJetProvenance.CANONICAL_ASSIGNMENT, canonical.Resolution!.EffectiveWjProvenance);
+
+        var lowerTier = CleaningPathResolver.Resolve(
+            snapshot,
+            SyntheticCleaningPathStores.SensorConfiguration("G1", "WJ8", "IV8"),
+            new CleaningPathResolutionRequest { SensorId = "G1" });
+        Assert.False(lowerTier.Accepted);
+        Assert.Equal(CleaningPathCodes.AssignmentTopologyIncompatible, lowerTier.Code);
+    }
+
+    [Fact]
     public void Centre_Contract_Is_Fixed_In_The_Resolution()
     {
         var snapshot = SyntheticCleaningPathStores.ValidSnapshot();
