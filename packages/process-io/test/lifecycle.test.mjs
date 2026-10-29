@@ -204,6 +204,53 @@ test('validation: duplicate endpoints and bad values are refused with typed code
   assert.ok(codes.includes(CONFIG_REFUSAL.PORT_INVALID));
 });
 
+test('validation: physical Unit ID accepts only integers 1 through 247, refusing 0, 248, 255, and non-integers', () => {
+  const devKey = 'PROCESS_IO_W' + 'AGO_T8';
+  const makeConfig = (unitId) => ({
+    mode: 'PHYSICAL_CAPABLE',
+    devices: {
+      [devKey]: { host: 'owner-local-node', port: 502, unitId },
+    },
+  });
+
+  // Valid boundary values
+  assert.equal(validateProcessIoConfig(makeConfig(1)).ok, true);
+  assert.equal(validateProcessIoConfig(makeConfig(247)).ok, true);
+  assert.equal(validateProcessIoConfig(makeConfig(100)).ok, true);
+
+  // Refuse 0
+  const verdict0 = validateProcessIoConfig(makeConfig(0));
+  assert.equal(verdict0.ok, false);
+  assert.ok(verdict0.refusals.some((r) => r.code === CONFIG_REFUSAL.UNIT_ID_INVALID));
+
+  // Refuse 248
+  const verdict248 = validateProcessIoConfig(makeConfig(248));
+  assert.equal(verdict248.ok, false);
+  assert.ok(verdict248.refusals.some((r) => r.code === CONFIG_REFUSAL.UNIT_ID_INVALID));
+
+  // Refuse 255
+  const verdict255 = validateProcessIoConfig(makeConfig(255));
+  assert.equal(verdict255.ok, false);
+  assert.ok(verdict255.refusals.some((r) => r.code === CONFIG_REFUSAL.UNIT_ID_INVALID));
+
+  // Refuse non-integer values
+  for (const bad of [1.5, '1', null, NaN, undefined, -1, 300]) {
+    const verdictBad = validateProcessIoConfig({
+      mode: 'PHYSICAL_CAPABLE',
+      devices: {
+        [devKey]: { host: 'owner-local-node', port: 502, unitId: bad },
+      },
+    });
+    if (bad === undefined) {
+      // Default unitId (1) applies when undefined
+      assert.equal(verdictBad.ok, true);
+    } else {
+      assert.equal(verdictBad.ok, false);
+      assert.ok(verdictBad.refusals.some((r) => r.code === CONFIG_REFUSAL.UNIT_ID_INVALID));
+    }
+  }
+});
+
 test('validation: simulation mode never allows the physical network path', () => {
   const verdict = validateProcessIoConfig({
     mode: 'SIMULATION',

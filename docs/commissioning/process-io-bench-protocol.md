@@ -10,11 +10,11 @@ and `ProcessIoBenchRunner`).
 ## 1. Safety Boundary & Non-Execution Invariant
 
 1. **Physical Hardware Status:** `PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED`.
-2. **Sandbox Invariant:** Network socket communication to physical fieldbus endpoints (e.g. `192.168.1.70`)
+2. **Sandbox Invariant:** Network socket communication to physical fieldbus endpoints (e.g. `<OWNER_LOCAL_WAGO_T8_ENDPOINT>`)
    is strictly prohibited during development and automated sandbox execution.
 3. **Execution Authority:** Physical trials are authorized exclusively on Owner-controlled hardware
    under explicit, interactive consent phrases.
-4. **Endpoint Governance:** Physical IP addresses (such as `192.168.1.70`) are strictly Owner-local and never committed
+4. **Endpoint Governance:** Physical IP addresses (such as `<OWNER_LOCAL_WAGO_T8_ENDPOINT>`) are strictly Owner-local and never committed
    to repository source code. Evidence transcripts redact physical IP octets.
 
 ---
@@ -112,7 +112,7 @@ node tools/process-io-bench/bench.mjs --mode=SIMULATION --read-profile=LEGACY_PR
 export WJSS_PROCESS_IO_CONSENT="I AUTHORIZE READ ONLY PROCESS IO BENCH TRIAL"
 node tools/process-io-bench/bench.mjs \
   --mode=PHYSICAL_DI_AI_READ \
-  --wago-t8-endpoint=<OWNER_LOCAL_IP> \
+  --wago-t8-endpoint=<OWNER_LOCAL_WAGO_T8_ENDPOINT> \
   --unit-id=1 \
   --read-profile=WORKBOOK_CANONICAL
 ```
@@ -122,7 +122,7 @@ node tools/process-io-bench/bench.mjs \
 export WJSS_PROCESS_IO_CONSENT="I AUTHORIZE READ ONLY PROCESS IO BENCH TRIAL"
 node tools/process-io-bench/bench.mjs \
   --mode=PHYSICAL_DI_AI_READ \
-  --wago-t8-endpoint=<OWNER_LOCAL_IP> \
+  --wago-t8-endpoint=<OWNER_LOCAL_WAGO_T8_ENDPOINT> \
   --unit-id=1 \
   --read-profile=LEGACY_PRODUCTION_COMPAT
 ```
@@ -132,7 +132,7 @@ node tools/process-io-bench/bench.mjs \
 export WJSS_PROCESS_IO_CONSENT="I AUTHORIZE SINGLE DO PROCESS IO BENCH TRIAL"
 node tools/process-io-bench/bench.mjs \
   --mode=PHYSICAL_DO_SINGLE \
-  --wago-t8-endpoint=<OWNER_LOCAL_IP> \
+  --wago-t8-endpoint=<OWNER_LOCAL_WAGO_T8_ENDPOINT> \
   --unit-id=1 \
   --allow-do-write=DO-001 \
   --hold-ms=500
@@ -143,7 +143,7 @@ node tools/process-io-bench/bench.mjs \
 export WJSS_PROCESS_IO_CONSENT="I AUTHORIZE SINGLE AO PROCESS IO BENCH TRIAL"
 node tools/process-io-bench/bench.mjs \
   --mode=PHYSICAL_AO_SINGLE \
-  --wago-t8-endpoint=<OWNER_LOCAL_IP> \
+  --wago-t8-endpoint=<OWNER_LOCAL_WAGO_T8_ENDPOINT> \
   --unit-id=1 \
   --allow-ao-write="AO-001+" \
   --ao-test-raw=6553 \
@@ -155,7 +155,7 @@ node tools/process-io-bench/bench.mjs \
 export WJSS_PROCESS_IO_CONSENT="I AUTHORIZE SINGLE AO PROCESS IO BENCH TRIAL"
 node tools/process-io-bench/bench.mjs \
   --mode=PHYSICAL_AO_SINGLE \
-  --wago-t8-endpoint=<OWNER_LOCAL_IP> \
+  --wago-t8-endpoint=<OWNER_LOCAL_WAGO_T8_ENDPOINT> \
   --unit-id=1 \
   --allow-ao-write="AO-001+" \
   --ao-test-raw=6553 \

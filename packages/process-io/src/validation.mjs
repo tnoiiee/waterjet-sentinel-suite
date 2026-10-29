@@ -64,10 +64,12 @@ export function validateProcessIoConfig(config) {
       }
       seenHosts.set(device.host, key);
     }
-    const port = device.port ?? TRANSPORT_SHAPE.port;
+    const port = device.port === undefined ? TRANSPORT_SHAPE.port : device.port;
     if (!Number.isInteger(port) || port < 1 || port > 65535) push(CONFIG_REFUSAL.PORT_INVALID, key);
-    const unitId = device.unitId ?? TRANSPORT_SHAPE.unitId;
-    if (!Number.isInteger(unitId) || unitId < 0 || unitId > 255) push(CONFIG_REFUSAL.UNIT_ID_INVALID, key);
+    const unitId = device.unitId === undefined ? TRANSPORT_SHAPE.unitId : device.unitId;
+    if (!Number.isInteger(unitId) || unitId < TRANSPORT_SHAPE.minUnitId || unitId > TRANSPORT_SHAPE.maxUnitId) {
+      push(CONFIG_REFUSAL.UNIT_ID_INVALID, key);
+    }
     for (const t of ['connectTimeoutMs', 'readTimeoutMs', 'writeTimeoutMs']) {
       const v = device[t] ?? TRANSPORT_SHAPE[t];
       if (!Number.isInteger(v) || v <= 0) push(CONFIG_REFUSAL.TIMEOUT_INVALID, `${key}.${t}`);
