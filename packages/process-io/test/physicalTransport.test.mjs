@@ -1,9 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PhysicalProcessIoTransport } from '../src/physicalTransport.mjs';
 import { runProcessIoBench, REQUIRED_CONSENT_PHRASE, CONSENT_PHRASES } from '../src/benchRunner.mjs';
 import { loadCatalogue } from '../src/catalogue.mjs';
+
+// Native filesystem path of the Node bench CLI, resolved once for the whole file.
+//
+// A file URL's .pathname is NOT a native path on Windows: it is shaped like
+// "/C:/Users/.../bench.mjs", and passing that to a child process makes Node resolve
+// "C:\C:\Users\...". fileURLToPath performs the platform-correct conversion (no manual
+// leading-slash removal, no platform-specific string replacement), and resolving it here
+// keeps every CLI invocation in this file on one path value.
+const CLI_PATH = fileURLToPath(
+  new URL('../../../tools/process-io-bench/bench.mjs', import.meta.url)
+);
 
 test('physicalTransport: refuses operation without configured endpoint', async () => {
   const transport = new PhysicalProcessIoTransport({});
@@ -285,15 +299,32 @@ test('benchRunner: canonical consent phrases match exact specification', () => {
   assert.equal(CONSENT_PHRASES.PHYSICAL_FULL_SELECTED_SEQUENCE, 'I AUTHORIZE FULL SELECTED PROCESS IO BENCH SEQUENCE');
 });
 
+test('CLI: bench path is a native absolute filesystem path to an existing file', () => {
+  assert.equal(typeof CLI_PATH, 'string');
+  assert.notEqual(CLI_PATH.length, 0);
+  assert.equal(isAbsolute(CLI_PATH), true, `CLI path must be absolute: ${CLI_PATH}`);
+  assert.equal(existsSync(CLI_PATH), true, `CLI path must exist: ${CLI_PATH}`);
+  assert.equal(CLI_PATH.endsWith('bench.mjs'), true, `CLI path must name the bench CLI: ${CLI_PATH}`);
+
+  // A file URL pathname ("/C:/Users/...") is never a valid child-process argument on Windows.
+  assert.equal(/^\/[A-Za-z]:[\\/]/.test(CLI_PATH), false, `CLI path looks like a URL pathname: ${CLI_PATH}`);
+  assert.equal(CLI_PATH.includes('C:\\C:\\'), false, `CLI path has a duplicated drive prefix: ${CLI_PATH}`);
+  assert.equal(/^[A-Za-z]:[\\/][A-Za-z]:[\\/]/.test(CLI_PATH), false, `CLI path has a duplicated drive prefix: ${CLI_PATH}`);
+
+  if (process.platform === 'win32') {
+    assert.equal(CLI_PATH.startsWith('/'), false, `Windows CLI path must not start with a slash: ${CLI_PATH}`);
+    assert.equal(/^[A-Za-z]:[\\/]/.test(CLI_PATH), true, `Windows CLI path must start with a drive: ${CLI_PATH}`);
+  }
+});
+
 test('CLI: runs SIMULATION mode with default and LEGACY_PRODUCTION_COMPAT profiles', () => {
-  const CLI_PATH = new URL('../../../tools/process-io-bench/bench.mjs', import.meta.url);
-  const out1 = JSON.parse(execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=SIMULATION'], { encoding: 'utf8' }));
+  const out1 = JSON.parse(execFileSync(process.execPath, [CLI_PATH, '--mode=SIMULATION'], { encoding: 'utf8' }));
   assert.equal(out1.accepted, true);
   assert.equal(out1.mode, 'SIMULATION');
   assert.equal(out1.readProfile, 'WORKBOOK_CANONICAL');
   assert.equal(out1.summary.DI_READS_PERFORMED, 40);
 
-  const out2 = JSON.parse(execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=SIMULATION', '--read-profile=LEGACY_PRODUCTION_COMPAT'], { encoding: 'utf8' }));
+  const out2 = JSON.parse(execFileSync(process.execPath, [CLI_PATH, '--mode=SIMULATION', '--read-profile=LEGACY_PRODUCTION_COMPAT'], { encoding: 'utf8' }));
   assert.equal(out2.accepted, true);
   assert.equal(out2.mode, 'SIMULATION');
   assert.equal(out2.readProfile, 'LEGACY_PRODUCTION_COMPAT');
@@ -301,12 +332,11 @@ test('CLI: runs SIMULATION mode with default and LEGACY_PRODUCTION_COMPAT profil
 });
 
 test('CLI: supports canonical endpoint option and deprecated --t8-endpoint', () => {
-  const CLI_PATH = new URL('../../../tools/process-io-bench/bench.mjs', import.meta.url);
   const canonicalOpt = '--w' + 'ago-t8-endpoint=127.0.0.1';
 
   let errCanonical;
   try {
-    execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=PHYSICAL_DI_AI_READ', canonicalOpt, '--unit-id=0'], {
+    execFileSync(process.execPath, [CLI_PATH, '--mode=PHYSICAL_DI_AI_READ', canonicalOpt, '--unit-id=0'], {
       encoding: 'utf8',
       env: { ...process.env, WJSS_PROCESS_IO_CONSENT: CONSENT_PHRASES.PHYSICAL_DI_AI_READ },
     });
@@ -317,7 +347,7 @@ test('CLI: supports canonical endpoint option and deprecated --t8-endpoint', () 
 
   let errDeprecated;
   try {
-    execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=PHYSICAL_DI_AI_READ', '--t8-endpoint=127.0.0.1', '--unit-id=0'], {
+    execFileSync(process.execPath, [CLI_PATH, '--mode=PHYSICAL_DI_AI_READ', '--t8-endpoint=127.0.0.1', '--unit-id=0'], {
       encoding: 'utf8',
       env: { ...process.env, WJSS_PROCESS_IO_CONSENT: CONSENT_PHRASES.PHYSICAL_DI_AI_READ },
     });
@@ -328,10 +358,9 @@ test('CLI: supports canonical endpoint option and deprecated --t8-endpoint', () 
 });
 
 test('CLI: enforces env consent and refuses CLI consent argument', () => {
-  const CLI_PATH = new URL('../../../tools/process-io-bench/bench.mjs', import.meta.url);
   let errCliConsent;
   try {
-    execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=PHYSICAL_DI_AI_READ', `--consent=${CONSENT_PHRASES.PHYSICAL_DI_AI_READ}`], {
+    execFileSync(process.execPath, [CLI_PATH, '--mode=PHYSICAL_DI_AI_READ', `--consent=${CONSENT_PHRASES.PHYSICAL_DI_AI_READ}`], {
       encoding: 'utf8',
     });
   } catch (e) {
@@ -341,10 +370,9 @@ test('CLI: enforces env consent and refuses CLI consent argument', () => {
 });
 
 test('CLI: refuses deprecated PHYSICAL_TEST mode', () => {
-  const CLI_PATH = new URL('../../../tools/process-io-bench/bench.mjs', import.meta.url);
   let errDeprecatedMode;
   try {
-    execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=PHYSICAL_TEST'], { encoding: 'utf8' });
+    execFileSync(process.execPath, [CLI_PATH, '--mode=PHYSICAL_TEST'], { encoding: 'utf8' });
   } catch (e) {
     errDeprecatedMode = JSON.parse(e.stderr);
   }
@@ -352,12 +380,11 @@ test('CLI: refuses deprecated PHYSICAL_TEST mode', () => {
 });
 
 test('CLI: enforces --hold-ms for PHYSICAL_DO_SINGLE and --ao-test-raw for PHYSICAL_AO_SINGLE', () => {
-  const CLI_PATH = new URL('../../../tools/process-io-bench/bench.mjs', import.meta.url);
   const canonicalOpt = '--w' + 'ago-t8-endpoint=127.0.0.1';
 
   let errDo;
   try {
-    execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=PHYSICAL_DO_SINGLE', canonicalOpt, '--allow-do-write=DO-001'], {
+    execFileSync(process.execPath, [CLI_PATH, '--mode=PHYSICAL_DO_SINGLE', canonicalOpt, '--allow-do-write=DO-001'], {
       encoding: 'utf8',
       env: { ...process.env, WJSS_PROCESS_IO_CONSENT: CONSENT_PHRASES.PHYSICAL_DO_SINGLE },
     });
@@ -368,7 +395,7 @@ test('CLI: enforces --hold-ms for PHYSICAL_DO_SINGLE and --ao-test-raw for PHYSI
 
   let errAo;
   try {
-    execFileSync(process.execPath, [CLI_PATH.pathname, '--mode=PHYSICAL_AO_SINGLE', canonicalOpt, '--allow-ao-write=AO-001+'], {
+    execFileSync(process.execPath, [CLI_PATH, '--mode=PHYSICAL_AO_SINGLE', canonicalOpt, '--allow-ao-write=AO-001+'], {
       encoding: 'utf8',
       env: { ...process.env, WJSS_PROCESS_IO_CONSENT: CONSENT_PHRASES.PHYSICAL_AO_SINGLE },
     });
