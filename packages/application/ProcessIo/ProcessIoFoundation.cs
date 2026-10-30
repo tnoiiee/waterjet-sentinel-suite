@@ -143,6 +143,9 @@ public sealed record ProcessIoAdmission
 /// </summary>
 public sealed class ProcessIoSession
 {
+    /// <summary>Authoritative source classification that may produce a Product observation.</summary>
+    private const string ObservableSourceClassification = "USED";
+
     private readonly IProcessIoTransport _transport;
     private readonly HashSet<string> _liveTokens = new();
     private readonly HashSet<string> _spentTokens = new();
@@ -233,6 +236,16 @@ public sealed class ProcessIoSession
         return true;
     }
 
+    /// <summary>
+    /// Fail-closed Product observation gate. Only a row whose authoritative source classification
+    /// is USED can produce a Product DI or AI observation. A SPARE row keeps its Workbook-derived
+    /// physical binding, so the explicit Hardware bench still reads the canonical physical address
+    /// ranges for commissioning, but the Product never observes it: no transport call is made and
+    /// no observation is fabricated.
+    /// </summary>
+    private static bool IsProductObservable(ProcessIoCatalogueRow row)
+        => string.Equals(row.SourceClassification, ObservableSourceClassification, StringComparison.Ordinal);
+
     public bool TryReadDigitalInput(
         string tag,
         ProcessIoCatalogueRow row,
@@ -241,6 +254,7 @@ public sealed class ProcessIoSession
     {
         observation = null!;
         if (State != "OPEN") return false;
+        if (!IsProductObservable(row)) return false;
         if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND) return false;
 
         bool raw = row.Binding.Area == ProcessIoArea.DiscreteInput
@@ -270,6 +284,7 @@ public sealed class ProcessIoSession
     {
         observation = null!;
         if (State != "OPEN") return false;
+        if (!IsProductObservable(row)) return false;
         if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND) return false;
 
         ushort raw = row.Binding.Area == ProcessIoArea.InputRegister

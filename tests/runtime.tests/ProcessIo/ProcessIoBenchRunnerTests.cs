@@ -10,11 +10,28 @@ namespace Wjss.Runtime.Core.Tests.ProcessIo;
 public sealed class ProcessIoBenchRunnerTests
 {
     private static string LoadCommittedCatalogueCsv()
+        => File.ReadAllText(ProcessIoTestPaths.CommittedCataloguePath);
+
+    [Fact]
+    public void Committed_Catalogue_Path_Resolves_To_Repository_Docs_Evidence()
     {
-        string path = Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory,
-            "../../../../docs/evidence/process-io-inventory-2026-10-22.csv"));
-        return File.ReadAllText(path);
+        string root = ProcessIoTestPaths.RepoRoot();
+        string path = ProcessIoTestPaths.CommittedCataloguePath;
+        string relative = Path.GetRelativePath(root, path).Replace('\\', '/');
+
+        Assert.True(File.Exists(path), $"committed catalogue evidence file missing: {path}");
+        Assert.Equal("docs/evidence/process-io-inventory-2026-10-22.csv", ProcessIoTestPaths.CommittedCatalogueRelativePath);
+        Assert.Equal("docs/evidence/process-io-inventory-2026-10-22.csv", relative);
+        Assert.Equal(Path.GetFullPath(Path.Combine(root, "docs", "evidence", "process-io-inventory-2026-10-22.csv")), path);
+
+        // Resolved under the repository root, never outside it.
+        Assert.False(relative.StartsWith("..", StringComparison.Ordinal), $"catalogue escapes the repository root: {path}");
+
+        // Never the test tree: the evidence lives in the repository, not in tests/docs.
+        string testTree = Path.Combine(root, "tests") + Path.DirectorySeparatorChar;
+        Assert.False(relative.StartsWith("tests/", StringComparison.Ordinal), $"catalogue resolved inside the test tree: {path}");
+        Assert.False(relative.Contains("tests/docs", StringComparison.Ordinal), $"catalogue resolved under tests/docs: {path}");
+        Assert.False(path.StartsWith(testTree, StringComparison.Ordinal), $"catalogue resolved under the test tree: {path}");
     }
 
     [Fact]
@@ -78,6 +95,29 @@ public sealed class ProcessIoBenchRunnerTests
         Assert.Equal("31", report.Summary["DO_CHANNELS_TESTED"]);
         Assert.Equal("1", report.Summary["AO_CHANNELS_TESTED"]);
         Assert.Equal(32, report.CleanupAudit.Count);
+    }
+
+    [Fact]
+    public void Bench_Runner_Still_Reads_Spare_Physical_Addresses_For_Commissioning()
+    {
+        string csv = LoadCommittedCatalogueCsv();
+        var catalogue = ProcessIoCatalogueLoader.Load(csv);
+        var spareRows = catalogue.Where(r => r.SourceClassification == "SPARE" && r.Binding is not null).ToList();
+
+        // The Product observation gate must not remove the Workbook-derived physical mapping:
+        // the bench still covers every bound channel, including the spare channels.
+        Assert.Equal(4, spareRows.Count);
+        Assert.Contains(spareRows, r => r.Tag == "AI-036" && r.Binding!.Address == 35);
+        Assert.Contains(spareRows, r => r.Tag == "DI-038" && r.Binding!.Address == 37);
+        Assert.Contains(spareRows, r => r.Tag == "DI-039" && r.Binding!.Address == 38);
+        Assert.Contains(spareRows, r => r.Tag == "DI-040" && r.Binding!.Address == 39);
+
+        var report = ProcessIoBenchRunner.Run(csv, new ProcessIoBenchConfig { Mode = ProcessIoBenchMode.SIMULATION });
+        Assert.True(report.Accepted);
+        Assert.Equal("40", report.Summary["DI_READS_PERFORMED"]);
+        Assert.Equal("36", report.Summary["AI_READS_PERFORMED"]);
+        Assert.Equal("32", report.Summary["DO_READBACKS_PERFORMED"]);
+        Assert.Equal("2", report.Summary["AO_READBACKS_PERFORMED"]);
     }
 
     [Fact]
