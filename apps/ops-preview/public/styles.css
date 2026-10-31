@@ -247,3 +247,28 @@ footer { padding:14px 24px 28px; color:var(--muted); font-size:var(--fs-small); 
 .cab1-label { color:var(--muted); text-transform:none; }
 .cab1-flag { color:#d29922; }
 .cab1-note { margin:8px 0 0; font-size:var(--fs-small); color:var(--muted); }
+
+/* H3-A Cleaning Job Workspace (panels A to F). Presentation only: the page adds no scrolling frame
+   of its own and no viewport-relative width, the auto-fit grid can never demand more than the width
+   it is given, and the frozen card is styled as a state, never as a control. */
+.workspace-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap:var(--gap); min-width:0; }
+.workspace-card { border:1px solid var(--line); border-radius:6px; background:var(--panel-2); padding:10px 14px; min-width:0; }
+.workspace-card h3 { margin:0 0 8px; font-size:var(--fs-body); overflow-wrap:anywhere; }
+.workspace-card h4 { margin:12px 0 6px; font-size:var(--fs-small); color:var(--muted); text-transform:none; }
+.workspace-card .summary { min-width:0; }
+.workspace-card .cell .v { overflow-wrap:anywhere; }
+.frozen-card { border-color:var(--info); }
+.frozen-note { margin:10px 0 0; padding:8px 12px; border-left:3px solid var(--info); background:var(--panel); color:var(--ink); font-weight:600; }
+.frozen-decision { display:grid; grid-template-columns:minmax(0, 220px) minmax(0, 1fr); gap:2px 10px; margin:8px 0 0; font-size:var(--fs-small); }
+.frozen-decision dt { color:var(--muted); }
+.frozen-decision dd { margin:0; word-break:break-word; }
+.timeline { list-style:none; display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; min-width:0; }
+.timeline-step { display:flex; flex-direction:column; gap:2px; min-width:0; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--panel); }
+.timeline-ordinal { color:var(--muted); font-size:var(--wj-meta-fs); }
+.timeline-label { font-weight:600; overflow-wrap:anywhere; }
+.timeline-state { color:var(--muted); font-size:var(--fs-small); }
+.timeline-step.current { border-color:var(--info); background:var(--pressed); }
+.timeline-step.current .timeline-state { color:var(--info); font-weight:700; }
+.timeline-step.complete .timeline-state { color:var(--ok); }
+.timeline-step.failed { border-color:var(--err); }
+.timeline-step.failed .timeline-state { color:var(--err); font-weight:700; }

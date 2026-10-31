@@ -45,6 +45,15 @@ endpoint connectivity and real field-device actuation remain **NOT EXECUTED / NO
 WAGO process-image mirroring is **DEFERRED BY OWNER** under the deferred gate `H2-WAGO-MIRROR`. PR #42
 is **OPEN / NOT MERGED** with merge on **HOLD pending Owner authorization**. H3 remains **PLANNED,
 NOT AUTHORIZED**: the Owner TimeDelay decision (FROZEN PER COUNTDOWN) is documentation context only.
+
+**Update 2026-10-31 (H3-A status; the paragraphs above remain the dated record).** H2 is **MERGED**
+(`main` `3ed4fac60080b8e73bd14d9f0d71385378fc2da3`). The Owner-authorised **H3-A** slice implements the
+Cleaning Job Workspace Product UI, the two typed TimeDelay modes, the Legacy inverse linear
+`RHTemp_SELECT` mapping, the Auto Upper-zone factor and the frozen-per-countdown lifecycle **in
+deterministic SIMULATION only**, behind one read-only Runtime document and one read-only Operations
+Preview route. It authorises no real Cleaning Job execution, no hardware, no Production and no merge.
+H3 (real), H3-B, H3-C, H4 and H5 remain **PLANNED, NOT AUTHORIZED**; merge remains **HOLD PENDING OWNER
+MANUAL REVIEW AND SEPARATE OWNER AUTHORIZATION**. This update authorises nothing.
 See [`MASTER_PLAN.md`](MASTER_PLAN.md) §3 and
 [`CURRENT_STATE.md`](CURRENT_STATE.md) for the record. This update authorises nothing.
 

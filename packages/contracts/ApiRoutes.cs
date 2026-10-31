@@ -22,6 +22,13 @@ public static class ApiRoutes
     /// <summary>Small read-only Runtime status payload for operators and the development Inspector.</summary>
     public const string Runtime = "/api/v1/runtime";
 
+    /// <summary>
+    /// Read-only Cleaning Job Workspace document (H3-A): the GlobalQueue, the single Active Job,
+    /// the frozen next-dispatch countdown, the live TimeDelay preview and the dispatch-cycle
+    /// timeline, all at one Runtime revision. It accepts no command.
+    /// </summary>
+    public const string DispatchWorkspace = "/api/v1/dispatch-workspace";
+
     /// <summary>Bounded recent Delta activity. Read-only and never unbounded.</summary>
     public const string Deltas = "/api/v1/deltas";
 
