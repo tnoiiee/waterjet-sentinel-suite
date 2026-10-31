@@ -28,6 +28,15 @@ public static class SchemaIds
     public const string Snapshot = "wjss.snapshot/2";
     public const string Delta = "wjss.delta/2";
 
+    /// <summary>
+    /// The read-only H3-A Cleaning Job Workspace document. It is a separate, additive read-only
+    /// document of the same Runtime revision; the Snapshot and Delta identifiers are unchanged.
+    /// </summary>
+    public const string DispatchWorkspace = "wjss.dispatch-workspace/1";
+
+    /// <summary>The document kind of the H3-A Cleaning Job Workspace document.</summary>
+    public const string DispatchWorkspaceKind = "dispatch-workspace";
+
     /// <summary>Numeric API version carried in every envelope (route family is /api/v1).</summary>
     public const int ApiVersion = 1;
 }

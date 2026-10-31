@@ -13,6 +13,11 @@ import { fileURLToPath } from 'node:url';
 import { WALL_MAP_ORDER_TEXT, WALL_MAP_EXPECTED } from '../../../packages/commissioning/src/index.mjs';
 import { allText, bootApp, byAction, byFilter, cellTexts, click, columnIndex, html, rowsOf, waitFor, walk } from './helpers/fakeDom.mjs';
 
+// The two Runtime-backed routes answer 503 while the independent Runtime host is absent in these
+// tests. Every other request must be a 200 local GET, so an unexpected failure stays visible.
+const RUNTIME_OFFLINE_PATHS = ['/api/tc-acquisition', '/api/operations/dispatch'];
+
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const css = readFileSync(join(HERE, '..', 'public', 'styles.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -255,7 +260,9 @@ test('STALE is presented as history: it is never the current value', async () =>
     assert.match(observation, /Engineering value UNAVAILABLE/);
     assert.match(observation, /Value age 45 s \(exceeds Preview threshold\)/);
     // The Overview keeps the last valid sample in a column explicitly labelled as history.
-    const headers = [...html.matchAll(/<th scope="col">([^<]+)<\/th>/g)].map((m) => m[1]);
+    const tableStart = html.indexOf('id="monitor-table"');
+    const headers = [...html.slice(tableStart, html.indexOf('</table>', tableStart))
+      .matchAll(/<th scope="col">([^<]+)<\/th>/g)].map((m) => m[1]);
     const staleRow = selectedRow(app);
     const staleCells = cellTexts(staleRow);
     assert.match(staleCells[columnIndex(headers, 'Last valid (historical)')], /HISTORICAL - LAST VALID/);
@@ -510,7 +517,7 @@ test('the Wall Map follows the node-scoped scenario, keeps the boundary and isol
     assert.ok(affected.length >= 18, 'the affected node must mark its Sensors on the Wall Map');
     // The independent Runtime is not started in this test; no fabricated TC state can leak
     // into an otherwise healthy synthetic Wall Map.
-    assert.equal(app.requests.every((r) => r.status === (r.path === '/api/tc-acquisition' ? 503 : 200)
+    assert.equal(app.requests.every((r) => r.status === (RUNTIME_OFFLINE_PATHS.includes(r.path) ? 503 : 200)
       && r.method === 'GET'), true, JSON.stringify(app.requests.filter((r) => r.status !== 200)));
     assert.equal(app.requests.every((r) => r.path.startsWith('/api/')), true);
     assert.match(allText(id(app, 'tc-acquisition-body')), /Runtime Snapshot could not be read/);

@@ -97,6 +97,10 @@ const state = {
   // Read-only Runtime Snapshot projection. Null represents a Runtime/Preview request failure,
   // not a completed TC read; the browser has no acquisition client or state writer.
   tcAcquisition: null,
+  // The read-only H3-A Cleaning Job Workspace projection (GlobalQueue, Active Job, TimeDelay
+  // configuration, frozen countdown, live preview, dispatch-cycle timeline). Null means the Runtime
+  // document could not be read or was refused: no countdown, Queue or Job is then claimed.
+  cleaningJob: null,
   // The read-only STATIC motion commissioning catalogue served by the dedicated catalogue route.
   // This browser owns no motion command:
   // it displays state and never raises, sends or authorizes one.
@@ -1486,6 +1490,9 @@ function wireControls() {
     await loadTcAcquisition();
     renderTcAcquisition();
   });
+  $('cleaning-job-refresh').addEventListener('click', async () => {
+    await loadCleaningJob();
+  });
   $('scenario-apply').addEventListener('click', () => {
     // `||` not `??`: an empty control value (a not-yet-populated selector) must fall back to the
     // current state, never be sent to the host as an empty scenario or node identity.
@@ -1841,6 +1848,252 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 }
 
 // ---------------------------------------------------------------------------
+// H3-A Cleaning Job Workspace (panels A to F)
+// ---------------------------------------------------------------------------
+
+/**
+ * The exact Owner-required wording of the frozen countdown card. It is rendered ONLY while the
+ * published countdown reports `frozen`, so the sentence is never shown for a countdown that is not
+ * actually frozen.
+ */
+const FROZEN_COUNTDOWN_TEXT = 'Active countdown is frozen. Live preview does not modify execution.';
+
+/** The six read-only panels; used to show one explicit refusal state in every panel. */
+const CLEANING_JOB_PANELS = [
+  'cj-workspace', 'cj-queue', 'cj-configuration', 'cj-countdown', 'cj-preview', 'cj-timeline',
+];
+
+const text = (value) => (value === null || value === undefined ? 'none' : String(value));
+
+function workspaceCells(workspace) {
+  const job = workspace.activeJob;
+  return [
+    ['Runtime revision', text(workspace.revision)],
+    ['AutoSequence', text(workspace.autoSequence)],
+    ['Mode', text(workspace.mode)],
+    ['Active Job', job ? job.jobId : 'none'],
+    ['Target Sensor', job ? job.targetSensorId : 'none'],
+    ['Phase', job ? `${job.phaseLabel} (${job.phaseIndex} of 6)` : 'none'],
+    ['Lifecycle', job ? job.lifecycle : 'none'],
+    ['Water Jet / Isolation Valve', job ? `${job.jetId} / ${job.valveId}` : 'none'],
+    ['Safe Return step', job?.safeReturn ? text(job.safeReturn.step) : 'not in Safe Return'],
+    ['Timeline stage', text(workspace.timeline?.stage)],
+  ];
+}
+
+function queueCells(workspace) {
+  const queue = workspace.queue;
+  return [
+    ['Entries', `${queue.totalQueued} of ${queue.capacity}`],
+    ['Queue revision', text(queue.revision)],
+    ['AutoSequence', text(queue.autoSequence)],
+    ['Last dispatch', queue.lastDispatch ? `${queue.lastDispatch.jobId} at ${queue.lastDispatch.dispatchedAt}` : 'none'],
+  ];
+}
+
+function renderCleaningJobUnavailable(reason) {
+  $('cleaning-job-status').textContent = reason;
+  for (const id of CLEANING_JOB_PANELS) {
+    clear(id);
+    $(id).append(el('p', { class: 'note' }, 'Unavailable. No value is claimed.'));
+  }
+  clear('cj-queue-body');
+}
+
+function renderCountdownCard(countdown) {
+  const body = $('cj-countdown');
+  const cells = [
+    ['Lifecycle', text(countdown.lifecycle)],
+    ['Generation', text(countdown.generation)],
+    ['Remaining seconds', text(countdown.remainingSeconds)],
+    ['Frozen', countdown.frozen ? 'yes - the decision is immutable' : 'no'],
+    ['Dispatch admissible', countdown.dispatchAdmissible ? 'yes - exactly one dispatch' : 'no'],
+    ['Superseded reason', text(countdown.supersededReason)],
+    ['Last superseded reason', text(countdown.lastSupersededReason)],
+    ['Refusal code', text(countdown.refusalCode)],
+    ['Created at', text(countdown.createdAt)],
+    ['Completed at', text(countdown.completedAt)],
+    ['Dispatched at', text(countdown.dispatchedAt)],
+  ];
+  body.append(el('div', { class: 'summary' }, cells.map(([k, v]) => el('div', { class: 'cell' }, [
+    el('span', { class: 'k' }, k), el('span', { class: 'v' }, v),
+  ]))));
+
+  if (countdown.lifecycle === 'NONE') {
+    body.append(el('p', { class: 'note' }, 'No countdown exists for this AutoSequence session.'));
+  }
+  if (countdown.frozen) {
+    body.append(el('p', { class: 'frozen-note', role: 'note' }, FROZEN_COUNTDOWN_TEXT));
+  }
+  if (countdown.lifecycle === 'SUPERSEDED') {
+    body.append(el('p', { class: 'note' },
+      `The frozen premise was superseded (${text(countdown.supersededReason)}). Nothing was dispatched: the next decision starts a new generation and the full applied delay again.`));
+  }
+  if (countdown.lifecycle === 'FAULTED') {
+    body.append(el('p', { class: 'alert' },
+      `The countdown is FAULTED (${text(countdown.refusalCode)}). No dispatch follows.`));
+  }
+
+  const decision = countdown.decision;
+  if (!decision) return;
+  body.append(el('h4', {}, 'Frozen decision'));
+  body.append(el('dl', { class: 'frozen-decision' }, [
+    ['Decision ID', decision.decisionId],
+    ['Countdown generation', text(decision.countdownGeneration)],
+    ['Queue generation', text(decision.queueGeneration)],
+    ['Queue entry', decision.queueEntryId],
+    ['Next Sensor', decision.nextSensorId],
+    ['Next Sensor wall', text(decision.nextWall)],
+    ['Next Sensor OrderWall', text(decision.nextSensorOrderWall)],
+    ['Canonical Water Jet', decision.canonicalWaterJetId],
+    ['Effective Water Jet', decision.effectiveWaterJetId],
+    ['Effective WJ provenance', decision.effectiveWaterJetProvenance],
+    ['Isolation valve', decision.isolationValveId],
+    ['Canonical WSB cabinet', decision.cabinetId],
+    ['Motion controller', decision.controllerId],
+    ['Motion axis pair (Horizontal / Vertical)', `${decision.horizontalAxisId} / ${decision.verticalAxisId}`],
+    ['RH input', decision.rhInput
+      ? `${decision.rhInput.rhTemperature} · ${decision.rhInput.quality} · observed ${decision.rhInput.observedAt} · generation ${decision.rhInput.generation}`
+      : 'not used (MANUAL_FIXED)'],
+    ['Boiler Condition', text(decision.boilerCondition)],
+    ['TimeDelay mode', text(decision.mode)],
+    ['Configuration version', decision.configurationVersion],
+    ['Manual delay (s)', text(decision.manualDelaySeconds)],
+    ['RH min / max', `${decision.rhTempMin} / ${decision.rhTempMax}`],
+    ['RH input window (s)', text(decision.rhInputWindowSeconds)],
+    ['Auto delay min / max (s)', `${decision.autoDelayMinSeconds} / ${decision.autoDelayMaxSeconds}`],
+    ['Base delay (s)', text(decision.baseDelaySeconds)],
+    ['Zone', text(decision.zone)],
+    ['Zone factor', text(decision.zoneFactor)],
+    ['Applied delay (s)', text(decision.appliedDelaySeconds)],
+    ['Created at', decision.createdAt],
+  ].flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))])));
+}
+
+function renderConfigurationCard(configuration) {
+  const body = $('cj-configuration');
+  if (!configuration) {
+    body.append(el('p', { class: 'note' },
+      'No TimeDelay configuration is configured on this Runtime: no countdown decision can be created.'));
+    return;
+  }
+  body.append(el('dl', { class: 'frozen-decision' }, [
+    ['Mode', text(configuration.mode)],
+    ['Manual delay (s)', text(configuration.manualDelaySeconds)],
+    ['RH min / max', `${configuration.rhTempMin} / ${configuration.rhTempMax}`],
+    ['RH input window (s)', text(configuration.rhInputWindowSeconds)],
+    ['Active Boiler Condition', text(configuration.activeBoilerCondition)],
+    ['Configuration version', configuration.configurationVersion],
+  ].flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, String(v))])));
+  body.append(el('h4', {}, 'Auto delay range per Boiler Condition'));
+  body.append(el('ul', { class: 'legend' }, configuration.boilerRanges.map((range) => el('li', {},
+    `${range.condition}: ${range.autoDelayMinSeconds} / ${range.autoDelayMaxSeconds} s`))));
+  body.append(el('p', { class: 'note' },
+    'These are the Owner-supplied simulation seeds of this stage, not DCS commissioning values.'));
+}
+
+function renderPreviewCard(preview) {
+  const body = $('cj-preview');
+  if (!preview.available) {
+    body.append(el('p', { class: 'note' },
+      `No preview is available: ${text(preview.refusalCode)}. No delay is claimed.`));
+  }
+  body.append(el('div', { class: 'summary' }, [
+    ['Live RH temperature', text(preview.rhTemperature)],
+    ['Live RH quality', text(preview.rhQuality)],
+    ['Live RH observed at', text(preview.rhObservedAt)],
+    ['Clamped RH', text(preview.clampedRhTemperature)],
+    ['Mapped delay (s)', text(preview.mappedDelaySeconds)],
+    ['Base delay (s)', text(preview.baseDelaySeconds)],
+    ['Zone', text(preview.zone)],
+    ['Zone factor', text(preview.zoneFactor)],
+    ['Applied if planned now (s)', text(preview.appliedDelaySeconds)],
+    ['Boiler Condition', text(preview.boilerCondition)],
+  ].map(([k, v]) => el('div', { class: 'cell' }, [el('span', { class: 'k' }, k), el('span', { class: 'v' }, v)]))));
+  body.append(el('p', { class: 'note' },
+    'Affects execution: no. These live values are a preview only; the frozen decision above does not change.'));
+}
+
+function renderTimelineCard(timeline) {
+  const body = $('cj-timeline');
+  body.append(el('ol', { class: 'timeline', 'data-stage': text(timeline.stage) }, timeline.steps.map((step) => el('li',
+    {
+      class: `timeline-step ${String(step.state).toLowerCase()}`,
+      'data-stage': step.stage,
+      'data-state': step.state,
+    },
+    [
+      el('span', { class: 'timeline-ordinal' }, String(step.ordinal)),
+      el('span', { class: 'timeline-label' }, step.label),
+      el('span', { class: 'timeline-state' }, step.state),
+    ]))));
+  body.append(el('p', { class: 'note' },
+    `Current stage: ${text(timeline.stage)}. Last dispatch: ${timeline.lastDispatchJobId
+      ? `${timeline.lastDispatchJobId} at ${timeline.lastDispatchedAt}` : 'none'}.`));
+}
+
+function renderCleaningJob() {
+  const projection = state.cleaningJob;
+  const workspace = projection && projection.status === 'PUBLISHED' ? projection.workspace : null;
+  if (!workspace) {
+    const reason = projection
+      ? `Cleaning Job Workspace unavailable (${projection.status}). No countdown, Queue or Job is claimed.`
+      : 'Cleaning Job Workspace unavailable: the local Runtime document could not be read. No countdown, Queue or Job is claimed.';
+    renderCleaningJobUnavailable(reason);
+    return;
+  }
+
+  $('cleaning-job-status').textContent =
+    `Runtime revision ${workspace.revision} · ${workspace.simulation} · document ${workspace.schema}`;
+
+  clear('cj-workspace');
+  $('cj-workspace').append(el('div', { class: 'summary' }, workspaceCells(workspace).map(([k, v]) => el('div',
+    { class: 'cell' }, [el('span', { class: 'k' }, k), el('span', { class: 'v' }, v)]))));
+  if (!workspace.activeJob) {
+    $('cj-workspace').append(el('p', { class: 'note' }, 'No Cleaning Job is active.'));
+  }
+
+  clear('cj-queue');
+  $('cj-queue').append(el('div', { class: 'summary' }, queueCells(workspace).map(([k, v]) => el('div',
+    { class: 'cell' }, [el('span', { class: 'k' }, k), el('span', { class: 'v' }, v)]))));
+  clear('cj-queue-body');
+  for (const entry of workspace.queue.entries) {
+    $('cj-queue-body').append(el('tr', { 'data-entry': entry.entryId }, [
+      el('td', {}, String(entry.position)),
+      el('td', {}, entry.entryId),
+      el('td', {}, entry.sensorId),
+      el('td', {}, entry.sourceReason),
+      el('td', {}, String(entry.secondsSinceLastClean)),
+    ]));
+  }
+  if (workspace.queue.entries.length === 0) {
+    $('cj-queue').append(el('p', { class: 'note' }, 'The GlobalQueue is empty: there is no dispatch candidate.'));
+  }
+
+  clear('cj-configuration');
+  renderConfigurationCard(workspace.configuration ?? null);
+
+  clear('cj-countdown');
+  renderCountdownCard(workspace.countdown);
+
+  clear('cj-preview');
+  renderPreviewCard(workspace.preview);
+
+  clear('cj-timeline');
+  renderTimelineCard(workspace.timeline);
+}
+
+async function loadCleaningJob() {
+  try {
+    state.cleaningJob = await getJson('/api/operations/dispatch');
+  } catch {
+    // A failure clears the displayed workspace: a stale countdown is never presented as current.
+    state.cleaningJob = null;
+  }
+  renderCleaningJob();
+}
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
@@ -1902,6 +2155,9 @@ async function loadInitialData() {
   // The Runtime-backed TC projection is isolated: a missing host or unpublished state cannot
   // fabricate success and degrades only this section, not the synthetic commissioning workflow.
   await loadTcAcquisition();
+  // The H3-A Cleaning Job Workspace is isolated too: a missing Runtime host degrades only its own
+  // section, never the synthetic commissioning workflow, and no countdown is ever claimed.
+  await loadCleaningJob();
   // The static motion commissioning catalogue is isolated as well: it is Owner-confirmed data with a
   // closed gate, so it does not depend on a Runtime host at all.
   await loadMotionCatalogue();
@@ -1966,6 +2222,7 @@ async function boot() {
     renderTcAcquisitionEvidence();
     renderTcAcquisition();
     renderMotionCommissioning();
+    renderCleaningJob();
     renderDiagnostics();
     await loadObservations();
     setAppState(APP_STATE.READY);

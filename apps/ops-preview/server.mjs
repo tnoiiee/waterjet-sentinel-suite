@@ -618,6 +618,191 @@ export function motionCataloguePayload() {
   };
 }
 
+/**
+ * Vocabulary of the H3-A Cleaning Job Workspace document, mirrored from
+ * packages/contracts/TimeDelay.cs and packages/contracts/DispatchWorkspace.cs. It is used ONLY to
+ * refuse a document this Preview cannot render truthfully: it is not a second decision authority,
+ * and no delay, countdown or timeline value is ever derived here.
+ */
+const COUNTDOWN_LIFECYCLES = new Set(['NONE', 'PENDING_DECISION', 'ACTIVE_FROZEN',
+  'COMPLETED_AWAITING_DISPATCH', 'DISPATCHED', 'CANCELLED', 'SUPERSEDED', 'FAULTED']);
+const TIMELINE_STAGES = ['PRECHECK', 'MOVE_TO_P1', 'OPEN_IV', 'P2', 'P3', 'P4', 'P5', 'P6', 'CLOSE_IV',
+  'MANDATORY_SAFE_RETURN', 'COMPLETE', 'NEXT_DISPATCH_COUNTDOWN', 'DISPATCHED'];
+const TIMELINE_STATES = new Set(['PENDING', 'CURRENT', 'COMPLETE', 'FAILED']);
+const DELAY_MODES = new Set(['MANUAL_FIXED', 'AUTO_RH_LINEAR_FROZEN']);
+const BOILER_CONDITIONS = new Set(['VERY_CLEAN', 'NORMAL_CLEAN', 'MEDIUM_DIRTY', 'VERY_DIRTY']);
+const DELAY_ZONES = new Set(['UPPER', 'LOWER']);
+const QUALITIES = new Set(['GOOD', 'UNCERTAIN', 'BAD', 'STALE', 'DISABLED']);
+
+const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const isSafeNonNegative = (value) => Number.isSafeInteger(value) && value >= 0;
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
+
+function validRhInput(value) {
+  return isRecord(value)
+    && typeof value.rhTemperature === 'number' && Number.isFinite(value.rhTemperature)
+    && QUALITIES.has(value.quality)
+    && isNonEmptyString(value.observedAt)
+    && Number.isSafeInteger(value.generation) && value.generation > 0;
+}
+
+function validDecision(value) {
+  if (value === null) return true;
+  if (!isRecord(value)) return false;
+  const strings = ['decisionId', 'queueEntryId', 'nextSensorId', 'canonicalWaterJetId', 'effectiveWaterJetId',
+    'effectiveWaterJetProvenance', 'isolationValveId', 'cabinetId', 'controllerId', 'horizontalAxisId',
+    'verticalAxisId', 'configurationVersion', 'createdAt'];
+  if (!strings.every((key) => isNonEmptyString(value[key]))) return false;
+  if (!DELAY_MODES.has(value.mode) || !BOILER_CONDITIONS.has(value.boilerCondition)) return false;
+  if (!DELAY_ZONES.has(value.zone)) return false;
+  if (!isSafeNonNegative(value.countdownGeneration) || value.countdownGeneration < 1) return false;
+  if (!isSafeNonNegative(value.queueGeneration)) return false;
+  if (!isSafeNonNegative(value.nextSensorOrderWall) || value.nextSensorOrderWall < 1) return false;
+  for (const key of ['manualDelaySeconds', 'rhInputWindowSeconds', 'autoDelayMinSeconds', 'autoDelayMaxSeconds',
+    'baseDelaySeconds', 'appliedDelaySeconds']) {
+    if (!isSafeNonNegative(value[key])) return false;
+  }
+  for (const key of ['rhTempMin', 'rhTempMax', 'zoneFactor']) {
+    if (typeof value[key] !== 'number' || !Number.isFinite(value[key])) return false;
+  }
+  if (value.appliedDelaySeconds < 0 || value.baseDelaySeconds < 0 || value.zoneFactor < 0) return false;
+  if (value.rhInput !== null && value.rhInput !== undefined && !validRhInput(value.rhInput)) return false;
+  // MANUAL_FIXED freezes no RH reading and applies no zone factor: a document claiming otherwise is
+  // refused rather than displayed as a truthful decision.
+  if (value.mode === 'MANUAL_FIXED' && (value.rhInput !== null || value.zoneFactor !== 1)) return false;
+  return true;
+}
+
+function validConfiguration(value) {
+  if (value === null) return true;
+  if (!isRecord(value)) return false;
+  if (!DELAY_MODES.has(value.mode) || !BOILER_CONDITIONS.has(value.activeBoilerCondition)) return false;
+  if (!isNonEmptyString(value.configurationVersion)) return false;
+  if (!isSafeNonNegative(value.manualDelaySeconds) || !isSafeNonNegative(value.rhInputWindowSeconds)) return false;
+  if (!(typeof value.rhTempMin === 'number' && Number.isFinite(value.rhTempMin))) return false;
+  if (!(typeof value.rhTempMax === 'number' && Number.isFinite(value.rhTempMax))) return false;
+  if (value.rhTempMin >= value.rhTempMax) return false;
+  if (!Array.isArray(value.boilerRanges) || value.boilerRanges.length === 0) return false;
+  return value.boilerRanges.every((range) => isRecord(range)
+    && BOILER_CONDITIONS.has(range.condition)
+    && isSafeNonNegative(range.autoDelayMinSeconds)
+    && isSafeNonNegative(range.autoDelayMaxSeconds)
+    && range.autoDelayMinSeconds <= range.autoDelayMaxSeconds);
+}
+
+function validPreview(value) {
+  if (!isRecord(value)) return false;
+  if (typeof value.available !== 'boolean' || typeof value.affectsExecution !== 'boolean') return false;
+  if (value.affectsExecution !== false) return false;
+  if (!DELAY_MODES.has(value.mode) || !DELAY_ZONES.has(value.zone)) return false;
+  if (typeof value.zoneFactor !== 'number' || !Number.isFinite(value.zoneFactor) || value.zoneFactor < 0) return false;
+  if (typeof value.refusalCode !== 'string' || value.refusalCode.length === 0) return false;
+  if (value.boilerCondition !== null && value.boilerCondition !== undefined
+    && !BOILER_CONDITIONS.has(value.boilerCondition)) return false;
+  const optionalNumbers = ['rhTemperature', 'clampedRhTemperature', 'mappedDelaySeconds'];
+  for (const key of optionalNumbers) {
+    if (value[key] !== null && value[key] !== undefined
+      && !(typeof value[key] === 'number' && Number.isFinite(value[key]))) return false;
+  }
+  for (const key of ['baseDelaySeconds', 'appliedDelaySeconds']) {
+    if (value[key] !== null && value[key] !== undefined && !isSafeNonNegative(value[key])) return false;
+  }
+  return true;
+}
+
+function validTimeline(value) {
+  if (!isRecord(value)) return false;
+  if (!TIMELINE_STAGES.includes(value.stage)) return false;
+  if (!Array.isArray(value.steps) || value.steps.length !== TIMELINE_STAGES.length) return false;
+  let current = 0;
+  for (let index = 0; index < value.steps.length; index += 1) {
+    const step = value.steps[index];
+    if (!isRecord(step)) return false;
+    if (step.stage !== TIMELINE_STAGES[index]) return false;
+    if (step.ordinal !== index + 1) return false;
+    if (!isNonEmptyString(step.label)) return false;
+    if (!TIMELINE_STATES.has(step.state)) return false;
+    if (step.state === 'CURRENT' || step.state === 'FAILED') current += 1;
+  }
+  return current === 1;
+}
+
+/**
+ * Strict validator of the Runtime's H3-A workspace document. A document this Preview cannot render
+ * truthfully is refused as INVALID_RUNTIME_RESPONSE: nothing is repaired, defaulted or filled in.
+ */
+export function validDispatchWorkspace(doc) {
+  if (!isRecord(doc)) return false;
+  if (doc.kind !== 'dispatch-workspace' || doc.schema !== 'wjss.dispatch-workspace/1') return false;
+  if (doc.apiVersion !== 1) return false;
+  if (!Number.isSafeInteger(doc.revision) || doc.revision < 1) return false;
+  if (!isNonEmptyString(doc.generatedAt) || !isNonEmptyString(doc.stageMarker)) return false;
+  if (typeof doc.simulation !== 'string' || doc.simulation.length === 0) return false;
+  if (!isRecord(doc.queue)) return false;
+  if (doc.queue.capacity !== 8) return false;
+  if (!Array.isArray(doc.queue.entries) || doc.queue.entries.length > 8) return false;
+  if (doc.queue.totalQueued !== doc.queue.entries.length) return false;
+  if (!isSafeNonNegative(doc.queue.revision)) return false;
+  const entriesOk = doc.queue.entries.every((entry, index) => isRecord(entry)
+    && entry.position === index + 1
+    && isNonEmptyString(entry.entryId)
+    && isNonEmptyString(entry.sensorId)
+    && isNonEmptyString(entry.sourceReason)
+    && isSafeNonNegative(entry.secondsSinceLastClean));
+  if (!entriesOk) return false;
+  if (doc.activeJob !== null && doc.activeJob !== undefined) {
+    if (!isRecord(doc.activeJob) || !isNonEmptyString(doc.activeJob.jobId)
+      || !isNonEmptyString(doc.activeJob.targetSensorId)) return false;
+  }
+  if (!isRecord(doc.countdown)) return false;
+  if (!COUNTDOWN_LIFECYCLES.has(doc.countdown.lifecycle)) return false;
+  if (!isSafeNonNegative(doc.countdown.generation)) return false;
+  if (!isSafeNonNegative(doc.countdown.remainingSeconds)) return false;
+  if (typeof doc.countdown.frozen !== 'boolean' || typeof doc.countdown.dispatchAdmissible !== 'boolean') return false;
+  if (!validDecision(doc.countdown.decision ?? null)) return false;
+  if (doc.countdown.frozen && !doc.countdown.decision) return false;
+  if (doc.countdown.dispatchAdmissible && doc.countdown.remainingSeconds !== 0) return false;
+  if (!validTimeline(doc.timeline)) return false;
+  if (!validConfiguration(doc.configuration ?? null)) return false;
+  return validPreview(doc.preview);
+}
+
+/**
+ * Reads the Runtime host's read-only Cleaning Job Workspace route. The Preview performs ONE GET and
+ * never polls, retries or caches: a transport error, a malformed answer or an unrecognized document
+ * is an explicit state, never substituted data and never a fabricated countdown.
+ */
+export async function dispatchWorkspacePayload({ runtimeFetch = globalThis.fetch,
+  runtimePort = process.env.WJSS_API_PORT ?? DEFAULT_RUNTIME_PORT } = {}) {
+  const port = String(runtimePort);
+  if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+    throw new RangeError('The local Runtime API port must be an integer from 1 through 65535.');
+  }
+  const origin = new URL(LOOPBACK_ORIGIN);
+  origin.port = port;
+  const envelope = (httpStatus, status, revision = null, workspace = null) => ({
+    status: httpStatus,
+    body: { stageId: STAGE_ID, mode: PREVIEW_MODE, status, revision, workspace },
+  });
+
+  let response;
+  try {
+    response = await runtimeFetch(new URL('/api/v1/dispatch-workspace', origin).href, {
+      method: 'GET', headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(1200),
+    });
+  } catch {
+    return envelope(503, 'RUNTIME_UNAVAILABLE');
+  }
+  if (!response?.ok) return envelope(503, 'RUNTIME_UNAVAILABLE');
+
+  let document;
+  try { document = await response.json(); }
+  catch { return envelope(502, 'INVALID_RUNTIME_RESPONSE'); }
+  if (!validDispatchWorkspace(document)) return envelope(502, 'INVALID_RUNTIME_RESPONSE');
+
+  return envelope(200, 'PUBLISHED', document.revision, document);
+}
+
 export function createPreviewServer({ runtimeFetch = globalThis.fetch,
   runtimePort = process.env.WJSS_API_PORT ?? DEFAULT_RUNTIME_PORT } = {}) {
   return createServer(async (req, res) => {
@@ -673,6 +858,10 @@ export function createPreviewServer({ runtimeFetch = globalThis.fetch,
       }
       if (path === '/api/tc-physical-mapping') {
         return send(res, 200, JSON.stringify(tcPhysicalMappingPayload()), MIME['.json']);
+      }
+      if (path === '/api/operations/dispatch') {
+        const { status, body } = await dispatchWorkspacePayload({ runtimeFetch, runtimePort });
+        return send(res, status, JSON.stringify(body), MIME['.json']);
       }
       if (path === '/api/tc-acquisition') {
         const { status, body } = await tcAcquisitionPayload({ runtimeFetch, runtimePort });

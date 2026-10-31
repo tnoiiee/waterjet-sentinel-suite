@@ -195,9 +195,19 @@ public sealed class RuntimeApiTopologyTests
             .ToArray();
 
         var routeCount = constants.Length;
-        Assert.Equal(6, routeCount);
+        // H3-A adds ONE read-only route (the Cleaning Job Workspace document). The registry stays
+        // read-only: the new constant carries no verb and the host maps it with GET only.
+        Assert.Equal(7, routeCount);
         Assert.Equal(
-            [ApiRoutes.HealthLive, ApiRoutes.HealthReady, ApiRoutes.Snapshot, ApiRoutes.Runtime, ApiRoutes.Deltas, ApiRoutes.Inspector],
+            [
+                ApiRoutes.HealthLive,
+                ApiRoutes.HealthReady,
+                ApiRoutes.Snapshot,
+                ApiRoutes.DispatchWorkspace,
+                ApiRoutes.Runtime,
+                ApiRoutes.Deltas,
+                ApiRoutes.Inspector,
+            ],
             constants);
 
         // No route constant declares a write surface: none carries a method verb,
