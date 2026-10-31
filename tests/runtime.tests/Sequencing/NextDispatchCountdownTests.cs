@@ -586,7 +586,11 @@ public sealed class NextDispatchCountdownTests
 
         Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, refusal);
         Assert.Same(malformed, refused);
-        Assert.Null(refused.DispatchedAtUtc);
+        // Fail closed means refused, not repaired: every malformed record is returned untouched, so the
+        // dispatch evidence must be preserved EXACTLY as it was constructed. Defects 0 to 4 carry no
+        // dispatch instant and null stays null; defect 5 carries the deliberately impossible one, and it
+        // must survive the refusal instead of being cleared, rewritten or moved to a new instance.
+        Assert.Equal(malformed.DispatchedAtUtc, refused.DispatchedAtUtc);
         Assert.Equal(CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH, refused.Lifecycle);
     }
 
