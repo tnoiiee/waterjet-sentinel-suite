@@ -179,11 +179,11 @@ public sealed class TimeDelayWorkspaceTests
             Assert.Equal(job.JobId, runtime.State.Queue.LastDispatch?.JobId);
 
             // A dispatched countdown stays dispatched: the Job now blocks any second dispatch.
-            var dispatchId = job.DispatchId;
+            var dispatchId = job.Dispatch.DispatchId;
             Tick(runtime);
             Tick(runtime);
             Assert.Equal(CountdownLifecycleState.DISPATCHED, runtime.Countdown.Lifecycle);
-            Assert.Equal(dispatchId, Assert.IsType<ActiveCleaningJobState>(runtime.State.ActiveJob).DispatchId);
+            Assert.Equal(dispatchId, Assert.IsType<ActiveCleaningJobState>(runtime.State.ActiveJob).Dispatch.DispatchId);
         }
         finally { await runtime.DisposeAsync(); }
     }
@@ -615,4 +615,9 @@ public sealed class TimeDelayWorkspaceTests
 
     private static IEnumerable<DispatchTimelineStage> DispatchWorkspaceProjectorSteps() =>
         DispatchWorkspaceProjector.OrderedSteps.Select(step => step.Stage);
+
+    private sealed class FixedClock(DateTimeOffset now) : IClock
+    {
+        public DateTimeOffset UtcNow => now;
+    }
 }

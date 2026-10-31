@@ -154,7 +154,7 @@ public sealed class TimeDelayPlannerTests
         Assert.Equal(660, decision.AppliedDelaySeconds);
         Assert.Equal(515.0, decision.RhTempMin);
         Assert.Equal(535.0, decision.RhTempMax);
-        Assert.Equal(DecisionRh(decision), 515.0);
+        Assert.Equal(515.0, DecisionRh(decision));
     }
 
     [Fact]
