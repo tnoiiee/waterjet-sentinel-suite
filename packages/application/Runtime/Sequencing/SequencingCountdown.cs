@@ -45,6 +45,15 @@ public sealed record NextDispatchCountdown
     /// <summary>The parsed decision instant, or null when no decision exists.</summary>
     public DateTimeOffset? CreatedAtUtc { get; init; }
 
+    /// <summary>
+    /// The latest observation instant this countdown has ACCEPTED, or null when no decision exists. It
+    /// starts at <see cref="CreatedAtUtc"/> and only ever moves forward, so an observation earlier than
+    /// it is refused as <see cref="CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION"/> instead of being
+    /// reinterpreted. Comparing whole second buckets is not enough: two instants inside ONE bucket can
+    /// still run backwards, so this evidence is the strict premise of every advance.
+    /// </summary>
+    public DateTimeOffset? LastObservedAtUtc { get; init; }
+
     public DateTimeOffset? CompletedAtUtc { get; init; }
     public DateTimeOffset? DispatchedAtUtc { get; init; }
 
@@ -66,9 +75,10 @@ public sealed record NextDispatchCountdown
 ///
 /// <para>
 /// Rules of the state machine: a decision is created once (generation 1) and every later decision
-/// must use exactly generation + 1; the remaining seconds never increase; a frozen countdown
-/// dispatches at most once; a superseded or cancelled countdown never dispatches; and an ordinary
-/// mutation is refused while a countdown is frozen.
+/// must use exactly generation + 1; the remaining seconds never increase; the observation instant
+/// never runs backwards, and an earlier instant is refused rather than reinterpreted; a frozen
+/// countdown dispatches at most once; a superseded or cancelled countdown never dispatches; and an
+/// ordinary mutation is refused while a countdown is frozen.
 /// </para>
 /// </summary>
 public static class NextDispatchCountdownCoordinator
@@ -132,15 +142,28 @@ public static class NextDispatchCountdownCoordinator
             RemainingSeconds = decision.AppliedDelaySeconds,
             Decision = decision,
             CreatedAtUtc = createdAtUtc,
+            // A new generation starts its OWN observation baseline: the previous generation's
+            // LastObservedAtUtc is never carried into the new active countdown.
+            LastObservedAtUtc = createdAtUtc,
             // The evidence of the restart survives the new decision.
             LastSupersededReason = current.SupersededReason ?? current.LastSupersededReason,
         };
     }
 
     /// <summary>
-    /// Advances the countdown to the observing instant. The remaining seconds are derived from the
-    /// frozen applied delay and the elapsed whole seconds, and are never allowed to grow; a time that
-    /// runs backwards is refused rather than reinterpreted.
+    /// Advances the countdown to the observing instant under the strict observation contract. The
+    /// remaining seconds are derived from the frozen applied delay and the elapsed whole seconds, and
+    /// are never allowed to grow.
+    ///
+    /// <para>
+    /// An instant EARLIER than <see cref="NextDispatchCountdown.LastObservedAtUtc"/> is refused as
+    /// <see cref="CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION"/> and returns the same instance, so no
+    /// accepted evidence changes. An instant EQUAL to it is accepted and leaves the remaining seconds and
+    /// the lifecycle where they are: the derivation reproduces the same whole seconds, and a zero applied
+    /// delay still completes at its own creation instant. A later instant sets the new observation
+    /// baseline on the accepted instance. Time is never inferred from the remaining seconds alone,
+    /// because a reversal inside one whole second bucket leaves them unchanged.
+    /// </para>
     /// </summary>
     public static NextDispatchCountdown Advance(
         NextDispatchCountdown current,
@@ -162,7 +185,17 @@ public static class NextDispatchCountdownCoordinator
             return current;
         }
 
-        if (atUtc < current.CreatedAtUtc.Value)
+        // Every accepted countdown carries its observation baseline: Begin sets it from the same
+        // parsed decision instant, so a missing one is an invalid record, never a silent fallback.
+        if (current.LastObservedAtUtc is null)
+        {
+            refusal = CountdownRefusalCode.DECISION_TIMESTAMP_INVALID;
+            return current;
+        }
+
+        // Strict premise: the observation instant may never run behind the latest accepted one. This
+        // also covers an instant before the creation instant, because the baseline never precedes it.
+        if (atUtc < current.LastObservedAtUtc.Value)
         {
             refusal = CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION;
             return current;
@@ -181,6 +214,7 @@ public static class NextDispatchCountdownCoordinator
             {
                 Lifecycle = CountdownLifecycleState.ACTIVE_FROZEN,
                 RemainingSeconds = remainingSeconds,
+                LastObservedAtUtc = atUtc,
             };
         }
 
@@ -189,10 +223,14 @@ public static class NextDispatchCountdownCoordinator
             Lifecycle = CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH,
             RemainingSeconds = 0,
             CompletedAtUtc = atUtc,
+            LastObservedAtUtc = atUtc,
         };
     }
 
-    /// <summary>Marks the single admissible dispatch. A second dispatch is refused.</summary>
+    /// <summary>
+    /// Marks the single admissible dispatch. A second dispatch is refused. The accepted observation
+    /// evidence is preserved: only the dispatch instant is added.
+    /// </summary>
     public static NextDispatchCountdown MarkDispatched(
         NextDispatchCountdown current,
         DateTimeOffset atUtc,
@@ -223,7 +261,9 @@ public static class NextDispatchCountdownCoordinator
 
     /// <summary>
     /// Supersedes a frozen countdown. The frozen decision is retained as evidence, nothing is
-    /// dispatched, and the next decision must start a new generation with the FULL applied delay.
+    /// dispatched, and the next decision must start a new generation with the FULL applied delay. The
+    /// accepted observation evidence is preserved on the superseded instance, and the NEXT generation
+    /// starts from its own decision instant instead of inheriting it.
     /// </summary>
     public static NextDispatchCountdown Supersede(
         NextDispatchCountdown current,
@@ -253,7 +293,10 @@ public static class NextDispatchCountdownCoordinator
         };
     }
 
-    /// <summary>Cancels a frozen countdown. A cancelled countdown never dispatches.</summary>
+    /// <summary>
+    /// Cancels a frozen countdown. A cancelled countdown never dispatches. The accepted observation
+    /// evidence is preserved.
+    /// </summary>
     public static NextDispatchCountdown Cancel(
         NextDispatchCountdown current,
         out CountdownRefusalCode refusal)
@@ -270,7 +313,10 @@ public static class NextDispatchCountdownCoordinator
         return current with { Lifecycle = CountdownLifecycleState.CANCELLED };
     }
 
-    /// <summary>Faults the countdown. Fail closed: a faulted countdown never dispatches.</summary>
+    /// <summary>
+    /// Faults the countdown. Fail closed: a faulted countdown never dispatches. The accepted observation
+    /// evidence is preserved, so the last instant the Runtime actually observed survives the fault.
+    /// </summary>
     public static NextDispatchCountdown Fault(
         NextDispatchCountdown current,
         CountdownRefusalCode code)

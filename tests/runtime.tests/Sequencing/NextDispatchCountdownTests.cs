@@ -94,6 +94,8 @@ public sealed class NextDispatchCountdownTests
         Assert.True(countdown.Frozen);
         Assert.False(countdown.DispatchAdmissible);
         Assert.Equal(At, countdown.CreatedAtUtc);
+        // The observation baseline starts at the frozen decision instant, never at "now".
+        Assert.Equal(At, countdown.LastObservedAtUtc);
         Assert.Equal("SYN-TD-1", countdown.Decision!.DecisionId);
     }
 
@@ -180,15 +182,101 @@ public sealed class NextDispatchCountdownTests
         var countdown = Active(appliedDelaySeconds: 10);
         countdown = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(6), out _);
         Assert.Equal(4, countdown.RemainingSeconds);
+        Assert.Equal(At.AddSeconds(6), countdown.LastObservedAtUtc);
 
         // An earlier instant is refused instead of being reinterpreted as a longer countdown.
         var regressed = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(5), out var refusal);
         Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, refusal);
         Assert.Same(countdown, regressed);
 
+        // The refusal changed no accepted evidence at all.
+        Assert.Equal(At.AddSeconds(6), regressed.LastObservedAtUtc);
+        Assert.Equal(4, regressed.RemainingSeconds);
+        Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, regressed.Lifecycle);
+
+        // An accepted later instant moves the baseline with it: the countdown is now proof against
+        // any instant before +7, not only against instants before the creation instant.
+        var accepted = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(7), out var acceptedRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, acceptedRefusal);
+        Assert.Equal(3, accepted.RemainingSeconds);
+        Assert.Equal(At.AddSeconds(7), accepted.LastObservedAtUtc);
+
+        var second = NextDispatchCountdownCoordinator.Advance(accepted, At.AddSeconds(6), out var secondRegression);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, secondRegression);
+        Assert.Same(accepted, second);
+
         // A repeated instant keeps the remaining seconds where they are.
-        var repeated = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(6), out _);
+        var repeated = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(6), out var repeatedRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, repeatedRefusal);
         Assert.Equal(4, repeated.RemainingSeconds);
+        Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, repeated.Lifecycle);
+    }
+
+    [Fact]
+    public void Time_regression_is_detected_inside_one_whole_second_bucket()
+    {
+        // Both instants floor to the SAME elapsed whole second, so the remaining seconds cannot
+        // reveal the reversal: only the accepted observation instant can.
+        var countdown = Active(appliedDelaySeconds: 30);
+        countdown = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(6.9), out _);
+        Assert.Equal(24, countdown.RemainingSeconds);
+        Assert.Equal(At.AddSeconds(6.9), countdown.LastObservedAtUtc);
+
+        var regressed = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(6.1), out var refusal);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, refusal);
+        Assert.Same(countdown, regressed);
+        Assert.Equal(24, regressed.RemainingSeconds);
+
+        // An instant later than the baseline inside the SAME bucket is accepted and records the later
+        // instant, without moving the remaining seconds.
+        var accepted = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(6.95), out var acceptedRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, acceptedRefusal);
+        Assert.Equal(24, accepted.RemainingSeconds);
+        Assert.Equal(At.AddSeconds(6.95), accepted.LastObservedAtUtc);
+    }
+
+    [Fact]
+    public void A_zero_applied_delay_still_completes_at_its_own_creation_instant()
+    {
+        // The equal instant rule must not strand a zero delay in ACTIVE_FROZEN: the Runtime observes
+        // the countdown at the very instant it was frozen.
+        var countdown = Active(appliedDelaySeconds: 0);
+        Assert.Equal(0, countdown.RemainingSeconds);
+        Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, countdown.Lifecycle);
+
+        var completed = NextDispatchCountdownCoordinator.Advance(countdown, At, out var refusal);
+
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH, completed.Lifecycle);
+        Assert.Equal(0, completed.RemainingSeconds);
+        Assert.Equal(At, completed.CompletedAtUtc);
+        Assert.Equal(At, completed.LastObservedAtUtc);
+    }
+
+    [Fact]
+    public void Completion_records_the_observation_and_the_completion_instant_together()
+    {
+        var countdown = Active(appliedDelaySeconds: 5);
+
+        countdown = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(4), out _);
+        Assert.Equal(1, countdown.RemainingSeconds);
+        Assert.Equal(At.AddSeconds(4), countdown.LastObservedAtUtc);
+        Assert.Null(countdown.CompletedAtUtc);
+
+        var completed = NextDispatchCountdownCoordinator.Advance(countdown, At.AddSeconds(5.25), out var refusal);
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH, completed.Lifecycle);
+        // The completion is stamped with the OBSERVED instant itself, never with a truncated bucket.
+        Assert.Equal(At.AddSeconds(5.25), completed.CompletedAtUtc);
+        Assert.Equal(At.AddSeconds(5.25), completed.LastObservedAtUtc);
+        Assert.True(completed.DispatchAdmissible);
+
+        // The completed instance keeps its baseline; a later observation of a completed countdown is
+        // refused as not active and changes no evidence.
+        var later = NextDispatchCountdownCoordinator.Advance(completed, At.AddSeconds(6), out var notActive);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_NOT_ACTIVE, notActive);
+        Assert.Same(completed, later);
+        Assert.Equal(At.AddSeconds(5.25), later.LastObservedAtUtc);
     }
 
     [Fact]
@@ -251,6 +339,7 @@ public sealed class NextDispatchCountdownTests
         Assert.Equal(CountdownLifecycleState.SUPERSEDED, superseded.Lifecycle);
         Assert.Equal(CountdownSupersessionReason.QUEUE_HEAD_IDENTITY_CHANGED, superseded.SupersededReason);
         Assert.NotNull(superseded.Decision);          // retained as evidence
+        Assert.Equal(At.AddSeconds(27), superseded.LastObservedAtUtc);   // observation evidence kept
         Assert.False(superseded.Frozen);
         Assert.False(superseded.DispatchAdmissible);
 
@@ -307,6 +396,19 @@ public sealed class NextDispatchCountdownTests
         Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, restarted.Lifecycle);
         Assert.Equal(30, restarted.RemainingSeconds);   // the FULL applied delay, not the 3 s that were left
         Assert.Equal(CountdownSupersessionReason.CRITICAL_PUMP_EVENT, restarted.LastSupersededReason);
+
+        // The new generation starts its OWN observation baseline from its own decision instant: the
+        // previous generation's accepted instant (+27) is never inherited.
+        Assert.Equal(At, restarted.CreatedAtUtc);
+        Assert.Equal(At, restarted.LastObservedAtUtc);
+        Assert.NotEqual(superseded.LastObservedAtUtc, restarted.LastObservedAtUtc);
+
+        // And an instant between the two generations is judged against the NEW baseline only: it is
+        // later than the new decision instant, so it is accepted.
+        var advanced = NextDispatchCountdownCoordinator.Advance(restarted, At.AddSeconds(1), out var advanceRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, advanceRefusal);
+        Assert.Equal(29, advanced.RemainingSeconds);
+        Assert.Equal(At.AddSeconds(1), advanced.LastObservedAtUtc);
     }
 
     [Fact]

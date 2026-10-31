@@ -230,11 +230,32 @@ public sealed class TimeDelayPlannerTests
     [Fact]
     public void The_base_delay_truncates_toward_zero()
     {
-        // 660 + (516.5 - 515) * (600 - 660) / 20 = 655.5, truncated to 655.
+        // 660 + (516.5 - 515) * (600 - 660) / 20 = 655.5, truncated to 655. The helper's default is a
+        // LOWER Sensor (LEFT order wall 12, and the Upper condition is STRICTLY below 12), so the zone
+        // factor is 1.00 and the applied delay is the truncated base delay itself.
         var decision = PlanAuto(Auto(), Rh(516.5));
 
+        Assert.Equal(DelayZone.LOWER, decision.Zone);
+        Assert.Equal(1.00, decision.ZoneFactor);
         Assert.Equal(655, decision.BaseDelaySeconds);
-        Assert.Equal(Convert.ToInt32(655 * 0.75), decision.AppliedDelaySeconds);
+        Assert.Equal(655, decision.AppliedDelaySeconds);
+    }
+
+    [Fact]
+    public void The_upper_zone_factor_is_applied_to_the_already_truncated_base_delay()
+    {
+        // The SAME fractional mapping on an UPPER Sensor (LEFT order wall 11, strictly below the 12
+        // bound) truncates to the same base delay and only then converts it, so the two concerns stay
+        // separable: truncation first, then Convert.ToInt32(base * factor).
+        var decision = PlanAuto(Auto(), Rh(516.5), Sensor(Wall.LEFT, 11));
+
+        Assert.Equal(DelayZone.UPPER, decision.Zone);
+        Assert.Equal(TimeDelayPlanner.UpperZoneFactor, decision.ZoneFactor);
+        Assert.Equal(655, decision.BaseDelaySeconds);          // truncation is zone independent
+        Assert.Equal(491, decision.AppliedDelaySeconds);       // Convert.ToInt32(655 * 0.75) = 491
+        Assert.Equal(
+            TimeDelayPlanner.ApplyZoneFactor(decision.BaseDelaySeconds, decision.ZoneFactor),
+            decision.AppliedDelaySeconds);
     }
 
     [Theory]
