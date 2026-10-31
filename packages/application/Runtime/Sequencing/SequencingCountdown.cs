@@ -75,19 +75,48 @@ public sealed record NextDispatchCountdown
 ///
 /// <para>
 /// Rules of the state machine: a decision is created once (generation 1) and every later decision
-/// must use exactly generation + 1; the remaining seconds never increase; the observation instant
-/// never runs backwards, and an earlier instant is refused rather than reinterpreted; a frozen
-/// countdown dispatches at most once; a superseded or cancelled countdown never dispatches; and an
+/// must use exactly generation + 1, which is the ONLY place a generation is derived; the remaining
+/// seconds never increase; the observation instant never runs backwards, and an earlier instant is
+/// refused rather than reinterpreted; a frozen countdown dispatches at most once, and only at or
+/// after the instant it completed; a superseded or cancelled countdown never dispatches; and an
 /// ordinary mutation is refused while a countdown is frozen.
 /// </para>
 /// </summary>
 public static class NextDispatchCountdownCoordinator
 {
-    /// <summary>The generation a NEW decision must carry, given the current countdown.</summary>
-    public static int NextGeneration(NextDispatchCountdown current)
+    /// <summary>
+    /// The ONE generation authority. It derives the generation a NEW decision must carry, or refuses
+    /// with the typed reason when no further generation exists. Generation identity is monotonic and
+    /// never wraps, saturates or restarts: the successor of <see cref="int.MaxValue"/> does not exist,
+    /// so it is refused as <see cref="CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED"/> rather
+    /// than being computed. A negative current generation is refused as invalid, because no accepted
+    /// countdown can carry one. Nothing is mutated on refusal.
+    /// </summary>
+    public static bool TryNextGeneration(
+        NextDispatchCountdown current,
+        out int nextGeneration,
+        out CountdownRefusalCode refusal)
     {
         ArgumentNullException.ThrowIfNull(current);
-        return current.Generation + 1;
+        nextGeneration = 0;
+        refusal = CountdownRefusalCode.NONE;
+
+        if (current.Generation < 0)
+        {
+            refusal = CountdownRefusalCode.COUNTDOWN_GENERATION_INVALID;
+            return false;
+        }
+
+        if (current.Generation == int.MaxValue)
+        {
+            refusal = CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED;
+            return false;
+        }
+
+        // Every case that reaches this line is 0 .. int.MaxValue - 1, so the successor is exact and
+        // can never overflow.
+        nextGeneration = current.Generation + 1;
+        return true;
     }
 
     /// <summary>
@@ -117,7 +146,15 @@ public static class NextDispatchCountdownCoordinator
             return current;
         }
 
-        if (decision.CountdownGeneration != current.Generation + 1)
+        // One authority, one derivation: the decision must carry exactly the successor this countdown
+        // publishes, and an exhausted or invalid generation is refused before the decision is adopted.
+        if (!TryNextGeneration(current, out var nextGeneration, out var generationRefusal))
+        {
+            refusal = generationRefusal;
+            return current;
+        }
+
+        if (decision.CountdownGeneration != nextGeneration)
         {
             refusal = CountdownRefusalCode.COUNTDOWN_GENERATION_INVALID;
             return current;
@@ -193,11 +230,25 @@ public static class NextDispatchCountdownCoordinator
             return current;
         }
 
+        // A frozen countdown has not completed and has not dispatched. A constructed record that
+        // carries either evidence contradicts its own lifecycle, so it is refused instead of repaired.
+        if (current.CompletedAtUtc is not null || current.DispatchedAtUtc is not null)
+        {
+            refusal = CountdownRefusalCode.DECISION_TIMESTAMP_INVALID;
+            return current;
+        }
+
         // Strict premise: the observation instant may never run behind the latest accepted one. This
         // also covers an instant before the creation instant, because the baseline never precedes it.
         if (atUtc < current.LastObservedAtUtc.Value)
         {
             refusal = CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION;
+            return current;
+        }
+
+        if (current.LastObservedAtUtc.Value < current.CreatedAtUtc.Value)
+        {
+            refusal = CountdownRefusalCode.DECISION_TIMESTAMP_INVALID;
             return current;
         }
 
@@ -229,7 +280,29 @@ public static class NextDispatchCountdownCoordinator
 
     /// <summary>
     /// Marks the single admissible dispatch. A second dispatch is refused. The accepted observation
-    /// evidence is preserved: only the dispatch instant is added.
+    /// evidence is preserved and the dispatch instant becomes the new latest observation, because a
+    /// dispatch IS a lifecycle observation.
+    ///
+    /// <para>
+    /// The accepted order of a finished generation is
+    /// <c>CreatedAtUtc &lt;= CompletedAtUtc &lt;= DispatchedAtUtc</c> with
+    /// <c>LastObservedAtUtc == DispatchedAtUtc</c>: while the countdown is running or merely completed,
+    /// the last observation can never run past the completion instant
+    /// (<c>CreatedAtUtc &lt;= LastObservedAtUtc &lt;= CompletedAtUtc</c>), and the dispatch instant then
+    /// becomes the final observation of that generation. The last accepted observation therefore never
+    /// moves backwards and never disappears, and the dispatch instant is never earlier than either
+    /// earlier evidence.
+    /// </para>
+    ///
+    /// <para>
+    /// A dispatch instant earlier than the accepted completion or observation evidence is refused as
+    /// <see cref="CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION"/> instead of writing contradictory
+    /// audit evidence. Missing or mutually contradictory timestamp evidence fails closed as
+    /// <see cref="CountdownRefusalCode.DECISION_TIMESTAMP_INVALID"/> before the instant is judged, so a
+    /// record whose own observation runs ahead of its completion can never be reinterpreted as a mere
+    /// regression. Every refusal returns the SAME instance, so no lifecycle, remaining time or timestamp
+    /// changes and no second dispatch becomes admissible.
+    /// </para>
     /// </summary>
     public static NextDispatchCountdown MarkDispatched(
         NextDispatchCountdown current,
@@ -251,11 +324,41 @@ public static class NextDispatchCountdownCoordinator
             return current;
         }
 
+        // Mandatory evidence of a completed countdown: a dispatch is never stamped onto a record that
+        // cannot prove when it completed or when it was last observed.
+        if (current.Decision is null
+            || current.CreatedAtUtc is not { } createdAtUtc
+            || current.LastObservedAtUtc is not { } lastObservedAtUtc
+            || current.CompletedAtUtc is not { } completedAtUtc
+            || current.DispatchedAtUtc is not null
+            || current.RemainingSeconds != 0)
+        {
+            refusal = CountdownRefusalCode.DECISION_TIMESTAMP_INVALID;
+            return current;
+        }
+
+        // The mandatory order of a completed countdown, refused rather than silently repaired when a
+        // constructed record contradicts it.
+        if (lastObservedAtUtc < createdAtUtc || completedAtUtc < lastObservedAtUtc)
+        {
+            refusal = CountdownRefusalCode.DECISION_TIMESTAMP_INVALID;
+            return current;
+        }
+
+        // The dispatch is the LAST lifecycle observation, so it may never precede the evidence it
+        // succeeds: a completion at 10:00:10 can never be dispatched at 10:00:05.
+        if (atUtc < completedAtUtc || atUtc < lastObservedAtUtc)
+        {
+            refusal = CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION;
+            return current;
+        }
+
         return current with
         {
             Lifecycle = CountdownLifecycleState.DISPATCHED,
             RemainingSeconds = 0,
             DispatchedAtUtc = atUtc,
+            LastObservedAtUtc = atUtc,
         };
     }
 

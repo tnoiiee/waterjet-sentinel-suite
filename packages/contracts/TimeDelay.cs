@@ -122,6 +122,15 @@ public enum CountdownRefusalCode
     MUTATION_REFUSED_DURING_COUNTDOWN,
     CONFIGURATION_MISSING,
     CONFIGURATION_CHANGE_REFUSED_DURING_COUNTDOWN,
+
+    /// <summary>
+    /// The countdown generation cannot advance: the current generation is already
+    /// <see cref="int.MaxValue"/>, so no further generation exists. Generation identity is monotonic
+    /// and never wraps, saturates or restarts inside an AutoSequence session, so the next decision is
+    /// refused instead of being stamped with a wrapped or repeated generation. Declared last so every
+    /// earlier member keeps its numeric value; the wire form is the name, never the number.
+    /// </summary>
+    COUNTDOWN_GENERATION_EXHAUSTED,
 }
 
 /// <summary>

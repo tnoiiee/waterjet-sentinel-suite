@@ -905,40 +905,50 @@ public sealed class SimulatorRuntime : IAsyncDisposable
 
         if (mayStartDecision)
         {
-            var head = candidate.Queue[0];
-            var sensor = FindSensor(sensors, head.SensorId);
-            TimeDelayPlanner.TryResolveSensorIdentity(sensor, out var identity, out var identityRefusal);
-            var rhInput = settings.RhSampleAt(checked((int)Interlocked.Read(ref _acceptedTicks)), atUtc);
-            var generation = NextDispatchCountdownCoordinator.NextGeneration(current);
-            var decisionId = $"SYN-TD-{generation}";
-            var plan = identity is null
-                ? TimeDelayPlanResult.Refused(identityRefusal)
-                : TimeDelayPlanner.Plan(
-                    settings.Configuration,
-                    identity,
-                    rhInput,
-                    atUtc,
-                    decisionId,
-                    generation,
-                    candidate.QueueRevision,
-                    head.EntryId);
-
-            if (plan.Accepted && plan.Decision is not null)
+            // The ONE generation authority decides before anything is sampled, stamped or planned. An
+            // exhausted (or invalid) generation is not fabricated and never reaches the planner: the
+            // countdown fails closed through its own fault path, so nothing is adopted, frozen or
+            // dispatched, and no Sensor or RH input is consumed for a decision that cannot exist.
+            if (!NextDispatchCountdownCoordinator.TryNextGeneration(current, out var generation, out var generationRefusal))
             {
-                var begun = NextDispatchCountdownCoordinator.Begin(current, plan.Decision, out var beginRefusal);
-                current = beginRefusal == CountdownRefusalCode.NONE
-                    ? begun
-                    : NextDispatchCountdownCoordinator.Fault(current, beginRefusal);
+                current = NextDispatchCountdownCoordinator.Fault(current, generationRefusal);
             }
             else
             {
-                // Fail closed: a refused premise (missing, stale, future-dated or bad-quality RH, an
-                // invalid generation, an invalid range or an unresolvable identity) blocks the
-                // countdown. No silent zero and no last-known value replaces the refusal.
-                var refusal = plan.RefusalCode == CountdownRefusalCode.NONE
-                    ? CountdownRefusalCode.SENSOR_IDENTITY_INVALID
-                    : plan.RefusalCode;
-                current = NextDispatchCountdownCoordinator.Fault(current, refusal);
+                var head = candidate.Queue[0];
+                var sensor = FindSensor(sensors, head.SensorId);
+                TimeDelayPlanner.TryResolveSensorIdentity(sensor, out var identity, out var identityRefusal);
+                var rhInput = settings.RhSampleAt(checked((int)Interlocked.Read(ref _acceptedTicks)), atUtc);
+                var decisionId = $"SYN-TD-{generation}";
+                var plan = identity is null
+                    ? TimeDelayPlanResult.Refused(identityRefusal)
+                    : TimeDelayPlanner.Plan(
+                        settings.Configuration,
+                        identity,
+                        rhInput,
+                        atUtc,
+                        decisionId,
+                        generation,
+                        candidate.QueueRevision,
+                        head.EntryId);
+
+                if (plan.Accepted && plan.Decision is not null)
+                {
+                    var begun = NextDispatchCountdownCoordinator.Begin(current, plan.Decision, out var beginRefusal);
+                    current = beginRefusal == CountdownRefusalCode.NONE
+                        ? begun
+                        : NextDispatchCountdownCoordinator.Fault(current, beginRefusal);
+                }
+                else
+                {
+                    // Fail closed: a refused premise (missing, stale, future-dated or bad-quality RH, an
+                    // invalid generation, an invalid range or an unresolvable identity) blocks the
+                    // countdown. No silent zero and no last-known value replaces the refusal.
+                    var refusal = plan.RefusalCode == CountdownRefusalCode.NONE
+                        ? CountdownRefusalCode.SENSOR_IDENTITY_INVALID
+                        : plan.RefusalCode;
+                    current = NextDispatchCountdownCoordinator.Fault(current, refusal);
+                }
             }
         }
 

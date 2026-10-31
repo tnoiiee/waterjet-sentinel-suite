@@ -70,6 +70,14 @@ public sealed class NextDispatchCountdownTests
         return countdown;
     }
 
+    /// <summary>
+    /// A countdown that already carries an arbitrary generation. It is only ever used to place the
+    /// state machine at a generation boundary that a real orchestration would take a very long time to
+    /// reach; it is never dispatched and never observed as Product state.
+    /// </summary>
+    private static NextDispatchCountdown AtGeneration(int generation, CountdownLifecycleState lifecycle) =>
+        NextDispatchCountdown.None with { Generation = generation, Lifecycle = lifecycle };
+
     [Fact]
     public void No_countdown_exists_before_the_first_decision()
     {
@@ -78,9 +86,15 @@ public sealed class NextDispatchCountdownTests
         Assert.Equal(CountdownLifecycleState.NONE, none.Lifecycle);
         Assert.Equal(0, none.Generation);
         Assert.Null(none.Decision);
+        Assert.Null(none.CreatedAtUtc);
+        Assert.Null(none.LastObservedAtUtc);
+        Assert.Null(none.CompletedAtUtc);
+        Assert.Null(none.DispatchedAtUtc);
         Assert.False(none.Frozen);
         Assert.False(none.DispatchAdmissible);
-        Assert.Equal(1, NextDispatchCountdownCoordinator.NextGeneration(none));
+        Assert.True(NextDispatchCountdownCoordinator.TryNextGeneration(none, out var nextGeneration, out var refusal));
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(1, nextGeneration);
     }
 
     [Fact]
@@ -121,6 +135,143 @@ public sealed class NextDispatchCountdownTests
 
         Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_INVALID, refusal);
         Assert.Same(current, countdown);
+    }
+
+    [Fact]
+    public void Generation_never_wraps_and_never_repeats_at_the_integer_boundary()
+    {
+        // The successor sequence is exact everywhere it exists.
+        foreach (var (current, expected) in new[]
+        {
+            (0, 1),
+            (1, 2),
+            (int.MaxValue - 1, int.MaxValue),
+        })
+        {
+            var countdown = AtGeneration(current, CountdownLifecycleState.SUPERSEDED);
+
+            Assert.True(NextDispatchCountdownCoordinator.TryNextGeneration(
+                countdown, out var nextGeneration, out var refusal));
+            Assert.Equal(CountdownRefusalCode.NONE, refusal);
+            Assert.Equal(expected, nextGeneration);
+        }
+    }
+
+    [Fact]
+    public void The_successor_of_int_MaxValue_does_not_exist_and_is_refused()
+    {
+        var exhausted = AtGeneration(int.MaxValue, CountdownLifecycleState.SUPERSEDED);
+
+        var accepted = NextDispatchCountdownCoordinator.TryNextGeneration(
+            exhausted, out var nextGeneration, out var refusal);
+
+        Assert.False(accepted);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED, refusal);
+        // No wrap to int.MinValue, no saturation at int.MaxValue, no negative generation.
+        Assert.Equal(0, nextGeneration);
+        Assert.NotEqual(int.MinValue, nextGeneration);
+        Assert.NotEqual(int.MaxValue, nextGeneration);
+        Assert.True(nextGeneration >= 0);
+    }
+
+    [Fact]
+    public void A_negative_current_generation_is_refused_as_invalid_rather_than_incremented()
+    {
+        var negative = AtGeneration(-1, CountdownLifecycleState.SUPERSEDED);
+
+        var accepted = NextDispatchCountdownCoordinator.TryNextGeneration(negative, out var nextGeneration, out var refusal);
+
+        Assert.False(accepted);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_INVALID, refusal);
+        Assert.Equal(0, nextGeneration);
+    }
+
+    [Fact]
+    public void Generation_exhaustion_refuses_the_decision_without_touching_the_frozen_state()
+    {
+        // A superseded generation at the last representable value: the next decision cannot exist.
+        var completed = NextDispatchCountdownCoordinator.Advance(
+            NextDispatchCountdown.None with
+            {
+                Lifecycle = CountdownLifecycleState.ACTIVE_FROZEN,
+                Generation = int.MaxValue,
+                RemainingSeconds = 3,
+                Decision = Decision(int.MaxValue, 3),
+                CreatedAtUtc = At,
+                LastObservedAtUtc = At,
+            },
+            At.AddSeconds(1),
+            out var advanceRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, advanceRefusal);
+        Assert.Equal(2, completed.RemainingSeconds);
+
+        var superseded = NextDispatchCountdownCoordinator.Supersede(
+            completed, CountdownSupersessionReason.CRITICAL_PUMP_EVENT, out _);
+        Assert.Equal(CountdownLifecycleState.SUPERSEDED, superseded.Lifecycle);
+        var remainingBefore = superseded.RemainingSeconds;
+
+        var refused = NextDispatchCountdownCoordinator.Begin(
+            superseded, Decision(int.MaxValue, 30), out var refusal);
+
+        // Exhaustion is reported by the SAME authority the Runtime uses, and the decision is never adopted.
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED, refusal);
+        Assert.Same(superseded, refused);
+        Assert.Equal(CountdownLifecycleState.SUPERSEDED, refused.Lifecycle);
+        Assert.Equal(remainingBefore, refused.RemainingSeconds);
+        Assert.Equal(int.MaxValue, refused.Generation);
+        Assert.False(refused.DispatchAdmissible);
+        Assert.False(refused.Frozen);
+        // No partial frozen decision was created: the retained decision is still the OLD one.
+        Assert.Equal(int.MaxValue, refused.Decision!.CountdownGeneration);
+        Assert.NotEqual(30, refused.Decision!.AppliedDelaySeconds);
+    }
+
+    [Fact]
+    public void An_exhausted_generation_faults_the_countdown_instead_of_reaching_the_planner()
+    {
+        // The Runtime never plans with a fabricated successor: it asks the ONE authority first and, on
+        // refusal, faults through the existing countdown fault path. This mirrors that composition, so
+        // no parallel error channel and no wrapped generation can reach TimeDelayPlanner.
+        var active = Active(appliedDelaySeconds: 5) with
+        {
+            Generation = int.MaxValue,
+            Decision = Decision(int.MaxValue, 5),
+        };
+
+        var planned = NextDispatchCountdownCoordinator.TryNextGeneration(active, out var generation, out var refusal);
+        var observed = planned ? active : NextDispatchCountdownCoordinator.Fault(active, refusal);
+
+        Assert.False(planned);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED, refusal);
+        Assert.Equal(CountdownLifecycleState.FAULTED, observed.Lifecycle);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED, observed.RefusalCode);
+        Assert.Equal(5, observed.RemainingSeconds);                       // evidence untouched
+        Assert.Equal(At, observed.LastObservedAtUtc);
+        Assert.Equal(int.MaxValue, observed.Generation);
+        Assert.False(observed.DispatchAdmissible);
+        // Nothing that could be handed to the planner exists: no successor was produced at all.
+        Assert.Equal(0, generation);
+    }
+
+    [Fact]
+    public void A_superseded_generation_still_restarts_at_exactly_plus_one_when_representable()
+    {
+        var previous = AtGeneration(int.MaxValue - 1, CountdownLifecycleState.SUPERSEDED);
+
+        Assert.True(NextDispatchCountdownCoordinator.TryNextGeneration(
+            previous, out var nextGeneration, out var refusal));
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(int.MaxValue, nextGeneration);
+
+        var decision = Decision(nextGeneration, 30);
+        var begun = NextDispatchCountdownCoordinator.Begin(previous, decision, out var beginRefusal);
+
+        Assert.Equal(CountdownRefusalCode.NONE, beginRefusal);
+        Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, begun.Lifecycle);
+        Assert.Equal(int.MaxValue, begun.Generation);
+        Assert.Equal(30, begun.RemainingSeconds);
+        Assert.Equal(At, begun.CreatedAtUtc);
+        Assert.Equal(At, begun.LastObservedAtUtc);
     }
 
     [Fact]
@@ -251,6 +402,17 @@ public sealed class NextDispatchCountdownTests
         Assert.Equal(0, completed.RemainingSeconds);
         Assert.Equal(At, completed.CompletedAtUtc);
         Assert.Equal(At, completed.LastObservedAtUtc);
+
+        // A zero delay dispatches at that same instant, and still exactly once.
+        var dispatched = NextDispatchCountdownCoordinator.MarkDispatched(completed, At, out var dispatchRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, dispatchRefusal);
+        Assert.Equal(CountdownLifecycleState.DISPATCHED, dispatched.Lifecycle);
+        Assert.Equal(At, dispatched.CompletedAtUtc);
+        Assert.Equal(At, dispatched.DispatchedAtUtc);
+        Assert.Equal(At, dispatched.LastObservedAtUtc);
+        var second = NextDispatchCountdownCoordinator.MarkDispatched(dispatched, At, out var secondRefusal);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_ALREADY_DISPATCHED, secondRefusal);
+        Assert.Same(dispatched, second);
     }
 
     [Fact]
@@ -323,6 +485,140 @@ public sealed class NextDispatchCountdownTests
         var second = NextDispatchCountdownCoordinator.MarkDispatched(countdown, At.AddSeconds(2), out var secondRefusal);
         Assert.Equal(CountdownRefusalCode.COUNTDOWN_ALREADY_DISPATCHED, secondRefusal);
         Assert.Same(countdown, second);
+    }
+
+    /// <summary>A completed countdown whose completion and observation instants both equal the given one.</summary>
+    private static NextDispatchCountdown Completed(int appliedDelaySeconds = 5, int completedAtSeconds = 5)
+    {
+        var advanced = NextDispatchCountdownCoordinator.Advance(
+            Active(appliedDelaySeconds: appliedDelaySeconds),
+            At.AddSeconds(completedAtSeconds),
+            out var refusal);
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH, advanced.Lifecycle);
+        return advanced;
+    }
+
+    [Fact]
+    public void A_dispatch_at_the_completion_instant_is_accepted()
+    {
+        // The zero-delay and same-tick paths dispatch at exactly the instant the countdown completed.
+        var completed = Completed(appliedDelaySeconds: 5, completedAtSeconds: 5);
+
+        var dispatched = NextDispatchCountdownCoordinator.MarkDispatched(completed, At.AddSeconds(5), out var refusal);
+
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(CountdownLifecycleState.DISPATCHED, dispatched.Lifecycle);
+        Assert.Equal(At.AddSeconds(5), dispatched.DispatchedAtUtc);
+        Assert.Equal(At.AddSeconds(5), dispatched.CompletedAtUtc);      // preserved
+        Assert.Equal(At.AddSeconds(5), dispatched.LastObservedAtUtc);   // the dispatch IS the observation
+        Assert.Equal(0, dispatched.RemainingSeconds);
+        Assert.False(dispatched.Frozen);
+        Assert.False(dispatched.DispatchAdmissible);
+    }
+
+    [Fact]
+    public void A_dispatch_after_the_completion_instant_advances_the_observation_baseline()
+    {
+        var completed = Completed(appliedDelaySeconds: 5, completedAtSeconds: 5);
+
+        var dispatched = NextDispatchCountdownCoordinator.MarkDispatched(completed, At.AddSeconds(7), out var refusal);
+
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(At.AddSeconds(7), dispatched.DispatchedAtUtc);
+        Assert.Equal(At.AddSeconds(7), dispatched.LastObservedAtUtc);   // moved with the dispatch
+        Assert.Equal(At.AddSeconds(5), dispatched.CompletedAtUtc);      // never rewritten
+        // The accepted order holds on the dispatched record: the completion is never rewritten, the
+        // dispatch instant is the final observation of the generation, and nothing precedes creation.
+        Assert.True(dispatched.CreatedAtUtc <= dispatched.CompletedAtUtc);
+        Assert.True(dispatched.CompletedAtUtc <= dispatched.DispatchedAtUtc);
+        Assert.Equal(dispatched.DispatchedAtUtc, dispatched.LastObservedAtUtc);
+    }
+
+    [Fact]
+    public void A_dispatch_before_the_completion_instant_is_refused_as_a_time_regression()
+    {
+        var completed = Completed(appliedDelaySeconds: 5, completedAtSeconds: 5);
+
+        var refused = NextDispatchCountdownCoordinator.MarkDispatched(completed, At.AddSeconds(4), out var refusal);
+
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, refusal);
+        Assert.Same(completed, refused);
+        Assert.Null(refused.DispatchedAtUtc);
+        Assert.Equal(At.AddSeconds(5), refused.LastObservedAtUtc);
+        Assert.Equal(At.AddSeconds(5), refused.CompletedAtUtc);
+        Assert.Equal(CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH, refused.Lifecycle);
+        Assert.True(refused.DispatchAdmissible);   // still exactly one dispatch remains admissible
+
+        // Evidence is judged BEFORE the instant it is compared with: a constructed record whose last
+        // observation runs ahead of its own completion is contradictory, so it fails closed as invalid
+        // evidence even when the dispatch instant sits strictly between the two.
+        var contradictory = completed with { LastObservedAtUtc = At.AddSeconds(9) };
+        var invalid = NextDispatchCountdownCoordinator.MarkDispatched(
+            contradictory, At.AddSeconds(6), out var invalidRefusal);
+        Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, invalidRefusal);
+        Assert.Same(contradictory, invalid);
+        Assert.Null(invalid.DispatchedAtUtc);
+        Assert.Equal(At.AddSeconds(9), invalid.LastObservedAtUtc);
+    }
+
+    [Theory]
+    [InlineData(0)]   // CompletedAtUtc missing
+    [InlineData(1)]   // LastObservedAtUtc missing
+    [InlineData(2)]   // CreatedAtUtc missing
+    [InlineData(3)]   // RemainingSeconds not zero
+    [InlineData(4)]   // observation AFTER completion: contradictory evidence
+    [InlineData(5)]   // DispatchedAtUtc already present on a completed lifecycle
+    public void A_completed_countdown_without_its_mandatory_evidence_fails_closed(int defect)
+    {
+        var completed = Completed(appliedDelaySeconds: 5, completedAtSeconds: 5);
+        var malformed = defect switch
+        {
+            0 => completed with { CompletedAtUtc = null },
+            1 => completed with { LastObservedAtUtc = null },
+            2 => completed with { CreatedAtUtc = null },
+            3 => completed with { RemainingSeconds = 1 },
+            4 => completed with { LastObservedAtUtc = At.AddSeconds(9) },
+            _ => completed with { DispatchedAtUtc = At.AddSeconds(6) },
+        };
+
+        var refused = NextDispatchCountdownCoordinator.MarkDispatched(malformed, At.AddSeconds(9), out var refusal);
+
+        Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, refusal);
+        Assert.Same(malformed, refused);
+        Assert.Null(refused.DispatchedAtUtc);
+        Assert.Equal(CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH, refused.Lifecycle);
+    }
+
+    [Fact]
+    public void A_superseded_cancelled_or_faulted_countdown_can_never_dispatch()
+    {
+        var completed = Completed();
+
+        // Superseded, cancelled and faulted countdowns keep their evidence and never dispatch: the
+        // lifecycle is judged before any timestamp, so no refusal can be mistaken for a dispatch.
+        var superseded = NextDispatchCountdownCoordinator.Supersede(
+            completed, CountdownSupersessionReason.QUEUE_HEAD_WITHDRAWN, out _);
+        var supersededAttempt = NextDispatchCountdownCoordinator.MarkDispatched(
+            superseded, At.AddSeconds(9), out var supersededRefusal);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_NOT_COMPLETE, supersededRefusal);
+        Assert.Same(superseded, supersededAttempt);
+        Assert.Null(supersededAttempt.DispatchedAtUtc);
+
+        var cancelled = NextDispatchCountdownCoordinator.Cancel(completed, out var cancelRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, cancelRefusal);
+        var cancelledAttempt = NextDispatchCountdownCoordinator.MarkDispatched(
+            cancelled, At.AddSeconds(9), out var cancelledRefusal);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_NOT_COMPLETE, cancelledRefusal);
+        Assert.Same(cancelled, cancelledAttempt);
+        Assert.Null(cancelledAttempt.DispatchedAtUtc);
+
+        var faulted = NextDispatchCountdownCoordinator.Fault(completed, CountdownRefusalCode.RH_STALE);
+        var faultedAttempt = NextDispatchCountdownCoordinator.MarkDispatched(
+            faulted, At.AddSeconds(9), out var faultedRefusal);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_NOT_COMPLETE, faultedRefusal);
+        Assert.Same(faulted, faultedAttempt);
+        Assert.Null(faultedAttempt.DispatchedAtUtc);
     }
 
     [Fact]
@@ -459,6 +755,130 @@ public sealed class NextDispatchCountdownTests
 
         var dispatched = NextDispatchCountdownCoordinator.MarkDispatched(completed, At.AddSeconds(5), out _);
         Assert.False(NextDispatchCountdownCoordinator.RefusesMutation(dispatched, out _));
+    }
+
+    [Fact]
+    public void A_contradictory_frozen_state_is_refused_instead_of_repaired()
+    {
+        var active = Active(appliedDelaySeconds: 5);
+
+        // A frozen countdown that already carries completion evidence contradicts its own lifecycle.
+        var withCompletion = active with { CompletedAtUtc = At.AddSeconds(2) };
+        var refusedCompletion = NextDispatchCountdownCoordinator.Advance(
+            withCompletion, At.AddSeconds(3), out var completionRefusal);
+        Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, completionRefusal);
+        Assert.Same(withCompletion, refusedCompletion);
+
+        // A frozen countdown that already carries dispatch evidence contradicts its own lifecycle.
+        var withDispatch = active with { DispatchedAtUtc = At.AddSeconds(2) };
+        var refusedDispatch = NextDispatchCountdownCoordinator.Advance(
+            withDispatch, At.AddSeconds(3), out var dispatchRefusal);
+        Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, dispatchRefusal);
+        Assert.Same(withDispatch, refusedDispatch);
+
+        // An observation baseline that precedes its own creation instant is impossible evidence.
+        var inverted = active with { LastObservedAtUtc = At.AddSeconds(-1) };
+        var refusedInverted = NextDispatchCountdownCoordinator.Advance(
+            inverted, At.AddSeconds(3), out var invertedRefusal);
+        Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, invertedRefusal);
+        Assert.Same(inverted, refusedInverted);
+
+        // Fail closed means refused, not repaired: every piece of the contradictory evidence survives
+        // untouched and no lifecycle is fabricated.
+        Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, refusedCompletion.Lifecycle);
+        Assert.Equal(At.AddSeconds(2), refusedCompletion.CompletedAtUtc);
+        Assert.Equal(At.AddSeconds(2), refusedDispatch.DispatchedAtUtc);
+        Assert.Equal(At.AddSeconds(-1), refusedInverted.LastObservedAtUtc);
+        Assert.Equal(5, refusedCompletion.RemainingSeconds);
+    }
+
+    [Fact]
+    public void Every_reachable_lifecycle_satisfies_the_countdown_invariant_matrix()
+    {
+        // ==== NONE: nothing exists yet.
+        var none = NextDispatchCountdown.None;
+        Assert.Equal(0, none.Generation);
+        Assert.Equal(0, none.RemainingSeconds);
+        Assert.Null(none.Decision);
+        Assert.Null(none.CreatedAtUtc);
+        Assert.Null(none.LastObservedAtUtc);
+        Assert.Null(none.CompletedAtUtc);
+        Assert.Null(none.DispatchedAtUtc);
+        Assert.False(none.Frozen);
+        Assert.False(none.DispatchAdmissible);
+
+        // ==== ACTIVE_FROZEN: a frozen decision is counting down, and it has not completed.
+        var active = Active(appliedDelaySeconds: 5);
+        Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, active.Lifecycle);
+        Assert.True(active.Generation >= 1);
+        Assert.NotNull(active.Decision);
+        Assert.NotNull(active.CreatedAtUtc);
+        Assert.NotNull(active.LastObservedAtUtc);
+        Assert.True(active.LastObservedAtUtc >= active.CreatedAtUtc);
+        Assert.Equal(active.Decision!.AppliedDelaySeconds, active.RemainingSeconds);
+        Assert.True(active.RemainingSeconds >= 0);
+        Assert.Null(active.CompletedAtUtc);
+        Assert.Null(active.DispatchedAtUtc);
+        Assert.True(active.Frozen);
+        Assert.False(active.DispatchAdmissible);
+
+        // ==== COMPLETED_AWAITING_DISPATCH: zero remaining, completion evidence present, once admissible.
+        var completed = Completed(appliedDelaySeconds: 5, completedAtSeconds: 5);
+        Assert.Equal(CountdownLifecycleState.COMPLETED_AWAITING_DISPATCH, completed.Lifecycle);
+        Assert.NotNull(completed.Decision);
+        Assert.NotNull(completed.CreatedAtUtc);
+        Assert.NotNull(completed.LastObservedAtUtc);
+        Assert.NotNull(completed.CompletedAtUtc);
+        Assert.True(completed.CreatedAtUtc <= completed.LastObservedAtUtc);
+        Assert.Equal(completed.CompletedAtUtc, completed.LastObservedAtUtc);
+        Assert.Equal(0, completed.RemainingSeconds);
+        Assert.Null(completed.DispatchedAtUtc);
+        Assert.True(completed.Frozen);
+        Assert.True(completed.DispatchAdmissible);
+
+        // ==== DISPATCHED: every earlier evidence retained, the dispatch instant last.
+        var dispatched = NextDispatchCountdownCoordinator.MarkDispatched(
+            completed, At.AddSeconds(6), out var dispatchRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, dispatchRefusal);
+        Assert.Equal(CountdownLifecycleState.DISPATCHED, dispatched.Lifecycle);
+        Assert.NotNull(dispatched.Decision);
+        Assert.Equal(completed.CompletedAtUtc, dispatched.CompletedAtUtc);
+        Assert.NotNull(dispatched.DispatchedAtUtc);
+        Assert.Equal(dispatched.DispatchedAtUtc, dispatched.LastObservedAtUtc);
+        Assert.True(dispatched.DispatchedAtUtc >= dispatched.CompletedAtUtc);
+        Assert.Equal(0, dispatched.RemainingSeconds);
+        Assert.False(dispatched.Frozen);
+        Assert.False(dispatched.DispatchAdmissible);
+
+        // ==== SUPERSEDED / CANCELLED / FAULTED: evidence retained, never dispatchable.
+        var superseded = NextDispatchCountdownCoordinator.Supersede(
+            active, CountdownSupersessionReason.HEAD_SENSOR_DISABLED, out _);
+        Assert.Equal(CountdownLifecycleState.SUPERSEDED, superseded.Lifecycle);
+        Assert.NotNull(superseded.Decision);
+        Assert.Equal(active.LastObservedAtUtc, superseded.LastObservedAtUtc);
+        Assert.False(superseded.DispatchAdmissible);
+
+        var cancelled = NextDispatchCountdownCoordinator.Cancel(active, out _);
+        Assert.Equal(CountdownLifecycleState.CANCELLED, cancelled.Lifecycle);
+        Assert.NotNull(cancelled.Decision);
+        Assert.Equal(active.LastObservedAtUtc, cancelled.LastObservedAtUtc);
+        Assert.False(cancelled.DispatchAdmissible);
+
+        var faulted = NextDispatchCountdownCoordinator.Fault(active, CountdownRefusalCode.RH_STALE);
+        Assert.Equal(CountdownLifecycleState.FAULTED, faulted.Lifecycle);
+        Assert.NotNull(faulted.Decision);
+        Assert.Equal(active.LastObservedAtUtc, faulted.LastObservedAtUtc);
+        Assert.Equal(CountdownRefusalCode.RH_STALE, faulted.RefusalCode);
+        Assert.False(faulted.DispatchAdmissible);
+
+        // ==== PENDING_DECISION is reserved and never produced by any factory or transition, so it
+        // owns no timestamp or generation behaviour to prove here.
+        var reachable = new[]
+        {
+            none.Lifecycle, active.Lifecycle, completed.Lifecycle, dispatched.Lifecycle,
+            superseded.Lifecycle, cancelled.Lifecycle, faulted.Lifecycle,
+        };
+        Assert.DoesNotContain(CountdownLifecycleState.PENDING_DECISION, reachable);
     }
 
     [Fact]
