@@ -24,8 +24,17 @@ public sealed record SimulationTimeDelaySettings
     /// <summary>The label used by tests and by any caller that supplies its own readings.</summary>
     public const string TestSourceLabel = "SIMULATION_TEST_INPUT";
 
-    /// <summary>The number of ticks of one full ramp cycle of the demo RH reading.</summary>
+    /// <summary>
+    /// The number of ticks of one full ramp cycle of the demo RH reading.
+    /// </summary>
     public const int DemoRampTicks = 120;
+
+    /// <summary>
+    /// The highest accepted sample tick. A reading generation is the one-based ordinal of its sample,
+    /// so the successor of this tick is the last representable generation: no reading identity exists
+    /// beyond it. The bound is a typing fact, never a process or commissioning value.
+    /// </summary>
+    public const long MaximumSampleTick = long.MaxValue - 1;
 
     /// <summary>The configured TimeDelay policy this simulation applies.</summary>
     public required TimeDelayConfiguration Configuration { get; init; }
@@ -46,13 +55,37 @@ public sealed record SimulationTimeDelaySettings
     public bool RampRhTemperature { get; init; }
 
     /// <summary>
-    /// The synthetic RH reading at one tick. Deterministic: the value depends only on the tick, and
-    /// the timestamp is the observing instant, never wall time.
+    /// The synthetic RH reading at one tick, or a typed refusal. It is the fail-closed form of
+    /// <see cref="RhSampleAt"/>: the accepted tick counter is passed through WITHOUT a narrowing
+    /// conversion, so no reading identity can wrap, go negative or be fabricated, and a tick outside
+    /// the representable range is a typed refusal rather than an overflow exception.
     /// </summary>
-    public RhTimeDelayInput RhSampleAt(int tick, DateTimeOffset instantUtc)
+    /// <param name="tick">The accepted tick counter, in whole ticks since the session started.</param>
+    /// <param name="instantUtc">The observing instant, which becomes the reading timestamp.</param>
+    /// <param name="input">The reading, or null when the tick has no representable reading identity.</param>
+    /// <param name="refusal">The typed refusal, or <see cref="CountdownRefusalCode.NONE"/>.</param>
+    public bool TryRhSampleAt(
+        long tick,
+        DateTimeOffset instantUtc,
+        out RhTimeDelayInput? input,
+        out CountdownRefusalCode refusal)
     {
-        if (FixedRhInput is not null) return FixedRhInput;
-        ArgumentOutOfRangeException.ThrowIfNegative(tick);
+        input = null;
+        refusal = CountdownRefusalCode.NONE;
+
+        if (FixedRhInput is not null)
+        {
+            input = FixedRhInput;
+            return true;
+        }
+
+        // The reading generation is tick + 1. Both bounds are checked BEFORE the arithmetic, so the
+        // generation is always positive and always representable.
+        if (tick < 0L || tick > MaximumSampleTick)
+        {
+            refusal = CountdownRefusalCode.RH_GENERATION_INVALID;
+            return false;
+        }
 
         var min = Configuration.RhTempMin;
         var max = Configuration.RhTempMax;
@@ -70,13 +103,34 @@ public sealed record SimulationTimeDelaySettings
             temperature = min + ((max - min) * 0.5);
         }
 
-        return new RhTimeDelayInput
+        input = new RhTimeDelayInput
         {
             RhTemperature = Math.Round(temperature, 3, MidpointRounding.ToEven),
             Quality = Quality.GOOD,
             ObservedAt = UtcTimestamps.Format(instantUtc),
             Generation = tick + 1L,
         };
+        return true;
+    }
+
+    /// <summary>
+    /// The synthetic RH reading at one tick. Deterministic: the value depends only on the tick, and
+    /// the timestamp is the observing instant, never wall time.
+    ///
+    /// <para>
+    /// This is the total-or-throw convenience form, kept for previews and tests: an out-of-range tick
+    /// is the caller's defect and throws. Every execution path uses <see cref="TryRhSampleAt"/>, so a
+    /// refusal is always typed and never an exception.
+    /// </para>
+    /// </summary>
+    public RhTimeDelayInput RhSampleAt(long tick, DateTimeOffset instantUtc)
+    {
+        if (TryRhSampleAt(tick, instantUtc, out var input, out var refusal)) return input!;
+
+        throw new ArgumentOutOfRangeException(
+            nameof(tick),
+            tick,
+            $"The sample tick must be 0 through {MaximumSampleTick} to carry a reading generation [{refusal}].");
     }
 
     /// <summary>

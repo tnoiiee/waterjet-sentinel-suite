@@ -344,6 +344,494 @@ public sealed class TimeDelayWorkspaceTests
         finally { await runtime.DisposeAsync(); }
     }
 
+    // ---------------------------------------------------------------- refusal propagation
+
+    // The deterministic catalogue dispatches its first Job as a SCRIPTED event, so a test that needs
+    // "a countdown whose own dispatch already happened, followed by a further release" cannot reach
+    // that boundary by ticking alone. These tests therefore seed a GENUINE coordinator-produced
+    // countdown AFTER that scripted dispatch and then let the real tick path do everything else: the
+    // seed decides only WHERE the state machine stands, never what the Runtime does with it.
+
+    /// <summary>Places a coordinator-produced countdown in the Runtime's single countdown field.</summary>
+    private static void SeedCountdown(SimulatorRuntime runtime, NextDispatchCountdown countdown) =>
+        typeof(SimulatorRuntime)
+            .GetField("_countdown", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(runtime, countdown);
+
+    private static RhTimeDelayInput Reading(
+        double temperature,
+        DateTimeOffset observedAt,
+        Quality quality = Quality.GOOD,
+        long generation = 1) => new()
+        {
+            RhTemperature = temperature,
+            Quality = quality,
+            ObservedAt = UtcTimestamps.Format(observedAt),
+            Generation = generation,
+        };
+
+    /// <summary>
+    /// An AUTO configuration with an explicit delay range and RH window, so a reading can be made
+    /// unusable for the NEXT generation while a previous generation stays valid.
+    /// </summary>
+    private static SimulationTimeDelaySettings AutoRange(
+        int minimumSeconds,
+        int maximumSeconds,
+        int windowSeconds,
+        RhTimeDelayInput? fixedRhInput = null) => new()
+        {
+            Configuration = TimeDelayConfiguration.LegacySeededSimulationDefaults(
+                TimeDelayMode.AUTO_RH_LINEAR_FROZEN,
+                activeBoilerCondition: BoilerCondition.VERY_CLEAN) with
+            {
+                RhInputWindowSeconds = windowSeconds,
+                BoilerRanges =
+                [
+                    new BoilerConditionDelayRange
+                    {
+                        Condition = BoilerCondition.VERY_CLEAN,
+                        AutoDelayMinSeconds = minimumSeconds,
+                        AutoDelayMaxSeconds = maximumSeconds,
+                    },
+                    new BoilerConditionDelayRange
+                    {
+                        Condition = BoilerCondition.NORMAL_CLEAN,
+                        AutoDelayMinSeconds = 500,
+                        AutoDelayMaxSeconds = 550,
+                    },
+                    new BoilerConditionDelayRange
+                    {
+                        Condition = BoilerCondition.MEDIUM_DIRTY,
+                        AutoDelayMinSeconds = 340,
+                        AutoDelayMaxSeconds = 380,
+                    },
+                    new BoilerConditionDelayRange
+                    {
+                        Condition = BoilerCondition.VERY_DIRTY,
+                        AutoDelayMinSeconds = 240,
+                        AutoDelayMaxSeconds = 280,
+                    },
+                ],
+            },
+            SourceLabel = fixedRhInput is null
+                ? SimulationTimeDelaySettings.TestSourceLabel
+                : SimulationTimeDelaySettings.DemoSourceLabel,
+            FixedRhInput = fixedRhInput,
+        };
+
+    /// <summary>One decision planned exactly as the Runtime plans it, from the same published head.</summary>
+    private static NextDispatchDelayDecision PlannedDecision(
+        SimulatorRuntime runtime,
+        TimeDelayConfiguration configuration,
+        QueueEntry head,
+        RhTimeDelayInput reading,
+        DateTimeOffset atUtc,
+        int generation = 1)
+    {
+        var sensor = runtime.State.Sensors.First(sensor => sensor.SensorId == head.SensorId);
+        Assert.True(TimeDelayPlanner.TryResolveSensorIdentity(sensor, out var identity, out var identityRefusal));
+        Assert.Equal(CountdownRefusalCode.NONE, identityRefusal);
+
+        var plan = TimeDelayPlanner.Plan(
+            configuration, identity, reading, atUtc, $"SYN-TD-{generation}",
+            generation, runtime.State.Queue.Revision, head.EntryId);
+        Assert.True(plan.Accepted, $"The seeded decision must be a real accepted decision [{plan.RefusalCode}].");
+        return Assert.IsType<NextDispatchDelayDecision>(plan.Decision);
+    }
+
+    /// <summary>A generation-one decision for the current head, frozen at the given instant.</summary>
+    private static NextDispatchCountdown FrozenCountdown(
+        SimulatorRuntime runtime,
+        TimeDelayConfiguration configuration,
+        QueueEntry head,
+        DateTimeOffset createdAtUtc)
+    {
+        var decision = PlannedDecision(runtime, configuration, head, Reading(520, Origin), createdAtUtc) with
+        {
+            CreatedAt = UtcTimestamps.Format(createdAtUtc),
+        };
+        var frozen = NextDispatchCountdownCoordinator.Begin(NextDispatchCountdown.None, decision, out var refusal);
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        Assert.Equal(decision.AppliedDelaySeconds, frozen.RemainingSeconds);
+        return frozen;
+    }
+
+    /// <summary>A generation-one countdown whose single dispatch already happened.</summary>
+    private static NextDispatchCountdown DispatchedCountdown(
+        SimulatorRuntime runtime,
+        SimulationTimeDelaySettings settings)
+    {
+        var decision = PlannedDecision(
+            runtime, settings.Configuration, runtime.State.Queue.Entries[0], Reading(520, Origin), Origin);
+        var begun = NextDispatchCountdownCoordinator.Begin(NextDispatchCountdown.None, decision, out var beginRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, beginRefusal);
+        var completed = NextDispatchCountdownCoordinator.Advance(
+            begun, Origin.AddSeconds(decision.AppliedDelaySeconds), out var advanceRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, advanceRefusal);
+        var dispatched = NextDispatchCountdownCoordinator.MarkDispatched(
+            completed, Origin.AddSeconds(decision.AppliedDelaySeconds), out var dispatchRefusal);
+        Assert.Equal(CountdownRefusalCode.NONE, dispatchRefusal);
+        Assert.Equal(CountdownLifecycleState.DISPATCHED, dispatched.Lifecycle);
+        return dispatched;
+    }
+
+    /// <summary>Ticks until the scripted first Job is active, and returns the head of that moment.</summary>
+    private static QueueEntry TickUntilActiveJob(SimulatorRuntime runtime)
+    {
+        for (var tick = 0; tick < 60; tick++)
+        {
+            Tick(runtime);
+            if (runtime.State.ActiveJob is not null) return runtime.State.Queue.Entries[0];
+        }
+
+        throw new InvalidOperationException("The scenario never activated its first Job.");
+    }
+
+    /// <summary>The published evidence of a failed next generation: the same values in Runtime and workspace.</summary>
+    private static void AssertFailedNextGeneration(
+        SimulatorRuntime runtime,
+        int attemptedGeneration,
+        CountdownRefusalCode refusal)
+    {
+        var countdown = runtime.Countdown;
+        Assert.Equal(CountdownLifecycleState.FAULTED, countdown.Lifecycle);
+        Assert.Equal(attemptedGeneration, countdown.Generation);
+        Assert.Equal(refusal, countdown.RefusalCode);
+        Assert.Null(countdown.Decision);
+        Assert.Equal(0, countdown.RemainingSeconds);
+        Assert.Null(countdown.CreatedAtUtc);
+        Assert.Null(countdown.LastObservedAtUtc);
+        Assert.Null(countdown.CompletedAtUtc);
+        Assert.Null(countdown.DispatchedAtUtc);
+        Assert.False(countdown.Frozen);
+        Assert.False(countdown.DispatchAdmissible);
+
+        // The same failure through the read-only workspace projection: the exact refusal is visible and
+        // no fabricated remaining delay, frozen decision or admissibility is presented.
+        var workspace = runtime.ProjectWorkspace();
+        Assert.Equal(CountdownLifecycleState.FAULTED, workspace.Countdown.Lifecycle);
+        Assert.Equal(attemptedGeneration, workspace.Countdown.Generation);
+        Assert.Equal(refusal, workspace.Countdown.RefusalCode);
+        Assert.Null(workspace.Countdown.Decision);
+        Assert.Null(workspace.Countdown.CreatedAt);
+        Assert.Null(workspace.Countdown.CompletedAt);
+        Assert.Null(workspace.Countdown.DispatchedAt);
+        Assert.Equal(0, workspace.Countdown.RemainingSeconds);
+        Assert.False(workspace.Countdown.Frozen);
+        Assert.False(workspace.Countdown.DispatchAdmissible);
+        // SIMULATION identity is explicit and no command surface is added to a faulted document.
+        Assert.Equal(DispatchWorkspace.SimulationNote, workspace.Simulation);
+        // The next head stays visible and ready: waiting and fault state never enter a QueueEntry.
+        Assert.NotEmpty(workspace.Queue.Entries);
+    }
+
+    /// <summary>
+    /// An ordinary tick never retries, re-plans, re-samples or clears a fault: the very same record is
+    /// still in place, still FAULTED and still admitting no dispatch.
+    /// </summary>
+    private static void AssertFaultIsStable(SimulatorRuntime runtime, CountdownRefusalCode refusal)
+    {
+        var faulted = runtime.Countdown;
+        // Twenty ticks cover the whole remaining Job cycle, INCLUDING the release that is an explicit
+        // lifecycle trigger for a new generation: a retry would have to happen here if it happened.
+        for (var tick = 0; tick < 20; tick++) Tick(runtime);
+        Assert.Same(faulted, runtime.Countdown);
+        Assert.Equal(CountdownLifecycleState.FAULTED, runtime.Countdown.Lifecycle);
+        Assert.Equal(refusal, runtime.Countdown.RefusalCode);
+        Assert.False(runtime.Countdown.Frozen);
+        Assert.False(runtime.Countdown.DispatchAdmissible);
+        Assert.Null(runtime.Countdown.DispatchedAtUtc);
+    }
+
+    [Fact]
+    public async Task A_refused_advance_faults_the_runtime_countdown_and_is_never_retried()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(30));
+        try
+        {
+            var head = TickUntilActiveJob(runtime);
+
+            // A frozen generation whose own accepted observation lies in the FUTURE of the tick clock.
+            // Every coordinator invariant holds; the tick instant simply runs behind it, which is what a
+            // clock that steps backwards looks like.
+            var frozen = FrozenCountdown(runtime, Manual(30).Configuration, head, Origin.AddHours(1));
+            Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, frozen.Lifecycle);
+            Assert.Equal(30, frozen.RemainingSeconds);
+            Assert.Null(frozen.RefusalCode);
+            SeedCountdown(runtime, frozen);
+
+            Tick(runtime);
+
+            // The refused Advance faults the countdown with its exact code instead of being discarded.
+            Assert.Equal(CountdownLifecycleState.FAULTED, runtime.Countdown.Lifecycle);
+            Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, runtime.Countdown.RefusalCode);
+            // A refused transition preserves the frozen evidence it could not accept.
+            Assert.Equal(30, runtime.Countdown.RemainingSeconds);
+            Assert.Equal(Origin.AddHours(1), runtime.Countdown.LastObservedAtUtc);
+            Assert.Equal(frozen.Decision, runtime.Countdown.Decision);
+            Assert.False(runtime.Countdown.Frozen);
+            Assert.False(runtime.Countdown.DispatchAdmissible);
+
+            // The workspace carries the same refusal and never claims admissibility or a live delay.
+            var workspace = runtime.ProjectWorkspace();
+            Assert.Equal(CountdownLifecycleState.FAULTED, workspace.Countdown.Lifecycle);
+            Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, workspace.Countdown.RefusalCode);
+            Assert.False(workspace.Countdown.DispatchAdmissible);
+            Assert.False(workspace.Countdown.Frozen);
+
+            // A refused Advance cannot dispatch, and the fault is not retried by any later tick. The
+            // stability ticks cover the Job's own release, so the release-triggered next generation is
+            // covered too; a dispatch after the fault would replace the published LastDispatch.
+            AssertFaultIsStable(runtime, CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION);
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            Assert.Null(runtime.State.ActiveJob);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_refused_advance_with_missing_observation_evidence_faults_the_countdown()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(30));
+        try
+        {
+            var head = TickUntilActiveJob(runtime);
+
+            // A deliberately malformed frozen record: the observation baseline a frozen countdown must
+            // always carry is absent. The Runtime must fail closed, never reinterpret it as "no
+            // regression" and never repair it.
+            var malformed = FrozenCountdown(runtime, Manual(30).Configuration, head, Origin) with
+            {
+                LastObservedAtUtc = null,
+            };
+            SeedCountdown(runtime, malformed);
+
+            Tick(runtime);
+
+            Assert.Equal(CountdownLifecycleState.FAULTED, runtime.Countdown.Lifecycle);
+            Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, runtime.Countdown.RefusalCode);
+            Assert.Equal(30, runtime.Countdown.RemainingSeconds);
+            Assert.Null(runtime.Countdown.LastObservedAtUtc);
+            Assert.Equal(malformed.Decision, runtime.Countdown.Decision);
+            AssertFaultIsStable(runtime, CountdownRefusalCode.DECISION_TIMESTAMP_INVALID);
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            Assert.Null(runtime.State.ActiveJob);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_next_generation_after_a_dispatch_records_a_stale_reading_as_a_fault()
+    {
+        // The reading is usable for nothing at all: it is already older than the configured RH window,
+        // so the plan the Runtime attempts on the release tick can only be refused with RH_STALE. The
+        // countdown is DISPATCHED at that moment, which is the closed generation that swallowed it.
+        var stale = Reading(520, Origin.AddMinutes(-1));
+        var runtime = Create(
+            SimulatorScenarioId.NORMAL_COMPLETION, AutoRange(600, 660, windowSeconds: 25, fixedRhInput: stale));
+        try
+        {
+            TickUntilActiveJob(runtime);
+            SeedCountdown(runtime, DispatchedCountdown(runtime, AutoRange(600, 660, 25)));
+
+            for (var tick = 0; tick < 60 && runtime.Countdown.Lifecycle == CountdownLifecycleState.DISPATCHED; tick++)
+            {
+                Tick(runtime);
+            }
+
+            // The failure is recorded with the exact refusal, after a CLOSED dispatch generation.
+            AssertFailedNextGeneration(runtime, 2, CountdownRefusalCode.RH_STALE);
+
+            // The previous dispatch is neither repeated nor reinterpreted, and the head is still ready.
+            Assert.Null(runtime.State.ActiveJob);
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            Assert.NotEmpty(runtime.State.Queue.Entries);
+            // The failed generation is not retried, not re-sampled and not cleared by later ticks.
+            AssertFaultIsStable(runtime, CountdownRefusalCode.RH_STALE);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_next_generation_after_a_dispatch_records_an_unusable_reading_as_a_fault()
+    {
+        // The reading EXISTS but is not usable: BAD quality is never converted into a delay, and the
+        // exact planner refusal is what the Runtime records.
+        var unusable = Reading(520, Origin, Quality.BAD);
+        var runtime = Create(
+            SimulatorScenarioId.NORMAL_COMPLETION, AutoRange(600, 660, windowSeconds: 300, fixedRhInput: unusable));
+        try
+        {
+            TickUntilActiveJob(runtime);
+            SeedCountdown(runtime, DispatchedCountdown(runtime, AutoRange(600, 660, 300)));
+
+            for (var tick = 0; tick < 60 && runtime.Countdown.Lifecycle == CountdownLifecycleState.DISPATCHED; tick++)
+            {
+                Tick(runtime);
+            }
+
+            AssertFailedNextGeneration(runtime, 2, CountdownRefusalCode.RH_BAD_QUALITY);
+            Assert.Null(runtime.State.ActiveJob);
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            AssertFaultIsStable(runtime, CountdownRefusalCode.RH_BAD_QUALITY);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_next_generation_after_a_dispatch_records_generation_exhaustion_without_planning()
+    {
+        // The reading here is BAD on purpose: if the Runtime sampled and planned before deciding the
+        // generation, the recorded refusal would be RH_BAD_QUALITY. It is EXHAUSTED instead, which is
+        // the observable proof that the generation authority decided first.
+        var unusable = Reading(520, Origin, Quality.BAD);
+        var runtime = Create(
+            SimulatorScenarioId.NORMAL_COMPLETION, AutoRange(600, 660, windowSeconds: 300, fixedRhInput: unusable));
+        try
+        {
+            TickUntilActiveJob(runtime);
+            // The last representable generation: its successor does not exist. A session cannot reach
+            // this boundary in a finite test, so the closed generation is placed at it.
+            SeedCountdown(runtime, DispatchedCountdown(runtime, AutoRange(600, 660, 300)) with
+            {
+                Generation = int.MaxValue,
+            });
+
+            for (var tick = 0; tick < 60 && runtime.Countdown.Lifecycle == CountdownLifecycleState.DISPATCHED; tick++)
+            {
+                Tick(runtime);
+            }
+
+            Assert.Equal(CountdownLifecycleState.FAULTED, runtime.Countdown.Lifecycle);
+            Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED, runtime.Countdown.RefusalCode);
+            // No successor was fabricated, so the last accepted identity survives unchanged.
+            Assert.Equal(int.MaxValue, runtime.Countdown.Generation);
+            Assert.Null(runtime.Countdown.Decision);
+            Assert.Equal(0, runtime.Countdown.RemainingSeconds);
+            Assert.Null(runtime.Countdown.CreatedAtUtc);
+            Assert.Null(runtime.Countdown.DispatchedAtUtc);
+            Assert.False(runtime.Countdown.DispatchAdmissible);
+
+            // Nothing was dispatched and the failure is not retried.
+            Assert.Null(runtime.State.ActiveJob);
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            AssertFaultIsStable(runtime, CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_new_AutoSequence_session_clears_a_faulted_countdown_and_starts_from_current_state()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(5));
+        try
+        {
+            // A fault left over from a previous session: the state a restarted session must not carry.
+            SeedCountdown(runtime, NextDispatchCountdownCoordinator.FaultNextGeneration(
+                NextDispatchCountdown.None,
+                7,
+                CountdownRefusalCode.RH_STALE));
+
+            // The session's own StartAutoSequence is the explicit lifecycle trigger that clears it.
+            Tick(runtime);
+            Assert.Equal(CountdownLifecycleState.NONE, runtime.Countdown.Lifecycle);
+            Assert.Null(runtime.Countdown.RefusalCode);
+            Assert.Null(runtime.Countdown.Decision);
+            Assert.Equal(0, runtime.Countdown.RemainingSeconds);
+
+            // The new session then starts from ITS current state: generation one, full applied delay.
+            for (var tick = 0; tick < 60 && runtime.Countdown.Lifecycle != CountdownLifecycleState.ACTIVE_FROZEN; tick++)
+            {
+                Tick(runtime);
+            }
+
+            Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, runtime.Countdown.Lifecycle);
+            Assert.Equal(1, runtime.Countdown.Generation);      // never the failed generation
+            Assert.Equal(5, runtime.Countdown.RemainingSeconds);
+            Assert.Null(runtime.Countdown.RefusalCode);
+            Assert.NotNull(runtime.Countdown.Decision);
+            Assert.True(runtime.Countdown.Frozen);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_superseded_countdown_restarts_with_the_full_applied_delay()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(5));
+        try
+        {
+            var head = TickUntilActiveJob(runtime);
+            var superseded = NextDispatchCountdownCoordinator.Supersede(
+                FrozenCountdown(runtime, Manual(5).Configuration, head, Origin),
+                CountdownSupersessionReason.QUEUE_HEAD_IDENTITY_CHANGED,
+                out var supersedeRefusal);
+            Assert.Equal(CountdownRefusalCode.NONE, supersedeRefusal);
+            Assert.Equal(CountdownLifecycleState.SUPERSEDED, superseded.Lifecycle);
+            Assert.Equal(5, superseded.RemainingSeconds);
+            SeedCountdown(runtime, superseded);
+
+            for (var tick = 0; tick < 60 && runtime.Countdown.Lifecycle != CountdownLifecycleState.ACTIVE_FROZEN; tick++)
+            {
+                Tick(runtime);
+            }
+
+            // The authorized restart path is unchanged: the next generation, and the FULL delay again.
+            Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, runtime.Countdown.Lifecycle);
+            Assert.Equal(2, runtime.Countdown.Generation);
+            Assert.Equal(5, runtime.Countdown.RemainingSeconds);
+            Assert.Equal(
+                CountdownSupersessionReason.QUEUE_HEAD_IDENTITY_CHANGED,
+                runtime.Countdown.LastSupersededReason);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public void The_simulation_reading_generation_accepts_the_last_representable_sample()
+    {
+        var settings = AutoRange(600, 660, windowSeconds: 30);
+
+        Assert.True(settings.TryRhSampleAt(
+            SimulationTimeDelaySettings.MaximumSampleTick, Origin, out var input, out var refusal));
+        Assert.Equal(CountdownRefusalCode.NONE, refusal);
+        var reading = Assert.IsType<RhTimeDelayInput>(input);
+        Assert.Equal(long.MaxValue, reading.Generation);     // the last representable generation
+        Assert.Equal(UtcTimestamps.Format(Origin), reading.ObservedAt);
+        Assert.Equal(Quality.GOOD, reading.Quality);
+        Assert.InRange(reading.RhTemperature, settings.Configuration.RhTempMin, settings.Configuration.RhTempMax);
+
+        // The planner accepts it: a positive generation, GOOD quality and a current timestamp.
+        Assert.True(TimeDelayPlanner.TryValidateRhInput(
+            settings.Configuration, reading, Origin, out _, out var plannerRefusal));
+        Assert.Equal(CountdownRefusalCode.NONE, plannerRefusal);
+
+        // Deterministic and never saturated: the same tick always yields the same reading identity.
+        Assert.True(settings.TryRhSampleAt(SimulationTimeDelaySettings.MaximumSampleTick, Origin, out var again, out _));
+        Assert.Equal(reading, Assert.IsType<RhTimeDelayInput>(again));
+    }
+
+    [Fact]
+    public void The_simulation_reading_generation_refuses_a_sample_it_cannot_represent()
+    {
+        var settings = AutoRange(600, 660, windowSeconds: 30);
+
+        // No exception, no wrap and no negative generation: a typed refusal at both bounds.
+        Assert.False(settings.TryRhSampleAt(
+            SimulationTimeDelaySettings.MaximumSampleTick + 1, Origin, out var input, out var refusal));
+        Assert.Null(input);
+        Assert.Equal(CountdownRefusalCode.RH_GENERATION_INVALID, refusal);
+
+        Assert.False(settings.TryRhSampleAt(-1L, Origin, out var negative, out var negativeRefusal));
+        Assert.Null(negative);
+        Assert.Equal(CountdownRefusalCode.RH_GENERATION_INVALID, negativeRefusal);
+
+        // The old int boundary is no longer a narrowing conversion: the reading identity is a long.
+        var reading = settings.RhSampleAt(int.MaxValue + 1L, Origin);
+        Assert.Equal(int.MaxValue + 2L, reading.Generation);
+        Assert.True(reading.Generation > 0);
+    }
+
     // ---------------------------------------------------------------- published timeline evidence
 
     /// <summary>The first published revision that carries an Active Job, after at most 40 ticks.</summary>

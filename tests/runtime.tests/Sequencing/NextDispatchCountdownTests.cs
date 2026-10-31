@@ -741,6 +741,120 @@ public sealed class NextDispatchCountdownTests
             NextDispatchCountdownCoordinator.Fault(Active(), CountdownRefusalCode.NONE));
     }
 
+    /// <summary>A generation-one countdown whose single dispatch already happened.</summary>
+    private static NextDispatchCountdown Dispatched()
+    {
+        var completed = Completed(appliedDelaySeconds: 5, completedAtSeconds: 5);
+        var dispatched = NextDispatchCountdownCoordinator.MarkDispatched(completed, At.AddSeconds(5), out _);
+        Assert.Equal(CountdownLifecycleState.DISPATCHED, dispatched.Lifecycle);
+        return dispatched;
+    }
+
+    [Fact]
+    public void A_failed_next_generation_is_recorded_even_after_a_closed_dispatch()
+    {
+        // The previous generation was dispatched and its evidence is closed. A plain Fault can never
+        // rewrite that state, which is exactly why the failed attempt owns its own transition.
+        var previous = Dispatched();
+        Assert.Same(previous, NextDispatchCountdownCoordinator.Fault(previous, CountdownRefusalCode.RH_STALE));
+
+        var failed = NextDispatchCountdownCoordinator.FaultNextGeneration(
+            previous, 2, CountdownRefusalCode.RH_STALE);
+
+        Assert.Equal(CountdownLifecycleState.FAULTED, failed.Lifecycle);
+        Assert.Equal(CountdownRefusalCode.RH_STALE, failed.RefusalCode);
+        Assert.Equal(2, failed.Generation);                 // the attempted identity, not the previous one
+        Assert.Null(failed.Decision);                       // no partial decision is ever adopted
+        Assert.Equal(0, failed.RemainingSeconds);
+        Assert.False(failed.Frozen);
+        Assert.False(failed.DispatchAdmissible);
+        // The attempt was never frozen, so it carries none of the previous generation's instants.
+        Assert.Null(failed.CreatedAtUtc);
+        Assert.Null(failed.LastObservedAtUtc);
+        Assert.Null(failed.CompletedAtUtc);
+        Assert.Null(failed.DispatchedAtUtc);
+        // Nothing about it can dispatch.
+        var attempt = NextDispatchCountdownCoordinator.MarkDispatched(failed, At.AddSeconds(9), out var refusal);
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_NOT_COMPLETE, refusal);
+        Assert.Same(failed, attempt);
+    }
+
+    [Fact]
+    public void Every_closed_generation_can_record_a_failed_next_attempt()
+    {
+        var completed = Completed();
+
+        // DISPATCHED and CANCELLED are the two closed lifecycles a plain Fault can never rewrite, so
+        // they are the ones that used to swallow the failure of the next generation entirely.
+        var closed = new[]
+        {
+            Dispatched(),
+            NextDispatchCountdownCoordinator.Cancel(completed, out _),
+            NextDispatchCountdownCoordinator.Supersede(
+                completed, CountdownSupersessionReason.QUEUE_HEAD_WITHDRAWN, out _),
+            NextDispatchCountdown.None,
+        };
+
+        foreach (var current in closed)
+        {
+            var attempted = current.Generation + 1;
+            var failed = NextDispatchCountdownCoordinator.FaultNextGeneration(
+                current, attempted, CountdownRefusalCode.SENSOR_IDENTITY_INVALID);
+
+            Assert.Equal(CountdownLifecycleState.FAULTED, failed.Lifecycle);
+            Assert.Equal(CountdownRefusalCode.SENSOR_IDENTITY_INVALID, failed.RefusalCode);
+            Assert.Equal(attempted, failed.Generation);   // the attempted identity is retained
+            Assert.Null(failed.Decision);
+            Assert.Equal(0, failed.RemainingSeconds);
+            Assert.Null(failed.CreatedAtUtc);
+            Assert.Null(failed.LastObservedAtUtc);
+            Assert.Null(failed.CompletedAtUtc);
+            Assert.Null(failed.DispatchedAtUtc);
+            Assert.False(failed.DispatchAdmissible);
+        }
+    }
+
+    [Fact]
+    public void A_failed_next_attempt_without_a_successor_keeps_the_last_accepted_identity()
+    {
+        var exhausted = Dispatched() with { Generation = int.MaxValue };
+
+        var failed = NextDispatchCountdownCoordinator.FaultNextGeneration(
+            exhausted, null, CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED);
+
+        Assert.Equal(CountdownLifecycleState.FAULTED, failed.Lifecycle);
+        Assert.Equal(int.MaxValue, failed.Generation);      // never incremented, never wrapped
+        Assert.Equal(CountdownRefusalCode.COUNTDOWN_GENERATION_EXHAUSTED, failed.RefusalCode);
+        Assert.Null(failed.Decision);
+    }
+
+    [Fact]
+    public void A_failed_next_generation_requires_a_typed_refusal_and_a_representable_attempt()
+    {
+        var previous = Dispatched();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            NextDispatchCountdownCoordinator.FaultNextGeneration(previous, 2, CountdownRefusalCode.NONE));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            NextDispatchCountdownCoordinator.FaultNextGeneration(previous, -1, CountdownRefusalCode.RH_STALE));
+        Assert.Throws<ArgumentNullException>(() =>
+            NextDispatchCountdownCoordinator.FaultNextGeneration(null!, 2, CountdownRefusalCode.RH_STALE));
+    }
+
+    [Fact]
+    public void A_fault_is_never_cleared_or_replaced_by_a_later_one()
+    {
+        var faulted = NextDispatchCountdownCoordinator.FaultNextGeneration(
+            Dispatched(), 2, CountdownRefusalCode.RH_STALE);
+
+        // A later fault can neither replace the first refusal nor revive the countdown.
+        Assert.Same(faulted, NextDispatchCountdownCoordinator.Fault(faulted, CountdownRefusalCode.RH_MISSING));
+        Assert.Same(faulted, NextDispatchCountdownCoordinator.FaultNextGeneration(
+            faulted, 3, CountdownRefusalCode.SENSOR_IDENTITY_INVALID));
+        Assert.Equal(CountdownRefusalCode.RH_STALE, faulted.RefusalCode);
+        Assert.Equal(2, faulted.Generation);
+    }
+
     [Fact]
     public void Ordinary_mutation_is_refused_only_while_a_countdown_is_frozen()
     {
@@ -871,12 +985,33 @@ public sealed class NextDispatchCountdownTests
         Assert.Equal(CountdownRefusalCode.RH_STALE, faulted.RefusalCode);
         Assert.False(faulted.DispatchAdmissible);
 
+        // ==== FAULTED from a FAILED NEXT GENERATION: the same lifecycle, a different evidence shape.
+        // The attempt never froze, so it publishes the attempted identity and the refusal with NO
+        // decision and NO inherited instant, while the dispatched evidence above stays where it is.
+        var failedNext = NextDispatchCountdownCoordinator.FaultNextGeneration(
+            dispatched, dispatched.Generation + 1, CountdownRefusalCode.RH_STALE);
+        Assert.Equal(CountdownLifecycleState.FAULTED, failedNext.Lifecycle);
+        Assert.Equal(dispatched.Generation + 1, failedNext.Generation);
+        Assert.Equal(CountdownRefusalCode.RH_STALE, failedNext.RefusalCode);
+        Assert.Null(failedNext.Decision);
+        Assert.Equal(0, failedNext.RemainingSeconds);
+        Assert.Null(failedNext.CreatedAtUtc);
+        Assert.Null(failedNext.LastObservedAtUtc);
+        Assert.Null(failedNext.CompletedAtUtc);
+        Assert.Null(failedNext.DispatchedAtUtc);
+        Assert.False(failedNext.Frozen);
+        Assert.False(failedNext.DispatchAdmissible);
+        // The closed dispatched generation is untouched by the failed attempt.
+        Assert.Equal(CountdownLifecycleState.DISPATCHED, dispatched.Lifecycle);
+        Assert.NotNull(dispatched.Decision);
+        Assert.Equal(At.AddSeconds(6), dispatched.DispatchedAtUtc);
+
         // ==== PENDING_DECISION is reserved and never produced by any factory or transition, so it
         // owns no timestamp or generation behaviour to prove here.
         var reachable = new[]
         {
             none.Lifecycle, active.Lifecycle, completed.Lifecycle, dispatched.Lifecycle,
-            superseded.Lifecycle, cancelled.Lifecycle, faulted.Lifecycle,
+            superseded.Lifecycle, cancelled.Lifecycle, faulted.Lifecycle, failedNext.Lifecycle,
         };
         Assert.DoesNotContain(CountdownLifecycleState.PENDING_DECISION, reachable);
     }

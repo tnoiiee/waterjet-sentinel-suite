@@ -546,12 +546,25 @@ public sealed class SimulatorRuntime : IAsyncDisposable
 
     /// <summary>
     /// The live synthetic RH reading of the current tick, or null when this Runtime has no TimeDelay
-    /// simulation configured. It is a preview input only: it never enters a frozen decision.
+    /// simulation configured or the tick has no representable reading generation. It is a preview
+    /// input only: it never enters a frozen decision, and a preview never throws, never retries and
+    /// never substitutes a value.
     /// </summary>
-    public RhTimeDelayInput? LiveRhInput(RuntimePublication publication) =>
-        _options.TimeDelay?.RhSampleAt(
-            checked((int)Interlocked.Read(ref _acceptedTicks)),
-            publication.Current.GeneratedAtUtc);
+    public RhTimeDelayInput? LiveRhInput(RuntimePublication publication)
+    {
+        var settings = _options.TimeDelay;
+        if (settings is null) return null;
+
+        // The refusal is deliberately irrelevant here: a preview carries no execution authority, so a
+        // reading that cannot be represented is simply absent and the preview reports its own refusal.
+        return settings.TryRhSampleAt(
+            Interlocked.Read(ref _acceptedTicks),
+            publication.Current.GeneratedAtUtc,
+            out var input,
+            out _)
+            ? input
+            : null;
+    }
 
     /// <summary>
     /// Starts the deterministic evolution lifecycle. One non-overlapping loop owns
@@ -725,7 +738,7 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             if (CanDispatchNext(_sequencing, nextSequencing, due) && CountdownAllowsDispatch(nextCountdown))
             {
                 var dispatch = SequencingKernel.Apply(nextSequencing,
-                    new DispatchHead(SimulatorScenarioCatalogue.AtTick(checked((int)_acceptedTicks)),
+                    new DispatchHead(SimulatorScenarioCatalogue.AtTick(Interlocked.Read(ref _acceptedTicks)),
                         _scenarioTopology!, PumpReady: false));
                 if (dispatch.Outcome != SequencingOutcome.APPLIED || dispatch.State.ActiveJob is null)
                     throw new InvalidOperationException("AutoSequence dispatch refused after head eligibility check.");
@@ -838,9 +851,16 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     ///
     /// <para>
     /// The countdown is created ONLY after Mandatory Safe Return succeeded (the Active Job left the
-    /// state while the AutoSequence was running) and a ready head exists. A superseded, cancelled or
-    /// faulted countdown is replaced by a NEW generation with the FULL applied delay; a refused
-    /// premise faults the countdown instead of dispatching or substituting a value.
+    /// state while the AutoSequence was running) and a ready head exists. A SUPERSEDED or CANCELLED
+    /// countdown is replaced by a NEW generation with the FULL applied delay.
+    /// </para>
+    ///
+    /// <para>
+    /// Every refusal is propagated: a refused <see cref="NextDispatchCountdownCoordinator.Advance"/>
+    /// and a failed attempt to create the next generation both fault the countdown with their exact
+    /// typed code, so no rejected transition is ever discarded. FAULTED is terminal for the session,
+    /// which is what stops a refused transition from being retried on the next timer tick; only a new
+    /// AutoSequence session starts planning again.
     /// </para>
     /// </summary>
     private NextDispatchCountdown ProgressCountdown(
@@ -861,11 +881,14 @@ public sealed class SimulatorRuntime : IAsyncDisposable
         {
             if (candidate.CriticalSuspended)
             {
+                // Provably impossible refusal: this branch runs only while the countdown is frozen and
+                // the reason is a defined system reason, which is exactly what Supersede admits.
                 current = NextDispatchCountdownCoordinator.Supersede(
                     current, CountdownSupersessionReason.CRITICAL_PUMP_EVENT, out _);
             }
             else if (candidate.Mode != AutoSequenceMode.RUNNING)
             {
+                // Provably impossible refusal, for the same reason as the critical-suspension branch.
                 current = NextDispatchCountdownCoordinator.Supersede(
                     current, CountdownSupersessionReason.AUTOSEQUENCE_NOT_RUNNING, out _);
             }
@@ -888,10 +911,16 @@ public sealed class SimulatorRuntime : IAsyncDisposable
                     structurallyValid,
                     out var reason))
             {
+                // Provably impossible refusal: TryDetectPremiseBreak returned true, which is only
+                // possible while the countdown is frozen, and every reason it reports is a defined one.
                 current = NextDispatchCountdownCoordinator.Supersede(current, reason, out _);
             }
         }
 
+        // Retry policy: a release (Mandatory Safe Return completed) is an explicit lifecycle event, and
+        // a SUPERSEDED or CANCELLED generation was closed by an explicit premise change, so either may
+        // start the next generation. FAULTED is deliberately absent: a fault is terminal for the
+        // session, so a timer tick can never retry it, re-sample RH, reuse elapsed time or clear it.
         var released = before.ActiveJob is not null && candidate.ActiveJob is null;
         var mayStartDecision = !current.Frozen
             && candidate.ActiveJob is null
@@ -900,64 +929,89 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             && !candidate.CriticalSuspended
             && (released
                 || current.Lifecycle is CountdownLifecycleState.SUPERSEDED
-                or CountdownLifecycleState.CANCELLED
-                or CountdownLifecycleState.FAULTED);
+                or CountdownLifecycleState.CANCELLED);
 
         if (mayStartDecision)
         {
-            // The ONE generation authority decides before anything is sampled, stamped or planned. An
-            // exhausted (or invalid) generation is not fabricated and never reaches the planner: the
-            // countdown fails closed through its own fault path, so nothing is adopted, frozen or
-            // dispatched, and no Sensor or RH input is consumed for a decision that cannot exist.
-            if (!NextDispatchCountdownCoordinator.TryNextGeneration(current, out var generation, out var generationRefusal))
-            {
-                current = NextDispatchCountdownCoordinator.Fault(current, generationRefusal);
-            }
-            else
-            {
-                var head = candidate.Queue[0];
-                var sensor = FindSensor(sensors, head.SensorId);
-                TimeDelayPlanner.TryResolveSensorIdentity(sensor, out var identity, out var identityRefusal);
-                var rhInput = settings.RhSampleAt(checked((int)Interlocked.Read(ref _acceptedTicks)), atUtc);
-                var decisionId = $"SYN-TD-{generation}";
-                var plan = identity is null
-                    ? TimeDelayPlanResult.Refused(identityRefusal)
-                    : TimeDelayPlanner.Plan(
-                        settings.Configuration,
-                        identity,
-                        rhInput,
-                        atUtc,
-                        decisionId,
-                        generation,
-                        candidate.QueueRevision,
-                        head.EntryId);
-
-                if (plan.Accepted && plan.Decision is not null)
-                {
-                    var begun = NextDispatchCountdownCoordinator.Begin(current, plan.Decision, out var beginRefusal);
-                    current = beginRefusal == CountdownRefusalCode.NONE
-                        ? begun
-                        : NextDispatchCountdownCoordinator.Fault(current, beginRefusal);
-                }
-                else
-                {
-                    // Fail closed: a refused premise (missing, stale, future-dated or bad-quality RH, an
-                    // invalid generation, an invalid range or an unresolvable identity) blocks the
-                    // countdown. No silent zero and no last-known value replaces the refusal.
-                    var refusal = plan.RefusalCode == CountdownRefusalCode.NONE
-                        ? CountdownRefusalCode.SENSOR_IDENTITY_INVALID
-                        : plan.RefusalCode;
-                    current = NextDispatchCountdownCoordinator.Fault(current, refusal);
-                }
-            }
+            current = StartNextDecision(current, candidate, atUtc, sensors, settings);
         }
 
         if (current.Lifecycle == CountdownLifecycleState.ACTIVE_FROZEN)
         {
-            current = NextDispatchCountdownCoordinator.Advance(current, atUtc, out _);
+            // A typed refusal is never discarded. The rejected observation cannot be accepted, so the
+            // countdown fails closed with its exact code instead of keeping a frozen state whose own
+            // transition was refused.
+            var advanced = NextDispatchCountdownCoordinator.Advance(current, atUtc, out var advanceRefusal);
+            current = advanceRefusal == CountdownRefusalCode.NONE
+                ? advanced
+                : NextDispatchCountdownCoordinator.Fault(current, advanceRefusal);
         }
 
         return current;
+    }
+
+    /// <summary>
+    /// ONE attempt to create the next generation of the countdown. Every failure returns
+    /// <see cref="NextDispatchCountdownCoordinator.FaultNextGeneration"/> with the exact typed refusal,
+    /// so a failure is never swallowed by a closed generation and never leaves a partial decision.
+    ///
+    /// <para>
+    /// The order is the contract: the generation authority decides first, so an exhausted or invalid
+    /// generation never samples RH, never resolves a Sensor identity and never reaches the planner.
+    /// Only a validly reserved generation is sampled, stamped and planned.
+    /// </para>
+    /// </summary>
+    private NextDispatchCountdown StartNextDecision(
+        NextDispatchCountdown current,
+        SequencingState candidate,
+        DateTimeOffset atUtc,
+        IReadOnlyList<SensorPresentationState> sensors,
+        SimulationTimeDelaySettings settings)
+    {
+        // No successor exists: nothing is fabricated, and the last accepted identity is retained.
+        if (!NextDispatchCountdownCoordinator.TryNextGeneration(current, out var generation, out var generationRefusal))
+        {
+            return NextDispatchCountdownCoordinator.FaultNextGeneration(current, null, generationRefusal);
+        }
+
+        // The accepted tick counter is passed through as a long: no narrowing conversion, so no
+        // overflow can escape as an untyped exception. An unrepresentable sample is a typed refusal.
+        if (!settings.TryRhSampleAt(Interlocked.Read(ref _acceptedTicks), atUtc, out var rhInput, out var rhRefusal))
+        {
+            return NextDispatchCountdownCoordinator.FaultNextGeneration(current, generation, rhRefusal);
+        }
+
+        var head = candidate.Queue[0];
+        var sensor = FindSensor(sensors, head.SensorId);
+        TimeDelayPlanner.TryResolveSensorIdentity(sensor, out var identity, out var identityRefusal);
+
+        var plan = identity is null
+            ? TimeDelayPlanResult.Refused(identityRefusal)
+            : TimeDelayPlanner.Plan(
+                settings.Configuration,
+                identity,
+                rhInput,
+                atUtc,
+                $"SYN-TD-{generation}",
+                generation,
+                candidate.QueueRevision,
+                head.EntryId);
+
+        if (!plan.Accepted || plan.Decision is null)
+        {
+            // Fail closed: a refused premise (missing, stale, future-dated or bad-quality RH, an
+            // invalid generation, an invalid range or an unresolvable identity) records the failed
+            // attempt. No silent zero and no last-known value replaces the refusal.
+            var refusal = plan.RefusalCode == CountdownRefusalCode.NONE
+                ? CountdownRefusalCode.SENSOR_IDENTITY_INVALID
+                : plan.RefusalCode;
+            return NextDispatchCountdownCoordinator.FaultNextGeneration(current, generation, refusal);
+        }
+
+        var begun = NextDispatchCountdownCoordinator.Begin(current, plan.Decision, out var beginRefusal);
+        return beginRefusal == CountdownRefusalCode.NONE
+            ? begun
+            : NextDispatchCountdownCoordinator.FaultNextGeneration(current, generation, beginRefusal);
     }
 
     /// <summary>

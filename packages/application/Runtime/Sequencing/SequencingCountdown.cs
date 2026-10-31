@@ -81,6 +81,15 @@ public sealed record NextDispatchCountdown
 /// after the instant it completed; a superseded or cancelled countdown never dispatches; and an
 /// ordinary mutation is refused while a countdown is frozen.
 /// </para>
+///
+/// <para>
+/// Two ways of stopping are distinct on purpose. <see cref="Fault"/> belongs to a generation that
+/// already carries a decision and preserves its evidence. <see cref="FaultNextGeneration"/> belongs
+/// to a FAILED ATTEMPT to create the next generation: it records the attempted identity and the exact
+/// refusal with no decision and no timestamps, so a closed generation's evidence is never overwritten
+/// and a failed attempt is never swallowed. FAULTED is terminal for the session: only a new
+/// AutoSequence session starts planning again, so a timer tick can never retry, re-sample or clear it.
+/// </para>
 /// </summary>
 public static class NextDispatchCountdownCoordinator
 {
@@ -417,8 +426,17 @@ public static class NextDispatchCountdownCoordinator
     }
 
     /// <summary>
-    /// Faults the countdown. Fail closed: a faulted countdown never dispatches. The accepted observation
-    /// evidence is preserved, so the last instant the Runtime actually observed survives the fault.
+    /// Faults a countdown that CARRIES a decision. Fail closed: a faulted countdown never dispatches.
+    /// The accepted observation evidence is preserved, so the last instant the Runtime actually observed
+    /// survives the fault.
+    ///
+    /// <para>
+    /// A DISPATCHED or CANCELLED generation is closed: its decision evidence is final, so a fault never
+    /// rewrites it. A failure that happens while the NEXT generation is being created is therefore
+    /// recorded through <see cref="FaultNextGeneration"/>, which owns its own transition instead of
+    /// overwriting the closed generation. A FAULTED countdown keeps its FIRST refusal, so a later fault
+    /// can never silently clear the reason the session stopped.
+    /// </para>
     /// </summary>
     public static NextDispatchCountdown Fault(
         NextDispatchCountdown current,
@@ -427,7 +445,9 @@ public static class NextDispatchCountdownCoordinator
         ArgumentNullException.ThrowIfNull(current);
         if (code == CountdownRefusalCode.NONE) throw new ArgumentOutOfRangeException(nameof(code));
 
-        if (current.Lifecycle is CountdownLifecycleState.DISPATCHED or CountdownLifecycleState.CANCELLED)
+        if (current.Lifecycle is CountdownLifecycleState.DISPATCHED
+            or CountdownLifecycleState.CANCELLED
+            or CountdownLifecycleState.FAULTED)
         {
             return current;
         }
@@ -436,6 +456,64 @@ public static class NextDispatchCountdownCoordinator
         {
             Lifecycle = CountdownLifecycleState.FAULTED,
             RefusalCode = code,
+        };
+    }
+
+    /// <summary>
+    /// Records ONE failed attempt to create the next generation. This is the single typed transition for
+    /// a next-generation failure, and it is deliberately distinct from <see cref="Fault"/>: Fault
+    /// preserves the evidence of a decision that exists, while this transition describes an attempt that
+    /// produced no decision at all, including an attempt made after a CLOSED generation (DISPATCHED or
+    /// CANCELLED) that a plain fault can never rewrite.
+    ///
+    /// <para>
+    /// The result is FAULTED with the exact refusal and NO decision: a generation that was never frozen
+    /// has no creation, completion or dispatch instant, so every decision timestamp is absent rather
+    /// than inherited from the previous generation. The attempted identity is the generation the
+    /// authority reserved; when no successor exists at all, the last accepted identity is kept and never
+    /// incremented. The PREVIOUS generation's dispatch evidence is never touched here: it stays
+    /// immutable in the published <c>QueueSummary.LastDispatch</c> record, so it is always
+    /// distinguishable from the failed attempt and is never reinterpreted as belonging to it.
+    /// </para>
+    /// </summary>
+    /// <param name="current">The countdown the attempt was made from.</param>
+    /// <param name="attemptedGeneration">
+    /// The generation the attempt carried, or null when the generation authority refused before any
+    /// successor existed.
+    /// </param>
+    /// <param name="refusal">The exact typed refusal. <see cref="CountdownRefusalCode.NONE"/> is rejected.</param>
+    public static NextDispatchCountdown FaultNextGeneration(
+        NextDispatchCountdown current,
+        int? attemptedGeneration,
+        CountdownRefusalCode refusal)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        if (refusal == CountdownRefusalCode.NONE) throw new ArgumentOutOfRangeException(nameof(refusal));
+        if (attemptedGeneration is < 0) throw new ArgumentOutOfRangeException(nameof(attemptedGeneration));
+
+        // The first refusal of a session is the evidence of WHY it stopped: a later attempt cannot
+        // replace it, so a fault is never silently cleared.
+        if (current.Lifecycle == CountdownLifecycleState.FAULTED) return current;
+
+        return new NextDispatchCountdown
+        {
+            Lifecycle = CountdownLifecycleState.FAULTED,
+            // A reserved successor is the identity of the attempt; without one, the last accepted
+            // identity survives unchanged because no further identity exists to record.
+            Generation = attemptedGeneration ?? current.Generation,
+            RemainingSeconds = 0,
+            // No decision was adopted, so no decision is published and no partial decision is retained.
+            Decision = null,
+            SupersededReason = current.SupersededReason,
+            // The restart evidence of the session survives the failed attempt.
+            LastSupersededReason = current.SupersededReason ?? current.LastSupersededReason,
+            RefusalCode = refusal,
+            // A generation that was never frozen has no decision instant, no observation, no completion
+            // and no dispatch: none of them is inherited from the previous generation.
+            CreatedAtUtc = null,
+            LastObservedAtUtc = null,
+            CompletedAtUtc = null,
+            DispatchedAtUtc = null,
         };
     }
 

@@ -125,8 +125,12 @@ public static class SimulatorScenarioCatalogue
         return false;
     }
 
-    /// <summary>The instant of a tick: the fixed epoch plus whole seconds.</summary>
-    public static DateTimeOffset AtTick(int tick) => Epoch.AddSeconds(tick);
+    /// <summary>
+    /// The instant of a tick: the fixed epoch plus whole seconds. The parameter is a <see cref="long"/>
+    /// so the accepted tick counter of the Runtime can be passed through without a narrowing
+    /// conversion: a long session never turns into an overflow exception or a wrapped instant.
+    /// </summary>
+    public static DateTimeOffset AtTick(long tick) => Epoch.AddSeconds(tick);
 
     private sealed record Plan(SequencingTopology Topology, SensorPresentationState[] Ordered, SequencingPressureThresholds Thresholds)
     {
