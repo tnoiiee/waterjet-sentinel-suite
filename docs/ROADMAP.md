@@ -37,6 +37,17 @@ separate explicit Owner authorization for the exact validated PR head and exact 
 procedure. This roadmap authorises
 nothing.
 
+**Update 2026-10-31 (H2 status synchronization only; the 2026-10-25 paragraph above remains the
+dated record).** H2 Physical Process-I/O is implemented and Owner-locally validated on PR #42 at
+exact Product head `5ae783cb7177eb3b629a097a48aa40c508868b2c`, and the Owner has **accepted the H2
+Modbus Simulator Function/Address Bench as PASS** (loopback `127.0.0.1:502`, Unit ID 1). Real WAGO
+endpoint connectivity and real field-device actuation remain **NOT EXECUTED / NOT VERIFIED**; real
+WAGO process-image mirroring is **DEFERRED BY OWNER** under the deferred gate `H2-WAGO-MIRROR`. PR #42
+is **OPEN / NOT MERGED** with merge on **HOLD pending Owner authorization**. H3 remains **PLANNED,
+NOT AUTHORIZED**: the Owner TimeDelay decision (FROZEN PER COUNTDOWN) is documentation context only.
+See [`MASTER_PLAN.md`](MASTER_PLAN.md) §3 and
+[`CURRENT_STATE.md`](CURRENT_STATE.md) for the record. This update authorises nothing.
+
 This roadmap describes *intended capability sequence*. It is not a schedule, not a
 commitment, and not an authorisation. The authoritative description of how stages are
 gated is in [`MASTER_PLAN.md`](MASTER_PLAN.md).

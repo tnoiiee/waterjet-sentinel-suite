@@ -70,6 +70,30 @@ version: **no application version exists**, and the documentation versioning pol
   behind a separate explicit Owner authorization for the exact validated PR head and exact
   reviewed trial procedure.
 
+- **H2 status synchronization (2026-10-31; supersedes only the H2 status field of the current
+  position above and the numbered H2 label in §5 — both remain the dated record, and nothing else
+  in this plan changes).** H2 Physical Process-I/O is **IMPLEMENTED and OWNER-LOCALLY VALIDATED on
+  PR #42** at exact Product head `5ae783cb7177eb3b629a097a48aa40c508868b2c` (direct parent
+  `edbffae5c2be3853915d9d6b3fc0d1ce34a1b744`; approved base `main`
+  `bfd2867af1dda29fcbc1987328be3d131a189d0a`): SDK 10.0.403, normal and locked restore PASS with no
+  drift, Full Release build PASS, focused Process-I/O .NET 32/32, Full .NET 1313/1313, focused
+  Windows Node CLI 23/23, full Process-I/O Node 88/88, both Simulation read profiles PASS,
+  evidence parity PASS, boundary S1–S9 clean, boundary self-tests 33/33. The Owner has accepted the
+  **H2 Modbus Simulator Function/Address Bench as PASS** (loopback `127.0.0.1:502`, Unit ID 1); the
+  simulator implements no WAGO output process-image mirroring, which is **not** an H2 failure. Real
+  WAGO endpoint connectivity and real field-device actuation remain **NOT EXECUTED / NOT VERIFIED**;
+  real WAGO process-image mirroring is **DEFERRED BY OWNER** under the deferred gate `H2-WAGO-MIRROR`
+  (FC05 write n vs FC01 read-back 512+n; FC06 or FC16 write n vs FC03 read-back 512+n; command-state
+  and safe-return mirror verification; real timing; physical field observation recorded separately).
+  **PR #42 remains OPEN / NOT MERGED; merge is on HOLD pending Owner authorization**, and no merge is
+  performed by the implementation session. H3 remains **PLANNED, NOT AUTHORIZED**: the Owner TimeDelay
+  decision (FROZEN PER COUNTDOWN for Auto, one fixed configured delay in Manual, Legacy inverse
+  linear mapping from `RHTemp_SELECT` in Auto, Upper-zone factor 0.75, Left/Right Upper condition
+  `OrderWall < 12`, Front/Rear Upper condition `OrderWall < 15`, modifier derived from the next Queue
+  Sensor, and freeze of next-Sensor identity, Queue generation, RH input and window, Boiler Condition
+  and configuration after Mandatory Safe Return with `AppliedDelay` immutable during the active
+  countdown) is recorded as **documentation context only** and authorises no H3 implementation.
+
 - The K6 implementation was authored in Arena; **Owner-local automated validation is the
   authoritative evidence** and has passed.
 - **K6 is MERGED** (PR #24, merge commit `f356b162…`, 2026-10-14); canonical documentation promotion is complete.

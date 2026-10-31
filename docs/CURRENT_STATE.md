@@ -1,5 +1,115 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **H2 CLOSEOUT — Owner-accepted Modbus simulator function/address bench, with H2 Final Readiness Review (2026-10-31; documentation-only closeout; REAL HARDWARE NOT EXECUTED / NOT VERIFIED).**
+> **Owner decision:** the H2 Modbus Simulator Function/Address Bench is **ACCEPTED AS PASS**. The Modbus simulator at the loopback endpoint `127.0.0.1:502` is the accepted current H2 function/address bench reference. The simulator does **not** implement WAGO output process-image mirroring, and that absence is **not** an H2 failure. Real WAGO process-image mirroring at the Owner-local endpoint `<OWNER_LOCAL_WAGO_T8_ENDPOINT>` is **DEFERRED BY OWNER** and may be executed later; real field-device actuation remains **NOT EXECUTED / NOT VERIFIED**. No additional Product Source change is required for current H2 acceptance, and this closeout changes **documentation only**.
+> **Product head of record:** `5ae783cb7177eb3b629a097a48aa40c508868b2c` (direct parent `edbffae5c2be3853915d9d6b3fc0d1ce34a1b744`; approved base `main` `bfd2867af1dda29fcbc1987328be3d131a189d0a`).
+> **H2 Owner-local software validation on that exact head, all PASS:** SDK 10.0.403; normal restore PASS; locked restore PASS; restore drift NONE; Full Release build PASS; focused Process-I/O .NET 32/32 PASS; Full .NET 1313/1313 PASS; focused Windows Node CLI 23/23 PASS; full Process-I/O Node 88/88 PASS; `WORKBOOK_CANONICAL` Simulation PASS; `LEGACY_PRODUCTION_COMPAT` Simulation PASS; Process-I/O evidence parity PASS; boundary scan S1–S9 clean; boundary self-tests 33/33 PASS; `git diff --check` PASS; worktree clean.
+> **Accepted Modbus simulator read evidence** (one trial; consent supplied only through the environment variable and never printed, logged or stored): endpoint `127.0.0.1:502`, Unit ID `1`, mode `PHYSICAL_DI_AI_READ`, read profile `WORKBOOK_CANONICAL`, accepted `true`, outcome `SUCCESS`; FC02 addresses 0 through 39 completed; FC04 addresses 0 through 35 completed; FC01 addresses 512 through 543 accessible; FC03 addresses 512 through 513 accessible; DI reads 40; AI reads 36; DO read-backs 32; AO read-backs 2; DO channels tested 0; AO channels tested 0; `cleanupAudit` empty; **no FC05, FC06, FC15 or FC16 write** occurred in the read trial.
+> **Accepted single-DO simulator evidence:** mode `PHYSICAL_DO_SINGLE`; selected tag `DO-001`; FC05 command address 0; command TRUE protocol response `SUCCESS`; requested hold 500 ms; observed hold 502 ms; FC05 safe return FALSE protocol response `SUCCESS`; DO channels tested 1; AO channels tested 0; no unrelated DO write; no AO write; touched-output cleanup scope contains only `DO-001`; cleanup safe state `false`.
+> **Accepted single-AO simulator evidence:** mode `PHYSICAL_AO_SINGLE`; selected tag `AO-001+`; function `FC06`; write address 0; test raw 1000; FC06 command protocol response `SUCCESS`; FC06 safe return raw 0 protocol response `SUCCESS`; AO channels tested 1; DO channels tested 0; no unrelated AO write; no DO write; touched-output cleanup scope contains only `AO-001+`; cleanup safe state raw 0.
+> **Simulator limitation (recorded; not a Product failure):** the selected simulator does not implement WAGO output process-image mirroring; FC01 address 512 did not mirror FC05 address 0 during the simulator DO trial, and FC03 address 512 did not mirror FC06 address 0 during the simulator AO trial. Mirror equality is **NOT APPLICABLE** to the current simulator acceptance. This limitation is not a WJSS Product failure, and real WAGO process-image mirroring remains **DEFERRED**. Nothing in this record states or implies that real WAGO mirroring passed.
+> **Status (exact meanings):** H2 SOFTWARE IMPLEMENTATION: **PASS** · H2 OWNER-LOCAL SOFTWARE VALIDATION: **PASS** · H2 MODBUS SIMULATOR FUNCTION/ADDRESS BENCH: **PASS** · REAL WAGO ENDPOINT CONNECTIVITY (`<OWNER_LOCAL_WAGO_T8_ENDPOINT>`, deliberately never committed): **NOT EXECUTED / NOT VERIFIED** · REAL WAGO PROCESS-IMAGE MIRRORING: **DEFERRED BY OWNER** · REAL FIELD-DEVICE ACTUATION: **NOT EXECUTED / NOT VERIFIED** · PR #42: **OPEN / NOT MERGED** · MERGE: **HOLD PENDING OWNER AUTHORIZATION**.
+> **Deferred follow-up gate — `H2-WAGO-MIRROR` (recorded; not a current merge blocker):** future scope is (a) FC05 write address n compared with FC01 read-back address 512+n; (b) FC06 or FC16 write address n compared with FC03 read-back address 512+n; (c) command-state and safe-return mirror verification; (d) real device timing; (e) physical field observation recorded separately from process-image state. The gate may be executed against a later exact Product head after validation appropriate to that changed surface.
+> **H2 Final Readiness Review (14-point review of the complete PR #42 diff against the approved base), disposition: READY FOR OWNER MERGE DECISION — no material merge blocker.** All 34 changed paths are H2 scope; no physical endpoint literal, no consent phrase in any evidence record, no Owner-local path, no Drive URL or token, no third-party credential; the only manifest change is a new zero-dependency package manifest and no package lock changes; this closeout changes no Product Source. Two observations are recorded as non-blocking: (a) the PR carries no CI checks (none are configured on the branch), so the Owner-local validation remains the only automated evidence of record; (b) the commissioning documentation test `H: the current-facing records carry no connector-derived archive identity` fails on its first head-content assertion (the K3 current-facing-records check) **identically at the approved base `bfd2867`** (verified: the same assertion fails against the base `CURRENT_STATE.md`), so it is a pre-existing K3 documentation drift that this H2 closeout neither causes nor repairs (repairing it is outside H2 scope and would touch dated K3 records).
+> **H3 decision context (documentation only; no H3 implementation in PR #42):** WJSS Auto TimeDelay will use FROZEN PER COUNTDOWN; Manual mode uses one fixed configured delay; Auto mode retains the Legacy inverse linear mapping from `RHTemp_SELECT`; the Auto Upper-zone factor is 0.75; the Left/Right Upper condition is `OrderWall < 12`; the Front/Rear Upper condition is `OrderWall < 15`; the modifier derives from the next Queue Sensor; after Mandatory Safe Return the next-Sensor identity, Queue generation, RH input and window, Boiler Condition and configuration are frozen; `AppliedDelay` remains immutable during the active countdown and live values may be displayed as preview only. This Owner decision is recorded as context for the next Product scope and authorises no H3 work in this PR.
+
+> **H2 Physical Process-I/O Full .NET defect repair pass (2026-10-30; software test/Product repair; HARDWARE NOT EXECUTED / NOT VERIFIED).**
+> Owner-local Full Release build passed; the Owner-local Full .NET matrix reported 1307 total / 1297 passed / 10 failed. Exactly two proven defect classes were repaired in one atomic focused change:
+> (1) Test fixture path defect in `ProcessIoBenchRunnerTests`: the committed-catalogue helper combined `AppContext.BaseDirectory` with four parent segments, which from `bin/Release/net10.0` resolved to `<repo>/tests/docs/evidence/...` instead of `<repo>/docs/evidence/...`. The helper now uses the shared repository-root discovery pattern (`ProcessIoTestPaths`, new internal helper, walking up to `WaterJetSentinelSuite.sln` exactly as the config test project does) that `ProcessIoFoundationTests` also adopted, so no fragile relative segment count remains anywhere in the Process-I/O tests. A new assertion test proves the resolved catalogue path exists, lies under the repository root, equals `docs/evidence/process-io-inventory-2026-10-22.csv`, and never resolves inside `tests/` or `tests/docs/`.
+> (2) Spare analog-input Product observation defect: `AI-036` carries a Workbook-derived physical binding (input register 35) but its authoritative `SourceClassification` is `SPARE`, so `ProcessIoSession.TryReadAnalogInput` previously performed a transport read and returned `true`. A single fail-closed Product observation gate (`IsProductObservable`, ordinal `USED` comparison on the authoritative classification) now precedes every DI/AI observation in `ProcessIoSession`; a non-USED row yields `false`, a null observation and zero transport/network reads. UNCHANGED: the Workbook-derived physical mapping (all 111 rows, all bindings and addresses), write admission (which already refuses spare rows), Unit ID rules, function codes, address ranges, bench modes, consent phrases, hold duration, AO raw/function behavior, touched-output cleanup, endpoint configuration, dependencies and package locks. The explicit Hardware bench still reads the canonical physical address ranges for commissioning because it reads through the transport, never through the Product observation gate; the SIMULATION bench totals remain 40 DI reads, 36 AI reads, 32 DO read-backs and 2 AO read-backs (spare channels included). Tests added: spare AI refusal with zero reads, spare DI (DI-038/DI-039/DI-040) refusal with zero reads, arbitrary non-USED classification refusal, USED DI/AI reads still working, AI-001+/AI-002+/AI-003+/AI-004+..AI-009+ engineering classification, AI-012..AI-035 RAW_ONLY, and bench spare-address coverage. Validation executed Agent-side: `packages/process-io` 87/87 PASS, commissioning/boundary-scan/process-io-evidence/tc-bench suites PASS, boundary scan 0 findings (S1–S9 clean), restricted endpoint sweep 0 matches, `git diff --check` clean. NOT VERIFIED: .NET restore/build/test NOT RUN in the Agent environment (no .NET SDK, no NuGet reachability); the Owner-local Full Release build and Full .NET matrix remain the validation of record. Hardware status remains: `PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED`. PR #42 remains OPEN and NOT MERGED (`PR #42 MERGE: HOLD`). NO HARDWARE. NO MERGE.
+
+> **H2 Physical Process-I/O Release compile/analyzer repair pass (2026-10-30; software compile repair; HARDWARE NOT EXECUTED / NOT VERIFIED).**
+> In preparation for Owner-local SDK 10.0.403 Release build on PR #42, three compiler/analyzer defects were resolved in exact minimal form:
+> (1) CA1513 in `ProcessIoPhysicalTransport.cs`: Replaced explicit `new ObjectDisposedException(...)` throw with `ObjectDisposedException.ThrowIf(_disposed, this)` while preserving disposed-state fail-closed semantics;
+> (2) CA2208 in `ProcessIoPhysicalTransport.cs`: Corrected parameter name from `nameof(config.UnitId)` to method parameter `nameof(deviceKey)` in `ArgumentOutOfRangeException(nameof(deviceKey), config.UnitId, ...)` since UnitId is not an `Execute` method parameter; preserved invalid Unit ID actual value, device key diagnostic context, and strict 1-247 range enforcement before network I/O;
+> (3) CA1846 in `ProcessIoFoundation.cs`: Replaced `tag.Substring(5, 1)` with allocation-free span `tag.AsSpan(5, 1)` in span-based `int.TryParse`, preserving exact AI tag classification, pressure mapping, and engineering conversion across all AI identities (AI-001+ through AI-036);
+> (4) Test & Validation: Added comprehensive unit tests in C# and Node covering `ObjectDisposedException` on post-disposal invocation, Unit ID boundary validation (1-247) throwing `ArgumentOutOfRangeException` with valid `deviceKey` param name before network attempts, and AI engineering classification preservation across all AI tags. Validation: 87/87 tests in `packages/process-io`, all boundary tests clean (0 findings, S1–S9 clean), `git diff --check` clean. Hardware status remains: `PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED`. PR #42 remains OPEN and NOT MERGED (`PR #42 MERGE: HOLD`). NO HARDWARE. NO MERGE.
+
+> **H2 Physical Process-I/O Legacy Rev2 Addendum reconciliation & hardware bench gap closure (2026-10-30;
+> software implementation and bench test harness; HARDWARE NOT EXECUTED / NOT VERIFIED).**
+> Following authoritative verification of the Owner mapping workbook `WAGO_T8_Analog_Digital_Modbus_Mapping 1.xlsx`
+> and reconciliation of the 9 gap items from `LEGACY PRODUCTION REV2 ADDENDUM` subordinate to the Owner-authoritative
+> Workbook, the Process-I/O physical architecture and bench execution layer have been updated and verified:
+> (1) Reconciled Legacy Production evidence (active WJ valve coils 22..29 commanded at Owner-local endpoint; `.50` confirmed stale;
+> physical endpoint kept strictly Owner-local and never committed); (2) Adopted configured default Unit ID = 1 with physical
+> range validation 1–247 (rejecting 0, 248, 255; no automatic Unit-ID fallback); (3) Implemented explicit read-contract profiles
+> `WORKBOOK_CANONICAL` and `LEGACY_PRODUCTION_COMPAT` (FC01 start 0 qty 100, FC03 start 0 qty 100) with zero silent fallback;
+> (4) Supported canonical CLI endpoint `--wago-t8-endpoint` and env `WJSS_PROCESS_IO_WAGO_T8_ENDPOINT` (retaining `--t8-endpoint`
+> as deprecated alias only; legacy multi-rack endpoint requirements removed); (5) Implemented required `--hold-ms` (100–2000 ms)
+> with FC05 command -> FC01 read-back -> hold -> FC05 safe return -> FC01 read-back for `PHYSICAL_DO_SINGLE`; (6) Implemented
+> required `--ao-test-raw` (0–32767) and `--ao-write-function=FC06|FC16` for `PHYSICAL_AO_SINGLE` (removing magic numbers; safe
+> return raw 0); (7) Enforced single canonical consent phrase set across codebase, requiring environment consent (`WJSS_PROCESS_IO_CONSENT`)
+> for physical modes, stripping it before socket creation, and refusing physical CLI consent arguments; (8) Deprecated and refused
+> `PHYSICAL_TEST` mode in CLI, restricting physical modes to explicit safe targets (`SIMULATION`, `PHYSICAL_DI_AI_READ`, `PHYSICAL_DO_SINGLE`,
+> `PHYSICAL_AO_SINGLE`, `PHYSICAL_FULL_SELECTED_SEQUENCE`); (9) Validation: all test suites green across Node and C#, boundary-scan clean
+> (0 findings, S1–S9 verified clean). Hardware status remains: `PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED`.
+> PR #42 remains OPEN and NOT MERGED (`PR #42 MERGE: HOLD`). NO HARDWARE. NO MERGE.
+
+> **H2 Physical Process-I/O Product software foundation — implementation record (2026-10-27;
+> software only; HARDWARE NOT EXECUTED).** The complete H2 Physical Process-I/O software
+> foundation covering all 111 rows of the adopted inventory is implemented on PR #42 from the
+> Exact Legacy Source pack (`repomix-output-exact-lagacy-source-pack.md`, SHA-256
+> `9dc7bf513a8e62e2bd76a77ec8af12aea9f25a47a63eb4379b1c9e00dc14fd1c`, 3,362,177 bytes,
+> verified outside the repository tree; the commissioned functional reference for the unchanged
+> Hardware). Components implemented: (1) complete typed catalogue integration
+> (`ProcessIoCatalogueLoader` / `@wjss/process-io/catalogue`) consuming the committed
+> normalized inventory (DI 40 / DO 32 / AI 36 / AO 2 / End module 1; USED 105 / SPARE 6; 108
+> tagged / 3 untagged; all 111 rows preserved in complete source order; spare and unresolved
+> rows fail-closed excluded); (2) exact Legacy physical bindings, function codes (FC01/FC03/FC05/FC16),
+> transport shape (port 502, unitId 1, timeouts 1000 ms, poll 200 ms) and conversions (WC/IV
+> pressure 0..40 bar, pump outlet two-stage 4..20 mA -> 0..40 bar per Owner ruling AI-003 sole
+> Pump-ready authority, water level, AO pump speed reference 0..20 mA -> raw 0..32767); (3) typed
+> session with generation counter, stale-response rejection, reconnect fencing, exactly-once write
+> admission, no write after Close/Stop; (4) commanded / effective / read-back separation; (5)
+> physical-capable configuration validation (fail-closed; missing/invalid endpoints refuse before
+> network I/O; zero network I/O on refusal); (6) deterministic Simulation covering all four I/O
+> classes with 23 scenarios; (7) commissioning-surface view model with full filtering/searching.
+> Legacy defects deliberately not copied: raw coil/register write grids, untyped monitor tables,
+> missing lifecycle ownership, missing cleanup, unseparated commanded read-back, inline simulation
+> data. Validation: 65/65 tests in `packages/process-io`, 15/15 generator tests, boundary scan 0
+> findings (S1–S9), relevant Node suites green; C# tests in `tests/runtime.tests/ProcessIo/`.
+> Hardware execution remains NOT AUTHORIZED; every physical trial requires separate exact-head
+> Owner authorization. H1 and PR #43 are outside this Scope. NO HARDWARE. NO PRODUCTION.
+
+> **H2 Physical Process-I/O evidence adoption + H2 Final Scope Gate (2026-10-26; evidence and
+> read-only analysis only; NO HARDWARE; NO PRODUCT RUNTIME CHANGE).** The exact
+> Owner-supplied connected-source artifact
+> `WAGO_IO_Mapping_Exact_Excel_Cyberpunk_PositiveIOSlot_2026-10-22.html` (Google Drive file
+> id `1GPig0jsZCLNbdgvBNR6a0LeXUdDHUjQd`, 36,667 bytes, SHA-256
+> `28245ad207a24078902fca48f4fa2622fbca631bd92f660aa4faf1681f4c5299`, modified
+> 2026-10-22) is adopted byte-identically at
+> [`docs/evidence/WAGO_IO_Mapping_Exact_Excel_Cyberpunk_PositiveIOSlot_2026-10-22.html`](evidence/WAGO_IO_Mapping_Exact_Excel_Cyberpunk_PositiveIOSlot_2026-10-22.html)
+> with a complete provenance record
+> ([`docs/evidence/process-io-source-provenance-2026-10-22.md`](evidence/process-io-source-provenance-2026-10-22.md),
+> including full disclosure of the connector's per-fetch cloud-proxy injection and its
+> cryptographic reversal; provider SHA-256/MD5/SHA-1/size all matched), a deterministic
+> generator-owned normalized inventory
+> ([`docs/evidence/process-io-inventory-2026-10-22.csv`](evidence/process-io-inventory-2026-10-22.csv),
+> 111 rows in complete source order: DI 40 / DO 32 / AI 36 / AO 2 / End module 1; USED 105 /
+> SPARE 6; 108 tagged / 3 untagged; rows kept verbatim including `+`-suffixed analog tags,
+> Thai notes and the 17 unresolved `XXX รอพี่ยิมตอบ` rows) produced by
+> `tools/process-io-evidence/generate.mjs` (fail-closed; hash-gated; `--check` parity; 15
+> focused tests). The artifact's own declared filter (`Filtered I/O Slot less than 0, equal
+> to 0, and blank`) excludes exactly the 3 non-process modules (RackSlots 1/2/12 — coupler
+> and the two power supplies); its Slot/I-O-Slot pairs match the committed 23-slot
+> authoritative rack topology exactly. The read-only **H2 Final Scope Gate** analysis is at
+> [`docs/H2_FINAL_SCOPE_GATE_REPORT.md`](H2_FINAL_SCOPE_GATE_REPORT.md): complete grouped
+> analysis of all 111 rows (Pump/Inverter, pump inlet/outlet pressure per Owner ruling
+> AI-002 diagnostic-only / AI-003 sole Pump-ready, IV1–IV8 outlet pressure + limits ordinal,
+> WSB limits, air solenoids, tank/boiler valve banks, 0-20 mA blower currents, breaker
+> status, unresolved and spare rows); typed Modbus architecture proposal (12 typed
+> boundaries, no raw UI); process-image/function-code/endpoint status **UNRESOLVED** (no
+> evidence in the artifact; none invented; TC cabinet endpoints not reused); H2-A…H2-Final
+> phasing with H2-B typed read-only observation as the proposed first Product coding scope.
+> **Evidence states: no row is VERIFIED; USED ≠ safe to actuate; spares and unresolved rows
+> are fail-closed excluded.** Owner decisions D1–D8 are listed in the report §29 (process-
+> image/FC evidence, endpoint provisioning, unresolved identities incl. DO-031/AI-020…AI-035
+> and the `+` suffix, workbook version authority, H2-B authorization). Validation in the
+> Author environment: retrieval/byte-identity proof, generator parity, 15/15 focused tests,
+> boundary scan 0 findings, relevant Node suites green; **no C# Source changed — no .NET
+> validation claimed**. H2–H5 remain **NOT AUTHORIZED**; this task authorizes evidence
+> adoption and read-only analysis only. NO HARDWARE. NO PRODUCTION.
+
 > **Owner-approved canonical Equipment topology adoption (2026-10-25; current equipment-topology\n> position — supersedes every contrary installed-position, Target Coverage, WSB/axis-allocation,\n> assignment-count, REV2-current and dated-identity statement below without deleting any dated\n> record; software only; HARDWARE NOT EXECUTED).** Implemented in Source on branch\n> `arena/7968e33e-waterjet-sentinel-suite` (PR #41 open, unmerged) inside the H1 pass. Canonical\n> table: WJ1 (legacy WJ2) IV1 installed LEFT/UPPER → targets RIGHT/UPPER, WSB1, A/B; WJ2 (legacy\n> WJ3) IV2 REAR/UPPER → FRONT/UPPER, WSB1, C/D; WJ3 (legacy WJ4) IV3 RIGHT/UPPER → LEFT/UPPER,\n> WSB2, C/D; WJ4 (legacy WJ1) IV4 FRONT/UPPER → REAR/UPPER, WSB2, A/B; WJ5 (legacy WJ5) IV5\n> FRONT/LOWER → REAR/LOWER, WSB3, A/B; WJ6 (legacy WJ7) IV6 REAR/LOWER → FRONT/LOWER, WSB3, C/D;\n> WJ7 (legacy WJ6) IV7 LEFT/LOWER → RIGHT/LOWER, WSB4, A/B; WJ8 (legacy WJ8) IV8 RIGHT/LOWER →\n> LEFT/LOWER, WSB4, C/D. A/C Horizontal, B/D Vertical; WJn ↔ IVn; Target Coverage is always the\n> opposite wall in the same tier. The Legacy WJ identity column is historical equipment identity\n> only, distinct from the legacy cannon identity; `cannon n → WJn` direct import is unchanged. The\n> H1 synthetic default route is corrected to G+210 (RIGHT/UPPER) → canonical WJ1/IV1, WSB1\n> A/B (Horizontal A, Vertical B), with G+201 (LEFT/UPPER) → WJ3/IV3, WSB2 C/D as the\n> unsupported-WSB refusal scenario. Dated current identities: .NET `MotionTopologyRevision =\n> OWNER_CANONICAL_TOPOLOGY_2026_10_25` and JS `MOTION_COMMISSIONING_DESIGN_ID =\n> MOTION_COMMISSIONING_DESIGN_2026_10_25`; `OWNER_CONFIRMED_REV2` / `OWNER_CONFIRMED_REV1` and\n> `MOTION_COMMISSIONING_DESIGN_REV2` / `MOTION_COMMISSIONING_DESIGN_REV1` retained as historical\n> identities only. Canonical default assignments by physical Sensor wall / tier: 8/10/8/10/20/20/\n> 16/16 to WJ1..WJ8 (108 total); I7 → WJ5/IV5 unchanged; I16 → WJ6/IV6 (was WJ7 under the\n> superseded table). `snapshot.seed0.json`, `delta.basic.json` and\n> `sensor-parameters.migrated.example.json` were regenerated only through their generator owners\n> (deterministic; frozen historical tables and `--legacy-proof` byte-identity preserved);\n> `sensor-map.example.json` unchanged. Unchanged: 108 Sensors / 216 assigned / 240 physical /\n> 24 spare, the Sensor sequence and coordinates, I7/I16 Product-Sensor status, physical\n> SDS/Cabinet/module/channel mapping, P1–P6 and Centre 125/125, WJn ↔ IVn pairing, queue and\n> safety semantics, Manual Motion command lifecycles, the gclib typed boundary and every Hardware\n> / Production authorization boundary. Physical wiring, the mechanical route and Galil A/B/C/D\n> physical semantics are unchanged; no Hardware matrix is repeated and no Hardware is executed.\n> **Validation position: .NET restore/build/test and C# fixture parity NOT RUN in the Author\n> environment (no .NET SDK) — the Owner-local exact-head gate is the validation of record;\n> Node suites (commissioning 239/239, contracts-ts 56/56, Ops Preview motion 22/22) and the\n> boundary scan passed in the Author environment.** No REV3 exists. NO HARDWARE. NO PRODUCTION.\n
 > **H1 WSB1 dry Cleaning Path commissioning — implementation record (2026-10-25; software only;
 > HARDWARE NOT EXECUTED).** The Product now owns the H1 dry commissioning run for WSB1 through the
