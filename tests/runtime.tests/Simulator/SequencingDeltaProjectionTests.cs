@@ -72,6 +72,29 @@ public sealed class SequencingDeltaProjectionTests
     }
 
     [Fact]
+    public void The_published_open_command_alone_changes_the_Job_and_is_carried_by_a_Present_delta()
+    {
+        // The command is published BEFORE any measured resolution exists, so this step is the clean
+        // proof that the command is its own evidence: exactly one published member changes.
+        var run = SimulatorRunHarness.RunScenario(SimulatorScenarioId.NORMAL_COMPLETION);
+        var step = run.Steps.Single(candidate => candidate.Event is ExecutionPhaseVerified { Phase: JobPhase.P1 });
+        var before = SimulatorRunHarness.Required(run.PreviousTo(step.Tick).ActiveJob);
+        var after = SimulatorRunHarness.Required(run.CandidateAt(step.Tick).ActiveJob);
+
+        Assert.Equal(ValveOpenCommandState.NOT_COMMANDED, before.ValveOpenCommand);
+        Assert.Equal(ValveOpenCommandState.OPEN_COMMANDED, after.ValveOpenCommand);
+        Assert.Null(before.ValveOpenResolution);
+        Assert.Null(after.ValveOpenResolution);
+        Assert.Equal(
+            before with { ValveOpenCommand = ValveOpenCommandState.OPEN_COMMANDED },
+            after);
+
+        var delta = RuntimeDeltaProjector.ProjectCandidate(run.PreviousTo(step.Tick), run.CandidateAt(step.Tick));
+        Assert.Equal(DeltaJobEncoding.Present, delta.ActiveJob.Encoding);
+        Assert.Equal(ValveOpenCommandState.OPEN_COMMANDED, delta.ActiveJob.Present.ValveOpenCommand);
+    }
+
+    [Fact]
     public void Admission_During_A_Job_Changes_Only_The_Queue_Section_And_One_Sensor()
     {
         var set = SimulatorRunHarness.ScenarioSet();

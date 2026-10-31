@@ -32,6 +32,9 @@ internal static class RuntimeDeltaTestFixture
         PhaseProgress = 0.0,
         Lifecycle = JobLifecycle.RUNNING,
         CleaningPhase = "SYNTHETIC",
+        // A verified P1 presentation cannot exist without the issued open command; the synthetic
+        // record stays coherent even though it is only ever used as encoded test data.
+        ValveOpenCommand = ValveOpenCommandState.OPEN_COMMANDED,
         Dispatch = new DispatchRecord
         {
             DispatchId = "D-SYN-01",

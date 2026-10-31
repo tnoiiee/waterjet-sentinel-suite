@@ -226,6 +226,7 @@ internal static class FixtureGenerator
         ValvePressureQuality = "GOOD",
         ValvePressureSourceId = "SYN-VLV-05_OUTLET",
         ValvePressureInputValid = true,
+        ValveOpenCommand = ValveOpenCommandState.OPEN_COMMANDED,
         ValveOpenResolution = "OPEN_CONFIRMED",
         ValveDiagnosis = "NONE",
         Dispatch = BuildDispatch(),

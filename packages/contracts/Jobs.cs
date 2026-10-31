@@ -44,6 +44,15 @@ public sealed record ActiveCleaningJobState
     public string? ValvePressureQuality { get; init; }
     public string? ValvePressureSourceId { get; init; }
     public bool ValvePressureInputValid { get; init; }
+
+    /// <summary>
+    /// The published open COMMAND for this Job's own Isolation Valve: <c>OPEN_COMMANDED</c> once the
+    /// Cleaning start step issued the open, <c>NOT_COMMANDED</c> before it. It is folded from the
+    /// authoritative sequencing command state only, so it is never inferred from the measured
+    /// <see cref="ValveOpenResolution"/> and it is never a measured valve state.
+    /// </summary>
+    public ValveOpenCommandState ValveOpenCommand { get; init; } = ValveOpenCommandState.NOT_COMMANDED;
+
     public string? ValveOpenResolution { get; init; }
     public string? ValveDiagnosis { get; init; }
 

@@ -37,6 +37,7 @@ public sealed class ContractEncodingTests
           "phaseProgress": 0.5,
           "lifecycle": "RUNNING",
           "cleaningPhase": "IN_PROGRESS",
+          "valveOpenCommand": "OPEN_COMMANDED",
           "dispatch": {
             "dispatchId": "D-100",
             "queueRevisionBefore": 4,
@@ -65,6 +66,42 @@ public sealed class ContractEncodingTests
         Revision = 11,
         GeneratedAt = "2026-10-07T00:00:00.000Z",
     };
+
+    [Fact]
+    public void Published_Job_Carries_Typed_Open_Command_Evidence_And_No_Internal_Sequencing_Member()
+    {
+        // (A) The wire token is the contract vocabulary, and the command is a member of its own:
+        // this payload carries the issued command and NO measured resolution at all, so neither
+        // one can be standing in for the other.
+        using (var document = SerializeToDocument(BuildJob()))
+        {
+            var root = document.RootElement;
+            Assert.Equal("OPEN_COMMANDED", root.GetProperty("valveOpenCommand").GetString());
+            Assert.Equal(JsonValueKind.Null, root.GetProperty("valveOpenResolution").ValueKind);
+        }
+
+        // (B) The added member is additive, never required: a payload without the key still
+        // deserializes and carries the pre-command default.
+        var withoutCommand = JsonNode.Parse(ActiveJobJson)!.AsObject();
+        Assert.True(withoutCommand.Remove("valveOpenCommand"));
+        var earlierPayload = JsonSerializer.Deserialize<ActiveCleaningJobState>(
+            withoutCommand.ToJsonString(), ContractJson.Options)!;
+        Assert.Equal(ValveOpenCommandState.NOT_COMMANDED, earlierPayload.ValveOpenCommand);
+
+        // (C) No raw sequencing execution member crosses the published type: the Job exposes the
+        // typed presentation evidence and nothing else from the internal execution state.
+        var published = typeof(ActiveCleaningJobState)
+            .GetProperties()
+            .Select(property => property.Name)
+            .ToArray();
+        Assert.DoesNotContain("VerifiedPhase", published);
+        Assert.DoesNotContain("ValveOpenCommanded", published);
+        Assert.DoesNotContain("OpenResolution", published);
+        Assert.DoesNotContain("Stage", published);
+        Assert.Equal(
+            typeof(ValveOpenCommandState),
+            typeof(ActiveCleaningJobState).GetProperty("ValveOpenCommand")!.PropertyType);
+    }
 
     [Fact]
     public void Wall_Map_Slot_Serializes_CamelCase_And_Explicit_Nulls()

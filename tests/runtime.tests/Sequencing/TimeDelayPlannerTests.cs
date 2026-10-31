@@ -240,6 +240,8 @@ public sealed class TimeDelayPlannerTests
     [Theory]
     [InlineData(2, 0.75, 2)]   // 1.5 rounds half to EVEN: 2
     [InlineData(6, 0.75, 4)]   // 4.5 rounds half to EVEN: 4
+    [InlineData(1, 0.5, 0)]    // 0.5 rounds half to EVEN: 0
+    [InlineData(3, 0.5, 2)]    // 1.5 rounds half to EVEN: 2
     [InlineData(660, 0.75, 495)]
     [InlineData(655, 0.75, 491)]
     [InlineData(600, 1.00, 600)]
@@ -556,9 +558,26 @@ public sealed class TimeDelayPlannerTests
     [InlineData(1.9, 1)]
     [InlineData(-3.4, 0)]
     [InlineData(655.5, 655)]
+    [InlineData(2147483647.0, int.MaxValue)]  // the inclusive whole-second boundary is representable
+    [InlineData(2147483646.5, 2147483646)]     // a large finite value still truncates DOWN
     public void Truncation_toward_zero_never_rounds_up(double seconds, int expected)
     {
         Assert.Equal(expected, TimeDelayPlanner.TruncateToWholeSeconds(seconds));
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(2147483647.5)]                // just past int.MaxValue
+    [InlineData(2147483648.0)]                // one whole second past int.MaxValue
+    public void A_non_finite_or_unrepresentable_second_count_is_refused(double seconds)
+    {
+        // Refusal, never saturation: a value that cannot be a whole second count is not clamped to
+        // int.MaxValue and never silently becomes the maximum delay.
+        var refusal = Assert.Throws<ArgumentOutOfRangeException>(
+            () => TimeDelayPlanner.TruncateToWholeSeconds(seconds));
+        Assert.Equal("seconds", refusal.ParamName);
     }
 
     [Fact]
@@ -574,6 +593,24 @@ public sealed class TimeDelayPlannerTests
             TimeDelayPlanner.ApplyZoneFactor(-1, TimeDelayPlanner.LowerZoneFactor));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             TimeDelayPlanner.ApplyZoneFactor(10, double.NaN));
+
+        // Every refusal names the value it refused, and each one is a distinct premise: a negative
+        // base, a negative factor, a non-finite factor and a scaled product that leaves the
+        // representable whole-second range.
+        Assert.Equal("baseDelaySeconds", Assert.Throws<ArgumentOutOfRangeException>(() =>
+            TimeDelayPlanner.ApplyZoneFactor(-1, TimeDelayPlanner.LowerZoneFactor)).ParamName);
+        Assert.Equal("zoneFactor", Assert.Throws<ArgumentOutOfRangeException>(() =>
+            TimeDelayPlanner.ApplyZoneFactor(10, -0.01)).ParamName);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            TimeDelayPlanner.ApplyZoneFactor(10, double.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            TimeDelayPlanner.ApplyZoneFactor(int.MaxValue, 2.0));
+
+        // The accepted edges stay accepted: a zero factor floors at zero and the boundary product
+        // is representable.
+        Assert.Equal(0, TimeDelayPlanner.ApplyZoneFactor(0, 0.0));
+        Assert.Equal(0, TimeDelayPlanner.ApplyZoneFactor(int.MaxValue, 0.0));
+        Assert.Equal(int.MaxValue, TimeDelayPlanner.ApplyZoneFactor(int.MaxValue, 1.0));
     }
 
     // ---------------------------------------------------------------- preview

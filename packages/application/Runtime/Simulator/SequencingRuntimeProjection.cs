@@ -93,6 +93,8 @@ public static class SequencingRuntimeProjection
     /// Projects the single Active Cleaning Job, or null when no Job is active. The phase presentation follows the
     /// brief: PREPARING and READY_TO_CLEAN are P1 pending, CLEANING presents its verified phase, and a Safe Return keeps
     /// the presentation frozen at the trigger, because the stage and the verified phase do not change during Safe Return.
+    /// The open command is published as its own typed evidence, so the pre-verification presentation can be read without
+    /// the measured resolution ever standing in for the command.
     /// </summary>
     public static ActiveCleaningJobState? ProjectActiveJob(SequencingState state, SequencingRetention retention)
     {
@@ -137,6 +139,9 @@ public static class SequencingRuntimeProjection
             ValvePressureSourceId = job.ValvePressure?.SourceId,
             ValvePressureInputValid = SequencingPressure.Valid(job.ValvePressure)
                 && job.ValvePressure?.SourceId == PressureSample.ValveOutletSource(job.ValveId),
+            ValveOpenCommand = job.ValveOpenCommanded
+                ? ValveOpenCommandState.OPEN_COMMANDED
+                : ValveOpenCommandState.NOT_COMMANDED,
             ValveOpenResolution = job.OpenResolution?.ToString(),
             ValveDiagnosis = job.ValveDiagnosis.ToString(),
             Dispatch = dispatch,

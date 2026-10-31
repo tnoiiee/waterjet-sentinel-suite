@@ -467,6 +467,27 @@ test('Pump and paired IVn outlets are separate sources with a strict Pump setpoi
   assert.ok(validateEnvelope(snapshot).issues.some(i => i.includes('paired IVn outlet')));
 });
 
+test('the open COMMAND is its own evidence and the measured resolution never stands in for it', () => {
+  const snapshot = fixture('snapshot.seed0.json');
+  const job = snapshot.activeJob;
+  assert.equal(job.valveOpenCommand, 'OPEN_COMMANDED');
+  assert.equal(job.valveOpenResolution, 'OPEN_CONFIRMED');
+
+  // Before P1 is verified the command may be published with NO measured resolution at all: the
+  // pre-verification presentation must never need the resolution to express "Open IV".
+  job.valveOpenResolution = null;
+  assert.deepEqual(safeReturnIssues(snapshot), []);
+
+  // The command is a closed vocabulary of its own; the measured outcome is not a command token,
+  // and a missing command is refused instead of silently defaulting.
+  job.valveOpenCommand = 'OPEN_CONFIRMED';
+  assert.ok(validateEnvelope(snapshot).issues.some((i) => i.includes('valveOpenCommand')));
+  job.valveOpenCommand = null;
+  assert.ok(validateEnvelope(snapshot).issues.some((i) => i.includes('valveOpenCommand')));
+  job.valveOpenCommand = 'NOT_COMMANDED';
+  assert.deepEqual(safeReturnIssues(snapshot), []);
+});
+
 test('released dual-fault Job needs both remarks and a post-command SR3 in either feedback order', () => {
   const snapshot = fixture('snapshot.seed0.json');
   const o = {

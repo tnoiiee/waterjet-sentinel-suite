@@ -12,8 +12,9 @@ namespace Wjss.Runtime.Core;
 ///
 /// <para>
 /// The projection owns no state, accepts no command and adds no policy: the timeline stage is
-/// derived from the already-published Job lifecycle and verified phase, and the preview is the
-/// planner's own view of the CURRENT inputs. A preview never enters the frozen decision.
+/// derived from the already-published Job lifecycle, published phase and published open command,
+/// and the preview is the planner's own view of the CURRENT inputs. A preview never enters the
+/// frozen decision.
 /// </para>
 /// </summary>
 public static class DispatchWorkspaceProjector
@@ -156,7 +157,9 @@ public static class DispatchWorkspaceProjector
     /// <summary>
     /// The current step of the dispatch cycle: the FIRST step the published evidence has not
     /// completed. A Job's own steps win while a Job exists; after release the cycle continues with
-    /// COMPLETE, then the frozen countdown, then the single dispatch.
+    /// COMPLETE, then the frozen countdown, then the single dispatch. Every branch reads published
+    /// Job values only: the lifecycle, the phase with its published index, and the typed open
+    /// command. No measured resolution is ever read as a command.
     /// </summary>
     public static DispatchTimelineStage CurrentStage(
         RuntimeState state,
@@ -185,7 +188,17 @@ public static class DispatchWorkspaceProjector
                 return DispatchTimelineStage.MANDATORY_SAFE_RETURN;
             }
 
-            return job.VerifiedPhase switch
+            // Published pre-verification presentation: the projection publishes P1 with index zero
+            // until a phase is verified. That presentation cannot tell the two pre-verification
+            // steps apart, so the ONLY separator is the published open COMMAND evidence.
+            if (job.PhaseIndex <= 0)
+            {
+                return job.ValveOpenCommand == ValveOpenCommandState.OPEN_COMMANDED
+                    ? DispatchTimelineStage.OPEN_IV
+                    : DispatchTimelineStage.MOVE_TO_P1;
+            }
+
+            return job.Phase switch
             {
                 JobPhase.P1 => DispatchTimelineStage.P2,
                 JobPhase.P2 => DispatchTimelineStage.P3,
@@ -193,7 +206,8 @@ public static class DispatchWorkspaceProjector
                 JobPhase.P4 => DispatchTimelineStage.P5,
                 JobPhase.P5 => DispatchTimelineStage.P6,
                 JobPhase.P6 => DispatchTimelineStage.CLOSE_IV,
-                _ => job.ValveOpenCommanded ? DispatchTimelineStage.OPEN_IV : DispatchTimelineStage.MOVE_TO_P1,
+                _ => throw new InvalidOperationException(
+                    $"The published Job phase '{job.Phase}' has no dispatch-cycle step."),
             };
         }
 

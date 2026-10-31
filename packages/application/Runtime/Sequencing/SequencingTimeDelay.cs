@@ -338,7 +338,7 @@ public static class TimeDelayPlanner
     {
         if (!double.IsFinite(seconds)) throw new ArgumentOutOfRangeException(nameof(seconds));
         if (seconds <= 0.0) return 0;
-        if (seconds > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(seconds));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(seconds, (double)int.MaxValue);
         return (int)Math.Truncate(seconds);
     }
 
@@ -349,7 +349,7 @@ public static class TimeDelayPlanner
     /// </summary>
     public static int ApplyZoneFactor(int baseDelaySeconds, double zoneFactor)
     {
-        if (baseDelaySeconds < 0) throw new ArgumentOutOfRangeException(nameof(baseDelaySeconds));
+        ArgumentOutOfRangeException.ThrowIfNegative(baseDelaySeconds);
         if (!double.IsFinite(zoneFactor) || zoneFactor < 0.0) throw new ArgumentOutOfRangeException(nameof(zoneFactor));
 
         var scaled = baseDelaySeconds * zoneFactor;

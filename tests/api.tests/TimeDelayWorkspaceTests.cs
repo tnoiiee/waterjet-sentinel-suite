@@ -158,7 +158,7 @@ public sealed class TimeDelayWorkspaceTests
             Assert.Equal(
                 DispatchWorkspaceProjectorSteps(),
                 workspace.Timeline.Steps.Select(step => step.Stage));
-            Assert.Single(workspace.Timeline.Steps.Where(step => step.State == DispatchTimelineStepState.CURRENT));
+            Assert.Single(workspace.Timeline.Steps, step => step.State == DispatchTimelineStepState.CURRENT);
 
             // The frozen delay holds the dispatch for every tick before zero.
             for (var held = 1; held <= 4; held++)
@@ -340,6 +340,205 @@ public sealed class TimeDelayWorkspaceTests
             Assert.Equal(head, runtime.State.Queue.Entries[0].EntryId);
             // The first (scripted) dispatch still happened; the paused sequence added no second one.
             Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    // ---------------------------------------------------------------- published timeline evidence
+
+    /// <summary>The first published revision that carries an Active Job, after at most 40 ticks.</summary>
+    private static (RuntimeState State, ActiveCleaningJobState Job) FirstActiveJob(SimulatorRuntime runtime)
+    {
+        for (var tick = 0; tick < 40 && runtime.State.ActiveJob is null; tick++)
+        {
+            Tick(runtime);
+        }
+
+        var state = runtime.State;
+        return (state, Assert.IsType<ActiveCleaningJobState>(state.ActiveJob));
+    }
+
+    [Fact]
+    public async Task The_published_timeline_walks_the_whole_dispatch_cycle_of_one_Job()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION);
+        try
+        {
+            var observed = new List<DispatchTimelineStage>();
+            var firstJob = new Dictionary<DispatchTimelineStage, ActiveCleaningJobState>();
+            for (var tick = 0; tick < 60; tick++)
+            {
+                Tick(runtime);
+                var workspace = runtime.ProjectWorkspace();
+                var stage = workspace.Timeline.Stage;
+                if (observed.Count == 0 || observed[^1] != stage)
+                {
+                    observed.Add(stage);
+                    if (workspace.ActiveJob is { } job)
+                    {
+                        firstJob.TryAdd(stage, job);
+                    }
+                }
+
+                if (stage == DispatchTimelineStage.COMPLETE)
+                {
+                    break;
+                }
+            }
+
+            // One Job, walked step by step: every stage the published evidence can complete appears
+            // once, in the Owner-approved order, and no stage is invented or skipped.
+            Assert.Equal(
+                new[]
+                {
+                    DispatchTimelineStage.PRECHECK,
+                    DispatchTimelineStage.MOVE_TO_P1,
+                    DispatchTimelineStage.OPEN_IV,
+                    DispatchTimelineStage.P2,
+                    DispatchTimelineStage.P3,
+                    DispatchTimelineStage.P4,
+                    DispatchTimelineStage.P5,
+                    DispatchTimelineStage.P6,
+                    DispatchTimelineStage.CLOSE_IV,
+                    DispatchTimelineStage.MANDATORY_SAFE_RETURN,
+                    DispatchTimelineStage.COMPLETE,
+                },
+                observed);
+
+            // The two pre-verification steps share ONE phase presentation (P1, index zero). The only
+            // published difference is the open COMMAND, and neither revision carries a measured
+            // resolution: the command is never inferred from a resolution here.
+            var waiting = firstJob[DispatchTimelineStage.MOVE_TO_P1];
+            Assert.Equal(JobPhase.P1, waiting.Phase);
+            Assert.Equal(0, waiting.PhaseIndex);
+            Assert.Equal(ValveOpenCommandState.NOT_COMMANDED, waiting.ValveOpenCommand);
+            Assert.Null(waiting.ValveOpenResolution);
+
+            var commanded = firstJob[DispatchTimelineStage.OPEN_IV];
+            Assert.Equal(JobPhase.P1, commanded.Phase);
+            Assert.Equal(0, commanded.PhaseIndex);
+            Assert.Equal(ValveOpenCommandState.OPEN_COMMANDED, commanded.ValveOpenCommand);
+            Assert.Null(commanded.ValveOpenResolution);
+
+            // A verified phase presents itself, and the stage is the step AFTER it.
+            var verifiedSteps = new (DispatchTimelineStage Stage, JobPhase Phase, int Index)[]
+            {
+                (DispatchTimelineStage.P2, JobPhase.P1, 1),
+                (DispatchTimelineStage.P3, JobPhase.P2, 2),
+                (DispatchTimelineStage.P4, JobPhase.P3, 3),
+                (DispatchTimelineStage.P5, JobPhase.P4, 4),
+                (DispatchTimelineStage.P6, JobPhase.P5, 5),
+                (DispatchTimelineStage.CLOSE_IV, JobPhase.P6, 6),
+            };
+
+            foreach (var (stage, phase, index) in verifiedSteps)
+            {
+                var job = firstJob[stage];
+                Assert.Equal(phase, job.Phase);
+                Assert.Equal(index, job.PhaseIndex);
+                Assert.Equal(ValveOpenCommandState.OPEN_COMMANDED, job.ValveOpenCommand);
+            }
+
+            Assert.Equal("OPEN_CONFIRMED", firstJob[DispatchTimelineStage.P2].ValveOpenResolution);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task The_published_phase_alone_drives_phase_progression()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION);
+        try
+        {
+            var (baseline, job) = FirstActiveJob(runtime);
+
+            // Only the published phase identity changes between the six cases: nothing else in the
+            // revision is touched, so the mapping provably reads the published phase.
+            var verified = job with
+            {
+                Lifecycle = JobLifecycle.RUNNING,
+                ValveOpenCommand = ValveOpenCommandState.OPEN_COMMANDED,
+            };
+            var expected = new (JobPhase Phase, int Index, DispatchTimelineStage Stage)[]
+            {
+                (JobPhase.P1, 1, DispatchTimelineStage.P2),
+                (JobPhase.P2, 2, DispatchTimelineStage.P3),
+                (JobPhase.P3, 3, DispatchTimelineStage.P4),
+                (JobPhase.P4, 4, DispatchTimelineStage.P5),
+                (JobPhase.P5, 5, DispatchTimelineStage.P6),
+                (JobPhase.P6, 6, DispatchTimelineStage.CLOSE_IV),
+            };
+
+            foreach (var (phase, index, stage) in expected)
+            {
+                var projected = baseline with { ActiveJob = verified with { Phase = phase, PhaseIndex = index } };
+                Assert.Equal(
+                    stage,
+                    DispatchWorkspaceProjector.CurrentStage(projected, NextDispatchCountdown.None, out var failed));
+                Assert.False(failed);
+            }
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Theory]
+    [InlineData(JobLifecycle.ABORTING)]
+    [InlineData(JobLifecycle.SAFE_RETURN_CLOSE_VALVE)]
+    [InlineData(JobLifecycle.SAFE_RETURN_VERIFY_VALVE_CLOSED)]
+    [InlineData(JobLifecycle.SAFE_RETURN_TO_STANDBY)]
+    [InlineData(JobLifecycle.SAFE_RETURN_VERIFY_STANDBY)]
+    public async Task Every_Mandatory_Safe_Return_lifecycle_overrides_the_ordinary_phase_step(JobLifecycle lifecycle)
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION);
+        try
+        {
+            var (baseline, job) = FirstActiveJob(runtime);
+
+            // A mid-Cleaning Job presentation: the ordinary mapping would report P4. The lifecycle
+            // must win for every Mandatory Safe Return lifecycle, and none of them is a failure.
+            var projected = baseline with
+            {
+                ActiveJob = job with { Phase = JobPhase.P3, PhaseIndex = 3, Lifecycle = lifecycle },
+            };
+            var stage = DispatchWorkspaceProjector.CurrentStage(projected, NextDispatchCountdown.None, out var failed);
+            Assert.Equal(DispatchTimelineStage.MANDATORY_SAFE_RETURN, stage);
+            Assert.False(failed);
+
+            var timeline = DispatchWorkspaceProjector.ProjectTimeline(projected, NextDispatchCountdown.None, stage, failed);
+            Assert.Single(timeline.Steps, step => step.State == DispatchTimelineStepState.CURRENT);
+            Assert.DoesNotContain(timeline.Steps, step => step.State == DispatchTimelineStepState.FAILED);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_failed_Safe_Return_projects_the_failed_mandatory_return_step_and_no_progress()
+    {
+        var runtime = Create(SimulatorScenarioId.AXIS_STANDBY_FAILURE);
+        try
+        {
+            for (var tick = 0; tick < 60 && runtime.State.ActiveJob?.Lifecycle != JobLifecycle.SAFE_RETURN_FAILED; tick++)
+            {
+                Tick(runtime);
+            }
+
+            var job = Assert.IsType<ActiveCleaningJobState>(runtime.State.ActiveJob);
+            Assert.Equal(JobLifecycle.SAFE_RETURN_FAILED, job.Lifecycle);
+
+            var workspace = runtime.ProjectWorkspace();
+            Assert.Equal(DispatchTimelineStage.MANDATORY_SAFE_RETURN, workspace.Timeline.Stage);
+            var failedStep = Assert.Single(
+                workspace.Timeline.Steps, step => step.State == DispatchTimelineStepState.FAILED);
+            Assert.Equal(DispatchTimelineStage.MANDATORY_SAFE_RETURN, failedStep.Stage);
+            Assert.Single(workspace.Timeline.Steps, step => step.State == DispatchTimelineStepState.CURRENT);
+
+            // A failure never invents progress: earlier steps stay complete, later steps stay pending.
+            Assert.All(
+                workspace.Timeline.Steps.Take(failedStep.Ordinal - 1),
+                step => Assert.Equal(DispatchTimelineStepState.COMPLETE, step.State));
+            Assert.All(
+                workspace.Timeline.Steps.Skip(failedStep.Ordinal),
+                step => Assert.Equal(DispatchTimelineStepState.PENDING, step.State));
         }
         finally { await runtime.DisposeAsync(); }
     }

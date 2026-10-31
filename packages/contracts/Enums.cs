@@ -42,6 +42,15 @@ public enum AlarmSeverity { LOW, MEDIUM, HIGH }
 public enum JobPhase { P1, P2, P3, P4, P5, P6 }
 
 /// <summary>
+/// Presentation evidence of the Cleaning start step's Isolation Valve open COMMAND, published so the
+/// read-only workspace can tell "Move to P1" from "Open IV" before P1 is verified. The vocabulary
+/// mirrors the Mandatory Safe Return command evidence (<c>CLOSE_COMMANDED</c>). It records the
+/// COMMAND only: it never proves the valve moved, and the measured outcome remains the separate
+/// <c>ValveOpenResolution</c> evidence.
+/// </summary>
+public enum ValveOpenCommandState { NOT_COMMANDED, OPEN_COMMANDED }
+
+/// <summary>
 /// Job lifecycle. SR steps are part of the accepted Mandatory Safe Return
 /// baseline (SR1-SR5 + failure); final outcome NAMES remain an open Owner
 /// decision, which is why <c>Outcome</c> fields are opaque strings, not enums.
