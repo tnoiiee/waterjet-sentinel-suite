@@ -281,7 +281,12 @@ test('the rendered page keeps both density controls live and the bounded table f
 });
 
 test('the Overview table keeps every column inside its own frame contract', () => {
-  const headerCells = [...html.matchAll(/<th scope="col">([^<]+)<\/th>/g)].map((m) => m[1]);
+  // Scoped to the Overview table on purpose: the page now carries a second, much narrower table
+  // (the H3-A GlobalQueue), and only the Overview table owns the 20-column contract.
+  const tableStart = html.indexOf('id="monitor-table"');
+  const tableEnd = html.indexOf('</table>', tableStart);
+  const monitorTable = html.slice(tableStart, tableEnd);
+  const headerCells = [...monitorTable.matchAll(/<th scope="col">([^<]+)<\/th>/g)].map((m) => m[1]);
   assert.equal(headerCells.length, 20, 'the Overview table must keep its 20 columns');
   assert.equal(headerCells[0], 'Sensor ID');
   assert.equal(headerCells[19], 'Field verification');

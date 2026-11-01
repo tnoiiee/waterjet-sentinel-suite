@@ -25,6 +25,16 @@ public sealed record RuntimeHostOptions
 
     /// <summary>Startup-only exact scenario identity.</summary>
     public const string ScenarioVariable = "WJSS_SIMULATOR_SCENARIO";
+
+    /// <summary>
+    /// Optional startup-only H3-A TimeDelay simulation selector. The values are the explicit
+    /// SIMULATION tokens NONE, MANUAL_seconds or AUTO_condition; the numeric delays are the
+    /// Owner-supplied legacy-seeded simulation values, never a commissioning value.
+    /// </summary>
+    public const string TimeDelayVariable = "WJSS_TIME_DELAY_DEMO";
+
+    /// <summary>The TimeDelay simulation token was supplied but is not one of the accepted values.</summary>
+    public const string InvalidTimeDelayDemo = "INVALID_TIME_DELAY_DEMO";
     public const string LowPressureVariable = "WJSS_LOW_PRESSURE_THRESHOLD_BAR";
     public const string HighPressureVariable = "WJSS_HIGH_PRESSURE_THRESHOLD_BAR";
     public const string PumpReadyVariable = "WJSS_PUMP_READY_SETPOINT_BAR";
@@ -90,6 +100,13 @@ public sealed record RuntimeHostOptions
     public SimulatorScenarioId Scenario { get; init; } = SimulatorScenarioId.IDLE;
 
     public SequencingPressureThresholds PressureThresholds { get; init; } = new();
+
+    /// <summary>
+    /// The optional H3-A TimeDelay simulation settings. Null means the Runtime has no TimeDelay
+    /// configuration at all: no countdown is created and the pre-existing dispatch behaviour is
+    /// unchanged. A configured value is applied to the deterministic simulator only.
+    /// </summary>
+    public SimulationTimeDelaySettings? TimeDelay { get; init; }
 
     public required DeviceProfile Profile { get; init; }
 
@@ -268,6 +285,16 @@ public sealed record RuntimeHostOptions
             return false;
         }
 
+        // The H3-A simulation TimeDelay token is read and validated BEFORE any host object exists,
+        // so a malformed token can never bind a port and can never be replaced by a default delay.
+        if (!SimulationTimeDelaySettings.TryParse(
+                readEnvironment(TimeDelayVariable), out var timeDelay, out var timeDelayDetail))
+        {
+            refusalCode = InvalidTimeDelayDemo;
+            refusalDetail = $"{TimeDelayVariable}: {timeDelayDetail}";
+            return false;
+        }
+
         options = new RuntimeHostOptions
         {
             Profile = profile,
@@ -275,6 +302,7 @@ public sealed record RuntimeHostOptions
             Endpoint = endpoint,
             Scenario = scenario,
             PressureThresholds = thresholds,
+            TimeDelay = timeDelay,
             Port = port,
             SyntheticSeed = syntheticSeed,
             TickIntervalMilliseconds = tickInterval,

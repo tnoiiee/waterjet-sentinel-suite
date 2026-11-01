@@ -41,6 +41,7 @@
   <nav class="viewbar" id="viewbar" aria-label="Sections and presentation">
     <ul class="sections" id="section-nav">
       <li><a href="#operations">Operations</a></li>
+      <li><a href="#cleaning-job">Cleaning Job</a></li>
       <li><a href="#sensor-map">Sensor Map</a></li>
       <li><a href="#commissioning">Commissioning Monitor</a></li>
       <li><a href="#mapping">Mapping</a></li>
@@ -67,6 +68,70 @@
       </div>
       <h3>Commissioning progress <span class="hint">BLOCKED is derived from the evidence, never from a verdict</span></h3>
       <div id="progress-body"></div>
+    </section>
+
+    <section id="cleaning-job" aria-labelledby="cleaning-job-h">
+      <h2 id="cleaning-job-h">Cleaning Job
+        <span class="hint">H3-A TimeDelay simulation · read-only · SIMULATION ONLY · NO HARDWARE ACCESS / NO DEVICE WRITE</span></h2>
+      <p class="note">This section renders the Runtime-owned Cleaning Job Workspace of one committed revision:
+      the GlobalQueue (ready-only, at most 8 entries, dispatch from Position 1 only), the single Active Job, the
+      TimeDelay configuration, the frozen next-dispatch countdown, the live preview and the dispatch-cycle timeline.
+      Every number here comes from the Runtime host; this page owns no queue, no Job and no countdown, and it can
+      command nothing. A countdown is AutoSequence lifecycle, never a Queue entry status.</p>
+      <p class="note">The TimeDelay values shown are the Owner-supplied Legacy Rev2 <strong>simulation</strong> seeds
+      (Boiler Conditions 600/660, 500/550, 340/380 and 240/280 seconds; RHTemp 515 to 535). They are not DCS
+      commissioning values and are not verified against any plant.</p>
+      <div class="toolbar" role="group" aria-label="Read-only refresh">
+        <button type="button" id="cleaning-job-refresh">Refresh workspace (read-only)</button>
+        <span class="field">No polling and no write: one GET on demand.</span>
+      </div>
+      <p class="alert" id="cleaning-job-status" role="status"></p>
+
+      <div class="workspace-grid" id="workspace-grid">
+        <div class="workspace-card" id="cj-workspace-card">
+          <h3 id="cj-workspace-h">A · Cleaning Job Workspace <span class="hint">the one Active Job, or none</span></h3>
+          <div id="cj-workspace"></div>
+        </div>
+
+        <div class="workspace-card" id="cj-queue-card">
+          <h3 id="cj-queue-h">B · GlobalQueue <span class="hint">ready-only · FIFO · cap 8 · head-only dispatch</span></h3>
+          <div id="cj-queue"></div>
+          <div class="table-wrap" id="cj-queue-wrap">
+            <table id="cj-queue-table">
+              <thead>
+                <tr>
+                  <th scope="col">Position</th>
+                  <th scope="col">Entry</th>
+                  <th scope="col">Sensor</th>
+                  <th scope="col">Source reason</th>
+                  <th scope="col">Seconds since last clean</th>
+                </tr>
+              </thead>
+              <tbody id="cj-queue-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="workspace-card" id="cj-configuration-card">
+          <h3 id="cj-configuration-h">C · TimeDelay Configuration <span class="hint">frozen into every decision</span></h3>
+          <div id="cj-configuration"></div>
+        </div>
+
+        <div class="workspace-card frozen-card" id="cj-countdown-card">
+          <h3 id="cj-countdown-h">D · Frozen next-dispatch countdown</h3>
+          <div id="cj-countdown"></div>
+        </div>
+
+        <div class="workspace-card" id="cj-preview-card">
+          <h3 id="cj-preview-h">E · Live preview <span class="hint">a preview only: it never changes execution</span></h3>
+          <div id="cj-preview"></div>
+        </div>
+
+        <div class="workspace-card" id="cj-timeline-card">
+          <h3 id="cj-timeline-h">F · Dispatch-cycle timeline</h3>
+          <div id="cj-timeline"></div>
+        </div>
+      </div>
     </section>
 
     <section id="sensor-map" aria-labelledby="sensor-map-h">

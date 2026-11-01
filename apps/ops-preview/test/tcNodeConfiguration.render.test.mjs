@@ -6,6 +6,11 @@ import assert from 'node:assert/strict';
 import { allText, bootApp, cellTexts, html, rowsOf, walk } from './helpers/fakeDom.mjs';
 import { CANONICAL_TC_NODE_CONFIGURATION } from '../../../packages/commissioning/src/index.mjs';
 
+// The two Runtime-backed routes answer 503 while the independent Runtime host is absent in these
+// tests. Every other request must be a 200 local GET, so an unexpected failure stays visible.
+const RUNTIME_OFFLINE_PATHS = ['/api/tc-acquisition', '/api/operations/dispatch'];
+
+
 let app;
 let closed = false;
 
@@ -35,7 +40,7 @@ test('G: the page boots ready; Node configuration succeeds and the absent Runtim
   assert.equal(projection.status, 200);
   for (const request of app.requests) {
     assert.equal(request.method, 'GET', request.path);
-    assert.equal(request.status, request.path === '/api/tc-acquisition' ? 503 : 200, request.path);
+    assert.equal(request.status, RUNTIME_OFFLINE_PATHS.includes(request.path) ? 503 : 200, request.path);
     assert.equal(request.path.startsWith('/'), true, 'every request is a local route');
   }
 });

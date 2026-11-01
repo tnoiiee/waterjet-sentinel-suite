@@ -307,6 +307,7 @@ public sealed class RuntimeHostCompositionTests
         Assert.Equal("/health/live", ApiRoutes.HealthLive);
         Assert.Equal("/health/ready", ApiRoutes.HealthReady);
         Assert.Equal("/api/v1/snapshot", ApiRoutes.Snapshot);
+        Assert.Equal("/api/v1/dispatch-workspace", ApiRoutes.DispatchWorkspace);
         Assert.Equal("/api/v1/runtime", ApiRoutes.Runtime);
         Assert.Equal("/api/v1/deltas", ApiRoutes.Deltas);
         Assert.Equal("/inspector", ApiRoutes.Inspector);

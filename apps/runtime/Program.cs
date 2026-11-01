@@ -163,6 +163,12 @@ IResult SnapshotEndpoint() => runtime.IsInitialized
 
 IResult RuntimeEndpoint() => Results.Json(BuildStatus(), ContractJson.Options);
 
+IResult DispatchWorkspaceEndpoint() => runtime.IsInitialized
+    ? Results.Json(runtime.ProjectWorkspace(runtime.Publication), ContractJson.Options)
+    : RuntimeUnavailable(
+        RuntimeReadinessCodes.StoreNotInitialized,
+        "No authoritative Runtime publication exists, so no Cleaning Job Workspace document is available.");
+
 IResult DeltasEndpoint() => runtime.IsInitialized
     ? Results.Json(RuntimeDeltaFeed.From(runtime.Publication), ContractJson.Options)
     : RuntimeUnavailable(
@@ -208,6 +214,7 @@ app.MapGet(ApiRoutes.HealthReady, () =>
 });
 
 app.MapGet(ApiRoutes.Snapshot, SnapshotEndpoint);
+app.MapGet(ApiRoutes.DispatchWorkspace, DispatchWorkspaceEndpoint);
 app.MapGet(ApiRoutes.Runtime, RuntimeEndpoint);
 app.MapGet(ApiRoutes.Deltas, DeltasEndpoint);
 // ONE registration only: ASP.NET Core matches a template with or without a

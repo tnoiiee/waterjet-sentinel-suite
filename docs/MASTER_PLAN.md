@@ -94,6 +94,22 @@ version: **no application version exists**, and the documentation versioning pol
   and configuration after Mandatory Safe Return with `AppliedDelay` immutable during the active
   countdown) is recorded as **documentation context only** and authorises no H3 implementation.
 
+- **H3-A implemented in simulation (2026-10-31; supersedes only the H3 status field of the current
+  position above and the numbered H3 label in section 5; both remain the dated record, and nothing
+  else in this plan changes).** `main` is `3ed4fac60080b8e73bd14d9f0d71385378fc2da3` (H2 closed;
+  PR #42 **MERGED by the Owner**). On branch `arena/7d570112-waterjet-sentinel-suite` the
+  Owner-authorized **H3-A** slice implements the Cleaning Job Workspace Product UI, the two typed
+  TimeDelay modes, the Legacy inverse linear `RHTemp_SELECT` mapping, the Auto Upper-zone factor and
+  the frozen-per-countdown lifecycle in the deterministic SIMULATOR only, exposed through one new
+  read-only Runtime document (`GET /api/v1/dispatch-workspace`, `wjss.dispatch-workspace/1`) and one
+  read-only Operations Preview route. It adds no command, dispatch, write or device surface and no
+  Production authority; the GlobalQueue stays ready-only and the head-only single-Active-Job rules
+  are unchanged. .NET restore/build/test are **NOT RUN** in Arena (no SDK); the Owner-local build and
+  Full .NET matrix on the exact PR head are the validation of record. **H3 (real Single Cleaning
+  Job), H3-B, H3-C, H4 and H5 remain PLANNED / NOT AUTHORIZED**, real Hardware execution remains
+  **NOT EXECUTED / NOT VERIFIED**, Production remains **NOT AUTHORIZED**, and merge remains **HOLD
+  PENDING OWNER MANUAL REVIEW AND SEPARATE OWNER AUTHORIZATION**.
+
 - The K6 implementation was authored in Arena; **Owner-local automated validation is the
   authoritative evidence** and has passed.
 - **K6 is MERGED** (PR #24, merge commit `f356b162…`, 2026-10-14); canonical documentation promotion is complete.
@@ -282,7 +298,9 @@ Critical Path working labels mapped to the formal stage families (formal IDs unc
    Hardware execution requires separate explicit Owner authorization for the exact validated PR
    head and the exact reviewed trial procedure. (Formal family: `0.4D-G1`–`0.4D-G5`.)
 2. **H2 — Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
-3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
+3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.) The
+   **H3-A** Product-UI and deterministic-Simulation sub-slice is **IMPLEMENTED IN SIMULATION** and
+   awaiting Owner review; real Job execution, hardware and Production authority are unchanged.
 4. **H4 — Sequential Multi-Job/Queue — PLANNED, NOT AUTHORIZED.** (Formal family `0.4E-I3`.)
 5. **H5 — Production Readiness — FUTURE, NOT AUTHORIZED.** (Formal family `0.5A-P1`–`0.5A-P4`.)
 

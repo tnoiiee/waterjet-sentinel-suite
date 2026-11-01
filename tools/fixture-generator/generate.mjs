@@ -304,6 +304,7 @@ function buildActiveJob(profile) {
     valvePressureQuality: 'GOOD',
     valvePressureSourceId: 'SYN-VLV-05_OUTLET',
     valvePressureInputValid: true,
+    ...(current ? { valveOpenCommand: 'OPEN_COMMANDED' } : {}),
     valveOpenResolution: 'OPEN_CONFIRMED',
     valveDiagnosis: 'NONE',
   };

@@ -372,6 +372,10 @@ function validateActiveJob(job, path, issues) {
     'pumpPressureSourceId', 'valvePressureSourceId', 'valveOpenResolution', 'valveDiagnosis']) {
     if (!(field in job)) issues.push(`${path}: ${field} required (null if absent)`);
   }
+  if (job.valveOpenCommand !== 'NOT_COMMANDED' && job.valveOpenCommand !== 'OPEN_COMMANDED') {
+    // The open COMMAND is its own published evidence; the measured resolution never stands in for it.
+    issues.push(`${path}: valveOpenCommand must be NOT_COMMANDED or OPEN_COMMANDED`);
+  }
   if (!Number.isFinite(job.pumpReadySetpointBar) || job.pumpReadySetpointBar < 0) issues.push(`${path}: invalid Pump readiness setpoint`);
   if (typeof job.pumpPressureInputValid !== 'boolean' || typeof job.valvePressureInputValid !== 'boolean') issues.push(`${path}: pressure validity flags required`);
   if (job.pumpOutletPressureBar != null && (!Number.isFinite(job.pumpOutletPressureBar) || job.pumpOutletPressureBar < 0)) issues.push(`${path}: invalid Pump pressure`);

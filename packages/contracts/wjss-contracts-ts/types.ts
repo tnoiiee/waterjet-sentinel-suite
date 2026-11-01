@@ -49,6 +49,12 @@ export type QueueState = 'NONE' | 'QUEUED' | 'ACTIVE';
 export type AlarmState = 'NONE' | 'ACTIVE_UNACK' | 'ACTIVE_ACK' | 'CLEARED_UNACK';
 export type AlarmSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 export type JobPhase = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6';
+/**
+ * Presentation evidence of the Cleaning start step's Isolation Valve open COMMAND. It records the
+ * COMMAND only: it never proves the valve moved, and the measured outcome remains the separate
+ * valveOpenResolution evidence.
+ */
+export type ValveOpenCommandState = 'NOT_COMMANDED' | 'OPEN_COMMANDED';
 export type JobLifecycle =
   | 'RUNNING'
   | 'ABORTING'
@@ -246,6 +252,8 @@ export interface ActiveCleaningJobState {
   valvePressureQuality: 'GOOD' | 'BAD' | 'STALE' | null;
   valvePressureSourceId: string | null;
   valvePressureInputValid: boolean;
+  /** The published open COMMAND; never a measured valve state and never derived from valveOpenResolution. */
+  valveOpenCommand: ValveOpenCommandState;
   valveOpenResolution: 'OPEN_CONFIRMED' | 'OPEN_BY_PRESSURE' | 'BLOCKED' | null;
   valveDiagnosis: string | null;
   dispatch: DispatchRecord;

@@ -23,6 +23,11 @@ import { fileURLToPath } from 'node:url';
 import { createPreviewServer, UI_BIND_HOST } from '../server.mjs';
 import { bootApp, click, allText, cellTexts, rowsOf, waitFor } from './helpers/fakeDom.mjs';
 
+// The two Runtime-backed routes answer 503 while the independent Runtime host is absent in these
+// tests. Every other request must be a 200 local GET, so an unexpected failure stays visible.
+const RUNTIME_OFFLINE_PATHS = ['/api/tc-acquisition', '/api/operations/dispatch'];
+
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..');
 const publicFile = (name) => readFileSync(join(APP, 'public', name), 'utf8');
@@ -162,7 +167,7 @@ test('application boot completes and reports a ready state', async () => {
     assert.ok(app.requests.length >= 6, `expected several requests, saw ${app.requests.length}`);
     for (const request of app.requests) {
       assert.equal(request.method, 'GET', `${request.path} must be a GET`);
-      assert.equal(request.status, request.path === '/api/tc-acquisition' ? 503 : 200,
+      assert.equal(request.status, RUNTIME_OFFLINE_PATHS.includes(request.path) ? 503 : 200,
         `${request.path} must report its real status (saw ${request.status})`);
       assert.match(request.path, /^\/(api\/|app\.mjs|styles\.css|pkg\/|index\.html|$)/, `${request.path} must be a local page route`);
     }
@@ -287,11 +292,13 @@ test('the density controls respond and the navigation targets every section', as
     assert.equal(app.byId['app-root'].attributes['data-density'], 'comfortable');
     assert.equal(app.byId['density-comfortable'].attributes['aria-pressed'], 'true');
 
-    // Navigation: eight anchors (Stage 0.4C-K2 added Node Configuration, Stage 0.4C-K3 adds TC
-    // Acquisition Evidence, the motion commissioning foundation adds Motion Commissioning), each
-    // pointing at a section that exists.
+    // Navigation: nine anchors (Stage 0.4C-K2 added Node Configuration, Stage 0.4C-K3 added TC
+    // Acquisition Evidence, the motion commissioning foundation added Motion Commissioning, and
+    // H3-A adds the Cleaning Job Workspace), each pointing at a section that exists.
     const anchors = [...html.matchAll(/<a href="#([a-z-]+)">([^<]+)<\/a>/g)].map((m) => ({ id: m[1], label: m[2] }));
-    assert.equal(anchors.length, 8, 'the navigation must offer eight sections');
+    assert.equal(anchors.length, 9, 'the navigation must offer nine sections');
+    assert.ok(anchors.some((anchor) => anchor.id === 'cleaning-job' && anchor.label === 'Cleaning Job'),
+      'the navigation must offer the H3-A Cleaning Job Workspace');
     for (const { id, label } of anchors) {
       assert.match(html, new RegExp(`id="${id}"`), `${label} must point at a section that exists`);
     }

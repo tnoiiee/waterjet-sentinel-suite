@@ -124,6 +124,52 @@ public static class CanonicalSensorMap
         throw new ArgumentOutOfRangeException(nameof(logicalColumn), "logical column must be 1-18");
     }
 
+    /// <summary>
+    /// Sensors per wall row of the canonical matrix: LEFT and RIGHT carry four columns, REAR and
+    /// FRONT carry five, and every wall carries six rows.
+    /// </summary>
+    public static int SensorsPerWallRow(Wall wall) => wall switch
+    {
+        Wall.LEFT or Wall.RIGHT => 4,
+        Wall.REAR or Wall.FRONT => 5,
+        _ => throw new ArgumentOutOfRangeException(nameof(wall), "unknown wall"),
+    };
+
+    /// <summary>
+    /// The canonical wall-local ordinal (the legacy <c>orderWall</c>) of one wall position: the
+    /// row-major rank inside its wall, 1 through 24 on LEFT and RIGHT and 1 through 30 on REAR and
+    /// FRONT. The relation is not a new authority: it reproduces the preserved <c>orderWall</c> of
+    /// every one of the 108 committed canonical rows exactly (asserted by the migration parity
+    /// test), and it exists so a delay decision can freeze the next Sensor's wall order without a
+    /// second topology table.
+    /// </summary>
+    public static int WallLocalOrdinal(Wall wall, int wallRow, int wallColumn)
+    {
+        var perRow = SensorsPerWallRow(wall);
+        if (wallRow < 1 || wallRow > LogicalRowCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(wallRow), "wall row must be 1-6");
+        }
+
+        if (wallColumn < 1 || wallColumn > perRow)
+        {
+            throw new ArgumentOutOfRangeException(nameof(wallColumn), "wall column is outside the wall");
+        }
+
+        return ((wallRow - 1) * perRow) + wallColumn;
+    }
+
+    /// <summary>Non-throwing form of <see cref="WallLocalOrdinal"/>; a refused geometry returns false.</summary>
+    public static bool TryWallLocalOrdinal(Wall wall, int wallRow, int wallColumn, out int ordinal)
+    {
+        ordinal = 0;
+        if (wall is not (Wall.LEFT or Wall.REAR or Wall.RIGHT or Wall.FRONT)) return false;
+        var perRow = SensorsPerWallRow(wall);
+        if (wallRow < 1 || wallRow > LogicalRowCount || wallColumn < 1 || wallColumn > perRow) return false;
+        ordinal = ((wallRow - 1) * perRow) + wallColumn;
+        return true;
+    }
+
     private static System.Collections.ObjectModel.ReadOnlyCollection<string> BuildSensorSequence()
     {
         var sequence = new string[MatrixSlots];
