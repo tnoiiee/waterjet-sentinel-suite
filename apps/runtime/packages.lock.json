@@ -39,6 +39,9 @@
         "resolved": "8.0.0",
         "contentHash": "IcfB4jKtM9pkzP9OpYelEcUX1MiDt0IJPBh3XYYdEISFF+6Mc+T8WWi0dr9wVh1gtcdVjubVEIBgB8BHESlGfQ=="
       },
+      "wjss.adapters.motionlibrary": {
+        "type": "Project"
+      },
       "wjss.adapters.simulator": {
         "type": "Project",
         "dependencies": {
@@ -60,6 +63,16 @@
         "type": "Project",
         "dependencies": {
           "Wjss.Contracts": "[1.0.0, )"
+        }
+      },
+      "wjss.motioncomposition": {
+        "type": "Project",
+        "dependencies": {
+          "Wjss.Adapters.MotionLibrary": "[1.0.0, )",
+          "Wjss.Contracts": "[1.0.0, )",
+          "Wjss.Domain": "[1.0.0, )",
+          "Wjss.Runtime.Core": "[1.0.0, )",
+          "Wjss.Time": "[1.0.0, )"
         }
       },
       "wjss.runtime.core": {
