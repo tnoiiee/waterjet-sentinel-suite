@@ -297,8 +297,11 @@ public sealed class ProcessIoSession
             eng["level"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WaterTankLevel(raw), Unit = "level_units" };
             eng["percent"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WaterTankLevelPercent(raw), Unit = "%" };
         }
-        else if (tag == "AI-002+" || (tag.StartsWith("AI-00", StringComparison.Ordinal) && int.TryParse(tag.AsSpan(5, 1), out int n) && n >= 4))
+        else if (tag == "AI-002+" || ProcessIoIsolationValves.IsOutletPressureTag(tag))
         {
+            // WC pressure: the Pump Inlet diagnostic row and all eight IV outlet rows. The IV family is
+            // resolved by its canonical membership authority, so AI-010+ and AI-011+ scale exactly like
+            // AI-004+ through AI-009+ instead of falling through to RAW_ONLY at the decimal-width boundary.
             eng["bar"] = new ProcessIoEngineeringValue { Value = ProcessIoEngineering.WcPressureBar(raw), Unit = "bar" };
         }
         else if (tag == "AI-003+")

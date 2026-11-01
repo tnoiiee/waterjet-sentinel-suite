@@ -230,19 +230,28 @@ public sealed class ProcessIoFoundationTests
         Assert.True(session.TryReadAnalogInput("AI-002+", ai002, At, out var obs002));
         Assert.Equal("ENGINEERING", obs002.Scaling);
         Assert.True(obs002.Engineering.ContainsKey("bar"));
+        Assert.Equal(ProcessIoEngineering.WcPressureBar(16384), obs002.Engineering["bar"].Value);
 
         var ai003 = rows.First(r => r.Tag == "AI-003+");
         Assert.True(session.TryReadAnalogInput("AI-003+", ai003, At, out var obs003));
         Assert.Equal("ENGINEERING", obs003.Scaling);
         Assert.True(obs003.Engineering.ContainsKey("bar"));
 
-        for (int i = 4; i <= 9; i++)
+        // Pump Outlet keeps its own two-stage raw -> mA -> bar conversion. It is never the WC/IV
+        // mapping, and it stays the only Pump-ready pressure source.
+        Assert.Equal(ProcessIoEngineering.PumpOutletPressureBar(16384), obs003.Engineering["bar"].Value);
+        Assert.NotEqual(obs002.Engineering["bar"].Value, obs003.Engineering["bar"].Value);
+
+        // All eight IV outlet rows, including the decimal-width boundary at ordinals 7 and 8.
+        for (int i = 4; i <= 11; i++)
         {
             string tag = $"AI-{i:D3}+";
             var row = rows.First(r => r.Tag == tag);
             Assert.True(session.TryReadAnalogInput(tag, row, At, out var obs));
             Assert.Equal("ENGINEERING", obs.Scaling);
             Assert.True(obs.Engineering.ContainsKey("bar"));
+            Assert.Equal("bar", obs.Engineering["bar"].Unit);
+            Assert.Equal(ProcessIoEngineering.WcPressureBar(16384), obs.Engineering["bar"].Value);
         }
 
         var ai012 = rows.First(r => r.Tag == "AI-012");
@@ -253,6 +262,56 @@ public sealed class ProcessIoFoundationTests
         var ai036 = rows.First(r => r.Tag == "AI-036");
         Assert.Equal("SPARE", ai036.SourceClassification);
         Assert.False(session.TryReadAnalogInput("AI-036", ai036, At, out _));
+    }
+
+    [Fact]
+    public void Iv_Outlet_Pressure_Membership_Agrees_Across_Legacy_And_Truthful_Read_Paths()
+    {
+        var transport = new SimulatedProcessIoTransport();
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(At);
+        var rows = LoadCommittedCatalogue();
+
+        for (int i = 0; i < 36; i++)
+        {
+            transport.SeedInputRegister(ProcessIoDevices.RackT8, i, 16384);
+        }
+
+        double expectedBar = ProcessIoEngineering.WcPressureBar(16384);
+
+        for (int i = 4; i <= 11; i++)
+        {
+            string tag = $"AI-{i:D3}+";
+            var row = rows.First(r => r.Tag == tag);
+
+            // Legacy synchronous read path.
+            Assert.True(session.TryReadAnalogInput(tag, row, At, out var legacy));
+            Assert.Equal("ENGINEERING", legacy.Scaling);
+            Assert.Equal(expectedBar, legacy.Engineering["bar"].Value);
+
+            // Truthful observation path: the same membership, the same conversion, the same unit.
+            ProcessIoPhysicalObservation observed =
+                session.ObserveAnalogInput(tag, row, At, At, TimeSpan.FromMinutes(5));
+            Assert.Equal(ProcessIoObservationQuality.GOOD, observed.Quality);
+            Assert.True(observed.EngineeringValue.HasValue);
+            Assert.Equal(expectedBar, observed.EngineeringValue.Value);
+            Assert.Equal("bar", observed.Unit);
+        }
+
+        // A four-digit spelling names no adopted row and must never receive IV pressure treatment in
+        // either path, even when the caller supplies an adopted row as its carrier.
+        var carrier = rows.First(r => r.Tag == "AI-010+");
+        foreach (string malformed in new[] { "AI-0010+", "AI-0011+" })
+        {
+            Assert.True(session.TryReadAnalogInput(malformed, carrier, At, out var legacy));
+            Assert.Equal("RAW_ONLY", legacy.Scaling);
+            Assert.Empty(legacy.Engineering);
+
+            ProcessIoPhysicalObservation observed =
+                session.ObserveAnalogInput(malformed, carrier, At, At, TimeSpan.FromMinutes(5));
+            Assert.Null(observed.EngineeringValue);
+            Assert.Null(observed.Unit);
+        }
     }
 
     [Fact]
