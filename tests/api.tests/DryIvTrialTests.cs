@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Reflection;
 using Wjss.Contracts;
 using Wjss.Runtime;
 using Wjss.Runtime.Core.CleaningPath.Composition;
@@ -332,8 +334,66 @@ public sealed class DryIvTrialTests
         Assert.Empty(transport.CoilWrites);
     }
 
+    // The initial-state truth table. Exactly one combination may admit an OPEN command:
+    //
+    //   Upper = false, Lower = true    closed and physically confirmed   -> admitted
+    //   Upper = true,  Lower = true    contradictory feedback            -> refused
+    //   Upper = true,  Lower = false   already open                      -> refused
+    //   Upper = false, Lower = false   closed NOT confirmed              -> refused
+    //
+    // Every refused row is proven to write NOTHING: no admission, no dispatch, no cleanup command.
+
     [Fact]
-    public void A_Contradictory_Initial_Feedback_Refuses_Before_Any_Write()
+    public void The_Only_Accepted_Initial_State_Is_Upper_False_And_Lower_True()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.True(result.Accepted);
+        Assert.NotNull(result.Initial);
+        Assert.False(result.Initial!.UpperLimitDetected);
+        Assert.True(result.Initial.LowerLimitDetected);
+        Assert.False(result.Initial.CommandDispatched);
+    }
+
+    [Fact]
+    public void An_Initial_Closed_State_That_Is_Not_Confirmed_Refuses_Before_Any_Write()
+    {
+        // Neither limit asserted is NOT evidence that the valve is closed.
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        transport.DiscreteInputs[Iv1UpperInput] = false;
+        transport.DiscreteInputs[Iv1LowerInput] = false;
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(DryIvTrial.RefusedInitialClosedNotConfirmed, result.Code);
+        Assert.Empty(transport.CoilWrites);
+        Assert.Equal(0, transport.NetworkAttempts);
+        Assert.Null(result.Cleanup);
+    }
+
+    [Fact]
+    public void An_Initial_State_With_Only_The_Open_Limit_Refuses_Before_Any_Write()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        transport.DiscreteInputs[Iv1UpperInput] = true;
+        transport.DiscreteInputs[Iv1LowerInput] = false;
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(DryIvTrial.RefusedInitialStateUnsafe, result.Code);
+        Assert.Empty(transport.CoilWrites);
+        Assert.Equal(0, transport.NetworkAttempts);
+        Assert.Null(result.Cleanup);
+    }
+
+    [Fact]
+    public void An_Initial_State_With_Both_Limits_Refuses_Before_Any_Write()
     {
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
         transport.DiscreteInputs[Iv1UpperInput] = true;
@@ -345,19 +405,7 @@ public sealed class DryIvTrialTests
         Assert.Equal(DryIvTrial.RefusedInitialStateContradictory, result.Code);
         Assert.Empty(transport.CoilWrites);
         Assert.Equal(0, transport.NetworkAttempts);
-    }
-
-    [Fact]
-    public void An_Already_Open_Initial_State_Refuses_Before_Any_Write()
-    {
-        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
-        transport.DiscreteInputs[Iv1UpperInput] = true;
-
-        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
-
-        Assert.False(result.Accepted);
-        Assert.Equal(DryIvTrial.RefusedInitialStateUnsafe, result.Code);
-        Assert.Empty(transport.CoilWrites);
+        Assert.Null(result.Cleanup);
     }
 
     // ------------------------------------------------------------------ the happy path
@@ -366,7 +414,8 @@ public sealed class DryIvTrialTests
     public void The_Open_Command_Writes_Do023_Coil_22_True_And_Is_Field_Confirmed_By_The_Upper_Input()
     {
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
-        transport.DiscreteInputs[Iv1UpperInput] = true;
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
 
@@ -383,10 +432,32 @@ public sealed class DryIvTrialTests
     }
 
     [Fact]
+    public void The_Open_Write_Drives_The_Physical_Feedback_To_Upper_True_And_Lower_False()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.True(result.Accepted);
+
+        // The feedback transition observed after the OPEN write is the OPEN state: Upper asserted,
+        // Lower released. This is the state the supervision was given, not a state invented by the
+        // Product.
+        (int Address, bool Value, bool Upper, bool Lower) openTransition =
+            Assert.Single(transport.Transitions, t => t.Value);
+        Assert.Equal(Iv1CommandCoil, openTransition.Address);
+        Assert.True(openTransition.Upper);
+        Assert.False(openTransition.Lower);
+    }
+
+    [Fact]
     public void The_Close_Command_Writes_The_Same_Coil_False_And_Is_Confirmed_By_The_Lower_Input()
     {
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
-        transport.DiscreteInputs[Iv1UpperInput] = true;
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
 
@@ -402,10 +473,34 @@ public sealed class DryIvTrialTests
     }
 
     [Fact]
+    public void The_Close_Write_Drives_The_Physical_Feedback_Back_To_Upper_False_And_Lower_True()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.True(result.Accepted);
+
+        Assert.Equal(2, transport.Transitions.Count);
+        (int Address, bool Value, bool Upper, bool Lower) closedTransition = transport.Transitions[1];
+        Assert.Equal(Iv1CommandCoil, closedTransition.Address);
+        Assert.False(closedTransition.Value);
+        Assert.False(closedTransition.Upper);
+        Assert.True(closedTransition.Lower);
+
+        // The physical state after the run is the closed state, and it is the state the trial left.
+        Assert.False(transport.DiscreteInputs[Iv1UpperInput]);
+        Assert.True(transport.DiscreteInputs[Iv1LowerInput]);
+    }
+
+    [Fact]
     public void The_Open_Is_Never_Accepted_From_The_Fc01_Process_Image_Alone()
     {
-        // The process image reads back true, but no discrete input reports the valve open.
+        // The process image reads back true, but the physical Upper input never asserts.
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
         transport.Coils[Iv1CommandCoil] = true;
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
@@ -414,20 +509,56 @@ public sealed class DryIvTrialTests
         Assert.Equal(DryIvTrial.RefusedOpenNotConfirmed, result.Code);
         Assert.True(result.TimedOut);
         Assert.False(result.Open!.FieldConfirmed);
+
+        // FC01 said "energised" the whole time. It is reported, and it confirmed nothing.
+        Assert.True(result.Open.ProcessImageReadBack);
+        Assert.Equal("IV_FIELD_NOT_CONFIRMED", result.Open.AssessmentCode);
+    }
+
+    [Fact]
+    public void The_Close_Is_Never_Accepted_From_The_Fc01_Process_Image_Alone()
+    {
+        // The valve opens physically but never returns to the Lower limit, while FC01 reads de-energised.
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        transport.OnCoilWrite = (address, value) =>
+        {
+            if (address != Iv1CommandCoil || !value)
+            {
+                return;
+            }
+
+            transport.DiscreteInputs[Iv1UpperInput] = true;
+            transport.DiscreteInputs[Iv1LowerInput] = false;
+        };
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(DryIvTrial.RefusedCloseNotConfirmed, result.Code);
+        Assert.True(result.TimedOut);
+        Assert.True(result.CloseCommand!.Dispatched);
+        Assert.False(result.CloseCommand.CoilValue);
+        Assert.False(result.Close!.FieldConfirmed);
+        Assert.False(result.Close.ProcessImageReadBack);
     }
 
     [Fact]
     public void Both_Limits_After_The_Write_Refuse_The_Trial_And_Still_Clean_Up()
     {
-        // The fake latches both feedback inputs as soon as the OPEN coil is written.
+        // The fake latches both limits as soon as the OPEN coil is written, which is physically
+        // impossible for a real valve and must never be accepted.
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
-        transport.OnCoilWrite = (_, value) =>
+        StartPhysicallyClosed(transport);
+        transport.OnCoilWrite = (address, value) =>
         {
-            if (value)
+            if (address != Iv1CommandCoil)
             {
-                transport.DiscreteInputs[Iv1UpperInput] = true;
-                transport.DiscreteInputs[Iv1LowerInput] = true;
+                return;
             }
+
+            transport.DiscreteInputs[Iv1UpperInput] = true;
+            transport.DiscreteInputs[Iv1LowerInput] = true;
         };
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
@@ -447,7 +578,8 @@ public sealed class DryIvTrialTests
     public void A_Clean_Run_Leaves_Nothing_Open_For_Cleanup_To_Close()
     {
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
-        transport.DiscreteInputs[Iv1UpperInput] = true;
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
 
@@ -470,7 +602,8 @@ public sealed class DryIvTrialTests
     public void Unrelated_Isolation_Valves_Are_Never_Commanded()
     {
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
-        transport.DiscreteInputs[Iv1UpperInput] = true;
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
 
@@ -487,6 +620,7 @@ public sealed class DryIvTrialTests
     {
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) =
             CreateBoundary(authorization: Unauthorized());
+        StartPhysicallyClosed(transport);
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
 
@@ -496,13 +630,250 @@ public sealed class DryIvTrialTests
         Assert.Equal(0, transport.NetworkAttempts);
     }
 
+    // ------------------------------------------------------------------ operator abort
+
+    [Fact]
+    public void A_Cancellation_Requested_Before_The_Open_Dispatches_Nothing()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+
+        var cancellation = new DryIvTrialCancellation();
+        cancellation.Request();
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0), cancellation), session, boundary);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(DryIvTrial.AbortedOperator, result.Code);
+        Assert.False(result.TimedOut);
+        Assert.Empty(transport.CoilWrites);
+        Assert.Equal(0, transport.NetworkAttempts);
+    }
+
+    [Fact]
+    public void A_Cancellation_During_Open_Supervision_Stops_The_Trial_And_Cleans_Up_Exactly_Once()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+
+        var cancellation = new DryIvTrialCancellation();
+
+        // The valve never moves, and the operator abort arrives after the OPEN command has gone out:
+        // the cancellation is therefore observed by the supervision loop, not before the dispatch.
+        transport.OnCoilWrite = (address, value) =>
+        {
+            if (address == Iv1CommandCoil && value)
+            {
+                cancellation.Request();
+            }
+        };
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0), cancellation), session, boundary);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(DryIvTrial.AbortedOperator, result.Code);
+        Assert.False(result.TimedOut);
+        Assert.True(result.OpenCommand!.Dispatched);
+        Assert.True(result.OpenCommand.CoilValue);
+        Assert.False(result.Open!.FieldConfirmed);
+
+        // Exactly one OPEN and exactly one cleanup CLOSE reached the wire, both on the trial's coil.
+        Assert.Equal(2, transport.CoilWrites.Count);
+        Assert.Single(transport.CoilWrites, write => write.Value);
+        Assert.Single(transport.CoilWrites, write => !write.Value);
+        Assert.All(transport.CoilWrites, write => Assert.Equal(Iv1CommandCoil, write.Address));
+
+        Assert.NotNull(result.Cleanup);
+        Assert.Contains("IV1", result.Cleanup!.AttemptedValveIds);
+        Assert.Contains("IV1", result.Cleanup.ClosedValveIds);
+        Assert.Empty(result.Cleanup.RemainingUnknownState);
+        Assert.True(result.Cleanup.Complete);
+    }
+
+    [Fact]
+    public void The_Supervision_Loop_Observes_A_Cancellation_Without_Waiting_For_The_Window()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+
+        var cancellation = new DryIvTrialCancellation();
+        bool openDispatched = false;
+
+        transport.OnCoilWrite = (address, value) =>
+        {
+            if (address == Iv1CommandCoil && value)
+            {
+                openDispatched = true;
+            }
+        };
+
+        // The abort arrives through a field read taken while the OPEN is being supervised.
+        transport.OnDiscreteInputRead = address =>
+        {
+            if (openDispatched && address == Iv1UpperInput)
+            {
+                cancellation.Request();
+            }
+        };
+
+        // A deliberately long window: if the loop ignored the signal the run would take this long.
+        DryIvTrialRequest request = Request(Sample(20.0), cancellation)
+            with { Supervision = TimeSpan.FromSeconds(30) };
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        DryIvTrialResult result = DryIvTrial.Execute(request, session, boundary);
+        stopwatch.Stop();
+
+        Assert.Equal(DryIvTrial.AbortedOperator, result.Code);
+        Assert.False(result.TimedOut);
+        Assert.True(
+            stopwatch.Elapsed < TimeSpan.FromSeconds(10),
+            $"the supervision loop did not observe the cancellation promptly: {stopwatch.Elapsed}");
+        Assert.Equal(2, transport.CoilWrites.Count);
+    }
+
+    [Fact]
+    public void A_Cancellation_During_Close_Supervision_Does_Not_Dispatch_A_Second_Close()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+
+        var cancellation = new DryIvTrialCancellation();
+
+        // The abort lands immediately after the CLOSE command, so the coil is already de-energised.
+        InstallPhysicalTransition(transport, after: (_, value) =>
+        {
+            if (!value)
+            {
+                cancellation.Request();
+            }
+        });
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0), cancellation), session, boundary);
+
+        Assert.False(result.Accepted);
+        Assert.Equal(DryIvTrial.AbortedOperator, result.Code);
+        Assert.False(result.TimedOut);
+        Assert.True(result.CloseCommand!.Dispatched);
+        Assert.False(result.CloseCommand.CoilValue);
+
+        // One OPEN and one CLOSE. Cleanup attempted nothing, because nothing was left energised.
+        Assert.Equal(2, transport.CoilWrites.Count);
+        Assert.Single(transport.CoilWrites, write => write.Value);
+        Assert.Single(transport.CoilWrites, write => !write.Value);
+
+        Assert.NotNull(result.Cleanup);
+        Assert.Empty(result.Cleanup!.AttemptedValveIds);
+        Assert.Empty(result.Cleanup.ClosedValveIds);
+        Assert.Empty(result.Cleanup.RemainingUnknownState);
+    }
+
+    [Fact]
+    public void The_Cancellation_Signal_Is_A_Flag_That_Cannot_Act_On_The_Device()
+    {
+        string trial = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "DryIvTrial.cs"));
+        string signal = Slice(
+            trial,
+            "public sealed class DryIvTrialCancellation",
+            "internal sealed class TrialAbortScope");
+
+        Assert.Contains("IsCancellationRequested", signal, StringComparison.Ordinal);
+        Assert.Contains("Request()", signal, StringComparison.Ordinal);
+        Assert.Contains("Volatile.Read", signal, StringComparison.Ordinal);
+        Assert.Contains("Interlocked.Exchange", signal, StringComparison.Ordinal);
+
+        // It holds no device, session or transport, so raising it cannot write, close or dispose.
+        foreach (string forbidden in new[]
+                 {
+                     "ProcessIoSession", "ProcessIoEquipmentBoundary", "ProcessIoPhysicalTransport",
+                     "RequestValve", "SafeCleanupCloseAll", "WriteCoil", "Console.CancelKeyPress",
+                 })
+        {
+            Assert.DoesNotContain(forbidden, signal, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void The_Abort_Handler_Requests_Cancellation_And_Does_Nothing_Else()
+    {
+        string trial = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "DryIvTrial.cs"));
+        string handler = Slice(
+            trial,
+            "internal sealed class TrialAbortScope",
+            "public sealed record DryIvTrialConfiguration");
+
+        Assert.Contains("eventArgs.Cancel = true;", handler, StringComparison.Ordinal);
+        Assert.Contains("cancellation.Request();", handler, StringComparison.Ordinal);
+
+        // No write, no session close, no transport disposal, no process termination from the handler.
+        foreach (string forbidden in new[]
+                 {
+                     "RequestValve", "SafeCleanupCloseAll", "session", "transport", "WriteCoil",
+                     "Environment", "Exit", "Thread", "Dispose();",
+                 })
+        {
+            Assert.DoesNotContain(forbidden, handler, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void No_Process_Termination_Remains_In_The_Trial()
+    {
+        string trial = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "DryIvTrial.cs"));
+
+        Assert.DoesNotContain("Environment.Exit", trial, StringComparison.Ordinal);
+        Assert.DoesNotContain("Environment.FailFast", trial, StringComparison.Ordinal);
+        Assert.DoesNotContain("Process.GetCurrentProcess", trial, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------ lifecycle ownership
+
+    [Fact]
+    public void Execute_Leaves_The_Session_Open_For_The_Caller_To_Close_Last()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.True(result.Accepted);
+
+        // The sequence never closes the session: the outer Run lifecycle closes it after cleanup.
+        Assert.Equal("OPEN", session.State);
+    }
+
+    [Fact]
+    public void Only_The_Outer_Run_Lifecycle_Disposes_The_Transport()
+    {
+        string trial = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "DryIvTrial.cs"));
+
+        Assert.Equal(1, CountOccurrences(trial, "transport.Dispose()"));
+
+        // Disposal comes after the session close, never before it.
+        Assert.True(
+            trial.IndexOf("session.Close(", StringComparison.Ordinal)
+            < trial.IndexOf("transport.Dispose()", StringComparison.Ordinal),
+            "the transport must be released after the session closes");
+
+        // Execute cannot dispose it: a transport is not part of its contract at all.
+        MethodInfo execute = typeof(DryIvTrial).GetMethod(
+            nameof(DryIvTrial.Execute),
+            new[] { typeof(DryIvTrialRequest), typeof(ProcessIoSession), typeof(ProcessIoEquipmentBoundary) })!;
+        Assert.NotNull(execute);
+        Assert.DoesNotContain(
+            execute.GetParameters(),
+            parameter => typeof(IProcessIoTransport).IsAssignableFrom(parameter.ParameterType));
+    }
+
     // ------------------------------------------------------------------ evidence classification
 
     [Fact]
     public void The_Trial_Result_Separates_Physical_Feedback_From_Simulated_Pump_Ready()
     {
         (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
-        transport.DiscreteInputs[Iv1UpperInput] = true;
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
 
         DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
 
@@ -614,13 +985,50 @@ public sealed class DryIvTrialTests
         return sample!;
     }
 
-    private static DryIvTrialRequest Request(DryIvTrialSimulatedPumpReady sample) => new()
+    private static DryIvTrialRequest Request(
+        DryIvTrialSimulatedPumpReady sample,
+        DryIvTrialCancellation? cancellation = null) => new()
     {
         ValveId = Valve,
         Thresholds = Thresholds,
         Supervision = Supervision,
         PumpReady = sample,
+        Cancellation = cancellation,
     };
+
+    /// <summary>
+    /// Puts the fake valve in the ONE initial state the trial may accept: physically closed, Lower
+    /// asserted and Upper not. Every happy-path test starts here, which is the same state a real
+    /// de-energised maintained-coil valve reports.
+    /// </summary>
+    private static void StartPhysicallyClosed(FakeTransport transport)
+    {
+        transport.DiscreteInputs[Iv1UpperInput] = false;
+        transport.DiscreteInputs[Iv1LowerInput] = true;
+    }
+
+    /// <summary>
+    /// Simulates a real valve driven by the maintained command coil: energised drives it OPEN (Upper
+    /// asserted, Lower released), de-energised drives it CLOSED (Upper released, Lower asserted).
+    ///
+    /// FC01 is deliberately NOT modelled here. The process image is what the output module believes,
+    /// never what the valve did, so keeping it out of this helper is what lets the FC01 tests prove
+    /// that a read-back alone confirms nothing.
+    /// </summary>
+    private static void InstallPhysicalTransition(FakeTransport transport, Action<int, bool>? after = null)
+    {
+        transport.OnCoilWrite = (address, value) =>
+        {
+            if (address != Iv1CommandCoil)
+            {
+                return;
+            }
+
+            transport.DiscreteInputs[Iv1UpperInput] = value;
+            transport.DiscreteInputs[Iv1LowerInput] = !value;
+            after?.Invoke(address, value);
+        };
+    }
 
     private static ProcessIoWriteAuthorization Unauthorized() => new()
     {
@@ -694,6 +1102,29 @@ public sealed class DryIvTrialTests
         return rows;
     }
 
+    /// <summary>The text between two exact markers, used to assert on one type without its neighbours.</summary>
+    private static string Slice(string text, string startMarker, string endMarker)
+    {
+        int start = text.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, startMarker);
+        int end = text.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end > start, endMarker);
+        return text[start..end];
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        int count = 0;
+        int index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count += 1;
+            index += value.Length;
+        }
+
+        return count;
+    }
+
     private static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -720,12 +1151,22 @@ public sealed class DryIvTrialTests
 
         public Dictionary<int, bool> Coils { get; } = new();
 
-        public Action<string, bool>? OnCoilWrite { get; set; }
+        /// <summary>Physical feedback state captured immediately after each accepted coil write.</summary>
+        public List<(int Address, bool Value, bool Upper, bool Lower)> Transitions { get; } = new();
+
+        /// <summary>Fake valve behaviour, keyed by coil address and the value that was written.</summary>
+        public Action<int, bool>? OnCoilWrite { get; set; }
+
+        /// <summary>Lets a test observe a discrete-input read (used to cancel mid-supervision).</summary>
+        public Action<int>? OnDiscreteInputRead { get; set; }
 
         public int NetworkAttempts => CoilWrites.Count;
 
         public bool ReadDiscreteInput(string deviceKey, int address)
-            => DiscreteInputs.TryGetValue(address, out bool value) && value;
+        {
+            OnDiscreteInputRead?.Invoke(address);
+            return DiscreteInputs.TryGetValue(address, out bool value) && value;
+        }
 
         public bool ReadCoil(string deviceKey, int coilAddress)
             => Coils.TryGetValue(coilAddress, out bool value) && value;
@@ -747,7 +1188,12 @@ public sealed class DryIvTrialTests
         {
             CoilWrites.Add((deviceKey, coilAddress, value));
             Coils[coilAddress] = value;
-            OnCoilWrite?.Invoke(deviceKey, value);
+            OnCoilWrite?.Invoke(coilAddress, value);
+            Transitions.Add((
+                coilAddress,
+                value,
+                DiscreteInputs.TryGetValue(Iv1UpperInput, out bool upper) && upper,
+                DiscreteInputs.TryGetValue(Iv1LowerInput, out bool lower) && lower));
         }
 
         public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value) { }

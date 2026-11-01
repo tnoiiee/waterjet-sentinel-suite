@@ -29,9 +29,13 @@ namespace Wjss.Runtime;
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. The Owner-local build and the separately
 /// authorized physical trial are the validation of record.
 ///
-/// Exit codes: 0 trial completed and accepted; 2 composition or sequence refusal after the trial
-/// selector was accepted; 3 supervision timeout before a terminal result; 4 invocation, selector or
-/// configuration refusal before anything was constructed.
+/// Operator abort is a first-class outcome, never a crash: the console handler only raises a
+/// trial-local flag, the bounded loop stops at its next observation point, the single cleanup path
+/// closes whatever this trial left energised, the session closes last and the process exits 2.
+///
+/// Exit codes: 0 trial completed and accepted; 2 composition or sequence refusal, unexpected fault or
+/// operator abort after the trial selector was accepted; 3 supervision timeout before a terminal
+/// result; 4 invocation, selector or configuration refusal before anything was constructed.
 /// </summary>
 public static class DryIvTrial
 {
@@ -90,6 +94,7 @@ public static class DryIvTrial
     public const string RefusedGenerationChanged = "IV_TRIAL_REFUSED_GENERATION_CHANGED";
     public const string RefusedInitialStateUnsafe = "IV_TRIAL_REFUSED_INITIAL_STATE_UNSAFE";
     public const string RefusedInitialStateContradictory = "IV_TRIAL_REFUSED_INITIAL_STATE_CONTRADICTORY";
+    public const string RefusedInitialClosedNotConfirmed = "IV_TRIAL_REFUSED_INITIAL_CLOSED_NOT_CONFIRMED";
     public const string RefusedWriteNotAuthorized = "IV_TRIAL_REFUSED_WRITE_NOT_AUTHORIZED";
     public const string RefusedOpenNotDispatched = "IV_TRIAL_REFUSED_OPEN_NOT_DISPATCHED";
     public const string RefusedOpenNotConfirmed = "IV_TRIAL_REFUSED_OPEN_NOT_FIELD_CONFIRMED";
@@ -442,9 +447,8 @@ public static class DryIvTrial
         var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
         var equipment = new ProcessIoEquipmentBoundary(session, catalogue, authorization);
 
-        // Operator abort: the handler only ever de-energises. It is registered for the lifetime of the
-        // one sequence and unregistered before the session closes.
-        using TrialAbortScope abort = new(equipment, session);
+        // One signal per trial process. It is never reused, never persisted and never generic.
+        var cancellation = new DryIvTrialCancellation();
 
         try
         {
@@ -460,30 +464,41 @@ public static class DryIvTrial
             }
 
             DryIvTrialResult result;
-            try
+
+            // The abort handler is live only while the bounded sequence is running. It is removed before
+            // the session closes, so cancellation can never overlap the ordered shutdown below.
+            using (new TrialAbortScope(cancellation))
             {
-                result = Execute(
-                    new DryIvTrialRequest
-                    {
-                        ValveId = trial.ValveId,
-                        Thresholds = trial.Thresholds,
-                        Supervision = trial.Supervision,
-                        PumpReady = pumpReady,
-                        OnOpenDispatched = abort.Arm,
-                    },
-                    session,
-                    equipment);
-            }
-            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
-            {
-                // The cleanup inside Execute has already run: it closes only the valves this trial
-                // dispatched OPEN, and the primary fault is reported rather than masked.
-                error.WriteLine($"WJSS IV trial aborted [{AbortedUnexpectedFault}]: {ex.Message}");
-                error.WriteLine("  cleanup ran before this report; no other valve was commanded and no retry follows.");
-                return 2;
+                try
+                {
+                    result = Execute(
+                        new DryIvTrialRequest
+                        {
+                            ValveId = trial.ValveId,
+                            Thresholds = trial.Thresholds,
+                            Supervision = trial.Supervision,
+                            PumpReady = pumpReady,
+                            Cancellation = cancellation,
+                        },
+                        session,
+                        equipment);
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+                {
+                    // The cleanup inside Execute has already run: it closes only the valves this trial
+                    // dispatched OPEN, and the primary fault is reported rather than masked.
+                    error.WriteLine($"WJSS IV trial aborted [{AbortedUnexpectedFault}]: {ex.Message}");
+                    error.WriteLine("  cleanup ran before this report; no other valve was commanded and no retry follows.");
+                    return 2;
+                }
             }
 
             ReportTrial(result, output);
+
+            if (result.Code == AbortedOperator)
+            {
+                output.WriteLine("  operator_abort=CANCELLATION_REQUESTED_SEQUENCE_STOPPED_ON_MAIN_THREAD");
+            }
 
             return result.Accepted ? 0 : (result.TimedOut ? 3 : 2);
         }
@@ -531,7 +546,16 @@ public static class DryIvTrial
         }
 
         // Initial state is read before any command exists for this valve, so the observation can only
-        // report field state. A contradictory or already-open state refuses the trial untouched.
+        // report field state. Exactly one initial state admits an OPEN command:
+        //
+        //   Upper = false, Lower = true    closed and physically confirmed   -> admitted
+        //   Upper = true,  Lower = true    contradictory feedback            -> refused
+        //   Upper = true,  Lower = false   already open                      -> refused
+        //   Upper = false, Lower = false   closed NOT confirmed              -> refused
+        //
+        // The fourth row is the one a careless reading loses: "no limit asserted" is not evidence that
+        // the valve is closed. An unusable or absent Lower observation reads false through the same
+        // path, so a missing feedback channel refuses here rather than being treated as safe.
         ProcessIoValveObservation initial = equipment.ObserveValve(request.ValveId);
         if (initial.UpperLimitDetected && initial.LowerLimitDetected)
         {
@@ -541,6 +565,11 @@ public static class DryIvTrial
         if (initial.UpperLimitDetected)
         {
             return Refused(RefusedInitialStateUnsafe) with { Initial = initial };
+        }
+
+        if (!initial.LowerLimitDetected)
+        {
+            return Refused(RefusedInitialClosedNotConfirmed) with { Initial = initial };
         }
 
         int generation = session.Generation;
@@ -571,6 +600,12 @@ public static class DryIvTrial
         ProcessIoValveObservation initial,
         int generation)
     {
+        // Nothing is dispatched once the operator has asked to stop.
+        if (IsCancelled(request))
+        {
+            return Refused(AbortedOperator) with { Initial = initial };
+        }
+
         equipment.RequestValve(new CleaningPathValveCommandRequest(request.ValveId, CleaningPathValveCommandKind.Open));
         ProcessIoCommandOutcome open = LastOutcome(equipment, request.ValveId);
         if (!open.Dispatched)
@@ -583,10 +618,16 @@ public static class DryIvTrial
             return Refused(RefusedGenerationChanged) with { Initial = initial, OpenCommand = open };
         }
 
-        // The valve is now energised: the caller may arm its operator-abort guard.
-        request.OnOpenDispatched?.Invoke();
+        ProcessIoValveObservation openObservation = Supervise(equipment, request.ValveId, request.Supervision, request.Cancellation);
 
-        ProcessIoValveObservation openObservation = Supervise(equipment, request.ValveId, request.Supervision);
+        // An operator abort outranks the classification of the observation that was in flight: the
+        // command has already been dispatched, so the caller must clean the valve up and report the
+        // abort rather than a timeout or an acceptance.
+        if (IsCancelled(request))
+        {
+            return Refused(AbortedOperator) with { Initial = initial, OpenCommand = open, Open = openObservation };
+        }
+
         if (openObservation.AssessmentCode == FeedbackContradiction)
         {
             return Refused(RefusedOpenContradictory) with { Initial = initial, OpenCommand = open, Open = openObservation };
@@ -612,6 +653,11 @@ public static class DryIvTrial
             Open = openObservation,
         };
 
+        if (IsCancelled(request))
+        {
+            return opened with { Code = AbortedOperator };
+        }
+
         equipment.RequestValve(new CleaningPathValveCommandRequest(request.ValveId, CleaningPathValveCommandKind.Close));
         ProcessIoCommandOutcome close = LastOutcome(equipment, request.ValveId);
         if (!close.Dispatched)
@@ -619,7 +665,15 @@ public static class DryIvTrial
             return opened with { Code = AdmissionRefusal(close, RefusedCloseNotDispatched), CloseCommand = close };
         }
 
-        ProcessIoValveObservation closeObservation = Supervise(equipment, request.ValveId, request.Supervision);
+        ProcessIoValveObservation closeObservation = Supervise(equipment, request.ValveId, request.Supervision, request.Cancellation);
+
+        // The CLOSE command was dispatched before the abort, so the coil is already de-energised and the
+        // cleanup below must not repeat it. The abort is still reported as the primary outcome.
+        if (IsCancelled(request))
+        {
+            return opened with { Code = AbortedOperator, CloseCommand = close, Close = closeObservation };
+        }
+
         if (closeObservation.AssessmentCode == FeedbackContradiction)
         {
             return opened with { Code = RefusedCloseContradictory, CloseCommand = close, Close = closeObservation };
@@ -653,7 +707,8 @@ public static class DryIvTrial
     private static ProcessIoValveObservation Supervise(
         ProcessIoEquipmentBoundary equipment,
         string valveId,
-        TimeSpan supervision)
+        TimeSpan supervision,
+        DryIvTrialCancellation? cancellation)
     {
         ProcessIoValveObservation observation = equipment.ObserveValve(valveId);
         DateTimeOffset deadline = DateTimeOffset.UtcNow + supervision;
@@ -661,6 +716,7 @@ public static class DryIvTrial
 
         while (!observation.FieldConfirmed
                && observation.AssessmentCode != FeedbackContradiction
+               && cancellation?.IsCancellationRequested != true
                && DateTimeOffset.UtcNow < deadline)
         {
             if (pollMilliseconds > 0)
@@ -702,6 +758,9 @@ public static class DryIvTrial
             At = DateTimeOffset.UtcNow,
         };
     }
+
+    private static bool IsCancelled(DryIvTrialRequest request)
+        => request.Cancellation?.IsCancellationRequested == true;
 
     private static string AdmissionRefusal(ProcessIoCommandOutcome outcome, string fallback) =>
         outcome.AdmissionCode switch
@@ -903,67 +962,54 @@ public static class DryIvTrial
 }
 
 /// <summary>
-/// The bounded operator-abort guard for one IV trial.
+/// The trial-local cancellation signal for one IV trial.
 ///
-/// A maintained command coil stays energised while the process lives, so an operator abort must
-/// de-energise exactly the valve this trial opened. The guard is armed only after the OPEN dispatch is
-/// observed to have happened, and it never opens anything: a duplicate CLOSE of the same coil is a
-/// safe-direction repeat, never a new command. It is unregistered before the session closes.
+/// It is a flag and nothing else. It holds no session, no boundary and no transport, so a caller that
+/// sets it cannot write a coil, close a session or dispose anything: the ONLY effect of a request is
+/// that the bounded sequence stops at its next observation point and returns an operator-abort result.
+/// All cleanup then runs on the main thread through the single existing cleanup path.
+/// </summary>
+public sealed class DryIvTrialCancellation
+{
+    private int _requested;
+
+    /// <summary>True once an abort has been requested. Safe to read from any thread.</summary>
+    public bool IsCancellationRequested => Volatile.Read(ref _requested) != 0;
+
+    /// <summary>Records the request. Idempotent, and it never acts on the device or on the session.</summary>
+    public void Request() => Interlocked.Exchange(ref _requested, 1);
+}
+
+/// <summary>
+/// Registers the console abort handler for the lifetime of one bounded sequence.
+///
+/// The handler does exactly one thing: raise the trial-local cancellation signal and suppress the
+/// default runtime termination so the MAIN thread can finish the sequence in order. It deliberately
+/// holds no device, session or transport reference — that is what makes it impossible for the handler
+/// to dispatch a coil write, close the session, dispose the transport or terminate the process, and it
+/// is what keeps a single cleanup path rather than a concurrent second one.
+///
+/// It is disposed before the session closes, so no handler is live while the session is being closed.
 /// </summary>
 internal sealed class TrialAbortScope : IDisposable
 {
-    private readonly ProcessIoEquipmentBoundary _equipment;
-    private readonly ProcessIoSession _session;
     private readonly ConsoleCancelEventHandler _handler;
-    private int _armed;
-    private int _disposed;
 
-    public TrialAbortScope(ProcessIoEquipmentBoundary equipment, ProcessIoSession session)
+    public TrialAbortScope(DryIvTrialCancellation cancellation)
     {
-        _equipment = equipment;
-        _session = session;
+        ArgumentNullException.ThrowIfNull(cancellation);
+
         _handler = (_, eventArgs) =>
         {
-            // The operator's abort is honoured, never suppressed by the runtime.
+            // Suppress the default termination: the caller owns the ordered shutdown.
             eventArgs.Cancel = true;
-            Abort();
-            Environment.Exit(2);
+            cancellation.Request();
         };
 
         Console.CancelKeyPress += _handler;
     }
 
-    /// <summary>Arms the guard. Called only once the trial has actually opened its valve.</summary>
-    public void Arm() => Interlocked.Exchange(ref _armed, 1);
-
-    private void Abort()
-    {
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-        {
-            return;
-        }
-
-        Console.Error.WriteLine("WJSS IV trial abort: " + DryIvTrial.AbortedOperator);
-
-        if (Interlocked.CompareExchange(ref _armed, 0, 1) == 1)
-        {
-            ProcessIoCleanupResult cleanup = _equipment.SafeCleanupCloseAll();
-            Console.Error.WriteLine(
-                "  cleanup.complete=" + cleanup.Complete.ToString()
-                + " attempted=" + cleanup.ClosedValveIds.Count.ToString(CultureInfo.InvariantCulture));
-        }
-
-        if (!string.Equals(_session.State, "CLOSED", StringComparison.Ordinal))
-        {
-            _session.Close(DateTimeOffset.UtcNow);
-        }
-    }
-
-    public void Dispose()
-    {
-        Console.CancelKeyPress -= _handler;
-        Interlocked.Exchange(ref _disposed, 1);
-    }
+    public void Dispose() => Console.CancelKeyPress -= _handler;
 }
 
 /// <summary>
@@ -1028,10 +1074,10 @@ public sealed record DryIvTrialRequest
     public required DryIvTrialSimulatedPumpReady PumpReady { get; init; }
 
     /// <summary>
-    /// Invoked once, immediately after the OPEN command is observed to be dispatched. The console trial
-    /// uses it to arm the operator-abort guard; tests leave it null.
+    /// The trial-local cancellation signal. Null means "never cancelled", which is what a test that is
+    /// not exercising the abort path wants. It can only ever stop the sequence; it cannot write.
     /// </summary>
-    public Action? OnOpenDispatched { get; init; }
+    public DryIvTrialCancellation? Cancellation { get; init; }
 }
 
 /// <summary>
