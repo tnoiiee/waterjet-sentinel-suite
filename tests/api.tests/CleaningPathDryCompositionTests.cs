@@ -24,6 +24,16 @@ public sealed class CleaningPathDryCompositionTests
 {
     private const string BenchHost = "bench-host.local";
 
+    /// <summary>
+    /// The two shared motion sources, in ordinal order. Hoisted out of the assertion argument so the
+    /// expected set is a single immutable field rather than a constant array allocated per call.
+    /// </summary>
+    private static readonly string[] ExpectedSharedMotionOwners =
+    {
+        "apps/motion-composition/ManualMotionProfileFile.cs",
+        "apps/motion-composition/MotionLibraryManualMotionPort.cs",
+    };
+
     private static Dictionary<string, string?> ValidDryEnvironment() => new(StringComparer.Ordinal)
     {
         [ProcessIoEndpointConfiguration.DryModeVariable] = nameof(DeviceProfile.TEST_HARDWARE_DRY),
@@ -327,9 +337,7 @@ public sealed class CleaningPathDryCompositionTests
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(
-            new[] { "apps/motion-composition/ManualMotionProfileFile.cs", "apps/motion-composition/MotionLibraryManualMotionPort.cs" },
-            owners);
+        Assert.Equal(ExpectedSharedMotionOwners, owners);
     }
 
     [Fact]
@@ -340,12 +348,18 @@ public sealed class CleaningPathDryCompositionTests
             Path.Combine(root, "apps", "motion-commissioning", "Wjss.MotionCommissioning.csproj"));
 
         // Still exactly two assembly references, and no package reference.
-        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(app, "<ProjectReference ").Count);
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Count(app, "<ProjectReference "));
         Assert.DoesNotContain("<PackageReference", app, StringComparison.Ordinal);
 
-        // The shared sources are linked from their single home, never copied.
-        Assert.Contains("../../motion-composition/MotionLibraryManualMotionPort.cs", app, StringComparison.Ordinal);
-        Assert.Contains("../../motion-composition/ManualMotionProfileFile.cs", app, StringComparison.Ordinal);
+        // The shared sources are linked from their single home, never copied. The exact Include
+        // attribute is asserted rather than a bare path: "../../motion-composition/..." still
+        // contains "../motion-composition/..." as a substring, so a bare path assertion would stay
+        // green with the sibling-relative form broken.
+        Assert.Contains(
+            "Compile Include=\"../motion-composition/MotionLibraryManualMotionPort.cs\"", app, StringComparison.Ordinal);
+        Assert.Contains(
+            "Compile Include=\"../motion-composition/ManualMotionProfileFile.cs\"", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("Include=\"../../motion-composition", app, StringComparison.Ordinal);
 
         // Nothing references the isolated application.
         foreach (string file in Directory.EnumerateFiles(Path.Combine(root, "apps"), "*.csproj", SearchOption.AllDirectories))

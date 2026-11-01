@@ -37,10 +37,14 @@
       two files from their single source of truth; it does not copy them and it does not reference
       the library as an assembly, so the application stays isolated and nothing else references it.
 
-      The two paths below are files, not projects: the assembly reference count is still two.
+      The two paths below are files, not projects: the assembly reference count is still two. They are
+      sibling-relative ("../"), because apps/motion-composition sits beside this directory inside
+      apps/. The ProjectReference paths below need "../../" instead, because adapters/ and packages/
+      are at the repository root. The two forms are not interchangeable and must not be copied from
+      one group to the other.
     -->
-    <Compile Include="../../motion-composition/MotionLibraryManualMotionPort.cs" Link="Shared/MotionLibraryManualMotionPort.cs" />
-    <Compile Include="../../motion-composition/ManualMotionProfileFile.cs" Link="Shared/ManualMotionProfileFile.cs" />
+    <Compile Include="../motion-composition/MotionLibraryManualMotionPort.cs" Link="Shared/MotionLibraryManualMotionPort.cs" />
+    <Compile Include="../motion-composition/ManualMotionProfileFile.cs" Link="Shared/ManualMotionProfileFile.cs" />
   </ItemGroup>
 
   <ItemGroup>
