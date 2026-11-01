@@ -47,11 +47,11 @@
          composes the internal controller owner, the closed commissioning plan and the existing
          typed Stop session; it is not Runtime/API/Kiosk/Preview/Production composition. -->
     <InternalsVisibleTo Include="Wjss.MotionCommissioning" />
-    <!-- ACCELERATED-CLEANING-INTEGRATION-01: the Runtime host composes the SAME controller owner and
-         the SAME Manual Motion port. The port source is linked into Wjss.Runtime (one file, one
-         implementation, no second motion adapter) rather than duplicated or moved, so the
-         commissioning application and the dry command composition stay identical. -->
-    <InternalsVisibleTo Include="Wjss.Runtime" />
+    <!-- ACCELERATED-CLEANING-INTEGRATION-01: the shared motion composition library composes the SAME
+         controller owner and the SAME Manual Motion port for every host that needs them. One
+         composition assembly, one port implementation, no second motion adapter and no duplicated
+         mapping. The commissioning application keeps its own unchanged grant. -->
+    <InternalsVisibleTo Include="Wjss.MotionComposition" />
   </ItemGroup>
 
 </Project>

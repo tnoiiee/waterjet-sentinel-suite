@@ -27,6 +27,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      ACCELERATED-CLEANING-INTEGRATION-01 (Owner decision: option A, the approved minimal shared
+      motion-composition library).
+
+      The hardware-capable port and the Owner-local profile reader now live with the shared motion
+      composition, because that library is the only place that can see both the internal
+      motion-library controller owner and the Application port contract. This application LINKS the
+      two files from their single source of truth; it does not copy them and it does not reference
+      the library as an assembly, so the application stays isolated and nothing else references it.
+
+      The two paths below are files, not projects: the assembly reference count is still two.
+    -->
+    <Compile Include="../../motion-composition/MotionLibraryManualMotionPort.cs" Link="Shared/MotionLibraryManualMotionPort.cs" />
+    <Compile Include="../../motion-composition/ManualMotionProfileFile.cs" Link="Shared/ManualMotionProfileFile.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj" />
     <ProjectReference Include="../../packages/application/Wjss.Runtime.Core.csproj" />
   </ItemGroup>

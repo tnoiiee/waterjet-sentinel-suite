@@ -39,6 +39,26 @@ if (!TcEndpointConfiguration.TryReadAcquisitionMode(
 
 var physicalReadOnly = acquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY;
 
+// 0b. Explicit dry command-composition selector (ACCELERATED-CLEANING-INTEGRATION-01).
+//     The selector is read BEFORE the profile so that the profile default and the profile gate can
+//     agree with it. An absent selector means the mode was NOT chosen; only the exact literal
+//     selects it. Nothing is inferred from the profile, the endpoint or any other variable.
+if (!ProcessIoEndpointConfiguration.TryReadDryMode(
+    Environment.GetEnvironmentVariable, out var dryCommandMode, out var dryModeCode, out var dryModeDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{dryModeCode}]: {dryModeDetail} Nothing was bound.");
+    return 4;
+}
+
+if (dryCommandMode && physicalReadOnly)
+{
+    Console.Error.WriteLine(
+        $"WJSS startup refused [{ProfileStartPolicy.ModeConflictCode}]: the dry command-composition "
+        + "mode and the physical read-only mode are mutually exclusive and were both requested. "
+        + "No mode is selected on the caller's behalf and nothing was bound.");
+    return 2;
+}
+
 // 1. Device profile (ADR-0012). Default SIMULATOR; the explicit physical read-only mode defaults to
 //    TEST_HARDWARE and nothing else. Unknown labels are a configuration error; any profile the mode
 //    does not authorize is refused by the policy.
@@ -59,7 +79,7 @@ if (!ProfileStartPolicy.TryParseProfile(profileLabel, out var profile))
     return 4;
 }
 
-if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, out var refusalCode, out var refusalReason))
+if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, dryCommandMode, out var refusalCode, out var refusalReason))
 {
     Console.Error.WriteLine($"WJSS startup refused [{refusalCode}]: {refusalReason}");
     return 2;
@@ -72,6 +92,17 @@ if (!int.TryParse(portLabel ?? DefaultPort.ToString(CultureInfo.InvariantCulture
 {
     Console.Error.WriteLine($"WJSS startup refused: invalid {PortEnv} '{portLabel}' (expected 1-65535). Nothing was bound.");
     return 4;
+}
+
+// 3b. TEST_HARDWARE_DRY: build the ONE dry composition root, here, before any listener exists.
+//
+//     It is deliberately NOT routed through SimulatorRuntime. The mode has exactly one surface: the
+//     bounded, single-use console trial that this branch runs and then exits. No HTTP route, no
+//     command API and no Kiosk control is added, and the read-only SIMULATOR projection is never
+//     served beside a physical composition (that would blur provenance).
+if (dryCommandMode)
+{
+    return CleaningPathDryTrial.Run(profile, port, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
 }
 
 // 3. Synthetic configuration: determinism seed, tick interval and bounded history

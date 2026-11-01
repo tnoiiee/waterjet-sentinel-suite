@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WJSS shared motion composition (ACCELERATED-CLEANING-INTEGRATION-01, Owner decision:
+    option A, the approved minimal shared motion-composition library).
+
+    WHY THIS PROJECT EXISTS
+    The physical-capable Manual Motion port must be constructed in two hosts: the isolated
+    Owner-local commissioning application and the TEST_HARDWARE_DRY cleaning composition. It
+    cannot live in either host, because a host is not referenceable as a library; it cannot live
+    in the motion-library adapter, because that adapter's documented boundary forbids an
+    Application reference; and it cannot live in the Application, because the Application may
+    not reference an adapter (that would be a cycle).
+
+    This assembly is the smallest thing that resolves the triangle. It references the adapter
+    (for the internal controller owner) and the Application (for the typed port and session), and
+    it OWNS the two shared source files:
+
+      MotionLibraryManualMotionPort.cs   the hardware-capable port (enum mapping only)
+      ManualMotionProfileFile.cs         the Owner-local profile reader
+
+    The isolated commissioning application LINKS those two files from here rather than keeping
+    a second copy. There is still exactly ONE port implementation and ONE profile reader, and the
+    application keeps its own two project references and stays unreferenced by anything.
+
+    WHAT THIS PROJECT DOES NOT DO
+    It adds no motion adapter, no native entry point, no command vocabulary, no text channel,
+    no raw command, no discovery surface and no new safety authority. It composes the existing
+    controller owner, the existing closed commissioning plan, the existing typed Stop session
+    and the existing Application session. Nothing here opens a handle, loads a native module or
+    touches a controller at construction time: the owner proves its gate at Open.
+
+    SOURCE-AUTHORED IN ARENA. NOT COMPILED IN ARENA (no .NET SDK in the Arena sandbox). The
+    Owner-local Windows build and test run are the validation of record.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Wjss.MotionComposition</RootNamespace>
+    <AssemblyName>Wjss.MotionComposition</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj" />
+    <ProjectReference Include="../../packages/application/Wjss.Runtime.Core.csproj" />
+    <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
+    <ProjectReference Include="../../packages/domain/Wjss.Domain.csproj" />
+    <ProjectReference Include="../../packages/time/Wjss.Time.csproj" />
+  </ItemGroup>
+
+</Project>

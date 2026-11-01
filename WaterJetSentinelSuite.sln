@@ -46,6 +46,8 @@ Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.MotionStopTrial", "app
 EndProject
 Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.MotionCommissioning", "apps\motion-commissioning\Wjss.MotionCommissioning.csproj", "{A1000022-0A10-4A10-8A10-0A100A100A22}"
 EndProject
+Project("{9A19103F-16F7-4668-8E54-9F58F7E45E8A}") = "Wjss.MotionComposition", "apps\motion-composition\Wjss.MotionComposition.csproj", "{A1000023-0A10-4A10-8A10-0A100A100A23}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -140,6 +142,10 @@ Global
 		{A1000022-0A10-4A10-8A10-0A100A100A22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1000022-0A10-4A10-8A10-0A100A100A22}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1000022-0A10-4A10-8A10-0A100A100A22}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1000023-0A10-4A10-8A10-0A100A100A23}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1000023-0A10-4A10-8A10-0A100A100A23}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1000023-0A10-4A10-8A10-0A100A100A23}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1000023-0A10-4A10-8A10-0A100A100A23}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

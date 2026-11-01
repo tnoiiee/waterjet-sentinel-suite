@@ -1,6 +1,6 @@
 using Wjss.Runtime.Core.Motion.Manual;
 
-namespace Wjss.MotionCommissioning;
+namespace Wjss.MotionComposition;
 
 /// <summary>
 /// Reads the Owner-local Manual Motion Commissioning profile file named by one environment variable.

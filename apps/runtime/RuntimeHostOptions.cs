@@ -2,6 +2,7 @@ using System.Globalization;
 using Wjss.Contracts;
 using Wjss.Domain;
 using Wjss.Runtime.Core;
+using Wjss.Runtime.Core.CleaningPath.Composition;
 using Wjss.Runtime.Core.Simulator;
 using Wjss.Runtime.Core.Sequencing;
 using SimulatorSeed = Wjss.Adapters.Simulator.SyntheticSeed;
@@ -382,7 +383,20 @@ public sealed record RuntimeHostOptions
             return false;
         }
 
-        // 3. Mode-aware profile gate.
+        // 3. The dry selector alone never authorizes a profile: TEST_HARDWARE_DRY is required by
+        //    name. The policy gate runs afterwards so the mode-conflict and unstartable-profile rules
+        //    stay the single authority for the decision itself.
+        if (profile != DeviceProfile.TEST_HARDWARE_DRY)
+        {
+            refusalCode = ProcessIoDryCommandGate.RefusedProfileNotDry;
+            refusalDetail =
+                $"The dry command mode is selected but the device profile is '{profile}'. Only "
+                + "TEST_HARDWARE_DRY composes a dry command path; no profile is substituted, and in "
+                + "particular a SIMULATOR profile is never used as a stand-in.";
+            return false;
+        }
+
+        // 4. Mode-aware profile gate.
         if (!ProfileStartPolicy.TryRequireStartable(
                 profile, physicalReadOnlyMode: false, dryCommandMode: true,
                 out refusalCode, out refusalDetail))
@@ -390,7 +404,7 @@ public sealed record RuntimeHostOptions
             return false;
         }
 
-        // 4. Owner-local endpoint and consent, both resolved before any listener exists.
+        // 5. Owner-local endpoint and consent, both resolved before any listener exists.
         if (!ProcessIoEndpointConfiguration.TryResolveEndpoint(
                 readEnvironment, out ProcessIoEndpointHandle? endpoint, out refusalCode, out refusalDetail))
         {

@@ -1,6 +1,7 @@
 using Wjss.Adapters.MotionLibrary;
 using Wjss.Contracts;
 using Wjss.Domain;
+using Wjss.MotionComposition;
 using Wjss.Runtime.Core.CleaningPath;
 using Wjss.Runtime.Core.Motion.Manual;
 using Wjss.Time;
