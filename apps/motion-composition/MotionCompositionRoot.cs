@@ -254,7 +254,7 @@ public sealed class MotionCompositionRoot
             }
         }
 
-        foreach (ManualMotionOperation operation in _session.Snapshot.ActiveOperations)
+        foreach (ManualMotionOperationSnapshot operation in _session.Snapshot.ActiveOperations)
         {
             stillActive.Add(operation.Axis.ToString());
         }
