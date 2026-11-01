@@ -858,9 +858,9 @@ public sealed class SimulatorRuntime : IAsyncDisposable
     /// <para>
     /// Every refusal is propagated: a refused <see cref="NextDispatchCountdownCoordinator.Advance"/>
     /// and a failed attempt to create the next generation both fault the countdown with their exact
-    /// typed code, so no rejected transition is ever discarded. FAULTED is terminal for the session,
-    /// which is what stops a refused transition from being retried on the next timer tick; only a new
-    /// AutoSequence session starts planning again.
+    /// typed code, so no rejected transition is ever discarded. FAULTED is terminal for the session:
+    /// neither the next timer tick nor a Job release restarts it, so a refused transition is never
+    /// retried, re-sampled or cleared; only a new AutoSequence session starts planning again.
     /// </para>
     /// </summary>
     private NextDispatchCountdown ProgressCountdown(
@@ -917,12 +917,19 @@ public sealed class SimulatorRuntime : IAsyncDisposable
             }
         }
 
-        // Retry policy: a release (Mandatory Safe Return completed) is an explicit lifecycle event, and
-        // a SUPERSEDED or CANCELLED generation was closed by an explicit premise change, so either may
-        // start the next generation. FAULTED is deliberately absent: a fault is terminal for the
-        // session, so a timer tick can never retry it, re-sample RH, reuse elapsed time or clear it.
+        // Retry policy. A FAULTED countdown is terminal for the session, so it is excluded as a
+        // MANDATORY outer condition: neither a timer tick nor a Job RELEASE may start a decision from
+        // it. Without that fence the release below would be an ordinary condition that retries a fault,
+        // re-samples RH, increments the generation and discards the refusal, which is exactly the retry
+        // loop the policy forbids. The one and only reset is an explicit StartAutoSequence, which has
+        // already replaced a stale countdown with NextDispatchCountdown.None above.
+        //
+        // From a non-faulted lifecycle, a release (Mandatory Safe Return completed) is an explicit
+        // lifecycle event, and a SUPERSEDED or CANCELLED generation was closed by an explicit premise
+        // change, so either may legitimately start the next generation with the FULL applied delay.
         var released = before.ActiveJob is not null && candidate.ActiveJob is null;
-        var mayStartDecision = !current.Frozen
+        var mayStartDecision = current.Lifecycle != CountdownLifecycleState.FAULTED
+            && !current.Frozen
             && candidate.ActiveJob is null
             && candidate.Queue.Count > 0
             && candidate.Mode == AutoSequenceMode.RUNNING

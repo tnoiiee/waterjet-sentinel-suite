@@ -123,11 +123,16 @@ public sealed class TimeDelayWorkspaceTests
         {
             TickUntilFirstRelease(runtime);
 
-            var workspace = runtime.ProjectWorkspace();
+            // ONE detached reader generation for every projection of this revision. Each Publication
+            // acquisition freezes its own RuntimeState copy (Queue = state.Queue with { ... }), so two
+            // acquisitions can never share instances even when their values are identical: the
+            // reference identity proved below is only meaningful within one publication.
+            var publication = runtime.Publication;
+            var workspace = runtime.ProjectWorkspace(publication);
             Assert.Equal(SchemaIds.DispatchWorkspace, workspace.Schema);
             Assert.Equal(SchemaIds.DispatchWorkspaceKind, workspace.Kind);
             Assert.Equal(DispatchWorkspace.SimulationNote, workspace.Simulation);
-            Assert.Equal(runtime.Publication.Current.Revision, workspace.Revision);
+            Assert.Equal(publication.Current.Revision, workspace.Revision);
 
             var countdown = workspace.Countdown;
             Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, countdown.Lifecycle);
@@ -149,10 +154,13 @@ public sealed class TimeDelayWorkspaceTests
             Assert.Equal(TimeDelayConfiguration.LegacySeededSimulationVersion, decision.ConfigurationVersion);
 
             // The workspace reuses the Snapshot's own Queue and Active Job projections, so the two
-            // documents of one revision can never disagree.
-            var snapshot = runtime.ProjectSnapshot();
+            // documents of one revision cannot disagree: they carry the SAME instances, not merely
+            // equal values. Both are projected from the publication captured above.
+            var snapshot = runtime.ProjectSnapshot(publication);
             Assert.Same(snapshot.Queue, workspace.Queue);
             Assert.Same(snapshot.ActiveJob, workspace.ActiveJob);
+            Assert.Same(publication.Current.Queue, workspace.Queue);
+            Assert.Same(publication.Current.ActiveJob, workspace.ActiveJob);
             Assert.Equal(DispatchTimelineStage.NEXT_DISPATCH_COUNTDOWN, workspace.Timeline.Stage);
             Assert.Equal(13, workspace.Timeline.Steps.Count);
             Assert.Equal(
@@ -526,14 +534,14 @@ public sealed class TimeDelayWorkspaceTests
     }
 
     /// <summary>
-    /// An ordinary tick never retries, re-plans, re-samples or clears a fault: the very same record is
-    /// still in place, still FAULTED and still admitting no dispatch.
+    /// No later tick ever retries, re-plans, re-samples or clears a fault: the very same record is
+    /// still in place, still FAULTED and still admitting no dispatch. The window also contains a Job
+    /// RELEASE whenever one is still pending, because a release is the one ordinary lifecycle event
+    /// that starts a new generation from a non-faulted countdown.
     /// </summary>
     private static void AssertFaultIsStable(SimulatorRuntime runtime, CountdownRefusalCode refusal)
     {
         var faulted = runtime.Countdown;
-        // Twenty ticks cover the whole remaining Job cycle, INCLUDING the release that is an explicit
-        // lifecycle trigger for a new generation: a retry would have to happen here if it happened.
         for (var tick = 0; tick < 20; tick++) Tick(runtime);
         Assert.Same(faulted, runtime.Countdown);
         Assert.Equal(CountdownLifecycleState.FAULTED, runtime.Countdown.Lifecycle);
@@ -832,6 +840,177 @@ public sealed class TimeDelayWorkspaceTests
         Assert.True(reading.Generation > 0);
     }
 
+    // ---------------------------------------------------------------- terminal fence
+
+    /// <summary>
+    /// Ticks until the Active Job is released and returns the ordinal of that release tick. The
+    /// release is the ONE ordinary lifecycle event that may legitimately start a new generation, so it
+    /// is the exact condition a fault must survive.
+    /// </summary>
+    private static int TickUntilRelease(SimulatorRuntime runtime)
+    {
+        for (var tick = 0; tick < 120; tick++)
+        {
+            Tick(runtime);
+            if (runtime.State.ActiveJob is null) return tick;
+        }
+
+        throw new InvalidOperationException("The scenario never released its Job.");
+    }
+
+    [Fact]
+    public async Task A_faulted_countdown_is_not_restarted_by_the_release_that_starts_a_decision()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(5));
+        try
+        {
+            var head = TickUntilActiveJob(runtime);
+
+            // A real refused Advance faults the countdown WITH its decision, which is the
+            // decision-bearing fault the release must not be able to replace.
+            var frozen = FrozenCountdown(runtime, Manual(5).Configuration, head, Origin.AddHours(1));
+            SeedCountdown(runtime, frozen);
+            Tick(runtime);
+
+            var faulted = runtime.Countdown;
+            Assert.Equal(CountdownLifecycleState.FAULTED, faulted.Lifecycle);
+            Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, faulted.RefusalCode);
+            Assert.Equal(1, faulted.Generation);
+            var decisionBefore = Assert.IsType<NextDispatchDelayDecision>(faulted.Decision);
+
+            // The release really happens while the countdown is FAULTED: a Manual decision here WOULD
+            // plan successfully, so any re-entry of the gate would be immediately visible.
+            TickUntilRelease(runtime);
+            Assert.Null(runtime.State.ActiveJob);
+
+            // The release changes nothing: same instance, same lifecycle, same generation, same
+            // decision and same refusal. No sampling, no increment, no clearing and no retry.
+            Assert.Same(faulted, runtime.Countdown);
+            Assert.Equal(CountdownLifecycleState.FAULTED, runtime.Countdown.Lifecycle);
+            Assert.Equal(1, runtime.Countdown.Generation);
+            Assert.Equal(decisionBefore, runtime.Countdown.Decision);
+            Assert.Equal(CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION, runtime.Countdown.RefusalCode);
+            Assert.False(runtime.Countdown.Frozen);
+            Assert.False(runtime.Countdown.DispatchAdmissible);
+
+            // The refused generation never dispatched, and the released Job was not replaced.
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            Assert.Null(runtime.State.ActiveJob);
+
+            // Later ticks, including further releases, still cannot revive it.
+            AssertFaultIsStable(runtime, CountdownRefusalCode.COUNTDOWN_TIME_REGRESSION);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_faulted_countdown_consumes_no_reading_and_starts_no_generation_across_a_release()
+    {
+        // The reading is VALID and current, so if the release re-entered StartNextDecision the plan
+        // would be ACCEPTED and the countdown would become ACTIVE_FROZEN with a new generation and a
+        // consumed reading. Staying on the same instance therefore proves no sampling took place.
+        var reading = Reading(520, Origin);
+        var runtime = Create(
+            SimulatorScenarioId.NORMAL_COMPLETION, AutoRange(600, 660, windowSeconds: 300, fixedRhInput: reading));
+        try
+        {
+            TickUntilActiveJob(runtime);
+
+            // The plan the release would attempt really is accepted: the refusal below is a FAULT, not
+            // a missing premise.
+            var head = runtime.State.Queue.Entries[0];
+            var wouldSucceed = PlannedDecision(
+                runtime, AutoRange(600, 660, 300).Configuration, head, reading, Origin, generation: 2);
+            Assert.Equal(2, wouldSucceed.CountdownGeneration);
+
+            SeedCountdown(runtime, NextDispatchCountdownCoordinator.FaultNextGeneration(
+                DispatchedCountdown(runtime, AutoRange(600, 660, 300)),
+                2,
+                CountdownRefusalCode.RH_STALE));
+            var faulted = runtime.Countdown;
+            Assert.Equal(CountdownLifecycleState.FAULTED, faulted.Lifecycle);
+            Assert.Null(faulted.Decision);
+
+            TickUntilRelease(runtime);
+
+            // No generation was consumed for a decision: the identity, the generation and the refusal
+            // are exactly the seeded ones.
+            Assert.Same(faulted, runtime.Countdown);
+            Assert.Equal(2, runtime.Countdown.Generation);
+            Assert.Equal(CountdownRefusalCode.RH_STALE, runtime.Countdown.RefusalCode);
+            Assert.Null(runtime.Countdown.Decision);
+            Assert.Equal(0, runtime.Countdown.RemainingSeconds);
+
+            // The previous dispatch is untouched and no new dispatch followed.
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            Assert.Null(runtime.State.ActiveJob);
+            Assert.Equal(CountdownLifecycleState.FAULTED, runtime.ProjectWorkspace().Countdown.Lifecycle);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_faulted_countdown_never_dispatches_the_head_after_the_release()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(0));
+        try
+        {
+            TickUntilActiveJob(runtime);
+            // A countdown-intrinsic refusal, so the seeded fault is honest for a MANUAL configuration
+            // that has no RH input at all.
+            SeedCountdown(runtime, NextDispatchCountdownCoordinator.FaultNextGeneration(
+                NextDispatchCountdown.None,
+                1,
+                CountdownRefusalCode.DECISION_TIMESTAMP_INVALID));
+            var faulted = runtime.Countdown;
+
+            // A zero-delay Manual configuration would dispatch on the very next gate opening, so a
+            // dispatch here would be a fault-clearing retry.
+            TickUntilRelease(runtime);
+            for (var tick = 0; tick < 10; tick++) Tick(runtime);
+
+            Assert.Same(faulted, runtime.Countdown);
+            Assert.Equal(CountdownRefusalCode.DECISION_TIMESTAMP_INVALID, runtime.Countdown.RefusalCode);
+            Assert.Equal(1, runtime.Countdown.Generation);
+            Assert.Equal("SYN-JOB-1", runtime.State.Queue.LastDispatch?.JobId);
+            Assert.Null(runtime.State.ActiveJob);
+            Assert.NotEmpty(runtime.State.Queue.Entries);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
+    [Fact]
+    public async Task A_cancelled_countdown_restarts_with_the_full_applied_delay()
+    {
+        var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(5));
+        try
+        {
+            var head = TickUntilActiveJob(runtime);
+            var cancelled = NextDispatchCountdownCoordinator.Cancel(
+                FrozenCountdown(runtime, Manual(5).Configuration, head, Origin), out var cancelRefusal);
+            Assert.Equal(CountdownRefusalCode.NONE, cancelRefusal);
+            Assert.Equal(CountdownLifecycleState.CANCELLED, cancelled.Lifecycle);
+            Assert.Equal(5, cancelled.RemainingSeconds);
+            SeedCountdown(runtime, cancelled);
+
+            // The active Job keeps the gate closed until its release, which is the explicit lifecycle
+            // event that restarts a CANCELLED generation.
+            for (var tick = 0; tick < 60 && runtime.Countdown.Lifecycle != CountdownLifecycleState.ACTIVE_FROZEN; tick++)
+            {
+                Tick(runtime);
+            }
+
+            // A closed-by-premise CANCELLED generation is still an explicit lifecycle trigger: it
+            // restarts on the NEXT generation with the FULL applied delay.
+            Assert.Equal(CountdownLifecycleState.ACTIVE_FROZEN, runtime.Countdown.Lifecycle);
+            Assert.Equal(2, runtime.Countdown.Generation);
+            Assert.Equal(5, runtime.Countdown.RemainingSeconds);
+            Assert.Null(runtime.Countdown.RefusalCode);
+            Assert.NotNull(runtime.Countdown.Decision);
+        }
+        finally { await runtime.DisposeAsync(); }
+    }
+
     // ---------------------------------------------------------------- published timeline evidence
 
     /// <summary>The first published revision that carries an Active Job, after at most 40 ticks.</summary>
@@ -1010,15 +1189,24 @@ public sealed class TimeDelayWorkspaceTests
                 Tick(runtime);
             }
 
-            var job = Assert.IsType<ActiveCleaningJobState>(runtime.State.ActiveJob);
+            // ONE publication for the published Job and the projected document, so the lifecycle read
+            // and the timeline read describe the same revision.
+            var publication = runtime.Publication;
+            var job = Assert.IsType<ActiveCleaningJobState>(publication.Current.ActiveJob);
             Assert.Equal(JobLifecycle.SAFE_RETURN_FAILED, job.Lifecycle);
 
-            var workspace = runtime.ProjectWorkspace();
+            var workspace = runtime.ProjectWorkspace(publication);
             Assert.Equal(DispatchTimelineStage.MANDATORY_SAFE_RETURN, workspace.Timeline.Stage);
             var failedStep = Assert.Single(
                 workspace.Timeline.Steps, step => step.State == DispatchTimelineStepState.FAILED);
             Assert.Equal(DispatchTimelineStage.MANDATORY_SAFE_RETURN, failedStep.Stage);
-            Assert.Single(workspace.Timeline.Steps, step => step.State == DispatchTimelineStepState.CURRENT);
+
+            // A step carries exactly ONE state, so a failed cycle has no CURRENT step at all: the
+            // failed step IS the frontier. Expecting both a FAILED and a CURRENT step would demand two
+            // states for one step.
+            Assert.DoesNotContain(
+                workspace.Timeline.Steps,
+                step => step.State == DispatchTimelineStepState.CURRENT);
 
             // A failure never invents progress: earlier steps stay complete, later steps stay pending.
             Assert.All(
@@ -1081,13 +1269,18 @@ public sealed class TimeDelayWorkspaceTests
         var runtime = Create(SimulatorScenarioId.NORMAL_COMPLETION, Manual(5));
         try
         {
-            var snapshot = runtime.ProjectSnapshot();
-            var workspace = runtime.ProjectWorkspace();
+            // ONE publication for both documents: "reuses the snapshot" is a reference-identity claim,
+            // and reference identity only exists inside a single publication.
+            var publication = runtime.Publication;
+            var snapshot = runtime.ProjectSnapshot(publication);
+            var workspace = runtime.ProjectWorkspace(publication);
 
             Assert.Equal(snapshot.Revision, workspace.Revision);
             Assert.Equal(snapshot.GeneratedAt, workspace.GeneratedAt);
             Assert.Equal(snapshot.DeviceProfile, workspace.DeviceProfile);
             Assert.Equal(snapshot.Queue, workspace.Queue);
+            Assert.Same(snapshot.Queue, workspace.Queue);
+            Assert.Same(snapshot.ActiveJob, workspace.ActiveJob);
             Assert.Equal(snapshot.Sequence.AutoSequence, workspace.AutoSequence);
             Assert.Equal(snapshot.Sequence.Mode, workspace.Mode);
             Assert.Equal(CountdownLifecycleState.NONE, workspace.Countdown.Lifecycle);
