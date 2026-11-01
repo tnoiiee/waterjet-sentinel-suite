@@ -438,3 +438,117 @@ public static class ProcessIoLegacyProvenance
     public static string PathFor(string tag) =>
         $"Authoritative T8 fieldbus mapping workbook for {tag} (see packages/process-io/src/legacyEvidence.mjs)";
 }
+
+/// <summary>
+/// Canonical Isolation Valve identity and its exact adopted Process-Io rows
+/// (ACCELERATED-CLEANING-INTEGRATION-01, Owner decisions D1 and D3).
+///
+/// This is NOT a second I/O catalogue: every accessor below resolves through
+/// <see cref="ProcessIoBindings"/> for the address and only supplies the documented ordinal
+/// derivation. The ordinals are fixed by the corrected authoritative workbook and the exact Legacy
+/// command chain:
+///
+///   Legacy cannon n  -> WJn            (canonical Product derivation, unchanged)
+///   WJn              <-> IVn           (one-to-one by ordinal)
+///   IVn command      -> DO-0(22+n)     coil 21+n, FC05, MAINTAINED single coil
+///   IVn OPEN  feedback -> DI-0(20+n)   FC02 address 19+n  (WSB Upper Limit Switch #n)
+///   IVn CLOSED feedback -> DI-0(28+n)  FC02 address 27+n  (WSB Lower Limit Switch #n)
+///   IVn outlet pressure -> AI-00(3+n)+ FC04 input register 2+n
+///
+/// Command semantics are maintained state, never a pulse: true (energised) = OPEN,
+/// false (de-energised) = CLOSED. Safe cleanup writes false and retains the de-energised state.
+/// FC01 output read-back is process-image evidence only and is never field confirmation.
+///
+/// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the gate).
+/// </summary>
+public static class ProcessIoIsolationValves
+{
+    /// <summary>Exactly eight Water Jets and eight Isolation Valves (never nine, never inferred).</summary>
+    public const int Count = 8;
+
+    /// <summary>Command shapes that carry command authority. Read shapes never write.</summary>
+    public const string MaintainedCommandSemantics = "MAINTAINED_SINGLE_COIL";
+
+    /// <summary>Canonical Product identity, e.g. 1 -> "IV1".</summary>
+    public static string ValveId(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "IV" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Strict parse of "IV1".."IV8"; anything else is not an Isolation Valve identity.</summary>
+    public static bool TryParseValveId(string? valveId, out int ordinal)
+    {
+        ordinal = 0;
+        if (string.IsNullOrWhiteSpace(valveId)) return false;
+        string trimmed = valveId.Trim();
+        if (!trimmed.StartsWith("IV", StringComparison.Ordinal)) return false;
+        if (!int.TryParse(trimmed.AsSpan(2), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out int parsed))
+        {
+            return false;
+        }
+        if (parsed < 1 || parsed > Count) return false;
+        ordinal = parsed;
+        return true;
+    }
+
+    /// <summary>The maintained FC05 command coil for IVn (DO-0(22+n)).</summary>
+    public static string CommandTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "DO-0" + (22 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The OPEN-position feedback row for IVn (WSB Upper Limit Switch #n).</summary>
+    public static string OpenFeedbackTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "DI-0" + (20 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The CLOSED-position feedback row for IVn (WSB Lower Limit Switch #n).</summary>
+    public static string ClosedFeedbackTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "DI-0" + (28 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The IVn outlet pressure row (AI-004+ .. AI-011+), ordinal by IV identity.</summary>
+    public static string OutletPressureTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "AI-00" + (3 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture) + "+";
+    }
+
+    /// <summary>The adopted command coil address (zero-based coil 21+n).</summary>
+    public static int CommandCoilAddress(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        if (!ProcessIoBindings.TryGet(CommandTag(ordinal), out ProcessIoPhysicalBinding binding))
+        {
+            throw new InvalidOperationException($"No adopted binding exists for {CommandTag(ordinal)}.");
+        }
+        if (binding.Area != ProcessIoArea.Coil || binding.Direction != "WRITE")
+        {
+            throw new InvalidOperationException(
+                $"{CommandTag(ordinal)} is not an adopted WRITE coil binding; refusing to command it.");
+        }
+        return binding.Address;
+    }
+
+    /// <summary>
+    /// The maintained command state for a typed command kind. OPEN energises (true); CLOSE
+    /// de-energises (false). This is the only place the polarity is expressed.
+    /// </summary>
+    public static bool CoilValueFor(bool open) => open;
+
+    private static void RequireOrdinal(int ordinal)
+    {
+        if (ordinal < 1 || ordinal > Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(ordinal), ordinal, $"Isolation Valve ordinal must be 1..{Count}.");
+        }
+    }
+}

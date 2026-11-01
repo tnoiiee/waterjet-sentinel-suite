@@ -106,4 +106,13 @@ public enum DeviceLinkState { ONLINE, TIMEOUT, RECOVERING, STALE_SOURCE }
 /// build identity. It is appended so the existing members keep their values and their meaning —
 /// <see cref="TEST_HARDWARE"/> and <see cref="PRODUCTION"/> remain refused exactly as before.
 /// </summary>
-public enum DeviceProfile { SIMULATOR, TEST_HARDWARE, PRODUCTION, TEST_HARDWARE_READ_ONLY }
+/// <remarks>
+/// <see cref="TEST_HARDWARE_DRY"/> is the second narrow, explicit extension (ACCELERATED-CLEANING-
+/// INTEGRATION-01, Owner decision D2). It is a SOFTWARE-ONLY profile: it is startable ONLY when the
+/// explicit dry command-composition mode was selected, and it grants command authority ONLY through
+/// the typed, authorization-gated Process-Io equipment boundary. It never contacts Hardware by
+/// itself, never substitutes SIMULATOR transport for physical mode, and never promotes to
+/// <see cref="TEST_HARDWARE"/> or <see cref="PRODUCTION"/>, which remain unstartable in every mode.
+/// The member is appended so every existing member keeps its value and its meaning.
+/// </remarks>
+public enum DeviceProfile { SIMULATOR, TEST_HARDWARE, PRODUCTION, TEST_HARDWARE_READ_ONLY, TEST_HARDWARE_DRY }
