@@ -244,7 +244,7 @@ public sealed class CleaningPathDryComposition : IDisposable
 
         // 3. The committed Process-Io catalogue, fully verified by the loader (row count, column
         //    contract, source order and the per-row provenance hash). A mismatched file is refused.
-        IReadOnlyDictionary<string, ProcessIoCatalogueRow> catalogue;
+        Dictionary<string, ProcessIoCatalogueRow> catalogue;
         try
         {
             if (!TryReadOwnerLocalFile(

@@ -69,7 +69,7 @@ public sealed class ProcessIoDryCycleMatrixTests
     }
 
     /// <summary>Builds the adopted catalogue from the real binding table, as the composition root does.</summary>
-    private static IReadOnlyDictionary<string, ProcessIoCatalogueRow> BuildCatalogue()
+    private static Dictionary<string, ProcessIoCatalogueRow> BuildCatalogue()
     {
         var rows = new Dictionary<string, ProcessIoCatalogueRow>(StringComparer.Ordinal);
         string[] tags =
