@@ -101,3 +101,32 @@ prevents any current reader from treating the reversed rows as truth.
 No Hardware was contacted to produce this record. No physical network access, no WAGO read or
 write, no Galil connection, no motion, no Brake output, no Pump command, no IV actuation, no water
 flow. **PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED. PRODUCTION: NOT AUTHORIZED.**
+
+---
+
+## 9. Dual representation record (Owner authority, 2026-11-01)
+
+Two representations of the corrected workbook exist and are recorded here. **They are not byte-identical,
+and this record does not claim they are.**
+
+| Representation | SHA-256 | Bytes |
+|---|---|---|
+| Owner-generated corrected representation (declared) | `d9d6d0d95cbe893f87557ecfe2b0a26b07cf0650b24b9301a32402bdd18ff030` | not stated |
+| Connected-source representation (observed by the Agent) | `b16670128f790d1f70ae3dcea2e623f16f74a32d61fee954f84595fe62784a40` | 23,005 |
+
+### Semantic authority
+
+Product behaviour is keyed to the **semantic content**, never to the workbook package bytes:
+
+- exactly **16** description changes;
+- **no** address, function code, tag, slot, channel, terminal or output identity change;
+- verified by cell-level comparison: 16 differing cells, one column (`Signal / Description`),
+  one sheet (`Digital Mapping`), rows 21–36; `Contract Summary` byte-identical.
+
+A future revision of the workbook package that keeps this semantic content leaves Product behaviour
+unchanged and needs no code change. A revision that changes any address, function code or tag is a
+different change and requires its own review — it can never ride in on a package-hash update.
+
+Product code therefore keys on the file name and on the sixteen exact expected description pairs
+(`SUPERSEDED_DESCRIPTIONS` in `tools/process-io-evidence/generate.mjs`), which fail closed if the
+content ever stops matching.

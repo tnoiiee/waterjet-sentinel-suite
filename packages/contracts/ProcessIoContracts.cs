@@ -243,6 +243,14 @@ public static class ProcessIoRefusals
     public const string SessionNotOpen = "WJSS_SESSION_NOT_OPEN";
     public const string ConfigRefused = "WJSS_CONFIG_REFUSED";
     public const string NoNetworkIoOnRefusal = "WJSS_NO_NETWORK_IO_ON_REFUSAL";
+
+    // Observation refusals (typed values, never exceptions, zero network I/O on refusal).
+    public const string ObservationRefusedUnbound = "WJSS_OBSERVATION_REFUSED_UNBOUND";
+    public const string ObservationRefusedNotCommissioned = "WJSS_OBSERVATION_REFUSED_NOT_COMMISSIONED";
+    public const string ObservationTransportFault = "WJSS_OBSERVATION_TRANSPORT_FAULT";
+    public const string ObservationStale = "WJSS_OBSERVATION_STALE";
+    public const string ObservationOutOfDomain = "WJSS_OBSERVATION_OUT_OF_DOMAIN";
+    public const string ObservationRefusedGeneration = "WJSS_OBSERVATION_REFUSED_GENERATION";
 }
 
 /// <summary>
@@ -521,6 +529,23 @@ public static class ProcessIoIsolationValves
         return "AI-00" + (3 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture) + "+";
     }
 
+    /// <summary>True for exactly the eight IV outlet pressure tags, AI-004+ .. AI-011+.</summary>
+    public static bool IsOutletPressureTag(string? tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return false;
+        for (int n = 1; n <= Count; n += 1)
+        {
+            if (string.Equals(tag, OutletPressureTag(n), StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>The Pump Outlet Pressure row, the sole Pump-ready pressure authority.</summary>
+    public const string PumpOutletPressureTag = "AI-003+";
+
+    /// <summary>The Pump Inlet Pressure row: diagnostic and trend only, never a Pump-ready source.</summary>
+    public const string PumpInletPressureTag = "AI-002+";
+
     /// <summary>The adopted command coil address (zero-based coil 21+n).</summary>
     public static int CommandCoilAddress(int ordinal)
     {
@@ -551,4 +576,127 @@ public static class ProcessIoIsolationValves
                 nameof(ordinal), ordinal, $"Isolation Valve ordinal must be 1..{Count}.");
         }
     }
+}
+
+/// <summary>
+/// Truthful quality of one physical Process-Io observation. A synchronous transport read that
+/// returned is evidence that a value was RECEIVED; it is not by itself evidence that the value is
+/// GOOD, current or plausible. The session assigns these from what it actually knows.
+/// </summary>
+public enum ProcessIoObservationQuality
+{
+    /// <summary>The read returned and the value is inside the adopted engineering domain.</summary>
+    GOOD = 0,
+
+    /// <summary>The read returned but the session cannot vouch for the value (unbound, excluded, wrong generation).</summary>
+    UNCERTAIN = 1,
+
+    /// <summary>The read did not return a usable value.</summary>
+    BAD = 2,
+
+    /// <summary>The value is older than the freshness budget, or belongs to a superseded generation.</summary>
+    STALE = 3,
+
+    /// <summary>The channel is not commissioned for observation.</summary>
+    DISABLED = 4,
+}
+
+/// <summary>Where a physical observation came from, as a value a report can carry verbatim.</summary>
+public enum ProcessIoObservationProvenance
+{
+    /// <summary>Read through the adopted catalogue row on the physical-capable transport.</summary>
+    PHYSICAL_READ = 0,
+
+    /// <summary>Read from a deterministic in-memory transport (never physical evidence).</summary>
+    SIMULATED_READ = 1,
+
+    /// <summary>No read was attempted because the session or row refused it.</summary>
+    NOT_OBSERVED = 2,
+}
+
+/// <summary>
+/// One typed physical observation. Every field is something the session actually knows: the raw
+/// word, the engineering value and its unit, the quality it can justify, both timestamps, the
+/// connection generation the value was read under, the freshness verdict and the provenance.
+///
+/// A caller must never synthesise this record from a bare transport call: that would fabricate a
+/// GOOD, current observation. Only <see cref="Wjss.Runtime.Core.ProcessIo.ProcessIoSession"/>
+/// produces it, and only after it has consulted its own generation and state.
+/// </summary>
+public sealed record ProcessIoPhysicalObservation
+{
+    /// <summary>Product tag of the catalogue row, e.g. "AI-003+" or "DI-021".</summary>
+    public required string Tag { get; init; }
+
+    /// <summary>The raw transport value: the word for AI, the bit for DI.</summary>
+    public required int RawValue { get; init; }
+
+    /// <summary>Engineering value when a conversion is adopted for the tag; null for raw-only rows.</summary>
+    public double? EngineeringValue { get; init; }
+
+    /// <summary>Engineering unit for <see cref="EngineeringValue"/>, e.g. "bar".</summary>
+    public string? Unit { get; init; }
+
+    public required ProcessIoObservationQuality Quality { get; init; }
+
+    /// <summary>The instant the value is claimed to describe.</summary>
+    public required DateTimeOffset ObservedAt { get; init; }
+
+    /// <summary>The instant the transport actually returned it. Never earlier than ObservedAt.</summary>
+    public required DateTimeOffset ReceivedAt { get; init; }
+
+    /// <summary>The session connection generation this value was read under.</summary>
+    public required int SourceGeneration { get; init; }
+
+    /// <summary>True only when the quality is GOOD and the sample is inside its freshness budget.</summary>
+    public required bool Fresh { get; init; }
+
+    public required ProcessIoObservationProvenance Provenance { get; init; }
+
+    /// <summary>Typed machine reason, "OK" when nothing was refused.</summary>
+    public required string DiagnosticCode { get; init; }
+
+    /// <summary>True when the record may be used as current process evidence.</summary>
+    public bool IsUsable => Quality == ProcessIoObservationQuality.GOOD && Fresh;
+
+    /// <summary>
+    /// True when the record is current, usable and belongs to the stated live generation. A value
+    /// from a superseded generation is refused rather than reinterpreted.
+    /// </summary>
+    public bool IsUsableAt(DateTimeOffset now, int liveGeneration, TimeSpan freshnessBudget) =>
+        IsUsable
+        && SourceGeneration == liveGeneration
+        && ObservedAt <= now
+        && now - ObservedAt <= freshnessBudget;
+}
+
+/// <summary>
+/// One admitted IV command result. The token belongs to the existing
+/// <see cref="Wjss.Runtime.Core.ProcessIo.ProcessIoSession"/> lifecycle; this record only reports
+/// what happened to it.
+/// </summary>
+public sealed record ProcessIoCommandOutcome
+{
+    public required string ValveId { get; init; }
+
+    public required string Tag { get; init; }
+
+    public required int CoilAddress { get; init; }
+
+    /// <summary>The maintained coil value sent: true = energised = OPEN, false = CLOSED.</summary>
+    public required bool CoilValue { get; init; }
+
+    /// <summary>True only when admission AND dispatch both succeeded.</summary>
+    public required bool Dispatched { get; init; }
+
+    public required string AdmissionCode { get; init; }
+
+    public required string DispatchCode { get; init; }
+
+    public required int SessionGeneration { get; init; }
+
+    public required DateTimeOffset At { get; init; }
+
+    /// <summary>True when the transport threw during dispatch; the exception is captured, never propagated.</summary>
+    public bool TransportFaulted { get; init; }
 }

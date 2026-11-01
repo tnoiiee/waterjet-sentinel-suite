@@ -125,6 +125,24 @@ public sealed record RuntimeHostOptions
     /// </summary>
     public TcEndpointHandle? Endpoint { get; init; }
 
+    /// <summary>
+    /// True only when the explicit dry command-composition mode was selected at startup. It is never
+    /// inferred, and it is mutually exclusive with the physical read-only acquisition mode.
+    /// </summary>
+    public bool DryCommandMode { get; init; }
+
+    /// <summary>
+    /// The resolved Owner-local Process-Io endpoint. Null unless the dry command mode was selected and
+    /// its endpoint resolved successfully. Held in memory only; never serialized or published.
+    /// </summary>
+    public ProcessIoEndpointHandle? ProcessIoEndpoint { get; init; }
+
+    /// <summary>
+    /// The Owner-local consent phrase, present only when the dry command mode resolved it. It is never
+    /// returned by an API route, logged or rendered.
+    /// </summary>
+    public string? ProcessIoConsent { get; init; }
+
     public required int Port { get; init; }
 
     /// <summary>Synthetic value-stream identity; two runs with the same seed produce the same values.</summary>
@@ -314,21 +332,164 @@ public sealed record RuntimeHostOptions
     }
 
     /// <summary>
+    /// Loads the explicit TEST_HARDWARE_DRY command-composition configuration.
+    ///
+    /// Every refusal happens before any host object exists, so a refused dry run can never bind a port.
+    /// The order is part of the safety posture: PRODUCTION is refused first and without reading a single
+    /// variable, then the dry mode must be explicitly selected, then the profile gate runs, and only
+    /// then are the Owner-local endpoint and consent resolved. Nothing is defaulted, nothing is inferred
+    /// and no simulated transport is ever substituted.
+    ///
+    /// This method performs NO physical contact: it resolves and validates values only. Opening a
+    /// connection is the composition root's job, and it happens only after this returns true.
+    /// </summary>
+    public static bool TryLoadDryCommand(
+        DeviceProfile profile,
+        int port,
+        Func<string, string?> readEnvironment,
+        out RuntimeHostOptions options,
+        out string refusalCode,
+        out string refusalDetail)
+    {
+        ArgumentNullException.ThrowIfNull(readEnvironment);
+
+        options = null!;
+        refusalCode = string.Empty;
+        refusalDetail = string.Empty;
+
+        // 1. PRODUCTION is refused before anything is read at all.
+        if (profile == DeviceProfile.PRODUCTION)
+        {
+            refusalCode = ProcessIoEndpointConfiguration.ProductionRefused;
+            refusalDetail =
+                "PRODUCTION is never startable. No configuration value is read and no listener is bound.";
+            return false;
+        }
+
+        // 2. The dry mode is never inferred: it must be explicitly selected.
+        if (!ProcessIoEndpointConfiguration.TryReadDryMode(
+                readEnvironment, out bool dryCommandMode, out refusalCode, out refusalDetail))
+        {
+            return false;
+        }
+
+        if (!dryCommandMode)
+        {
+            refusalCode = ProcessIoEndpointConfiguration.DryModeNotSelected;
+            refusalDetail =
+                $"The TEST_HARDWARE_DRY profile requires {ProcessIoEndpointConfiguration.DryModeVariable}="
+                + "'TEST_HARDWARE_DRY'. The mode is never inferred from the profile alone.";
+            return false;
+        }
+
+        // 3. Mode-aware profile gate.
+        if (!ProfileStartPolicy.TryRequireStartable(
+                profile, physicalReadOnlyMode: false, dryCommandMode: true,
+                out refusalCode, out refusalDetail))
+        {
+            return false;
+        }
+
+        // 4. Owner-local endpoint and consent, both resolved before any listener exists.
+        if (!ProcessIoEndpointConfiguration.TryResolveEndpoint(
+                readEnvironment, out ProcessIoEndpointHandle? endpoint, out refusalCode, out refusalDetail))
+        {
+            return false;
+        }
+
+        if (!ProcessIoEndpointConfiguration.TryReadConsent(
+                readEnvironment, out string? consent, out refusalCode, out refusalDetail))
+        {
+            return false;
+        }
+
+        if (port is < 1 or > 65535)
+        {
+            refusalCode = InvalidPort;
+            refusalDetail = $"{PortVariable} must be an integer between 1 and 65535; got {port}.";
+            return false;
+        }
+
+        // The projection, history and delta machinery is the same composition, so the same bounded
+        // capacities apply. The synthetic seed is fixed and is never used as process evidence here.
+        options = new RuntimeHostOptions
+        {
+            Profile = profile,
+            DryCommandMode = true,
+            ProcessIoEndpoint = endpoint,
+            ProcessIoConsent = consent,
+            AcquisitionMode = TcAcquisitionMode.DETERMINISTIC,
+            Endpoint = null,
+            Port = port,
+            SyntheticSeed = 0UL,
+            TickIntervalMilliseconds = DefaultTickIntervalMilliseconds,
+            StateHistoryCapacity = RuntimeLimits.DefaultRevisionHistoryCapacity,
+            DeltaHistoryCapacity = RuntimeLimits.DefaultDeltaHistoryCapacity,
+        };
+
+        return options.TryValidate(out refusalCode, out refusalDetail);
+    }
+
+    /// <summary>
     /// Validates an assembled configuration (including the profile policy), so a
     /// hand-built options object cannot compose a runtime that the policy refuses.
     /// </summary>
     public bool TryValidate(out string refusalCode, out string refusalDetail)
     {
         if (!ProfileStartPolicy.TryRequireStartable(
-            Profile, AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY, out refusalCode, out refusalDetail))
+            Profile,
+            AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY,
+            DryCommandMode,
+            out refusalCode,
+            out refusalDetail))
         {
             return false;
         }
 
+        // The dry command mode is decided before the acquisition-mode branches: it is its own mode, it
+        // owns its own endpoint and consent, and it never shares authority with a physical read-only run.
+        if (DryCommandMode)
+        {
+            if (Profile != DeviceProfile.TEST_HARDWARE_DRY)
+            {
+                refusalCode = ProfileModeConflict;
+                refusalDetail =
+                    "The dry command-composition mode runs only under the TEST_HARDWARE_DRY device profile. "
+                    + "No other profile is substituted, and PRODUCTION is never startable.";
+                return false;
+            }
+
+            if (AcquisitionMode != TcAcquisitionMode.DETERMINISTIC || Endpoint is not null)
+            {
+                refusalCode = ProfileModeConflict;
+                refusalDetail =
+                    "The dry command-composition mode is not a TC acquisition mode: it carries no TC "
+                    + "endpoint and never sets the physical read-only acquisition mode.";
+                return false;
+            }
+
+            if (ProcessIoEndpoint is null)
+            {
+                refusalCode = ProcessIoEndpointConfiguration.NotConfigured;
+                refusalDetail =
+                    "The dry command-composition mode requires a resolved Owner-local Process-Io endpoint. "
+                    + "It is deliberately not committed and no value is defaulted or substituted.";
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(ProcessIoConsent))
+            {
+                refusalCode = ProcessIoEndpointConfiguration.ConsentMissing;
+                refusalDetail =
+                    "The dry command-composition mode requires the exact Owner consent phrase before any "
+                    + "listener is bound.";
+                return false;
+            }
+        }
         // The mode, the profile and the endpoint must agree in both directions. Physical mode without
         // its Owner-local endpoint, a physical profile in deterministic mode, or a leftover endpoint in
         // deterministic mode are all refused rather than resolved: nothing is substituted or defaulted.
-        if (AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY)
+        else if (AcquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY)
         {
             if (Profile != DeviceProfile.TEST_HARDWARE_READ_ONLY)
             {

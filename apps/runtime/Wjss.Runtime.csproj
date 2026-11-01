@@ -32,6 +32,19 @@
 
   <ItemGroup>
     <!--
+      ACCELERATED-CLEANING-INTEGRATION-01: ONE motion port implementation, shared by source link.
+
+      The port must live in an assembly that can see both the internal motion-library controller
+      owner and the Application IManualMotionPort contract. The adapter project deliberately has no
+      Application/Contracts reference (its own documented boundary), and the Application project
+      cannot see the adapter (that would be a cycle). Linking the single existing file is therefore
+      the only way to reuse the shipped port instead of writing a second motion adapter.
+    -->
+    <Compile Include="../motion-commissioning/MotionLibraryManualMotionPort.cs" Link="Motion/MotionLibraryManualMotionPort.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
       The development Inspector page ships with the host output so the route can
       serve it from the build directory without a Node build pipeline.
     -->
@@ -41,6 +54,9 @@
   <ItemGroup>
     <ProjectReference Include="../../adapters/simulator/Wjss.Adapters.Simulator.csproj" />
     <ProjectReference Include="../../adapters/tc-acquisition/Wjss.Adapters.TcAcquisition.csproj" />
+    <!-- ACCELERATED-CLEANING-INTEGRATION-01: the physical-capable motion boundary. The owner is
+         internal to the adapter, exposed to this assembly via InternalsVisibleTo. -->
+    <ProjectReference Include="../../adapters/motion-library/Wjss.Adapters.MotionLibrary.csproj" />
     <ProjectReference Include="../../packages/contracts/Wjss.Contracts.csproj" />
     <ProjectReference Include="../../packages/domain/Wjss.Domain.csproj" />
     <ProjectReference Include="../../packages/application/Wjss.Runtime.Core.csproj" />

@@ -320,6 +320,202 @@ public sealed class ProcessIoSession
         };
         return true;
     }
+
+    // ------------------------------------------------------------ physical observation model
+    //
+    // The two methods below are the ONLY way Product code obtains process evidence. They never
+    // assume GOOD: quality is derived from what this session can actually justify (state, row
+    // binding, generation, engineering domain, and whether the transport returned at all), and the
+    // received timestamp is captured separately from the claimed observation instant.
+
+    /// <summary>Provenance of this session's transport, determined from the injected instance.</summary>
+    public ProcessIoObservationProvenance TransportProvenance =>
+        _transport is SimulatedProcessIoTransport
+            ? ProcessIoObservationProvenance.SIMULATED_READ
+            : ProcessIoObservationProvenance.PHYSICAL_READ;
+
+    /// <summary>
+    /// Observes one analog input row as a typed physical observation. Refusals are values with a
+    /// typed code and no transport call; a transport fault is captured as BAD, never propagated.
+    /// </summary>
+    public ProcessIoPhysicalObservation ObserveAnalogInput(
+        string tag,
+        ProcessIoCatalogueRow? row,
+        DateTimeOffset observedAt,
+        DateTimeOffset receivedAt,
+        TimeSpan freshnessBudget)
+    {
+        string? refusal = ClassifyObservationRefusal(row);
+        if (refusal is not null || row is null || row.Binding is null)
+        {
+            return Refused(tag, observedAt, receivedAt, refusal ?? ProcessIoRefusals.ObservationRefusedUnbound);
+        }
+
+        int raw;
+        try
+        {
+            raw = row.Binding.Area == ProcessIoArea.InputRegister
+                ? _transport.ReadInputRegister(row.Binding.DeviceKey, row.Binding.Address)
+                : _transport.ReadRegister(row.Binding.DeviceKey, row.Binding.Address);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            return Refused(tag, observedAt, receivedAt, ProcessIoRefusals.ObservationTransportFault)
+                with { RawValue = 0 };
+        }
+
+        bool converted = TryEngineering(tag, (ushort)raw, out double engineering, out string unit);
+        bool finite = !converted || double.IsFinite(engineering);
+        bool inDomain = raw is >= 0 and <= ProcessIoRepresentation.RawFullScale;
+
+        ProcessIoObservationQuality quality = !finite || !inDomain
+            ? ProcessIoObservationQuality.BAD
+            : ProcessIoObservationQuality.GOOD;
+
+        bool fresh = quality == ProcessIoObservationQuality.GOOD
+            && observedAt <= receivedAt
+            && receivedAt - observedAt <= freshnessBudget;
+
+        if (quality == ProcessIoObservationQuality.GOOD && !fresh)
+        {
+            quality = ProcessIoObservationQuality.STALE;
+        }
+
+        return new ProcessIoPhysicalObservation
+        {
+            Tag = tag,
+            RawValue = raw,
+            EngineeringValue = converted ? engineering : null,
+            Unit = converted ? unit : null,
+            Quality = quality,
+            ObservedAt = observedAt,
+            ReceivedAt = receivedAt,
+            SourceGeneration = Generation,
+            Fresh = fresh,
+            Provenance = TransportProvenance,
+            DiagnosticCode = quality switch
+            {
+                ProcessIoObservationQuality.GOOD => "OK",
+                ProcessIoObservationQuality.STALE => ProcessIoRefusals.ObservationStale,
+                _ => ProcessIoRefusals.ObservationOutOfDomain,
+            },
+        };
+    }
+
+    /// <summary>
+    /// Observes one digital input row. The bit is reported as read; the caller decides what a named
+    /// state means. Quality and freshness follow the same rules as the analog path.
+    /// </summary>
+    public ProcessIoPhysicalObservation ObserveDigitalInput(
+        string tag,
+        ProcessIoCatalogueRow? row,
+        DateTimeOffset observedAt,
+        DateTimeOffset receivedAt,
+        TimeSpan freshnessBudget)
+    {
+        string? refusal = ClassifyObservationRefusal(row);
+        if (refusal is not null || row is null || row.Binding is null)
+        {
+            return Refused(tag, observedAt, receivedAt, refusal ?? ProcessIoRefusals.ObservationRefusedUnbound);
+        }
+
+        bool raw;
+        try
+        {
+            raw = row.Binding.Area == ProcessIoArea.DiscreteInput
+                ? _transport.ReadDiscreteInput(row.Binding.DeviceKey, row.Binding.Address)
+                : _transport.ReadCoil(row.Binding.DeviceKey, row.Binding.Address);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            return Refused(tag, observedAt, receivedAt, ProcessIoRefusals.ObservationTransportFault);
+        }
+
+        bool fresh = observedAt <= receivedAt && receivedAt - observedAt <= freshnessBudget;
+        return new ProcessIoPhysicalObservation
+        {
+            Tag = tag,
+            RawValue = raw ? 1 : 0,
+            EngineeringValue = null,
+            Unit = null,
+            Quality = fresh ? ProcessIoObservationQuality.GOOD : ProcessIoObservationQuality.STALE,
+            ObservedAt = observedAt,
+            ReceivedAt = receivedAt,
+            SourceGeneration = Generation,
+            Fresh = fresh,
+            Provenance = TransportProvenance,
+            DiagnosticCode = fresh ? "OK" : ProcessIoRefusals.ObservationStale,
+        };
+    }
+
+    /// <summary>Shared refusal classification: state, observability, binding and commissioning.</summary>
+    private string? ClassifyObservationRefusal(ProcessIoCatalogueRow? row)
+    {
+        if (State != "OPEN" || _stopped) return ProcessIoRefusals.SessionNotOpen;
+        if (row is null) return ProcessIoRefusals.ObservationRefusedUnbound;
+        if (!IsProductObservable(row)) return ProcessIoRefusals.ObservationRefusedNotCommissioned;
+        if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND)
+            return ProcessIoRefusals.ObservationRefusedUnbound;
+        if (row.CommissioningState == ProcessIoCommissioningState.EXCLUDED)
+            return ProcessIoRefusals.ObservationRefusedNotCommissioned;
+        return null;
+    }
+
+    /// <summary>A refused observation carries no value and can never be mistaken for evidence.</summary>
+    private ProcessIoPhysicalObservation Refused(
+        string tag,
+        DateTimeOffset observedAt,
+        DateTimeOffset receivedAt,
+        string code) =>
+        new()
+        {
+            Tag = tag,
+            RawValue = 0,
+            EngineeringValue = null,
+            Unit = null,
+            Quality = code == ProcessIoRefusals.ObservationRefusedNotCommissioned
+                ? ProcessIoObservationQuality.DISABLED
+                : ProcessIoObservationQuality.BAD,
+            ObservedAt = observedAt,
+            ReceivedAt = receivedAt,
+            SourceGeneration = Generation,
+            Fresh = false,
+            Provenance = ProcessIoObservationProvenance.NOT_OBSERVED,
+            DiagnosticCode = code,
+        };
+
+    /// <summary>
+    /// The adopted engineering conversion for one analog tag. Reuses the exact constants; returns
+    /// false for a raw-only row so no engineering value is fabricated.
+    /// </summary>
+    private static bool TryEngineering(string tag, ushort raw, out double value, out string unit)
+    {
+        value = 0;
+        unit = string.Empty;
+
+        if (tag == "AI-001+")
+        {
+            value = ProcessIoEngineering.WaterTankLevel(raw);
+            unit = "level_units";
+            return true;
+        }
+
+        if (tag == "AI-003+")
+        {
+            value = ProcessIoEngineering.PumpOutletPressureBar(raw);
+            unit = "bar";
+            return true;
+        }
+
+        if (tag == "AI-002+" || ProcessIoIsolationValves.IsOutletPressureTag(tag))
+        {
+            value = ProcessIoEngineering.WcPressureBar(raw);
+            unit = "bar";
+            return true;
+        }
+
+        return false;
+    }
 }
 
 /// <summary>

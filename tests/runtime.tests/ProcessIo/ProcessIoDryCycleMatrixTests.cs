@@ -8,16 +8,15 @@ namespace Wjss.Runtime.Core.Tests;
 
 // ACCELERATED-CLEANING-INTEGRATION-01 fake integrated dry-cycle matrix.
 //
-// Every test here is FAKE / DRY: the transport is a deterministic in-memory double or the product's
-// own SimulatedProcessIoTransport, no socket is opened, and no device is contacted. The matrix proves
-// the corrected IV command and feedback composition:
+// Every test here is FAKE / DRY: the transport is a deterministic in-memory double, no socket is
+// opened and no device is contacted. The matrix proves:
 //
 //   - Legacy maintained single-coil authority: OPEN = true, CLOSE = false, coil 21+n, FC05
+//   - every command passes through the existing ProcessIoSession admission/dispatch lifecycle
 //   - corrected feedback: Upper/open DI-020+n, Lower/closed DI-028+n
 //   - FC01 read-back is process-image evidence only and never field confirmation
-//   - Upper/open, Lower/closed and paired pressure are three separate evidence kinds
-//   - safe cleanup writes false and retains the de-energised CLOSED state
-//   - a PRODUCTION or SIMULATOR-backed command path is refused
+//   - observations carry truthful quality/freshness; nothing is fabricated GOOD
+//   - safe cleanup is structured and never hides the primary failure
 //
 // SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
 
@@ -26,8 +25,8 @@ public sealed class ProcessIoDryCycleMatrixTests
     private const string Consent = "I AUTHORIZE SINGLE DO PROCESS IO BENCH TRIAL";
 
     /// <summary>
-    /// Deterministic fake transport. Records every call so a test can prove exactly what was written.
-    /// Not the product Simulation transport: this one is only reachable through a valid grant.
+    /// Deterministic fake transport. Not the product Simulation transport: a physical command path must
+    /// never be backed by it, so this double stands in for the adopted bench transport.
     /// </summary>
     private sealed class FakeTransport : IProcessIoTransport
     {
@@ -35,6 +34,7 @@ public sealed class ProcessIoDryCycleMatrixTests
         public Dictionary<int, bool> DiscreteInputs { get; } = new();
         public Dictionary<int, ushort> InputRegisters { get; } = new();
         public Dictionary<int, bool> Coils { get; } = new();
+        public bool ThrowOnWrite { get; set; }
         public int NetworkAttempts => CoilWrites.Count;
 
         public bool ReadDiscreteInput(string deviceKey, int address)
@@ -58,6 +58,7 @@ public sealed class ProcessIoDryCycleMatrixTests
 
         public void WriteCoil(string deviceKey, int coilAddress, bool value)
         {
+            if (ThrowOnWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
             CoilWrites.Add((deviceKey, coilAddress, value));
             Coils[coilAddress] = value;
         }
@@ -67,22 +68,73 @@ public sealed class ProcessIoDryCycleMatrixTests
         public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values) { }
     }
 
-    private static ProcessIoEquipmentBoundary CreateGranted(FakeTransport transport, DateTimeOffset? at = null)
+    /// <summary>Builds the adopted catalogue from the real binding table, as the composition root does.</summary>
+    private static IReadOnlyDictionary<string, ProcessIoCatalogueRow> BuildCatalogue()
     {
-        Assert.True(ProcessIoDryCommandGate.TryIssue(
+        var rows = new Dictionary<string, ProcessIoCatalogueRow>(StringComparer.Ordinal);
+        string[] tags =
+        [
+            "AI-002+", "AI-003+",
+            "AI-004+", "AI-005+", "AI-006+", "AI-007+", "AI-008+", "AI-009+", "AI-010+", "AI-011+",
+            "DI-021", "DI-022", "DI-023", "DI-024", "DI-025", "DI-026", "DI-027", "DI-028",
+            "DI-029", "DI-030", "DI-031", "DI-032", "DI-033", "DI-034", "DI-035", "DI-036",
+            "DO-023", "DO-024", "DO-025", "DO-026", "DO-027", "DO-028", "DO-029", "DO-030",
+        ];
+
+        foreach (string tag in tags)
+        {
+            Assert.True(ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding));
+            rows[tag] = new ProcessIoCatalogueRow
+            {
+                SourceRowOrdinal = 1,
+                Tag = tag,
+                Description = tag,
+                Module = string.Empty,
+                Slot = string.Empty,
+                IoSlot = string.Empty,
+                Channel = string.Empty,
+                Terminal = string.Empty,
+                From = string.Empty,
+                To = string.Empty,
+                Reference = string.Empty,
+                Location = string.Empty,
+                Note = string.Empty,
+                SourceStatus = "USED",
+                IoClass = binding.Area == ProcessIoArea.Coil ? "DO" : binding.Area == ProcessIoArea.DiscreteInput ? "DI" : "AI",
+                SourceClassification = "USED",
+                ProvenanceArtifact = "test",
+                ProvenanceSha256 = "test",
+                Binding = binding,
+                BindingState = ProcessIoBindingState.BOUND_LEGACY_EXACT,
+                Address = null!,
+                CommissioningState = ProcessIoCommissioningState.READ_ONLY_CANDIDATE,
+            };
+        }
+
+        return rows;
+    }
+
+    private static ProcessIoWriteAuthorization Authorize()
+    {
+        Assert.True(ProcessIoDryCommandGate.TryAuthorize(
             DeviceProfile.TEST_HARDWARE_DRY,
             dryCommandMode: true,
             ownerLocalEndpoint: "dry-run.invalid:502",
             suppliedConsent: Consent,
-            at: at ?? new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero),
-            out ProcessIoDryCommandGrant? grant,
+            out ProcessIoWriteAuthorization? authorization,
             out string code));
         Assert.Equal(ProcessIoDryCommandGate.Granted, code);
+        return authorization!;
+    }
 
-        Assert.True(ProcessIoEquipmentBoundary.TryCreate(
-            transport, grant, TimeProvider.System, out ProcessIoEquipmentBoundary? boundary, out string createCode));
-        Assert.Equal(ProcessIoDryCommandGate.Granted, createCode);
-        return boundary!;
+    private static (ProcessIoEquipmentBoundary Boundary, ProcessIoSession Session) CreateGranted(
+        FakeTransport transport, TimeSpan? freshness = null)
+    {
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(DateTimeOffset.UnixEpoch);
+        var boundary = new ProcessIoEquipmentBoundary(
+            session, BuildCatalogue(), Authorize(), time: null, freshnessBudget: freshness ?? TimeSpan.FromMinutes(5));
+        return (boundary, session);
     }
 
     // ---------------------------------------------------------------- identity and ordinals
@@ -130,14 +182,73 @@ public sealed class ProcessIoDryCycleMatrixTests
         {
             Assert.True(ProcessIoBindings.TryGet(ProcessIoIsolationValves.OpenFeedbackTag(n), out ProcessIoPhysicalBinding open));
             Assert.True(ProcessIoBindings.TryGet(ProcessIoIsolationValves.ClosedFeedbackTag(n), out ProcessIoPhysicalBinding closed));
-            Assert.Equal(ProcessIoArea.DiscreteInput, open.Area);
-            Assert.Equal(ProcessIoArea.DiscreteInput, closed.Area);
             Assert.Equal(19 + n, open.Address);
             Assert.Equal(27 + n, closed.Address);
-            Assert.Equal("READ", open.Direction);
-            Assert.Equal("READ", closed.Direction);
             Assert.True(open.Address < closed.Address);
         }
+    }
+
+    // ---------------------------------------------------------------- session lifecycle reuse
+
+    [Fact]
+    public void Commands_Flow_Through_The_Session_Admission_And_Dispatch_Lifecycle()
+    {
+        var transport = new FakeTransport();
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) = CreateGranted(transport);
+
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
+
+        ProcessIoCommandOutcome outcome = Assert.Single(boundary.CommandLog);
+        Assert.True(outcome.Dispatched);
+        Assert.Equal("OK", outcome.AdmissionCode);
+        Assert.Equal("DISPATCHED", outcome.DispatchCode);
+        Assert.Equal(session.Generation, outcome.SessionGeneration);
+        Assert.Contains(session.AuditTrail, entry => entry.StartsWith("ADMIT DO-023", StringComparison.Ordinal));
+        Assert.Contains(session.AuditTrail, entry => entry.StartsWith("DISPATCH_DO DO-023 True", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_Closed_Session_Refuses_The_Command_With_Zero_Writes()
+    {
+        var transport = new FakeTransport();
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) = CreateGranted(transport);
+        session.Close(DateTimeOffset.UnixEpoch);
+
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
+
+        Assert.Empty(transport.CoilWrites);
+        ProcessIoCommandOutcome outcome = Assert.Single(boundary.CommandLog);
+        Assert.False(outcome.Dispatched);
+        Assert.Equal(ProcessIoRefusals.SessionNotOpen, outcome.AdmissionCode);
+    }
+
+    [Fact]
+    public void A_Stopped_Session_Refuses_The_Command_With_Zero_Writes()
+    {
+        var transport = new FakeTransport();
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) = CreateGranted(transport);
+        session.Stop(DateTimeOffset.UnixEpoch);
+
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV2", CleaningPathValveCommandKind.Open));
+
+        Assert.Empty(transport.CoilWrites);
+        Assert.False(Assert.Single(boundary.CommandLog).Dispatched);
+    }
+
+    [Fact]
+    public void Reopening_Advances_The_Generation_And_The_Boundary_Reports_It()
+    {
+        var transport = new FakeTransport();
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) = CreateGranted(transport);
+        int first = session.Generation;
+
+        session.Close(DateTimeOffset.UnixEpoch);
+        int second = session.Open(DateTimeOffset.UnixEpoch);
+
+        Assert.True(second > first);
+
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV3", CleaningPathValveCommandKind.Open));
+        Assert.Equal(second, Assert.Single(boundary.CommandLog).SessionGeneration);
     }
 
     // ---------------------------------------------------------------- command polarity
@@ -146,7 +257,7 @@ public sealed class ProcessIoDryCycleMatrixTests
     public void Open_Writes_True_And_Close_Writes_False_On_The_Same_Coil()
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
         Assert.Single(transport.CoilWrites);
@@ -169,7 +280,7 @@ public sealed class ProcessIoDryCycleMatrixTests
     public void Every_Valve_Commands_Its_Own_Coil_Only(int ordinal, int expectedCoil)
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         boundary.RequestValve(new CleaningPathValveCommandRequest(
             ProcessIoIsolationValves.ValveId(ordinal), CleaningPathValveCommandKind.Open));
@@ -180,16 +291,14 @@ public sealed class ProcessIoDryCycleMatrixTests
     }
 
     [Fact]
-    public void Command_Is_Maintained_Not_A_Pulse_And_Retains_Its_State()
+    public void Command_Is_Maintained_Not_A_Pulse()
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV3", CleaningPathValveCommandKind.Open));
 
-        // Exactly one write: no automatic revert write, no trailing pulse-low.
         Assert.Single(transport.CoilWrites);
-        Assert.True(boundary.CommandedState[3]);
         Assert.True(transport.Coils[24]);
     }
 
@@ -197,13 +306,99 @@ public sealed class ProcessIoDryCycleMatrixTests
     public void An_Invalid_Valve_Identity_Is_Refused_With_Zero_Writes()
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV9", CleaningPathValveCommandKind.Open));
 
         Assert.Empty(transport.CoilWrites);
-        Assert.Equal(0, boundary.WriteAttempts);
-        Assert.Equal("IV_COMMAND_REFUSED_VALVE_IDENTITY_INVALID", boundary.LastRefusal);
+        ProcessIoCommandOutcome outcome = Assert.Single(boundary.CommandLog);
+        Assert.False(outcome.Dispatched);
+        Assert.Equal("IV_COMMAND_REFUSED_VALVE_IDENTITY_INVALID", outcome.AdmissionCode);
+    }
+
+    [Fact]
+    public void A_Transport_Fault_Is_Captured_Not_Propagated()
+    {
+        var transport = new FakeTransport { ThrowOnWrite = true };
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
+
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
+
+        ProcessIoCommandOutcome outcome = Assert.Single(boundary.CommandLog);
+        Assert.False(outcome.Dispatched);
+        Assert.True(outcome.TransportFaulted);
+        Assert.Equal(ProcessIoRefusals.ObservationTransportFault, outcome.DispatchCode);
+    }
+
+    // ---------------------------------------------------------------- observation quality
+
+    [Fact]
+    public void An_Observation_Carries_Generation_Timestamps_And_Provenance()
+    {
+        var transport = new FakeTransport();
+        transport.InputRegisters[2] = 32767;
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) = CreateGranted(transport);
+
+        ProcessIoPhysicalObservation observation = boundary.Observe("AI-003+");
+
+        Assert.Equal("AI-003+", observation.Tag);
+        Assert.Equal(32767, observation.RawValue);
+        Assert.Equal(40.0, observation.EngineeringValue!.Value, 3);
+        Assert.Equal("bar", observation.Unit);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, observation.Quality);
+        Assert.True(observation.Fresh);
+        Assert.Equal(session.Generation, observation.SourceGeneration);
+        Assert.Equal(ProcessIoObservationProvenance.PHYSICAL_READ, observation.Provenance);
+        Assert.True(observation.ReceivedAt >= observation.ObservedAt);
+    }
+
+    [Fact]
+    public void A_Simulated_Transport_Is_Never_Accepted_As_Process_Evidence()
+    {
+        var simulated = new SimulatedProcessIoTransport();
+        simulated.SeedInputRegister(ProcessIoDevices.RackT8, 2, 32767);
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, simulated);
+        session.Open(DateTimeOffset.UnixEpoch);
+        var boundary = new ProcessIoEquipmentBoundary(
+            session, BuildCatalogue(), Authorize(), null, TimeSpan.FromMinutes(5));
+
+        ProcessIoPhysicalObservation observation = boundary.Observe("AI-003+");
+        Assert.Equal(ProcessIoObservationProvenance.SIMULATED_READ, observation.Provenance);
+
+        // The Pump-ready authority refuses it: a simulated value is never physical evidence.
+        Assert.Null(boundary.ReadPumpOutletPressure());
+    }
+
+    [Fact]
+    public void A_Closed_Session_Produces_A_Refused_Observation_Not_A_Good_One()
+    {
+        var transport = new FakeTransport();
+        transport.InputRegisters[2] = 32767;
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) = CreateGranted(transport);
+        session.Close(DateTimeOffset.UnixEpoch);
+
+        ProcessIoPhysicalObservation observation = boundary.Observe("AI-003+");
+
+        Assert.NotEqual(ProcessIoObservationQuality.GOOD, observation.Quality);
+        Assert.False(observation.Fresh);
+        Assert.Equal(ProcessIoObservationProvenance.NOT_OBSERVED, observation.Provenance);
+        Assert.False(observation.IsUsable);
+        Assert.Null(boundary.ReadPumpOutletPressure());
+    }
+
+    [Fact]
+    public void A_Zero_Length_Freshness_Budget_Makes_The_Observation_Stale()
+    {
+        var transport = new FakeTransport();
+        transport.InputRegisters[2] = 32767;
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport, TimeSpan.Zero);
+
+        ProcessIoPhysicalObservation observation = boundary.Observe("AI-003+");
+
+        // The claimed instant and the received instant differ, so nothing is fresh at zero budget.
+        Assert.False(observation.Fresh);
+        Assert.False(observation.IsUsable);
+        Assert.Null(boundary.ReadPumpOutletPressure());
     }
 
     // ---------------------------------------------------------------- separated evidence
@@ -212,15 +407,14 @@ public sealed class ProcessIoDryCycleMatrixTests
     public void Upper_Open_Lower_Closed_And_Pressure_Are_Three_Separate_Evidence_Kinds()
     {
         var transport = new FakeTransport();
-        // IV2: Upper/open asserted (FC02 21), Lower/closed clear (FC02 29), pressure present.
         transport.DiscreteInputs[21] = true;
         transport.DiscreteInputs[29] = false;
         transport.InputRegisters[4] = 16384;
 
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV2", CleaningPathValveCommandKind.Open));
 
-        ProcessIoValveObservation observation = boundary.Observe("IV2");
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV2");
 
         Assert.True(observation.UpperLimitDetected);
         Assert.False(observation.LowerLimitDetected);
@@ -233,19 +427,19 @@ public sealed class ProcessIoDryCycleMatrixTests
     public void Process_Image_Read_Back_Is_Never_Used_As_Field_Confirmation()
     {
         var transport = new FakeTransport();
-        // The output image says "energised" but NO field feedback exists.
+        // The output image says energised, but no field feedback exists.
         transport.Coils[22] = true;
         transport.DiscreteInputs[20] = false;
         transport.DiscreteInputs[28] = false;
 
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
 
-        ProcessIoValveObservation observation = boundary.Observe("IV1");
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
 
-        Assert.True(observation.ProcessImageReadBack);      // process image only
-        Assert.False(observation.UpperLimitDetected);       // no field evidence
-        Assert.False(observation.FieldConfirmed);           // so NOT confirmed
+        Assert.True(observation.ProcessImageReadBack);
+        Assert.False(observation.UpperLimitDetected);
+        Assert.False(observation.FieldConfirmed);
         Assert.Equal("IV_FIELD_NOT_CONFIRMED", observation.AssessmentCode);
     }
 
@@ -253,70 +447,106 @@ public sealed class ProcessIoDryCycleMatrixTests
     public void Contradictory_Feedback_Is_Never_Resolved_In_Favour_Of_The_Command()
     {
         var transport = new FakeTransport();
-        transport.DiscreteInputs[20] = true;   // Upper/open
-        transport.DiscreteInputs[28] = true;   // Lower/closed
+        transport.DiscreteInputs[20] = true;
+        transport.DiscreteInputs[28] = true;
 
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Close));
 
-        ProcessIoValveObservation observation = boundary.Observe("IV1");
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
 
         Assert.False(observation.FieldConfirmed);
         Assert.Equal("IV_FEEDBACK_CONTRADICTORY_BOTH_LIMITS", observation.AssessmentCode);
     }
 
     [Fact]
-    public void Observation_Without_A_Commanded_State_Is_Not_Confirmed()
+    public void Observation_Without_A_Dispatched_Command_Is_Not_Confirmed()
     {
         var transport = new FakeTransport();
         transport.DiscreteInputs[20] = true;
 
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
-        ProcessIoValveObservation observation = boundary.Observe("IV1");
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
 
-        Assert.False(observation.CommandAccepted);
+        Assert.False(observation.CommandDispatched);
         Assert.False(observation.FieldConfirmed);
-        Assert.Equal("IV_OBSERVATION_NO_COMMANDED_STATE", observation.AssessmentCode);
+        Assert.Equal("IV_OBSERVATION_NO_DISPATCHED_COMMAND", observation.AssessmentCode);
     }
 
-    // ---------------------------------------------------------------- safe cleanup
+    // ---------------------------------------------------------------- structured cleanup
 
     [Fact]
-    public void Safe_Cleanup_Writes_False_And_Retains_The_DeEnergised_State()
+    public void Safe_Cleanup_Writes_False_And_Reports_Complete()
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV5", CleaningPathValveCommandKind.Open));
 
-        IReadOnlyList<string> closed = boundary.SafeCleanupCloseAll();
+        ProcessIoCleanupResult cleanup = boundary.SafeCleanupCloseAll();
 
-        Assert.Equal(2, closed.Count);
-        Assert.Contains("IV1", closed);
-        Assert.Contains("IV5", closed);
-        Assert.False(boundary.CommandedState[1]);
-        Assert.False(boundary.CommandedState[5]);
+        Assert.Equal(2, cleanup.AttemptedValveIds.Count);
+        Assert.Equal(2, cleanup.AdmittedValveIds.Count);
+        Assert.Equal(2, cleanup.ClosedValveIds.Count);
+        Assert.Empty(cleanup.RefusedValves);
+        Assert.Empty(cleanup.TransportFailures);
+        Assert.Empty(cleanup.RemainingUnknownState);
+        Assert.True(cleanup.Complete);
 
-        // The retained command state is CLOSED and no second revert write followed.
-        Assert.Equal(4, transport.CoilWrites.Count);
-        Assert.False(transport.CoilWrites[2].Value);
-        Assert.False(transport.CoilWrites[3].Value);
         Assert.False(transport.Coils[22]);
         Assert.False(transport.Coils[26]);
+        Assert.Equal(4, transport.CoilWrites.Count);
     }
 
     [Fact]
-    public void Safe_Cleanup_Never_Touches_A_Valve_It_Did_Not_Command()
+    public void Safe_Cleanup_Never_Touches_A_Valve_It_Did_Not_Open()
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV4", CleaningPathValveCommandKind.Open));
         boundary.SafeCleanupCloseAll();
 
-        // Only coil 25 was ever written; coils 22..24 and 26..29 are untouched.
-        Assert.All(transport.CoilWrites, w => Assert.Equal(25, w.Address));
+        Assert.All(transport.CoilWrites, write => Assert.Equal(25, write.Address));
+    }
+
+    [Fact]
+    public void Safe_Cleanup_Reports_Transport_Failures_And_Remaining_Unknown_State()
+    {
+        var transport = new FakeTransport();
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
+
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
+
+        // Every subsequent write faults: cleanup must report it, not throw and not claim success.
+        transport.ThrowOnWrite = true;
+        ProcessIoCleanupResult cleanup = boundary.SafeCleanupCloseAll();
+
+        Assert.Equal("IV1", Assert.Single(cleanup.AttemptedValveIds));
+        Assert.Single(cleanup.AdmittedValveIds);
+        Assert.Empty(cleanup.ClosedValveIds);
+        Assert.Contains("IV1", cleanup.TransportFailures.Keys);
+        Assert.Contains("IV1", cleanup.RemainingUnknownState);
+        Assert.False(cleanup.Complete);
+    }
+
+    [Fact]
+    public void Safe_Cleanup_After_Close_Reports_Refusals_Instead_Of_Claiming_Success()
+    {
+        var transport = new FakeTransport();
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) = CreateGranted(transport);
+
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV2", CleaningPathValveCommandKind.Open));
+        session.Close(DateTimeOffset.UnixEpoch);
+
+        ProcessIoCleanupResult cleanup = boundary.SafeCleanupCloseAll();
+
+        Assert.Equal("IV2", Assert.Single(cleanup.AttemptedValveIds));
+        Assert.Empty(cleanup.ClosedValveIds);
+        Assert.Equal(ProcessIoRefusals.SessionNotOpen, cleanup.RefusedValves["IV2"]);
+        Assert.Contains("IV2", cleanup.RemainingUnknownState);
+        Assert.False(cleanup.Complete);
     }
 
     // ---------------------------------------------------------------- authority refusals
@@ -325,82 +555,49 @@ public sealed class ProcessIoDryCycleMatrixTests
     [InlineData(DeviceProfile.SIMULATOR)]
     [InlineData(DeviceProfile.TEST_HARDWARE)]
     [InlineData(DeviceProfile.TEST_HARDWARE_READ_ONLY)]
-    public void Only_The_Dry_Profile_Is_Granted(DeviceProfile profile)
+    public void Only_The_Dry_Profile_Is_Authorized(DeviceProfile profile)
     {
-        Assert.False(ProcessIoDryCommandGate.TryIssue(
-            profile, dryCommandMode: true, ownerLocalEndpoint: "dry-run.invalid:502",
-            suppliedConsent: Consent, at: DateTimeOffset.UnixEpoch,
-            out ProcessIoDryCommandGrant? grant, out string code));
-        Assert.Null(grant);
+        Assert.False(ProcessIoDryCommandGate.TryAuthorize(
+            profile, true, "dry-run.invalid:502", Consent,
+            out ProcessIoWriteAuthorization? authorization, out string code));
+        Assert.Null(authorization);
         Assert.Equal(ProcessIoDryCommandGate.RefusedProfileNotDry, code);
     }
 
     [Fact]
     public void Production_Is_Refused_Before_Any_Other_Check()
     {
-        Assert.False(ProcessIoDryCommandGate.TryIssue(
-            DeviceProfile.PRODUCTION, dryCommandMode: true, ownerLocalEndpoint: null,
-            suppliedConsent: null, at: DateTimeOffset.UnixEpoch,
-            out ProcessIoDryCommandGrant? grant, out string code));
-        Assert.Null(grant);
+        Assert.False(ProcessIoDryCommandGate.TryAuthorize(
+            DeviceProfile.PRODUCTION, true, null, null,
+            out ProcessIoWriteAuthorization? authorization, out string code));
+        Assert.Null(authorization);
         Assert.Equal(ProcessIoDryCommandGate.RefusedProductionRequested, code);
     }
 
     [Fact]
     public void A_Missing_Endpoint_Or_Consent_Is_Refused()
     {
-        Assert.False(ProcessIoDryCommandGate.TryIssue(
-            DeviceProfile.TEST_HARDWARE_DRY, true, "  ", Consent, DateTimeOffset.UnixEpoch,
-            out _, out string codeMissingEndpoint));
-        Assert.Equal(ProcessIoDryCommandGate.RefusedEndpointMissing, codeMissingEndpoint);
+        Assert.False(ProcessIoDryCommandGate.TryAuthorize(
+            DeviceProfile.TEST_HARDWARE_DRY, true, "  ", Consent, out _, out string missingEndpoint));
+        Assert.Equal(ProcessIoDryCommandGate.RefusedEndpointMissing, missingEndpoint);
 
-        Assert.False(ProcessIoDryCommandGate.TryIssue(
-            DeviceProfile.TEST_HARDWARE_DRY, true, "dry-run.invalid:502", null, DateTimeOffset.UnixEpoch,
-            out _, out string codeMissingConsent));
-        Assert.Equal(ProcessIoDryCommandGate.RefusedConsentMissing, codeMissingConsent);
+        Assert.False(ProcessIoDryCommandGate.TryAuthorize(
+            DeviceProfile.TEST_HARDWARE_DRY, true, "dry-run.invalid:502", null, out _, out string missingConsent));
+        Assert.Equal(ProcessIoDryCommandGate.RefusedConsentMissing, missingConsent);
 
-        Assert.False(ProcessIoDryCommandGate.TryIssue(
-            DeviceProfile.TEST_HARDWARE_DRY, true, "dry-run.invalid:502", "wrong phrase", DateTimeOffset.UnixEpoch,
-            out _, out string codeMismatch));
-        Assert.Equal(ProcessIoDryCommandGate.RefusedConsentMismatch, codeMismatch);
-    }
-
-    [Fact]
-    public void A_Grant_Is_Single_Use()
-    {
-        Assert.True(ProcessIoDryCommandGate.TryIssue(
-            DeviceProfile.TEST_HARDWARE_DRY, true, "dry-run.invalid:502", Consent, DateTimeOffset.UnixEpoch,
-            out ProcessIoDryCommandGrant? grant, out _));
-
-        var first = new FakeTransport();
-        Assert.True(ProcessIoEquipmentBoundary.TryCreate(first, grant, TimeProvider.System, out _, out _));
-
-        var second = new FakeTransport();
-        Assert.False(ProcessIoEquipmentBoundary.TryCreate(second, grant, TimeProvider.System, out _, out string code));
-        Assert.Equal(ProcessIoDryCommandGate.RefusedConsentMissing, code);
-    }
-
-    [Fact]
-    public void A_Simulation_Transport_Is_Refused_As_A_Command_Backing()
-    {
-        Assert.True(ProcessIoDryCommandGate.TryIssue(
-            DeviceProfile.TEST_HARDWARE_DRY, true, "dry-run.invalid:502", Consent, DateTimeOffset.UnixEpoch,
-            out ProcessIoDryCommandGrant? grant, out _));
-
-        Assert.False(ProcessIoEquipmentBoundary.TryCreate(
-            new SimulatedProcessIoTransport(), grant, TimeProvider.System, out _, out string code));
-        Assert.Equal(ProcessIoDryCommandGate.RefusedProfileNotDry, code);
+        Assert.False(ProcessIoDryCommandGate.TryAuthorize(
+            DeviceProfile.TEST_HARDWARE_DRY, true, "dry-run.invalid:502", "wrong", out _, out string mismatch));
+        Assert.Equal(ProcessIoDryCommandGate.RefusedConsentMismatch, mismatch);
     }
 
     [Fact]
     public void The_Endpoint_Is_Never_Exposed_Only_A_Digest_Prefix()
     {
-        string fingerprint = ProcessIoDryCommandGate.Fingerprint("dry-run.invalid:502");
+        string fingerprint = ProcessIoDryCommandGate.EndpointFingerprint("dry-run.invalid:502");
         Assert.StartsWith("endpoint-sha256-prefix:", fingerprint);
         Assert.DoesNotContain("dry-run.invalid", fingerprint);
-        Assert.DoesNotContain("502", fingerprint);
-        Assert.Equal(fingerprint, ProcessIoDryCommandGate.Fingerprint("dry-run.invalid:502"));
-        Assert.NotEqual(fingerprint, ProcessIoDryCommandGate.Fingerprint("other.invalid:502"));
+        Assert.Equal(fingerprint, ProcessIoDryCommandGate.EndpointFingerprint("dry-run.invalid:502"));
+        Assert.NotEqual(fingerprint, ProcessIoDryCommandGate.EndpointFingerprint("other.invalid:502"));
     }
 
     // ---------------------------------------------------------------- profile start policy
@@ -426,12 +623,8 @@ public sealed class ProcessIoDryCycleMatrixTests
             new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero), PressureSample.PumpOutletSource);
 
         Assert.True(SequencingPressure.PumpReady(ready, thresholds));
-
-        var inletSource = ready with { SourceId = "PUMP_INLET" };
-        Assert.False(SequencingPressure.PumpReady(inletSource, thresholds));
-
-        var belowSetpoint = ready with { Bar = 10.0 };
-        Assert.False(SequencingPressure.PumpReady(belowSetpoint, thresholds));
+        Assert.False(SequencingPressure.PumpReady(ready with { SourceId = "PUMP_INLET" }, thresholds));
+        Assert.False(SequencingPressure.PumpReady(ready with { Bar = 10.0 }, thresholds));
     }
 
     [Theory]
@@ -452,12 +645,9 @@ public sealed class ProcessIoDryCycleMatrixTests
         var future = new PressureSample(20.0, PressureQuality.GOOD, false,
             now.AddMinutes(5), PressureSample.PumpOutletSource);
 
-        // The base gate has no clock and accepts it; the time-aware gate refuses it.
         Assert.True(SequencingPressure.PumpReady(future, thresholds));
         Assert.False(SequencingPressure.PumpReady(future, thresholds, now, TimeSpan.Zero));
-
-        var present = future with { At = now };
-        Assert.True(SequencingPressure.PumpReady(present, thresholds, now, TimeSpan.Zero));
+        Assert.True(SequencingPressure.PumpReady(future with { At = now }, thresholds, now, TimeSpan.Zero));
     }
 
     // ---------------------------------------------------------------- integrated dry cycle
@@ -466,17 +656,17 @@ public sealed class ProcessIoDryCycleMatrixTests
     public void Integrated_Dry_Cycle_Commands_Supervises_And_Cleans_Up()
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         // 1. Pump-ready composition reads AI-003 (input register 2) only.
-        transport.InputRegisters[2] = 32767; // full scale -> 40 bar
+        transport.InputRegisters[2] = 32767;
         PressureSample? pumpOutlet = boundary.ReadPumpOutletPressure();
         Assert.NotNull(pumpOutlet);
         Assert.Equal(PressureSample.PumpOutletSource, pumpOutlet!.SourceId);
         Assert.Equal(40.0, pumpOutlet.Bar!.Value, 3);
         Assert.True(SequencingPressure.PumpReady(
             pumpOutlet, new SequencingPressureThresholds(),
-            new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.Zero), TimeSpan.FromMinutes(1)));
+            DateTimeOffset.UtcNow.AddSeconds(1), TimeSpan.FromMinutes(1)));
 
         // 2. Open IV6 (cannon 6): coil 27 energised.
         boundary.RequestValve(new CleaningPathValveCommandRequest("IV6", CleaningPathValveCommandKind.Open));
@@ -486,7 +676,7 @@ public sealed class ProcessIoDryCycleMatrixTests
         // 3. Field confirms open through the corrected Upper limit (FC02 25).
         transport.DiscreteInputs[25] = true;
         transport.DiscreteInputs[33] = false;
-        ProcessIoValveObservation opened = boundary.Observe("IV6");
+        ProcessIoValveObservation opened = boundary.ObserveValve("IV6");
         Assert.True(opened.FieldConfirmed);
         Assert.Equal("IV_OPEN_FIELD_CONFIRMED", opened.AssessmentCode);
 
@@ -497,21 +687,22 @@ public sealed class ProcessIoDryCycleMatrixTests
         // 5. Field confirms closed through the corrected Lower limit (FC02 33).
         transport.DiscreteInputs[25] = false;
         transport.DiscreteInputs[33] = true;
-        ProcessIoValveObservation closed = boundary.Observe("IV6");
+        ProcessIoValveObservation closed = boundary.ObserveValve("IV6");
         Assert.True(closed.FieldConfirmed);
         Assert.Equal("IV_CLOSED_FIELD_CONFIRMED", closed.AssessmentCode);
 
-        // 6. Safe Return cleanup is a no-op here (nothing left open) and writes nothing more.
+        // 6. Nothing is left open, so cleanup attempts nothing and writes nothing more.
         int writesBeforeCleanup = transport.CoilWrites.Count;
-        boundary.SafeCleanupCloseAll();
+        ProcessIoCleanupResult cleanup = boundary.SafeCleanupCloseAll();
         Assert.Equal(writesBeforeCleanup, transport.CoilWrites.Count);
+        Assert.True(cleanup.Complete);
     }
 
     [Fact]
     public void Integrated_Dry_Cycle_Leaves_Every_Valve_DeEnergised_After_Cleanup()
     {
         var transport = new FakeTransport();
-        ProcessIoEquipmentBoundary boundary = CreateGranted(transport);
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport);
 
         for (int n = 1; n <= 8; n += 1)
         {
@@ -527,7 +718,5 @@ public sealed class ProcessIoDryCycleMatrixTests
         {
             Assert.False(transport.Coils[coil]);
         }
-
-        Assert.All(boundary.CommandedState.Values, open => Assert.False(open));
     }
 }

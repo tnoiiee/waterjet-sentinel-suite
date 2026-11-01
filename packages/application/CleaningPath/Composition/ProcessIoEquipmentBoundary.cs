@@ -4,69 +4,73 @@ using Wjss.Runtime.Core.Sequencing;
 
 namespace Wjss.Runtime.Core.CleaningPath.Composition;
 
-// ACCELERATED-CLEANING-INTEGRATION-01: the typed, authorization-gated Process-Io equipment boundary.
+// ACCELERATED-CLEANING-INTEGRATION-01: the typed Process-Io equipment boundary.
 //
 // This adapter is the ONLY bridge between the existing Cleaning Path composition coordinator and the
-// adopted Process-Io rows. It implements the existing ICleaningPathEquipmentBoundary contract, so
-// the composition coordinator, its state machine, its evidence sequence and its Mandatory Safe
-// Return handoff are all reused unchanged. No second state machine, no second I/O catalogue and no
-// second topology authority is introduced here.
+// adopted Process-Io rows. It implements the existing ICleaningPathEquipmentBoundary contract, so the
+// composition coordinator, its state machine, its evidence sequence and its Mandatory Safe Return
+// handoff are all reused unchanged. No second state machine, no second I/O catalogue and no second
+// topology authority is introduced here.
 //
-// Authority model
-//   The adapter can only be constructed with a live ProcessIoDryCommandGrant. A grant is issued by
-//   ProcessIoDryCommandGate, which refuses unless the run is explicitly in TEST_HARDWARE_DRY and the
-//   Owner-local endpoint and consent are present. The adapter never creates a grant itself, never
-//   falls back to a simulated transport, and never promotes to Production.
+// WRITE AUTHORITY
+//   Every command goes through the existing ProcessIoSession lifecycle: AdmitWrite(row, authorization)
+//   produces the admission token, and DispatchDigitalOutput(token, row, value) spends it exactly once.
+//   This type does not mint tokens, does not own a generation and cannot write around the session.
+//   There is no parallel grant authority: ProcessIoDryCommandGate returns the EXISTING
+//   ProcessIoWriteAuthorization record, and the session remains the sole write-lifecycle authority.
 //
-// Command model (exact Legacy authority)
-//   OpenValveWC(n): IsOpen = true  -> FC05 WriteSingleCoil(coil 21+n, true)
+// COMMAND MODEL (exact Legacy authority)
+//   OpenValveWC(n):  IsOpen = true  -> FC05 WriteSingleCoil(coil 21+n, true)
 //   CloseValveWC(n): IsOpen = false -> FC05 WriteSingleCoil(coil 21+n, false)
 //   Maintained single-coil state, not a pulse. Safe cleanup writes false and retains it.
 //
-// Evidence model (three separate evidence kinds, never merged)
-//   1. command acceptance   - the write was admitted and the coil value was sent
-//   2. process-image read-back (FC01) - what the output image says; NEVER field confirmation
-//   3. field feedback       - corrected Upper/open + Lower/closed limits and paired IV pressure
+// EVIDENCE MODEL (three separate kinds, never merged)
+//   1. command admission + dispatch  - typed ProcessIoCommandOutcome
+//   2. FC01 process image read-back  - reported, NEVER field confirmation
+//   3. field feedback                - corrected Upper/open + Lower/closed limits and paired IV pressure
 //
 // SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the validation of record).
 
 /// <summary>
-/// The single typed authorization artifact for dry command composition. It is created only by
-/// <see cref="ProcessIoDryCommandGate"/>; the constructor is private so a caller can neither mint nor
-/// forge one, and every instance records the exact profile and consent it was issued under.
+/// Structured cleanup result. It records what was attempted and what is still unknown, so a cleanup
+/// failure can never overwrite or hide the primary failure it ran after.
 /// </summary>
-public sealed class ProcessIoDryCommandGrant
+public sealed record ProcessIoCleanupResult
 {
-    private int _consumed;
+    /// <summary>Valve ordinals this boundary attempted to close.</summary>
+    public IReadOnlyList<string> AttemptedValveIds { get; init; } = Array.Empty<string>();
 
-    private ProcessIoDryCommandGrant(string consentPhrase, string endpointFingerprint, DateTimeOffset issuedAt)
-    {
-        ConsentPhrase = consentPhrase;
-        EndpointFingerprint = endpointFingerprint;
-        IssuedAt = issuedAt;
-    }
+    /// <summary>Valves whose close command was admitted by the session.</summary>
+    public IReadOnlyList<string> AdmittedValveIds { get; init; } = Array.Empty<string>();
 
-    /// <summary>The exact consent phrase the grant was issued under (never a credential).</summary>
-    public string ConsentPhrase { get; }
+    /// <summary>Valves whose de-energising close command was dispatched and returned.</summary>
+    public IReadOnlyList<string> ClosedValveIds { get; init; } = Array.Empty<string>();
 
-    /// <summary>A redacted fingerprint of the Owner-local endpoint. The endpoint itself is never stored.</summary>
-    public string EndpointFingerprint { get; }
+    /// <summary>Valves whose close was refused by the session, with the typed refusal code.</summary>
+    public IReadOnlyDictionary<string, string> RefusedValves { get; init; }
+        = new Dictionary<string, string>(StringComparer.Ordinal);
 
-    public DateTimeOffset IssuedAt { get; }
+    /// <summary>Valves whose close threw on the transport. The exception is captured, never propagated.</summary>
+    public IReadOnlyDictionary<string, string> TransportFailures { get; init; }
+        = new Dictionary<string, string>(StringComparer.Ordinal);
 
-    /// <summary>True until the grant has been consumed by one adapter instance.</summary>
-    public bool IsLive => Volatile.Read(ref _consumed) == 0;
+    /// <summary>
+    /// Valves whose final de-energised state could not be established. This is the honest "unknown"
+    /// set: cleanup reports it rather than claiming success.
+    /// </summary>
+    public IReadOnlyList<string> RemainingUnknownState { get; init; } = Array.Empty<string>();
 
-    /// <summary>Consumes the grant exactly once. A second adapter can never reuse it.</summary>
-    internal bool TryConsume() => Interlocked.CompareExchange(ref _consumed, 1, 0) == 0;
-
-    internal static ProcessIoDryCommandGrant Issue(string consentPhrase, string endpointFingerprint, DateTimeOffset issuedAt)
-        => new ProcessIoDryCommandGrant(consentPhrase, endpointFingerprint, issuedAt);
+    /// <summary>True only when every attempted valve is known to be de-energised.</summary>
+    public bool Complete =>
+        TransportFailures.Count == 0
+        && RefusedValves.Count == 0
+        && RemainingUnknownState.Count == 0
+        && ClosedValveIds.Count == AttemptedValveIds.Count;
 }
 
 /// <summary>
-/// Fail-closed issuance and refusal vocabulary for dry command composition. Nothing here touches a
-/// device: the gate decides authority only, and every refusal is a typed machine code.
+/// Fail-closed authorization for the dry command composition. It issues the EXISTING
+/// <see cref="ProcessIoWriteAuthorization"/> record; it never creates a token, generation or session.
 /// </summary>
 public static class ProcessIoDryCommandGate
 {
@@ -75,25 +79,23 @@ public static class ProcessIoDryCommandGate
     public const string RefusedConsentMissing = "DRY_COMMAND_REFUSED_CONSENT_MISSING";
     public const string RefusedConsentMismatch = "DRY_COMMAND_REFUSED_CONSENT_MISMATCH";
     public const string RefusedProductionRequested = "DRY_COMMAND_REFUSED_PRODUCTION_NOT_AUTHORIZED";
-    public const string Granted = "DRY_COMMAND_GRANTED";
+    public const string RefusedSessionNotOpen = "DRY_COMMAND_REFUSED_SESSION_NOT_OPEN";
+    public const string Granted = "DRY_COMMAND_AUTHORIZED";
 
     /// <summary>
-    /// Issues a one-use grant for dry command composition, or refuses with a typed code.
-    ///
-    /// The gate requires: the dry profile, a resolved Owner-local endpoint, and the exact dry consent
-    /// phrase. It never substitutes a default endpoint, never accepts a PRODUCTION request, and never
-    /// issues a grant to a caller that asked for physical command authority.
+    /// Issues a write authorization for the dry profile, or refuses with a typed code. The gate
+    /// requires the dry profile, a resolved Owner-local endpoint and the exact dry consent phrase.
+    /// It never substitutes a default endpoint and never authorizes PRODUCTION.
     /// </summary>
-    public static bool TryIssue(
+    public static bool TryAuthorize(
         DeviceProfile profile,
         bool dryCommandMode,
         string? ownerLocalEndpoint,
         string? suppliedConsent,
-        DateTimeOffset at,
-        out ProcessIoDryCommandGrant? grant,
+        out ProcessIoWriteAuthorization? authorization,
         out string code)
     {
-        grant = null;
+        authorization = null;
 
         if (profile == DeviceProfile.PRODUCTION)
         {
@@ -119,23 +121,26 @@ public static class ProcessIoDryCommandGate
             return false;
         }
 
-        string expected = ProcessIoConsentPhrases.PhysicalDoSingle;
-        if (!string.Equals(suppliedConsent, expected, StringComparison.Ordinal))
+        if (!string.Equals(suppliedConsent, ProcessIoConsentPhrases.PhysicalDoSingle, StringComparison.Ordinal))
         {
             code = RefusedConsentMismatch;
             return false;
         }
 
-        grant = ProcessIoDryCommandGrant.Issue(expected, Fingerprint(ownerLocalEndpoint), at);
+        authorization = new ProcessIoWriteAuthorization
+        {
+            PhysicalWriteAuthorized = true,
+            Basis = $"TEST_HARDWARE_DRY/{EndpointFingerprint(ownerLocalEndpoint)}",
+        };
         code = Granted;
         return true;
     }
 
     /// <summary>
-    /// A stable, non-reversible redaction of the endpoint for provenance. Only the length and a short
-    /// digest prefix are exposed, so a committed or logged report never carries the address.
+    /// Stable, non-reversible redaction of the endpoint for provenance. The endpoint itself is never
+    /// stored, logged or committed; only a digest prefix is exposed.
     /// </summary>
-    public static string Fingerprint(string endpoint)
+    public static string EndpointFingerprint(string endpoint)
     {
         byte[] digest = System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(endpoint));
@@ -143,120 +148,48 @@ public static class ProcessIoDryCommandGate
     }
 }
 
-/// <summary>One admitted command, with the exact coil value that was sent.</summary>
-public sealed record ProcessIoValveCommandAdmission(
-    string ValveId,
-    CleaningPathValveCommandKind Kind,
-    string CommandTag,
-    int CoilAddress,
-    bool CoilValue,
-    DateTimeOffset At);
-
 /// <summary>
-/// Separated observation of one Isolation Valve. The three evidence kinds are kept in distinct
-/// members on purpose: a caller can never mistake process-image read-back for field confirmation.
-/// </summary>
-public sealed record ProcessIoValveObservation
-{
-    /// <summary>FC05 command acceptance only.</summary>
-    public required bool CommandAccepted { get; init; }
-
-    /// <summary>FC01 output read-back: process image only, NEVER field confirmation.</summary>
-    public bool? ProcessImageReadBack { get; init; }
-
-    /// <summary>Corrected Upper limit, IVn OPEN-position field feedback.</summary>
-    public required bool UpperLimitDetected { get; init; }
-
-    /// <summary>Corrected Lower limit, IVn CLOSED-position field feedback.</summary>
-    public required bool LowerLimitDetected { get; init; }
-
-    /// <summary>Paired IVn outlet pressure observation (AI-004+ .. AI-011+).</summary>
-    public PressureSample? OutletPressure { get; init; }
-
-    /// <summary>
-    /// True only when field evidence agrees with the commanded state. Process-image read-back is
-    /// deliberately excluded from this decision.
-    /// </summary>
-    public required bool FieldConfirmed { get; init; }
-
-    public required string AssessmentCode { get; init; }
-}
-
-/// <summary>
-/// The typed Process-Io equipment boundary for one dry composition. Implements the existing
-/// <see cref="ICleaningPathEquipmentBoundary"/> so the composition coordinator is reused unchanged.
+/// The typed Process-Io equipment boundary for one dry composition. Reads and writes the adopted
+/// catalogue rows exclusively through <see cref="ProcessIoSession"/>.
 /// </summary>
 public sealed class ProcessIoEquipmentBoundary : ICleaningPathEquipmentBoundary
 {
-    private readonly IProcessIoTransport _transport;
+    private readonly ProcessIoSession _session;
+    private readonly IReadOnlyDictionary<string, ProcessIoCatalogueRow> _catalogue;
+    private readonly ProcessIoWriteAuthorization _authorization;
     private readonly TimeProvider _time;
-    private readonly ProcessIoDryCommandGrant _grant;
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> _commandedState = new();
-    private int _writeAttempts;
-    private string? _lastRefusal;
+    private readonly TimeSpan _freshnessBudget;
+    private readonly Dictionary<int, ProcessIoCommandOutcome> _commands = new();
+    private readonly List<ProcessIoCommandOutcome> _commandLog = new();
 
-    private ProcessIoEquipmentBoundary(
-        IProcessIoTransport transport,
-        ProcessIoDryCommandGrant grant,
-        TimeProvider time)
+    public ProcessIoEquipmentBoundary(
+        ProcessIoSession session,
+        IReadOnlyDictionary<string, ProcessIoCatalogueRow> catalogue,
+        ProcessIoWriteAuthorization authorization,
+        TimeProvider? time = null,
+        TimeSpan? freshnessBudget = null)
     {
-        _transport = transport;
-        _grant = grant;
-        _time = time;
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(catalogue);
+        ArgumentNullException.ThrowIfNull(authorization);
+
+        _session = session;
+        _catalogue = catalogue;
+        _authorization = authorization;
+        _time = time ?? TimeProvider.System;
+        _freshnessBudget = freshnessBudget ?? DefaultFreshnessBudget;
     }
 
-    /// <summary>
-    /// Creates the boundary, or refuses. The grant is consumed on success so no second boundary can
-    /// be built from it; a refusal never touches the transport.
-    /// </summary>
-    public static bool TryCreate(
-        IProcessIoTransport? transport,
-        ProcessIoDryCommandGrant? grant,
-        TimeProvider? time,
-        out ProcessIoEquipmentBoundary? boundary,
-        out string code)
-    {
-        boundary = null;
+    /// <summary>Default freshness budget for one observation. Development value, not certified.</summary>
+    public static readonly TimeSpan DefaultFreshnessBudget = TimeSpan.FromSeconds(2);
 
-        if (transport is null)
-        {
-            code = ProcessIoDryCommandGate.RefusedEndpointMissing;
-            return false;
-        }
+    /// <summary>The session this boundary reads and writes through.</summary>
+    public ProcessIoSession Session => _session;
 
-        if (transport is SimulatedProcessIoTransport)
-        {
-            // A dry command path must never be backed by the Simulation transport: that would make a
-            // physical command appear to succeed with no device and no evidence.
-            code = ProcessIoDryCommandGate.RefusedProfileNotDry;
-            return false;
-        }
+    /// <summary>Every command outcome in issue order, for evidence.</summary>
+    public IReadOnlyList<ProcessIoCommandOutcome> CommandLog => _commandLog;
 
-        if (grant is null || !grant.IsLive)
-        {
-            code = ProcessIoDryCommandGate.RefusedConsentMissing;
-            return false;
-        }
-
-        if (!grant.TryConsume())
-        {
-            code = ProcessIoDryCommandGate.RefusedConsentMismatch;
-            return false;
-        }
-
-        boundary = new ProcessIoEquipmentBoundary(transport, grant, time ?? TimeProvider.System);
-        code = ProcessIoDryCommandGate.Granted;
-        return true;
-    }
-
-    /// <summary>Number of FC05 writes actually attempted. Used to prove zero writes on refusal.</summary>
-    public int WriteAttempts => Volatile.Read(ref _writeAttempts);
-
-    /// <summary>The last typed refusal code, or null.</summary>
-    public string? LastRefusal => Volatile.Read(ref _lastRefusal);
-
-    /// <summary>The maintained command state retained for safe cleanup (IVn -> open).</summary>
-    public IReadOnlyDictionary<int, bool> CommandedState => _commandedState;
+    // ---------------------------------------------------------------- commands
 
     /// <summary>Issues exactly one typed command for exactly one Isolation Valve.</summary>
     public void RequestValve(CleaningPathValveCommandRequest request)
@@ -265,87 +198,186 @@ public sealed class ProcessIoEquipmentBoundary : ICleaningPathEquipmentBoundary
 
         if (!ProcessIoIsolationValves.TryParseValveId(request.ValveId, out int ordinal))
         {
-            // An unidentified valve is never resolved by ordinal guessing or by an alias.
-            Volatile.Write(ref _lastRefusal, "IV_COMMAND_REFUSED_VALVE_IDENTITY_INVALID");
+            // An unidentified valve is never resolved by ordinal guessing, alias or fallback.
+            _commandLog.Add(Unresolved(request.ValveId, "IV_COMMAND_REFUSED_VALVE_IDENTITY_INVALID"));
+            return;
+        }
+
+        bool open = request.Kind == CleaningPathValveCommandKind.Open;
+        bool close = request.Kind == CleaningPathValveCommandKind.Close;
+        if (!open && !close)
+        {
+            _commandLog.Add(Unresolved(request.ValveId, "IV_COMMAND_REFUSED_KIND_INVALID"));
             return;
         }
 
         string tag = ProcessIoIsolationValves.CommandTag(ordinal);
-        int coil = ProcessIoIsolationValves.CommandCoilAddress(ordinal);
-
-        bool open = request.Kind == CleaningPathValveCommandKind.Open;
-        if (request.Kind is not CleaningPathValveCommandKind.Open and not CleaningPathValveCommandKind.Close)
+        if (!_catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row) || row.Binding is null)
         {
-            Volatile.Write(ref _lastRefusal, "IV_COMMAND_REFUSED_KIND_INVALID");
+            _commandLog.Add(Unresolved(request.ValveId, ProcessIoRefusals.WriteRefusedUnbound));
+            return;
+        }
+
+        ProcessIoAdmission admission = _session.AdmitWrite(_time.GetUtcNow(), row, _authorization);
+        if (!admission.Admitted || string.IsNullOrEmpty(admission.Token))
+        {
+            _commandLog.Add(Outcome(request.ValveId, row, open, dispatched: false,
+                admission.Code, "NOT_DISPATCHED", faulted: false, generation: _session.Generation));
             return;
         }
 
         bool coilValue = ProcessIoIsolationValves.CoilValueFor(open);
+        bool dispatched;
+        bool faulted = false;
+        string dispatchCode;
 
-        Interlocked.Increment(ref _writeAttempts);
-        _transport.WriteCoil(ProcessIoDevices.RackT8, coil, coilValue);
-        _commandedState[ordinal] = open;
-        Volatile.Write(ref _lastRefusal, null);
-        LastAdmission = new ProcessIoValveCommandAdmission(
-            ProcessIoIsolationValves.ValveId(ordinal), request.Kind, tag, coil, coilValue, _time.GetUtcNow());
+        try
+        {
+            dispatched = _session.DispatchDigitalOutput(_time.GetUtcNow(), admission.Token, row, coilValue);
+            dispatchCode = dispatched ? "DISPATCHED" : "DISPATCH_REFUSED";
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            // The token is already spent inside the session, so exactly-once is preserved even here.
+            dispatched = false;
+            faulted = true;
+            dispatchCode = ProcessIoRefusals.ObservationTransportFault;
+        }
+
+        ProcessIoCommandOutcome outcome = Outcome(
+            request.ValveId, row, open, dispatched, admission.Code, dispatchCode, faulted, _session.Generation);
+        _commandLog.Add(outcome);
+        _commands[ordinal] = outcome;
     }
 
-    /// <summary>The most recent admitted command, or null.</summary>
-    public ProcessIoValveCommandAdmission? LastAdmission { get; private set; }
+    private ProcessIoCommandOutcome Unresolved(string valveId, string code) => new()
+    {
+        ValveId = valveId,
+        Tag = string.Empty,
+        CoilAddress = -1,
+        CoilValue = false,
+        Dispatched = false,
+        AdmissionCode = code,
+        DispatchCode = "NOT_DISPATCHED",
+        SessionGeneration = _session.Generation,
+        At = _time.GetUtcNow(),
+    };
 
-    /// <summary>Reads the Pump Outlet Pressure (AI-003), the sole Pump-ready authority.</summary>
+    private ProcessIoCommandOutcome Outcome(
+        string valveId,
+        ProcessIoCatalogueRow row,
+        bool open,
+        bool dispatched,
+        string admissionCode,
+        string dispatchCode,
+        bool faulted,
+        int generation) => new()
+    {
+        ValveId = valveId,
+        Tag = row.Tag,
+        CoilAddress = row.Binding?.Address ?? -1,
+        CoilValue = ProcessIoIsolationValves.CoilValueFor(open),
+        Dispatched = dispatched,
+        AdmissionCode = admissionCode,
+        DispatchCode = dispatchCode,
+        SessionGeneration = generation,
+        At = _time.GetUtcNow(),
+        TransportFaulted = faulted,
+    };
+
+    // ---------------------------------------------------------------- observations
+
+    /// <summary>
+    /// Reads the Pump Outlet Pressure (AI-003), the sole Pump-ready authority.
+    ///
+    /// Returns null unless the value is a usable PHYSICAL observation from the live generation. The
+    /// null is what makes the Pump-ready gate refuse: this method never fabricates a GOOD sample, and
+    /// it never falls back to AI-002 or to a simulated value.
+    /// </summary>
     public PressureSample? ReadPumpOutletPressure()
     {
-        if (!TryReadRegister("AI-003+", out ushort raw))
-        {
-            return null;
-        }
+        ProcessIoPhysicalObservation observation = Observe(ProcessIoIsolationValves.PumpOutletPressureTag);
+        if (!Accepts(observation)) return null;
 
-        double bar = ProcessIoEngineering.PumpOutletPressureBar(raw);
-        return new PressureSample(bar, PressureQuality.GOOD, false, _time.GetUtcNow(), PressureSample.PumpOutletSource);
+        return new PressureSample(
+            observation.EngineeringValue,
+            PressureQuality.GOOD,
+            Stale: false,
+            observation.ObservedAt.ToUniversalTime(),
+            PressureSample.PumpOutletSource);
     }
 
-    /// <summary>Reads one valve's outlet pressure (AI-004+ .. AI-011+).</summary>
+    /// <summary>Reads one valve's outlet pressure (AI-004+ .. AI-011+), under the same rules.</summary>
     public PressureSample? ReadValveOutletPressure(string valveId)
     {
-        if (!ProcessIoIsolationValves.TryParseValveId(valveId, out int ordinal))
-        {
-            return null;
-        }
+        if (!ProcessIoIsolationValves.TryParseValveId(valveId, out int ordinal)) return null;
 
-        if (!TryReadRegister(ProcessIoIsolationValves.OutletPressureTag(ordinal), out ushort raw))
-        {
-            return null;
-        }
+        ProcessIoPhysicalObservation observation =
+            Observe(ProcessIoIsolationValves.OutletPressureTag(ordinal));
+        if (!Accepts(observation)) return null;
 
-        double bar = ProcessIoEngineering.WcPressureBar(raw);
         return new PressureSample(
-            bar, PressureQuality.GOOD, false, _time.GetUtcNow(),
+            observation.EngineeringValue,
+            PressureQuality.GOOD,
+            Stale: false,
+            observation.ObservedAt.ToUniversalTime(),
             PressureSample.ValveOutletSource(ProcessIoIsolationValves.ValveId(ordinal)));
     }
 
     /// <summary>Corrected Upper limit: IVn OPEN-position feedback (WSB Upper Limit Switch #n).</summary>
     public bool ReadUpperLimitDetected(string valveId)
         => ProcessIoIsolationValves.TryParseValveId(valveId, out int ordinal)
-           && TryReadDiscrete(ProcessIoIsolationValves.OpenFeedbackTag(ordinal));
+           && ReadLimit(ProcessIoIsolationValves.OpenFeedbackTag(ordinal));
 
     /// <summary>Corrected Lower limit: IVn CLOSED-position feedback (WSB Lower Limit Switch #n).</summary>
     public bool ReadLowerLimitDetected(string valveId)
         => ProcessIoIsolationValves.TryParseValveId(valveId, out int ordinal)
-           && TryReadDiscrete(ProcessIoIsolationValves.ClosedFeedbackTag(ordinal));
+           && ReadLimit(ProcessIoIsolationValves.ClosedFeedbackTag(ordinal));
+
+    /// <summary>A limit bit counts only when the observation is usable; anything else reads false.</summary>
+    private bool ReadLimit(string tag)
+    {
+        ProcessIoPhysicalObservation observation = Observe(tag);
+        return Accepts(observation) && observation.RawValue == 1;
+    }
+
+    /// <summary>Observes one catalogue row through the session, capturing both timestamps.</summary>
+    public ProcessIoPhysicalObservation Observe(string tag)
+    {
+        _catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row);
+        DateTimeOffset observed = _time.GetUtcNow();
+        ProcessIoPhysicalObservation observation = IsAnalogTag(tag)
+            ? _session.ObserveAnalogInput(tag, row, observed, _time.GetUtcNow(), _freshnessBudget)
+            : _session.ObserveDigitalInput(tag, row, observed, _time.GetUtcNow(), _freshnessBudget);
+        return observation;
+    }
 
     /// <summary>
-    /// Composes the separated observation for one valve. Field confirmation requires the field
-    /// evidence only: an OPEN command is confirmed by the Upper limit, a CLOSE command by the Lower
-    /// limit. FC01 read-back is reported but never used to decide confirmation.
+    /// The single acceptance rule for process evidence. A simulated read is never acceptable here,
+    /// because a dry command path must never present in-memory state as physical evidence.
     /// </summary>
-    public ProcessIoValveObservation Observe(string valveId)
+    private bool Accepts(ProcessIoPhysicalObservation observation) =>
+        observation.IsUsable
+        && observation.Provenance == ProcessIoObservationProvenance.PHYSICAL_READ
+        && observation.SourceGeneration == _session.Generation
+        && observation.IsUsableAt(_time.GetUtcNow(), _session.Generation, _freshnessBudget);
+
+    private static bool IsAnalogTag(string tag) =>
+        tag.StartsWith("AI-", StringComparison.Ordinal);
+
+    // ---------------------------------------------------------------- separated observation
+
+    /// <summary>
+    /// The separated observation for one valve: command outcome, FC01 process image (reported only)
+    /// and the two field limits. Field confirmation is derived from the field limits only.
+    /// </summary>
+    public ProcessIoValveObservation ObserveValve(string valveId)
     {
         if (!ProcessIoIsolationValves.TryParseValveId(valveId, out int ordinal))
         {
             return new ProcessIoValveObservation
             {
-                CommandAccepted = false,
+                CommandDispatched = false,
                 UpperLimitDetected = false,
                 LowerLimitDetected = false,
                 FieldConfirmed = false,
@@ -357,34 +389,29 @@ public sealed class ProcessIoEquipmentBoundary : ICleaningPathEquipmentBoundary
         bool lower = ReadLowerLimitDetected(valveId);
         PressureSample? pressure = ReadValveOutletPressure(valveId);
 
-        bool hasCommand = _commandedState.TryGetValue(ordinal, out bool commandedOpen);
-        bool? readBack = TryReadCoil(ProcessIoIsolationValves.CommandTag(ordinal), out bool coil) ? coil : null;
+        bool hasCommand = _commands.TryGetValue(ordinal, out ProcessIoCommandOutcome? command);
+        bool? processImage = ReadProcessImage(ordinal);
 
-        bool confirmed = hasCommand && (commandedOpen
-            ? upper && !lower
-            : lower && !upper);
-
-        if (!hasCommand)
+        if (!hasCommand || command is null || !command.Dispatched)
         {
             return new ProcessIoValveObservation
             {
-                CommandAccepted = false,
-                ProcessImageReadBack = readBack,
+                CommandDispatched = false,
+                ProcessImageReadBack = processImage,
                 UpperLimitDetected = upper,
                 LowerLimitDetected = lower,
                 OutletPressure = pressure,
                 FieldConfirmed = false,
-                AssessmentCode = "IV_OBSERVATION_NO_COMMANDED_STATE",
+                AssessmentCode = "IV_OBSERVATION_NO_DISPATCHED_COMMAND",
             };
         }
 
         if (upper && lower)
         {
-            // Contradictory field evidence is never resolved in favour of the command.
             return new ProcessIoValveObservation
             {
-                CommandAccepted = true,
-                ProcessImageReadBack = readBack,
+                CommandDispatched = true,
+                ProcessImageReadBack = processImage,
                 UpperLimitDetected = upper,
                 LowerLimitDetected = lower,
                 OutletPressure = pressure,
@@ -393,10 +420,13 @@ public sealed class ProcessIoEquipmentBoundary : ICleaningPathEquipmentBoundary
             };
         }
 
+        bool commandedOpen = command.CoilValue;
+        bool confirmed = commandedOpen ? upper && !lower : lower && !upper;
+
         return new ProcessIoValveObservation
         {
-            CommandAccepted = true,
-            ProcessImageReadBack = readBack,
+            CommandDispatched = true,
+            ProcessImageReadBack = processImage,
             UpperLimitDetected = upper,
             LowerLimitDetected = lower,
             OutletPressure = pressure,
@@ -408,65 +438,134 @@ public sealed class ProcessIoEquipmentBoundary : ICleaningPathEquipmentBoundary
     }
 
     /// <summary>
-    /// Safe cleanup: writes false to every valve this boundary ever commanded open and retains the
-    /// de-energised CLOSED command state. Never throws, never touches a valve it did not command.
+    /// FC01 output read-back. Deliberately surfaced as its own value and never folded into
+    /// FieldConfirmed: the process image is what the output module believes, not what the valve did.
     /// </summary>
-    public IReadOnlyList<string> SafeCleanupCloseAll()
+    private bool? ReadProcessImage(int ordinal)
     {
+        string tag = ProcessIoIsolationValves.CommandTag(ordinal);
+        if (!_catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row) || row.Binding is null)
+        {
+            return null;
+        }
+
+        ProcessIoPhysicalObservation observation = Observe(tag);
+        return Accepts(observation) ? observation.RawValue == 1 : null;
+    }
+
+    // ---------------------------------------------------------------- cleanup
+
+    /// <summary>
+    /// Safe cleanup: writes the CLOSED command (false) to every valve this boundary dispatched OPEN.
+    ///
+    /// Every transport and session failure is captured and represented in the returned record, so the
+    /// caller can keep the primary failure separate. This method does not throw for transport faults;
+    /// it reports them.
+    /// </summary>
+    public ProcessIoCleanupResult SafeCleanupCloseAll()
+    {
+        var attempted = new List<string>();
+        var admitted = new List<string>();
         var closed = new List<string>();
-        foreach (KeyValuePair<int, bool> entry in _commandedState)
+        var refused = new Dictionary<string, string>(StringComparer.Ordinal);
+        var failed = new Dictionary<string, string>(StringComparer.Ordinal);
+        var unknown = new List<string>();
+
+        var openOrdinals = _commands
+            .Where(entry => entry.Value.Dispatched && entry.Value.CoilValue)
+            .Select(entry => entry.Key)
+            .OrderBy(ordinal => ordinal)
+            .ToArray();
+
+        foreach (int ordinal in openOrdinals)
         {
-            if (!entry.Value)
+            string valveId = ProcessIoIsolationValves.ValveId(ordinal);
+            attempted.Add(valveId);
+
+            string tag = ProcessIoIsolationValves.CommandTag(ordinal);
+            if (!_catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row) || row.Binding is null)
             {
+                refused[valveId] = ProcessIoRefusals.WriteRefusedUnbound;
+                unknown.Add(valveId);
                 continue;
             }
 
-            string tag = ProcessIoIsolationValves.CommandTag(entry.Key);
-            if (!ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding))
+            ProcessIoAdmission admission;
+            try
             {
+                admission = _session.AdmitWrite(_time.GetUtcNow(), row, _authorization);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                refused[valveId] = ProcessIoRefusals.SessionNotOpen;
+                unknown.Add(valveId);
                 continue;
             }
 
-            Interlocked.Increment(ref _writeAttempts);
-            _transport.WriteCoil(ProcessIoDevices.RackT8, binding.Address, false);
-            _commandedState[entry.Key] = false;
-            closed.Add(ProcessIoIsolationValves.ValveId(entry.Key));
+            if (!admission.Admitted || string.IsNullOrEmpty(admission.Token))
+            {
+                refused[valveId] = admission.Code;
+                unknown.Add(valveId);
+                continue;
+            }
+
+            admitted.Add(valveId);
+
+            try
+            {
+                if (_session.DispatchDigitalOutput(_time.GetUtcNow(), admission.Token, row, false))
+                {
+                    closed.Add(valveId);
+                    _commands[ordinal] = _commands[ordinal] with { CoilValue = false };
+                }
+                else
+                {
+                    refused[valveId] = "DISPATCH_REFUSED";
+                    unknown.Add(valveId);
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+            {
+                failed[valveId] = ex.GetType().Name;
+                unknown.Add(valveId);
+            }
         }
 
-        return closed;
-    }
-
-    private bool TryReadRegister(string tag, out ushort raw)
-    {
-        raw = 0;
-        if (!ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding))
+        return new ProcessIoCleanupResult
         {
-            return false;
-        }
-
-        raw = _transport.ReadInputRegister(ProcessIoDevices.RackT8, binding.Address);
-        return true;
+            AttemptedValveIds = attempted,
+            AdmittedValveIds = admitted,
+            ClosedValveIds = closed,
+            RefusedValves = refused,
+            TransportFailures = failed,
+            RemainingUnknownState = unknown,
+        };
     }
+}
 
-    private bool TryReadDiscrete(string tag)
-    {
-        if (!ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding))
-        {
-            return false;
-        }
+/// <summary>
+/// Separated observation of one Isolation Valve. The three evidence kinds occupy distinct members on
+/// purpose, so no caller can mistake process-image read-back for field confirmation.
+/// </summary>
+public sealed record ProcessIoValveObservation
+{
+    /// <summary>True only when the session admitted AND dispatched the command coil write.</summary>
+    public required bool CommandDispatched { get; init; }
 
-        return _transport.ReadDiscreteInput(ProcessIoDevices.RackT8, binding.Address);
-    }
+    /// <summary>FC01 output read-back: process image only, never field confirmation.</summary>
+    public bool? ProcessImageReadBack { get; init; }
 
-    private bool TryReadCoil(string tag, out bool value)
-    {
-        value = false;
-        if (!ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding))
-        {
-            return false;
-        }
+    /// <summary>Corrected Upper limit, IVn OPEN-position field feedback.</summary>
+    public required bool UpperLimitDetected { get; init; }
 
-        value = _transport.ReadCoil(ProcessIoDevices.RackT8, binding.Address);
-        return true;
-    }
+    /// <summary>Corrected Lower limit, IVn CLOSED-position field feedback.</summary>
+    public required bool LowerLimitDetected { get; init; }
+
+    /// <summary>Paired IVn outlet pressure (AI-004+ .. AI-011+), or null when unusable.</summary>
+    public PressureSample? OutletPressure { get; init; }
+
+    /// <summary>True only when the field limits agree with the dispatched command.</summary>
+    public required bool FieldConfirmed { get; init; }
+
+    public required string AssessmentCode { get; init; }
 }
