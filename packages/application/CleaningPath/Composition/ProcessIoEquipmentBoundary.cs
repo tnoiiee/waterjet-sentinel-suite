@@ -80,6 +80,13 @@ public static class ProcessIoDryCommandGate
     public const string RefusedConsentMismatch = "DRY_COMMAND_REFUSED_CONSENT_MISMATCH";
     public const string RefusedProductionRequested = "DRY_COMMAND_REFUSED_PRODUCTION_NOT_AUTHORIZED";
     public const string RefusedSessionNotOpen = "DRY_COMMAND_REFUSED_SESSION_NOT_OPEN";
+
+    /// <summary>Refused because the simulated Pump-ready input was not explicitly selected.</summary>
+    public const string RefusedSimulatedInputNotSelected = "DRY_COMMAND_REFUSED_SIMULATED_INPUT_NOT_SELECTED";
+
+    /// <summary>Refused because the Owner Pump-stopped attestation was absent or not the exact literal.</summary>
+    public const string RefusedPumpStoppedAttestationMissing = "DRY_COMMAND_REFUSED_PUMP_STOPPED_ATTESTATION_MISSING";
+
     public const string Granted = "DRY_COMMAND_AUTHORIZED";
 
     /// <summary>
@@ -131,6 +138,81 @@ public static class ProcessIoDryCommandGate
         {
             PhysicalWriteAuthorized = true,
             Basis = $"TEST_HARDWARE_DRY/{EndpointFingerprint(ownerLocalEndpoint)}",
+        };
+        code = Granted;
+        return true;
+    }
+
+    /// <summary>
+    /// Issues a write authorization for the isolated IV Hardware trial, or refuses with a typed code.
+    ///
+    /// This is the same gate, and the same authorization type, as the integrated dry composition: it
+    /// exists here so exactly one place in the Product mints a write authorization. It differs in one
+    /// respect only, which the caller must prove before calling it: the IV trial is selected by its
+    /// own explicit trial selector and carries the Owner Pump-stopped attestation, because the
+    /// integrated dry coverage variable is deliberately NOT set for that trial.
+    ///
+    /// It never authorizes PRODUCTION, never authorizes a non-dry profile, never substitutes an
+    /// endpoint and never accepts a missing consent or attestation.
+    /// </summary>
+    public static bool TryAuthorizeIvTrial(
+        DeviceProfile profile,
+        bool simulatedAi003Selected,
+        string? ownerLocalEndpoint,
+        string? suppliedConsent,
+        bool pumpStoppedAttested,
+        out ProcessIoWriteAuthorization? authorization,
+        out string code)
+    {
+        authorization = null;
+
+        if (profile == DeviceProfile.PRODUCTION)
+        {
+            code = RefusedProductionRequested;
+            return false;
+        }
+
+        if (profile != DeviceProfile.TEST_HARDWARE_DRY)
+        {
+            code = RefusedProfileNotDry;
+            return false;
+        }
+
+        // The simulated Pump-ready input is only ever authorized as an explicitly selected trial input.
+        if (!simulatedAi003Selected)
+        {
+            code = RefusedSimulatedInputNotSelected;
+            return false;
+        }
+
+        if (!pumpStoppedAttested)
+        {
+            code = RefusedPumpStoppedAttestationMissing;
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(ownerLocalEndpoint))
+        {
+            code = RefusedEndpointMissing;
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(suppliedConsent))
+        {
+            code = RefusedConsentMissing;
+            return false;
+        }
+
+        if (!string.Equals(suppliedConsent, ProcessIoConsentPhrases.PhysicalDoSingle, StringComparison.Ordinal))
+        {
+            code = RefusedConsentMismatch;
+            return false;
+        }
+
+        authorization = new ProcessIoWriteAuthorization
+        {
+            PhysicalWriteAuthorized = true,
+            Basis = $"TEST_HARDWARE_DRY/IV_TRIAL/{EndpointFingerprint(ownerLocalEndpoint)}",
         };
         code = Granted;
         return true;

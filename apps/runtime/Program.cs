@@ -79,6 +79,26 @@ if (!ProfileStartPolicy.TryParseProfile(profileLabel, out var profile))
     return 4;
 }
 
+// 0c. Isolated IV Hardware trial selector (ACCELERATED-CLEANING-INTEGRATION-01 two-stage evidence).
+//
+//     This is a SEPARATE evidence class from the integrated dry command composition below, and the
+//     two are never combined: the trial refuses when the integrated dry selector is also set, and the
+//     integrated dry path is not modified by this branch. The trial is selected by its own exact
+//     literal (see DryIvTrial.Token / DryIvTrial.ModeVariable) plus the published single-DO consent
+//     and the Owner Pump-stopped attestation, and it is validated in full by DryIvTrial itself, so
+//     PRODUCTION, a non-dry profile, a missing endpoint, a missing consent or a missing attestation
+//     all refuse before anything is bound.
+if (!DryIvTrial.TryReadMode(Environment.GetEnvironmentVariable, out var ivTrialSelected, out var ivTrialCode, out var ivTrialDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{ivTrialCode}]: {ivTrialDetail} Nothing was bound.");
+    return 4;
+}
+
+if (ivTrialSelected)
+{
+    return DryIvTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
+}
+
 if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, dryCommandMode, out var refusalCode, out var refusalReason))
 {
     Console.Error.WriteLine($"WJSS startup refused [{refusalCode}]: {refusalReason}");
