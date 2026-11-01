@@ -148,7 +148,7 @@ test('bindings: command shapes and read-back sources adopted', () => {
   assert.equal(OUTPUT_COMMAND_SHAPE['DO-008'].pair, 'DO-009');
   assert.equal(OUTPUT_COMMAND_SHAPE['DO-001'].shape, 'MUTUAL_EXCLUSIVE_MAINTAINED');
   assert.equal(OUTPUT_COMMAND_SHAPE['DO-023'].shape, 'MAINTAINED');
-  assert.equal(READ_BACK_SOURCES['DO-023'].readBackRow, 'DI-029');
+  assert.equal(READ_BACK_SOURCES['DO-023'].readBackRow, 'DI-021');
   assert.equal(READ_BACK_SOURCES['AO-001+'].readBackRow, null);
 });
 

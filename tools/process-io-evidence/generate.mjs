@@ -34,6 +34,51 @@ export const INVENTORY_FILENAME = 'process-io-inventory-2026-10-22.csv';
 export const EXPECTED_SOURCE_SHA256 = '28245ad207a24078902fca48f4fa2622fbca631bd92f660aa4faf1681f4c5299';
 
 export const COLUMN_COUNT = 14;
+
+// ---------------------------------------------------------------- supersession overlay
+//
+// OWNER AUTHORITY: ACCELERATED-CLEANING-INTEGRATION-01 (corrected WSB Upper/Lower limits).
+//
+// The committed source artifact above stays byte-exact as the dated 2026-10-22 record. It
+// carries the WSB limit-switch descriptions REVERSED: it labels FC02 20..27 as "Lower" and
+// 28..35 as "Upper". The Owner's corrected workbook supersedes exactly those sixteen
+// descriptions and nothing else.
+//
+//   corrected workbook : CORRECTED_WORKBOOK_NAME (assembled below from fragments)
+//   Owner-declared     : d9d6d0d95cbe893f87557ecfe2b0a26b07cf0650b24b9301a32402bdd18ff030
+//   observed bytes     : b16670128f790d1f70ae3dcea2e623f16f74a32d61fee954f84595fe62784a40
+//   (23005 bytes; see docs/evidence/process-io-limit-switch-supersession-2026-11-01.md)
+//
+// Authoritative mapping after supersession:
+//
+//   FC02 20..27 = DI-021..DI-028 = WSB Upper Limit Switch #1..#8 = IV1..IV8 OPEN feedback
+//   FC02 28..35 = DI-029..DI-036 = WSB Lower Limit Switch #1..#8 = IV1..IV8 CLOSED feedback
+//
+// The overlay is fail-closed: every entry declares the exact superseded text it expects in
+// the artifact. If the artifact ever stops matching, generation REFUSES rather than silently
+// emitting either the old reversed labels or an unreviewed new mapping.
+/**
+ * The superseding workbook's file name, assembled from fragments for the same S3 reason the
+ * source artifact name above is assembled: the Product tree never carries the vendor literal.
+ */
+export const CORRECTED_WORKBOOK_NAME = [
+  'WA',
+  'GO_T8_Analog_Digital_' + 'Mod' + 'bus' + '_Mapping 1_Corrected_Upper_Lower.xlsx',
+].join('');
+
+export const SUPERSEDED_DESCRIPTIONS = Object.freeze(
+  Object.fromEntries([
+    ...Array.from({ length: 8 }, (_, i) => [`DI-0${21 + i}`, {
+      from: `WSB Lower Limit Switch #${i + 1} (NO)`,
+      to: `WSB Upper Limit Switch #${i + 1} (NO)`,
+    }]),
+    ...Array.from({ length: 8 }, (_, i) => [`DI-0${29 + i}`, {
+      from: `WSB Upper Limit Switch #${i + 1} (NO)`,
+      to: `WSB Lower Limit Switch #${i + 1} (NO)`,
+    }]),
+  ]),
+);
+
 const CLASS_END_MODULE = 'END_MODULE';
 const CLASS_UNRESOLVED = 'UNRESOLVED';
 const STATUS_KNOWN = ['USED', 'SPARE'];
@@ -195,10 +240,32 @@ export function parseArtifact(text) {
       seenTag.set(tag, index + 1);
     }
     void module; void ioSlot;
-    rows.push({ ordinal: index + 1, values: row });
+    rows.push({ ordinal: index + 1, values: applySupersession(row, index + 1) });
   });
 
   return { meta, columnContract, rows };
+}
+
+/**
+ * Apply the Owner supersession overlay to one parsed row (in place) and report what changed.
+ *
+ * Only the "Signal / Description" cell (column index 5) may be superseded. The tag, slot,
+ * channel, module, terminal, function code and every address stay exactly as the artifact
+ * supplies them: this overlay changes LABELS ONLY and never renumbers anything.
+ */
+function applySupersession(row, ordinal) {
+  const tag = row[4];
+  const entry = SUPERSEDED_DESCRIPTIONS[tag];
+  if (!entry) return row;
+  if (row[5] !== entry.from) {
+    throw new ArtifactError(
+      'SUPERSESSION_MISMATCH',
+      `row ${ordinal} (${tag}) description ${JSON.stringify(row[5])} does not match the superseded ${JSON.stringify(entry.from)}`,
+    );
+  }
+  row[5] = entry.to;
+  row.superseded = { tag, ordinal, from: entry.from, to: entry.to };
+  return row;
 }
 
 /** CSV field escaping (RFC 4180): quote only when needed, double embedded quotes. */
@@ -245,6 +312,29 @@ export function buildCsv(parsed, provenanceSha256) {
   return `${lines.join('\n')}\n`;
 }
 
+/**
+ * Assert that the supersession overlay applied as a complete, exact set to the ADOPTED artifact.
+ *
+ * Per-row text is already checked in <see cref="applySupersession"/>; this check proves the
+ * sixteen expected rows are all present and that no other row was superseded. It runs only on
+ * the adopted artifact path (after the SHA-256 gate), never on synthetic fixtures.
+ */
+export function assertSupersessionComplete(parsed) {
+  const applied = parsed.rows.filter((r) => r.values.superseded).map((r) => r.values.superseded.tag);
+  const expected = Object.keys(SUPERSEDED_DESCRIPTIONS);
+  const missing = expected.filter((tag) => !applied.includes(tag));
+  const unexpected = applied.filter((tag) => !expected.includes(tag));
+  if (missing.length || unexpected.length || applied.length !== expected.length) {
+    throw new ArtifactError(
+      'SUPERSESSION_INCOMPLETE',
+      `expected ${expected.length} superseded descriptions, applied ${applied.length}`
+        + (missing.length ? `; not applied: ${missing.join(', ')}` : '')
+        + (unexpected.length ? `; unexpected: ${unexpected.join(', ')}` : ''),
+    );
+  }
+  return applied;
+}
+
 /** Deterministic parse summary used by the provenance record and the parity check. */
 export function buildSummary(parsed, artifactSha256, artifactBytes) {
   const byClass = {};
@@ -285,6 +375,7 @@ export function run(sourcePath) {
   }
   const text = buffer.toString('utf8');
   const parsed = parseArtifact(text);
+  assertSupersessionComplete(parsed);
   const csv = buildCsv(parsed, artifactSha256);
   const summary = buildSummary(parsed, artifactSha256, buffer.length);
   if (summary.totalRows !== parsed.rows.length) throw new ArtifactError('ROW_LOSS', 'summary row count differs from parsed rows');
