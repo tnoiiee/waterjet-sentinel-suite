@@ -85,8 +85,20 @@ or previous pressure, to another valve, or to a Production path.
 4. construct the transport (no socket yet) and open the existing `ProcessIoSession`;
 5. mint the simulated Pump-ready sample for **this** session generation and require the existing
    Pump-ready rule to accept it — the trial refuses otherwise;
-6. read the initial Upper/open and Lower/closed feedback and refuse a contradictory or already-open
-   state **before** any write;
+6. read the initial Upper/open and Lower/closed feedback **before** any write and admit the OPEN only
+   from the one physically confirmed CLOSED state:
+
+   | Upper / open | Lower / closed | Meaning | Result |
+   |---|---|---|---|
+   | `false` | `true` | closed, physically confirmed | **admitted** |
+   | `true` | `true` | contradictory feedback | refused, `IV_TRIAL_REFUSED_INITIAL_STATE_CONTRADICTORY` |
+   | `true` | `false` | already open | refused, `IV_TRIAL_REFUSED_INITIAL_STATE_UNSAFE` |
+   | `false` | `false` | closed **not** confirmed | refused, `IV_TRIAL_REFUSED_INITIAL_CLOSED_NOT_CONFIRMED` |
+
+   "Neither limit asserted" is not evidence that the valve is closed, so the last row refuses. An
+   unusable or absent Lower observation reads `false` through the same path, so a missing feedback
+   channel refuses here rather than being treated as safe. None of the three refused rows writes
+   anything;
 7. admit and dispatch **OPEN** on the selected valve's existing command coil (`DO-023` for `IV1`);
 8. supervise the physical Upper/open discrete input (`DI-021` for `IV1`) until the existing contract
    confirms, contradicts, or the supervision window expires;
@@ -125,8 +137,17 @@ Every close goes through the existing session admission and dispatch lifecycle, 
 attempted / admitted / closed / refused / transport-failure / remaining-unknown separately. It never
 hides the primary failure and never claims closure from the FC01 process image.
 
-An operator abort (Ctrl+C) is honoured: it de-energises the same coil and closes the session. If the
-process is killed outright while the coil is energised, the maintained coil stays energised — the
+An operator abort (Ctrl+C) is honoured without ever acting from the console handler. The handler does
+exactly two things: it suppresses the default runtime termination and raises a trial-local cancellation
+flag. It holds no device, session or transport reference, so it cannot write a coil, close the session,
+dispose the transport or terminate the process, and there is no second cleanup path running beside the
+first. The bounded supervision loop observes the flag at its next observation point (one poll interval,
+at most 25 ms), the main sequence returns `IV_TRIAL_ABORTED_BY_OPERATOR` with exit code 2, the single
+existing cleanup path closes whatever the trial left energised, and the session closes last before the
+transport is released. An abort during OPEN supervision therefore produces exactly one cleanup CLOSE; an
+abort during CLOSE supervision produces none, because the coil is already de-energised.
+
+If the process is killed outright while the coil is energised, the maintained coil stays energised — the
 physical abort described in §2.6 is the authority for that case, and the procedure must say so.
 
 ### 2.6 Trial B procedure
