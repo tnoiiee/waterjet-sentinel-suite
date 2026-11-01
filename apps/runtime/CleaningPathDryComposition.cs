@@ -5,6 +5,7 @@ using Wjss.MotionComposition;
 using Wjss.Runtime.Core.CleaningPath;
 using Wjss.Runtime.Core.CleaningPath.Composition;
 using Wjss.Runtime.Core.CleaningPath.Execution;
+using Wjss.Runtime.Core.Motion.Manual;
 using Wjss.Runtime.Core.ProcessIo;
 using Wjss.Runtime.Core.Sequencing;
 using Wjss.Time;
