@@ -13,8 +13,8 @@ namespace Wjss.Runtime;
 /// profile, the Owner-local endpoint, the one-use consent and every Owner-local file are present and
 /// valid, and it never substitutes a simulated value for a physical one.
 ///
-/// Exit codes: 0 terminal result reached; 2 configuration, composition or start refusal; 3 bounded
-/// timeout before a terminal result; 4 invalid invocation.
+/// Exit codes: 0 terminal result reached; 2 composition, prepare or start refusal; 3 bounded
+/// timeout before a terminal result; 4 invalid invocation or options/configuration refusal.
 ///
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. The Owner-local build and the separately
 /// authorized representative dry Hardware trial are the validation of record.
