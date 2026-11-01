@@ -461,7 +461,8 @@ public static class ProcessIoLegacyProvenance
 ///   IVn command      -> DO-0(22+n)     coil 21+n, FC05, MAINTAINED single coil
 ///   IVn OPEN  feedback -> DI-0(20+n)   FC02 address 19+n  (WSB Upper Limit Switch #n)
 ///   IVn CLOSED feedback -> DI-0(28+n)  FC02 address 27+n  (WSB Lower Limit Switch #n)
-///   IVn outlet pressure -> AI-00(3+n)+ FC04 input register 2+n
+///   IVn outlet pressure -> AI-(3+n, exactly three digits)+ FC04 input register 2+n
+///                          so n=1 is AI-004+ and n=8 is AI-011+; the tag is never four digits
 ///
 /// Command semantics are maintained state, never a pulse: true (energised) = OPEN,
 /// false (de-energised) = CLOSED. Safe cleanup writes false and retains the de-energised state.
@@ -484,19 +485,27 @@ public static class ProcessIoIsolationValves
         return "IV" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    /// <summary>Strict parse of "IV1".."IV8"; anything else is not an Isolation Valve identity.</summary>
+    /// <summary>
+    /// Strict parse of "IV1".."IV8"; anything else is not an Isolation Valve identity. The supplied
+    /// spelling must be the canonical identity itself, so a zero-padded ordinal or a whitespace-wrapped
+    /// spelling is refused rather than normalized: a physical command identity is never an alias.
+    /// </summary>
     public static bool TryParseValveId(string? valveId, out int ordinal)
     {
         ordinal = 0;
-        if (string.IsNullOrWhiteSpace(valveId)) return false;
-        string trimmed = valveId.Trim();
-        if (!trimmed.StartsWith("IV", StringComparison.Ordinal)) return false;
-        if (!int.TryParse(trimmed.AsSpan(2), System.Globalization.NumberStyles.None,
+        if (string.IsNullOrEmpty(valveId)) return false;
+        if (!valveId.StartsWith("IV", StringComparison.Ordinal)) return false;
+        if (!int.TryParse(valveId.AsSpan(2), System.Globalization.NumberStyles.None,
                 System.Globalization.CultureInfo.InvariantCulture, out int parsed))
         {
             return false;
         }
         if (parsed < 1 || parsed > Count) return false;
+
+        // Range validation alone is not strict: "IV01" parses to the in-range ordinal 1. Requiring the
+        // supplied value to be the canonical identity rejects every alias without normalizing it.
+        if (!string.Equals(valveId, ValveId(parsed), StringComparison.Ordinal)) return false;
+
         ordinal = parsed;
         return true;
     }
@@ -522,11 +531,17 @@ public static class ProcessIoIsolationValves
         return "DI-0" + (28 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    /// <summary>The IVn outlet pressure row (AI-004+ .. AI-011+), ordinal by IV identity.</summary>
+    /// <summary>
+    /// The IVn outlet pressure row, AI-004+ .. AI-011+, ordinal by IV identity. The numeric identity is
+    /// exactly three decimal digits, so ordinal 7 is AI-010+ and ordinal 8 is AI-011+. Unpadded
+    /// concatenation would widen to a fourth digit at ordinal 7 and name no adopted row.
+    /// </summary>
     public static string OutletPressureTag(int ordinal)
     {
         RequireOrdinal(ordinal);
-        return "AI-00" + (3 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture) + "+";
+        return "AI-"
+            + (3 + ordinal).ToString("D3", System.Globalization.CultureInfo.InvariantCulture)
+            + "+";
     }
 
     /// <summary>True for exactly the eight IV outlet pressure tags, AI-004+ .. AI-011+.</summary>

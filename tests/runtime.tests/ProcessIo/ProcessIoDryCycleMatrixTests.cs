@@ -25,6 +25,26 @@ public sealed class ProcessIoDryCycleMatrixTests
     private const string Consent = "I AUTHORIZE SINGLE DO PROCESS IO BENCH TRIAL";
 
     /// <summary>
+    /// Every non-canonical valve spelling the strict parser must refuse. The canonical identities are
+    /// exactly "IV1".."IV8": no zero padding, no surrounding whitespace, no sign and no alias.
+    /// </summary>
+    private static readonly string?[] InvalidValveIds =
+    {
+        "IV0", "IV9", "IV10", "IV", "iv1", "Iv1", "WJ1", "", "  ",
+        "IV01", "IV001", " IV1", "IV1 ", "IV 1", "+IV1", "IV+1", null,
+    };
+
+    /// <summary>
+    /// Outlet-pressure spellings that name no adopted row and must be refused, including the
+    /// four-digit forms that unpadded concatenation would have produced.
+    /// </summary>
+    private static readonly string[] MalformedOutletPressureTags =
+    {
+        "AI-003+", "AI-012+", "AI-0010+", "AI-0011+", "AI-010", "AI-011", "AI-0004+",
+        "ai-010+", "AI-010 +", "AI-010+ ",
+    };
+
+    /// <summary>
     /// Deterministic fake transport. Not the product Simulation transport: a physical command path must
     /// never be backed by it, so this double stands in for the adopted bench transport.
     /// </summary>
@@ -150,10 +170,50 @@ public sealed class ProcessIoDryCycleMatrixTests
             Assert.Equal(n, parsed);
         }
 
-        foreach (string invalid in new[] { "IV0", "IV9", "IV", "iv1", "WJ1", "", "  ", "IV01", null! })
+        foreach (string? invalid in InvalidValveIds)
         {
             Assert.False(ProcessIoIsolationValves.TryParseValveId(invalid, out _));
         }
+    }
+
+    [Fact]
+    public void Outlet_Pressure_Membership_Accepts_Exactly_The_Eight_Adopted_Tags()
+    {
+        string[] adopted =
+        {
+            "AI-004+", "AI-005+", "AI-006+", "AI-007+", "AI-008+", "AI-009+", "AI-010+", "AI-011+",
+        };
+
+        Assert.Equal(ProcessIoIsolationValves.Count, adopted.Length);
+
+        for (int n = 1; n <= ProcessIoIsolationValves.Count; n += 1)
+        {
+            string tag = adopted[n - 1];
+
+            // The generator is the membership predicate's only source, so both must agree exactly.
+            Assert.Equal(tag, ProcessIoIsolationValves.OutletPressureTag(n));
+            Assert.True(ProcessIoIsolationValves.IsOutletPressureTag(tag));
+
+            // Every generated tag names an adopted input register, at FC04 input register 2+n.
+            Assert.True(ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding));
+            Assert.Equal(ProcessIoArea.InputRegister, binding.Area);
+            Assert.Equal("READ", binding.Direction);
+            Assert.Equal(2 + n, binding.Address);
+        }
+
+        // The decimal-width boundary is inside the adopted range, not past it.
+        Assert.Equal("AI-009+", ProcessIoIsolationValves.OutletPressureTag(6));
+        Assert.Equal("AI-010+", ProcessIoIsolationValves.OutletPressureTag(7));
+        Assert.Equal("AI-011+", ProcessIoIsolationValves.OutletPressureTag(8));
+
+        foreach (string malformed in MalformedOutletPressureTags)
+        {
+            Assert.False(ProcessIoIsolationValves.IsOutletPressureTag(malformed));
+        }
+
+        Assert.False(ProcessIoIsolationValves.IsOutletPressureTag(null));
+        Assert.False(ProcessIoIsolationValves.IsOutletPressureTag(string.Empty));
+        Assert.False(ProcessIoIsolationValves.IsOutletPressureTag("   "));
     }
 
     [Theory]
