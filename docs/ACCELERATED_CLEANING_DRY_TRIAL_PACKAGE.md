@@ -13,6 +13,15 @@
 
 ---
 
+> **Sibling package.** The two-stage split of this evidence — **Trial A** (physical Pump-ready,
+> procedure only, every IV closed) and **Trial B** (the isolated IV Hardware trial with an explicitly
+> simulated `AI-003+` sample) — is documented in
+> `docs/ACCELERATED_CLEANING_IV_TWO_STAGE_EVIDENCE.md`. This integrated trial remains a **third,
+> separate** evidence class: it is not Trial A and not Trial B, and no claim may be carried from one
+> of the three to another.
+
+---
+
 ## 1. What this package is, and what it is not
 
 This is the **representative dry trial**: it exercises the complete typed IV command and feedback
