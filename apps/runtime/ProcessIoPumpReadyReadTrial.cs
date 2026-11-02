@@ -552,6 +552,11 @@ public static class ProcessIoPumpReadyReadTrial
             }
 
             transport.Dispose();
+
+            // These two lines are printed only after the lifecycle is complete, so the record states a
+            // fact rather than an intention.
+            output.WriteLine("  session_state=" + session.State);
+            output.WriteLine("  transport_released=TRUE");
         }
     }
 
@@ -885,7 +890,6 @@ public static class ProcessIoPumpReadyReadTrial
         output.WriteLine("  motion_executed=FALSE");
         output.WriteLine("  waterjet_command_executed=FALSE");
         output.WriteLine("  write_authorization_created=FALSE");
-        output.WriteLine("  session_closed=TRUE");
     }
 
     private static string Flag(bool value) => value ? "TRUE" : "FALSE";
