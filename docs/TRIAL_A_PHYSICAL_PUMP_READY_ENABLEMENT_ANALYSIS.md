@@ -3,12 +3,14 @@
 **Scope:** `TRIAL-A-PHYSICAL-PUMP-READY-ENABLEMENT`
 **Question asked:** does the current Product already contain an Owner-invoked, bounded, read-only
 execution path that can produce the WJSS Pump-ready decision from physical `AI-003+`?
-**Answer: NO.** The Product contains every building block and no host. This document records the exact
-gap and the one narrow addition that would close it.
+**Answer at the analysed head (`5c270dd`): NO.** The Product contained every building block and no host.
+This document records that finding of record, and §5 now records the narrow host that was authorized
+afterwards and implemented in `apps/runtime/ProcessIoPumpReadyReadTrial.cs`.
 
-> **Status: ANALYSIS ONLY. NO PRODUCT SOURCE CHANGED. NO HARDWARE EXECUTED.**
+> **Status: ANALYSIS, THEN IMPLEMENTATION. NO HARDWARE EXECUTED.**
 > Nothing here was run against a device. No physical Pump evidence exists, and nothing in this document
-> may be read as a record that it does. **PRODUCTION: NOT AUTHORIZED. MERGE: HOLD.**
+> may be read as a record that it does. The gap is closed in source; the physical stage is not run.
+> **PRODUCTION: NOT AUTHORIZED. MERGE: HOLD.**
 
 ---
 
@@ -49,8 +51,10 @@ labelled, Owner-invoked run.
 | 13 | Command no IV | **Yes, if a host exists** | Reads use `ObserveAnalogInput`; `RequestValve` is never reached |
 | 14 | Terminate cleanly with typed exit codes | **No** for this purpose | The only read host is the Node bench, which exits 0/2 and reports counts, not a Pump-ready decision |
 
-**Rows 2, 10 and 14 are the gap.** Rows 1 and 3–9 are finished Product capability that simply has no
-read-only caller.
+**Rows 2, 10 and 14 were the gap** at the analysed head. Rows 1 and 3–9 were, and remain, finished
+Product capability with no read-only caller. Rows 2, 10 and 14 are closed by the host recorded in §5:
+the trial reads `AI-003+` alone, states the `AI-002+` exclusion in its own output, and terminates with
+the typed exit-code contract.
 
 ## 3. Why each existing candidate path fails
 
@@ -130,32 +134,49 @@ the Product that the Product never made. It is refused here on exactly that grou
 
 None of M1–M6 requires new domain logic. All of it is composition of existing, already-tested parts.
 
-## 5. Proposed narrow addition (NOT IMPLEMENTED — awaiting Owner authorization)
+## 5. The narrow addition, as authorized and implemented
 
 One console surface, one file, no new project, no dependency, no topology change.
 
 **`apps/runtime/ProcessIoPumpReadyReadTrial.cs`** — `public static class ProcessIoPumpReadyReadTrial`,
 plus one routing branch in `apps/runtime/Program.cs` beside the existing two.
+Focused coverage: `tests/api.tests/ProcessIoPumpReadyReadTrialTests.cs`.
 
-**Selector:** `WJSS_PUMP_READY_READ_TRIAL = AI-003_ONLY` (exact literal; absent means not selected).
-Reuses `ProcessIoEndpointConfiguration` for endpoint and consent — the same
-`WJSS_PROCESS_IO_CONSENT` variable and the same `ProcessIoConsentPhrases.PhysicalDiAiRead` constant the
-bench already requires; **no second consent channel**.
+**Selector:** `WJSS_PUMP_READY_READ_TRIAL = AI-003_ONLY` (exact literal, compared exactly; absent means
+not selected). Reuses `ProcessIoEndpointConfiguration` for the endpoint, but validates the consent
+against the published **read-only** `ProcessIoConsentPhrases.PhysicalDiAiRead` phrase. The existing
+`TryReadConsent` validates the single-output **write** phrase and is deliberately not reused: write
+consent must never authorize a read trial. **No second consent channel and no second variable.**
 
-**Sequence (bounded, single-use, read-only):**
+**Sequence as built (bounded, single-use, read-only):**
 
-1. refuse `PRODUCTION`, refuse `WJSS_DRY_COMMAND_MODE`, refuse `WJSS_DRY_IV_TRIAL_MODE`;
-2. resolve the endpoint; require the consent phrase; load and verify the catalogue with the existing
-   loader; validate the adopted bindings with the existing validator;
-3. construct `ProcessIoPhysicalTransport` and open `ProcessIoSession` (no socket before the first read);
-4. `ObserveAnalogInput("AI-003+", …)` once through `ProcessIoEquipmentBoundary.Observe`, then
-   `ReadPumpOutletPressure()` — the existing method, unmodified;
-5. read `AI-002+` once and report it as **`AI-002_DIAGNOSTIC_ONLY / NOT_USED_FOR_DECISION`** — read so
-   the exclusion is observed rather than asserted;
-6. evaluate `SequencingPressure.PumpReady` against the Owner-supplied threshold;
-7. print the evidence block of M5; close the session; dispose the transport;
-8. exit 0 (accepted), 3 (read good but not Pump-ready, or stale/not-fresh), 4 (configuration refusal),
-   2 (unexpected fault).
+1. refuse `PRODUCTION` first; then refuse an absent or inexact selector, `WJSS_DRY_COMMAND_MODE`,
+   `WJSS_DRY_IV_TRIAL_MODE` and every profile other than `TEST_HARDWARE`;
+2. resolve the endpoint and validate the read-only consent; load the catalogue with the existing
+   `ProcessIoCatalogueLoader`; prove the `AI-003+` row is an adopted READ Input Register on the rack;
+   read the setpoint, the optional band and the freshness budget, defaulting none of them;
+3. construct `ProcessIoPhysicalTransport` and open `ProcessIoSession` (only here can anything reach the
+   network);
+4. `ProcessIoSession.ObserveAnalogInput("AI-003+", …)` exactly once, capturing raw, bar, quality,
+   `ObservedAt`, `ReceivedAt`, freshness and generation;
+5. read `AI-002+` once and report it as **`DIAGNOSTIC_ONLY_NOT_USED_FOR_DECISION`** with
+   `ai002_used_for_decision=FALSE` — read so the exclusion is observed rather than asserted;
+6. evaluate the existing `SequencingPressure.Valid` and `SequencingPressure.PumpReady` against the
+   Owner-supplied setpoint;
+7. print the evidence block of M5; close the session; dispose the transport; exit;
+8. exit `0` (accepted), `2` (observed but not accepted), `3` (bounded read timeout or transport fault),
+   `4` (refusal before acquisition).
+
+**Two deliberate deviations from this document's own proposal, both narrowing:**
+
+- **No `ProcessIoEquipmentBoundary`.** Its constructor requires a `ProcessIoWriteAuthorization`, and
+  minting a write authorization on a read-only stage would be exactly the confusion this stage exists to
+  avoid. The trial calls `ProcessIoSession.ObserveAnalogInput` and `SequencingPressure` directly, which
+  are the same two authorities the boundary delegates to. `ReadPumpOutletPressure()` itself compounds
+  the observation with the decision, which would have made a truthful per-field report impossible.
+- **Exit codes are `0/2/3/4` as the Owner specified**, superseding the `0/3/4/2` ordering proposed here.
+  The proposal folded "read good but not Pump-ready" and "stale" into one code; the Owner's contract
+  separates a non-acceptance (`2`) from a bounded read failure (`3`).
 
 **Invariants this function must keep:** zero `AdmitWrite`, zero `DispatchDigitalOutput`, zero
 `WriteCoil`, no motion type referenced, no `SimulatorRuntime`, no Queue/`TimeDelay`, no Production path,
@@ -167,9 +188,9 @@ untouched.
 and already covered by existing tests; the new code reads one tag, calls one existing rule and prints
 one record.
 
-## 6. Trial A claim boundary (unchanged, still unimplemented)
+## 6. Trial A claim boundary (unchanged; the mechanism exists, the physical run does not)
 
-**A passing Trial A would establish:** physical Pump operation for that trial; physical `AI-003+`
+**A passing Trial A (exit `0`, `PHYSICAL_PUMP_READY`) would establish:** physical Pump operation for that trial; physical `AI-003+`
 acquisition through the transmitter and the WAGO input; the WJSS scaling and observation pipeline;
 quality/freshness/generation validation; and the WJSS Pump-ready decision computed from `AI-003+` alone.
 

@@ -99,6 +99,26 @@ if (ivTrialSelected)
     return DryIvTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
 }
 
+// 0d. Isolated READ-ONLY physical Pump-ready trial selector (Trial A).
+//
+//     The third evidence class, and the only read-only one. It reads AI-003+ through the existing
+//     Process-Io transport and applies the existing Pump-ready rule; it commands nothing. Like the IV
+//     trial it is selected by its own exact literal and validated in full by its own runner, so
+//     PRODUCTION, a non-authorized profile, a missing endpoint, a missing consent, a missing catalogue
+//     or a missing AI-003+ binding all refuse before a transport is constructed. It also refuses when
+//     either of the other two physical selectors is set, so the three are never combined.
+if (!ProcessIoPumpReadyReadTrial.TryReadMode(
+    Environment.GetEnvironmentVariable, out var pumpReadyReadSelected, out var pumpReadCode, out var pumpReadDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{pumpReadCode}]: {pumpReadDetail} Nothing was bound.");
+    return 4;
+}
+
+if (pumpReadyReadSelected)
+{
+    return ProcessIoPumpReadyReadTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
+}
+
 if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, dryCommandMode, out var refusalCode, out var refusalReason))
 {
     Console.Error.WriteLine($"WJSS startup refused [{refusalCode}]: {refusalReason}");

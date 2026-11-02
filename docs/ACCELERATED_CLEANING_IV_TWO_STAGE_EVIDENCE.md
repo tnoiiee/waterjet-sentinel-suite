@@ -1,7 +1,8 @@
 # Accelerated Cleaning Integration — Two-Stage Hardware Evidence Package
 
 **Owner authority:** `ACCELERATED-CLEANING-INTEGRATION-01-TWO-STAGE-HARDWARE-EVIDENCE`
-**Profile:** `TEST_HARDWARE_DRY` for both stages, and nothing else
+**Profile:** `TEST_HARDWARE` for Trial A (read-only, no command path), `TEST_HARDWARE_DRY` for Trial B
+(the single-DO write path), and nothing else for either
 **Companion document:** `docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` — the *integrated* dry trial
 (motion + IV command + physical AI-003), which remains a **third, separate** evidence class and is
 neither stage described here
@@ -9,9 +10,9 @@ neither stage described here
 > **Status: NOT EXECUTED, NOT AUTHORIZED.** Nothing in this document was run. No physical network
 > contact, no valve actuation, no Pump command and no motion occurred while it was written. Items that
 > only the Owner can decide are marked `OWNER_DECISION_REQUIRED` and are deliberately empty.
-> **Trial B is executable. Trial A is BLOCKED** — no WJSS executable yet produces a Pump-ready decision
-> from a physical `AI-003+` reading; see §3 and
-> `docs/TRIAL_A_PHYSICAL_PUMP_READY_ENABLEMENT_ANALYSIS.md`.
+> **Both trials are now executable.** Trial A runs through `ProcessIoPumpReadyReadTrial` (read-only,
+> physical `AI-003+`) and Trial B through `DryIvTrial` (one coil write, simulated `AI-003+`); see §2 and
+> §3. Neither has been executed: the physical runs remain separately authorized Owner-local activities.
 
 ---
 
@@ -30,14 +31,15 @@ each:
 | IV commands | **None — every IV stays CLOSED** | **One** valve OPEN, then CLOSED |
 | Motion / Home / P1–P6 | **None** | **None** |
 | Queue / `TimeDelay` / next Job | **None** | **None** |
-| Executable today | **No** — and no existing read-only path produces the decision (see §3) | **Yes** — `DryIvTrial` |
+| Executable today | **Yes** — `ProcessIoPumpReadyReadTrial` (read-only, no command path; see §3) | **Yes** — `DryIvTrial` |
 
 The two stages are **never combined**. Trial B deliberately runs with the Pump stopped, so its
 Pump-ready input cannot be physical; Trial A deliberately runs with every valve closed, so it cannot
 produce valve evidence. Combining them would produce one ambiguous record instead of two clean ones.
 
 The two selects are mutually exclusive in software: Trial B refuses when the integrated dry selector
-is present, and the integrated dry path is unmodified by Trial B.
+is present, Trial A refuses when either the integrated dry selector or the Trial B selector is present,
+and neither of the two existing paths is modified by Trial A.
 
 ## 2. Trial B — the isolated IV Hardware trial (executable)
 
@@ -166,52 +168,111 @@ physical abort described in §2.6 is the authority for that case, and the proced
 5. Capture standard output, standard error, the exit code and the session audit trail as the record.
 6. `OWNER_DECISION_REQUIRED` — state whether a repeated run is permitted, and on what evidence.
 
-## 3. Trial A — physical Pump-ready evidence (BLOCKED: no executable path exists)
+## 3. Trial A — physical Pump-ready evidence (executable, read-only)
 
 > **Correction (2026-11-03).** An earlier revision of this section stated that "no new executable is
 > added for Trial A, and none is required", and that the Owner could run the existing read-only
 > acquisition path to obtain the Pump-ready acceptance decision. Source inspection under
-> `TRIAL-A-PHYSICAL-PUMP-READY-ENABLEMENT` proved that statement false and it is withdrawn. The full
-> analysis, with exact evidence, is in
-> `docs/TRIAL_A_PHYSICAL_PUMP_READY_ENABLEMENT_ANALYSIS.md`.
+> `TRIAL-A-PHYSICAL-PUMP-READY-ENABLEMENT` proved that statement false and it is withdrawn. The gap
+> analysis is in `docs/TRIAL_A_PHYSICAL_PUMP_READY_ENABLEMENT_ANALYSIS.md`; the narrow host it proposed
+> is now implemented as `ProcessIoPumpReadyReadTrial` and routed by the runtime host.
 
-**No WJSS executable currently produces a Pump-ready decision from a physical `AI-003+` reading.**
+### 3.1 Entry point and selectors
 
-- The only read-only Process-Io host the Owner can invoke is the Node bench, which reads every DI and AI
-  row and reports **counts**, not values, and has no setpoint rule.
-- `ProcessIoBenchRunner` (C#) does read physically but has **no console host at all**.
-- The only code that evaluates `SequencingPressure.PumpReady` against a physical observation is the
-  integrated dry composition, which Homes the axes — forbidden for Trial A — and Trial B, whose
-  `AI-003+` input is the software-simulated sample.
+| Variable | Required value | Meaning |
+|---|---|---|
+| `WJSS_PUMP_READY_READ_TRIAL` | `AI-003_ONLY` (exact, case-sensitive) | selects Trial A and nothing else |
+| `WJSS_DEVICE_PROFILE` | `TEST_HARDWARE` | the only authorized profile for this stage |
+| `WJSS_PROCESS_IO_HOST` / `_PORT` / `_UNIT_ID` | Owner-local endpoint | resolved by the existing `ProcessIoEndpointConfiguration` |
+| `WJSS_PROCESS_IO_CONSENT` | the published **read-only** `PhysicalDiAiRead` phrase | write consent never authorizes a read trial |
+| `WJSS_PROCESS_IO_CATALOGUE` | fully qualified path, ≤ 1 MiB | loaded by the existing `ProcessIoCatalogueLoader` |
+| `WJSS_PUMP_READY_SETPOINT_BAR` | one finite bar value | **never defaulted** |
+| `WJSS_PRESSURE_LOW_BAR` / `_HIGH_BAR` | optional, finite | carried unchanged, never invented as Owner values |
+| `WJSS_PUMP_READY_FRESHNESS_MS` | integer 1–600000 | the freshness budget for the single observation |
 
-The building blocks are finished Product: the physical transport, the `AI-003+` observation with raw
-value, bar, quality, timestamp, freshness and generation, and the Pump-ready rule itself. What is
-missing is a bounded read-only **host** that composes them and labels the result. Deriving the value by
-hand from a bench ledger would be arithmetic performed outside WJSS on unlabelled data, and is not
-accepted as Product evidence.
+The consent phrase is read from the environment only. It is never printed, logged, persisted or passed
+on a command line; the report carries a non-reversible digest code instead of the phrase, and a
+non-reversible fingerprint instead of the endpoint address.
 
-Trial A therefore remains a **procedure with a blocked pipeline**, not a runnable stage:
+### 3.2 Refusals, all before a transport is constructed
+
+Trial A refuses, with exit code 4 and no network contact, when: the selector is absent; the selector is
+not the exact literal; `PRODUCTION` is the profile; the profile is not `TEST_HARDWARE` (`SIMULATOR`,
+`TEST_HARDWARE_DRY` and `TEST_HARDWARE_READ_ONLY` are all refused, the last because it is committed to
+the one-Node TC read path); the integrated dry selector or the Trial B selector is also present; the
+endpoint is missing or rejected; the consent is missing or does not match the read-only phrase; the
+catalogue is missing, relative, oversized or refused by the loader; the `AI-003+` row is absent,
+unbound, not an adopted READ Input Register on the Process-I/O rack, or resolves to another device; the
+Pump-ready setpoint is missing or non-finite; the pressure band is invalid; or the freshness budget is
+missing or out of range.
+
+### 3.3 What the trial does, in order
+
+1. validates the selector, the profile and the two exclusions;
+2. resolves the Owner-local endpoint and validates the read-only consent;
+3. loads the catalogue and proves the `AI-003+` binding is an adopted READ Input Register on the rack;
+4. reads the setpoint, the optional band and the freshness budget, defaulting none of them;
+5. constructs the existing `ProcessIoPhysicalTransport` — only now does anything exist that could
+   reach the network;
+6. opens the existing `ProcessIoSession` and captures its generation;
+7. observes `AI-003+` once, capturing raw word, engineering bar, source tag, quality, `ObservedAt`,
+   `ReceivedAt`, freshness and generation;
+8. optionally observes `AI-002+` and reports it as `NOT_USED_FOR_DECISION`;
+9. builds a `PressureSample` carrying the Pump-Outlet identity and applies the existing
+   `SequencingPressure.Valid` and `SequencingPressure.PumpReady` rules with the configured setpoint;
+10. reports the evidence, closes the session, releases the transport, and exits.
+
+Steps 1–4 perform no I/O at all. Nothing is retried, no previous observation is reused, and no value is
+substituted on refusal.
+
+### 3.4 What the trial commands
+
+**Nothing.** The path contains no write admission, no digital-output dispatch, no coil write, no
+register write, no IV command, no motion, no Home, no Queue and no `TimeDelay`. It composes no write
+authorization and holds no equipment boundary: a read needs no authority, and the total absence of a
+write authority is what keeps the stage read-only. Every Isolation Valve stays CLOSED for the whole
+stage.
+
+### 3.5 Evidence printed
+
+`TRIAL: PHYSICAL_PUMP_READY_READ_ONLY`, `source_tag: AI-003+`, `evidence_kind`, `physical_pump_verified`,
+`physical_ai003_verified`, `pump_ready`, `raw_value`, `engineering_bar`, `quality`, `observed_at`,
+`fresh`, `session_generation`, `configured_setpoint_bar`, `strict_comparison`,
+`ai002_role: DIAGNOSTIC_ONLY_NOT_USED_FOR_DECISION` with `ai002_used_for_decision=FALSE`,
+`iv_command_executed: FALSE`, `motion_executed: FALSE`, `waterjet_command_executed: FALSE`.
+
+`physical_pump_verified` and `physical_ai003_verified` are `TRUE` only when the whole chain passed; a
+refused or failed run can never claim physical Pump verification.
+
+### 3.6 Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | the physical `AI-003+` observation is valid, current and **strictly** above the setpoint |
+| `2` | the observation completed but Pump-ready was not accepted: invalid quality, stale, future-dated, superseded generation, wrong source identity, or at/below the setpoint |
+| `3` | bounded read timeout or transport fault — no value was produced |
+| `4` | refusal before acquisition: selector, profile, endpoint, consent, catalogue, binding, threshold or freshness |
+
+### 3.7 Trial A procedure
 
 1. all eight Isolation Valves are confirmed CLOSED and stay closed for the whole stage;
 2. no IV command, no Home, no motion, no Queue, no `TimeDelay`, no next Job;
 3. the Pump runs under the Owner's own control and authority;
-4. `AI-003+` — the sole Pump-ready authority — must be read and decided **by WJSS**, which no current
-   surface can do;
+4. `AI-003+` — the sole Pump-ready authority — is read and decided **by WJSS**, in one generation;
 5. `AI-002+` is diagnostic only and is never treated as Pump-ready;
-6. the record must capture the Pump state, the running condition, the acceptance decision and the
+6. the record captures the Pump state, the running condition, the acceptance decision and the
    freshness/generation the decision was made in.
 
-`OWNER_DECISION_REQUIRED` — whether to authorize the narrow read-only Trial A host proposed in the
-analysis document, and, only after that: the Pump running condition (speed, duration, water
-destination), the safe observation point, the person authorized to start and stop the Pump, and the
-abort method.
+`OWNER_DECISION_REQUIRED` — the Pump running condition (speed, duration, water destination), the safe
+observation point, the person authorized to start and stop the Pump, and the abort method. All of these
+are Owner-local and none of them is defaulted by the software.
 
-**Trial A would prove (once a host exists):** a physical Pump can produce an `AI-003+` reading that the
-existing Pump-ready rule accepts, in the recorded generation.
+**Trial A proves:** a physical Pump can produce a physical `AI-003+` reading that the existing
+Pump-ready rule accepts, in the recorded generation — `PHYSICAL_PUMP_READY`.
 
 **Trial A does not prove:** any Isolation Valve movement, any valve feedback, any motion, any queue
-behaviour, or any wet cleaning outcome. Trial A produces **no** `PHYSICAL_PUMP_READY` label for the
-software path; the label belongs to the Owner's record, not to a simulated or integrated run.
+behaviour, any wet cleaning outcome, or anything about Trial B. Trial A is not repeated per WSB: it is
+one shared Pump-Outlet verification.
 
 ## 4. Route identity (stated once — no per-WSB matrix)
 
@@ -244,6 +305,11 @@ outlet pressure; and structured cleanup that closes exactly the valve it opened.
 transmitter; water-on behaviour; any second valve; any other WSB; motion, Home or P1–P6; Queue or
 `TimeDelay` behaviour; Production readiness; valve actuation time, seat tightness, leak rate or
 pressure-band behaviour; or the correctness of any Owner-supplied threshold.
+
+**Trial A establishes only:** that a physical `AI-003+` reading, obtained through the existing transport
+and session, satisfied the existing Pump-ready rule under the Owner-supplied setpoint in the recorded
+generation — reported as `PHYSICAL_PUMP_READY`. **Trial A does not establish** any valve, motion, queue
+or wet-cleaning behaviour, and it establishes nothing about Production.
 
 **Combining the two stages into one claim is not permitted.** A reader of either record must be able
 to see which part was physical and which part was simulated without consulting a second document,
