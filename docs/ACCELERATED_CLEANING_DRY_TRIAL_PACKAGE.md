@@ -14,8 +14,10 @@
 ---
 
 > **Sibling package.** The two-stage split of this evidence — **Trial A** (physical Pump-ready,
-> procedure only, every IV closed) and **Trial B** (the isolated IV Hardware trial with an explicitly
-> simulated `AI-003+` sample) — is documented in
+> procedure only, every IV closed, and currently **blocked**: no WJSS executable yet produces a
+> Pump-ready decision from a physical `AI-003+` reading — see
+> `docs/TRIAL_A_PHYSICAL_PUMP_READY_ENABLEMENT_ANALYSIS.md`) and **Trial B** (the isolated IV Hardware
+> trial with an explicitly simulated `AI-003+` sample) — is documented in
 > `docs/ACCELERATED_CLEANING_IV_TWO_STAGE_EVIDENCE.md`. This integrated trial remains a **third,
 > separate** evidence class: it is not Trial A and not Trial B, and no claim may be carried from one
 > of the three to another.

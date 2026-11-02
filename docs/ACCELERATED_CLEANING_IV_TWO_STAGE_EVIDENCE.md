@@ -9,6 +9,9 @@ neither stage described here
 > **Status: NOT EXECUTED, NOT AUTHORIZED.** Nothing in this document was run. No physical network
 > contact, no valve actuation, no Pump command and no motion occurred while it was written. Items that
 > only the Owner can decide are marked `OWNER_DECISION_REQUIRED` and are deliberately empty.
+> **Trial B is executable. Trial A is BLOCKED** — no WJSS executable yet produces a Pump-ready decision
+> from a physical `AI-003+` reading; see §3 and
+> `docs/TRIAL_A_PHYSICAL_PUMP_READY_ENABLEMENT_ANALYSIS.md`.
 
 ---
 
@@ -27,7 +30,7 @@ each:
 | IV commands | **None — every IV stays CLOSED** | **One** valve OPEN, then CLOSED |
 | Motion / Home / P1–P6 | **None** | **None** |
 | Queue / `TimeDelay` / next Job | **None** | **None** |
-| Executable today | **No** — procedure only | **Yes** — `DryIvTrial` |
+| Executable today | **No** — and no existing read-only path produces the decision (see §3) | **Yes** — `DryIvTrial` |
 
 The two stages are **never combined**. Trial B deliberately runs with the Pump stopped, so its
 Pump-ready input cannot be physical; Trial A deliberately runs with every valve closed, so it cannot
@@ -163,27 +166,48 @@ physical abort described in §2.6 is the authority for that case, and the proced
 5. Capture standard output, standard error, the exit code and the session audit trail as the record.
 6. `OWNER_DECISION_REQUIRED` — state whether a repeated run is permitted, and on what evidence.
 
-## 3. Trial A — physical Pump-ready evidence (procedure only)
+## 3. Trial A — physical Pump-ready evidence (BLOCKED: no executable path exists)
 
-**No new executable is added for Trial A, and none is required by this package.** The Owner runs the
-existing read-only acquisition path against the running Pump and records what the software accepts.
+> **Correction (2026-11-03).** An earlier revision of this section stated that "no new executable is
+> added for Trial A, and none is required", and that the Owner could run the existing read-only
+> acquisition path to obtain the Pump-ready acceptance decision. Source inspection under
+> `TRIAL-A-PHYSICAL-PUMP-READY-ENABLEMENT` proved that statement false and it is withdrawn. The full
+> analysis, with exact evidence, is in
+> `docs/TRIAL_A_PHYSICAL_PUMP_READY_ENABLEMENT_ANALYSIS.md`.
 
-Trial A is a **procedure**, not a code change:
+**No WJSS executable currently produces a Pump-ready decision from a physical `AI-003+` reading.**
+
+- The only read-only Process-Io host the Owner can invoke is the Node bench, which reads every DI and AI
+  row and reports **counts**, not values, and has no setpoint rule.
+- `ProcessIoBenchRunner` (C#) does read physically but has **no console host at all**.
+- The only code that evaluates `SequencingPressure.PumpReady` against a physical observation is the
+  integrated dry composition, which Homes the axes — forbidden for Trial A — and Trial B, whose
+  `AI-003+` input is the software-simulated sample.
+
+The building blocks are finished Product: the physical transport, the `AI-003+` observation with raw
+value, bar, quality, timestamp, freshness and generation, and the Pump-ready rule itself. What is
+missing is a bounded read-only **host** that composes them and labels the result. Deriving the value by
+hand from a bench ledger would be arithmetic performed outside WJSS on unlabelled data, and is not
+accepted as Product evidence.
+
+Trial A therefore remains a **procedure with a blocked pipeline**, not a runnable stage:
 
 1. all eight Isolation Valves are confirmed CLOSED and stay closed for the whole stage;
 2. no IV command, no Home, no motion, no Queue, no `TimeDelay`, no next Job;
 3. the Pump runs under the Owner's own control and authority;
-4. the existing acquisition records `AI-003+` — the sole Pump-ready authority — and the Pump-ready
-   acceptance decision it produces;
-5. `AI-002+` is recorded **as a diagnostic only** and is never treated as Pump-ready;
-6. the record captures the Pump state, the running condition, the acceptance decision and the
+4. `AI-003+` — the sole Pump-ready authority — must be read and decided **by WJSS**, which no current
+   surface can do;
+5. `AI-002+` is diagnostic only and is never treated as Pump-ready;
+6. the record must capture the Pump state, the running condition, the acceptance decision and the
    freshness/generation the decision was made in.
 
-`OWNER_DECISION_REQUIRED` — the Pump running condition (speed, duration, water destination), the safe
-observation point, the person authorized to start and stop the Pump, and the abort method.
+`OWNER_DECISION_REQUIRED` — whether to authorize the narrow read-only Trial A host proposed in the
+analysis document, and, only after that: the Pump running condition (speed, duration, water
+destination), the safe observation point, the person authorized to start and stop the Pump, and the
+abort method.
 
-**Trial A proves:** a physical Pump can produce an `AI-003+` reading that the existing Pump-ready rule
-accepts, in the recorded generation.
+**Trial A would prove (once a host exists):** a physical Pump can produce an `AI-003+` reading that the
+existing Pump-ready rule accepts, in the recorded generation.
 
 **Trial A does not prove:** any Isolation Valve movement, any valve feedback, any motion, any queue
 behaviour, or any wet cleaning outcome. Trial A produces **no** `PHYSICAL_PUMP_READY` label for the
