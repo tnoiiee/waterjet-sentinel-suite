@@ -21,13 +21,13 @@ public sealed class ProcessIoPumpReadyReadTrialTests
     private const string BenchHost = "bench-host.local";
 
     /// <summary>Raw word whose Product conversion is about 29 bar, strictly above the 15 bar setpoint.</summary>
-    private const int RawAbove = 24000;
+    private const ushort RawAbove = 24000;
 
     /// <summary>Raw word whose Product conversion is about 14.6 bar, below the 15 bar setpoint.</summary>
-    private const int RawBelow = 12000;
+    private const ushort RawBelow = 12000;
 
     /// <summary>A raw word outside the adopted representation domain (full scale is 32767).</summary>
-    private const int RawOutOfDomain = 40000;
+    private const ushort RawOutOfDomain = 40000;
 
     private static readonly SequencingPressureThresholds Thresholds = new(1.0, 15.0, 15.0);
 
@@ -1184,7 +1184,10 @@ public sealed class ProcessIoPumpReadyReadTrialTests
     {
         var outcomes = new List<PumpReadyReadOutcome>();
 
-        foreach (int inletRaw in new[] { 0, RawBelow, RawAbove, 32000 })
+        foreach (ushort inletRaw in new ushort[]
+                 {
+                     0, RawBelow, RawAbove, 32000,
+                 })
         {
             var runClock = new TestClock();
             (ProcessIoSession session, FakeTransport transport) = CreateSession();
