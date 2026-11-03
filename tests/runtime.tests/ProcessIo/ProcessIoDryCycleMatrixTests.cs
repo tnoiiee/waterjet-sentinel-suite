@@ -55,22 +55,46 @@ public sealed class ProcessIoDryCycleMatrixTests
         public Dictionary<int, ushort> InputRegisters { get; } = new();
         public Dictionary<int, bool> Coils { get; } = new();
         public bool ThrowOnWrite { get; set; }
+
+        /// <summary>Faults every read, so a read failure can be proven not to be field evidence.</summary>
+        public bool ThrowOnRead { get; set; }
+
+        /// <summary>
+        /// Runs inside every read with that address, so a test can consume elapsed clock time exactly
+        /// where a real device would — and can make one tag slow while another stays fast.
+        /// </summary>
+        public Action<int>? DuringRead { get; set; }
+
+        public int ReadAttempts { get; private set; }
+
         public int NetworkAttempts => CoilWrites.Count;
 
         public bool ReadDiscreteInput(string deviceKey, int address)
-            => DiscreteInputs.TryGetValue(address, out bool value) && value;
+        {
+            OnRead(address);
+            return DiscreteInputs.TryGetValue(address, out bool value) && value;
+        }
 
         public IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity)
-            => Enumerable.Range(startAddress, quantity).Select(a => Coils.TryGetValue(a, out bool v) && v).ToList();
+        {
+            OnRead(startAddress);
+            return Enumerable.Range(startAddress, quantity).Select(a => Coils.TryGetValue(a, out bool v) && v).ToList();
+        }
 
         public ushort ReadInputRegister(string deviceKey, int registerAddress)
-            => InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
+        {
+            OnRead(registerAddress);
+            return InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
+        }
 
         public ushort ReadRegister(string deviceKey, int registerAddress)
             => InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
 
         public bool ReadCoil(string deviceKey, int coilAddress)
-            => Coils.TryGetValue(coilAddress, out bool value) && value;
+        {
+            OnRead(coilAddress);
+            return Coils.TryGetValue(coilAddress, out bool value) && value;
+        }
 
         public IReadOnlyList<ushort> ReadHoldingRegistersBulk(string deviceKey, int startAddress, int quantity)
             => Enumerable.Range(startAddress, quantity)
@@ -81,6 +105,13 @@ public sealed class ProcessIoDryCycleMatrixTests
             if (ThrowOnWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
             CoilWrites.Add((deviceKey, coilAddress, value));
             Coils[coilAddress] = value;
+        }
+
+        private void OnRead(int address)
+        {
+            ReadAttempts++;
+            if (ThrowOnRead) throw new IOException("FAKE_READ_TIMEOUT");
+            DuringRead?.Invoke(address);
         }
 
         public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value) { }
@@ -148,12 +179,12 @@ public sealed class ProcessIoDryCycleMatrixTests
     }
 
     private static (ProcessIoEquipmentBoundary Boundary, ProcessIoSession Session) CreateGranted(
-        FakeTransport transport, TimeSpan? freshness = null)
+        FakeTransport transport, TimeSpan? freshness = null, TimeProvider? time = null)
     {
         var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
         session.Open(DateTimeOffset.UnixEpoch);
         var boundary = new ProcessIoEquipmentBoundary(
-            session, BuildCatalogue(), Authorize(), time: null, freshnessBudget: freshness ?? TimeSpan.FromMinutes(5));
+            session, BuildCatalogue(), Authorize(), time: time, freshnessBudget: freshness ?? TimeSpan.FromMinutes(5));
         return (boundary, session);
     }
 
@@ -459,6 +490,328 @@ public sealed class ProcessIoDryCycleMatrixTests
         Assert.False(observation.Fresh);
         Assert.False(observation.IsUsable);
         Assert.Null(boundary.ReadPumpOutletPressure());
+    }
+
+    // ---------------------------------------------------------------- observation timestamp bracketing
+    //
+    // C# evaluates method arguments before the call, so the boundary must not sample an observation
+    // instant and a receive instant and hand both to the session: both would be taken BEFORE the
+    // transport read, and a slow read would be accepted as current. The boundary therefore hands its
+    // clock to the session and lets the session bracket the read. These tests drive a controllable
+    // clock to prove the bracket is real on every path the boundary exposes.
+
+    [Fact]
+    public void Analog_Boundary_Fast_Read_Is_Fresh_And_Good()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.InputRegisters[2] = 24000;
+        transport.DuringRead = address =>
+        {
+            if (address == 2) clock.Advance(TimeSpan.FromMilliseconds(5));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+
+        ProcessIoPhysicalObservation observation = boundary.Observe("AI-003+");
+
+        Assert.True(observation.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, observation.Quality);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), observation.ReceivedAt - observation.ObservedAt);
+        Assert.NotNull(boundary.ReadPumpOutletPressure());
+    }
+
+    [Fact]
+    public void Analog_Boundary_Slow_Read_Is_Stale_And_Refused()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.InputRegisters[2] = 24000;
+        transport.DuringRead = address =>
+        {
+            if (address == 2) clock.Advance(TimeSpan.FromMilliseconds(60));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+
+        ProcessIoPhysicalObservation observation = boundary.Observe("AI-003+");
+
+        Assert.False(observation.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, observation.Quality);
+        Assert.Equal(TimeSpan.FromMilliseconds(60), observation.ReceivedAt - observation.ObservedAt);
+        Assert.False(observation.IsUsable);
+
+        // The Pump-ready authority refuses a stale reading outright: no sample is produced at all.
+        Assert.Null(boundary.ReadPumpOutletPressure());
+    }
+
+    [Fact]
+    public void Upper_Open_Fast_Read_Confirms_Field_Position()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.DiscreteInputs[20] = true;
+        transport.DiscreteInputs[28] = false;
+        transport.DuringRead = address =>
+        {
+            if (address is 20 or 28) clock.Advance(TimeSpan.FromMilliseconds(5));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
+
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
+
+        Assert.True(observation.UpperLimitDetected);
+        Assert.False(observation.LowerLimitDetected);
+        Assert.True(observation.FieldConfirmed);
+        Assert.Equal("IV_OPEN_FIELD_CONFIRMED", observation.AssessmentCode);
+    }
+
+    [Fact]
+    public void Upper_Open_Slow_Read_Refuses_Field_Confirmation()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.DiscreteInputs[20] = true;
+        transport.DiscreteInputs[28] = false;
+        transport.DuringRead = address =>
+        {
+            if (address == 20) clock.Advance(TimeSpan.FromMilliseconds(60));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
+
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
+
+        // The bit arrived OPEN, but too late to be current: it is not field evidence of position.
+        Assert.False(observation.UpperLimitDetected);
+        Assert.False(observation.FieldConfirmed);
+        Assert.Equal("IV_FIELD_NOT_CONFIRMED", observation.AssessmentCode);
+    }
+
+    [Fact]
+    public void Lower_Closed_Fast_Read_Confirms_Field_Position()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.DiscreteInputs[20] = false;
+        transport.DiscreteInputs[28] = true;
+        transport.DuringRead = address =>
+        {
+            if (address is 20 or 28) clock.Advance(TimeSpan.FromMilliseconds(5));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Close));
+
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
+
+        Assert.True(observation.LowerLimitDetected);
+        Assert.False(observation.UpperLimitDetected);
+        Assert.True(observation.FieldConfirmed);
+        Assert.Equal("IV_CLOSED_FIELD_CONFIRMED", observation.AssessmentCode);
+    }
+
+    [Fact]
+    public void Lower_Closed_Slow_Read_Refuses_Field_Confirmation()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.DiscreteInputs[20] = false;
+        transport.DiscreteInputs[28] = true;
+        transport.DuringRead = address =>
+        {
+            if (address == 28) clock.Advance(TimeSpan.FromMilliseconds(60));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Close));
+
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
+
+        Assert.False(observation.LowerLimitDetected);
+        Assert.False(observation.FieldConfirmed);
+        Assert.Equal("IV_FIELD_NOT_CONFIRMED", observation.AssessmentCode);
+    }
+
+    [Fact]
+    public void Boundary_Freshness_Budget_Is_Inclusive_At_Its_Exact_Boundary()
+    {
+        var atClock = new TestClock();
+        var atTransport = new FakeTransport();
+        atTransport.InputRegisters[2] = 24000;
+        atTransport.DuringRead = address =>
+        {
+            if (address == 2) atClock.Advance(TimeSpan.FromMilliseconds(20));
+        };
+        (ProcessIoEquipmentBoundary atBoundary, _) =
+            CreateGranted(atTransport, TimeSpan.FromMilliseconds(20), atClock);
+
+        ProcessIoPhysicalObservation atObservation = atBoundary.Observe("AI-003+");
+        Assert.True(atObservation.Fresh);
+        Assert.NotNull(atBoundary.ReadPumpOutletPressure());
+
+        var pastClock = new TestClock();
+        var pastTransport = new FakeTransport();
+        pastTransport.InputRegisters[2] = 24000;
+        pastTransport.DuringRead = address =>
+        {
+            if (address == 2) pastClock.Advance(TimeSpan.FromMilliseconds(21));
+        };
+        (ProcessIoEquipmentBoundary pastBoundary, _) =
+            CreateGranted(pastTransport, TimeSpan.FromMilliseconds(20), pastClock);
+
+        ProcessIoPhysicalObservation pastObservation = pastBoundary.Observe("AI-003+");
+        Assert.False(pastObservation.Fresh);
+        Assert.Null(pastBoundary.ReadPumpOutletPressure());
+    }
+
+    [Fact]
+    public void Boundary_Transport_Fault_Is_Bad_And_Never_Field_Confirmation()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport
+        {
+            ThrowOnRead = true,
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) = CreateGranted(transport, TimeSpan.FromSeconds(2), clock);
+        boundary.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
+
+        ProcessIoValveObservation observation = boundary.ObserveValve("IV1");
+
+        Assert.False(observation.UpperLimitDetected);
+        Assert.False(observation.LowerLimitDetected);
+        Assert.False(observation.FieldConfirmed);
+
+        ProcessIoPhysicalObservation faulted = boundary.Observe("AI-003+");
+        Assert.Equal(ProcessIoObservationQuality.BAD, faulted.Quality);
+        Assert.Equal(ProcessIoObservationProvenance.NOT_OBSERVED, faulted.Provenance);
+        Assert.Null(boundary.ReadPumpOutletPressure());
+    }
+
+    [Fact]
+    public void Boundary_Generation_Remains_Current_Across_A_Slow_Read()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.InputRegisters[2] = 24000;
+        transport.DuringRead = address =>
+        {
+            if (address == 2) clock.Advance(TimeSpan.FromMilliseconds(60));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+
+        ProcessIoPhysicalObservation observation = boundary.Observe("AI-003+");
+
+        // Staleness is a freshness verdict, never a generation change.
+        Assert.False(observation.Fresh);
+        Assert.Equal(session.Generation, observation.SourceGeneration);
+    }
+
+    [Fact]
+    public void Pump_Ready_Cannot_Be_Satisfied_By_A_Stale_Physical_Ai003()
+    {
+        var thresholds = new SequencingPressureThresholds(1.0, 15.0, 15.0);
+
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.InputRegisters[2] = 24000;
+        transport.DuringRead = address =>
+        {
+            if (address == 2) clock.Advance(TimeSpan.FromMilliseconds(60));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+
+        // A stale reading produces no sample, so the existing Pump-ready rule can never accept it.
+        PressureSample? sample = boundary.ReadPumpOutletPressure();
+        Assert.Null(sample);
+        Assert.False(SequencingPressure.PumpReady(sample, thresholds));
+
+        // Control: the identical reading, delivered in time, does produce a Pump-ready sample.
+        var fastClock = new TestClock();
+        var fastTransport = new FakeTransport();
+        fastTransport.InputRegisters[2] = 24000;
+        (ProcessIoEquipmentBoundary fastBoundary, _) =
+            CreateGranted(fastTransport, TimeSpan.FromMilliseconds(20), fastClock);
+
+        PressureSample? fastSample = fastBoundary.ReadPumpOutletPressure();
+        Assert.NotNull(fastSample);
+        Assert.True(SequencingPressure.PumpReady(fastSample, thresholds));
+    }
+
+    [Fact]
+    public void Valve_Pressure_Supervision_Cannot_Accept_Stale_Pressure()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.InputRegisters[4] = 16384;
+        transport.DuringRead = address =>
+        {
+            if (address == 4) clock.Advance(TimeSpan.FromMilliseconds(60));
+        };
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromMilliseconds(20), clock);
+
+        Assert.Null(boundary.ReadValveOutletPressure("IV2"));
+
+        // Control: the same register, delivered in time, is accepted as valve-outlet evidence.
+        var fastClock = new TestClock();
+        var fastTransport = new FakeTransport();
+        fastTransport.InputRegisters[4] = 16384;
+        (ProcessIoEquipmentBoundary fastBoundary, _) =
+            CreateGranted(fastTransport, TimeSpan.FromMilliseconds(20), fastClock);
+
+        PressureSample? fastSample = fastBoundary.ReadValveOutletPressure("IV2");
+        Assert.NotNull(fastSample);
+        Assert.Equal(PressureSample.ValveOutletSource("IV2"), fastSample!.SourceId);
+    }
+
+    [Fact]
+    public void Observation_Paths_Perform_No_Write()
+    {
+        var clock = new TestClock();
+        var transport = new FakeTransport();
+        transport.DiscreteInputs[20] = true;
+        transport.DiscreteInputs[28] = false;
+        transport.InputRegisters[2] = 24000;
+
+        (ProcessIoEquipmentBoundary boundary, _) =
+            CreateGranted(transport, TimeSpan.FromSeconds(2), clock);
+
+        // No valve was commanded, so these are pure observation paths.
+        boundary.Observe("AI-003+");
+        boundary.Observe("DI-021");
+        boundary.ReadPumpOutletPressure();
+        boundary.ReadUpperLimitDetected("IV1");
+        boundary.ReadLowerLimitDetected("IV1");
+        boundary.ReadValveOutletPressure("IV2");
+
+        Assert.Empty(transport.CoilWrites);
+        Assert.True(transport.ReadAttempts > 0);
+    }
+
+    /// <summary>A clock the test moves on purpose, so freshness is a fact rather than a race.</summary>
+    private sealed class TestClock : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; private set; } = new(2026, 11, 3, 8, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
+
+        public void Advance(TimeSpan delta) => UtcNow += delta;
     }
 
     // ---------------------------------------------------------------- separated evidence

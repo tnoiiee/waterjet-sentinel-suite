@@ -400,6 +400,262 @@ public sealed class ProcessIoFoundationTests
         Assert.Equal(2, transport.TotalReads);
     }
 
+    // ------------------------------------------------------------ observation timestamp bracketing
+    //
+    // C# evaluates method arguments before the call, so a caller that samples an observation instant
+    // and a receive instant and passes both into the session records two timestamps taken BEFORE the
+    // transport read. A slow read would then be reported with ObservedAt == ReceivedAt and accepted as
+    // fresh. The TimeProvider overloads remove that possibility by bracketing the read themselves.
+
+    [Fact]
+    public void Digital_Clock_Overload_Brackets_A_Fast_Read_As_Good()
+    {
+        var clock = new TestClock();
+        var transport = new ReadCountingProcessIoTransport();
+        transport.SeedDiscreteInput(ProcessIoDevices.RackT8, 20, true);
+        transport.DuringRead = () => clock.Advance(TimeSpan.FromMilliseconds(5));
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(clock.UtcNow);
+        var upper = LoadCommittedCatalogue().First(r => r.Tag == "DI-021");
+
+        ProcessIoPhysicalObservation observation =
+            session.ObserveDigitalInput("DI-021", upper, clock, TimeSpan.FromSeconds(2));
+
+        Assert.Equal(ProcessIoObservationQuality.GOOD, observation.Quality);
+        Assert.True(observation.Fresh);
+        Assert.Equal(1, observation.RawValue);
+        Assert.Equal("OK", observation.DiagnosticCode);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), observation.ReceivedAt - observation.ObservedAt);
+        Assert.Equal(1, transport.DiscreteInputReads);
+    }
+
+    [Fact]
+    public void Digital_Clock_Overload_Reports_A_Slow_Read_Stale()
+    {
+        var clock = new TestClock();
+        var transport = new ReadCountingProcessIoTransport();
+        transport.SeedDiscreteInput(ProcessIoDevices.RackT8, 20, true);
+        transport.DuringRead = () => clock.Advance(TimeSpan.FromMilliseconds(60));
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(clock.UtcNow);
+        var upper = LoadCommittedCatalogue().First(r => r.Tag == "DI-021");
+
+        ProcessIoPhysicalObservation observation =
+            session.ObserveDigitalInput("DI-021", upper, clock, TimeSpan.FromMilliseconds(20));
+
+        Assert.False(observation.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, observation.Quality);
+        Assert.Equal(ProcessIoRefusals.ObservationStale, observation.DiagnosticCode);
+        Assert.Equal(TimeSpan.FromMilliseconds(60), observation.ReceivedAt - observation.ObservedAt);
+        Assert.False(observation.IsUsable);
+    }
+
+    [Fact]
+    public void Digital_Freshness_Budget_Is_Inclusive_At_Its_Exact_Boundary()
+    {
+        var upper = LoadCommittedCatalogue().First(r => r.Tag == "DI-021");
+
+        var atClock = new TestClock();
+        var atTransport = new ReadCountingProcessIoTransport();
+        atTransport.SeedDiscreteInput(ProcessIoDevices.RackT8, 20, true);
+        atTransport.DuringRead = () => atClock.Advance(TimeSpan.FromMilliseconds(20));
+        var atSession = new ProcessIoSession(ProcessIoDevices.RackT8, atTransport);
+        atSession.Open(atClock.UtcNow);
+
+        ProcessIoPhysicalObservation atBoundary =
+            atSession.ObserveDigitalInput("DI-021", upper, atClock, TimeSpan.FromMilliseconds(20));
+        Assert.True(atBoundary.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, atBoundary.Quality);
+
+        var pastClock = new TestClock();
+        var pastTransport = new ReadCountingProcessIoTransport();
+        pastTransport.SeedDiscreteInput(ProcessIoDevices.RackT8, 20, true);
+        pastTransport.DuringRead = () => pastClock.Advance(TimeSpan.FromMilliseconds(21));
+        var pastSession = new ProcessIoSession(ProcessIoDevices.RackT8, pastTransport);
+        pastSession.Open(pastClock.UtcNow);
+
+        ProcessIoPhysicalObservation past =
+            pastSession.ObserveDigitalInput("DI-021", upper, pastClock, TimeSpan.FromMilliseconds(20));
+        Assert.False(past.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, past.Quality);
+    }
+
+    [Fact]
+    public void Digital_Transport_Fault_Is_Bad_And_Never_Fresh()
+    {
+        var clock = new TestClock();
+        var transport = new ThrowingProcessIoTransport();
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(clock.UtcNow);
+        var lower = LoadCommittedCatalogue().First(r => r.Tag == "DI-029");
+
+        ProcessIoPhysicalObservation observation =
+            session.ObserveDigitalInput("DI-029", lower, clock, TimeSpan.FromSeconds(2));
+
+        Assert.False(observation.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.BAD, observation.Quality);
+        Assert.Equal(ProcessIoObservationProvenance.NOT_OBSERVED, observation.Provenance);
+        Assert.Equal(ProcessIoRefusals.ObservationTransportFault, observation.DiagnosticCode);
+        Assert.Equal(1, transport.ReadAttempts);
+    }
+
+    [Fact]
+    public void Analog_Clock_Overload_Reports_A_Slow_Read_Stale()
+    {
+        var clock = new TestClock();
+        var transport = new ReadCountingProcessIoTransport();
+        transport.SeedInputRegister(ProcessIoDevices.RackT8, 2, 24000);
+        transport.DuringRead = () => clock.Advance(TimeSpan.FromMilliseconds(60));
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(clock.UtcNow);
+        var pumpOutlet = LoadCommittedCatalogue().First(r => r.Tag == "AI-003+");
+
+        ProcessIoPhysicalObservation observation =
+            session.ObserveAnalogInput("AI-003+", pumpOutlet, clock, TimeSpan.FromMilliseconds(20));
+
+        Assert.False(observation.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, observation.Quality);
+        Assert.Equal(TimeSpan.FromMilliseconds(60), observation.ReceivedAt - observation.ObservedAt);
+        Assert.True(observation.EngineeringValue.HasValue);
+    }
+
+    [Fact]
+    public void The_Clock_Overloads_Reject_A_Null_Clock_Before_Any_Read()
+    {
+        var transport = new ReadCountingProcessIoTransport();
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(At);
+        var analog = LoadCommittedCatalogue().First(r => r.Tag == "AI-003+");
+        var digital = LoadCommittedCatalogue().First(r => r.Tag == "DI-021");
+
+        Assert.Throws<ArgumentNullException>(
+            () => session.ObserveAnalogInput("AI-003+", analog, (TimeProvider)null!, TimeSpan.FromSeconds(2)));
+        Assert.Throws<ArgumentNullException>(
+            () => session.ObserveDigitalInput("DI-021", digital, (TimeProvider)null!, TimeSpan.FromSeconds(2)));
+        Assert.Equal(0, transport.TotalReads);
+    }
+
+    [Fact]
+    public void Digital_Timestamp_Overload_Retains_Its_Caller_Supplied_Contract()
+    {
+        var transport = new ReadCountingProcessIoTransport();
+        transport.SeedDiscreteInput(ProcessIoDevices.RackT8, 20, true);
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(At);
+        var upper = LoadCommittedCatalogue().First(r => r.Tag == "DI-021");
+
+        // The verdict derives only from the two instants the caller states; no clock is consulted.
+        ProcessIoPhysicalObservation same =
+            session.ObserveDigitalInput("DI-021", upper, At, At, TimeSpan.FromSeconds(2));
+        Assert.True(same.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, same.Quality);
+        Assert.Equal(At, same.ObservedAt);
+        Assert.Equal(At, same.ReceivedAt);
+
+        ProcessIoPhysicalObservation slow =
+            session.ObserveDigitalInput("DI-021", upper, At, At.AddMilliseconds(60), TimeSpan.FromMilliseconds(20));
+        Assert.False(slow.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, slow.Quality);
+        Assert.Equal(ProcessIoRefusals.ObservationStale, slow.DiagnosticCode);
+        Assert.Equal(At, slow.ObservedAt);
+        Assert.Equal(At.AddMilliseconds(60), slow.ReceivedAt);
+
+        ProcessIoPhysicalObservation refused =
+            session.ObserveDigitalInput("DI-021", null, At, At.AddMilliseconds(5), TimeSpan.FromSeconds(2));
+        Assert.False(refused.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.BAD, refused.Quality);
+        Assert.Equal(ProcessIoObservationProvenance.NOT_OBSERVED, refused.Provenance);
+        Assert.Equal(At, refused.ObservedAt);
+        Assert.Equal(At.AddMilliseconds(5), refused.ReceivedAt);
+    }
+
+    [Fact]
+    public void Session_Generation_Stays_Current_Across_A_Slow_Read()
+    {
+        var clock = new TestClock();
+        var transport = new ReadCountingProcessIoTransport();
+        transport.SeedInputRegister(ProcessIoDevices.RackT8, 2, 24000);
+        transport.DuringRead = () => clock.Advance(TimeSpan.FromMilliseconds(60));
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        int generation = session.Open(clock.UtcNow);
+        var pumpOutlet = LoadCommittedCatalogue().First(r => r.Tag == "AI-003+");
+
+        ProcessIoPhysicalObservation observation =
+            session.ObserveAnalogInput("AI-003+", pumpOutlet, clock, TimeSpan.FromMilliseconds(20));
+
+        // Staleness is a freshness verdict, not a generation verdict.
+        Assert.False(observation.Fresh);
+        Assert.Equal(generation, observation.SourceGeneration);
+    }
+
+    [Fact]
+    public void Observation_Overloads_Perform_Exactly_One_Read_And_No_Write()
+    {
+        // The spy refuses every write, so completing these calls is itself the zero-write proof.
+        var clock = new TestClock();
+        var transport = new ReadCountingProcessIoTransport();
+        transport.SeedDiscreteInput(ProcessIoDevices.RackT8, 20, true);
+        transport.SeedInputRegister(ProcessIoDevices.RackT8, 2, 24000);
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(clock.UtcNow);
+        var analog = LoadCommittedCatalogue().First(r => r.Tag == "AI-003+");
+        var digital = LoadCommittedCatalogue().First(r => r.Tag == "DI-021");
+
+        session.ObserveAnalogInput("AI-003+", analog, clock, TimeSpan.FromSeconds(2));
+        session.ObserveDigitalInput("DI-021", digital, clock, TimeSpan.FromSeconds(2));
+
+        Assert.Equal(1, transport.InputRegisterReads);
+        Assert.Equal(1, transport.DiscreteInputReads);
+        Assert.Equal(2, transport.TotalReads);
+    }
+
+    /// <summary>A clock the test moves on purpose, so freshness is a fact rather than a race.</summary>
+    private sealed class TestClock : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; private set; } = new(2026, 11, 3, 8, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
+
+        public void Advance(TimeSpan delta) => UtcNow += delta;
+    }
+
+    /// <summary>A transport that always faults, so a read failure can be proven not to be a reading.</summary>
+    private sealed class ThrowingProcessIoTransport : IProcessIoTransport
+    {
+        public int ReadAttempts { get; private set; }
+
+        public int NetworkAttempts => ReadAttempts;
+
+        public bool ReadDiscreteInput(string deviceKey, int address) => Fail<bool>();
+
+        public bool ReadCoil(string deviceKey, int coilAddress) => Fail<bool>();
+
+        public IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity) =>
+            Fail<IReadOnlyList<bool>>();
+
+        public ushort ReadInputRegister(string deviceKey, int registerAddress) => Fail<ushort>();
+
+        public ushort ReadRegister(string deviceKey, int registerAddress) => Fail<ushort>();
+
+        public IReadOnlyList<ushort> ReadHoldingRegistersBulk(string deviceKey, int startAddress, int quantity) =>
+            Fail<IReadOnlyList<ushort>>();
+
+        public void WriteCoil(string deviceKey, int coilAddress, bool value) =>
+            throw new InvalidOperationException("a Product observation path must never write");
+
+        public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value) =>
+            throw new InvalidOperationException("a Product observation path must never write");
+
+        public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values) =>
+            throw new InvalidOperationException("a Product observation path must never write");
+
+        private T Fail<T>()
+        {
+            ReadAttempts++;
+            throw new IOException("FAKE_READ_TIMEOUT");
+        }
+    }
+
     /// <summary>
     /// Deterministic transport spy: counts every read so a refused Product observation can be
     /// proven to perform zero transport I/O, and refuses every write (a read path must never
@@ -408,6 +664,12 @@ public sealed class ProcessIoFoundationTests
     private sealed class ReadCountingProcessIoTransport : IProcessIoTransport
     {
         private readonly SimulatedProcessIoTransport _inner = new();
+
+        /// <summary>
+        /// Runs inside every read, so a test can consume elapsed clock time exactly where a real device
+        /// would. Nothing is retried and no value is fabricated by this hook.
+        /// </summary>
+        public Action? DuringRead { get; set; }
 
         public int DiscreteInputReads { get; private set; }
         public int CoilReads { get; private set; }
@@ -426,6 +688,7 @@ public sealed class ProcessIoFoundationTests
         public bool ReadDiscreteInput(string deviceKey, int address)
         {
             DiscreteInputReads++;
+            DuringRead?.Invoke();
             return _inner.ReadDiscreteInput(deviceKey, address);
         }
 
@@ -444,6 +707,7 @@ public sealed class ProcessIoFoundationTests
         public ushort ReadInputRegister(string deviceKey, int registerAddress)
         {
             InputRegisterReads++;
+            DuringRead?.Invoke();
             return _inner.ReadInputRegister(deviceKey, registerAddress);
         }
 
