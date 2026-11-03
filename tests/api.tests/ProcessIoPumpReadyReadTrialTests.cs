@@ -830,26 +830,24 @@ public sealed class ProcessIoPumpReadyReadTrialTests
     [Fact]
     public void Diagnostic_Freshness_Never_Changes_The_Three_Verdicts()
     {
+        // The 60 ms diagnostic delay must be measured against a budget it can actually exceed, so both
+        // runs use the narrow budget and the difference under test is real.
         var fastClock = new TestClock();
         (ProcessIoSession fastSession, FakeTransport fastTransport) = CreateSession();
         fastTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
         fastTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
-        PumpReadyReadOutcome fastInlet = ProcessIoPumpReadyReadTrial.Observe(Request(fastClock), fastSession);
+        PumpReadyReadOutcome fastInlet =
+            ProcessIoPumpReadyReadTrial.Observe(Request(fastClock, NarrowBudget), fastSession);
 
         var slowClock = new TestClock();
         (ProcessIoSession slowSession, FakeTransport slowTransport) = CreateSession();
         slowTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
         slowTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
-        slowTransport.DuringRegisterRead = address =>
-        {
-            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
-            {
-                slowClock.Advance(TimeSpan.FromMilliseconds(60));
-            }
-        };
-        PumpReadyReadOutcome slowInlet = ProcessIoPumpReadyReadTrial.Observe(Request(slowClock), slowSession);
+        slowTransport.DuringRegisterRead = SlowOnly(slowClock, AddressOf(ProcessIoIsolationValves.PumpInletPressureTag), 60);
+        PumpReadyReadOutcome slowInlet =
+            ProcessIoPumpReadyReadTrial.Observe(Request(slowClock, NarrowBudget), slowSession);
 
-        // The diagnostic reading differs in freshness; none of the three verdicts may move.
+        // The diagnostic reading genuinely differs in freshness; none of the three verdicts may move.
         Assert.True(fastInlet.Ai002Diagnostic!.Fresh);
         Assert.False(slowInlet.Ai002Diagnostic!.Fresh);
         Assert.Equal(fastInlet.PhysicalAi003Verified, slowInlet.PhysicalAi003Verified);
@@ -939,73 +937,237 @@ public sealed class ProcessIoPumpReadyReadTrialTests
     {
         var clock = new TestClock();
         (ProcessIoSession session, FakeTransport transport) = CreateSession();
-        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
-        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+        transport.InputRegisters[outlet] = RawAbove;
+        transport.InputRegisters[inlet] = RawBelow;
+        transport.DuringRegisterRead = SlowOnly(clock, inlet, 5);
 
-        transport.DuringRegisterRead = address =>
-        {
-            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
-            {
-                clock.Advance(TimeSpan.FromMilliseconds(5));
-            }
-        };
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+
+        ProcessIoPhysicalObservation diagnostic = outcome.Ai002Diagnostic!;
+        Assert.True(diagnostic.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, diagnostic.Quality);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), diagnostic.ReceivedAt - diagnostic.ObservedAt);
+        Assert.True(diagnostic.ObservedAt <= diagnostic.ReceivedAt);
+        Assert.Equal(ProcessIoObservationProvenance.PHYSICAL_READ, diagnostic.Provenance);
+        Assert.Equal(session.Generation, diagnostic.SourceGeneration);
+    }
+
+    [Fact]
+    public void A_Diagnostic_Read_Inside_A_Wide_Budget_Is_Fresh()
+    {
+        // 60 ms of diagnostic latency against a 2 s budget is comfortably inside the contract, so the
+        // reading is fresh. Expecting stale here would be a test defect, not a Product defect.
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+        transport.InputRegisters[outlet] = RawAbove;
+        transport.InputRegisters[inlet] = RawBelow;
+        transport.DuringRegisterRead = SlowOnly(clock, inlet, 60);
 
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
 
         Assert.NotNull(outcome.Ai002Diagnostic);
-        ProcessIoPhysicalObservation inlet = outcome.Ai002Diagnostic!;
-        Assert.True(inlet.Fresh);
-        Assert.Equal(ProcessIoObservationQuality.GOOD, inlet.Quality);
-        Assert.Equal(TimeSpan.FromMilliseconds(5), inlet.ReceivedAt - inlet.ObservedAt);
-        Assert.True(inlet.ObservedAt <= inlet.ReceivedAt);
+        ProcessIoPhysicalObservation diagnostic = outcome.Ai002Diagnostic!;
+        Assert.True(diagnostic.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, diagnostic.Quality);
+        Assert.Equal("OK", diagnostic.DiagnosticCode);
+        Assert.Equal(TimeSpan.FromMilliseconds(60), diagnostic.ReceivedAt - diagnostic.ObservedAt);
     }
 
     [Fact]
-    public void A_Slow_Diagnostic_Read_Is_Stale()
+    public void A_Diagnostic_Read_Beyond_A_Narrow_Budget_Is_Stale()
+    {
+        // The same 60 ms against a 20 ms budget is outside it, so the diagnostic reports its own stale
+        // span and its own code.
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+        transport.InputRegisters[outlet] = RawAbove;
+        transport.InputRegisters[inlet] = RawBelow;
+        transport.DuringRegisterRead = SlowOnly(clock, inlet, 60);
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(
+            Request(clock, NarrowBudget), session);
+
+        Assert.NotNull(outcome.Ai002Diagnostic);
+        ProcessIoPhysicalObservation diagnostic = outcome.Ai002Diagnostic!;
+        Assert.False(diagnostic.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, diagnostic.Quality);
+        Assert.Equal(ProcessIoRefusals.ObservationStale, diagnostic.DiagnosticCode);
+        Assert.Equal(TimeSpan.FromMilliseconds(60), diagnostic.ReceivedAt - diagnostic.ObservedAt);
+    }
+
+    [Fact]
+    public void A_Stale_Diagnostic_Cannot_Make_A_Fast_Ai003_Stale()
+    {
+        // The discriminating case. AI-003 is fast and above the setpoint; the optional diagnostic read
+        // then burns 60 ms against a 20 ms budget. If the decision were still taken after that read, the
+        // acquisition would be aged out and refused. Deciding first keeps it accepted.
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+        transport.InputRegisters[outlet] = RawAbove;
+        transport.InputRegisters[inlet] = RawBelow;
+        transport.DuringRegisterRead = SlowOnly(clock, inlet, 60);
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(
+            Request(clock, NarrowBudget), session);
+
+        Assert.True(outcome.PhysicalAi003Verified);
+        Assert.True(outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.Accepted, outcome.Code);
+        Assert.Equal(0, outcome.ExitCode);
+        Assert.True(outcome.Ai003.Fresh);
+
+        // The diagnostic itself is stale, and reporting that is the whole point of reading it.
+        Assert.False(outcome.Ai002Diagnostic!.Fresh);
+    }
+
+    [Fact]
+    public void Diagnostic_Freshness_Never_Changes_Any_Decision_Field()
+    {
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+
+        // Fast diagnostic, narrow budget.
+        var fastClock = new TestClock();
+        (ProcessIoSession fastSession, FakeTransport fastTransport) = CreateSession();
+        fastTransport.InputRegisters[outlet] = RawAbove;
+        fastTransport.InputRegisters[inlet] = RawBelow;
+        PumpReadyReadOutcome fast =
+            ProcessIoPumpReadyReadTrial.Observe(Request(fastClock, NarrowBudget), fastSession);
+
+        // Stale diagnostic, same narrow budget and the same AI-003 reading.
+        var slowClock = new TestClock();
+        (ProcessIoSession slowSession, FakeTransport slowTransport) = CreateSession();
+        slowTransport.InputRegisters[outlet] = RawAbove;
+        slowTransport.InputRegisters[inlet] = RawBelow;
+        slowTransport.DuringRegisterRead = SlowOnly(slowClock, inlet, 60);
+        PumpReadyReadOutcome slow =
+            ProcessIoPumpReadyReadTrial.Observe(Request(slowClock, NarrowBudget), slowSession);
+
+        Assert.True(fast.Ai002Diagnostic!.Fresh);
+        Assert.False(slow.Ai002Diagnostic!.Fresh);
+
+        // The four decision fields and the reported generation are identical.
+        Assert.Equal(fast.PhysicalAi003Verified, slow.PhysicalAi003Verified);
+        Assert.Equal(fast.PumpReady, slow.PumpReady);
+        Assert.Equal(fast.Code, slow.Code);
+        Assert.Equal(fast.ExitCode, slow.ExitCode);
+        Assert.Equal(fast.SessionGeneration, slow.SessionGeneration);
+        Assert.Equal(
+            fast.PhysicalAi003Verified && fast.PumpReady,
+            slow.PhysicalAi003Verified && slow.PumpReady);
+    }
+
+    [Fact]
+    public void A_Below_Setpoint_Ai003_Stays_Refused_Whatever_The_Diagnostic_Does()
+    {
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+
+        var fastClock = new TestClock();
+        (ProcessIoSession fastSession, FakeTransport fastTransport) = CreateSession();
+        fastTransport.InputRegisters[outlet] = RawBelow;
+        fastTransport.InputRegisters[inlet] = RawAbove; // a high inlet must not promote it
+        PumpReadyReadOutcome fast =
+            ProcessIoPumpReadyReadTrial.Observe(Request(fastClock, NarrowBudget), fastSession);
+
+        var slowClock = new TestClock();
+        (ProcessIoSession slowSession, FakeTransport slowTransport) = CreateSession();
+        slowTransport.InputRegisters[outlet] = RawBelow;
+        slowTransport.InputRegisters[inlet] = RawAbove;
+        slowTransport.DuringRegisterRead = SlowOnly(slowClock, inlet, 60);
+        PumpReadyReadOutcome slow =
+            ProcessIoPumpReadyReadTrial.Observe(Request(slowClock, NarrowBudget), slowSession);
+
+        // The acquisition is verified in both; the unmet setpoint refuses in both.
+        Assert.True(fast.PhysicalAi003Verified);
+        Assert.True(slow.PhysicalAi003Verified);
+        Assert.False(fast.PumpReady);
+        Assert.False(slow.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedAtOrBelowSetpoint, fast.Code);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedAtOrBelowSetpoint, slow.Code);
+        Assert.Equal(2, fast.ExitCode);
+        Assert.Equal(2, slow.ExitCode);
+    }
+
+    [Fact]
+    public void A_Diagnostic_Transport_Fault_Does_Not_Disturb_An_Accepted_Acquisition()
+    {
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+        transport.InputRegisters[outlet] = RawAbove;
+        transport.InputRegisters[inlet] = RawBelow;
+
+        // Only the diagnostic read faults. The acquisition succeeds.
+        transport.ThrowOnRegister.Add(inlet);
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+
+        // The AI-003 verdict is untouched by the diagnostic failure.
+        Assert.True(outcome.PhysicalAi003Verified);
+        Assert.True(outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.Accepted, outcome.Code);
+        Assert.Equal(0, outcome.ExitCode);
+
+        // The fault is retained as the diagnostic's own result, never as the acquisition's.
+        Assert.NotNull(outcome.Ai002Diagnostic);
+        Assert.Equal(ProcessIoRefusals.ObservationTransportFault, outcome.Ai002Diagnostic!.DiagnosticCode);
+        Assert.Equal(ProcessIoObservationProvenance.NOT_OBSERVED, outcome.Ai002Diagnostic.Provenance);
+        Assert.Null(outcome.Ai002Diagnostic.EngineeringValue);
+        Assert.Equal("AI-003+", outcome.Ai003.Tag);
+        Assert.Equal(ProcessIoObservationProvenance.PHYSICAL_READ, outcome.Ai003.Provenance);
+    }
+
+    [Fact]
+    public void An_Absent_Diagnostic_Row_Leaves_The_Decision_And_The_Member_Alone()
     {
         var clock = new TestClock();
         (ProcessIoSession session, FakeTransport transport) = CreateSession();
         transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
-        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
 
-        // Only the inlet is slow. The diagnostic path carries the same defect class and is bracketed
-        // with the same clock, so it must report the elapsed span too.
-        transport.DuringRegisterRead = address =>
-        {
-            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
-            {
-                clock.Advance(TimeSpan.FromMilliseconds(60));
-            }
-        };
+        // The catalogue carries no AI-002+ row at all.
+        PumpReadyReadRequest request = Request(clock);
+        var withoutInlet = new Dictionary<string, ProcessIoCatalogueRow>(request.Catalogue, StringComparer.Ordinal);
+        Assert.True(withoutInlet.Remove(ProcessIoIsolationValves.PumpInletPressureTag));
 
-        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(
+            request with { Catalogue = withoutInlet }, session);
 
-        Assert.NotNull(outcome.Ai002Diagnostic);
-        ProcessIoPhysicalObservation inlet = outcome.Ai002Diagnostic!;
-        Assert.False(inlet.Fresh);
-        Assert.Equal(ProcessIoObservationQuality.STALE, inlet.Quality);
-        Assert.Equal(ProcessIoRefusals.ObservationStale, inlet.DiagnosticCode);
-        Assert.Equal(TimeSpan.FromMilliseconds(60), inlet.ReceivedAt - inlet.ObservedAt);
+        Assert.True(outcome.PhysicalAi003Verified);
+        Assert.True(outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.Accepted, outcome.Code);
+        Assert.Equal(0, outcome.ExitCode);
+        Assert.Null(outcome.Ai002Diagnostic);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.Ai002Role, outcome.Ai002Role);
+
+        // It was never read, because there was no row to read.
+        Assert.Equal(1, transport.ReadAttempts);
     }
 
     [Fact]
     public void A_Slow_Ai003_Refuses_Even_When_The_Diagnostic_Read_Is_Fast()
     {
+        // The mirror image of the discriminating case: a stale acquisition is refused on its own merits,
+        // and a healthy diagnostic reading cannot rescue it.
         var clock = new TestClock();
         (ProcessIoSession session, FakeTransport transport) = CreateSession();
-        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
-        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
-
-        transport.DuringRegisterRead = address =>
-        {
-            if (address == AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag))
-            {
-                clock.Advance(TimeSpan.FromMilliseconds(60));
-            }
-        };
+        int outlet = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+        int inlet = AddressOf(ProcessIoIsolationValves.PumpInletPressureTag);
+        transport.InputRegisters[outlet] = RawAbove;
+        transport.InputRegisters[inlet] = RawBelow;
+        transport.DuringRegisterRead = SlowOnly(clock, outlet, 60);
 
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(
-            Request(clock) with { Freshness = TimeSpan.FromMilliseconds(20) }, session);
+            Request(clock, NarrowBudget), session);
 
         Assert.False(outcome.Ai003.Fresh);
         Assert.False(outcome.PhysicalAi003Verified);
@@ -1013,38 +1175,56 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedStale, outcome.Code);
         Assert.Equal(2, outcome.ExitCode);
 
-        // A fresh diagnostic reading cannot rescue a stale acquisition.
         Assert.NotNull(outcome.Ai002Diagnostic);
         Assert.True(outcome.Ai002Diagnostic!.Fresh);
     }
 
     [Fact]
-    public void A_Slow_Diagnostic_Read_Never_Changes_The_Decision()
+    public void A_Diagnostic_Value_On_Either_Side_Of_The_Threshold_Changes_Nothing()
     {
-        var clock = new TestClock();
-        (ProcessIoSession session, FakeTransport transport) = CreateSession();
-        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
-        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+        var outcomes = new List<PumpReadyReadOutcome>();
 
-        transport.DuringRegisterRead = address =>
+        foreach (int inletRaw in new[] { 0, RawBelow, RawAbove, 32000 })
         {
-            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
-            {
-                clock.Advance(TimeSpan.FromMilliseconds(60));
-            }
-        };
+            var runClock = new TestClock();
+            (ProcessIoSession session, FakeTransport transport) = CreateSession();
+            transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+            transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = inletRaw;
 
-        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+            outcomes.Add(ProcessIoPumpReadyReadTrial.Observe(Request(runClock), session));
+        }
 
-        // The inlet is stale; the outlet is not, so every verdict is driven by AI-003 alone.
-        Assert.False(outcome.Ai002Diagnostic!.Fresh);
-        Assert.True(outcome.Ai003.Fresh);
-        Assert.True(outcome.PhysicalAi003Verified);
-        Assert.True(outcome.PumpReady);
-        Assert.True(outcome.PhysicalAi003Verified && outcome.PumpReady);
-        Assert.Equal(ProcessIoPumpReadyReadTrial.Accepted, outcome.Code);
-        Assert.Equal(0, outcome.ExitCode);
-        Assert.Equal(ProcessIoPumpReadyReadTrial.Ai002Role, outcome.Ai002Role);
+        PumpReadyReadOutcome first = outcomes[0];
+        Assert.All(outcomes, outcome =>
+        {
+            Assert.True(outcome.PhysicalAi003Verified);
+            Assert.True(outcome.PumpReady);
+            Assert.Equal(first.Code, outcome.Code);
+            Assert.Equal(first.ExitCode, outcome.ExitCode);
+            Assert.NotNull(outcome.Ai002Diagnostic);
+        });
+
+        // The diagnostic values genuinely differed, so the invariance above is not vacuous.
+        Assert.True(outcomes[2].Ai002Diagnostic!.EngineeringValue > outcomes[1].Ai002Diagnostic!.EngineeringValue);
+    }
+
+    [Fact]
+    public void The_Ai003_Decision_Is_Taken_Before_The_Diagnostic_Read_Starts()
+    {
+        string trial = ReadSource("ProcessIoPumpReadyReadTrial.cs");
+
+        int classify = trial.IndexOf("PumpReadyReadOutcome outcome = Classify(", StringComparison.Ordinal);
+        int diagnostic = trial.IndexOf("ObserveDiagnosticInlet(request, session)", StringComparison.Ordinal);
+
+        Assert.True(classify > 0, "the AI-003 decision call must exist");
+        Assert.True(diagnostic > 0, "the diagnostic read must exist");
+        Assert.True(classify < diagnostic, "the AI-003 verdict must be fixed before AI-002 is read");
+
+        // The verdict is not recomputed afterwards: Classify is called exactly once in the runner.
+        Assert.Equal(1, CountOccurrences(trial, "PumpReadyReadOutcome outcome = Classify("));
+
+        // And the diagnostic cannot be fed into the decision, because none is passed to it.
+        Assert.Contains("inletDiagnostic: null", trial);
     }
 
     // ================================================================== AI-002+ separation
@@ -1375,7 +1555,9 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         [ProcessIoPumpReadyReadTrial.FreshnessVariable] = "2000",
     };
 
-    private static PumpReadyReadRequest Request(TestClock clock)
+    private static PumpReadyReadRequest Request(TestClock clock) => Request(clock, Freshness);
+
+    private static PumpReadyReadRequest Request(TestClock clock, TimeSpan freshness)
     {
         Dictionary<string, ProcessIoCatalogueRow> catalogue = BuildCatalogue();
         return new PumpReadyReadRequest
@@ -1383,10 +1565,23 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             PumpRow = catalogue[ProcessIoIsolationValves.PumpOutletPressureTag],
             Catalogue = catalogue,
             Thresholds = Thresholds,
-            Freshness = Freshness,
+            Freshness = freshness,
             Time = clock,
         };
     }
+
+    /// <summary>A budget narrower than the delays the diagnostic tests inject, so stale is reachable.</summary>
+    private static readonly TimeSpan NarrowBudget = TimeSpan.FromMilliseconds(20);
+
+    /// <summary>Makes exactly one register read consume clock time, leaving every other read fast.</summary>
+    private static Action<int> SlowOnly(TestClock clock, int registerAddress, int milliseconds) =>
+        address =>
+        {
+            if (address == registerAddress)
+            {
+                clock.Advance(TimeSpan.FromMilliseconds(milliseconds));
+            }
+        };
 
     private static (ProcessIoSession Session, FakeTransport Transport) CreateSession()
     {
@@ -1526,6 +1721,9 @@ public sealed class ProcessIoPumpReadyReadTrialTests
 
         public bool ThrowOnRead { get; set; }
 
+        /// <summary>Registers whose read throws, so one tag can fault while another succeeds.</summary>
+        public HashSet<int> ThrowOnRegister { get; } = new();
+
         /// <summary>Runs inside every read, so a test can consume clock time where a real device would.</summary>
         public Action? DuringRead { get; set; }
 
@@ -1599,7 +1797,7 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         private void OnRead(int? registerAddress = null)
         {
             ReadAttempts += 1;
-            if (ThrowOnRead)
+            if (ThrowOnRead || (registerAddress is int faulting && ThrowOnRegister.Contains(faulting)))
             {
                 throw new IOException("FAKE_READ_TIMEOUT");
             }

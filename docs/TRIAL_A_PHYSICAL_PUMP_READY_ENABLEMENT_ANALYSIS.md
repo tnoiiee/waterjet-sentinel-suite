@@ -159,14 +159,21 @@ consent must never authorize a read trial. **No second consent channel and no se
    network);
 4. `ProcessIoSession.ObserveAnalogInput("AI-003+", …)` exactly once, capturing raw, bar, quality,
    `ObservedAt`, `ReceivedAt`, freshness and generation;
-5. read `AI-002+` once and report it as **`DIAGNOSTIC_ONLY_NOT_USED_FOR_DECISION`** with
-   `ai002_used_for_decision=FALSE` — read so the exclusion is observed rather than asserted;
-6. classify the acquisition first, then — and only if it passed — evaluate the existing
-   `SequencingPressure.Valid` and `SequencingPressure.PumpReady` against the Owner-supplied setpoint;
+5. classify the acquisition and decide, **before anything optional is read**: only if the acquisition
+   passed, evaluate the existing `SequencingPressure.Valid` and `SequencingPressure.PumpReady` against
+   the Owner-supplied setpoint. The judgement instant is taken immediately after `AI-003+` completed;
+6. only then read `AI-002+` once and attach it as **`DIAGNOSTIC_ONLY_NOT_USED_FOR_DECISION`** with
+   `ai002_used_for_decision=FALSE` — read so the exclusion is observed rather than asserted. The verdict
+   already exists, so this read cannot move it;
 7. print the evidence block of M5 with the two verdicts reported separately; close the session; dispose
    the transport; exit;
 8. exit `0` (accepted), `2` (observed but not accepted), `3` (bounded read timeout or transport fault),
    `4` (refusal before acquisition).
+
+Step 6 is deliberately after step 5. Deciding first is what makes the diagnostic genuinely inert: an
+`AI-002+` row that is absent, unbound, stale, BAD or faulted changes nothing about
+`physical_ai003_verified`, `pump_ready`, `physical_pump_verified`, the code or the exit code, and its
+latency cannot age the acquisition between the read and the judgement.
 
 **Two deliberate deviations from this document's own proposal, both narrowing:**
 

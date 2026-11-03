@@ -600,20 +600,66 @@ public static class ProcessIoPumpReadyReadTrial
 
         int generation = session.Generation;
 
+        // The AI-003 decision is taken HERE, before the optional diagnostic read is started, and with the
+        // judgement instant captured immediately after AI-003 completed. Deciding first is what makes the
+        // diagnostic genuinely inert: a slow, stale, BAD or faulted AI-002 read happens strictly after the
+        // verdict exists, so its latency cannot age the decision input and none of its properties can move
+        // PhysicalAi003Verified, PumpReady, Code, ExitCode or SessionGeneration. Deciding after the
+        // diagnostic read would silently make the optional read part of the Pump-ready decision.
+        PumpReadyReadOutcome outcome = Classify(
+            observation,
+            inletDiagnostic: null,
+            generation,
+            request.Time.GetUtcNow(),
+            request);
+
         // AI-002+ is observed separately and only to record that it was NOT used. It is never read as an
-        // alias, never a fallback, and it cannot reach the decision below.
-        ProcessIoPhysicalObservation? inlet = null;
-        if (!string.Equals(ProcessIoIsolationValves.PumpInletPressureTag, ProcessIoIsolationValves.PumpOutletPressureTag, StringComparison.Ordinal)
-            && request.Catalogue.TryGetValue(ProcessIoIsolationValves.PumpInletPressureTag, out ProcessIoCatalogueRow? inletRow)
-            && inletRow.Binding is not null)
+        // alias, never a fallback, and it cannot reach the verdict that already exists above. Classify is
+        // deliberately not re-run afterwards.
+        ProcessIoPhysicalObservation? inlet = ObserveDiagnosticInlet(request, session);
+
+        return inlet is null ? outcome : outcome with { Ai002Diagnostic = inlet };
+    }
+
+    /// <summary>
+    /// Reads the optional Pump Inlet Pressure row as diagnostic evidence only.
+    ///
+    /// It is called after the AI-003 verdict is already fixed, so nothing it returns can change that
+    /// verdict. It is optional by contract: an absent row, an unbound row, a refusal, a stale value or a
+    /// transport fault all leave the AI-003 decision exactly as it was. A fault is retained in the returned
+    /// observation rather than raised, so a failing diagnostic read is never reported as a failing
+    /// acquisition, and the absence of the row leaves the diagnostic member null.
+    /// </summary>
+    private static ProcessIoPhysicalObservation? ObserveDiagnosticInlet(
+        PumpReadyReadRequest request,
+        ProcessIoSession session)
+    {
+        // The identity guard is defensive: the diagnostic is only ever read for a tag that is distinct
+        // from the decision input, so it can never alias AI-003 even if the constants were to converge.
+        if (string.Equals(ProcessIoIsolationValves.PumpInletPressureTag, ProcessIoIsolationValves.PumpOutletPressureTag, StringComparison.Ordinal))
         {
-            // The same defect class lived on the diagnostic path: bracketed the same way, with the same
-            // clock, so a slow inlet read is reported stale instead of silently accepted.
-            inlet = session.ObserveAnalogInput(
-                ProcessIoIsolationValves.PumpInletPressureTag, inletRow, request.Time, request.Freshness);
+            return null;
         }
 
-        return Classify(observation, inlet, generation, request.Time.GetUtcNow(), request);
+        if (!request.Catalogue.TryGetValue(ProcessIoIsolationValves.PumpInletPressureTag, out ProcessIoCatalogueRow? inletRow)
+            || inletRow.Binding is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            // Bracketed by the same clock as the acquisition, so a slow inlet read reports its own stale
+            // span truthfully instead of being silently accepted.
+            return session.ObserveAnalogInput(
+                ProcessIoIsolationValves.PumpInletPressureTag, inletRow, request.Time, request.Freshness);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        {
+            // A diagnostic read that fails outside the session's own fault capture is still only a
+            // diagnostic failure: the AI-003 verdict stands and the member simply carries no value.
+            return null;
+        }
     }
 
     /// <summary>
@@ -637,6 +683,12 @@ public static class ProcessIoPumpReadyReadTrial
     ///
     /// Absence of evidence is never reported as evidence: nothing below turns a failed acquisition into a
     /// verified one, and nothing turns a verified reading into a Pump-ready claim.
+    ///
+    /// <paramref name="inletDiagnostic"/> is carried into the record and is never read by the decision: it
+    /// has no bearing on <see cref="PumpReadyReadOutcome.PhysicalAi003Verified"/>,
+    /// <see cref="PumpReadyReadOutcome.PumpReady"/>, the code or the exit code. Production always passes
+    /// null here and attaches the diagnostic afterwards, so the diagnostic cannot even be present while the
+    /// verdict is being formed.
     /// </summary>
     public static PumpReadyReadOutcome Classify(
         ProcessIoPhysicalObservation observation,

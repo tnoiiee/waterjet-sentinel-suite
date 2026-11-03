@@ -222,13 +222,21 @@ missing or out of range.
 6. opens the existing `ProcessIoSession` and captures its generation;
 7. observes `AI-003+` once, capturing raw word, engineering bar, source tag, quality, `ObservedAt`,
    `ReceivedAt`, freshness and generation;
-8. optionally observes `AI-002+` and reports it as `NOT_USED_FOR_DECISION`;
-9. builds a `PressureSample` carrying the Pump-Outlet identity and applies the existing
-   `SequencingPressure.Valid` and `SequencingPressure.PumpReady` rules with the configured setpoint;
+8. **decides**, before anything optional is read: builds a `PressureSample` carrying the Pump-Outlet
+   identity and applies the existing `SequencingPressure.Valid` and `SequencingPressure.PumpReady` rules
+   with the configured setpoint. The judgement instant is taken immediately after `AI-003+` completed;
+9. only then optionally observes `AI-002+` and reports it as `NOT_USED_FOR_DECISION`. The verdict already
+   exists at this point, so the diagnostic read is strictly after it and cannot move the decision;
 10. reports the evidence, closes the session, releases the transport, and exits.
 
 Steps 1–4 perform no I/O at all. Nothing is retried, no previous observation is reused, and no value is
 substituted on refusal.
+
+Because step 9 happens after step 8, the optional diagnostic is inert by construction: an `AI-002+` row
+that is absent, unbound, stale, BAD, or faulted on the wire changes nothing about
+`physical_ai003_verified`, `pump_ready`, `physical_pump_verified`, the recorded code or the exit code. A
+failing diagnostic read is reported as its own observation and never as a failing acquisition, and a
+missing row simply leaves the diagnostic member empty.
 
 ### 3.4 What the trial commands
 
