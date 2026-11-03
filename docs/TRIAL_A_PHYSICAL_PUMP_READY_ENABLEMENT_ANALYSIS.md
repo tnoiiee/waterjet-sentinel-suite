@@ -161,9 +161,10 @@ consent must never authorize a read trial. **No second consent channel and no se
    `ObservedAt`, `ReceivedAt`, freshness and generation;
 5. read `AI-002+` once and report it as **`DIAGNOSTIC_ONLY_NOT_USED_FOR_DECISION`** with
    `ai002_used_for_decision=FALSE` — read so the exclusion is observed rather than asserted;
-6. evaluate the existing `SequencingPressure.Valid` and `SequencingPressure.PumpReady` against the
-   Owner-supplied setpoint;
-7. print the evidence block of M5; close the session; dispose the transport; exit;
+6. classify the acquisition first, then — and only if it passed — evaluate the existing
+   `SequencingPressure.Valid` and `SequencingPressure.PumpReady` against the Owner-supplied setpoint;
+7. print the evidence block of M5 with the two verdicts reported separately; close the session; dispose
+   the transport; exit;
 8. exit `0` (accepted), `2` (observed but not accepted), `3` (bounded read timeout or transport fault),
    `4` (refusal before acquisition).
 
@@ -188,11 +189,51 @@ untouched.
 and already covered by existing tests; the new code reads one tag, calls one existing rule and prints
 one record.
 
+### 5.1 Three verdicts, two questions
+
+M5's block carries three verification fields, and they must not be collapsed into one another:
+
+| Field | Source | Question |
+|---|---|---|
+| `physical_ai003_verified` | `PumpReadyReadOutcome.PhysicalAi003Verified` | Did the physical `AI-003+` acquisition chain produce usable, current, in-generation evidence? |
+| `pump_ready` | `PumpReadyReadOutcome.PumpReady` — the existing `SequencingPressure.PumpReady` verdict | Is that verified pressure strictly above the configured setpoint? |
+| `physical_pump_verified` | the conjunction of the two | Is this a complete `PHYSICAL_PUMP_READY` result? |
+
+`PhysicalAi003Verified` is set only after every acquisition requirement passes: the exact `AI-003+`
+source tag, a `PHYSICAL_READ` provenance, a timestamp that is not future-dated, usable quality, the live
+session generation, freshness at the moment of judgement, and a finite engineering value in bar. It
+deliberately does **not** depend on the setpoint, because a correctly acquired 14 bar reading is genuine
+physical evidence about the transmitter, the wiring, the rack input, the transport and the scaling — it
+is simply not Pump-ready.
+
+Consequently **physical AI-003 evidence may pass while Pump-ready fails**:
+
+| Reading | `physical_ai003_verified` | `pump_ready` | `physical_pump_verified` |
+|---|---|---|---|
+| `29 bar`, GOOD, fresh, live generation, setpoint `15 bar` | `TRUE` | `TRUE` | `TRUE` |
+| `15 bar`, GOOD, fresh, live generation, setpoint `15 bar` | `TRUE` | `FALSE` | `FALSE` |
+| `11 bar`, GOOD, fresh, live generation, setpoint `15 bar` | `TRUE` | `FALSE` | `FALSE` |
+| transport fault, non-physical read, wrong tag, future stamp, stale or unusable quality, superseded generation, or no value in bar | `FALSE` | `FALSE` | `FALSE` |
+
+`PhysicalAi003Verified` is `FALSE` for every entry in the last row: absence of a verified acquisition is
+never reported as evidence.
+
+**Trial A requires `pump_ready=TRUE` for the complete `PHYSICAL_PUMP_READY` evidence verdict.** A
+below-setpoint run is retained as useful physical `AI-003+` acquisition evidence — it is reported as
+`physical_ai003_verified=TRUE` with `pump_ready=FALSE` — but it is **not** a passing Pump-ready run, and
+it never becomes one by re-reading, reinterpretation or by combining it with `AI-002+`.
+
 ## 6. Trial A claim boundary (unchanged; the mechanism exists, the physical run does not)
 
-**A passing Trial A (exit `0`, `PHYSICAL_PUMP_READY`) would establish:** physical Pump operation for that trial; physical `AI-003+`
-acquisition through the transmitter and the WAGO input; the WJSS scaling and observation pipeline;
-quality/freshness/generation validation; and the WJSS Pump-ready decision computed from `AI-003+` alone.
+**A passing Trial A (exit `0`, `pump_ready=TRUE`, `physical_pump_verified=TRUE`) would establish:**
+physical Pump operation for that trial; physical `AI-003+` acquisition through the transmitter and the
+WAGO input; the WJSS scaling and observation pipeline; quality/freshness/generation validation; and the
+WJSS Pump-ready decision computed from `AI-003+` alone.
+
+**A below-setpoint Trial A run establishes a strict subset:** `physical_ai003_verified=TRUE` — the
+acquisition chain, the conversion and the freshness/generation rules — with `pump_ready=FALSE` and
+`physical_pump_verified=FALSE`. It is recorded as acquisition evidence and is never presented as a
+Pump-ready result.
 
 **It would not establish:** IV command behaviour; Upper or Lower limit feedback; physical IV outlet
 pressure; Galil motion; Cleaning Path execution; water-on cleaning; Queue; `TimeDelay`; Production

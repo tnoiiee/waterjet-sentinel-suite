@@ -380,10 +380,14 @@ public sealed class ProcessIoPumpReadyReadTrialTests
 
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
 
+        Assert.True(outcome.PhysicalAi003Verified);
         Assert.True(outcome.PumpReady);
+        Assert.Equal("AI-003+", outcome.Ai003.Tag);
         Assert.Equal(ProcessIoPumpReadyReadTrial.Accepted, outcome.Code);
         Assert.Equal(0, outcome.ExitCode);
-        Assert.Equal("AI-003+", outcome.Ai003.Tag);
+
+        // Verification and Pump-readiness agree only here, because the pressure is above the setpoint.
+        Assert.True(outcome.PhysicalAi003Verified && outcome.PumpReady);
     }
 
     [Fact]
@@ -442,6 +446,7 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             Request(clock) with { Freshness = TimeSpan.FromMilliseconds(20) }, session);
 
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified);
         Assert.False(outcome.Ai003.Fresh);
         Assert.Equal(ProcessIoObservationQuality.STALE, outcome.Ai003.Quality);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedStale, outcome.Code);
@@ -456,10 +461,12 @@ public sealed class ProcessIoPumpReadyReadTrialTests
 
         PumpReadyReadOutcome current = ProcessIoPumpReadyReadTrial.Classify(
             Observe(RawAbove, clock.UtcNow.AddMilliseconds(-100), clock.UtcNow), null, 1, clock.UtcNow, request);
+        Assert.True(current.PhysicalAi003Verified);
         Assert.True(current.PumpReady);
 
         PumpReadyReadOutcome future = ProcessIoPumpReadyReadTrial.Classify(
             Observe(RawAbove, clock.UtcNow.AddSeconds(5), clock.UtcNow), null, 1, clock.UtcNow, request);
+        Assert.False(future.PhysicalAi003Verified);
         Assert.False(future.PumpReady);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedFuture, future.Code);
         Assert.Equal(2, future.ExitCode);
@@ -477,6 +484,7 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             Request(clock));
 
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedGeneration, outcome.Code);
         Assert.Equal(2, outcome.ExitCode);
     }
@@ -504,6 +512,7 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
 
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified);
         Assert.Equal(RawOutOfDomain, outcome.Ai003.RawValue);
         Assert.Equal(ProcessIoObservationQuality.BAD, outcome.Ai003.Quality);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedNotUsable, outcome.Code);
@@ -517,7 +526,10 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Classify(
             Observe(15.0, clock.UtcNow, clock.UtcNow), null, 1, clock.UtcNow, Request(clock));
 
+        // The acquisition is verified; the strict comparison is not satisfied. These are two facts.
+        Assert.True(outcome.PhysicalAi003Verified);
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified && outcome.PumpReady);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedAtOrBelowSetpoint, outcome.Code);
         Assert.Equal(2, outcome.ExitCode);
         Assert.Equal(15.0, outcome.Ai003.EngineeringValue!.Value, 6);
@@ -532,7 +544,10 @@ public sealed class ProcessIoPumpReadyReadTrialTests
 
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
 
+        // A correctly acquired low reading is still a verified acquisition. It is not Pump-ready.
+        Assert.True(outcome.PhysicalAi003Verified);
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified && outcome.PumpReady);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedAtOrBelowSetpoint, outcome.Code);
         Assert.Equal(2, outcome.ExitCode);
         Assert.True(outcome.Ai003.EngineeringValue < 15.0);
@@ -545,7 +560,11 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Classify(
             Observe(-1.0, clock.UtcNow, clock.UtcNow), null, 1, clock.UtcNow, Request(clock));
 
+        // The acquisition chain completed (a finite value arrived from the wire), so the acquisition is
+        // verified; the value then fails the existing sample rule, so Pump-ready is not claimed.
+        Assert.True(outcome.PhysicalAi003Verified);
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified && outcome.PumpReady);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedInvalidSample, outcome.Code);
         Assert.Equal(2, outcome.ExitCode);
     }
@@ -562,6 +581,7 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             Request(clock));
 
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedWrongProvenance, outcome.Code);
         Assert.Equal(2, outcome.ExitCode);
     }
@@ -583,8 +603,135 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             Request(clock));
 
         Assert.False(outcome.PumpReady);
+        Assert.False(outcome.PhysicalAi003Verified);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedNotUsable, outcome.Code);
         Assert.Null(outcome.Ai003.EngineeringValue);
+    }
+
+    // ================================================================== separated evidence verdicts
+
+    [Fact]
+    public void A_Wrong_Source_Tag_Is_Never_Verified_Physical_Ai003_Evidence()
+    {
+        var clock = new TestClock();
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Classify(
+            Observe(RawAbove, clock.UtcNow, clock.UtcNow) with { Tag = "AI-004+" },
+            null,
+            1,
+            clock.UtcNow,
+            Request(clock));
+
+        Assert.False(outcome.PhysicalAi003Verified);
+        Assert.False(outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedWrongSourceTag, outcome.Code);
+        Assert.Equal(2, outcome.ExitCode);
+    }
+
+    [Fact]
+    public void A_Missing_Engineering_Value_Is_Never_Verified_Physical_Ai003_Evidence()
+    {
+        var clock = new TestClock();
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Classify(
+            Observe(RawAbove, clock.UtcNow, clock.UtcNow) with { EngineeringValue = null, Unit = null },
+            null,
+            1,
+            clock.UtcNow,
+            Request(clock));
+
+        // Everything else about the record is sound; without a value in bar there is nothing verified.
+        Assert.False(outcome.PhysicalAi003Verified);
+        Assert.False(outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedNotUsable, outcome.Code);
+    }
+
+    [Fact]
+    public void A_Non_Finite_Engineering_Value_Is_Never_Verified_Physical_Ai003_Evidence()
+    {
+        var clock = new TestClock();
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Classify(
+            Observe(RawAbove, clock.UtcNow, clock.UtcNow) with { EngineeringValue = double.NaN },
+            null,
+            1,
+            clock.UtcNow,
+            Request(clock));
+
+        Assert.False(outcome.PhysicalAi003Verified);
+        Assert.False(outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedNotUsable, outcome.Code);
+    }
+
+    [Fact]
+    public void Verification_Does_Not_Depend_On_The_Setpoint_Only_On_The_Acquisition()
+    {
+        var clock = new TestClock();
+
+        // The same, sound observation is verified identically whatever the Owner's setpoint is.
+        foreach (double setpoint in new[] { 0.0, 5.0, 15.0, 30.0 })
+        {
+            PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Classify(
+                Observe(RawAbove, clock.UtcNow, clock.UtcNow),
+                null,
+                1,
+                clock.UtcNow,
+                Request(clock) with { Thresholds = new SequencingPressureThresholds(1.0, setpoint + 2, setpoint) });
+
+            Assert.True(outcome.PhysicalAi003Verified);
+        }
+    }
+
+    [Fact]
+    public void Ai002_Never_Affects_Any_Of_The_Three_Flags()
+    {
+        var clock = new TestClock();
+
+        PumpReadyReadOutcome withHighInlet = ProcessIoPumpReadyReadTrial.Classify(
+            Observe(RawAbove, clock.UtcNow, clock.UtcNow),
+            InletObservation(RawAbove, clock.UtcNow),
+            1,
+            clock.UtcNow,
+            Request(clock));
+
+        PumpReadyReadOutcome withLowInlet = ProcessIoPumpReadyReadTrial.Classify(
+            Observe(RawAbove, clock.UtcNow, clock.UtcNow),
+            InletObservation(RawBelow, clock.UtcNow),
+            1,
+            clock.UtcNow,
+            Request(clock));
+
+        // The inlet differs; none of the three verdicts may.
+        Assert.Equal(withHighInlet.PhysicalAi003Verified, withLowInlet.PhysicalAi003Verified);
+        Assert.Equal(withHighInlet.PumpReady, withLowInlet.PumpReady);
+        Assert.Equal(
+            withHighInlet.PhysicalAi003Verified && withHighInlet.PumpReady,
+            withLowInlet.PhysicalAi003Verified && withLowInlet.PumpReady);
+
+        // And a high inlet cannot lift a below-setpoint outlet.
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawBelow;
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawAbove;
+        PumpReadyReadOutcome outletBelow = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+
+        Assert.True(outletBelow.PhysicalAi003Verified);
+        Assert.False(outletBelow.PumpReady);
+        Assert.False(outletBelow.PhysicalAi003Verified && outletBelow.PumpReady);
+    }
+
+    [Fact]
+    public void The_Exit_Code_Still_Follows_Acquisition_And_Not_Verification_Alone()
+    {
+        var clock = new TestClock();
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Classify(
+            Observe(RawBelow, clock.UtcNow, clock.UtcNow),
+            null,
+            1,
+            clock.UtcNow,
+            Request(clock));
+
+        // Verified acquisition with an unmet setpoint is exit 2, never 0.
+        Assert.True(outcome.PhysicalAi003Verified);
+        Assert.False(outcome.PumpReady);
+        Assert.Equal(2, outcome.ExitCode);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedAtOrBelowSetpoint, outcome.Code);
     }
 
     // ================================================================== AI-002+ separation
@@ -741,6 +888,8 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
 
         Assert.Equal(3, outcome.ExitCode);
+        Assert.False(outcome.PhysicalAi003Verified);
+        Assert.False(outcome.PumpReady);
         Assert.Equal(ProcessIoObservationQuality.BAD, outcome.Ai003.Quality);
         Assert.Equal(ProcessIoRefusals.ObservationTransportFault, outcome.Ai003.DiagnosticCode);
     }
@@ -851,20 +1000,47 @@ public sealed class ProcessIoPumpReadyReadTrialTests
     }
 
     [Fact]
-    public void Physical_Verification_Is_Never_Claimed_On_A_Failed_Run()
+    public void The_Report_Keeps_Acquisition_Verification_And_Pump_Ready_Separate()
+    {
+        string trial = ReadSource("ProcessIoPumpReadyReadTrial.cs");
+
+        // Acquisition verification is its own member, never the Pump-ready verdict.
+        Assert.Contains("physical_ai003_verified=\" + Flag(outcome.PhysicalAi003Verified)", trial);
+
+        // Pump-readiness is the existing rule's verdict.
+        Assert.Contains("pump_ready=\" + Flag(outcome.PumpReady)", trial);
+
+        // Physical Pump verification is the conjunction: verified acquisition AND Pump-ready.
+        Assert.Contains("physical_pump_verified=\" + Flag(outcome.PhysicalAi003Verified && outcome.PumpReady)", trial);
+
+        // The collapsed derivation must not survive anywhere in the source.
+        Assert.DoesNotContain("physical_ai003_verified=\" + Flag(outcome.PumpReady)", trial);
+        Assert.DoesNotContain("physical_pump_verified=\" + Flag(outcome.PumpReady)", trial);
+    }
+
+    [Fact]
+    public void A_Refused_Run_Can_Never_Claim_Physical_Pump_Verification()
     {
         var clock = new TestClock();
+
+        // A below-setpoint acquisition is verified evidence but is not a physical Pump verification.
         (ProcessIoSession session, FakeTransport transport) = CreateSession();
         transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawBelow;
+        PumpReadyReadOutcome belowSetpoint = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
 
-        PumpReadyReadOutcome failed = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
-        Assert.False(failed.PumpReady);
-        Assert.Equal(2, failed.ExitCode);
+        Assert.True(belowSetpoint.PhysicalAi003Verified);
+        Assert.False(belowSetpoint.PumpReady);
+        Assert.False(belowSetpoint.PhysicalAi003Verified && belowSetpoint.PumpReady);
+        Assert.Equal(2, belowSetpoint.ExitCode);
 
-        // The report derives both verification flags from the verdict, never from the run having happened.
-        string trial = ReadSource("ProcessIoPumpReadyReadTrial.cs");
-        Assert.Contains("physical_pump_verified=\" + Flag(outcome.PumpReady)", trial);
-        Assert.Contains("physical_ai003_verified=\" + Flag(outcome.PumpReady)", trial);
+        // A failed acquisition can claim neither.
+        (ProcessIoSession faultedSession, FakeTransport faulted) = CreateSession();
+        faulted.ThrowOnRead = true;
+        PumpReadyReadOutcome faultedRun = ProcessIoPumpReadyReadTrial.Observe(Request(clock), faultedSession);
+
+        Assert.False(faultedRun.PhysicalAi003Verified);
+        Assert.False(faultedRun.PhysicalAi003Verified && faultedRun.PumpReady);
+        Assert.Equal(3, faultedRun.ExitCode);
     }
 
     // ================================================================== helpers
@@ -951,6 +1127,17 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             Fresh = true,
             Provenance = ProcessIoObservationProvenance.PHYSICAL_READ,
             DiagnosticCode = "OK",
+        };
+
+    /// <summary>
+    /// The Pump Inlet observation, carrying its own identity and the Product's own inlet conversion. It
+    /// exists so the diagnostic-only member can be populated without a transport.
+    /// </summary>
+    private static ProcessIoPhysicalObservation InletObservation(int rawWord, DateTimeOffset at) =>
+        Observe(rawWord, at, at) with
+        {
+            Tag = ProcessIoIsolationValves.PumpInletPressureTag,
+            EngineeringValue = ProcessIoEngineering.WcPressureBar(rawWord),
         };
 
     /// <summary>An observation whose engineering value is stated directly, for boundary values.</summary>

@@ -117,6 +117,9 @@ public static class ProcessIoPumpReadyReadTrial
     /// <summary>The value did not come from a physical read, so it is not physical evidence.</summary>
     public const string RefusedWrongProvenance = "PUMP_READY_REFUSED_NOT_A_PHYSICAL_READ";
 
+    /// <summary>The observation is not the Pump Outlet Pressure identity, so it cannot be its evidence.</summary>
+    public const string RefusedWrongSourceTag = "PUMP_READY_REFUSED_SOURCE_TAG_NOT_AI003";
+
     /// <summary>The evidence was outside its freshness budget when it was judged.</summary>
     public const string RefusedStale = "PUMP_READY_REFUSED_EVIDENCE_STALE";
 
@@ -616,8 +619,23 @@ public static class ProcessIoPumpReadyReadTrial
     /// The single Trial A decision. It is a pure function of one observation, the live generation, the
     /// judging clock and the configured rule, so the decision can be replayed from a record without
     /// contacting anything. It adds no rule of its own: acceptance is exactly
-    /// <c>SequencingPressure.PumpReady</c> over a
-    /// sample built from a physical read, and every refusal is a classified reason.
+    /// <c>SequencingPressure.PumpReady</c> over a sample built from a physical read, and every refusal is
+    /// a classified reason.
+    ///
+    /// The decision is taken in two separately reported parts, because they answer two different
+    /// questions and one does not imply the other:
+    ///
+    /// 1. <see cref="PumpReadyReadOutcome.PhysicalAi003Verified"/> — did the physical <c>AI-003+</c>
+    ///    acquisition chain produce usable, current, in-generation evidence? This is a statement about
+    ///    the transmitter, the wiring, the rack input, the transport, the conversion and the freshness
+    ///    rules. It is deliberately independent of the setpoint: a correctly acquired 14 bar reading is
+    ///    verified physical evidence that simply is not Pump-ready.
+    /// 2. <see cref="PumpReadyReadOutcome.PumpReady"/> — over that verified evidence, does the existing
+    ///    rule accept the pressure as Pump-ready? It is only ever evaluated after part 1 passed, and it
+    ///    is never evaluated on a value the acquisition chain did not verify.
+    ///
+    /// Absence of evidence is never reported as evidence: nothing below turns a failed acquisition into a
+    /// verified one, and nothing turns a verified reading into a Pump-ready claim.
     /// </summary>
     public static PumpReadyReadOutcome Classify(
         ProcessIoPhysicalObservation observation,
@@ -629,7 +647,7 @@ public static class ProcessIoPumpReadyReadTrial
         ArgumentNullException.ThrowIfNull(observation);
         ArgumentNullException.ThrowIfNull(request);
 
-        var outcome = new PumpReadyReadOutcome
+        PumpReadyReadOutcome outcome = new()
         {
             Ai003 = observation,
             Ai002Diagnostic = inletDiagnostic,
@@ -639,11 +657,20 @@ public static class ProcessIoPumpReadyReadTrial
             ExitCode = 2,
         };
 
+        // ---- part 1: the physical acquisition chain. Any failure here means the reading is not physical
+        // AI-003 evidence at all, so PhysicalAi003Verified stays false and PumpReady is never evaluated.
+
         // A transport fault is a bounded read failure, not a low reading: it exits 3 and never reaches the
         // Pump-ready rule at all.
         if (string.Equals(observation.DiagnosticCode, ProcessIoRefusals.ObservationTransportFault, StringComparison.Ordinal))
         {
             return outcome with { Code = ReadTimeout, ExitCode = 3 };
+        }
+
+        // The evidence must be the Pump Outlet Pressure identity itself, never a neighbouring channel.
+        if (!string.Equals(observation.Tag, ProcessIoIsolationValves.PumpOutletPressureTag, StringComparison.Ordinal))
+        {
+            return outcome with { Code = RefusedWrongSourceTag };
         }
 
         // A simulated or absent read is never physical evidence, whatever its value.
@@ -679,10 +706,15 @@ public static class ProcessIoPumpReadyReadTrial
         }
 
         double? engineering = observation.EngineeringValue;
-        if (engineering is null)
+        if (engineering is null || !double.IsFinite(engineering.Value))
         {
             return outcome with { Code = RefusedNotUsable };
         }
+
+        // The acquisition chain passed. From here the record may say so, and only from here.
+        outcome = outcome with { PhysicalAi003Verified = true };
+
+        // ---- part 2: the existing Pump-ready rule over the verified evidence. No second rule exists.
 
         // The sample carries the Product's own Pump Outlet identity and a GOOD quality only because every
         // check above passed. Nothing here fabricates quality or substitutes another source.
@@ -849,14 +881,20 @@ public static class ProcessIoPumpReadyReadTrial
         output.WriteLine("  trial_code=" + outcome.Code);
         output.WriteLine("  source_tag=" + ProcessIoIsolationValves.PumpOutletPressureTag);
 
-        // The evidence class states how the value was acquired. The verdict states whether it was accepted.
+        // The evidence class states where the value came from: the wire, or nowhere. It is deliberately
+        // narrower than either verdict below, so it can never stand in for one of them.
         output.WriteLine("  evidence_kind=" + (observation.Provenance == ProcessIoObservationProvenance.PHYSICAL_READ
             ? EvidenceKindPhysical
             : EvidenceKindNotEstablished));
 
-        // Physical verification is TRUE only when the read-only chain actually passed end to end.
-        output.WriteLine("  physical_pump_verified=" + Flag(outcome.PumpReady));
-        output.WriteLine("  physical_ai003_verified=" + Flag(outcome.PumpReady));
+        // Two decisions, reported separately, because one does not imply the other:
+        //   physical_ai003_verified — the physical acquisition chain produced usable, current, in-generation
+        //                             evidence, independently of the setpoint;
+        //   pump_ready              — that verified pressure is strictly above the configured setpoint;
+        //   physical_pump_verified  — the conjunction. Pump verification is never claimed on a reading that
+        //                             is merely well acquired, and never on one that is not.
+        output.WriteLine("  physical_pump_verified=" + Flag(outcome.PhysicalAi003Verified && outcome.PumpReady));
+        output.WriteLine("  physical_ai003_verified=" + Flag(outcome.PhysicalAi003Verified));
         output.WriteLine("  pump_ready=" + Flag(outcome.PumpReady));
 
         output.WriteLine("  raw_value=" + observation.RawValue.ToString(CultureInfo.InvariantCulture));
@@ -956,6 +994,21 @@ public sealed record PumpReadyReadOutcome
 
     public required int ExitCode { get; init; }
 
-    /// <summary>True only when the physical chain passed and the sample strictly exceeded the setpoint.</summary>
+    /// <summary>
+    /// True when the physical <c>AI-003+</c> acquisition chain produced usable, current, in-generation
+    /// evidence: the exact Pump Outlet identity, a PHYSICAL_READ provenance, a timestamp that is not
+    /// future-dated, a usable quality, the live session generation, freshness at the moment of judgement
+    /// and a finite engineering value in bar.
+    ///
+    /// It is deliberately independent of the setpoint. A 14 bar reading against a 15 bar setpoint is
+    /// verified physical AI-003 evidence that is not Pump-ready, and it must be reportable as such.
+    /// </summary>
+    public bool PhysicalAi003Verified { get; init; }
+
+    /// <summary>
+    /// True only when the acquisition chain was verified AND the existing Pump-ready rule accepted the
+    /// pressure, which requires it to be strictly above the configured setpoint. It is never set on an
+    /// unverified value.
+    /// </summary>
     public bool PumpReady { get; init; }
 }

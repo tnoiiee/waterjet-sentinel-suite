@@ -132,6 +132,11 @@ P1–P6, no queue, no `TimeDelay`, no next Job and no Pump command anywhere in t
 | `PHYSICAL_PUMP_EVIDENCE = NOT_ESTABLISHED_BY_THIS_TRIAL` | printed unconditionally |
 | `PUMP_STOPPED: … / NOT SOFTWARE_VERIFIED` | the attestation is the Owner's statement; the software never claims to have measured it |
 
+Both physical Pump fields are `FALSE` here because Trial B's `AI-003+` input is simulated, so there is
+no physical acquisition to verify in the first place. Trial A, which does read the physical transmitter,
+reports them separately — `physical_ai003_verified` for the acquisition and `physical_pump_verified` for
+the full Pump-ready verdict; see §3.5. The two tables are not interchangeable.
+
 ### 2.5 Cleanup
 
 Cleanup runs on success, on every refusal after an OPEN was attempted, on a supervision timeout, on a
@@ -241,8 +246,29 @@ stage.
 `ai002_role: DIAGNOSTIC_ONLY_NOT_USED_FOR_DECISION` with `ai002_used_for_decision=FALSE`,
 `iv_command_executed: FALSE`, `motion_executed: FALSE`, `waterjet_command_executed: FALSE`.
 
-`physical_pump_verified` and `physical_ai003_verified` are `TRUE` only when the whole chain passed; a
-refused or failed run can never claim physical Pump verification.
+The three verification fields answer **two different questions** and are reported separately, because
+one does not imply the other:
+
+| Field | Question it answers |
+|---|---|
+| `physical_ai003_verified` | Did the physical `AI-003+` acquisition chain produce usable, current, in-generation evidence — the exact Pump-Outlet identity, a physical read, a timestamp that is not future-dated, usable quality, the live session generation, freshness at judgement, and a finite value in `bar`? **Independent of the setpoint.** |
+| `pump_ready` | Over that verified evidence, does the existing Pump-ready rule accept the pressure **strictly above** the configured setpoint? |
+| `physical_pump_verified` | The conjunction: `physical_ai003_verified` **and** `pump_ready`. |
+
+**Physical AI-003 evidence may pass while Pump-ready fails.** A correctly acquired `14 bar` reading
+against a `15 bar` setpoint reports `physical_ai003_verified=TRUE`, `pump_ready=FALSE`,
+`physical_pump_verified=FALSE`. That run is real, useful physical acquisition evidence; it is simply
+not a passing Pump-ready run.
+
+**Trial A requires `pump_ready=TRUE` for the complete `PHYSICAL_PUMP_READY` evidence verdict**, which
+`physical_pump_verified=TRUE` states exactly. A below-setpoint run therefore remains valid physical
+`AI-003+` acquisition evidence but is **not** a passing Pump-ready run, and it never becomes one by
+being re-read, reinterpreted or combined with `AI-002+`.
+
+`physical_ai003_verified` is `FALSE` for a transport fault, a wrong source tag, a non-physical
+provenance, a future timestamp, unusable or stale quality, a superseded generation, and an unavailable
+or non-finite engineering value. A refused or failed run can never claim physical Pump verification,
+and no reading can claim Pump-readiness without first being verified evidence.
 
 ### 3.6 Exit codes
 
@@ -267,8 +293,14 @@ refused or failed run can never claim physical Pump verification.
 observation point, the person authorized to start and stop the Pump, and the abort method. All of these
 are Owner-local and none of them is defaulted by the software.
 
-**Trial A proves:** a physical Pump can produce a physical `AI-003+` reading that the existing
-Pump-ready rule accepts, in the recorded generation — `PHYSICAL_PUMP_READY`.
+**A passing Trial A proves:** a physical Pump can produce a physical `AI-003+` reading that the existing
+Pump-ready rule accepts, in the recorded generation — `PHYSICAL_PUMP_READY`, reported as
+`physical_pump_verified=TRUE`. Passing means `pump_ready=TRUE`; nothing less is a passing run.
+
+**A below-setpoint Trial A run proves less, and that is still evidence:** it establishes the physical
+`AI-003+` acquisition chain — transmitter, wiring, rack input, transport, scaling, quality, freshness and
+generation — while explicitly **not** establishing Pump-ready. It must be recorded as
+`physical_ai003_verified=TRUE` with `pump_ready=FALSE`, never as a Pump-ready result.
 
 **Trial A does not prove:** any Isolation Valve movement, any valve feedback, any motion, any queue
 behaviour, any wet cleaning outcome, or anything about Trial B. Trial A is not repeated per WSB: it is
@@ -306,10 +338,12 @@ transmitter; water-on behaviour; any second valve; any other WSB; motion, Home o
 `TimeDelay` behaviour; Production readiness; valve actuation time, seat tightness, leak rate or
 pressure-band behaviour; or the correctness of any Owner-supplied threshold.
 
-**Trial A establishes only:** that a physical `AI-003+` reading, obtained through the existing transport
-and session, satisfied the existing Pump-ready rule under the Owner-supplied setpoint in the recorded
-generation — reported as `PHYSICAL_PUMP_READY`. **Trial A does not establish** any valve, motion, queue
-or wet-cleaning behaviour, and it establishes nothing about Production.
+**Trial A establishes, in two separable parts:** that a physical `AI-003+` reading was acquired and
+verified through the existing transport, session and conversion rules (`physical_ai003_verified`), and —
+only when the pressure was strictly above the Owner-supplied setpoint in the recorded generation — that
+the existing Pump-ready rule accepted it, reported as `PHYSICAL_PUMP_READY` (`physical_pump_verified`).
+The first part can hold while the second does not; the reverse never can. **Trial A does not establish**
+any valve, motion, queue or wet-cleaning behaviour, and it establishes nothing about Production.
 
 **Combining the two stages into one claim is not permitted.** A reader of either record must be able
 to see which part was physical and which part was simulated without consulting a second document,
