@@ -580,7 +580,7 @@ public static class ProcessIoPumpReadyReadTrial
         {
             return new PumpReadyReadOutcome
             {
-                Ai003 = RefusedObservation(ProcessIoIsolationValves.PumpOutletPressureTag),
+                Ai003 = RefusedObservation(ProcessIoIsolationValves.PumpOutletPressureTag, request.Time),
                 Ai002Role = ProcessIoPumpReadyReadTrial.Ai002Role,
                 SessionGeneration = session.Generation,
                 Code = RefusedSessionNotOpen,
@@ -588,14 +588,14 @@ public static class ProcessIoPumpReadyReadTrial
             };
         }
 
-        // Both timestamps come from the same clock and bracket the transport call, so a slow read is
-        // reported as stale rather than silently accepted.
-        DateTimeOffset observedAt = request.Time.GetUtcNow();
+        // The clock is handed to the session rather than sampled here. C# evaluates arguments before the
+        // call, so any timestamp this method captured would precede the transport read and a slow read
+        // would be recorded with identical timestamps and Fresh true. The session brackets the read with
+        // this one clock instead: observed before the read, received after it.
         ProcessIoPhysicalObservation observation = session.ObserveAnalogInput(
             ProcessIoIsolationValves.PumpOutletPressureTag,
             request.PumpRow,
-            observedAt,
-            request.Time.GetUtcNow(),
+            request.Time,
             request.Freshness);
 
         int generation = session.Generation;
@@ -607,9 +607,10 @@ public static class ProcessIoPumpReadyReadTrial
             && request.Catalogue.TryGetValue(ProcessIoIsolationValves.PumpInletPressureTag, out ProcessIoCatalogueRow? inletRow)
             && inletRow.Binding is not null)
         {
-            DateTimeOffset inletAt = request.Time.GetUtcNow();
+            // The same defect class lived on the diagnostic path: bracketed the same way, with the same
+            // clock, so a slow inlet read is reported stale instead of silently accepted.
             inlet = session.ObserveAnalogInput(
-                ProcessIoIsolationValves.PumpInletPressureTag, inletRow, inletAt, request.Time.GetUtcNow(), request.Freshness);
+                ProcessIoIsolationValves.PumpInletPressureTag, inletRow, request.Time, request.Freshness);
         }
 
         return Classify(observation, inlet, generation, request.Time.GetUtcNow(), request);
@@ -744,9 +745,10 @@ public static class ProcessIoPumpReadyReadTrial
     }
 
     /// <summary>A refused observation with no raw value, no engineering value and no quality claim.</summary>
-    private static ProcessIoPhysicalObservation RefusedObservation(string tag)
+    private static ProcessIoPhysicalObservation RefusedObservation(string tag, TimeProvider time)
     {
-        DateTimeOffset at = DateTimeOffset.UtcNow;
+        ArgumentNullException.ThrowIfNull(time);
+        DateTimeOffset at = time.GetUtcNow();
         return new ProcessIoPhysicalObservation
         {
             Tag = tag,

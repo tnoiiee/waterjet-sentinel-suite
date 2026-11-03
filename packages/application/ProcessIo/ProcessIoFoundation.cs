@@ -338,20 +338,64 @@ public sealed class ProcessIoSession
             : ProcessIoObservationProvenance.PHYSICAL_READ;
 
     /// <summary>
-    /// Observes one analog input row as a typed physical observation. Refusals are values with a
-    /// typed code and no transport call; a transport fault is captured as BAD, never propagated.
+    /// Observes one analog input row as a typed physical observation, using caller-supplied timestamps.
+    /// Refusals are values with a typed code and no transport call; a transport fault is captured as
+    /// BAD, never propagated.
+    ///
+    /// This overload cannot bracket the read: both timestamps are evaluated by the caller before the
+    /// call, so the transport has not run yet when <paramref name="receivedAt"/> is determined. A caller
+    /// that wants the elapsed read time reflected in freshness must use the
+    /// <see cref="TimeProvider"/> overload instead.
     /// </summary>
     public ProcessIoPhysicalObservation ObserveAnalogInput(
         string tag,
         ProcessIoCatalogueRow? row,
         DateTimeOffset observedAt,
         DateTimeOffset receivedAt,
+        TimeSpan freshnessBudget) =>
+        ObserveAnalogInputCore(tag, row, observedAt, () => receivedAt, freshnessBudget);
+
+    /// <summary>
+    /// Observes one analog input row as a typed physical observation, bracketing the physical transport
+    /// read with the supplied clock.
+    ///
+    /// C# evaluates arguments before the call, so a caller cannot capture a receive instant that lies
+    /// after a read it has not issued yet. This overload therefore takes the clock instead of the
+    /// timestamps and captures them itself: <paramref name="time"/> is read immediately before the
+    /// transport read and again immediately after it. A read that consumes more than
+    /// <paramref name="freshnessBudget"/> is consequently reported STALE with Fresh false, rather than
+    /// silently accepted with identical timestamps.
+    ///
+    /// This is the same observation authority as the timestamp overload: one shared implementation, one
+    /// read, one engineering conversion, one quality/freshness/generation decision. It never writes,
+    /// never retries and never fabricates a reading.
+    /// </summary>
+    public ProcessIoPhysicalObservation ObserveAnalogInput(
+        string tag,
+        ProcessIoCatalogueRow? row,
+        TimeProvider time,
+        TimeSpan freshnessBudget)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+        return ObserveAnalogInputCore(tag, row, time.GetUtcNow(), () => time.GetUtcNow(), freshnessBudget);
+    }
+
+    /// <summary>
+    /// The single analog observation authority both overloads share. <paramref name="receivedAt"/> is a
+    /// factory rather than a value so the receive instant is only determined once the transport read has
+    /// actually returned; the timestamp overload simply supplies a constant.
+    /// </summary>
+    private ProcessIoPhysicalObservation ObserveAnalogInputCore(
+        string tag,
+        ProcessIoCatalogueRow? row,
+        DateTimeOffset observedAt,
+        Func<DateTimeOffset> receivedAt,
         TimeSpan freshnessBudget)
     {
         string? refusal = ClassifyObservationRefusal(row);
         if (refusal is not null || row is null || row.Binding is null)
         {
-            return Refused(tag, observedAt, receivedAt, refusal ?? ProcessIoRefusals.ObservationRefusedUnbound);
+            return Refused(tag, observedAt, receivedAt(), refusal ?? ProcessIoRefusals.ObservationRefusedUnbound);
         }
 
         int raw;
@@ -363,9 +407,13 @@ public sealed class ProcessIoSession
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
-            return Refused(tag, observedAt, receivedAt, ProcessIoRefusals.ObservationTransportFault)
+            return Refused(tag, observedAt, receivedAt(), ProcessIoRefusals.ObservationTransportFault)
                 with { RawValue = 0 };
         }
+
+        // The receive instant is taken only now, after the read returned. Everything below judges the
+        // span the transport actually consumed.
+        DateTimeOffset received = receivedAt();
 
         bool converted = TryEngineering(tag, (ushort)raw, out double engineering, out string unit);
         bool finite = !converted || double.IsFinite(engineering);
@@ -376,8 +424,8 @@ public sealed class ProcessIoSession
             : ProcessIoObservationQuality.GOOD;
 
         bool fresh = quality == ProcessIoObservationQuality.GOOD
-            && observedAt <= receivedAt
-            && receivedAt - observedAt <= freshnessBudget;
+            && observedAt <= received
+            && received - observedAt <= freshnessBudget;
 
         if (quality == ProcessIoObservationQuality.GOOD && !fresh)
         {
@@ -392,7 +440,7 @@ public sealed class ProcessIoSession
             Unit = converted ? unit : null,
             Quality = quality,
             ObservedAt = observedAt,
-            ReceivedAt = receivedAt,
+            ReceivedAt = received,
             SourceGeneration = Generation,
             Fresh = fresh,
             Provenance = TransportProvenance,

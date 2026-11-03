@@ -425,11 +425,33 @@ public sealed class ProcessIoPumpReadyReadTrialTests
 
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
 
+        // A read that consumed no clock time is GOOD and fresh, and its two instants are the same.
         Assert.Equal(ProcessIoObservationQuality.GOOD, outcome.Ai003.Quality);
         Assert.Equal(ProcessIoObservationProvenance.PHYSICAL_READ, outcome.Ai003.Provenance);
         Assert.True(outcome.Ai003.Fresh);
-        Assert.InRange(outcome.Ai003.ObservedAt, clock.UtcNow, clock.UtcNow);
+        Assert.Equal(clock.UtcNow, outcome.Ai003.ObservedAt);
+        Assert.Equal(clock.UtcNow, outcome.Ai003.ReceivedAt);
         Assert.True(outcome.Ai003.ReceivedAt >= outcome.Ai003.ObservedAt);
+        Assert.Equal(TimeSpan.Zero, outcome.Ai003.ReceivedAt - outcome.Ai003.ObservedAt);
+    }
+
+    [Fact]
+    public void A_Fast_Read_Inside_The_Budget_Brackets_The_Transport_Call()
+    {
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+
+        // 5 ms elapsed inside the transport read, against a 2 s budget.
+        transport.DuringRead = () => clock.Advance(TimeSpan.FromMilliseconds(5));
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+
+        Assert.True(outcome.Ai003.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, outcome.Ai003.Quality);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), outcome.Ai003.ReceivedAt - outcome.Ai003.ObservedAt);
+        Assert.True(outcome.PhysicalAi003Verified);
+        Assert.True(outcome.PumpReady);
     }
 
     [Fact]
@@ -445,12 +467,83 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(
             Request(clock) with { Freshness = TimeSpan.FromMilliseconds(20) }, session);
 
-        Assert.False(outcome.PumpReady);
-        Assert.False(outcome.PhysicalAi003Verified);
+        // The elapsed read time is now visible in the record, not collapsed to zero.
+        Assert.Equal(TimeSpan.FromMilliseconds(60), outcome.Ai003.ReceivedAt - outcome.Ai003.ObservedAt);
+
         Assert.False(outcome.Ai003.Fresh);
         Assert.Equal(ProcessIoObservationQuality.STALE, outcome.Ai003.Quality);
+        Assert.Equal(ProcessIoRefusals.ObservationStale, outcome.Ai003.DiagnosticCode);
+        Assert.False(outcome.PhysicalAi003Verified);
+        Assert.False(outcome.PumpReady);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedStale, outcome.Code);
         Assert.Equal(2, outcome.ExitCode);
+    }
+
+    [Fact]
+    public void The_Freshness_Budget_Is_Inclusive_At_Its_Exact_Boundary()
+    {
+        // The accepted contract is "received - observed <= budget", so exactly at the boundary is fresh.
+        // Only the acquisition read is slowed, so the diagnostic read cannot move the judging instant.
+        int pumpOutletAddress = AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag);
+
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[pumpOutletAddress] = RawAbove;
+        transport.DuringRegisterRead = address =>
+        {
+            if (address == pumpOutletAddress)
+            {
+                clock.Advance(TimeSpan.FromMilliseconds(20));
+            }
+        };
+
+        PumpReadyReadOutcome atBoundary = ProcessIoPumpReadyReadTrial.Observe(
+            Request(clock) with { Freshness = TimeSpan.FromMilliseconds(20) }, session);
+
+        Assert.Equal(TimeSpan.FromMilliseconds(20), atBoundary.Ai003.ReceivedAt - atBoundary.Ai003.ObservedAt);
+        Assert.True(atBoundary.Ai003.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, atBoundary.Ai003.Quality);
+        Assert.True(atBoundary.PhysicalAi003Verified);
+        Assert.True(atBoundary.PumpReady);
+
+        // One millisecond beyond it is stale, with no special case in between.
+        var beyondClock = new TestClock();
+        (ProcessIoSession beyondSession, FakeTransport beyondTransport) = CreateSession();
+        beyondTransport.InputRegisters[pumpOutletAddress] = RawAbove;
+        beyondTransport.DuringRegisterRead = address =>
+        {
+            if (address == pumpOutletAddress)
+            {
+                beyondClock.Advance(TimeSpan.FromMilliseconds(21));
+            }
+        };
+
+        PumpReadyReadOutcome beyond = ProcessIoPumpReadyReadTrial.Observe(
+            Request(beyondClock) with { Freshness = TimeSpan.FromMilliseconds(20) }, beyondSession);
+
+        Assert.False(beyond.Ai003.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, beyond.Ai003.Quality);
+        Assert.False(beyond.PhysicalAi003Verified);
+        Assert.False(beyond.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedStale, beyond.Code);
+        Assert.Equal(2, beyond.ExitCode);
+    }
+
+    [Fact]
+    public void The_Session_Generation_Stays_Truthful_Across_A_Slow_Read()
+    {
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        transport.DuringRead = () => clock.Advance(TimeSpan.FromMilliseconds(60));
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(
+            Request(clock) with { Freshness = TimeSpan.FromMilliseconds(20) }, session);
+
+        // Staleness is a freshness verdict, not a generation verdict: both still name the live session.
+        Assert.False(outcome.Ai003.Fresh);
+        Assert.Equal(session.Generation, outcome.Ai003.SourceGeneration);
+        Assert.Equal(session.Generation, outcome.SessionGeneration);
     }
 
     [Fact]
@@ -732,6 +825,226 @@ public sealed class ProcessIoPumpReadyReadTrialTests
         Assert.False(outcome.PumpReady);
         Assert.Equal(2, outcome.ExitCode);
         Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedAtOrBelowSetpoint, outcome.Code);
+    }
+
+    [Fact]
+    public void Diagnostic_Freshness_Never_Changes_The_Three_Verdicts()
+    {
+        var fastClock = new TestClock();
+        (ProcessIoSession fastSession, FakeTransport fastTransport) = CreateSession();
+        fastTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        fastTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+        PumpReadyReadOutcome fastInlet = ProcessIoPumpReadyReadTrial.Observe(Request(fastClock), fastSession);
+
+        var slowClock = new TestClock();
+        (ProcessIoSession slowSession, FakeTransport slowTransport) = CreateSession();
+        slowTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        slowTransport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+        slowTransport.DuringRegisterRead = address =>
+        {
+            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
+            {
+                slowClock.Advance(TimeSpan.FromMilliseconds(60));
+            }
+        };
+        PumpReadyReadOutcome slowInlet = ProcessIoPumpReadyReadTrial.Observe(Request(slowClock), slowSession);
+
+        // The diagnostic reading differs in freshness; none of the three verdicts may move.
+        Assert.True(fastInlet.Ai002Diagnostic!.Fresh);
+        Assert.False(slowInlet.Ai002Diagnostic!.Fresh);
+        Assert.Equal(fastInlet.PhysicalAi003Verified, slowInlet.PhysicalAi003Verified);
+        Assert.Equal(fastInlet.PumpReady, slowInlet.PumpReady);
+        Assert.Equal(
+            fastInlet.PhysicalAi003Verified && fastInlet.PumpReady,
+            slowInlet.PhysicalAi003Verified && slowInlet.PumpReady);
+        Assert.Equal(fastInlet.Code, slowInlet.Code);
+        Assert.Equal(fastInlet.ExitCode, slowInlet.ExitCode);
+    }
+
+    // ================================================================== the session overload contract
+
+    [Fact]
+    public void The_Timestamp_Overload_Retains_Its_Caller_Supplied_Contract()
+    {
+        // The pre-existing overload must keep behaving exactly as before for every current caller: the
+        // verdict is derived only from the two instants the caller states, with no clock consulted.
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        ProcessIoCatalogueRow row = BuildCatalogue()[ProcessIoIsolationValves.PumpOutletPressureTag];
+        var at = new DateTimeOffset(2026, 11, 3, 8, 0, 0, TimeSpan.Zero);
+
+        ProcessIoPhysicalObservation same = session.ObserveAnalogInput(
+            ProcessIoIsolationValves.PumpOutletPressureTag, row, at, at, TimeSpan.FromSeconds(2));
+        Assert.True(same.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, same.Quality);
+        Assert.Equal("OK", same.DiagnosticCode);
+        Assert.Equal(at, same.ObservedAt);
+        Assert.Equal(at, same.ReceivedAt);
+
+        ProcessIoPhysicalObservation slow = session.ObserveAnalogInput(
+            ProcessIoIsolationValves.PumpOutletPressureTag,
+            row,
+            at,
+            at.AddMilliseconds(60),
+            TimeSpan.FromMilliseconds(20));
+        Assert.False(slow.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, slow.Quality);
+        Assert.Equal(ProcessIoRefusals.ObservationStale, slow.DiagnosticCode);
+        Assert.Equal(at, slow.ObservedAt);
+        Assert.Equal(at.AddMilliseconds(60), slow.ReceivedAt);
+
+        // A refused row is still refused identically, and the caller's instants are still the record's.
+        ProcessIoPhysicalObservation refused = session.ObserveAnalogInput(
+            ProcessIoIsolationValves.PumpOutletPressureTag,
+            null,
+            at,
+            at.AddMilliseconds(5),
+            TimeSpan.FromSeconds(2));
+        Assert.False(refused.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.BAD, refused.Quality);
+        Assert.Equal(ProcessIoObservationProvenance.NOT_OBSERVED, refused.Provenance);
+        Assert.Equal(ProcessIoRefusals.ObservationRefusedUnbound, refused.DiagnosticCode);
+        Assert.Equal(at, refused.ObservedAt);
+        Assert.Equal(at.AddMilliseconds(5), refused.ReceivedAt);
+    }
+
+    [Fact]
+    public void The_Clock_Overload_Rejects_A_Missing_Clock_Before_Any_Read()
+    {
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        ProcessIoCatalogueRow row = BuildCatalogue()[ProcessIoIsolationValves.PumpOutletPressureTag];
+
+        Assert.Throws<ArgumentNullException>(() => session.ObserveAnalogInput(
+            ProcessIoIsolationValves.PumpOutletPressureTag, row, (TimeProvider)null!, TimeSpan.FromSeconds(2)));
+        Assert.Equal(0, transport.ReadAttempts);
+    }
+
+    [Fact]
+    public void The_Trial_Hands_The_Clock_To_The_Session_Rather_Than_Sampling_Timestamps()
+    {
+        string trial = ReadSource("ProcessIoPumpReadyReadTrial.cs");
+
+        // Both observations - the acquisition and the diagnostic - use the clock overload.
+        Assert.Equal(2, CountOccurrences(trial, "session.ObserveAnalogInput("));
+        Assert.Equal(2, CountOccurrences(trial, "request.Time,"));
+
+        // Exactly one instant is sampled by the trial itself: the judging instant, after the reads.
+        Assert.Equal(1, CountOccurrences(trial, "request.Time.GetUtcNow()"));
+    }
+
+    // ================================================================== diagnostic-path freshness
+
+    [Fact]
+    public void A_Fast_Diagnostic_Read_Has_Truthful_Timestamps()
+    {
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+
+        transport.DuringRegisterRead = address =>
+        {
+            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
+            {
+                clock.Advance(TimeSpan.FromMilliseconds(5));
+            }
+        };
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+
+        Assert.NotNull(outcome.Ai002Diagnostic);
+        ProcessIoPhysicalObservation inlet = outcome.Ai002Diagnostic!;
+        Assert.True(inlet.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.GOOD, inlet.Quality);
+        Assert.Equal(TimeSpan.FromMilliseconds(5), inlet.ReceivedAt - inlet.ObservedAt);
+        Assert.True(inlet.ObservedAt <= inlet.ReceivedAt);
+    }
+
+    [Fact]
+    public void A_Slow_Diagnostic_Read_Is_Stale()
+    {
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+
+        // Only the inlet is slow. The diagnostic path carries the same defect class and is bracketed
+        // with the same clock, so it must report the elapsed span too.
+        transport.DuringRegisterRead = address =>
+        {
+            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
+            {
+                clock.Advance(TimeSpan.FromMilliseconds(60));
+            }
+        };
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+
+        Assert.NotNull(outcome.Ai002Diagnostic);
+        ProcessIoPhysicalObservation inlet = outcome.Ai002Diagnostic!;
+        Assert.False(inlet.Fresh);
+        Assert.Equal(ProcessIoObservationQuality.STALE, inlet.Quality);
+        Assert.Equal(ProcessIoRefusals.ObservationStale, inlet.DiagnosticCode);
+        Assert.Equal(TimeSpan.FromMilliseconds(60), inlet.ReceivedAt - inlet.ObservedAt);
+    }
+
+    [Fact]
+    public void A_Slow_Ai003_Refuses_Even_When_The_Diagnostic_Read_Is_Fast()
+    {
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+
+        transport.DuringRegisterRead = address =>
+        {
+            if (address == AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag))
+            {
+                clock.Advance(TimeSpan.FromMilliseconds(60));
+            }
+        };
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(
+            Request(clock) with { Freshness = TimeSpan.FromMilliseconds(20) }, session);
+
+        Assert.False(outcome.Ai003.Fresh);
+        Assert.False(outcome.PhysicalAi003Verified);
+        Assert.False(outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.RefusedStale, outcome.Code);
+        Assert.Equal(2, outcome.ExitCode);
+
+        // A fresh diagnostic reading cannot rescue a stale acquisition.
+        Assert.NotNull(outcome.Ai002Diagnostic);
+        Assert.True(outcome.Ai002Diagnostic!.Fresh);
+    }
+
+    [Fact]
+    public void A_Slow_Diagnostic_Read_Never_Changes_The_Decision()
+    {
+        var clock = new TestClock();
+        (ProcessIoSession session, FakeTransport transport) = CreateSession();
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpOutletPressureTag)] = RawAbove;
+        transport.InputRegisters[AddressOf(ProcessIoIsolationValves.PumpInletPressureTag)] = RawBelow;
+
+        transport.DuringRegisterRead = address =>
+        {
+            if (address == AddressOf(ProcessIoIsolationValves.PumpInletPressureTag))
+            {
+                clock.Advance(TimeSpan.FromMilliseconds(60));
+            }
+        };
+
+        PumpReadyReadOutcome outcome = ProcessIoPumpReadyReadTrial.Observe(Request(clock), session);
+
+        // The inlet is stale; the outlet is not, so every verdict is driven by AI-003 alone.
+        Assert.False(outcome.Ai002Diagnostic!.Fresh);
+        Assert.True(outcome.Ai003.Fresh);
+        Assert.True(outcome.PhysicalAi003Verified);
+        Assert.True(outcome.PumpReady);
+        Assert.True(outcome.PhysicalAi003Verified && outcome.PumpReady);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.Accepted, outcome.Code);
+        Assert.Equal(0, outcome.ExitCode);
+        Assert.Equal(ProcessIoPumpReadyReadTrial.Ai002Role, outcome.Ai002Role);
     }
 
     // ================================================================== AI-002+ separation
@@ -1213,8 +1526,14 @@ public sealed class ProcessIoPumpReadyReadTrialTests
 
         public bool ThrowOnRead { get; set; }
 
-        /// <summary>Runs inside the read, so a test can consume clock time where a real device would.</summary>
+        /// <summary>Runs inside every read, so a test can consume clock time where a real device would.</summary>
         public Action? DuringRead { get; set; }
+
+        /// <summary>
+        /// Runs inside one input-register read with that register's address, so a test can make exactly
+        /// one tag slow — for example a slow AI-002 diagnostic beside a fast AI-003 acquisition.
+        /// </summary>
+        public Action<int>? DuringRegisterRead { get; set; }
 
         public int ReadAttempts { get; private set; }
 
@@ -1242,13 +1561,13 @@ public sealed class ProcessIoPumpReadyReadTrialTests
 
         public ushort ReadInputRegister(string deviceKey, int registerAddress)
         {
-            OnRead();
+            OnRead(registerAddress);
             return InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
         }
 
         public ushort ReadRegister(string deviceKey, int registerAddress)
         {
-            OnRead();
+            OnRead(registerAddress);
             return InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
         }
 
@@ -1277,7 +1596,7 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             }
         }
 
-        private void OnRead()
+        private void OnRead(int? registerAddress = null)
         {
             ReadAttempts += 1;
             if (ThrowOnRead)
@@ -1286,6 +1605,11 @@ public sealed class ProcessIoPumpReadyReadTrialTests
             }
 
             DuringRead?.Invoke();
+
+            if (registerAddress is int address)
+            {
+                DuringRegisterRead?.Invoke(address);
+            }
         }
     }
 }
