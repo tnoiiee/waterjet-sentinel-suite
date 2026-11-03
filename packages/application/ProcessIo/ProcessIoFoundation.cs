@@ -454,20 +454,61 @@ public sealed class ProcessIoSession
     }
 
     /// <summary>
-    /// Observes one digital input row. The bit is reported as read; the caller decides what a named
-    /// state means. Quality and freshness follow the same rules as the analog path.
+    /// Observes one digital input row, using caller-supplied timestamps. The bit is reported as read; the
+    /// caller decides what a named state means. Quality and freshness follow the same rules as the analog
+    /// path.
+    ///
+    /// This overload cannot bracket the read: both timestamps are evaluated by the caller before the
+    /// call, so the transport has not run yet when <paramref name="receivedAt"/> is determined. A caller
+    /// that wants the elapsed read time reflected in freshness must use the
+    /// <see cref="TimeProvider"/> overload instead.
     /// </summary>
     public ProcessIoPhysicalObservation ObserveDigitalInput(
         string tag,
         ProcessIoCatalogueRow? row,
         DateTimeOffset observedAt,
         DateTimeOffset receivedAt,
+        TimeSpan freshnessBudget) =>
+        ObserveDigitalInputCore(tag, row, observedAt, () => receivedAt, freshnessBudget);
+
+    /// <summary>
+    /// Observes one digital input row, bracketing the physical transport read with the supplied clock.
+    ///
+    /// The same argument-evaluation defect the analog path had applies here: a caller cannot capture a
+    /// receive instant that lies after a read it has not issued yet. This overload takes the clock and
+    /// captures both instants itself, so a bit that takes longer than
+    /// <paramref name="freshnessBudget"/> to arrive is reported STALE with Fresh false instead of being
+    /// accepted as current field feedback.
+    ///
+    /// It shares one implementation with the timestamp overload: one read, one quality/freshness/
+    /// generation decision. It never writes, never retries and never fabricates a bit.
+    /// </summary>
+    public ProcessIoPhysicalObservation ObserveDigitalInput(
+        string tag,
+        ProcessIoCatalogueRow? row,
+        TimeProvider time,
+        TimeSpan freshnessBudget)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+        return ObserveDigitalInputCore(tag, row, time.GetUtcNow(), () => time.GetUtcNow(), freshnessBudget);
+    }
+
+    /// <summary>
+    /// The single digital observation authority both overloads share. <paramref name="receivedAt"/> is a
+    /// factory rather than a value so the receive instant is only determined once the transport read has
+    /// actually returned; the timestamp overload simply supplies a constant.
+    /// </summary>
+    private ProcessIoPhysicalObservation ObserveDigitalInputCore(
+        string tag,
+        ProcessIoCatalogueRow? row,
+        DateTimeOffset observedAt,
+        Func<DateTimeOffset> receivedAt,
         TimeSpan freshnessBudget)
     {
         string? refusal = ClassifyObservationRefusal(row);
         if (refusal is not null || row is null || row.Binding is null)
         {
-            return Refused(tag, observedAt, receivedAt, refusal ?? ProcessIoRefusals.ObservationRefusedUnbound);
+            return Refused(tag, observedAt, receivedAt(), refusal ?? ProcessIoRefusals.ObservationRefusedUnbound);
         }
 
         bool raw;
@@ -479,10 +520,13 @@ public sealed class ProcessIoSession
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
         {
-            return Refused(tag, observedAt, receivedAt, ProcessIoRefusals.ObservationTransportFault);
+            return Refused(tag, observedAt, receivedAt(), ProcessIoRefusals.ObservationTransportFault);
         }
 
-        bool fresh = observedAt <= receivedAt && receivedAt - observedAt <= freshnessBudget;
+        // The receive instant is taken only now, after the read returned.
+        DateTimeOffset received = receivedAt();
+
+        bool fresh = observedAt <= received && received - observedAt <= freshnessBudget;
         return new ProcessIoPhysicalObservation
         {
             Tag = tag,
@@ -491,7 +535,7 @@ public sealed class ProcessIoSession
             Unit = null,
             Quality = fresh ? ProcessIoObservationQuality.GOOD : ProcessIoObservationQuality.STALE,
             ObservedAt = observedAt,
-            ReceivedAt = receivedAt,
+            ReceivedAt = received,
             SourceGeneration = Generation,
             Fresh = fresh,
             Provenance = TransportProvenance,

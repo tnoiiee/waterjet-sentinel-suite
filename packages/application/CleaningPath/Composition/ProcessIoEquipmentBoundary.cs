@@ -423,15 +423,22 @@ public sealed class ProcessIoEquipmentBoundary : ICleaningPathEquipmentBoundary
         return Accepts(observation) && observation.RawValue == 1;
     }
 
-    /// <summary>Observes one catalogue row through the session, capturing both timestamps.</summary>
+    /// <summary>
+    /// Observes one catalogue row through the session.
+    ///
+    /// The clock is handed to the session rather than sampled here. C# evaluates arguments before the
+    /// call, so any receive instant captured in this method would precede the transport read, and a slow
+    /// read would be recorded with identical timestamps and accepted as current — including the Pump
+    /// Outlet pressure, every IV outlet pressure, and the Upper and Lower field limits that decide field
+    /// confirmation. The session brackets the read with this same clock instead: observed before the
+    /// read, received after it. The timestamps are never adjusted afterwards.
+    /// </summary>
     public ProcessIoPhysicalObservation Observe(string tag)
     {
         _catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row);
-        DateTimeOffset observed = _time.GetUtcNow();
-        ProcessIoPhysicalObservation observation = IsAnalogTag(tag)
-            ? _session.ObserveAnalogInput(tag, row, observed, _time.GetUtcNow(), _freshnessBudget)
-            : _session.ObserveDigitalInput(tag, row, observed, _time.GetUtcNow(), _freshnessBudget);
-        return observation;
+        return IsAnalogTag(tag)
+            ? _session.ObserveAnalogInput(tag, row, _time, _freshnessBudget)
+            : _session.ObserveDigitalInput(tag, row, _time, _freshnessBudget);
     }
 
     /// <summary>
