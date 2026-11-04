@@ -162,6 +162,10 @@ physical abort described in §2.6 is the authority for that case, and the proced
 
 ### 2.6 Trial B procedure
 
+> The exact environment contract, the runnable sequence, the required fields and the STOP conditions are
+> in `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md` §5. This section states the procedure; that document
+> states the exact contract.
+
 1. `OWNER_DECISION_REQUIRED` — name the Operator and the person who can physically abort.
 2. Confirm the Pump is stopped, no Pump command is authorized, Pump start is physically prevented or
    under continuous control, no water flow from the Pump is expected, and the selected Isolation Valve
@@ -288,6 +292,10 @@ and no reading can claim Pump-readiness without first being verified evidence.
 | `4` | refusal before acquisition: selector, profile, endpoint, consent, catalogue, binding, threshold or freshness |
 
 ### 3.7 Trial A procedure
+
+> The exact environment contract, the runnable sequence, the required fields and the STOP conditions are
+> in `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md` §4. This section states the procedure; that document
+> states the exact contract.
 
 1. all eight Isolation Valves are confirmed CLOSED and stay closed for the whole stage;
 2. no IV command, no Home, no motion, no Queue, no `TimeDelay`, no next Job;
