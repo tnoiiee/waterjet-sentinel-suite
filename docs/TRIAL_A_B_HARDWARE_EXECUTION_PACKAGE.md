@@ -218,6 +218,29 @@ refuses the run. Neither phrase ever appears in captured output; Trial A prints 
 One run, one file set. A second attempt gets a new timestamp; nothing is overwritten and nothing is
 appended to a previous trial's record.
 
+### 3.8 Lifecycle contract — shared by both trials
+
+Both scripts follow the same shape, because the same class of defect applies to both: a check placed
+after a normal return is not a check.
+
+| Element | Rule |
+|---|---|
+| Invocation count | **exactly one** `Start-Process` per script, inside `try`. There is no loop, no retry, no second launch, and no automatic re-run of any kind. |
+| Pre-initialized state | every variable the `finally` body reads is assigned **before** the `try`, in `NOT_ACCEPTED` / `NOT_CONFIRMED` form, so `Set-StrictMode -Version Latest` cannot make a `finally` body fail on an unassigned variable. |
+| Exception capture | `try { … } catch { … } finally { … }` — the `catch` records `invocation_status=FAULTED`, the exception **type**, and a message passed through `Get-RedactedText`, then returns control so the `finally` still runs. |
+| Exception message | the endpoint address and the consent phrase are replaced with `<endpoint-redacted>` and `<consent-redacted>`, and the text is capped at 300 characters. No exception text reaches the console or the record unfiltered. |
+| Terminal obligations | all physical confirmations live in `finally`, so an invocation, redirection or wait fault cannot skip them. |
+| Classification gate | `ACCEPTED…` requires `terminal_obligations_complete=YES`, `invocation_status=COMPLETED` and zero other failures. The assignment sits **after** the `try/finally`, so an interrupted `finally` leaves the initialized `NOT_ACCEPTED` in place. |
+| Consent lifetime | the phrase is converted once inside an outer `try`, and an outer `finally` removes `Env:WJSS_PROCESS_IO_CONSENT`, nulls `$consent` and disposes `$secure` on every path. The phrase is never printed, never written and never placed in the record. |
+| Path safety | before any prompt: placeholders must be replaced, `Repo` / `EvidenceDir` / `CataloguePath` must be fully qualified, and the evidence folder must resolve **outside** the repository after canonical normalization. |
+
+**The limit of all of it.** The script cannot stop the Pump and cannot command a valve. If the
+PowerShell process is hard-killed, the console is lost, or the machine loses power, `finally` is **not
+guaranteed to run**. For Trial A that is tolerable, because the trial commands nothing and the Pump is
+already under the Owner's hand. For Trial B it matters directly: a killed process cannot de-energise a
+maintained coil. In either case the **physical abort procedure is immediately authoritative**, and no
+software step in this package substitutes for it.
+
 ---
 
 ## 4. TRIAL A — physical Pump-ready read-only evidence
@@ -282,13 +305,37 @@ software and none is invented by this package.
 
 ### 4.4 Execution sequence
 
-Fill the seven placeholders in step 0, then run the block top to bottom in **one** PowerShell window.
-The script stops on the first failure; a stop before step 12 contacts nothing.
+Fill the six placeholders in step 1, then run the block top to bottom in **one** PowerShell window.
+
+**Guaranteed terminal state.** The Pump is started by the Owner at step 11, the executable is invoked
+inside `try` at steps 12–13, and steps 14–17 — Pump stop, Pump-stopped confirmation, IV-closed
+confirmation, no-motion confirmation and the safe-terminal confirmation — run in `finally`. All five
+run on every path out of the invocation: normal return, non-zero exit, invocation fault, redirection
+fault or wait fault. An invocation failure is retained as `invocation_status=FAULTED` with its
+exception type and a redacted message, and it forces `NOT_ACCEPTED`; it can never bypass the Pump stop.
+
+**Classification is gated on the finally body.** `$terminalObligationsComplete` starts at `NO` and is
+set to `YES` only when all five answers are affirmative. `ACCEPTED_PHYSICAL_PUMP_READY` is reachable
+only from a `YES` — and because the assignment happens *after* the `finally` block, a `finally` that
+is itself interrupted leaves the run at its initialized `NOT_ACCEPTED`. Nothing is accepted by default.
+
+The script never controls the Pump: it prompts the Owner, records the answer and records the
+timestamp. A stop before step 12 contacts nothing and writes no record, because nothing was contacted.
 
 ```powershell
 # =====================================================================================
 # TRIAL A — PHYSICAL PUMP-READY READ-ONLY EVIDENCE
-# One bounded read-only trial. No loop. No retry.
+# One bounded read-only trial. No loop. No retry. Exactly ONE invocation.
+#
+# LIFECYCLE: the Owner starts the Pump, the executable is invoked inside try, and the Pump
+# stop plus every physical terminal-state confirmation run inside finally. An invocation,
+# redirection or wait failure therefore cannot bypass the Pump stop, the Pump-stopped
+# confirmation, the IV-closed confirmation, the safe-terminal confirmation or the consent
+# cleanup, because all of them live in finally rather than after a normal return.
+#
+# LIMIT: this script never controls the Pump and cannot stop it. If PowerShell itself or
+# the host process cannot continue — hard kill, console loss, power loss — finally is NOT
+# guaranteed to run, and the PHYSICAL ABORT is immediately authoritative.
 # =====================================================================================
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -311,74 +358,50 @@ $OutFile  = Join-Path $EvidenceDir ($RunLabel + '.stdout.txt')
 $ErrFile  = Join-Path $EvidenceDir ($RunLabel + '.stderr.txt')
 $RecFile  = Join-Path $EvidenceDir ($RunLabel + '.record.txt')
 
-if (-not (Test-Path -LiteralPath $Exe -PathType Leaf))          { throw "STOP: Release executable not found at $Exe" }
-if (-not (Test-Path -LiteralPath $CataloguePath -PathType Leaf)) { throw 'STOP: the Owner-local catalogue file is missing' }
-if (-not (Test-Path -LiteralPath $EvidenceDir -PathType Container)) { throw 'STOP: the evidence folder does not exist' }
-if ($EvidenceDir.StartsWith($Repo, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'STOP: evidence folder must be outside the repository' }
-
-# ---- step 2 — clear TargetPath and every WJSS_* variable -----------------------------
-Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } |
-    ForEach-Object { Remove-Item -LiteralPath ('Env:' + $_.Name) -ErrorAction SilentlyContinue }
-Remove-Item -LiteralPath 'Env:TargetPath' -ErrorAction SilentlyContinue
-
-# ---- step 3 — set only the Trial A variables ----------------------------------------
-$env:WJSS_DEVICE_PROFILE       = 'TEST_HARDWARE'
-$env:WJSS_PUMP_READY_READ_TRIAL = 'AI-003_ONLY'
-$env:WJSS_PROCESS_IO_HOST      = $EndpointHost
-$env:WJSS_PROCESS_IO_CATALOGUE = $CataloguePath
-$env:WJSS_PUMP_READY_SETPOINT_BAR  = $SetpointBar
-$env:WJSS_PUMP_READY_FRESHNESS_MS  = $FreshnessMs
-if ($EndpointPort -ne '') { $env:WJSS_PROCESS_IO_PORT    = $EndpointPort }
-if ($EndpointUnit -ne '') { $env:WJSS_PROCESS_IO_UNIT_ID = $EndpointUnit }
-
-# The read-only phrase is typed here, never echoed, never written to disk.
-$secure = Read-Host -AsSecureString -Prompt 'Enter the published READ-ONLY consent phrase'
-$consent = [System.Net.NetworkCredential]::new('', $secure).Password
-$env:WJSS_PROCESS_IO_CONSENT = $consent
-
-# ---- step 4 — prove Trial B, integrated-dry and TC selectors are absent --------------
-$mustBeAbsent = @(
-    'WJSS_DRY_IV_TRIAL_MODE', 'WJSS_DRY_IV_TRIAL_VALVE', 'WJSS_DRY_IV_TRIAL_PUMP_STOPPED',
-    'WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR', 'WJSS_DRY_COMMAND_MODE', 'WJSS_TC_ACQUISITION_MODE'
-)
-foreach ($name in $mustBeAbsent) {
-    $value = [System.Environment]::GetEnvironmentVariable($name, 'Process')
-    if (-not [string]::IsNullOrWhiteSpace($value)) { throw "STOP: $name must be absent for Trial A but is present" }
+# ---- helpers ------------------------------------------------------------------------
+function Test-FullyQualified {
+    param([string] $Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    return [System.IO.Path]::IsPathFullyQualified($Value)
 }
 
-# ---- step 5 — record the exact Git HEAD ---------------------------------------------
-$head = (& git -C $Repo rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0) { throw 'STOP: git rev-parse failed in the validated worktree' }
-if ($head -ne $ExpectedHead) { throw "STOP: HEAD is $head, expected $ExpectedHead" }
+function Get-CanonicalPath {
+    param([string] $Value)
+    $full = [System.IO.Path]::GetFullPath($Value)
+    $trimmed = $full.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    if ($trimmed.Length -eq 0) { return [string][System.IO.Path]::DirectorySeparatorChar }
+    return $trimmed
+}
 
-# ---- steps 6 and 7 — record the executable and catalogue SHA-256 --------------------
-$exeSha = (Get-FileHash -LiteralPath $Exe -Algorithm SHA256).Hash.ToLowerInvariant()
-$catSha = (Get-FileHash -LiteralPath $CataloguePath -Algorithm SHA256).Hash.ToLowerInvariant()
+# The only text that may reach the record from a caught exception. The endpoint address and
+# the consent phrase are replaced, and the result is length-capped.
+function Get-RedactedText {
+    param([string] $Text)
+    if ([string]::IsNullOrEmpty($Text)) { return 'NONE' }
+    $out = $Text
+    if (-not [string]::IsNullOrEmpty($EndpointHost) -and $EndpointHost.Length -ge 3) {
+        $out = $out.Replace($EndpointHost, '<endpoint-redacted>')
+    }
+    if (-not [string]::IsNullOrEmpty($consent) -and $consent.Length -ge 3) {
+        $out = $out.Replace($consent, '<consent-redacted>')
+    }
+    if ($out.Length -gt 300) { $out = $out.Substring(0, 300) + '...' }
+    return $out
+}
 
-# ---- steps 8, 9, 10 — record setpoint, freshness and the IV prohibition -------------
-Write-Host "setpoint_bar=$SetpointBar  freshness_ms=$FreshnessMs  iv_command=PROHIBITED  motion=PROHIBITED"
-$ivProhibited = 'PROHIBITED_ALL_EIGHT_CLOSED'
+# Always answers, so a terminal-state confirmation can never abort the finally body.
+function Read-Confirmation {
+    param([string] $Prompt)
+    try {
+        $answer = Read-Host $Prompt
+        if ($null -eq $answer) { return 'UNAVAILABLE' }
+        $text = ([string]$answer).Trim().ToUpperInvariant()
+        if ($text.Length -eq 0) { return 'UNAVAILABLE' }
+        return $text
+    }
+    catch { return 'UNAVAILABLE' }
+}
 
-# ---- step 11 — start the physical Pump under Owner authority ------------------------
-Read-Host 'Start the Pump under Owner authority, confirm flow destination, then press ENTER' | Out-Null
-$pumpStart = (Get-Date).ToUniversalTime().ToString('O')
-
-# ---- steps 12 and 13 — invoke ONCE and capture stdout, stderr and exit code ---------
-$trial = Start-Process -FilePath $Exe -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait `
-    -RedirectStandardOutput $OutFile -RedirectStandardError $ErrFile
-$exitCode = $trial.ExitCode
-
-# ---- step 14 — stop the physical Pump under Owner authority -------------------------
-Read-Host 'Stop the Pump under Owner authority, confirm the Pump is stopped, then press ENTER' | Out-Null
-$pumpStop = (Get-Date).ToUniversalTime().ToString('O')
-
-# ---- steps 15, 16, 17 — physical confirmations --------------------------------------
-$a15 = Read-Host 'All eight IV command outputs unchanged and CLOSED? type YES or NO'
-$a16 = Read-Host 'No motion authority was created and no axis moved? type YES or NO'
-$a17 = Read-Host 'Safe terminal state confirmed: Pump stopped, no water flow, no valve energised? type YES or NO'
-
-# ---- parse the captured report ------------------------------------------------------
-$map = @{}
 function Get-ReportField {
     param(
         [Parameter(Mandatory)] [hashtable] $Report,
@@ -387,65 +410,243 @@ function Get-ReportField {
     if ($Report.ContainsKey($Key)) { return $Report[$Key] }
     return 'UNAVAILABLE'
 }
-foreach ($line in Get-Content -LiteralPath $OutFile -Encoding UTF8) {
-    $idx = $line.IndexOf('=')
-    if ($idx -gt 0) {
-        $key = $line.Substring(0, $idx).Trim()
-        $val = $line.Substring($idx + 1).Trim()
-        if ($key.Length -gt 0 -and -not $map.ContainsKey($key)) { $map[$key] = $val }
+
+# ---- placeholder scan — BEFORE any prompt, so nothing is prompted or contacted ------
+foreach ($pair in @(
+    @{ Name = 'Repo';          Value = $Repo },
+    @{ Name = 'EvidenceDir';   Value = $EvidenceDir },
+    @{ Name = 'CataloguePath'; Value = $CataloguePath },
+    @{ Name = 'EndpointHost';  Value = $EndpointHost },
+    @{ Name = 'SetpointBar';   Value = $SetpointBar },
+    @{ Name = 'FreshnessMs';   Value = $FreshnessMs })) {
+    if ($pair.Value -match '[<>]') {
+        throw ("STOP: {0} still contains a placeholder. Nothing was prompted and nothing was contacted." -f $pair.Name)
     }
 }
 
-$expected = [ordered]@{
-    'source_tag'                  = 'AI-003+'
-    'evidence_kind'               = 'PHYSICAL'
-    'physical_ai003_verified'     = 'TRUE'
-    'pump_ready'                  = 'TRUE'
-    'physical_pump_verified'      = 'TRUE'
-    'fresh'                       = 'TRUE'
-    'quality'                     = 'GOOD'
-    'ai002_used_for_decision'     = 'FALSE'
-    'iv_command_executed'         = 'FALSE'
-    'motion_executed'             = 'FALSE'
-    'waterjet_command_executed'   = 'FALSE'
-    'write_authorization_created' = 'FALSE'
-    'session_state'               = 'CLOSED'
-    'transport_released'          = 'TRUE'
+# ---- canonical path validation — file-system strings only, no Hardware contact ------
+foreach ($pair in @(
+    @{ Name = 'Repo';          Value = $Repo },
+    @{ Name = 'EvidenceDir';   Value = $EvidenceDir },
+    @{ Name = 'CataloguePath'; Value = $CataloguePath })) {
+    if (-not (Test-FullyQualified $pair.Value)) {
+        throw ("STOP: {0} must be a fully qualified path. Nothing was prompted and nothing was contacted." -f $pair.Name)
+    }
 }
 
-$failures = @()
-if ($exitCode -ne 0) { $failures += "exit_code=$exitCode (expected 0)" }
-foreach ($key in $expected.Keys) {
-    if (-not $map.ContainsKey($key)) { $failures += "$key is missing from the report" }
-    elseif ($map[$key] -ne $expected[$key]) { $failures += "$key=$($map[$key]) (expected $($expected[$key]))" }
-}
-if ($map.ContainsKey('strict_comparison') -and -not $map['strict_comparison'].EndsWith('=> TRUE')) {
-    $failures += "strict_comparison did not resolve TRUE: $($map['strict_comparison'])"
-}
-if ($map.ContainsKey('observed_at') -and $map.ContainsKey('received_at')) {
-    $observed = [DateTimeOffset]::Parse($map['observed_at'], [Globalization.CultureInfo]::InvariantCulture)
-    $received = [DateTimeOffset]::Parse($map['received_at'], [Globalization.CultureInfo]::InvariantCulture)
-    if ($observed -gt $received) { $failures += 'observed_at is later than received_at' }
-    if (([DateTimeOffset]::UtcNow - $received).TotalSeconds -lt -5) { $failures += 'received_at is in the future' }
+# Compared AFTER canonical normalization and against a trailing separator, so a sibling
+# folder that merely shares the repository's name prefix is not mistaken for the repository
+# and a real sub-folder cannot slip through. Windows path semantics: case-insensitive.
+$repoCanonical       = Get-CanonicalPath $Repo
+$evidenceCanonical   = Get-CanonicalPath $EvidenceDir
+$repoPrefix          = $repoCanonical + [System.IO.Path]::DirectorySeparatorChar
+$evidencePrefix      = $evidenceCanonical + [System.IO.Path]::DirectorySeparatorChar
+if ($evidencePrefix.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'STOP: the evidence folder resolves inside the repository after canonicalization. Nothing was prompted and nothing was contacted.'
 }
 
-# ---- step 18 — redaction scan, then one redacted record outside the repository ------
-$leaks = @()
-foreach ($file in @($OutFile, $ErrFile)) {
-    if (Select-String -LiteralPath $file -SimpleMatch -Pattern $EndpointHost -Quiet -ErrorAction SilentlyContinue) { $leaks += 'endpoint address' }
-    if ($consent -and (Select-String -LiteralPath $file -SimpleMatch -Pattern $consent -Quiet -ErrorAction SilentlyContinue)) { $leaks += 'consent phrase' }
-}
-if ($leaks.Count -gt 0) {
-    Remove-Item -LiteralPath $OutFile, $ErrFile -Force -ErrorAction SilentlyContinue
-    throw "STOP: redaction failure ($($leaks -join ', ')) — captures destroyed, do not paste them anywhere"
-}
+if (-not (Test-Path -LiteralPath $Exe -PathType Leaf))              { throw 'STOP: the Release executable was not found in the validated worktree.' }
+if (-not (Test-Path -LiteralPath $CataloguePath -PathType Leaf))   { throw 'STOP: the Owner-local catalogue file is missing.' }
+if (-not (Test-Path -LiteralPath $EvidenceDir -PathType Container)) { throw 'STOP: the evidence folder does not exist.' }
 
-$identityLine = Get-Content -LiteralPath $OutFile -Encoding UTF8 |
-    Where-Object { $_ -match '^\s*TRIAL:\s' } | Select-Object -First 1
-$trialIdentity = if ($identityLine) { $identityLine.Split(':', 2)[1].Trim() } else { 'UNAVAILABLE' }
+# ---- lifecycle state, initialized before any prompt --------------------------------
+# StrictMode is on, so every variable used by the finally body exists even when the try
+# body fails long before assigning it. NOT_ACCEPTED is the starting classification and no
+# path can promote it except a completed finally body.
+$invocationStatus            = 'NOT_ATTEMPTED'
+$invocationErrorType         = 'NONE'
+$invocationErrorMessage      = 'NONE'
+$exitCode                    = -1
+$pumpStartConfirmed          = 'NO'
+$pumpStartUtc                = 'NOT_STARTED'
+$pumpStopUtc                 = 'NOT_STOPPED'
+$pumpStoppedConfirmed        = 'NOT_CONFIRMED'
+$ivsClosed                   = 'NOT_CONFIRMED'
+$noMotion                    = 'NOT_CONFIRMED'
+$safeTerminal                = 'NOT_CONFIRMED'
+$terminalObligationsComplete = 'NO'
+$classification              = 'NOT_ACCEPTED'
+$failures                    = @()
+$map                         = @{}
+$consent                     = $null
+$secure                      = $null
 
-$classification = if ($failures.Count -eq 0) { 'ACCEPTED_PHYSICAL_PUMP_READY' } else { 'NOT_ACCEPTED' }
-$record = @"
+try {
+    # ---- step 2 — clear TargetPath and every WJSS_* variable ------------------------
+    Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } |
+        ForEach-Object { Remove-Item -LiteralPath ('Env:' + $_.Name) -ErrorAction SilentlyContinue }
+    Remove-Item -LiteralPath 'Env:TargetPath' -ErrorAction SilentlyContinue
+
+    # ---- step 3 — set only the Trial A variables ------------------------------------
+    $env:WJSS_DEVICE_PROFILE        = 'TEST_HARDWARE'
+    $env:WJSS_PUMP_READY_READ_TRIAL = 'AI-003_ONLY'
+    $env:WJSS_PROCESS_IO_HOST       = $EndpointHost
+    $env:WJSS_PROCESS_IO_CATALOGUE  = $CataloguePath
+    $env:WJSS_PUMP_READY_SETPOINT_BAR = $SetpointBar
+    $env:WJSS_PUMP_READY_FRESHNESS_MS = $FreshnessMs
+    if ($EndpointPort -ne '') { $env:WJSS_PROCESS_IO_PORT    = $EndpointPort }
+    if ($EndpointUnit -ne '') { $env:WJSS_PROCESS_IO_UNIT_ID = $EndpointUnit }
+
+    # ---- the read-only consent. Typed, converted once, never echoed or persisted ----
+    $secure  = Read-Host -AsSecureString -Prompt 'Enter the published READ-ONLY consent phrase'
+    $consent = [System.Net.NetworkCredential]::new('', $secure).Password
+    if ([string]::IsNullOrEmpty($consent)) { throw 'STOP: no consent phrase was supplied. Nothing was contacted.' }
+    $env:WJSS_PROCESS_IO_CONSENT = $consent
+
+    # ---- step 4 — prove Trial B, integrated-dry and TC selectors are absent ----------
+    $mustBeAbsent = @(
+        'WJSS_DRY_IV_TRIAL_MODE', 'WJSS_DRY_IV_TRIAL_VALVE', 'WJSS_DRY_IV_TRIAL_PUMP_STOPPED',
+        'WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR', 'WJSS_DRY_COMMAND_MODE', 'WJSS_TC_ACQUISITION_MODE'
+    )
+    foreach ($name in $mustBeAbsent) {
+        $value = [System.Environment]::GetEnvironmentVariable($name, 'Process')
+        if (-not [string]::IsNullOrWhiteSpace($value)) { throw "STOP: $name must be absent for Trial A but is present" }
+    }
+
+    # ---- step 5 — record the exact Git HEAD -----------------------------------------
+    $head = (& git -C $Repo rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'STOP: git rev-parse failed in the validated worktree' }
+    if ($head -ne $ExpectedHead) { throw "STOP: HEAD is $head, expected $ExpectedHead" }
+
+    # ---- steps 6 and 7 — record the executable and catalogue SHA-256 ----------------
+    $exeSha = (Get-FileHash -LiteralPath $Exe -Algorithm SHA256).Hash.ToLowerInvariant()
+    $catSha = (Get-FileHash -LiteralPath $CataloguePath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+    # ---- steps 8, 9, 10 — record setpoint, freshness and the IV prohibition ---------
+    Write-Host "setpoint_bar=$SetpointBar  freshness_ms=$FreshnessMs  iv_command=PROHIBITED  motion=PROHIBITED"
+    $ivProhibited = 'PROHIBITED_ALL_EIGHT_CLOSED'
+
+    # ---- step 11 — start the physical Pump under Owner authority --------------------
+    $startAck = Read-Confirmation 'Start the Pump under Owner authority, confirm the flow destination, then type START'
+    if ($startAck -eq 'START') {
+        $pumpStartConfirmed = 'YES'
+        $pumpStartUtc       = (Get-Date).ToUniversalTime().ToString('O')
+    }
+    else {
+        # The Owner may already have started the Pump by hand before answering. The trial is
+        # NOT invoked, but the terminal-state obligations still run below, so the Owner is
+        # walked through the Pump stop instead of being left with a running Pump and no prompt.
+        $pumpStartConfirmed = 'NO'
+        Write-Host 'The Owner did not confirm the Pump start. The trial will NOT be invoked; the Pump stop and terminal-state checks still run.'
+    }
+
+    # ---- steps 12 and 13 — invoke EXACTLY ONCE, inside try --------------------------
+    try {
+        if ($pumpStartConfirmed -ne 'YES') {
+            $invocationStatus = 'SKIPPED_PUMP_START_NOT_CONFIRMED'
+        }
+        else {
+            $invocationStatus = 'ATTEMPTED'
+            $trial = Start-Process -FilePath $Exe -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait `
+                -RedirectStandardOutput $OutFile -RedirectStandardError $ErrFile
+            $exitCode         = $trial.ExitCode
+            $invocationStatus = 'COMPLETED'
+            Write-Host "exit_code=$exitCode"
+        }
+    }
+    catch {
+        # An invocation, redirection or wait failure is retained as NOT_ACCEPTED evidence
+        # and never as a reading. Execution continues into the finally body below.
+        $invocationStatus       = 'FAULTED'
+        $invocationErrorType    = $_.Exception.GetType().Name
+        $invocationErrorMessage = 'INVOCATION_EXCEPTION_REDACTED: ' + (Get-RedactedText $_.Exception.Message)
+        $exitCode               = -1
+        Write-Host ("invocation faulted: " + $invocationErrorType)
+    }
+    finally {
+        # ---- steps 14, 15, 16, 17 — ALWAYS run once the Pump was started ------------
+        # Nothing here reads the trial result, and nothing here can be skipped by an
+        # invocation failure. The Owner stops the Pump; the software only asks and records.
+        $pumpStopAck = Read-Confirmation 'STOP THE PUMP NOW under Owner authority, confirm it is stopped, then type STOPPED'
+        $pumpStopUtc = (Get-Date).ToUniversalTime().ToString('O')
+
+        $pumpStoppedConfirmed = Read-Confirmation 'Is the Pump physically stopped with no water flowing? type YES or NO'
+        $ivsClosed            = Read-Confirmation 'Are all eight IV command outputs unchanged and physically CLOSED? type YES or NO'
+        $noMotion             = Read-Confirmation 'Is there no motion authority and no axis movement? type YES or NO'
+        $safeTerminal         = Read-Confirmation 'Is the safe terminal state confirmed: Pump stopped, no water flow, no valve energised? type YES or NO'
+
+        if ($pumpStopAck -eq 'STOPPED' -and
+            $pumpStoppedConfirmed -eq 'YES' -and
+            $ivsClosed -eq 'YES' -and
+            $noMotion -eq 'YES' -and
+            $safeTerminal -eq 'YES') {
+            $terminalObligationsComplete = 'YES'
+        }
+    }
+
+    # ---- parse the captured report, only when a capture exists ----------------------
+    if (Test-Path -LiteralPath $OutFile -PathType Leaf) {
+        foreach ($line in Get-Content -LiteralPath $OutFile -Encoding UTF8) {
+            $idx = $line.IndexOf('=')
+            if ($idx -gt 0) {
+                $key = $line.Substring(0, $idx).Trim()
+                $val = $line.Substring($idx + 1).Trim()
+                if ($key.Length -gt 0 -and -not $map.ContainsKey($key)) { $map[$key] = $val }
+            }
+        }
+    }
+
+    $expected = [ordered]@{
+        'source_tag'                  = 'AI-003+'
+        'evidence_kind'               = 'PHYSICAL'
+        'physical_ai003_verified'     = 'TRUE'
+        'pump_ready'                  = 'TRUE'
+        'physical_pump_verified'      = 'TRUE'
+        'fresh'                       = 'TRUE'
+        'quality'                     = 'GOOD'
+        'ai002_used_for_decision'     = 'FALSE'
+        'iv_command_executed'         = 'FALSE'
+        'motion_executed'             = 'FALSE'
+        'waterjet_command_executed'   = 'FALSE'
+        'write_authorization_created' = 'FALSE'
+        'session_state'               = 'CLOSED'
+        'transport_released'          = 'TRUE'
+    }
+
+    $failures = @()
+    if ($invocationStatus -ne 'COMPLETED') { $failures += "invocation_status=$invocationStatus ($invocationErrorType)" }
+    if ($exitCode -ne 0)                   { $failures += "exit_code=$exitCode (expected 0)" }
+    foreach ($key in $expected.Keys) {
+        if (-not $map.ContainsKey($key)) { $failures += "$key is missing from the report" }
+        elseif ($map[$key] -ne $expected[$key]) { $failures += "$key=$($map[$key]) (expected $($expected[$key]))" }
+    }
+    if ($map.ContainsKey('strict_comparison') -and -not $map['strict_comparison'].EndsWith('=> TRUE')) {
+        $failures += "strict_comparison did not resolve TRUE: $($map['strict_comparison'])"
+    }
+    if ($map.ContainsKey('observed_at') -and $map.ContainsKey('received_at')) {
+        $observed = [DateTimeOffset]::Parse($map['observed_at'], [Globalization.CultureInfo]::InvariantCulture)
+        $received = [DateTimeOffset]::Parse($map['received_at'], [Globalization.CultureInfo]::InvariantCulture)
+        if ($observed -gt $received) { $failures += 'observed_at is later than received_at' }
+        if (([DateTimeOffset]::UtcNow - $received).TotalSeconds -lt -5) { $failures += 'received_at is in the future' }
+    }
+    if ($terminalObligationsComplete -ne 'YES') { $failures += 'physical terminal-state obligations were not fully confirmed' }
+
+    # ---- step 18 — redaction scan, then one redacted record outside the repository --
+    $leaks = @()
+    foreach ($file in @($OutFile, $ErrFile)) {
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
+        if (Select-String -LiteralPath $file -SimpleMatch -Pattern $EndpointHost -Quiet -ErrorAction SilentlyContinue) { $leaks += 'endpoint address' }
+        if ($consent -and (Select-String -LiteralPath $file -SimpleMatch -Pattern $consent -Quiet -ErrorAction SilentlyContinue)) { $leaks += 'consent phrase' }
+    }
+    if ($leaks.Count -gt 0) {
+        Remove-Item -LiteralPath $OutFile, $ErrFile -Force -ErrorAction SilentlyContinue
+        throw "STOP: redaction failure ($($leaks -join ', ')) — captures destroyed, do not paste them anywhere"
+    }
+
+    $identityLine = if (Test-Path -LiteralPath $OutFile -PathType Leaf) {
+        Get-Content -LiteralPath $OutFile -Encoding UTF8 | Where-Object { $_ -match '^\s*TRIAL:\s' } | Select-Object -First 1
+    } else { $null }
+    $trialIdentity = if ($identityLine) { $identityLine.Split(':', 2)[1].Trim() } else { 'UNAVAILABLE' }
+    $reportText = if (Test-Path -LiteralPath $OutFile -PathType Leaf) {
+        (Get-Content -LiteralPath $OutFile -Encoding UTF8) -join "`n"
+    } else { 'NO_CAPTURE_FILE' }
+
+    # ACCEPTED only here, only after the finally body above completed with every YES.
+    $classification = if ($terminalObligationsComplete -eq 'YES' -and
+                          $invocationStatus -eq 'COMPLETED' -and
+                          $failures.Count -eq 0) { 'ACCEPTED_PHYSICAL_PUMP_READY' } else { 'NOT_ACCEPTED' }
+
+    $record = @"
 TRIAL A — PHYSICAL PUMP-READY READ-ONLY EVIDENCE
 scope_id=TRIAL-A-B-HARDWARE-EXECUTION-PACKAGE
 run_label=$RunLabel
@@ -461,27 +662,41 @@ trial_identity=$trialIdentity
 configured_setpoint_bar=$SetpointBar
 configured_freshness_ms=$FreshnessMs
 strict_comparison=$(Get-ReportField $map 'strict_comparison')
+invocation_status=$invocationStatus
+invocation_error_type=$invocationErrorType
+invocation_error_redacted=$invocationErrorMessage
 exit_code=$exitCode
-classification=$classification
-failures=$($failures -join ' | ')
-pump_start_utc=$pumpStart
-pump_stop_utc=$pumpStop
+pump_start_confirmed=$pumpStartConfirmed
+pump_start_utc=$pumpStartUtc
+pump_stop_utc=$pumpStopUtc
+pump_stopped_confirmed=$pumpStoppedConfirmed
+iv_unchanged_and_closed=$ivsClosed
+motion_authority_created=$noMotion
+safe_terminal_state=$safeTerminal
+terminal_obligations_complete=$terminalObligationsComplete
 physical_abort_available=YES_OWNER_OPERATOR_NAMED
 iv_command=$ivProhibited
-iv_unchanged_and_closed=$a15
-motion_authority_created=$a16
-safe_terminal_state=$a17
+classification=$classification
+failures=$($failures -join ' | ')
 -- report --
-$((Get-Content -LiteralPath $OutFile -Encoding UTF8) -join "`n")
+$reportText
 "@
-Set-Content -LiteralPath $RecFile -Value $record -Encoding UTF8
+    Set-Content -LiteralPath $RecFile -Value $record -Encoding UTF8
 
-$consent = $null
-Remove-Item -LiteralPath 'Env:WJSS_PROCESS_IO_CONSENT' -ErrorAction SilentlyContinue
-
-Write-Host "classification=$classification"
-Write-Host "record=$RecFile"
-if ($failures.Count -gt 0) { Write-Host ("failures: " + ($failures -join ' | ')) }
+    Write-Host "classification=$classification"
+    Write-Host "record=$RecFile"
+    if ($failures.Count -gt 0) { Write-Host ("failures: " + ($failures -join ' | ')) }
+}
+finally {
+    # Consent cleanup is guaranteed once the phrase has been converted for the child, on
+    # every path: accepted, refused, faulted or thrown. The phrase is never printed.
+    Remove-Item -LiteralPath 'Env:WJSS_PROCESS_IO_CONSENT' -ErrorAction SilentlyContinue
+    $consent = $null
+    if ($null -ne $secure) {
+        try { $secure.Dispose() } catch { }
+        $secure = $null
+    }
+}
 ```
 
 `TRIAL:`. The line `  TRIAL: PHYSICAL_PUMP_READY_READ_ONLY` is the only colon-separated field; the record
@@ -526,11 +741,16 @@ Every field below is printed by Source. Column three is the acceptance reading.
 | `session_state` | terminal session state | **`CLOSED`** |
 | `transport_released` | transport released after the session | **`TRUE`** |
 | `exit_code` | process exit code | **`0`** |
-| `pump_start_utc` / `pump_stop_utc` | Owner Pump authority boundaries | recorded |
+| `pump_start_confirmed` | the Owner confirmed the Pump start at step 11 | `YES` |
+| `pump_start_utc` / `pump_stop_utc` | Owner Pump authority boundaries | recorded, stop never `NOT_STOPPED` |
+| `pump_stopped_confirmed` | explicit Pump-stopped answer | **`YES`** |
 | `physical_abort_available` | abort posture | `YES` |
-| `iv_unchanged_and_closed` | IV confirmation | `YES` |
-| `motion_authority_created` | motion confirmation | `NO` |
-| `safe_terminal_state` | terminal attestation | `YES` |
+| `iv_unchanged_and_closed` | all eight IVs unchanged and CLOSED | **`YES`** |
+| `motion_authority_created` | no motion authority, no axis movement | **`NO`** |
+| `safe_terminal_state` | terminal attestation | **`YES`** |
+| `terminal_obligations_complete` | every `finally` answer affirmative | **`YES`** |
+| `invocation_status` | `COMPLETED` only; `FAULTED`, `SKIPPED_*` and `NOT_ATTEMPTED` all force `NOT_ACCEPTED` | **`COMPLETED`** |
+| `invocation_error_type` / `..._redacted` | exception type and redacted message | `NONE` |
 
 ### 4.6 Acceptance
 
@@ -546,7 +766,14 @@ Trial A is accepted as **`PHYSICAL_PUMP_READY`** evidence only when **every** li
 * `ai002_used_for_decision=FALSE`;
 * no IV command (`iv_command_executed=FALSE`), no motion (`motion_executed=FALSE`), no water-jet command;
 * Pump stopped at the terminal state; all eight IVs remain CLOSED;
-* `session_state=CLOSED`, `transport_released=TRUE`.
+* `session_state=CLOSED`, `transport_released=TRUE`;
+* `invocation_status=COMPLETED` — a faulted invocation is never accepted;
+* `terminal_obligations_complete=YES` — the `finally` body ran to completion with every answer
+  affirmative, including the Pump stop.
+
+Because `$terminalObligationsComplete` can only become `YES` inside the `finally` block, the
+acceptance rule and the safety lifecycle are the same rule: a run that could not confirm the Pump
+stop cannot be accepted, no matter what the report contains.
 
 A valid physical `AI-003+` reading **at or below** the setpoint is still evidence — it establishes the
 transmitter, wiring, rack input, transport, scaling, quality, freshness and generation — but it is
@@ -593,7 +820,10 @@ clears".
 * water reaches a Water Jet unexpectedly;
 * the Pump stop cannot be confirmed;
 * the session or the transport does not close cleanly;
-* the process exits unexpectedly or without a report.
+* the process exits unexpectedly or without a report;
+* the invocation faults (`invocation_status=FAULTED`) — redirection, wait or launch failure;
+* any `finally` confirmation is `UNAVAILABLE` or not `YES`;
+* the Owner did not confirm the Pump stop.
 
 A STOP is a completed, reportable outcome. It is never repaired by editing an expectation, by raising
 the freshness budget, by lowering the setpoint after the fact, or by re-running until it passes.
@@ -691,15 +921,44 @@ being treated as safe. None of the three refused rows writes anything.
 
 ### 5.6 Execution sequence
 
+Fill the nine placeholders in step 1, then run the block top to bottom in **one** PowerShell
+window.
+
+**Guaranteed final state.** The executable is invoked inside `try`, and every closing confirmation —
+Pump still stopped, `IV1` physically CLOSED, `DI-029` active, `DI-021` inactive, `IV2`…`IV8`
+untouched, no motion, abort still available, release observed — is requested in `finally`. A check
+placed after a normal return can be skipped by an invocation, redirection or wait fault; a `finally`
+body is reached on every path once the invocation has begun.
+
+**Classification is gated on the finally body.** `$terminalObligationsComplete` starts at `NO` and is
+set to `YES` only when all eight answers are `YES`. Any answer that is `UNAVAILABLE` or not `YES`
+forces `NOT_ACCEPTED`.
+
+**Product cleanup is never inferred from an operator answer.** `cleanup.complete` and `cleanup.unknown`
+are read from the captured trial report, in their own block of the record, labelled as the Product's
+own cleanup record. The operator's observed state is written to a *separate* block. The two are never
+merged, and an operator "IV1 CLOSED" never stands in for `cleanup.complete=True`.
+
 ```powershell
 # =====================================================================================
 # TRIAL B — PHYSICAL IV OPEN/CLOSE EVIDENCE (SOFTWARE-SIMULATED AI-003)
-# One bounded trial. No loop. No retry.
+# One bounded trial. No loop. No retry. Exactly ONE invocation.
+#
+# LIFECYCLE: the executable is invoked inside try, and every final physical confirmation —
+# Pump still stopped, IV1 CLOSED, DI-029 active, DI-021 inactive, IV2..IV8 untouched, no
+# motion, abort still available, release observed — runs inside finally. A normal-return
+# check could be skipped by an invocation, redirection or wait failure; a finally body
+# cannot. The IV is left CLOSED by the Product's own ordered cleanup inside the executable.
+#
+# LIMIT: if PowerShell itself or the host process cannot continue — hard kill, console
+# loss, power loss — finally is NOT guaranteed to run, and the PHYSICAL ABORT is
+# immediately authoritative. The maintained coil is the reason that matters: a killed
+# process cannot de-energise DO-023 by itself.
 # =====================================================================================
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ---- step 0 — validated worktree and exact Release output ---------------------------
+# ---- step 1 — validated worktree and exact Release output ---------------------------
 # ---- Owner-local values: never committed, never printed ------------------------------
 $ExpectedHead  = 'c9c4a2d0ee1cca38bf6dee08ae8fa76f5c6ce6c7'
 $Repo          = '<FULLY-QUALIFIED-PATH-TO-THE-VALIDATED-WORKTREE>'
@@ -720,79 +979,47 @@ $OutFile  = Join-Path $EvidenceDir ($RunLabel + '.stdout.txt')
 $ErrFile  = Join-Path $EvidenceDir ($RunLabel + '.stderr.txt')
 $RecFile  = Join-Path $EvidenceDir ($RunLabel + '.record.txt')
 
-if (-not (Test-Path -LiteralPath $Exe -PathType Leaf))          { throw "STOP: Release executable not found at $Exe" }
-if (-not (Test-Path -LiteralPath $CataloguePath -PathType Leaf)) { throw 'STOP: the Owner-local catalogue file is missing' }
-if (-not (Test-Path -LiteralPath $EvidenceDir -PathType Container)) { throw 'STOP: the evidence folder does not exist' }
-if ($EvidenceDir.StartsWith($Repo, [System.StringComparison]::OrdinalIgnoreCase)) { throw 'STOP: evidence folder must be outside the repository' }
-
-# ---- step 1 — clear TargetPath and every WJSS_* variable ----------------------------
-Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } |
-    ForEach-Object { Remove-Item -LiteralPath ('Env:' + $_.Name) -ErrorAction SilentlyContinue }
-Remove-Item -LiteralPath 'Env:TargetPath' -ErrorAction SilentlyContinue
-
-# ---- step 2 — set only the Trial B variables ----------------------------------------
-$env:WJSS_DEVICE_PROFILE                   = 'TEST_HARDWARE_DRY'
-$env:WJSS_DRY_IV_TRIAL_MODE                = 'SOFTWARE_SIMULATED_AI003'
-$env:WJSS_DRY_IV_TRIAL_VALVE               = 'IV1'
-$env:WJSS_DRY_IV_TRIAL_PUMP_STOPPED        = 'PUMP_STOPPED_OWNER_ATTESTED'
-$env:WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR = $SimulatedBar
-$env:WJSS_PROCESS_IO_HOST                  = $EndpointHost
-$env:WJSS_PROCESS_IO_CATALOGUE             = $CataloguePath
-$env:WJSS_PUMP_READY_SETPOINT_BAR          = $SetpointBar
-$env:WJSS_PRESSURE_LOW_BAR                 = $LowBar
-$env:WJSS_PRESSURE_HIGH_BAR                = $HighBar
-$env:WJSS_VALVE_SUPERVISION_MS             = $SupervisionMs
-if ($EndpointPort -ne '') { $env:WJSS_PROCESS_IO_PORT    = $EndpointPort }
-if ($EndpointUnit -ne '') { $env:WJSS_PROCESS_IO_UNIT_ID = $EndpointUnit }
-
-# The single-DO phrase is typed here, never echoed, never written to disk.
-$secure = Read-Host -AsSecureString -Prompt 'Enter the published SINGLE-DO consent phrase'
-$consent = [System.Net.NetworkCredential]::new('', $secure).Password
-$env:WJSS_PROCESS_IO_CONSENT = $consent
-
-# ---- step 3 — prove Trial A and the integrated-dry selector are absent --------------
-$mustBeAbsent = @('WJSS_PUMP_READY_READ_TRIAL', 'WJSS_DRY_COMMAND_MODE', 'WJSS_TC_ACQUISITION_MODE')
-foreach ($name in $mustBeAbsent) {
-    $value = [System.Environment]::GetEnvironmentVariable($name, 'Process')
-    if (-not [string]::IsNullOrWhiteSpace($value)) { throw "STOP: $name must be absent for Trial B but is present" }
+# ---- helpers ------------------------------------------------------------------------
+function Test-FullyQualified {
+    param([string] $Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    return [System.IO.Path]::IsPathFullyQualified($Value)
 }
 
-# ---- steps 4 and 5 — record HEAD, executable SHA-256 and catalogue SHA-256 ----------
-$head = (& git -C $Repo rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0) { throw 'STOP: git rev-parse failed in the validated worktree' }
-if ($head -ne $ExpectedHead) { throw "STOP: HEAD is $head, expected $ExpectedHead" }
-$exeSha = (Get-FileHash -LiteralPath $Exe -Algorithm SHA256).Hash.ToLowerInvariant()
-$catSha = (Get-FileHash -LiteralPath $CataloguePath -Algorithm SHA256).Hash.ToLowerInvariant()
-
-# ---- steps 6, 7 and 8 — record simulated value, thresholds and supervision ----------
-Write-Host "simulated_ai003_bar=$SimulatedBar  setpoint=$SetpointBar  low=$LowBar  high=$HighBar  supervision_ms=$SupervisionMs"
-
-# ---- step 9 — record the Pump-stopped Owner attestation ----------------------------
-Write-Host 'PUMP_STOPPED_OWNER_ATTESTED — the software does not verify this and never claims to'
-
-# ---- step 10 — record IV1 initial feedback -----------------------------------------
-$initialUpper = Read-Host 'IV1 DI-021 Upper/open observed state before the run — type TRUE or FALSE'
-$initialLower = Read-Host 'IV1 DI-029 Lower/closed observed state before the run — type TRUE or FALSE'
-if ($initialUpper -ne 'FALSE' -or $initialLower -ne 'TRUE') {
-    throw 'STOP: IV1 is not physically CLOSED-and-confirmed (FALSE/TRUE). Nothing was commanded.'
+function Get-CanonicalPath {
+    param([string] $Value)
+    $full = [System.IO.Path]::GetFullPath($Value)
+    $trimmed = $full.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    if ($trimmed.Length -eq 0) { return [string][System.IO.Path]::DirectorySeparatorChar }
+    return $trimmed
 }
 
-# ---- steps 11 and 12 — invoke ONCE, capture stdout, stderr and exit code ------------
-Read-Host 'Confirm the Pump is STOPPED, IV1 is CLOSED, the field observer is in position, then press ENTER' | Out-Null
-$trial = Start-Process -FilePath $Exe -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait `
-    -RedirectStandardOutput $OutFile -RedirectStandardError $ErrFile
-$exitCode = $trial.ExitCode
-Write-Host "exit_code=$exitCode"
+function Get-RedactedText {
+    param([string] $Text)
+    if ([string]::IsNullOrEmpty($Text)) { return 'NONE' }
+    $out = $Text
+    if (-not [string]::IsNullOrEmpty($EndpointHost) -and $EndpointHost.Length -ge 3) {
+        $out = $out.Replace($EndpointHost, '<endpoint-redacted>')
+    }
+    if (-not [string]::IsNullOrEmpty($consent) -and $consent.Length -ge 3) {
+        $out = $out.Replace($consent, '<consent-redacted>')
+    }
+    if ($out.Length -gt 300) { $out = $out.Substring(0, 300) + '...' }
+    return $out
+}
 
-Read-Host 'Observe IV1 physically: confirm it is CLOSED now, then press ENTER' | Out-Null
-$finalClosed = Read-Host 'IV1 final physical state = CLOSED and DI-029 active? type YES or NO'
-$unrelated = Read-Host 'IV2..IV8 outputs untouched? type YES or NO'
-$noPump    = Read-Host 'No Pump command occurred and the Pump remains stopped? type YES or NO'
-$noMotion  = Read-Host 'No motion session or axis movement occurred? type YES or NO'
-$released  = Read-Host 'The trial process exited, its window closed and no connection to the bench remains open? type YES or NO'
+function Read-Confirmation {
+    param([string] $Prompt)
+    try {
+        $answer = Read-Host $Prompt
+        if ($null -eq $answer) { return 'UNAVAILABLE' }
+        $text = ([string]$answer).Trim().ToUpperInvariant()
+        if ($text.Length -eq 0) { return 'UNAVAILABLE' }
+        return $text
+    }
+    catch { return 'UNAVAILABLE' }
+}
 
-# ---- parse the captured report ------------------------------------------------------
-$map = @{}
 function Get-ReportField {
     param(
         [Parameter(Mandatory)] [hashtable] $Report,
@@ -801,56 +1028,237 @@ function Get-ReportField {
     if ($Report.ContainsKey($Key)) { return $Report[$Key] }
     return 'UNAVAILABLE'
 }
-foreach ($line in Get-Content -LiteralPath $OutFile -Encoding UTF8) {
-    $idx = $line.IndexOf('=')
-    if ($idx -gt 0) {
-        $key = $line.Substring(0, $idx).Trim()
-        $val = $line.Substring($idx + 1).Trim()
-        if ($key.Length -gt 0 -and -not $map.ContainsKey($key)) { $map[$key] = $val }
+
+# ---- placeholder scan — BEFORE any prompt, so nothing is prompted or contacted ------
+foreach ($pair in @(
+    @{ Name = 'Repo';          Value = $Repo },
+    @{ Name = 'EvidenceDir';   Value = $EvidenceDir },
+    @{ Name = 'CataloguePath'; Value = $CataloguePath },
+    @{ Name = 'EndpointHost';  Value = $EndpointHost },
+    @{ Name = 'SetpointBar';   Value = $SetpointBar },
+    @{ Name = 'LowBar';        Value = $LowBar },
+    @{ Name = 'HighBar';       Value = $HighBar },
+    @{ Name = 'SupervisionMs'; Value = $SupervisionMs },
+    @{ Name = 'SimulatedBar';  Value = $SimulatedBar })) {
+    if ($pair.Value -match '[<>]') {
+        throw ("STOP: {0} still contains a placeholder. Nothing was prompted and nothing was contacted." -f $pair.Name)
     }
 }
 
-$expected = [ordered]@{
-    'accepted'                 = 'True'
-    'trial_code'               = 'IV_TRIAL_ACCEPTED'
-    'evidence_kind'            = 'SOFTWARE_SIMULATED'
-    'physical_pump_verified'   = 'FALSE'
-    'physical_ai003_verified'  = 'FALSE'
-    'physical_iv_command'      = 'TRUE'
-    'physical_upper_feedback'  = 'TRUE'
-    'physical_lower_feedback'  = 'TRUE'
-    'cleanup.complete'         = 'True'
-    'cleanup.unknown'          = '0'
+# ---- canonical path validation — file-system strings only, no Hardware contact ------
+foreach ($pair in @(
+    @{ Name = 'Repo';          Value = $Repo },
+    @{ Name = 'EvidenceDir';   Value = $EvidenceDir },
+    @{ Name = 'CataloguePath'; Value = $CataloguePath })) {
+    if (-not (Test-FullyQualified $pair.Value)) {
+        throw ("STOP: {0} must be a fully qualified path. Nothing was prompted and nothing was contacted." -f $pair.Name)
+    }
 }
 
-$failures = @()
-if ($exitCode -ne 0) { $failures += "exit_code=$exitCode (expected 0)" }
-foreach ($key in $expected.Keys) {
-    if (-not $map.ContainsKey($key)) { $failures += "$key is missing from the report" }
-    elseif ($map[$key] -ne $expected[$key]) { $failures += "$key=$($map[$key]) (expected $($expected[$key]))" }
-}
-if ($map.ContainsKey('open_command') -and $map['open_command'] -notlike 'DO-023 coil=22 value=True*') {
-    $failures += "open_command is not DO-023/coil 22/True: $($map['open_command'])"
-}
-if ($map.ContainsKey('close_command') -and $map['close_command'] -notlike 'DO-023 coil=22 value=False*') {
-    $failures += "close_command is not DO-023/coil 22/False: $($map['close_command'])"
-}
-if ($finalClosed -ne 'YES') { $failures += 'IV1 not confirmed physically CLOSED at the end' }
-if ($released -ne 'YES')    { $failures += 'session close / transport release not confirmed' }
-
-# ---- redaction scan, then one redacted record outside the repository ---------------
-$leaks = @()
-foreach ($file in @($OutFile, $ErrFile)) {
-    if (Select-String -LiteralPath $file -SimpleMatch -Pattern $EndpointHost -Quiet -ErrorAction SilentlyContinue) { $leaks += 'endpoint address' }
-    if ($consent -and (Select-String -LiteralPath $file -SimpleMatch -Pattern $consent -Quiet -ErrorAction SilentlyContinue)) { $leaks += 'consent phrase' }
-}
-if ($leaks.Count -gt 0) {
-    Remove-Item -LiteralPath $OutFile, $ErrFile -Force -ErrorAction SilentlyContinue
-    throw "STOP: redaction failure ($($leaks -join ', ')) — captures destroyed, do not paste them anywhere"
+# Compared AFTER canonical normalization and against a trailing separator, so a sibling
+# folder that merely shares the repository's name prefix is not mistaken for the repository
+# and a real sub-folder cannot slip through. Windows path semantics: case-insensitive.
+$repoCanonical     = Get-CanonicalPath $Repo
+$evidenceCanonical = Get-CanonicalPath $EvidenceDir
+$repoPrefix        = $repoCanonical + [System.IO.Path]::DirectorySeparatorChar
+$evidencePrefix    = $evidenceCanonical + [System.IO.Path]::DirectorySeparatorChar
+if ($evidencePrefix.StartsWith($repoPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw 'STOP: the evidence folder resolves inside the repository after canonicalization. Nothing was prompted and nothing was contacted.'
 }
 
-$classification = if ($failures.Count -eq 0) { 'ACCEPTED_PHYSICAL_IV_COMMAND_AND_FEEDBACK' } else { 'NOT_ACCEPTED' }
-$record = @"
+if (-not (Test-Path -LiteralPath $Exe -PathType Leaf))              { throw 'STOP: the Release executable was not found in the validated worktree.' }
+if (-not (Test-Path -LiteralPath $CataloguePath -PathType Leaf))   { throw 'STOP: the Owner-local catalogue file is missing.' }
+if (-not (Test-Path -LiteralPath $EvidenceDir -PathType Container)) { throw 'STOP: the evidence folder does not exist.' }
+
+# ---- lifecycle state, initialized before any prompt --------------------------------
+$invocationStatus            = 'NOT_ATTEMPTED'
+$invocationErrorType         = 'NONE'
+$invocationErrorMessage      = 'NONE'
+$exitCode                    = -1
+$initialUpper                = 'UNKNOWN'
+$initialLower                = 'UNKNOWN'
+$pumpStillStopped            = 'NOT_CONFIRMED'
+$iv1Closed                   = 'NOT_CONFIRMED'
+$di029Active                 = 'NOT_CONFIRMED'
+$di021Inactive               = 'NOT_CONFIRMED'
+$unrelated                   = 'NOT_CONFIRMED'
+$noMotion                    = 'NOT_CONFIRMED'
+$abortAvailable              = 'NOT_CONFIRMED'
+$released                    = 'NOT_CONFIRMED'
+$terminalObligationsComplete = 'NO'
+$classification              = 'NOT_ACCEPTED'
+$failures                    = @()
+$map                         = @{}
+$consent                     = $null
+$secure                      = $null
+
+try {
+    # ---- step 2 — clear TargetPath and every WJSS_* variable ------------------------
+    Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } |
+        ForEach-Object { Remove-Item -LiteralPath ('Env:' + $_.Name) -ErrorAction SilentlyContinue }
+    Remove-Item -LiteralPath 'Env:TargetPath' -ErrorAction SilentlyContinue
+
+    # ---- step 3 — set only the Trial B variables ------------------------------------
+    $env:WJSS_DEVICE_PROFILE                   = 'TEST_HARDWARE_DRY'
+    $env:WJSS_DRY_IV_TRIAL_MODE                = 'SOFTWARE_SIMULATED_AI003'
+    $env:WJSS_DRY_IV_TRIAL_VALVE               = 'IV1'
+    $env:WJSS_DRY_IV_TRIAL_PUMP_STOPPED        = 'PUMP_STOPPED_OWNER_ATTESTED'
+    $env:WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR = $SimulatedBar
+    $env:WJSS_PROCESS_IO_HOST                  = $EndpointHost
+    $env:WJSS_PROCESS_IO_CATALOGUE             = $CataloguePath
+    $env:WJSS_PUMP_READY_SETPOINT_BAR          = $SetpointBar
+    $env:WJSS_PRESSURE_LOW_BAR                 = $LowBar
+    $env:WJSS_PRESSURE_HIGH_BAR                = $HighBar
+    $env:WJSS_VALVE_SUPERVISION_MS             = $SupervisionMs
+    if ($EndpointPort -ne '') { $env:WJSS_PROCESS_IO_PORT    = $EndpointPort }
+    if ($EndpointUnit -ne '') { $env:WJSS_PROCESS_IO_UNIT_ID = $EndpointUnit }
+
+    # ---- the single-DO consent. Typed, converted once, never echoed or persisted ----
+    $secure  = Read-Host -AsSecureString -Prompt 'Enter the published SINGLE-DO consent phrase'
+    $consent = [System.Net.NetworkCredential]::new('', $secure).Password
+    if ([string]::IsNullOrEmpty($consent)) { throw 'STOP: no consent phrase was supplied. Nothing was contacted.' }
+    $env:WJSS_PROCESS_IO_CONSENT = $consent
+
+    # ---- step 4 — prove Trial A and the integrated-dry selector are absent ----------
+    $mustBeAbsent = @('WJSS_PUMP_READY_READ_TRIAL', 'WJSS_DRY_COMMAND_MODE', 'WJSS_TC_ACQUISITION_MODE')
+    foreach ($name in $mustBeAbsent) {
+        $value = [System.Environment]::GetEnvironmentVariable($name, 'Process')
+        if (-not [string]::IsNullOrWhiteSpace($value)) { throw "STOP: $name must be absent for Trial B but is present" }
+    }
+
+    # ---- steps 5 and 6 — record HEAD, executable SHA-256 and catalogue SHA-256 ------
+    $head = (& git -C $Repo rev-parse HEAD).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'STOP: git rev-parse failed in the validated worktree' }
+    if ($head -ne $ExpectedHead) { throw "STOP: HEAD is $head, expected $ExpectedHead" }
+    $exeSha = (Get-FileHash -LiteralPath $Exe -Algorithm SHA256).Hash.ToLowerInvariant()
+    $catSha = (Get-FileHash -LiteralPath $CataloguePath -Algorithm SHA256).Hash.ToLowerInvariant()
+
+    # ---- steps 7, 8 and 9 — record simulated value, thresholds and supervision ------
+    Write-Host "simulated_ai003_bar=$SimulatedBar  setpoint=$SetpointBar  low=$LowBar  high=$HighBar  supervision_ms=$SupervisionMs"
+    Write-Host 'PUMP_STOPPED_OWNER_ATTESTED — the software does not verify this and never claims to'
+
+    # ---- step 10 — record IV1 initial feedback, and gate on the only admissible state
+    $initialUpper = (Read-Confirmation 'IV1 DI-021 Upper/open observed state before the run — type TRUE or FALSE')
+    $initialLower = (Read-Confirmation 'IV1 DI-029 Lower/closed observed state before the run — type TRUE or FALSE')
+    if ($initialUpper -ne 'FALSE' -or $initialLower -ne 'TRUE') {
+        throw 'STOP: IV1 is not physically CLOSED-and-confirmed (FALSE/TRUE). Nothing was commanded.'
+    }
+
+    # ---- steps 11 and 12 — invoke EXACTLY ONCE, inside try -------------------------
+    try {
+        $preAck = Read-Confirmation 'Confirm the Pump is STOPPED, IV1 is CLOSED and the field observer is in position, then type GO'
+        if ($preAck -ne 'GO') {
+            # Nothing is invoked and nothing is commanded: the gate above already proved the
+            # closed state. The finally body still asks for the final physical state.
+            $invocationStatus = 'SKIPPED_PRE_RUN_NOT_CONFIRMED'
+        }
+        else {
+            $invocationStatus = 'ATTEMPTED'
+            $trial = Start-Process -FilePath $Exe -WorkingDirectory $Repo -NoNewWindow -PassThru -Wait `
+                -RedirectStandardOutput $OutFile -RedirectStandardError $ErrFile
+            $exitCode         = $trial.ExitCode
+            $invocationStatus = 'COMPLETED'
+            Write-Host "exit_code=$exitCode"
+        }
+    }
+    catch {
+        $invocationStatus       = 'FAULTED'
+        $invocationErrorType    = $_.Exception.GetType().Name
+        $invocationErrorMessage = 'INVOCATION_EXCEPTION_REDACTED: ' + (Get-RedactedText $_.Exception.Message)
+        $exitCode               = -1
+        Write-Host ("invocation faulted: " + $invocationErrorType)
+    }
+    finally {
+        # ---- steps 13 to 20 — ALWAYS run once invocation has begun ------------------
+        # These are observations of the field, not of the software. The Product's own
+        # cleanup record is read separately from the captured report and is never
+        # replaced by these answers.
+        # Read through the same always-answers helper as the rest of the finally body, so this
+        # pause cannot abort the obligations that follow it.
+        $null = Read-Confirmation 'Observe IV1 physically now: confirm it is CLOSED, then type OK'
+
+        $pumpStillStopped = Read-Confirmation 'Is the physical Pump still stopped, with no Pump command issued? type YES or NO'
+        $iv1Closed        = Read-Confirmation 'Is IV1 physically CLOSED? type YES or NO'
+        $di029Active      = Read-Confirmation 'Is DI-029 Lower/closed active on IV1? type YES or NO'
+        $di021Inactive    = Read-Confirmation 'Is DI-021 Upper/open inactive on IV1? type YES or NO'
+        $unrelated        = Read-Confirmation 'Are the IV2 through IV8 outputs untouched? type YES or NO'
+        $noMotion         = Read-Confirmation 'Is there no motion authority and no axis movement? type YES or NO'
+        $abortAvailable   = Read-Confirmation 'Did the physical abort remain available throughout? type YES or NO'
+        $released         = Read-Confirmation 'Was process exit and session/transport release observed? type YES or NO'
+
+        if ($pumpStillStopped -eq 'YES' -and
+            $iv1Closed -eq 'YES' -and
+            $di029Active -eq 'YES' -and
+            $di021Inactive -eq 'YES' -and
+            $unrelated -eq 'YES' -and
+            $noMotion -eq 'YES' -and
+            $abortAvailable -eq 'YES' -and
+            $released -eq 'YES') {
+            $terminalObligationsComplete = 'YES'
+        }
+    }
+
+    # ---- parse the captured report, only when a capture exists ----------------------
+    if (Test-Path -LiteralPath $OutFile -PathType Leaf) {
+        foreach ($line in Get-Content -LiteralPath $OutFile -Encoding UTF8) {
+            $idx = $line.IndexOf('=')
+            if ($idx -gt 0) {
+                $key = $line.Substring(0, $idx).Trim()
+                $val = $line.Substring($idx + 1).Trim()
+                if ($key.Length -gt 0 -and -not $map.ContainsKey($key)) { $map[$key] = $val }
+            }
+        }
+    }
+
+    $expected = [ordered]@{
+        'accepted'                 = 'True'
+        'trial_code'               = 'IV_TRIAL_ACCEPTED'
+        'evidence_kind'            = 'SOFTWARE_SIMULATED'
+        'physical_pump_verified'   = 'FALSE'
+        'physical_ai003_verified'  = 'FALSE'
+        'physical_iv_command'      = 'TRUE'
+        'physical_upper_feedback'  = 'TRUE'
+        'physical_lower_feedback'  = 'TRUE'
+        'cleanup.complete'         = 'True'
+        'cleanup.unknown'          = '0'
+    }
+
+    $failures = @()
+    if ($invocationStatus -ne 'COMPLETED') { $failures += "invocation_status=$invocationStatus ($invocationErrorType)" }
+    if ($exitCode -ne 0)                   { $failures += "exit_code=$exitCode (expected 0)" }
+    foreach ($key in $expected.Keys) {
+        if (-not $map.ContainsKey($key)) { $failures += "$key is missing from the report" }
+        elseif ($map[$key] -ne $expected[$key]) { $failures += "$key=$($map[$key]) (expected $($expected[$key]))" }
+    }
+    if ($map.ContainsKey('open_command') -and $map['open_command'] -notlike 'DO-023 coil=22 value=True*') {
+        $failures += "open_command is not DO-023/coil 22/True: $($map['open_command'])"
+    }
+    if ($map.ContainsKey('close_command') -and $map['close_command'] -notlike 'DO-023 coil=22 value=False*') {
+        $failures += "close_command is not DO-023/coil 22/False: $($map['close_command'])"
+    }
+    if ($terminalObligationsComplete -ne 'YES') { $failures += 'final physical-state obligations were not fully confirmed' }
+
+    # ---- redaction scan, then one redacted record outside the repository -----------
+    $leaks = @()
+    foreach ($file in @($OutFile, $ErrFile)) {
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
+        if (Select-String -LiteralPath $file -SimpleMatch -Pattern $EndpointHost -Quiet -ErrorAction SilentlyContinue) { $leaks += 'endpoint address' }
+        if ($consent -and (Select-String -LiteralPath $file -SimpleMatch -Pattern $consent -Quiet -ErrorAction SilentlyContinue)) { $leaks += 'consent phrase' }
+    }
+    if ($leaks.Count -gt 0) {
+        Remove-Item -LiteralPath $OutFile, $ErrFile -Force -ErrorAction SilentlyContinue
+        throw "STOP: redaction failure ($($leaks -join ', ')) — captures destroyed, do not paste them anywhere"
+    }
+
+    $reportText = if (Test-Path -LiteralPath $OutFile -PathType Leaf) {
+        (Get-Content -LiteralPath $OutFile -Encoding UTF8) -join "`n"
+    } else { 'NO_CAPTURE_FILE' }
+
+    $classification = if ($terminalObligationsComplete -eq 'YES' -and
+                          $invocationStatus -eq 'COMPLETED' -and
+                          $failures.Count -eq 0) { 'ACCEPTED_PHYSICAL_IV_COMMAND_AND_FEEDBACK' } else { 'NOT_ACCEPTED' }
+
+    $record = @"
 TRIAL B — PHYSICAL IV OPEN/CLOSE EVIDENCE
 scope_id=TRIAL-A-B-HARDWARE-EXECUTION-PACKAGE
 run_label=$RunLabel
@@ -872,25 +1280,44 @@ high_bar=$HighBar
 supervision_ms=$SupervisionMs
 iv1_initial_upper=$initialUpper
 iv1_initial_lower=$initialLower
+invocation_status=$invocationStatus
+invocation_error_type=$invocationErrorType
+invocation_error_redacted=$invocationErrorMessage
 exit_code=$exitCode
+-- product cleanup record (from the trial report, never from an operator answer) --
+cleanup_complete=$(Get-ReportField $map 'cleanup.complete')
+cleanup_unknown=$(Get-ReportField $map 'cleanup.unknown')
+-- observed final physical state (operator attestation, separate by design) --------
+pump_still_stopped=$pumpStillStopped
+iv1_final_closed=$iv1Closed
+di029_lower_closed_active=$di029Active
+di021_upper_open_inactive=$di021Inactive
+unrelated_iv_untouched=$unrelated
+motion_absent=$noMotion
+physical_abort_available=$abortAvailable
+session_closed_transport_released=$released
+terminal_obligations_complete=$terminalObligationsComplete
 classification=$classification
 failures=$($failures -join ' | ')
-iv1_final_closed=$finalClosed
-unrelated_iv_untouched=$unrelated
-pump_command_absent=$noPump
-motion_absent=$noMotion
-session_closed_transport_released=$released
 -- report --
-$((Get-Content -LiteralPath $OutFile -Encoding UTF8) -join "`n")
+$reportText
 "@
-Set-Content -LiteralPath $RecFile -Value $record -Encoding UTF8
+    Set-Content -LiteralPath $RecFile -Value $record -Encoding UTF8
 
-$consent = $null
-Remove-Item -LiteralPath 'Env:WJSS_PROCESS_IO_CONSENT' -ErrorAction SilentlyContinue
-
-Write-Host "classification=$classification"
-Write-Host "record=$RecFile"
-if ($failures.Count -gt 0) { Write-Host ("failures: " + ($failures -join ' | ')) }
+    Write-Host "classification=$classification"
+    Write-Host "record=$RecFile"
+    if ($failures.Count -gt 0) { Write-Host ("failures: " + ($failures -join ' | ')) }
+}
+finally {
+    # Consent cleanup is guaranteed once the phrase has been converted for the child, on
+    # every path: accepted, refused, faulted or thrown. The phrase is never printed.
+    Remove-Item -LiteralPath 'Env:WJSS_PROCESS_IO_CONSENT' -ErrorAction SilentlyContinue
+    $consent = $null
+    if ($null -ne $secure) {
+        try { $secure.Dispose() } catch { }
+        $secure = $null
+    }
+}
 ```
 
 ### 5.7 Required evidence fields
@@ -923,8 +1350,18 @@ if ($failures.Count -gt 0) { Write-Host ("failures: " + ($failures -join ' | '))
 | `accepted` | trial verdict | **`True`** |
 | `trial_code` | classification | `IV_TRIAL_ACCEPTED` |
 | `exit_code` | process exit code | **`0`** |
-| `iv1_final_closed`, `unrelated_iv_untouched`, `pump_command_absent`, `motion_absent` | operator confirmations | `YES`, `YES`, `YES`, `YES` |
-| `session_closed_transport_released` | operator attestation — the runner prints no session field (unlike Trial A), so this is observed, not quoted | `YES` |
+| `pump_still_stopped` | Pump remained stopped, no Pump command | **`YES`** |
+| `iv1_final_closed` | `IV1` physically CLOSED | **`YES`** |
+| `di029_lower_closed_active` | `DI-029` active | **`YES`** |
+| `di021_upper_open_inactive` | `DI-021` inactive | **`YES`** |
+| `unrelated_iv_untouched` | `IV2`…`IV8` outputs untouched | **`YES`** |
+| `motion_absent` | no motion authority, no movement | **`YES`** |
+| `physical_abort_available` | abort remained available throughout | **`YES`** |
+| `session_closed_transport_released` | operator attestation — the runner prints no session field (unlike Trial A), so this is observed, not quoted | **`YES`** |
+| `terminal_obligations_complete` | every `finally` answer affirmative | **`YES`** |
+| `invocation_status` | `COMPLETED` only; `FAULTED`, `SKIPPED_*` and `NOT_ATTEMPTED` all force `NOT_ACCEPTED` | **`COMPLETED`** |
+| `invocation_error_type` / `..._redacted` | exception type and redacted message | `NONE` |
+| `cleanup_complete` / `cleanup_unknown` | the Product's own cleanup record, quoted from the report | `True` / `0` — never inferred from an operator answer |
 
 Two printing conventions in this report are **exactly as Source emits them** and must not be "corrected"
 in a transcript: `accepted=True` and `cleanup.complete=True` are Pascal case, while the `physical_*`
@@ -945,9 +1382,12 @@ Trial B is accepted as **`PHYSICAL_IV_COMMAND_AND_FEEDBACK`** only when every li
 * FC01 was recorded separately and was never treated as field confirmation;
 * cleanup completed with **zero** remaining unknown state;
 * unrelated IV outputs untouched, Pump still stopped, no motion;
-* `IV1` ends physically **CLOSED**;
+* `IV1` ends physically **CLOSED**, `DI-029` active and `DI-021` inactive;
 * the process has exited with no open connection remaining — Trial B prints no `session_state` or
-  `transport_released` field, so the release is confirmed by observation and recorded as such.
+  `transport_released` field, so the release is confirmed by observation and recorded as such;
+* `invocation_status=COMPLETED`;
+* `terminal_obligations_complete=YES` — the `finally` body ran with all eight answers affirmative;
+* cleanup fields quoted from the report, not reconstructed from operator confirmations.
 
 **A passing Trial B proves nothing about the Pump, `AI-003+` or water-on behaviour.** It is not Pump
 evidence and must never be cited as Pump evidence.
@@ -981,7 +1421,9 @@ evidence and must never be cited as Pump evidence.
 * a Pump command occurs;
 * a motion session is created;
 * water flow occurs unexpectedly;
-* the operator physical abort becomes unavailable.
+* the operator physical abort becomes unavailable;
+* the invocation faults (`invocation_status=FAULTED`);
+* any `finally` confirmation is `UNAVAILABLE` or not `YES`.
 
 ### 5.11 Operator abort
 
