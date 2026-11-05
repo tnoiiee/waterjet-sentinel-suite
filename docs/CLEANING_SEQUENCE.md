@@ -289,6 +289,45 @@ The Stage 0.2.1A spike demonstrates this behaviour with synthetic signals only
 It is not a safety function, not motor protection and not verified on hardware. Section 7.1 is
 unchanged.
 
+### 7.3 Commissioned Pump command contract (Owner decision; supersedes the derivation note in §7)
+
+The Owner has since commissioned exact Pump command and feedback identities. This supersedes the
+opening statement of §7 that the system receives no direct motor-running feedback: that statement
+described the accepted derivation before the contract was commissioned, and it is withdrawn as a
+description of current behaviour. §7.1 and §7.2 are unchanged.
+
+- **Selection** is maintained and mutually exclusive. Pump 1 is `DO-001` true then `DO-002` false;
+  Pump 2 is the inverse route `DO-002` true then `DO-001` false. The Current Product Critical Path
+  uses Pump 1 unless the Owner authorizes another selection.
+- **Start order**: `DO-003` enable inverter true, then `DO-007` run pump true. Both are maintained
+  active-high outputs. They are not pulses, no pulse duration applies, and no timer clears them.
+- **Stop order (corrected)**: `DO-007` false first, then `DO-003` false. An older Legacy source
+  cleared Enable before Run; that order is superseded and must not be implemented, documented or
+  tested as current behaviour.
+- **Running and Fault feedback**: `DI-004` and `DI-005`. Their physical polarity is **not yet
+  commissioned**; the Product initial state is `NOT_CONFIGURED`, and a physical Pump command fails
+  closed until both are commissioned. The stopped state is therefore never inferred from `AI-003`
+  pressure.
+- **Analog speed reference**: `AO-001+`, engineering unit **milliamps** (not pressure), converted by
+  the existing boundary. The automatic ramp uses a 1000 ms interval and a step of 2 engineering
+  units, upward toward the configured target and downward toward the configured safe zero.
+- **Pump-ready**: `AI-003+` only, strictly greater than the configured setpoint (Owner-initial
+  15 bar), from a current physical observation inside a 2000 ms freshness budget. `AI-002+` is Pump
+  Inlet pressure, diagnostic and trend only, and can never alias, substitute or fall back for it.
+- **Every Stop path is the same path**: normal completion, cancellation, downstream Isolation Valve
+  failure, Cleaning Job or sequence failure, an active Fault and application cleanup all ramp toward
+  the safe zero, dispatch `DO-007` false exactly once, then `DO-003` false exactly once, then wait
+  for confirmed not-running feedback. A ramp failure never prevents the two de-energisations.
+  Ownership is released only after a confirmed Stop; an unknown stopped state reports
+  `PHYSICAL_ABORT_REQUIRED` and is never a safe completion.
+- **Main Valve**: the catalogue defines no Main Valve I/O identity, so no Main Valve control is part
+  of this integration. See §11.
+
+Implementation: `ProcessIoPumpLifecycle` is the one reusable lifecycle, driven through the existing
+`ProcessIoSession` admission and dispatch lifecycle. Physical execution remains
+**NOT EXECUTED / NOT VERIFIED**, Production write authority remains **NOT AUTHORIZED**, and the
+Trial B software plan is unchanged.
+
 ## 8. Motion supervision during a job
 
 - Galil model: DMC-B140-M; stepper motors with encoder feedback. `[APPROVED]`
