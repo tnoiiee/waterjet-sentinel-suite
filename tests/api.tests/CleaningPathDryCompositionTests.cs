@@ -401,6 +401,99 @@ public sealed class CleaningPathDryCompositionTests
         Assert.Contains("apps\\motion-composition\\Wjss.MotionComposition.csproj", solution, StringComparison.Ordinal);
     }
 
+    // ------------------------------------------------------------ the ONE Pump composition
+
+    [Fact]
+    public void The_Production_Composition_Constructs_Exactly_One_Pump_Lifecycle()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+
+        // Exactly one of each authority: one boundary, one lifecycle, one ownership channel, one gate.
+        Assert.Equal(1, Count(text, "new ProcessIoPumpCommandBoundary("));
+        Assert.Equal(1, Count(text, "new ProcessIoPumpLifecycle("));
+        Assert.Equal(1, Count(text, "new PumpCommandOwnership("));
+        Assert.Equal(1, Count(text, "new CleaningPathPumpLifecycleGate("));
+
+        // The lifecycle is built in the production composition root and exposed only through it.
+        Assert.Contains("ProcessIoPumpLifecycle Pump => _pump;", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Active_Cleaning_Path_Uses_The_Pump_Gate_And_Not_The_Raw_Equipment_Boundary()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+
+        // The coordinator is handed the gated boundary, so it has no reference through which it could
+        // request an Isolation Valve OPEN without consulting the Pump lifecycle.
+        Assert.Contains(
+            "new CleaningPathCompositionCoordinator(motion, pumpGate, clock)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "new CleaningPathCompositionCoordinator(motion, equipment, clock)", text, StringComparison.Ordinal);
+
+        // The raw boundary remains the cleanup authority, so a CLOSE is never blocked by a Pump state.
+        Assert.Contains("_equipment.SafeCleanupCloseAll()", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Composition_Starts_The_Pump_Before_The_Motion_Composition()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+
+        int pumpStart = text.IndexOf("StartPump(", StringComparison.Ordinal);
+        int compositionStart = text.IndexOf("_composition.Start(StoreSnapshot, Resolution, Request)", StringComparison.Ordinal);
+
+        Assert.True(pumpStart >= 0, "The composition must start the Pump.");
+        Assert.True(compositionStart >= 0, "The composition must start the motion composition.");
+        Assert.True(pumpStart < compositionStart, "The Pump must be started before the path is started.");
+
+        // And the Pump is stopped before the motion cleanup, so the jet is withdrawn first.
+        int pumpStop = text.IndexOf("StopPump()", StringComparison.Ordinal);
+        int motionCleanup = text.IndexOf("_motionRoot.Shutdown()", StringComparison.Ordinal);
+        Assert.True(pumpStop >= 0 && motionCleanup >= 0);
+        Assert.True(pumpStop < motionCleanup, "The Pump Stop must precede the motion cleanup.");
+    }
+
+    [Fact]
+    public void The_Pump_Configuration_Is_Typed_Owner_Local_And_Never_Defaulted_To_A_Command()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+
+        foreach (string variable in new[]
+                 {
+                     "WJSS_PUMP_SELECTION",
+                     "WJSS_PUMP_ANALOG_TARGET_MA",
+                     "WJSS_PUMP_FRESHNESS_MS",
+                     "WJSS_PUMP_RUNNING_POLARITY",
+                     "WJSS_PUMP_FAULT_POLARITY",
+                     "WJSS_PUMP_RUNNING_CONFIRM_MS",
+                     "WJSS_PUMP_READY_TIMEOUT_MS",
+                     "WJSS_PUMP_STOPPED_CONFIRM_MS",
+                 })
+        {
+            Assert.Contains(variable, text, StringComparison.Ordinal);
+        }
+
+        // A refused Pump configuration is a typed composition refusal, never a silent default command.
+        Assert.Contains("DRY_COMPOSITION_REFUSED_PUMP_CONFIGURATION", text, StringComparison.Ordinal);
+    }
+
+    private static int Count(string text, string value)
+    {
+        int count = 0;
+        int index = text.IndexOf(value, StringComparison.Ordinal);
+        while (index >= 0)
+        {
+            count += 1;
+            index = text.IndexOf(value, index + value.Length, StringComparison.Ordinal);
+        }
+
+        return count;
+    }
+
     private static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -2,240 +2,823 @@ using Wjss.Contracts;
 using Wjss.Runtime.Core.CleaningPath.Composition;
 using Wjss.Runtime.Core.ProcessIo;
 using Wjss.Runtime.Core.Sequencing;
-using Xunit;
+using Wjss.Time;
 
-namespace Wjss.Runtime.Core.Tests;
+namespace Wjss.Runtime.Tests.ProcessIo;
 
-// PUMP-COMMAND-PRODUCT-INTEGRATION: the focused Pump lifecycle matrix.
-//
-// Every test here is FAKE. The transport is a deterministic in-memory double: no socket is opened, no
-// device is contacted, and no value is a hardware observation. The matrix proves the commissioned
-// command contract, the fail-closed admission, the AI-003-only readiness rule, the CORRECTED Stop
-// order, and the cleanup obligations.
-//
-// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
-
+/// <summary>
+/// PHASE 0.5C Pump command, feedback, lifecycle and Cleaning Path precondition.
+///
+/// These tests prove the CONTRACT and the STATE MACHINE only. Nothing here is a physical verification:
+/// every transport is an in-memory double, no Hardware is contacted and no value is a field measurement.
+///
+/// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA.
+/// </summary>
 public sealed class ProcessIoPumpLifecycleTests
 {
-    private const string Owner = "owner-test";
-    private const int CoilSelect1 = 0;
-    private const int CoilSelect2 = 1;
-    private const int CoilEnable = 2;
-    private const int CoilRun = 6;
-    private const int InputRunning = 3;
-    private const int InputFault = 4;
-    private const int RegisterPumpOutlet = 2;
-    private const int RegisterPumpInlet = 1;
-
-    /// <summary>Raw word whose converted outlet pressure is just BELOW the 15 bar setpoint.</summary>
-    private const ushort RawJustBelow15Bar = 16383;
-
-    /// <summary>Raw word whose converted outlet pressure is just ABOVE the 15 bar setpoint.</summary>
-    private const ushort RawJustAbove15Bar = 16384;
+    private const double TargetMilliamps = 4.0;
 
     private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(20);
-    private static readonly TimeSpan Supervision = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan Freshness = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan Freshness = TimeSpan.FromSeconds(2);
 
-    // ---------------------------------------------------------------- scaffolding
+    private const int CoilSelectOne = 0;
+    private const int CoilSelectTwo = 1;
+    private const int CoilEnable = 2;
+    private const int CoilRun = 6;
+    private const int CoilIvOne = 22;
 
-    private sealed class FakeTime : TimeProvider
+    private const int InputRunning = 3;
+    private const int InputFault = 4;
+
+    private const int RegisterPumpInlet = 1;
+    private const int RegisterPumpOutlet = 2;
+
+    /// <summary>A raw word that converts to about 16.5 bar, strictly above the 15 bar setpoint.</summary>
+    private const ushort RawAboveSetpoint = 13500;
+
+    /// <summary>A raw word that converts to about 15.1 bar, strictly above the 15 bar setpoint.</summary>
+    private const ushort RawJustAboveSetpoint = 12400;
+
+    /// <summary>A raw word that converts to about 14.9 bar, strictly below the 15 bar setpoint.</summary>
+    private const ushort RawJustBelowSetpoint = 12200;
+
+    // ---------------------------------------------------------------- 1 to 8. the analog conversion
+
+    [Fact(DisplayName = "1. The Pump converter maps 0 mA to raw 0")]
+    public void The_Pump_Converter_Maps_Zero_Milliamps_To_Raw_Zero()
     {
-        private DateTimeOffset _now = new(2026, 11, 5, 6, 0, 0, TimeSpan.Zero);
-
-        public override DateTimeOffset GetUtcNow() => _now;
-
-        public void Advance(TimeSpan delta) => _now = _now.Add(delta);
+        Assert.True(PumpAnalogCommand.TryCreate(0.0, out PumpAnalogCommand command));
+        Assert.True(command.IsSafeStopSentinel);
+        Assert.True(PumpAnalogCommandContract.TryToRaw(command, out int raw));
+        Assert.Equal(0, raw);
     }
 
-    /// <summary>Deterministic transport double. Never the Product Simulation transport.</summary>
-    private sealed class FakeTransport : IProcessIoTransport
+    [Fact(DisplayName = "2. The Pump converter maps the 4 mA live minimum to raw 0")]
+    public void The_Pump_Converter_Maps_The_Live_Minimum_To_Raw_Zero()
     {
-        public List<(string Device, int Address, bool Value)> CoilWrites { get; } = new();
-        public List<(int Address, ushort Value)> RegisterWrites { get; } = new();
-        public List<int> RegisterReads { get; } = new();
-        public Dictionary<int, bool> DiscreteInputs { get; } = new();
-        public Dictionary<int, ushort> InputRegisters { get; } = new();
-        public bool ThrowOnWrite { get; set; }
-        public bool ThrowOnAnalogWrite { get; set; }
+        Assert.True(PumpAnalogCommand.TryCreate(4.0, out PumpAnalogCommand command));
+        Assert.True(command.IsRunning);
+        Assert.False(command.IsSafeStopSentinel);
+        Assert.True(PumpAnalogCommandContract.TryToRaw(command, out int raw));
+        Assert.Equal(0, raw);
+    }
 
-        public int NetworkAttempts => CoilWrites.Count + RegisterWrites.Count;
+    [Fact(DisplayName = "3. The Pump converter maps 12 mA to 16384, the exact half-scale word")]
+    public void The_Pump_Converter_Maps_Twelve_Milliamps_To_Half_Scale()
+    {
+        Assert.True(PumpAnalogCommand.TryCreate(12.0, out PumpAnalogCommand command));
+        Assert.True(PumpAnalogCommandContract.TryToRaw(command, out int raw));
+        Assert.InRange(raw, 16383, 16385);
+    }
 
-        public bool ReadDiscreteInput(string deviceKey, int address) =>
-            DiscreteInputs.TryGetValue(address, out bool value) && value;
+    [Fact(DisplayName = "4. The Pump converter maps 20 mA to raw full scale")]
+    public void The_Pump_Converter_Maps_Twenty_Milliamps_To_Full_Scale()
+    {
+        Assert.True(PumpAnalogCommand.TryCreate(20.0, out PumpAnalogCommand command));
+        Assert.True(PumpAnalogCommandContract.TryToRaw(command, out int raw));
+        Assert.Equal(ProcessIoRepresentation.RawFullScale, raw);
+    }
 
-        public IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity) =>
-            Enumerable.Range(startAddress, quantity)
-                .Select(address => DiscreteInputs.TryGetValue(address, out bool value) && value)
-                .ToList();
-
-        public ushort ReadInputRegister(string deviceKey, int registerAddress)
+    [Fact(DisplayName = "5. The open 0 to 4 mA band is refused and never clamped")]
+    public void The_Open_Zero_To_Four_Band_Is_Refused()
+    {
+        double[] refused = [0.001, 1.0, 2.0, 3.999];
+        foreach (double value in refused)
         {
-            RegisterReads.Add(registerAddress);
-            return InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
+            Assert.False(PumpAnalogCommand.TryCreate(value, out _), $"Expected {value} mA to be refused.");
+            Assert.False(PumpAnalogCommandContract.TryToRaw(value, out int raw));
+            Assert.Equal(0, raw);
         }
 
-        public ushort ReadRegister(string deviceKey, int registerAddress)
+        // And nothing in that band is inside the command domain.
+        Assert.False(PumpAnalogCommandContract.IsInDomain(3.999));
+        Assert.True(PumpAnalogCommandContract.IsInDomain(4.0));
+        Assert.True(PumpAnalogCommandContract.IsInDomain(20.0));
+        Assert.True(PumpAnalogCommandContract.IsInDomain(0.0));
+    }
+
+    [Fact(DisplayName = "6. A negative or above-20 mA command is refused and never clamped")]
+    public void A_Negative_Or_Above_Twenty_Milliamps_Command_Is_Refused()
+    {
+        Assert.False(PumpAnalogCommand.TryCreate(-0.001, out _));
+        Assert.False(PumpAnalogCommand.TryCreate(20.001, out _));
+        Assert.False(PumpAnalogCommand.TryCreate(double.NaN, out _));
+        Assert.False(PumpAnalogCommand.TryCreate(double.PositiveInfinity, out _));
+        Assert.False(PumpAnalogCommand.TryCreate(double.NegativeInfinity, out _));
+
+        // The exact fractional band just above 20 mA is refused, not rounded down to 20 mA.
+        Assert.False(PumpAnalogCommandContract.TryToRaw(20.4, out _));
+    }
+
+    [Fact(DisplayName = "7. A running target below 4 mA is an invalid configuration")]
+    public void A_Running_Target_Below_Four_Milliamps_Is_Invalid_Configuration()
+    {
+        var belowMinimum = new PumpSpeedRampConfiguration { TargetEngineeringMilliamps = 2.0 };
+        Assert.False(belowMinimum.Valid);
+        Assert.False(PumpAnalogCommand.TryCreateRunning(2.0, out _));
+
+        var atMinimum = new PumpSpeedRampConfiguration { TargetEngineeringMilliamps = 4.0 };
+        Assert.True(atMinimum.Valid);
+
+        // The lifecycle refuses such a configuration before the first write.
+        var configuration = ConfigurationFor(Commissioned()) with
         {
-            RegisterReads.Add(registerAddress);
-            return InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
+            Ramp = new PumpSpeedRampConfiguration { TargetEngineeringMilliamps = 2.0 },
+        };
+        Assert.False(configuration.Valid);
+
+        Rig rig = Create(configuration);
+        PumpLifecycleStartOutcome outcome = rig.Lifecycle.Start(Request());
+        Assert.False(outcome.Started);
+        Assert.Equal(PumpLifecycleState.COMMAND_ADMISSION_REFUSED, rig.Lifecycle.State);
+        Assert.Empty(rig.Transport.CoilWrites);
+        Assert.Empty(rig.Transport.RegisterWrites);
+    }
+
+    [Fact(DisplayName = "8. The ramp-down reaches the sentinel without ever emitting 0 to 4 mA")]
+    public void The_Ramp_Down_Reaches_The_Sentinel_Without_Emitting_An_Invalid_Command()
+    {
+        var current = PumpAnalogCommand.SafeStopSentinel;
+        Assert.True(PumpAnalogCommand.TryCreate(20.0, out current));
+
+        int steps = 0;
+        while (!PumpAnalogRamp.AtTarget(current, 0.0) && steps < 32)
+        {
+            Assert.True(PumpAnalogRamp.TryNext(current, 0.0, 2.0, out PumpAnalogCommand next));
+
+            // Every emitted command is either the sentinel or a live 4 to 20 mA reference.
+            Assert.True(next.Valid);
+            Assert.True(
+                next.IsSafeStopSentinel || PumpAnalogCommandContract.IsLive(next.Milliamps),
+                "The down-ramp emitted an invalid command: " + next.Milliamps.ToString("R"));
+
+            current = next;
+            steps += 1;
         }
 
-        public bool ReadCoil(string deviceKey, int coilAddress) =>
-            CoilWrites.Any(write => write.Address == coilAddress && write.Value);
+        Assert.True(current.IsSafeStopSentinel);
+        Assert.Equal(0.0, current.Milliamps);
 
-        public IReadOnlyList<ushort> ReadHoldingRegistersBulk(string deviceKey, int startAddress, int quantity) =>
-            Enumerable.Range(startAddress, quantity)
-                .Select(address => InputRegisters.TryGetValue(address, out ushort value) ? value : (ushort)0)
-                .ToList();
+        // The 4 mA live minimum is stepped through and the 0 to 4 band never appears.
+        var atMinimum = PumpAnalogCommand.TryCreate(4.0, out PumpAnalogCommand four) ? four : default;
+        Assert.True(PumpAnalogRamp.TryNext(atMinimum, 0.0, 2.0, out PumpAnalogCommand fromMinimum));
+        Assert.True(fromMinimum.IsSafeStopSentinel);
+    }
 
-        public void WriteCoil(string deviceKey, int coilAddress, bool value)
+    [Fact(DisplayName = "9. The ramp-up never emits a value outside the live running domain")]
+    public void The_Ramp_Up_Stays_In_The_Live_Running_Domain()
+    {
+        var current = PumpAnalogCommand.SafeStopSentinel;
+        int steps = 0;
+
+        while (!PumpAnalogRamp.AtTarget(current, TargetMilliamps) && steps < 16)
         {
-            if (ThrowOnWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
-            CoilWrites.Add((deviceKey, coilAddress, value));
+            Assert.True(PumpAnalogRamp.TryNext(current, TargetMilliamps, 2.0, out PumpAnalogCommand next));
+            Assert.True(next.IsRunning);
+            Assert.True(PumpAnalogCommandContract.IsLive(next.Milliamps));
+            Assert.True(next.Milliamps <= TargetMilliamps);
+            current = next;
+            steps += 1;
         }
 
-        public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value)
+        Assert.True(PumpAnalogRamp.AtTarget(current, TargetMilliamps));
+        Assert.Equal(TargetMilliamps, current.Milliamps);
+    }
+
+    [Fact(DisplayName = "10. The raw word is ambiguous at 0 and the engineering identity is retained")]
+    public void The_Raw_Word_Is_Ambiguous_And_Identity_Is_Retained()
+    {
+        Assert.True(PumpAnalogCommand.TryCreate(0.0, out PumpAnalogCommand sentinel));
+        Assert.True(PumpAnalogCommand.TryCreate(4.0, out PumpAnalogCommand liveMinimum));
+
+        Assert.True(PumpAnalogCommandContract.TryToRaw(sentinel, out int sentinelRaw));
+        Assert.True(PumpAnalogCommandContract.TryToRaw(liveMinimum, out int liveRaw));
+
+        // One raw word, two meanings. Nothing may infer running or stopped from the raw output.
+        Assert.Equal(0, sentinelRaw);
+        Assert.Equal(0, liveRaw);
+        Assert.NotEqual(sentinel.Kind, liveMinimum.Kind);
+        Assert.NotEqual(sentinel.KindCode, liveMinimum.KindCode);
+        Assert.Equal(PumpAnalogCommandContract.SafeStopSentinelCode, sentinel.KindCode);
+        Assert.Equal(PumpAnalogCommandContract.RunningCode, liveMinimum.KindCode);
+
+        // The general converter is NOT the Pump authority and keeps its own 0 to 20 mA contract.
+        Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(0.0, out int generalZero));
+        Assert.Equal(0, generalZero);
+        Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(12.0, out int generalHalf));
+        Assert.NotEqual(generalHalf, 16384);
+    }
+
+    [Fact(DisplayName = "11. The analog contract states milliamps, and states no pressure")]
+    public void The_Analog_Contract_States_Milliamps_And_No_Pressure()
+    {
+        Assert.Equal("mA", PumpAnalogCommandContract.EngineeringUnit);
+        Assert.Equal(4.0, PumpAnalogCommandContract.LiveMinimumMilliamps);
+        Assert.Equal(20.0, PumpAnalogCommandContract.LiveMaximumMilliamps);
+        Assert.Equal(0.0, PumpAnalogCommandContract.SafeStopSentinelMilliamps);
+        Assert.Equal(0.0, PumpAnalogCommandContract.SafeZeroEngineeringCommand);
+        Assert.Equal(PumpCommandContract.SpeedReferenceTag, PumpAnalogCommandContract.Tag);
+        Assert.Equal(1000, PumpSpeedRampConfiguration.OwnerInitialIntervalMilliseconds);
+        Assert.Equal(2.0, PumpSpeedRampConfiguration.OwnerInitialStepMilliamps);
+    }
+
+    // ---------------------------------------------------------------- 12 to 15. configuration
+
+    [Fact(DisplayName = "12. Both feedback polarities default to NOT_CONFIGURED")]
+    public void Both_Feedback_Polarities_Default_To_Not_Configured()
+    {
+        PumpFeedbackConfiguration feedback = PumpFeedbackConfiguration.Uncommissioned;
+        Assert.Equal(PumpFeedbackPolarity.NOT_CONFIGURED, feedback.RunningPolarity);
+        Assert.Equal(PumpFeedbackPolarity.NOT_CONFIGURED, feedback.FaultPolarity);
+        Assert.False(feedback.IsCommissioned);
+        Assert.Equal(PumpFeedbackConfiguration.NotCommissionedCode, feedback.CommissioningCode);
+    }
+
+    [Fact(DisplayName = "13. A half-commissioned pair is not commissioned")]
+    public void A_Half_Commissioned_Pair_Is_Not_Commissioned()
+    {
+        var half = new PumpFeedbackConfiguration
         {
-            if (ThrowOnWrite || ThrowOnAnalogWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
-            RegisterWrites.Add((registerAddress, value));
+            RunningPolarity = PumpFeedbackPolarity.ACTIVE_HIGH,
+            FaultPolarity = PumpFeedbackPolarity.NOT_COMMISSIONED,
+        };
+
+        Assert.True(half.RunningCommissioned);
+        Assert.False(half.FaultCommissioned);
+        Assert.False(half.IsCommissioned);
+
+        var both = new PumpFeedbackConfiguration
+        {
+            RunningPolarity = PumpFeedbackPolarity.ACTIVE_HIGH,
+            FaultPolarity = PumpFeedbackPolarity.ACTIVE_LOW,
+        };
+        Assert.True(both.IsCommissioned);
+    }
+
+    [Fact(DisplayName = "14. An uncommissioned polarity refuses the command and writes nothing")]
+    public void An_Uncommissioned_Polarity_Refuses_And_Writes_Nothing()
+    {
+        Rig rig = Create(ConfigurationFor(PumpFeedbackConfiguration.Uncommissioned));
+
+        PumpLifecycleStartOutcome outcome = rig.Lifecycle.Start(Request());
+
+        Assert.False(outcome.Started);
+        Assert.Equal(PumpFeedbackConfiguration.NotCommissionedCode, outcome.Code);
+        Assert.Equal(PumpLifecycleState.COMMAND_ADMISSION_REFUSED, rig.Lifecycle.State);
+        Assert.False(rig.Ownership.IsHeld);
+        Assert.Empty(rig.Transport.CoilWrites);
+        Assert.Empty(rig.Transport.RegisterWrites);
+    }
+
+    [Fact(DisplayName = "15. A Production owner can never acquire the command channel")]
+    public void A_Production_Owner_Can_Never_Acquire_The_Command_Channel()
+    {
+        var ownership = new PumpCommandOwnership();
+
+        Assert.False(ownership.TryAcquire(
+            PumpCommandOwnerKind.PRODUCTION, "operator", out string productionCode));
+        Assert.Equal(PumpCommandRefusals.RefusedProductionOwner, productionCode);
+        Assert.False(ownership.IsHeld);
+
+        Assert.True(ownership.TryAcquire(
+            PumpCommandOwnerKind.INTEGRATED_DRY_CYCLE, "dry", out string granted));
+        Assert.Equal(PumpCommandRefusals.Granted, granted);
+
+        // The same channel is refused to a second owner, and no fallback owner is invented.
+        Assert.False(ownership.TryAcquire(
+            PumpCommandOwnerKind.CLEANING_JOB, "another", out string conflictCode));
+        Assert.Equal(PumpCommandRefusals.RefusedConflictingOwner, conflictCode);
+    }
+
+    // ---------------------------------------------------------------- 16 to 20. state machine
+
+    [Fact(DisplayName = "16. Start withholds every command until the polarity is commissioned")]
+    public void Start_Withholds_Every_Command_Until_The_Polarity_Is_Commissioned()
+    {
+        Rig rig = Create(ConfigurationFor(PumpFeedbackConfiguration.Uncommissioned));
+        rig.Lifecycle.Start(Request());
+
+        Assert.Equal(0, rig.Transport.NetworkAttempts);
+        Assert.Empty(rig.Lifecycle.CleanupFaultCodes);
+    }
+
+    [Fact(DisplayName = "17. The Start order is DO-003 TRUE then DO-007 TRUE")]
+    public void The_Start_Order_Is_Enable_Before_Run()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        Assert.True(rig.Lifecycle.Start(Request()).Started);
+
+        int enableIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilEnable && w.Value);
+        int runIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilRun && w.Value);
+
+        Assert.True(enableIndex >= 0, "Enable Inverter must be energised.");
+        Assert.True(runIndex >= 0, "Run Pump must be energised.");
+        Assert.True(enableIndex < runIndex, "Enable Inverter must be energised BEFORE Run Pump.");
+
+        // The selection pair precedes both, selected first.
+        Assert.Equal((CoilSelectOne, true), (rig.Transport.CoilWrites[0].Address, rig.Transport.CoilWrites[0].Value));
+        Assert.Equal((CoilSelectTwo, false), (rig.Transport.CoilWrites[1].Address, rig.Transport.CoilWrites[1].Value));
+        Assert.Equal((CoilEnable, true), (rig.Transport.CoilWrites[2].Address, rig.Transport.CoilWrites[2].Value));
+        Assert.Equal((CoilRun, true), (rig.Transport.CoilWrites[3].Address, rig.Transport.CoilWrites[3].Value));
+    }
+
+    [Fact(DisplayName = "18. Both Start outputs are maintained and are never treated as pulses")]
+    public void Both_Start_Outputs_Are_Maintained()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Lifecycle.Start(Request());
+        int afterStart = rig.Transport.CoilWrites.Count;
+
+        // A long idle wait must not clear anything: no timer may clear a maintained command.
+        for (int step = 0; step < 10; step += 1)
+        {
+            rig.Time.Advance(Interval);
+            rig.Lifecycle.Step();
         }
 
-        public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values)
+        Assert.Equal(afterStart, rig.Transport.CoilWrites.Count);
+        Assert.DoesNotContain(rig.Transport.CoilWrites, write => write.Address == CoilRun && !write.Value);
+        Assert.True(GetCoil(rig, CoilRun, defaultValue: true), "Run Pump must remain energised.");
+    }
+
+    [Fact(DisplayName = "19. Selection is mutually exclusive and only Pump 1 and Pump 2 exist")]
+    public void Selection_Is_Mutually_Exclusive()
+    {
+        IReadOnlyList<PumpCommandStep> one = PumpCommandContract.SelectionSequence(1);
+        IReadOnlyList<PumpCommandStep> two = PumpCommandContract.SelectionSequence(2);
+
+        Assert.Equal(
+            new[] { PumpCommandContract.SelectPumpOneTag, PumpCommandContract.SelectPumpTwoTag },
+            one.Select(step => step.Tag).ToArray());
+        Assert.Equal(
+            new[] { PumpCommandContract.SelectPumpTwoTag, PumpCommandContract.SelectPumpOneTag },
+            two.Select(step => step.Tag).ToArray());
+
+        // The selected contactor is energised first and the other is de-energised second.
+        Assert.Equal(new[] { true, false }, one.Select(step => step.Value).ToArray());
+        Assert.Equal(new[] { true, false }, two.Select(step => step.Value).ToArray());
+
+        Assert.Empty(PumpCommandContract.SelectionSequence(0));
+        Assert.Empty(PumpCommandContract.SelectionSequence(3));
+
+        // An invalid ordinal refuses the Start outright and writes nothing.
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        PumpLifecycleStartOutcome outcome = rig.Lifecycle.Start(new PumpLifecycleStartRequest
         {
-            if (ThrowOnWrite || ThrowOnAnalogWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
-            for (int index = 0; index < values.Count; index += 1)
+            Owner = PumpCommandOwnerKind.INTEGRATED_DRY_CYCLE,
+            OwnerId = "owner",
+            Selection = 3,
+        });
+
+        Assert.False(outcome.Started);
+        Assert.Equal(PumpCommandRefusals.RefusedInvalidSelection, outcome.Code);
+        Assert.Empty(rig.Transport.CoilWrites);
+    }
+
+    [Fact(DisplayName = "20. The lifecycle reaches every progression state in order and no other")]
+    public void The_Lifecycle_Reaches_Every_Progression_State_In_Order()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+
+        var seen = new List<PumpLifecycleState>();
+        void Record()
+        {
+            if (seen.Count == 0 || seen[^1] != rig.Lifecycle.State) seen.Add(rig.Lifecycle.State);
+        }
+
+        Record();
+        Assert.True(rig.Lifecycle.Start(Request()).Started);
+        Record();
+
+        for (int step = 0; step < 200 && rig.Lifecycle.Result is null; step += 1)
+        {
+            rig.Time.Advance(Interval);
+            rig.Lifecycle.Step();
+            Record();
+
+            if (rig.Lifecycle.State == PumpLifecycleState.PUMP_READY)
             {
-                RegisterWrites.Add((startAddress + index, values[index]));
+                rig.Transport.DiscreteInputs[InputRunning] = false;
+                rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
             }
         }
+
+        Assert.Equal(PumpLifecycleState.STOPPED, rig.Lifecycle.State);
+
+        PumpLifecycleState[] expected =
+        [
+            PumpLifecycleState.IDLE,
+            PumpLifecycleState.WAITING_FOR_RUNNING,
+            PumpLifecycleState.RAMPING_OUTPUT,
+            PumpLifecycleState.WAITING_FOR_AI003_READY,
+            PumpLifecycleState.PUMP_READY,
+            PumpLifecycleState.RAMPING_DOWN,
+            PumpLifecycleState.CLEARING_RUN,
+            PumpLifecycleState.DISABLING_INVERTER,
+            PumpLifecycleState.WAITING_FOR_STOPPED,
+            PumpLifecycleState.STOPPED,
+        ];
+
+        Assert.Equal(expected, seen);
+        Assert.All(seen, state => Assert.True(PumpLifecycleStates.IsProgression(state)));
     }
 
-    /// <summary>
-    /// A pressure-only boundary double. It lets the lifecycle rule be exercised at an exact pressure
-    /// value that the raw conversion cannot land on, without a second Production implementation.
-    /// </summary>
-    private sealed class PressureOnlyBoundary : IPumpCommandBoundary
-    {
-        private readonly FakeTime _time;
+    // ---------------------------------------------------------------- 21 to 26. readiness and faults
 
-        public PressureOnlyBoundary(FakeTime time, PumpFeedbackConfiguration feedback)
+    [Fact(DisplayName = "21. AI-003 BAD or stale refuses readiness and never fabricates a bar value")]
+    public void A_Bad_Or_Stale_Ai003_Refuses_Ready()
+    {
+        Rig bad = Create(ConfigurationFor(Commissioned()));
+        bad.Transport.DiscreteInputs[InputRunning] = true;
+        bad.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        bad.Transport.FaultingInputRegisters.Add(RegisterPumpOutlet);
+        StartAndDrive(bad);
+
+        Assert.Equal(PumpLifecycleState.AI003_INVALID, bad.Lifecycle.PrimaryFailure);
+        Assert.NotEqual(PumpLifecycleState.PUMP_READY, bad.Lifecycle.State);
+
+        Rig stale = Create(ConfigurationFor(Commissioned()));
+        stale.Transport.DiscreteInputs[InputRunning] = true;
+        stale.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        stale.Transport.ReadDelay = TimeSpan.FromSeconds(5);
+        StartAndDrive(stale);
+
+        Assert.Equal(PumpLifecycleState.AI003_STALE, stale.Lifecycle.PrimaryFailure);
+        Assert.NotEqual(PumpLifecycleState.PUMP_READY, stale.Lifecycle.State);
+    }
+
+    [Fact(DisplayName = "22. Pump-ready requires strictly more than the configured setpoint")]
+    public void Pump_Ready_Requires_Strictly_More_Than_The_Setpoint()
+    {
+        Rig below = Create(ConfigurationFor(Commissioned()));
+        below.Transport.DiscreteInputs[InputRunning] = true;
+        below.Transport.InputRegisters[RegisterPumpOutlet] = RawJustBelowSetpoint;
+        StartAndDrive(below);
+
+        Assert.Equal(PumpLifecycleState.AI003_TIMEOUT, below.Lifecycle.PrimaryFailure);
+        Assert.NotEqual(PumpLifecycleState.PUMP_READY, below.Lifecycle.State);
+
+        Rig above = Create(ConfigurationFor(Commissioned()));
+        above.Transport.DiscreteInputs[InputRunning] = true;
+        above.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAboveSetpoint;
+        StarToReady(above);
+
+        Assert.Equal(PumpLifecycleState.PUMP_READY, above.Lifecycle.State);
+        Assert.True(above.Lifecycle.AllowsValveOpen);
+    }
+
+    [Fact(DisplayName = "23. The Pump Inlet row is never read as Pump-ready evidence")]
+    public void The_Pump_Inlet_Row_Is_Never_Read_As_Pump_Ready_Evidence()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+
+        // The Inlet register carries a high pressure. The Outlet register carries none.
+        rig.Transport.InputRegisters[RegisterPumpInlet] = RawAboveSetpoint;
+
+        StartAndDrive(rig);
+
+        Assert.NotEqual(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
+        Assert.DoesNotContain(RegisterPumpInlet, rig.Transport.RegisterReads);
+        Assert.Contains(RegisterPumpOutlet, rig.Transport.RegisterReads);
+    }
+
+    [Fact(DisplayName = "24. Run lost after readiness is a trip, not a completion")]
+    public void Run_Lost_After_Readiness_Is_A_Trip()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        StarToReady(rig);
+
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+        rig.Time.Advance(Interval);
+        rig.Lifecycle.Step();
+
+        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, rig.Lifecycle.PrimaryFailure);
+        Assert.NotEqual(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
+
+        DriveToTerminal(rig);
+        Assert.False(rig.Lifecycle.SafeToReportComplete);
+    }
+
+    [Fact(DisplayName = "25. An active configured Fault trips the Pump and blocks readiness")]
+    public void An_Active_Configured_Fault_Trips_The_Pump()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        rig.Transport.DiscreteInputs[InputFault] = true;
+
+        PumpLifecycleStartOutcome outcome = rig.Lifecycle.Start(Request());
+
+        Assert.False(outcome.Started);
+        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, rig.Lifecycle.State);
+        Assert.Empty(rig.Transport.CoilWrites);
+        Assert.False(rig.Ownership.IsHeld);
+    }
+
+    [Fact(DisplayName = "26. A lost Running feedback is a timeout, never an inferred stop")]
+    public void A_Lost_Running_Feedback_Is_A_Timeout()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+
+        Assert.True(rig.Lifecycle.Start(Request()).Started);
+        DriveToTerminal(rig);
+
+        Assert.Equal(PumpLifecycleState.RUNNING_FEEDBACK_TIMEOUT, rig.Lifecycle.PrimaryFailure);
+        Assert.Equal(PumpLifecycleState.RUNNING_FEEDBACK_TIMEOUT, rig.Lifecycle.State);
+        Assert.False(rig.Lifecycle.SafeToReportComplete);
+    }
+
+    // ---------------------------------------------------------------- 27 to 32. the corrected Stop
+
+    [Fact(DisplayName = "27. The Stop order is DO-007 FALSE then DO-003 FALSE")]
+    public void The_Stop_Order_Is_Run_Before_Enable()
+    {
+        Rig rig = Ready();
+
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        DriveToTerminal(rig);
+
+        int runIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilRun && !w.Value);
+        int enableIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilEnable && !w.Value);
+
+        Assert.True(runIndex >= 0, "Run Pump FALSE must be written.");
+        Assert.True(enableIndex >= 0, "Enable Inverter FALSE must be written.");
+        Assert.True(runIndex < enableIndex, "Run Pump must be de-energised BEFORE Enable Inverter.");
+    }
+
+    [Fact(DisplayName = "28. Each de-energisation happens exactly once")]
+    public void Each_De_Energisation_Happens_Exactly_Once()
+    {
+        Rig rig = Ready();
+
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        DriveToTerminal(rig);
+
+        // Stepping well past the terminal must not re-issue anything.
+        for (int step = 0; step < 20; step += 1)
         {
-            _time = time;
-            Feedback = feedback;
-            Running = true;
+            rig.Time.Advance(Interval);
+            rig.Lifecycle.Step();
         }
 
-        public PumpFeedbackConfiguration Feedback { get; }
-
-        public int SessionGeneration => 1;
-
-        public bool Running { get; set; }
-
-        public bool FaultActive { get; set; }
-
-        public double? OutletBar { get; set; }
-
-        public PressureQuality OutletQuality { get; set; } = PressureQuality.GOOD;
-
-        public IReadOnlyList<PumpCommandOutcome> SelectPump(int selection) => new[]
-        {
-            Record(PumpCommandContract.SelectPumpOneTag, true),
-            Record(PumpCommandContract.SelectPumpTwoTag, !selection.Equals(1)),
-        };
-
-        public PumpCommandOutcome SetEnableInverter(bool value) => Record(PumpCommandContract.EnableInverterTag, value);
-
-        public PumpCommandOutcome SetRunPump(bool value) => Record(PumpCommandContract.RunPumpTag, value);
-
-        public PumpAnalogCommandOutcome SetSpeedCommand(double engineeringMilliamps) => new()
-        {
-            Tag = PumpCommandContract.SpeedReferenceTag,
-            Address = 0,
-            RequestedEngineering = engineeringMilliamps,
-            Admitted = true,
-            Dispatched = true,
-            AdmissionCode = PumpCommandRefusals.Granted,
-            DispatchCode = PumpCommandRefusals.Granted,
-            SessionGeneration = 1,
-            At = _time.GetUtcNow(),
-        };
-
-        public PumpFeedbackRead ReadRunning() => new()
-        {
-            Tag = PumpCommandContract.RunningFeedbackTag,
-            Commissioned = Feedback.RunningCommissioned,
-            Code = PumpCommandRefusals.Granted,
-            RawBit = Running,
-            Active = Running,
-            Current = true,
-            SessionGeneration = 1,
-            At = _time.GetUtcNow(),
-        };
-
-        public PumpFeedbackRead ReadFault() => new()
-        {
-            Tag = PumpCommandContract.FaultFeedbackTag,
-            Commissioned = Feedback.FaultCommissioned,
-            Code = PumpCommandRefusals.Granted,
-            RawBit = FaultActive,
-            Active = FaultActive,
-            Current = true,
-            SessionGeneration = 1,
-            At = _time.GetUtcNow(),
-        };
-
-        public PumpPressureRead ReadPumpOutletPressure()
-        {
-            ProcessIoObservationQuality quality = OutletQuality switch
-            {
-                PressureQuality.BAD => ProcessIoObservationQuality.BAD,
-                PressureQuality.STALE => ProcessIoObservationQuality.STALE,
-                _ => ProcessIoObservationQuality.GOOD,
-            };
-
-            return new PumpPressureRead
-            {
-                Tag = PumpCommandContract.PumpOutletPressureTag,
-                Accepted = OutletBar is not null && OutletQuality == PressureQuality.GOOD,
-                Code = PumpCommandRefusals.Granted,
-                Quality = quality,
-                Sample = OutletBar is { } bar
-                    ? new PressureSample(
-                        bar,
-                        OutletQuality,
-                        OutletQuality == PressureQuality.STALE,
-                        _time.GetUtcNow(),
-                        PressureSample.PumpOutletSource)
-                    : null,
-                SessionGeneration = 1,
-                At = _time.GetUtcNow(),
-            };
-        }
-
-        private PumpCommandOutcome Record(string tag, bool value) => new()
-        {
-            Tag = tag,
-            Address = 0,
-            RequestedValue = value,
-            Admitted = true,
-            Dispatched = true,
-            AdmissionCode = PumpCommandRefusals.Granted,
-            DispatchCode = PumpCommandRefusals.Granted,
-            SessionGeneration = 1,
-            At = _time.GetUtcNow(),
-        };
+        Assert.Single(rig.Transport.CoilWrites, write => write.Address == CoilRun && !write.Value);
+        Assert.Single(rig.Transport.CoilWrites, write => write.Address == CoilEnable && !write.Value);
     }
 
-    private sealed class Rig
+    [Fact(DisplayName = "29. Enable is never cleared before Run during the Stop path")]
+    public void Enable_Is_Never_Cleared_Before_Run()
     {
-        public required FakeTransport Transport { get; init; }
-        public required FakeTime Time { get; init; }
-        public required ProcessIoSession Session { get; init; }
-        public required PumpCommandOwnership Ownership { get; init; }
-        public required ProcessIoPumpLifecycle Lifecycle { get; init; }
-        public required PumpLifecycleConfiguration Configuration { get; init; }
+        // The superseded order cleared Enable first. It must not be reachable at all.
+        Assert.Equal(new[] { PumpCommandContract.RunPumpTag, PumpCommandContract.EnableInverterTag },
+            PumpCommandContract.StopOrder);
+        Assert.Equal(new[] { PumpCommandContract.EnableInverterTag, PumpCommandContract.RunPumpTag },
+            PumpCommandContract.StartOrder);
+
+        foreach (PumpStopReason reason in Enum.GetValues<PumpStopReason>())
+        {
+            Rig rig = Ready();
+            rig.Transport.DiscreteInputs[InputRunning] = false;
+            rig.Lifecycle.Stop(reason);
+            DriveToTerminal(rig);
+
+            int runIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilRun && !w.Value);
+            int enableIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilEnable && !w.Value);
+
+            Assert.True(runIndex >= 0 && enableIndex >= 0, "Both de-energisations must run for " + reason);
+            Assert.True(runIndex < enableIndex, "The order must hold for " + reason);
+        }
     }
+
+    [Fact(DisplayName = "30. A ramp fault still attempts both de-energisations")]
+    public void A_Ramp_Fault_Still_Attempts_Both_De_Energisations()
+    {
+        Rig rig = Ready();
+
+        // The analog write now fails. The two digital de-energisations must still happen, in order.
+        rig.Transport.ThrowOnAnalogWrite = true;
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+
+        rig.Lifecycle.Stop(PumpStopReason.CANCELLATION);
+        DriveToTerminal(rig);
+
+        Assert.Contains(PumpLifecycleState.RAMP_DOWN_FAILED.ToString(), rig.Lifecycle.CleanupFaultCodes);
+
+        int runIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilRun && !w.Value);
+        int enableIndex = rig.Transport.CoilWrites.FindIndex(w => w.Address == CoilEnable && !w.Value);
+
+        Assert.True(runIndex >= 0, "A ramp fault must not skip Run Pump FALSE.");
+        Assert.True(enableIndex >= 0, "A ramp fault must not skip Enable Inverter FALSE.");
+        Assert.True(runIndex < enableIndex);
+        Assert.False(rig.Lifecycle.SafeToReportComplete);
+    }
+
+    [Fact(DisplayName = "31. The Pump Stop ramp reaches the configured safe zero")]
+    public void The_Pump_Stop_Ramp_Reaches_The_Safe_Zero()
+    {
+        Rig rig = Ready();
+
+        // The upward ramp raised the reference. The downward ramp must retract it to the sentinel.
+        Assert.True(rig.Lifecycle.SpeedCommandMilliamps > 0.0);
+
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        DriveToTerminal(rig);
+
+        Assert.Equal(PumpLifecycleState.STOPPED, rig.Lifecycle.State);
+        Assert.True(rig.Lifecycle.SpeedCommand.IsSafeStopSentinel);
+        Assert.Equal(0.0, rig.Lifecycle.SpeedCommandMilliamps);
+        Assert.Equal((ushort)0, rig.Transport.RegisterWrites[^1].Value);
+
+        // Every analog word written in the whole cycle is a valid Pump command.
+        Assert.All(rig.Transport.RegisterWrites, write => Assert.True(write.Value <= ProcessIoRepresentation.RawFullScale));
+    }
+
+    [Fact(DisplayName = "32. Ownership is not released before a confirmed Stop")]
+    public void Ownership_Is_Not_Released_Before_A_Confirmed_Stop()
+    {
+        Rig rig = Ready();
+        Assert.True(rig.Ownership.IsHeld);
+
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+
+        Assert.Null(rig.Lifecycle.Result);
+        Assert.True(rig.Ownership.IsHeld, "Ownership must be held while the Stop is unconfirmed.");
+
+        // Drive to a terminal without ever confirming the stopped state.
+        DriveToTerminal(rig);
+
+        Assert.Equal(PumpLifecycleState.PHYSICAL_ABORT_REQUIRED, rig.Lifecycle.State);
+        Assert.False(rig.Lifecycle.Result!.StoppedConfirmed);
+        Assert.True(rig.Ownership.IsHeld, "An unknown stopped state must never release the channel.");
+        Assert.False(rig.Lifecycle.SafeToReportComplete);
+    }
+
+    // ---------------------------------------------------------------- 33 to 36. cleanup reporting
+
+    [Fact(DisplayName = "33. An unknown stopped state requires a physical abort")]
+    public void An_Unknown_Stopped_State_Requires_A_Physical_Abort()
+    {
+        Rig rig = Ready();
+
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        DriveToTerminal(rig);
+
+        PumpLifecycleResult result = rig.Lifecycle.Result!;
+        Assert.Equal(PumpLifecycleState.PHYSICAL_ABORT_REQUIRED, result.TerminalState);
+        Assert.Equal(PumpCleanupStates.PhysicalAbortRequired, result.CleanupState);
+        Assert.False(result.StoppedConfirmed);
+        Assert.Contains(PumpLifecycleState.STOPPED_FEEDBACK_TIMEOUT.ToString(), result.CleanupFaultCodes);
+    }
+
+    [Fact(DisplayName = "34. The primary fault remains separate from the cleanup faults")]
+    public void The_Primary_Fault_Remains_Separate_From_The_Cleanup_Faults()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        StarToReady(rig);
+
+        // The inverter fault appears while the Pump is ready, and the stopped state stays unknown.
+        rig.Transport.DiscreteInputs[InputFault] = true;
+        rig.Time.Advance(Interval);
+        rig.Lifecycle.Step();
+
+        DriveToTerminal(rig);
+
+        PumpLifecycleResult result = rig.Lifecycle.Result!;
+        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, result.PrimaryFailure);
+        Assert.Equal(PumpLifecycleState.PHYSICAL_ABORT_REQUIRED, result.TerminalState);
+        Assert.Contains(PumpLifecycleState.STOPPED_FEEDBACK_TIMEOUT.ToString(), result.CleanupFaultCodes);
+        Assert.False(rig.Lifecycle.SafeToReportComplete);
+    }
+
+    [Fact(DisplayName = "35. A confirmed, complete, normal Stop is the only safe completion")]
+    public void Only_A_Confirmed_Complete_Normal_Stop_Is_A_Safe_Completion()
+    {
+        Rig normal = Ready();
+        normal.Transport.DiscreteInputs[InputRunning] = false;
+        normal.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        DriveToTerminal(normal);
+
+        Assert.True(normal.Lifecycle.SafeToReportComplete);
+        Assert.Equal(PumpCleanupStates.Complete, normal.Lifecycle.Result!.CleanupState);
+        Assert.False(normal.Ownership.IsHeld);
+
+        // A cleanup that completed with a fault is not a safe completion.
+        Rig faulted = Ready();
+        faulted.Transport.ThrowOnAnalogWrite = true;
+        faulted.Transport.DiscreteInputs[InputRunning] = false;
+        faulted.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        DriveToTerminal(faulted);
+
+        Assert.False(faulted.Lifecycle.SafeToReportComplete);
+    }
+
+    [Fact(DisplayName = "36. A terminal lifecycle refuses to start again and never retries")]
+    public void A_Terminal_Lifecycle_Refuses_To_Start_Again()
+    {
+        Rig rig = Ready();
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        DriveToTerminal(rig);
+
+        Assert.Equal(PumpLifecycleState.STOPPED, rig.Lifecycle.State);
+
+        int writes = rig.Transport.CoilWrites.Count + rig.Transport.RegisterWrites.Count;
+        PumpLifecycleStartOutcome again = rig.Lifecycle.Start(Request());
+
+        Assert.False(again.Started);
+        Assert.Equal(PumpCommandRefusals.RefusedTerminal, again.Code);
+        Assert.Equal(writes, rig.Transport.CoilWrites.Count + rig.Transport.RegisterWrites.Count);
+        Assert.DoesNotContain(rig.Transport.CoilWrites.Skip(writes), write => write.Value);
+    }
+
+    // ---------------------------------------------------------------- 37 to 40. the Cleaning Path
+
+    [Fact(DisplayName = "37. An IV OPEN is refused before confirmed Pump readiness")]
+    public void An_Iv_Open_Is_Refused_Before_Pump_Ready()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        var inner = new RecordingEquipmentBoundary();
+        var gate = new CleaningPathPumpLifecycleGate(inner, rig.Lifecycle);
+
+        gate.RequestValve(OpenRequest());
+
+        Assert.Empty(inner.Requested);
+        Assert.Single(gate.RefusedRequests);
+        Assert.Contains(CleaningPathPumpLifecycleGate.RefusedValveOpenPumpNotReady, gate.RefusedRequests[0]);
+
+        // And the Pump-ready evidence is withheld, so the composition gate cannot be satisfied either.
+        Assert.Null(gate.ReadPumpOutletPressure());
+    }
+
+    [Fact(DisplayName = "38. An IV OPEN is delegated after confirmed Pump readiness")]
+    public void An_Iv_Open_Is_Delegated_After_Pump_Ready()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        StarToReady(rig);
+
+        var inner = new RecordingEquipmentBoundary();
+        var gate = new CleaningPathPumpLifecycleGate(inner, rig.Lifecycle);
+
+        gate.RequestValve(OpenRequest());
+
+        Assert.Single(inner.Requested);
+        Assert.Empty(gate.RefusedRequests);
+    }
+
+    [Fact(DisplayName = "39. An IV CLOSE is delegated in every Pump state, including cleanup")]
+    public void An_Iv_Close_Is_Delegated_In_Every_Pump_State()
+    {
+        var inner = new RecordingEquipmentBoundary();
+
+        // A lifecycle that never started: the gate still delegates every close.
+        Rig idle = Create(ConfigurationFor(Commissioned()));
+        var idleGate = new CleaningPathPumpLifecycleGate(inner, idle.Lifecycle);
+        idleGate.RequestValve(CloseRequest());
+
+        // A faulted lifecycle: still delegated.
+        Rig failed = Create(ConfigurationFor(Commissioned()));
+        failed.Lifecycle.Start(Request());
+        DriveToTerminal(failed);
+        Assert.True(PumpLifecycleStates.IsFailure(failed.Lifecycle.State));
+
+        var failedGate = new CleaningPathPumpLifecycleGate(inner, failed.Lifecycle);
+        failedGate.RequestValve(CloseRequest());
+
+        Assert.Equal(2, inner.Requested.Count);
+        Assert.All(inner.Requested, request => Assert.Equal(CleaningPathValveCommandKind.Close, request.Kind));
+    }
+
+    [Fact(DisplayName = "40. The gate never widens the equipment boundary contract")]
+    public void The_Gate_Never_Widens_The_Equipment_Boundary_Contract()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        var gate = new CleaningPathPumpLifecycleGate(new RecordingEquipmentBoundary(), rig.Lifecycle);
+
+        // The gate is the equipment boundary, so the coordinator cannot reach a Pump command through it.
+        Assert.IsAssignableFrom<ICleaningPathEquipmentBoundary>(gate);
+        Assert.Same(rig.Lifecycle, gate.Pump);
+
+        // No member of the contract accepts a Pump COMMAND: the only Pump member is the pressure read.
+        Assert.DoesNotContain(
+            typeof(ICleaningPathEquipmentBoundary).GetMethods(),
+            method => method.GetParameters().Any(parameter =>
+                parameter.ParameterType.Name.Contains("Pump", StringComparison.Ordinal)
+                && parameter.ParameterType.Name.Contains("Command", StringComparison.Ordinal)));
+    }
+
+    // ---------------------------------------------------------------- helpers
 
     private static PumpFeedbackConfiguration Commissioned() => new()
     {
@@ -243,39 +826,130 @@ public sealed class ProcessIoPumpLifecycleTests
         FaultPolarity = PumpFeedbackPolarity.ACTIVE_HIGH,
     };
 
-    private static PumpLifecycleConfiguration ConfigurationFor(PumpFeedbackConfiguration feedback, double target = 4.0) => new()
+    private static PumpLifecycleConfiguration ConfigurationFor(
+        PumpFeedbackConfiguration feedback,
+        double target = TargetMilliamps) => new()
+        {
+            PumpReadySetpointBar = PumpLifecycleConfiguration.OwnerInitialPumpReadySetpointBar,
+            PressureFreshnessBudget = Freshness,
+            RunningFeedbackTimeout = TimeSpan.FromSeconds(1),
+            PumpReadyTimeout = TimeSpan.FromSeconds(1),
+            StoppedFeedbackTimeout = TimeSpan.FromSeconds(1),
+            Ramp = new PumpSpeedRampConfiguration
+            {
+                Interval = Interval,
+                Step = 2.0,
+                TargetEngineeringMilliamps = target,
+            },
+            Feedback = feedback,
+        };
+
+    private static PumpLifecycleStartRequest Request() => new()
     {
-        PumpReadySetpointBar = PumpLifecycleConfiguration.OwnerInitialPumpReadySetpointBar,
-        PressureFreshnessBudget = Freshness,
-        RunningFeedbackTimeout = Supervision,
-        PumpReadyTimeout = Supervision,
-        StoppedFeedbackTimeout = Supervision,
-        Ramp = PumpSpeedRampConfiguration.OwnerInitial(target) with { Interval = Interval },
-        Feedback = feedback,
+        Owner = PumpCommandOwnerKind.INTEGRATED_DRY_CYCLE,
+        OwnerId = "cleaning-path-dry",
+        Selection = 1,
     };
 
-    private static Dictionary<string, ProcessIoCatalogueRow> Catalogue()
+    private static CleaningPathValveCommandRequest OpenRequest() => new()
+    {
+        ValveId = "IV1",
+        Kind = CleaningPathValveCommandKind.Open,
+    };
+
+    private static CleaningPathValveCommandRequest CloseRequest() => new()
+    {
+        ValveId = "IV1",
+        Kind = CleaningPathValveCommandKind.Close,
+    };
+
+    private static bool GetCoil(Rig rig, int address, bool defaultValue) =>
+        rig.Transport.Coils.TryGetValue(address, out bool value) ? value : defaultValue;
+
+    private sealed class Rig
+    {
+        public required FakeTransport Transport { get; init; }
+        public required FakeTime Time { get; init; }
+        public required ProcessIoPumpLifecycle Lifecycle { get; init; }
+        public required PumpCommandOwnership Ownership { get; init; }
+    }
+
+    private static Rig Create(PumpLifecycleConfiguration configuration)
+    {
+        var time = new FakeTime();
+        var transport = new FakeTransport { Clock = time };
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(time.GetUtcNow());
+
+        var boundary = new ProcessIoPumpCommandBoundary(
+            session, BuildCatalogue(), Authorize(), configuration.Feedback, time, Freshness);
+        var ownership = new PumpCommandOwnership();
+
+        return new Rig
+        {
+            Transport = transport,
+            Time = time,
+            Ownership = ownership,
+            Lifecycle = new ProcessIoPumpLifecycle(boundary, configuration, ownership, time),
+        };
+    }
+
+    private static Rig Ready()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        StarToReady(rig);
+        return rig;
+    }
+
+    private static void StarToReady(Rig rig)
+    {
+        Assert.True(rig.Lifecycle.Start(Request()).Started);
+        Drive(rig, 64, PumpLifecycleState.PUMP_READY);
+        Assert.Equal(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
+    }
+
+    private static void StartAndDrive(Rig rig)
+    {
+        Assert.True(rig.Lifecycle.Start(Request()).Started);
+        DriveToTerminal(rig);
+    }
+
+    private static void DriveToTerminal(Rig rig) => Drive(rig, 128, null);
+
+    private static void Drive(Rig rig, int steps, PumpLifecycleState? stopAt)
+    {
+        for (int step = 0; step < steps; step += 1)
+        {
+            if (rig.Lifecycle.Result is not null) return;
+            if (stopAt is { } target && rig.Lifecycle.State == target) return;
+
+            rig.Time.Advance(Interval);
+            rig.Lifecycle.Step();
+        }
+    }
+
+    /// <summary>Builds the adopted catalogue from the real binding table, as the composition root does.</summary>
+    private static Dictionary<string, ProcessIoCatalogueRow> BuildCatalogue()
     {
         string[] tags =
         [
-            PumpCommandContract.SelectPumpOneTag, PumpCommandContract.SelectPumpTwoTag,
-            PumpCommandContract.EnableInverterTag, PumpCommandContract.RunPumpTag,
+            PumpCommandContract.SelectPumpOneTag,
+            PumpCommandContract.SelectPumpTwoTag,
+            PumpCommandContract.EnableInverterTag,
+            PumpCommandContract.RunPumpTag,
             PumpCommandContract.SpeedReferenceTag,
-            PumpCommandContract.RunningFeedbackTag, PumpCommandContract.FaultFeedbackTag,
-            PumpCommandContract.PumpOutletPressureTag, PumpCommandContract.PumpInletPressureTag,
+            PumpCommandContract.RunningFeedbackTag,
+            PumpCommandContract.FaultFeedbackTag,
+            PumpCommandContract.PumpOutletPressureTag,
+            PumpCommandContract.PumpInletPressureTag,
         ];
 
         var rows = new Dictionary<string, ProcessIoCatalogueRow>(StringComparer.Ordinal);
         foreach (string tag in tags)
         {
             Assert.True(ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding));
-            string ioClass = binding.Area switch
-            {
-                ProcessIoArea.Coil => "DO",
-                ProcessIoArea.DiscreteInput => "DI",
-                ProcessIoArea.InputRegister => "AI",
-                _ => "AO",
-            };
             rows[tag] = new ProcessIoCatalogueRow
             {
                 SourceRowOrdinal = 1,
@@ -292,7 +966,12 @@ public sealed class ProcessIoPumpLifecycleTests
                 Location = string.Empty,
                 Note = string.Empty,
                 SourceStatus = "USED",
-                IoClass = ioClass,
+                IoClass = binding.Area switch
+                {
+                    ProcessIoArea.Coil => "DO",
+                    ProcessIoArea.DiscreteInput => "DI",
+                    _ => "AI",
+                },
                 SourceClassification = "USED",
                 ProvenanceArtifact = "test",
                 ProvenanceSha256 = "test",
@@ -311,7 +990,7 @@ public sealed class ProcessIoPumpLifecycleTests
         Assert.True(ProcessIoDryCommandGate.TryAuthorize(
             DeviceProfile.TEST_HARDWARE_DRY,
             dryCommandMode: true,
-            ownerLocalEndpoint: "pump-only.invalid:502",
+            ownerLocalEndpoint: "dry-run.invalid:502",
             suppliedConsent: ProcessIoConsentPhrases.PhysicalDoSingle,
             out ProcessIoWriteAuthorization? authorization,
             out string code));
@@ -319,725 +998,14 @@ public sealed class ProcessIoPumpLifecycleTests
         return authorization!;
     }
 
-    /// <summary>
-    /// Builds a granted lifecycle. The ownership instance the lifecycle uses is the one exposed, so a
-    /// test can assert on the real channel rather than on a copy.
-    /// </summary>
-    private static Rig CreateWired(PumpFeedbackConfiguration configuration, double target = 4.0)
+    private sealed class RecordingEquipmentBoundary : ICleaningPathEquipmentBoundary
     {
-        PumpLifecycleConfiguration lifecycleConfiguration = ConfigurationFor(configuration, target);
+        public List<CleaningPathValveCommandRequest> Requested { get; } = new();
 
-        var transport = new FakeTransport();
-        var time = new FakeTime();
-        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
-        session.Open(time.GetUtcNow());
+        public void RequestValve(CleaningPathValveCommandRequest request) => Requested.Add(request);
 
-        var boundary = new ProcessIoPumpCommandBoundary(
-            session,
-            Catalogue(),
-            Authorize(),
-            configuration,
-            time,
-            lifecycleConfiguration.PressureFreshnessBudget);
-
-        var ownership = new PumpCommandOwnership();
-        return new Rig
-        {
-            Transport = transport,
-            Time = time,
-            Session = session,
-            Ownership = ownership,
-            Lifecycle = new ProcessIoPumpLifecycle(boundary, lifecycleConfiguration, ownership, time),
-            Configuration = lifecycleConfiguration,
-        };
-    }
-
-    private static void Drive(Rig rig, int maxSteps = 400, PumpLifecycleState? stopAt = null)
-    {
-        for (int step = 0; step < maxSteps; step += 1)
-        {
-            if (rig.Lifecycle.Result is not null) return;
-            if (stopAt is { } target && rig.Lifecycle.State == target) return;
-            rig.Time.Advance(Interval);
-            rig.Lifecycle.Step();
-        }
-    }
-
-    /// <summary>Starts, seeds a running Pump and drives to confirmed readiness.</summary>
-    private static Rig CreateReady()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-
-        Assert.True(Start(rig).Started);
-        Drive(rig, stopAt: PumpLifecycleState.PUMP_READY);
-        Assert.Equal(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
-        return rig;
-    }
-
-    private static PumpLifecycleStartRequest Request(
-        PumpCommandOwnerKind owner = PumpCommandOwnerKind.CLEANING_JOB,
-        int selection = 1) => new()
-        {
-            Owner = owner,
-            OwnerId = Owner,
-            Selection = selection,
-        };
-
-    private static PumpLifecycleStartOutcome Start(Rig rig, int selection = 1) =>
-        rig.Lifecycle.Start(Request(selection: selection));
-
-    private static List<int> ClearedCoils(Rig rig) =>
-        rig.Transport.CoilWrites.Where(write => !write.Value).Select(write => write.Address).ToList();
-
-    // ---------------------------------------------------------------- 1. feedback configuration
-
-    [Fact]
-    public void Feedback_Polarity_Defaults_To_Not_Configured()
-    {
-        PumpFeedbackConfiguration configuration = PumpFeedbackConfiguration.Uncommissioned;
-
-        Assert.Equal(PumpFeedbackPolarity.NOT_CONFIGURED, configuration.RunningPolarity);
-        Assert.Equal(PumpFeedbackPolarity.NOT_CONFIGURED, configuration.FaultPolarity);
-        Assert.False(configuration.RunningCommissioned);
-        Assert.False(configuration.FaultCommissioned);
-        Assert.False(configuration.IsCommissioned);
-        Assert.Equal(PumpFeedbackConfiguration.NotCommissionedCode, configuration.CommissioningCode);
-    }
-
-    [Fact]
-    public void A_Half_Commissioned_Pair_Is_Still_Not_Commissioned()
-    {
-        var half = new PumpFeedbackConfiguration { RunningPolarity = PumpFeedbackPolarity.ACTIVE_HIGH };
-
-        Assert.True(half.RunningCommissioned);
-        Assert.False(half.FaultCommissioned);
-        Assert.False(half.IsCommissioned);
-        Assert.Equal(PumpFeedbackConfiguration.NotCommissionedCode, half.CommissioningCode);
-    }
-
-    // ---------------------------------------------------------------- 2. commissioning gate
-
-    [Fact]
-    public void A_Physical_Pump_Command_Refuses_Before_Polarity_Commissioning_And_Writes_Nothing()
-    {
-        Rig rig = CreateWired(PumpFeedbackConfiguration.Uncommissioned);
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-
-        PumpLifecycleStartOutcome start = Start(rig);
-
-        Assert.False(start.Started);
-        Assert.Equal(PumpCommandRefusals.RefusedPolarityNotCommissioned, start.Code);
-        Assert.Equal(PumpLifecycleState.IDLE, rig.Lifecycle.State);
-        Assert.Empty(rig.Transport.CoilWrites);
-        Assert.Empty(rig.Transport.RegisterWrites);
-        Assert.False(rig.Ownership.IsHeld);
-    }
-
-    // ---------------------------------------------------------------- 3 to 5. selection
-
-    [Fact]
-    public void Pump_One_Selection_Writes_Do001_True_Then_Do002_False()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-
-        Start(rig, selection: 1);
-
-        Assert.Equal(2, rig.Transport.CoilWrites.Count);
-        Assert.Equal((CoilSelect1, true), (rig.Transport.CoilWrites[0].Address, rig.Transport.CoilWrites[0].Value));
-        Assert.Equal((CoilSelect2, false), (rig.Transport.CoilWrites[1].Address, rig.Transport.CoilWrites[1].Value));
-        Assert.Equal(PumpLifecycleState.WAITING_FOR_RUNNING, rig.Lifecycle.State);
-    }
-
-    [Fact]
-    public void Pump_Two_Selection_Writes_Do002_True_Then_Do001_False()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-
-        Start(rig, selection: 2);
-
-        Assert.Equal(2, rig.Transport.CoilWrites.Count);
-        Assert.Equal((CoilSelect2, true), (rig.Transport.CoilWrites[0].Address, rig.Transport.CoilWrites[0].Value));
-        Assert.Equal((CoilSelect1, false), (rig.Transport.CoilWrites[1].Address, rig.Transport.CoilWrites[1].Value));
-    }
-
-    [Fact]
-    public void Selection_Is_Mutually_Exclusive_And_Refuses_Every_Other_Ordinal()
-    {
-        IReadOnlyList<PumpCommandStep> one = PumpCommandContract.SelectionSequence(1);
-        IReadOnlyList<PumpCommandStep> two = PumpCommandContract.SelectionSequence(2);
-
-        Assert.NotEqual(one[0].Tag, two[0].Tag);
-        Assert.Contains(one, step => step.Tag == PumpCommandContract.SelectPumpOneTag && step.Value);
-        Assert.Contains(one, step => step.Tag == PumpCommandContract.SelectPumpTwoTag && !step.Value);
-        Assert.Contains(two, step => step.Tag == PumpCommandContract.SelectPumpTwoTag && step.Value);
-        Assert.Contains(two, step => step.Tag == PumpCommandContract.SelectPumpOneTag && !step.Value);
-
-        foreach (int invalid in new[] { 0, 3, 8, -1 })
-        {
-            Assert.False(PumpCommandContract.IsValidSelection(invalid));
-            Assert.Empty(PumpCommandContract.SelectionSequence(invalid));
-
-            Rig rig = CreateWired(Commissioned());
-            PumpLifecycleStartOutcome outcome = Start(rig, selection: invalid);
-
-            Assert.False(outcome.Started);
-            Assert.Equal(PumpCommandRefusals.RefusedInvalidSelection, outcome.Code);
-            Assert.Empty(rig.Transport.CoilWrites);
-        }
-    }
-
-    // ---------------------------------------------------------------- 6 to 8. start order and semantics
-
-    [Fact]
-    public void Start_Writes_Do003_True_Then_Do007_True()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-
-        Start(rig);
-
-        Assert.Equal(4, rig.Transport.CoilWrites.Count);
-        Assert.Equal((CoilEnable, true), (rig.Transport.CoilWrites[2].Address, rig.Transport.CoilWrites[2].Value));
-        Assert.Equal((CoilRun, true), (rig.Transport.CoilWrites[3].Address, rig.Transport.CoilWrites[3].Value));
-    }
-
-    [Fact]
-    public void Start_Commands_Are_Maintained_And_No_Timer_Clears_Them()
-    {
-        // Neither output is a pulse: there is no duration, no release write and no scheduled clear.
-        Assert.Equal("MAINTAINED_ACTIVE_HIGH", PumpCommandContract.CommandSemantics);
-        Assert.Equal("NO_PULSE_DURATION_APPLIES", PumpCommandContract.PulseSemantics);
-        Assert.Equal("FC05", ProcessIoFunctionCodes.DoCommand);
-
-        Rig rig = CreateReady();
-
-        // A long, healthy run must not de-energise either output on a timer.
-        for (int step = 0; step < 30; step += 1)
-        {
-            rig.Time.Advance(Interval);
-            rig.Lifecycle.Step();
-        }
-
-        Assert.Equal(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
-        Assert.DoesNotContain(rig.Transport.CoilWrites, write => write.Address == CoilRun && !write.Value);
-        Assert.DoesNotContain(rig.Transport.CoilWrites, write => write.Address == CoilEnable && !write.Value);
-        Assert.Single(rig.Transport.CoilWrites, write => write.Address == CoilRun && write.Value);
-        Assert.Single(rig.Transport.CoilWrites, write => write.Address == CoilEnable && write.Value);
-    }
-
-    // ---------------------------------------------------------------- 9. fault admission
-
-    [Fact]
-    public void An_Active_Configured_Fault_Refuses_Start()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputFault] = true;
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-
-        PumpLifecycleStartOutcome start = Start(rig);
-
-        Assert.False(start.Started);
-        Assert.Equal(PumpCommandRefusals.RefusedFaultActive, start.Code);
-        Assert.Empty(rig.Transport.CoilWrites);
-        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, rig.Lifecycle.State);
-        Assert.False(rig.Ownership.IsHeld);
-        Assert.False(rig.Lifecycle.SafeToReportComplete);
-    }
-
-    // ---------------------------------------------------------------- 10 and 11. running feedback
-
-    [Fact]
-    public void Running_Feedback_Uses_Di004_Only()
-    {
-        Assert.Equal("DI-004", PumpCommandContract.RunningFeedbackTag);
-        Assert.True(PumpCommandContract.TryDiscreteInputAddress(PumpCommandContract.RunningFeedbackTag, out int address));
-        Assert.Equal(InputRunning, address);
-
-        // Only DI-004 is seeded false, so the Pump never reports running whatever else is high.
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-
-        Start(rig);
-        for (int step = 0; step < 5; step += 1)
-        {
-            rig.Time.Advance(Interval);
-            rig.Lifecycle.Step();
-        }
-
-        Assert.Equal(PumpLifecycleState.WAITING_FOR_RUNNING, rig.Lifecycle.State);
-    }
-
-    [Fact]
-    public void A_Stale_Or_Wrong_Generation_Running_Feedback_Is_Never_Accepted_As_Running()
-    {
-        var observation = new ProcessIoPhysicalObservation
-        {
-            Tag = PumpCommandContract.RunningFeedbackTag,
-            RawValue = 1,
-            EngineeringValue = null,
-            Unit = null,
-            Quality = ProcessIoObservationQuality.STALE,
-            ObservedAt = DateTimeOffset.UnixEpoch,
-            ReceivedAt = DateTimeOffset.UnixEpoch,
-            SourceGeneration = 1,
-            Fresh = false,
-            Provenance = ProcessIoObservationProvenance.PHYSICAL_READ,
-            DiagnosticCode = ProcessIoRefusals.ObservationStale,
-        };
-
-        DateTimeOffset now = DateTimeOffset.UnixEpoch.AddMinutes(10);
-        Assert.False(ProcessIoEvidenceAcceptance.Accepts(observation, 1, now, Freshness));
-
-        // A current value from a superseded generation is refused too.
-        var superseded = observation with
-        {
-            Quality = ProcessIoObservationQuality.GOOD,
-            Fresh = true,
-            ObservedAt = now,
-            ReceivedAt = now,
-            SourceGeneration = 2,
-        };
-        Assert.False(ProcessIoEvidenceAcceptance.Accepts(superseded, 1, now, Freshness));
-
-        // A simulated read is never physical evidence, however current it looks.
-        Assert.False(ProcessIoEvidenceAcceptance.Accepts(
-            superseded with { Provenance = ProcessIoObservationProvenance.SIMULATED_READ }, 2, now, Freshness));
-
-        // The same record from the live generation, inside the budget, is accepted.
-        Assert.True(ProcessIoEvidenceAcceptance.Accepts(superseded, 2, now, Freshness));
-    }
-
-    // ---------------------------------------------------------------- 12 and 13. source identity
-
-    [Fact]
-    public void The_Pump_Outlet_Source_Is_Ai003_And_The_Inlet_Is_Diagnostic_Only()
-    {
-        Assert.Equal("AI-003+", PumpCommandContract.PumpOutletPressureTag);
-        Assert.Equal("AI-002+", PumpCommandContract.PumpInletPressureTag);
-
-        Assert.True(ProcessIoBindings.TryGet(PumpCommandContract.PumpOutletPressureTag, out ProcessIoPhysicalBinding outlet));
-        Assert.Equal(ProcessIoArea.InputRegister, outlet.Area);
-        Assert.Equal(RegisterPumpOutlet, outlet.Address);
-
-        Assert.True(ProcessIoBindings.TryGet(PumpCommandContract.PumpInletPressureTag, out ProcessIoPhysicalBinding inlet));
-        Assert.Equal(ProcessIoArea.InputRegister, inlet.Area);
-        Assert.Equal(RegisterPumpInlet, inlet.Address);
-    }
-
-    [Fact]
-    public void Ai002_Cannot_Satisfy_Pump_Ready_And_Is_Never_Read()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpInlet] = ushort.MaxValue;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustBelow15Bar;
-
-        Start(rig);
-        Drive(rig);
-
-        // A saturated inlet value changes nothing: the row is never read for readiness.
-        Assert.DoesNotContain(RegisterPumpInlet, rig.Transport.RegisterReads);
-        Assert.NotEqual(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
-        Assert.Equal(PumpLifecycleState.AI003_TIMEOUT, rig.Lifecycle.PrimaryFailure);
-        Assert.Equal(PumpLifecycleState.AI003_TIMEOUT, rig.Lifecycle.Result!.PrimaryFailure);
-    }
-
-    // ---------------------------------------------------------------- 14 to 17. the strict rule
-
-    [Fact]
-    public void A_Bad_Or_Stale_Ai003_Refuses_Ready()
-    {
-        var time = new FakeTime();
-        var boundary = new PressureOnlyBoundary(time, Commissioned());
-        var lifecycle = new ProcessIoPumpLifecycle(
-            boundary, ConfigurationFor(Commissioned()), new PumpCommandOwnership(), time);
-
-        Assert.True(lifecycle.Start(Request()).Started);
-        boundary.OutletBar = 18.0;
-
-        for (int step = 0; step < 20 && lifecycle.State != PumpLifecycleState.WAITING_FOR_AI003_READY; step += 1)
-        {
-            time.Advance(Interval);
-            lifecycle.Step();
-        }
-
-        Assert.Equal(PumpLifecycleState.WAITING_FOR_AI003_READY, lifecycle.State);
-
-        boundary.OutletQuality = PressureQuality.STALE;
-        time.Advance(Interval);
-        lifecycle.Step();
-
-        Assert.Equal(PumpLifecycleState.AI003_STALE, lifecycle.PrimaryFailure);
-        Assert.Equal(PumpLifecycleState.RAMPING_DOWN, lifecycle.State);
-        Assert.NotEqual(PumpLifecycleState.PUMP_READY, lifecycle.State);
-    }
-
-    [Fact]
-    public void A_Bad_Ai003_Refuses_Ready()
-    {
-        var time = new FakeTime();
-        var boundary = new PressureOnlyBoundary(time, Commissioned());
-        var lifecycle = new ProcessIoPumpLifecycle(
-            boundary, ConfigurationFor(Commissioned()), new PumpCommandOwnership(), time);
-
-        Assert.True(lifecycle.Start(Request()).Started);
-        boundary.OutletBar = 18.0;
-
-        for (int step = 0; step < 20 && lifecycle.State != PumpLifecycleState.WAITING_FOR_AI003_READY; step += 1)
-        {
-            time.Advance(Interval);
-            lifecycle.Step();
-        }
-
-        boundary.OutletQuality = PressureQuality.BAD;
-        time.Advance(Interval);
-        lifecycle.Step();
-
-        Assert.Equal(PumpLifecycleState.AI003_INVALID, lifecycle.PrimaryFailure);
-        Assert.NotEqual(PumpLifecycleState.PUMP_READY, lifecycle.State);
-    }
-
-    [Fact]
-    public void Ai003_Equal_To_The_Setpoint_Is_Not_Ready()
-    {
-        // Proves the comparison is STRICT: exactly at the setpoint is refused, and so is anything below.
-        var thresholds = new SequencingPressureThresholds(PumpReadySetpointBar: 15.0);
-        DateTimeOffset at = DateTimeOffset.UnixEpoch;
-
-        Assert.False(SequencingPressure.PumpReady(
-            new PressureSample(15.0, PressureQuality.GOOD, false, at, PressureSample.PumpOutletSource), thresholds));
-        Assert.False(SequencingPressure.PumpReady(
-            new PressureSample(14.999, PressureQuality.GOOD, false, at, PressureSample.PumpOutletSource), thresholds));
-        Assert.True(SequencingPressure.PumpReady(
-            new PressureSample(15.001, PressureQuality.GOOD, false, at, PressureSample.PumpOutletSource), thresholds));
-
-        // And through the lifecycle, at exactly the setpoint.
-        var time = new FakeTime();
-        var boundary = new PressureOnlyBoundary(time, Commissioned());
-        var lifecycle = new ProcessIoPumpLifecycle(
-            boundary, ConfigurationFor(Commissioned()), new PumpCommandOwnership(), time);
-
-        Assert.True(lifecycle.Start(Request()).Started);
-        boundary.OutletBar = 15.0;
-
-        for (int step = 0; step < 20 && lifecycle.State != PumpLifecycleState.WAITING_FOR_AI003_READY; step += 1)
-        {
-            time.Advance(Interval);
-            lifecycle.Step();
-        }
-
-        Assert.Equal(PumpLifecycleState.WAITING_FOR_AI003_READY, lifecycle.State);
-        time.Advance(Interval);
-        lifecycle.Step();
-        Assert.NotEqual(PumpLifecycleState.PUMP_READY, lifecycle.State);
-    }
-
-    [Fact]
-    public void Ai003_Below_The_Setpoint_Is_Not_Ready_And_Above_It_Is()
-    {
-        Rig below = CreateWired(Commissioned());
-        below.Transport.DiscreteInputs[InputRunning] = true;
-        below.Transport.InputRegisters[RegisterPumpOutlet] = RawJustBelow15Bar;
-        Start(below);
-
-        for (int step = 0; step < 80 && below.Lifecycle.State != PumpLifecycleState.WAITING_FOR_AI003_READY; step += 1)
-        {
-            below.Time.Advance(Interval);
-            below.Lifecycle.Step();
-        }
-
-        Assert.Equal(PumpLifecycleState.WAITING_FOR_AI003_READY, below.Lifecycle.State);
-        below.Time.Advance(Interval);
-        below.Lifecycle.Step();
-        Assert.NotEqual(PumpLifecycleState.PUMP_READY, below.Lifecycle.State);
-
-        Rig above = CreateWired(Commissioned());
-        above.Transport.DiscreteInputs[InputRunning] = true;
-        above.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-        Start(above);
-        Drive(above, stopAt: PumpLifecycleState.PUMP_READY);
-
-        Assert.Equal(PumpLifecycleState.PUMP_READY, above.Lifecycle.State);
-    }
-
-    // ---------------------------------------------------------------- 18 to 22. the analog command
-
-    [Fact]
-    public void The_Committed_Analog_Conversion_Is_Preserved()
-    {
-        // The existing boundary is authoritative: engineering milliamps 0..20 map linearly to raw
-        // 0..32767. This pins the anchors through that existing conversion rather than adding a second
-        // map, and records the 4 mA live-signal anchor explicitly.
-        Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(0.0, out int zero));
-        Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(20.0, out int full));
-        Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(4.0, out int live));
-
-        Assert.Equal(0, zero);
-        Assert.Equal(ProcessIoRepresentation.RawFullScale, full);
-        Assert.Equal(6553, live);
-
-        Assert.False(ProcessIoEngineering.TryPumpSpeedRaw(-0.001, out _));
-        Assert.False(ProcessIoEngineering.TryPumpSpeedRaw(20.001, out _));
-        Assert.False(ProcessIoEngineering.TryPumpSpeedRaw(double.NaN, out _));
-        Assert.False(ProcessIoEngineering.TryPumpSpeedRaw(double.PositiveInfinity, out _));
-
-        Assert.Equal("mA", PumpAnalogCommandContract.EngineeringUnit);
-        Assert.Equal(0.0, PumpAnalogCommandContract.EngineeringMinimum);
-        Assert.Equal(20.0, PumpAnalogCommandContract.EngineeringMaximum);
-    }
-
-    [Fact]
-    public void The_Commissioned_Ramp_Is_A_Thousand_Millisecond_Interval_And_A_Step_Of_Two()
-    {
-        Assert.Equal(1000, PumpAnalogCommandContract.RampIntervalMilliseconds);
-        Assert.Equal(2.0, PumpAnalogCommandContract.RampStepEngineering);
-
-        PumpSpeedRampConfiguration ownerInitial = PumpSpeedRampConfiguration.OwnerInitial(10.0);
-        Assert.Equal(TimeSpan.FromMilliseconds(1000), ownerInitial.Interval);
-        Assert.Equal(2.0, ownerInitial.Step);
-        Assert.Equal(0.0, ownerInitial.SafeZeroEngineeringCommand);
-        Assert.True(ownerInitial.Valid);
-    }
-
-    [Fact]
-    public void The_Ramp_Never_Exceeds_Its_Target()
-    {
-        Assert.Equal(2.0, PumpSpeedRamp.Next(0.0, 10.0, 2.0));
-        Assert.Equal(10.0, PumpSpeedRamp.Next(9.0, 10.0, 2.0));
-        Assert.Equal(10.0, PumpSpeedRamp.Next(8.0, 10.0, 5.0));
-
-        double current = 0.0;
-        for (int step = 0; step < 20; step += 1)
-        {
-            current = PumpSpeedRamp.Next(current, 10.0, 2.0);
-            Assert.True(current <= 10.0);
-        }
-
-        Assert.Equal(10.0, current);
-        Assert.True(PumpSpeedRamp.AtTarget(current, 10.0));
-    }
-
-    [Fact]
-    public void The_Stop_Ramp_Reaches_The_Configured_Safe_Zero()
-    {
-        double current = 10.0;
-        for (int step = 0; step < 20 && !PumpSpeedRamp.AtTarget(current, 0.0); step += 1)
-        {
-            current = PumpSpeedRamp.Next(current, 0.0, 2.0);
-            Assert.True(current >= 0.0);
-        }
-
-        Assert.Equal(0.0, current);
-        Assert.True(PumpSpeedRamp.AtTarget(current, PumpAnalogCommandContract.SafeZeroEngineeringCommand));
-
-        // The live I/O path reaches the same safe zero.
-        Rig rig = CreateReady();
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
-        Drive(rig);
-
-        Assert.Equal(PumpLifecycleState.STOPPED, rig.Lifecycle.State);
-        Assert.Equal(0.0, rig.Lifecycle.SpeedCommand);
-        Assert.Equal((ushort)0, rig.Transport.RegisterWrites[^1].Value);
-    }
-
-    // ---------------------------------------------------------------- 23 to 26. corrected stop order
-
-    [Fact]
-    public void The_Stop_Writes_Do007_False_Before_Do003_False()
-    {
-        Rig rig = CreateReady();
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-
-        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
-        Drive(rig);
-
-        Assert.Equal(PumpLifecycleState.STOPPED, rig.Lifecycle.State);
-
-        int runIndex = rig.Transport.CoilWrites.FindIndex(write => write.Address == CoilRun && !write.Value);
-        int enableIndex = rig.Transport.CoilWrites.FindIndex(write => write.Address == CoilEnable && !write.Value);
-
-        Assert.True(runIndex >= 0);
-        Assert.True(enableIndex >= 0);
-        Assert.True(runIndex < enableIndex, "Run Pump must be de-energised BEFORE Enable Inverter.");
-    }
-
-    [Fact]
-    public void Each_De_Energisation_Happens_Exactly_Once()
-    {
-        Rig rig = CreateReady();
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-
-        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
-        Drive(rig);
-
-        // Stepping well past the terminal must not re-issue anything.
-        for (int step = 0; step < 10; step += 1)
-        {
-            rig.Time.Advance(Interval);
-            rig.Lifecycle.Step();
-        }
-
-        Assert.Single(rig.Transport.CoilWrites, write => write.Address == CoilRun && !write.Value);
-        Assert.Single(rig.Transport.CoilWrites, write => write.Address == CoilEnable && !write.Value);
-    }
-
-    [Fact]
-    public void Enable_Is_Never_Cleared_Before_Run_During_Stop()
-    {
-        // The superseded Legacy order cleared Enable first. It must not be reachable at all.
-        Assert.True(PumpCommandContract.IsCorrectedStopOrder(PumpCommandContract.StopSequence));
-        Assert.Equal(PumpCommandContract.RunPumpTag, PumpCommandContract.StopSequence[0].Tag);
-        Assert.Equal(PumpCommandContract.EnableInverterTag, PumpCommandContract.StopSequence[1].Tag);
-        Assert.False(PumpCommandContract.StopSequence[0].Value);
-        Assert.False(PumpCommandContract.StopSequence[1].Value);
-
-        var superseded = new[]
-        {
-            new PumpCommandStep(1, PumpCommandContract.EnableInverterTag, false),
-            new PumpCommandStep(2, PumpCommandContract.RunPumpTag, false),
-        };
-        Assert.False(PumpCommandContract.IsCorrectedStopOrder(superseded));
-        Assert.False(PumpCommandContract.IsCorrectedStopOrder(null));
-        Assert.False(PumpCommandContract.IsCorrectedStopOrder(Array.Empty<PumpCommandStep>()));
-
-        // And the live path agrees with the declared order.
-        Rig rig = CreateReady();
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
-        Drive(rig);
-
-        Assert.Equal(new[] { CoilRun, CoilEnable }, ClearedCoils(rig));
-    }
-
-    // ---------------------------------------------------------------- 27 to 30. every path shares the order
-
-    [Fact]
-    public void Cancellation_Uses_The_Same_Stop_Order() => AssertSameStopOrder(PumpStopReason.CANCELLATION);
-
-    [Fact]
-    public void Fault_Cleanup_Uses_The_Same_Stop_Order() => AssertSameStopOrder(PumpStopReason.FAULT);
-
-    [Fact]
-    public void Downstream_Iv_Failure_Uses_The_Same_Stop_Order() =>
-        AssertSameStopOrder(PumpStopReason.DOWNSTREAM_IV_FAILURE);
-
-    [Fact]
-    public void Cleaning_Job_Sequence_Application_And_Timeout_Failures_Use_The_Same_Stop_Order()
-    {
-        AssertSameStopOrder(PumpStopReason.CLEANING_JOB_FAILURE);
-        AssertSameStopOrder(PumpStopReason.SEQUENCE_FAILURE);
-        AssertSameStopOrder(PumpStopReason.APPLICATION_CLEANUP);
-        AssertSameStopOrder(PumpStopReason.AI003_TIMEOUT);
-        AssertSameStopOrder(PumpStopReason.RUNNING_FEEDBACK_TIMEOUT);
-        AssertSameStopOrder(PumpStopReason.AI003_INVALID);
-        AssertSameStopOrder(PumpStopReason.AI003_STALE);
-        AssertSameStopOrder(PumpStopReason.START_FAILURE);
-    }
-
-    private static void AssertSameStopOrder(PumpStopReason reason)
-    {
-        Rig rig = CreateReady();
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-        rig.Lifecycle.Stop(reason);
-        Drive(rig);
-
-        Assert.Equal(new[] { CoilRun, CoilEnable }, ClearedCoils(rig));
-        Assert.Equal(reason, rig.Lifecycle.Result?.StopReason);
-    }
-
-    [Fact]
-    public void A_Ramp_Failure_Still_Attempts_Both_De_Energisations_In_Order()
-    {
-        Rig rig = CreateReady();
-
-        // The analog reference refuses from now on. The down-ramp cannot be dispatched, but the two
-        // digital de-energisations must still be issued, in the corrected order.
-        rig.Transport.ThrowOnAnalogWrite = true;
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-
-        rig.Lifecycle.Stop(PumpStopReason.CLEANING_JOB_FAILURE);
-        Drive(rig);
-
-        PumpLifecycleResult? result = rig.Lifecycle.Result;
-        Assert.NotNull(result);
-        Assert.Contains(PumpLifecycleState.RAMP_DOWN_FAILED.ToString(), result!.CleanupFaultCodes);
-        Assert.Equal(new[] { CoilRun, CoilEnable }, ClearedCoils(rig));
-        Assert.Equal(PumpCleanupStates.Incomplete, result.CleanupState);
-        Assert.Equal(PumpLifecycleState.CLEANUP_INCOMPLETE, result.TerminalState);
-        Assert.False(rig.Lifecycle.SafeToReportComplete);
-    }
-
-    // ---------------------------------------------------------------- 31. no IV OPEN before Ready
-
-    [Fact]
-    public void An_Iv_Open_Cannot_Occur_Before_Pump_Ready()
-    {
-        // 1. The lifecycle itself never permits a valve open before confirmed readiness.
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustBelow15Bar;
-        Assert.False(rig.Lifecycle.AllowsValveOpen);
-
-        Start(rig);
-        Assert.False(rig.Lifecycle.AllowsValveOpen);
-
-        for (int step = 0; step < 80 && rig.Lifecycle.State != PumpLifecycleState.WAITING_FOR_AI003_READY; step += 1)
-        {
-            rig.Time.Advance(Interval);
-            rig.Lifecycle.Step();
-        }
-
-        Assert.False(rig.Lifecycle.AllowsValveOpen);
-
-        // 2. The Cleaning Path precondition gate refuses the OPEN and the readiness evidence.
-        var inner = new RecordingBoundary();
-        var gate = new CleaningPathPumpLifecycleGate(inner, rig.Lifecycle);
-
-        gate.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
-        Assert.Empty(inner.Requests);
-        Assert.Single(gate.RefusedRequests);
-        Assert.Null(gate.ReadPumpOutletPressure());
-
-        // A CLOSE is always delegated: a cleanup close must never be blocked by a Pump state.
-        gate.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Close));
-        Assert.Single(inner.Requests);
-
-        // 3. Once ready, the OPEN is permitted and the evidence is served.
-        Rig ready = CreateReady();
-        var readyInner = new RecordingBoundary();
-        var readyGate = new CleaningPathPumpLifecycleGate(readyInner, ready.Lifecycle);
-
-        Assert.True(ready.Lifecycle.AllowsValveOpen);
-        readyGate.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
-        Assert.Single(readyInner.Requests);
-        Assert.NotNull(readyGate.ReadPumpOutletPressure());
-
-        // 4. A Stop request closes the gate immediately, before the terminal is reached.
-        ready.Lifecycle.Stop(PumpStopReason.DOWNSTREAM_IV_FAILURE);
-        Assert.False(ready.Lifecycle.AllowsValveOpen);
-        readyGate.RequestValve(new CleaningPathValveCommandRequest("IV2", CleaningPathValveCommandKind.Open));
-        Assert.Single(readyInner.Requests);
-        Assert.Null(readyGate.ReadPumpOutletPressure());
-    }
-
-    private sealed class RecordingBoundary : ICleaningPathEquipmentBoundary
-    {
-        public List<CleaningPathValveCommandRequest> Requests { get; } = new();
-
-        public void RequestValve(CleaningPathValveCommandRequest request) => Requests.Add(request);
-
-        public PressureSample? ReadPumpOutletPressure() => new(
-            20.0, PressureQuality.GOOD, false, DateTimeOffset.UnixEpoch, PressureSample.PumpOutletSource);
+        public PressureSample? ReadPumpOutletPressure() =>
+            new(18.0, PressureQuality.GOOD, false, DateTimeOffset.UnixEpoch, PressureSample.PumpOutletSource);
 
         public PressureSample? ReadValveOutletPressure(string valveId) => null;
 
@@ -1046,256 +1014,98 @@ public sealed class ProcessIoPumpLifecycleTests
         public bool ReadLowerLimitDetected(string valveId) => false;
     }
 
-    // ---------------------------------------------------------------- 32 and 33. ownership and unknown state
-
-    [Fact]
-    public void Ownership_Is_Not_Released_Before_A_Confirmed_Stop()
+    /// <summary>
+    /// An in-memory transport. It records every attempt, never contacts anything and can be told to fault.
+    /// </summary>
+    private sealed class FakeTransport : IProcessIoTransport
     {
-        Rig rig = CreateReady();
-        Assert.True(rig.Ownership.IsHeld);
-        Assert.True(rig.Lifecycle.OwnsPumpCommand);
+        public List<(string Device, int Address, bool Value)> CoilWrites { get; } = new();
+        public Dictionary<int, bool> Coils { get; } = new();
+        public List<(int Address, ushort Value)> RegisterWrites { get; } = new();
+        public List<int> RegisterReads { get; } = new();
+        public Dictionary<int, bool> DiscreteInputs { get; } = new();
+        public Dictionary<int, ushort> InputRegisters { get; } = new();
+        /// <summary>Registers whose read fails, so the session reports an unusable observation.</summary>
+        public HashSet<int> FaultingInputRegisters { get; } = new();
 
-        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+        /// <summary>A read that consumes this long is reported STALE by the session's own bracketing.</summary>
+        public TimeSpan ReadDelay { get; set; } = TimeSpan.Zero;
 
-        // The Stop has been requested but not confirmed, so the channel is still held.
-        Assert.True(rig.Ownership.IsHeld);
+        /// <summary>The clock the transport advances while a slow read is in flight.</summary>
+        public FakeTime? Clock { get; set; }
 
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-        Drive(rig);
+        public bool ThrowOnWrite { get; set; }
+        public bool ThrowOnAnalogWrite { get; set; }
 
-        Assert.Equal(PumpLifecycleState.STOPPED, rig.Lifecycle.State);
-        Assert.False(rig.Ownership.IsHeld);
-        Assert.True(rig.Lifecycle.Result!.StoppedConfirmed);
-        Assert.True(rig.Lifecycle.SafeToReportComplete);
-    }
+        public int NetworkAttempts => CoilWrites.Count + RegisterWrites.Count;
 
-    [Fact]
-    public void An_Unknown_Stopped_State_Requires_A_Physical_Abort()
-    {
-        Rig rig = CreateReady();
+        public bool ReadDiscreteInput(string deviceKey, int address) =>
+            DiscreteInputs.TryGetValue(address, out bool value) && value;
 
-        // The running feedback never goes false, so the stopped state stays unknown.
-        rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
-        Drive(rig);
+        public IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity) =>
+            Enumerable.Range(startAddress, quantity)
+                .Select(address => Coils.TryGetValue(address, out bool value) && value)
+                .ToList();
 
-        Assert.Equal(PumpLifecycleState.PHYSICAL_ABORT_REQUIRED, rig.Lifecycle.State);
-        Assert.Equal(PumpCleanupStates.PhysicalAbortRequired, rig.Lifecycle.Result!.CleanupState);
-        Assert.False(rig.Lifecycle.Result.StoppedConfirmed);
-        Assert.False(rig.Lifecycle.SafeToReportComplete);
-        Assert.Contains(PumpLifecycleState.STOPPED_FEEDBACK_TIMEOUT.ToString(), rig.Lifecycle.Result.CleanupFaultCodes);
-
-        // Ownership is released, but the unknown state is reported rather than hidden.
-        Assert.False(rig.Ownership.IsHeld);
-    }
-
-    // ---------------------------------------------------------------- 34. primary fault separation
-
-    [Fact]
-    public void The_Primary_Fault_Remains_Separate_From_Cleanup_Failures()
-    {
-        Rig rig = CreateReady();
-
-        // Trip while the stop cannot be confirmed: the trip and the cleanup failure must both survive,
-        // in separate fields.
-        rig.Transport.DiscreteInputs[InputFault] = true;
-        rig.Time.Advance(Interval);
-        rig.Lifecycle.Step();
-
-        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, rig.Lifecycle.PrimaryFailure);
-
-        Drive(rig);
-
-        PumpLifecycleResult? result = rig.Lifecycle.Result;
-        Assert.NotNull(result);
-        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, result!.PrimaryFailure);
-        Assert.NotEmpty(result.CleanupFaultCodes);
-        Assert.Equal(PumpCleanupStates.PhysicalAbortRequired, result.CleanupState);
-        Assert.Equal(CriticalPumpKind.MAIN_PUMP_TRIP, result.CriticalEvent);
-        Assert.False(rig.Lifecycle.SafeToReportComplete);
-    }
-
-    [Fact]
-    public void An_Unexpected_Stop_While_Ready_Raises_The_Critical_Event()
-    {
-        Rig rig = CreateReady();
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-
-        rig.Time.Advance(Interval);
-        rig.Lifecycle.Step();
-
-        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, rig.Lifecycle.PrimaryFailure);
-        Assert.Equal(PumpLifecycleState.RAMPING_DOWN, rig.Lifecycle.State);
-
-        Drive(rig);
-        Assert.Equal(CriticalPumpKind.MAIN_PUMP_UNEXPECTED_STOP, rig.Lifecycle.Result!.CriticalEvent);
-        Assert.Equal(PumpLifecycleState.FAULT_ACTIVE, rig.Lifecycle.Result.PrimaryFailure);
-    }
-
-    // ---------------------------------------------------------------- admission boundary
-
-    [Fact]
-    public void Production_Is_Refused()
-    {
-        Rig rig = CreateWired(Commissioned());
-        PumpLifecycleStartOutcome start = rig.Lifecycle.Start(Request(PumpCommandOwnerKind.PRODUCTION));
-
-        Assert.False(start.Started);
-        Assert.Equal(PumpCommandRefusals.RefusedProduction, start.Code);
-        Assert.Empty(rig.Transport.CoilWrites);
-        Assert.False(rig.Ownership.IsHeld);
-    }
-
-    [Fact]
-    public void A_Conflicting_Owner_And_A_Concurrent_Lifecycle_Are_Refused()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-        Assert.True(Start(rig).Started);
-
-        int writesAfterStart = rig.Transport.CoilWrites.Count;
-
-        Assert.False(rig.Ownership.TryAcquire(
-            PumpCommandOwnerKind.MANUAL_COMMISSIONING, "other-owner", out string conflicting));
-        Assert.Equal(PumpCommandRefusals.RefusedConflictingOwner, conflicting);
-
-        // The same owner asking again is a concurrent lifecycle, not a re-entrant grant.
-        Assert.False(rig.Ownership.TryAcquire(
-            PumpCommandOwnerKind.CLEANING_JOB, Owner, out string concurrent));
-        Assert.Equal(PumpCommandRefusals.RefusedConcurrentLifecycle, concurrent);
-
-        PumpLifecycleStartOutcome again = Start(rig);
-        Assert.False(again.Started);
-        Assert.Equal(PumpCommandRefusals.RefusedConcurrentLifecycle, again.Code);
-        Assert.Equal(writesAfterStart, rig.Transport.CoilWrites.Count);
-    }
-
-    [Fact]
-    public void An_Invalid_Configuration_Is_Refused()
-    {
-        PumpLifecycleConfiguration invalid =
-            ConfigurationFor(Commissioned()) with { PressureFreshnessBudget = TimeSpan.Zero };
-        Assert.False(invalid.Valid);
-
-        var transport = new FakeTransport();
-        var time = new FakeTime();
-        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
-        session.Open(time.GetUtcNow());
-        var boundary = new ProcessIoPumpCommandBoundary(
-            session, Catalogue(), Authorize(), Commissioned(), time, Freshness);
-        var lifecycle = new ProcessIoPumpLifecycle(boundary, invalid, new PumpCommandOwnership(), time);
-
-        PumpLifecycleStartOutcome start = lifecycle.Start(Request());
-        Assert.False(start.Started);
-        Assert.Equal(PumpCommandRefusals.RefusedInvalidConfiguration, start.Code);
-        Assert.Empty(transport.CoilWrites);
-    }
-
-    [Fact]
-    public void A_Wrong_Tag_Or_Address_Is_Refused_By_The_Command_Contract()
-    {
-        Assert.True(PumpCommandContract.IsPumpCommandTag("DO-001"));
-        Assert.True(PumpCommandContract.IsPumpCommandTag("DO-002"));
-        Assert.True(PumpCommandContract.IsPumpCommandTag("DO-003"));
-        Assert.True(PumpCommandContract.IsPumpCommandTag("DO-007"));
-
-        Assert.False(PumpCommandContract.IsPumpCommandTag("DO-004"));
-        Assert.False(PumpCommandContract.IsPumpCommandTag("DO-023"));
-        Assert.False(PumpCommandContract.IsPumpCommandTag("DI-004"));
-        Assert.False(PumpCommandContract.IsPumpCommandTag("AI-003+"));
-        Assert.False(PumpCommandContract.IsPumpCommandTag(null));
-
-        // The addresses are DERIVED from the one binding table, never restated.
-        Assert.True(PumpCommandContract.TryCoilAddress(PumpCommandContract.SelectPumpOneTag, out int one));
-        Assert.True(PumpCommandContract.TryCoilAddress(PumpCommandContract.SelectPumpTwoTag, out int two));
-        Assert.True(PumpCommandContract.TryCoilAddress(PumpCommandContract.EnableInverterTag, out int enable));
-        Assert.True(PumpCommandContract.TryCoilAddress(PumpCommandContract.RunPumpTag, out int run));
-        Assert.Equal(CoilSelect1, one);
-        Assert.Equal(CoilSelect2, two);
-        Assert.Equal(CoilEnable, enable);
-        Assert.Equal(CoilRun, run);
-
-        // A discrete input is not a writable coil, so it cannot be given a coil address.
-        Assert.False(PumpCommandContract.TryCoilAddress(PumpCommandContract.RunningFeedbackTag, out _));
-        Assert.False(PumpCommandContract.TryRegisterAddress(PumpCommandContract.RunPumpTag, out _));
-    }
-
-    // ---------------------------------------------------------------- 40. no automatic retry
-
-    [Fact]
-    public void Nothing_Retries_After_A_Terminal()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = false;
-        Start(rig);
-
-        Drive(rig);
-        Assert.Equal(PumpLifecycleState.RUNNING_FEEDBACK_TIMEOUT, rig.Lifecycle.PrimaryFailure);
-
-        int writes = rig.Transport.CoilWrites.Count;
-
-        for (int step = 0; step < 50; step += 1)
+        public ushort ReadInputRegister(string deviceKey, int registerAddress)
         {
-            rig.Time.Advance(Interval);
-            rig.Lifecycle.Step();
-        }
+            RegisterReads.Add(registerAddress);
 
-        Assert.Equal(writes, rig.Transport.CoilWrites.Count);
-        Assert.False(Start(rig).Started);
-        Assert.Equal(PumpCommandRefusals.RefusedAlreadyTerminal, Start(rig).Code);
-
-        // The lifecycle never re-energises after termination.
-        Assert.DoesNotContain(rig.Transport.CoilWrites.Skip(writes), write => write.Value);
-    }
-
-    // ---------------------------------------------------------------- ordering invariant
-
-    [Fact]
-    public void The_Lifecycle_Reaches_Every_Progression_State_In_Order()
-    {
-        Rig rig = CreateWired(Commissioned());
-        rig.Transport.DiscreteInputs[InputRunning] = true;
-        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawJustAbove15Bar;
-
-        var seen = new List<PumpLifecycleState>();
-
-        void Record()
-        {
-            if (seen.Count == 0 || seen[^1] != rig.Lifecycle.State) seen.Add(rig.Lifecycle.State);
-        }
-
-        Record();
-        Start(rig);
-        Record();
-
-        for (int step = 0; step < 400 && rig.Lifecycle.Result is null; step += 1)
-        {
-            rig.Time.Advance(Interval);
-            rig.Lifecycle.Step();
-            Record();
-
-            if (rig.Lifecycle.State == PumpLifecycleState.PUMP_READY)
+            if (ReadDelay > TimeSpan.Zero)
             {
-                rig.Transport.DiscreteInputs[InputRunning] = false;
-                rig.Lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
-                Record();
+                Clock?.Advance(ReadDelay);
+            }
+
+            if (FaultingInputRegisters.Contains(registerAddress))
+            {
+                throw new IOException("FAKE_ANALOG_READ_FAULT");
+            }
+
+            return InputRegisters.TryGetValue(registerAddress, out ushort value) ? value : (ushort)0;
+        }
+
+        public ushort ReadRegister(string deviceKey, int registerAddress)
+        {
+            RegisterReads.Add(registerAddress);
+            return 0;
+        }
+
+        public bool ReadCoil(string deviceKey, int coilAddress) =>
+            Coils.TryGetValue(coilAddress, out bool value) && value;
+
+        public IReadOnlyList<ushort> ReadHoldingRegistersBulk(string deviceKey, int startAddress, int quantity) =>
+            Enumerable.Range(startAddress, quantity).Select(_ => (ushort)0).ToList();
+
+        public void WriteCoil(string deviceKey, int coilAddress, bool value)
+        {
+            if (ThrowOnWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
+            CoilWrites.Add((deviceKey, coilAddress, value));
+            Coils[coilAddress] = value;
+        }
+
+        public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value)
+        {
+            if (ThrowOnWrite || ThrowOnAnalogWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
+            RegisterWrites.Add((registerAddress, value));
+        }
+
+        public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values)
+        {
+            if (ThrowOnWrite || ThrowOnAnalogWrite) throw new InvalidOperationException("FAKE_TRANSPORT_FAULT");
+            for (int index = 0; index < values.Count; index += 1)
+            {
+                RegisterWrites.Add((startAddress + index, values[index]));
             }
         }
+    }
 
-        Assert.Equal(
-            new[]
-            {
-                PumpLifecycleState.IDLE,
-                PumpLifecycleState.WAITING_FOR_RUNNING,
-                PumpLifecycleState.RAMPING_OUTPUT,
-                PumpLifecycleState.WAITING_FOR_AI003_READY,
-                PumpLifecycleState.PUMP_READY,
-                PumpLifecycleState.RAMPING_DOWN,
-                PumpLifecycleState.CLEARING_RUN,
-                PumpLifecycleState.DISABLING_INVERTER,
-                PumpLifecycleState.WAITING_FOR_STOPPED,
-                PumpLifecycleState.STOPPED,
-            },
-            seen);
+    /// <summary>A manual clock that only advances when the test advances it.</summary>
+    private sealed class FakeTime : TimeProvider
+    {
+        private DateTimeOffset _now = new(2026, 10, 7, 0, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan delta) => _now = _now.Add(delta);
     }
 }
