@@ -301,13 +301,24 @@ Critical Path working labels mapped to the formal stage families (formal IDs unc
    NOT EXECUTED / NOT VERIFIED.** The one reusable Pump lifecycle (`ProcessIoPumpLifecycle`) now
    implements the Owner-commissioned contract: maintained and mutually exclusive selection
    (`DO-001`/`DO-002`), Start as `DO-003` true then `DO-007` true, the **corrected** Stop as
-   `DO-007` false then `DO-003` false, the `AO-001+` milliamp ramp (1000 ms interval, step 2,
-   safe zero 0), the `DI-004`/`DI-005` feedback commissioning gate, and the `AI-003+` strict
-   Pump-ready rule (setpoint 15 bar, freshness 2000 ms, `AI-002+` never aliased). Every normal,
-   cancelled, faulted, downstream-IV-failed and application-cleanup path runs the same corrected
-   Stop order and releases command ownership only after a confirmed Stop. Production write
-   authority is **NOT AUTHORIZED**, physical execution is **NOT EXECUTED / NOT VERIFIED**, Trial B
-   is unchanged, and Merge is on hold.
+   `DO-007` false then `DO-003` false, the `DI-004`/`DI-005` feedback commissioning gate, and the
+   `AI-003+` strict Pump-ready rule (setpoint 15 bar, freshness 2000 ms, `AI-002+` never aliased).
+   Every normal, cancelled, faulted, downstream-IV-failed and application-cleanup path runs the same
+   corrected Stop order and releases command ownership only after a confirmed Stop.
+   The `AO-001+` write conversion is now its own Pump authority: the exact Legacy
+   `map(pumpCurrentOut, 4, 20, 0, 32767)` over the closed **4 to 20 mA** running span with an
+   explicit **0 mA safe-stop sentinel**, refusing the open 0 to 4 mA band, negatives and above 20 mA
+   rather than clamping, and ramping in 1000 ms / 2 mA steps from the 4 mA live minimum straight to
+   the sentinel so the open band is never emitted. The general 0 to 20 mA helper is unchanged and is
+   not the Pump authority.
+   The production Runtime composition (`CleaningPathDryComposition`) now constructs exactly one Pump
+   lifecycle over the existing session, catalogue and time source with one typed ownership channel,
+   and wraps the active Cleaning Path equipment boundary with `CleaningPathPumpLifecycleGate`: an
+   Isolation Valve OPEN is refused before confirmed Pump readiness, a CLOSE always passes through,
+   and the Pump is started to readiness before the path and stopped before the motion cleanup.
+   Production write authority is **NOT AUTHORIZED**, physical execution is **NOT EXECUTED / NOT
+   VERIFIED**, Trial B is unchanged and not routed through the production lifecycle, the Main Valve
+   remains excluded because the catalogue defines no Main Valve I/O identity, and Merge is on hold.
 
 2. **H2 — Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
 3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.) The
