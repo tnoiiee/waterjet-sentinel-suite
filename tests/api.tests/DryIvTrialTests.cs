@@ -1137,6 +1137,94 @@ public sealed class DryIvTrialTests
         return directory.FullName;
     }
 
+    // ---------------------------------------------------------------- Pump lifecycle isolation
+
+    // PUMP-COMMAND-PRODUCT-INTEGRATION regression.
+    //
+    // Trial B stays exactly as commissioned: physical Isolation Valve, software-simulated outlet
+    // pressure, no Pump command at all. These tests prove the new Pump lifecycle never reaches it.
+
+    /// <summary>The four Pump command coils: select 1, select 2, enable inverter, run pump.</summary>
+    private static readonly int[] PumpCommandCoils = [0, 1, 2, 6];
+
+    [Fact]
+    public void Trial_B_Never_Writes_Any_Pump_Selection_Enable_Or_Run_Coil()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.True(result.Accepted);
+        Assert.NotEmpty(transport.CoilWrites);
+        Assert.DoesNotContain(transport.CoilWrites, write => PumpCommandCoils.Contains(write.Address));
+        Assert.All(transport.CoilWrites, write => Assert.Equal(Iv1CommandCoil, write.Address));
+    }
+
+    [Fact]
+    public void Trial_B_Never_Writes_The_Pump_Analog_Speed_Reference()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.True(result.Accepted);
+
+        // The analog speed reference is holding register 0. Trial B must not write it, and must not
+        // write any other analog register either.
+        Assert.Empty(transport.RegisterWrites);
+        Assert.DoesNotContain(transport.RegisterWrites, write => write.Address == 0);
+    }
+
+    [Fact]
+    public void Trial_B_Retains_Software_Simulated_Pump_Ready_Evidence_And_Never_Claims_Physical_Pump()
+    {
+        (ProcessIoEquipmentBoundary boundary, ProcessIoSession session, FakeTransport transport) = CreateBoundary();
+        StartPhysicallyClosed(transport);
+        InstallPhysicalTransition(transport);
+
+        DryIvTrialResult result = DryIvTrial.Execute(Request(Sample(20.0)), session, boundary);
+
+        Assert.True(result.Accepted);
+        Assert.Equal(DryIvTrial.EvidenceKindSimulated, "SOFTWARE_SIMULATED");
+        Assert.Equal(DryIvTrial.SimulatedProvenance, "SOFTWARE_SIMULATED_AI003_FOR_IV_TRIAL");
+        Assert.Equal(DryIvTrial.TrialPurpose, "IV_OPEN_CLOSE_HARDWARE_TRIAL_ONLY");
+
+        // The Pump was never commanded by this trial, so no physical Pump evidence can exist: the
+        // Pump is reported stopped on the Owner attestation, not on any measurement.
+        Assert.DoesNotContain(transport.CoilWrites, write => PumpCommandCoils.Contains(write.Address));
+        Assert.Empty(transport.RegisterWrites);
+
+        // Pressure evidence is the simulated AI-003 the caller supplied, never a physical read.
+        DryIvTrialSimulatedPumpReady simulated = Sample(20.0);
+        Assert.True(simulated.SimulatedBar > Thresholds.PumpReadySetpointBar);
+        Assert.Equal(DryIvTrial.EvidenceKindSimulated, simulated.EvidenceKind);
+        Assert.Equal(DryIvTrial.SimulatedProvenance, simulated.Provenance);
+        Assert.Equal(DryIvTrial.TrialPurpose, simulated.TrialPurpose);
+        Assert.Equal(PumpCommandContract.PumpOutletPressureTag, simulated.SourceTag);
+    }
+
+    [Fact]
+    public void Trial_B_Source_Never_References_The_Pump_Lifecycle_Or_A_Pump_Command()
+    {
+        string source = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "DryIvTrial.cs"));
+
+        // The trial does not construct, hold or call the Pump lifecycle.
+        Assert.DoesNotContain("ProcessIoPumpLifecycle", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("IPumpCommandBoundary", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProcessIoPumpCommandBoundary", source, StringComparison.Ordinal);
+
+        // And it names no Pump command row of its own.
+        Assert.DoesNotContain("DO-001", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DO-002", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DO-003", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DO-007", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AO-001", source, StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// Deterministic in-memory double. It is not the product Simulation transport: a physical command
     /// path must never be backed by one, so this stands in for the adopted bench transport.
@@ -1150,6 +1238,9 @@ public sealed class DryIvTrialTests
         public Dictionary<int, ushort> InputRegisters { get; } = new();
 
         public Dictionary<int, bool> Coils { get; } = new();
+
+        /// <summary>Analog writes. Trial B must leave this empty.</summary>
+        public List<(int Address, ushort Value)> RegisterWrites { get; } = new();
 
         /// <summary>Physical feedback state captured immediately after each accepted coil write.</summary>
         public List<(int Address, bool Value, bool Upper, bool Lower)> Transitions { get; } = new();
@@ -1196,8 +1287,15 @@ public sealed class DryIvTrialTests
                 DiscreteInputs.TryGetValue(Iv1LowerInput, out bool lower) && lower));
         }
 
-        public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value) { }
+        public void WriteSingleRegister(string deviceKey, int registerAddress, ushort value)
+            => RegisterWrites.Add((registerAddress, value));
 
-        public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values) { }
+        public void WriteRegisters(string deviceKey, int startAddress, IReadOnlyList<ushort> values)
+        {
+            for (int index = 0; index < values.Count; index += 1)
+            {
+                RegisterWrites.Add((startAddress + index, values[index]));
+            }
+        }
     }
 }
