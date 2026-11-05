@@ -446,10 +446,8 @@ public sealed class ProcessIoEquipmentBoundary : ICleaningPathEquipmentBoundary
     /// because a dry command path must never present in-memory state as physical evidence.
     /// </summary>
     private bool Accepts(ProcessIoPhysicalObservation observation) =>
-        observation.IsUsable
-        && observation.Provenance == ProcessIoObservationProvenance.PHYSICAL_READ
-        && observation.SourceGeneration == _session.Generation
-        && observation.IsUsableAt(_time.GetUtcNow(), _session.Generation, _freshnessBudget);
+        ProcessIoEvidenceAcceptance.Accepts(
+            observation, _session.Generation, _time.GetUtcNow(), _freshnessBudget);
 
     private static bool IsAnalogTag(string tag) =>
         tag.StartsWith("AI-", StringComparison.Ordinal);
