@@ -65,6 +65,21 @@ public sealed record CleaningPathDryProvenance
     /// <summary>True only when both coordinators are the composed application coordinators.</summary>
     public required bool CoordinatorsComposed { get; init; }
 
+    /// <summary>The Pump ordinal this composition selects. Stated, never inferred at a call site.</summary>
+    public required int PumpSelection { get; init; }
+
+    /// <summary>
+    /// True only when both commissioned feedback polarities were configured. When false the Pump
+    /// lifecycle refuses every physical command, so the Cleaning Path cannot open an Isolation Valve.
+    /// </summary>
+    public required bool PumpFeedbackCommissioned { get; init; }
+
+    /// <summary>The typed owner kind the Pump command channel is acquired under.</summary>
+    public required string PumpCommandOwner { get; init; }
+
+    /// <summary>True only when the active Cleaning Path equipment boundary is the Pump gate.</summary>
+    public required bool PumpGateComposed { get; init; }
+
     /// <summary>
     /// The fixed, non-negotiable statements every dry composition carries. They exist so a reader of
     /// the evidence cannot mistake a dry composition for a verified or authorized one.
@@ -103,6 +118,30 @@ public sealed class CleaningPathDryComposition : IDisposable
     public const string ValveSupervisionVariable = "WJSS_VALVE_SUPERVISION_MS";
     public const string CatalogueVariable = "WJSS_PROCESS_IO_CATALOGUE";
 
+    /// <summary>The Owner-local Pump ordinal this composition selects. 1 or 2, never defaulted.</summary>
+    public const string PumpSelectionVariable = "WJSS_PUMP_SELECTION";
+
+    /// <summary>The Owner-local analog speed reference, in milliamps. 4 to 20 mA inclusive.</summary>
+    public const string PumpAnalogTargetVariable = "WJSS_PUMP_ANALOG_TARGET_MA";
+
+    /// <summary>The Owner-local Pump Outlet pressure freshness budget, in milliseconds.</summary>
+    public const string PumpFreshnessVariable = "WJSS_PUMP_FRESHNESS_MS";
+
+    /// <summary>DI-004 polarity. Absent means NOT_CONFIGURED, and then the Pump command fails closed.</summary>
+    public const string PumpRunningPolarityVariable = "WJSS_PUMP_RUNNING_POLARITY";
+
+    /// <summary>DI-005 polarity. Absent means NOT_CONFIGURED, and then the Pump command fails closed.</summary>
+    public const string PumpFaultPolarityVariable = "WJSS_PUMP_FAULT_POLARITY";
+
+    /// <summary>How long the commissioned running feedback may take. Required, no default.</summary>
+    public const string PumpRunningConfirmVariable = "WJSS_PUMP_RUNNING_CONFIRM_MS";
+
+    /// <summary>How long the outlet pressure may take to exceed the setpoint. Required, no default.</summary>
+    public const string PumpReadyTimeoutVariable = "WJSS_PUMP_READY_TIMEOUT_MS";
+
+    /// <summary>How long the commissioned not-running feedback may take during Stop. Required, no default.</summary>
+    public const string PumpStoppedConfirmVariable = "WJSS_PUMP_STOPPED_CONFIRM_MS";
+
     public const string RefusedNotDry = "DRY_COMPOSITION_REFUSED_NOT_DRY_MODE";
     public const string RefusedCatalogue = "DRY_COMPOSITION_REFUSED_CATALOGUE";
     public const string RefusedStore = "DRY_COMPOSITION_REFUSED_STORE";
@@ -113,12 +152,22 @@ public sealed class CleaningPathDryComposition : IDisposable
     public const string RefusedSupervision = "DRY_COMPOSITION_REFUSED_SUPERVISION_WINDOW";
     public const string RefusedMotion = "DRY_COMPOSITION_REFUSED_MOTION";
     public const string RefusedMotionNotHardwareCapable = "DRY_COMPOSITION_REFUSED_MOTION_NOT_HARDWARE_CAPABLE";
+    public const string RefusedPumpConfiguration = "DRY_COMPOSITION_REFUSED_PUMP_CONFIGURATION";
+
+    /// <summary>The deterministic pause between two Pump driver steps. Bounded and never zero.</summary>
+    private const int PumpDriveIntervalMilliseconds = 5;
     public const string Composed = "DRY_COMPOSITION_COMPOSED";
 
     private readonly ProcessIoEndpointHandle _endpoint;
     private readonly ProcessIoPhysicalTransport _transport;
     private readonly ProcessIoSession _session;
     private readonly ProcessIoEquipmentBoundary _equipment;
+    private readonly ProcessIoPumpLifecycle _pump;
+    private readonly CleaningPathPumpLifecycleGate _pumpGate;
+    private readonly PumpLifecycleConfiguration _pumpConfiguration;
+    private readonly int _pumpSelection;
+    private readonly string _pumpOwnerId;
+    private bool _pumpStarted;
     private readonly MotionCompositionRoot _motionRoot;
     private readonly ManualMotionCleaningPathBoundary _motion;
     private readonly CleaningPathCompositionCoordinator _composition;
@@ -132,6 +181,11 @@ public sealed class CleaningPathDryComposition : IDisposable
         ProcessIoPhysicalTransport transport,
         ProcessIoSession session,
         ProcessIoEquipmentBoundary equipment,
+        ProcessIoPumpLifecycle pump,
+        CleaningPathPumpLifecycleGate pumpGate,
+        PumpLifecycleConfiguration pumpConfiguration,
+        int pumpSelection,
+        string pumpOwnerId,
         MotionCompositionRoot motionRoot,
         ManualMotionCleaningPathBoundary motion,
         CleaningPathCompositionCoordinator composition,
@@ -145,6 +199,11 @@ public sealed class CleaningPathDryComposition : IDisposable
         _transport = transport;
         _session = session;
         _equipment = equipment;
+        _pump = pump;
+        _pumpGate = pumpGate;
+        _pumpConfiguration = pumpConfiguration;
+        _pumpSelection = pumpSelection;
+        _pumpOwnerId = pumpOwnerId;
         _motionRoot = motionRoot;
         _motion = motion;
         _composition = composition;
@@ -180,6 +239,21 @@ public sealed class CleaningPathDryComposition : IDisposable
 
     /// <summary>The Process-Io session: the sole write-lifecycle authority.</summary>
     public ProcessIoSession Session => _session;
+
+    /// <summary>
+    /// The ONE Pump lifecycle of this composition. It is constructed here, in the production
+    /// composition root, and nowhere else: the Cleaning Path cannot reach a Pump command without it.
+    /// </summary>
+    public ProcessIoPumpLifecycle Pump => _pump;
+
+    /// <summary>
+    /// The Pump precondition decorator the active Cleaning Path equipment boundary was wrapped with.
+    /// An IV OPEN is refused by it unless the Pump lifecycle is at confirmed readiness.
+    /// </summary>
+    public CleaningPathPumpLifecycleGate PumpGate => _pumpGate;
+
+    /// <summary>The typed Pump lifecycle configuration composed from the Owner-local values.</summary>
+    public PumpLifecycleConfiguration PumpConfiguration => _pumpConfiguration;
 
     /// <summary>The shared motion composition (owner, port, session).</summary>
     public MotionCompositionRoot MotionRoot => _motionRoot;
@@ -410,13 +484,45 @@ public sealed class CleaningPathDryComposition : IDisposable
         var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
         var equipment = new ProcessIoEquipmentBoundary(session, catalogue, authorization);
 
+        // 9b. The ONE Pump command channel of this composition: one boundary over the same session,
+        //     one lifecycle, one ownership authority and one time source. A composition without a
+        //     commissionable Pump configuration is refused here: the alternative would be a Cleaning
+        //     Path that can move and open an Isolation Valve with no Pump authority at all.
+        if (!TryReadPumpConfiguration(
+                readEnvironment,
+                thresholds,
+                out PumpLifecycleConfiguration pumpConfiguration,
+                out int pumpSelection,
+                out refusalCode,
+                out refusalDetail))
+        {
+            transport.Dispose();
+            return false;
+        }
+
+        TimeProvider pumpTime = new ClockTimeProvider(clock);
+        var pumpOwnership = new PumpCommandOwnership();
+        var pumpBoundary = new ProcessIoPumpCommandBoundary(
+            session,
+            catalogue,
+            authorization,
+            pumpConfiguration.Feedback,
+            pumpTime,
+            pumpConfiguration.PressureFreshnessBudget);
+        var pumpLifecycle = new ProcessIoPumpLifecycle(pumpBoundary, pumpConfiguration, pumpOwnership, pumpTime);
+
+        // The precondition is structural, not advisory: the coordinator receives the gated boundary,
+        // so it has no reference through which it could request an IV OPEN without the Pump.
+        var pumpGate = new CleaningPathPumpLifecycleGate(equipment, pumpLifecycle);
+        string pumpOwnerId = "CLEANING_PATH_DRY:" + resolved.SensorId + ":" + resolved.DerivedIsolationValveId;
+
         // 10. The Phase 3B manual motion boundary over the shared motion session, then the ONE
         //     composition coordinator, which composes the execution coordinator inside itself.
         var motion = new ManualMotionCleaningPathBoundary(
             motionRoot.Session,
             resolved.HorizontalAxisId,
             resolved.VerticalAxisId);
-        var compositionCoordinator = new CleaningPathCompositionCoordinator(motion, equipment, clock);
+        var compositionCoordinator = new CleaningPathCompositionCoordinator(motion, pumpGate, clock);
 
         var provenance = new CleaningPathDryProvenance
         {
@@ -435,6 +541,10 @@ public sealed class CleaningPathDryComposition : IDisposable
             MotionProfileCode = motionRoot.ProfileCode,
             SessionAuthorizedWrites = true,
             CoordinatorsComposed = true,
+            PumpSelection = pumpSelection,
+            PumpFeedbackCommissioned = pumpConfiguration.Feedback.IsCommissioned,
+            PumpCommandOwner = PumpCommandOwnerKind.INTEGRATED_DRY_CYCLE.ToString(),
+            PumpGateComposed = true,
         };
 
         composition = new CleaningPathDryComposition(
@@ -442,6 +552,11 @@ public sealed class CleaningPathDryComposition : IDisposable
             transport,
             session,
             equipment,
+            pumpLifecycle,
+            pumpGate,
+            pumpConfiguration,
+            pumpSelection,
+            pumpOwnerId,
             motionRoot,
             motion,
             compositionCoordinator,
@@ -545,13 +660,42 @@ public sealed class CleaningPathDryComposition : IDisposable
     }
 
     /// <summary>
-    /// Starts the ONE composition: Pump-ready (AI-003) is evaluated first and P1 is requested only
-    /// when it is accepted. Every refusal is returned unchanged with its own code.
+    /// Starts the ONE composition in the order the safety position requires: the Pump is admitted,
+    /// selected, enabled, run and ramped to confirmed readiness FIRST, and only then is the path
+    /// started. Pump-ready (AI-003, served only through the gate) is evaluated by the coordinator before
+    /// P1 is requested, so no Isolation Valve can open on an unproven Pump.
+    ///
+    /// Every refusal is returned unchanged with its own code, and a refused Pump start means the path
+    /// was never started at all.
     /// </summary>
-    public CleaningPathCompositionStartOutcome Start() => _composition.Start(StoreSnapshot, Resolution, Request);
+    public CleaningPathCompositionStartOutcome Start()
+    {
+        if (!StartPump(out string pumpCode))
+        {
+            return new CleaningPathCompositionStartOutcome(false, pumpCode, null, null);
+        }
 
-    /// <summary>One deterministic driver step of the composed path, motion and supervision.</summary>
-    public void Step() => _composition.Step();
+        return _composition.Start(StoreSnapshot, Resolution, Request);
+    }
+
+    /// <summary>
+    /// One deterministic driver step: the Pump lifecycle first, then the composed path, motion and
+    /// supervision.
+    ///
+    /// The Pump order is not cosmetic. The lifecycle is the only thing that can observe a lost Running
+    /// input, an active Fault or a lost AI-003, and it withdraws <see cref="ProcessIoPumpLifecycle.AllowsValveOpen"/>
+    /// the moment it does. Stepping it before the path means the gate has already been closed before the
+    /// coordinator can request another Isolation Valve OPEN in the same step.
+    /// </summary>
+    public void Step()
+    {
+        if (_pumpStarted && !PumpLifecycleStates.IsTerminal(_pump.State))
+        {
+            _pump.Step();
+        }
+
+        _composition.Step();
+    }
 
     /// <summary>The terminal result, or null while the composition is still active.</summary>
     public CleaningPathCompositionResult? Result => _composition.Result;
@@ -560,8 +704,10 @@ public sealed class CleaningPathDryComposition : IDisposable
     public bool Active => _composition.Active;
 
     /// <summary>
-    /// Cleanup in the order the safety position requires: motion Stop and session close first, then
-    /// the Isolation Valve close-all through the session.
+    /// The ONE cleanup, in the order the safety position requires: the Pump Stop first (withdraw the
+    /// analog reference, then Run Pump FALSE exactly once, then Enable Inverter FALSE exactly once, then
+    /// wait for confirmed not-running), then the motion Stop, then the Isolation Valve close-all through
+    /// the session, then the session close.
     ///
     /// Every stage is captured separately and nothing is collapsed into a single boolean. This method
     /// reports rather than throws for recoverable faults, and it never claims a clean shutdown it did
@@ -569,16 +715,150 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// </summary>
     public CleaningPathDryCleanupReport Shutdown()
     {
+        CleaningPathPumpCleanupReport pump = StopPump();
         MotionCleanupRecord motion = _motionRoot.Shutdown();
         ProcessIoCleanupResult valves = _equipment.SafeCleanupCloseAll();
         _session.Close(_clock.UtcNow);
 
         return new CleaningPathDryCleanupReport
         {
+            Pump = pump,
             Motion = motion,
             Valves = valves,
             SessionState = _session.State,
             SessionGeneration = _session.Generation,
+        };
+    }
+
+    /// <summary>
+    /// Starts the Pump and drives it to confirmed readiness under the existing bounded supervision. The
+    /// budget is the configured ramp duration plus the two configured feedback timeouts, so the wait is
+    /// derived from configuration and never from an invented constant.
+    /// </summary>
+    private bool StartPump(out string code)
+    {
+        code = string.Empty;
+
+        var request = new PumpLifecycleStartRequest
+        {
+            Owner = PumpCommandOwnerKind.INTEGRATED_DRY_CYCLE,
+            OwnerId = _pumpOwnerId,
+            Selection = _pumpSelection,
+        };
+
+        PumpLifecycleStartOutcome admitted = _pump.Start(request);
+        if (!admitted.Started)
+        {
+            code = admitted.Code;
+            return false;
+        }
+
+        _pumpStarted = true;
+
+        // The budget is derived from configuration: the full down-ramp span, plus the two configured
+        // supervision timeouts. Nothing here invents a wait.
+        int rampSteps = (int)Math.Ceiling(
+            PumpAnalogCommandContract.LiveMaximumMilliamps / _pumpConfiguration.Ramp.Step);
+        TimeSpan budget = TimeSpan.FromTicks(_pumpConfiguration.Ramp.Interval.Ticks * rampSteps)
+            + _pumpConfiguration.RunningFeedbackTimeout
+            + _pumpConfiguration.PumpReadyTimeout;
+        DateTimeOffset deadline = _clock.UtcNow + budget;
+
+        // A second, independent bound. A stalled transport or a clock that does not advance must never
+        // turn a refusal into a hang, so the drive also stops after a derived number of iterations.
+        int maximumSteps = (int)(budget.TotalMilliseconds / PumpDriveIntervalMilliseconds) + 1000;
+
+        for (int step = 0; step < maximumSteps; step += 1)
+        {
+            if (_pump.State == PumpLifecycleState.PUMP_READY && _pump.AllowsValveOpen)
+            {
+                return true;
+            }
+
+            PumpLifecycleResult? terminal = _pump.Result;
+            if (terminal is not null)
+            {
+                code = "PUMP_START_REFUSED_" + terminal.TerminalState;
+                return false;
+            }
+
+            if (step > 0 && _clock.UtcNow >= deadline)
+            {
+                code = "PUMP_START_TIMEOUT_" + _pump.State;
+                return false;
+            }
+
+            _pump.Step();
+            Thread.Sleep(PumpDriveIntervalMilliseconds);
+        }
+
+        code = "PUMP_START_TIMEOUT_" + _pump.State;
+        return false;
+    }
+
+    /// <summary>
+    /// Stops the Pump through the ONE Stop path and reports each stage separately. Ownership is released
+    /// by the lifecycle only on a confirmed Stop, so an unconfirmed Stop leaves the channel held and the
+    /// cleanup incomplete.
+    /// </summary>
+    private CleaningPathPumpCleanupReport StopPump()
+    {
+        if (!_pumpStarted || _pump.State == PumpLifecycleState.IDLE)
+        {
+            return new CleaningPathPumpCleanupReport
+            {
+                Attempted = false,
+                TerminalState = _pump.State.ToString(),
+                CleanupState = PumpCleanupStates.Complete,
+                StoppedConfirmed = false,
+                OwnershipReleased = !_pump.OwnsPumpCommand,
+                CleanupFaultCodes = Array.Empty<string>(),
+            };
+        }
+
+        if (_pump.Result is null)
+        {
+            _pump.Stop(PumpStopReason.APPLICATION_CLEANUP);
+
+            int rampSteps = (int)Math.Ceiling(
+                PumpAnalogCommandContract.LiveMaximumMilliamps / _pumpConfiguration.Ramp.Step);
+            TimeSpan budget = TimeSpan.FromTicks(_pumpConfiguration.Ramp.Interval.Ticks * rampSteps)
+                + _pumpConfiguration.StoppedFeedbackTimeout;
+            DateTimeOffset deadline = _clock.UtcNow + budget;
+            int maximumSteps = (int)(budget.TotalMilliseconds / PumpDriveIntervalMilliseconds) + 1000;
+
+            for (int step = 0; step < maximumSteps && _pump.Result is null; step += 1)
+            {
+                if (step > 0 && _clock.UtcNow >= deadline) break;
+
+                _pump.Step();
+                Thread.Sleep(PumpDriveIntervalMilliseconds);
+            }
+        }
+
+        PumpLifecycleResult? result = _pump.Result;
+        if (result is null)
+        {
+            // The bounded Stop did not converge. Nothing is claimed and the channel stays held.
+            return new CleaningPathPumpCleanupReport
+            {
+                Attempted = true,
+                TerminalState = _pump.State.ToString(),
+                CleanupState = PumpCleanupStates.Incomplete,
+                StoppedConfirmed = false,
+                OwnershipReleased = !_pump.OwnsPumpCommand,
+                CleanupFaultCodes = _pump.CleanupFaultCodes,
+            };
+        }
+
+        return new CleaningPathPumpCleanupReport
+        {
+            Attempted = true,
+            TerminalState = result.TerminalState.ToString(),
+            CleanupState = result.CleanupState,
+            StoppedConfirmed = result.StoppedConfirmed,
+            OwnershipReleased = !_pump.OwnsPumpCommand,
+            CleanupFaultCodes = result.CleanupFaultCodes,
         };
     }
 
@@ -688,6 +968,196 @@ public sealed class CleaningPathDryComposition : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Reads the typed Pump lifecycle configuration from Owner-local values. The setpoint is the ONE
+    /// setpoint the composition already resolved, so a second setpoint can never disagree with it.
+    ///
+    /// The two feedback polarities are the only OPTIONAL values, and their absence is NOT a default
+    /// command: it leaves them NOT_CONFIGURED, which makes the physical Pump command fail closed. A
+    /// supplied value that is not a known polarity is refused rather than silently downgraded.
+    /// </summary>
+    private static bool TryReadPumpConfiguration(
+        Func<string, string?> readEnvironment,
+        SequencingPressureThresholds thresholds,
+        out PumpLifecycleConfiguration configuration,
+        out int selection,
+        out string refusalCode,
+        out string refusalDetail)
+    {
+        configuration = null!;
+        selection = 0;
+        refusalCode = string.Empty;
+        refusalDetail = string.Empty;
+
+        if (!TryReadOptionalInt(readEnvironment, PumpSelectionVariable, null, out int? parsedSelection)
+            || parsedSelection is not { } pumpOrdinal
+            || !PumpCommandContract.IsValidSelection(pumpOrdinal))
+        {
+            refusalCode = RefusedPumpConfiguration;
+            refusalDetail =
+                $"{PumpSelectionVariable} must name exactly Pump 1 or Pump 2. It is never defaulted: an "
+                + "assumed Pump ordinal would command a machine the composition was not authorized for.";
+            return false;
+        }
+
+        if (!TryReadDouble(readEnvironment, PumpAnalogTargetVariable, out double target)
+            || !PumpAnalogCommandContract.IsLive(target))
+        {
+            refusalCode = RefusedPumpConfiguration;
+            refusalDetail =
+                $"{PumpAnalogTargetVariable} must be a finite running target inside the commissioned 4 to "
+                + "20 mA span. A target below 4 mA is an invalid configuration, and no value is clamped.";
+            return false;
+        }
+
+        if (!TryReadOptionalInt(
+                readEnvironment,
+                PumpFreshnessVariable,
+                PumpLifecycleConfiguration.OwnerInitialFreshnessBudgetMilliseconds,
+                out int? parsedFreshness)
+            || parsedFreshness is not { } freshness
+            || freshness is < 1 or > 600000)
+        {
+            refusalCode = RefusedPumpConfiguration;
+            refusalDetail = $"{PumpFreshnessVariable} must be an integer between 1 and 600000 milliseconds.";
+            return false;
+        }
+
+        if (!TryReadRequiredTimeout(readEnvironment, PumpRunningConfirmVariable, out TimeSpan runningTimeout)
+            || !TryReadRequiredTimeout(readEnvironment, PumpReadyTimeoutVariable, out TimeSpan readyTimeout)
+            || !TryReadRequiredTimeout(readEnvironment, PumpStoppedConfirmVariable, out TimeSpan stoppedTimeout))
+        {
+            refusalCode = RefusedPumpConfiguration;
+            refusalDetail =
+                $"The Pump supervision timeouts in {PumpRunningConfirmVariable}, {PumpReadyTimeoutVariable} "
+                + $"and {PumpStoppedConfirmVariable} are required integers between 1 and 600000 "
+                + "milliseconds. They are never defaulted.";
+            return false;
+        }
+
+        if (!TryReadPolarity(readEnvironment, PumpRunningPolarityVariable, out PumpFeedbackPolarity runningPolarity)
+            || !TryReadPolarity(readEnvironment, PumpFaultPolarityVariable, out PumpFeedbackPolarity faultPolarity))
+        {
+            refusalCode = RefusedPumpConfiguration;
+            refusalDetail =
+                $"{PumpRunningPolarityVariable} and {PumpFaultPolarityVariable} must each be absent, "
+                + "ACTIVE_HIGH or ACTIVE_LOW. A supplied value that is none of these is refused rather "
+                + "than treated as uncommissioned.";
+            return false;
+        }
+
+        var candidate = new PumpLifecycleConfiguration
+        {
+            PumpReadySetpointBar = thresholds.PumpReadySetpointBar,
+            PressureFreshnessBudget = TimeSpan.FromMilliseconds(freshness),
+            RunningFeedbackTimeout = runningTimeout,
+            PumpReadyTimeout = readyTimeout,
+            StoppedFeedbackTimeout = stoppedTimeout,
+            Ramp = new PumpSpeedRampConfiguration
+            {
+                Interval = TimeSpan.FromMilliseconds(PumpSpeedRampConfiguration.OwnerInitialIntervalMilliseconds),
+                Step = PumpSpeedRampConfiguration.OwnerInitialStepMilliamps,
+                TargetEngineeringMilliamps = target,
+            },
+            Feedback = new PumpFeedbackConfiguration
+            {
+                RunningPolarity = runningPolarity,
+                FaultPolarity = faultPolarity,
+            },
+        };
+
+        if (!candidate.Valid)
+        {
+            refusalCode = RefusedPumpConfiguration;
+            refusalDetail = "The composed Pump lifecycle configuration is not valid.";
+            return false;
+        }
+
+        configuration = candidate;
+        selection = pumpOrdinal;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads one feedback polarity. Absence means NOT_CONFIGURED, which is not an error: it leaves the
+    /// physical Pump command fail-closed. A supplied value that is not a known polarity IS an error.
+    /// </summary>
+    private static bool TryReadPolarity(
+        Func<string, string?> readEnvironment,
+        string variable,
+        out PumpFeedbackPolarity polarity)
+    {
+        polarity = PumpFeedbackPolarity.NOT_CONFIGURED;
+
+        string? raw = readEnvironment(variable);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return true;
+        }
+
+        string value = raw.Trim();
+        if (string.Equals(value, "ACTIVE_HIGH", StringComparison.OrdinalIgnoreCase))
+        {
+            polarity = PumpFeedbackPolarity.ACTIVE_HIGH;
+            return true;
+        }
+
+        if (string.Equals(value, "ACTIVE_LOW", StringComparison.OrdinalIgnoreCase))
+        {
+            polarity = PumpFeedbackPolarity.ACTIVE_LOW;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Reads one required supervision timeout in milliseconds. Absence is a refusal.</summary>
+    private static bool TryReadRequiredTimeout(
+        Func<string, string?> readEnvironment,
+        string variable,
+        out TimeSpan timeout)
+    {
+        timeout = TimeSpan.Zero;
+        if (!TryReadOptionalInt(readEnvironment, variable, null, out int? parsed)
+            || parsed is not { } milliseconds
+            || milliseconds is < 1 or > 600000)
+        {
+            return false;
+        }
+
+        timeout = TimeSpan.FromMilliseconds(milliseconds);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads one optional integer. When the variable is absent the fallback is used, and a null fallback
+    /// means the value was required.
+    /// </summary>
+    private static bool TryReadOptionalInt(
+        Func<string, string?> readEnvironment,
+        string variable,
+        int? fallback,
+        out int? value)
+    {
+        value = null;
+
+        string? raw = readEnvironment(variable);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            if (fallback is null) return false;
+            value = fallback;
+            return true;
+        }
+
+        if (!int.TryParse(raw.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int parsed))
+        {
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
+
     private static bool TryReadSupervision(
         Func<string, string?> readEnvironment,
         out TimeSpan supervision,
@@ -747,8 +1217,44 @@ public sealed class CleaningPathDryComposition : IDisposable
 }
 
 /// <summary>One combined dry-cleanup report: motion and valve evidence stay separate.</summary>
+/// <summary>
+/// The Pump cleanup evidence of one composition. It is captured separately from the motion and valve
+/// cleanups so a complete valve close can never hide an unconfirmed Pump stop.
+/// </summary>
+public sealed record CleaningPathPumpCleanupReport
+{
+    /// <summary>False only when no Pump lifecycle was ever started, so there was nothing to stop.</summary>
+    public required bool Attempted { get; init; }
+
+    /// <summary>The terminal lifecycle state. STOPPED only when the stop was confirmed.</summary>
+    public required string TerminalState { get; init; }
+
+    /// <summary>The typed cleanup state. Never claimed complete without a confirmed stopped reading.</summary>
+    public required string CleanupState { get; init; }
+
+    /// <summary>True only when the commissioned not-running feedback was observed.</summary>
+    public required bool StoppedConfirmed { get; init; }
+
+    /// <summary>
+    /// True only when the command channel was released. Ownership is released after the Stop is
+    /// confirmed, never before, so an unconfirmed stop keeps the channel held.
+    /// </summary>
+    public required bool OwnershipReleased { get; init; }
+
+    /// <summary>The ordered cleanup fault codes. Never merged into the primary failure.</summary>
+    public required IReadOnlyList<string> CleanupFaultCodes { get; init; }
+
+    /// <summary>True only when every attempted stage was independently observed complete.</summary>
+    public bool Complete => !Attempted
+        || (StoppedConfirmed && OwnershipReleased
+            && string.Equals(CleanupState, PumpCleanupStates.Complete, StringComparison.Ordinal));
+}
+
 public sealed record CleaningPathDryCleanupReport
 {
+    /// <summary>The Pump Stop evidence of this composition.</summary>
+    public required CleaningPathPumpCleanupReport Pump { get; init; }
+
     /// <summary>The motion Stop, session close and native release evidence.</summary>
     public required MotionCleanupRecord Motion { get; init; }
 
@@ -765,5 +1271,5 @@ public sealed record CleaningPathDryCleanupReport
     /// True only when both cleanups were independently observed complete. Neither side can mask the
     /// other: a complete valve close never hides a failed motion Stop.
     /// </summary>
-    public bool Complete => Motion.Complete && Valves.Complete;
+    public bool Complete => Pump.Complete && Motion.Complete && Valves.Complete;
 }

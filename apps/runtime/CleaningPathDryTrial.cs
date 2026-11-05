@@ -127,6 +127,12 @@ internal static class CleaningPathDryTrial
             finally
             {
                 CleaningPathDryCleanupReport cleanup = dry.Shutdown();
+                output.WriteLine("  cleanup.pump.attempted=" + cleanup.Pump.Attempted.ToString());
+                output.WriteLine("  cleanup.pump.terminal=" + cleanup.Pump.TerminalState);
+                output.WriteLine("  cleanup.pump.state=" + cleanup.Pump.CleanupState);
+                output.WriteLine("  cleanup.pump.stopped_confirmed=" + cleanup.Pump.StoppedConfirmed.ToString());
+                output.WriteLine("  cleanup.pump.ownership_released=" + cleanup.Pump.OwnershipReleased.ToString());
+                output.WriteLine("  cleanup.pump.complete=" + cleanup.Pump.Complete.ToString());
                 output.WriteLine("  cleanup.motion.complete=" + cleanup.Motion.Complete.ToString());
                 output.WriteLine("  cleanup.motion.session=" + cleanup.Motion.SessionState);
                 output.WriteLine("  cleanup.motion.close=" + cleanup.Motion.CloseCode);
@@ -163,6 +169,10 @@ internal static class CleaningPathDryTrial
         output.WriteLine("  motion_profile=" + provenance.MotionProfileCode);
         output.WriteLine("  write_authority=" + (provenance.SessionAuthorizedWrites ? "PROCESS_IO_SESSION" : "NONE"));
         output.WriteLine("  coordinators=" + (provenance.CoordinatorsComposed ? "COMPOSITION+EXECUTION" : "NONE"));
+        output.WriteLine("  pump_selection=" + provenance.PumpSelection.ToString(CultureInfo.InvariantCulture));
+        output.WriteLine("  pump_feedback=" + (provenance.PumpFeedbackCommissioned ? "COMMISSIONED" : "NOT_COMMISSIONED"));
+        output.WriteLine("  pump_owner=" + provenance.PumpCommandOwner);
+        output.WriteLine("  pump_gate=" + (provenance.PumpGateComposed ? "PUMP_PRECONDITION" : "NONE"));
         foreach (string statement in CleaningPathDryProvenance.StandingStatements)
         {
             output.WriteLine("  " + statement);
