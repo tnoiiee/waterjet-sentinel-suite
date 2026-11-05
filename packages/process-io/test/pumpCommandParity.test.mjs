@@ -17,7 +17,8 @@ import {
   PUMP_COMMAND_OUTPUTS, PUMP_ANALOG_OUTPUT, PUMP_FEEDBACK_INPUTS, PUMP_PRESSURE_INPUTS,
   MAINTAINED_SEMANTICS, SELECTION_SEQUENCES, START_SEQUENCE, STOP_SEQUENCE, SUPERSEDED_STOP_SEQUENCE,
   PUMP_READY_CONFIGURATION, FEEDBACK_POLARITY, PUMP_FAILURE_STATES, PUMP_PROGRESSION_STATES,
-  PUMP_STOP_REASONS,
+  PUMP_STOP_REASONS, PUMP_ANALOG_ANCHORS, PUMP_ANALOG_COMMAND_KIND,
+  pumpCommandKind, pumpRawWord, pumpRampNext,
 } from '../src/pumpCommandEvidence.mjs';
 
 const ROOT = new URL('../../../', import.meta.url);
@@ -193,24 +194,99 @@ test('pump parity: the analog ramp is the commissioned 1000 ms interval and step
   assert.equal(constNumber(CONTRACTS, 'SafeZeroEngineeringCommand'), PUMP_ANALOG_OUTPUT.safeZero);
   assert.equal(constNumber(CONTRACTS, 'EngineeringMinimum'), PUMP_ANALOG_OUTPUT.engineeringMin);
   assert.equal(constNumber(CONTRACTS, 'EngineeringMaximum'), PUMP_ANALOG_OUTPUT.engineeringMax);
+  assert.equal(constNumber(CONTRACTS, 'EngineeringMinimum'), 4);
+  assert.equal(constNumber(CONTRACTS, 'EngineeringMaximum'), 20);
 
   assert.equal(PUMP_ANALOG_OUTPUT.rampIntervalMilliseconds, 1000);
   assert.equal(PUMP_ANALOG_OUTPUT.rampStepEngineering, 2);
 });
 
-test('pump parity: the analog command keeps its commissioned milliamp unit and conversion', () => {
+test('pump parity: the Pump command keeps its commissioned milliamp unit and its own 4 to 20 mA authority', () => {
   assert.equal(constString(CONTRACTS, 'EngineeringUnit'), 'mA');
   assert.equal(PUMP_ANALOG_OUTPUT.engineeringUnit, 'mA');
 
-  // The conversion itself is NOT restated in the Pump contract: the existing boundary owns it.
-  assert.match(CONTRACTS, /ProcessIoEngineering\.TryPumpSpeedRaw/);
+  // The Pump command has ONE conversion authority of its own. The general 0 to 20 mA helper is NOT the
+  // Pump authority and this contract must not defer to it.
+  assert.match(CONTRACTS, /public static bool TryToRaw\(PumpAnalogCommand command, out int raw\)/);
+  assert.doesNotMatch(CONTRACTS, /ProcessIoEngineering\.TryPumpSpeedRaw/);
 
+  // The general converter is unchanged: it still declares its own 0 to 20 mA contract, and it must not
+  // be rewritten to serve the Pump.
+  const general = read('packages/contracts/ProcessIoContracts.cs');
+  assert.match(general, /public static bool TryPumpSpeedRaw\(double milliamps, out int raw\)[\s\S]{0,200}milliamps < 0 \|\| milliamps > 20/);
+
+  // The Legacy raw-to-milliamps record is unchanged too: it describes the READ direction, not the
+  // Pump write command, so it is not the authority for the 4 to 20 mA write map.
   const conversion = ANALOG_OUTPUT_CONVERSION['AO-001+'];
   assert.equal(conversion.engineeringUnit, 'mA');
-  assert.equal(conversion.engineeringMin, PUMP_ANALOG_OUTPUT.engineeringMin);
-  assert.equal(conversion.engineeringMax, PUMP_ANALOG_OUTPUT.engineeringMax);
   assert.equal(conversion.rawFullScale, PUMP_ANALOG_OUTPUT.rawFullScale);
-  assert.equal(conversion.safeValue, PUMP_ANALOG_OUTPUT.safeZero);
+});
+
+test('pump parity: the write conversion is the exact Legacy map(mA, 4, 20, 0, 32767)', () => {
+  // Anchors, from both the mirror and the C# source constants.
+  assert.equal(PUMP_ANALOG_OUTPUT.liveMinimumMilliamps, 4);
+  assert.equal(PUMP_ANALOG_OUTPUT.liveMaximumMilliamps, 20);
+  assert.equal(PUMP_ANALOG_OUTPUT.safeStopSentinelMilliamps, 0);
+
+  assert.equal(constNumber(CONTRACTS, 'LiveMinimumMilliamps'), 4);
+  assert.equal(constNumber(CONTRACTS, 'LiveMaximumMilliamps'), 20);
+  assert.equal(constNumber(CONTRACTS, 'SafeStopSentinelMilliamps'), 0);
+
+  for (const anchor of PUMP_ANALOG_ANCHORS) {
+    const converted = pumpRawWord(anchor.milliamps);
+    assert.equal(converted.ok, true, `${anchor.milliamps} mA must be accepted`);
+    assert.equal(converted.raw, anchor.raw, `${anchor.milliamps} mA must convert to raw ${anchor.raw}`);
+    assert.equal(converted.kind, anchor.kind, `${anchor.milliamps} mA has the wrong command kind`);
+  }
+
+  // The false 4 mA to 6553 claim is gone from the contract and the mirror.
+  assert.doesNotMatch(CONTRACTS, /6553/);
+  assert.notEqual(pumpRawWord(4).raw, 6553);
+});
+
+test('pump parity: the open 0 to 4 mA band, a negative value and above 20 mA are refused', () => {
+  for (const value of [-0.001, 0.001, 1, 2, 3.999, 20.001, 21]) {
+    assert.equal(pumpCommandKind(value).ok, false, `${value} mA must be refused`);
+    assert.equal(pumpRawWord(value).ok, false, `${value} mA must produce no raw word`);
+    assert.equal(pumpRawWord(value).raw, undefined);
+  }
+
+  assert.equal(pumpCommandKind(0).kind, PUMP_ANALOG_COMMAND_KIND.SAFE_STOP_SENTINEL);
+  assert.equal(pumpCommandKind(4).kind, PUMP_ANALOG_COMMAND_KIND.RUNNING);
+  assert.equal(pumpCommandKind(20).kind, PUMP_ANALOG_COMMAND_KIND.RUNNING);
+});
+
+test('pump parity: the raw word is ambiguous at 0 and never infers running or stopped', () => {
+  const sentinel = pumpRawWord(0);
+  const liveMinimum = pumpRawWord(4);
+
+  assert.equal(sentinel.raw, 0);
+  assert.equal(liveMinimum.raw, 0);
+  assert.notEqual(sentinel.kind, liveMinimum.kind);
+});
+
+test('pump parity: a running target below 4 mA is an invalid configuration', () => {
+  assert.equal(pumpCommandKind(2).ok, false);
+  assert.equal(pumpRampNext(0, 2, 2).ok, false);
+  assert.equal(pumpRampNext(20, 2, 2).ok, false);
+
+  // A live target is accepted.
+  assert.equal(pumpRampNext(0, 4, 2).ok, true);
+});
+
+test('pump parity: the ramp never emits a value inside the open 0 to 4 mA band', () => {
+  let current = 20;
+  for (let step = 0; step < 32 && current !== 0; step += 1) {
+    const next = pumpRampNext(current, 0, 2);
+    assert.equal(next.ok, true);
+    assert.ok(
+      next.kind === PUMP_ANALOG_COMMAND_KIND.SAFE_STOP_SENTINEL
+        || (next.milliamps >= 4 && next.milliamps <= 20),
+      `the ramp emitted an invalid command: ${next.milliamps}`);
+    current = next.milliamps;
+  }
+
+  assert.equal(current, 0);
 });
 
 // ---------------------------------------------------------------- readiness
@@ -313,5 +389,5 @@ test('pump parity: no raw transport, no arbitrary write and no UI command surfac
   const boundary = read('packages/application/ProcessIo/ProcessIoPumpCommandBoundary.cs');
   assert.match(boundary, /_session\.AdmitWrite/);
   assert.match(boundary, /_session\.DispatchDigitalOutput/);
-  assert.match(boundary, /_session\.DispatchAnalogOutput/);
+  assert.match(boundary, /_session\.DispatchPumpAnalogOutput/);
 });

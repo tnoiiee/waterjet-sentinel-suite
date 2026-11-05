@@ -16,18 +16,132 @@ export const PUMP_COMMAND_OUTPUTS = Object.freeze({
   RUN_PUMP: Object.freeze({ tag: 'DO-007', coil: 6 }),
 });
 
-/** The analog speed reference. The engineering unit is milliamps, never pressure. */
+/**
+ * The analog speed reference. The engineering unit is milliamps, never pressure.
+ *
+ * The live running domain is the CLOSED 4 to 20 mA span, and 0 mA is the explicit safe-stop sentinel.
+ * The open 0 to 4 mA band is not a command: it is an invalid value and is refused, never clamped. The
+ * exact Legacy write is map(mA, 4, 20, 0, 32767), so 4 mA and the sentinel both produce raw 0 and the
+ * raw word alone can never be read back as running or stopped.
+ */
 export const PUMP_ANALOG_OUTPUT = Object.freeze({
   tag: 'AO-001+',
   register: 0,
   engineeringUnit: 'mA',
-  engineeringMin: 0,
+  engineeringMin: 4,
   engineeringMax: 20,
   rawFullScale: 32767,
   safeZero: 0,
+  safeStopSentinelMilliamps: 0,
+  liveMinimumMilliamps: 4,
+  liveMaximumMilliamps: 20,
   rampIntervalMilliseconds: 1000,
   rampStepEngineering: 2,
 });
+
+/** The two admissible command kinds. Raw 0 belongs to both, so the kind carries the identity. */
+export const PUMP_ANALOG_COMMAND_KIND = Object.freeze({
+  SAFE_STOP_SENTINEL: 'SAFE_STOP_SENTINEL',
+  RUNNING: 'RUNNING',
+});
+
+/** The exact conversion anchors of map(mA, 4, 20, 0, 32767). */
+export const PUMP_ANALOG_ANCHORS = Object.freeze([
+  Object.freeze({ milliamps: 0, raw: 0, kind: 'SAFE_STOP_SENTINEL' }),
+  Object.freeze({ milliamps: 4, raw: 0, kind: 'RUNNING' }),
+  Object.freeze({ milliamps: 12, raw: 16384, kind: 'RUNNING' }),
+  Object.freeze({ milliamps: 20, raw: 32767, kind: 'RUNNING' }),
+]);
+
+function isLiveMilliamps(value) {
+  return Number.isFinite(value)
+    && value >= PUMP_ANALOG_OUTPUT.liveMinimumMilliamps
+    && value <= PUMP_ANALOG_OUTPUT.liveMaximumMilliamps;
+}
+
+/**
+ * Classifies one engineering value as the explicit sentinel, a live running reference, or nothing.
+ * The open 0 to 4 mA band is refused and is never clamped into a neighbouring command.
+ */
+export function pumpCommandKind(milliamps) {
+  const value = Number(milliamps);
+  if (!Number.isFinite(value)) {
+    return Object.freeze({ ok: false, code: 'PUMP_ANALOG_REFUSED_NOT_FINITE' });
+  }
+  if (value === PUMP_ANALOG_OUTPUT.safeStopSentinelMilliamps) {
+    return Object.freeze({
+      ok: true,
+      kind: PUMP_ANALOG_COMMAND_KIND.SAFE_STOP_SENTINEL,
+      milliamps: value,
+    });
+  }
+  if (!isLiveMilliamps(value)) {
+    return Object.freeze({ ok: false, code: 'PUMP_ANALOG_REFUSED_OUT_OF_DOMAIN' });
+  }
+  return Object.freeze({ ok: true, kind: PUMP_ANALOG_COMMAND_KIND.RUNNING, milliamps: value });
+}
+
+/**
+ * The exact Legacy inverse, applied to a typed command. A refused value produces no raw word at all:
+ * this never clamps.
+ */
+export function pumpRawWord(milliamps) {
+  const classified = pumpCommandKind(milliamps);
+  if (!classified.ok) return classified;
+  if (classified.kind === PUMP_ANALOG_COMMAND_KIND.SAFE_STOP_SENTINEL) {
+    return Object.freeze({ ...classified, raw: 0 });
+  }
+
+  const span = PUMP_ANALOG_OUTPUT.liveMaximumMilliamps - PUMP_ANALOG_OUTPUT.liveMinimumMilliamps;
+  const scaled = ((classified.milliamps - PUMP_ANALOG_OUTPUT.liveMinimumMilliamps)
+    * PUMP_ANALOG_OUTPUT.rawFullScale) / span;
+  return Object.freeze({ ...classified, raw: Math.round(scaled) });
+}
+
+/**
+ * The next command of a Run or Stop ramp. Every emitted value is either the sentinel or a live
+ * reference, so the open 0 to 4 mA band is never produced in either direction.
+ */
+export function pumpRampNext(currentMilliamps, targetMilliamps, stepMilliamps) {
+  const current = pumpCommandKind(currentMilliamps);
+  if (!current.ok) return Object.freeze({ ok: false, code: 'PUMP_RAMP_REFUSED_CURRENT' });
+
+  const target = pumpCommandKind(targetMilliamps);
+  if (!target.ok) return Object.freeze({ ok: false, code: 'PUMP_RAMP_REFUSED_TARGET' });
+
+  const step = Number(stepMilliamps);
+  if (!Number.isFinite(step) || step <= 0) {
+    return Object.freeze({ ok: false, code: 'PUMP_RAMP_REFUSED_STEP' });
+  }
+
+  if (Math.abs(current.milliamps - target.milliamps) <= 1e-9) {
+    return Object.freeze({ ok: true, milliamps: target.milliamps, kind: target.kind });
+  }
+
+  if (target.kind === PUMP_ANALOG_COMMAND_KIND.SAFE_STOP_SENTINEL) {
+    const lowered = current.milliamps - step;
+    if (lowered < PUMP_ANALOG_OUTPUT.liveMinimumMilliamps) {
+      return Object.freeze({
+        ok: true,
+        milliamps: PUMP_ANALOG_OUTPUT.safeStopSentinelMilliamps,
+        kind: PUMP_ANALOG_COMMAND_KIND.SAFE_STOP_SENTINEL,
+      });
+    }
+    return Object.freeze({
+      ok: true,
+      milliamps: lowered,
+      kind: PUMP_ANALOG_COMMAND_KIND.RUNNING,
+    });
+  }
+
+  let candidate = current.milliamps + step;
+  if (candidate < PUMP_ANALOG_OUTPUT.liveMinimumMilliamps) {
+    candidate = PUMP_ANALOG_OUTPUT.liveMinimumMilliamps;
+  }
+  if (candidate > target.milliamps) candidate = target.milliamps;
+
+  return Object.freeze({ ok: true, milliamps: candidate, kind: PUMP_ANALOG_COMMAND_KIND.RUNNING });
+}
 
 /** The two feedback inputs. Their physical polarity is NOT commissioned in the Product. */
 export const PUMP_FEEDBACK_INPUTS = Object.freeze({
