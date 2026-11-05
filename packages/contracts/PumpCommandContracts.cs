@@ -232,6 +232,24 @@ public static class PumpCommandRefusals
     public const string RefusedAnalogOutOfDomain = "WJSS_PUMP_ANALOG_REFUSED_OUT_OF_DOMAIN";
     public const string RefusedNotReady = "WJSS_PUMP_COMMAND_REFUSED_NOT_READY";
     public const string RefusedAlreadyTerminal = "WJSS_PUMP_COMMAND_REFUSED_ALREADY_TERMINAL";
+
+    /// <summary>The alias the lifecycle uses for a terminal channel that may never restart.</summary>
+    public const string RefusedTerminal = RefusedAlreadyTerminal;
+
+    /// <summary>A Production owner attempted to acquire the channel.</summary>
+    public const string RefusedProductionOwner = RefusedProduction;
+
+    /// <summary>The transport reported a fault. Never retried automatically.</summary>
+    public const string RefusedTransportFault = "WJSS_PUMP_COMMAND_REFUSED_TRANSPORT_FAULT";
+
+    /// <summary>The tag has no adopted binding, so no address can be derived for it.</summary>
+    public const string RefusedUnbound = "WJSS_PUMP_COMMAND_REFUSED_UNBOUND";
+
+    /// <summary>The Pump Outlet Pressure evidence was not accepted as current physical evidence.</summary>
+    public const string RefusedPressure = "WJSS_PUMP_READY_REFUSED_PRESSURE";
+
+    /// <summary>The session did not admit the write, so nothing was dispatched.</summary>
+    public const string RefusedNotAdmitted = RefusedNotAdmittedBySession;
 }
 
 /// <summary>One step of an ordered command sequence: the tag, the maintained value and its order.</summary>
@@ -386,6 +404,33 @@ public static class PumpCommandContract
     };
 
     /// <summary>
+    /// The Start order as ordered tags. A view of <see cref="StartSequence"/>: the order is stated
+    /// once, and this member restates nothing.
+    /// </summary>
+    public static IReadOnlyList<string> StartOrder { get; } = new[]
+    {
+        EnableInverterTag,
+        RunPumpTag,
+    };
+
+    /// <summary>
+    /// The CORRECTED Stop order as ordered tags. A view of <see cref="StopSequence"/>, so the
+    /// superseded order has no place to reappear.
+    /// </summary>
+    public static IReadOnlyList<string> StopOrder { get; } = new[]
+    {
+        RunPumpTag,
+        EnableInverterTag,
+    };
+
+    /// <summary>
+    /// The adopted WRITE holding-register address of the analog speed reference. The tag is the
+    /// commissioned contract tag, so a caller cannot supply a different analog row here.
+    /// </summary>
+    public static bool TryAnalogAddress(out int registerAddress) =>
+        TryRegisterAddress(SpeedReferenceTag, out registerAddress);
+
+    /// <summary>
     /// True when the supplied order is the corrected one. Used to refuse a caller that supplies the
     /// superseded order rather than silently accepting it.
     /// </summary>
@@ -402,21 +447,34 @@ public static class PumpCommandContract
 }
 
 /// <summary>
-/// The analog speed reference conversion, restated as identity only. The conversion itself remains
-/// <see cref="ProcessIoEngineering.TryPumpSpeedRaw"/>: this type adds no second map.
+/// The Pump analog speed reference command: the ONE Pump-specific conversion authority.
+///
+/// The Legacy write conversion is map(pumpCurrentOut, 4, 20, 0, 32767). The live running span is the
+/// closed 4 to 20 mA range, an explicit 0 mA sentinel withdraws the reference, and a value in the open
+/// 0 to 4 mA band, a negative value or a value above 20 mA is refused rather than clamped.
+///
+/// The general 0 to 20 mA helper belongs to unrelated Product callers, is NOT this authority, is not
+/// modified, and is never used to produce a Pump command.
 ///
 /// The engineering command unit is milliamps, as commissioned. It is deliberately NOT renamed to
 /// pressure: no conversion authority proves that the analog output means bar.
 /// </summary>
 public static class PumpAnalogCommandContract
 {
+    /// <summary>The analog output row.</summary>
     public const string Tag = PumpCommandContract.SpeedReferenceTag;
-    public const string EngineeringUnit = "mA";
-    public const double EngineeringMinimum = 0.0;
-    public const double EngineeringMaximum = 20.0;
 
-    /// <summary>The commissioned safe zero of the analog command.</summary>
-    public const double SafeZeroEngineeringCommand = 0.0;
+    /// <summary>The engineering unit. Milliamps, not bar.</summary>
+    public const string EngineeringUnit = "mA";
+
+    /// <summary>The lowest live running reference. Inclusive.</summary>
+    public const double LiveMinimumMilliamps = 4.0;
+
+    /// <summary>The highest live running reference. Inclusive, and equal to raw full scale.</summary>
+    public const double LiveMaximumMilliamps = 20.0;
+
+    /// <summary>The explicit safe-stop sentinel. Not a live signal, and it shares raw 0 with 4 mA.</summary>
+    public const double SafeStopSentinelMilliamps = 0.0;
 
     /// <summary>The commissioned automatic ramp interval.</summary>
     public const int RampIntervalMilliseconds = 1000;
@@ -424,82 +482,278 @@ public static class PumpAnalogCommandContract
     /// <summary>The commissioned automatic ramp step, in engineering command units.</summary>
     public const double RampStepEngineering = 2.0;
 
-    /// <summary>True when the value is inside the commissioned engineering domain.</summary>
+    /// <summary>The closed live running domain lower bound. Inclusive, equal to the live minimum.</summary>
+    public const double EngineeringMinimum = 4.0;
+
+    /// <summary>The closed live running domain upper bound. Inclusive, equal to the live maximum.</summary>
+    public const double EngineeringMaximum = 20.0;
+
+    /// <summary>The safe zero the down-ramp converges on: the explicit sentinel, never 2 mA.</summary>
+    public const double SafeZeroEngineeringCommand = 0.0;
+
+    /// <summary>Evidence code for the explicit safe-stop sentinel.</summary>
+    public const string SafeStopSentinelCode = "PUMP_ANALOG_SAFE_STOP_SENTINEL_0MA";
+
+    /// <summary>Evidence code for a live running reference.</summary>
+    public const string RunningCode = "PUMP_ANALOG_RUNNING_REFERENCE";
+
+    /// <summary>True when the value is a live running reference: 4 to 20 mA inclusive.</summary>
+    public static bool IsLive(double milliamps) =>
+        double.IsFinite(milliamps)
+        && milliamps >= LiveMinimumMilliamps
+        && milliamps <= LiveMaximumMilliamps;
+
+    /// <summary>True when the value is the explicit 0 mA safe-stop sentinel.</summary>
+    public static bool IsSafeStopSentinel(double milliamps) =>
+        double.IsFinite(milliamps) && milliamps == SafeStopSentinelMilliamps;
+
+    /// <summary>
+    /// The Pump command domain: the sentinel plus the closed live span. The open 0 to 4 mA band is NOT
+    /// in the domain, and neither is any negative or above-20 mA value.
+    /// </summary>
     public static bool IsInDomain(double engineering) =>
-        double.IsFinite(engineering)
-        && engineering >= EngineeringMinimum
-        && engineering <= EngineeringMaximum;
+        IsSafeStopSentinel(engineering) || IsLive(engineering);
+
+    /// <summary>
+    /// The exact Legacy conversion, applied to a typed command: map(mA, 4, 20, 0, 32767). A running
+    /// command of exactly 4 mA yields raw 0, 12 mA yields 16384 and 20 mA yields 32767. The sentinel
+    /// yields raw 0 as well, which is why the engineering identity is carried by the command kind and
+    /// never inferred from the raw word.
+    /// </summary>
+    public static bool TryToRaw(PumpAnalogCommand command, out int raw)
+    {
+        raw = 0;
+        if (!command.Valid) return false;
+        if (command.IsSafeStopSentinel) return true;
+        if (!IsLive(command.Milliamps)) return false;
+
+        double span = LiveMaximumMilliamps - LiveMinimumMilliamps;
+        double scaled = (command.Milliamps - LiveMinimumMilliamps)
+            * ProcessIoRepresentation.RawFullScale / span;
+        raw = (int)Math.Round(scaled, MidpointRounding.AwayFromZero);
+        return true;
+    }
+
+    /// <summary>
+    /// Builds the one command the value denotes and converts it, or refuses it. This is the only Pump
+    /// raw-word entry, and it refuses rather than clamps.
+    /// </summary>
+    public static bool TryToRaw(double milliamps, out int raw)
+    {
+        raw = 0;
+        return PumpAnalogCommand.TryCreate(milliamps, out PumpAnalogCommand command) && TryToRaw(command, out raw);
+    }
 }
 
 /// <summary>
-/// The ramp shape: one step per interval toward the target, clamped so the command never passes the
-/// target, and the same shape in both directions so the down-ramp reaches the configured safe zero.
+/// The two admissible kinds of Pump analog command. The kind carries the engineering identity that
+/// the raw word cannot: the 4 mA live minimum and the 0 mA safe-stop sentinel both convert to raw 0.
+/// </summary>
+public enum PumpAnalogCommandKind
+{
+    /// <summary>0 mA safe-stop sentinel: the analog reference is withdrawn.</summary>
+    SAFE_STOP_SENTINEL = 0,
+
+    /// <summary>A live running reference inside the commissioned 4 to 20 mA span.</summary>
+    RUNNING = 1,
+}
+
+/// <summary>
+/// One typed Pump analog command. A command is either the explicit 0 mA safe-stop sentinel or a live
+/// running reference in the closed 4 to 20 mA span. Anything else is not a command: there is no third
+/// kind and no unknown value, so an invalid engineering value can never be constructed.
+/// </summary>
+public readonly record struct PumpAnalogCommand
+{
+    private PumpAnalogCommand(PumpAnalogCommandKind kind, double milliamps)
+    {
+        Kind = kind;
+        Milliamps = milliamps;
+        Valid = true;
+    }
+
+    /// <summary>Which of the two admissible commands this is.</summary>
+    public PumpAnalogCommandKind Kind { get; }
+
+    /// <summary>The engineering command in milliamps.</summary>
+    public double Milliamps { get; }
+
+    /// <summary>False only for the default value, which is never a command.</summary>
+    public bool Valid { get; }
+
+    /// <summary>True only for the explicit 0 mA safe-stop sentinel.</summary>
+    public bool IsSafeStopSentinel => Valid && Kind == PumpAnalogCommandKind.SAFE_STOP_SENTINEL;
+
+    /// <summary>True only for a live running reference in the 4 to 20 mA span.</summary>
+    public bool IsRunning => Valid && Kind == PumpAnalogCommandKind.RUNNING;
+
+    /// <summary>The explicit safe-stop sentinel: 0 mA, raw 0.</summary>
+    public static PumpAnalogCommand SafeStopSentinel =>
+        new(PumpAnalogCommandKind.SAFE_STOP_SENTINEL, PumpAnalogCommandContract.SafeStopSentinelMilliamps);
+
+    /// <summary>
+    /// Creates the one command the value denotes, or refuses it. Exactly 0 mA is the sentinel; 4 to
+    /// 20 mA inclusive is a live running reference; every other value (negative, above 20 mA and the
+    /// open 0 to 4 mA band) is refused and is never clamped into a neighbouring command.
+    /// </summary>
+    public static bool TryCreate(double milliamps, out PumpAnalogCommand command)
+    {
+        command = default;
+
+        if (!double.IsFinite(milliamps)) return false;
+
+        if (milliamps == PumpAnalogCommandContract.SafeStopSentinelMilliamps)
+        {
+            command = SafeStopSentinel;
+            return true;
+        }
+
+        if (!PumpAnalogCommandContract.IsLive(milliamps)) return false;
+
+        command = new PumpAnalogCommand(PumpAnalogCommandKind.RUNNING, milliamps);
+        return true;
+    }
+
+    /// <summary>
+    /// Creates a live running reference. A value outside the closed 4 to 20 mA span is refused: a
+    /// running target below 4 mA is an invalid configuration, not a slow speed.
+    /// </summary>
+    public static bool TryCreateRunning(double milliamps, out PumpAnalogCommand command)
+    {
+        command = default;
+        if (!PumpAnalogCommandContract.IsLive(milliamps)) return false;
+        command = new PumpAnalogCommand(PumpAnalogCommandKind.RUNNING, milliamps);
+        return true;
+    }
+
+    /// <summary>The canonical evidence code for this command kind. Never the raw word.</summary>
+    public string KindCode => Kind == PumpAnalogCommandKind.SAFE_STOP_SENTINEL
+        ? PumpAnalogCommandContract.SafeStopSentinelCode
+        : PumpAnalogCommandContract.RunningCode;
+
+    public override string ToString() => KindCode;
+}
+
+/// <summary>Typed cleanup states. A completion is never claimed without a confirmed stopped reading.</summary>
+public static class PumpCleanupStates
+{
+    /// <summary>Every stage was observed complete and the stopped state was confirmed.</summary>
+    public const string Complete = "COMPLETE";
+
+    /// <summary>At least one stage failed or could not be confirmed.</summary>
+    public const string Incomplete = "CLEANUP_INCOMPLETE";
+
+    /// <summary>The stopped state is unknown. Physical abort is required.</summary>
+    public const string PhysicalAbortRequired = "PHYSICAL_ABORT_REQUIRED";
+}
+
+/// <summary>
+/// The ramp shape: one command step per interval toward the target, clamped so the command never
+/// passes the target, and expressed as a typed command so the 0 to 4 mA band is never emitted.
+///
+/// The Owner-initial shape is a 1000 ms interval with a 2 mA step, converging on the explicit
+/// safe-stop sentinel. Both values are configuration, not physics.
 /// </summary>
 public sealed record PumpSpeedRampConfiguration
 {
-    /// <summary>Elapsed time between two ramp steps. No default: it is deployment configuration.</summary>
-    public required TimeSpan Interval { get; init; }
+    /// <summary>The Owner-initial ramp interval.</summary>
+    public const int OwnerInitialIntervalMilliseconds = 1000;
 
-    /// <summary>Engineering units added or removed per interval. No default.</summary>
-    public required double Step { get; init; }
+    /// <summary>The Owner-initial ramp step, in milliamps.</summary>
+    public const double OwnerInitialStepMilliamps = 2.0;
 
-    /// <summary>The configured upward target of the automatic ramp.</summary>
-    public required double TargetEngineeringCommand { get; init; }
+    /// <summary>Elapsed time between two ramp steps.</summary>
+    public TimeSpan Interval { get; init; } = TimeSpan.FromMilliseconds(OwnerInitialIntervalMilliseconds);
 
-    /// <summary>The configured safe zero the down-ramp converges on.</summary>
-    public required double SafeZeroEngineeringCommand { get; init; }
+    /// <summary>Engineering milliamps added or removed per interval.</summary>
+    public double Step { get; init; } = OwnerInitialStepMilliamps;
 
-    /// <summary>The Owner-initialized shape: 1000 ms interval and a step of 2 engineering units.</summary>
-    public static PumpSpeedRampConfiguration OwnerInitial(double targetEngineeringCommand) => new()
-    {
-        Interval = TimeSpan.FromMilliseconds(PumpAnalogCommandContract.RampIntervalMilliseconds),
-        Step = PumpAnalogCommandContract.RampStepEngineering,
-        TargetEngineeringCommand = targetEngineeringCommand,
-        SafeZeroEngineeringCommand = PumpAnalogCommandContract.SafeZeroEngineeringCommand,
-    };
+    /// <summary>The configured running target. It must be a live reference.</summary>
+    public required double TargetEngineeringMilliamps { get; init; }
 
+    /// <summary>The safe zero the down-ramp converges on: the explicit sentinel.</summary>
+    public double SafeZeroEngineeringCommand { get; init; } = PumpAnalogCommandContract.SafeZeroEngineeringCommand;
+
+    /// <summary>
+    /// True only when the interval and step are usable, the target is a live reference and the safe
+    /// zero is the explicit sentinel. A target below 4 mA is an invalid configuration.
+    /// </summary>
     public bool Valid =>
         Interval > TimeSpan.Zero
         && double.IsFinite(Step)
         && Step > 0
-        && PumpAnalogCommandContract.IsInDomain(TargetEngineeringCommand)
-        && PumpAnalogCommandContract.IsInDomain(SafeZeroEngineeringCommand)
-        && SafeZeroEngineeringCommand < TargetEngineeringCommand;
+        && PumpAnalogCommandContract.IsLive(TargetEngineeringMilliamps)
+        && PumpAnalogCommandContract.IsSafeStopSentinel(SafeZeroEngineeringCommand)
+        && SafeZeroEngineeringCommand < TargetEngineeringMilliamps;
 }
 
-/// <summary>The one ramp arithmetic. Nothing else clamps a Pump analog command.</summary>
-public static class PumpSpeedRamp
+/// <summary>
+/// The one ramp arithmetic. Every produced value is a typed command, so the caller cannot write an
+/// analog value outside the commissioned domain even by accident.
+/// </summary>
+public static class PumpAnalogRamp
 {
     private const double Epsilon = 1e-9;
 
+    /// <summary>True when the command is already the target value.</summary>
+    public static bool AtTarget(PumpAnalogCommand current, double target) =>
+        current.Valid && double.IsFinite(target) && Math.Abs(current.Milliamps - target) <= Epsilon;
+
     /// <summary>
-    /// The next command value: one step toward the target, clamped so it never passes the target.
+    /// The next command toward the target. The target is either the explicit 0 mA sentinel (a Stop
+    /// ramp) or a live 4 to 20 mA reference (a Run ramp). Any other target, a non-positive step or an
+    /// invalid current command is refused, and no command is produced.
     /// </summary>
-    public static double Next(double current, double target, double step)
+    public static bool TryNext(
+        PumpAnalogCommand current,
+        double target,
+        double step,
+        out PumpAnalogCommand next)
     {
-        if (!double.IsFinite(current) || !double.IsFinite(target) || !double.IsFinite(step) || step <= 0)
+        next = default;
+
+        if (!current.Valid) return false;
+        if (!double.IsFinite(step) || step <= 0) return false;
+        if (!PumpAnalogCommandContract.IsInDomain(target)) return false;
+
+        if (AtTarget(current, target))
         {
-            return double.NaN;
+            next = current;
+            return true;
         }
 
-        if (current < target)
+        if (PumpAnalogCommandContract.IsSafeStopSentinel(target))
         {
-            double raised = current + step;
-            return raised > target ? target : raised;
+            // A Stop ramp converges on the explicit sentinel. Anything below the 4 mA live minimum is
+            // no longer a live reference, so the next command is the sentinel and never 2 mA.
+            double lowered = current.Milliamps - step;
+            next = lowered < PumpAnalogCommandContract.LiveMinimumMilliamps - Epsilon
+                ? PumpAnalogCommand.SafeStopSentinel
+                : Command(lowered);
+            return true;
         }
 
-        if (current > target)
+        // The first live command of a Run ramp is the 4 mA live minimum, so a ramp that starts at the
+        // sentinel never passes through the open band either.
+        double candidate = current.Milliamps + step;
+        if (candidate < PumpAnalogCommandContract.LiveMinimumMilliamps)
         {
-            double lowered = current - step;
-            return lowered < target ? target : lowered;
+            candidate = PumpAnalogCommandContract.LiveMinimumMilliamps;
         }
 
-        return target;
+        if (candidate > target)
+        {
+            candidate = target;
+        }
+
+        next = Command(candidate);
+        return true;
     }
 
-    /// <summary>True when the current command has reached the target.</summary>
-    public static bool AtTarget(double current, double target) =>
-        double.IsFinite(current) && double.IsFinite(target) && Math.Abs(current - target) <= Epsilon;
+    private static PumpAnalogCommand Command(double milliamps) =>
+        PumpAnalogCommand.TryCreateRunning(milliamps, out PumpAnalogCommand command)
+            ? command
+            : PumpAnalogCommand.SafeStopSentinel;
 }
 
 /// <summary>
@@ -532,8 +786,11 @@ public sealed record PumpLifecycleConfiguration
     /// <summary>The ramp shape of the analog command.</summary>
     public required PumpSpeedRampConfiguration Ramp { get; init; }
 
-    /// <summary>The commissioned feedback polarity. Uncommissioned by default, and then refused.</summary>
-    public required PumpFeedbackConfiguration Feedback { get; init; }
+    /// <summary>
+    /// The commissioned feedback polarity. The Product initial state leaves both inputs
+    /// NOT_CONFIGURED, which fails the whole command path closed rather than assuming a polarity.
+    /// </summary>
+    public PumpFeedbackConfiguration Feedback { get; init; } = PumpFeedbackConfiguration.Uncommissioned;
 
     public bool Valid
     {
