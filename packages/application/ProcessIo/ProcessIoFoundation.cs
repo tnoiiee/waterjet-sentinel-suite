@@ -223,6 +223,12 @@ public sealed class ProcessIoSession
         return true;
     }
 
+    /// <summary>
+    /// Writes one analog word using the general 0 to 20 mA helper. This is NOT the Product Pump
+    /// command path: the owner of the Pump speed reference is
+    /// <see cref="DispatchPumpAnalogOutput"/>, whose conversion is the commissioned 4 to 20 mA map.
+    /// The general entry is retained unchanged for the existing Hardware bench diagnostic caller.
+    /// </summary>
     public bool DispatchAnalogOutput(DateTimeOffset at, string token, ProcessIoCatalogueRow row, double value)
     {
         if (State != "OPEN" || _stopped) return false;
@@ -233,6 +239,32 @@ public sealed class ProcessIoSession
         if (!ProcessIoEngineering.TryPumpSpeedRaw(value, out int raw)) return false;
         _transport.WriteSingleRegister(row.Binding.DeviceKey, row.Binding.Address, (ushort)raw);
         AuditTrail.Add($"DISPATCH_AO {row.Tag} {value} (raw {raw}) {at:O}");
+        return true;
+    }
+
+    /// <summary>
+    /// Writes one typed Pump analog command through the commissioned 4 to 20 mA conversion. The
+    /// session remains the only write authority: this method only turns an already-admitted token and
+    /// an already-validated command into one register write.
+    ///
+    /// The engineering identity is written to the audit trail as the command kind, because the raw
+    /// word is 0 for both the 4 mA live minimum and the 0 mA safe-stop sentinel.
+    /// </summary>
+    public bool DispatchPumpAnalogOutput(
+        DateTimeOffset at,
+        string token,
+        ProcessIoCatalogueRow row,
+        PumpAnalogCommand command)
+    {
+        if (State != "OPEN" || _stopped) return false;
+        if (!_liveTokens.Remove(token)) return false;
+        _spentTokens.Add(token);
+        if (row.Binding is null || row.BindingState == ProcessIoBindingState.UNBOUND) return false;
+        if (!PumpAnalogCommandContract.TryToRaw(command, out int raw)) return false;
+
+        _transport.WriteSingleRegister(row.Binding.DeviceKey, row.Binding.Address, (ushort)raw);
+        AuditTrail.Add(
+            $"DISPATCH_AO {row.Tag} {command.KindCode} {command.Milliamps} mA (raw {raw}) {at:O}");
         return true;
     }
 

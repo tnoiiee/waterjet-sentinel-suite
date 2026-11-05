@@ -3,101 +3,76 @@ using Wjss.Runtime.Core.Sequencing;
 
 namespace Wjss.Runtime.Core.ProcessIo;
 
-// PUMP-COMMAND-PRODUCT-INTEGRATION: the one reusable Pump lifecycle.
+// PUMP PLATFORM, PHASE 0.5C: the ONE Main Pump lifecycle.
 //
-// Every consumer (manual commissioning, the integrated dry cycle, Cleaning Job preconditions and a
-// future automatic sequence) uses THIS implementation. There is no second state machine, no second
-// command order and no second cleanup path.
+// The lifecycle owns the Pump command ORDER, the selection pair, the analog ramp and the corrected Stop
+// sequence. It is deterministic: every transition is driven by Step() against the injected clock, so the
+// corrected Stop order is observable and each de-energisation happens exactly once. It never spawns a
+// thread, never retries, never sleeps and never touches a raw word or the transport: all I/O goes through
+// the typed boundary, which goes through the Process-Io session.
 //
 // SAFETY POSTURE
-//   1. Admission is fail closed. Production, a conflicting owner, a concurrent lifecycle, an invalid
-//      selection, an active configured Fault, an invalid configuration and an uncommissioned feedback
-//      polarity all refuse BEFORE a single write.
-//   2. Start never opens an Isolation Valve and never infers Running from pressure.
-//   3. Pump-ready is AI-003 only, strictly above the configured setpoint, from a current PHYSICAL_READ
-//      in the live generation. AI-002 is never read here.
-//   4. Every terminal path that began a command runs the SAME corrected cleanup: ramp toward the
-//      configured safe zero, de-energise Run Pump, then de-energise Enable Inverter, then wait for
-//      confirmed not-running feedback.
-//   5. An unknown stopped state is never reported as safe completion.
-//   6. Nothing retries. One lifecycle, one attempt.
+//   * A physical Pump command fails closed while either required feedback polarity is uncommissioned.
+//   * The corrected Stop order is Run Pump FALSE then Enable Inverter FALSE, and it is the only order.
+//   * A ramp failure NEVER skips either de-energisation.
+//   * Ownership is released only after the Stop is confirmed, never before.
+//   * A completion is never claimed while the stopped state is unknown.
 //
-// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
+// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. Physical Hardware has NOT been executed and is NOT
+// verified. Production write authority is NOT granted, and nothing here is a physical verification claim.
 
-/// <summary>Typed cleanup outcome vocabulary.</summary>
-public static class PumpCleanupStates
-{
-    /// <summary>Every commanded de-energisation was dispatched and not-running was confirmed.</summary>
-    public const string Complete = "PUMP_CLEANUP_COMPLETE";
-
-    /// <summary>At least one cleanup obligation could not be completed.</summary>
-    public const string Incomplete = "PUMP_CLEANUP_INCOMPLETE";
-
-    /// <summary>The stopped state remains unknown, so a physical abort is required.</summary>
-    public const string PhysicalAbortRequired = "PUMP_CLEANUP_PHYSICAL_ABORT_REQUIRED";
-}
-
-/// <summary>One Pump lifecycle configuration and the ownership record it runs under.</summary>
+/// <summary>One Pump Start request. The owner is typed and a Production owner is always refused.</summary>
 public sealed record PumpLifecycleStartRequest
 {
-    /// <summary>Who is asking. A Production owner is always refused.</summary>
+    /// <summary>Who is asking. A Production owner is always refused in this scope.</summary>
     public required PumpCommandOwnerKind Owner { get; init; }
 
     /// <summary>A stable identity for the owner, used to refuse a conflicting second owner.</summary>
     public required string OwnerId { get; init; }
 
-    /// <summary>The Pump selection. Only 1 and 2 are commissioned.</summary>
-    public int Selection { get; init; } = PumpCommandContract.CurrentCriticalPathSelection;
+    /// <summary>The Pump ordinal. Only 1 and 2 exist, and neither is a default.</summary>
+    public int Selection { get; init; }
 }
 
-/// <summary>The typed Start verdict. Nothing here is a hardware confirmation.</summary>
+/// <summary>The typed Start verdict. Nothing here is a physical confirmation.</summary>
 public sealed record PumpLifecycleStartOutcome(bool Started, string Code, PumpLifecycleState State);
 
-/// <summary>The typed Stop verdict.</summary>
-public sealed record PumpLifecycleStopOutcome(
-    bool StopConfirmed,
-    string Code,
-    PumpLifecycleState State,
-    string CleanupState);
+/// <summary>
+/// The typed Stop verdict at the moment Stop was requested. A Stop is a REQUEST: the de-energisations
+/// run on the following Step calls, and <see cref="StopConfirmed"/> is only ever true once the
+/// commissioned not-running feedback was observed.
+/// </summary>
+public sealed record PumpLifecycleStopOutcome(bool StopConfirmed, string Code, PumpLifecycleState State);
 
 /// <summary>
-/// The terminal record. It keeps the primary failure SEPARATE from the cleanup faults, so a cleanup
-/// that failed after a trip can never overwrite the trip that caused it.
+/// The terminal record. The primary failure is kept SEPARATE from the cleanup faults, so a cleanup that
+/// failed after a trip can never overwrite the trip that caused it.
 /// </summary>
 public sealed record PumpLifecycleResult
 {
     public required PumpLifecycleState TerminalState { get; init; }
 
-    /// <summary>The first failure state that caused termination, retained verbatim. Null on a normal Stop.</summary>
+    /// <summary>The first failure state that caused termination. Null on a normal Stop.</summary>
     public PumpLifecycleState? PrimaryFailure { get; init; }
 
-    /// <summary>Cleanup faults in the order they occurred. Never merged into <see cref="PrimaryFailure"/>.</summary>
+    /// <summary>Cleanup faults in the order they occurred. Never merged into the primary failure.</summary>
     public required IReadOnlyList<string> CleanupFaultCodes { get; init; }
 
     /// <summary>One of the <see cref="PumpCleanupStates"/> values.</summary>
     public required string CleanupState { get; init; }
 
-    /// <summary>The Stop mechanism was commanded (not inferred) at least once.</summary>
-    public required bool StopCommanded { get; init; }
-
-    /// <summary>True only when the stopped state is confirmed. Completion must never be reported otherwise.</summary>
+    /// <summary>True only when the commissioned not-running feedback was observed.</summary>
     public required bool StoppedConfirmed { get; init; }
 
-    /// <summary>Why the Stop path was entered. Retained for evidence only.</summary>
+    /// <summary>Why the Stop path was entered. Evidence only.</summary>
     public required PumpStopReason StopReason { get; init; }
-
-    /// <summary>
-    /// The High Critical Pump event this lifecycle raises, if any. The alarm latch, modal presentation
-    /// and Queue blocking are the existing sequencing rules and are not reimplemented here.
-    /// </summary>
-    public CriticalPumpKind? CriticalEvent { get; init; }
 
     public required DateTimeOffset CompletedAt { get; init; }
 }
 
 /// <summary>
-/// The single Pump command-ownership boundary. Exactly one owner may hold the channel, and a
-/// Production owner can never acquire it in this scope.
+/// The Pump command ownership channel. Exactly one owner may hold it, and a Production owner can never
+/// acquire it in this scope. Ownership is released only after a confirmed Stop.
 /// </summary>
 public sealed class PumpCommandOwnership
 {
@@ -115,8 +90,8 @@ public sealed class PumpCommandOwnership
     public int Generation => _generation;
 
     /// <summary>
-    /// Acquires the channel for one owner, or refuses with a typed code. A second acquisition by the
-    /// same owner is a concurrent-lifecycle refusal, not a re-entrant grant.
+    /// Acquires the channel for exactly one owner. A second acquisition while the channel is held is
+    /// refused, whether by the same owner or another one.
     /// </summary>
     public bool TryAcquire(PumpCommandOwnerKind kind, string ownerId, out string code)
     {
@@ -124,28 +99,26 @@ public sealed class PumpCommandOwnership
 
         if (kind == PumpCommandOwnerKind.NONE)
         {
-            code = PumpCommandRefusals.RefusedInvalidConfiguration;
+            code = PumpCommandRefusals.RefusedConflictingOwner;
             return false;
         }
 
         if (kind == PumpCommandOwnerKind.PRODUCTION)
         {
             // Production write authority is not granted in this scope. This is a refusal, not a gate.
-            code = PumpCommandRefusals.RefusedProduction;
+            code = PumpCommandRefusals.RefusedProductionOwner;
             return false;
         }
 
         if (string.IsNullOrWhiteSpace(ownerId))
         {
-            code = PumpCommandRefusals.RefusedInvalidConfiguration;
+            code = PumpCommandRefusals.RefusedConflictingOwner;
             return false;
         }
 
         if (IsHeld)
         {
-            code = string.Equals(_ownerId, ownerId, StringComparison.Ordinal) && _kind == kind
-                ? PumpCommandRefusals.RefusedConcurrentLifecycle
-                : PumpCommandRefusals.RefusedConflictingOwner;
+            code = PumpCommandRefusals.RefusedConflictingOwner;
             return false;
         }
 
@@ -155,7 +128,7 @@ public sealed class PumpCommandOwnership
         return true;
     }
 
-    /// <summary>Releases the channel. Called only after confirmed Stop or after a refused admission.</summary>
+    /// <summary>Releases the channel. Only ever called after a confirmed Stop or a refused Start.</summary>
     public void Release()
     {
         _kind = PumpCommandOwnerKind.NONE;
@@ -164,7 +137,7 @@ public sealed class PumpCommandOwnership
 }
 
 /// <summary>
-/// The one Pump lifecycle. It is driven explicitly by <see cref="Step"/> so that every transition is
+/// The one Pump lifecycle. It is driven explicitly by <see cref="Step"/> so every transition is
 /// deterministic and every wait is bounded by the injected clock.
 /// </summary>
 public sealed class ProcessIoPumpLifecycle
@@ -172,20 +145,19 @@ public sealed class ProcessIoPumpLifecycle
     private readonly IPumpCommandBoundary _boundary;
     private readonly PumpCommandOwnership _ownership;
     private readonly TimeProvider _time;
+    private readonly SequencingPressureThresholds _thresholds;
     private readonly List<string> _cleanupFaultCodes = new();
 
     private DateTimeOffset _waitStartedAt;
+    private DateTimeOffset _stoppedWaitStartedAt;
     private DateTimeOffset _nextRampAt;
-    private double _speedCommand;
+    private PumpAnalogCommand _speedCommand = PumpAnalogCommand.SafeStopSentinel;
     private bool _stopRequested;
     private bool _runCleared;
     private bool _enableCleared;
-    private bool _stopCommanded;
     private bool _stopEntered;
     private PumpLifecycleState? _primaryFailure;
-    private CriticalPumpKind? _criticalEvent;
     private PumpStopReason _stopReason = PumpStopReason.NORMAL_COMPLETION;
-    private readonly SequencingPressureThresholds _thresholds;
 
     public ProcessIoPumpLifecycle(
         IPumpCommandBoundary boundary,
@@ -201,11 +173,11 @@ public sealed class ProcessIoPumpLifecycle
         Configuration = configuration;
         _ownership = ownership;
         _time = time ?? TimeProvider.System;
-        // Only PumpReadySetpointBar is consumed by SequencingPressure.PumpReady. The Low and High band
-        // members belong to the Isolation Valve classifier and are deliberately not restated here, so
-        // this lifecycle cannot invent a Valve threshold.
-        _thresholds = new SequencingPressureThresholds(
-            PumpReadySetpointBar: configuration.PumpReadySetpointBar);
+
+        // Only PumpReadySetpointBar is consumed, by the existing strict SequencingPressure.PumpReady
+        // rule. The Low and High band members belong to the Isolation Valve classifier and are
+        // deliberately not restated: this lifecycle must not invent a Valve threshold.
+        _thresholds = new SequencingPressureThresholds(PumpReadySetpointBar: configuration.PumpReadySetpointBar);
     }
 
     public PumpLifecycleConfiguration Configuration { get; }
@@ -213,10 +185,16 @@ public sealed class ProcessIoPumpLifecycle
     public PumpLifecycleState State { get; private set; } = PumpLifecycleState.IDLE;
 
     /// <summary>True while this lifecycle holds the Pump command channel.</summary>
-    public bool OwnsPumpCommand => _ownership.IsHeld && _ownership.Kind != PumpCommandOwnerKind.NONE;
+    public bool OwnsPumpCommand => _ownership.IsHeld;
 
-    /// <summary>The current analog engineering command in milliamps.</summary>
-    public double SpeedCommand => _speedCommand;
+    /// <summary>
+    /// The current typed analog command. Its kind is the engineering identity: the 0 mA safe-stop
+    /// sentinel and the 4 mA live minimum share raw 0, so a raw word is never read back as a state.
+    /// </summary>
+    public PumpAnalogCommand SpeedCommand => _speedCommand;
+
+    /// <summary>The current analog command in engineering milliamps, for evidence only.</summary>
+    public double SpeedCommandMilliamps => _speedCommand.Milliamps;
 
     /// <summary>The terminal record, populated once the lifecycle terminates.</summary>
     public PumpLifecycleResult? Result { get; private set; }
@@ -224,19 +202,22 @@ public sealed class ProcessIoPumpLifecycle
     /// <summary>The first failure state, retained separately from the cleanup faults.</summary>
     public PumpLifecycleState? PrimaryFailure => _primaryFailure;
 
-    /// <summary>Cleanup faults in occurrence order. Never merged into <see cref="PrimaryFailure"/>.</summary>
+    /// <summary>Cleanup faults in occurrence order. Never merged into the primary failure.</summary>
     public IReadOnlyList<string> CleanupFaultCodes => _cleanupFaultCodes;
 
     /// <summary>
-    /// True only while the Pump is at confirmed readiness and no Stop has been requested. This is the
-    /// single precondition an Isolation Valve OPEN must consult: a Stop request closes it immediately.
+    /// True only while the Pump is at confirmed readiness, the channel is owned and no Stop has been
+    /// requested. This is the single precondition a new Isolation Valve OPEN must consult.
     /// </summary>
     public bool AllowsValveOpen =>
-        State == PumpLifecycleState.PUMP_READY && !_stopRequested && Result is null;
+        State == PumpLifecycleState.PUMP_READY
+        && !_stopRequested
+        && Result is null
+        && _ownership.IsHeld;
 
     /// <summary>
-    /// True only for a confirmed, complete, normal Stop. An unknown stopped state, an incomplete
-    /// cleanup or any failure terminal is never a safe completion.
+    /// True only for a confirmed, complete Stop. An unknown stopped state, an incomplete cleanup or any
+    /// failure terminal is never a safe completion.
     /// </summary>
     public bool SafeToReportComplete
     {
@@ -253,7 +234,8 @@ public sealed class ProcessIoPumpLifecycle
     // ---------------------------------------------------------------- start
 
     /// <summary>
-    /// Admits and begins the Pump. Every refusal happens before the first write.
+    /// Admits the Start and performs the ordered Start commands: the selection pair, Enable Inverter
+    /// TRUE, then Run Pump TRUE. Every refusal happens before the first write.
     /// </summary>
     public PumpLifecycleStartOutcome Start(PumpLifecycleStartRequest request)
     {
@@ -261,7 +243,7 @@ public sealed class ProcessIoPumpLifecycle
 
         if (Result is not null || PumpLifecycleStates.IsTerminal(State))
         {
-            return new PumpLifecycleStartOutcome(false, PumpCommandRefusals.RefusedAlreadyTerminal, State);
+            return new PumpLifecycleStartOutcome(false, PumpCommandRefusals.RefusedTerminal, State);
         }
 
         if (State != PumpLifecycleState.IDLE)
@@ -271,46 +253,46 @@ public sealed class ProcessIoPumpLifecycle
 
         if (!Configuration.Valid)
         {
-            return Refuse(PumpCommandRefusals.RefusedInvalidConfiguration);
+            return RefuseStart(PumpCommandRefusals.RefusedAnalogOutOfDomain);
         }
 
-        // The commissioning gate. A physical Pump command fails closed while either required polarity
-        // is uncommissioned: without both, Running and Fault cannot be interpreted, and a Start that
-        // cannot be observed is not a Start the Product may issue.
+        // The commissioning gate. A physical Pump command fails closed while either required polarity is
+        // uncommissioned: without both, Running and Fault cannot be interpreted, and a Start that cannot
+        // be observed is not a Start the Product may issue.
         if (!Configuration.Feedback.IsCommissioned)
         {
-            return Refuse(PumpCommandRefusals.RefusedPolarityNotCommissioned);
+            return RefuseStart(PumpFeedbackConfiguration.NotCommissionedCode);
         }
 
         if (!PumpCommandContract.IsValidSelection(request.Selection))
         {
-            return Refuse(PumpCommandRefusals.RefusedInvalidSelection);
+            return RefuseStart(PumpCommandRefusals.RefusedInvalidSelection);
         }
 
         if (!_ownership.TryAcquire(request.Owner, request.OwnerId, out string ownershipCode))
         {
-            return Refuse(ownershipCode);
+            return RefuseStart(ownershipCode);
         }
 
-        // An active configured Fault refuses the Start outright. The Fault polarity is commissioned at
-        // this point, so this is a real reading rather than an assumption.
+        // An active Fault refuses the Start outright. The Fault polarity is commissioned at this point,
+        // so this is a real reading and not an assumption. Nothing was energised, so nothing is cleared.
         PumpFeedbackRead fault = _boundary.ReadFault();
         if (fault.Current && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
-            _criticalEvent = CriticalPumpKind.MAIN_PUMP_TRIP;
-            SettlePreStartRefusal(PumpLifecycleState.FAULT_ACTIVE);
-            return new PumpLifecycleStartOutcome(false, PumpCommandRefusals.RefusedFaultActive, State);
+            _ownership.Release();
+            Settle(PumpLifecycleState.FAULT_ACTIVE, PumpCleanupStates.Complete, stoppedConfirmed: false);
+            return new PumpLifecycleStartOutcome(false, PumpCommandRefusals.RefusedNotReady, State);
         }
 
-        // 1. Selection: energise the selected contactor, then de-energise the other.
+        // 1. Selection: the selected contactor is energised, then the other is de-energised.
         State = PumpLifecycleState.SELECTING_PUMP;
         IReadOnlyList<PumpCommandOutcome> selection = _boundary.SelectPump(request.Selection);
         if (selection.Count != 2 || !AllSucceeded(selection))
         {
             _primaryFailure = PumpLifecycleState.SELECTION_FAILED;
             EnterStopPath(PumpStopReason.START_FAILURE);
-            return new PumpLifecycleStartOutcome(false, PumpCommandRefusals.RefusedCommandAdmission, State);
+            return new PumpLifecycleStartOutcome(false, FirstFailureCode(selection), State);
         }
 
         State = PumpLifecycleState.PUMP_SELECTED;
@@ -321,87 +303,66 @@ public sealed class ProcessIoPumpLifecycle
         {
             _primaryFailure = PumpLifecycleState.ENABLE_FAILED;
             EnterStopPath(PumpStopReason.START_FAILURE);
-            return new PumpLifecycleStartOutcome(false, PumpCommandRefusals.RefusedCommandAdmission, State);
+            return new PumpLifecycleStartOutcome(false, enable.Code, State);
         }
 
         State = PumpLifecycleState.ENABLE_DISPATCHED;
 
-        // 3. Run Pump, second. Both are maintained and neither is a pulse.
+        // 3. Run Pump, second. Both commands are maintained and neither is ever a pulse.
         PumpCommandOutcome run = _boundary.SetRunPump(true);
         if (!run.Succeeded)
         {
             _primaryFailure = PumpLifecycleState.RUN_FAILED;
             EnterStopPath(PumpStopReason.START_FAILURE);
-            return new PumpLifecycleStartOutcome(false, PumpCommandRefusals.RefusedCommandAdmission, State);
+            return new PumpLifecycleStartOutcome(false, run.Code, State);
         }
 
         State = PumpLifecycleState.RUN_DISPATCHED;
-
         State = PumpLifecycleState.WAITING_FOR_RUNNING;
         _waitStartedAt = _time.GetUtcNow();
         return new PumpLifecycleStartOutcome(true, PumpCommandRefusals.Granted, State);
-    }
-
-    private PumpLifecycleStartOutcome Refuse(string code) =>
-        new(false, code, State);
-
-    /// <summary>
-    /// Settles a refusal that occurred before any command was written. Nothing was energised, so there
-    /// is no commanded state to return and no cleanup write is issued; the channel is released at once.
-    /// This is NOT a safe completion: <see cref="SafeToReportComplete"/> requires a confirmed Stop.
-    /// </summary>
-    private void SettlePreStartRefusal(PumpLifecycleState failureState)
-    {
-        State = failureState;
-        _ownership.Release();
-        Result = BuildResult(failureState, PumpCleanupStates.Complete, stopCommanded: false, stoppedConfirmed: true);
     }
 
     // ---------------------------------------------------------------- stop
 
     /// <summary>
     /// Requests the Stop path for a normal completion, a cancellation, a downstream Isolation Valve
-    /// failure or any other external reason. The mechanism is always the same corrected order.
+    /// failure or any other external reason. The mechanism is always the corrected order. The
+    /// de-energisations run on the following <see cref="Step"/> calls.
     /// </summary>
     public PumpLifecycleStopOutcome Stop(PumpStopReason reason)
     {
         if (Result is not null)
         {
             return new PumpLifecycleStopOutcome(
-                Result.StoppedConfirmed,
-                PumpCommandRefusals.RefusedAlreadyTerminal,
-                State,
-                Result.CleanupState);
+                Result.StoppedConfirmed, PumpCommandRefusals.RefusedTerminal, State);
         }
 
         if (State == PumpLifecycleState.IDLE)
         {
-            return new PumpLifecycleStopOutcome(
-                false,
-                PumpCommandRefusals.RefusedOwnershipNotHeld,
-                State,
-                PumpCleanupStates.Incomplete);
+            return new PumpLifecycleStopOutcome(false, PumpCommandRefusals.RefusedNotAdmitted, State);
         }
 
-        // Stop is always permitted. No application permissive may block it, and the same corrected
-        // mechanism runs whatever the reason is.
-        _stopRequested = true;
-        _stopReason = reason;
+        // Stop is always permitted. No application permissive may block it.
         EnterStopPath(reason);
-        return new PumpLifecycleStopOutcome(false, PumpCommandRefusals.Granted, State, PumpCleanupStates.Incomplete);
+        return new PumpLifecycleStopOutcome(false, PumpCommandRefusals.Granted, State);
     }
 
-    /// <summary>Enters the one Stop path. Idempotent: a second entry does not restart or duplicate it.</summary>
+    /// <summary>Enters the one Stop path. Idempotent: a second entry never restarts it.</summary>
     private void EnterStopPath(PumpStopReason reason)
     {
         _stopRequested = true;
         _stopReason = reason;
+
         if (_stopEntered)
         {
             return;
         }
 
         _stopEntered = true;
+
+        // The mechanism always begins by withdrawing the analog reference, whatever the reason is. A
+        // command path that never raised the reference passes through this stage in one step.
         State = PumpLifecycleState.RAMPING_DOWN;
         _nextRampAt = _time.GetUtcNow();
     }
@@ -409,15 +370,13 @@ public sealed class ProcessIoPumpLifecycle
     // ---------------------------------------------------------------- step
 
     /// <summary>
-    /// Advances the lifecycle by exactly one deterministic unit. It performs at most one command write,
-    /// so the corrected Stop order is observable and each de-energisation happens exactly once.
+    /// Advances the lifecycle by exactly one deterministic unit. At most one command write happens per
+    /// step, so the corrected Stop order is observable and each de-energisation happens exactly once.
     /// </summary>
     public void Step()
     {
-        if (Result is not null || State == PumpLifecycleState.IDLE)
-        {
-            return;
-        }
+        if (Result is not null) return;
+        if (State == PumpLifecycleState.IDLE) return;
 
         DateTimeOffset now = _time.GetUtcNow();
 
@@ -426,35 +385,27 @@ public sealed class ProcessIoPumpLifecycle
             case PumpLifecycleState.WAITING_FOR_RUNNING:
                 StepWaitingForRunning(now);
                 return;
-
             case PumpLifecycleState.RAMPING_OUTPUT:
                 StepRampingOutput(now);
                 return;
-
             case PumpLifecycleState.WAITING_FOR_AI003_READY:
                 StepWaitingForReady(now);
                 return;
-
             case PumpLifecycleState.PUMP_READY:
                 StepReady();
                 return;
-
             case PumpLifecycleState.RAMPING_DOWN:
                 StepRampingDown(now);
                 return;
-
             case PumpLifecycleState.CLEARING_RUN:
                 StepClearingRun();
                 return;
-
             case PumpLifecycleState.DISABLING_INVERTER:
                 StepDisablingInverter();
                 return;
-
             case PumpLifecycleState.WAITING_FOR_STOPPED:
                 StepWaitingForStopped(now);
                 return;
-
             default:
                 return;
         }
@@ -466,7 +417,6 @@ public sealed class ProcessIoPumpLifecycle
         if (fault.Current && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
-            _criticalEvent = CriticalPumpKind.MAIN_PUMP_TRIP;
             EnterStopPath(PumpStopReason.FAULT);
             return;
         }
@@ -474,10 +424,10 @@ public sealed class ProcessIoPumpLifecycle
         PumpFeedbackRead running = _boundary.ReadRunning();
         if (running.Current && running.Active)
         {
-            // Running is taken from the commissioned feedback input only. It is never inferred from
-            // the outlet pressure and never from the command that was just dispatched.
+            // Running is taken from the commissioned feedback input only. It is never inferred from the
+            // outlet pressure and never from the command that was just dispatched.
             State = PumpLifecycleState.RAMPING_OUTPUT;
-            _speedCommand = Configuration.Ramp.SafeZeroEngineeringCommand;
+            _speedCommand = PumpAnalogCommand.SafeStopSentinel;
             _nextRampAt = now;
             return;
         }
@@ -491,21 +441,17 @@ public sealed class ProcessIoPumpLifecycle
 
     private void StepRampingOutput(DateTimeOffset now)
     {
-        if (now < _nextRampAt)
-        {
-            return;
-        }
+        if (now < _nextRampAt) return;
 
-        double target = Configuration.Ramp.TargetEngineeringCommand;
-        if (PumpSpeedRamp.AtTarget(_speedCommand, target))
+        double target = Configuration.Ramp.TargetEngineeringMilliamps;
+        if (PumpAnalogRamp.AtTarget(_speedCommand, target))
         {
             State = PumpLifecycleState.WAITING_FOR_AI003_READY;
             _waitStartedAt = now;
             return;
         }
 
-        double next = PumpSpeedRamp.Next(_speedCommand, target, Configuration.Ramp.Step);
-        if (!double.IsFinite(next))
+        if (!PumpAnalogRamp.TryNext(_speedCommand, target, Configuration.Ramp.Step, out PumpAnalogCommand next))
         {
             _primaryFailure = PumpLifecycleState.COMMAND_ADMISSION_REFUSED;
             EnterStopPath(PumpStopReason.START_FAILURE);
@@ -515,10 +461,9 @@ public sealed class ProcessIoPumpLifecycle
         PumpAnalogCommandOutcome outcome = _boundary.SetSpeedCommand(next);
         if (!outcome.Succeeded)
         {
-            // The upward analog reference could not be dispatched. The cleanup still runs: a ramp
-            // failure never prevents the two de-energisations.
+            // The upward reference could not be dispatched. The cleanup still runs: a ramp failure never
+            // prevents the two de-energisations.
             _primaryFailure = PumpLifecycleState.COMMAND_ADMISSION_REFUSED;
-            _cleanupFaultCodes.Add(PumpCommandRefusals.RefusedDispatchFailed);
             EnterStopPath(PumpStopReason.START_FAILURE);
             return;
         }
@@ -533,44 +478,25 @@ public sealed class ProcessIoPumpLifecycle
         if (fault.Current && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
-            _criticalEvent = CriticalPumpKind.MAIN_PUMP_TRIP;
-            EnterStopPath(PumpStopReason.FAULT);
-            return;
-        }
-
-        PumpFeedbackRead running = _boundary.ReadRunning();
-        if (running.Current && !running.Active)
-        {
-            // The Pump stopped while it was expected to be running. This is the critical event and the
-            // primary record is retained separately from any cleanup failure that follows.
-            _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
-            _criticalEvent = CriticalPumpKind.MAIN_PUMP_UNEXPECTED_STOP;
             EnterStopPath(PumpStopReason.FAULT);
             return;
         }
 
         PumpPressureRead pressure = _boundary.ReadPumpOutletPressure();
+        PressureSample? sample = pressure.Sample;
 
-        if (pressure.Quality == ProcessIoObservationQuality.STALE)
-        {
-            // A stale outlet reading is refused outright rather than reused as readiness.
-            _primaryFailure = PumpLifecycleState.AI003_STALE;
-            EnterStopPath(PumpStopReason.AI003_STALE);
-            return;
-        }
-
-        if (!pressure.Accepted)
-        {
-            // BAD, DISABLED, UNCERTAIN or never observed: the sole Pump-ready authority is unusable, and
-            // the Pump Inlet row is never substituted for it.
-            _primaryFailure = PumpLifecycleState.AI003_INVALID;
-            EnterStopPath(PumpStopReason.AI003_INVALID);
-            return;
-        }
-
-        if (SequencingPressure.PumpReady(pressure.Sample, _thresholds))
+        if (pressure.Accepted && sample is not null && SequencingPressure.PumpReady(sample, _thresholds))
         {
             State = PumpLifecycleState.PUMP_READY;
+            return;
+        }
+
+        if (!pressure.Accepted || sample is null)
+        {
+            // A refused reading is never waited on: a stale, superseded or unusable sample is a refusal
+            // and never a slow one, and the Pump Inlet row is never substituted for the Outlet row.
+            _primaryFailure = pressure.Stale ? PumpLifecycleState.AI003_STALE : PumpLifecycleState.AI003_INVALID;
+            EnterStopPath(pressure.Stale ? PumpStopReason.AI003_STALE : PumpStopReason.AI003_INVALID);
             return;
         }
 
@@ -581,65 +507,56 @@ public sealed class ProcessIoPumpLifecycle
         }
     }
 
-    /// <summary>
-    /// Supervises the Pump while it is ready. Readiness is a live condition, not a latch: an active
-    /// Fault, a lost running feedback or a no longer usable outlet pressure leaves readiness at once,
-    /// which closes the valve-open permission before any Isolation Valve can act on it.
-    /// </summary>
     private void StepReady()
     {
         PumpFeedbackRead fault = _boundary.ReadFault();
         if (fault.Current && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
-            _criticalEvent = CriticalPumpKind.MAIN_PUMP_TRIP;
             EnterStopPath(PumpStopReason.FAULT);
             return;
         }
 
         PumpFeedbackRead running = _boundary.ReadRunning();
-        if (running.Current && !running.Active)
+        if (running.Commissioned && running.Usable && !running.Active)
         {
+            // The Pump stopped without being told to. That is a trip, not a completion.
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
-            _criticalEvent = CriticalPumpKind.MAIN_PUMP_UNEXPECTED_STOP;
             EnterStopPath(PumpStopReason.FAULT);
             return;
         }
 
         PumpPressureRead pressure = _boundary.ReadPumpOutletPressure();
-        if (pressure.Quality == ProcessIoObservationQuality.STALE)
-        {
-            _primaryFailure = PumpLifecycleState.AI003_STALE;
-            EnterStopPath(PumpStopReason.AI003_STALE);
-            return;
-        }
+        PressureSample? sample = pressure.Sample;
 
-        if (!pressure.Accepted || !SequencingPressure.PumpReady(pressure.Sample, _thresholds))
+        if (!pressure.Accepted || sample is null)
         {
             _primaryFailure = PumpLifecycleState.AI003_INVALID;
             EnterStopPath(PumpStopReason.AI003_INVALID);
+            return;
+        }
+
+        if (!SequencingPressure.PumpReady(sample, _thresholds))
+        {
+            _primaryFailure = PumpLifecycleState.AI003_STALE;
+            EnterStopPath(PumpStopReason.AI003_STALE);
         }
     }
 
     private void StepRampingDown(DateTimeOffset now)
     {
-        if (now < _nextRampAt)
-        {
-            return;
-        }
+        if (now < _nextRampAt) return;
 
         double safeZero = Configuration.Ramp.SafeZeroEngineeringCommand;
-        if (PumpSpeedRamp.AtTarget(_speedCommand, safeZero))
+        if (PumpAnalogRamp.AtTarget(_speedCommand, safeZero))
         {
+            // The down-ramp converged on the EXPLICIT 0 mA sentinel. Raw 0 alone is not the proof.
             State = PumpLifecycleState.CLEARING_RUN;
             return;
         }
 
-        double next = PumpSpeedRamp.Next(_speedCommand, safeZero, Configuration.Ramp.Step);
-        if (!double.IsFinite(next))
+        if (!PumpAnalogRamp.TryNext(_speedCommand, safeZero, Configuration.Ramp.Step, out PumpAnalogCommand next))
         {
-            // A ramp that cannot be computed is a recorded cleanup fault, and the two de-energisations
-            // are still attempted.
             RecordCleanupFault(PumpLifecycleState.RAMP_DOWN_FAILED);
             State = PumpLifecycleState.CLEARING_RUN;
             return;
@@ -665,15 +582,14 @@ public sealed class ProcessIoPumpLifecycle
             return;
         }
 
-        // CORRECTED ORDER, step 1: de-energise Run Pump first.
-        _runCleared = true;
-        _stopCommanded = true;
-        PumpCommandOutcome outcome = _boundary.SetRunPump(false);
-        if (!outcome.Succeeded)
+        PumpCommandOutcome clearRun = _boundary.SetRunPump(false);
+        if (!clearRun.Succeeded)
         {
             RecordCleanupFault(PumpLifecycleState.CLEAR_RUN_FAILED);
         }
 
+        // Marked regardless, so a failed write is never re-issued: exactly one attempt, never a retry.
+        _runCleared = true;
         State = PumpLifecycleState.DISABLING_INVERTER;
     }
 
@@ -682,93 +598,81 @@ public sealed class ProcessIoPumpLifecycle
         if (_enableCleared)
         {
             State = PumpLifecycleState.WAITING_FOR_STOPPED;
-            _waitStartedAt = _time.GetUtcNow();
+            _stoppedWaitStartedAt = _time.GetUtcNow();
             return;
         }
 
-        // CORRECTED ORDER, step 2: de-energise Enable Inverter second, never before Run.
-        _enableCleared = true;
-        PumpCommandOutcome outcome = _boundary.SetEnableInverter(false);
-        if (!outcome.Succeeded)
+        PumpCommandOutcome clearEnable = _boundary.SetEnableInverter(false);
+        if (!clearEnable.Succeeded)
         {
             RecordCleanupFault(PumpLifecycleState.DISABLE_FAILED);
         }
 
+        _enableCleared = true;
         State = PumpLifecycleState.WAITING_FOR_STOPPED;
-        _waitStartedAt = _time.GetUtcNow();
+        _stoppedWaitStartedAt = _time.GetUtcNow();
     }
 
     private void StepWaitingForStopped(DateTimeOffset now)
     {
         PumpFeedbackRead running = _boundary.ReadRunning();
-        if (running.Current && !running.Active)
+        bool stoppedConfirmed = running.Commissioned && running.Usable && !running.Active;
+
+        if (stoppedConfirmed)
         {
-            Settle(StoppedConfirmed: true);
+            Settle(
+                _primaryFailure ?? PumpLifecycleState.STOPPED,
+                _cleanupFaultCodes.Count > 0 ? PumpCleanupStates.Incomplete : PumpCleanupStates.Complete,
+                stoppedConfirmed: true);
             return;
         }
 
-        if (now - _waitStartedAt > Configuration.StoppedFeedbackTimeout)
+        if (now - _stoppedWaitStartedAt > Configuration.StoppedFeedbackTimeout)
         {
-            // The stopped state is unknown. The Product must never report safe completion here.
+            // The stopped state is unknown. Completion is never reported and the channel is not released.
             RecordCleanupFault(PumpLifecycleState.STOPPED_FEEDBACK_TIMEOUT);
-            Settle(StoppedConfirmed: false);
+            Settle(
+                PumpLifecycleState.PHYSICAL_ABORT_REQUIRED,
+                PumpCleanupStates.PhysicalAbortRequired,
+                stoppedConfirmed: false);
         }
     }
 
-    /// <summary>Records one cleanup fault once, in order, without overwriting the primary failure.</summary>
-    private void RecordCleanupFault(PumpLifecycleState fault)
+    // ---------------------------------------------------------------- settle
+
+    private void Settle(PumpLifecycleState terminal, string cleanupState, bool stoppedConfirmed)
     {
-        _cleanupFaultCodes.Add(fault.ToString());
-    }
-
-    /// <summary>
-    /// Settles the terminal record. The primary failure keeps its identity; the cleanup outcome is
-    /// reported beside it and never replaces it.
-    /// </summary>
-    private void Settle(bool StoppedConfirmed)
-    {
-        string cleanupState;
-        PumpLifecycleState terminal;
-
-        if (!StoppedConfirmed)
-        {
-            // The stopped state is unknown. The terminal says so unambiguously, while the primary
-            // failure is retained beside it: a trip is never erased by the cleanup outcome.
-            cleanupState = PumpCleanupStates.PhysicalAbortRequired;
-            terminal = PumpLifecycleState.PHYSICAL_ABORT_REQUIRED;
-        }
-        else if (_cleanupFaultCodes.Count == 0)
-        {
-            cleanupState = PumpCleanupStates.Complete;
-            terminal = _primaryFailure ?? PumpLifecycleState.STOPPED;
-        }
-        else
-        {
-            cleanupState = PumpCleanupStates.Incomplete;
-            terminal = _primaryFailure ?? PumpLifecycleState.CLEANUP_INCOMPLETE;
-        }
-
-        _ownership.Release();
         State = terminal;
-        Result = BuildResult(terminal, cleanupState, _stopCommanded, StoppedConfirmed);
-    }
-
-    private PumpLifecycleResult BuildResult(
-        PumpLifecycleState terminal,
-        string cleanupState,
-        bool stopCommanded,
-        bool stoppedConfirmed) => new()
+        Result = new PumpLifecycleResult
         {
             TerminalState = terminal,
             PrimaryFailure = _primaryFailure,
             CleanupFaultCodes = _cleanupFaultCodes.ToArray(),
             CleanupState = cleanupState,
-            StopCommanded = stopCommanded,
             StoppedConfirmed = stoppedConfirmed,
             StopReason = _stopReason,
-            CriticalEvent = _criticalEvent,
             CompletedAt = _time.GetUtcNow(),
         };
+
+        if (stoppedConfirmed)
+        {
+            // Ownership is released only after the Stop is confirmed, never before.
+            _ownership.Release();
+        }
+    }
+
+    // ---------------------------------------------------------------- helpers
+
+    private PumpLifecycleStartOutcome RefuseStart(string code)
+    {
+        // Nothing was energised, so there is nothing to clean up. The channel is never held.
+        _primaryFailure = PumpLifecycleState.COMMAND_ADMISSION_REFUSED;
+        _ownership.Release();
+        Settle(PumpLifecycleState.COMMAND_ADMISSION_REFUSED, PumpCleanupStates.Complete, stoppedConfirmed: false);
+        return new PumpLifecycleStartOutcome(false, code, State);
+    }
+
+    private void RecordCleanupFault(PumpLifecycleState fault) => _cleanupFaultCodes.Add(fault.ToString());
 
     private static bool AllSucceeded(IReadOnlyList<PumpCommandOutcome> outcomes)
     {
@@ -778,5 +682,15 @@ public sealed class ProcessIoPumpLifecycle
         }
 
         return true;
+    }
+
+    private static string FirstFailureCode(IReadOnlyList<PumpCommandOutcome> outcomes)
+    {
+        for (int index = 0; index < outcomes.Count; index += 1)
+        {
+            if (!outcomes[index].Succeeded) return outcomes[index].Code;
+        }
+
+        return PumpCommandRefusals.RefusedInvalidSelection;
     }
 }

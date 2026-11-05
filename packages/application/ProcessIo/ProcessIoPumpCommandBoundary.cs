@@ -3,114 +3,132 @@ using Wjss.Runtime.Core.Sequencing;
 
 namespace Wjss.Runtime.Core.ProcessIo;
 
-// PUMP-COMMAND-PRODUCT-INTEGRATION: the typed Pump command boundary.
+// PUMP PLATFORM, PHASE 0.5C: the Pump command boundary and the Pump feedback interpretation.
 //
-// This is the ONLY bridge between the Pump lifecycle and the adopted Process-Io rows. It adds no
-// second catalogue, no second binding table and no second write lifecycle:
+// The boundary is the ONLY place a Pump command becomes a Process-Io dispatch. It owns no state
+// machine, no ramp and no order: the lifecycle owns those, and the boundary executes exactly the one
+// command it is handed. Every write still passes through ProcessIoSession admission, so the session
+// remains the single write authority of the composition.
 //
-//   admission  ProcessIoSession.AdmitWrite(row, authorization) -> token
-//   dispatch   ProcessIoSession.DispatchDigitalOutput / DispatchAnalogOutput(token, row, value)
-//   evidence   ProcessIoSession.ObserveDigitalInput / ObserveAnalogInput
+// The boundary is fed by ProcessIoPhysicalObservation evidence and applies the ONE acceptance rule
+// (ProcessIoEvidenceAcceptance) that the Cleaning Path equipment boundary already applies, so the two
+// can never disagree about what counts as a current physical reading.
 //
-// The boundary cannot mint a token, cannot own a generation and cannot write around the session.
-// Every command carries the tag, the DERIVED adopted address and the admission/dispatch codes, so a
-// caller can never mistake a dispatched command for a confirmed physical effect.
-//
-// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (the Owner-local build is the validation of record).
+// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA. Physical Hardware has NOT been executed and is NOT
+// verified.
 
 /// <summary>
-/// One admitted Pump command. It reports admission and dispatch separately and never claims that a
-/// field device moved.
+/// The single acceptance rule for Process-Io evidence. One definition, used by the Pump boundary and by
+/// the Cleaning Path equipment boundary, so a simulated or superseded read can never be mistaken for a
+/// current physical one.
+/// </summary>
+public static class ProcessIoEvidenceAcceptance
+{
+    /// <summary>
+    /// True only for a usable PHYSICAL_READ observation that belongs to the live session generation and
+    /// is inside the configured freshness budget at <paramref name="now"/>.
+    /// </summary>
+    public static bool Accepts(
+        ProcessIoPhysicalObservation? observation,
+        int liveGeneration,
+        DateTimeOffset now,
+        TimeSpan freshnessBudget)
+    {
+        if (observation is null) return false;
+        if (!observation.IsUsable) return false;
+        if (observation.Provenance != ProcessIoObservationProvenance.PHYSICAL_READ) return false;
+        if (observation.SourceGeneration != liveGeneration) return false;
+        return observation.IsUsableAt(now, liveGeneration, freshnessBudget);
+    }
+}
+
+/// <summary>
+/// One dispatched Pump digital command. <see cref="Dispatched"/> true means the session accepted the
+/// token and the transport call returned; it is never a claim that the field device actuated.
 /// </summary>
 public sealed record PumpCommandOutcome
 {
     public required string Tag { get; init; }
-
-    /// <summary>The adopted write address, derived from the single binding table.</summary>
-    public required int Address { get; init; }
-
-    /// <summary>The maintained value requested. There is no pulse, so there is no duration.</summary>
-    public required bool RequestedValue { get; init; }
-
-    /// <summary>True only when the session admitted the write.</summary>
+    public required int CoilAddress { get; init; }
+    public required bool Value { get; init; }
     public required bool Admitted { get; init; }
-
-    /// <summary>True only when admission AND dispatch both succeeded.</summary>
     public required bool Dispatched { get; init; }
-
-    public required string AdmissionCode { get; init; }
-    public required string DispatchCode { get; init; }
+    public required string Code { get; init; }
     public required int SessionGeneration { get; init; }
     public required DateTimeOffset At { get; init; }
-
-    /// <summary>True when the transport threw during dispatch; the exception is captured, never propagated.</summary>
     public bool TransportFaulted { get; init; }
 
-    /// <summary>True only for a fully successful command.</summary>
+    /// <summary>True only when the command was admitted and the write returned without a fault.</summary>
     public bool Succeeded => Admitted && Dispatched && !TransportFaulted;
 }
 
 /// <summary>
-/// One analog speed-reference outcome. The engineering command is milliamps, as commissioned; the raw
-/// word is reported as the conversion produced it.
+/// One analog reference command. <see cref="RequestedEngineeringMilliamps"/> is the typed command's
+/// engineering value and <see cref="RequestedKind"/> is its identity, because the raw word is 0 for
+/// both the 4 mA live minimum and the 0 mA safe-stop sentinel.
 /// </summary>
 public sealed record PumpAnalogCommandOutcome
 {
     public required string Tag { get; init; }
-    public required int Address { get; init; }
-    public required double RequestedEngineering { get; init; }
+    public required int RegisterAddress { get; init; }
+    public required double RequestedEngineeringMilliamps { get; init; }
+
+    /// <summary>The engineering identity of the requested command, never inferred from the raw word.</summary>
+    public required string RequestedKind { get; init; }
+
+    /// <summary>The raw word actually written, or 0 when nothing was written.</summary>
+    public required int RawWord { get; init; }
+
     public required bool Admitted { get; init; }
     public required bool Dispatched { get; init; }
-    public required string AdmissionCode { get; init; }
-    public required string DispatchCode { get; init; }
+    public required string Code { get; init; }
     public required int SessionGeneration { get; init; }
     public required DateTimeOffset At { get; init; }
     public bool TransportFaulted { get; init; }
+
     public bool Succeeded => Admitted && Dispatched && !TransportFaulted;
 }
 
 /// <summary>
-/// One interpreted digital feedback read. <see cref="Commissioned"/> false means the configured
-/// polarity has not been established, so <see cref="Active"/> carries no meaning and must not be used.
+/// One interpreted feedback read. <see cref="Commissioned"/> false means the configured polarity has
+/// not been established, so <see cref="Active"/> carries no meaning and must never be used.
 /// </summary>
 public sealed record PumpFeedbackRead
 {
     public required string Tag { get; init; }
     public required bool Commissioned { get; init; }
-    public required string Code { get; init; }
 
-    /// <summary>The raw bit the transport returned. Meaningful only when the read was usable.</summary>
+    /// <summary>The physical bit the transport returned. Meaningful only when the read was accepted.</summary>
     public required bool RawBit { get; init; }
 
-    /// <summary>The interpreted physical condition. Always false while uncommissioned.</summary>
+    /// <summary>The interpreted condition. Always false while uncommissioned or unaccepted.</summary>
     public required bool Active { get; init; }
 
-    /// <summary>True when the observation was usable, current and from the live generation.</summary>
-    public required bool Current { get; init; }
+    /// <summary>True only for an accepted, current, commissioned reading.</summary>
+    public required bool Usable { get; init; }
 
+    public required string Code { get; init; }
     public required int SessionGeneration { get; init; }
     public required DateTimeOffset At { get; init; }
 }
 
 /// <summary>
-/// One interpreted Pump Outlet pressure read. <see cref="Accepted"/> false means the observation may
-/// not be used as Pump-ready evidence; <see cref="Quality"/> says why, so the lifecycle can keep the
-/// refusal reasons distinct instead of collapsing them into "no value".
+/// One Pump Outlet pressure observation. <see cref="Accepted"/> false means no sample exists: a refusal
+/// never fabricates a bar value and never falls back to the Pump Inlet row.
 /// </summary>
 public sealed record PumpPressureRead
 {
     public required string Tag { get; init; }
-
-    /// <summary>True only when the observation was usable, PHYSICAL_READ, current and in generation.</summary>
     public required bool Accepted { get; init; }
-
-    /// <summary>"OK" when accepted; the observation diagnostic code otherwise.</summary>
     public required string Code { get; init; }
 
-    /// <summary>The session quality verdict. Null when no observation was produced at all.</summary>
-    public ProcessIoObservationQuality? Quality { get; init; }
+    /// <summary>
+    /// True only when the observation existed but was outside its freshness budget. A stale reading is
+    /// refused, and it is distinguished from an unusable one so the lifecycle can say which happened.
+    /// </summary>
+    public bool Stale { get; init; }
 
-    /// <summary>The typed sample, present only when accepted.</summary>
+    /// <summary>The accepted engineering sample, or null when the read was refused.</summary>
     public PressureSample? Sample { get; init; }
 
     public required int SessionGeneration { get; init; }
@@ -118,7 +136,7 @@ public sealed record PumpPressureRead
 }
 
 /// <summary>
-/// The typed Pump command boundary the lifecycle consumes. It exposes four command groups, two
+/// The typed Pump command boundary the lifecycle consumes. It exposes the four command groups, the two
 /// feedback inputs and one pressure observation. It exposes no transport, no raw word writer and no
 /// arbitrary tag command.
 /// </summary>
@@ -139,8 +157,8 @@ public interface IPumpCommandBoundary
     /// <summary>Writes the maintained Run Pump output.</summary>
     PumpCommandOutcome SetRunPump(bool value);
 
-    /// <summary>Writes the analog speed reference in engineering milliamps.</summary>
-    PumpAnalogCommandOutcome SetSpeedCommand(double engineeringMilliamps);
+    /// <summary>Writes one typed analog speed reference.</summary>
+    PumpAnalogCommandOutcome SetSpeedCommand(PumpAnalogCommand command);
 
     /// <summary>Reads the Running input interpreted through the commissioned polarity.</summary>
     PumpFeedbackRead ReadRunning();
@@ -156,27 +174,10 @@ public interface IPumpCommandBoundary
 }
 
 /// <summary>
-/// The single acceptance rule for process evidence. One definition, used by the Pump boundary and by
-/// the Cleaning Path equipment boundary, so the two can never disagree about what counts as current.
-/// A simulated read is never acceptable: a dry command path must never present in-memory state as
-/// physical evidence.
-/// </summary>
-public static class ProcessIoEvidenceAcceptance
-{
-    public static bool Accepts(
-        ProcessIoPhysicalObservation? observation,
-        int liveGeneration,
-        DateTimeOffset now,
-        TimeSpan freshnessBudget) =>
-        observation is not null
-        && observation.IsUsable
-        && observation.Provenance == ProcessIoObservationProvenance.PHYSICAL_READ
-        && observation.SourceGeneration == liveGeneration
-        && observation.IsUsableAt(now, liveGeneration, freshnessBudget);
-}
-
-/// <summary>
 /// The Process-Io implementation of <see cref="IPumpCommandBoundary"/>.
+///
+/// It holds no lifecycle state. It is constructed once per composition and is the only route from the
+/// Pump lifecycle to the transport, always through the session.
 /// </summary>
 public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
 {
@@ -205,10 +206,11 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         _authorization = authorization;
         Feedback = feedback;
         _time = time ?? TimeProvider.System;
-        _freshnessBudget = freshnessBudget ?? TimeSpan.FromSeconds(2);
+        _freshnessBudget = freshnessBudget ?? TimeSpan.FromMilliseconds(
+            PumpLifecycleConfiguration.OwnerInitialFreshnessBudgetMilliseconds);
     }
 
-    /// <summary>Every command outcome in issue order, for evidence.</summary>
+    /// <summary>Every digital command outcome in issue order, for evidence.</summary>
     public IReadOnlyList<PumpCommandOutcome> CommandLog => _commandLog;
 
     public PumpFeedbackConfiguration Feedback { get; }
@@ -217,18 +219,24 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
 
     // ---------------------------------------------------------------- commands
 
+    /// <summary>
+    /// Writes the exact two-write selection pair for one Pump ordinal: the selected output TRUE, then
+    /// the other output FALSE. An ordinal that is not 1 or 2 is refused outright and no fallback to
+    /// Pump 1 is ever substituted.
+    /// </summary>
     public IReadOnlyList<PumpCommandOutcome> SelectPump(int selection)
     {
-        if (!PumpCommandContract.IsValidSelection(selection))
+        IReadOnlyList<PumpCommandStep> order = PumpCommandContract.SelectionSequence(selection);
+        if (order.Count == 0)
         {
-            // An invalid selection is never resolved by falling back to Pump 1.
+            // An invalid ordinal produces no command at all, and never a fallback to Pump 1.
             return Array.Empty<PumpCommandOutcome>();
         }
 
-        var outcomes = new List<PumpCommandOutcome>(2);
-        foreach (PumpCommandStep step in PumpCommandContract.SelectionSequence(selection))
+        var outcomes = new List<PumpCommandOutcome>(order.Count);
+        for (int index = 0; index < order.Count; index += 1)
         {
-            outcomes.Add(WriteCoil(step.Tag, step.Value));
+            outcomes.Add(WriteCoil(order[index].Tag, order[index].Value));
         }
 
         return outcomes;
@@ -240,56 +248,64 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
     public PumpCommandOutcome SetRunPump(bool value) =>
         WriteCoil(PumpCommandContract.RunPumpTag, value);
 
-    /// <summary>Writes the analog speed reference. An out-of-domain value is refused, never clamped.</summary>
-    public PumpAnalogCommandOutcome SetSpeedCommand(double engineeringMilliamps)
+    /// <summary>
+    /// Writes one typed analog speed reference through the session. The command was already proven to be
+    /// either the explicit 0 mA sentinel or a live 4 to 20 mA reference, so the only conversion that runs
+    /// here is the commissioned Pump map. No value is clamped and no guessed command is substituted: an
+    /// invalid command is refused before it can reach the transport.
+    /// </summary>
+    public PumpAnalogCommandOutcome SetSpeedCommand(PumpAnalogCommand command)
     {
         DateTimeOffset at = _time.GetUtcNow();
-        int address = 0;
-        bool bound = PumpCommandContract.TryRegisterAddress(PumpCommandContract.SpeedReferenceTag, out address);
 
-        if (!bound)
+        if (!command.Valid || !PumpCommandContract.TryAnalogAddress(out int registerAddress))
         {
             return new PumpAnalogCommandOutcome
             {
                 Tag = PumpCommandContract.SpeedReferenceTag,
-                Address = 0,
-                RequestedEngineering = engineeringMilliamps,
+                RegisterAddress = 0,
+                RequestedEngineeringMilliamps = command.Milliamps,
+                RequestedKind = PumpAnalogCommandContract.SafeStopSentinelCode,
+                RawWord = 0,
                 Admitted = false,
                 Dispatched = false,
-                AdmissionCode = PumpCommandRefusals.RefusedWrongFunctionOrAddress,
-                DispatchCode = PumpCommandRefusals.RefusedWrongFunctionOrAddress,
+                Code = PumpCommandRefusals.RefusedAnalogOutOfDomain,
                 SessionGeneration = _session.Generation,
                 At = at,
             };
         }
 
-        if (!PumpAnalogCommandContract.IsInDomain(engineeringMilliamps))
+        // The conversion is proven BEFORE admission, so an invalid command consumes no token.
+        if (!PumpAnalogCommandContract.TryToRaw(command, out int raw))
         {
             return new PumpAnalogCommandOutcome
             {
                 Tag = PumpCommandContract.SpeedReferenceTag,
-                Address = address,
-                RequestedEngineering = engineeringMilliamps,
+                RegisterAddress = registerAddress,
+                RequestedEngineeringMilliamps = command.Milliamps,
+                RequestedKind = command.KindCode,
+                RawWord = 0,
                 Admitted = false,
                 Dispatched = false,
-                AdmissionCode = PumpCommandRefusals.RefusedAnalogOutOfDomain,
-                DispatchCode = PumpCommandRefusals.RefusedAnalogOutOfDomain,
+                Code = PumpCommandRefusals.RefusedAnalogOutOfDomain,
                 SessionGeneration = _session.Generation,
                 At = at,
             };
         }
 
-        if (!_catalogue.TryGetValue(PumpCommandContract.SpeedReferenceTag, out ProcessIoCatalogueRow? row) || row.Binding is null)
+        if (!_catalogue.TryGetValue(PumpCommandContract.SpeedReferenceTag, out ProcessIoCatalogueRow? row)
+            || row.Binding is null)
         {
             return new PumpAnalogCommandOutcome
             {
                 Tag = PumpCommandContract.SpeedReferenceTag,
-                Address = address,
-                RequestedEngineering = engineeringMilliamps,
+                RegisterAddress = registerAddress,
+                RequestedEngineeringMilliamps = command.Milliamps,
+                RequestedKind = command.KindCode,
+                RawWord = 0,
                 Admitted = false,
                 Dispatched = false,
-                AdmissionCode = ProcessIoRefusals.WriteRefusedUnbound,
-                DispatchCode = ProcessIoRefusals.WriteRefusedUnbound,
+                Code = PumpCommandRefusals.RefusedUnbound,
                 SessionGeneration = _session.Generation,
                 At = at,
             };
@@ -301,12 +317,13 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
             return new PumpAnalogCommandOutcome
             {
                 Tag = PumpCommandContract.SpeedReferenceTag,
-                Address = address,
-                RequestedEngineering = engineeringMilliamps,
+                RegisterAddress = registerAddress,
+                RequestedEngineeringMilliamps = command.Milliamps,
+                RequestedKind = command.KindCode,
+                RawWord = 0,
                 Admitted = false,
                 Dispatched = false,
-                AdmissionCode = admission.Code,
-                DispatchCode = PumpCommandRefusals.RefusedNotAdmittedBySession,
+                Code = PumpCommandRefusals.RefusedNotAdmitted,
                 SessionGeneration = _session.Generation,
                 At = at,
             };
@@ -316,9 +333,9 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         bool faulted = false;
         try
         {
-            dispatched = _session.DispatchAnalogOutput(at, admission.Token, row, engineeringMilliamps);
+            dispatched = _session.DispatchPumpAnalogOutput(at, admission.Token, row, command);
         }
-        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
         {
             // The token is already spent inside the session, so exactly-once is preserved even here.
             // The exception is captured as evidence, never propagated into the lifecycle.
@@ -329,36 +346,169 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         return new PumpAnalogCommandOutcome
         {
             Tag = PumpCommandContract.SpeedReferenceTag,
-            Address = address,
-            RequestedEngineering = engineeringMilliamps,
+            RegisterAddress = registerAddress,
+            RequestedEngineeringMilliamps = command.Milliamps,
+            RequestedKind = command.KindCode,
+            RawWord = dispatched ? raw : 0,
             Admitted = true,
             Dispatched = dispatched,
-            AdmissionCode = admission.Code,
-            DispatchCode = dispatched ? PumpCommandRefusals.Granted : PumpCommandRefusals.RefusedDispatchFailed,
+            Code = dispatched ? PumpCommandRefusals.Granted : PumpCommandRefusals.RefusedTransportFault,
             SessionGeneration = _session.Generation,
             At = at,
             TransportFaulted = faulted,
         };
     }
 
+    // ---------------------------------------------------------------- feedback
+
+    public PumpFeedbackRead ReadRunning() =>
+        ReadFeedback(
+            PumpCommandContract.RunningFeedbackTag,
+            Feedback.RunningPolarity,
+            Feedback.RunningCommissioned);
+
+    public PumpFeedbackRead ReadFault() =>
+        ReadFeedback(
+            PumpCommandContract.FaultFeedbackTag,
+            Feedback.FaultPolarity,
+            Feedback.FaultCommissioned);
+
+    /// <summary>
+    /// Reads the Pump Outlet pressure. The row identity is AI-003, the sample source identity is the
+    /// Pump Outlet source, and the sample is accepted only through the ONE acceptance rule. The Pump
+    /// Inlet row is never substituted.
+    /// </summary>
+    public PumpPressureRead ReadPumpOutletPressure()
+    {
+        DateTimeOffset at = _time.GetUtcNow();
+
+        if (!_catalogue.TryGetValue(PumpCommandContract.PumpOutletPressureTag, out ProcessIoCatalogueRow? row)
+            || row.Binding is null)
+        {
+            return new PumpPressureRead
+            {
+                Tag = PumpCommandContract.PumpOutletPressureTag,
+                Accepted = false,
+                Code = PumpCommandRefusals.RefusedUnbound,
+                SessionGeneration = _session.Generation,
+                At = at,
+            };
+        }
+
+        ProcessIoPhysicalObservation observation =
+            _session.ObserveAnalogInput(PumpCommandContract.PumpOutletPressureTag, row, _time, _freshnessBudget);
+
+        if (!ProcessIoEvidenceAcceptance.Accepts(observation, _session.Generation, at, _freshnessBudget))
+        {
+            // A stale sample is reported as stale; anything else is unusable. Neither is ever converted
+            // into an invented bar value, and the Pump Inlet row is never substituted.
+            return new PumpPressureRead
+            {
+                Tag = PumpCommandContract.PumpOutletPressureTag,
+                Accepted = false,
+                Code = PumpCommandRefusals.RefusedPressure,
+                Stale = observation.Quality == ProcessIoObservationQuality.STALE,
+                SessionGeneration = _session.Generation,
+                At = at,
+            };
+        }
+
+        double bar = ProcessIoEngineering.PumpOutletPressureBar(observation.RawValue);
+        if (!double.IsFinite(bar))
+        {
+            return new PumpPressureRead
+            {
+                Tag = PumpCommandContract.PumpOutletPressureTag,
+                Accepted = false,
+                Code = PumpCommandRefusals.RefusedPressure,
+                SessionGeneration = _session.Generation,
+                At = at,
+            };
+        }
+
+        return new PumpPressureRead
+        {
+            Tag = PumpCommandContract.PumpOutletPressureTag,
+            Accepted = true,
+            Code = PumpCommandRefusals.Granted,
+            Sample = new PressureSample(bar, PressureQuality.GOOD, false, at, PressureSample.PumpOutletSource),
+            SessionGeneration = _session.Generation,
+            At = at,
+        };
+    }
+
+    // ---------------------------------------------------------------- internals
+
+    private PumpFeedbackRead ReadFeedback(
+        string tag,
+        PumpFeedbackPolarity polarity,
+        bool commissioned)
+    {
+        DateTimeOffset at = _time.GetUtcNow();
+        bool polarityKnown = commissioned;
+        string code = polarityKnown ? PumpCommandRefusals.Granted : PumpFeedbackConfiguration.NotCommissionedCode;
+
+        if (!_catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row) || row.Binding is null)
+        {
+            return new PumpFeedbackRead
+            {
+                Tag = tag,
+                Commissioned = polarityKnown,
+                RawBit = false,
+                Active = false,
+                Usable = false,
+                Code = PumpCommandRefusals.RefusedUnbound,
+                SessionGeneration = _session.Generation,
+                At = at,
+            };
+        }
+
+        ProcessIoPhysicalObservation observation =
+            _session.ObserveDigitalInput(tag, row, _time, _freshnessBudget);
+
+        bool usable = ProcessIoEvidenceAcceptance.Accepts(
+            observation, _session.Generation, at, _freshnessBudget);
+        bool rawBit = usable && observation.RawValue != 0;
+
+        // An uncommissioned polarity is never interpreted: Active stays false and the code says why.
+        bool active = usable
+            && polarityKnown
+            && (polarity == PumpFeedbackPolarity.ACTIVE_HIGH ? rawBit : !rawBit);
+
+        return new PumpFeedbackRead
+        {
+            Tag = tag,
+            Commissioned = polarityKnown,
+            RawBit = rawBit,
+            Active = active,
+            Usable = usable && polarityKnown,
+            Code = usabilityCode(code, usable, polarityKnown),
+            SessionGeneration = _session.Generation,
+            At = at,
+        };
+
+        static string usabilityCode(string granted, bool usable, bool polarityKnown)
+        {
+            if (!usable) return PumpCommandRefusals.RefusedPressure;
+            return polarityKnown ? granted : PumpFeedbackConfiguration.NotCommissionedCode;
+        }
+    }
+
     private PumpCommandOutcome WriteCoil(string tag, bool value)
     {
         DateTimeOffset at = _time.GetUtcNow();
-        int address = 0;
-        bool bound = PumpCommandContract.TryCoilAddress(tag, out address);
 
-        if (!PumpCommandContract.IsPumpCommandTag(tag) || !bound)
+        if (!PumpCommandContract.TryCoilAddress(tag, out int coilAddress))
         {
             // A tag that is not one of the four commissioned Pump command outputs is refused outright.
             var refused = new PumpCommandOutcome
             {
                 Tag = tag,
-                Address = address,
-                RequestedValue = value,
+                CoilAddress = 0,
+                Value = value,
                 Admitted = false,
                 Dispatched = false,
-                AdmissionCode = PumpCommandRefusals.RefusedWrongTag,
-                DispatchCode = PumpCommandRefusals.RefusedWrongFunctionOrAddress,
+                Code = PumpCommandRefusals.RefusedUnbound,
                 SessionGeneration = _session.Generation,
                 At = at,
             };
@@ -371,12 +521,11 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
             var unbound = new PumpCommandOutcome
             {
                 Tag = tag,
-                Address = address,
-                RequestedValue = value,
+                CoilAddress = coilAddress,
+                Value = value,
                 Admitted = false,
                 Dispatched = false,
-                AdmissionCode = ProcessIoRefusals.WriteRefusedUnbound,
-                DispatchCode = ProcessIoRefusals.WriteRefusedUnbound,
+                Code = PumpCommandRefusals.RefusedUnbound,
                 SessionGeneration = _session.Generation,
                 At = at,
             };
@@ -387,20 +536,19 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         ProcessIoAdmission admission = _session.AdmitWrite(at, row, _authorization);
         if (!admission.Admitted || admission.Token is null)
         {
-            var notAdmitted = new PumpCommandOutcome
+            var refused = new PumpCommandOutcome
             {
                 Tag = tag,
-                Address = address,
-                RequestedValue = value,
+                CoilAddress = coilAddress,
+                Value = value,
                 Admitted = false,
                 Dispatched = false,
-                AdmissionCode = admission.Code,
-                DispatchCode = PumpCommandRefusals.RefusedNotAdmittedBySession,
+                Code = PumpCommandRefusals.RefusedNotAdmitted,
                 SessionGeneration = _session.Generation,
                 At = at,
             };
-            _commandLog.Add(notAdmitted);
-            return notAdmitted;
+            _commandLog.Add(refused);
+            return refused;
         }
 
         bool dispatched;
@@ -409,9 +557,8 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         {
             dispatched = _session.DispatchDigitalOutput(at, admission.Token, row, value);
         }
-        catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
+        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
         {
-            // The token is already spent inside the session, so exactly-once is preserved even here.
             dispatched = false;
             faulted = true;
         }
@@ -419,115 +566,16 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         var outcome = new PumpCommandOutcome
         {
             Tag = tag,
-            Address = address,
-            RequestedValue = value,
+            CoilAddress = coilAddress,
+            Value = value,
             Admitted = true,
             Dispatched = dispatched,
-            AdmissionCode = admission.Code,
-            DispatchCode = dispatched ? PumpCommandRefusals.Granted : PumpCommandRefusals.RefusedDispatchFailed,
+            Code = dispatched ? PumpCommandRefusals.Granted : PumpCommandRefusals.RefusedTransportFault,
             SessionGeneration = _session.Generation,
             At = at,
             TransportFaulted = faulted,
         };
         _commandLog.Add(outcome);
         return outcome;
-    }
-
-    // ---------------------------------------------------------------- feedback
-
-    public PumpFeedbackRead ReadRunning() => ReadFeedback(PumpCommandContract.RunningFeedbackTag, Feedback.RunningPolarity);
-
-    public PumpFeedbackRead ReadFault() => ReadFeedback(PumpCommandContract.FaultFeedbackTag, Feedback.FaultPolarity);
-
-    private PumpFeedbackRead ReadFeedback(string tag, PumpFeedbackPolarity polarity)
-    {
-        DateTimeOffset at = _time.GetUtcNow();
-        bool commissioned =
-            polarity == PumpFeedbackPolarity.ACTIVE_HIGH || polarity == PumpFeedbackPolarity.ACTIVE_LOW;
-
-        _catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row);
-        ProcessIoPhysicalObservation observation = _session.ObserveDigitalInput(tag, row, _time, _freshnessBudget);
-        bool current = ProcessIoEvidenceAcceptance.Accepts(
-            observation, _session.Generation, _time.GetUtcNow(), _freshnessBudget);
-
-        bool rawBit = observation.RawValue == 1;
-        bool active = false;
-        if (commissioned && current)
-        {
-            active = polarity == PumpFeedbackPolarity.ACTIVE_HIGH ? rawBit : !rawBit;
-        }
-
-        return new PumpFeedbackRead
-        {
-            Tag = tag,
-            Commissioned = commissioned,
-            Code = commissioned ? observation.DiagnosticCode : PumpFeedbackConfiguration.NotCommissionedCode,
-            RawBit = rawBit,
-            Active = active,
-            Current = current,
-            SessionGeneration = _session.Generation,
-            At = at,
-        };
-    }
-
-    // ---------------------------------------------------------------- pressure
-
-    /// <summary>
-    /// Reads the Pump Outlet Pressure (AI-003), the sole Pump-ready authority.
-    ///
-    /// Returns null unless the observation is usable, PHYSICAL_READ, from the live generation and
-    /// inside the freshness budget. The Pump Inlet row (AI-002) is never read here: it is diagnostic
-    /// and trend only and cannot alias, substitute or fall back for this value.
-    /// </summary>
-    public PumpPressureRead ReadPumpOutletPressure()
-    {
-        string tag = PumpCommandContract.PumpOutletPressureTag;
-        _catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row);
-        ProcessIoPhysicalObservation observation = _session.ObserveAnalogInput(tag, row, _time, _freshnessBudget);
-        DateTimeOffset now = _time.GetUtcNow();
-
-        if (!ProcessIoEvidenceAcceptance.Accepts(observation, _session.Generation, now, _freshnessBudget))
-        {
-            return new PumpPressureRead
-            {
-                Tag = tag,
-                Accepted = false,
-                Code = observation.DiagnosticCode,
-                Quality = observation.Quality,
-                Sample = null,
-                SessionGeneration = _session.Generation,
-                At = now,
-            };
-        }
-
-        if (observation.EngineeringValue is not { } bar)
-        {
-            return new PumpPressureRead
-            {
-                Tag = tag,
-                Accepted = false,
-                Code = observation.DiagnosticCode,
-                Quality = observation.Quality,
-                Sample = null,
-                SessionGeneration = _session.Generation,
-                At = now,
-            };
-        }
-
-        return new PumpPressureRead
-        {
-            Tag = tag,
-            Accepted = true,
-            Code = PumpCommandRefusals.Granted,
-            Quality = observation.Quality,
-            Sample = new PressureSample(
-                bar,
-                PressureQuality.GOOD,
-                Stale: false,
-                observation.ObservedAt.ToUniversalTime(),
-                PressureSample.PumpOutletSource),
-            SessionGeneration = _session.Generation,
-            At = now,
-        };
     }
 }
