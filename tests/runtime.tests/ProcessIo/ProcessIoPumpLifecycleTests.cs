@@ -3,6 +3,7 @@ using Wjss.Runtime.Core.CleaningPath.Composition;
 using Wjss.Runtime.Core.ProcessIo;
 using Wjss.Runtime.Core.Sequencing;
 using Wjss.Time;
+using Xunit;
 
 namespace Wjss.Runtime.Tests.ProcessIo;
 
