@@ -37,13 +37,13 @@ public sealed class ProcessIoPumpLifecycleTests
     private const int RegisterPumpOutlet = 2;
 
     /// <summary>A raw word that converts to about 16.5 bar, strictly above the 15 bar setpoint.</summary>
-    private const ushort RawAboveSetpoint = 13500;
+    private const ushort RawAboveSetpoint = 17367;
 
     /// <summary>A raw word that converts to about 15.1 bar, strictly above the 15 bar setpoint.</summary>
-    private const ushort RawJustAboveSetpoint = 12400;
+    private const ushort RawJustAboveSetpoint = 16448;
 
     /// <summary>A raw word that converts to about 14.9 bar, strictly below the 15 bar setpoint.</summary>
-    private const ushort RawJustBelowSetpoint = 12200;
+    private const ushort RawJustBelowSetpoint = 16317;
 
     // ---------------------------------------------------------------- 1 to 8. the analog conversion
 
@@ -382,6 +382,11 @@ public sealed class ProcessIoPumpLifecycleTests
     public void The_Lifecycle_Reaches_Every_Progression_State_In_Order()
     {
         Rig rig = Create(ConfigurationFor(Commissioned()));
+
+        // The progression is driven by commissioned evidence, never by the command itself: the Running
+        // input confirms before the ramp runs, and the Outlet register clears the 15 bar gate.
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
 
         var seen = new List<PumpLifecycleState>();
         void Record()
