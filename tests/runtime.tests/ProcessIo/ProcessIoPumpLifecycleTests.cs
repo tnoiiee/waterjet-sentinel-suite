@@ -19,6 +19,8 @@ public sealed class ProcessIoPumpLifecycleTests
 {
     private const double TargetMilliamps = 4.0;
 
+    private static readonly bool[] EnergisedThenDeEnergised = [true, false];
+
     private static readonly TimeSpan Interval = TimeSpan.FromMilliseconds(20);
     private static readonly TimeSpan Freshness = TimeSpan.FromSeconds(2);
 
@@ -207,7 +209,7 @@ public sealed class ProcessIoPumpLifecycleTests
         Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(0.0, out int generalZero));
         Assert.Equal(0, generalZero);
         Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(12.0, out int generalHalf));
-        Assert.NotEqual(generalHalf, 16384);
+        Assert.NotEqual(16384, generalHalf);
     }
 
     [Fact(DisplayName = "11. The analog contract states milliamps, and states no pressure")]
@@ -356,8 +358,8 @@ public sealed class ProcessIoPumpLifecycleTests
             two.Select(step => step.Tag).ToArray());
 
         // The selected contactor is energised first and the other is de-energised second.
-        Assert.Equal(new[] { true, false }, one.Select(step => step.Value).ToArray());
-        Assert.Equal(new[] { true, false }, two.Select(step => step.Value).ToArray());
+        Assert.Equal(EnergisedThenDeEnergised, one.Select(step => step.Value).ToArray());
+        Assert.Equal(EnergisedThenDeEnergised, two.Select(step => step.Value).ToArray());
 
         Assert.Empty(PumpCommandContract.SelectionSequence(0));
         Assert.Empty(PumpCommandContract.SelectionSequence(3));
@@ -950,17 +952,11 @@ public sealed class ProcessIoPumpLifecycleTests
         Selection = 1,
     };
 
-    private static CleaningPathValveCommandRequest OpenRequest() => new()
-    {
-        ValveId = "IV1",
-        Kind = CleaningPathValveCommandKind.Open,
-    };
+    private static CleaningPathValveCommandRequest OpenRequest() =>
+        new("IV1", CleaningPathValveCommandKind.Open);
 
-    private static CleaningPathValveCommandRequest CloseRequest() => new()
-    {
-        ValveId = "IV1",
-        Kind = CleaningPathValveCommandKind.Close,
-    };
+    private static CleaningPathValveCommandRequest CloseRequest() =>
+        new("IV1", CleaningPathValveCommandKind.Close);
 
     private static bool GetCoil(Rig rig, int address, bool defaultValue) =>
         rig.Transport.Coils.TryGetValue(address, out bool value) ? value : defaultValue;
