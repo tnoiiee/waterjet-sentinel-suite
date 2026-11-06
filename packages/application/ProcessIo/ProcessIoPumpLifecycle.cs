@@ -277,7 +277,7 @@ public sealed class ProcessIoPumpLifecycle
         // An active Fault refuses the Start outright. The Fault polarity is commissioned at this point,
         // so this is a real reading and not an assumption. Nothing was energised, so nothing is cleared.
         PumpFeedbackRead fault = _boundary.ReadFault();
-        if (fault.Current && fault.Active)
+        if (fault.Usable && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
             _ownership.Release();
@@ -414,7 +414,7 @@ public sealed class ProcessIoPumpLifecycle
     private void StepWaitingForRunning(DateTimeOffset now)
     {
         PumpFeedbackRead fault = _boundary.ReadFault();
-        if (fault.Current && fault.Active)
+        if (fault.Usable && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
             EnterStopPath(PumpStopReason.FAULT);
@@ -422,7 +422,7 @@ public sealed class ProcessIoPumpLifecycle
         }
 
         PumpFeedbackRead running = _boundary.ReadRunning();
-        if (running.Current && running.Active)
+        if (running.Usable && running.Active)
         {
             // Running is taken from the commissioned feedback input only. It is never inferred from the
             // outlet pressure and never from the command that was just dispatched.
@@ -475,7 +475,7 @@ public sealed class ProcessIoPumpLifecycle
     private void StepWaitingForReady(DateTimeOffset now)
     {
         PumpFeedbackRead fault = _boundary.ReadFault();
-        if (fault.Current && fault.Active)
+        if (fault.Usable && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
             EnterStopPath(PumpStopReason.FAULT);
@@ -510,7 +510,7 @@ public sealed class ProcessIoPumpLifecycle
     private void StepReady()
     {
         PumpFeedbackRead fault = _boundary.ReadFault();
-        if (fault.Current && fault.Active)
+        if (fault.Usable && fault.Active)
         {
             _primaryFailure = PumpLifecycleState.FAULT_ACTIVE;
             EnterStopPath(PumpStopReason.FAULT);

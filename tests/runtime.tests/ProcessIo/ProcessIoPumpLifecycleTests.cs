@@ -818,6 +818,104 @@ public sealed class ProcessIoPumpLifecycleTests
                 && parameter.ParameterType.Name.Contains("Command", StringComparison.Ordinal)));
     }
 
+    // ------------------------------------------------ 41 to 43. the currentness authority of feedback
+
+    [Fact(DisplayName = "41. A stale Running feedback is refused: never a confirmation, only a timeout")]
+    public void A_Stale_Running_Feedback_Is_Never_A_Confirmation()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+
+        // Every digital read consumes five seconds against the two-second freshness budget, so the
+        // session's own bracketing reports STALE. An asserted-but-stale Running bit never confirms
+        // Running and never starts the ramp: currentness gates every verdict.
+        rig.Transport.DiscreteReadDelay = TimeSpan.FromSeconds(5);
+
+        Assert.True(rig.Lifecycle.Start(Request()).Started);
+        DriveToTerminal(rig);
+
+        Assert.Equal(PumpLifecycleState.RUNNING_FEEDBACK_TIMEOUT, rig.Lifecycle.PrimaryFailure);
+        Assert.Empty(rig.Transport.RegisterWrites);
+        Assert.NotEqual(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
+        Assert.False(rig.Lifecycle.SafeToReportComplete);
+
+        // And still fail-closed on the way out: the not-running feedback is just as stale, so the Stop
+        // is never confirmed, the channel is never released and a physical abort is required.
+        PumpLifecycleResult result = rig.Lifecycle.Result!;
+        Assert.Equal(PumpCleanupStates.PhysicalAbortRequired, result.CleanupState);
+        Assert.False(result.StoppedConfirmed);
+        Assert.True(rig.Ownership.IsHeld, "A stale feedback loop must never release the channel.");
+    }
+
+    [Fact(DisplayName = "42. A stale Fault feedback is refused: PUMP_READY is never tripped by it")]
+    public void A_Stale_Fault_Feedback_Never_Trips_The_Pump()
+    {
+        Rig rig = Create(ConfigurationFor(Commissioned()));
+        rig.Transport.DiscreteInputs[InputRunning] = true;
+        rig.Transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        StarToReady(rig);
+
+        int writesAtReady = rig.Transport.CoilWrites.Count;
+
+        // A Fault bit that only arrives stale, and a Running bit that goes missing just as stalely:
+        // neither is trusted, so neither trips anything. The refusal is silence, not reinterpretation.
+        rig.Transport.DiscreteReadDelay = TimeSpan.FromSeconds(5);
+        rig.Transport.DiscreteInputs[InputFault] = true;
+        rig.Transport.DiscreteInputs[InputRunning] = false;
+
+        for (int step = 0; step < 4; step += 1)
+        {
+            rig.Time.Advance(Interval);
+            rig.Lifecycle.Step();
+        }
+
+        Assert.Equal(PumpLifecycleState.PUMP_READY, rig.Lifecycle.State);
+        Assert.Null(rig.Lifecycle.PrimaryFailure);
+        Assert.Equal(writesAtReady, rig.Transport.CoilWrites.Count);
+    }
+
+    [Fact(DisplayName = "43. Feedback usability is the acceptance rule: never generation, freshness or provenance-free")]
+    public void Feedback_Usability_Is_The_Acceptance_Rule_Itself()
+    {
+        // The boundary sets PumpFeedbackRead.Usable from exactly one authority. This pins that
+        // authority directly, so the lifecycle's guards cannot be satisfied by anything weaker: the
+        // same physical observation is accepted only while it is GOOD, current, physical and live.
+        DateTimeOffset observed = new(2026, 10, 7, 0, 0, 0, TimeSpan.Zero);
+
+        ProcessIoPhysicalObservation Build(
+            int generation,
+            bool fresh,
+            ProcessIoObservationProvenance provenance) => new()
+        {
+            Tag = PumpCommandContract.RunningFeedbackTag,
+            RawValue = 1,
+            Quality = fresh ? ProcessIoObservationQuality.GOOD : ProcessIoObservationQuality.STALE,
+            ObservedAt = observed,
+            ReceivedAt = observed,
+            SourceGeneration = generation,
+            Fresh = fresh,
+            Provenance = provenance,
+            DiagnosticCode = fresh ? "OK" : "STALE",
+        };
+
+        ProcessIoPhysicalObservation live = Build(7, true, ProcessIoObservationProvenance.PHYSICAL_READ);
+        Assert.True(ProcessIoEvidenceAcceptance.Accepts(live, 7, observed, Freshness));
+
+        // A superseded generation is refused even when the sample is otherwise perfect.
+        Assert.False(ProcessIoEvidenceAcceptance.Accepts(live, 8, observed, Freshness));
+
+        // The same sample ages out: past the freshness budget it is a refusal, never a clamp.
+        Assert.False(ProcessIoEvidenceAcceptance.Accepts(live, 7, observed + TimeSpan.FromSeconds(3), Freshness));
+
+        // A simulated read is never physical evidence, at any age and any generation.
+        ProcessIoPhysicalObservation simulated = Build(7, true, ProcessIoObservationProvenance.SIMULATED_READ);
+        Assert.False(ProcessIoEvidenceAcceptance.Accepts(simulated, 7, observed, Freshness));
+
+        // A stale-quality observation is refused on its own terms, not reinterpreted.
+        ProcessIoPhysicalObservation stale = Build(7, false, ProcessIoObservationProvenance.PHYSICAL_READ);
+        Assert.False(ProcessIoEvidenceAcceptance.Accepts(stale, 7, observed, Freshness));
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private static PumpFeedbackConfiguration Commissioned() => new()
@@ -1039,8 +1137,21 @@ public sealed class ProcessIoPumpLifecycleTests
 
         public int NetworkAttempts => CoilWrites.Count + RegisterWrites.Count;
 
-        public bool ReadDiscreteInput(string deviceKey, int address) =>
-            DiscreteInputs.TryGetValue(address, out bool value) && value;
+        /// <summary>
+        /// A digital read that consumes this long is reported STALE by the session's own bracketing,
+        /// independently of the analog delay, so feedback currentness is provable on the DI path too.
+        /// </summary>
+        public TimeSpan DiscreteReadDelay { get; set; } = TimeSpan.Zero;
+
+        public bool ReadDiscreteInput(string deviceKey, int address)
+        {
+            if (DiscreteReadDelay > TimeSpan.Zero)
+            {
+                Clock?.Advance(DiscreteReadDelay);
+            }
+
+            return DiscreteInputs.TryGetValue(address, out bool value) && value;
+        }
 
         public IReadOnlyList<bool> ReadCoilsBulk(string deviceKey, int startAddress, int quantity) =>
             Enumerable.Range(startAddress, quantity)
