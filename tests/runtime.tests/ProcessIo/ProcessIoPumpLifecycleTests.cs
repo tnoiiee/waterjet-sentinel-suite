@@ -36,14 +36,18 @@ public sealed class ProcessIoPumpLifecycleTests
     private const int RegisterPumpInlet = 1;
     private const int RegisterPumpOutlet = 2;
 
-    /// <summary>A raw word that converts to about 16.5 bar, strictly above the 15 bar setpoint.</summary>
+    /// <summary>A raw word that converts to about 21.2 bar, strictly above the 15 bar setpoint.</summary>
     private const ushort RawAboveSetpoint = 17367;
 
-    /// <summary>A raw word that converts to about 15.1 bar, strictly above the 15 bar setpoint.</summary>
-    private const ushort RawJustAboveSetpoint = 16448;
+    /// <summary>
+    /// A raw word that converts to about 15.08 bar, strictly above the 15 bar setpoint. The setpoint sits at
+    /// raw 12287.6 under the commissioned 4-20 mA / 0-40 bar conversion (15 / 40 x 32767), so the bracket
+    /// pair is built around that word, not around the superseded two-stage boundary at raw 16383.5.
+    /// </summary>
+    private const ushort RawJustAboveSetpoint = 12352;
 
-    /// <summary>A raw word that converts to about 14.9 bar, strictly below the 15 bar setpoint.</summary>
-    private const ushort RawJustBelowSetpoint = 16317;
+    /// <summary>A raw word that converts to about 14.92 bar, strictly below the 15 bar setpoint.</summary>
+    private const ushort RawJustBelowSetpoint = 12223;
 
     // ---------------------------------------------------------------- 1 to 8. the analog conversion
 

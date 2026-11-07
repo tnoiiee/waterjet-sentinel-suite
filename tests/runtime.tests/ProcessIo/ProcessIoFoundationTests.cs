@@ -83,13 +83,26 @@ public sealed class ProcessIoFoundationTests
     }
 
     [Fact]
-    public void Engineering_Follows_Exact_Legacy_Conversion_Chains()
+    public void Engineering_Follows_Adopted_Conversion_Chains()
     {
         Assert.Equal(40.0, ProcessIoEngineering.WcPressureBar(32767), 6);
         Assert.Equal(0.0, ProcessIoEngineering.WcPressureBar(0), 6);
         Assert.Equal(40.0, ProcessIoEngineering.PumpOutletPressureBar(32767), 6);
         Assert.Equal(0.0, ProcessIoEngineering.PumpOutletPressureBar(0), 6);
-        Assert.Equal(270.0, ProcessIoEngineering.WaterTankLevel(32767), 6);
+
+        // The Pump Outlet row is deliberately NOT the Legacy chain: the live zero is applied by the
+        // commissioned channel, so the conversion is the same 0..32767 -> 0..40 bar as every other
+        // pressure transmitter, and only the role differs. Field anchors recorded 2026-11-07 on the live
+        // device (raw 580 at rest, raw 13631 running against the Owner's independent 16.x bar reading):
+        Assert.Equal(
+            ProcessIoEngineering.WcPressureBar(13631),
+            ProcessIoEngineering.PumpOutletPressureBar(13631),
+            9);
+        Assert.Equal(16.64, Math.Round(ProcessIoEngineering.PumpOutletPressureBar(13631), 2), 6);
+        Assert.True(ProcessIoEngineering.PumpOutletPressureBar(580) < 1.0);
+
+        // Legacy rev2 corrected the water-level span from 270 (rev1) to 240; the adoption follows rev2.
+        Assert.Equal(240.0, ProcessIoEngineering.WaterTankLevel(32767), 6);
         Assert.Equal(100.0, ProcessIoEngineering.WaterTankLevelPercent(32767), 6);
         Assert.True(ProcessIoEngineering.TryPumpSpeedRaw(12, out int raw));
         Assert.Equal((int)Math.Round(12.0 * 32767 / 20), raw);
@@ -237,10 +250,12 @@ public sealed class ProcessIoFoundationTests
         Assert.Equal("ENGINEERING", obs003.Scaling);
         Assert.True(obs003.Engineering.ContainsKey("bar"));
 
-        // Pump Outlet keeps its own two-stage raw -> mA -> bar conversion. It is never the WC/IV
-        // mapping, and it stays the only Pump-ready pressure source.
+        // Pump Outlet uses the same commissioned live-zero pressure conversion as every other
+        // transmitter row — the rows differ in ROLE, never in scale. Its separation is therefore asserted
+        // on role: the same raw word converts to the same bar on AI-002+ and AI-003+, while only AI-003+
+        // is ever a Pump-ready source (asserted in the Pump-ready and Pump-inlet tests below).
         Assert.Equal(ProcessIoEngineering.PumpOutletPressureBar(16384), obs003.Engineering["bar"].Value);
-        Assert.NotEqual(obs002.Engineering["bar"].Value, obs003.Engineering["bar"].Value);
+        Assert.Equal(obs002.Engineering["bar"].Value, obs003.Engineering["bar"].Value);
 
         // All eight IV outlet rows, including the decimal-width boundary at ordinals 7 and 8.
         for (int i = 4; i <= 11; i++)

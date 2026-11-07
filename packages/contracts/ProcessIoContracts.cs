@@ -255,7 +255,10 @@ public static class ProcessIoRefusals
 
 /// <summary>
 /// Exact engineering conversion constants. The formulas are the clamped linear map
-/// chains of the runtime call sites (raw 0..32767 full scale). Mirrored by legacyEvidence.mjs.
+/// chains of the runtime call sites (raw 0..32767 full scale), with the two corrections the commissioned
+/// hardware forced: the Pump Outlet live zero is applied by the channel and not a second time in software,
+/// and the water-level span follows Legacy rev2 (0..240). Both are recorded with their evidence in
+/// docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md. Mirrored by legacyEvidence.mjs.
 /// </summary>
 public static class ProcessIoEngineering
 {
@@ -272,16 +275,31 @@ public static class ProcessIoEngineering
     public static double WcPressureBar(int rawWord)
         => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 40);
 
-    /// <summary>Pump outlet pressure: raw to signal mA 0..20 to bar 0..40 (two stage).</summary>
+    /// <summary>
+    /// Pump outlet pressure: raw 0..32767 to bar 0..40, ONE stage. The 4 mA live zero is already applied
+    /// by the commissioned channel (750-471 slot 13 ch 3, signal type 4-20 mA, user limits 32767/-32768),
+    /// so raw 0 IS 4 mA and raw 32767 IS 20 mA; subtracting the live zero a second time in software was a
+    /// defect inherited from the Legacy call site (rev1 and rev2 both chain raw -&gt; 0..20 mA and then
+    /// 4..20 mA -&gt; 0..40 bar), which under-reported pressure by a factor of 1.54 and silently raised the
+    /// effective Pump-ready threshold from 15 bar to just over 20 bar. Field evidence at 2026-11-07 settled
+    /// it: raw 580 at rest (4.28 mA, ~0.7 bar) and raw 13631 with the pump running against the Owner's
+    /// independent reading of 16.x bar. This is the Owner ruling "4-20 mA, 0-40 bar" implemented exactly, and
+    /// it is now the same conversion as the other pressure transmitters. A below-4 mA loop is reported by
+    /// the channel as a negative word and is refused by the raw-domain check (0..32767) as BAD, never
+    /// clamped into a value, so the fail-closed behaviour is unchanged.
+    /// See docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md.
+    /// </summary>
     public static double PumpOutletPressureBar(int rawWord)
-    {
-        double milliamps = LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 20);
-        return LegacyMap(milliamps, 4, 20, 0, 40);
-    }
+        => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 40);
 
-    /// <summary>Water level: raw to level 0..270.</summary>
+    /// <summary>
+    /// Water level: raw to level 0..240. Legacy rev1 used a 0..270 span; rev2 corrected the same call site to
+    /// 0..240, and the commissioned equipment follows rev2. The percentage output below is unaffected,
+    /// because rev2 derives it as level over the same 0..240 span, which is algebraically raw 0..32767 to
+    /// 0..100. See docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md.
+    /// </summary>
     public static double WaterTankLevel(int rawWord)
-        => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 270);
+        => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 240);
 
     /// <summary>Water level percent: raw to 0..100.</summary>
     public static double WaterTankLevelPercent(int rawWord)

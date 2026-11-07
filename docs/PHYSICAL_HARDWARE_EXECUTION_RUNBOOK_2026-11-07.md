@@ -54,12 +54,15 @@ $env:WJSS_PUMP_READY_SETPOINT_BAR   = '15'
 $env:WJSS_PUMP_READY_FRESHNESS_MS   = '2000'
 & $EXE 2>&1 | Tee-Object "$EV\trialA-off.log"; "EXIT=$LASTEXITCODE"
 ```
-- **A1 (ปั๊มหยุด) — contract จริงของ trial (แก้จากที่เขียนผิดไว้รอบแรก):** ใต้ setpoint คือ typed refusal ⇒ `trial_code=PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT` + exit **2** (ไม่ใช่ 0!) ส่วน exit: 0 = Accepted เท่านั้น, 2 = refusal หลัง bind, 3 = ReadTimeout, 4 = startup refusal; zero-write เชิงโครงสร้าง + `session_state=CLOSED`, `transport_released=TRUE` — ถ้าวัดใต้ setpoint แล้วได้ exit 0 = ผิดปกติ ให้หยุดและส่ง log
-  - หมายเหตุ conversion: raw ใต้ live zero (เช่น 580 ⇒ 0.354 mA < 4 mA) จะ **saturate เป็น 0 bar** ตาม `LegacyMap` ของ Product — `engineering_bar=0` ที่ปั๊มหยุดคือพฤติกรรมถูกต้อง ไม่ใช่ศูนย์หลอก
-- **A2 (ปั๊ม RUN จาก Panel — ผู้ปฏิบัติ: Owner เท่านั้น):** รอแรงดันนิ่ง รันซ้ำหนึ่งครั้ง; ถ้า raw → bar แล้ว ≤ setpoint จะได้ exit 2 + refusal code แบบเดิม (ถูกต้อง, fail-closed) — ตัวเลข bar บันทึกสมุดหน้างานเท่านั้น
-- **A2b (คำถาม scale ที่หน้างานต้องตอบ 1 นาที):** transmitter ที่พักอยู่ควรอ่าน ~4 mA (raw ≈ 4196); ค่าที่วัดได้ ~0.35 mA ตอนหยุด บ่งว่า (ก) transmitter จ่ายไฟร่วมกับการ์ดปั๊ม (ค่าตอนหยุดไร้ความหมายแต่ไร้โทษ) หรือ (ข) ฟิลด์เป็น 0–20 mA ไม่ใช่ 4–20 mA — ถ้า (ข) ค่า 10.8 bar จะ under-report (~16.6 bar จริง) และ **การแก้ scale = Product change ที่ Owner ต้องสั่งชัด** ไม่ใช่การปรับใน test
-- **A3 (ปิด TRUE branch — แนะนำรันตอนนี้, ปั๊ม RUN):** ตั้ง `WJSS_PUMP_READY_SETPOINT_BAR=10` (owner-selected สำหรับ commissioning run เท่านั้น; 15 คงเป็นค่า production) แล้วรันซ้ำ: คาด `pump_ready=TRUE`, `strict_comparison=<bar> > 10 => TRUE`, exit **0** — บันทึกว่านี่คือ low-setpoint demonstration ลงตารางผล
-- Gate ปิดเมื่อ: A1 exit 2 + A2 (exit ตามค่าจริง) + A3 exit 0 ครบ ⇒ connectivity + AI-003 signal path + strict-greater ทั้งสองฝั่งบนของจริง ✓ (evidence class เต็ม `PHYSICAL_PUMP_READY` ต้องการ script §4.4 ของ TRIAL_A_B package พร้อม attestations — ทำตอนปิด register ทางการ)
+- **A0 (บังคับก่อน A ทั้งหมด — build ใหม่บน HEAD นี้):** การแก้ scaling pump-outlet เป็น **Product change** (ไม่ใช่ test change) ⇒ ต้อง `dotnet restore` (ถ้า project/package เปลี่ยน) + `dotnet build WaterJetSentinelSuite.sln -c Release` + รัน suite เต็ม แล้วใช้ `.exe` ที่ build ใหม่นี้เท่านั้น — ผลที่วัดบน build เก่า (`608aa3b3`/`7c90adf3`) ไม่ใช่ผลของโค้ดที่ยืนบน correction; หลักฐานการแก้และเลขทุกตัวอยู่ใน `docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md`
+- **A1 (ปั๊มหยุด):** ใต้ setpoint คือ typed refusal ⇒ `trial_code=PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT` + exit **2** (ไม่ใช่ 0) ส่วน exit ladder: 0 = Accepted เท่านั้น, 2 = refusal หลัง bind, 3 = ReadTimeout, 4 = startup refusal; zero-write เชิงโครงสร้าง + `session_state=CLOSED`, `transport_released=TRUE` — ถ้าวัดใต้ setpoint แล้วได้ exit 0 = ผิดปกติ ให้หยุดและส่ง log
+  - conversion ที่ถูกต้อง (map ที่แก้แล้ว): ช่อง AI-003 ถูก configure เป็น **4-20 mA** ⇒ `raw 0 = 4 mA` อยู่แล้ว, `bar = raw/32767 × 40` — ที่ raw ~580 ตอนปั๊มหยุด = **4.283 mA ⇒ 0.708 bar** ซึ่งเป็น live-zero ปกติ **ไม่ใช่ under-range** อีกต่อไป
+  - เพิกถอนคำอธิบายรอบก่อน: "580 ⇒ 0.354 mA ⇒ saturate เป็น 0 bar" มาจาก map two-stage ที่ minus live zero ซ้ำ ( defect) และเลข "raw ≈ 4196" ที่ผมเขียนไว้คือตัวเลขที่ไม่มีใน source ใด ๆ — ลบทิ้ง อย่าใช้อ้างอิง
+- **A2 (ปั๊ม RUN จาก Panel — ผู้ปฏิบัติ: Owner เท่านั้น):** รอแรงดันนิ่ง รันซ้ำหนึ่งครั้ง **บน build ใหม่**: ค่าจริงต้อง换算 > setpoint ⇒ คาด **exit 0** + `trial_code=PUMP_READY_ACCEPTED` + `pump_ready=TRUE` + `physical_ai003_verified=TRUE` + `strict_comparison=16.6399 > 15 => TRUE` (ที่ raw 13631); ถ้าแรงดันจริง ≤ 15 bar ก็ยังเป็น exit 2 (ถูกต้อง, fail-closed) — บันทึก `engineering_bar` เต็มบรรทัดลงในตารางผล (ไม่ใช่ข้อมูลลับ)
+  - ผล A2 ที่วิ่งบน build เดิม (10.7999 bar → exit 2) ถูกรีคลาสเป็น **หลักฐานของ defect** ไม่ใช่ gate ที่ผ่าน: map เก่าทำให้ threshold จริงกลายเป็น 20.0006 bar และถ้าปั๊มถือ 18 bar (legacy `PressureSetpoint`) มันจะไม่มีวันเปิดเลย
+- **A2b — ปิดคำถามแล้วด้วยหลักฐาน:** ฟิลด์เป็น 4–20 mA ตามที่ Owner ยืนยัน + ค่าอ้างอิงหน้างาน 16.x bar ตรงกับ single-stage เป๊ะ ⇒ แก้ที่ **Product map** (ห้ามแก้ใน test/ห้ามใส่ offset ในสคริปต์)
+- **A3 (ไม่จำเป็นแล้ว — เก็บเป็น optional data point, ปั๊ม RUN):** ตั้ง `WJSS_PUMP_READY_SETPOINT_BAR=10` (commissioning only; 15 คงเป็นค่า production) แล้วรันซ้ำ: คาด `pump_ready=TRUE`, `strict_comparison=<bar> > 10 => TRUE`, exit **0**
+- Gate ปิดเมื่อ: A1 exit 2 (refusal ใต้ setpoint บนสัญญาณจริง) + A2 exit 0 (`Accepted` เหนือ setpoint บนสัญญาณจริง) [+ A3 ถ้ารัน] ⇒ connectivity + AI-003 signal path + ทั้งสองฝั่งของ strict-greater บนของจริง ✓ (evidence class เต็ม `PHYSICAL_PUMP_READY` ต้องการ script §4.4 ของ TRIAL_A_B package พร้อม attestations — ทำตอนปิด register ทางการ)
 
 ## 4. Stage B — Polarity commissioning (DI-004/DI-005)
 1. อ่านสถานะ DI-004/DI-005 ตอนปั๊มหยุด (Trial A log ไม่มี DI — ใช้ Modbus diagnostic ที่ Owner มี หรืออ่านจาก log ของ Stage C/D ที่ print feedback state)
@@ -133,8 +136,8 @@ $env:WJSS_CLEANING_SENSOR_ID         = '<canonical Sensor id ของรอบ�
 
 ## 11. ตารางผลที่ต้องส่งผม (หลัง scrub แล้วเท่านั้น)
 ```text
-Stage A1 off:   exit=..  verdict_line=<บรรทัดสรุป โดยไม่ตัดบริบท>
-Stage A2 run:   exit=..  ready_seen=true/false  (bar = บันทึกส่วนตัว)
+Stage A1 off:   exit=..  verdict_line=<บรรทัดสรุป โดยไม่ตัดบริบท>  engineering_bar=<ค่าที่อ่านได้>
+Stage A2 run:   exit=..  trial_code=..  pump_ready=..  engineering_bar=<ค่าที่อ่านได้>  build_head=<8 ตัวแรกของ HEAD ที่ build>
 Stage B:        Running=<HIGH|LOW> Fault=<HIGH|LOW>  method=<Modbus diag|trial log>
 Stage C:        exit=..  open_confirmed=.. close_confirmed=.. readback=..
 Stage D:        exit=..  steps=.. terminal=<state>   order_verified=DO-003-before-007? down-ramp?

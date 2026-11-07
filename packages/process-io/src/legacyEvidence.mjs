@@ -90,10 +90,10 @@ export const ANALOG_CONVERSIONS = Object.freeze({
   'AI-001+': Object.freeze({
     kind: 'WATER_LEVEL',
     outputs: Object.freeze([
-      Object.freeze({ name: 'level', unit: 'level_units', steps: Object.freeze([{ type: 'legacyMap', inMin: 0, inMax: 32767, outMin: 0, outMax: 270 }]) }),
+      Object.freeze({ name: 'level', unit: 'level_units', steps: Object.freeze([{ type: 'legacyMap', inMin: 0, inMax: 32767, outMin: 0, outMax: 240 }]) }),
       Object.freeze({ name: 'percent', unit: '%', steps: Object.freeze([{ type: 'legacyMap', inMin: 0, inMax: 32767, outMin: 0, outMax: 100 }]) }),
     ]),
-    legacyPath: 'FormWCAndPump.cs UpdateWCAndPumpfieldbusUI()',
+    legacyPath: 'FormWCAndPump.cs UpdateWCAndPumpfieldbusUI() (rev1 span 270 superseded by rev2 240)',
   }),
   'AI-002+': PRESSURE_SINGLE_STAGE(),
   'AI-003+': Object.freeze({
@@ -101,13 +101,15 @@ export const ANALOG_CONVERSIONS = Object.freeze({
     outputs: Object.freeze([
       Object.freeze({
         name: 'bar', unit: 'bar',
-        steps: Object.freeze([
-          { type: 'legacyMap', inMin: 0, inMax: 32767, outMin: 0, outMax: 20 },
-          { type: 'legacyMap', inMin: 4, inMax: 20, outMin: 0, outMax: 40 },
-        ]),
+        // One stage only: the 4 mA live zero belongs to the commissioned channel (signal type 4-20 mA),
+        // so raw 0 is 4 mA and raw 32767 is 20 mA. The Legacy call site chained a second 4..20 mA
+        // subtraction (rev1 and rev2 alike); field evidence at 2026-11-07 proved it under-reports by 1.54x
+        // and raises the effective Pump-ready threshold above 20 bar. Corrected deliberately, per
+        // docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md.
+        steps: Object.freeze([{ type: 'legacyMap', inMin: 0, inMax: 32767, outMin: 0, outMax: 40 }]),
       }),
     ]),
-    legacyPath: 'FormWCAndPump.cs UpdateWCAndPumpfieldbusUI(); FormCannonController.cs (display + gate)',
+    legacyPath: 'FormWCAndPump.cs UpdateWCAndPumpfieldbusUI(); FormCannonController.cs (display + gate) — live-zero stage removed',
   }),
   'AI-004+': PRESSURE_SINGLE_STAGE(), 'AI-005+': PRESSURE_SINGLE_STAGE(), 'AI-006+': PRESSURE_SINGLE_STAGE(),
   'AI-007+': PRESSURE_SINGLE_STAGE(), 'AI-008+': PRESSURE_SINGLE_STAGE(), 'AI-009+': PRESSURE_SINGLE_STAGE(),

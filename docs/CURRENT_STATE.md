@@ -64,8 +64,12 @@
 > tagged / 3 untagged; all 111 rows preserved in complete source order; spare and unresolved
 > rows fail-closed excluded); (2) exact Legacy physical bindings, function codes (FC01/FC03/FC05/FC16),
 > transport shape (port 502, unitId 1, timeouts 1000 ms, poll 200 ms) and conversions (WC/IV
-> pressure 0..40 bar, pump outlet two-stage 4..20 mA -> 0..40 bar per Owner ruling AI-003 sole
-> Pump-ready authority, water level, AO pump speed reference 0..20 mA -> raw 0..32767); (3) typed
+> pressure 0..40 bar, pump outlet 0..32767 -> 0..40 bar one stage per Owner ruling "4-20 mA, 0-40 bar" with the
+> live zero applied by the commissioned channel (AI-003 stays the sole Pump-ready authority), water level
+> 0..240 (Legacy rev2 span; rev1's 0..270 superseded 2026-11-07), commissioned AO pump speed reference
+> 4..20 mA -> raw 0..32767 via `PumpAnalogCommand`, and the general bench helper keeping the rev1 0..20 mA span
+> for the simulated path only — all four recorded with their field evidence in
+> docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md); (3) typed
 > session with generation counter, stale-response rejection, reconnect fencing, exactly-once write
 > admission, no write after Close/Stop; (4) commanded / effective / read-back separation; (5)
 > physical-capable configuration validation (fail-closed; missing/invalid endpoints refuse before
