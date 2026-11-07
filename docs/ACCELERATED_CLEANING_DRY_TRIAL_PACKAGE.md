@@ -89,7 +89,9 @@ The dry composition is **never routed through `SimulatorRuntime`**. It binds **n
 1. Owner-local Process-Io endpoint configured outside the repository. No address, credential or
    endpoint value is committed to the Product tree; only a SHA-256 prefix fingerprint is reported.
 2. The consent phrase supplied through the environment, never as a command-line argument:
-   `I AUTHORIZE SINGLE DO PROCESS IO BENCH TRIAL`.
+   the literal of `ProcessIoConsentPhrases.PhysicalDoSingle` (`packages/contracts/ProcessIoContracts.cs`)
+   — deliberately not reproduced here, following the redaction convention of
+   `TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md` §3.4.
 3. All `WJSS_*` variables cleared in one PowerShell process before restore/build/test.
 4. Dry profile selected explicitly: `TEST_HARDWARE_DRY` **with** the dry command mode. Selecting it
    together with the physical read-only mode is refused (`PROFILE_MODE_CONFLICT`), not resolved.
