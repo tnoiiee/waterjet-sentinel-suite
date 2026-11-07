@@ -1,147 +1,344 @@
-# WJSS — Physical Hardware Execution Runbook (PR #45 gate closure) — 2026-11-07
+# WJSS Physical Hardware Execution Runbook v2 — 2026-11-07
 
-**Owner authority:** หน้างานจริงอนุมัติโดย Owner การรันนี้คือ PRODUCTION-READY ไม่ใช่แบบฝึกหัด
-**Head of record:** `608aa3b35f7ae7c0b6d16ef6842ae7e19f6e8f83` (PR #45 — Owner-local 1787/1787, build 0W/0E)
-**Executables:** `<repo>\apps\runtime\bin\Release\net10.0\Wjss.Runtime.exe` (build สดที่ head นี้แล้ว — ห้าม build ใหม่ระหว่างขั้น)
-**Scripts เต็มรูปแบบ (guarded lifecycle):** `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md` §4.4 (Trial A), §5.x (Trial B),
-`docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` §4–§9 (integrated dry) — runbook นี้คือลำดับ master + ผลที่คาด; ถ้ารัน script จาก package ให้ override `$ExpectedHead` เป็น SHA ปัจจุบันของ branch (package เดิม pin `c9c4a2d0` — เก่าแล้ว)
+> เอกสารนี้แทนที่รุ่นแรก (รุ่นแรกเขียนงงและให้คนรันหาข้อมูลมากรอกเอง) — v2 ออกแบบให้ **copy → paste → รัน** เท่านั้น
+> ผลลัพธ์ทุก stage มี script ตรวจให้เอง และก้อนข้อความสำหรับส่งให้ผมถูก scrub IP ให้อัตโนมัติ
 
-## 0. Gate register — สิ่งที่แต่ละขั้นปิด
+**วิธีใช้ (อ่าน 6 บรรทัดนี้ก่อนอย่างอื่น)**
 
-| HOLD ที่ค้างอยู่ | ปิดที่ขั้น |
-|---|---|
-| REAL WAGO ENDPOINT CONNECTIVITY: NOT EXECUTED | **Stage A** |
-| Pump-ready rule บนสัญญาณจริง (AI-003+, strict > setpoint) | **Stage A** |
-| Polarity commissioning DI-004/DI-005 (uncommissioned ⇒ fail closed) | **Stage B** |
-| REAL FIELD-DEVICE ACTUATION (IV1 coil + FC01 readback) | **Stage C** |
-| Pump lifecycle + selection/enable/run + gate + cleanup บน hardware | **Stage D** |
-| WSB Upper/Lower limit-switch reclass (corrected workbook 2026-11-01) + process-image mirroring | **Stage E** |
-| Motion WSB1 no-load Stop trial (เคย prepare ไว้เท่านั้น) | **Stage F — optional** |
+1. `cd` ไปที่ repo แล้ว build: `dotnet build WaterJetSentinelSuite.sln -c Release` (ห้ามข้าม — script เช็คให้ว่า `.exe` เก่ากว่า source หรือไม่)
+2. เปิด PowerShell หน้าต่างเดียว ใช้ทั้งวัน — วางบล็อค **§2 ทั้งบล็อค** แล้วกด Enter (มันจะถาม path / IP / consent แค่ครั้งเดียวต่อชนิด)
+3. วางบล็อคของ stage ที่ถึงคิว ตามลำดับ **A → B → C → D → E** (ห้ามข้ามขั้น)
+4. script จะพิมพ์ `RESULT <stage>: PASS` หรือ `CHECK` + ก้อนข้อความใต้เส้นประ — **copy ก้อนนั้นส่งให้ผม** พร้อม logดิบถ้าผมขอ
+5. ถ้าบรรทัดไหน error (ตัวแดง) ให้ copy error ส่งผม **ห้ามแก้ script เอง**
+6. log ดิบอยู่ที่ `$env:USERPROFILE\wjss-evidence\<วันที่>\` — ห้าม commit เข้า repo
 
-## 1. กฎความปลอดภัยหน้างาน (ห้ามข้าม)
-1. E-Stop ทดสอบก่อนเริ่ม 1 ครั้ง; ใครอยู่นอกตู้ต้องรู้ตำแหน่ง E-Stop
-2. Stage A, B, E = **อ่านอย่างเดียว** — ห้ามมีใครสั่งปั๊มจาก Panel ตอนอ่านยกเว้นที่ขั้นระบุ "pump RUN (local)"
-3. Stage C/D = มี coil ทำงานจริง —ยืนยันไม่มีคนอยู่หน้า WJ head, วาล์ว-manual ทุกตัวอยู่ในตำแหน่งที่ Owner ตัดสินใจแล้ว (§6 ของ package ACCELERATED — "DRY PHYSICAL ARRANGEMENT — OWNER DECISION" ให้บันทึกการตัดสินใจลงสมุดหน้างาน)
-4. Water supply: ปิด/ล็อกตามการตัดสินใจ dry arrangement ของ Owner; ปั๊มห้ามดูดน้ำถ้า Owner ยังไม่สั่ง
-5. หยุดทันที (กด E-Stop แล้วโทรแจ้งกัน) เมื่อ: เสียงมอเตอร์ผิดปกติ / กลิ่นไหม้ / แรงดันโชว์ > ค่าที่ Owner ตั้งเป็นเพดานเอง / การสั่นผิดรูป แล้ว **ค่อย** บันทึก exit code + log ภายหลัง — ความปลอดภัยนำหลักฐานเสมอ
-6. ห้ามแก้ environment variable ระดับ User/Machine ของ Windows — ตั้งเฉพาะใน PowerShell process ที่รันเท่านั้น
+**สถานะ scale ของ Pump pressure (แก้ที่ Product แล้ว):** ตัวแปลงตอนนี้คือ `bar = raw / 32767 × 40` (ช่อง AI‑003 ถูก config เป็น 4‑20 mA ⇒ `raw 0 = 4 mA` อยู่แล้ว) — ตัวอย่างจริงที่หน้างาน: `raw 580 = 4.283 mA = 0.708 bar` (ปั๊มหยุด, ปกติ), `raw 13631 = 10.656 mA = 16.6399 bar` (ปั๊มรัน) หลักฐานทั้งชุดอยู่ใน `docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md`
 
-## 2. Master prep (ทุก stage เริ่มด้วย block นี้เสมอ — หน้าต่าง PowerShell เดิม, ตามลำดับ)
+---
+
+## 1. กฎความปลอดภัย (ห้ามข้าม)
+
+- Stage **A, B, E = อ่านอย่างเดียว** ห้ามสั่งปั๊ม/วาล์วจาก Panel ระหว่างอ่าน ยกเว้นบรรทัดที่เขียนว่า "pump RUN"
+- **C และ D** เป็นการสั่งงานจริง (actuation) — ห้ามรันถ้า **B ยังไม่ผ่าน** และ (สำหรับ D) ยังไม่ได้ตัดสินใจข้อ `docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` §6/§7
+- consent phrase พิมพ์จากค่าคงที่ใน `packages/contracts/ProcessIoContracts.cs` (`ProcessIoConsentPhrases.*`) เท่านั้น — ห้ามจดไว้ที่อื่น ห้ามถ่ายรูป และ script จะ `Remove-Item Env:` ท้ายทุกบล็อค
+- IP ของ T8 ใช้ในหน่วยความจำของหน้าต่างนี้เท่านั้น — ไม่ถูกเขียนลงไฟล์ไหนใน repo และถูก scrub ออกจากก้อนที่ส่งผม
+- ถ้าเกิดอะไรผิดปกติระหว่าง C/D: สั่งที่ Panel ตามลำดับ **Run (DO‑007) = FALSE ก่อน แล้ว Enable (DO‑003) = FALSE** (ห้ามกลับลำดับ) แล้วหยุดส่ง log
+
+## 2. บล็อกร่วม — วางครั้งเดียวต่อบัญชี PowerShell
+
 ```powershell
-cd <repo>
-# hygiene: ล้าง WJSS_* + TargetPath ของโพรเซสนี้
-Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } | ForEach-Object { Remove-Item ("Env:" + $_.Name) }
-Remove-Item Env:TargetPath -ErrorAction SilentlyContinue
-# identity check — ต้องตรงกับ head ของ PR ตอนนี้ ไม่ใช่ค่าที่ pin ใน package เก่า
-(git rev-parse HEAD)                      # ต้องได้ SHA ที่คุณเพิ่ง pull
-(git status --porcelain)                  # ต้องว่าง
-$EXE = ".\apps\runtime\bin\Release\net10.0\Wjss.Runtime.exe"
-Test-Path $EXE                             # True
-$EV  = "$HOME\wjss-evidence\2026-11-07"    # โฟลเดอร์หลักฐานส่วนตัว — ห้าม commit
-New-Item -ItemType Directory -Force $EV | Out-Null
-```
-- ค่า site-specific (IP/PORT/UNIT/SETPOINT จริง) ใช้ตอนพิมพ์เข้า console เท่านั้น **ห้ามเขียนลงไฟล์ที่จะ commit หรือ paste ให้ผมทั้งก้อน** — ก่อนส่ง log ให้ scrub: `(Get-Content $log) -replace '\b\d{1,3}(\.\d{1,3}){3}\b','<IP>' | Set-Content $log`
-- Consent phrases: **ห้ามพิมพ์ลงเอกสาร/แชท** — Owner อ่านค่าจริงจาก source: `packages/contracts/ProcessIoContracts.cs` (คลาส `ProcessIoConsentPhrases`, ใช้ constant name ที่ระบุแต่ละ stage; เปรียบเทียบ ordinal-exact)
+$ErrorActionPreference = 'Stop'
+$script:Repo = (Resolve-Path (Read-Host 'Repo path (folder with WaterJetSentinelSuite.sln)')).Path
+$script:Exe  = Join-Path $script:Repo 'apps\runtime\bin\Release\net10.0\Wjss.Runtime.exe'
+$script:Cat  = Join-Path $script:Repo 'docs\evidence\process-io-inventory-2026-10-22.csv'
+$script:Ip   = Read-Host 'T8 IP (used for this run only, never written to disk)'
+$script:Ev   = Join-Path $env:USERPROFILE ('wjss-evidence\' + (Get-Date -Format yyyy-MM-dd))
+New-Item -ItemType Directory -Force -Path $script:Ev | Out-Null
+$script:Head = (& git -C $script:Repo rev-parse HEAD).Trim()
+if (-not $script:Head) { throw 'STOP: not a git worktree.' }
+$script:Consent = @{}
 
-## 3. Stage A — Trial A: physical Pump-ready READ-ONLY (`PhysicalDiAiRead`)
+function Test-WjssBuild {
+    if (-not (Test-Path -LiteralPath $script:Exe)) { throw 'STOP: Release exe missing. Run: dotnet build WaterJetSentinelSuite.sln -c Release' }
+    $exe = Get-Item -LiteralPath $script:Exe
+    $newest = Get-ChildItem -Path (Join-Path $script:Repo 'apps'), (Join-Path $script:Repo 'packages') -Recurse -Include *.cs -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if ($newest -and $newest.LastWriteTime -gt $exe.LastWriteTime) {
+        throw ('STOP: source file {0} is newer than the exe. Rebuild Release, then re-paste this stage.' -f $newest.Name)
+    }
+    ('HEAD {0} | exe sha256 {1} | built {2}' -f $script:Head.Substring(0,8), (Get-FileHash -LiteralPath $script:Exe -Algorithm SHA256).Hash.Substring(0,12), $exe.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))
+}
+
+function Read-WjssConsent {
+    param([string]$Const)
+    if (-not $script:Consent.ContainsKey($Const)) {
+        Write-Host ('  copy the value of ProcessIoConsentPhrases.{0} from packages\contracts\ProcessIoContracts.cs' -f $Const) -ForegroundColor DarkGray
+        $sec = Read-Host ('  paste consent for {0} (typing is hidden)' -f $Const) -AsSecureString
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+        try { $script:Consent[$Const] = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
+        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    }
+    return $script:Consent[$Const]
+}
+
+function Save-WjssSend {
+    param([string]$Name, $Lines)
+    $txt = @('STAGE {0} | HEAD={1}' -f $Name, $script:Head.Substring(0,8)) + @($Lines)
+    $txt = $txt -replace '\b\d{1,3}(\.\d{1,3}){3}\b', '<IP>'
+    $p = Join-Path $script:Ev ('stage-' + $Name + '.send.txt')
+    Set-Content -LiteralPath $p -Value ($txt -join [Environment]::NewLine) -Encoding UTF8
+    Write-Host '--- copy everything below to the assistant (IP already scrubbed) ---' -ForegroundColor Cyan
+    $txt
+    Write-Host ('--- saved: {0} ---' -f $p) -ForegroundColor DarkGray
+}
+
+function Invoke-WjssStage {
+    param([string]$Name, [hashtable]$Vars = @{}, [string]$ConsentConst = '', [IDictionary]$Expect = @{}, [int]$ExpectExit = 0, [string[]]$Show = @())
+    Write-WjssClearEnv
+    $build = Test-WjssBuild
+    Write-Host ('  build check: ' + $build) -ForegroundColor DarkGray
+    $log = Join-Path $script:Ev ('stage-' + $Name + '.log')
+    $env:WJSS_DEVICE_PROFILE       = 'TEST_HARDWARE'
+    $env:WJSS_PROCESS_IO_HOST      = $script:Ip
+    $env:WJSS_PROCESS_IO_CATALOGUE = $script:Cat
+    foreach ($k in $Vars.Keys) { Set-Item -Path ('env:' + $k) -Value ([string]$Vars[$k]) }
+    if ($ConsentConst) { $env:WJSS_PROCESS_IO_CONSENT = Read-WjssConsent -Const $ConsentConst }
+    Push-Location $script:Repo
+    try {
+        & $script:Exe 2>&1 | Tee-Object -FilePath $log | Out-Null
+        $code = $LASTEXITCODE
+    }
+    finally {
+        Remove-Item -LiteralPath 'env:WJSS_PROCESS_IO_CONSENT' -ErrorAction SilentlyContinue
+        Pop-Location
+    }
+    $map = [ordered]@{}
+    foreach ($line in (Get-Content -LiteralPath $log)) {
+        $t = $line.Trim(); $i = $t.IndexOf('=')
+        if ($i -gt 0) { $k = $t.Substring(0, $i).Trim(); if (-not $map.Contains($k)) { $map[$k] = $t.Substring($i + 1).Trim() } }
+    }
+    $fail = @()
+    if ($ExpectExit -ge 0 -and $code -ne $ExpectExit) { $fail += ('exit={0} (expected {1})' -f $code, $ExpectExit) }
+    foreach ($k in $Expect.Keys) {
+        $want = [string]$Expect[$k]
+        if (-not $map.Contains($k)) { $fail += ($k + ' missing from report') }
+        elseif ($want.StartsWith('~')) { if (-not $map[$k].EndsWith($want.Substring(1))) { $fail += ('{0}={1} (expected ...{2})' -f $k, $map[$k], $want.Substring(1)) } }
+        elseif ($map[$k] -ne $want) { $fail += ('{0}={1} (expected {2})' -f $k, $map[$k], $want) }
+    }
+    $keys = (@($Expect.Keys) + @($Show) | Select-Object -Unique | Where-Object { $map.Contains($_) })
+    $out = @('  exit={0}' -f $code)
+    foreach ($k in $keys) { $out += ('  {0}={1}' -f $k, $map[$k]) }
+    if ($fail.Count) { Write-Host ('RESULT {0}: CHECK' -f $Name) -ForegroundColor Yellow; foreach ($f in $fail) { Write-Host ('   - ' + $f) -ForegroundColor Yellow } }
+    else { Write-Host ('RESULT {0}: PASS' -f $Name) -ForegroundColor Green }
+    Save-WjssSend -Name $Name -Lines $out
+    Write-Host ('raw log (keep local, never commit): {0}' -f $log) -ForegroundColor DarkGray
+}
+
+function Write-WjssClearEnv {
+    Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } | ForEach-Object { Remove-Item -LiteralPath ('env:' + $_.Name) -ErrorAction SilentlyContinue }
+}
+
+# read-only Modbus TCP poller (FC02 = discrete inputs, FC01 = coils). FC05/06/15/16 are not implemented at all.
+function Read-WjssBits {
+    param([string]$Area = 'DI', [int]$Start = 0, [int]$Count = 16)
+    $fc = 2
+    if ($Area -eq 'COIL') { $fc = 1 }
+    $tcp = New-Object System.Net.Sockets.TcpClient
+    try {
+        if (-not $tcp.ConnectAsync($script:Ip, 502).Wait(3000)) { throw 'connect timed out (check IP / firewall / device power)' }
+        $s = $tcp.GetStream()
+        $req = New-Object byte[] 12
+        $req[0] = 0; $req[1] = 1; $req[2] = 0; $req[3] = 0; $req[4] = 0; $req[5] = 6
+        $req[6] = 1; $req[7] = $fc
+        $req[8] = [int][math]::Floor($Start / 256); $req[9] = ($Start % 256)
+        $req[10] = [int][math]::Floor($Count / 256); $req[11] = ($Count % 256)
+        $s.Write($req, 0, 12); $s.Flush()
+        $hdr = New-Object byte[] 9
+        $o = 0
+        while ($o -lt 9) { $r = $s.Read($hdr, $o, 9 - $o); if ($r -le 0) { throw 'connection closed by device' }; $o += $r }
+        if ([int]$hdr[7] -ne $fc) { throw ('device returned Modbus exception for FC{0:00} (check that this area is exposed on the device)' -f $fc) }
+        $n = [int]$hdr[8]
+        $dat = New-Object byte[] $n
+        $o = 0
+        while ($o -lt $n) { $r = $s.Read($dat, $o, $n - $o); if ($r -le 0) { throw 'connection closed mid-response' }; $o += $r }
+        $bits = @()
+        for ($i = 0; $i -lt $Count; $i++) { $byte = [int]$dat[[int][math]::Floor($i / 8)]; $bits += (($byte -shr ($i % 8)) -band 1) }
+        return @{ ok = $true; fc = $fc; start = $Start; bits = $bits }
+    }
+    catch { return @{ ok = $false; error = $_.Exception.Message; bits = @() } }
+    finally { $tcp.Close() }
+}
+
+function Format-WjssBits {
+    param([string]$Prefix, [int]$Base, $Result)
+    if (-not $Result.ok) { return ('  {0}: READ FAILED - {1}' -f $Prefix, $Result.error) }
+    $line = '  ' + $Prefix + ':'
+    for ($i = 0; $i -lt $Result.bits.Count; $i++) { $line += (' {0}-{1:D3}={2}' -f $Prefix, ($Base + $i), $Result.bits[$i]) }
+    return $line
+}
+```
+
+รัน `Test-WjssBuild` หนึ่งครั้งเพื่อดู HEAD/exe ที่ใช้ (พิมพ์ผลลัพธ์เก็บไว้ ผมใช้เทียบว่ารันบน build ไหน)
+
+## 3. Stage A — Trial A: อ่าน Pump-ready บนสัญญาณจริง (อ่านอย่างเดียว)
+
+ปิด gate: `REAL WAGO ENDPOINT CONNECTIVITY` + `Pump-ready rule บนสัญญาณจริง (strict >)` ทั้งสองฝั่ง
+
+**A1 — ปั๊มหยุด** (คาดว่า **exit 2** = typed refusal เพราะ 0.7 bar ≤ 15 bar →นี่คือ PASS)
+
 ```powershell
-$env:WJSS_DEVICE_PROFILE            = 'TEST_HARDWARE'
-$env:WJSS_PUMP_READY_READ_TRIAL     = 'AI-003_ONLY'
-$env:WJSS_PROCESS_IO_HOST           = '<IP ของ T8 ที่หน้างาน>'
-$env:WJSS_PROCESS_IO_CONSENT        = '<ค่า ProcessIoConsentPhrases.PhysicalDiAiRead>'
-$env:WJSS_PROCESS_IO_CATALOGUE      = (Resolve-Path '.\docs\evidence\process-io-inventory-2026-10-22.csv').Path
-$env:WJSS_PUMP_READY_SETPOINT_BAR   = '15'
-$env:WJSS_PUMP_READY_FRESHNESS_MS   = '2000'
-& $EXE 2>&1 | Tee-Object "$EV\trialA-off.log"; "EXIT=$LASTEXITCODE"
+Invoke-WjssStage -Name 'A1-off' -ConsentConst 'PhysicalDiAiRead' -ExpectExit 2 -Vars @{
+  'WJSS_PUMP_READY_READ_TRIAL'   = 'AI-003_ONLY'
+  'WJSS_PUMP_READY_SETPOINT_BAR' = '15'
+  'WJSS_PUMP_READY_FRESHNESS_MS' = '2000'
+} -Expect ([ordered]@{
+  'trial_code'                = 'PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT'
+  'source_tag'                = 'AI-003+'
+  'evidence_kind'             = 'PHYSICAL'
+  'provenance'                = 'PHYSICAL_READ'
+  'quality'                   = 'GOOD'
+  'fresh'                     = 'TRUE'
+  'physical_ai003_verified'   = 'TRUE'
+  'pump_ready'                = 'FALSE'
+  'strict_comparison'         = '~=> FALSE'
+  'session_state'             = 'CLOSED'
+  'transport_released'        = 'TRUE'
+  'ai002_used_for_decision'   = 'FALSE'
+  'iv_command_executed'       = 'FALSE'
+  'motion_executed'           = 'FALSE'
+  'write_authorization_created' = 'FALSE'
+}) -Show @('raw_value','engineering_bar','configured_setpoint_bar','session_generation')
 ```
-- **A0 (บังคับก่อน A ทั้งหมด — build ใหม่บน HEAD นี้):** การแก้ scaling pump-outlet เป็น **Product change** (ไม่ใช่ test change) ⇒ ต้อง `dotnet restore` (ถ้า project/package เปลี่ยน) + `dotnet build WaterJetSentinelSuite.sln -c Release` + รัน suite เต็ม แล้วใช้ `.exe` ที่ build ใหม่นี้เท่านั้น — ผลที่วัดบน build เก่า (`608aa3b3`/`7c90adf3`) ไม่ใช่ผลของโค้ดที่ยืนบน correction; หลักฐานการแก้และเลขทุกตัวอยู่ใน `docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md`
-- **A1 (ปั๊มหยุด):** ใต้ setpoint คือ typed refusal ⇒ `trial_code=PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT` + exit **2** (ไม่ใช่ 0) ส่วน exit ladder: 0 = Accepted เท่านั้น, 2 = refusal หลัง bind, 3 = ReadTimeout, 4 = startup refusal; zero-write เชิงโครงสร้าง + `session_state=CLOSED`, `transport_released=TRUE` — ถ้าวัดใต้ setpoint แล้วได้ exit 0 = ผิดปกติ ให้หยุดและส่ง log
-  - conversion ที่ถูกต้อง (map ที่แก้แล้ว): ช่อง AI-003 ถูก configure เป็น **4-20 mA** ⇒ `raw 0 = 4 mA` อยู่แล้ว, `bar = raw/32767 × 40` — ที่ raw ~580 ตอนปั๊มหยุด = **4.283 mA ⇒ 0.708 bar** ซึ่งเป็น live-zero ปกติ **ไม่ใช่ under-range** อีกต่อไป
-  - เพิกถอนคำอธิบายรอบก่อน: "580 ⇒ 0.354 mA ⇒ saturate เป็น 0 bar" มาจาก map two-stage ที่ minus live zero ซ้ำ ( defect) และเลข "raw ≈ 4196" ที่ผมเขียนไว้คือตัวเลขที่ไม่มีใน source ใด ๆ — ลบทิ้ง อย่าใช้อ้างอิง
-- **A2 (ปั๊ม RUN จาก Panel — ผู้ปฏิบัติ: Owner เท่านั้น):** รอแรงดันนิ่ง รันซ้ำหนึ่งครั้ง **บน build ใหม่**: ค่าจริงต้อง换算 > setpoint ⇒ คาด **exit 0** + `trial_code=PUMP_READY_ACCEPTED` + `pump_ready=TRUE` + `physical_ai003_verified=TRUE` + `strict_comparison=16.6399 > 15 => TRUE` (ที่ raw 13631); ถ้าแรงดันจริง ≤ 15 bar ก็ยังเป็น exit 2 (ถูกต้อง, fail-closed) — บันทึก `engineering_bar` เต็มบรรทัดลงในตารางผล (ไม่ใช่ข้อมูลลับ)
-  - ผล A2 ที่วิ่งบน build เดิม (10.7999 bar → exit 2) ถูกรีคลาสเป็น **หลักฐานของ defect** ไม่ใช่ gate ที่ผ่าน: map เก่าทำให้ threshold จริงกลายเป็น 20.0006 bar และถ้าปั๊มถือ 18 bar (legacy `PressureSetpoint`) มันจะไม่มีวันเปิดเลย
-- **A2b — ปิดคำถามแล้วด้วยหลักฐาน:** ฟิลด์เป็น 4–20 mA ตามที่ Owner ยืนยัน + ค่าอ้างอิงหน้างาน 16.x bar ตรงกับ single-stage เป๊ะ ⇒ แก้ที่ **Product map** (ห้ามแก้ใน test/ห้ามใส่ offset ในสคริปต์)
-- **A3 (ไม่จำเป็นแล้ว — เก็บเป็น optional data point, ปั๊ม RUN):** ตั้ง `WJSS_PUMP_READY_SETPOINT_BAR=10` (commissioning only; 15 คงเป็นค่า production) แล้วรันซ้ำ: คาด `pump_ready=TRUE`, `strict_comparison=<bar> > 10 => TRUE`, exit **0**
-- Gate ปิดเมื่อ: A1 exit 2 (refusal ใต้ setpoint บนสัญญาณจริง) + A2 exit 0 (`Accepted` เหนือ setpoint บนสัญญาณจริง) [+ A3 ถ้ารัน] ⇒ connectivity + AI-003 signal path + ทั้งสองฝั่งของ strict-greater บนของจริง ✓ (evidence class เต็ม `PHYSICAL_PUMP_READY` ต้องการ script §4.4 ของ TRIAL_A_B package พร้อม attestations — ทำตอนปิด register ทางการ)
 
-## 4. Stage B — Polarity commissioning (DI-004/DI-005)
-1. อ่านสถานะ DI-004/DI-005 ตอนปั๊มหยุด (Trial A log ไม่มี DI — ใช้ Modbus diagnostic ที่ Owner มี หรืออ่านจาก log ของ Stage C/D ที่ print feedback state)
-2. อ่านตอนปั๊ม RUN (จาก Panel): DI-004 ต้องเปลี่ยนสถานะจริง — จดว่า "RUN ⇒ level HIGH หรือ LOW"; DI-005 ตอนปกติต้องนิ่งฝั่ง inactive
-3. บันทึกตาราง: `RunningPolarity = ACTIVE_HIGH|ACTIVE_LOW`, `FaultPolarity = ...` ลงสมุด — ค่านี้คือสิ่งที่ Stage D จะป้อน (ถ้ายังไม่ commission, Product จะ **refuse Start fail-closed ตามที่ออกแบบไว้** — ไม่ใช่บั๊ก)
-4. ถ้าไม่สามารถทำให้ DI-004 กระดิกได้จริง (สาย/คอนแทกเตอร์) ⇒ Stage D ยังทำไม่ได้ — บันทึกไว้แล้วข้ามไป Stage F ได้, อย่าฝืน
+**A2 — ปั๊ม RUN จาก Panel (Owner เท่านั้น):** รอแรงดันนิ่งก่อน แล้วรันซ้ำ — คาด **exit 0** + `pump_ready=TRUE`
 
-## 5. Stage C — Trial B: IV1 OPEN/CLOSE single-DO (`PhysicalDoSingle`)
 ```powershell
-Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } | ForEach-Object { Remove-Item ("Env:" + $_.Name) }
-$env:WJSS_DEVICE_PROFILE             = 'TEST_HARDWARE_DRY'
-$env:WJSS_DRY_IV_TRIAL_MODE          = 'SOFTWARE_SIMULATED_AI003'
-$env:WJSS_DRY_IV_TRIAL_VALVE         = 'IV1'
-$env:WJSS_DRY_IV_TRIAL_PUMP_STOPPED  = 'PUMP_STOPPED_OWNER_ATTESTED'   # Owner ยืนยันด้วยสายตาว่าปั๊มหยุดจริงก่อนพิมพ์
-$env:WJSS_PROCESS_IO_HOST           = '<IP>'
-$env:WJSS_PROCESS_IO_CONSENT        = '<ค่า ProcessIoConsentPhrases.PhysicalDoSingle>'
-$env:WJSS_PROCESS_IO_CATALOGUE      = (Resolve-Path '.\docs\evidence\process-io-inventory-2026-10-22.csv').Path
-$env:WJSS_PUMP_READY_SETPOINT_BAR   = '15'
-$env:WJSS_PRESSURE_LOW_BAR          = '<Owner ตั้ง>'
-$env:WJSS_PRESSURE_HIGH_BAR          = '<Owner ตั้ง>'
-$env:WJSS_VALVE_SUPERVISION_MS      = '5000'
-& $EXE 2>&1 | Tee-Object "$EV\trialB.log"; "EXIT=$LASTEXITCODE"
+Invoke-WjssStage -Name 'A2-run' -ConsentConst 'PhysicalDiAiRead' -ExpectExit 0 -Vars @{
+  'WJSS_PUMP_READY_READ_TRIAL'   = 'AI-003_ONLY'
+  'WJSS_PUMP_READY_SETPOINT_BAR' = '15'
+  'WJSS_PUMP_READY_FRESHNESS_MS' = '2000'
+} -Expect ([ordered]@{
+  'trial_code'              = 'PUMP_READY_ACCEPTED_PHYSICAL'
+  'evidence_kind'           = 'PHYSICAL'
+  'physical_ai003_verified' = 'TRUE'
+  'pump_ready'              = 'TRUE'
+  'physical_pump_verified'  = 'TRUE'
+  'strict_comparison'       = '~=> TRUE'
+  'session_state'           = 'CLOSED'
+  'transport_released'      = 'TRUE'
+  'iv_command_executed'     = 'FALSE'
+  'motion_executed'         = 'FALSE'
+  'write_authorization_created' = 'FALSE'
+}) -Show @('raw_value','engineering_bar','configured_setpoint_bar','quality','fresh')
 ```
-- ลำดับที่คาดหวัง: initial-closed confirmed → OPEN dispatched → **coil ที่ตู้ขยับจริง + FC01 readback TRUE** → field confirmation → CLOSE dispatched → readback FALSE → closed confirmed → session CLOSED → exit **0**
-- `IV_TRIAL_REFUSED_INITIAL_CLOSED_NOT_CONFIRMED` = วาล์วไม่ได้ปิดอยู่จริง → แก้หน้างานแล้วรันครั้งเดียวใหม่
-- `..._FIELD_CONFIRMED` ไม่เกิด/`CONTRADICTORY` = สัญญาณ feedback ขัดกับการกระทำ → หยุด stage นี้ จด code ส่งผม **ห้าม retry เกิน 1 ครั้ง** (fail-closed by design)
-- Gate ปิดเมื่อ: ACTUATION จริง + readback/mirror ตรง ⇒ "REAL FIELD-DEVICE ACTUATION" ✓ (+ หลักฐาน process-image half ของ mirror gate)
 
-## 6. Stage D — Integrated Cleaning-Path DRY cycle (full consent ผ่าน `PhysicalDoSingle` dry gate)
-เงื่อนไขเข้า: A ✓, B ✓ (polarities commissioned), C ✓
-1. Owner ตัดสินใจ+บันทึก "DRY PHYSICAL ARRANGEMENT" และ "REPRESENTATIVE ROUTE" (package ACCELERATED §6, §7) — ถ้า TwinCAT/WSB controller พร้อม ให้ set ทั้ง 7 motion variables ตาม §4 "Motion (Gate A)" ของ package นั้น (manual-motion consent, profile file, endpoint, lib dir + 2 digests)
-2. Env เพิ่มจาก block ของ C (ลบ `WJSS_DRY_IV_TRIAL_*` ก่อน!):
+- **A2 ได้ exit 2 + `engineering_bar` ≤ 15** → ปกติ (ปั๊มยังไม่ขึ้นแรงดัน) รอแล้วรันซ้ำได้
+- **A2 ได้ exit 2 แต่ `engineering_bar` > 15** → นี่แหละผิดปกติจริง หยุดและส่ง log ให้ผม
+- **A1 ได้ exit 0** → ผิดปกติ (gate ต้อง refuse ใต้ setpoint) หยุดและส่ง log
+- exit ladder: `0` = Accepted เท่านั้น · `2` = refusal หลัง bind session · `3` = ReadTimeout · `4` = startup refusal (env/consent/profile)
+
+## 4. Stage B — ขั้วสัญญาณ (polarity) DI‑004 / DI‑005 (อ่านอย่างเดียว)
+
+ปิด gate: `WJSS_PUMP_RUNNING_POLARITY` / `WJSS_PUMP_FAULT_POLARITY` (ถ้ายังไม่commission ⇒ Stage D จะถูก refuse — นั่นคือ fail-closed ทำงาน)
+ไม่มี tool ใดใน Product ที่พิมพ์สถานะ DI แบบต่อบิต — ใช้ poller ใน §2 (อ่านอย่างเดียว, เขียนไม่ได้)
+
 ```powershell
-$env:WJSS_DRY_COMMAND_MODE           = 'TEST_HARDWARE_DRY'
-$env:WJSS_PUMP_RUNNING_POLARITY      = '<จาก Stage B>'   # ACTIVE_HIGH | ACTIVE_LOW
-$env:WJSS_PUMP_FAULT_POLARITY        = '<จาก Stage B>'
-$env:WJSS_CLEANING_PATH_STORE        = '<path owner-local>'
-$env:WJSS_SENSOR_PARAMETER_CSV       = '<path owner-local>'
-$env:WJSS_CLEANING_SENSOR_ID         = '<canonical Sensor id ของรอบนี้>'
-& $EXE 2>&1 | Tee-Object "$EV\drycycle.log"; "EXIT=$LASTEXITCODE"
+$t = @()
+$t += Format-WjssBits -Prefix 'DI' -Base 1 -Result (Read-WjssBits -Area 'DI' -Start 0 -Count 8)   # DI-001..DI-008
+Save-WjssSend -Name 'B-off' -Lines $t
 ```
-(ห้าม set `WJSS_PUMP_READY_READ_TRIAL`/`WJSS_DRY_IV_TRIAL_MODE` พร้อมกัน — selector ขัดกัน = refuse ตามแบบ)
-- ผลคาดหวัง: console รายงาน ordered steps แล้ว `steps=<n>` + exit **0** (terminal result); exit 3 = ถึง bounded step budget — **ห้าม re-run เพื่อลุ้น**; ให้ส่ง log ทั้งก้อน
-- ยืนยันด้วยสายตาที่ตู้: selection pair → DO-003 TRUE **ก่อน** DO-007 TRUE; AO ขึ้นทีละ 2 mA/1000 ms; ตอนจบ: ramp ลง → DO-007 FALSE → DO-003 FALSE → not-running → ownership released (log/เสียง relay เป็นพยาน)
-- ถ้ากลางรอบมี fault จริง (E-stop/เกินแรงดัน): Product ต้องพาเข้า stop path เอง — จด exit + โค้ด refusal/terminal state ส่งผม นี่คือผล **บวก** ถ้าพฤติกรรมตรงกับ state machine
 
-## 7. Stage E — WSB limit switches (Upper/Lower reclass) + mirror
-1. สั่งเลื้อน WSB ด้วย manual ของเครื่อง (นอกเส้นทาง WJSS) ไป **Upper end**: คาด DI addresses FC02 `20..27` ฝั่งที่ active ตรง label "Upper" ของ inventory ปัจจุบัน (`docs/evidence/...csv` — แก้ reclass แล้ว)
-2. ไป **Lower end**: คาด `28..35` ฝั่งตรง label "Lower"
-3. ตอนพัก (axes ค้าง): คาดทุกตัว inactive — บันทึก 3 ภาวะลงตารางผล
-4. กระบวนการนี้คือหลักฐานปิด "process-image mirroring (DEFERRED)" ฝั่ง DI; ฝั่ง DO พิสูจน์แล้วจาก FC01 readback ของ Stage C/D
+สั่ง **ปั๊ม RUN** จาก Panel รอให้นิ่ง แล้วรันบล็อคเดิมซ้ำ (เปลี่ยนชื่อเป็น `B-on`):
 
-## 8. Stage F (optional) — Motion WSB1 no-load Stop trial
-รันตาม `docs/MOTION_STOP_TRIAL_RUNBOOK.md` เฉพาะเมื่อหน้างาน TwinCAT พร้อมและ Owner ประกาศเอง; ไม่พร้อม = ข้าม, gate คง NOT EXECUTED (ไม่ใช่ความล้มเหลวของ PR นี้)
-
-## 9. Standard stop / cleanup ทุกกรณี
-- ปกติ: trial เองจะปิด session, de-energise ตามลำดับมาตรฐาน (DO-007 F → verify → DO-003 F → verify → wait not-running → release ownership) ก่อน process ออก
-- ผิดปกติ/ค้าง: ที่ตู้ — ตัด DO-007 (Run) ก่อน, ยืนยัน, แล้ว DO-003 (Enable), ยืนยัน, รอปั๊มนิ่ง, ปลด mode อัตโนมัติที่ Panel; ห้ามถอดสายขณะ coil มีไฟ
-- หลังทุก stage: `Get-ChildItem Env: | Where-Object Name -like 'WJSS_*' | Remove-Item` (log ไม่มีค่า sensitive นอกจาก fingerprint แบบ hash-prefix ตาม redaction ของ Product เอง)
-
-## 10. Exit-code / refusal map (ย่อ)
-| Exit | ความหมาย | Action |
-|---|---|---|
-| 0 | verdict บรรลุตาม contract | บันทึกผล ✓ |
-| 2 | typed refusal ก่อน bind (profile/endpoint/consent/catalogue/attestation) | แก้ config แล้วรันครั้งเดียวใหม่ |
-| 3 (Stage D) | bounded step budget หมด — ไม่มี terminal | ส่ง log ทั้งก้อน ห้าม re-run |
-| 4 | startup refused (selector ผิด/ชนกัน) | ตรวจ hygiene block ให้ตรง stage |
-| `*_REFUSED_READ_ONLY_CONSENT` / `_CONSENT_MISSING` / mismatch | phrase ไม่ตรง ordinal-exact | พิมพ์ใหม่จาก constant source |
-| `IV_TRIAL_REFUSED_*_NOT_FIELD_CONFIRMED` / `CONTRADICTORY` | การกระทำขัดกับ feedback | หยุด stage — นี่คือ fail-closed ทำงาน |
-| `PUMP_READY_TRIAL_REFUSED_ENDPOINT` / `PROCESS_IO_ENDPOINT_REJECTED` | endpoint ผิด/ถึงไม่ได้ | ตรวจ IP/ firewall |
-
-## 11. ตารางผลที่ต้องส่งผม (หลัง scrub แล้วเท่านั้น)
-```text
-Stage A1 off:   exit=..  verdict_line=<บรรทัดสรุป โดยไม่ตัดบริบท>  engineering_bar=<ค่าที่อ่านได้>
-Stage A2 run:   exit=..  trial_code=..  pump_ready=..  engineering_bar=<ค่าที่อ่านได้>  build_head=<8 ตัวแรกของ HEAD ที่ build>
-Stage B:        Running=<HIGH|LOW> Fault=<HIGH|LOW>  method=<Modbus diag|trial log>
-Stage C:        exit=..  open_confirmed=.. close_confirmed=.. readback=..
-Stage D:        exit=..  steps=.. terminal=<state>   order_verified=DO-003-before-007? down-ramp?
-Stage E:        upper_end=.. lower_end=.. idle_all_low=true/false
-Stage F (ถ้าทำ): runbook result=..
-log files: scrubbed? YES/NO   evidence folder: <ชื่อเฉพาะ, ไม่ใช่ path เต็ม>
+```powershell
+$t = @()
+$t += Format-WjssBits -Prefix 'DI' -Base 1 -Result (Read-WjssBits -Area 'DI' -Start 0 -Count 8)
+Save-WjssSend -Name 'B-on' -Lines $t
 ```
+
+ตัดสินจากสองก้อนที่ส่งผม (คุณไม่ต้องแปลเอง ผมแปลให้): **DI‑004** ต้องเปลี่ยนระดับเมื่อ RUN, **DI‑005** ต้องอยู่นิ่งฝั่ง inactive
+ค่าที่จะใช้ใน Stage D = `ACTIVE_HIGH` ถ้าระดับ "ทำงาน" คือ 1, `ACTIVE_LOW` ถ้าคือ 0
+
+## 5. Stage C — Trial B: IV1 OPEN/CLOSE ครั้งเดียว (actuation ครั้งแรก)
+
+ปิด gate: `physical IV command + FC01 read-back` · ต้องมี B ผ่านแล้ว และ **ปั๊มต้องหยุด** (trial ต้องการ attestation นี้)
+
+```powershell
+Invoke-WjssStage -Name 'C-iv1' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
+  'WJSS_DRY_IV_TRIAL_MODE'               = 'SOFTWARE_SIMULATED_AI003'
+  'WJSS_DRY_IV_TRIAL_VALVE'              = 'IV1'
+  'WJSS_DRY_IV_TRIAL_PUMP_STOPPED'       = 'PUMP_STOPPED_OWNER_ATTESTED'
+  'WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR' = '0.7'
+  'WJSS_VALVE_SUPERVISION_MS'            = '5000'
+} -Show @('trial_code','accepted','evidence_kind','physical_iv_command','physical_upper_feedback','physical_lower_feedback','cleanup','session_state')
+```
+
+- stage นี้ **light โดยเจตนา** (ค่า terminal ขึ้นกับ feedback จริงหน้างาน) — ตัวเลขทั้งหมดในก้อน send ผมวิเคราะห์เอง
+- ถ้า `exit=4` = startup refused (env/consent ไม่ครบหรือชนกัน) · `exit=2` = refuse หลัง bind เช่น `IV_TRIAL_REFUSED_*_NOT_FIELD_CONFIRMED` / `CONTRADICTORY` → **นี่คือ fail-closed ทำงาน ไม่ใช่บั๊ก** หยุด stage แล้วส่ง log
+
+## 6. Stage D — Integrated cleaning-path DRY cycle (actuation เต็มรูป)
+
+ปิด gate: วงจร dry ทั้งรอบ (select pump → enable → run → AO ramp → supervision → cleanup → release)
+**เงื่อนไขก่อนรัน:** B ผ่าน (รู้ขั้วสัญญาณแล้ว) + C ผ่าน + เจ้าของตัดสินใจ `docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` §6/§7 แล้ว + Motion ยังไม่มีแรง (no-load)
+
+```powershell
+Invoke-WjssStage -Name 'D-dry' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
+  'WJSS_DRY_COMMAND_MODE'          = 'TEST_HARDWARE_DRY'
+  'WJSS_CLEANING_SENSOR_ID'        = '<Sensor Id จากตาราง §6 ของ ACCELERATED package>'
+  'WJSS_PUMP_SELECTION'            = '1'
+  'WJSS_PUMP_ANALOG_TARGET_MA'     = '<ค่า mA ที่เลือกไว้ §6>'
+  'WJSS_PUMP_FRESHNESS_MS'         = '2000'
+  'WJSS_PUMP_RUNNING_POLARITY'     = '<ACTIVE_HIGH หรือ ACTIVE_LOW จาก Stage B>'
+  'WJSS_PUMP_FAULT_POLARITY'       = '<ACTIVE_HIGH หรือ ACTIVE_LOW จาก Stage B>'
+  'WJSS_PUMP_RUNNING_CONFIRM_MS'   = '10000'
+  'WJSS_PUMP_READY_TIMEOUT_MS'     = '30000'
+  'WJSS_PUMP_STOPPED_CONFIRM_MS'   = '15000'
+  'WJSS_PUMP_READY_SETPOINT_BAR'   = '15'
+  'WJSS_PRESSURE_LOW_BAR'          = '1'
+  'WJSS_PRESSURE_HIGH_BAR'         = '15'
+  'WJSS_VALVE_SUPERVISION_MS'      = '5000'
+} -Show @('profile','mode','terminal_status','terminal_code','primary_failure','steps','pump_readiness','session_state','session_generation','write_authority')
+```
+
+- 4 ค่าใน `<...>` คือค่าที่ **ผมห้ามเดาแทน** (sensor id, mA target, polarity สองตัว) — ขาดไม่ได้: script จะส่ง `exit=4` พร้อม refusal ที่บอกชื่อตัวแปรที่ขาด
+- **ห้าม re-run เพื่อหวังผล luck**: ถ้า `steps` หมด budget แล้วไม่มี terminal state ให้ส่ง log ทั้งก้อน
+- cleanup ของ trial = ramp ลง → DO‑007 FALSE → ตรวจ → DO‑003 FALSE → ตรวจ → รอ not-running → ปล่อย ownership (script ตรวจ `cleanup=` จาก log ให้ผมดูอีกชั้น)
+
+## 7. Stage E — WSB limit switches (Upper/Lower) + FC02/FC01 divergence probe
+
+ปิด gate: `DI mirroring / limit-switch reclass` ตาม corrected CSV (DI‑021..028 = Upper, DI‑029..036 = Lower)
+Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)** ส่วน Product อ่านผ่าน **FC02 (discrete inputs)** ที่ address เดียวกัน — บล็อคนี้วัดทั้งสองทางให้เห็นจริง (อ่านอย่างเดียว)
+
+```powershell
+$t = @()
+$t += Format-WjssBits -Prefix 'DI' -Base 21 -Result (Read-WjssBits -Area 'DI'   -Start 20 -Count 16)   # FC02, addr 20..35
+$t += Format-WjssBits -Prefix 'CO' -Base 21 -Result (Read-WjssBits -Area 'COIL' -Start 20 -Count 16)   # FC01, same addresses
+$t += '  all-switches-at-rest-should-be-one-side (ตาม wiring จริง)'
+Save-WjssSend -Name 'E-idle' -Lines $t
+```
+
+จากนั้นให้ Owner ขยับ WSB ทีละตัว (หรือให้ปั๊ม/วาล์วทำงานในจังหวะที่มี limit switch เปลี่ยน) แล้วรันซ้ำ:
+
+```powershell
+$t = @()
+$t += Format-WjssBits -Prefix 'DI' -Base 21 -Result (Read-WjssBits -Area 'DI'   -Start 20 -Count 16)
+$t += Format-WjssBits -Prefix 'CO' -Base 21 -Result (Read-WjssBits -Area 'COIL' -Start 20 -Count 16)
+Save-WjssSend -Name 'E-moved' -Lines $t
+```
+
+- FC02 เปลี่ยนตามการขยับ + FC01 เปลี่ยนตรงกัน → binding ปัจจุบันถูกต้อง ✓
+- FC02 error/ค้างคงที่ แต่ FC01 เปลี่ยน → device map DI ไว้ที่ coil space (ตาม legacy) → **นี่คือข้อมูลเพื่อสั่ง `WJSS_CONFIG` เปลี่ยน function code** ห้ามใส่ fallback อัตโนมัติในโค้ด ผมจะเป็นคนเขียนบันทึกให้หลังคุณส่ง log
+
+## 8. Stage F (optional) — Motion WSB no-load stop
+
+ใช้ `docs/MOTION_STOP_TRIAL_RUNBOOK.md` ตามเดิม (เป็นเอกสาร software-prep + ลำดับหน้างาน) — ไม่ทำก็ปิด gate หลักได้ครบ
+
+## 9. ลำดับ stop / cleanup มาตรฐาน (ทุกกรณีที่ต้องหยุดกะทันหัน)
+
+1. Panel: **Run (DO‑007) = FALSE**  2. รอ/ยืนยันว่าปั๊มไม่หมุนแล้ว  3. **Enable (DO‑003) = FALSE**  4. ถ้า Stage C/D เปิด IV ไว้ ให้ trial ทำ close เอง — **อย่าปิด manual ซ้ำ** ถ้า trial ยังถือ session อยู่ (มันจะทำ cleanup เอง แล้ว `session_state=CLOSED`)  5. ส่ง log ที่ค้างให้ผมก่อนแตะอะไรต่อ
+
+## 10. refusal / exit map (ย่อ — เจอแล้วไม่ต้องเดา)
+
+| ที่เห็น | ความหมาย | ทำอะไรต่อ |
+| --- | --- | --- |
+| `RESULT ..: PASS` | ตรง contract ทุก field | ไป stage ถัดไป |
+| `CHECK - exit=4` | startup refused (env/consent/profile/selector) | ตรวจบล็อค stage นั้นว่าวางครบ/ค่าตรงตัวพิมพ์ใหญ่ |
+| `CHECK - <key> missing` | trial ไม่พิมพ์ key นั้น (แปลว่าหยุดก่อนถึงขั้นนั้น) | ส่ง log ให้ผม |
+| `PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT` ที่ A2 | แรงดันจริง ≤ 15 bar | รอปั๊มขึ้นแล้วซ้ำ (ไม่ผิด) |
+| `*_REFUSED_READ_ONLY_CONSENT` / `_CONSENT_MISSING` | phrase ไม่ตรง exact | พิมพ์ใหม่จาก constant (อย่า copy จากแชท/doc) |
+| `IV_TRIAL_REFUSED_*_NOT_FIELD_CONFIRMED` / `CONTRADICTORY` | สั่งงานแล้ว feedback ขัดกัน | หยุด — fail-closed ทำงาน |
+| poller `READ FAILED - connect timed out` | IP/ firewall / ไม่ได้เสียบสาย | ตรวจ network แล้วรันบล็อค poller ซ้ำ (อ่านอย่างเดียว ปลอดภัย) |
+
+## 11. สรุปว่า stage ไหนปิด gate อะไร (ใช้ตอนผมอัปเดต register)
+
+| Stage | Gate ที่ปิด |
+| --- | --- |
+| A1 + A2 | REAL WAGO ENDPOINT CONNECTIVITY · Pump-ready strict-greater ทั้งสองฝั่งบนสัญญาณจริง |
+| B | Pump running/fault polarity commissioned (absent ⇒ NOT_CONFIGURED ⇒ D ถูก refuse) |
+| C | IV physical actuation + FC01 read-back |
+| D | integrated dry cycle (no-load) ครบลูปพร้อม cleanup |
+| E | WSB Upper/Lower reclass + DI read path (FC02 vs FC01) |
+| F | (optional) motion stop behaviour |
+
+**ส่งผมทุก stage:** ก้อนข้อความใต้ `--- copy everything below ---` (scrub แล้ว) + log ดิบเฉพาะก้อนที่มี `CHECK` — ห้าม commit ไฟล์ log/ผลลัพธ์เข้า repo เด็ดขาด
+**สถานะ:** HARDWARE GATES ยัง OPEN · PRODUCTION NOT AUTHORIZED · MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง
