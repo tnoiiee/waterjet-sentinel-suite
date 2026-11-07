@@ -54,9 +54,12 @@ $env:WJSS_PUMP_READY_SETPOINT_BAR   = '15'
 $env:WJSS_PUMP_READY_FRESHNESS_MS   = '2000'
 & $EXE 2>&1 | Tee-Object "$EV\trialA-off.log"; "EXIT=$LASTEXITCODE"
 ```
-- **A1 (ปั๊มหยุด):** คาด `verdict` เป็น "not ready / below setpoint" + exit **0**; zero-write เชิงโครงสร้าง — ยืนยันว่าไม่มี coil/register ใดขยับ (สังเกตที่ตู้) ถ้า `connect refused/timeout` → connectivity FAIL: ตรวจ `WJSS_PROCESS_IO_HOST/PORT/UNIT_ID`, firewall, แล้วรันซ้ำ **ครั้งเดียว** (bounded, no retry loop; repeat ได้เฉพาะเมื่อแก้ config แล้ว)
-- **A2 (ปั๊ม RUN จาก Panel — ผู้ปฏิบัติ: Owner เท่านั้น):** รอแรงดันนิ่ง แล้วรันคำสั่ง `& $EXE ... trialA-on.log` ซ้ำหนึ่งครั้ง: คาด reading ผ่าน freshness และ `PumpReady=true` (strictly > 15 bar) — ตัวเลข bar ที่เห็นให้ **บันทึกในสมุดหน้างานเท่านั้น**
-- Gate ปิดเมื่อ: A1+A2 exit 0 + verdict ตรงคาดสองฝั่ง ⇒ connectivity + AI-003 signal path + strict-greater rule บนของจริง ✓
+- **A1 (ปั๊มหยุด) — contract จริงของ trial (แก้จากที่เขียนผิดไว้รอบแรก):** ใต้ setpoint คือ typed refusal ⇒ `trial_code=PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT` + exit **2** (ไม่ใช่ 0!) ส่วน exit: 0 = Accepted เท่านั้น, 2 = refusal หลัง bind, 3 = ReadTimeout, 4 = startup refusal; zero-write เชิงโครงสร้าง + `session_state=CLOSED`, `transport_released=TRUE` — ถ้าวัดใต้ setpoint แล้วได้ exit 0 = ผิดปกติ ให้หยุดและส่ง log
+  - หมายเหตุ conversion: raw ใต้ live zero (เช่น 580 ⇒ 0.354 mA < 4 mA) จะ **saturate เป็น 0 bar** ตาม `LegacyMap` ของ Product — `engineering_bar=0` ที่ปั๊มหยุดคือพฤติกรรมถูกต้อง ไม่ใช่ศูนย์หลอก
+- **A2 (ปั๊ม RUN จาก Panel — ผู้ปฏิบัติ: Owner เท่านั้น):** รอแรงดันนิ่ง รันซ้ำหนึ่งครั้ง; ถ้า raw → bar แล้ว ≤ setpoint จะได้ exit 2 + refusal code แบบเดิม (ถูกต้อง, fail-closed) — ตัวเลข bar บันทึกสมุดหน้างานเท่านั้น
+- **A2b (คำถาม scale ที่หน้างานต้องตอบ 1 นาที):** transmitter ที่พักอยู่ควรอ่าน ~4 mA (raw ≈ 4196); ค่าที่วัดได้ ~0.35 mA ตอนหยุด บ่งว่า (ก) transmitter จ่ายไฟร่วมกับการ์ดปั๊ม (ค่าตอนหยุดไร้ความหมายแต่ไร้โทษ) หรือ (ข) ฟิลด์เป็น 0–20 mA ไม่ใช่ 4–20 mA — ถ้า (ข) ค่า 10.8 bar จะ under-report (~16.6 bar จริง) และ **การแก้ scale = Product change ที่ Owner ต้องสั่งชัด** ไม่ใช่การปรับใน test
+- **A3 (ปิด TRUE branch — แนะนำรันตอนนี้, ปั๊ม RUN):** ตั้ง `WJSS_PUMP_READY_SETPOINT_BAR=10` (owner-selected สำหรับ commissioning run เท่านั้น; 15 คงเป็นค่า production) แล้วรันซ้ำ: คาด `pump_ready=TRUE`, `strict_comparison=<bar> > 10 => TRUE`, exit **0** — บันทึกว่านี่คือ low-setpoint demonstration ลงตารางผล
+- Gate ปิดเมื่อ: A1 exit 2 + A2 (exit ตามค่าจริง) + A3 exit 0 ครบ ⇒ connectivity + AI-003 signal path + strict-greater ทั้งสองฝั่งบนของจริง ✓ (evidence class เต็ม `PHYSICAL_PUMP_READY` ต้องการ script §4.4 ของ TRIAL_A_B package พร้อม attestations — ทำตอนปิด register ทางการ)
 
 ## 4. Stage B — Polarity commissioning (DI-004/DI-005)
 1. อ่านสถานะ DI-004/DI-005 ตอนปั๊มหยุด (Trial A log ไม่มี DI — ใช้ Modbus diagnostic ที่ Owner มี หรืออ่านจาก log ของ Stage C/D ที่ print feedback state)
