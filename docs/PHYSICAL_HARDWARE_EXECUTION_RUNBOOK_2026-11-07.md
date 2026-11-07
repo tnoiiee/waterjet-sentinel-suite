@@ -3,14 +3,74 @@
 > เอกสารนี้แทนที่รุ่นแรก (รุ่นแรกเขียนงงและให้คนรันหาข้อมูลมากรอกเอง) — v2 ออกแบบให้ **copy → paste → รัน** เท่านั้น
 > ผลลัพธ์ทุก stage มี script ตรวจให้เอง และก้อนข้อความสำหรับส่งให้ผมถูก scrub IP ให้อัตโนมัติ
 
-**วิธีใช้ (อ่าน 6 บรรทัดนี้ก่อนอย่างอื่น)**
+## 0. ขั้นตอนที่ต้องรัน (copy ทั้งบล็อคไปวางได้เลย)
 
-1. `cd` ไปที่ repo แล้ว build: `dotnet build WaterJetSentinelSuite.sln -c Release` (ห้ามข้าม — script เช็คให้ว่า `.exe` เก่ากว่า source หรือไม่)
-2. เปิด PowerShell หน้าต่างเดียว ใช้ทั้งวัน — วางบล็อค **§2 ทั้งบล็อค** แล้วกด Enter (มันจะถาม path / IP / consent แค่ครั้งเดียวต่อชนิด)
-3. วางบล็อคของ stage ที่ถึงคิว ตามลำดับ **A → B → C → D → E** (ห้ามข้ามขั้น)
-4. script จะพิมพ์ `RESULT <stage>: PASS` หรือ `CHECK` + ก้อนข้อความใต้เส้นประ — **copy ก้อนนั้นส่งให้ผม** พร้อม logดิบถ้าผมขอ
-5. ถ้าบรรทัดไหน error (ตัวแดง) ให้ copy error ส่งผม **ห้ามแก้ script เอง**
-6. log ดิบอยู่ที่ `$env:USERPROFILE\wjss-evidence\<วันที่>\` — ห้าม commit เข้า repo
+> บล็อค ``powershell`` ทุกบล็อกจาก §0 ถึง §8 เป็นคำสั่งจริงที่รันได้ทันที — ไม่ต้องแทนที่อะไรนอกจากค่าที่ผมไม่มี (IP, catalogue, ค่าที่มาจากผล Stage B)
+
+### ข้อ 0.1 — ดึงโค้ด + build + รัน .NET matrix ทั้งหมด (ทำทุกครั้งที่ผมแจ้งว่า commit ใหม่แล้ว)
+
+```powershell
+$Repo = (Get-ChildItem -Path $HOME -Recurse -Depth 3 -Filter 'WaterJetSentinelSuite.sln' -ErrorAction SilentlyContinue | Select-Object -First 1).DirectoryName
+if (-not $Repo) { $Repo = Read-Host 'Repo path (folder containing WaterJetSentinelSuite.sln)' }
+Set-Location $Repo
+$env:DOTNET_NOLOGO = '1'; $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+git fetch origin
+git rev-parse --short HEAD
+# HEAD ต้องเป็น 214c0e0 หรือใหม่กว่า ถ้าไม่ตรง:
+git pull --ff-only origin arena/b179a92e-waterjet-sentinel-suite
+# ถ้า git pull บ่นว่าไม่ ff หรือมี local change -> หยุด แล้วส่งข้อความ error ให้ผม (ห้ามใช้ --force / reset)
+dotnet restore WaterJetSentinelSuite.sln
+dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
+dotnet test WaterJetSentinelSuite.sln -c Release --no-build
+```
+
+ต้องเห็นอะไร (ส่งตัวเลขจริงมาให้ผม 3 บรรทัดนี้):
+
+| คำสั่ง | บรรทัดที่คาดหวัง |
+| --- | --- |
+| `dotnet build` | `0 Warning(s)` และ `0 Error(s)` |
+| `dotnet test` (ทั้ง matrix) | `Failed: 0` และ `Skipped: 0` (รอบก่อนที่ `608aa3b` = `Passed: 1787`; รอบนี้ N เปลี่ยนได้เล็กน้อย — รายงานตัวเลขจริง) |
+| ถ้ามี Failed > 0 | **ห้ามแก้ test/tolerances เอง** — ส่งชื่อ test + ข้อความ assert ทั้งก้อนให้ผม |
+
+### ข้อ 0.2 — ซ้ำเฉพาะจุดที่การแก้ scaling กระทบ (รันในหน้าต่างเดียวกับข้อ 0.1 เพราะใช้ `$Repo` ร่วมกัน)
+
+```powershell
+Set-Location $Repo
+dotnet test tests/runtime.tests/Wjss.Runtime.Core.Tests.csproj      -c Release --no-build --filter "FullyQualifiedName~ProcessIo"
+dotnet test tests/api.tests/Wjss.Runtime.Api.Tests.csproj           -c Release --no-build --filter "FullyQualifiedName~ProcessIoPumpReadyReadTrial"
+dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj     -c Release --no-build
+```
+
+บล็อคที่สามคือ fixture parity — ผมตรวจ `tests/integration/FixtureGenerator.cs` แล้วว่ามันใส่ `PumpOutletPressureBar = 16.0` เป็นค่าคงที่ ไม่เรียก conversion chain ⇒ **ต้องเขียวโดยไม่แตะอะไร** และ **ห้ามตั้ง `WJSS_UPDATE_FIXTURES=1`** เด็ดขาดถ้าผมยังไม่สั่ง (มันเขียนทับ golden)
+
+### ข้อ 0.3 — เตรียมหน้าต่างงานหน้างาน (วางครั้งเดียวต่อ 1 หน้าต่าง PowerShell)
+
+วางบล็อค **§2 ทั้งบล็อค** (ใต้หัวข้อ §2 ในไฟล์นี้) แล้วตอบคำถาม 2 ข้อ: repo path + T8 IP — ตัวแปร `$script:Repo $script:Exe $script:Cat $script:Ip $script:Ev $script:Head` จะถูกตั้งครบ และ consent จะถูกถามเฉพาะ stage ที่ต้องใช้ (ซ่อนการพิมพ์, cache ในหน่วยความจำ,ถูกลบท้ายบล็อค)
+
+ถ้าคุณใช้ catalogue สำเนาของคุณเอง (ตาม `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md:148`) ให้วางต่อท้ายบล็อค §2:
+
+```powershell
+$script:Cat = 'C:\FULL\PATH\TO\YOUR\T8_CATALOGUE.csv'   # ค่าเริ่มต้น = docs\evidence\process-io-inventory-2026-10-22.csv ใน repo
+```
+
+### ข้อ 0.4 — รัน stage ตามลำดับ (ห้ามข้าม A1 ซึ่งคือ "ปั๊มหยุด")
+
+```powershell
+# ลำดับ: §3-A1 (ปั๊มหยุด) -> §3-A2 (ปั๊มรัน) -> §4-B (polarity) -> §5-C (IV1) -> §6-D (dry cycle) -> §7-E (WSB) -> [§8-F ถ้าถึง]
+# แต่ละบล็อคพิมพ์บรรทัดสุดท้ายเป็น: RESULT <stage>: PASS  หรือ  RESULT <stage>: CHECK
+```
+
+### ข้อ 0.5 — สิ่งที่ต้องส่งกลับมาให้ผมหลังทุก stage
+
+1. ก้อนที่อยู่ใต้ `--- copy everything below to the assistant ---` (script พิมพ์ให้ + เก็บในไฟล์ `$script:Ev\stage-<name>.send.txt` ซึ่ง scrub IP แล้ว)
+2. ตัวเลข build/test จากข้อ 0.1
+3. **เฉพาะ**เมื่อมี `CHECK`/`ERROR`: log ดิบทั้งไฟล์ `Get-Content $script:Ev\stage-A2.log -Raw` (ห้ามแก้ข้อความ ห้ามลบบรรทัด)
+
+log ดิบทั้งหมดอยู่ใน `$env:USERPROFILE\wjss-evidence\<วันที่>\` — **ห้าม `git add` / ห้าม commit**
+
+### ข้อ 0.6 — กติกาเวลาเจอ error
+
+copy ข้อความ error ทั้งก้อน (บรรทัดแดง) ส่งผม แล้ว**ห้ามแก้ script เอง** และห้ามเปลี่ยนเกณฑ์ `PASS`/ค่าที่ script เทียบ — ผมจะแก้แล้ว commit ใหม่ให้เอง
 
 **สถานะ scale ของ Pump pressure (แก้ที่ Product แล้ว):** ตัวแปลงตอนนี้คือ `bar = raw / 32767 × 40` (ช่อง AI‑003 ถูก config เป็น 4‑20 mA ⇒ `raw 0 = 4 mA` อยู่แล้ว) — ตัวอย่างจริงที่หน้างาน: `raw 580 = 4.283 mA = 0.708 bar` (ปั๊มหยุด, ปกติ), `raw 13631 = 10.656 mA = 16.6399 bar` (ปั๊มรัน) หลักฐานทั้งชุดอยู่ใน `docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md`
 
@@ -84,11 +144,14 @@ function Invoke-WjssStage {
     foreach ($k in $Vars.Keys) { Set-Item -Path ('env:' + $k) -Value ([string]$Vars[$k]) }
     if ($ConsentConst) { $env:WJSS_PROCESS_IO_CONSENT = Read-WjssConsent -Const $ConsentConst }
     Push-Location $script:Repo
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'   # native stderr must not abort us; the exit code decides
     try {
         & $script:Exe 2>&1 | Tee-Object -FilePath $log | Out-Null
         $code = $LASTEXITCODE
     }
     finally {
+        $ErrorActionPreference = $prevEap
         Remove-Item -LiteralPath 'env:WJSS_PROCESS_IO_CONSENT' -ErrorAction SilentlyContinue
         Pop-Location
     }
