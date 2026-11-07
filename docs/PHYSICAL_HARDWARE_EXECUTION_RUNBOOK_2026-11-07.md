@@ -47,6 +47,21 @@ dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj     -c Release -
 
 วางบล็อค **§2 ทั้งบล็อค** (ใต้หัวข้อ §2 ในไฟล์นี้) แล้วตอบคำถาม 2 ข้อ: repo path + T8 IP — ตัวแปร `$script:Repo $script:Exe $script:Cat $script:Ip $script:Ev $script:Head` จะถูกตั้งครบ และ consent จะถูกถามเฉพาะ stage ที่ต้องใช้ (ซ่อนการพิมพ์, cache ในหน่วยความจำ,ถูกลบท้ายบล็อค)
 
+ทางลัด — ไม่ต้อง copy บล็อค §2 เอง (โหลดจากไฟล์นี้แล้ว dot-source เข้าหน้าต่างปัจจุบัน):
+
+```powershell
+$b   = [char]0x60 * 3
+$md  = Get-Content "$Repo\docs\PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md" -Raw
+$sec = $md.Substring($md.IndexOf('## 2.'))
+$code = [regex]::Match($sec, ('(?s)' + $b + 'powershell' + [char]13 + '?'+ [char]10 + '(.*?)' + $b)).Groups[1].Value
+if (-not $code) { throw 'ไม่พบบล็อคร่วมในไฟล์ - แจ้งผู้ช่วย (ทางสำรอง: เปิดไฟล์แล้ว copy บล็อคใต้หัวข้อ §2 มาวางเอง)' }
+. ([scriptblock]::Create($code))
+Test-WjssBuild
+Export-WjssStageFiles
+```
+
+หมายเหตุ: ตัวแปร `$Repo` มาจากข้อ 0.1 (รันในหน้าต่างเดียวกัน) — ถ้าเปิดหน้าต่างใหม่ให้วางสามบรรทัดแรกของข้อ 0.1 ก่อน
+
 ถ้าคุณใช้ catalogue สำเนาของคุณเอง (ตาม `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md:148`) ให้วางต่อท้ายบล็อค §2:
 
 ```powershell
