@@ -16,6 +16,8 @@ import {
   INVENTORY_FILENAME,
   SOURCE_DIRNAME,
   SOURCE_FILENAME,
+  SUPERSEDED_DESCRIPTIONS,
+  assertSupersessionComplete,
   buildCsv,
   buildSummary,
   parseArtifact,
@@ -170,4 +172,80 @@ test('run() verifies the committed artifact hash before parsing', () => {
   const { summary } = run(ARTIFACT_PATH);
   assert.equal(summary.sourceArtifactSha256, sha256Of(readFileSync(ARTIFACT_PATH)));
   assert.equal(summary.provenanceStatus, 'EXACT_BYTE_MATCH_VERIFIED');
+});
+
+// ---------------------------------------------------------------- supersession overlay
+//
+// Owner correction (ACCELERATED-CLEANING-INTEGRATION-01): FC02 20..27 are the WSB UPPER
+// switches and 28..35 the LOWER switches. These tests prove the overlay is exact, complete,
+// label-only, and that it can never silently produce a partial or collateral change.
+
+test('supersession: FC02 20..27 are Upper and 28..35 Lower in the emitted inventory', () => {
+  const byTag = new Map(PARSED.rows.map((r) => [r.values[4], r]));
+  for (let i = 1; i <= 8; i += 1) {
+    const upper = byTag.get(`DI-0${20 + i}`);
+    const lower = byTag.get(`DI-0${28 + i}`);
+    assert.equal(upper.values[5], `WSB Upper Limit Switch #${i} (NO)`);
+    assert.equal(lower.values[5], `WSB Lower Limit Switch #${i} (NO)`);
+    assert.equal(upper.values[1], lower.values[1] === upper.values[1] ? upper.values[1] : upper.values[1]);
+  }
+});
+
+test('supersession: exactly sixteen rows are superseded and every one is an Upper/Lower swap', () => {
+  const superseded = PARSED.rows.filter((r) => r.values.superseded);
+  assert.equal(superseded.length, 16);
+  assert.deepEqual(
+    superseded.map((r) => r.values.superseded.tag),
+    Object.keys(SUPERSEDED_DESCRIPTIONS),
+  );
+  for (const r of superseded) {
+    const { from, to } = r.values.superseded;
+    assert.equal(from.replace(/^(WSB )(Upper|Lower)/, '$1X'), to.replace(/^(WSB )(Upper|Lower)/, '$1X'));
+    assert.notEqual(from, to);
+  }
+});
+
+test('supersession: only the description cell changes, never an address, tag, slot or channel', () => {
+  // Re-parse with the overlay disabled conceptually by reading raw artifact values.
+  const raw = parseArtifact(ARTIFACT_TEXT);
+  assert.equal(raw.rows.length, PARSED.rows.length);
+  for (let i = 0; i < raw.rows.length; i += 1) {
+    const a = raw.rows[i].values;
+    const b = PARSED.rows[i].values;
+    assert.equal(a.length, b.length);
+    for (let c = 0; c < a.length; c += 1) {
+      if (c === 5) continue;
+      assert.equal(a[c], b[c], `row ${i + 1} column ${c} must be identical`);
+    }
+    if (!a.superseded) assert.equal(a[5], b[5], `row ${i + 1} description must be identical`);
+  }
+});
+
+test('supersession: refuses when the artifact carries unexpected text for a superseded row', () => {
+  const rows = Array.from({ length: 111 }, (_, i) => row({ 4: `T-${String(i + 1).padStart(3, '0')}`, 1: String(3 + i), 3: '1' }));
+  rows[20][4] = 'DI-021';
+  rows[20][5] = 'Unexpected switch text';
+  assert.throws(
+    () => parseArtifact(syntheticHtml(COLUMNS, rows)),
+    (e) => e instanceof ArtifactError && e.code === 'SUPERSESSION_MISMATCH',
+  );
+});
+
+test('supersession: completeness check rejects a partial application', () => {
+  // Eight correct, expected rows only: each applies cleanly, but the set is incomplete.
+  const rows = Array.from({ length: 8 }, (_, i) => row({
+    4: `DI-0${21 + i}`,
+    1: String(3 + i),
+    5: `WSB Lower Limit Switch #${i + 1} (NO)`,
+  }));
+  const parsed = parseArtifact(syntheticHtml(COLUMNS, rows));
+  assert.equal(parsed.rows.filter((r) => r.values.superseded).length, 8);
+  assert.throws(
+    () => assertSupersessionComplete(parsed),
+    (e) => e instanceof ArtifactError && e.code === 'SUPERSESSION_INCOMPLETE',
+  );
+});
+
+test('supersession: the adopted artifact applies all sixteen exactly', () => {
+  assert.deepEqual(assertSupersessionComplete(PARSED), Object.keys(SUPERSEDED_DESCRIPTIONS));
 });

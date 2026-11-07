@@ -344,6 +344,16 @@ Identity basis vocabulary: `WORKBOOK_TEXT` (the workbook description is the iden
 `OWNER_RULING` (an Owner ruling establishes the identity), `UNRESOLVED` (the workbook text does
 not establish an identity).
 
+> **SUPERSEDED — WSB Upper/Lower limit rows only (2026-11-01).** The two limit-switch rows of the
+> table below record the wording of the 2026-10-22 workbook **as it stood at this checkpoint** and are
+> preserved unchanged as dated history. The Owner's corrected workbook
+> (`WAGO_T8_Analog_Digital_Modbus_Mapping 1_Corrected_Upper_Lower.xlsx`) reverses them: **FC02 20..27
+> (`DI-021`..`DI-028`) are the WSB UPPER switches = IVn OPEN feedback**, and **FC02 28..35
+> (`DI-029`..`DI-036`) are the WSB LOWER switches = IVn CLOSED feedback**. The current Product truth is
+> `packages/process-io/src/legacyEvidence.mjs` and `docs/evidence/process-io-inventory-2026-10-22.csv`;
+> see [`process-io-limit-switch-supersession-2026-11-01.md`](evidence/process-io-limit-switch-supersession-2026-11-01.md).
+> Every other row of this table is unaffected.
+
 | Group | Channels | Workbook identity (verified at this head) | Identity basis | Mapping status | Engineering range status | Diagnostic capability | Commissioning evidence needed | `TEST_HARDWARE` dependency |
 |---|---|---|---|---|---|---|---|---|
 | Water Level Sensor | `AI-001` | "Water Level Sensor", `AI (4-20 mA. HART5)`, slot 13 / 750-471 ch 1 | `WORKBOOK_TEXT` | Tag exists; address `ADDRESS_UNRESOLVED` | **NOT PROVIDED** | Model-level only; instance configuration not verified (only slot 13 ch 3 is Channel-level evidence) | Terminal schedule, wiring, range, instance configuration | Required |

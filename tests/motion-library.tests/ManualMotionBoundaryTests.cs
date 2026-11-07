@@ -37,10 +37,10 @@ public sealed class ManualMotionBoundaryTests
     {
         "apps/motion-commissioning/ManualMotionAxisStateGrid.cs",
         "apps/motion-commissioning/ManualMotionForm.cs",
-        "apps/motion-commissioning/ManualMotionProfileFile.cs",
+        "apps/motion-composition/ManualMotionProfileFile.cs",
         "apps/motion-commissioning/ManualMotionSessionRunner.cs",
         "apps/motion-commissioning/ManualMotionTimestampCell.cs",
-        "apps/motion-commissioning/MotionLibraryManualMotionPort.cs",
+        "apps/motion-composition/MotionLibraryManualMotionPort.cs",
         "apps/motion-commissioning/Program.cs",
     };
 

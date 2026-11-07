@@ -32,6 +32,22 @@ public static class SequencingPressure
         Valid(sample) && sample!.SourceId == PressureSample.PumpOutletSource
         && sample.Bar!.Value > thresholds.PumpReadySetpointBar;
 
+    /// <summary>
+    /// Time-aware validity: the base quality rules plus a future-dated refusal. A sample stamped after
+    /// the caller's clock (beyond <paramref name="tolerance"/>) is not evidence of the present and is
+    /// refused instead of being clamped to now. Default tolerance is zero: any future stamp is refused.
+    /// </summary>
+    public static bool Valid(PressureSample? sample, DateTimeOffset now, TimeSpan tolerance) =>
+        Valid(sample) && sample!.At <= now + tolerance;
+
+    /// <summary>Time-aware Pump-ready gate: the base gate plus the future-dated refusal.</summary>
+    public static bool PumpReady(
+        PressureSample? sample,
+        SequencingPressureThresholds thresholds,
+        DateTimeOffset now,
+        TimeSpan tolerance) =>
+        PumpReady(sample, thresholds) && sample!.At <= now + tolerance;
+
     public static ValveAssessment Open(PressureSample? sample, bool upperDetected, bool timedOut, SequencingPressureThresholds thresholds)
     {
         if (!Valid(sample)) return new(ValveOpenResolution.BLOCKED, null, ValveDiagnosis.VALVE_PRESSURE_INPUT_INVALID);

@@ -1,7 +1,7 @@
 using Wjss.Adapters.MotionLibrary;
 using Wjss.Runtime.Core.Motion.Manual;
 
-namespace Wjss.MotionCommissioning;
+namespace Wjss.MotionComposition;
 
 /// <summary>
 /// The HARDWARE-CAPABLE port: it maps the Application's closed typed commands and reads onto the

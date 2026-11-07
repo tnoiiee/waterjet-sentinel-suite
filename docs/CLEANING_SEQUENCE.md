@@ -289,6 +289,62 @@ The Stage 0.2.1A spike demonstrates this behaviour with synthetic signals only
 It is not a safety function, not motor protection and not verified on hardware. Section 7.1 is
 unchanged.
 
+### 7.3 Commissioned Pump command contract (Owner decision; supersedes the derivation note in §7)
+
+The Owner has since commissioned exact Pump command and feedback identities. This supersedes the
+opening statement of §7 that the system receives no direct motor-running feedback: that statement
+described the accepted derivation before the contract was commissioned, and it is withdrawn as a
+description of current behaviour. §7.1 and §7.2 are unchanged.
+
+- **Selection** is maintained and mutually exclusive. Pump 1 is `DO-001` true then `DO-002` false;
+  Pump 2 is the inverse route `DO-002` true then `DO-001` false. The Current Product Critical Path
+  uses Pump 1 unless the Owner authorizes another selection.
+- **Start order**: `DO-003` enable inverter true, then `DO-007` run pump true. Both are maintained
+  active-high outputs. They are not pulses, no pulse duration applies, and no timer clears them.
+- **Stop order (corrected)**: `DO-007` false first, then `DO-003` false. An older Legacy source
+  cleared Enable before Run; that order is superseded and must not be implemented, documented or
+  tested as current behaviour.
+- **Running and Fault feedback**: `DI-004` and `DI-005`. Their physical polarity is **not yet
+  commissioned**; the Product initial state is `NOT_CONFIGURED`, and a physical Pump command fails
+  closed until both are commissioned. The stopped state is therefore never inferred from `AI-003`
+  pressure.
+- **Analog speed reference**: `AO-001+`, engineering unit **milliamps** (not pressure). The write
+  conversion is the exact Legacy `map(pumpCurrentOut, 4, 20, 0, 32767)` and it has its own Pump
+  authority (`PumpAnalogCommandContract`): a live running reference is the closed **4 to 20 mA** span,
+  so 4 mA is raw 0, 12 mA is raw 16384 and 20 mA is raw 32767. **0 mA is the explicit safe-stop
+  sentinel** and is also raw 0. The open **0 to 4 mA** band, a negative value and any value above
+  20 mA are invalid: they are refused, never clamped, and a running target below 4 mA is an invalid
+  configuration. Because 4 mA and the sentinel share raw 0, an analog command carries its engineering
+  kind explicitly and the raw word is never read back as running or stopped. The general 0 to 20 mA
+  helper in `ProcessIoEngineering` is **not** the Pump authority and is unchanged.
+- **Analog ramp**: one typed command step per 1000 ms interval, in 2 mA steps, upward toward the
+  configured running target and downward toward the explicit sentinel. The downward step from the
+  live 4 mA minimum lands on the **0 mA sentinel**, so neither direction ever emits a value inside the
+  open 0 to 4 mA band.
+- **Pump-ready**: `AI-003+` only, strictly greater than the configured setpoint (Owner-initial
+  15 bar), from a current physical observation inside a 2000 ms freshness budget. `AI-002+` is Pump
+  Inlet pressure, diagnostic and trend only, and can never alias, substitute or fall back for it.
+- **Every Stop path is the same path**: normal completion, cancellation, downstream Isolation Valve
+  failure, Cleaning Job or sequence failure, an active Fault and application cleanup all ramp toward
+  the safe zero, dispatch `DO-007` false exactly once, then `DO-003` false exactly once, then wait
+  for confirmed not-running feedback. A ramp failure never prevents the two de-energisations.
+  Ownership is released only after a confirmed Stop; an unknown stopped state reports
+  `PHYSICAL_ABORT_REQUIRED` and is never a safe completion.
+- **Main Valve**: the catalogue defines no Main Valve I/O identity, so no Main Valve control is part
+  of this integration. See §11.
+
+Implementation: `ProcessIoPumpLifecycle` is the one reusable lifecycle, driven through the existing
+`ProcessIoSession` admission and dispatch lifecycle. The production Runtime composition
+(`CleaningPathDryComposition`) constructs **exactly one** Pump lifecycle per composition, over the
+same session, the same catalogue, the same time source and one typed ownership channel, and wraps the
+active Cleaning Path equipment boundary with `CleaningPathPumpLifecycleGate`. The coordinator is handed
+the gate, so an Isolation Valve OPEN is refused before confirmed Pump readiness and a CLOSE always
+passes through for cleanup. The Pump is started and driven to confirmed readiness before the path is
+started, and it is stopped before the motion cleanup. Trial B is not routed through this composition.
+
+Physical execution remains **NOT EXECUTED / NOT VERIFIED**, Production write authority remains
+**NOT AUTHORIZED**, and the Trial B software plan is unchanged.
+
 ## 8. Motion supervision during a job
 
 - Galil model: DMC-B140-M; stepper motors with encoder feedback. `[APPROVED]`

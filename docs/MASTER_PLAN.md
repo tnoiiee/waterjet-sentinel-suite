@@ -297,6 +297,29 @@ Critical Path working labels mapped to the formal stage families (formal IDs unc
    preparation and exact real-Hardware trial preparation are authorized in the current PR; real
    Hardware execution requires separate explicit Owner authorization for the exact validated PR
    head and the exact reviewed trial procedure. (Formal family: `0.4D-G1`–`0.4D-G5`.)
+0. **PUMP-COMMAND-PRODUCT-INTEGRATION — Software implementation, OWNER-AUTHORIZED; Hardware
+   NOT EXECUTED / NOT VERIFIED.** The one reusable Pump lifecycle (`ProcessIoPumpLifecycle`) now
+   implements the Owner-commissioned contract: maintained and mutually exclusive selection
+   (`DO-001`/`DO-002`), Start as `DO-003` true then `DO-007` true, the **corrected** Stop as
+   `DO-007` false then `DO-003` false, the `DI-004`/`DI-005` feedback commissioning gate, and the
+   `AI-003+` strict Pump-ready rule (setpoint 15 bar, freshness 2000 ms, `AI-002+` never aliased).
+   Every normal, cancelled, faulted, downstream-IV-failed and application-cleanup path runs the same
+   corrected Stop order and releases command ownership only after a confirmed Stop.
+   The `AO-001+` write conversion is now its own Pump authority: the exact Legacy
+   `map(pumpCurrentOut, 4, 20, 0, 32767)` over the closed **4 to 20 mA** running span with an
+   explicit **0 mA safe-stop sentinel**, refusing the open 0 to 4 mA band, negatives and above 20 mA
+   rather than clamping, and ramping in 1000 ms / 2 mA steps from the 4 mA live minimum straight to
+   the sentinel so the open band is never emitted. The general 0 to 20 mA helper is unchanged and is
+   not the Pump authority.
+   The production Runtime composition (`CleaningPathDryComposition`) now constructs exactly one Pump
+   lifecycle over the existing session, catalogue and time source with one typed ownership channel,
+   and wraps the active Cleaning Path equipment boundary with `CleaningPathPumpLifecycleGate`: an
+   Isolation Valve OPEN is refused before confirmed Pump readiness, a CLOSE always passes through,
+   and the Pump is started to readiness before the path and stopped before the motion cleanup.
+   Production write authority is **NOT AUTHORIZED**, physical execution is **NOT EXECUTED / NOT
+   VERIFIED**, Trial B is unchanged and not routed through the production lifecycle, the Main Valve
+   remains excluded because the catalogue defines no Main Valve I/O identity, and Merge is on hold.
+
 2. **H2 — Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
 3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.) The
    **H3-A** Product-UI and deterministic-Simulation sub-slice is **IMPLEMENTED IN SIMULATION** and
@@ -778,6 +801,7 @@ Feedback carries the `ValveId`. A mismatched identity is refused (§19 O-6). Val
 - Accepted critical inputs: `CriticalPumpKind.MAIN_PUMP_UNEXPECTED_STOP` (class B) and `CriticalPumpKind.MAIN_PUMP_TRIP` (class C). Each raises the critical condition.
 - Class A (expected commanded stop) is not accepted in CP-2 and is refused with `PUMP_EXPECTED_STOP_NOT_MODELLED` (§19 O-3).
 - `PumpRunState` (`STOPPED`, `STARTING`, `RUNNING`, `STOPPING`, `TRIPPED`) is **not** a kernel input. The accepted derivation has no direct motor-running feedback ([`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §7). CP-2 accepts only the critical event.
+  - **Superseded as a description of current behaviour (Owner Pump command contract).** The Owner has since commissioned direct Pump feedback: `DI-004` Inverter Is Running and `DI-005` Inverter Is Fault, both `FC02`, with the exact active polarity **not yet commissioned** in WJSS. The Product initial state for both is `NOT_CONFIGURED`, and a physical Pump command fails closed until both are commissioned. `PumpRunState` remains outside the CP-2 kernel: the commissioned lifecycle is a separate typed layer that reports the critical event to it. [`CLEANING_SEQUENCE.md`](CLEANING_SEQUENCE.md) §7.3 is the current description. Nothing here reopens a CP-2 kernel input.
 - Effect in one transition, with no delay and no timer: `CriticalSuspended = true`; AutoSequence projects `CRITICAL_SUSPENDED`; if a Job is active, `WATER_OUTPUT_OFF` and SR1 are recorded, the lifecycle moves to `SAFE_RETURN_CLOSE_VALVE`, and the SR2 intent is emitted in that same transition. The queue and queue revision are unchanged. No dispatch. The spike's `1.5 s` value is a minimum-step constant and is not used. The Owner rule that no delay precedes the valve-close request is honoured.
 
 **9. Pure event model** (every event carries an explicit `At`; no clock, no timer, no transport):
