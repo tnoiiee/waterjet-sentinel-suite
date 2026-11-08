@@ -16,9 +16,9 @@ Set-Location $Repo
 $env:DOTNET_NOLOGO = '1'; $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
 git fetch origin
 git rev-parse --short HEAD
-# HEAD ต้องเป็น 214c0e0 หรือใหม่กว่า ถ้าไม่ตรง:
+# HEAD must be the sha I reported in my last message; if it is older, pull:
 git pull --ff-only origin arena/b179a92e-waterjet-sentinel-suite
-# ถ้า git pull บ่นว่าไม่ ff หรือมี local change -> หยุด แล้วส่งข้อความ error ให้ผม (ห้ามใช้ --force / reset)
+# if the pull refuses (not fast-forward, or local changes): STOP and send me the message. Never --force, never reset.
 dotnet restore WaterJetSentinelSuite.sln
 dotnet build WaterJetSentinelSuite.sln -c Release --no-restore
 dotnet test WaterJetSentinelSuite.sln -c Release --no-build
@@ -50,11 +50,12 @@ dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj     -c Release -
 ทางลัด — ไม่ต้อง copy บล็อค §2 เอง (โหลดจากไฟล์นี้แล้ว dot-source เข้าหน้าต่างปัจจุบัน):
 
 ```powershell
-$b   = [char]0x60 * 3
-$md  = Get-Content "$Repo\docs\PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md" -Raw
-$sec = $md.Substring($md.IndexOf('## 2.'))
-$code = [regex]::Match($sec, ('(?s)' + $b + 'powershell' + [char]13 + '?'+ [char]10 + '(.*?)' + $b)).Groups[1].Value
-if (-not $code) { throw 'ไม่พบบล็อคร่วมในไฟล์ - แจ้งผู้ช่วย (ทางสำรอง: เปิดไฟล์แล้ว copy บล็อคใต้หัวข้อ §2 มาวางเอง)' }
+$b  = [char]0x60 * 3
+$md = Get-Content "$Repo\docs\PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md" -Raw
+$m  = [regex]::Match($md, '(?m)^## 2\. ')
+if (-not $m.Success) { throw 'STOP: no section 2 heading in that file.' }
+$code = [regex]::Match($md.Substring($m.Index), ('(?s)' + $b + 'powershell' + [char]13 + '?' + [char]10 + '(.*?)' + $b)).Groups[1].Value
+if ($code.Length -lt 200) { throw 'STOP: the shared block was not found. Open the runbook and paste the block under heading 2 manually.' }
 . ([scriptblock]::Create($code))
 Test-WjssBuild
 Export-WjssStageFiles
@@ -62,25 +63,33 @@ Export-WjssStageFiles
 
 หมายเหตุ: ตัวแปร `$Repo` มาจากข้อ 0.1 (รันในหน้าต่างเดียวกัน) — ถ้าเปิดหน้าต่างใหม่ให้วางสามบรรทัดแรกของข้อ 0.1 ก่อน
 
+ค่าควบคุมที่มีประโยชน์ (ใส่ต่อท้ายบล็อค §2 ได้เลย):
+
+```powershell
+$script:Port = 502       # Modbus TCP port used by the read-only poller AND given to the trial
+$script:UnitId = 1       # unit id, same for both
+# if a stage must run on an exe you built outside this repo: Invoke-WjssStage ... -SkipBuildCheck
+```
+
 ถ้าคุณใช้ catalogue สำเนาของคุณเอง (ตาม `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md:148`) ให้วางต่อท้ายบล็อค §2:
 
 ```powershell
-$script:Cat = 'C:\FULL\PATH\TO\YOUR\T8_CATALOGUE.csv'   # ค่าเริ่มต้น = docs\evidence\process-io-inventory-2026-10-22.csv ใน repo
+$script:Cat = 'C:\FULL\PATH\TO\YOUR\T8_CATALOGUE.csv'   # default is docs\evidence\process-io-inventory-2026-10-22.csv in the repo
 ```
 
 ### ข้อ 0.4 — รัน stage ตามลำดับ (ห้ามข้าม A1 ซึ่งคือ "ปั๊มหยุด")
 
-รันตามลำดับนี้ (บรรทัดเดียวต่อ stage — ไฟล์พวกนี้เกิดจาก `Export-WjssStageFiles` ใน §2):
+รันตามลำดับนี้ **ทีละบรรทัด** (ไฟล์พวกนี้เกิดจาก `Export-WjssStageFiles` ใน §2) — A1 รันตอนปั๊มหยุด, A2 รันตอนปั๊มรัน, B off/on เช่นกัน, ห้ามรันคู่ที่ติดกันแล้วลืมเปลี่ยนสถานะปั๊ม:
 
 ```powershell
-& "$script:Ev\stage-A1-off.ps1"     # ปั๊มหยุด   คาด exit 2  (นี่คือ PASS)
-& "$script:Ev\stage-A2-run.ps1"     # ปั๊มรัน    คาด exit 0  + pump_ready=TRUE
-& "$script:Ev\stage-B-off.ps1"      # อ่าน DI-001..008 (ปั๊มหยุด)
-& "$script:Ev\stage-B-on.ps1"       # อ่าน DI-001..008 (ปั๊มรัน)  -> ผมเทียบสองก้อนให้
-& "$script:Ev\stage-C-iv1.ps1"      # IV1 OPEN/CLOSE ครั้งเดียว
-& "$script:Ev\stage-D-dry.ps1"      # dry cycle เต็มรูป (จะถาม 4 ค่าที่ต้องมาจากคุณ)
-& "$script:Ev\stage-E-idle.ps1"     # WSB ทุกตัวอยู่กับที่: FC02 + FC01 พร้อมกัน
-& "$script:Ev\stage-E-moved.ps1"    # หลังขยับ WSB ทีละตัว
+& "$script:Ev\stage-A1-off.ps1"     # pump STOPPED, exit 2 expected - that is the PASS
+& "$script:Ev\stage-A2-run.ps1"     # pump RUNNING, exit 0 + pump_ready=TRUE
+& "$script:Ev\stage-B-off.ps1"      # read DI-001..008, pump stopped
+& "$script:Ev\stage-B-on.ps1"       # read DI-001..008, pump running - I diff the two
+& "$script:Ev\stage-C-iv1.ps1"      # IV1 open/close, one actuation
+& "$script:Ev\stage-D-dry.ps1"      # full dry cycle, asks you for 4 values
+& "$script:Ev\stage-E-idle.ps1"     # all switches at rest: FC02 + FC01 together
+& "$script:Ev\stage-E-moved.ps1"    # after moving each WSB switch by hand
 ```
 
 แต่ละ stage พิมพ์บรรทัดสุดท้ายเป็น `RESULT <stage>: PASS` หรือ `RESULT <stage>: CHECK` — ส่งก้อนใต้เส้นประ cyan มาให้ผมทุกครั้ง
@@ -113,32 +122,72 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 
 ```powershell
 $ErrorActionPreference = 'Stop'
-$script:Repo = (Resolve-Path (Read-Host 'Repo path (folder with WaterJetSentinelSuite.sln)')).Path
+
+function Read-WjssLine {
+    # asks once, retries up to three times, never invents a value
+    param([string]$Prompt, [string]$Kind = 'text')
+    for ($i = 0; $i -lt 3; $i++) {
+        $v = (Read-Host $Prompt).Trim()
+        $v = $v.Trim([char]34).Trim([char]39)
+        if ($v.Length -eq 0) { Write-Host '  empty answer - type the value' -ForegroundColor Yellow; continue }
+        if ($Kind -eq 'repo') {
+            if (-not (Test-Path -LiteralPath (Join-Path $v 'WaterJetSentinelSuite.sln'))) {
+                Write-Host '  no WaterJetSentinelSuite.sln in that folder - type the repo root' -ForegroundColor Yellow; continue
+            }
+            return (Resolve-Path -LiteralPath $v).Path
+        }
+        if ($Kind -eq 'ip') {
+            if ($v -notmatch '^[0-9]{1,3}(\.[0-9]{1,3}){3}$') {
+                Write-Host '  not an IPv4 address - four dotted numbers, the value on the T8 label' -ForegroundColor Yellow; continue
+            }
+            return $v
+        }
+        return $v
+    }
+    throw 'STOP: no valid answer after 3 tries. Re-paste this block.'
+}
+
+$script:Repo = Read-WjssLine -Kind 'repo' -Prompt 'Repo path (folder that contains WaterJetSentinelSuite.sln)'
+$script:Ip   = Read-WjssLine -Kind 'ip'   -Prompt 'T8 Modbus TCP IP (this window only - never written to any file)'
 $script:Exe  = Join-Path $script:Repo 'apps\runtime\bin\Release\net10.0\Wjss.Runtime.exe'
 $script:Cat  = Join-Path $script:Repo 'docs\evidence\process-io-inventory-2026-10-22.csv'
-$script:Ip   = Read-Host 'T8 IP (used for this run only, never written to disk)'
-$script:Ev   = Join-Path $env:USERPROFILE ('wjss-evidence\' + (Get-Date -Format yyyy-MM-dd))
+$script:Ev   = Join-Path $env:USERPROFILE ('wjss-evidence\' + (Get-Date -Format 'yyyy-MM-dd'))
+$script:Port    = 502      # same default as ProcessIoTransportShape.Port in the Product
+$script:UnitId  = 1        # same default as ProcessIoTransportShape.UnitId
 New-Item -ItemType Directory -Force -Path $script:Ev | Out-Null
-$script:Head = (& git -C $script:Repo rev-parse HEAD).Trim()
-if (-not $script:Head) { throw 'STOP: not a git worktree.' }
+$script:Head = [string](& git -C $script:Repo rev-parse HEAD)
+if ($script:Head.Length -lt 40) { throw 'STOP: git did not return a HEAD sha in that folder.' }
+$script:Head = $script:Head.Trim()
 $script:Consent = @{}
 
 function Test-WjssBuild {
-    if (-not (Test-Path -LiteralPath $script:Exe)) { throw 'STOP: Release exe missing. Run: dotnet build WaterJetSentinelSuite.sln -c Release' }
-    $exe = Get-Item -LiteralPath $script:Exe
-    $newest = Get-ChildItem -Path (Join-Path $script:Repo 'apps'), (Join-Path $script:Repo 'packages') -Recurse -Include *.cs -ErrorAction SilentlyContinue |
-              Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($newest -and $newest.LastWriteTime -gt $exe.LastWriteTime) {
-        throw ('STOP: source file {0} is newer than the exe. Rebuild Release, then re-paste this stage.' -f $newest.Name)
+    # refuses to test a stale binary: this is what protects the corrected scaling from being judged on an old exe
+    if (-not (Test-Path -LiteralPath $script:Exe)) {
+        throw 'STOP: Wjss.Runtime.exe not found. Run: dotnet build WaterJetSentinelSuite.sln -c Release'
     }
-    ('HEAD {0} | exe sha256 {1} | built {2}' -f $script:Head.Substring(0,8), (Get-FileHash -LiteralPath $script:Exe -Algorithm SHA256).Hash.Substring(0,12), $exe.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))
+    $exe = Get-Item -LiteralPath $script:Exe
+    $newest = $null
+    $roots = @((Join-Path $script:Repo 'apps'), (Join-Path $script:Repo 'packages'))
+    foreach ($r in $roots) {
+        $files = @(Get-ChildItem -Path $r -Recurse -File -Filter '*.cs' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' })
+        foreach ($f in $files) {
+            if ($null -eq $newest) { $newest = $f }
+            elseif ($f.LastWriteTime -gt $newest.LastWriteTime) { $newest = $f }
+        }
+    }
+    if ($null -ne $newest -and $newest.LastWriteTime -gt $exe.LastWriteTime) {
+        throw ('STOP: ' + $newest.Name + ' is newer than the exe. Rebuild Release, then run this stage again (or add -SkipBuildCheck to this stage only if you know why).')
+    }
+    $hash = 'unavailable'
+    try { $hash = (Get-FileHash -LiteralPath $script:Exe -Algorithm SHA256).Hash.Substring(0, 12) } catch { }
+    return ('HEAD ' + $script:Head.Substring(0, 8) + ' | exe sha256 ' + $hash + ' | built ' + $exe.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))
 }
 
 function Read-WjssConsent {
     param([string]$Const)
     if (-not $script:Consent.ContainsKey($Const)) {
-        Write-Host ('  copy the value of ProcessIoConsentPhrases.{0} from packages\contracts\ProcessIoContracts.cs' -f $Const) -ForegroundColor DarkGray
-        $sec = Read-Host ('  paste consent for {0} (typing is hidden)' -f $Const) -AsSecureString
+        Write-Host ('  read the value of ProcessIoConsentPhrases.' + $Const + ' from packages\contracts\ProcessIoContracts.cs, then paste it below (hidden)') -ForegroundColor DarkGray
+        $sec = Read-Host '  consent phrase' -AsSecureString
         $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
         try { $script:Consent[$Const] = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
         finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
@@ -146,116 +195,215 @@ function Read-WjssConsent {
     return $script:Consent[$Const]
 }
 
+function Write-WjssClearEnv {
+    $names = @([Environment]::GetEnvironmentVariables().Keys)
+    foreach ($n in $names) {
+        if ($n -like 'WJSS_*') { [Environment]::SetEnvironmentVariable($n, $null) }
+    }
+}
+
 function Save-WjssSend {
     param([string]$Name, $Lines)
-    $txt = @('STAGE {0} | HEAD={1}' -f $Name, $script:Head.Substring(0,8)) + @($Lines)
-    $txt = $txt -replace '\b\d{1,3}(\.\d{1,3}){3}\b', '<IP>'
+    $txt = @()
+    $txt += 'STAGE ' + $Name + ' | HEAD=' + $script:Head.Substring(0, 8) + ' | ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+    foreach ($l in @($Lines)) { $txt += [string]$l }
+    $scrubbed = @()
+    foreach ($l in $txt) { $scrubbed += ($l -replace '\b[0-9]{1,3}(\.[0-9]{1,3}){3}\b', '<IP>') }
     $p = Join-Path $script:Ev ('stage-' + $Name + '.send.txt')
-    Set-Content -LiteralPath $p -Value ($txt -join [Environment]::NewLine) -Encoding UTF8
+    Set-Content -LiteralPath $p -Value ($scrubbed -join [Environment]::NewLine) -Encoding utf8
     Write-Host '--- copy everything below to the assistant (IP already scrubbed) ---' -ForegroundColor Cyan
-    $txt
-    Write-Host ('--- saved: {0} ---' -f $p) -ForegroundColor DarkGray
+    foreach ($l in $scrubbed) { Write-Host $l }
+    Write-Host ('--- saved: ' + $p + ' ---') -ForegroundColor DarkGray
 }
 
 function Invoke-WjssStage {
-    param([string]$Name, [hashtable]$Vars = @{}, [string]$ConsentConst = '', [IDictionary]$Expect = @{}, [int]$ExpectExit = 0, [string[]]$Show = @())
+    param(
+        [string]$Name,
+        [hashtable]$Vars = @{},
+        [string]$ConsentConst = '',
+        $Expect = $null,
+        $Show = @(),
+        [int]$ExpectExit = 0,
+        [switch]$SkipBuildCheck
+    )
     Write-WjssClearEnv
-    $build = Test-WjssBuild
-    Write-Host ('  build check: ' + $build) -ForegroundColor DarkGray
-    $log = Join-Path $script:Ev ('stage-' + $Name + '.log')
-    $env:WJSS_DEVICE_PROFILE       = 'TEST_HARDWARE'
-    $env:WJSS_PROCESS_IO_HOST      = $script:Ip
-    $env:WJSS_PROCESS_IO_CATALOGUE = $script:Cat
-    foreach ($k in $Vars.Keys) { Set-Item -Path ('env:' + $k) -Value ([string]$Vars[$k]) }
-    if ($ConsentConst) { $env:WJSS_PROCESS_IO_CONSENT = Read-WjssConsent -Const $ConsentConst }
-    Push-Location $script:Repo
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'   # native stderr must not abort us; the exit code decides
+    if ($SkipBuildCheck) { Write-Host '  build check SKIPPED by request' -ForegroundColor Yellow }
+    else { Write-Host ('  build: ' + (Test-WjssBuild)) -ForegroundColor DarkGray }
+
+    $outFile = Join-Path $script:Ev ('stage-' + $Name + '.out.txt')
+    $errFile = Join-Path $script:Ev ('stage-' + $Name + '.err.txt')
+    if (-not (Test-Path -LiteralPath $script:Exe)) { throw ('STOP: exe not found: ' + $script:Exe) }
+
+    [Environment]::SetEnvironmentVariable('WJSS_DEVICE_PROFILE', 'TEST_HARDWARE')
+    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_HOST', $script:Ip)
+    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CATALOGUE', $script:Cat)
+    # the poller and the Product must address the same endpoint, so the stage inherits both values
+    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_PORT', [string]$script:Port)
+    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_UNIT_ID', [string]$script:UnitId)
+    foreach ($k in @($Vars.Keys)) { [Environment]::SetEnvironmentVariable($k, [string]$Vars[$k]) }
+    if ($ConsentConst.Length -gt 0) {
+        [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CONSENT', (Read-WjssConsent -Const $ConsentConst))
+    }
+
+    $code = $null
     try {
-        & $script:Exe 2>&1 | Tee-Object -FilePath $log | Out-Null
-        $code = $LASTEXITCODE
+        $proc = Start-Process -FilePath $script:Exe -WorkingDirectory $script:Repo -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+        if ($null -ne $proc) {
+            if (-not $proc.HasExited) { $proc.WaitForExit() }
+            try { $code = [int]$proc.ExitCode } catch { $code = $null }
+            try { $proc.Dispose() } catch { }
+        }
     }
     finally {
-        $ErrorActionPreference = $prevEap
-        Remove-Item -LiteralPath 'env:WJSS_PROCESS_IO_CONSENT' -ErrorAction SilentlyContinue
-        Pop-Location
+        [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CONSENT', $null)
     }
-    $map = [ordered]@{}
-    foreach ($line in (Get-Content -LiteralPath $log)) {
-        $t = $line.Trim(); $i = $t.IndexOf('=')
-        if ($i -gt 0) { $k = $t.Substring(0, $i).Trim(); if (-not $map.Contains($k)) { $map[$k] = $t.Substring($i + 1).Trim() } }
+
+    $map = @{}
+    if (Test-Path -LiteralPath $outFile) {
+        foreach ($line in @(Get-Content -LiteralPath $outFile)) {
+            $t = [string]$line
+            $i = $t.IndexOf('=')
+            if ($i -gt 0) {
+                $k = $t.Substring(0, $i).Trim()
+                if ($k.Length -gt 0 -and -not $map.ContainsKey($k)) { $map[$k] = $t.Substring($i + 1).Trim() }
+            }
+        }
     }
+    $errLines = @()
+    if (Test-Path -LiteralPath $errFile) { $errLines = @(Get-Content -LiteralPath $errFile | Where-Object { $_.Length -gt 0 }) }
+
     $fail = @()
-    if ($ExpectExit -ge 0 -and $code -ne $ExpectExit) { $fail += ('exit={0} (expected {1})' -f $code, $ExpectExit) }
-    foreach ($k in $Expect.Keys) {
-        $want = [string]$Expect[$k]
-        if (-not $map.Contains($k)) { $fail += ($k + ' missing from report') }
-        elseif ($want.StartsWith('~')) { if (-not $map[$k].EndsWith($want.Substring(1))) { $fail += ('{0}={1} (expected ...{2})' -f $k, $map[$k], $want.Substring(1)) } }
-        elseif ($map[$k] -ne $want) { $fail += ('{0}={1} (expected {2})' -f $k, $map[$k], $want) }
+    if ($null -eq $code) { $fail += 'exit code could not be read from the process object' }
+    elseif ($code -ne $ExpectExit) { $fail += ('exit=' + [string]$code + ' but this stage expects ' + [string]$ExpectExit) }
+    if ($null -ne $Expect) {
+        foreach ($k in @($Expect.Keys)) {
+            $exp = [string]$Expect[$k]
+            if (-not $map.ContainsKey($k)) { $fail += ('key ' + $k + ' was not printed by the trial (expected ' + $exp + ')'); continue }
+            $got = [string]$map[$k]
+            if ($exp.Length -gt 1 -and $exp.Substring(0, 1) -eq '~') {
+                if (-not $got.EndsWith($exp.Substring(1))) { $fail += ($k + '=' + $got + ' does not end with ' + $exp.Substring(1)) }
+            }
+            elseif ($got -ne $exp) { $fail += ($k + '=' + $got + ' but expected ' + $exp) }
+        }
     }
-    $keys = (@($Expect.Keys) + @($Show) | Select-Object -Unique | Where-Object { $map.Contains($_) })
-    $out = @('  exit={0}' -f $code)
-    foreach ($k in $keys) { $out += ('  {0}={1}' -f $k, $map[$k]) }
-    if ($fail.Count) { Write-Host ('RESULT {0}: CHECK' -f $Name) -ForegroundColor Yellow; foreach ($f in $fail) { Write-Host ('   - ' + $f) -ForegroundColor Yellow } }
-    else { Write-Host ('RESULT {0}: PASS' -f $Name) -ForegroundColor Green }
-    Save-WjssSend -Name $Name -Lines $out
-    Write-Host ('raw log (keep local, never commit): {0}' -f $log) -ForegroundColor DarkGray
+
+    $rep = @()
+    $rep += '  exit=' + [string]$code
+    foreach ($k in @($Show)) {
+        if ($map.ContainsKey($k)) { $rep += ('  ' + $k + '=' + [string]$map[$k]) }
+        else { $rep += ('  ' + $k + '=<not printed>') }
+    }
+    if ($errLines.Count -gt 0) {
+        $rep += ('  stderr_lines=' + [string]$errLines.Count)
+        $take = 5
+        if ($errLines.Count -lt $take) { $take = $errLines.Count }
+        for ($j = 0; $j -lt $take; $j++) { $rep += ('  stderr| ' + [string]$errLines[$j]) }
+    }
+    if ($fail.Count -gt 0) {
+        $rep += '  --- last 40 output lines (auto-included because this stage did not match) ---'
+        $all = @(Get-Content -LiteralPath $outFile)
+        $from = $all.Count - 40
+        if ($from -lt 0) { $from = 0 }
+        for ($j = $from; $j -lt $all.Count; $j++) { $rep += ('  | ' + [string]$all[$j]) }
+    }
+    $rep += '  raw stdout: ' + $outFile
+
+    if ($fail.Count -eq 0) {
+        Write-Host ('RESULT ' + $Name + ': PASS (exit=' + [string]$code + ')') -ForegroundColor Green
+        Save-WjssSend -Name $Name -Lines $rep
+    }
+    else {
+        Write-Host ('RESULT ' + $Name + ': CHECK') -ForegroundColor Red
+        foreach ($m in $fail) { Write-Host ('   MISMATCH ' + $m) -ForegroundColor Red }
+        $withFails = @()
+        foreach ($m in $fail) { $withFails += ('  MISMATCH ' + $m) }
+        Save-WjssSend -Name $Name -Lines ($withFails + $rep)
+    }
 }
 
-function Write-WjssClearEnv {
-    Get-ChildItem Env: | Where-Object { $_.Name -like 'WJSS_*' } | ForEach-Object { Remove-Item -LiteralPath ('env:' + $_.Name) -ErrorAction SilentlyContinue }
+function Read-WjssExact {
+    param($Stream, [byte[]]$Buffer, [int]$Offset, [int]$Count)
+    $got = 0
+    while ($got -lt $Count) {
+        $n = $Stream.Read($Buffer, ($Offset + $got), ($Count - $got))
+        if ($n -le 0) { throw 'the device closed the connection mid-response' }
+        $got = $got + $n
+    }
 }
 
-# read-only Modbus TCP poller (FC02 = discrete inputs, FC01 = coils). FC05/06/15/16 are not implemented at all.
 function Read-WjssBits {
+    # READ ONLY Modbus TCP poller: FC02 discrete inputs, FC01 coils. Nothing here can write to the device.
     param([string]$Area = 'DI', [int]$Start = 0, [int]$Count = 16)
     $fc = 2
     if ($Area -eq 'COIL') { $fc = 1 }
-    $tcp = New-Object System.Net.Sockets.TcpClient
+    $client = $null
     try {
-        if (-not $tcp.ConnectAsync($script:Ip, 502).Wait(3000)) { throw 'connect timed out (check IP / firewall / device power)' }
-        $s = $tcp.GetStream()
+        $client = New-Object System.Net.Sockets.TcpClient
+        $client.ReceiveTimeout = 4000
+        $client.SendTimeout = 4000
+        $task = $client.ConnectAsync($script:Ip, $script:Port)
+        if (-not $task.Wait(4000)) { return @{ ok = $false; error = 'connect timed out after 4000 ms'; bits = @() } }
+        $stream = $client.GetStream()
+
         $req = New-Object byte[] 12
-        $req[0] = 0; $req[1] = 1; $req[2] = 0; $req[3] = 0; $req[4] = 0; $req[5] = 6
-        $req[6] = 1; $req[7] = $fc
-        $req[8] = [int][math]::Floor($Start / 256); $req[9] = ($Start % 256)
-        $req[10] = [int][math]::Floor($Count / 256); $req[11] = ($Count % 256)
-        $s.Write($req, 0, 12); $s.Flush()
+        $req[0] = 0; $req[1] = 1; $req[2] = 0; $req[3] = 1; $req[4] = 0; $req[5] = 6
+        $req[6] = [byte]$script:UnitId
+        $req[7] = [byte]$fc
+        $req[8] = [byte](($Start -shr 8) -band 255); $req[9] = [byte]($Start -band 255)
+        $req[10] = [byte](($Count -shr 8) -band 255); $req[11] = [byte]($Count -band 255)
+        $stream.Write($req, 0, 12)
+        $stream.Flush()
+
         $hdr = New-Object byte[] 9
-        $o = 0
-        while ($o -lt 9) { $r = $s.Read($hdr, $o, 9 - $o); if ($r -le 0) { throw 'connection closed by device' }; $o += $r }
-        if ([int]$hdr[7] -ne $fc) { throw ('device returned Modbus exception for FC{0:00} (check that this area is exposed on the device)' -f $fc) }
-        $n = [int]$hdr[8]
-        $dat = New-Object byte[] $n
-        $o = 0
-        while ($o -lt $n) { $r = $s.Read($dat, $o, $n - $o); if ($r -le 0) { throw 'connection closed mid-response' }; $o += $r }
+        Read-WjssExact -Stream $stream -Buffer $hdr -Offset 0 -Count 9 | Out-Null
+        if ([int]$hdr[7] -ne $fc) {
+            $ex = New-Object byte[] 1
+            Read-WjssExact -Stream $stream -Buffer $ex -Offset 0 -Count 1 | Out-Null
+            return @{ ok = $false; error = ('device returned Modbus exception ' + [string]([int]$ex[0]) + ' for FC' + [string]$fc + ' (that area may not be exposed on this device)'); bits = @() }
+        }
+        $byteCount = [int]$hdr[8]
+        $data = New-Object byte[] $byteCount
+        if ($byteCount -gt 0) { Read-WjssExact -Stream $stream -Buffer $data -Offset 0 -Count $byteCount | Out-Null }
         $bits = @()
-        for ($i = 0; $i -lt $Count; $i++) { $byte = [int]$dat[[int][math]::Floor($i / 8)]; $bits += (($byte -shr ($i % 8)) -band 1) }
+        for ($i = 0; $i -lt $Count; $i++) {
+            $b = [int]$data[($i -shr 3)]
+            $bits += (($b -shr ($i -band 7)) -band 1)
+        }
         return @{ ok = $true; fc = $fc; start = $Start; bits = $bits }
     }
-    catch { return @{ ok = $false; error = $_.Exception.Message; bits = @() } }
-    finally { $tcp.Close() }
+    catch {
+        return @{ ok = $false; error = $_.Exception.Message; bits = @() }
+    }
+    finally {
+        if ($null -ne $client) { $client.Close() }
+    }
 }
 
 function Format-WjssBits {
-    param([string]$Prefix, [int]$Base, $Result)
-    if (-not $Result.ok) { return ('  {0}: READ FAILED - {1}' -f $Prefix, $Result.error) }
-    $line = '  ' + $Prefix + ':'
-    for ($i = 0; $i -lt $Result.bits.Count; $i++) { $line += (' {0}-{1:D3}={2}' -f $Prefix, ($Base + $i), $Result.bits[$i]) }
-    return $line
+    param([string]$Prefix = 'DI', [int]$Base = 1, $Result)
+    if ($null -eq $Result.ok -or -not $Result.ok) {
+        return ('  ' + $Prefix + ': READ FAILED - ' + [string]$Result.error)
+    }
+    $parts = @()
+    for ($i = 0; $i -lt $Result.bits.Count; $i++) {
+        $parts += ($Prefix + ('-{0:D3}=' -f ($Base + $i)) + [string]$Result.bits[$i])
+    }
+    return ('  ' + ($parts -join ' '))
 }
 
 function Read-WjssField {
-    # asks for one Owner-only value; empty is never accepted (no default is invented for you)
+    # one Owner-only value; empty is never accepted and nothing is guessed for you
     param([string]$Label, [string]$Pattern = '', [switch]$Number)
     while ($true) {
         $v = (Read-Host ('  ' + $Label)).Trim()
-        if (-not $v) { Write-Host '  empty is not allowed - the trial refuses with exit=4 instead of guessing' -ForegroundColor Yellow; continue }
+        if ($v.Length -eq 0) { Write-Host '  empty is not allowed (the trial refuses with exit=4 rather than defaulting)' -ForegroundColor Yellow; continue }
         if ($Number) {
-            if ($v -match '^-?\d{1,3}(\.\d{1,3})?$') { return $v }
-            Write-Host '  must be a plain number with a DOT decimal (comma is refused by the invariant-culture parser)' -ForegroundColor Yellow; continue
+            if ($v -match '^-?[0-9]{1,3}(\.[0-9]{1,3})?$') { return $v }
+            Write-Host '  must be a plain number with a DOT decimal (a comma is rejected by the invariant-culture parser)' -ForegroundColor Yellow; continue
         }
-        if ($Pattern -and $v -notmatch $Pattern) { Write-Host ('  must match: ' + $Pattern) -ForegroundColor Yellow; continue }
+        if ($Pattern.Length -gt 0 -and $v -notmatch $Pattern) {
+            Write-Host ('  must match: ' + $Pattern) -ForegroundColor Yellow; continue
+        }
         return $v
     }
 }
@@ -264,28 +412,34 @@ function Confirm-WjssState {
     # stops a stage BEFORE anything is set if the physical pre-state is not confirmed
     param([string]$Token, [string]$Prompt)
     $a = Read-Host ($Prompt + ' | type ' + $Token + ' to continue')
-    if ($a -ne $Token) { throw ('STOP: pre-state not confirmed (you typed "{0}"), nothing was run.' -f $a) }
+    if ($a -ne $Token) { throw ('STOP: pre-state not confirmed (typed "' + $a + '"), nothing was run.') }
 }
 
 function Export-WjssStageFiles {
-    # splits the 8 labelled fences of this runbook (marker: powershell stage:<name>) into $Ev\stage-<name>.ps1
-    param([switch]$Force)
+    # rebuilds every labelled stage fence from the runbook; the .ps1 files are never edited by hand
+    param([switch]$KeepExisting)
     $md = Join-Path $script:Repo 'docs\PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md'
-    if (-not (Test-Path -LiteralPath $md)) { throw 'STOP: runbook not found under the repo path you gave.' }
+    if (-not (Test-Path -LiteralPath $md)) { throw 'STOP: this runbook file is not in the repo path you gave.' }
     $raw = Get-Content -LiteralPath $md -Raw
-    # \x60 = backtick, so this line never contains a literal fence marker (keeps the markdown parse unambiguous)
-    $ms = [regex]::Matches($raw, '(?s)\x60\x60\x60powershell stage:([A-Za-z0-9\-]+)\r?\n(.*?)\x60\x60\x60')
-    if ($ms.Count -ne 8) { throw ('STOP: expected 8 labelled stage blocks, found {0} - git pull this branch, then paste §2 again.' -f $ms.Count) }
+    $fence = [string]([char]0x60 * 3)
+    $pat = '(?s)' + $fence + 'powershell stage:([A-Za-z0-9\-]+)\r?\n(.*?)' + $fence
+    $ms = [regex]::Matches($raw, $pat)
+    if ($ms.Count -ne 8) {
+        throw ('STOP: expected 8 labelled stage blocks, found ' + [string]$ms.Count + '. git pull this branch, then paste this block again.')
+    }
     foreach ($m in $ms) {
         $n = [string]$m.Groups[1].Value
         $b = [string]$m.Groups[2].Value
         $f = Join-Path $script:Ev ('stage-' + $n + '.ps1')
-        if ((Test-Path -LiteralPath $f) -and -not $Force) { Write-Host ('  kept (unchanged): stage-' + $n + '.ps1  |  use -Force to rewrite') -ForegroundColor DarkGray; continue }
-        $hdr = '# generated from runbook HEAD ' + $script:Head.Substring(0, 8) + ' - do not edit this file; edit the runbook, then re-run: Export-WjssStageFiles -Force'
-        $need = 'if (-not (Test-Path function:\Test-WjssBuild)) { throw "paste the shared block of the runbook (section 2) into THIS window first - the stage files call its functions" }'
-        Set-Content -LiteralPath $f -Value ($hdr + [Environment]::NewLine + $need + [Environment]::NewLine + $b) -Encoding utf8
+        if ($KeepExisting -and (Test-Path -LiteralPath $f)) {
+            Write-Host ('  kept: stage-' + $n + '.ps1') -ForegroundColor DarkGray; continue
+        }
+        $head = '# generated from runbook HEAD ' + $script:Head.Substring(0, 8) + ' - do not edit this file; edit the runbook and re-run Export-WjssStageFiles'
+        $need = 'if (-not (Test-Path function:\Invoke-WjssStage)) { throw "paste the shared block (section 2) of the runbook into THIS window first" }'
+        Set-Content -LiteralPath $f -Value ($head + [Environment]::NewLine + $need + [Environment]::NewLine + $b) -Encoding utf8
         Write-Host ('  stage-{0,-8}  run with:  & "$script:Ev\stage-{0}.ps1"' -f $n)
     }
+    Write-Host ('  files: ' + $script:Ev) -ForegroundColor DarkGray
 }
 ```
 
@@ -299,11 +453,11 @@ Test-WjssBuild
 ```powershell
 Export-WjssStageFiles
 ```
-แตกบล็อค stage ทั้ง 8 ของเอกสารนี้ออกเป็นไฟล์ `.ps1` ในโฟลเดอร์หลักฐาน แล้วพิมพ์รายการคำสั่งให้คัดลอก
+แตกบล็อค stage ทั้ง 8 ของเอกสารนี้ออกเป็นไฟล์ `.ps1` ในโฟลเดอร์หลักฐาน (เขียนทับไฟล์เดิมทุกครั้งเพื่อให้ตรงกับ runbook; ใช้ `Export-WjssStageFiles -KeepExisting` ถ้าไม่อยากให้ทับ) แล้วพิมพ์รายการคำสั่งให้คัดลอก
 
 ```powershell
-& "$script:Ev\stage-A1-off.ps1"        # ถึงคิว stage ไหน ก็รันบรรทัดเดียวตามนั้น
-& "$script:Ev\stage-A2-run.ps1"        # (ตัวอย่างนี้คือ 2 stage ของ Stage A - ห้ามรันติดกัน ต้องสลับสถานะปั๊มก่อน)
+& "$script:Ev\stage-A1-off.ps1"        # one line per stage - whichever stage is next
+& "$script:Ev\stage-A2-run.ps1"        # do not run these two back to back: the pump state must change between them
 ```
 
 > วิธีดูว่า stage ไหนชื่ออะไร: `Get-ChildItem $script:Ev -Filter 'stage-*.ps1' | Select-Object -ExpandProperty Name`
@@ -401,7 +555,7 @@ Invoke-WjssStage -Name 'C-iv1' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -V
   'WJSS_DRY_IV_TRIAL_PUMP_STOPPED'       = 'PUMP_STOPPED_OWNER_ATTESTED'
   'WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR' = '0.7'
   'WJSS_VALVE_SUPERVISION_MS'            = '5000'
-} -Show @('trial_code','accepted','evidence_kind','physical_iv_command','physical_upper_feedback','physical_lower_feedback','cleanup','session_state')
+} -Show @('trial_code','accepted','evidence_kind','valve','physical_iv_command','open_command','close_command','physical_upper_feedback','physical_lower_feedback','cleanup','operator_abort')
 ```
 
 - stage นี้ **light โดยเจตนา** (ค่า terminal ขึ้นกับ feedback จริงหน้างาน) — ตัวเลขทั้งหมดในก้อน send ผมวิเคราะห์เอง
@@ -414,10 +568,10 @@ Invoke-WjssStage -Name 'C-iv1' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -V
 
 ```powershell stage:D-dry
 Confirm-WjssState -Token 'DRY CYCLE AUTHORIZED' -Prompt 'D: Stage B and C passed, ACCELERATED package section 6/7 decided, motion unloaded'
-$sid    = Read-WjssField -Label 'Canonical Sensor Id ที่มีอยู่ใน catalogue CSV ของคุณจริง (Phase 3A store ใช้ตัวไหน ใช้ตัวนั้น)'
-$ma     = Read-WjssField -Label 'Pump AO target in mA ตามที่คุณตัดสินใจใน ACCELERATED package' -Number
-$runPol = Read-WjssField -Label 'Pump RUNNING polarity - ผลจาก Stage B' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
-$fltPol = Read-WjssField -Label 'Pump FAULT polarity - ผลจาก Stage B' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+$sid    = Read-WjssField -Label 'Canonical Sensor Id exactly as it appears in your catalogue CSV'
+$ma     = Read-WjssField -Label 'Pump AO target in mA (the value you decided in the ACCELERATED package)' -Number
+$runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+$fltPol = Read-WjssField -Label 'Pump FAULT polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
 Invoke-WjssStage -Name 'D-dry' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
   'WJSS_DRY_COMMAND_MODE'          = 'TEST_HARDWARE_DRY'
   'WJSS_CLEANING_SENSOR_ID'        = $sid
@@ -433,7 +587,7 @@ Invoke-WjssStage -Name 'D-dry' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -V
   'WJSS_PRESSURE_LOW_BAR'          = '1'
   'WJSS_PRESSURE_HIGH_BAR'         = '15'
   'WJSS_VALVE_SUPERVISION_MS'      = '5000'
-} -Show @('profile','mode','terminal_status','terminal_code','primary_failure','steps','pump_readiness','session_state','session_generation','write_authority')
+} -Show @('profile','mode','sensor','isolation_valve','water_jet','pump_selection','pump_owner','pump_gate','pump_feedback','pump_readiness','prepare','start','steps','terminal_status','terminal_code','primary_failure','write_authority','session_state','session_generation')
 ```
 
 - 4 ค่าที่ผมห้ามเดาแทน (sensor id, mA target, polarity x2) ตอนนี้จะ**ถามบนหน้าจอ**ตอนรัน stage นั้น และตรวจรูปแบบให้ก่อน (ค่าว่างไม่ได้, ทศนิยมต้องใช้จุด ไม่ใช่จุลภาค)
@@ -450,7 +604,7 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 $t = @()
 $t += Format-WjssBits -Prefix 'DI' -Base 21 -Result (Read-WjssBits -Area 'DI'   -Start 20 -Count 16)   # FC02, addr 20..35
 $t += Format-WjssBits -Prefix 'CO' -Base 21 -Result (Read-WjssBits -Area 'COIL' -Start 20 -Count 16)   # FC01, same addresses
-$t += '  all-switches-at-rest-should-be-one-side (ตาม wiring จริง)'
+$t += '  note: at rest every switch should sit on one side, per the real wiring'
 Save-WjssSend -Name 'E-idle' -Lines $t
 ```
 
