@@ -1,11 +1,12 @@
 # WJSS Physical Hardware Execution Runbook v2 — 2026-11-07
 
 > เอกสารนี้แทนที่รุ่นแรก (รุ่นแรกเขียนงงและให้คนรันหาข้อมูลมากรอกเอง) — v2 ออกแบบให้ **copy → paste → รัน** เท่านั้น
-> ผลลัพธ์ทุก stage มี script ตรวจให้เอง และก้อนข้อความสำหรับส่งให้ผมถูก scrub IP ให้อัตโนมัติ
+> ผลลัพธ์ทุก stage มีตัวขับตรวจให้เอง และก้อนข้อความสำหรับส่งให้ผมถูก scrub IP ให้อัตโนมัติ
+> ตัวขับ = ไฟล์ PowerShell ที่ commit ใน repo (ดูข้อ 0.3) ไม่ใช่บล็อกที่ต้อง copy จาก markdown อีกต่อไป
 
 ## 0. ขั้นตอนที่ต้องรัน (copy ทั้งบล็อคไปวางได้เลย)
 
-> บล็อค ``powershell`` ทุกบล็อกจาก §0 ถึง §8 เป็นคำสั่งจริงที่รันได้ทันที — ไม่ต้องแทนที่อะไรนอกจากค่าที่ผมไม่มี (IP, catalogue, ค่าที่มาจากผล Stage B)
+> โค้ดทั้งหมดอยู่ใน `tools/hardware-runbook/wjss-field-driver.ps1` (ไฟล์จริงใน repo) — บล็อก `powershell` ในเอกสารนี้จึงมีแต่คำสั่งสั้นที่รันได้ทันที
 
 ### ข้อ 0.1 — ดึงโค้ด + build + รัน .NET matrix ทั้งหมด (ทำทุกครั้งที่ผมแจ้งว่า commit ใหม่แล้ว)
 
@@ -45,41 +46,50 @@ dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj     -c Release -
 
 ### ข้อ 0.3 — เตรียมหน้าต่างงานหน้างาน (วางครั้งเดียวต่อ 1 หน้าต่าง PowerShell)
 
-วางบล็อค **§2 ทั้งบล็อค** (ใต้หัวข้อ §2 ในไฟล์นี้) แล้วตอบคำถาม 2 ข้อ: repo path + T8 IP — ตัวแปร `$script:Repo $script:Exe $script:Cat $script:Ip $script:Ev $script:Head` จะถูกตั้งครบ และ consent จะถูกถามเฉพาะ stage ที่ต้องใช้ (ซ่อนการพิมพ์, cache ในหน่วยความจำ,ถูกลบท้ายบล็อค)
+ตัวขับงานหน้างาน**ไม่ได้อยู่ในไฟล์ markdown นี้อีกต่อไป** — มันคือไฟล์จริงที่ commit ไว้ใน repo: `tools/hardware-runbook/wjss-field-driver.ps1`
+(เหตุผล: บล็อกที่ต้อง copy จากไฟล์ .md ต้องหาทางเลี่ยง syntax ของ markdown ซึ่งเคยทำพังมาแล้วจริง ๆ — ทั้ง backtick ที่กลายเป็น
+ตัว escape ใน PowerShell และการประกอบอักขระเป็นสายเพื่อสร้าง fence (เคยใช้ `char` คูณจำนวนครั้ง ซึ่ง PowerShell ไม่มี operator นี้)
+เมื่อโค้ดเป็นไฟล์ `.ps1` จริงใน repo จึงไม่มีเรื่องประกอบสายเหลืออยู่เลย และ **PowerShell จะ parse โค้ดทั้งไฟล์ตอน dot-source**
+— typo, type ที่ไม่มีจริง, operator ที่ไม่มี จะโผล่ทันทีตอนโหลด ไม่ใช่ตอนยืนอยู่หน้าปั๊ม)
 
-ทางลัด — ไม่ต้อง copy บล็อค §2 เอง (โหลดจากไฟล์นี้แล้ว dot-source เข้าหน้าต่างปัจจุบัน):
+วางสามบรรทัดนี้ (ถ้ายังไม่ได้เปิดหน้าต่างใหม่ ให้ทำข้อ 0.1 ก่อน เพราะใช้ `$Repo` ร่วมกัน):
 
 ```powershell
-$b  = [char]0x60 * 3
-$md = Get-Content "$Repo\docs\PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md" -Raw
-$m  = [regex]::Match($md, '(?m)^## 2\. ')
-if (-not $m.Success) { throw 'STOP: no section 2 heading in that file.' }
-$code = [regex]::Match($md.Substring($m.Index), ('(?s)' + $b + 'powershell' + [char]13 + '?' + [char]10 + '(.*?)' + $b)).Groups[1].Value
-if ($code.Length -lt 200) { throw 'STOP: the shared block was not found. Open the runbook and paste the block under heading 2 manually.' }
-. ([scriptblock]::Create($code))
-Test-WjssBuild
+$Repo = 'C:\dev\waterjet-sentinel-suite'      # same value you used in 0.1
+. Join-Path $Repo 'tools/hardware-runbook/wjss-field-driver.ps1'
+Test-WjssDriver
 Export-WjssStageFiles
 ```
 
-หมายเหตุ: ตัวแปร `$Repo` มาจากข้อ 0.1 (รันในหน้าต่างเดียวกัน) — ถ้าเปิดหน้าต่างใหม่ให้วางสามบรรทัดแรกของข้อ 0.1 ก่อน
+`Test-WjssDriver` ไม่ใช่ formal check — มัน**รันโค้ดจริงบน PowerShell เครื่องคุณ** (ตัวเดียวกับที่จะรัน stage):
 
-ค่าควบคุมที่มีประโยชน์ (ใส่ต่อท้ายบล็อค §2 ได้เลย):
+- parse ไฟล์ตัวขับและ parse ไฟล์ `stage-*.ps1` ทั้ง 8 ไฟล์ที่ export ออกมา (syntax ผิด = เจอตรงนั้นเลย)
+- ตรวจว่า stage ครบ 8 ตัว ไม่มี consent literal/endpoint literal หลงอยู่ในโค้ดของ stage
+- รัน `& <exe>` จริงใน mode startup-refusal (ไม่แตะ device) แล้วดูว่า exit code/ refusal มาจริง
+- เทียบตัวอ่าน log, ตัวตัดสิน verdict, ตัว scrub IP กับ log สังเคราะห์ (บรรทัดที่มี `=` ซ้ำในค่า, junk line, key ซ้ำ, ค่าที่พิมพ์ตัวพิมพ์ใหญ่ต่างกันเลยต้องถูกจับ)
+- ตรวจ frame ที่ใช้อ่านบิต: ความยาว 12 ไบต์, protocol id ต้องเป็น 0, length 6, start/quantity เป็น big-endian — พร้อมเคส reply ที่ device ตอบ exception / สั้นเกิน / function code ไม่ตรง
+- เทียบ keys ที่ใช้ใน `-Expect`/`-Show` กับ keys ที่ trial นั้นพิมพ์จริง และ grep ชื่อ `WJSS_*` ทุกตัว + ค่าที่ผม assert ทุกตัวว่ามีอยู่ใน source ของ Product จริง
+
+อะไรก็ตามที่ grep ไม่เจอ = `DRIVER SELF-TEST FAILED` แล้วตัวขับจะ**ไม่ปล่อยให้รัน stage**
+
+ส่วนบรรทัด `Export-WjssStageFiles` คือตัวสร้าง `$env:USERPROFILE\wjss-evidence\<วันที่>\stage-<name>.ps1` ทั้ง 8 ไฟล์ ซึ่งเป็นสิ่งที่รันจริง (ห้ามแก้เอง)
+
+หมายเหตุ: ในไฟล์ `tools/` ผมไม่พิมพ์ชื่อ protocol ของยี่ห้อ device (กฎ boundary-scan S3 ใน repo) — protocol ที่ใช้จริงคือ Modbus TCP FC01/FC02 ซึ่งเอกสารนี้เป็นคนอธิบายเอง ตัวขับเลยใช้คำว่า "device TCP port / unit id"
+
+ค่าควบคุม: ตัวขับ**ถาม** repo path / IP / port / unit id / catalogue ตอน dot-source (port 502, unit 1, catalogue ใน repo — กด Enter เพื่อเอา default) ถ้าอยาก override หลังโหลดแล้ว:
 
 ```powershell
-$script:Port = 502       # Modbus TCP port used by the read-only poller AND given to the trial
-$script:UnitId = 1       # unit id, same for both
-# if a stage must run on an exe you built outside this repo: Invoke-WjssStage ... -SkipBuildCheck
+$script:Port = 502       # TCP port - the same value the poller reads and the trial is given
+$script:UnitId = 1       # unit id (slave address)
+$script:Cat  = 'C:\FULL\PATH\TO\YOUR\T8_CATALOGUE.csv'   # default: docs\evidence\process-io-inventory-2026-10-22.csv
 ```
 
-ถ้าคุณใช้ catalogue สำเนาของคุณเอง (ตาม `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md:148`) ให้วางต่อท้ายบล็อค §2:
-
-```powershell
-$script:Cat = 'C:\FULL\PATH\TO\YOUR\T8_CATALOGUE.csv'   # default is docs\evidence\process-io-inventory-2026-10-22.csv in the repo
-```
+catalogue ต้องเป็นสำเนาของคุณเองที่ path **นอก repo tree** (ตาม `docs/TRIAL_A_B_HARDWARE_EXECUTION_PACKAGE.md:148`) —
+ตัวขับจะปฏิเสธ path ที่อยู่ใต้ `$Repo`
 
 ### ข้อ 0.4 — รัน stage ตามลำดับ (ห้ามข้าม A1 ซึ่งคือ "ปั๊มหยุด")
 
-รันตามลำดับนี้ **ทีละบรรทัด** (ไฟล์พวกนี้เกิดจาก `Export-WjssStageFiles` ใน §2) — A1 รันตอนปั๊มหยุด, A2 รันตอนปั๊มรัน, B off/on เช่นกัน, ห้ามรันคู่ที่ติดกันแล้วลืมเปลี่ยนสถานะปั๊ม:
+รันตามลำดับนี้ **ทีละบรรทัด** (ไฟล์ทั้ง 8 เกิดจาก `Export-WjssStageFiles` ในข้อ 0.3 — ห้าม copy โค้ดจากเอกสารนี้ไปรันเอง และห้ามแก้ไฟล์ `stage-*.ps1`) — A1 รันตอนปั๊มหยุด, A2 รันตอนปั๊มรัน, B off/on เช่นกัน, ห้ามรันคู่ที่ติดกันแล้วลืมเปลี่ยนสถานะปั๊ม:
 
 ```powershell
 & "$script:Ev\stage-A1-off.ps1"     # pump STOPPED, exit 2 expected - that is the PASS
@@ -97,14 +107,15 @@ $script:Cat = 'C:\FULL\PATH\TO\YOUR\T8_CATALOGUE.csv'   # default is docs\eviden
 ### ข้อ 0.5 — สิ่งที่ต้องส่งกลับมาให้ผมหลังทุก stage
 
 1. ก้อนที่อยู่ใต้ `--- copy everything below to the assistant ---` (script พิมพ์ให้ + เก็บในไฟล์ `$script:Ev\stage-<name>.send.txt` ซึ่ง scrub IP แล้ว)
-2. ตัวเลข build/test จากข้อ 0.1
-3. **เฉพาะ**เมื่อมี `CHECK`/`ERROR`: log ดิบทั้งไฟล์ `Get-Content $script:Ev\stage-A2.log -Raw` (ห้ามแก้ข้อความ ห้ามลบบรรทัด)
+2. ถ้าผมขอ log ดิบ ให้ส่งจากไฟล์ `.log` / `.err.log` ในโฟลเดอร์เดียวกัน (raw log ไม่ถูก scrub เพราะไม่ออกจากเครื่องคุณ — ห้ามเอาไปโพสต์ที่อื่น)
+3. ตัวเลข build/test จากข้อ 0.1
+4. **เฉพาะ**เมื่อมี `CHECK`/`ERROR`: log ดิบทั้งไฟล์ `Get-Content $script:Ev\stage-A2.log -Raw` (ห้ามแก้ข้อความ ห้ามลบบรรทัด)
 
 log ดิบทั้งหมดอยู่ใน `$env:USERPROFILE\wjss-evidence\<วันที่>\` — **ห้าม `git add` / ห้าม commit**
 
 ### ข้อ 0.6 — กติกาเวลาเจอ error
 
-copy ข้อความ error ทั้งก้อน (บรรทัดแดง) ส่งผม แล้ว**ห้ามแก้ script เอง** และห้ามเปลี่ยนเกณฑ์ `PASS`/ค่าที่ script เทียบ — ผมจะแก้แล้ว commit ใหม่ให้เอง
+copy ข้อความ error ทั้งก้อน (บรรทัดแดง) ส่งผม แล้ว**ห้ามแก้ script เอง** รวมถึงห้ามแก้ไฟล์ `stage-*.ps1` ที่ export ออกมา (มันถูกสร้างใหม่จากตัวขับเสมอ และถ้าคุณแก้มัน `Test-WjssDriver` จะฟ้องว่าไม่ตรงกับตัวขับ) — ผมจะแก้ที่ตัวขับแล้ว commit ใหม่ให้เอง
 
 **สถานะ scale ของ Pump pressure (แก้ที่ Product แล้ว):** ตัวแปลงตอนนี้คือ `bar = raw / 32767 × 40` (ช่อง AI‑003 ถูก config เป็น 4‑20 mA ⇒ `raw 0 = 4 mA` อยู่แล้ว) — ตัวอย่างจริงที่หน้างาน: `raw 580 = 4.283 mA = 0.708 bar` (ปั๊มหยุด, ปกติ), `raw 13631 = 10.656 mA = 16.6399 bar` (ปั๊มรัน) หลักฐานทั้งชุดอยู่ใน `docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md`
 
@@ -114,353 +125,37 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 
 - Stage **A, B, E = อ่านอย่างเดียว** ห้ามสั่งปั๊ม/วาล์วจาก Panel ระหว่างอ่าน ยกเว้นบรรทัดที่เขียนว่า "pump RUN"
 - **C และ D** เป็นการสั่งงานจริง (actuation) — ห้ามรันถ้า **B ยังไม่ผ่าน** และ (สำหรับ D) ยังไม่ได้ตัดสินใจข้อ `docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` §6/§7
-- consent phrase พิมพ์จากค่าคงที่ใน `packages/contracts/ProcessIoContracts.cs` (`ProcessIoConsentPhrases.*`) เท่านั้น — ห้ามจดไว้ที่อื่น ห้ามถ่ายรูป และ script จะ `Remove-Item Env:` ท้ายทุกบล็อค
+- consent phrase พิมพ์จากค่าคงที่ใน `packages/contracts/ProcessIoContracts.cs` (`ProcessIoConsentPhrases.*`) เท่านั้น — ห้ามจดไว้ที่อื่น ห้ามถ่ายรูป และตัวขับจะลบตัวแปร env ของ consent ท้ายทุก stage เสมอ (`SetEnvironmentVariable(name, $null)` ในบล็อก `finally` — ลบแม้ stage จะ throw)
 - IP ของ T8 ใช้ในหน่วยความจำของหน้าต่างนี้เท่านั้น — ไม่ถูกเขียนลงไฟล์ไหนใน repo และถูก scrub ออกจากก้อนที่ส่งผม
 - ถ้าเกิดอะไรผิดปกติระหว่าง C/D: สั่งที่ Panel ตามลำดับ **Run (DO‑007) = FALSE ก่อน แล้ว Enable (DO‑003) = FALSE** (ห้ามกลับลำดับ) แล้วหยุดส่ง log
 
-## 2. บล็อกร่วม — วางครั้งเดียวต่อบัญชี PowerShell
+## 2. ตัวขับงานหน้างาน (`tools/hardware-runbook/wjss-field-driver.ps1`) — what is in it, so nothing here is a black box
 
-```powershell
-$ErrorActionPreference = 'Stop'
+ไฟล์เดียวรับผิดชอบทุกสิ่งที่เคยอยู่ในบล็อก §2 รุ่นเก่า และใน stage fence ทั้ง 8 บล็อก — **โค้ดมีที่มาที่เดียวคือ `.ps1` นี้**
+ส่วน markdown นี้มีไว้สำหรับคำอธิบาย/เงื่อนไข/เกณฑ์เท่านั้น (ถ้าสองส่วนนี้ไม่ตรงกัน ถือว่า .ps1 ถูกและผมจะแก้ doc)
 
-function Read-WjssLine {
-    # asks once, retries up to three times, never invents a value
-    param([string]$Prompt, [string]$Kind = 'text')
-    for ($i = 0; $i -lt 3; $i++) {
-        $v = (Read-Host $Prompt).Trim()
-        $v = $v.Trim([char]34).Trim([char]39)
-        if ($v.Length -eq 0) { Write-Host '  empty answer - type the value' -ForegroundColor Yellow; continue }
-        if ($Kind -eq 'repo') {
-            if (-not (Test-Path -LiteralPath (Join-Path $v 'WaterJetSentinelSuite.sln'))) {
-                Write-Host '  no WaterJetSentinelSuite.sln in that folder - type the repo root' -ForegroundColor Yellow; continue
-            }
-            return (Resolve-Path -LiteralPath $v).Path
-        }
-        if ($Kind -eq 'ip') {
-            if ($v -notmatch '^[0-9]{1,3}(\.[0-9]{1,3}){3}$') {
-                Write-Host '  not an IPv4 address - four dotted numbers, the value on the T8 label' -ForegroundColor Yellow; continue
-            }
-            return $v
-        }
-        return $v
-    }
-    throw 'STOP: no valid answer after 3 tries. Re-paste this block.'
-}
+| function | หน้าที่ |
+|---|---|
+| `Set-WjssDevice` | ถาม repo path / IP / port / unit / catalogue ตอนโหลด (ถามซ้ำจนกว่าจะตอบครบ 3 ครั้งแล้ว throw) — catalogue ต้องอยู่นอก repo |
+| `Test-WjssBuild` | เทียบเวลา: ถ้ามี `.cs` ใต้ `apps` หรือ `packages` ที่ใหม่กว่า exe จะ throw ให้ build ก่อน — แล้วคืนบรรทัด `HEAD + driver version + exe sha256(12 อักขระ) + เวลาที่ build` (sha นี้ใช้เทียบข้ามรอบได้ แต่ไม่ pinsายเป็นค่าคงที่ เพราะ build บนเครื่องคุณคนละเครื่องกับผม) |
+| `Read-WjssConsent` | อ่าน consent แบบซ่อนตัวอักษร แปลงเป็น `SecureString` เก็บในหน่วยความจำเท่านั้น (ไม่มี path ให้แก้) |
+| `Clear-WjssEnv` | ลบ `WJSS_*` ท้ายทุกบlock (ค่า test ซ้อนกันไม่ได้) |
+| `Get-WjssKeyValuePairs` | parse log `key=value` (first-key-wins, `=` ในค่าใช้ได้, ทิ้งบรรทัดไม่มี `=`) |
+| `Resolve-WjssVerdict` | เทียบ exit code + ทุก key ที่ต้องตาม; ค่าขึ้นต้น `~` = "ต้องลงท้ายด้วย" (ใช้กับบรรทัด `strict_comparison` ที่มีตัวเลข bar ปนอยู่) |
+| `Save-WjssSend` | scrub dotted-quad → `<IP>` **ก่อน**เขียนไฟล์ แล้ว print ใต้เส้นประ cyan |
+| `Invoke-WjssStage` | `Start-Process -Wait -PassThru` + redirect stdout/err เป็นไฟล์ (ไม่ pipe ผ่าน PowerShell ⇒ ไม่มี NativeCommandError), export env, `Clear-WjssEnv` + `Read-WjssConsent` อัตโนมัติ, ปิด env ใน `finally`, auto-attach 40 บรรทัดท้ายเมื่อ CHECK |
+| `Read-WjssField` / `Confirm-WjssState` | อ่าน key เดี่ยวจาก log / ยืนยันสถานะปั๊มโดย Owner พิมพ์เอง (fail-closed) |
+| `Read-WjssBits` / `Format-WjssBits` | FC02 (discrete inputs) / FC01 (coils) แบบ raw TCP — เจอ exception จาก device (code 1..4) แล้วรายงานเป็น error ไม่ใช่เอา payload มาเป็นค่าบิต |
+| `New-WjssBitReadRequest` / `Resolve-WjssBitReadReply` | ประกอบ frame 12-byte และถอด reply แบบ pure function (ไม่แตะ socket) — `Test-WjssDriver` เทียบ byte ต่อ byte รวมทั้ง case exception/truncated/wrong-function |
+| `Show-WjssStage` | พิมพ์โค้ดจริงของ stage (มี `-Copy` ที่ clipboard ใส่ `.` แทน `&` เพื่อให้วางรันตรง ๆ ได้) |
+| `Export-WjssStageFiles` | เขียน stage `scriptล็อก` ออกเป็นไฟล์ `.ps1` 8 ไฟล์ + บรรทัด guard ที่บอกให้คุณกลับมา dot-source ถ้าเผลอรันก่อนโหลด |
+| `Test-WjssDriver` | self-test ที่รันบน PowerShell เครื่องคุณ (ดูข้อ 0.3) |
 
-$script:Repo = Read-WjssLine -Kind 'repo' -Prompt 'Repo path (folder that contains WaterJetSentinelSuite.sln)'
-$script:Ip   = Read-WjssLine -Kind 'ip'   -Prompt 'T8 Modbus TCP IP (this window only - never written to any file)'
-$script:Exe  = Join-Path $script:Repo 'apps\runtime\bin\Release\net10.0\Wjss.Runtime.exe'
-$script:Cat  = Join-Path $script:Repo 'docs\evidence\process-io-inventory-2026-10-22.csv'
-$script:Ev   = Join-Path $env:USERPROFILE ('wjss-evidence\' + (Get-Date -Format 'yyyy-MM-dd'))
-$script:Port    = 502      # same default as ProcessIoTransportShape.Port in the Product
-$script:UnitId  = 1        # same default as ProcessIoTransportShape.UnitId
-New-Item -ItemType Directory -Force -Path $script:Ev | Out-Null
-$script:Head = [string](& git -C $script:Repo rev-parse HEAD)
-if ($script:Head.Length -lt 40) { throw 'STOP: git did not return a HEAD sha in that folder.' }
-$script:Head = $script:Head.Trim()
-$script:Consent = @{}
-
-function Test-WjssBuild {
-    # refuses to test a stale binary: this is what protects the corrected scaling from being judged on an old exe
-    if (-not (Test-Path -LiteralPath $script:Exe)) {
-        throw 'STOP: Wjss.Runtime.exe not found. Run: dotnet build WaterJetSentinelSuite.sln -c Release'
-    }
-    $exe = Get-Item -LiteralPath $script:Exe
-    $newest = $null
-    $roots = @((Join-Path $script:Repo 'apps'), (Join-Path $script:Repo 'packages'))
-    foreach ($r in $roots) {
-        $files = @(Get-ChildItem -Path $r -Recurse -File -Filter '*.cs' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' })
-        foreach ($f in $files) {
-            if ($null -eq $newest) { $newest = $f }
-            elseif ($f.LastWriteTime -gt $newest.LastWriteTime) { $newest = $f }
-        }
-    }
-    if ($null -ne $newest -and $newest.LastWriteTime -gt $exe.LastWriteTime) {
-        throw ('STOP: ' + $newest.Name + ' is newer than the exe. Rebuild Release, then run this stage again (or add -SkipBuildCheck to this stage only if you know why).')
-    }
-    $hash = 'unavailable'
-    try { $hash = (Get-FileHash -LiteralPath $script:Exe -Algorithm SHA256).Hash.Substring(0, 12) } catch { }
-    return ('HEAD ' + $script:Head.Substring(0, 8) + ' | exe sha256 ' + $hash + ' | built ' + $exe.LastWriteTime.ToString('yyyy-MM-dd HH:mm:ss'))
-}
-
-function Read-WjssConsent {
-    param([string]$Const)
-    if (-not $script:Consent.ContainsKey($Const)) {
-        Write-Host ('  read the value of ProcessIoConsentPhrases.' + $Const + ' from packages\contracts\ProcessIoContracts.cs, then paste it below (hidden)') -ForegroundColor DarkGray
-        $sec = Read-Host '  consent phrase' -AsSecureString
-        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-        try { $script:Consent[$Const] = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
-        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-    }
-    return $script:Consent[$Const]
-}
-
-function Write-WjssClearEnv {
-    $names = @([Environment]::GetEnvironmentVariables().Keys)
-    foreach ($n in $names) {
-        if ($n -like 'WJSS_*') { [Environment]::SetEnvironmentVariable($n, $null) }
-    }
-}
-
-function Save-WjssSend {
-    param([string]$Name, $Lines)
-    $txt = @()
-    $txt += 'STAGE ' + $Name + ' | HEAD=' + $script:Head.Substring(0, 8) + ' | ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-    foreach ($l in @($Lines)) { $txt += [string]$l }
-    $scrubbed = @()
-    foreach ($l in $txt) { $scrubbed += ($l -replace '\b[0-9]{1,3}(\.[0-9]{1,3}){3}\b', '<IP>') }
-    $p = Join-Path $script:Ev ('stage-' + $Name + '.send.txt')
-    Set-Content -LiteralPath $p -Value ($scrubbed -join [Environment]::NewLine) -Encoding utf8
-    Write-Host '--- copy everything below to the assistant (IP already scrubbed) ---' -ForegroundColor Cyan
-    foreach ($l in $scrubbed) { Write-Host $l }
-    Write-Host ('--- saved: ' + $p + ' ---') -ForegroundColor DarkGray
-}
-
-function Invoke-WjssStage {
-    param(
-        [string]$Name,
-        [hashtable]$Vars = @{},
-        [string]$ConsentConst = '',
-        $Expect = $null,
-        $Show = @(),
-        [int]$ExpectExit = 0,
-        [switch]$SkipBuildCheck
-    )
-    Write-WjssClearEnv
-    if ($SkipBuildCheck) { Write-Host '  build check SKIPPED by request' -ForegroundColor Yellow }
-    else { Write-Host ('  build: ' + (Test-WjssBuild)) -ForegroundColor DarkGray }
-
-    $outFile = Join-Path $script:Ev ('stage-' + $Name + '.out.txt')
-    $errFile = Join-Path $script:Ev ('stage-' + $Name + '.err.txt')
-    if (-not (Test-Path -LiteralPath $script:Exe)) { throw ('STOP: exe not found: ' + $script:Exe) }
-
-    [Environment]::SetEnvironmentVariable('WJSS_DEVICE_PROFILE', 'TEST_HARDWARE')
-    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_HOST', $script:Ip)
-    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CATALOGUE', $script:Cat)
-    # the poller and the Product must address the same endpoint, so the stage inherits both values
-    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_PORT', [string]$script:Port)
-    [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_UNIT_ID', [string]$script:UnitId)
-    foreach ($k in @($Vars.Keys)) { [Environment]::SetEnvironmentVariable($k, [string]$Vars[$k]) }
-    if ($ConsentConst.Length -gt 0) {
-        [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CONSENT', (Read-WjssConsent -Const $ConsentConst))
-    }
-
-    $code = $null
-    try {
-        $proc = Start-Process -FilePath $script:Exe -WorkingDirectory $script:Repo -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outFile -RedirectStandardError $errFile
-        if ($null -ne $proc) {
-            if (-not $proc.HasExited) { $proc.WaitForExit() }
-            try { $code = [int]$proc.ExitCode } catch { $code = $null }
-            try { $proc.Dispose() } catch { }
-        }
-    }
-    finally {
-        [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CONSENT', $null)
-    }
-
-    $map = @{}
-    if (Test-Path -LiteralPath $outFile) {
-        foreach ($line in @(Get-Content -LiteralPath $outFile)) {
-            $t = [string]$line
-            $i = $t.IndexOf('=')
-            if ($i -gt 0) {
-                $k = $t.Substring(0, $i).Trim()
-                if ($k.Length -gt 0 -and -not $map.ContainsKey($k)) { $map[$k] = $t.Substring($i + 1).Trim() }
-            }
-        }
-    }
-    $errLines = @()
-    if (Test-Path -LiteralPath $errFile) { $errLines = @(Get-Content -LiteralPath $errFile | Where-Object { $_.Length -gt 0 }) }
-
-    $fail = @()
-    if ($null -eq $code) { $fail += 'exit code could not be read from the process object' }
-    elseif ($code -ne $ExpectExit) { $fail += ('exit=' + [string]$code + ' but this stage expects ' + [string]$ExpectExit) }
-    if ($null -ne $Expect) {
-        foreach ($k in @($Expect.Keys)) {
-            $exp = [string]$Expect[$k]
-            if (-not $map.ContainsKey($k)) { $fail += ('key ' + $k + ' was not printed by the trial (expected ' + $exp + ')'); continue }
-            $got = [string]$map[$k]
-            if ($exp.Length -gt 1 -and $exp.Substring(0, 1) -eq '~') {
-                if (-not $got.EndsWith($exp.Substring(1))) { $fail += ($k + '=' + $got + ' does not end with ' + $exp.Substring(1)) }
-            }
-            elseif ($got -ne $exp) { $fail += ($k + '=' + $got + ' but expected ' + $exp) }
-        }
-    }
-
-    $rep = @()
-    $rep += '  exit=' + [string]$code
-    foreach ($k in @($Show)) {
-        if ($map.ContainsKey($k)) { $rep += ('  ' + $k + '=' + [string]$map[$k]) }
-        else { $rep += ('  ' + $k + '=<not printed>') }
-    }
-    if ($errLines.Count -gt 0) {
-        $rep += ('  stderr_lines=' + [string]$errLines.Count)
-        $take = 5
-        if ($errLines.Count -lt $take) { $take = $errLines.Count }
-        for ($j = 0; $j -lt $take; $j++) { $rep += ('  stderr| ' + [string]$errLines[$j]) }
-    }
-    if ($fail.Count -gt 0) {
-        $rep += '  --- last 40 output lines (auto-included because this stage did not match) ---'
-        $all = @(Get-Content -LiteralPath $outFile)
-        $from = $all.Count - 40
-        if ($from -lt 0) { $from = 0 }
-        for ($j = $from; $j -lt $all.Count; $j++) { $rep += ('  | ' + [string]$all[$j]) }
-    }
-    $rep += '  raw stdout: ' + $outFile
-
-    if ($fail.Count -eq 0) {
-        Write-Host ('RESULT ' + $Name + ': PASS (exit=' + [string]$code + ')') -ForegroundColor Green
-        Save-WjssSend -Name $Name -Lines $rep
-    }
-    else {
-        Write-Host ('RESULT ' + $Name + ': CHECK') -ForegroundColor Red
-        foreach ($m in $fail) { Write-Host ('   MISMATCH ' + $m) -ForegroundColor Red }
-        $withFails = @()
-        foreach ($m in $fail) { $withFails += ('  MISMATCH ' + $m) }
-        Save-WjssSend -Name $Name -Lines ($withFails + $rep)
-    }
-}
-
-function Read-WjssExact {
-    param($Stream, [byte[]]$Buffer, [int]$Offset, [int]$Count)
-    $got = 0
-    while ($got -lt $Count) {
-        $n = $Stream.Read($Buffer, ($Offset + $got), ($Count - $got))
-        if ($n -le 0) { throw 'the device closed the connection mid-response' }
-        $got = $got + $n
-    }
-}
-
-function Read-WjssBits {
-    # READ ONLY Modbus TCP poller: FC02 discrete inputs, FC01 coils. Nothing here can write to the device.
-    param([string]$Area = 'DI', [int]$Start = 0, [int]$Count = 16)
-    $fc = 2
-    if ($Area -eq 'COIL') { $fc = 1 }
-    $client = $null
-    try {
-        $client = New-Object System.Net.Sockets.TcpClient
-        $client.ReceiveTimeout = 4000
-        $client.SendTimeout = 4000
-        $task = $client.ConnectAsync($script:Ip, $script:Port)
-        if (-not $task.Wait(4000)) { return @{ ok = $false; error = 'connect timed out after 4000 ms'; bits = @() } }
-        $stream = $client.GetStream()
-
-        $req = New-Object byte[] 12
-        $req[0] = 0; $req[1] = 1; $req[2] = 0; $req[3] = 1; $req[4] = 0; $req[5] = 6
-        $req[6] = [byte]$script:UnitId
-        $req[7] = [byte]$fc
-        $req[8] = [byte](($Start -shr 8) -band 255); $req[9] = [byte]($Start -band 255)
-        $req[10] = [byte](($Count -shr 8) -band 255); $req[11] = [byte]($Count -band 255)
-        $stream.Write($req, 0, 12)
-        $stream.Flush()
-
-        $hdr = New-Object byte[] 9
-        Read-WjssExact -Stream $stream -Buffer $hdr -Offset 0 -Count 9 | Out-Null
-        if ([int]$hdr[7] -ne $fc) {
-            $ex = New-Object byte[] 1
-            Read-WjssExact -Stream $stream -Buffer $ex -Offset 0 -Count 1 | Out-Null
-            return @{ ok = $false; error = ('device returned Modbus exception ' + [string]([int]$ex[0]) + ' for FC' + [string]$fc + ' (that area may not be exposed on this device)'); bits = @() }
-        }
-        $byteCount = [int]$hdr[8]
-        $data = New-Object byte[] $byteCount
-        if ($byteCount -gt 0) { Read-WjssExact -Stream $stream -Buffer $data -Offset 0 -Count $byteCount | Out-Null }
-        $bits = @()
-        for ($i = 0; $i -lt $Count; $i++) {
-            $b = [int]$data[($i -shr 3)]
-            $bits += (($b -shr ($i -band 7)) -band 1)
-        }
-        return @{ ok = $true; fc = $fc; start = $Start; bits = $bits }
-    }
-    catch {
-        return @{ ok = $false; error = $_.Exception.Message; bits = @() }
-    }
-    finally {
-        if ($null -ne $client) { $client.Close() }
-    }
-}
-
-function Format-WjssBits {
-    param([string]$Prefix = 'DI', [int]$Base = 1, $Result)
-    if ($null -eq $Result.ok -or -not $Result.ok) {
-        return ('  ' + $Prefix + ': READ FAILED - ' + [string]$Result.error)
-    }
-    $parts = @()
-    for ($i = 0; $i -lt $Result.bits.Count; $i++) {
-        $parts += ($Prefix + ('-{0:D3}=' -f ($Base + $i)) + [string]$Result.bits[$i])
-    }
-    return ('  ' + ($parts -join ' '))
-}
-
-function Read-WjssField {
-    # one Owner-only value; empty is never accepted and nothing is guessed for you
-    param([string]$Label, [string]$Pattern = '', [switch]$Number)
-    while ($true) {
-        $v = (Read-Host ('  ' + $Label)).Trim()
-        if ($v.Length -eq 0) { Write-Host '  empty is not allowed (the trial refuses with exit=4 rather than defaulting)' -ForegroundColor Yellow; continue }
-        if ($Number) {
-            if ($v -match '^-?[0-9]{1,3}(\.[0-9]{1,3})?$') { return $v }
-            Write-Host '  must be a plain number with a DOT decimal (a comma is rejected by the invariant-culture parser)' -ForegroundColor Yellow; continue
-        }
-        if ($Pattern.Length -gt 0 -and $v -notmatch $Pattern) {
-            Write-Host ('  must match: ' + $Pattern) -ForegroundColor Yellow; continue
-        }
-        return $v
-    }
-}
-
-function Confirm-WjssState {
-    # stops a stage BEFORE anything is set if the physical pre-state is not confirmed
-    param([string]$Token, [string]$Prompt)
-    $a = Read-Host ($Prompt + ' | type ' + $Token + ' to continue')
-    if ($a -ne $Token) { throw ('STOP: pre-state not confirmed (typed "' + $a + '"), nothing was run.') }
-}
-
-function Export-WjssStageFiles {
-    # rebuilds every labelled stage fence from the runbook; the .ps1 files are never edited by hand
-    param([switch]$KeepExisting)
-    $md = Join-Path $script:Repo 'docs\PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md'
-    if (-not (Test-Path -LiteralPath $md)) { throw 'STOP: this runbook file is not in the repo path you gave.' }
-    $raw = Get-Content -LiteralPath $md -Raw
-    $fence = [string]([char]0x60 * 3)
-    $pat = '(?s)' + $fence + 'powershell stage:([A-Za-z0-9\-]+)\r?\n(.*?)' + $fence
-    $ms = [regex]::Matches($raw, $pat)
-    if ($ms.Count -ne 8) {
-        throw ('STOP: expected 8 labelled stage blocks, found ' + [string]$ms.Count + '. git pull this branch, then paste this block again.')
-    }
-    foreach ($m in $ms) {
-        $n = [string]$m.Groups[1].Value
-        $b = [string]$m.Groups[2].Value
-        $f = Join-Path $script:Ev ('stage-' + $n + '.ps1')
-        if ($KeepExisting -and (Test-Path -LiteralPath $f)) {
-            Write-Host ('  kept: stage-' + $n + '.ps1') -ForegroundColor DarkGray; continue
-        }
-        $head = '# generated from runbook HEAD ' + $script:Head.Substring(0, 8) + ' - do not edit this file; edit the runbook and re-run Export-WjssStageFiles'
-        $need = 'if (-not (Test-Path function:\Invoke-WjssStage)) { throw "paste the shared block (section 2) of the runbook into THIS window first" }'
-        Set-Content -LiteralPath $f -Value ($head + [Environment]::NewLine + $need + [Environment]::NewLine + $b) -Encoding utf8
-        Write-Host ('  stage-{0,-8}  run with:  & "$script:Ev\stage-{0}.ps1"' -f $n)
-    }
-    Write-Host ('  files: ' + $script:Ev) -ForegroundColor DarkGray
-}
-```
-
-หลังวางบล็อคร่วมเสร็จ ให้วางตามนี้ทีละบล็อค (บล็อคที่ 2 และ 3 คือสิ่งที่คุณใช้ทั้งวัน):
-
-```powershell
-Test-WjssBuild
-```
-พิมพ์ HEAD / sha256 ของ exe / เวลา build — เก็บบรรทัดนี้ไว้ให้ผมเทียบว่ารันบน build ไหน
-
-```powershell
-Export-WjssStageFiles
-```
-แตกบล็อค stage ทั้ง 8 ของเอกสารนี้ออกเป็นไฟล์ `.ps1` ในโฟลเดอร์หลักฐาน (เขียนทับไฟล์เดิมทุกครั้งเพื่อให้ตรงกับ runbook; ใช้ `Export-WjssStageFiles -KeepExisting` ถ้าไม่อยากให้ทับ) แล้วพิมพ์รายการคำสั่งให้คัดลอก
-
-```powershell
-& "$script:Ev\stage-A1-off.ps1"        # one line per stage - whichever stage is next
-& "$script:Ev\stage-A2-run.ps1"        # do not run these two back to back: the pump state must change between them
-```
-
-> วิธีดูว่า stage ไหนชื่ออะไร: `Get-ChildItem $script:Ev -Filter 'stage-*.ps1' | Select-Object -ExpandProperty Name`
+กติกาที่ฝังในตัวขับ (ห้ามแก้เพื่อให้ผ่าน):
+- `Invoke-WjssStage` เรียก `[string](Get-Content -LiteralPath $logFile -Raw)` = **0 หรือ 1 ไฟล์เท่านั้น** — ถ้า log หายคือ ERROR ไม่ใช่ CHECK
+- `-ExpectExit` ตัดสินก่อน ถ้าไม่ตรงก็ยัง parse log ต่อ (ต้องรู้ *ว่า* trial ปฏิเสธด้วย reason อะไร) — เหมือนเดิม
+- consent ถูก `SetEnvironmentVariable(name, $null)` ท้ายทุก stage และถ้า `Confirm-WjssState` ยังไม่ตอบตรง ตัวขับจะไม่เรียก exe เลย
+- ตัวขับไม่ print consent, ไม่ print IP, ไม่เขียน IP ลงไฟล์ repo — ก้อนที่ส่งผม scrub แล้วเสมอ
 
 ## 3. Stage A — Trial A: อ่าน Pump-ready บนสัญญาณจริง (อ่านอย่างเดียว)
 
@@ -468,53 +163,31 @@ Export-WjssStageFiles
 
 **A1 — ปั๊มหยุด** (คาดว่า **exit 2** = typed refusal เพราะ 0.7 bar ≤ 15 bar →นี่คือ PASS)
 
-```powershell stage:A1-off
-Confirm-WjssState -Token 'STOPPED' -Prompt 'A1: the pump must be STOPPED at the Panel (read-only trial)'
-Invoke-WjssStage -Name 'A1-off' -ConsentConst 'PhysicalDiAiRead' -ExpectExit 2 -Vars @{
-  'WJSS_PUMP_READY_READ_TRIAL'   = 'AI-003_ONLY'
-  'WJSS_PUMP_READY_SETPOINT_BAR' = '15'
-  'WJSS_PUMP_READY_FRESHNESS_MS' = '2000'
-} -Expect ([ordered]@{
-  'trial_code'                = 'PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT'
-  'source_tag'                = 'AI-003+'
-  'evidence_kind'             = 'PHYSICAL'
-  'provenance'                = 'PHYSICAL_READ'
-  'quality'                   = 'GOOD'
-  'fresh'                     = 'TRUE'
-  'physical_ai003_verified'   = 'TRUE'
-  'pump_ready'                = 'FALSE'
-  'strict_comparison'         = '~=> FALSE'
-  'session_state'             = 'CLOSED'
-  'transport_released'        = 'TRUE'
-  'ai002_used_for_decision'   = 'FALSE'
-  'iv_command_executed'       = 'FALSE'
-  'motion_executed'           = 'FALSE'
-  'write_authorization_created' = 'FALSE'
-}) -Show @('raw_value','engineering_bar','configured_setpoint_bar','session_generation')
+```powershell
+& "$script:Ev\stage-A1-off.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-A1-off.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'A1-off'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- ต้องยืนยันกับ Owner ก่อน: พิมพ์ `STOPPED` ตามที่ prompt ทวงถาม ( prompt: A1: the pump must be STOPPED at the Panel (read-only trial) ) — ถ้าไม่ตอบตรงตัวบล็อกจะ**ไม่เรียก exe เลย**
+- consent ที่บล็อกขอ: `PhysicalDiAiRead` (อ่านแบบซ่อน, ลบทิ้งหลังจบบล็อก)
+- exit code ที่ยอมรับ: `2` เท่านั้น
+- env ที่บล็อกตั้ง: `WJSS_PUMP_READY_READ_TRIAL=AI-003_ONLY`, `WJSS_PUMP_READY_SETPOINT_BAR=15`, `WJSS_PUMP_READY_FRESHNESS_MS=2000`
+- key ที่**ต้องตรง**ตามนี้ (17 คู่): `trial_code=PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT`, `source_tag=AI-003+`, `evidence_kind=PHYSICAL`, `provenance=PHYSICAL_READ`, `quality=GOOD`, `fresh=TRUE`, `physical_ai003_verified=TRUE`, `pump_ready=FALSE`, `physical_pump_verified=FALSE`, `strict_comparison` ลงท้ายด้วย `=> FALSE`, `session_state=CLOSED`, `transport_released=TRUE`, `ai002_used_for_decision=FALSE`, `iv_command_executed=FALSE`, `motion_executed=FALSE`, `waterjet_command_executed=FALSE`, `write_authorization_created=FALSE`
+- key ที่แนบมาให้ผมดูด้วย (ไม่ใช้ตัดสิน pass/fail): `raw_value`, `engineering_bar`, `engineering_unit`, `configured_setpoint_bar`, `session_generation`, `observation_diagnostic`
 
 **A2 — ปั๊ม RUN จาก Panel (Owner เท่านั้น):** รอแรงดันนิ่งก่อน แล้วรันซ้ำ — คาด **exit 0** + `pump_ready=TRUE`
 
-```powershell stage:A2-run
-Confirm-WjssState -Token 'RUN' -Prompt 'A2: the pump must be RUNNING at the Panel and the pressure must look settled'
-Invoke-WjssStage -Name 'A2-run' -ConsentConst 'PhysicalDiAiRead' -ExpectExit 0 -Vars @{
-  'WJSS_PUMP_READY_READ_TRIAL'   = 'AI-003_ONLY'
-  'WJSS_PUMP_READY_SETPOINT_BAR' = '15'
-  'WJSS_PUMP_READY_FRESHNESS_MS' = '2000'
-} -Expect ([ordered]@{
-  'trial_code'              = 'PUMP_READY_ACCEPTED_PHYSICAL'
-  'evidence_kind'           = 'PHYSICAL'
-  'physical_ai003_verified' = 'TRUE'
-  'pump_ready'              = 'TRUE'
-  'physical_pump_verified'  = 'TRUE'
-  'strict_comparison'       = '~=> TRUE'
-  'session_state'           = 'CLOSED'
-  'transport_released'      = 'TRUE'
-  'iv_command_executed'     = 'FALSE'
-  'motion_executed'         = 'FALSE'
-  'write_authorization_created' = 'FALSE'
-}) -Show @('raw_value','engineering_bar','configured_setpoint_bar','quality','fresh')
+```powershell
+& "$script:Ev\stage-A2-run.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-A2-run.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'A2-run'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- ต้องยืนยันกับ Owner ก่อน: พิมพ์ `RUN` ตามที่ prompt ทวงถาม ( prompt: A2: the pump must be RUNNING at the Panel and the pressure must look settled ) — ถ้าไม่ตอบตรงตัวบล็อกจะ**ไม่เรียก exe เลย**
+- consent ที่บล็อกขอ: `PhysicalDiAiRead` (อ่านแบบซ่อน, ลบทิ้งหลังจบบล็อก)
+- exit code ที่ยอมรับ: `0` เท่านั้น
+- env ที่บล็อกตั้ง: `WJSS_PUMP_READY_READ_TRIAL=AI-003_ONLY`, `WJSS_PUMP_READY_SETPOINT_BAR=15`, `WJSS_PUMP_READY_FRESHNESS_MS=2000`
+- key ที่**ต้องตรง**ตามนี้ (14 คู่): `trial_code=PUMP_READY_ACCEPTED_PHYSICAL`, `evidence_kind=PHYSICAL`, `provenance=PHYSICAL_READ`, `quality=GOOD`, `fresh=TRUE`, `physical_ai003_verified=TRUE`, `pump_ready=TRUE`, `physical_pump_verified=TRUE`, `strict_comparison` ลงท้ายด้วย `=> TRUE`, `session_state=CLOSED`, `transport_released=TRUE`, `iv_command_executed=FALSE`, `motion_executed=FALSE`, `write_authorization_created=FALSE`
+- key ที่แนบมาให้ผมดูด้วย (ไม่ใช้ตัดสิน pass/fail): `raw_value`, `engineering_bar`, `engineering_unit`, `configured_setpoint_bar`, `quality`, `fresh`, `session_generation`
 
 - **A2 ได้ exit 2 + `engineering_bar` ≤ 15** → ปกติ (ปั๊มยังไม่ขึ้นแรงดัน) รอแล้วรันซ้ำได้
 - **A2 ได้ exit 2 แต่ `engineering_bar` > 15** → นี่แหละผิดปกติจริง หยุดและส่ง log ให้ผม
@@ -524,21 +197,25 @@ Invoke-WjssStage -Name 'A2-run' -ConsentConst 'PhysicalDiAiRead' -ExpectExit 0 -
 ## 4. Stage B — ขั้วสัญญาณ (polarity) DI‑004 / DI‑005 (อ่านอย่างเดียว)
 
 ปิด gate: `WJSS_PUMP_RUNNING_POLARITY` / `WJSS_PUMP_FAULT_POLARITY` (ถ้ายังไม่commission ⇒ Stage D จะถูก refuse — นั่นคือ fail-closed ทำงาน)
-ไม่มี tool ใดใน Product ที่พิมพ์สถานะ DI แบบต่อบิต — ใช้ poller ใน §2 (อ่านอย่างเดียว, เขียนไม่ได้)
+ไม่มี tool ใดใน Product ที่พิมพ์สถานะ DI แบบต่อบิต — ใช้ `Read-WjssBits` ในตัวขับ (FC02/FC01 อ่านอย่างเดียว ไม่มี path สำหรับเขียน)
 
-```powershell stage:B-off
-$t = @()
-$t += Format-WjssBits -Prefix 'DI' -Base 1 -Result (Read-WjssBits -Area 'DI' -Start 0 -Count 8)   # DI-001..DI-008
-Save-WjssSend -Name 'B-off' -Lines $t
+```powershell
+& "$script:Ev\stage-B-off.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-B-off.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'B-off'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- อ่านบิต: FC02 (read discrete inputs) ที่ start=0 count=8 ⇒ address 0..7
+- ผลอ่านแต่ละช่วง print ผ่าน `Save-WjssSend` (scrub แล้ว) — ถ้า device ไม่รองรับ function code นั้น บรรทัดนั้นจะขึ้น `READ FAILED - protocol exception N` (N คือ code ที่ device ตอบ แบบทศนิยม) ซึ่งผมใช้ตัดสิน gate ได้ **ห้ามแก้ไฟล์ที่ export มาแล้ว**
 
 สั่ง **ปั๊ม RUN** จาก Panel รอให้นิ่ง แล้วรันบล็อคเดิมซ้ำ (เปลี่ยนชื่อเป็น `B-on`):
 
-```powershell stage:B-on
-$t = @()
-$t += Format-WjssBits -Prefix 'DI' -Base 1 -Result (Read-WjssBits -Area 'DI' -Start 0 -Count 8)
-Save-WjssSend -Name 'B-on' -Lines $t
+```powershell
+& "$script:Ev\stage-B-on.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-B-on.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'B-on'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- อ่านบิต: FC02 (read discrete inputs) ที่ start=0 count=8 ⇒ address 0..7
+- ผลอ่านแต่ละช่วง print ผ่าน `Save-WjssSend` (scrub แล้ว) — ถ้า device ไม่รองรับ function code นั้น บรรทัดนั้นจะขึ้น `READ FAILED - protocol exception N` (N คือ code ที่ device ตอบ แบบทศนิยม) ซึ่งผมใช้ตัดสิน gate ได้ **ห้ามแก้ไฟล์ที่ export มาแล้ว**
 
 ตัดสินจากสองก้อนที่ส่งผม (คุณไม่ต้องแปลเอง ผมแปลให้): **DI‑004** ต้องเปลี่ยนระดับเมื่อ RUN, **DI‑005** ต้องอยู่นิ่งฝั่ง inactive
 ค่าที่จะใช้ใน Stage D = `ACTIVE_HIGH` ถ้าระดับ "ทำงาน" คือ 1, `ACTIVE_LOW` ถ้าคือ 0
@@ -547,16 +224,17 @@ Save-WjssSend -Name 'B-on' -Lines $t
 
 ปิด gate: `physical IV command + FC01 read-back` · ต้องมี B ผ่านแล้ว และ **ปั๊มต้องหยุด** (trial ต้องการ attestation นี้)
 
-```powershell stage:C-iv1
-Confirm-WjssState -Token 'CLEAR' -Prompt 'C: IV1 area clear, pump STOPPED, nobody at the lance'
-Invoke-WjssStage -Name 'C-iv1' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
-  'WJSS_DRY_IV_TRIAL_MODE'               = 'SOFTWARE_SIMULATED_AI003'
-  'WJSS_DRY_IV_TRIAL_VALVE'              = 'IV1'
-  'WJSS_DRY_IV_TRIAL_PUMP_STOPPED'       = 'PUMP_STOPPED_OWNER_ATTESTED'
-  'WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR' = '0.7'
-  'WJSS_VALVE_SUPERVISION_MS'            = '5000'
-} -Show @('trial_code','accepted','evidence_kind','valve','physical_iv_command','open_command','close_command','physical_upper_feedback','physical_lower_feedback','cleanup','operator_abort')
+```powershell
+& "$script:Ev\stage-C-iv1.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-C-iv1.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'C-iv1'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- ต้องยืนยันกับ Owner ก่อน: พิมพ์ `CLEAR` ตามที่ prompt ทวงถาม ( prompt: C: IV1 area clear, pump STOPPED, nobody at the lance ) — ถ้าไม่ตอบตรงตัวบล็อกจะ**ไม่เรียก exe เลย**
+- consent ที่บล็อกขอ: `PhysicalDoSingle` (อ่านแบบซ่อน, ลบทิ้งหลังจบบล็อก)
+- exit code ที่ยอมรับ: `0` เท่านั้น
+- env ที่บล็อกตั้ง: `WJSS_DRY_IV_TRIAL_MODE=SOFTWARE_SIMULATED_AI003`, `WJSS_DRY_IV_TRIAL_VALVE=IV1`, `WJSS_DRY_IV_TRIAL_PUMP_STOPPED=PUMP_STOPPED_OWNER_ATTESTED`, `WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR=0.7`, `WJSS_VALVE_SUPERVISION_MS=5000`
+- key ที่**ต้องตรง**ตามนี้ (15 คู่): `trial_code=IV_TRIAL_ACCEPTED`, `accepted=True`, `evidence_kind=SOFTWARE_SIMULATED`, `trial_purpose=IV_OPEN_CLOSE_HARDWARE_TRIAL_ONLY`, `physical_pump_verified=FALSE`, `physical_ai003_verified=FALSE`, `physical_iv_command=TRUE`, `physical_upper_feedback=TRUE`, `physical_lower_feedback=TRUE`, `open_command` ขึ้นต้นด้วย `IV1`, `close_command` ขึ้นต้นด้วย `IV1`, `cleanup.complete=True`, `cleanup.refused=0`, `cleanup.transport_failures=0`, `cleanup.unknown=0`
+- key ที่แนบมาให้ผมดูด้วย (ไม่ใช้ตัดสิน pass/fail): `valve`, `open_command`, `close_command`, `open_observation`, `closed_observation`, `cleanup`, `cleanup.attempted`, `cleanup.closed`, `cleanup.refused`, `operator_abort`, `PUMP_READY_EVIDENCE`, `PHYSICAL_PUMP_EVIDENCE`, `queue`, `surface`, `motion`
 
 - stage นี้ **light โดยเจตนา** (ค่า terminal ขึ้นกับ feedback จริงหน้างาน) — ตัวเลขทั้งหมดในก้อน send ผมวิเคราะห์เอง
 - ถ้า `exit=4` = startup refused (env/consent ไม่ครบหรือชนกัน) · `exit=2` = refuse หลัง bind เช่น `IV_TRIAL_REFUSED_*_NOT_FIELD_CONFIRMED` / `CONTRADICTORY` → **นี่คือ fail-closed ทำงาน ไม่ใช่บั๊ก** หยุด stage แล้วส่ง log
@@ -566,29 +244,18 @@ Invoke-WjssStage -Name 'C-iv1' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -V
 ปิด gate: วงจร dry ทั้งรอบ (select pump → enable → run → AO ramp → supervision → cleanup → release)
 **เงื่อนไขก่อนรัน:** B ผ่าน (รู้ขั้วสัญญาณแล้ว) + C ผ่าน + เจ้าของตัดสินใจ `docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` §6/§7 แล้ว + Motion ยังไม่มีแรง (no-load)
 
-```powershell stage:D-dry
-Confirm-WjssState -Token 'DRY CYCLE AUTHORIZED' -Prompt 'D: Stage B and C passed, ACCELERATED package section 6/7 decided, motion unloaded'
-$sid    = Read-WjssField -Label 'Canonical Sensor Id exactly as it appears in your catalogue CSV'
-$ma     = Read-WjssField -Label 'Pump AO target in mA (the value you decided in the ACCELERATED package)' -Number
-$runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
-$fltPol = Read-WjssField -Label 'Pump FAULT polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
-Invoke-WjssStage -Name 'D-dry' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
-  'WJSS_DRY_COMMAND_MODE'          = 'TEST_HARDWARE_DRY'
-  'WJSS_CLEANING_SENSOR_ID'        = $sid
-  'WJSS_PUMP_SELECTION'            = '1'
-  'WJSS_PUMP_ANALOG_TARGET_MA'     = $ma
-  'WJSS_PUMP_FRESHNESS_MS'         = '2000'
-  'WJSS_PUMP_RUNNING_POLARITY'     = $runPol
-  'WJSS_PUMP_FAULT_POLARITY'       = $fltPol
-  'WJSS_PUMP_RUNNING_CONFIRM_MS'   = '10000'
-  'WJSS_PUMP_READY_TIMEOUT_MS'     = '30000'
-  'WJSS_PUMP_STOPPED_CONFIRM_MS'   = '15000'
-  'WJSS_PUMP_READY_SETPOINT_BAR'   = '15'
-  'WJSS_PRESSURE_LOW_BAR'          = '1'
-  'WJSS_PRESSURE_HIGH_BAR'         = '15'
-  'WJSS_VALVE_SUPERVISION_MS'      = '5000'
-} -Show @('profile','mode','sensor','isolation_valve','water_jet','pump_selection','pump_owner','pump_gate','pump_feedback','pump_readiness','prepare','start','steps','terminal_status','terminal_code','primary_failure','write_authority','session_state','session_generation')
+```powershell
+& "$script:Ev\stage-D-dry.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-D-dry.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'D-dry'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- ต้องยืนยันกับ Owner ก่อน: พิมพ์ `DRY CYCLE AUTHORIZED` ตามที่ prompt ทวงถาม ( prompt: D: Stage B and C passed, the ACCELERATED package owner decisions are recorded, motion unloaded ) — ถ้าไม่ตอบตรงตัวบล็อกจะ**ไม่เรียก exe เลย**
+- consent ที่บล็อกขอ: `PhysicalDoSingle` (อ่านแบบซ่อน, ลบทิ้งหลังจบบล็อก)
+- exit code ที่ยอมรับ: `0` เท่านั้น
+- env ที่บล็อกตั้ง: `WJSS_DRY_COMMAND_MODE=TEST_HARDWARE_DRY`, `WJSS_PUMP_SELECTION=1`, `WJSS_PUMP_FRESHNESS_MS=2000`, `WJSS_PUMP_RUNNING_CONFIRM_MS=10000`, `WJSS_PUMP_READY_TIMEOUT_MS=30000`, `WJSS_PUMP_STOPPED_CONFIRM_MS=15000`, `WJSS_PUMP_READY_SETPOINT_BAR=15`, `WJSS_PRESSURE_LOW_BAR=1`, `WJSS_PRESSURE_HIGH_BAR=15`, `WJSS_VALVE_SUPERVISION_MS=5000`
+  และตั้งจากคำตอบของคุณบนหน้าจอ: `WJSS_CLEANING_SENSOR_ID`, `WJSS_PUMP_ANALOG_TARGET_MA`, `WJSS_PUMP_RUNNING_POLARITY`, `WJSS_PUMP_FAULT_POLARITY`
+- key ที่**ต้องตรง**ตามนี้ (20 คู่): `profile=TEST_HARDWARE_DRY`, `mode=WJSS_DRY_COMMAND_MODE`, `prepare=DRY_PREPARE_READY`, `terminal_status=CompleteAwaitingSafeReturn`, `terminal_code=PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN`, `primary_failure=NONE`, `cleanup.pump.stopped_confirmed=True`, `cleanup.pump.ownership_released=True`, `cleanup.pump.complete=True`, `cleanup.motion.complete=True`, `cleanup.valves.complete=True`, `cleanup.valves.refused=0`, `cleanup.valves.transport_failures=0`, `cleanup.valves.unknown=0`, `cleanup.complete=True`, `pump_ready_source=AI-003+`, `pump_feedback=COMMISSIONED`, `pump_gate=PUMP_PRECONDITION`, `write_authority=PROCESS_IO_SESSION`, `coordinators=COMPOSITION+EXECUTION`
+- key ที่แนบมาให้ผมดูด้วย (ไม่ใช้ตัดสิน pass/fail): `sensor`, `isolation_valve`, `water_jet`, `axes`, `catalogue_rows`, `endpoint`, `process_io_device`, `pump_selection`, `pump_owner`, `pump_readiness`, `start`, `steps`, `session_state`, `session_generation`, `cleanup.pump.attempted`, `cleanup.pump.terminal`, `cleanup.pump.state`, `cleanup.motion.session`, `cleanup.motion.close`, `cleanup.valves.attempted`, `cleanup.valves.closed`, `motion_port`, `motion_profile`
 
 - 4 ค่าที่ผมห้ามเดาแทน (sensor id, mA target, polarity x2) ตอนนี้จะ**ถามบนหน้าจอ**ตอนรัน stage นั้น และตรวจรูปแบบให้ก่อน (ค่าว่างไม่ได้, ทศนิยมต้องใช้จุด ไม่ใช่จุลภาค)
 - ถ้าพิมพ์ผิดรูป script จะถามซ้ำจนกว่าจะได้ค่าที่ถูกต้อง; ค่าที่ยังไงก็ไม่ถูกหลักจะถูก Product ปฏิเสธด้วย `exit=4` + refusal ที่บอกชื่อตัวแปร (ไม่ได้เดาแทนคุณ)
@@ -600,22 +267,23 @@ Invoke-WjssStage -Name 'D-dry' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -V
 ปิด gate: `DI mirroring / limit-switch reclass` ตาม corrected CSV (DI‑021..028 = Upper, DI‑029..036 = Lower)
 Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)** ส่วน Product อ่านผ่าน **FC02 (discrete inputs)** ที่ address เดียวกัน — บล็อคนี้วัดทั้งสองทางให้เห็นจริง (อ่านอย่างเดียว)
 
-```powershell stage:E-idle
-$t = @()
-$t += Format-WjssBits -Prefix 'DI' -Base 21 -Result (Read-WjssBits -Area 'DI'   -Start 20 -Count 16)   # FC02, addr 20..35
-$t += Format-WjssBits -Prefix 'CO' -Base 21 -Result (Read-WjssBits -Area 'COIL' -Start 20 -Count 16)   # FC01, same addresses
-$t += '  note: at rest every switch should sit on one side, per the real wiring'
-Save-WjssSend -Name 'E-idle' -Lines $t
+```powershell
+& "$script:Ev\stage-E-idle.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-E-idle.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'E-idle'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- อ่านบิต: FC02 (read discrete inputs) ที่ start=20 count=16 ⇒ address 20..35; FC01 (read coils) ที่ start=20 count=16 ⇒ address 20..35
+- ผลอ่านแต่ละช่วง print ผ่าน `Save-WjssSend` (scrub แล้ว) — ถ้า device ไม่รองรับ function code นั้น บรรทัดนั้นจะขึ้น `READ FAILED - protocol exception N` (N คือ code ที่ device ตอบ แบบทศนิยม) ซึ่งผมใช้ตัดสิน gate ได้ **ห้ามแก้ไฟล์ที่ export มาแล้ว**
 
 จากนั้นให้ Owner ขยับ WSB ทีละตัว (หรือให้ปั๊ม/วาล์วทำงานในจังหวะที่มี limit switch เปลี่ยน) แล้วรันซ้ำ:
 
-```powershell stage:E-moved
-$t = @()
-$t += Format-WjssBits -Prefix 'DI' -Base 21 -Result (Read-WjssBits -Area 'DI'   -Start 20 -Count 16)
-$t += Format-WjssBits -Prefix 'CO' -Base 21 -Result (Read-WjssBits -Area 'COIL' -Start 20 -Count 16)
-Save-WjssSend -Name 'E-moved' -Lines $t
+```powershell
+& "$script:Ev\stage-E-moved.ps1"
 ```
+สิ่งที่บล็อกทำจริง (ตัวโค้ดคือ `stage-E-moved.ps1` ที่ export มาจากตัวขับ — ดูด้วย `Show-WjssStage -Name 'E-moved'`; ข้อความนี้ generate จากโค้ดจริงของตัวขับ จึงไม่เขียนค้าง):
+
+- อ่านบิต: FC02 (read discrete inputs) ที่ start=20 count=16 ⇒ address 20..35; FC01 (read coils) ที่ start=20 count=16 ⇒ address 20..35
+- ผลอ่านแต่ละช่วง print ผ่าน `Save-WjssSend` (scrub แล้ว) — ถ้า device ไม่รองรับ function code นั้น บรรทัดนั้นจะขึ้น `READ FAILED - protocol exception N` (N คือ code ที่ device ตอบ แบบทศนิยม) ซึ่งผมใช้ตัดสิน gate ได้ **ห้ามแก้ไฟล์ที่ export มาแล้ว**
 
 - FC02 เปลี่ยนตามการขยับ + FC01 เปลี่ยนตรงกัน → binding ปัจจุบันถูกต้อง ✓
 - FC02 error/ค้างคงที่ แต่ FC01 เปลี่ยน → device map DI ไว้ที่ coil space (ตาม legacy) → **นี่คือข้อมูลเพื่อสั่ง `WJSS_CONFIG` เปลี่ยน function code** ห้ามใส่ fallback อัตโนมัติในโค้ด ผมจะเป็นคนเขียนบันทึกให้หลังคุณส่ง log
@@ -638,7 +306,7 @@ Save-WjssSend -Name 'E-moved' -Lines $t
 | `PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT` ที่ A2 | แรงดันจริง ≤ 15 bar | รอปั๊มขึ้นแล้วซ้ำ (ไม่ผิด) |
 | `*_REFUSED_READ_ONLY_CONSENT` / `_CONSENT_MISSING` | phrase ไม่ตรง exact | พิมพ์ใหม่จาก constant (อย่า copy จากแชท/doc) |
 | `IV_TRIAL_REFUSED_*_NOT_FIELD_CONFIRMED` / `CONTRADICTORY` | สั่งงานแล้ว feedback ขัดกัน | หยุด — fail-closed ทำงาน |
-| poller `READ FAILED - connect timed out` | IP/ firewall / ไม่ได้เสียบสาย | ตรวจ network แล้วรันบล็อค poller ซ้ำ (อ่านอย่างเดียว ปลอดภัย) |
+| poller `READ FAILED - connect timed out` | IP/ firewall / ไม่ได้เสียบสาย | ตรวจ network แล้วรันบล็อกอ่านบิตซ้ำ เช่น `& "$script:Ev\stage-B-off.ps1"` (อ่านอย่างเดียว ปลอดภัย) |
 
 ## 11. สรุปว่า stage ไหนปิด gate อะไร (ใช้ตอนผมอัปเดต register)
 
