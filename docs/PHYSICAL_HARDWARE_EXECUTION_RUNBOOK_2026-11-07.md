@@ -89,7 +89,7 @@ catalogue ต้องเป็นสำเนาของคุณเองท�
 
 ### ข้อ 0.4 — รัน stage ตามลำดับ (ห้ามข้าม A1 ซึ่งคือ "ปั๊มหยุด")
 
-รันตามลำดับนี้ **ทีละบรรทัด** (ไฟล์ทั้ง 8 เกิดจาก `Export-WjssStageFiles` ในข้อ 0.3 — ห้าม copy โค้ดจากเอกสารนี้ไปรันเอง และห้ามแก้ไฟล์ `stage-*.ps1`) — A1 รันตอนปั๊มหยุด, A2 รันตอนปั๊มรัน, B off/on เช่นกัน, ห้ามรันคู่ที่ติดกันแล้วลืมเปลี่ยนสถานะปั๊ม:
+รันตามลำดับนี้ **ทีละบรรทัด** (ไฟล์ทั้ง 10 เกิดจาก `Export-WjssStageFiles` ในข้อ 0.3 — ห้าม copy โค้ดจากเอกสารนี้ไปรันเอง และห้ามแก้ไฟล์ `stage-*.ps1`) — A1 รันตอนปั๊มหยุด, A2 รันตอนปั๊มรัน, B off/on เช่นกัน, ห้ามรันคู่ที่ติดกันแล้วลืมเปลี่ยนสถานะปั๊ม:
 
 ```powershell
 & "$script:Ev\stage-A1-off.ps1"     # pump STOPPED, exit 2 expected - that is the PASS
@@ -97,7 +97,9 @@ catalogue ต้องเป็นสำเนาของคุณเองท�
 & "$script:Ev\stage-B-off.ps1"      # read DI-001..008, pump stopped
 & "$script:Ev\stage-B-on.ps1"       # read DI-001..008, pump running - I diff the two
 & "$script:Ev\stage-C-iv1.ps1"      # IV1 open/close, one actuation
-& "$script:Ev\stage-D-dry.ps1"      # full dry cycle, asks you for 4 values
+& "$script:Ev\stage-D-pump.ps1"     # D variant 1: pump ladder only, NO valve boundary composed
+& "$script:Ev\stage-D-sim.ps1"      # D variant 2: real IV + real path on a DECLARED pump pressure
+& "$script:Ev\stage-D-dry.ps1"      # D variant 3 (wet): real pump + real IV, extra ack required
 & "$script:Ev\stage-E-idle.ps1"     # all switches at rest: FC02 + FC01 together
 & "$script:Ev\stage-E-moved.ps1"    # after moving each WSB switch by hand
 ```
@@ -239,7 +241,47 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 - stage นี้ **light โดยเจตนา** (ค่า terminal ขึ้นกับ feedback จริงหน้างาน) — ตัวเลขทั้งหมดในก้อน send ผมวิเคราะห์เอง
 - ถ้า `exit=4` = startup refused (env/consent ไม่ครบหรือชนกัน) · `exit=2` = refuse หลัง bind เช่น `IV_TRIAL_REFUSED_*_NOT_FIELD_CONFIRMED` / `CONTRADICTORY` → **นี่คือ fail-closed ทำงาน ไม่ใช่บั๊ก** หยุด stage แล้วส่ง log
 
-## 6. Stage D — Integrated cleaning-path DRY cycle (actuation เต็มรูป)
+## 5b. ข้อเท็จจริงทางฮาร์ดแวร์ที่ Owner ยืนยันแล้ว (บันทึกไว้กันเข้าใจผิดซ้ำ)
+
+- `DO-023` (WSB air solenoid ผ่าน Relay K160) เป็นแบบ **MAINTAINED** ไม่ใช่ pulse/momentary: เขียน `True` = เปิด, เขียน `False` = ปิด แล้วคงสถานะ
+- ตาม sheet "Contract Summary" ของไฟล์ mapping: **การเขียน DO 0-31 ใช้ FC05/FC15 แต่การอ่านกลับด้วย FC01 ต้องอ่านที่ RW mirror ตำแหน่ง +512** → `DO-023` เขียนที่ address **22** แต่ต้องอ่านกลับที่ **534** (22+512); การอ่าน FC01 ที่ address 22 จะได้ `False` เสมอ ซึ่ง**ไม่ใช่ defect ของ Product**
+- ความน่าเชื่อถือของสถานะวาล์วใน Product จึงอยู่ที่ **limit switches ของหัวงาน (DI-021 Upper + DI-029 Lower)** ซึ่งเป็นตัวที่ยืนยัน `IV_OPEN_FIELD_CONFIRMED` / `IV_CLOSED_FIELD_CONFIRMED` ใน Stage C แล้ว
+
+## 6. Stage D — Integrated cleaning-path cycle (มี 3 variant)
+
+ปิด gate: วงจรทั้งรอบ (select pump → enable → run → AO ramp → supervision → cleanup → release) ควบคู่กับการเปิด/ปิดวาล์วและการเดิน Cleaning Path P1-P6
+
+### ข้อ 6.1 — variant แรก: `D-pump` = บันไดคำสั่งปั๊มอย่างเดียว (ล็อกการเขียนวาล์วเชิงโครงสร้าง)
+
+```powershell
+& "$script:Ev\stage-D-pump.ps1"
+```
+
+- Product ที่รัน: `apps/runtime/PumpCommandDryTrial.cs` (เลือกด้วย `WJSS_PUMP_COMMAND_DRY_TRIAL=PUMP_ONLY_NO_VALVES`) — บล็อกนี้**ไม่ compose equipment boundary เลย** จึงไม่มีเส้นทางสั่งวาล์วอยู่ใน process นั้น (ไม่มี `RequestValve`, ไม่มี cleanup close ของวาล์ว) และไม่มี motion → วาล์วอยู่กับที่ตามที่ Stage C ทิ้งไว้, แกนไม่ขยับ
+- บันไดที่ตรวจ (มาจาก `ProcessIoPumpLifecycle` ตัวเดิม ไม่มี state machine ชุดที่สอง): `selection_pair_written` (DO-001 TRUE / DO-002 FALSE) → `pump_enable_written` (DO-003 TRUE) → `pump_run_written` (DO-007 TRUE) → `running_feedback_confirmed` (DI-004) → `analog_ramp_executed` (AO-001) → `pump_ready_confirmed` (AI-003 > setpoint แบบ strictly-greater เดิม) → `analog_stop_sentinel_written` (AO = 0 mA sentinel) → `pump_run_cleared` (DO-007 FALSE) → `pump_enable_released` (DO-003 FALSE) → `stopped_confirmed` (DI-004 not-running) → `ownership_released` + `safe_to_report_complete`
+- ต้องพิมพ์ยืนยันก่อนรัน: `PUMP LADDER ONLY` — ปั๊มทำงานจริงขณะที่วาล์วปิด เส้นสายจะ dead-head จึงต้องยืนยันว่าเส้นทาง relief/return เปิดอยู่และไม่มีใครอยู่ที่ lance
+- บรรทัดหลักฐาน: `evidence_kind=PHYSICAL`, `physical_pump_verified=True`, `iv_command_executed=FALSE`, `iv_command_surface=NONE_NO_VALVE_BOUNDARY_COMPOSED`, `motion_composed=False`
+- exit ที่ยอมรับ: `0` เท่านั้น (2 = ปฏิเสธ/ล้มกลางบันได, 3 = supervision หมดเวลา, 4 = ปฏิเสธก่อนแตะอุปกรณ์)
+- มีอ่าน AI-003 เทียบอีกชั้นหนึ่งใน session เดียวกัน (ผ่าน read-only observer ตัวเดิม) (read-only เท่านั้น): `pump_outlet_pressure_bar`, `ai003_evidence_verified`, `ai003_pump_ready_rule`
+
+### ข้อ 6.2 — variant สอง: `D-sim` = วาล์วจริง + Path จริงบนค่าแรงดันที่ Owner ประกาศ
+
+```powershell
+& "$script:Ev\stage-D-sim.ps1"
+```
+
+- Product: `CleaningPathDryComposition` + `CleaningPathSimulatedPumpReadyGate` (เลือกด้วย `WJSS_DRY_SIMULATED_PUMP_READY=SOFTWARE_SIMULATED_AI003` + `WJSS_DRY_SIMULATED_AI003_BAR` > setpoint + `WJSS_DRY_SIMULATED_PUMP_STOPPED=PUMP_STOPPED_OWNER_ATTESTED`)
+- **ปั๊มต้องหยุดอยู่ที่ Panel ตลอดการรัน** และใน mode นี้ Product ไม่สั่งปั๊มเลย (ไม่ select, ไม่ enable, ไม่เขียน AO, ไม่อ่าน DI-004/005) — ตรวจได้จาก `cleanup.pump.attempted=False` + `cleanup.pump.terminal=IDLE`
+- สิ่งที่ยังเป็นการสัมผัสจริงทั้งหมด: เปิด/ปิด paired isolation valve ผ่าน session ที่มีอำนาจเขียน, limit switches, การเดิน P1-P6, Mandatory Safe Return + cleanup close
+- หลักฐานติดป้ายชัดเจน: `pump_evidence_kind=SOFTWARE_SIMULATED`, `physical_pump_verified=False`, `pump_gate=DECLARED_PUMP_PRECONDITION`, `simulated_pump_ready_rule=DECLARED_ABOVE_SETPOINT` + บรรทัด `DECLARED PUMP-READY EVIDENCE: ...` → นับเป็นหลักฐานของเส้นทางคำสั่ง/การควบคุมได้ **แต่ไม่นับเป็นหลักฐานว่า "สั่งงานพร้อมน้ำจริง"**
+- ค่าที่ห้ามเดา (ถามบนหน้าจอ): sensor id, mA target (ยังถูก validate แต่ไม่ถูกใช้), polarity x2 และ **bar ที่ประกาศ (ต้อง > 15)**
+- refusal ที่เกี่ยวข้อง: `DRY_COMPOSITION_REFUSED_SIMULATED_PUMP_SELECTOR` / `_BAR` / `_ATTESTATION` — แก้ที่ input ไม่ใช่ที่โค้ด
+
+### ข้อ 6.3 — variant สาม: `D-dry` = ปั๊มจริง + วาล์วจริง (โหมดเปียก ต้อง ack แยก)
+
+Product บังคับ `WJSS_DRY_WET_SEQUENCE_ACK=WATER_AT_NOZZLE_AUTHORIZED` กับเส้นทางที่มีปั๊มจริง (ตัวขับตั้งให้หลังคุณพิมพ์ `DRY CYCLE AUTHORIZED` เท่านั้น และปฏิเสธก่อนเรียก exe ถ้าคุณไม่ตอบ) เพราะโหมดนี้เปิดวาล์วขณะปั๊มสร้างความดัน: **น้ำอาจพุ่งออกจาก nozzle ได้** ถ้า env นี้ขาด Product จะปฏิเสธด้วย `DRY_COMPOSITION_REFUSED_WET_SEQUENCE_NOT_ACKNOWLEDGED`
+
+### ข้อ 6.4 — รายละเอียดของ `D-dry` (คงเดิม + key ที่เพิ่ม 2 คู่)
 
 ปิด gate: วงจร dry ทั้งรอบ (select pump → enable → run → AO ramp → supervision → cleanup → release)
 **เงื่อนไขก่อนรัน:** B ผ่าน (รู้ขั้วสัญญาณแล้ว) + C ผ่าน + เจ้าของตัดสินใจ `docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` §6/§7 แล้ว + Motion ยังไม่มีแรง (no-load)
@@ -252,9 +294,9 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 - ต้องยืนยันกับ Owner ก่อน: พิมพ์ `DRY CYCLE AUTHORIZED` ตามที่ prompt ทวงถาม ( prompt: D: Stage B and C passed, the ACCELERATED package owner decisions are recorded, motion unloaded ) — ถ้าไม่ตอบตรงตัวบล็อกจะ**ไม่เรียก exe เลย**
 - consent ที่บล็อกขอ: `PhysicalDoSingle` (อ่านแบบซ่อน, ลบทิ้งหลังจบบล็อก)
 - exit code ที่ยอมรับ: `0` เท่านั้น
-- env ที่บล็อกตั้ง: `WJSS_DRY_COMMAND_MODE=TEST_HARDWARE_DRY`, `WJSS_PUMP_SELECTION=1`, `WJSS_PUMP_FRESHNESS_MS=2000`, `WJSS_PUMP_RUNNING_CONFIRM_MS=10000`, `WJSS_PUMP_READY_TIMEOUT_MS=30000`, `WJSS_PUMP_STOPPED_CONFIRM_MS=15000`, `WJSS_PUMP_READY_SETPOINT_BAR=15`, `WJSS_PRESSURE_LOW_BAR=1`, `WJSS_PRESSURE_HIGH_BAR=15`, `WJSS_VALVE_SUPERVISION_MS=5000`
+- env ที่บล็อกตั้ง: `WJSS_DRY_COMMAND_MODE=TEST_HARDWARE_DRY`, `WJSS_DRY_WET_SEQUENCE_ACK=WATER_AT_NOZZLE_AUTHORIZED`, `WJSS_PUMP_SELECTION=1`, `WJSS_PUMP_FRESHNESS_MS=2000`, `WJSS_PUMP_RUNNING_CONFIRM_MS=10000`, `WJSS_PUMP_READY_TIMEOUT_MS=30000`, `WJSS_PUMP_STOPPED_CONFIRM_MS=15000`, `WJSS_PUMP_READY_SETPOINT_BAR=15`, `WJSS_PRESSURE_LOW_BAR=1`, `WJSS_PRESSURE_HIGH_BAR=15`, `WJSS_VALVE_SUPERVISION_MS=5000`
   และตั้งจากคำตอบของคุณบนหน้าจอ: `WJSS_CLEANING_SENSOR_ID`, `WJSS_PUMP_ANALOG_TARGET_MA`, `WJSS_PUMP_RUNNING_POLARITY`, `WJSS_PUMP_FAULT_POLARITY`
-- key ที่**ต้องตรง**ตามนี้ (20 คู่): `profile=TEST_HARDWARE_DRY`, `mode=WJSS_DRY_COMMAND_MODE`, `prepare=DRY_PREPARE_READY`, `terminal_status=CompleteAwaitingSafeReturn`, `terminal_code=PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN`, `primary_failure=NONE`, `cleanup.pump.stopped_confirmed=True`, `cleanup.pump.ownership_released=True`, `cleanup.pump.complete=True`, `cleanup.motion.complete=True`, `cleanup.valves.complete=True`, `cleanup.valves.refused=0`, `cleanup.valves.transport_failures=0`, `cleanup.valves.unknown=0`, `cleanup.complete=True`, `pump_ready_source=AI-003+`, `pump_feedback=COMMISSIONED`, `pump_gate=PUMP_PRECONDITION`, `write_authority=PROCESS_IO_SESSION`, `coordinators=COMPOSITION+EXECUTION`
+- key ที่**ต้องตรง**ตามนี้ (22 คู่): `profile=TEST_HARDWARE_DRY`, `mode=WJSS_DRY_COMMAND_MODE`, `prepare=DRY_PREPARE_READY`, `terminal_status=CompleteAwaitingSafeReturn`, `terminal_code=PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN`, `primary_failure=NONE`, `cleanup.pump.stopped_confirmed=True`, `cleanup.pump.ownership_released=True`, `cleanup.pump.complete=True`, `cleanup.motion.complete=True`, `cleanup.valves.complete=True`, `cleanup.valves.refused=0`, `cleanup.valves.transport_failures=0`, `cleanup.valves.unknown=0`, `cleanup.complete=True`, `pump_ready_source=AI-003+`, `pump_feedback=COMMISSIONED`, `pump_gate=PUMP_PRECONDITION`, `pump_evidence_kind=PHYSICAL`, `physical_pump_verified=True`, `write_authority=PROCESS_IO_SESSION`, `coordinators=COMPOSITION+EXECUTION`
 - key ที่แนบมาให้ผมดูด้วย (ไม่ใช้ตัดสิน pass/fail): `sensor`, `isolation_valve`, `water_jet`, `axes`, `catalogue_rows`, `endpoint`, `process_io_device`, `pump_selection`, `pump_owner`, `pump_readiness`, `start`, `steps`, `session_state`, `session_generation`, `cleanup.pump.attempted`, `cleanup.pump.terminal`, `cleanup.pump.state`, `cleanup.motion.session`, `cleanup.motion.close`, `cleanup.valves.attempted`, `cleanup.valves.closed`, `motion_port`, `motion_profile`
 
 - 4 ค่าที่ผมห้ามเดาแทน (sensor id, mA target, polarity x2) ตอนนี้จะ**ถามบนหน้าจอ**ตอนรัน stage นั้น และตรวจรูปแบบให้ก่อน (ค่าว่างไม่ได้, ทศนิยมต้องใช้จุด ไม่ใช่จุลภาค)
@@ -310,14 +352,16 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 
 ## 11. สรุปว่า stage ไหนปิด gate อะไร (ใช้ตอนผมอัปเดต register)
 
-| Stage | Gate ที่ปิด |
-| --- | --- |
-| A1 + A2 | REAL WAGO ENDPOINT CONNECTIVITY · Pump-ready strict-greater ทั้งสองฝั่งบนสัญญาณจริง |
-| B | Pump running/fault polarity commissioned (absent ⇒ NOT_CONFIGURED ⇒ D ถูก refuse) |
-| C | IV physical actuation + FC01 read-back |
-| D | integrated dry cycle (no-load) ครบลูปพร้อม cleanup |
-| E | WSB Upper/Lower reclass + DI read path (FC02 vs FC01) |
-| F | (optional) motion stop behaviour |
+| Stage | Gate ที่ปิด | สถานะที่ `c4898a0` |
+| --- | --- | --- |
+| A1 + A2 | REAL WAGO ENDPOINT CONNECTIVITY · Pump-ready strict-greater ทั้งสองฝั่งบนสัญญาณจริง | **CLOSED** (A1 0.669 bar ⇒ FALSE, exit 2; A2 15.6047 bar ⇒ TRUE, exit 0, `physical_pump_verified=TRUE`) |
+| B | Pump running/fault polarity commissioned (absent ⇒ NOT_CONFIGURED ⇒ D ถูก refuse) | **CLOSED** (DI-004 0→1 ⇒ `ACTIVE_HIGH`; DI-005 ไม่เปลี่ยน ⇒ `ACTIVE_HIGH` ตาม convention เท่านั้น) |
+| C | IV physical actuation + FC01 read-back | **CLOSED** — field-confirmed ทั้งสองทางด้วย limit switches; `fc01=False` ที่ address 22 อธิบายด้วยกติกา RW mirror +512 (อ่านที่ 534) จึงไม่ใช่ defect |
+| D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — โค้ดเพิ่มหลัง `c4898a0` ต้อง build ใหม่แล้วรันบนโต๊ะ |
+| D-sim | Path จริง + วาล์วจริง บนค่าแรงดันที่ประกาศ (ติดป้าย SOFTWARE_SIMULATED) | **OPEN** — ต้อง build ใหม่แล้วรันบนโต๊ะ |
+| D-dry | integrated dry cycle แบบเปียก (ปั๊มจริง + วาล์วจริง) no-load ครบลูปพร้อม cleanup | **OPEN** — ต้องมี `WJSS_DRY_WET_SEQUENCE_ACK` |
+| E | WSB Upper/Lower reclass + DI read path (FC02 vs FC01) | **CLOSED** สำหรับเส้นทางอ่าน (ยังไม่ทำ per-switch E ตามที่ตกลง) |
+| F | (optional) motion stop behaviour | ยังไม่รัน (optional) |
 
 **ส่งผมทุก stage:** ก้อนข้อความใต้ `--- copy everything below ---` (scrub แล้ว) + log ดิบเฉพาะก้อนที่มี `CHECK` — ห้าม commit ไฟล์ log/ผลลัพธ์เข้า repo เด็ดขาด
-**สถานะ:** HARDWARE GATES ยัง OPEN · PRODUCTION NOT AUTHORIZED · MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง
+**สถานะ:** A/B/C/E ปิดแล้วที่ `c4898a0` · D ยัง OPEN รอคิว `D-pump` + `D-sim` (โค้ด C# + tests เพิ่มหลังคอมมิธนั้น ต้อง build ใหม่ก่อน) · PRODUCTION NOT AUTHORIZED · MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง

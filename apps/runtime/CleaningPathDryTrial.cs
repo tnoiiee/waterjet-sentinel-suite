@@ -172,7 +172,22 @@ internal static class CleaningPathDryTrial
         output.WriteLine("  pump_selection=" + provenance.PumpSelection.ToString(CultureInfo.InvariantCulture));
         output.WriteLine("  pump_feedback=" + (provenance.PumpFeedbackCommissioned ? "COMMISSIONED" : "NOT_COMMISSIONED"));
         output.WriteLine("  pump_owner=" + provenance.PumpCommandOwner);
-        output.WriteLine("  pump_gate=" + (provenance.PumpGateComposed ? "PUMP_PRECONDITION" : "NONE"));
+        output.WriteLine("  pump_gate=" + (provenance.PumpGateComposed
+            ? "PUMP_PRECONDITION"
+            : "DECLARED_PUMP_PRECONDITION"));
+        output.WriteLine("  pump_evidence_kind=" + provenance.PumpEvidenceKind);
+        output.WriteLine("  physical_pump_verified=" + (provenance.PhysicalPumpVerified ? "True" : "False"));
+        if (!provenance.PhysicalPumpVerified)
+        {
+            // The label is printed with the value it declares, so a reader of the transcript cannot mistake
+            // this evidence class for a Pump start. Everything else in the run stayed physical.
+            output.WriteLine("  simulated_ai003_bar=" + provenance.DeclaredPumpOutletBar
+                .ToString("0.###", CultureInfo.InvariantCulture));
+            output.WriteLine("  simulated_pump_ready_rule=DECLARED_ABOVE_SETPOINT");
+            output.WriteLine(
+                "  DECLARED PUMP-READY EVIDENCE: THE PUMP WAS ATTESTED STOPPED AT THE PANEL AND NO PUMP "
+                + "COMMAND WAS ISSUED; THE PAIRED-IV AND THE CLEANING PATH WERE PHYSICAL");
+        }
         foreach (string statement in CleaningPathDryProvenance.StandingStatements)
         {
             output.WriteLine("  " + statement);

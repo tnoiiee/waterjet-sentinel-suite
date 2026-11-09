@@ -119,6 +119,25 @@ if (pumpReadyReadSelected)
     return ProcessIoPumpReadyReadTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
 }
 
+// 0e. The Pump command ladder alone (runbook Stage D, first variant).
+//
+//     The fourth evidence class. It commands the Pump ladder over the existing dry write authorization and
+//     nothing else: no equipment boundary is composed, so that run holds no Isolation Valve command surface
+//     at all, and no motion composition exists, so no axis moves. Like the other two physical trials it is
+//     selected by its own exact literal and validated in full by its own runner, and it refuses when another
+//     physical evidence class is selected beside it.
+if (!PumpCommandDryTrial.TryReadMode(
+    Environment.GetEnvironmentVariable, out var pumpCommandSelected, out var pumpCommandCode, out var pumpCommandDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{pumpCommandCode}]: {pumpCommandDetail} Nothing was bound.");
+    return 4;
+}
+
+if (pumpCommandSelected)
+{
+    return PumpCommandDryTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
+}
+
 if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, dryCommandMode, out var refusalCode, out var refusalReason))
 {
     Console.Error.WriteLine($"WJSS startup refused [{refusalCode}]: {refusalReason}");

@@ -81,6 +81,25 @@ public sealed record CleaningPathDryProvenance
     public required bool PumpGateComposed { get; init; }
 
     /// <summary>
+    /// Which evidence source stood behind the Pump precondition of this run: PHYSICAL, or
+    /// SOFTWARE_SIMULATED for an Owner-declared Pump Outlet Pressure. The default is NOT_RECORDED, so a
+    /// composition that fails to state its source is visible as a defect instead of reading as physical.
+    /// </summary>
+    public string PumpEvidenceKind { get; init; } = "NOT_RECORDED";
+
+    /// <summary>
+    /// True only when a real Pump command and its commissioned feedback were part of this evidence. It
+    /// defaults to false: a declared value never verifies a physical Pump.
+    /// </summary>
+    public bool PhysicalPumpVerified { get; init; }
+
+    /// <summary>
+    /// The Pump Outlet Pressure this run declared, in bar. Zero means the run declared nothing, which is
+    /// the physical case: a measured Pump never has a declared value to report.
+    /// </summary>
+    public double DeclaredPumpOutletBar { get; init; }
+
+    /// <summary>
     /// The fixed, non-negotiable statements every dry composition carries. They exist so a reader of
     /// the evidence cannot mistake a dry composition for a verified or authorized one.
     /// </summary>
@@ -154,6 +173,38 @@ public sealed class CleaningPathDryComposition : IDisposable
     public const string RefusedMotionNotHardwareCapable = "DRY_COMPOSITION_REFUSED_MOTION_NOT_HARDWARE_CAPABLE";
     public const string RefusedPumpConfiguration = "DRY_COMPOSITION_REFUSED_PUMP_CONFIGURATION";
 
+    /// <summary>
+    /// The selector of the Stage D simulated-Pump-ready evidence class. It must be absent (the physical
+    /// Pump is the readiness source) or exactly <see cref="SimulatedPumpReadyLiteral"/>. Any other value is
+    /// a refusal: a near miss is never treated as an instruction to simulate, and the selector can never
+    /// turn a physical Pump start into a declared one by accident.
+    /// </summary>
+    public const string SimulatedPumpReadyVariable = "WJSS_DRY_SIMULATED_PUMP_READY";
+    public const string SimulatedPumpReadyLiteral = "SOFTWARE_SIMULATED_AI003";
+
+    /// <summary>The declared Pump Outlet Pressure, in bar, of the simulated evidence class.</summary>
+    public const string SimulatedPumpBarVariable = "WJSS_DRY_SIMULATED_AI003_BAR";
+
+    /// <summary>
+    /// The Owner's typed attestation that the Pump is STOPPED at the panel for the simulated evidence
+    /// class. It is a required exact literal: the Product cannot observe the panel, so the Owner states it.
+    /// </summary>
+    public const string SimulatedPumpStoppedVariable = "WJSS_DRY_SIMULATED_PUMP_STOPPED";
+    public const string SimulatedPumpStoppedLiteral = "PUMP_STOPPED_OWNER_ATTESTED";
+
+    /// <summary>
+    /// The separate acknowledgement required of the PHYSICAL variant, in which the Pump runs and water can
+    /// reach the nozzle while the paired Isolation Valve is open. It is deliberately not the same
+    /// acknowledgement as the dry consent: the consequence being accepted is a physical one.
+    /// </summary>
+    public const string WetSequenceAckVariable = "WJSS_DRY_WET_SEQUENCE_ACK";
+    public const string WetSequenceAckLiteral = "WATER_AT_NOZZLE_AUTHORIZED";
+
+    public const string RefusedSimulatedPumpSelector = "DRY_COMPOSITION_REFUSED_SIMULATED_PUMP_SELECTOR";
+    public const string RefusedSimulatedPumpBar = "DRY_COMPOSITION_REFUSED_SIMULATED_PUMP_BAR";
+    public const string RefusedSimulatedPumpAttestation = "DRY_COMPOSITION_REFUSED_SIMULATED_PUMP_ATTESTATION";
+    public const string RefusedWetSequenceAcknowledgement = "DRY_COMPOSITION_REFUSED_WET_SEQUENCE_NOT_ACKNOWLEDGED";
+
     /// <summary>The deterministic pause between two Pump driver steps. Bounded and never zero.</summary>
     private const int PumpDriveIntervalMilliseconds = 5;
     public const string Composed = "DRY_COMPOSITION_COMPOSED";
@@ -163,7 +214,9 @@ public sealed class CleaningPathDryComposition : IDisposable
     private readonly ProcessIoSession _session;
     private readonly ProcessIoEquipmentBoundary _equipment;
     private readonly ProcessIoPumpLifecycle _pump;
-    private readonly CleaningPathPumpLifecycleGate _pumpGate;
+    private readonly CleaningPathPumpLifecycleGate? _pumpGate;
+    private readonly CleaningPathSimulatedPumpReadyGate? _simulatedPumpGate;
+    private readonly bool _pumpSimulated;
     private readonly PumpLifecycleConfiguration _pumpConfiguration;
     private readonly int _pumpSelection;
     private readonly string _pumpOwnerId;
@@ -182,7 +235,9 @@ public sealed class CleaningPathDryComposition : IDisposable
         ProcessIoSession session,
         ProcessIoEquipmentBoundary equipment,
         ProcessIoPumpLifecycle pump,
-        CleaningPathPumpLifecycleGate pumpGate,
+        CleaningPathPumpLifecycleGate? pumpGate,
+        CleaningPathSimulatedPumpReadyGate? simulatedPumpGate,
+        bool pumpSimulated,
         PumpLifecycleConfiguration pumpConfiguration,
         int pumpSelection,
         string pumpOwnerId,
@@ -201,6 +256,8 @@ public sealed class CleaningPathDryComposition : IDisposable
         _equipment = equipment;
         _pump = pump;
         _pumpGate = pumpGate;
+        _simulatedPumpGate = simulatedPumpGate;
+        _pumpSimulated = pumpSimulated;
         _pumpConfiguration = pumpConfiguration;
         _pumpSelection = pumpSelection;
         _pumpOwnerId = pumpOwnerId;
@@ -250,7 +307,16 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// The Pump precondition decorator the active Cleaning Path equipment boundary was wrapped with.
     /// An IV OPEN is refused by it unless the Pump lifecycle is at confirmed readiness.
     /// </summary>
-    public CleaningPathPumpLifecycleGate PumpGate => _pumpGate;
+    public CleaningPathPumpLifecycleGate? PumpGate => _pumpGate;
+
+    /// <summary>
+    /// The declared-value precondition decorator, present only in the simulated Pump-ready evidence class.
+    /// It is exposed so the evidence line can print the exact declared bar instead of a paraphrase.
+    /// </summary>
+    public CleaningPathSimulatedPumpReadyGate? SimulatedPumpGate => _simulatedPumpGate;
+
+    /// <summary>True when this run admitted an Owner-declared Pump-ready value instead of a measured one.</summary>
+    public bool PumpReadyIsDeclared => _pumpSimulated;
 
     /// <summary>The typed Pump lifecycle configuration composed from the Owner-local values.</summary>
     public PumpLifecycleConfiguration PumpConfiguration => _pumpConfiguration;
@@ -448,6 +514,69 @@ public sealed class CleaningPathDryComposition : IDisposable
             return false;
         }
 
+        // 7b. Which source stands behind the Pump precondition of this run. The Owner states it; nothing is
+        //     inferred from an absent value.
+        //
+        //   PHYSICAL (the selector absent): the lifecycle commands the real Pump and an Isolation Valve may
+        //     open only while it reports confirmed readiness. Water can then reach the nozzle, so this
+        //     variant additionally requires the physical-consequence acknowledgement below. Nothing about
+        //     the readiness rule changes: the setpoint comparison stays strict and the commissioned
+        //     feedback polarities stay mandatory.
+        //
+        //   SOFTWARE_SIMULATED_AI003 (the selector present with its exact literal): the Owner attests the
+        //     Pump is stopped at the panel and declares the Pump Outlet Pressure the path would have seen.
+        //     The declared value must be strictly above the same setpoint, the paired-IV and Cleaning Path
+        //     commands stay fully physical and the evidence is labelled as declared, never as measured.
+        bool simulatedPumpReady = false;
+        double declaredPumpOutletBar = 0.0;
+        string? pumpReadySelector = readEnvironment(SimulatedPumpReadyVariable);
+        if (!string.IsNullOrWhiteSpace(pumpReadySelector))
+        {
+            if (!string.Equals(pumpReadySelector, SimulatedPumpReadyLiteral, StringComparison.Ordinal))
+            {
+                refusalCode = RefusedSimulatedPumpSelector;
+                refusalDetail =
+                    $"{SimulatedPumpReadyVariable} must be absent, or exactly '{SimulatedPumpReadyLiteral}'. "
+                    + "A different value is refused instead of guessing which Pump-ready evidence class was "
+                    + "intended.";
+                return false;
+            }
+
+            if (!string.Equals(readEnvironment(SimulatedPumpStoppedVariable), SimulatedPumpStoppedLiteral, StringComparison.Ordinal))
+            {
+                refusalCode = RefusedSimulatedPumpAttestation;
+                refusalDetail =
+                    $"{SimulatedPumpStoppedVariable} must state exactly '{SimulatedPumpStoppedLiteral}'. The "
+                    + "Product cannot observe the panel, so the Owner states that the Pump is stopped and no "
+                    + "Pump command is issued in this evidence class.";
+                return false;
+            }
+
+            if (!TryReadDouble(readEnvironment, SimulatedPumpBarVariable, out declaredPumpOutletBar)
+                || !double.IsFinite(declaredPumpOutletBar)
+                || declaredPumpOutletBar <= thresholds.PumpReadySetpointBar)
+            {
+                refusalCode = RefusedSimulatedPumpBar;
+                refusalDetail =
+                    $"{SimulatedPumpBarVariable} must be a finite number of bar strictly above the Pump-ready "
+                    + $"setpoint of {thresholds.PumpReadySetpointBar.ToString(CultureInfo.InvariantCulture)} bar. "
+                    + "The strict comparison is not loosened for a declared value.";
+                return false;
+            }
+
+            simulatedPumpReady = true;
+        }
+        else if (!string.Equals(readEnvironment(WetSequenceAckVariable), WetSequenceAckLiteral, StringComparison.Ordinal))
+        {
+            refusalCode = RefusedWetSequenceAcknowledgement;
+            refusalDetail =
+                $"{WetSequenceAckVariable} must state exactly '{WetSequenceAckLiteral}' before a composition "
+                + "that runs the Pump with the paired Isolation Valve is built: water can then leave the "
+                + "nozzle while the path moves. The dry consent authorizes the write path, not the "
+                + "consequence at the nozzle, so the two are asked for separately.";
+            return false;
+        }
+
         // 8. The shared motion composition. Built from the Owner-local external source only, with no
         //    native load and no open at construction.
         if (!MotionCompositionRoot.TryCreate(readEnvironment, clock, out MotionCompositionRoot? motionRoot, out refusalCode, out refusalDetail)
@@ -513,7 +642,25 @@ public sealed class CleaningPathDryComposition : IDisposable
 
         // The precondition is structural, not advisory: the coordinator receives the gated boundary,
         // so it has no reference through which it could request an IV OPEN without the Pump.
-        var pumpGate = new CleaningPathPumpLifecycleGate(equipment, pumpLifecycle);
+        CleaningPathPumpLifecycleGate? pumpGate = null;
+        CleaningPathSimulatedPumpReadyGate? simulatedPumpGate = null;
+        ICleaningPathEquipmentBoundary equipmentAuthority;
+        if (simulatedPumpReady)
+        {
+            // The lifecycle is composed and stays IDLE: it is never started, so it writes no selection, no
+            // enable and no analog value. It is deliberately NOT the authority behind the path here, because
+            // an unstarted lifecycle cannot permit a valve OPEN and this evidence class is built on the
+            // Owner's declaration instead. The valve write path itself is untouched: the decorator delegates
+            // every command and every observation to the real boundary.
+            simulatedPumpGate = new CleaningPathSimulatedPumpReadyGate(
+                equipment, clock, declaredPumpOutletBar, thresholds.PumpReadySetpointBar);
+            equipmentAuthority = simulatedPumpGate;
+        }
+        else
+        {
+            pumpGate = new CleaningPathPumpLifecycleGate(equipment, pumpLifecycle);
+            equipmentAuthority = pumpGate;
+        }
         string pumpOwnerId = "CLEANING_PATH_DRY:" + resolved.SensorId + ":" + resolved.DerivedIsolationValveId;
 
         // 10. The Phase 3B manual motion boundary over the shared motion session, then the ONE
@@ -522,7 +669,7 @@ public sealed class CleaningPathDryComposition : IDisposable
             motionRoot.Session,
             resolved.HorizontalAxisId,
             resolved.VerticalAxisId);
-        var compositionCoordinator = new CleaningPathCompositionCoordinator(motion, pumpGate, clock);
+        var compositionCoordinator = new CleaningPathCompositionCoordinator(motion, equipmentAuthority, clock);
 
         var provenance = new CleaningPathDryProvenance
         {
@@ -544,7 +691,12 @@ public sealed class CleaningPathDryComposition : IDisposable
             PumpSelection = pumpSelection,
             PumpFeedbackCommissioned = pumpConfiguration.Feedback.IsCommissioned,
             PumpCommandOwner = PumpCommandOwnerKind.INTEGRATED_DRY_CYCLE.ToString(),
-            PumpGateComposed = true,
+            PumpGateComposed = !simulatedPumpReady,
+            PumpEvidenceKind = simulatedPumpReady
+                ? CleaningPathSimulatedPumpReadyGate.EvidenceKind
+                : "PHYSICAL",
+            PhysicalPumpVerified = !simulatedPumpReady,
+            DeclaredPumpOutletBar = simulatedPumpReady ? declaredPumpOutletBar : 0.0,
         };
 
         composition = new CleaningPathDryComposition(
@@ -554,6 +706,8 @@ public sealed class CleaningPathDryComposition : IDisposable
             equipment,
             pumpLifecycle,
             pumpGate,
+            simulatedPumpGate,
+            simulatedPumpReady,
             pumpConfiguration,
             pumpSelection,
             pumpOwnerId,
@@ -670,6 +824,15 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// </summary>
     public CleaningPathCompositionStartOutcome Start()
     {
+        if (_pumpSimulated)
+        {
+            // No Pump command is issued in this evidence class. The declared readiness becomes admissible
+            // only now, so a paired-IV OPEN cannot be requested before the run has begun, which mirrors the
+            // ordering the physical precondition provides.
+            _simulatedPumpGate?.Begin();
+            return _composition.Start(StoreSnapshot, Resolution, Request);
+        }
+
         if (!StartPump(out string pumpCode))
         {
             return new CleaningPathCompositionStartOutcome(false, pumpCode, null, null);
@@ -932,7 +1095,7 @@ public sealed class CleaningPathDryComposition : IDisposable
         }
     }
 
-    private static bool TryReadThresholds(
+    internal static bool TryReadThresholds(
         Func<string, string?> readEnvironment,
         out SequencingPressureThresholds? thresholds,
         out string refusalCode,
@@ -976,7 +1139,7 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// command: it leaves them NOT_CONFIGURED, which makes the physical Pump command fail closed. A
     /// supplied value that is not a known polarity is refused rather than silently downgraded.
     /// </summary>
-    private static bool TryReadPumpConfiguration(
+    internal static bool TryReadPumpConfiguration(
         Func<string, string?> readEnvironment,
         SequencingPressureThresholds thresholds,
         out PumpLifecycleConfiguration configuration,

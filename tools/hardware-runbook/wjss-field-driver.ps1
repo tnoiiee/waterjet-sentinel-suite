@@ -210,7 +210,13 @@ function Invoke-WjssStage {
     $errFile = Join-Path $script:Ev ('stage-' + $Name + '.err.txt')
     if (-not (Test-Path -LiteralPath $script:Exe)) { throw ('STOP: exe not found: ' + $script:Exe) }
 
-    [Environment]::SetEnvironmentVariable('WJSS_DEVICE_PROFILE', 'TEST_HARDWARE')
+    # The device profile each trial composes for, taken from the source at this commit and not from a
+    # guess: DryIvTrial refuses any profile but TEST_HARDWARE_DRY (apps/runtime/DryIvTrial.cs:278), the
+    # dry command composition refuses it too (apps/runtime/RuntimeHostOptions.cs:389), and the read-only
+    # Pump-ready trial runs under TEST_HARDWARE. A wrong profile is refused before anything is contacted.
+    $prof = 'TEST_HARDWARE'
+    if ($Name -eq 'C-iv1' -or $Name -eq 'D-dry' -or $Name -eq 'D-pump' -or $Name -eq 'D-sim') { $prof = 'TEST_HARDWARE_DRY' }
+    [Environment]::SetEnvironmentVariable('WJSS_DEVICE_PROFILE', $prof)
     [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_HOST', $script:Ip)
     [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CATALOGUE', $script:Cat)
     # the poller and the trial must address the same socket
@@ -409,7 +415,7 @@ function Format-WjssBits {
 
 # ------------------------------------------------------------------ the stage definitions (this is the authority, not the markdown)
 
-$script:StageNames = @('A1-off', 'A2-run', 'B-off', 'B-on', 'C-iv1', 'D-dry', 'E-idle', 'E-moved')
+$script:StageNames = @('A1-off', 'A2-run', 'B-off', 'B-on', 'C-iv1', 'D-pump', 'D-sim', 'D-dry', 'E-idle', 'E-moved')
 
 $script:Stages = @{
     'A1-off' = {
@@ -479,8 +485,15 @@ $script:Stages = @{
             'WJSS_DRY_IV_TRIAL_MODE'                = 'SOFTWARE_SIMULATED_AI003'
             'WJSS_DRY_IV_TRIAL_VALVE'               = 'IV1'
             'WJSS_DRY_IV_TRIAL_PUMP_STOPPED'        = 'PUMP_STOPPED_OWNER_ATTESTED'
-            'WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR' = '0.7'
+            # must be strictly above WJSS_PUMP_READY_SETPOINT_BAR or the trial refuses with
+            # IV_TRIAL_REFUSED_SIMULATED_PRESSURE_AT_OR_BELOW_SETPOINT (DryIvTrial.cs:150)
+            'WJSS_DRY_IV_TRIAL_SIMULATED_AI003_BAR' = '16'
             'WJSS_VALVE_SUPERVISION_MS'             = '5000'
+            # the IV trial reads all three and refuses with IV_TRIAL_REFUSED_THRESHOLDS without them;
+            # they are never defaulted (DryIvTrial.cs:845-866)
+            'WJSS_PUMP_READY_SETPOINT_BAR'          = '15'
+            'WJSS_PRESSURE_LOW_BAR'                 = '1'
+            'WJSS_PRESSURE_HIGH_BAR'                = '15'
         } -Expect ([ordered]@{
             'trial_code'                = 'IV_TRIAL_ACCEPTED'
             'accepted'                  = 'True'
@@ -491,16 +504,130 @@ $script:Stages = @{
             'physical_iv_command'       = 'TRUE'
             'physical_upper_feedback'   = 'TRUE'
             'physical_lower_feedback'   = 'TRUE'
-            'open_command'              = '^IV1'
-            'close_command'             = '^IV1'
+            # the Product prints the hardware tag rather than the catalogue alias, e.g.
+            # open_command=DO-023 coil=22 value=True admission=OK dispatch=DISPATCHED. The tail is what
+            # the gate is about, so it is asserted that way: a different bench wiring still fails loudly
+            # instead of passing silently on a hard-coded DO number.
+            'open_command'              = '~value=True admission=OK dispatch=DISPATCHED'
+            'close_command'             = '~value=False admission=OK dispatch=DISPATCHED'
             'cleanup.complete'          = 'True'
             'cleanup.refused'           = '0'
             'cleanup.transport_failures' = '0'
             'cleanup.unknown'           = '0'
         }) -Show @('valve', 'open_command', 'close_command', 'open_observation', 'closed_observation', 'cleanup', 'cleanup.attempted', 'cleanup.closed', 'cleanup.refused', 'operator_abort', 'PUMP_READY_EVIDENCE', 'PHYSICAL_PUMP_EVIDENCE', 'queue', 'surface', 'motion')
     }
+    'D-pump' = {
+        # Stage D, first variant: the Pump command ladder ALONE. The Product composes no equipment
+        # boundary in this run at all (apps/runtime/PumpCommandDryTrial.cs), so no Isolation Valve
+        # command exists to be sent; the valve stays exactly where Stage C left it.
+        Confirm-WjssState -Token 'PUMP LADDER ONLY' -Prompt 'D-pump: the pump runs for real while the isolation valve stays closed, so the line dead-heads - confirm the relief or return path is open, the nozzle is clear of people, and that you do NOT expect any valve motion in this run'
+        $ma     = Read-WjssField -Label 'Pump AO target in mA (the value you decided in the ACCELERATED package)' -Number
+        $runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+        $fltPol = Read-WjssField -Label 'Pump FAULT polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+        Invoke-WjssStage -Name 'D-pump' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
+            'WJSS_PUMP_COMMAND_DRY_TRIAL'   = 'PUMP_ONLY_NO_VALVES'
+            'WJSS_DRY_COMMAND_MODE'         = 'TEST_HARDWARE_DRY'
+            'WJSS_PUMP_SELECTION'           = '1'
+            'WJSS_PUMP_ANALOG_TARGET_MA'    = $ma
+            'WJSS_PUMP_FRESHNESS_MS'        = '2000'
+            'WJSS_PUMP_RUNNING_POLARITY'    = $runPol
+            'WJSS_PUMP_FAULT_POLARITY'      = $fltPol
+            'WJSS_PUMP_RUNNING_CONFIRM_MS'  = '10000'
+            'WJSS_PUMP_READY_TIMEOUT_MS'    = '30000'
+            'WJSS_PUMP_STOPPED_CONFIRM_MS'  = '15000'
+            'WJSS_PUMP_READY_SETPOINT_BAR'  = '15'
+            'WJSS_PRESSURE_LOW_BAR'         = '1'
+            'WJSS_PRESSURE_HIGH_BAR'        = '15'
+        } -Expect ([ordered]@{
+            'trial_identity'                = 'PHYSICAL_PUMP_COMMAND_ONLY_NO_VALVES'
+            'evidence_kind'                 = 'PHYSICAL'
+            'physical_pump_verified'        = 'True'
+            'start_accepted'                = 'True'
+            'selection_pair_written'        = 'True'
+            'pump_enable_written'           = 'True'
+            'pump_run_written'              = 'True'
+            'running_feedback_confirmed'    = 'True'
+            'analog_ramp_executed'          = 'True'
+            'pump_ready_confirmed'          = 'True'
+            'fault_feedback_never_active'   = 'True'
+            'analog_stop_sentinel_written'  = 'True'
+            'pump_run_cleared'              = 'True'
+            'pump_enable_released'          = 'True'
+            'terminal_state'                = 'STOPPED'
+            'stopped_confirmed'             = 'True'
+            'cleanup_state'                 = 'COMPLETE'
+            'ownership_released'            = 'True'
+            'safe_to_report_complete'       = 'True'
+            'primary_failure'               = 'NONE'
+            'iv_command_executed'           = 'FALSE'
+            'iv_command_surface'            = 'NONE_NO_VALVE_BOUNDARY_COMPOSED'
+            'motion_composed'               = 'False'
+            'trial_code'                    = 'PUMP_COMMAND_TRIAL_ACCEPTED'
+            'session_state'                 = 'CLOSED'
+            'transport_released'            = 'True'
+        }) -Show @('pump_selection', 'pump_analog_target_ma', 'pump_ready_setpoint_bar', 'ladder', 'ladder_complete', 'pump_outlet_pressure_bar', 'pump_outlet_pressure_raw', 'pump_outlet_pressure_fresh', 'ai003_evidence_verified', 'ai003_pump_ready_rule', 'valve_open_admitted_by_lifecycle', 'terminal_state', 'cleanup_state', 'primary_failure', 'session_state')
+    }
+    'D-sim' = {
+        # Stage D, second variant: the Cleaning Path for real, on a DECLARED Pump Outlet Pressure. The
+        # pump must stay stopped at the panel: the Product never selects it, never enables it and never
+        # writes the analog reference (apps/runtime/CleaningPathDryComposition.cs, step 7b), while the
+        # paired isolation valve, the limit switches and the whole P1-P6 path stay physical. The evidence
+        # is labelled SOFTWARE_SIMULATED and physical_pump_verified=False, so it can never be read as a
+        # verified pump start.
+        Confirm-WjssState -Token 'PUMP STOPPED' -Prompt 'D-sim: the pump must be STOPPED and left stopped at the Panel for the whole run - this stage opens the paired isolation valve and walks the path on a declared pump-outlet pressure, with no pump command issued'
+        $sid    = Read-WjssField -Label 'Canonical Sensor Id exactly as it appears in your catalogue CSV'
+        $ma     = Read-WjssField -Label 'Pump AO target in mA (still asked: the composition validates its pump configuration, then never uses it)' -Number
+        $runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+        $fltPol = Read-WjssField -Label 'Pump FAULT polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+        $bar    = Read-WjssField -Label 'Declared Pump Outlet Pressure in bar, must be strictly above 15' -Number
+        Invoke-WjssStage -Name 'D-sim' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
+            'WJSS_DRY_COMMAND_MODE'           = 'TEST_HARDWARE_DRY'
+            'WJSS_DRY_SIMULATED_PUMP_READY'   = 'SOFTWARE_SIMULATED_AI003'
+            'WJSS_DRY_SIMULATED_PUMP_STOPPED' = 'PUMP_STOPPED_OWNER_ATTESTED'
+            'WJSS_DRY_SIMULATED_AI003_BAR'    = $bar
+            'WJSS_CLEANING_SENSOR_ID'         = $sid
+            'WJSS_PUMP_SELECTION'             = '1'
+            'WJSS_PUMP_ANALOG_TARGET_MA'      = $ma
+            'WJSS_PUMP_FRESHNESS_MS'          = '2000'
+            'WJSS_PUMP_RUNNING_POLARITY'      = $runPol
+            'WJSS_PUMP_FAULT_POLARITY'        = $fltPol
+            'WJSS_PUMP_RUNNING_CONFIRM_MS'   = '10000'
+            'WJSS_PUMP_READY_TIMEOUT_MS'     = '30000'
+            'WJSS_PUMP_STOPPED_CONFIRM_MS'   = '15000'
+            'WJSS_PUMP_READY_SETPOINT_BAR'   = '15'
+            'WJSS_PRESSURE_LOW_BAR'          = '1'
+            'WJSS_PRESSURE_HIGH_BAR'         = '15'
+            'WJSS_VALVE_SUPERVISION_MS'      = '5000'
+        } -Expect ([ordered]@{
+            'profile'                           = 'TEST_HARDWARE_DRY'
+            'mode'                              = 'WJSS_DRY_COMMAND_MODE'
+            'prepare'                           = 'DRY_PREPARE_READY'
+            'terminal_status'                   = 'CompleteAwaitingSafeReturn'
+            'terminal_code'                     = 'PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN'
+            'primary_failure'                   = 'NONE'
+            'pump_gate'                          = 'DECLARED_PUMP_PRECONDITION'
+            'pump_evidence_kind'                 = 'SOFTWARE_SIMULATED'
+            'physical_pump_verified'             = 'False'
+            'simulated_pump_ready_rule'           = 'DECLARED_ABOVE_SETPOINT'
+            'cleanup.pump.attempted'             = 'False'
+            'cleanup.pump.terminal'              = 'IDLE'
+            'cleanup.pump.state'                 = 'COMPLETE'
+            'cleanup.pump.stopped_confirmed'     = 'False'
+            'cleanup.pump.ownership_released'     = 'True'
+            'cleanup.pump.complete'              = 'True'
+            'cleanup.motion.complete'            = 'True'
+            'cleanup.valves.complete'            = 'True'
+            'cleanup.valves.refused'             = '0'
+            'cleanup.valves.transport_failures'  = '0'
+            'cleanup.valves.unknown'             = '0'
+            'cleanup.complete'                   = 'True'
+            'write_authority'                    = 'PROCESS_IO_SESSION'
+            'coordinators'                       = 'COMPOSITION+EXECUTION'
+            'session_state'                      = 'CLOSED'
+        }) -Show @('pump_evidence_kind', 'simulated_ai003_bar', 'simulated_pump_ready_rule', 'pump_gate', 'pump_selection', 'isolation_valve', 'start', 'terminal_status', 'terminal_code', 'primary_failure', 'steps', 'cleanup.pump.attempted', 'cleanup.valves.attempted', 'cleanup.valves.closed', 'cleanup.complete', 'session_state')
+    }
     'D-dry' = {
-        Confirm-WjssState -Token 'DRY CYCLE AUTHORIZED' -Prompt 'D: Stage B and C passed, the ACCELERATED package owner decisions are recorded, motion unloaded'
+        Confirm-WjssState -Token 'DRY CYCLE AUTHORIZED' -Prompt 'D: Stage B and C passed, the ACCELERATED package owner decisions are recorded, motion unloaded. This composition ramps the pump itself and opens the paired isolation valve inside the cycle, so with water in the loop the lance is pressurised: the software cannot see whether the water supply is open, only you can'
         $sid    = Read-WjssField -Label 'Canonical Sensor Id exactly as it appears in your catalogue CSV'
         $ma     = Read-WjssField -Label 'Pump AO target in mA (the value you decided in the ACCELERATED package)' -Number
         $runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
@@ -520,6 +647,7 @@ $script:Stages = @{
             'WJSS_PRESSURE_LOW_BAR'         = '1'
             'WJSS_PRESSURE_HIGH_BAR'        = '15'
             'WJSS_VALVE_SUPERVISION_MS'     = '5000'
+            'WJSS_DRY_WET_SEQUENCE_ACK'      = 'WATER_AT_NOZZLE_AUTHORIZED'
         } -Expect ([ordered]@{
             'profile'                           = 'TEST_HARDWARE_DRY'
             'mode'                              = 'WJSS_DRY_COMMAND_MODE'
@@ -539,6 +667,8 @@ $script:Stages = @{
             'pump_ready_source'                  = 'AI-003+'
             'pump_feedback'                     = 'COMMISSIONED'
             'pump_gate'                          = 'PUMP_PRECONDITION'
+            'pump_evidence_kind'                 = 'PHYSICAL'
+            'physical_pump_verified'             = 'True'
             'write_authority'                    = 'PROCESS_IO_SESSION'
             'coordinators'                      = 'COMPOSITION+EXECUTION'
         }) -Show @('sensor', 'isolation_valve', 'water_jet', 'axes', 'catalogue_rows', 'endpoint', 'process_io_device', 'pump_selection', 'pump_owner', 'pump_readiness', 'start', 'steps', 'session_state', 'session_generation', 'cleanup.pump.attempted', 'cleanup.pump.terminal', 'cleanup.pump.state', 'cleanup.motion.session', 'cleanup.motion.close', 'cleanup.valves.attempted', 'cleanup.valves.closed', 'motion_port', 'motion_profile')
@@ -591,7 +721,7 @@ function Test-WjssDriver {
     $bad = @()
     $done = @()
 
-    if ($script:StageNames.Count -ne 8) { $bad += ('expected 8 stage names, got ' + [string]$script:StageNames.Count) }
+    if ($script:StageNames.Count -ne 10) { $bad += ('expected 10 stage names, got ' + [string]$script:StageNames.Count) }
     # assembled at run time so that this file never contains the consent wording itself
     $needle = 'I ' + 'AUTH' + 'ORIZE'
     foreach ($n in $script:StageNames) {
@@ -602,7 +732,7 @@ function Test-WjssDriver {
         if ($text.Contains($needle)) { $bad += ('stage ' + $n + ' contains a consent literal') }
         if ($text -match '\b[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b') { $bad += ('stage ' + $n + ' contains an IP literal') }
     }
-    $done += '8 stage definitions present, no consent literal, no endpoint literal'
+    $done += '10 stage definitions present, no consent literal, no endpoint literal'
 
     $self = [string]$MyInvocation.PSCommandPath
     if ($self.Length -eq 0 -or -not (Test-Path -LiteralPath $self)) {
@@ -705,7 +835,7 @@ function Test-WjssDriver {
         elseif ($b.Count -lt 3) { $bad += ('export: stage-' + $n + '.ps1 has no body') }
         elseif ([string]$a[0].Trim() -ne [string]$b[2].Trim()) { $bad += ('export: stage-' + $n + ' first body line differs from the definition') }
     }
-    $done += 'exporter round-trip (8 files parsed by this PowerShell, guard line, body matches the definition)'
+    $done += ('exporter round-trip (' + [string]$script:StageNames.Count + ' files parsed by this PowerShell, guard line, body matches the definition)')
 
     # every WJSS_* name this driver sets must exist in the Product source
     $all = @()
