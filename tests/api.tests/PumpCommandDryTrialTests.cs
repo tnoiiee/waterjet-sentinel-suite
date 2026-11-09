@@ -49,7 +49,7 @@ public sealed class PumpCommandDryTrialTests
     [InlineData("pump_only_no_valves")]
     [InlineData("PUMP_ONLY")]
     [InlineData("SIMULATED")]
-    [InlineData("")]
+    [InlineData("PUMP_ONLY_NO_VALVES ")]
     public void A_Selector_That_Is_Not_The_Exact_Literal_Is_Refused(string supplied)
     {
         var values = new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -61,6 +61,25 @@ public sealed class PumpCommandDryTrialTests
 
         Assert.False(selected);
         Assert.Equal(PumpCommandDryTrial.RefusedModeInvalid, code);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_Blank_Selector_Means_Not_Chosen_Rather_Than_Invalid(string supplied)
+    {
+        // Blank is treated the same way as absent: this evidence class was not asked for. Only a non-blank
+        // value that is not the exact literal is a refusal, so a stray quote in a pasted block cannot be
+        // mistaken for an instruction to run the Pump ladder.
+        var values = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [PumpCommandDryTrial.ModeVariable] = supplied,
+        };
+
+        Assert.True(PumpCommandDryTrial.TryReadMode(Reader(values), out bool selected, out string code, out _));
+
+        Assert.False(selected);
+        Assert.Empty(code);
     }
 
     [Fact]

@@ -80,9 +80,11 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
     {
         CleaningPathSimulatedPumpReadyGate gate = Gate(new FakeBoundary());
 
-        Assert.False(gate.PhysicalPumpVerified);
-        Assert.Equal("SOFTWARE_SIMULATED", gate.PumpEvidenceKind);
-        Assert.Equal(CleaningPathSimulatedPumpReadyGate.EvidenceKind, gate.PumpEvidenceKind);
+        Assert.False(CleaningPathSimulatedPumpReadyGate.PhysicalPumpVerified);
+        Assert.Equal("SOFTWARE_SIMULATED", CleaningPathSimulatedPumpReadyGate.PumpEvidenceKind);
+        Assert.Equal(
+            CleaningPathSimulatedPumpReadyGate.EvidenceKind,
+            CleaningPathSimulatedPumpReadyGate.PumpEvidenceKind);
         Assert.Equal(Declared, gate.DeclaredPumpOutletBar);
         Assert.Equal(Setpoint, gate.PumpReadySetpointBar);
     }

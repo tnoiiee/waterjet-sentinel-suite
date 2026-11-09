@@ -379,18 +379,24 @@ public static class PumpCommandDryTrial
         }
         finally
         {
-            try
+            // The close is guarded the same way the read-only trial guards it: a session that never opened
+            // is not "closed" by this trial, and the claim is printed only after the release has actually
+            // happened, so the record states a fact rather than an intention.
+            if (!string.Equals(session.State, "CLOSED", StringComparison.Ordinal))
             {
-                session.Close(clock.UtcNow);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
-            {
-                error.WriteLine("WJSS Pump command trial: the session close reported " + ex.Message);
+                try
+                {
+                    session.Close(clock.UtcNow);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+                {
+                    error.WriteLine("WJSS Pump command trial: the session close reported " + ex.Message);
+                }
             }
 
+            transport.Dispose();
             output.WriteLine("  session_state=" + session.State);
             output.WriteLine("  transport_released=True");
-            transport.Dispose();
         }
 
         return exitCode;
@@ -485,7 +491,7 @@ public static class PumpCommandDryTrial
         output.WriteLine("  fault_feedback_never_active=" + (sawFault ? "False" : "True"));
         output.WriteLine("  valve_open_admitted_by_lifecycle=" + (lifecycle.AllowsValveOpen ? "True" : "False"));
 
-        ReportPressureCrossCheck(lifecycle, session, catalogue, thresholds, configuration, time, output);
+        ReportPressureCrossCheck(session, catalogue, thresholds, configuration, time, output);
 
         PumpLifecycleStopOutcome stopped = lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
         output.WriteLine("  stop_accepted=" + (stopped.StopConfirmed ? "True" : "False"));
@@ -553,7 +559,6 @@ public static class PumpCommandDryTrial
     /// decision. It writes nothing.
     /// </summary>
     private static void ReportPressureCrossCheck(
-        ProcessIoPumpLifecycle lifecycle,
         ProcessIoSession session,
         IReadOnlyDictionary<string, ProcessIoCatalogueRow> catalogue,
         SequencingPressureThresholds thresholds,

@@ -56,7 +56,7 @@ dotnet test tests/integration/Wjss.FixtureEmission.Tests.csproj     -c Release -
 
 ```powershell
 $Repo = 'C:\dev\waterjet-sentinel-suite'      # same value you used in 0.1
-. Join-Path $Repo 'tools/hardware-runbook/wjss-field-driver.ps1'
+. (Join-Path $Repo 'tools\hardware-runbook\wjss-field-driver.ps1')   # วงเล็บครอบจำเป็น: dot-source ต้องการ expression ไม่ใช่ชื่อ cmdlet
 Test-WjssDriver
 Export-WjssStageFiles
 ```
@@ -257,6 +257,8 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 & "$script:Ev\stage-D-pump.ps1"
 ```
 
+- **ต้องการแค่ WAGO T8 เท่านั้น**: trial นี้ไม่อ่าน Cleaning Path store, ไม่อ่าน sensor CSV, ไม่ compose motion — จึงรันบนโต๊ะ
+  ที่ต่อเฉพาะ Process-I/O ได้ทันที (และเพราะไม่มี motion จึงไม่มีแกนไหนขยับ)
 - Product ที่รัน: `apps/runtime/PumpCommandDryTrial.cs` (เลือกด้วย `WJSS_PUMP_COMMAND_DRY_TRIAL=PUMP_ONLY_NO_VALVES`) — บล็อกนี้**ไม่ compose equipment boundary เลย** จึงไม่มีเส้นทางสั่งวาล์วอยู่ใน process นั้น (ไม่มี `RequestValve`, ไม่มี cleanup close ของวาล์ว) และไม่มี motion → วาล์วอยู่กับที่ตามที่ Stage C ทิ้งไว้, แกนไม่ขยับ
 - บันไดที่ตรวจ (มาจาก `ProcessIoPumpLifecycle` ตัวเดิม ไม่มี state machine ชุดที่สอง): `selection_pair_written` (DO-001 TRUE / DO-002 FALSE) → `pump_enable_written` (DO-003 TRUE) → `pump_run_written` (DO-007 TRUE) → `running_feedback_confirmed` (DI-004) → `analog_ramp_executed` (AO-001) → `pump_ready_confirmed` (AI-003 > setpoint แบบ strictly-greater เดิม) → `analog_stop_sentinel_written` (AO = 0 mA sentinel) → `pump_run_cleared` (DO-007 FALSE) → `pump_enable_released` (DO-003 FALSE) → `stopped_confirmed` (DI-004 not-running) → `ownership_released` + `safe_to_report_complete`
 - ต้องพิมพ์ยืนยันก่อนรัน: `PUMP LADDER ONLY` — ปั๊มทำงานจริงขณะที่วาล์วปิด เส้นสายจะ dead-head จึงต้องยืนยันว่าเส้นทาง relief/return เปิดอยู่และไม่มีใครอยู่ที่ lance
@@ -275,6 +277,15 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 - สิ่งที่ยังเป็นการสัมผัสจริงทั้งหมด: เปิด/ปิด paired isolation valve ผ่าน session ที่มีอำนาจเขียน, limit switches, การเดิน P1-P6, Mandatory Safe Return + cleanup close
 - หลักฐานติดป้ายชัดเจน: `pump_evidence_kind=SOFTWARE_SIMULATED`, `physical_pump_verified=False`, `pump_gate=DECLARED_PUMP_PRECONDITION`, `simulated_pump_ready_rule=DECLARED_ABOVE_SETPOINT` + บรรทัด `DECLARED PUMP-READY EVIDENCE: ...` → นับเป็นหลักฐานของเส้นทางคำสั่ง/การควบคุมได้ **แต่ไม่นับเป็นหลักฐานว่า "สั่งงานพร้อมน้ำจริง"**
 - ค่าที่ห้ามเดา (ถามบนหน้าจอ): sensor id, mA target (ยังถูก validate แต่ไม่ถูกใช้), polarity x2 และ **bar ที่ประกาศ (ต้อง > 15)**
+- **สิ่งที่ D-sim ต้องมีมากกว่า D-pump (สำคัญ - อ่านก่อนรัน):** `CleaningPathDryComposition` compose ทั้ง Cleaning Path จึงต้องอ่าน
+  ไฟล์ Owner-local อีก 2 ฉบับและฝั่ง motion ด้วย: `WJSS_CLEANING_PATH_STORE`, `WJSS_SENSOR_PARAMETER_CSV` และชุด motion
+  (`WJSS_MANUAL_MOTION_PROFILE`, `WJSS_MOTION_CONTROLLER_01_ENDPOINT`, `WJSS_MOTION_LIB_DIR`, `WJSS_MOTION_LIB_GCLIB_SHA256`,
+  `WJSS_MOTION_LIB_GCLIBO_SHA256`, `WJSS_MOTION_LIB_EXPECTED_VERSION`, `WJSS_MANUAL_MOTION_CONSENT`) — ตัวขับ**ถามค่าที่ขาด**
+  ในตอนรัน stage `D-sim`/`D-dry` เท่านั้น (ค่าที่เคยตั้งไว้ในหน้าต่างก่อนโหลดตัวขับจะถูกเก็บไว้ไม่ให้ `Clear-WjssEnv` ลบ) และ
+  **ถ้าค่าไหนไม่มี ตัวขับจะ STOP ก่อนเรียก exe** พร้อมชื่อตัวแปรให้ส่งกลับมา — ไม่ใช่ให้กรอกเดาสุ่ม
+- เพราะฉะนั้น D-sim รันได้เมื่อโต๊ะต่อทั้ง WAGO T8 **และ** motion controller พร้อม homing no-load; ถ้าวันนี้มีแค่ T8
+  ให้รัน `D-pump` (บันไดปั๊มจริง, ไม่ต้องมี store/CSV/motion เลย) + `C-iv1` (วาล์วจริงบนค่า AI-003 ที่ประกาศ) ซึ่งคู่นี้ปิด
+  gate คนละครึ่งพอดี และการเดิน P1-P6 ค้างไว้จนกว่าจะต่อ motion ครบ (นี่คือขอบเขตจริงของ Product ไม่ใช่ข้อจำกัดของสคริปต์)
 - refusal ที่เกี่ยวข้อง: `DRY_COMPOSITION_REFUSED_SIMULATED_PUMP_SELECTOR` / `_BAR` / `_ATTESTATION` — แก้ที่ input ไม่ใช่ที่โค้ด
 
 ### ข้อ 6.3 — variant สาม: `D-dry` = ปั๊มจริง + วาล์วจริง (โหมดเปียก ต้อง ack แยก)

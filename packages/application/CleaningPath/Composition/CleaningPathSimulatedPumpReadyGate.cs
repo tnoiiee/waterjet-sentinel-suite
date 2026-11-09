@@ -106,11 +106,15 @@ public sealed class CleaningPathSimulatedPumpReadyGate : ICleaningPathEquipmentB
     /// <summary>The setpoint the declaration was compared against.</summary>
     public double PumpReadySetpointBar => _pumpReadySetpointBar;
 
-    /// <summary>False always: no physical Pump command was verified in this evidence class.</summary>
-    public bool PhysicalPumpVerified => false;
+    /// <summary>
+    /// False always: no physical Pump command was verified in this evidence class. It is stated on the
+    /// type because it is a property of the evidence class, not of one instance - the composition prints
+    /// it beside every value this gate declares, and a caller can never set it.
+    /// </summary>
+    public static bool PhysicalPumpVerified => false;
 
-    /// <summary>The evidence kind this composition must report.</summary>
-    public string PumpEvidenceKind => EvidenceKind;
+    /// <summary>The evidence kind this composition must report, for the same reason.</summary>
+    public static string PumpEvidenceKind => EvidenceKind;
 
     /// <summary>True once the composition has begun, which is what admits a paired-IV OPEN.</summary>
     public bool RunBegun => _begun;

@@ -19,7 +19,7 @@
 # SOURCE-AUTHORED IN ARENA. NOT EXECUTED IN ARENA: the Arena sandbox has no PowerShell interpreter, so the
 # gates here are (a) the load-time parser of PowerShell itself, (b) Test-WjssDriver on the Owner's machine.
 
-$script:WjssDriverVersion = '2026-11-08.2'
+$script:WjssDriverVersion = '2026-11-09.1'
 $ErrorActionPreference = 'Stop'
 
 function Read-WjssAnswer {
@@ -90,7 +90,7 @@ function Test-WjssBuild {
     }
     $exe = Get-Item -LiteralPath $script:Exe
     $newest = $null
-    $roots = @((Join-Path $script:Repo 'apps'), (Join-Path $script:Repo 'packages'))
+    $roots = @((Join-Path $script:Repo 'apps'), (Join-Path $script:Repo 'packages'), (Join-Path $script:Repo 'adapters'))
     foreach ($r in $roots) {
         $files = @(Get-ChildItem -Path $r -Recurse -File -Filter '*.cs' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' })
         foreach ($f in $files) {
@@ -281,7 +281,7 @@ function Invoke-WjssStage {
 
 function Read-WjssField {
     # one Owner-only value; nothing is guessed on your behalf
-    param([string]$Label, [string]$Pattern = '', [switch]$Number)
+    param([string]$Label, [string]$Pattern = '', [switch]$Number, [switch]$Hash)
     while ($true) {
         $v = (Read-Host ('  ' + $Label)).Trim()
         if ($v.Length -eq 0) { Write-Host '  empty is not allowed (the trial refuses with exit=4 rather than defaulting)' -ForegroundColor Yellow; continue }
@@ -289,11 +289,97 @@ function Read-WjssField {
             if ($v -match '^-?[0-9]{1,3}(\.[0-9]{1,3})?$') { return $v }
             Write-Host '  needs a plain number with a DOT decimal (a comma is rejected by the invariant-culture parser)' -ForegroundColor Yellow; continue
         }
+        if ($Hash) {
+            if ($v -match '^[0-9a-fA-F]{64}$') { return $v }
+            Write-Host '  needs the 64 hex characters of the SHA-256 that Gate A expects' -ForegroundColor Yellow
+            continue
+        }
         if ($Pattern.Length -gt 0 -and $v -notmatch $Pattern) {
             Write-Host ('  must match: ' + $Pattern) -ForegroundColor Yellow; continue
         }
         return $v
     }
+}
+
+$script:MotionVarNames = @(
+    'WJSS_MANUAL_MOTION_CONSENT',
+    'WJSS_MOTION_CONTROLLER_01_ENDPOINT',
+    'WJSS_MOTION_LIB_DIR',
+    'WJSS_MOTION_LIB_GCLIB_SHA256',
+    'WJSS_MOTION_LIB_GCLIBO_SHA256',
+    'WJSS_MOTION_LIB_EXPECTED_VERSION',
+    'WJSS_MANUAL_MOTION_PROFILE'
+)
+
+function Save-WjssMotionEnv {
+    # The Cleaning Path composition also composes the motion side, so those names must survive the
+    # per-stage Clear-WjssEnv. They are taken from THIS window at load time; nothing is invented and
+    # nothing is read from a file, so a value that was never supplied stays missing.
+    if ($null -eq $script:Motion) { $script:Motion = @{} }
+    $all = [Environment]::GetEnvironmentVariables()
+    foreach ($n in $script:MotionVarNames) {
+        $v = [string]$all[$n]
+        if ($v.Length -gt 0) { $script:Motion[$n] = $v }
+    }
+    return $script:Motion.Count
+}
+
+function Get-WjssMotionVars {
+    # one prompt per missing motion value, and a refusal rather than a guess when nothing is given
+    [void](Save-WjssMotionEnv)
+    if ($null -eq $script:Motion) { $script:Motion = @{} }
+    foreach ($k in $script:MotionVarNames) {
+        $v = ''
+        if ($script:Motion.ContainsKey($k)) { $v = [string]$script:Motion[$k] }
+        if ($v.Length -eq 0) {
+            if ($k -eq 'WJSS_MANUAL_MOTION_CONSENT') {
+                $v = Read-WjssMotionConsent
+            } elseif ($k -eq 'WJSS_MANUAL_MOTION_PROFILE') {
+                $v = Read-WjssOwnerFile -Label 'Owner-local manual motion profile file (the same file your motion commissioning run was given)'
+            } elseif ($k -eq 'WJSS_MOTION_CONTROLLER_01_ENDPOINT') {
+                $v = Read-WjssField -Label 'Motion controller endpoint, exactly as in your motion commissioning run'
+            } elseif ($k -eq 'WJSS_MOTION_LIB_DIR') {
+                $v = Read-WjssOwnerFile -Label 'Directory that holds the motion native library'
+            } else {
+                $v = Read-WjssField -Label ('Gate A value for ' + $k + ' (the same value your motion commissioning window used)') -Hash
+            }
+        }
+        if ($v.Length -eq 0) {
+            throw ('STOP: ' + $k + ' is required by the Cleaning Path composition and nothing was supplied. Nothing was run.')
+        }
+        $script:Motion[$k] = $v
+    }
+    return $script:Motion
+}
+
+function Read-WjssOwnerFile {
+    # an Owner-local file the Product refuses to default; asked for by path, checked on disk
+    param([string]$Label)
+    while ($true) {
+        $v = (Read-Host ('  ' + $Label)).Trim()
+        if ($v.Length -eq 0) {
+            Write-Host '  empty is not allowed - the composition refuses with exit=2 rather than substituting a file' -ForegroundColor Yellow
+            continue
+        }
+        if (-not (Test-Path -LiteralPath $v)) {
+            Write-Host ('  no such file or folder: ' + $v) -ForegroundColor Yellow
+            continue
+        }
+        return $v
+    }
+}
+
+function Read-WjssMotionConsent {
+    # the motion session confirmation: never printed, never written to a file, held for this window only
+    Ensure-WjssDevice
+    if (-not $script:Consent.ContainsKey('ManualMotionSession')) {
+        Write-Host '  open adapters\motion-library\ManualMotionControllerOutcome.cs and read the value of ManualMotionControllerCodes.ExactConsentValue' -ForegroundColor DarkGray
+        $sec = Read-Host '  paste that phrase (input hidden)' -AsSecureString
+        $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+        try { $script:Consent['ManualMotionSession'] = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
+        finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+    }
+    return $script:Consent['ManualMotionSession']
 }
 
 function Confirm-WjssState {
@@ -538,6 +624,8 @@ $script:Stages = @{
             'WJSS_PUMP_READY_SETPOINT_BAR'  = '15'
             'WJSS_PRESSURE_LOW_BAR'         = '1'
             'WJSS_PRESSURE_HIGH_BAR'        = '15'
+            # nothing else: this trial composes no store, no sensor parameters and no motion, so the WAGO
+            # T8 alone is the whole device surface it touches
         } -Expect ([ordered]@{
             'trial_identity'                = 'PHYSICAL_PUMP_COMMAND_ONLY_NO_VALVES'
             'evidence_kind'                 = 'PHYSICAL'
@@ -580,7 +668,10 @@ $script:Stages = @{
         $runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
         $fltPol = Read-WjssField -Label 'Pump FAULT polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
         $bar    = Read-WjssField -Label 'Declared Pump Outlet Pressure in bar, must be strictly above 15' -Number
-        Invoke-WjssStage -Name 'D-sim' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
+        # This variant composes the WHOLE Cleaning Path, so the composition also reads the Owner-local
+        # topology and the motion side. Those names are asked for here because every stage starts from an
+        # environment that Clear-WjssEnv emptied on purpose - nothing is inherited and nothing is invented.
+        $v = @{
             'WJSS_DRY_COMMAND_MODE'           = 'TEST_HARDWARE_DRY'
             'WJSS_DRY_SIMULATED_PUMP_READY'   = 'SOFTWARE_SIMULATED_AI003'
             'WJSS_DRY_SIMULATED_PUMP_STOPPED' = 'PUMP_STOPPED_OWNER_ATTESTED'
@@ -598,7 +689,12 @@ $script:Stages = @{
             'WJSS_PRESSURE_LOW_BAR'          = '1'
             'WJSS_PRESSURE_HIGH_BAR'         = '15'
             'WJSS_VALVE_SUPERVISION_MS'      = '5000'
-        } -Expect ([ordered]@{
+            'WJSS_CLEANING_PATH_STORE'         = Read-WjssOwnerFile -Label 'Owner-local Cleaning Path store file (the canonical topology the resolver reads)'
+            'WJSS_SENSOR_PARAMETER_CSV'        = Read-WjssOwnerFile -Label 'Owner-local sensor parameter CSV (the Sensor-owned P1-P6 parameters)'
+        }
+        $mv = Get-WjssMotionVars
+        foreach ($k in @($mv.Keys)) { $v[$k] = $mv[$k] }
+        Invoke-WjssStage -Name 'D-sim' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars $v -Expect ([ordered]@{
             'profile'                           = 'TEST_HARDWARE_DRY'
             'mode'                              = 'WJSS_DRY_COMMAND_MODE'
             'prepare'                           = 'DRY_PREPARE_READY'
@@ -632,7 +728,9 @@ $script:Stages = @{
         $ma     = Read-WjssField -Label 'Pump AO target in mA (the value you decided in the ACCELERATED package)' -Number
         $runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
         $fltPol = Read-WjssField -Label 'Pump FAULT polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
-        Invoke-WjssStage -Name 'D-dry' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
+        # the wet variant composes the whole path as well, so it needs the same Owner-local topology and
+        # motion values as D-sim (asked for here, after the environment was deliberately cleared)
+        $v = @{
             'WJSS_DRY_COMMAND_MODE'        = 'TEST_HARDWARE_DRY'
             'WJSS_CLEANING_SENSOR_ID'      = $sid
             'WJSS_PUMP_SELECTION'           = '1'
@@ -648,13 +746,19 @@ $script:Stages = @{
             'WJSS_PRESSURE_HIGH_BAR'        = '15'
             'WJSS_VALVE_SUPERVISION_MS'     = '5000'
             'WJSS_DRY_WET_SEQUENCE_ACK'      = 'WATER_AT_NOZZLE_AUTHORIZED'
-        } -Expect ([ordered]@{
+            'WJSS_CLEANING_PATH_STORE'       = Read-WjssOwnerFile -Label 'Owner-local Cleaning Path store file (the canonical topology the resolver reads)'
+            'WJSS_SENSOR_PARAMETER_CSV'      = Read-WjssOwnerFile -Label 'Owner-local sensor parameter CSV (the Sensor-owned P1-P6 parameters)'
+        }
+        $mv = Get-WjssMotionVars
+        foreach ($k in @($mv.Keys)) { $v[$k] = $mv[$k] }
+        Invoke-WjssStage -Name 'D-dry' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars $v -Expect ([ordered]@{
             'profile'                           = 'TEST_HARDWARE_DRY'
             'mode'                              = 'WJSS_DRY_COMMAND_MODE'
             'prepare'                           = 'DRY_PREPARE_READY'
             'terminal_status'                   = 'CompleteAwaitingSafeReturn'
             'terminal_code'                     = 'PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN'
             'primary_failure'                   = 'NONE'
+            'pump_evidence_kind'                = 'PHYSICAL'
             'cleanup.pump.stopped_confirmed'    = 'True'
             'cleanup.pump.ownership_released'   = 'True'
             'cleanup.pump.complete'              = 'True'
@@ -844,7 +948,9 @@ function Test-WjssDriver {
     $used = @{}
     foreach ($m in [regex]::Matches([string]($all -join [Environment]::NewLine), 'WJSS_[A-Z0-9_]+')) { $used[$m.Value] = $true }
     $corpus = ''
-    foreach ($r in @((Join-Path $script:Repo 'packages'), (Join-Path $script:Repo 'apps\runtime'))) {
+    $roots = @((Join-Path $script:Repo 'packages'), (Join-Path $script:Repo 'apps\runtime'),
+               (Join-Path $script:Repo 'apps\motion-composition'), (Join-Path $script:Repo 'adapters\motion-library'))
+    foreach ($r in $roots) {
         if (-not (Test-Path -LiteralPath $r)) { $bad += ('source tree missing, cannot audit: ' + $r); continue }
         foreach ($fi in @(Get-ChildItem -Path $r -Recurse -File -Filter '*.cs' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '\\(bin|obj)\\' })) {
             $corpus += [string](Get-Content -LiteralPath $fi.FullName -Raw)
@@ -892,5 +998,14 @@ function Test-WjssDriver {
     Write-Host ('  self-test scratch: ' + $tmp + ' (evidence folder stays clean)') -ForegroundColor DarkGray
 }
 
+# The motion-side values a Cleaning Path stage needs are snapshotted NOW, at load, because every stage
+# starts by emptying the process environment on purpose. A value this window was given before the driver was
+# loaded is therefore kept for the stages that require it; a value it was never given stays missing and is
+# asked for (or refused) by the stage, never invented here.
+[void](Save-WjssMotionEnv)
+
 Write-Host ('WJSS field driver ' + $script:WjssDriverVersion + ' loaded. Next: Test-WjssDriver, then Export-WjssStageFiles.') -ForegroundColor Green
+if ($script:Motion.Count -gt 0) {
+    Write-Host ('  motion-side values carried from this window: ' + [string]$script:Motion.Count + ' of ' + [string]$script:MotionVarNames.Count + ' (the rest are asked for by the D-sim/D-dry stage)') -ForegroundColor DarkGray
+}
 Write-Host ('  stages: ' + ($script:StageNames -join ', ')) -ForegroundColor DarkGray

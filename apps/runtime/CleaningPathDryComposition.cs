@@ -642,9 +642,11 @@ public sealed class CleaningPathDryComposition : IDisposable
 
         // The precondition is structural, not advisory: the coordinator receives the gated boundary,
         // so it has no reference through which it could request an IV OPEN without the Pump.
-        CleaningPathPumpLifecycleGate? pumpGate = null;
+        // The variable handed to the coordinator is named for the decision it carries, whatever that
+        // decision's source turns out to be: pumpGate is the ONLY equipment authority the path receives.
+        CleaningPathPumpLifecycleGate? lifecyclePumpGate = null;
         CleaningPathSimulatedPumpReadyGate? simulatedPumpGate = null;
-        ICleaningPathEquipmentBoundary equipmentAuthority;
+        ICleaningPathEquipmentBoundary pumpGate;
         if (simulatedPumpReady)
         {
             // The lifecycle is composed and stays IDLE: it is never started, so it writes no selection, no
@@ -654,12 +656,12 @@ public sealed class CleaningPathDryComposition : IDisposable
             // every command and every observation to the real boundary.
             simulatedPumpGate = new CleaningPathSimulatedPumpReadyGate(
                 equipment, clock, declaredPumpOutletBar, thresholds.PumpReadySetpointBar);
-            equipmentAuthority = simulatedPumpGate;
+            pumpGate = simulatedPumpGate;
         }
         else
         {
-            pumpGate = new CleaningPathPumpLifecycleGate(equipment, pumpLifecycle);
-            equipmentAuthority = pumpGate;
+            lifecyclePumpGate = new CleaningPathPumpLifecycleGate(equipment, pumpLifecycle);
+            pumpGate = lifecyclePumpGate;
         }
         string pumpOwnerId = "CLEANING_PATH_DRY:" + resolved.SensorId + ":" + resolved.DerivedIsolationValveId;
 
@@ -669,7 +671,7 @@ public sealed class CleaningPathDryComposition : IDisposable
             motionRoot.Session,
             resolved.HorizontalAxisId,
             resolved.VerticalAxisId);
-        var compositionCoordinator = new CleaningPathCompositionCoordinator(motion, equipmentAuthority, clock);
+        var compositionCoordinator = new CleaningPathCompositionCoordinator(motion, pumpGate, clock);
 
         var provenance = new CleaningPathDryProvenance
         {
@@ -705,7 +707,7 @@ public sealed class CleaningPathDryComposition : IDisposable
             session,
             equipment,
             pumpLifecycle,
-            pumpGate,
+            lifecyclePumpGate,
             simulatedPumpGate,
             simulatedPumpReady,
             pumpConfiguration,
@@ -824,18 +826,22 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// </summary>
     public CleaningPathCompositionStartOutcome Start()
     {
+        // The order of these two statements is a contract, not a style choice: the Pump precondition is
+        // admitted before the path is started, in every evidence class.
+        //
+        // In the declared-value class there is no Pump command to admit, so the same position in the order
+        // is taken by beginning the run's readiness window - and it is still BEFORE the path starts.
+        if (!_pumpSimulated && !StartPump(out string pumpCode))
+        {
+            return new CleaningPathCompositionStartOutcome(false, pumpCode, null, null);
+        }
+
         if (_pumpSimulated)
         {
             // No Pump command is issued in this evidence class. The declared readiness becomes admissible
             // only now, so a paired-IV OPEN cannot be requested before the run has begun, which mirrors the
             // ordering the physical precondition provides.
             _simulatedPumpGate?.Begin();
-            return _composition.Start(StoreSnapshot, Resolution, Request);
-        }
-
-        if (!StartPump(out string pumpCode))
-        {
-            return new CleaningPathCompositionStartOutcome(false, pumpCode, null, null);
         }
 
         return _composition.Start(StoreSnapshot, Resolution, Request);
