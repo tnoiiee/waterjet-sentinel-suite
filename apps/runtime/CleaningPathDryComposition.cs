@@ -629,7 +629,7 @@ public sealed class CleaningPathDryComposition : IDisposable
             return false;
         }
 
-        TimeProvider pumpTime = new ClockTimeProvider(clock);
+        var pumpTime = new ClockTimeProvider(clock);
         var pumpOwnership = new PumpCommandOwnership();
         var pumpBoundary = new ProcessIoPumpCommandBoundary(
             session,

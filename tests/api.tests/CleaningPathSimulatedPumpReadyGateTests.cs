@@ -18,6 +18,20 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
     private const double Setpoint = 15.0;
     private const double Declared = 16.64;
 
+    /// <summary>
+    /// The expected transcripts of the fake boundary, hoisted into immutable fields so each assertion compares
+    /// against one shared array instead of allocating a constant array per call (CA1861). Nothing here is
+    /// mutated, so sharing them across tests is safe.
+    /// </summary>
+    private static readonly string[] RefusedOpenBeforeBegin =
+    {
+        CleaningPathSimulatedPumpReadyGate.RefusedValveOpenBeforeBegin + ":IV1",
+    };
+
+    private static readonly string[] CloseOnIV1 = ["Close:IV1"];
+
+    private static readonly string[] OpenOnIV1 = ["Open:IV1"];
+
     private static CleaningPathSimulatedPumpReadyGate Gate(FakeBoundary inner) =>
         new(inner, new SystemClock(), Declared, Setpoint);
 
@@ -51,7 +65,7 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
             new CleaningPathSimulatedPumpReadyGate(inner, new SystemClock(), Setpoint, Setpoint));
 
         Assert.Contains("is not readiness", ex.Message, StringComparison.Ordinal);
-        Assert.Equal(0, inner.ValveRequests.Count);
+        Assert.Empty(inner.ValveRequests);
     }
 
     [Theory]
@@ -100,9 +114,7 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
         gate.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
 
         Assert.Empty(inner.ValveRequests);
-        Assert.Equal(
-            new[] { CleaningPathSimulatedPumpReadyGate.RefusedValveOpenBeforeBegin + ":IV1" },
-            gate.RefusedRequests);
+        Assert.Equal(RefusedOpenBeforeBegin, gate.RefusedRequests.ToArray());
         Assert.False(gate.RunBegun);
     }
 
@@ -114,9 +126,7 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
 
         gate.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Close));
 
-        Assert.Equal(
-            new[] { "Close:IV1" },
-            inner.ValveRequests);
+        Assert.Equal(CloseOnIV1, inner.ValveRequests.ToArray());
         Assert.Empty(gate.RefusedRequests);
     }
 
@@ -130,7 +140,7 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
         gate.RequestValve(new CleaningPathValveCommandRequest("IV1", CleaningPathValveCommandKind.Open));
 
         Assert.True(gate.RunBegun);
-        Assert.Equal(new[] { "Open:IV1" }, inner.ValveRequests);
+        Assert.Equal(OpenOnIV1, inner.ValveRequests.ToArray());
         Assert.Empty(gate.RefusedRequests);
         // The gate never touches a coil itself: it has no session and no catalogue reference.
         Assert.Equal(0, inner.PumpPressureReads);

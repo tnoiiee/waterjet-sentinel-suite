@@ -31,6 +31,45 @@ public sealed class PumpCommandDryTrialTests
     private static Func<string, string?> Reader(IDictionary<string, string?> values) => key =>
         values.TryGetValue(key, out string? value) ? value : null;
 
+    /// <summary>
+    /// The markers that must not appear in the Pump-only trial, hoisted into an immutable field so the
+    /// structural scan reuses one array (CA1861) instead of allocating a constant array per call.
+    /// </summary>
+    private static readonly string[] ForbiddenValveSurfaceMarkers =
+    {
+        "ProcessIoEquipmentBoundary",
+        "RequestValve",
+        "CleaningPathCompositionCoordinator",
+        "MotionCompositionRoot",
+        "CleaningPathDryComposition.TryCreate",
+        "SafeCleanupCloseAll",
+    };
+
+    /// <summary>
+    /// Every rung the Pump-only trial must print, hoisted for the same reason as the marker list above.
+    /// </summary>
+    private static readonly string[] PrintedRungKeys =
+    {
+        "start_accepted=",
+        "selection_pair_written=",
+        "pump_enable_written=",
+        "pump_run_written=",
+        "running_feedback_confirmed=",
+        "analog_ramp_executed=",
+        "pump_ready_confirmed=",
+        "fault_feedback_never_active=",
+        "analog_stop_sentinel_written=",
+        "pump_run_cleared=",
+        "pump_enable_released=",
+        "terminal_state=",
+        "stopped_confirmed=",
+        "cleanup_state=",
+        "ownership_released=",
+        "safe_to_report_complete=",
+        "session_state=",
+        "transport_released=",
+    };
+
     // ------------------------------------------------------------ selector semantics
 
     [Fact]
@@ -217,15 +256,7 @@ public sealed class PumpCommandDryTrialTests
         string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
 
         // No valve surface of any kind: not the boundary, not a request, not a valve tag.
-        foreach (string forbidden in new[]
-                 {
-                     "ProcessIoEquipmentBoundary",
-                     "RequestValve",
-                     "CleaningPathCompositionCoordinator",
-                     "MotionCompositionRoot",
-                     "CleaningPathDryComposition.TryCreate",
-                     "SafeCleanupCloseAll",
-                 })
+        foreach (string forbidden in ForbiddenValveSurfaceMarkers)
         {
             Assert.DoesNotContain(forbidden, text, StringComparison.Ordinal);
         }
@@ -243,27 +274,7 @@ public sealed class PumpCommandDryTrialTests
     {
         string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
 
-        foreach (string key in new[]
-                 {
-                     "start_accepted=",
-                     "selection_pair_written=",
-                     "pump_enable_written=",
-                     "pump_run_written=",
-                     "running_feedback_confirmed=",
-                     "analog_ramp_executed=",
-                     "pump_ready_confirmed=",
-                     "fault_feedback_never_active=",
-                     "analog_stop_sentinel_written=",
-                     "pump_run_cleared=",
-                     "pump_enable_released=",
-                     "terminal_state=",
-                     "stopped_confirmed=",
-                     "cleanup_state=",
-                     "ownership_released=",
-                     "safe_to_report_complete=",
-                     "session_state=",
-                     "transport_released=",
-                 })
+        foreach (string key in PrintedRungKeys)
         {
             Assert.Contains(key, text, StringComparison.Ordinal);
         }

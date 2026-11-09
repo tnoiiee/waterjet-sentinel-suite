@@ -322,8 +322,11 @@ public static class PumpCommandDryTrial
             return 4;
         }
 
-        IClock clock = new SystemClock();
-        TimeProvider time = new ClockTimeProvider(clock);
+        // Declared with var on purpose: the clock and the time provider are the concrete types the trials
+        // always use, and naming an interface here only adds a devirtualisation cost the analyzers report as
+        // CA1859 under this repo's warnings-as-errors build.
+        var clock = new SystemClock();
+        var time = new ClockTimeProvider(clock);
 
         var endpoints = new Dictionary<string, ProcessIoEndpointConfig>(StringComparer.Ordinal)
         {
