@@ -28,7 +28,14 @@ public sealed class PumpCommandDryTrialTests
         [ProcessIoEndpointConfiguration.ConsentVariable] = ProcessIoConsentPhrases.PhysicalDoSingle,
     };
 
-    private static Func<string, string?> Reader(IDictionary<string, string?> values) => key =>
+    /// <summary>
+    /// The environment reader every refusal test hands to the trial. It takes the concrete dictionary type
+    /// because that is what all of them build - Valid() and the inline dictionaries - and a private helper
+    /// whose parameter is IDictionary while every caller passes Dictionary is exactly what CA1859 reports
+    /// under this repo's warnings-as-errors build. (CleaningPathDryCompositionTests.cs keeps IDictionary for
+    /// its identical helper because one of ITS callers forwards an IDictionary parameter of its own.)
+    /// </summary>
+    private static Func<string, string?> Reader(Dictionary<string, string?> values) => key =>
         values.TryGetValue(key, out string? value) ? value : null;
 
     /// <summary>

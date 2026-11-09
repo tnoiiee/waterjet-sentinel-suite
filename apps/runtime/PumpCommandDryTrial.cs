@@ -419,7 +419,11 @@ public static class PumpCommandDryTrial
         PumpLifecycleConfiguration configuration,
         int pumpSelection,
         TimeProvider time,
-        IClock clock,
+        // The concrete clock, not IClock, on purpose: this is the trial's own private helper and it is
+        // called exactly once, with the SystemClock created above. Declaring an interface here would only
+        // add a virtual dispatch per UtcNow read, and under this repo's warnings-as-errors build CA1859
+        // reports it. Everything the ladder actually needs from the clock is UtcNow.
+        SystemClock clock,
         TextWriter output)
     {
         PumpLifecycleStartOutcome admitted = lifecycle.Start(new PumpLifecycleStartRequest
