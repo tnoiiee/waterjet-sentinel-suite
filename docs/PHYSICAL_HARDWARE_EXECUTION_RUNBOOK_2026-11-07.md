@@ -63,8 +63,8 @@ Export-WjssStageFiles
 
 `Test-WjssDriver` ไม่ใช่ formal check — มัน**รันโค้ดจริงบน PowerShell เครื่องคุณ** (ตัวเดียวกับที่จะรัน stage):
 
-- parse ไฟล์ตัวขับและ parse ไฟล์ `stage-*.ps1` ทั้ง 8 ไฟล์ที่ export ออกมา (syntax ผิด = เจอตรงนั้นเลย)
-- ตรวจว่า stage ครบ 8 ตัว ไม่มี consent literal/endpoint literal หลงอยู่ในโค้ดของ stage
+- parse ไฟล์ตัวขับและ parse ไฟล์ `stage-*.ps1` ทั้ง 10 ไฟล์ที่ export ออกมา (syntax ผิด = เจอตรงนั้นเลย)
+- ตรวจว่า stage ครบ 10 ตัว ไม่มี consent literal/endpoint literal หลงอยู่ในโค้ดของ stage
 - รัน `& <exe>` จริงใน mode startup-refusal (ไม่แตะ device) แล้วดูว่า exit code/ refusal มาจริง
 - เทียบตัวอ่าน log, ตัวตัดสิน verdict, ตัว scrub IP กับ log สังเคราะห์ (บรรทัดที่มี `=` ซ้ำในค่า, junk line, key ซ้ำ, ค่าที่พิมพ์ตัวพิมพ์ใหญ่ต่างกันเลยต้องถูกจับ)
 - ตรวจ frame ที่ใช้อ่านบิต: ความยาว 12 ไบต์, protocol id ต้องเป็น 0, length 6, start/quantity เป็น big-endian — พร้อมเคส reply ที่ device ตอบ exception / สั้นเกิน / function code ไม่ตรง
@@ -72,7 +72,7 @@ Export-WjssStageFiles
 
 อะไรก็ตามที่ grep ไม่เจอ = `DRIVER SELF-TEST FAILED` แล้วตัวขับจะ**ไม่ปล่อยให้รัน stage**
 
-ส่วนบรรทัด `Export-WjssStageFiles` คือตัวสร้าง `$env:USERPROFILE\wjss-evidence\<วันที่>\stage-<name>.ps1` ทั้ง 8 ไฟล์ ซึ่งเป็นสิ่งที่รันจริง (ห้ามแก้เอง)
+ส่วนบรรทัด `Export-WjssStageFiles` คือตัวสร้าง `$env:USERPROFILE\wjss-evidence\<วันที่>\stage-<name>.ps1` ทั้ง 10 ไฟล์ ซึ่งเป็นสิ่งที่รันจริง (ห้ามแก้เอง)
 
 หมายเหตุ: ในไฟล์ `tools/` ผมไม่พิมพ์ชื่อ protocol ของยี่ห้อ device (กฎ boundary-scan S3 ใน repo) — protocol ที่ใช้จริงคือ Modbus TCP FC01/FC02 ซึ่งเอกสารนี้เป็นคนอธิบายเอง ตัวขับเลยใช้คำว่า "device TCP port / unit id"
 
