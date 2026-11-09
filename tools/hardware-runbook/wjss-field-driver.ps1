@@ -3,7 +3,7 @@
 # HOW TO USE (one line, in a plain PowerShell window, on the machine wired to the T8 rack):
 #     . "$Repo\tools\hardware-runbook\wjss-field-driver.ps1"      # dot-source, never run with &
 #     Test-WjssDriver                                             # runs the built-in self-tests, no hardware needed
-#     Export-WjssStageFiles                                       # writes the 8 stage scripts into the evidence folder
+#     Export-WjssStageFiles                                       # writes the 10 stage scripts into the evidence folder
 #     & "$script:Ev\stage-A1-off.ps1"                             # then one line per stage, in runbook order
 #
 # Contract of this file:
