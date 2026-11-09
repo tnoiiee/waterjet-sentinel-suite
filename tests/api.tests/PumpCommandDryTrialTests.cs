@@ -301,21 +301,78 @@ public sealed class PumpCommandDryTrialTests
     }
 
     [Fact]
-    public void The_Ladder_Rungs_Are_Compared_On_The_Existing_State_Order()
+    public void The_Ladder_Rungs_Are_Proven_By_Observed_States_And_By_The_Dispatch_Log()
     {
         string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
 
-        // The rung judgement is an ordinal comparison over the adopted lifecycle states: no rung name is
-        // invented here and no rung is inferred from a later one.
-        Assert.Contains("(int)highest >= (int)rung", text, StringComparison.Ordinal);
-        Assert.Contains("PumpLifecycleState.PUMP_SELECTED", text, StringComparison.Ordinal);
-        Assert.Contains("PumpLifecycleState.ENABLE_DISPATCHED", text, StringComparison.Ordinal);
-        Assert.Contains("PumpLifecycleState.RUN_DISPATCHED", text, StringComparison.Ordinal);
+        // A rung is claimed only when the ladder was actually shown that state. Ordinals are never compared:
+        // PumpLifecycleStates.IsFailure is ordinal 20 and up, so the failure values sit above the progression
+        // values and RUNNING_FEEDBACK_TIMEOUT would have reported RAMPING_OUTPUT as reached. That is the
+        // difference between a record and a story, and it is the judgement the field evidence turns on.
+        Assert.Contains("var visited = new HashSet<PumpLifecycleState> { lifecycle.State };", text, StringComparison.Ordinal);
+        Assert.Contains("visited.Contains(rung)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("(int)highest >= (int)rung", text, StringComparison.Ordinal);
+
+        // The rungs before WAITING_FOR_RUNNING are crossed inside Start(), where no loop can observe them, so
+        // those claims come from the boundary's own dispatch log: the tag, the value and a successful dispatch.
+        Assert.Contains("log.Any(o => o.Succeeded", text, StringComparison.Ordinal);
+        Assert.Contains("PumpCommandContract.SelectPumpOneTag, true", text, StringComparison.Ordinal);
+        Assert.Contains("PumpCommandContract.SelectPumpTwoTag, false", text, StringComparison.Ordinal);
+        Assert.Contains("PumpCommandContract.EnableInverterTag, true", text, StringComparison.Ordinal);
+        Assert.Contains("PumpCommandContract.RunPumpTag, true", text, StringComparison.Ordinal);
+
+        // Only states the existing lifecycle enum names, never an invented rung.
         Assert.Contains("PumpLifecycleState.RAMPING_OUTPUT", text, StringComparison.Ordinal);
         Assert.Contains("PumpLifecycleState.RAMPING_DOWN", text, StringComparison.Ordinal);
         Assert.Contains("PumpLifecycleState.CLEARING_RUN", text, StringComparison.Ordinal);
         Assert.Contains("PumpLifecycleState.DISABLING_INVERTER", text, StringComparison.Ordinal);
+        Assert.Contains("PumpLifecycleState.PUMP_READY", text, StringComparison.Ordinal);
         Assert.Contains("PumpLifecycleStates.IsTerminal(lifecycle.State)", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Stop_Order_Is_Not_Asked_Twice_And_Complete_Is_The_Whole_Record()
+    {
+        string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
+
+        // A failure inside the wait already drove the Stop path, so the ladder is terminal before this point.
+        // Asking again used to earn WJSS_PUMP_COMMAND_REFUSED_ALREADY_TERMINAL and print a second,
+        // contradicting story about the same teardown; now the record states that no second order was sent.
+        Assert.Contains("if (ended is null)", text, StringComparison.Ordinal);
+        Assert.Contains("stop_code=NOT_REQUESTED_LADDER_ALREADY_TERMINAL", text, StringComparison.Ordinal);
+
+        // An accepted trial is the whole of it: the ladder reached PUMP_READY, ended in the STOPPED terminal
+        // state with a complete cleanup, released the command channel, was reported safe to complete, and never
+        // saw a Fault input active. A run that tore down cleanly after a timeout cannot report an accepted trial.
+        Assert.Contains("result.TerminalState == PumpLifecycleState.STOPPED", text, StringComparison.Ordinal);
+        Assert.Contains("&& result.StoppedConfirmed", text, StringComparison.Ordinal);
+        Assert.Contains("&& !lifecycle.OwnsPumpCommand", text, StringComparison.Ordinal);
+        Assert.Contains("&& lifecycle.SafeToReportComplete", text, StringComparison.Ordinal);
+        Assert.Contains("&& sawReady", text, StringComparison.Ordinal);
+        Assert.Contains("&& !sawFault", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_Timeout_Names_The_Feedback_It_Waited_For_And_The_Transport_It_Used()
+    {
+        string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
+
+        // Nothing about a refusal may stay silent: the bit, its usability, the refusal code, the catalogue
+        // binding, the commissioned polarity and the transport counters are all printed, so a reader can
+        // tell a low input from an unbound row and from a device that never answered.
+        foreach (string key in new[]
+        {
+            "last_running_usable=", "last_running_raw_bit=", "last_running_active=", "last_running_code=",
+            "last_fault_usable=", "last_fault_raw_bit=", "last_fault_active=", "last_fault_code=",
+            "running_binding=", "fault_binding=", "running_commissioned=", "fault_commissioned=",
+            "network_attempts=", "transport_errors=", "transport_error_summary=", "dispatch_summary=",
+        })
+        {
+            Assert.Contains("  " + key, text, StringComparison.Ordinal);
+        }
+
+        // The pace is a bounded constant, ten times finer than the wall-clock gate the ladder waits on.
+        Assert.Contains("private const int DriveIntervalMilliseconds = 100;", text, StringComparison.Ordinal);
     }
 
     private static string RepoRoot()

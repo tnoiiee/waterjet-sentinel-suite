@@ -247,6 +247,24 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 - ตาม sheet "Contract Summary" ของไฟล์ mapping: **การเขียน DO 0-31 ใช้ FC05/FC15 แต่การอ่านกลับด้วย FC01 ต้องอ่านที่ RW mirror ตำแหน่ง +512** → `DO-023` เขียนที่ address **22** แต่ต้องอ่านกลับที่ **534** (22+512); การอ่าน FC01 ที่ address 22 จะได้ `False` เสมอ ซึ่ง**ไม่ใช่ defect ของ Product**
 - ความน่าเชื่อถือของสถานะวาล์วใน Product จึงอยู่ที่ **limit switches ของหัวงาน (DI-021 Upper + DI-029 Lower)** ซึ่งเป็นตัวที่ยืนยัน `IV_OPEN_FIELD_CONFIRMED` / `IV_CLOSED_FIELD_CONFIRMED` ใน Stage C แล้ว
 
+- **เส้นทาง Modbus ใช้การเชื่อมต่อต่อเนื่องอยู่แล้ว — ไม่ต้องแก้ and อย่าถกซ้ำ**: `ProcessIoPhysicalTransport.GetOrCreateClient`
+  (packages/application/ProcessIo/ProcessIoPhysicalTransport.cs:399-416) เก็บ `TcpClient` หนึ่งตัวต่อ `deviceKey` ใน `ConcurrentDictionary`,
+  `TryGetValue` แล้วเช็ค `existing.Connected` ก่อนใช้, และสร้างใหม่เฉพาะหลัง client ที่เสียถูกถอดออกจาก dictionary เท่านั้น
+  ไม่มี `new TcpClient()` ต่อคำสั่ง Modbus ใน repo (มีจุดเดียวคือบรรทัด 406 ข้างใน `GetOrCreateClient` นี้) และไม่มี `SendMbap`/`SendWriteSingle`
+  ตามที่เคยเข้าใจ จึงไม่มี socket churn/TIME_WAIT ให้แก้; สิ่งที่โต๊ะนี้พลาดไม่ใช่เรื่อง socket (ดูบันทึกผลรันจริงที่ `6865f58` ใน §6 ข้อ 6.1.1)
+- **จังหวะระหว่างคำสั่งใน Start() ไม่มี dwell ที่ Product เติมให้**: `ProcessIoPumpLifecycle.Start`
+  (packages/application/ProcessIo/ProcessIoPumpLifecycle.cs:288-321) เขียน DO-001/DO-002 → DO-003 → DO-007 ติดกัน
+  ระยะห่างจริงคือเวลาที่ Modbus round-trip ใช้เท่านั้น และ **AO จะเริ่มยกก็ต่อเมื่อ DI-004 ยืนยันว่ารันแล้ว**
+  (`StepWaitingForRunning` ที่ :416-440 → `RAMPING_OUTPUT` ที่ :429; ถ้าหมดเวลาจะได้ `_primaryFailure = RUNNING_FEEDBACK_TIMEOUT`)
+  ถ้า inverter ต้องการ dwell ระหว่าง enable กับ run หรือต้องการ AO floor ก่อนรอ running feedback **นั่นเป็นการตัดสินใจระดับ Product**
+  เพราะบันไดชุดเดียวกันนี้เป็นตัวที่ปิด A/B/C/E มาแล้ว — ตอนนี้มีตัวเลข `dispatch_window_ms`/`gap_ms` ให้วัดจริงก่อนตัดสินใจ
+- **รอบการ step ของ trial ตอนนี้เป็น 100 ms** (`PumpCommandDryTrial.DriveIntervalMilliseconds` เดิม 5 ms) — ละเอียดกว่า gate 10 เท่า
+  เพราะสิ่งเดียวที่ loop นี้รอคือ wall clock: ramp ผูกกับ `PumpSpeedRampConfiguration.OwnerInitialIntervalMilliseconds = 1000`
+  (`apps/runtime/CleaningPathDryComposition.cs:1227`, `ProcessIoPumpLifecycle.cs:444 if (now < _nextRampAt) return;`)
+  และ `maximumSteps`/deadline คำนวณจากเวลาไม่ใช่จำนวนครั้ง → loop ช้าลงไม่ทำให้ ramp หรือการรอ DI-004 หิว,
+  บันไดเดินทางเดียวและ PUMP_READY/terminal state ค้างอยู่เมื่อถึงแล้ว จึงไม่มี rung ไหนหลุดเพราะโพลล์ช้าขึ้น
+  (ผลพลอยได้: จำนวน request บน coupler ลดลง ~20 เท่าในช่วง supervision 50 s เดิม)
+
 ## 6. Stage D — Integrated cleaning-path cycle (มี 3 variant)
 
 ปิด gate: วงจรทั้งรอบ (select pump → enable → run → AO ramp → supervision → cleanup → release) ควบคู่กับการเปิด/ปิดวาล์วและการเดิน Cleaning Path P1-P6
@@ -265,6 +283,43 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
 - บรรทัดหลักฐาน: `evidence_kind=PHYSICAL`, `physical_pump_verified=True`, `iv_command_executed=FALSE`, `iv_command_surface=NONE_NO_VALVE_BOUNDARY_COMPOSED`, `motion_composed=False`
 - exit ที่ยอมรับ: `0` เท่านั้น (2 = ปฏิเสธ/ล้มกลางบันได, 3 = supervision หมดเวลา, 4 = ปฏิเสธก่อนแตะอุปกรณ์)
 - มีอ่าน AI-003 เทียบอีกชั้นหนึ่งใน session เดียวกัน (ผ่าน read-only observer ตัวเดิม) (read-only เท่านั้น): `pump_outlet_pressure_bar`, `ai003_evidence_verified`, `ai003_pump_ready_rule`
+
+### ข้อ 6.1.1 — หลัง `6865f58`: บันไดถูกตัดสินด้วย "state ที่เห็นจริง + dispatch log" ไม่ใช่ ordinal และทุก refusal ต้องพูดได้
+
+สองรอบแรกที่โต๊ะ (start จาก DO-001=0 และจาก DO-001=1) พิสูจน์ว่าของเดิม "พูดมากเกินไป" และ "เงียบเกินไป" จึงแก้พร้อมกัน:
+
+- **เลิกนับ ordinal ของ enum** — `PumpLifecycleStates.IsFailure` คือ ordinal `>= 20` ซึ่ง**อยู่เหนือ** progression states (0-13)
+  ทำให้ `RUNNING_FEEDBACK_TIMEOUT` "ผ่าน" การเทียบกับ `RAMPING_OUTPUT` และพิมพ์ `running_feedback_confirmed=True` ทั้งที่บันไดไม่เคยถึงขั้นนั้น
+  ตอนนี้ `Drive` เก็บ `HashSet<PumpLifecycleState> visited` (เก็บตอนเริ่ม, ทุกครั้งก่อน/หลัง `Step()`, และ TerminalState) แล้ว key ใด ๆ
+  ที่เกี่ยวกับ rung ตอบจาก set นี้เท่านั้น
+- **rung ที่เกิดใน `Start()` loop เห็นไม่ได้** (`selection_pair_written`, `pump_enable_written`, `pump_run_written`) จึงอ่านจาก
+  `boundary.CommandLog` แทน: ต้องมี record ที่ `Succeeded` (admitted + dispatched + ไร้ transport fault) และ `Value` ตรงตามที่ contract สั่ง
+- **ไม่เรียก `Stop` ซ้ำบน lifecycle ที่ terminal แล้ว** — เดิมได้ `WJSS_PUMP_COMMAND_REFUSED_ALREADY_TERMINAL`
+  (`ProcessIoPumpLifecycle.cs:338` คืน `RefusedTerminal` เมื่อ `Result is not null`) และพิมพ์เรื่องเล่าชุดที่สองของ teardown เดียวกัน
+  ตอนนี้บันทึก `stop_code=NOT_REQUESTED_LADDER_ALREADY_TERMINAL` แทน (ไม่ใช่ defect ของฮาร์ดแวร์ — เป็นแผลของ runner)
+- **`complete` เข้มขึ้น: บันไดที่ timeout ต้องออก exit 2 ไม่ใช่ 0** — ต้องครบทุกข้อ: `TerminalState == STOPPED`, `StoppedConfirmed`,
+  `CleanupState == COMPLETE`, `!OwnsPumpCommand`, `SafeToReportComplete`, เคยเห็น `PUMP_READY` จริง (`run_reached_ready=True`) และไม่เจอ Fault
+  ⇒ ผลข้างเคียงที่ตั้งใจ: **รอบที่ปั๊มไม่ขึ้นจะมี exit=2 + RESULT CHECK** ถ้าเคยเห็น exit=0 ทั้งที่ `terminal_state=RUNNING_FEEDBACK_TIMEOUT`
+  นั่นคือบั๊กเก่าที่ถูกปิดไปแล้ว
+- **diagnostic ใหม่ที่แนบมากับ send file (Show เท่านั้น ไม่ใช้ตัดสิน pass/fail)** — `dispatch_summary`, `dispatch` รายคำสั่ง
+  (มี `gap_ms`), `dispatch_window_ms`, `command_dispatches`, `command_dispatch_refusals`, `run_reached_ready`,
+  `run_cleared_dispatch`, `enable_released_dispatch`, `stop_accepted`, `stop_code`, `running_commissioned`, `fault_commissioned`,
+  `running_binding`, `fault_binding`, `last_running_usable`/`_raw_bit`/`_active`/`_code`, `last_fault_usable`/`_raw_bit`/`_active`/`_code`,
+  `network_attempts`, `transport_errors`, `transport_error_summary`
+- **อ่าน diagnostic ยังไง (ไม่ต้องเดา):**
+  | ที่เห็น | หมายความว่า |
+  | --- | --- |
+  | `last_running_code=WJSS_OBSERVATION_REFUSED_UNBOUND` + `running_binding=DI-004=UNBOUND ..` | แถว DI-004 ใน catalogue ไม่ถูก bind → แก้ที่ CSV mapping ไม่ใช่ที่โค้ด |
+  | `last_running_code=WJSS_OBSERVATION_REFUSED_NOT_COMMISSIONED` + `running_commissioned=False` | ขั้วสัญญาณยังไม่ได้ commission (env `WJSS_PUMP_RUNNING_POLARITY`) |
+  | `last_running_code=WJSS_SESSION_NOT_OPEN` | session ปิดไปก่อนแล้ว (ดู `session_state`) |
+  | `last_running_code=WJSS_OBSERVATION_TRANSPORT_FAULT` + `transport_errors>0` | อ่านไม่ตอบเลย (network/timeout) — ไม่ใช่ "บิตต่ำ" |
+  | `last_running_usable=True` + `last_running_raw_bit=False` + `transport_errors=0` | อุปกรณ์ตอบจริงและบิตต่ำจริง → ดูฝั่ง inverter/starter/สาย DI และเทียบ `running_binding=DI@<addr>` กับ mapping workbook (เบอร์หน้าตู้ = addr+1) |
+  | `dispatch=DO-003 .. admission=REFUSED` | session ปฏิเสธการเขียน (consent/generation/lock) — ไม่ใช่ความผิดของ rack |
+  | `dispatch=DO-007 .. admission=ADMITTED dispatch=NOT_DISPATCHED transport=FAULTED` | คำสั่งไปไม่ถึงอุปกรณ์ (socket ตาย — transport จะ reconnect ในครั้งถัดไปตาม §5b) |
+  | `gap_ms` / `dispatch_window_ms` เล็กมากและ inverter ต้องมี dwell dwell ระหว่าง enable→run | เป็นเรื่องของ Product lifecycle ไม่ใช่ของ trial — ส่งค่านี้มาให้ผมตัดสินใจ |
+- **load-time gate ใหม่**: ตัวขับจะปฏิเสธทุก stage ถ้า `Test-WjssDriver` ยังไม่ PASS ในหน้าต่างนั้น
+  (`SELFCHECK: PASS (driver 2026-11-18.1, .. groups)` ต้องปรากฏก่อน) — เพราะที่ `6865f58` self-test แดงแต่ stage ยังรันได้
+  และ fixture กับ assertion เคยหลุดกัน (บรรทัด `fresh=TRUE` หายไปจาก fixture) ซึ่งแก้แล้วทั้งคู่
 
 ### ข้อ 6.2 — variant สอง: `D-sim` = วาล์วจริง + Path จริงบนค่าแรงดันที่ Owner ประกาศ
 
@@ -368,11 +423,11 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 | A1 + A2 | REAL WAGO ENDPOINT CONNECTIVITY · Pump-ready strict-greater ทั้งสองฝั่งบนสัญญาณจริง | **CLOSED** (A1 0.669 bar ⇒ FALSE, exit 2; A2 15.6047 bar ⇒ TRUE, exit 0, `physical_pump_verified=TRUE`) |
 | B | Pump running/fault polarity commissioned (absent ⇒ NOT_CONFIGURED ⇒ D ถูก refuse) | **CLOSED** (DI-004 0→1 ⇒ `ACTIVE_HIGH`; DI-005 ไม่เปลี่ยน ⇒ `ACTIVE_HIGH` ตาม convention เท่านั้น) |
 | C | IV physical actuation + FC01 read-back | **CLOSED** — field-confirmed ทั้งสองทางด้วย limit switches; `fc01=False` ที่ address 22 อธิบายด้วยกติกา RW mirror +512 (อ่านที่ 534) จึงไม่ใช่ defect |
-| D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — โค้ดเพิ่มหลัง `c4898a0` ต้อง build ใหม่แล้วรันบนโต๊ะ |
+| D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — สองรอบแรกที่ `6865f58` ไม่ผ่านบันได (รอบ 1 `RUNNING_FEEDBACK_TIMEOUT` โดย DI-004 ต่ำจริงและ `pump_outlet_pressure_bar=0.8301` ใกล้ค่า static ของ Stage A; รอบ 2 `PHYSICAL_ABORT_REQUIRED` + `cleanup_fault=STOPPED_FEEDBACK_TIMEOUT`) — เป็นเหตุฝั่ง feedback/wiring ไม่ใช่ build; ตัว runner ใหม่ตัดสินด้วย state ที่เห็นจริง + dispatch log และพิมพ์หลักฐานครบแล้ว รอรันซ้ำบน SHA ใหม่ (รอบที่ timeout จะออก exit=2 ตามที่ควรเป็นตั้งแต่แรก) |
 | D-sim | Path จริง + วาล์วจริง บนค่าแรงดันที่ประกาศ (ติดป้าย SOFTWARE_SIMULATED) | **OPEN** — ต้อง build ใหม่แล้วรันบนโต๊ะ |
 | D-dry | integrated dry cycle แบบเปียก (ปั๊มจริง + วาล์วจริง) no-load ครบลูปพร้อม cleanup | **OPEN** — ต้องมี `WJSS_DRY_WET_SEQUENCE_ACK` |
 | E | WSB Upper/Lower reclass + DI read path (FC02 vs FC01) | **CLOSED** สำหรับเส้นทางอ่าน (ยังไม่ทำ per-switch E ตามที่ตกลง) |
 | F | (optional) motion stop behaviour | ยังไม่รัน (optional) |
 
 **ส่งผมทุก stage:** ก้อนข้อความใต้ `--- copy everything below ---` (scrub แล้ว) + log ดิบเฉพาะก้อนที่มี `CHECK` — ห้าม commit ไฟล์ log/ผลลัพธ์เข้า repo เด็ดขาด
-**สถานะ:** A/B/C/E ปิดแล้วที่ `c4898a0` · D ยัง OPEN รอคิว `D-pump` + `D-sim` (โค้ด C# + tests เพิ่มหลังคอมมิธนั้น ต้อง build ใหม่ก่อน) · PRODUCTION NOT AUTHORIZED · MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง
+**สถานะ:** A/B/C/E ปิดแล้วที่ `c4898a0` · D ยัง OPEN รอคิว `D-pump` (ซ้ำบน SHA ใหม่ แล้วอ่าน `last_running_*`/`transport_errors` ก่อนแตะ Product code) + `D-sim` (โค้ด C# + tests เพิ่มหลังคอมมิธนั้น ต้อง build ใหม่ก่อน) · PRODUCTION NOT AUTHORIZED · MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง

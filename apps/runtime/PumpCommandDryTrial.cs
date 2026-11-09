@@ -60,8 +60,16 @@ public static class PumpCommandDryTrial
     /// </summary>
     public const string IvCommandSurface = "NONE_NO_VALVE_BOUNDARY_COMPOSED";
 
-    /// <summary>The deterministic pause between two driver steps. Bounded and never zero.</summary>
-    private const int DriveIntervalMilliseconds = 5;
+    /// <summary>
+    /// The deterministic pause between two driver steps. Bounded and never zero. One hundred ms is ten
+    /// times finer than the only thing this loop waits on - the ramp is gated by wall clock inside the
+    /// lifecycle at PumpSpeedRampConfiguration.OwnerInitialIntervalMilliseconds = 1000 ms
+    /// (apps/runtime/CleaningPathDryComposition.cs:1227), and StepWaitingForRunning re-reads the Running
+    /// input on its own schedule - so a faster poll adds nothing to the judgement and every extra read is
+    /// one more request on the same coupler the writes use. Nothing can be missed at this pace either: the
+    /// ladder only moves forward, and PUMP_READY and the terminal states are sticky once entered.
+    /// </summary>
+    private const int DriveIntervalMilliseconds = 100;
 
     // ------------------------------------------------------------------ refusals before contact
 
@@ -372,8 +380,8 @@ public static class PumpCommandDryTrial
         try
         {
             session.Open(clock.UtcNow);
-            exitCode = Drive(lifecycle, session, catalogue, thresholds, pumpConfiguration, pumpSelection,
-                time, clock, output);
+            exitCode = Drive(lifecycle, boundary, transport, session, catalogue, thresholds,
+                pumpConfiguration, pumpSelection, time, clock, output);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -413,6 +421,8 @@ public static class PumpCommandDryTrial
     /// </summary>
     private static int Drive(
         ProcessIoPumpLifecycle lifecycle,
+        ProcessIoPumpCommandBoundary boundary,
+        ProcessIoPhysicalTransport transport,
         ProcessIoSession session,
         IReadOnlyDictionary<string, ProcessIoCatalogueRow> catalogue,
         SequencingPressureThresholds thresholds,
@@ -448,17 +458,21 @@ public static class PumpCommandDryTrial
             + configuration.PumpReadyTimeout;
         DateTimeOffset deadline = clock.UtcNow + budget;
 
-        PumpLifecycleState highest = lifecycle.State;
-        var trace = new List<string> { highest.ToString() };
+        // A rung is claimed only when the state itself was observed. Ordinals are never compared for this:
+        // PumpLifecycleStates.IsFailure is ordinal 20 and up, so the failure values sit ABOVE the progression
+        // values, and a ladder that timed out waiting for running feedback would otherwise report
+        // RAMPING_OUTPUT as reached. The rungs crossed inside Start() cannot be observed by this loop at all,
+        // so every coil claim is taken from the boundary's own dispatch log instead of from a state name.
+        var visited = new HashSet<PumpLifecycleState> { lifecycle.State };
+        var trace = new List<string> { lifecycle.State.ToString() };
         bool sawFault = false;
 
         int maximumSteps = (int)(budget.TotalMilliseconds / DriveIntervalMilliseconds) + 1000;
         for (int step = 0; step < maximumSteps; step += 1)
         {
-            if (lifecycle.State > highest)
+            if (visited.Add(lifecycle.State))
             {
-                highest = lifecycle.State;
-                trace.Add(highest.ToString());
+                trace.Add(lifecycle.State.ToString());
             }
 
             if (lifecycle.State == PumpLifecycleState.FAULT_ACTIVE)
@@ -478,6 +492,8 @@ public static class PumpCommandDryTrial
 
             if (step > 0 && clock.UtcNow >= deadline)
             {
+                trace.Add(lifecycle.State.ToString());
+                output.WriteLine("  ladder=" + string.Join(">", trace));
                 output.WriteLine("  trial_code=PUMP_COMMAND_TRIAL_TIMEOUT_" + lifecycle.State);
                 return 3;
             }
@@ -486,23 +502,89 @@ public static class PumpCommandDryTrial
             Thread.Sleep(DriveIntervalMilliseconds);
         }
 
-        trace.Add(lifecycle.State.ToString());
+        PumpLifecycleResult? ended = lifecycle.Result;
+        if (ended is not null && visited.Add(ended.TerminalState))
+        {
+            trace.Add(ended.TerminalState.ToString());
+        }
+
+        IReadOnlyList<PumpCommandOutcome> log = boundary.CommandLog;
+
+        bool Written(string tag, bool value) => log.Any(o => o.Succeeded
+            && string.Equals(o.Tag, tag, StringComparison.Ordinal)
+            && o.Value == value);
+
+        string Reached(PumpLifecycleState rung) => visited.Contains(rung) ? "True" : "False";
+
         output.WriteLine("  ladder=" + string.Join(">", trace));
-        output.WriteLine("  selection_pair_written=" + Reached(highest, PumpLifecycleState.PUMP_SELECTED));
-        output.WriteLine("  pump_enable_written=" + Reached(highest, PumpLifecycleState.ENABLE_DISPATCHED));
-        output.WriteLine("  pump_run_written=" + Reached(highest, PumpLifecycleState.RUN_DISPATCHED));
-        output.WriteLine("  running_feedback_confirmed=" + Reached(highest, PumpLifecycleState.RAMPING_OUTPUT));
-        output.WriteLine("  analog_ramp_executed=" + Reached(highest, PumpLifecycleState.RAMPING_OUTPUT));
-        output.WriteLine("  pump_ready_confirmed=" + (highest == PumpLifecycleState.PUMP_READY
-            || lifecycle.State == PumpLifecycleState.PUMP_READY ? "True" : "False"));
+        output.WriteLine("  selection_pair_written=" + (Written(PumpCommandContract.SelectPumpOneTag, true)
+            && Written(PumpCommandContract.SelectPumpTwoTag, false) ? "True" : "False"));
+        output.WriteLine("  pump_enable_written=" + (Written(PumpCommandContract.EnableInverterTag, true) ? "True" : "False"));
+        output.WriteLine("  pump_run_written=" + (Written(PumpCommandContract.RunPumpTag, true) ? "True" : "False"));
+        output.WriteLine("  running_feedback_confirmed=" + Reached(PumpLifecycleState.RAMPING_OUTPUT));
+        output.WriteLine("  analog_ramp_executed=" + Reached(PumpLifecycleState.RAMPING_OUTPUT));
+        output.WriteLine("  pump_ready_confirmed=" + Reached(PumpLifecycleState.PUMP_READY));
         output.WriteLine("  fault_feedback_never_active=" + (sawFault ? "False" : "True"));
         output.WriteLine("  valve_open_admitted_by_lifecycle=" + (lifecycle.AllowsValveOpen ? "True" : "False"));
 
+        // The dispatch ledger, printed rather than inferred. Admission and dispatch are kept apart so a
+        // session refusal never reads as a transport failure and neither reads as a successful write.
+        output.WriteLine("  command_dispatches=" + log.Count.ToString(CultureInfo.InvariantCulture));
+        output.WriteLine(
+            "  command_dispatch_refusals=" + log.Count(o => !o.Succeeded).ToString(CultureInfo.InvariantCulture));
+        output.WriteLine("  dispatch_summary=" + (log.Count == 0
+            ? "NONE"
+            : string.Join("|", log.Select(o => o.Tag + "=" + o.Value + ":"
+                + (o.Succeeded ? "OK" : o.Code)
+                + (o.Dispatched ? string.Empty : ":NOT_DISPATCHED")))));
+        DateTimeOffset firstAt = default;
+        DateTimeOffset? previousAt = null;
+        foreach (PumpCommandOutcome outcome in log)
+        {
+            if (previousAt is null)
+            {
+                firstAt = outcome.At;
+            }
+
+            double gapMs = previousAt is null ? 0d : (outcome.At - previousAt.Value).TotalMilliseconds;
+            output.WriteLine("  dispatch=" + outcome.Tag
+                + " coil=" + outcome.CoilAddress.ToString(CultureInfo.InvariantCulture)
+                + " value=" + outcome.Value.ToString()
+                + " admission=" + (outcome.Admitted ? "ADMITTED" : "REFUSED")
+                + " dispatch=" + (outcome.Dispatched ? "DISPATCHED" : "NOT_DISPATCHED")
+                + " code=" + outcome.Code
+                + " gap_ms=" + gapMs.ToString("0.#", CultureInfo.InvariantCulture)
+                + (outcome.TransportFaulted ? " transport=FAULTED" : string.Empty));
+            previousAt = outcome.At;
+        }
+
+        // The dwell between the enable and the Run command is a physical question the Owner answers with the
+        // inverter manual, not a guess this runner may fill in: Start() dispatches the whole sequence without
+        // an artificial delay (packages/application/ProcessIo/ProcessIoPumpLifecycle.cs:288-321), so the only
+        // spacing is the Modbus round trip. These two numbers say what that spacing actually was.
+        output.WriteLine("  dispatch_window_ms=" + (log.Count == 0
+            ? "0"
+            : (log[log.Count - 1].At - firstAt).TotalMilliseconds.ToString("0.#", CultureInfo.InvariantCulture)));
+
+        ReportFeedbackDiagnostics(boundary, catalogue, configuration, output);
+        ReportTransportDiagnostics(transport, output);
+
         ReportPressureCrossCheck(session, catalogue, thresholds, configuration, time, output);
 
-        PumpLifecycleStopOutcome stopped = lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
-        output.WriteLine("  stop_accepted=" + (stopped.StopConfirmed ? "True" : "False"));
-        output.WriteLine("  stop_code=" + stopped.Code);
+        if (ended is null)
+        {
+            PumpLifecycleStopOutcome stopped = lifecycle.Stop(PumpStopReason.NORMAL_COMPLETION);
+            output.WriteLine("  stop_accepted=" + (stopped.StopConfirmed ? "True" : "False"));
+            output.WriteLine("  stop_code=" + stopped.Code);
+        }
+        else
+        {
+            // A failure inside the wait already drove the Stop path, so the ladder is terminal before this
+            // point. Calling Stop again only earns a refusal code and prints a second, contradicting story
+            // about the same teardown, so the record states what happened instead of asking again.
+            output.WriteLine("  stop_accepted=False");
+            output.WriteLine("  stop_code=NOT_REQUESTED_LADDER_ALREADY_TERMINAL");
+        }
 
         TimeSpan stopBudget = TimeSpan.FromTicks(configuration.Ramp.Interval.Ticks * rampSteps)
             + configuration.StoppedFeedbackTimeout;
@@ -511,10 +593,9 @@ public static class PumpCommandDryTrial
 
         for (int step = 0; step < stopMaximumSteps && lifecycle.Result is null; step += 1)
         {
-            if (lifecycle.State > highest)
+            if (visited.Add(lifecycle.State))
             {
-                highest = lifecycle.State;
-                trace.Add(highest.ToString());
+                trace.Add(lifecycle.State.ToString());
             }
 
             if (step > 0 && clock.UtcNow >= stopDeadline)
@@ -526,17 +607,18 @@ public static class PumpCommandDryTrial
             Thread.Sleep(DriveIntervalMilliseconds);
         }
 
-        if (lifecycle.Result is not null)
+        PumpLifecycleResult? result = lifecycle.Result;
+        if (result is not null && visited.Add(result.TerminalState))
         {
-            trace.Add(lifecycle.Result.TerminalState.ToString());
+            trace.Add(result.TerminalState.ToString());
         }
 
-        PumpLifecycleResult? result = lifecycle.Result;
-
         output.WriteLine("  ladder_complete=" + string.Join(">", trace));
-        output.WriteLine("  analog_stop_sentinel_written=" + Reached(highest, PumpLifecycleState.RAMPING_DOWN));
-        output.WriteLine("  pump_run_cleared=" + Reached(highest, PumpLifecycleState.CLEARING_RUN));
-        output.WriteLine("  pump_enable_released=" + Reached(highest, PumpLifecycleState.DISABLING_INVERTER));
+        output.WriteLine("  analog_stop_sentinel_written=" + Reached(PumpLifecycleState.RAMPING_DOWN));
+        output.WriteLine("  pump_run_cleared=" + Reached(PumpLifecycleState.CLEARING_RUN));
+        output.WriteLine("  pump_enable_released=" + Reached(PumpLifecycleState.DISABLING_INVERTER));
+        output.WriteLine("  run_cleared_dispatch=" + (Written(PumpCommandContract.RunPumpTag, false) ? "True" : "False"));
+        output.WriteLine("  enable_released_dispatch=" + (Written(PumpCommandContract.EnableInverterTag, false) ? "True" : "False"));
         output.WriteLine("  terminal_state=" + (result?.TerminalState.ToString() ?? lifecycle.State.ToString()));
         output.WriteLine("  stopped_confirmed=" + (result?.StoppedConfirmed == true ? "True" : "False"));
         output.WriteLine("  cleanup_state=" + (result?.CleanupState ?? "NONE"));
@@ -548,15 +630,107 @@ public static class PumpCommandDryTrial
             output.WriteLine("  cleanup_fault=" + fault);
         }
 
+        // Success is the whole of it, not the absence of a complaint: the ladder must have reached PUMP_READY,
+        // stopped in the STOPPED terminal state with a complete cleanup, released the command channel and been
+        // reported safe to complete, and no fault input may have been seen active on the way. Each half is a
+        // separate claim, so a run that tore down cleanly after a timeout cannot report an accepted trial.
+        bool sawReady = visited.Contains(PumpLifecycleState.PUMP_READY);
         bool complete = result is not null
+            && result.TerminalState == PumpLifecycleState.STOPPED
             && result.StoppedConfirmed
             && result.CleanupState == PumpCleanupStates.Complete
-            && !lifecycle.OwnsPumpCommand;
+            && !lifecycle.OwnsPumpCommand
+            && lifecycle.SafeToReportComplete
+            && sawReady
+            && !sawFault;
 
+        output.WriteLine("  run_reached_ready=" + (sawReady ? "True" : "False"));
         output.WriteLine("  trial_code=" + (complete
             ? "PUMP_COMMAND_TRIAL_ACCEPTED"
             : "PUMP_COMMAND_TRIAL_" + (result?.TerminalState.ToString() ?? lifecycle.State.ToString())));
         return complete ? 0 : 2;
+    }
+
+    /// <summary>
+    /// The two feedback inputs, read read-only after the ladder. Four different failures look identical from
+    /// a state name alone - the bit is genuinely low, the polarity is not commissioned, the catalogue row is
+    /// not bound, or the transport never answered - and each one needs a different correction. This prints the
+    /// evidence that tells them apart and commands nothing.
+    /// </summary>
+    private static void ReportFeedbackDiagnostics(
+        ProcessIoPumpCommandBoundary boundary,
+        IReadOnlyDictionary<string, ProcessIoCatalogueRow> catalogue,
+        PumpLifecycleConfiguration configuration,
+        TextWriter output)
+    {
+        PumpFeedbackConfiguration feedback = configuration.Feedback;
+        output.WriteLine("  running_commissioned=" + (feedback.RunningCommissioned ? "True" : "False"));
+        output.WriteLine("  fault_commissioned=" + (feedback.FaultCommissioned ? "True" : "False"));
+        output.WriteLine("  running_binding=" + DescribeBinding(catalogue, PumpCommandContract.RunningFeedbackTag));
+        output.WriteLine("  fault_binding=" + DescribeBinding(catalogue, PumpCommandContract.FaultFeedbackTag));
+
+        PumpFeedbackRead running = boundary.ReadRunning();
+        output.WriteLine("  last_running_usable=" + (running.Usable ? "True" : "False"));
+        output.WriteLine("  last_running_raw_bit=" + (running.RawBit ? "True" : "False"));
+        output.WriteLine("  last_running_active=" + (running.Active ? "True" : "False"));
+        output.WriteLine("  last_running_code=" + running.Code);
+
+        PumpFeedbackRead fault = boundary.ReadFault();
+        output.WriteLine("  last_fault_usable=" + (fault.Usable ? "True" : "False"));
+        output.WriteLine("  last_fault_raw_bit=" + (fault.RawBit ? "True" : "False"));
+        output.WriteLine("  last_fault_active=" + (fault.Active ? "True" : "False"));
+        output.WriteLine("  last_fault_code=" + fault.Code);
+    }
+
+    /// <summary>
+    /// What the catalogue binds one tag to, in the transport's own terms. The panel number is the Modbus
+    /// address plus one, so this line can be compared with the mapping workbook without opening the CSV.
+    /// </summary>
+    private static string DescribeBinding(
+        IReadOnlyDictionary<string, ProcessIoCatalogueRow> catalogue,
+        string tag)
+    {
+        if (!catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row) || row is null)
+        {
+            return tag + "=ROW_MISSING";
+        }
+
+        if (row.BindingState == ProcessIoBindingState.UNBOUND || row.Binding is null)
+        {
+            return tag + "=UNBOUND " + row.CommissioningState;
+        }
+
+        string area = row.Binding.Area == ProcessIoArea.DiscreteInput ? "DI" : "CO";
+        return tag + "=" + area + "@" + row.Binding.Address.ToString(CultureInfo.InvariantCulture)
+            + " " + row.CommissioningState;
+    }
+
+    /// <summary>
+    /// The transport's own counters for this run. Attempts and errors are what separate a device that
+    /// answered "low" from a device that stopped answering: the observation path never fabricates a bit, so a
+    /// missing answer arrives here as a refused observation plus a ledger error, never as a quiet false.
+    /// </summary>
+    private static void ReportTransportDiagnostics(ProcessIoPhysicalTransport transport, TextWriter output)
+    {
+        IReadOnlyList<ProcessIoTransportLedgerEntry> ledger = transport.GetLedger();
+        List<ProcessIoTransportLedgerEntry> errors =
+            ledger.Where(entry => !string.Equals(entry.Status, "SUCCESS", StringComparison.Ordinal)).ToList();
+        output.WriteLine("  network_attempts=" + transport.NetworkAttempts.ToString(CultureInfo.InvariantCulture));
+        output.WriteLine("  transport_errors=" + errors.Count.ToString(CultureInfo.InvariantCulture));
+        // the send file carries one line per key, so the whole ledger has to fit on this one as well as in
+        // the raw stdout file below it
+        output.WriteLine("  transport_error_summary=" + (errors.Count == 0
+            ? "NONE"
+            : string.Join("|", errors.Select(entry => entry.FunctionCode + "@"
+                + entry.Address.ToString(CultureInfo.InvariantCulture) + ":" + entry.Status))));
+        foreach (ProcessIoTransportLedgerEntry entry in errors)
+        {
+            output.WriteLine("  transport_error=" + entry.Operation
+                + " " + entry.FunctionCode
+                + " address=" + entry.Address.ToString(CultureInfo.InvariantCulture)
+                + " status=" + entry.Status
+                + (string.IsNullOrEmpty(entry.Diagnostic) ? string.Empty : " detail=" + entry.Diagnostic));
+        }
     }
 
     /// <summary>
@@ -600,12 +774,4 @@ public static class PumpCommandDryTrial
         output.WriteLine("  ai003_session_generation=" + outcome.SessionGeneration.ToString(CultureInfo.InvariantCulture));
         output.WriteLine("  lifecycle_generation_held=" + session.Generation.ToString(CultureInfo.InvariantCulture));
     }
-
-    /// <summary>
-    /// True when the ladder passed through <paramref name="rung"/>. The progression values of
-    /// <see cref="PumpLifecycleState"/> are ordered, so a comparison is the whole of this judgement: no
-    /// rung is inferred from a later one, and a failure state never reports a rung it did not reach.
-    /// </summary>
-    private static string Reached(PumpLifecycleState highest, PumpLifecycleState rung) =>
-        (int)highest >= (int)rung ? "True" : "False";
 }

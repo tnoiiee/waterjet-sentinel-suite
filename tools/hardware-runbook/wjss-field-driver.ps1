@@ -19,8 +19,13 @@
 # SOURCE-AUTHORED IN ARENA. NOT EXECUTED IN ARENA: the Arena sandbox has no PowerShell interpreter, so the
 # gates here are (a) the load-time parser of PowerShell itself, (b) Test-WjssDriver on the Owner's machine.
 
-$script:WjssDriverVersion = '2026-11-09.1'
+$script:WjssDriverVersion = '2026-11-18.1'
 $ErrorActionPreference = 'Stop'
+# A stage never runs on a driver whose own self-test has not passed in THIS window. Test-WjssDriver is
+# the only thing that proves the parser, the verdict matcher and the expectations still agree with each
+# other, and at 6865f58 that agreement broke silently: the fixture and its expectation had drifted apart,
+# so a red self-test still let a stage execute. Loading sets this false; only a PASS sets it true.
+$script:SelfTestPassed = $false
 
 function Read-WjssAnswer {
     # one prompt, up to three attempts, never invents an answer
@@ -80,8 +85,20 @@ function Set-WjssDevice {
     Write-Host ('  device set: port ' + [string]$script:Port + ', unit id ' + [string]$script:UnitId + ', evidence ' + $script:Ev) -ForegroundColor DarkGray
 }
 
-function Ensure-WjssDevice { if ($null -eq $script:Repo -or $script:Repo.Length -eq 0) { Set-WjssDevice } }
-
+function Ensure-WjssDevice {
+    # Set-WjssDevice is the only place any of these are set, and it sets them together. A guard that looked only
+    # at $script:Repo therefore let a session that already held a repo path typed at the prompt (a dot-sourced
+    # script shares the caller's scope) skip the whole setup, leaving $script:Ev, $script:Exe and $script:Head
+    # null - and the failure arrived dozens of lines later as a bare InvokeMethodOnNull inside Save-WjssSend,
+    # with no hint that the device was never configured. The guard now checks every derived value the stages
+    # depend on, and re-runs the complete prompt set if any one of them is missing. Plain $script: references
+    # only, exactly as the rest of this file uses them.
+    foreach ($value in @($script:Ip, $script:Port, $script:UnitId, $script:Exe, $script:Cat, $script:Ev, $script:Head, $script:Consent)) {
+        if ($null -eq $value) { Set-WjssDevice; return }
+    }
+    if (-not $script:Repo -or ([string]$script:Repo).Length -eq 0) { Set-WjssDevice; return }
+    if (([string]$script:Head).Length -lt 40) { Set-WjssDevice }
+}
 function Test-WjssBuild {
     # refuses to test a stale binary: that is what protects the corrected scaling from being judged on an old exe
     Ensure-WjssDevice
@@ -201,6 +218,9 @@ function Invoke-WjssStage {
         [int]$ExpectExit = 0,
         [switch]$SkipBuildCheck
     )
+    if ($script:SelfTestPassed -ne $true) {
+        throw ('STOP: Test-WjssDriver has not passed in this window, so no stage runs. Run: Test-WjssDriver')
+    }
     Ensure-WjssDevice
     Clear-WjssEnv
     if ($SkipBuildCheck) { Write-Host '  build check skipped by request' -ForegroundColor Yellow }
@@ -653,7 +673,7 @@ $script:Stages = @{
             'trial_code'                    = 'PUMP_COMMAND_TRIAL_ACCEPTED'
             'session_state'                 = 'CLOSED'
             'transport_released'            = 'True'
-        }) -Show @('pump_selection', 'pump_analog_target_ma', 'pump_ready_setpoint_bar', 'ladder', 'ladder_complete', 'pump_outlet_pressure_bar', 'pump_outlet_pressure_raw', 'pump_outlet_pressure_fresh', 'ai003_evidence_verified', 'ai003_pump_ready_rule', 'valve_open_admitted_by_lifecycle', 'terminal_state', 'cleanup_state', 'primary_failure', 'session_state')
+        }) -Show @('pump_selection', 'pump_analog_target_ma', 'pump_ready_setpoint_bar', 'ladder', 'ladder_complete', 'run_reached_ready', 'dispatch_summary', 'command_dispatches', 'command_dispatch_refusals', 'run_cleared_dispatch', 'enable_released_dispatch', 'stop_accepted', 'stop_code', 'running_commissioned', 'fault_commissioned', 'running_binding', 'fault_binding', 'last_running_usable', 'last_running_raw_bit', 'last_running_active', 'last_running_code', 'last_fault_usable', 'last_fault_raw_bit', 'last_fault_active', 'last_fault_code', 'network_attempts', 'transport_errors', 'transport_error_summary', 'pump_outlet_pressure_bar', 'pump_outlet_pressure_raw', 'pump_outlet_pressure_fresh', 'ai003_evidence_verified', 'ai003_pump_ready_rule', 'valve_open_admitted_by_lifecycle', 'terminal_state', 'cleanup_state', 'primary_failure', 'session_state')
     }
     'D-sim' = {
         # Stage D, second variant: the Cleaning Path for real, on a DECLARED Pump Outlet Pressure. The
@@ -771,7 +791,6 @@ $script:Stages = @{
             'pump_ready_source'                  = 'AI-003+'
             'pump_feedback'                     = 'COMMISSIONED'
             'pump_gate'                          = 'PUMP_PRECONDITION'
-            'pump_evidence_kind'                 = 'PHYSICAL'
             'physical_pump_verified'             = 'True'
             'write_authority'                    = 'PROCESS_IO_SESSION'
             'coordinators'                      = 'COMPOSITION+EXECUTION'
@@ -859,6 +878,7 @@ function Test-WjssDriver {
         '  trial_code=PUMP_READY_ACCEPTED_PHYSICAL',
         '  strict_comparison=16.6399 > 15 => TRUE',
         '  open_command=IV1 coil=6 value=True admission=ADMITTED dispatch=DISPATCHED',
+        '  fresh=TRUE',
         '  raw_value=13631',
         '  raw_value=99999',
         '  note = has spaces around the sign',
@@ -870,7 +890,7 @@ function Test-WjssDriver {
     if ([string]$map['raw_value'] -ne '13631') { $bad += 'parser: first key did not win' }
     if ([string]$map['strict_comparison'] -notlike '*=> TRUE') { $bad += 'parser: value truncated at a later =' }
     if ([string]$map['open_command'] -notlike 'IV1 coil=6*') { $bad += 'parser: the packed open_command line was not kept whole' }
-    $done += 'key=value parser (6 lines, duplicate keys, trailing =, junk line, packed pairs)'
+    $done += 'key=value parser (7 lines, duplicate keys, trailing =, junk line, packed pairs)'
 
     # verdict test: match, wrong value, ends-with, missing key, wrong exit
     $e1 = @{ trial_code = 'PUMP_READY_ACCEPTED_PHYSICAL'; strict_comparison = '~=> TRUE'; fresh = 'TRUE' }
@@ -995,6 +1015,7 @@ function Test-WjssDriver {
         throw ('STOP: driver self-test failed with ' + [string]$bad.Count + ' problem(s). Do not run stages; send this to the assistant.')
     }
     Write-Host ('SELFCHECK: PASS (driver ' + $script:WjssDriverVersion + ', ' + [string]$done.Count + ' groups)') -ForegroundColor Green
+    $script:SelfTestPassed = $true
     Write-Host ('  self-test scratch: ' + $tmp + ' (evidence folder stays clean)') -ForegroundColor DarkGray
 }
 
