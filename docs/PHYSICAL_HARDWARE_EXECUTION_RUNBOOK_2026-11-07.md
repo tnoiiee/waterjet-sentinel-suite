@@ -364,9 +364,11 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   trio พี่น้องแล้วน่าจะเป็น `K137` — ถือเป็นการแก้เอกสารเท่านั้น ไม่แตะ address แต่อย่างใด)
 - **กฎที่บังคับ (Owner rulings 2026-11-19):** open = `DO-015` FALSE ก่อนแล้ว `DO-014` TRUE, close = `DO-014` FALSE ก่อนแล้ว
   `DO-015` TRUE, ห้ามเป็น TRUE พร้อมกันเด็ดขาด; เมื่อถึงลิมิตแล้วต้องปล่อยคอยล์ที่จ่ายอยู่ (ไม่ hold คอยล์);
-  `WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS` และ `WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS` = **45000** (driver ตั้งให้;ฝั่ง composition ไม่มีค่า
-  default — ขาดหรือเกิน 1..120000 ms คือ `DRY_COMPOSITION_REFUSED_MAIN_VALVE_CONFIGURATION` ก่อนแตะ endpoint, ฝั่ง trial ใช้ 30000
-  เมื่อ env หายซึ่งตอนนี้ถือว่าแคบเกินไปดูหัวข้อ "เวลาเดินทางจริง" ด้านล่าง);
+  `WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS` และ `WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS` = **45000** (ตัวขับเป็นคนตั้งให้ **ฝั่ง C# ไม่มีค่า default
+  ใดๆ ทั้งสิ้น** — `TryReadRequiredTimeout` คืน false เมื่อ env หาย ⇒ `DRY_COMPOSITION_REFUSED_MAIN_VALVE_CONFIGURATION`
+  ก่อนแตะ endpoint; `PumpCommandDryTrial` ก็เรียกตัวอ่านเดียวกัน (`CleaningPathDryComposition.cs:1475-1515`,
+  `PumpCommandDryTrial.cs:355-358`) — Owner อนุมัติข้อ ก. ไว้ที่ 45000 ms แล้วไม่มีการแก้ constant ใน C# เพราะไม่มี constant
+  ให้แก้ ดูหัวข้อ "เวลาเดินทางจริง" ด้านล่าง);
   `DI-012` เป็น TRUE ตอน pre‑flight ⇒ ปฏิเสธการเริ่มด้วย `WJSS_MAIN_VALVE_OVER_TORQUE` และถ้า trip ระหว่างเดินทางหรือ
   ระหว่างรัน ⇒ ปล่อยทั้งสองคอยล์แล้วเข้าเส้นทางหยุดทันที; ขา feedback อ่านไม่ได้ หรือได้ CONFLICT (ลิมิตสองตัวเป็น TRUE พร้อมกัน)
   ⇒ ปฏิเสธและไม่จ่ายปั๊ม; ปิดวาล์วเฉพาะหลังยืนยันว่าหยุดแล้ว และความผิดพลาดของวาล์วห้ามขัดขวางการหยุดปั๊ม
@@ -416,8 +418,24 @@ patch โปรไฟล์ในหน่วยความจำ (ยังไ
 สิ่งที่ gate นี้พิสูจน์จริง: Product เป็นผู้เปิดวาล์วเอง (`PRODUCT_DISPATCH`) → ยืนยันตำแหน่งด้วย FC02 → ค่อย Select Pump
 → รันบันไดครบ 9 ขั้น → หยุดยืนยันแล้ว → ปิดวาล์วจน `CLOSED` + คอยล์พักทั้งคู่ (`coils_resting=True`)
 สิ่งที่ **ไม่ได้** พิสูจน์ (ห้ามอ้างเกิน): ไม่มีน้ำแรงดันสูงผ่าน nozzle, ไม่มี Cleaning Path/IV sequence, ไม่มีการขยับ axis
-และไม่ใช่ FRR — ตาราง §11 ยังเหลือ `D-sim` กับ `D-dry` ที่รันไม่ได้จนกว่าจะ build ที่ SHA ใหม่ และ `F` (optional) ยังไม่รัน
-ส่วน `E` ปิดเฉพาะเส้นทางอ่าน ยังไม่ทำ per-switch E ตามที่ตกลง
+และไม่ใช่ FRR — ตาราง §11 ยังเหลือ `D-sim` ที่ Owner กำลังรันบนโต๊ะ (ขออนุมัติ 2026-11-11 ข้อ ข.), `D-dry` และ `F`
+ถูก **waive** ไม่เป็น merge blocker (ข้อ ค.), ส่วน `E` ปิดเฉพาะเส้นทางอ่าน ยังไม่ทำ per-switch E ตามที่ตกลง
+
+**คำตัดสินของ Owner ที่ HEAD `e3a731c` (2026-11-11) — บันทึกลากถึงเหตุผล ไม่ใช้แค่สรุปว่า "อนุมัติ":**
+- **ข้อ ก. ค่า default timeout ของวาล์ว:** อนุมัติให้ใช้ **45000 ms** ให้ตรงกับตัวขับและเวลาเดินทางจริง
+  (เปิด 30399.395 ms / ปิด 29609.902 ms) · **ผลตรวจในโค้ด: ไม่มี default ฝั่ง C# ให้แก้ตั้งแต่ต้น** — ความเห็นว่า
+  "trial default ที่ 30000" ที่ผมเขียนไว้ในรายงานก่อนหน้า **ไม่ตรงกับ source** ผมจึงไม่สร้าง default ขึ้นใหม่
+  เพราะจะเป็นการกลับกติกา fail‑closed ที่ Owner อนุมัติไว้เอง ("ขาด env = ปฏิเสธ") สิ่งที่แก้จริงจึงมีแค่
+  doc comment ที่เขียนเลขค้างไว้ 30000 ใน `apps/runtime/CleaningPathDryComposition.cs:157-159`
+  (เป็นข้อความล้วน ไม่มี test ไหน pin ตัวเลขนี้: `CleaningPathDryCompositionTests.cs:465-477` กับ
+  `PumpCommandDryTrialTests.cs:470-481` ตรวจเฉพาะชื่อตัวแปรกับคำสั่ง refusal)
+- **ข้อ ข. `D-sim`:** Owner ดำเนินการรันบนหน้างานจริง (ปั๊มจริงหยุด, `SOFTWARE_SIMULATED_AI003`) และจะส่ง
+  `stage-D-sim.out.txt` + `.err.txt` มาให้บันทึกเพื่อปิด gate ⇒ แถว `D-sim` ยัง **OPEN** จนกว่าหลักฐานจะมาถึง
+- **ข้อ ค. waive `D-dry` (โหมดเปียก) และ `F` (motion stop):** **ไม่ใช่ merge blocker ของ PR #45** — นโยบายคือแยก
+  พิสูจน์ Physical Pump + Main Valve (`A1/A2` + `D-pump-mv`) ออกจาก Physical IV + Cleaning Path (`C-iv1` + `D-sim`)
+  เพื่อไม่ให้น้ำแรงดันสูงออกหัวฉีดในขั้นตอน dry commissioning · ตัว stage ยังอยู่ในตัวขับ (ยัง export เป็น
+  `stage-D-dry.ps1`) แต่ไม่มีการรัน · ถ้าจะรันเมื่อไหร่ `WJSS_DRY_WET_SEQUENCE_ACK` ยังบังคับอยู่ และ**การ waive
+  นี้ไม่ใช่การลดกฎความปลอดภัย** เป็นแค่การตัดเงื่อนไขออกจาก PR นี้เท่านั้น (การกลับคำ waive ต้องเป็นคำสั่ง Owner)
 
 ### ข้อ 6.2 — variant สาม: `D-sim` = วาล์วจริง + Path จริงบนค่าแรงดันที่ Owner ประกาศ
 
@@ -523,15 +541,16 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 | C | IV physical actuation + FC01 read-back | **CLOSED** — field-confirmed ทั้งสองทางด้วย limit switches; `fc01=False` ที่ address 22 อธิบายด้วยกติกา RW mirror +512 (อ่านที่ 534) จึงไม่ใช่ defect |
 | D-pump-mv | บันไดปั๊มจริง + Motorized Main Valve (บล็อก 1.27) ที่ Product สั่งเองทั้งเปิดและปิด | **CLOSED ที่ `16f78bc` (2026-11-11 01:33, driver 2026-11-20.1 + patch โปรไฟล์, exe sha256 `492BCB9DE0CF`)** — `RESULT D-pump-mv: PASS (exit=0)`: Product เปิดวาล์วเอง (`main_valve_open_source=PRODUCT_DISPATCH`, `position_at_start=CLOSED`) ยืนยันด้วย FC02 แล้วค่อย Select Pump, ปิดหลัง `pump_stop_confirmed=True` จนได้ `position_at_end=CLOSED` + `coils_resting=True`, `over_torque=False`, `position_lost=False`, `supervision_fault=False`, `refusal=NONE`; ลำดับ 6 การเขียนตรง invariant (FALSE ของคอยล์ฝั่งตรงข้ามก่อนเสมอ + ปล่อยคอยล์ที่ลิมิต) และ `dispatch_summary` สอดคล้อง; แรงดันจริง 15.4631 bar > 15 (raw 12667, `ai003_pump_ready_rule=ACCEPTED`), `transport_errors=0`, `network_attempts=1550`; เวลาเดินทาง 30399.395/29609.902 ms ⇒ ตัวขับตั้ง timeout เป็น 45000 (driver `2026-11-21.1`); หลักฐานเต็มอยู่ข้อ 6.1.2 — **ยังต้อง build+test เขียวที่ SHA ล่าสุดของ branch ก่อนนับเป็นรอบปิด gate** |
 | D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — ที่ `ee69196` บันไดถูกตัดสินถูกต้องแล้ว (exit=2 + CHECK แทน exit=0 ปลอม) และเจอต้นเหตุจริงชั้น boundary: `now` ที่ใช้ acceptance ถูกจับก่อนการอ่าน ⇒ Usable=false เสมอบนของจริง (แก้พร้อมกันทั้ง ReadFeedback/ReadPumpOutletPressure + test นานาฬิกา ticking) — รันซ้ำที่ `1eb65a6` แล้ว: acceptance ที่แก้ทำงานจริงบนฮาร์ดแวร์ (`analog_ramp_executed=True`, `last_running_usable=True`, `transport_errors=0`) แต่รอบที่ exit 0 เกิดเพราะวาล์วถูกเปิดนอก Product ด้วยมือ จึงยังปิด gate ไม่ได้ — หลักฐานวาล์วต้องมาจาก `D-pump-mv`; ฝั่งโต๊ะ: `dispatch_window_ms`/`written=` ยังต้องดูจาก out.txt ⇒ **ปิด gate แล้วโดยอ้างหลักฐาน `D-pump-mv` ที่ `16f78bc` เป็นหลัก** (วาล์วเปิดโดย Product เอง, 7 dispatches `MATCH_OVER_7`, `written=` ตรง bound ทุกบรรทัด, `transport_errors=0`) ส่วนรอบ manual ของ `D-pump` ที่ `1eb65a6` ถูกบันทึกเป็นหลักฐานเสริมเท่านั้น ไม่ถูกนับเป็นหลักฐานวาล์ว |
-| D-sim | Path จริง + วาล์วจริง บนค่าแรงดันที่ประกาศ (ติดป้าย SOFTWARE_SIMULATED) | **OPEN** — ต้อง build ใหม่แล้วรันบนโต๊ะ |
-| D-dry | integrated dry cycle แบบเปียก (ปั๊มจริง + วาล์วจริง) no-load ครบลูปพร้อม cleanup | **OPEN** — ต้องมี `WJSS_DRY_WET_SEQUENCE_ACK` |
+| D-sim | Path จริง + วาล์วจริง บนค่าแรงดันที่ประกาศ (ติดป้าย SOFTWARE_SIMULATED) | **OPEN — Owner กำลังรันที่โต๊ะ (อนุมัติข้อ ข. 2026-11-11)** · ต้อง build ที่ SHA ใหม่ก่อน · ต้องเห็น `pump_evidence_kind=SOFTWARE_SIMULATED_AI003` + `simulated_pump_ready_rule=ACCEPTED` + `terminal_status=CompleteAwaitingSafeReturn` + `primary_failure=NONE` + IV เปิด/ปิดครบตาม `isolation_valve` · gate D จะปิดเมื่อ `.out.txt`/`.err.txt` ก้อนนี้ถูกบันทึก |
+| D-dry | integrated dry cycle แบบเปียก (ปั๊มจริง + วาล์วจริง) no-load ครบลูปพร้อม cleanup | **WAIVED (Owner 2026-11-11 ข้อ ค.) — ไม่ใช่ merge blocker ของ PR #45** · เหตุผล: แยกพิสูจน์ปั๊ม/วาล์วหลักออกจาก path เพื่อไม่ให้น้ำออกหัวฉีดช่วง dry · stage ยัง export ได้และยังต้อง `WJSS_DRY_WET_SEQUENCE_ACK` ถ้าจะรัน |
 | E | WSB Upper/Lower reclass + DI read path (FC02 vs FC01) | **CLOSED** สำหรับเส้นทางอ่าน (ยังไม่ทำ per-switch E ตามที่ตกลง) |
-| F | (optional) motion stop behaviour | ยังไม่รัน (optional) |
+| F | (optional) motion stop behaviour | **WAIVED (Owner 2026-11-11 ข้อ ค.) — ไม่ใช่ merge blocker** · ใช้ `docs/MOTION_STOP_TRIAL_RUNBOOK.md` ตามเดิมเมื่อต้องการ |
 
 **ส่งผมทุก stage:** ก้อนข้อความใต้ `--- copy everything below ---` (scrub แล้ว) + log ดิบเฉพาะก้อนที่มี `CHECK` — ห้าม commit ไฟล์ log/ผลลัพธ์เข้า repo เด็ดขาด
 **สถานะ (อัปเดต 2026-11-11 หลัง `D-pump-mv` PASS):** A/B/C/E ปิดแล้วที่ `c4898a0` (ห้ามรันซ้ำ) · **D-pump กับ D-pump-mv ปิดแล้ว**
 ที่ `16f78bc` — วาล์ว Main ถูก Product สั่งเปิด/ปิดพร้อมหลักฐาน FC02 ครบ (ดูข้อ 6.1.2) · D ยังเหลือ `D-sim` (ต้อง build ใหม่หลัง
 เพิ่มโค้ด/tests) และถ้าจะเอา `D-dry` (wet) ด้วยต้องอ่านข้อ 6.2/6.3 ก่อน · ตัวขับเป็น `2026-11-21.1` (แก้เส้นเลือกโปรไฟล์ให้
-`D-pump-mv` + ขยับ timeout วาล์วเป็น 45000 + self-test กลุ่มใหม่) · ค่า default ฝั่ง trial ยังเป็น 30000 ms ซึ่งสั้นกว่า
-เวลาจริง ⇒ รอคำสั่ง Owner ว่าจะขยับ constant ตัวนั้นด้วยหรือไม่ (มันคือกฎที่ Owner อนุมัติไว้ที่ 30000) · PRODUCTION NOT AUTHORIZED ·
+`D-pump-mv` + ขยับ timeout วาล์วเป็น 45000 + self-test กลุ่มใหม่) · ข้อ ก. ของ Owner **ปิดแล้วโดยไม่แก้ C#**: ฝั่ง Product ไม่มี
+ค่า default ให้ขยับ (env หาย = refuse) มีแค่ doc comment ที่เขียนเลขค้างไว้ซึ่งอัปเดตแล้ว · `D-dry` กับ `F` ถูก waive ตามข้อ ค.
+⇒ เหลือ `D-sim` (ข้อ ข.) เป็นรายการเดียวที่ยังค้ำ gate D · PRODUCTION NOT AUTHORIZED ·
 MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง

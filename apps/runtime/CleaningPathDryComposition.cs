@@ -155,7 +155,8 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// <summary>
     /// How long the Main Valve may take to reach its open limit (DI-013). Required in the physical Pump
     /// class and never defaulted: a travel bound the Product invented would be a wait nobody authorized,
-    /// and the field driver is the place that states the 30000 ms the Owner set.
+    /// and the field driver is the place that states the bound the Owner set (45000 ms since 2026-11-11,
+    /// after the bench measured this valve's travel at 30399 ms open and 29610 ms close).
     /// </summary>
     public const string MainValveOpenTimeoutVariable = "WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS";
 
