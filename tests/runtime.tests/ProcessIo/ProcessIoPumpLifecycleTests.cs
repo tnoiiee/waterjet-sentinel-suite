@@ -1356,7 +1356,7 @@ public sealed class ProcessIoPumpLifecycleTests
     {
         bool open = false;
         bool close = false;
-        foreach ((int address, bool value) in rig.Transport.CoilWrites)
+        foreach ((_, int address, bool value) in rig.Transport.CoilWrites)
         {
             if (address == CoilValveOpen)
             {

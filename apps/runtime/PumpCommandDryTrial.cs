@@ -778,9 +778,11 @@ public static class PumpCommandDryTrial
     /// </summary>
     private static bool OpenMainValve(ProcessIoMainValveGate gate, TextWriter output)
     {
-        bool confirmed = gate.BeginOpen(out _);
+        // The outcome of the call is not carried: the phase is the only thing worth trusting here, and a
+        // caller that reads Settled cannot mistake a refusal for a confirmation.
+        gate.BeginOpen(out _);
 
-        if (!confirmed && !gate.Settled)
+        if (!gate.Settled)
         {
             int maximumSteps = (int)(gate.Configuration.OpenTimeout.TotalMilliseconds
                 / DriveIntervalMilliseconds) + 1000;
@@ -796,7 +798,7 @@ public static class PumpCommandDryTrial
             }
         }
 
-        confirmed = gate.AdmitsPumpEnergise;
+        bool confirmed = gate.AdmitsPumpEnergise;
 
         output.WriteLine("  main_valve_position_at_start=" + gate.PositionAtStart);
         output.WriteLine("  main_valve_open_source=" + gate.OpenSource);

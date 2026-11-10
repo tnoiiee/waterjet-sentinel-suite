@@ -1696,6 +1696,13 @@ public sealed record CleaningPathDryCleanupReport
     /// <summary>The Isolation Valve close-all evidence, captured through the session.</summary>
     public required ProcessIoCleanupResult Valves { get; init; }
 
+    /// <summary>
+    /// The Main Valve travel-and-close evidence of this composition, or null when no valve path was composed
+    /// (the declared-value class). It is deliberately NOT required: a composition that never commanded the
+    /// valve must keep constructing this report exactly as it did before the Main Valve existed.
+    /// </summary>
+    public MainValveCleanupRecord? MainValve { get; init; }
+
     /// <summary>The Process-Io session state after cleanup.</summary>
     public required string SessionState { get; init; }
 
