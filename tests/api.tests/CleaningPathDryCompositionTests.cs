@@ -472,6 +472,8 @@ public sealed class CleaningPathDryCompositionTests
                      "WJSS_PUMP_RUNNING_CONFIRM_MS",
                      "WJSS_PUMP_READY_TIMEOUT_MS",
                      "WJSS_PUMP_STOPPED_CONFIRM_MS",
+                     "WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS",
+                     "WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS",
                  })
         {
             Assert.Contains(variable, text, StringComparison.Ordinal);
@@ -479,6 +481,55 @@ public sealed class CleaningPathDryCompositionTests
 
         // A refused Pump configuration is a typed composition refusal, never a silent default command.
         Assert.Contains("DRY_COMPOSITION_REFUSED_PUMP_CONFIGURATION", text, StringComparison.Ordinal);
+
+        // The two Main Valve bounds are refused the same way, so a missing travel bound cannot be honored by
+        // inventing one. They are named here rather than in their own test because the rule is identical.
+        Assert.Contains("DRY_COMPOSITION_REFUSED_MAIN_VALVE_CONFIGURATION", text, StringComparison.Ordinal);
+        Assert.Contains("TryReadMainValveConfiguration", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The Main Valve order, asserted as text because it is a safety order and not an implementation detail:
+    /// the valve must be proven OPEN before the Pump is admitted, and it may be commanded closed only once the
+    /// Pump stop is both recorded and confirmed - which also means the close can never stand between the Pump
+    /// and its motion cleanup.
+    /// </summary>
+    [Fact]
+    public void The_Main_Valve_Is_Proven_Open_Before_The_Pump_And_Closed_After_The_Confirmed_Stop()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+
+        int valveOpen = text.IndexOf("OpenMainValve(out string mainValveCode)", StringComparison.Ordinal);
+        int pumpStart = text.IndexOf("StartPump(out string pumpCode)", StringComparison.Ordinal);
+        Assert.True(valveOpen >= 0, "The composition must prove the Main Valve OPEN.");
+        Assert.True(pumpStart >= 0, "The composition must start the Pump.");
+        Assert.True(valveOpen < pumpStart, "The Main Valve must be proven OPEN before the Pump is started.");
+
+        int pumpStop = text.IndexOf("StopPump();", StringComparison.Ordinal);
+        int valveClose = text.IndexOf("CloseMainValve(pump.StoppedConfirmed)", StringComparison.Ordinal);
+        int motionCleanup = text.IndexOf("_motionRoot.Shutdown()", StringComparison.Ordinal);
+        Assert.True(pumpStop >= 0 && valveClose >= 0 && motionCleanup >= 0);
+        Assert.True(pumpStop < valveClose, "The valve may only be closed after the Pump stop is recorded.");
+        Assert.True(valveClose < motionCleanup, "A valve close must never delay the motion cleanup.");
+
+        // The valve path is composed for the physical class only, and the declared-value class keeps the
+        // configuration that existed before this scope, so a simulated Pump cannot move a real valve.
+        Assert.Contains("ProcessIoMainValveConfiguration.NotEnforced", text, StringComparison.Ordinal);
+        Assert.Contains("new ProcessIoMainValveGate(pumpBoundary, mainValveConfiguration, pumpTime)", text, StringComparison.Ordinal);
+
+        // The close is gated on the confirmation itself, not on an intention, and the refusal it returns when
+        // the Pump stop is unconfirmed is its own code rather than a silent skip.
+        string gate = File.ReadAllText(
+            Path.Combine(RepoRoot(), "packages", "application", "ProcessIo", "ProcessIoMainValveGate.cs"));
+        Assert.Contains("PumpCommandRefusals.RefusedMainValveCloseNotStopped", gate, StringComparison.Ordinal);
+        Assert.Contains("public bool BeginClose(bool pumpStoppedConfirmed, out string code)", gate, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProcessIoPumpLifecycle", gate, StringComparison.Ordinal);
+        Assert.DoesNotContain("_boundary.SetEnableInverter(", gate, StringComparison.Ordinal);
+        Assert.DoesNotContain("_boundary.SetRunPump(", gate, StringComparison.Ordinal);
+        Assert.DoesNotContain("_boundary.SetSpeedCommand(", gate, StringComparison.Ordinal);
+        Assert.Contains("_boundary.SetMainValveOpenCoil(", gate, StringComparison.Ordinal);
+        Assert.Contains("_boundary.SetMainValveCloseCoil(", gate, StringComparison.Ordinal);
     }
 
     private static int Count(string text, string value)

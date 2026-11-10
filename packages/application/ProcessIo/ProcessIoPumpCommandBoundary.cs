@@ -186,6 +186,25 @@ public interface IPumpCommandBoundary
     /// falls back to the Pump Inlet row.
     /// </summary>
     PumpPressureRead ReadPumpOutletPressure();
+
+    // --------------------------------------------------------------- Main Valve (motorized, block 1.27)
+    //
+    // The Main Valve is neither a rung of the Pump ladder nor an Isolation Valve, so it gets its own three
+    // members and nothing else: one read of the limit and torque inputs, and the two maintained coil writes.
+    // There is no pulse, no timed hold, no arbitrary tag write and no member here that can stop the Pump.
+
+    /// <summary>
+    /// Reads DI-013, DI-014 and DI-012 in one pass and interprets them as a single Main Valve observation.
+    /// The position is derived from the limit switches only: a coil read-back is process-image state and is
+    /// never consulted as evidence that the valve moved.
+    /// </summary>
+    ProcessIoMainValveRead ReadMainValvePosition();
+
+    /// <summary>Writes the maintained Main Valve open coil (DO-014). FALSE releases it; nothing pulses.</summary>
+    PumpCommandOutcome SetMainValveOpenCoil(bool value);
+
+    /// <summary>Writes the maintained Main Valve close coil (DO-015). FALSE releases it; nothing pulses.</summary>
+    PumpCommandOutcome SetMainValveCloseCoil(bool value);
 }
 
 /// <summary>
@@ -201,6 +220,7 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
     private readonly ProcessIoWriteAuthorization _authorization;
     private readonly TimeProvider _time;
     private readonly TimeSpan _freshnessBudget;
+    private readonly ProcessIoMainValveConfiguration _mainValve;
     private readonly List<PumpCommandOutcome> _commandLog = new();
 
     public ProcessIoPumpCommandBoundary(
@@ -209,7 +229,8 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         ProcessIoWriteAuthorization authorization,
         PumpFeedbackConfiguration feedback,
         TimeProvider? time = null,
-        TimeSpan? freshnessBudget = null)
+        TimeSpan? freshnessBudget = null,
+        ProcessIoMainValveConfiguration? mainValve = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(catalogue);
@@ -223,7 +244,25 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         _time = time ?? TimeProvider.System;
         _freshnessBudget = freshnessBudget ?? TimeSpan.FromMilliseconds(
             PumpLifecycleConfiguration.OwnerInitialFreshnessBudgetMilliseconds);
+
+        // Absent means NOT_ENFORCED, and NOT_ENFORCED is honest rather than permissive only because the
+        // transcript has to print it: a composition that never commands the valve gates nothing, and says so.
+        _mainValve = mainValve ?? ProcessIoMainValveConfiguration.NotEnforced;
+        if (!_mainValve.Valid)
+        {
+            // An enforced gate with an unusable timeout cannot bound its own wait, so the whole boundary is
+            // refused at construction instead of degrading into a valve that is never checked.
+            throw new ArgumentException(
+                PumpCommandRefusals.RefusedMainValveConfiguration
+                + ": an enforced Main Valve configuration needs both travel timeouts inside "
+                + ProcessIoMainValve.MinimumTravelTimeoutMilliseconds + " to "
+                + ProcessIoMainValve.MaximumTravelTimeoutMilliseconds + " milliseconds.",
+                nameof(mainValve));
+        }
     }
+
+    /// <summary>The Main Valve enforcement this boundary applies to energising Pump commands.</summary>
+    public ProcessIoMainValveConfiguration MainValveConfiguration => _mainValve;
 
     /// <summary>Every digital command outcome in issue order, for evidence.</summary>
     public IReadOnlyList<PumpCommandOutcome> CommandLog => _commandLog;
@@ -263,6 +302,12 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
     public PumpCommandOutcome SetRunPump(bool value) =>
         WriteCoil(PumpCommandContract.RunPumpTag, value);
 
+    public PumpCommandOutcome SetMainValveOpenCoil(bool value) =>
+        WriteCoil(ProcessIoMainValve.OpenCommandTag, value);
+
+    public PumpCommandOutcome SetMainValveCloseCoil(bool value) =>
+        WriteCoil(ProcessIoMainValve.CloseCommandTag, value);
+
     /// <summary>
     /// Writes one typed analog speed reference through the session. The command was already proven to be
     /// either the explicit 0 mA sentinel or a live 4 to 20 mA reference, so the only conversion that runs
@@ -272,6 +317,28 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
     public PumpAnalogCommandOutcome SetSpeedCommand(PumpAnalogCommand command)
     {
         DateTimeOffset at = _time.GetUtcNow();
+
+        // The same admission as the coil path, restricted to a reference that would spin the Pump. The 0 mA
+        // safe-stop sentinel is a stop command: gating it would let a valve fault hold the Pump at speed.
+        if (command.Valid && command.IsRunning && _mainValve.Enforced
+            && !MainValveAdmitsEnergise(out string analogValveCode))
+        {
+            return new PumpAnalogCommandOutcome
+            {
+                Tag = PumpCommandContract.SpeedReferenceTag,
+                // Nothing was written, so no address and no raw word are claimed. The kind is stated exactly,
+                // because a reader must be able to see that a RUNNING reference was the thing that was refused.
+                RegisterAddress = 0,
+                RequestedEngineeringMilliamps = command.Milliamps,
+                RequestedKind = PumpAnalogCommandContract.RunningCode,
+                RawWord = 0,
+                Admitted = false,
+                Dispatched = false,
+                Code = analogValveCode,
+                SessionGeneration = _session.Generation,
+                At = at,
+            };
+        }
 
         if (!command.Valid || !PumpCommandContract.TryAnalogAddress(out int registerAddress))
         {
@@ -553,6 +620,29 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
             return refused;
         }
 
+        // The Main Valve admission (Owner ruling 6): no Pump channel that could energise the motor is written
+        // before the valve is confirmed OPEN by its own limit switch. Only an energising write is gated and
+        // only when the composition asked for it, so a de-energising write, the release of a coil and every
+        // valve write itself always pass. The refusal is returned before AdmitWrite, so no one-use token is
+        // consumed by a command that was never allowed to exist.
+        if (value && _mainValve.Enforced && PumpCommandContract.IsPumpCommandTag(tag)
+            && !MainValveAdmitsEnergise(out string valveCode))
+        {
+            var blocked = new PumpCommandOutcome
+            {
+                Tag = tag,
+                CoilAddress = coilAddress,
+                Value = value,
+                Admitted = false,
+                Dispatched = false,
+                Code = valveCode,
+                SessionGeneration = _session.Generation,
+                At = at,
+            };
+            _commandLog.Add(blocked);
+            return blocked;
+        }
+
         if (!_catalogue.TryGetValue(tag, out ProcessIoCatalogueRow? row) || row.Binding is null)
         {
             var unbound = new PumpCommandOutcome
@@ -616,5 +706,78 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         };
         _commandLog.Add(outcome);
         return outcome;
+    }
+
+    /// <summary>
+    /// Reads the three Main Valve inputs and answers one question: is the valve proven OPEN right now.
+    /// A read that was not usable is answered as a refusal, never as an unknown that is waved through, and
+    /// the underlying session code is reported by the valve gate's own last-read keys rather than folded
+    /// into a second vocabulary here.
+    /// </summary>
+    private bool MainValveAdmitsEnergise(out string code)
+    {
+        ProcessIoMainValveRead read = ReadMainValvePosition();
+
+        if (read.Position == ProcessIoMainValvePosition.OPEN)
+        {
+            code = PumpCommandRefusals.Granted;
+            return true;
+        }
+
+        code = read.Usable
+            ? PumpCommandRefusals.RefusedMainValveNotOpen
+            : PumpCommandRefusals.RefusedMainValvePositionUnconfirmed;
+        return false;
+    }
+
+    public ProcessIoMainValveRead ReadMainValvePosition()
+    {
+        // The polarity of this trio is not configurable, on purpose. Both limit switches and the over-torque
+        // contact are dry auxiliary contacts relayed to 24 VDC that close at their end of travel, so an
+        // operator-settable inversion would be a way to make OPEN and CLOSED swap meanings on the bench.
+        PumpFeedbackRead opened = ReadFeedback(
+            ProcessIoMainValve.OpenedFeedbackTag, ProcessIoMainValve.FeedbackPolarity, commissioned: true);
+        PumpFeedbackRead closed = ReadFeedback(
+            ProcessIoMainValve.ClosedFeedbackTag, ProcessIoMainValve.FeedbackPolarity, commissioned: true);
+        PumpFeedbackRead overTorque = ReadFeedback(
+            ProcessIoMainValve.OverTorqueFeedbackTag, ProcessIoMainValve.FeedbackPolarity, commissioned: true);
+
+        bool positionReadable = opened.Usable && closed.Usable;
+        bool usable = positionReadable && overTorque.Usable;
+        ProcessIoMainValvePosition position =
+            ProcessIoMainValve.Classify(opened.Active, closed.Active, positionReadable);
+
+        string code = PumpCommandRefusals.Granted;
+        if (!positionReadable)
+        {
+            code = opened.Usable ? closed.Code : opened.Code;
+        }
+        else if (!overTorque.Usable)
+        {
+            code = overTorque.Code;
+        }
+        else if (position == ProcessIoMainValvePosition.CONFLICT)
+        {
+            // Readable and self-contradictory: the inputs are believed, and what they say is impossible.
+            code = PumpCommandRefusals.RefusedMainValveFeedbackConflict;
+        }
+        else if (overTorque.Active)
+        {
+            code = PumpCommandRefusals.RefusedMainValveOverTorque;
+        }
+
+        return new ProcessIoMainValveRead
+        {
+            Position = position,
+            OpenedActive = opened.Active,
+            ClosedActive = closed.Active,
+            OverTorqueActive = overTorque.Active,
+            PositionReadable = positionReadable,
+            OverTorqueReadable = overTorque.Usable,
+            Usable = usable,
+            Code = code,
+            SessionGeneration = opened.SessionGeneration,
+            At = overTorque.At,
+        };
     }
 }

@@ -46,11 +46,25 @@ public static class PumpCommandDryTrial
     /// <summary>The dedicated selector of this evidence class. No other selector reaches this runner.</summary>
     public const string ModeVariable = "WJSS_PUMP_COMMAND_DRY_TRIAL";
 
-    /// <summary>The only accepted selector literal. It is compared exactly, never normalized.</summary>
+    /// <summary>
+    /// The first accepted selector literal, and the pump-only evidence class. Compared exactly, never
+    /// normalized, so a typo can neither select the ladder by accident nor quietly fall back to it.
+    /// </summary>
     public const string ModePumpOnly = "PUMP_ONLY_NO_VALVES";
 
-    /// <summary>The evidence identity printed by every run of this trial.</summary>
+    /// <summary>
+    /// The second accepted selector literal: the same Pump ladder with the Main Valve (block 1.27) proven
+    /// OPEN before any Pump channel is energised and commanded back to CLOSED after a confirmed stop. It is
+    /// a separate evidence class rather than a flag on the first one because it moves a valve, and a reader
+    /// must be able to tell the two apart from the selector alone.
+    /// </summary>
+    public const string ModeMainValveAndPump = "MAIN_VALVE_AND_PUMP";
+
+    /// <summary>The evidence identity of a pump-only run: no valve of any kind was commanded.</summary>
     public const string TrialIdentity = "PHYSICAL_PUMP_COMMAND_ONLY_NO_VALVES";
+
+    /// <summary>The evidence identity of a run in which the Main Valve was commanded by this trial.</summary>
+    public const string MainValveTrialIdentity = "PHYSICAL_PUMP_COMMAND_WITH_MAIN_VALVE_ONLY";
 
     /// <summary>The owner kind the Pump command channel is acquired under for this trial.</summary>
     public const string PumpOwnerId = "PUMP_COMMAND_DRY_TRIAL";
@@ -125,12 +139,14 @@ public static class PumpCommandDryTrial
             return true;
         }
 
-        if (!string.Equals(raw, ModePumpOnly, StringComparison.Ordinal))
+        if (!string.Equals(raw, ModePumpOnly, StringComparison.Ordinal)
+            && !string.Equals(raw, ModeMainValveAndPump, StringComparison.Ordinal))
         {
             refusalCode = RefusedModeInvalid;
             refusalDetail =
-                $"{ModeVariable} must be absent, or exactly '{ModePumpOnly}'. It is never normalized, and "
-                + "no other literal selects the Pump command ladder.";
+                $"{ModeVariable} must be absent, exactly '{ModePumpOnly}' or exactly "
+                + $"'{ModeMainValveAndPump}'. It is never normalized, and no other literal selects the Pump "
+                + "command ladder.";
             return false;
         }
 
@@ -330,6 +346,23 @@ public static class PumpCommandDryTrial
             return 4;
         }
 
+        // The second evidence class of this trial: the same ladder with the Main Valve admitted in front of
+        // it. The selector is re-read here rather than threaded through TryReadMode so that helper's signature
+        // and every existing caller of it stay exactly as they were; the literal was already proven exact.
+        bool mainValveMode = string.Equals(
+            readEnvironment(ModeVariable), ModeMainValveAndPump, StringComparison.Ordinal);
+
+        var mainValveConfiguration = ProcessIoMainValveConfiguration.NotEnforced;
+        if (mainValveMode
+            && !CleaningPathDryComposition.TryReadMainValveConfiguration(
+                readEnvironment, out mainValveConfiguration, out _, out string mainValveDetail))
+        {
+            // Refused before the transport is used: an enforced valve admission without a bound on its own
+            // travel wait is not something this trial will run with.
+            error.WriteLine("WJSS Pump command trial refused: " + mainValveDetail);
+            return 4;
+        }
+
         // Declared with var on purpose: the clock and the time provider are the concrete types the trials
         // always use, and naming an interface here only adds a devirtualisation cost the analyzers report as
         // CA1859 under this repo's warnings-as-errors build.
@@ -355,12 +388,16 @@ public static class PumpCommandDryTrial
             authorization,
             pumpConfiguration.Feedback,
             time,
-            pumpConfiguration.PressureFreshnessBudget);
+            pumpConfiguration.PressureFreshnessBudget,
+            mainValveConfiguration);
         var lifecycle = new ProcessIoPumpLifecycle(
             boundary, pumpConfiguration, new PumpCommandOwnership(), time);
+        ProcessIoMainValveGate? mainValveGate = mainValveMode
+            ? new ProcessIoMainValveGate(boundary, mainValveConfiguration, time)
+            : null;
 
         output.WriteLine("WJSS PUMP COMMAND DRY TRIAL");
-        output.WriteLine("  trial_identity=" + TrialIdentity);
+        output.WriteLine("  trial_identity=" + (mainValveMode ? MainValveTrialIdentity : TrialIdentity));
         output.WriteLine("  evidence_kind=PHYSICAL");
         output.WriteLine("  physical_pump_verified=True");
         output.WriteLine("  profile=" + profile);
@@ -376,11 +413,22 @@ public static class PumpCommandDryTrial
         output.WriteLine("  iv_command_executed=" + IvCommandExecutedNever);
         output.WriteLine("  motion_composed=False");
 
+        // The Main Valve state is stated in both evidence classes. In the pump-only class it says NOT_ENFORCED
+        // and nothing else is printed about it, because reading the limit inputs there would add claims to a
+        // run whose whole point is that it commanded no valve.
+        output.WriteLine("  main_valve_policy=" + (mainValveMode
+            ? ProcessIoMainValveEnforcement.ENFORCED.ToString()
+            : ProcessIoMainValveEnforcement.NOT_ENFORCED.ToString()));
+        output.WriteLine("  main_valve_block=" + (mainValveMode
+            ? ProcessIoMainValve.PanelBlock
+            : "NOT_ENFORCED"));
+        output.WriteLine("  main_valve_command_executed=" + (mainValveMode ? "True" : "False"));
+
         int exitCode;
         try
         {
             session.Open(clock.UtcNow);
-            exitCode = Drive(lifecycle, boundary, transport, session, catalogue, thresholds,
+            exitCode = Drive(lifecycle, boundary, mainValveGate, transport, session, catalogue, thresholds,
                 pumpConfiguration, pumpSelection, time, clock, output);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
@@ -422,6 +470,7 @@ public static class PumpCommandDryTrial
     private static int Drive(
         ProcessIoPumpLifecycle lifecycle,
         ProcessIoPumpCommandBoundary boundary,
+        ProcessIoMainValveGate? mainValve,
         ProcessIoPhysicalTransport transport,
         ProcessIoSession session,
         IReadOnlyDictionary<string, ProcessIoCatalogueRow> catalogue,
@@ -436,6 +485,15 @@ public static class PumpCommandDryTrial
         SystemClock clock,
         TextWriter output)
     {
+        // The Main Valve admission owns this position in the order: while the valve is not proven OPEN by its
+        // own limit switch, no Pump selection, enable, run or analog write is issued at all, and the trial
+        // stops here with the valve's own refusal code (Owner ruling 6). The Pump ladder was never started, so
+        // nothing below this line has to unwind anything.
+        if (mainValve is not null && !OpenMainValve(mainValve, output))
+        {
+            return 2;
+        }
+
         PumpLifecycleStartOutcome admitted = lifecycle.Start(new PumpLifecycleStartRequest
         {
             Owner = PumpCommandOwnerKind.MANUAL_COMMISSIONING,
@@ -466,6 +524,7 @@ public static class PumpCommandDryTrial
         var visited = new HashSet<PumpLifecycleState> { lifecycle.State };
         var trace = new List<string> { lifecycle.State.ToString() };
         bool sawFault = false;
+        bool mainValveAborted = false;
 
         int maximumSteps = (int)(budget.TotalMilliseconds / DriveIntervalMilliseconds) + 1000;
         for (int step = 0; step < maximumSteps; step += 1)
@@ -499,6 +558,17 @@ public static class PumpCommandDryTrial
             }
 
             lifecycle.Step();
+
+            // Owner rulings 3 and 8 while the Pump is coming up: an over-torque trip or the loss of both limit
+            // inputs releases the coils and requests the stop through the ONE stop path. The request is made
+            // and the loop keeps running, because abandoning the run here would leave the Pump at speed with no
+            // teardown recorded at all.
+            if (mainValve is not null && mainValve.Supervise())
+            {
+                mainValveAborted = true;
+                lifecycle.Stop(PumpStopReason.SEQUENCE_FAILURE);
+            }
+
             Thread.Sleep(DriveIntervalMilliseconds);
         }
 
@@ -668,10 +738,18 @@ public static class PumpCommandDryTrial
             output.WriteLine("  cleanup_fault=" + fault);
         }
 
+        output.WriteLine("  pump_stop_reason=" + (result?.StopReason.ToString() ?? "NOT_TERMINAL"));
+
+        // The valve goes back only now: the Pump stop above is already recorded and its confirmation is the
+        // gate on this call, so a valve that refuses to close can never be the reason a Pump stayed running.
+        bool mainValveComplete = CloseMainValveAfterStop(mainValve, result, mainValveAborted, output);
+
         // Success is the whole of it, not the absence of a complaint: the ladder must have reached PUMP_READY,
         // stopped in the STOPPED terminal state with a complete cleanup, released the command channel and been
-        // reported safe to complete, and no fault input may have been seen active on the way. Each half is a
-        // separate claim, so a run that tore down cleanly after a timeout cannot report an accepted trial.
+        // reported safe to complete, no fault input may have been seen active on the way, and - when a Main
+        // Valve path is composed - the valve must have arrived at its closed limit with both coils released and
+        // no torque trip. Each half is a separate claim, so a run that tore down cleanly after a timeout cannot
+        // report an accepted trial, and a clean Pump teardown cannot certify a valve that never moved.
         bool sawReady = visited.Contains(PumpLifecycleState.PUMP_READY);
         bool complete = result is not null
             && result.TerminalState == PumpLifecycleState.STOPPED
@@ -680,13 +758,144 @@ public static class PumpCommandDryTrial
             && !lifecycle.OwnsPumpCommand
             && lifecycle.SafeToReportComplete
             && sawReady
-            && !sawFault;
+            && !sawFault
+            && mainValveComplete;
 
         output.WriteLine("  run_reached_ready=" + (sawReady ? "True" : "False"));
         output.WriteLine("  trial_code=" + (complete
             ? "PUMP_COMMAND_TRIAL_ACCEPTED"
-            : "PUMP_COMMAND_TRIAL_" + (result?.TerminalState.ToString() ?? lifecycle.State.ToString())));
+            : mainValveComplete
+                ? "PUMP_COMMAND_TRIAL_" + (result?.TerminalState.ToString() ?? lifecycle.State.ToString())
+                : "PUMP_COMMAND_TRIAL_MAIN_VALVE_REFUSED"));
         return complete ? 0 : 2;
+    }
+
+    /// <summary>
+    /// Proves the Main Valve OPEN, commanding the travel when the limit switch says it is not. The wait is
+    /// bounded by the configured open timeout plus the same second bound the Pump drive loop uses, and the
+    /// only sleep is the trial's own drive interval. True means the open limit switch has been seen and the
+    /// gate has released the coil it energised.
+    /// </summary>
+    private static bool OpenMainValve(ProcessIoMainValveGate gate, TextWriter output)
+    {
+        bool confirmed = gate.BeginOpen(out _);
+
+        if (!confirmed && !gate.Settled)
+        {
+            int maximumSteps = (int)(gate.Configuration.OpenTimeout.TotalMilliseconds
+                / DriveIntervalMilliseconds) + 1000;
+
+            for (int step = 0; step < maximumSteps && !gate.Settled; step += 1)
+            {
+                gate.Step();
+
+                if (!gate.Settled)
+                {
+                    Thread.Sleep(DriveIntervalMilliseconds);
+                }
+            }
+        }
+
+        confirmed = gate.AdmitsPumpEnergise;
+
+        output.WriteLine("  main_valve_position_at_start=" + gate.PositionAtStart);
+        output.WriteLine("  main_valve_open_source=" + gate.OpenSource);
+        output.WriteLine("  main_valve_open_confirmed=" + (confirmed ? "True" : "False"));
+        output.WriteLine("  main_valve_open_elapsed_ms="
+            + gate.OpenElapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture));
+        output.WriteLine("  main_valve_open_refusal=" + (confirmed ? "NONE" : gate.Code));
+        output.WriteLine("  main_valve_over_torque=" + (gate.OverTorqueSeen ? "True" : "False"));
+        output.WriteLine("  main_valve_phase_after_open=" + gate.Phase);
+
+        return confirmed;
+    }
+
+    /// <summary>
+    /// Commands the valve closed once the Pump stop is confirmed, drives the travel to its bound and prints
+    /// every valve claim of the run. Returns the valve half of the trial's verdict, and it never refuses
+    /// anything the Pump teardown still needed: by the time this runs, the stop is already recorded.
+    /// </summary>
+    private static bool CloseMainValveAfterStop(
+        ProcessIoMainValveGate? gate,
+        PumpLifecycleResult? result,
+        bool mainValveAborted,
+        TextWriter output)
+    {
+        if (gate is null)
+        {
+            return true;
+        }
+
+        bool pumpStopConfirmed = result?.StoppedConfirmed == true;
+        bool closed = gate.BeginClose(pumpStopConfirmed, out string closeCode);
+
+        if (!closed && !gate.Settled && closeCode != PumpCommandRefusals.RefusedMainValveCloseNotStopped)
+        {
+            int maximumSteps = (int)(gate.Configuration.CloseTimeout.TotalMilliseconds
+                / DriveIntervalMilliseconds) + 1000;
+
+            for (int step = 0; step < maximumSteps && !gate.Settled; step += 1)
+            {
+                gate.Step();
+
+                if (!gate.Settled)
+                {
+                    Thread.Sleep(DriveIntervalMilliseconds);
+                }
+            }
+
+        }
+
+        // Recomputed from the phase rather than from what BeginClose returned, so a travel that confirmed on a
+        // later step is reported as confirmed and an already-closed valve is not reported as a failure.
+        closed = gate.Phase == ProcessIoMainValveGatePhase.CLOSED_CONFIRMED;
+
+        bool heldOpen = !gate.LeftOpenDuringRun && !gate.PositionLostDuringRun;
+
+        output.WriteLine("  main_valve_close_requested=True");
+        output.WriteLine("  main_valve_pump_stop_confirmed=" + (pumpStopConfirmed ? "True" : "False"));
+        output.WriteLine("  main_valve_close_confirmed=" + (closed ? "True" : "False"));
+        output.WriteLine("  main_valve_close_elapsed_ms="
+            + gate.CloseElapsed.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture));
+        output.WriteLine("  main_valve_position_at_end=" + gate.PositionAtEnd);
+        output.WriteLine("  main_valve_coils_resting=" + (gate.CoilsResting ? "True" : "False"));
+        output.WriteLine("  main_valve_over_torque=" + (gate.OverTorqueSeen ? "True" : "False"));
+        output.WriteLine("  main_valve_position_lost=" + (gate.PositionLostDuringRun ? "True" : "False"));
+        output.WriteLine("  main_valve_held_open=" + (heldOpen ? "True" : "False"));
+        output.WriteLine("  main_valve_supervision_fault=" + (mainValveAborted ? "True" : "False"));
+        output.WriteLine("  main_valve_position_reads="
+            + gate.PositionReads.ToString(CultureInfo.InvariantCulture));
+        output.WriteLine("  main_valve_refusal="
+            + (closed && gate.CoilsResting && !gate.OverTorqueSeen ? "NONE" : gate.Code));
+
+        output.WriteLine("  main_valve_writes=" + gate.Writes.Count.ToString(CultureInfo.InvariantCulture));
+        foreach (PumpCommandOutcome write in gate.Writes)
+        {
+            output.WriteLine("  main_valve_write=" + write.Tag
+                + " coil=" + write.CoilAddress.ToString(CultureInfo.InvariantCulture)
+                + " bound=" + (write.BoundAddress is int bound
+                    ? bound.ToString(CultureInfo.InvariantCulture)
+                    : "UNBOUND")
+                + " value=" + (write.Value ? "True" : "False")
+                + " admission=" + (write.Admitted ? "ADMITTED" : "REFUSED")
+                + " dispatch=" + (write.Dispatched ? "DISPATCHED" : "NOT_DISPATCHED")
+                + " code=" + write.Code);
+        }
+
+        ProcessIoMainValveRead? last = gate.LastPosition;
+        if (last is not null)
+        {
+            output.WriteLine("  main_valve_last_opened_raw=" + (last.OpenedActive ? "True" : "False"));
+            output.WriteLine("  main_valve_last_closed_raw=" + (last.ClosedActive ? "True" : "False"));
+            output.WriteLine("  main_valve_last_over_torque_raw=" + (last.OverTorqueActive ? "True" : "False"));
+            output.WriteLine("  main_valve_last_read_code=" + last.Code);
+        }
+
+        return closed
+            && gate.CoilsResting
+            && !gate.OverTorqueSeen
+            && gate.Phase == ProcessIoMainValveGatePhase.CLOSED_CONFIRMED
+            && !mainValveAborted;
     }
 
     /// <summary>

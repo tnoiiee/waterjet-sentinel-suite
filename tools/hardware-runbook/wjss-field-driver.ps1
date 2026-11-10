@@ -3,7 +3,7 @@
 # HOW TO USE (one line, in a plain PowerShell window, on the machine wired to the T8 rack):
 #     . "$Repo\tools\hardware-runbook\wjss-field-driver.ps1"      # dot-source, never run with &
 #     Test-WjssDriver                                             # runs the built-in self-tests, no hardware needed
-#     Export-WjssStageFiles                                       # writes the 10 stage scripts into the evidence folder
+#     Export-WjssStageFiles                                       # writes the 11 stage scripts into the evidence folder
 #     & "$script:Ev\stage-A1-off.ps1"                             # then one line per stage, in runbook order
 #
 # Contract of this file:
@@ -19,7 +19,7 @@
 # SOURCE-AUTHORED IN ARENA. NOT EXECUTED IN ARENA: the Arena sandbox has no PowerShell interpreter, so the
 # gates here are (a) the load-time parser of PowerShell itself, (b) Test-WjssDriver on the Owner's machine.
 
-$script:WjssDriverVersion = '2026-11-19.1'
+$script:WjssDriverVersion = '2026-11-20.1'
 $ErrorActionPreference = 'Stop'
 # A stage never runs on a driver whose own self-test has not passed in THIS window. Test-WjssDriver is
 # the only thing that proves the parser, the verdict matcher and the expectations still agree with each
@@ -525,7 +525,7 @@ function Format-WjssBits {
 
 # ------------------------------------------------------------------ the stage definitions (this is the authority, not the markdown)
 
-$script:StageNames = @('A1-off', 'A2-run', 'B-off', 'B-on', 'C-iv1', 'D-pump', 'D-sim', 'D-dry', 'E-idle', 'E-moved')
+$script:StageNames = @('A1-off', 'A2-run', 'B-off', 'B-on', 'C-iv1', 'D-pump', 'D-pump-mv', 'D-sim', 'D-dry', 'E-idle', 'E-moved')
 
 $script:Stages = @{
     'A1-off' = {
@@ -678,6 +678,79 @@ $script:Stages = @{
             'session_state'                 = 'CLOSED'
             'transport_released'            = 'True'
         }) -Show @('pump_selection', 'pump_analog_target_ma', 'pump_ready_setpoint_bar', 'ladder', 'ladder_complete', 'run_reached_ready', 'dispatch_summary', 'dispatch_window_ms', 'dispatch_address_agreement', 'command_dispatches', 'command_dispatch_refusals', 'run_cleared_dispatch', 'enable_released_dispatch', 'stop_accepted', 'stop_code', 'running_commissioned', 'fault_commissioned', 'running_binding', 'fault_binding', 'last_running_usable', 'last_running_raw_bit', 'last_running_active', 'last_running_code', 'last_running_observation_raw', 'last_fault_usable', 'last_fault_raw_bit', 'last_fault_active', 'last_fault_code', 'last_fault_observation_raw', 'network_attempts', 'transport_errors', 'transport_error_summary', 'pump_outlet_pressure_bar', 'pump_outlet_pressure_raw', 'pump_outlet_pressure_fresh', 'ai003_evidence_verified', 'ai003_pump_ready_rule', 'valve_open_admitted_by_lifecycle', 'terminal_state', 'cleanup_state', 'primary_failure', 'session_state')
+    }
+    'D-pump-mv' = {
+        # Stage D, second variant: the Pump command ladder with the motorized Main Valve in front of it.
+        # The Main Valve (block 1.27) is the supply valve upstream of the Isolation Valve manifold, so this run
+        # opens it, runs the pump and closes it again. Every Isolation Valve stays exactly where Stage C left it
+        # and the WJ nozzle still gets no water, because this trial composes no equipment boundary at all.
+        Confirm-WjssState -Token 'MAIN VALVE 1.27 COMMAND AUTHORIZED' -Prompt 'D-pump-mv: WJSS will energise DO-014 and DO-015 to move the motorized main valve, DI-012 DI-013 DI-014 must be wired, and all four isolation valves must stay CLOSED - confirm the return path is open and the nozzle is clear of people'
+        $ma     = Read-WjssField -Label 'Pump AO target in mA (the value you decided in the ACCELERATED package)' -Number
+        $runPol = Read-WjssField -Label 'Pump RUNNING polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+        $fltPol = Read-WjssField -Label 'Pump FAULT polarity, from the Stage B result' -Pattern '^(ACTIVE_HIGH|ACTIVE_LOW)$'
+        Invoke-WjssStage -Name 'D-pump-mv' -ConsentConst 'PhysicalDoSingle' -ExpectExit 0 -Vars @{
+            'WJSS_PUMP_COMMAND_DRY_TRIAL'    = 'MAIN_VALVE_AND_PUMP'
+            'WJSS_DRY_COMMAND_MODE'          = 'TEST_HARDWARE_DRY'
+            'WJSS_PUMP_SELECTION'            = '1'
+            'WJSS_PUMP_ANALOG_TARGET_MA'     = $ma
+            'WJSS_PUMP_FRESHNESS_MS'         = '2000'
+            'WJSS_PUMP_RUNNING_POLARITY'     = $runPol
+            'WJSS_PUMP_FAULT_POLARITY'       = $fltPol
+            'WJSS_PUMP_RUNNING_CONFIRM_MS'   = '10000'
+            'WJSS_PUMP_READY_TIMEOUT_MS'     = '30000'
+            'WJSS_PUMP_STOPPED_CONFIRM_MS'   = '15000'
+            # the two Main Valve bounds. The Product never defaults them: an absent or out of range value is a
+            # refusal before the endpoint is touched, so these two lines are where the 30 s decision is written.
+            'WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS'  = '30000'
+            'WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS' = '30000'
+            'WJSS_PUMP_READY_SETPOINT_BAR'   = '15'
+            'WJSS_PRESSURE_LOW_BAR'          = '1'
+            'WJSS_PRESSURE_HIGH_BAR'         = '15'
+        } -Expect ([ordered]@{
+            'trial_identity'                  = 'PHYSICAL_PUMP_COMMAND_WITH_MAIN_VALVE_ONLY'
+            'evidence_kind'                   = 'PHYSICAL'
+            'physical_pump_verified'          = 'True'
+            'start_accepted'                  = 'True'
+            'selection_pair_written'          = 'True'
+            'pump_enable_written'             = 'True'
+            'pump_run_written'                = 'True'
+            'running_feedback_confirmed'      = 'True'
+            'analog_ramp_executed'            = 'True'
+            'pump_ready_confirmed'            = 'True'
+            'fault_feedback_never_active'     = 'True'
+            'analog_stop_sentinel_written'    = 'True'
+            'pump_run_cleared'                = 'True'
+            'pump_enable_released'            = 'True'
+            'terminal_state'                  = 'STOPPED'
+            'stopped_confirmed'               = 'True'
+            'cleanup_state'                   = 'COMPLETE'
+            'ownership_released'              = 'True'
+            'safe_to_report_complete'         = 'True'
+            'primary_failure'                 = 'NONE'
+            'iv_command_executed'             = 'FALSE'
+            'iv_command_surface'              = 'NONE_NO_VALVE_BOUNDARY_COMPOSED'
+            'motion_composed'                 = 'False'
+            'trial_code'                      = 'PUMP_COMMAND_TRIAL_ACCEPTED'
+            'session_state'                   = 'CLOSED'
+            'transport_released'              = 'True'
+            # the Main Valve half. No key here depends on where the valve was standing when the run began:
+            # a valve that was already open at the open limit is admitted as PRE_CONFIRMED_OPEN, and a valve
+            # that had to be driven is admitted as PRODUCT_DISPATCH. Both must end closed and resting.
+            'main_valve_policy'               = 'ENFORCED'
+            'main_valve_command_executed'     = 'True'
+            'main_valve_open_confirmed'       = 'True'
+            'main_valve_open_refusal'         = 'NONE'
+            'main_valve_close_requested'      = 'True'
+            'main_valve_pump_stop_confirmed'  = 'True'
+            'main_valve_close_confirmed'      = 'True'
+            'main_valve_position_at_end'      = 'CLOSED'
+            'main_valve_coils_resting'        = 'True'
+            'main_valve_over_torque'          = 'False'
+            'main_valve_position_lost'        = 'False'
+            'main_valve_held_open'            = 'True'
+            'main_valve_supervision_fault'    = 'False'
+            'main_valve_refusal'              = 'NONE'
+        }) -Show @('pump_selection', 'pump_analog_target_ma', 'pump_ready_setpoint_bar', 'ladder', 'ladder_complete', 'run_reached_ready', 'dispatch_summary', 'dispatch_window_ms', 'dispatch_address_agreement', 'command_dispatches', 'command_dispatch_refusals', 'run_cleared_dispatch', 'enable_released_dispatch', 'stop_accepted', 'stop_code', 'pump_stop_reason', 'running_commissioned', 'fault_commissioned', 'running_binding', 'fault_binding', 'last_running_usable', 'last_running_raw_bit', 'last_running_active', 'last_running_code', 'last_running_observation_raw', 'last_fault_usable', 'last_fault_raw_bit', 'last_fault_active', 'last_fault_code', 'last_fault_observation_raw', 'network_attempts', 'transport_errors', 'transport_error_summary', 'pump_outlet_pressure_bar', 'pump_outlet_pressure_raw', 'pump_outlet_pressure_fresh', 'ai003_evidence_verified', 'ai003_pump_ready_rule', 'valve_open_admitted_by_lifecycle', 'terminal_state', 'cleanup_state', 'primary_failure', 'session_state', 'main_valve_policy', 'main_valve_block', 'main_valve_command_executed', 'main_valve_position_at_start', 'main_valve_open_source', 'main_valve_open_confirmed', 'main_valve_open_refusal', 'main_valve_open_elapsed_ms', 'main_valve_phase_after_open', 'main_valve_close_requested', 'main_valve_pump_stop_confirmed', 'main_valve_close_confirmed', 'main_valve_close_elapsed_ms', 'main_valve_position_at_end', 'main_valve_coils_resting', 'main_valve_over_torque', 'main_valve_position_lost', 'main_valve_held_open', 'main_valve_supervision_fault', 'main_valve_position_reads', 'main_valve_refusal', 'main_valve_writes', 'main_valve_write', 'main_valve_last_opened_raw', 'main_valve_last_closed_raw', 'main_valve_last_over_torque_raw', 'main_valve_last_read_code')
     }
     'D-sim' = {
         # Stage D, second variant: the Cleaning Path for real, on a DECLARED Pump Outlet Pressure. The
@@ -848,7 +921,7 @@ function Test-WjssDriver {
     $bad = @()
     $done = @()
 
-    if ($script:StageNames.Count -ne 10) { $bad += ('expected 10 stage names, got ' + [string]$script:StageNames.Count) }
+    if ($script:StageNames.Count -ne 11) { $bad += ('expected 11 stage names, got ' + [string]$script:StageNames.Count) }
     # assembled at run time so that this file never contains the consent wording itself
     $needle = 'I ' + 'AUTH' + 'ORIZE'
     foreach ($n in $script:StageNames) {
@@ -859,7 +932,7 @@ function Test-WjssDriver {
         if ($text.Contains($needle)) { $bad += ('stage ' + $n + ' contains a consent literal') }
         if ($text -match '\b[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b') { $bad += ('stage ' + $n + ' contains an IP literal') }
     }
-    $done += '10 stage definitions present, no consent literal, no endpoint literal'
+    $done += '11 stage definitions present, no consent literal, no endpoint literal'
 
     $self = [string]$MyInvocation.PSCommandPath
     if ($self.Length -eq 0 -or -not (Test-Path -LiteralPath $self)) {

@@ -317,8 +317,12 @@ Critical Path working labels mapped to the formal stage families (formal IDs unc
    Isolation Valve OPEN is refused before confirmed Pump readiness, a CLOSE always passes through,
    and the Pump is started to readiness before the path and stopped before the motion cleanup.
    Production write authority is **NOT AUTHORIZED**, physical execution is **NOT EXECUTED / NOT
-   VERIFIED**, Trial B is unchanged and not routed through the production lifecycle, the Main Valve
-   remains excluded because the catalogue defines no Main Valve I/O identity, and Merge is on hold.
+   VERIFIED**, Trial B is unchanged and not routed through the production lifecycle, and Merge is on hold.
+   The Main Valve exclusion sentence that used to sit here is superseded (2026-11-19): the motorized valve in
+   block 1.27 (`DO-014`/`DO-015` coils, `DI-013`/`DI-014` limits, `DI-012` over-torque) is now gated in front
+   of the Pump by `ProcessIoMainValveGate` in the `D-pump-mv` evidence class and in the physical Cleaning Path
+   composition. No Main Valve *pressure* identity exists and none is invented: `AI-003` is still the only
+   Pump-ready source.
 
 2. **H2 — Physical Pump/IV I/O Commissioning — NEXT, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.)
 3. **H3 — Single Real Cleaning Job — PLANNED, NOT AUTHORIZED.** (Formal mapping `[OPEN]`.) The

@@ -330,8 +330,16 @@ description of current behaviour. §7.1 and §7.2 are unchanged.
   for confirmed not-running feedback. A ramp failure never prevents the two de-energisations.
   Ownership is released only after a confirmed Stop; an unknown stopped state reports
   `PHYSICAL_ABORT_REQUIRED` and is never a safe completion.
-- **Main Valve**: the catalogue defines no Main Valve I/O identity, so no Main Valve control is part
-  of this integration. See §11.
+- **Main Valve** *(superseded 2026-11-19, was: "the catalogue defines no Main Valve I/O identity")*: the
+  adopted binding table does define the motorized Main Valve trio in panel block 1.27 — `DO-014` open coil
+  (FC05, coil 13), `DO-015` close coil (FC05, coil 14), `DI-013` opened limit, `DI-014` closed limit and
+  `DI-012` over-torque (FC02, discrete 12, 13 and 11). `ProcessIoMainValve` plus `ProcessIoMainValveGate`
+  now own it: no Pump channel that energises is written while the valve is not proven OPEN by its limit
+  switch, the two coils are never both True and the coil that reached its limit is released, a torque trip or
+  the loss of both limit inputs releases both coils and enters the stop path, and the valve is commanded
+  closed only after the Pump stop is confirmed. There is still **no Main Valve pressure row and no Main Valve
+  Pump-ready source**: `AI-003` remains the sole pressure authority and the mapping-config catalogue is
+  untouched. See §11 and `docs/PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md` §6.1.2.
 
 Implementation: `ProcessIoPumpLifecycle` is the one reusable lifecycle, driven through the existing
 `ProcessIoSession` admission and dispatch lifecycle. The production Runtime composition

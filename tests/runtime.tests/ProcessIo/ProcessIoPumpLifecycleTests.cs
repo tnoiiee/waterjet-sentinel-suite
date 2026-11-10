@@ -1050,6 +1050,394 @@ public sealed class ProcessIoPumpLifecycleTests
         Assert.Equal(ProcessIoRefusals.SessionNotOpen, running.Code);
     }
 
+    // ------------------------------------------------------- the Main Valve (motorized, block 1.27)
+    //
+    // These tests hold the valve rules the Owner ruled on 2026-11-19 to the same standard as the Pump ladder:
+    // the position comes only from the limit switches, the two coils are never both energised, the coil is
+    // released at the confirmed end, no Pump channel is energised while the valve is not proven OPEN, a trip
+    // or a lost input releases and stops, and a close is refused until the Pump stop is confirmed. Every
+    // transport here is the same in-memory double, so nothing below is a physical verification.
+
+    private const int InputOverTorque = 11;
+    private const int InputValveOpened = 12;
+    private const int InputValveClosed = 13;
+    private const int CoilValveOpen = 13;
+    private const int CoilValveClose = 14;
+    private const int CoilHeater = 15;
+
+    [Fact(DisplayName = "47. The Main Valve addresses come from the adopted table, and DI-014 is not DO-014")]
+    public void The_Valve_Addresses_Are_Derived_And_The_Number_Collision_Is_Stated()
+    {
+        Assert.True(PumpCommandContract.TryCoilAddress(ProcessIoMainValve.OpenCommandTag, out int openCoil));
+        Assert.True(PumpCommandContract.TryCoilAddress(ProcessIoMainValve.CloseCommandTag, out int closeCoil));
+        Assert.True(PumpCommandContract.TryDiscreteInputAddress(
+            ProcessIoMainValve.OpenedFeedbackTag, out int openedInput));
+        Assert.True(PumpCommandContract.TryDiscreteInputAddress(
+            ProcessIoMainValve.ClosedFeedbackTag, out int closedInput));
+        Assert.True(PumpCommandContract.TryDiscreteInputAddress(
+            ProcessIoMainValve.OverTorqueFeedbackTag, out int torqueInput));
+
+        // The Owner's ruling 9: the addresses follow the table, which already says 11, 12, 13 for the inputs
+        // and 13, 14 for the coils. This is the assertion that catches a silent renumbering.
+        Assert.Equal(11, torqueInput);
+        Assert.Equal(12, openedInput);
+        Assert.Equal(13, closedInput);
+        Assert.Equal(13, openCoil);
+        Assert.Equal(14, closeCoil);
+
+        // The trap itself, stated as a test: the closed limit INPUT and the open command COIL share the number
+        // 13 in two different Modbus address spaces. Any code that ever conflates them is wrong on the bench in
+        // the loudest possible way, so the collision must stay visible here.
+        Assert.Equal(closedInput, openCoil);
+
+        // And the heater on the same module, in the same row trio of the mapping, is never a valve command.
+        Assert.False(PumpCommandContract.IsPumpCommandTag("DO-016"));
+        Assert.DoesNotContain("DO-016", ProcessIoMainValve.OpenCommandTag, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "48. The two limit bits classify into exactly the four positions the Owner ruled")]
+    public void The_Limit_Bits_Classify_Into_The_Ruled_Positions()
+    {
+        Assert.Equal(ProcessIoMainValvePosition.OPEN, ProcessIoMainValve.Classify(true, false, true));
+        Assert.Equal(ProcessIoMainValvePosition.CLOSED, ProcessIoMainValve.Classify(false, true, true));
+        Assert.Equal(ProcessIoMainValvePosition.IN_TRANSIT, ProcessIoMainValve.Classify(false, false, true));
+        Assert.Equal(ProcessIoMainValvePosition.CONFLICT, ProcessIoMainValve.Classify(true, true, true));
+
+        // A read that was not usable is never interpreted as closed-and-open-neither, which would look like a
+        // valve mid-travel and invite a wait for a device that was never asked.
+        Assert.Equal(ProcessIoMainValvePosition.UNKNOWN, ProcessIoMainValve.Classify(false, false, false));
+        Assert.Equal(ProcessIoMainValvePosition.UNKNOWN, ProcessIoMainValve.Classify(true, true, false));
+    }
+
+    [Fact(DisplayName = "49. A valve already at its open limit is admitted without a write, and the source says so")]
+    public void An_Already_Open_Valve_Is_Admitted_And_Labelled()
+    {
+        ValveRig rig = BuildValveRig();
+        SetLimits(rig, opened: true, closed: false);
+
+        Assert.True(rig.Gate.BeginOpen(out string code));
+        Assert.Equal(PumpCommandRefusals.Granted, code);
+        Assert.Equal(ProcessIoMainValve.OpenSourcePreConfirmed, rig.Gate.OpenSource);
+        Assert.Equal(ProcessIoMainValveGatePhase.OPEN_CONFIRMED, rig.Gate.Phase);
+        Assert.True(rig.Gate.AdmitsPumpEnergise);
+
+        // Nothing was written, which is the whole point: the valve was proven where it needed to be.
+        Assert.Empty(rig.Transport.CoilWrites);
+    }
+
+    [Fact(DisplayName = "50. A closed valve is driven open with the close coil cleared first and no coil left hot")]
+    public void The_Open_Travel_Clears_The_Opposite_Coil_First_And_Releases_On_Arrival()
+    {
+        ValveRig rig = BuildValveRig();
+        SetLimits(rig, opened: false, closed: true);
+
+        Assert.False(rig.Gate.BeginOpen(out _));
+        Assert.Equal(ProcessIoMainValve.OpenSourceProductDispatch, rig.Gate.OpenSource);
+        Assert.Equal(ProcessIoMainValveGatePhase.ENSURING_OPEN, rig.Gate.Phase);
+
+        // The legacy order, exactly: DO-015 FALSE before DO-014 TRUE.
+        Assert.Equal(2, rig.Gate.Writes.Count);
+        Assert.Equal(CoilValveClose, rig.Transport.CoilWrites[0].Address);
+        Assert.False(rig.Transport.CoilWrites[0].Value);
+        Assert.Equal(CoilValveOpen, rig.Transport.CoilWrites[1].Address);
+        Assert.True(rig.Transport.CoilWrites[1].Value);
+
+        SetLimits(rig, opened: true, closed: false);
+        DriveValve(rig, 4);
+
+        Assert.Equal(ProcessIoMainValveGatePhase.OPEN_CONFIRMED, rig.Gate.Phase);
+        Assert.True(rig.Gate.CoilsResting);
+        Assert.Equal(3, rig.Gate.Writes.Count);
+        Assert.Equal(CoilValveOpen, rig.Transport.CoilWrites[2].Address);
+        Assert.False(rig.Transport.CoilWrites[2].Value, "the coil that reached its limit is released, never held");
+
+        AssertNoCoilBridge(rig);
+    }
+
+    [Fact(DisplayName = "51. No Pump channel that energises is written while the valve is not proven OPEN")]
+    public void An_Energising_Pump_Command_Is_Refused_Until_The_Valve_Is_Open()
+    {
+        ValveRig rig = BuildValveRig();
+        SetLimits(rig, opened: false, closed: true);
+
+        PumpCommandOutcome enable = rig.Boundary.SetEnableInverter(true);
+        Assert.False(enable.Admitted);
+        Assert.False(enable.Dispatched);
+        Assert.Equal(PumpCommandRefusals.RefusedMainValveNotOpen, enable.Code);
+        Assert.Empty(rig.Transport.CoilWrites);
+
+        // A release is never blocked, and the 0 mA sentinel is a stop command rather than a run command: both
+        // must reach the rack whatever the valve says, or a valve fault would hold the Pump at speed.
+        Assert.True(rig.Boundary.SetEnableInverter(false).Dispatched);
+        Assert.True(rig.Boundary.SetSpeedCommand(PumpAnalogCommand.SafeStopSentinel).Dispatched);
+        Assert.Equal(2, rig.Transport.CoilWrites.Count + rig.Transport.RegisterWrites.Count);
+
+        Assert.True(PumpAnalogCommand.TryCreate(TargetMilliamps, out PumpAnalogCommand running));
+        PumpAnalogCommandOutcome refused = rig.Boundary.SetSpeedCommand(running);
+        Assert.False(refused.Dispatched);
+        Assert.Equal(PumpCommandRefusals.RefusedMainValveNotOpen, refused.Code);
+        Assert.Single(rig.Transport.RegisterWrites);
+
+        // Once the open limit is proven, the same commands go through.
+        SetLimits(rig, opened: true, closed: false);
+        Assert.True(rig.Boundary.SetEnableInverter(true).Dispatched);
+        Assert.True(rig.Boundary.SetSpeedCommand(running).Dispatched);
+    }
+
+    [Fact(DisplayName = "52. Unreadable or contradictory limit inputs refuse the start and write nothing")]
+    public void The_Valve_Fails_Closed_On_Unreadable_And_Contradictory_Inputs()
+    {
+        // No rows for the limit switches at all: the position cannot be established, so it is not assumed.
+        ValveRig unbound = BuildValveRig(withOpenedInput: false, withClosedInput: false, withTorqueInput: false);
+        Assert.False(unbound.Gate.BeginOpen(out string unreadable));
+        Assert.Equal(PumpCommandRefusals.RefusedMainValvePositionUnconfirmed, unreadable);
+        Assert.Equal(ProcessIoMainValveGatePhase.ABORTED, unbound.Gate.Phase);
+        Assert.Empty(unbound.Transport.CoilWrites);
+
+        // Both limits at once: the inputs are believed and what they say is impossible.
+        ValveRig conflict = BuildValveRig();
+        SetLimits(conflict, opened: true, closed: true);
+        ProcessIoMainValveRead read = conflict.Boundary.ReadMainValvePosition();
+        Assert.True(read.Usable, "the read itself is clean, so the contradiction is a real field state");
+        Assert.Equal(PumpCommandRefusals.RefusedMainValveFeedbackConflict, read.Code);
+        Assert.False(conflict.Gate.BeginOpen(out string conflictCode));
+        Assert.Equal(PumpCommandRefusals.RefusedMainValveFeedbackConflict, conflictCode);
+        Assert.Empty(conflict.Transport.CoilWrites);
+    }
+
+    [Fact(DisplayName = "53. A travel that never arrives is bounded and releases both coils")]
+    public void A_Travel_That_Never_Arrives_Times_Out_With_Both_Coils_Released()
+    {
+        ValveRig rig = BuildValveRig(openTimeout: TimeSpan.FromMilliseconds(60));
+        SetLimits(rig, opened: false, closed: true);
+
+        Assert.False(rig.Gate.BeginOpen(out _));
+
+        // The valve never reaches its limit and the torque contact stays quiet, so the only thing that can end
+        // this is the configured bound. The clock here only moves when the test moves it, so the wait is
+        // provably derived from the timeout rather than from how fast the loop happens to run.
+        for (int step = 0; step < 16 && !rig.Gate.Settled; step += 1)
+        {
+            rig.Time.Advance(TimeSpan.FromMilliseconds(20));
+            rig.Gate.Step();
+        }
+
+        Assert.Equal(ProcessIoMainValveGatePhase.ABORTED, rig.Gate.Phase);
+        Assert.Equal(PumpCommandRefusals.RefusedMainValveOpenTimeout, rig.Gate.Code);
+        Assert.False(rig.Gate.AdmitsPumpEnergise);
+        Assert.True(rig.Gate.CoilsResting);
+
+        // Clear the close coil, energise the open coil, and on the way out both are written FALSE - the
+        // release the Owner ruled, in the order that can never bridge the two windings.
+        (int Address, bool Value)[] writes =
+        [
+            (CoilValveClose, false), (CoilValveOpen, true), (CoilValveOpen, false), (CoilValveClose, false),
+        ];
+        for (int index = 0; index < writes.Length; index += 1)
+        {
+            Assert.Equal(writes[index].Address, rig.Transport.CoilWrites[index].Address);
+            Assert.Equal(writes[index].Value, rig.Transport.CoilWrites[index].Value);
+        }
+
+        Assert.Equal(writes.Length, rig.Transport.CoilWrites.Count);
+        AssertNoCoilBridge(rig);
+    }
+
+    [Fact(DisplayName = "54. The close waits for confirmed evidence that the Pump stopped, and never aborts the run for it")]
+    public void The_Close_Is_Gated_On_Confirmed_Stop_Evidence()
+    {
+        ValveRig rig = BuildValveRig();
+        SetLimits(rig, opened: true, closed: false);
+        Assert.True(rig.Gate.BeginOpen(out _));
+
+        // Unconfirmed stop: nothing is attempted, nothing is written, and the gate is NOT aborted - the valve
+        // simply is not closed yet, and the Pump teardown the caller is doing is untouched by this answer.
+        Assert.False(rig.Gate.BeginClose(pumpStoppedConfirmed: false, out string refused));
+        Assert.Equal(PumpCommandRefusals.RefusedMainValveCloseNotStopped, refused);
+        Assert.Equal(ProcessIoMainValveGatePhase.OPEN_CONFIRMED, rig.Gate.Phase);
+        Assert.Empty(rig.Transport.CoilWrites);
+
+        // Confirmed stop: the valve travels, and the arrival at the closed limit releases the close coil.
+        Assert.False(rig.Gate.BeginClose(pumpStoppedConfirmed: true, out _));
+        Assert.Equal(2, rig.Transport.CoilWrites.Count);
+        SetLimits(rig, opened: false, closed: true);
+        DriveValve(rig, 4);
+
+        Assert.Equal(ProcessIoMainValveGatePhase.CLOSED_CONFIRMED, rig.Gate.Phase);
+        Assert.Equal(ProcessIoMainValvePosition.CLOSED, rig.Gate.PositionAtEnd);
+        Assert.True(rig.Gate.CoilsResting);
+        Assert.Equal(3, rig.Transport.CoilWrites.Count);
+        Assert.False(rig.Transport.CoilWrites[2].Value);
+        AssertNoCoilBridge(rig);
+    }
+
+    [Fact(DisplayName = "55. A torque trip during travel releases both coils and withdraws the admission")]
+    public void ATrip_During_Travel_Releases_Both_Coils_And_Ends_The_Travel()
+    {
+        ValveRig rig = BuildValveRig();
+        SetLimits(rig, opened: false, closed: true);
+        Assert.False(rig.Gate.BeginOpen(out _));
+
+        // The actuator trips on the way: both coils go False in the same step that saw it, in the same order
+        // the Owner ruled, and the gate stops believing the valve is anywhere.
+        SetLimits(rig, opened: false, closed: false, overTorque: true);
+        rig.Gate.Step();
+
+        Assert.Equal(ProcessIoMainValveGatePhase.ABORTED, rig.Gate.Phase);
+        Assert.Equal(PumpCommandRefusals.RefusedMainValveOverTorque, rig.Gate.Code);
+        Assert.True(rig.Gate.OverTorqueSeen);
+        Assert.True(rig.Gate.CoilsResting);
+        Assert.False(rig.Gate.AdmitsPumpEnergise);
+
+        Assert.Equal(4, rig.Transport.CoilWrites.Count);
+        Assert.Equal(CoilValveOpen, rig.Transport.CoilWrites[1].Address);
+        Assert.True(rig.Transport.CoilWrites[1].Value);
+        Assert.Equal(CoilValveOpen, rig.Transport.CoilWrites[2].Address);
+        Assert.False(rig.Transport.CoilWrites[2].Value);
+        Assert.Equal(CoilValveClose, rig.Transport.CoilWrites[3].Address);
+        Assert.False(rig.Transport.CoilWrites[3].Value);
+        AssertNoCoilBridge(rig);
+    }
+
+    [Fact(DisplayName = "56. Supervision while open: a trip stops, a lost input stops, and a quiet run reports nothing")]
+    public void Supervision_Stops_On_Trip_Or_Loss_And_Otherwise_Reports_Nothing()
+    {
+        ValveRig quiet = BuildValveRig();
+        SetLimits(quiet, opened: true, closed: false);
+        Assert.True(quiet.Gate.BeginOpen(out _));
+        Assert.False(quiet.Gate.Supervise());
+        Assert.Equal(ProcessIoMainValveGatePhase.OPEN_CONFIRMED, quiet.Gate.Phase);
+        Assert.Empty(quiet.Transport.CoilWrites);
+        Assert.False(quiet.Gate.LeftOpenDuringRun);
+
+        ValveRig tripped = BuildValveRig();
+        SetLimits(tripped, opened: true, closed: false);
+        Assert.True(tripped.Gate.BeginOpen(out _));
+        SetLimits(tripped, opened: true, closed: false, overTorque: true);
+        Assert.True(tripped.Gate.Supervise(), "a trip while the Pump runs is a stop request");
+        Assert.Equal(ProcessIoMainValveGatePhase.ABORTED, tripped.Gate.Phase);
+        Assert.True(tripped.Gate.CoilsResting);
+
+        // Losing the limit inputs while pumping is also a stop request, and the valve is not touched again:
+        // the Owner's order is stop first, and only confirmed evidence lets the valve be closed.
+        ValveRig lost = BuildValveRig();
+        SetLimits(lost, opened: true, closed: false);
+        Assert.True(lost.Gate.BeginOpen(out _));
+        lost.Transport.DiscreteReadDelay = TimeSpan.FromMinutes(1);
+        Assert.True(lost.Gate.Supervise());
+        Assert.True(lost.Gate.PositionLostDuringRun);
+        Assert.Equal(PumpCommandRefusals.RefusedMainValvePositionUnconfirmed, lost.Gate.Code);
+        Assert.Empty(lost.Transport.CoilWrites);
+        Assert.False(lost.Gate.BeginClose(pumpStoppedConfirmed: false, out _));
+    }
+
+    private static void SetLimits(ValveRig rig, bool opened, bool closed, bool overTorque = false)
+    {
+        rig.Transport.DiscreteInputs[InputValveOpened] = opened;
+        rig.Transport.DiscreteInputs[InputValveClosed] = closed;
+        rig.Transport.DiscreteInputs[InputOverTorque] = overTorque;
+    }
+
+    private static void DriveValve(ValveRig rig, int steps)
+    {
+        for (int step = 0; step < steps && !rig.Gate.Settled; step += 1)
+        {
+            rig.Time.Advance(TimeSpan.FromMilliseconds(20));
+            rig.Gate.Step();
+        }
+    }
+
+    /// <summary>
+    /// Replays every coil write in order and proves the invariant the Owner put first: DO-014 and DO-015 are
+    /// never both True. A bridge across the two windings is what burns this actuator, so no valve test in this
+    /// file is allowed to pass without walking past it.
+    /// </summary>
+    private static void AssertNoCoilBridge(ValveRig rig)
+    {
+        bool open = false;
+        bool close = false;
+        foreach ((int address, bool value) in rig.Transport.CoilWrites)
+        {
+            if (address == CoilValveOpen)
+            {
+                open = value;
+            }
+            else if (address == CoilValveClose)
+            {
+                close = value;
+            }
+
+            Assert.False(open && close, "both valve coils were energised at once at write " + address);
+        }
+    }
+
+    private static ValveRig BuildValveRig(
+        bool enforce = true,
+        TimeSpan? openTimeout = null,
+        TimeSpan? closeTimeout = null,
+        bool withOpenedInput = true,
+        bool withClosedInput = true,
+        bool withTorqueInput = true)
+    {
+        var time = new FakeTime();
+        var transport = new FakeTransport { Clock = time };
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(time.GetUtcNow());
+
+        var tags = new List<string>();
+        if (withOpenedInput)
+        {
+            tags.Add(ProcessIoMainValve.OpenedFeedbackTag);
+        }
+
+        if (withClosedInput)
+        {
+            tags.Add(ProcessIoMainValve.ClosedFeedbackTag);
+        }
+
+        if (withTorqueInput)
+        {
+            tags.Add(ProcessIoMainValve.OverTorqueFeedbackTag);
+        }
+
+        tags.Add(ProcessIoMainValve.OpenCommandTag);
+        tags.Add(ProcessIoMainValve.CloseCommandTag);
+
+        var configuration = new ProcessIoMainValveConfiguration
+        {
+            Enforcement = enforce
+                ? ProcessIoMainValveEnforcement.ENFORCED
+                : ProcessIoMainValveEnforcement.NOT_ENFORCED,
+            OpenTimeout = openTimeout ?? TimeSpan.FromMilliseconds(200),
+            CloseTimeout = closeTimeout ?? TimeSpan.FromMilliseconds(200),
+        };
+
+        var boundary = new ProcessIoPumpCommandBoundary(
+            session,
+            BuildCatalogue([.. tags]),
+            Authorize(),
+            Commissioned(),
+            time,
+            Freshness,
+            configuration);
+
+        return new ValveRig
+        {
+            Transport = transport,
+            Time = time,
+            Boundary = boundary,
+            Gate = new ProcessIoMainValveGate(boundary, configuration, time),
+        };
+    }
+
+    private sealed class ValveRig
+    {
+        public required FakeTransport Transport { get; init; }
+        public required FakeTime Time { get; init; }
+         public required ProcessIoPumpCommandBoundary Boundary { get; init; }
+        public required ProcessIoMainValveGate Gate { get; init; }
+    }
+
     private static Rig Create(PumpLifecycleConfiguration configuration)
     {
         var time = new FakeTime();
@@ -1106,8 +1494,12 @@ public sealed class ProcessIoPumpLifecycleTests
         }
     }
 
-    /// <summary>Builds the adopted catalogue from the real binding table, as the composition root does.</summary>
-    private static Dictionary<string, ProcessIoCatalogueRow> BuildCatalogue()
+    /// <summary>
+    /// Builds the adopted catalogue from the real binding table, as the composition root does. The extra tags
+    /// are how the Main Valve tests add their own rows: one builder for every channel, so a test can never
+    /// invent a binding that the product does not have.
+    /// </summary>
+    private static Dictionary<string, ProcessIoCatalogueRow> BuildCatalogue(params string[] additionalTags)
     {
         string[] tags =
         [
@@ -1123,7 +1515,7 @@ public sealed class ProcessIoPumpLifecycleTests
         ];
 
         var rows = new Dictionary<string, ProcessIoCatalogueRow>(StringComparer.Ordinal);
-        foreach (string tag in tags)
+        foreach (string tag in tags.Concat(additionalTags))
         {
             Assert.True(ProcessIoBindings.TryGet(tag, out ProcessIoPhysicalBinding binding));
             rows[tag] = new ProcessIoCatalogueRow

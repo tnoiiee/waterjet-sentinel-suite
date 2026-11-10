@@ -53,6 +53,43 @@ public sealed class PumpCommandDryTrialTests
     };
 
     /// <summary>
+    /// Every Main Valve claim the valve class must print. The pump-only class prints none of them except the
+    /// two that state its own policy, and that difference is the point: a stage that commanded no valve must
+    /// not leave a reader guessing whether the valve was checked.
+    /// </summary>
+    private static readonly string[] MainValveReportKeys =
+    {
+        "main_valve_policy=",
+        "main_valve_block=",
+        "main_valve_command_executed=",
+        "main_valve_position_at_start=",
+        "main_valve_open_source=",
+        "main_valve_open_confirmed=",
+        "main_valve_open_refusal=",
+        "main_valve_open_elapsed_ms=",
+        "main_valve_phase_after_open=",
+        "main_valve_close_requested=",
+        "main_valve_pump_stop_confirmed=",
+        "main_valve_close_confirmed=",
+        "main_valve_close_elapsed_ms=",
+        "main_valve_position_at_end=",
+        "main_valve_coils_resting=",
+        "main_valve_over_torque=",
+        "main_valve_position_lost=",
+        "main_valve_held_open=",
+        "main_valve_supervision_fault=",
+        "main_valve_position_reads=",
+        "main_valve_refusal=",
+        "main_valve_writes=",
+        "main_valve_write=",
+        "main_valve_last_opened_raw=",
+        "main_valve_last_closed_raw=",
+        "main_valve_last_over_torque_raw=",
+        "main_valve_last_read_code=",
+        "pump_stop_reason=",
+    };
+
+    /// <summary>
     /// Every rung the Pump-only trial must print, hoisted for the same reason as the marker list above.
     /// </summary>
     private static readonly string[] PrintedRungKeys =
@@ -258,11 +295,16 @@ public sealed class PumpCommandDryTrialTests
     // ------------------------------------------------------------ the structural claim
 
     [Fact]
-    public void The_Trial_Composes_No_Valve_Boundary_No_Motion_And_No_Second_Ladder()
+    public void The_Trial_Composes_No_Isolation_Valve_Boundary_No_Motion_And_No_Second_Ladder()
     {
         string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
 
-        // No valve surface of any kind: not the boundary, not a request, not a valve tag.
+        // No Isolation Valve surface of any kind: not the equipment boundary, not a request, not a valve tag.
+        // The Main Valve of block 1.27 is the one valve this file may command, and only in its own evidence
+        // class; it reaches the rack through the same Pump boundary, never through a second write path.
+        Assert.Contains("new ProcessIoMainValveGate(boundary, mainValveConfiguration, time)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("_transport.WriteCoil", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("WriteSingleRegister", text, StringComparison.Ordinal);
         foreach (string forbidden in ForbiddenValveSurfaceMarkers)
         {
             Assert.DoesNotContain(forbidden, text, StringComparison.Ordinal);
@@ -374,6 +416,89 @@ public sealed class PumpCommandDryTrialTests
 
         // The pace is a bounded constant, ten times finer than the wall-clock gate the ladder waits on.
         Assert.Contains("private const int DriveIntervalMilliseconds = 100;", text, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------ the Main Valve evidence class
+    //
+    // These four tests hold the second selector to the same standard as the first one: it is chosen by an
+    // exact literal, it is refused before any contact when its own configuration is unusable, it prints every
+    // claim the field driver asserts, and a clean Pump teardown cannot certify it.
+
+    [Theory]
+    [InlineData(PumpCommandDryTrial.ModePumpOnly)]
+    [InlineData(PumpCommandDryTrial.ModeMainValveAndPump)]
+    public void Either_Exact_Selector Chooses_This_Evidence_Class(string supplied)
+    {
+        var values = new Dictionary<string, string?>(StringComparer.Ordinal)
+        {
+            [PumpCommandDryTrial.ModeVariable] = supplied,
+        };
+
+        Assert.True(PumpCommandDryTrial.TryReadMode(
+            Reader(values), out bool selected, out string code, out string detail));
+
+        Assert.True(selected);
+        Assert.Empty(code);
+        Assert.Empty(detail);
+    }
+
+    [Fact]
+    public void The_Main_Valve_Class_Prints_Its_Own_Identity_And_Every_Valve_Claim()
+    {
+        string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
+
+        // A different evidence class needs a different identity line, so a transcript cannot be filed under
+        // the pump-only run that never touched a valve.
+        Assert.Contains(
+            "  trial_identity=\" + (mainValveMode ? MainValveTrialIdentity : TrialIdentity)", text,
+            StringComparison.Ordinal);
+
+        foreach (string key in MainValveReportKeys)
+        {
+            Assert.Contains("  " + key, text, StringComparison.Ordinal);
+        }
+
+        // And the pump-only class keeps saying what it always said.
+        Assert.Contains("iv_command_executed=\" + IvCommandExecutedNever", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Valve_Configuration_Is_Refused_Before_The_Trial_Contacts_Anything()
+    {
+        string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
+
+        int valveConfiguration = text.IndexOf(
+            "CleaningPathDryComposition.TryReadMainValveConfiguration", StringComparison.Ordinal);
+        int transport = text.IndexOf("new ProcessIoPhysicalTransport(endpoints)", StringComparison.Ordinal);
+
+        Assert.True(valveConfiguration > 0, "the trial must read the Main Valve bounds");
+        Assert.True(transport > 0, "the trial must build its transport");
+        Assert.True(valveConfiguration < transport, "an unusable valve configuration must be refused before a transport exists");
+
+        // The bound is required, so the trial never defaults it and never waits on an invented number.
+        Assert.Contains("WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS", text, StringComparison.Ordinal);
+        Assert.Contains("WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_Valve_Failure_Cannot_Be_Passed_Over_By_A_Clean_Pump_Teardown()
+    {
+        string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
+
+        // The valve half is a conjunct of the verdict, not a note beside it.
+        Assert.Contains("&& mainValveComplete;", text, StringComparison.Ordinal);
+        Assert.Contains("\"PUMP_COMMAND_TRIAL_MAIN_VALVE_REFUSED\"", text, StringComparison.Ordinal);
+
+        // A trip or a lost position during the ramp goes through the ONE stop path with the lifecycle's own
+        // failure reason, and the valve is not touched again until the stop is confirmed.
+        Assert.Contains("mainValve.Supervise()", text, StringComparison.Ordinal);
+        Assert.Contains("lifecycle.Stop(PumpStopReason.SEQUENCE_FAILURE)", text, StringComparison.Ordinal);
+        Assert.Contains("gate.BeginClose(pumpStopConfirmed, out string closeCode)", text, StringComparison.Ordinal);
+        Assert.Contains("PumpCommandRefusals.RefusedMainValveCloseNotStopped", text, StringComparison.Ordinal);
+
+        // And the close itself is a bounded wait, derived from the configured bound like every other wait here.
+        Assert.Contains("gate.Configuration.CloseTimeout.TotalMilliseconds", text, StringComparison.Ordinal);
+        Assert.Contains("gate.Configuration.OpenTimeout.TotalMilliseconds", text, StringComparison.Ordinal);
     }
 
     private static string RepoRoot()

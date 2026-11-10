@@ -63,8 +63,8 @@ Export-WjssStageFiles
 
 `Test-WjssDriver` ไม่ใช่ formal check — มัน**รันโค้ดจริงบน PowerShell เครื่องคุณ** (ตัวเดียวกับที่จะรัน stage):
 
-- parse ไฟล์ตัวขับและ parse ไฟล์ `stage-*.ps1` ทั้ง 10 ไฟล์ที่ export ออกมา (syntax ผิด = เจอตรงนั้นเลย)
-- ตรวจว่า stage ครบ 10 ตัว ไม่มี consent literal/endpoint literal หลงอยู่ในโค้ดของ stage
+- parse ไฟล์ตัวขับและ parse ไฟล์ `stage-*.ps1` ทั้ง 11 ไฟล์ที่ export ออกมา (syntax ผิด = เจอตรงนั้นเลย)
+- ตรวจว่า stage ครบ 11 ตัว ไม่มี consent literal/endpoint literal หลงอยู่ในโค้ดของ stage
 - รัน `& <exe>` จริงใน mode startup-refusal (ไม่แตะ device) แล้วดูว่า exit code/ refusal มาจริง
 - เทียบตัวอ่าน log, ตัวตัดสิน verdict, ตัว scrub IP กับ log สังเคราะห์ (บรรทัดที่มี `=` ซ้ำในค่า, junk line, key ซ้ำ, ค่าที่พิมพ์ตัวพิมพ์ใหญ่ต่างกันเลยต้องถูกจับ)
 - ตรวจ frame ที่ใช้อ่านบิต: ความยาว 12 ไบต์, protocol id ต้องเป็น 0, length 6, start/quantity เป็น big-endian — พร้อมเคส reply ที่ device ตอบ exception / สั้นเกิน / function code ไม่ตรง
@@ -72,7 +72,7 @@ Export-WjssStageFiles
 
 อะไรก็ตามที่ grep ไม่เจอ = `DRIVER SELF-TEST FAILED` แล้วตัวขับจะ**ไม่ปล่อยให้รัน stage**
 
-ส่วนบรรทัด `Export-WjssStageFiles` คือตัวสร้าง `$env:USERPROFILE\wjss-evidence\<วันที่>\stage-<name>.ps1` ทั้ง 10 ไฟล์ ซึ่งเป็นสิ่งที่รันจริง (ห้ามแก้เอง)
+ส่วนบรรทัด `Export-WjssStageFiles` คือตัวสร้าง `$env:USERPROFILE\wjss-evidence\<วันที่>\stage-<name>.ps1` ทั้ง 11 ไฟล์ ซึ่งเป็นสิ่งที่รันจริง (ห้ามแก้เอง)
 
 หมายเหตุ: ในไฟล์ `tools/` ผมไม่พิมพ์ชื่อ protocol ของยี่ห้อ device (กฎ boundary-scan S3 ใน repo) — protocol ที่ใช้จริงคือ Modbus TCP FC01/FC02 ซึ่งเอกสารนี้เป็นคนอธิบายเอง ตัวขับเลยใช้คำว่า "device TCP port / unit id"
 
@@ -89,7 +89,7 @@ catalogue ต้องเป็นสำเนาของคุณเองท�
 
 ### ข้อ 0.4 — รัน stage ตามลำดับ (ห้ามข้าม A1 ซึ่งคือ "ปั๊มหยุด")
 
-รันตามลำดับนี้ **ทีละบรรทัด** (ไฟล์ทั้ง 10 เกิดจาก `Export-WjssStageFiles` ในข้อ 0.3 — ห้าม copy โค้ดจากเอกสารนี้ไปรันเอง และห้ามแก้ไฟล์ `stage-*.ps1`) — A1 รันตอนปั๊มหยุด, A2 รันตอนปั๊มรัน, B off/on เช่นกัน, ห้ามรันคู่ที่ติดกันแล้วลืมเปลี่ยนสถานะปั๊ม:
+รันตามลำดับนี้ **ทีละบรรทัด** (ไฟล์ทั้ง 11 เกิดจาก `Export-WjssStageFiles` ในข้อ 0.3 — ห้าม copy โค้ดจากเอกสารนี้ไปรันเอง และห้ามแก้ไฟล์ `stage-*.ps1`) — A1 รันตอนปั๊มหยุด, A2 รันตอนปั๊มรัน, B off/on เช่นกัน, ห้ามรันคู่ที่ติดกันแล้วลืมเปลี่ยนสถานะปั๊ม:
 
 ```powershell
 & "$script:Ev\stage-A1-off.ps1"     # pump STOPPED, exit 2 expected - that is the PASS
@@ -98,8 +98,9 @@ catalogue ต้องเป็นสำเนาของคุณเองท�
 & "$script:Ev\stage-B-on.ps1"       # read DI-001..008, pump running - I diff the two
 & "$script:Ev\stage-C-iv1.ps1"      # IV1 open/close, one actuation
 & "$script:Ev\stage-D-pump.ps1"     # D variant 1: pump ladder only, NO valve boundary composed
-& "$script:Ev\stage-D-sim.ps1"      # D variant 2: real IV + real path on a DECLARED pump pressure
-& "$script:Ev\stage-D-dry.ps1"      # D variant 3 (wet): real pump + real IV, extra ack required
+& "$script:Ev\stage-D-pump-mv.ps1"  # D variant 2: the same ladder WITH the motorized main valve (block 1.27)
+& "$script:Ev\stage-D-sim.ps1"      # D variant 3: real IV + real path on a DECLARED pump pressure
+& "$script:Ev\stage-D-dry.ps1"      # D variant 4 (wet): real pump + real IV, extra ack required
 & "$script:Ev\stage-E-idle.ps1"     # all switches at rest: FC02 + FC01 together
 & "$script:Ev\stage-E-moved.ps1"    # after moving each WSB switch by hand
 ```
@@ -277,7 +278,7 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   และ `ProcessIoCommissioningState` มีแค่ `EXCLUDED`/`READ_ONLY_CANDIDATE` (`packages/contracts/ProcessIoContracts.cs:91-95`) —
   `READ_ONLY_CANDIDATE` ไม่ได้บล็อกทั้งอ่านและเขียน (บล็อกเฉพาะ `EXCLUDED`: :203, :586) และแถว DI-004/DI-005 เป็น `USED` ใน CSV จริง
 
-## 6. Stage D — Integrated cleaning-path cycle (มี 3 variant)
+## 6. Stage D — Integrated cleaning-path cycle (มี 4 variant)
 
 ปิด gate: วงจรทั้งรอบ (select pump → enable → run → AO ramp → supervision → cleanup → release) ควบคู่กับการเปิด/ปิดวาล์วและการเดิน Cleaning Path P1-P6
 
@@ -344,7 +345,50 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   (`SELFCHECK: PASS (driver 2026-11-18.1, .. groups)` ต้องปรากฏก่อน) — เพราะที่ `6865f58` self-test แดงแต่ stage ยังรันได้
   และ fixture กับ assertion เคยหลุดกัน (บรรทัด `fresh=TRUE` หายไปจาก fixture) ซึ่งแก้แล้วทั้งคู่
 
-### ข้อ 6.2 — variant สอง: `D-sim` = วาล์วจริง + Path จริงบนค่าแรงดันที่ Owner ประกาศ
+### ข้อ 6.1.2 — variant สอง: `D-pump-mv` = บันไดปั๊มจริง + Motorized Main Valve (บล็อก 1.27)
+
+```powershell
+& "$script:Ev\stage-D-pump-mv.ps1"
+```
+
+- **ต่างจาก `D-pump` ตรงไหน:** เหมือนเดิมทุกประการ (trial ตัวเดิม `apps/runtime/PumpCommandDryTrial.cs`, session เดิม,
+  ไม่ compose equipment boundary, ไม่มี motion, วาล์ว IV ทั้งสี่ยังปิดตามที่ Stage C ทิ้งไว้) ที่เพิ่มคือ selector
+  `WJSS_PUMP_COMMAND_DRY_TRIAL=MAIN_VALVE_AND_PUMP` ซึ่ง compose `ProcessIoMainValveGate` ไว้หน้าบันไดปั๊ม:
+  Product เปิด Main Valve เอง (WJSS เป็นผู้เขียนคนเดียว — ตู้หน้างานไม่เปิดให้อัตโนมัติ) แล้วจึงสั่ง Select Pump
+  และปิดวาล์วกลับหลังหยุดปั๊มแบบยืนยันแล้วเท่านั้น
+- **แอดเดรส/ฟังก์ชันที่ใช้ (derive จากตาราง binding ที่ adopt แล้วเท่านั้น ไม่มีเลขที่เขียนตายไว้ในโค้ด):** `DI-012` Over Torque
+  = FC02 discrete 11, `DI-013` Valve is Opened = FC02 12, `DI-014` Valve is Closed = FC02 13, `DO-014` Open Valve
+  = FC05 coil 13, `DO-015` Close Valve = FC05 coil 14 กับดักที่ห้ามสับสน: DI‑014 (discrete 13) กับ DO‑014 (coil 13)
+  อยู่คนละ address space และการ read‑back ของ coil (FC01 525/526) เป็นเพียง process image ไม่ใช่หลักฐานว่าวาล์วขยับ
+  ตำแหน่งจึงตัดสินจาก limit switch เท่านั้น (บันทึกจาก Owner: workbook ใส่เลข `K136` ที่ลิมิตทั้งสอง ซึ่งเทียบ step ของ
+  trio พี่น้องแล้วน่าจะเป็น `K137` — ถือเป็นการแก้เอกสารเท่านั้น ไม่แตะ address แต่อย่างใด)
+- **กฎที่บังคับ (Owner rulings 2026-11-19):** open = `DO-015` FALSE ก่อนแล้ว `DO-014` TRUE, close = `DO-014` FALSE ก่อนแล้ว
+  `DO-015` TRUE, ห้ามเป็น TRUE พร้อมกันเด็ดขาด; เมื่อถึงลิมิตแล้วต้องปล่อยคอยล์ที่จ่ายอยู่ (ไม่ hold คอยล์);
+  `WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS` และ `WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS` = 30000 (driver ตั้งให้ ตัว Product ไม่มีค่า default);
+  `DI-012` เป็น TRUE ตอน pre‑flight ⇒ ปฏิเสธการเริ่มด้วย `WJSS_MAIN_VALVE_OVER_TORQUE` และถ้า trip ระหว่างเดินทางหรือ
+  ระหว่างรัน ⇒ ปล่อยทั้งสองคอยล์แล้วเข้าเส้นทางหยุดทันที; ขา feedback อ่านไม่ได้ หรือได้ CONFLICT (ลิมิตสองตัวเป็น TRUE พร้อมกัน)
+  ⇒ ปฏิเสธและไม่จ่ายปั๊ม; ปิดวาล์วเฉพาะหลังยืนยันว่าหยุดแล้ว และความผิดพลาดของวาล์วห้ามขัดขวางการหยุดปั๊ม
+  (AO = 0 mA, `DO-007` FALSE, `DO-003` FALSE ไปต่อเสมอ)
+- ต้องพิมพ์ยืนยันก่อนรัน: `MAIN VALVE 1.27 COMMAND AUTHORIZED`
+- **วาล์วจะเริ่มจากสถานะไหนก็ได้ ทั้งสองกรณีต้องผ่าน:** ถ้า `DI-013` ยืนยันว่าเปิดอยู่แล้ว รับเป็น
+  `main_valve_open_source=PRE_CONFIRMED_OPEN` (ไม่เขียนคอยล์เลย) ถ้าต้องสั่งเปิดเองเป็น `PRODUCT_DISPATCH` และเพราะกฎ
+  "ปิดทุกจบรัน" การรันครั้งถัดไปจะเริ่มจาก CLOSED เสมอ จึงพิสูจน์ `PRODUCT_DISPATCH` ไปเองโดยไม่ต้องจัดฉาก
+- key หลักใน out.txt: `main_valve_policy=ENFORCED`, `main_valve_command_executed`, `main_valve_position_at_start`,
+  `main_valve_open_confirmed`, `main_valve_open_source`, `main_valve_open_refusal=NONE`, `main_valve_close_requested`,
+  `main_valve_pump_stop_confirmed`, `main_valve_close_confirmed`, `main_valve_position_at_end=CLOSED`,
+  `main_valve_coils_resting`, `main_valve_over_torque`, `main_valve_position_lost`, `main_valve_held_open`,
+  `main_valve_supervision_fault`, `main_valve_refusal=NONE`, `main_valve_position_reads`, `main_valve_writes`
+  และบรรทัด `main_valve_write=DO-014 coil=13 bound=13 value=True admission=ADMITTED dispatch=DISPATCHED code=OK`
+  ทีละการเขียน (จำนวนเขียนไม่คงที่ตามสถานะเริ่มต้น จึงเป็น `-Show` ไม่ใช่ `-Expect`) ส่วน `physical_pump_verified`,
+  `stop_accepted`, `valve_open_admitted_by_lifecycle` คงชื่อเดิมความหมายเดิมไว้ — `valve_open_admitted_by_lifecycle`
+  คือ "lifecycle อนุญาตให้เปิดวาล์ว IV หรือยัง" ไม่ใช่หลักฐานว่า Main Valve เปิด จึงไม่เอามาแทนกัน
+- exit ที่ยอมรับ: `0` เท่านั้น (2 = ปฏิเสธที่วาล์วหรือล้มกลางบันได, 3 = supervision หมดเวลา, 4 = ปฏิเสธก่อนแตะอุปกรณ์
+  รวมถึง `DRY_COMPOSITION_REFUSED_MAIN_VALVE_CONFIGURATION` เมื่อขาด timeout สองตัว)
+- **gate D ยังไม่ปิดด้วย stage นี้ตัวเดียว:** ถ้ารันนี้ผ่าน จะบันทึกว่า "วาล์วถูกสั่งและยืนยันโดย Product แล้ว" —
+  การปิด gate ต้องอ่าน `main_valve_write` ทั้งก้อน (ลำดับต้องเป็น FALSE ของคอยล์ฝั่งตรงข้ามก่อนเสมอ) พร้อม
+  `main_valve_coils_resting=True` และ `main_valve_refusal=NONE`
+
+### ข้อ 6.2 — variant สาม: `D-sim` = วาล์วจริง + Path จริงบนค่าแรงดันที่ Owner ประกาศ
 
 ```powershell
 & "$script:Ev\stage-D-sim.ps1"
@@ -366,7 +410,7 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   gate คนละครึ่งพอดี และการเดิน P1-P6 ค้างไว้จนกว่าจะต่อ motion ครบ (นี่คือขอบเขตจริงของ Product ไม่ใช่ข้อจำกัดของสคริปต์)
 - refusal ที่เกี่ยวข้อง: `DRY_COMPOSITION_REFUSED_SIMULATED_PUMP_SELECTOR` / `_BAR` / `_ATTESTATION` — แก้ที่ input ไม่ใช่ที่โค้ด
 
-### ข้อ 6.3 — variant สาม: `D-dry` = ปั๊มจริง + วาล์วจริง (โหมดเปียก ต้อง ack แยก)
+### ข้อ 6.3 — variant สี่: `D-dry` = ปั๊มจริง + วาล์วจริง (โหมดเปียก ต้อง ack แยก)
 
 Product บังคับ `WJSS_DRY_WET_SEQUENCE_ACK=WATER_AT_NOZZLE_AUTHORIZED` กับเส้นทางที่มีปั๊มจริง (ตัวขับตั้งให้หลังคุณพิมพ์ `DRY CYCLE AUTHORIZED` เท่านั้น และปฏิเสธก่อนเรียก exe ถ้าคุณไม่ตอบ) เพราะโหมดนี้เปิดวาล์วขณะปั๊มสร้างความดัน: **น้ำอาจพุ่งออกจาก nozzle ได้** ถ้า env นี้ขาด Product จะปฏิเสธด้วย `DRY_COMPOSITION_REFUSED_WET_SEQUENCE_NOT_ACKNOWLEDGED`
 
@@ -446,7 +490,8 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 | A1 + A2 | REAL WAGO ENDPOINT CONNECTIVITY · Pump-ready strict-greater ทั้งสองฝั่งบนสัญญาณจริง | **CLOSED** (A1 0.669 bar ⇒ FALSE, exit 2; A2 15.6047 bar ⇒ TRUE, exit 0, `physical_pump_verified=TRUE`) |
 | B | Pump running/fault polarity commissioned (absent ⇒ NOT_CONFIGURED ⇒ D ถูก refuse) | **CLOSED** (DI-004 0→1 ⇒ `ACTIVE_HIGH`; DI-005 ไม่เปลี่ยน ⇒ `ACTIVE_HIGH` ตาม convention เท่านั้น) |
 | C | IV physical actuation + FC01 read-back | **CLOSED** — field-confirmed ทั้งสองทางด้วย limit switches; `fc01=False` ที่ address 22 อธิบายด้วยกติกา RW mirror +512 (อ่านที่ 534) จึงไม่ใช่ defect |
-| D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — ที่ `ee69196` บันไดถูกตัดสินถูกต้องแล้ว (exit=2 + CHECK แทน exit=0 ปลอม) และเจอต้นเหตุจริงชั้น boundary: `now` ที่ใช้ acceptance ถูกจับก่อนการอ่าน ⇒ Usable=false เสมอบนของจริง (แก้พร้อมกันทั้ง ReadFeedback/ReadPumpOutletPressure + test นานาฬิกา ticking) — รอรันซ้ำบน SHA ใหม่เพื่อวัด `last_running_usable` และ `analog_ramp_executed` ด้วยตาตัวเอง; ฝั่งโต๊ะ: `dispatch_window_ms`/`written=` ยังต้องดูจาก out.txt |
+| D-pump-mv | บันไดปั๊มจริง + Motorized Main Valve (บล็อก 1.27) ที่ Product สั่งเองทั้งเปิดและปิด | **ยังไม่รัน** — โค้ดกับ tests เข้ารอบนี้; ต้อง `Test-WjssDriver` PASS บน driver `2026-11-20.1` ก่อน แล้วรัน `stage-D-pump-mv.ps1` ดู `main_valve_refusal=NONE`, `main_valve_coils_resting=True` และลำดับใน `main_valve_write` |
+| D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — ที่ `ee69196` บันไดถูกตัดสินถูกต้องแล้ว (exit=2 + CHECK แทน exit=0 ปลอม) และเจอต้นเหตุจริงชั้น boundary: `now` ที่ใช้ acceptance ถูกจับก่อนการอ่าน ⇒ Usable=false เสมอบนของจริง (แก้พร้อมกันทั้ง ReadFeedback/ReadPumpOutletPressure + test นานาฬิกา ticking) — รันซ้ำที่ `1eb65a6` แล้ว: acceptance ที่แก้ทำงานจริงบนฮาร์ดแวร์ (`analog_ramp_executed=True`, `last_running_usable=True`, `transport_errors=0`) แต่รอบที่ exit 0 เกิดเพราะวาล์วถูกเปิดนอก Product ด้วยมือ จึงยังปิด gate ไม่ได้ — หลักฐานวาล์วต้องมาจาก `D-pump-mv`; ฝั่งโต๊ะ: `dispatch_window_ms`/`written=` ยังต้องดูจาก out.txt |
 | D-sim | Path จริง + วาล์วจริง บนค่าแรงดันที่ประกาศ (ติดป้าย SOFTWARE_SIMULATED) | **OPEN** — ต้อง build ใหม่แล้วรันบนโต๊ะ |
 | D-dry | integrated dry cycle แบบเปียก (ปั๊มจริง + วาล์วจริง) no-load ครบลูปพร้อม cleanup | **OPEN** — ต้องมี `WJSS_DRY_WET_SEQUENCE_ACK` |
 | E | WSB Upper/Lower reclass + DI read path (FC02 vs FC01) | **CLOSED** สำหรับเส้นทางอ่าน (ยังไม่ทำ per-switch E ตามที่ตกลง) |

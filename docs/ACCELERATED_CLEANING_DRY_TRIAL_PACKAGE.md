@@ -219,6 +219,20 @@ is filled and the section is approved.
 | 11 | Physical abort method | `OWNER_DECISION_REQUIRED` |
 | 12 | Safe initial and terminal valve states | `OWNER_DECISION_REQUIRED` |
 
+Update 2026-11-19 (Main Valve scope). Two of these twelve fields are now answered by the Owner's rulings and
+by product code, and the answers are recorded here rather than rewritten into the table so the table keeps
+its meaning as the record of what was decided before the run:
+
+- Field 6 (*which boundary prevents water reaching the selected WJ*): the Isolation Valves. The motorized Main
+  Valve in block 1.27 is the supply valve upstream of the IV manifold and is now commanded by the Product
+  itself (`DO-014` open / `DO-015` close, proven by `DI-013`/`DI-014`) in the `D-pump-mv` class; the trial that
+  runs the Pump ladder with it composes no IV boundary at all, so an IV command cannot reach the nozzle.
+- Field 12 (*safe initial and terminal valve states*): Main Valve CLOSED at the terminal state of every run
+  that opened it, with **neither** valve coil left energised; Isolation Valves left as their own close-all
+  cleanup left them. A valve close is never attempted while the Pump stop is unconfirmed.
+- Fields 1, 2, 3 and 8 remain `OWNER_DECISION_REQUIRED` for the *wet* variants: no Main Valve pressure row
+  exists, none is invented, and `AI-003` remains the sole Pump-ready pressure authority.
+
 Nothing in this section may be filled in by analogy, by copying another site's arrangement, or from
 H3-A simulation evidence. An unfilled field is a stop, not a default.
 

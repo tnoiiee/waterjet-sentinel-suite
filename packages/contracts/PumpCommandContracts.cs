@@ -257,6 +257,52 @@ public static class PumpCommandRefusals
 
     /// <summary>The session did not admit the write, so nothing was dispatched.</summary>
     public const string RefusedNotAdmitted = RefusedNotAdmittedBySession;
+
+    // ------------------------------------------------------------- Main Valve (motorized, block 1.27)
+    //
+    // Every one of these is a refusal to ENERGISE, never a refusal to STOP. A Main Valve fault must never
+    // block the Pump stop path, so no code below is ever returned by a de-energising write or by an AO
+    // sentinel write.
+
+    /// <summary>
+    /// A Pump energising command was attempted while the Main Valve was not confirmed OPEN by its own limit
+    /// switch (Owner ruling 6). Nothing was written and no one-use token was consumed.
+    /// </summary>
+    public const string RefusedMainValveNotOpen = "WJSS_MAIN_VALVE_NOT_OPEN";
+
+    /// <summary>
+    /// The position could not be established because DI-013 or DI-014 was refused, stale, unbound or
+    /// off-generation. Failed closed as a refusal, never as a assumed-closed or assumed-open reading.
+    /// </summary>
+    public const string RefusedMainValvePositionUnconfirmed = "WJSS_MAIN_VALVE_POSITION_UNCONFIRMED";
+
+    /// <summary>DI-013 and DI-014 were both TRUE. That is a wiring fault, not a position (Owner ruling 4).</summary>
+    public const string RefusedMainValveFeedbackConflict = "WJSS_MAIN_VALVE_FEEDBACK_CONFLICT";
+
+    /// <summary>
+    /// DI-012 was TRUE at the pre-flight, so the actuator is tripped and the Pump start is refused before
+    /// any channel is written (Owner ruling 3).
+    /// </summary>
+    public const string RefusedMainValveOverTorque = "WJSS_MAIN_VALVE_OVER_TORQUE";
+
+    /// <summary>The valve did not reach the open limit inside the configured open timeout.</summary>
+    public const string RefusedMainValveOpenTimeout = "WJSS_MAIN_VALVE_OPEN_TIMEOUT";
+
+    /// <summary>The valve did not reach the closed limit inside the configured close timeout.</summary>
+    public const string RefusedMainValveCloseTimeout = "WJSS_MAIN_VALVE_CLOSE_TIMEOUT";
+
+    /// <summary>
+    /// A close was attempted before the Pump stop was confirmed. The Main Valve is never closed while the
+    /// Pump is running or while its stop is unproven (Owner ruling 7), and the Pump stop is never held up by
+    /// this refusal.
+    /// </summary>
+    public const string RefusedMainValveCloseNotStopped = "WJSS_MAIN_VALVE_CLOSE_REFUSED_PUMP_NOT_STOPPED";
+
+    /// <summary>A valve coil write the session or the admission refused, so the travel was never commanded.</summary>
+    public const string RefusedMainValveDispatch = "WJSS_MAIN_VALVE_COMMAND_REFUSED_DISPATCH";
+
+    /// <summary>The valve configuration was enforced but not internally valid, so the gate refuses to run.</summary>
+    public const string RefusedMainValveConfiguration = "WJSS_MAIN_VALVE_REFUSED_CONFIGURATION";
 }
 
 /// <summary>One step of an ordered command sequence: the tag, the maintained value and its order.</summary>

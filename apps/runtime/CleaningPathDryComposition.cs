@@ -152,6 +152,16 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// <summary>DI-005 polarity. Absent means NOT_CONFIGURED, and then the Pump command fails closed.</summary>
     public const string PumpFaultPolarityVariable = "WJSS_PUMP_FAULT_POLARITY";
 
+    /// <summary>
+    /// How long the Main Valve may take to reach its open limit (DI-013). Required in the physical Pump
+    /// class and never defaulted: a travel bound the Product invented would be a wait nobody authorized,
+    /// and the field driver is the place that states the 30000 ms the Owner set.
+    /// </summary>
+    public const string MainValveOpenTimeoutVariable = "WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS";
+
+    /// <summary>How long the Main Valve may take to reach its closed limit (DI-014). Required, no default.</summary>
+    public const string MainValveCloseTimeoutVariable = "WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS";
+
     /// <summary>How long the commissioned running feedback may take. Required, no default.</summary>
     public const string PumpRunningConfirmVariable = "WJSS_PUMP_RUNNING_CONFIRM_MS";
 
@@ -172,6 +182,12 @@ public sealed class CleaningPathDryComposition : IDisposable
     public const string RefusedMotion = "DRY_COMPOSITION_REFUSED_MOTION";
     public const string RefusedMotionNotHardwareCapable = "DRY_COMPOSITION_REFUSED_MOTION_NOT_HARDWARE_CAPABLE";
     public const string RefusedPumpConfiguration = "DRY_COMPOSITION_REFUSED_PUMP_CONFIGURATION";
+
+    /// <summary>
+    /// The Main Valve travel timeouts were missing, out of range or unusable, so the physical Pump class was
+    /// refused before contact. A valve admission with no bound on its own wait is not a safety rule.
+    /// </summary>
+    public const string RefusedMainValveConfiguration = "DRY_COMPOSITION_REFUSED_MAIN_VALVE_CONFIGURATION";
 
     /// <summary>
     /// The selector of the Stage D simulated-Pump-ready evidence class. It must be absent (the physical
@@ -214,6 +230,12 @@ public sealed class CleaningPathDryComposition : IDisposable
     private readonly ProcessIoSession _session;
     private readonly ProcessIoEquipmentBoundary _equipment;
     private readonly ProcessIoPumpLifecycle _pump;
+
+    /// <summary>
+    /// The Main Valve gate, composed only for the physical Pump class. Null is a stated fact and not a
+    /// fallback: the declared-value class commands no Pump, so it must not move the valve either.
+    /// </summary>
+    private readonly ProcessIoMainValveGate? _mainValve;
     private readonly CleaningPathPumpLifecycleGate? _pumpGate;
     private readonly CleaningPathSimulatedPumpReadyGate? _simulatedPumpGate;
     private readonly bool _pumpSimulated;
@@ -221,6 +243,7 @@ public sealed class CleaningPathDryComposition : IDisposable
     private readonly int _pumpSelection;
     private readonly string _pumpOwnerId;
     private bool _pumpStarted;
+    private bool _mainValveOpened;
     private readonly MotionCompositionRoot _motionRoot;
     private readonly ManualMotionCleaningPathBoundary _motion;
     private readonly CleaningPathCompositionCoordinator _composition;
@@ -241,6 +264,7 @@ public sealed class CleaningPathDryComposition : IDisposable
         PumpLifecycleConfiguration pumpConfiguration,
         int pumpSelection,
         string pumpOwnerId,
+        ProcessIoMainValveGate? mainValve,
         MotionCompositionRoot motionRoot,
         ManualMotionCleaningPathBoundary motion,
         CleaningPathCompositionCoordinator composition,
@@ -261,6 +285,7 @@ public sealed class CleaningPathDryComposition : IDisposable
         _pumpConfiguration = pumpConfiguration;
         _pumpSelection = pumpSelection;
         _pumpOwnerId = pumpOwnerId;
+        _mainValve = mainValve;
         _motionRoot = motionRoot;
         _motion = motion;
         _composition = composition;
@@ -629,6 +654,19 @@ public sealed class CleaningPathDryComposition : IDisposable
             return false;
         }
 
+        // 9b. The Main Valve (block 1.27). It is composed for the physical Pump class only, and its travel
+        //     bounds are read here, before any contact, because a valve admission without a bound on its own
+        //     wait is not a rule anyone could audit. The declared-value class keeps NotEnforced, which is the
+        //     configuration the boundary was built with before this scope existed, so that class is unchanged.
+        var mainValveConfiguration = ProcessIoMainValveConfiguration.NotEnforced;
+        if (!simulatedPumpReady
+            && !TryReadMainValveConfiguration(
+                readEnvironment, out mainValveConfiguration, out refusalCode, out refusalDetail))
+        {
+            transport.Dispose();
+            return false;
+        }
+
         var pumpTime = new ClockTimeProvider(clock);
         var pumpOwnership = new PumpCommandOwnership();
         var pumpBoundary = new ProcessIoPumpCommandBoundary(
@@ -637,8 +675,12 @@ public sealed class CleaningPathDryComposition : IDisposable
             authorization,
             pumpConfiguration.Feedback,
             pumpTime,
-            pumpConfiguration.PressureFreshnessBudget);
+            pumpConfiguration.PressureFreshnessBudget,
+            mainValveConfiguration);
         var pumpLifecycle = new ProcessIoPumpLifecycle(pumpBoundary, pumpConfiguration, pumpOwnership, pumpTime);
+        ProcessIoMainValveGate? mainValveGate = simulatedPumpReady
+            ? null
+            : new ProcessIoMainValveGate(pumpBoundary, mainValveConfiguration, pumpTime);
 
         // The precondition is structural, not advisory: the coordinator receives the gated boundary,
         // so it has no reference through which it could request an IV OPEN without the Pump.
@@ -713,6 +755,7 @@ public sealed class CleaningPathDryComposition : IDisposable
             pumpConfiguration,
             pumpSelection,
             pumpOwnerId,
+            mainValveGate,
             motionRoot,
             motion,
             compositionCoordinator,
@@ -831,6 +874,13 @@ public sealed class CleaningPathDryComposition : IDisposable
         //
         // In the declared-value class there is no Pump command to admit, so the same position in the order
         // is taken by beginning the run's readiness window - and it is still BEFORE the path starts.
+        // The Main Valve is proven OPEN before the Pump is admitted, selected, enabled or ramped (Owner
+        // ruling 6). A refusal here means the Pump ladder was never started and no Pump channel was written.
+        if (!_pumpSimulated && !OpenMainValve(out string mainValveCode))
+        {
+            return new CleaningPathCompositionStartOutcome(false, mainValveCode, null, null);
+        }
+
         if (!_pumpSimulated && !StartPump(out string pumpCode))
         {
             return new CleaningPathCompositionStartOutcome(false, pumpCode, null, null);
@@ -863,6 +913,11 @@ public sealed class CleaningPathDryComposition : IDisposable
             _pump.Step();
         }
 
+        // The valve is stepped after the Pump for the same reason the Pump is stepped first: the lifecycle is
+        // the authority that can withdraw a valve permission, and it has already done so for this step before
+        // anything here asks the Pump to stop.
+        StepMainValve();
+
         _composition.Step();
     }
 
@@ -885,6 +940,12 @@ public sealed class CleaningPathDryComposition : IDisposable
     public CleaningPathDryCleanupReport Shutdown()
     {
         CleaningPathPumpCleanupReport pump = StopPump();
+
+        // The valve is closed only once the Pump stop is confirmed, and only after that confirmation is
+        // already recorded. Nothing in this call can delay the motion stop, the valve close-all or the session
+        // close below it, whatever the valve does next (Owner rulings 7 and 8).
+        MainValveCleanupRecord? mainValve = CloseMainValve(pump.StoppedConfirmed);
+
         MotionCleanupRecord motion = _motionRoot.Shutdown();
         ProcessIoCleanupResult valves = _equipment.SafeCleanupCloseAll();
         _session.Close(_clock.UtcNow);
@@ -892,10 +953,157 @@ public sealed class CleaningPathDryComposition : IDisposable
         return new CleaningPathDryCleanupReport
         {
             Pump = pump,
+            MainValve = mainValve,
             Motion = motion,
             Valves = valves,
             SessionState = _session.State,
             SessionGeneration = _session.Generation,
+        };
+    }
+
+    /// <summary>
+    /// Proves the Main Valve OPEN before the Pump is admitted, exactly as <see cref="StartPump"/> proves the
+    /// Pump: the wait is bounded by the configured travel timeout, the drive is this composition's own step
+    /// loop rather than a timer, and a refusal means no Pump channel was written.
+    /// </summary>
+    private bool OpenMainValve(out string code)
+    {
+        ProcessIoMainValveGate? gate = _mainValve;
+        if (gate is null)
+        {
+            // The declared-value class composes no valve path. Stated here so the absence is a fact a reader
+            // can see rather than a silence that has to be interpreted.
+            code = "MAIN_VALVE_NOT_COMPOSED";
+            return true;
+        }
+
+        if (gate.BeginOpen(out code))
+        {
+            _mainValveOpened = true;
+            code = "MAIN_VALVE_OPEN";
+            return true;
+        }
+
+        if (!gate.Settled)
+        {
+            int maximumSteps = (int)(gate.Configuration.OpenTimeout.TotalMilliseconds
+                / PumpDriveIntervalMilliseconds) + 1000;
+
+            for (int step = 0; step < maximumSteps && !gate.Settled; step += 1)
+            {
+                // Supervision is inert until OPEN is confirmed - during the travel it is Step() itself that
+                // watches DI-012 - so this call costs nothing here and covers the case where the travel
+                // confirmed on the previous line and the trip arrived in the same breath.
+                if (gate.Supervise())
+                {
+                    break;
+                }
+
+                gate.Step();
+
+                if (!gate.Settled)
+                {
+                    Thread.Sleep(PumpDriveIntervalMilliseconds);
+                }
+            }
+        }
+
+        if (gate.AdmitsPumpEnergise)
+        {
+            _mainValveOpened = true;
+            code = "MAIN_VALVE_OPEN";
+            return true;
+        }
+
+        code = gate.Code == PumpCommandRefusals.Granted
+            ? "MAIN_VALVE_TRAVEL_BUDGET_EXHAUSTED"
+            : gate.Code;
+        return false;
+    }
+
+    /// <summary>
+    /// Drives an unfinished travel and applies the two supervision duties the Owner ruled for the run: the
+    /// over-torque trip and the loss of both limit inputs. Both go through the ONE Pump stop path, and the
+    /// valve is not touched further until the stop is confirmed.
+    /// </summary>
+    private void StepMainValve()
+    {
+        ProcessIoMainValveGate? gate = _mainValve;
+        if (gate is null)
+        {
+            return;
+        }
+
+        if (!gate.Settled)
+        {
+            gate.Step();
+        }
+
+        if (gate.Phase != ProcessIoMainValveGatePhase.ABORTED && !gate.Supervise())
+        {
+            return;
+        }
+
+        if (_pumpStarted && _pump.Result is null && !PumpLifecycleStates.IsTerminal(_pump.State))
+        {
+            _pump.Stop(PumpStopReason.SEQUENCE_FAILURE);
+        }
+    }
+
+    /// <summary>
+    /// Commands the travel to CLOSED once, and only on confirmed evidence that the Pump stopped. The Pump stop
+    /// report is already assembled by the time this runs, and nothing here can delay the motion stop, the
+    /// Isolation Valve close-all or the session close that follow it: a valve fault is recorded, never allowed
+    /// to become the reason a Pump stayed at speed.
+    /// </summary>
+    private MainValveCleanupRecord CloseMainValve(bool pumpStopConfirmed)
+    {
+        ProcessIoMainValveGate? gate = _mainValve;
+        if (gate is null)
+        {
+            return new MainValveCleanupRecord
+            {
+                Attempted = false,
+                Position = ProcessIoMainValvePosition.UNKNOWN.ToString(),
+                ClosedConfirmed = false,
+                CoilsResting = true,
+                OverTorqueSeen = false,
+                Code = "MAIN_VALVE_NOT_COMPOSED",
+                PumpStopConfirmed = pumpStopConfirmed,
+                Writes = 0,
+                OpenedThisRun = false,
+            };
+        }
+
+        bool closed = gate.BeginClose(pumpStopConfirmed, out string code);
+
+        if (!closed && !gate.Settled && code != PumpCommandRefusals.RefusedMainValveCloseNotStopped)
+        {
+            int maximumSteps = (int)(gate.Configuration.CloseTimeout.TotalMilliseconds
+                / PumpDriveIntervalMilliseconds) + 1000;
+
+            for (int step = 0; step < maximumSteps && !gate.Settled; step += 1)
+            {
+                gate.Step();
+
+                if (!gate.Settled)
+                {
+                    Thread.Sleep(PumpDriveIntervalMilliseconds);
+                }
+            }
+        }
+
+        return new MainValveCleanupRecord
+        {
+            Attempted = gate.Writes.Count > 0,
+            Position = gate.PositionAtEnd.ToString(),
+            ClosedConfirmed = gate.Phase == ProcessIoMainValveGatePhase.CLOSED_CONFIRMED,
+            CoilsResting = gate.CoilsResting,
+            OverTorqueSeen = gate.OverTorqueSeen,
+            Code = closed || code == PumpCommandRefusals.Granted ? gate.Code : code,
+            PumpStopConfirmed = pumpStopConfirmed,
+            Writes = gate.Writes.Count,
+            OpenedThisRun = _mainValveOpened,
         };
     }
 
@@ -958,6 +1166,16 @@ public sealed class CleaningPathDryComposition : IDisposable
             }
 
             _pump.Step();
+
+            // Owner rulings 3 and 8, applied while the Pump is coming up: an over-torque trip or the loss of
+            // both limit inputs stops the Pump through the ONE stop path. The valve is never closed here.
+            if (_mainValve is not null && _mainValve.Supervise())
+            {
+                _pump.Stop(PumpStopReason.SEQUENCE_FAILURE);
+                code = "PUMP_START_REFUSED_" + _mainValve.Code;
+                return false;
+            }
+
             Thread.Sleep(PumpDriveIntervalMilliseconds);
         }
 
@@ -1248,6 +1466,54 @@ public sealed class CleaningPathDryComposition : IDisposable
     }
 
     /// <summary>
+    /// Reads the Main Valve travel bounds from Owner-local values for the physical Pump class. Both are
+    /// required and neither is defaulted: a wait this Product invented for itself is not an authorized bound
+    /// on a machine, and a missing one would leave the gate either hanging or never waiting at all. The
+    /// ceiling is the contract's own, so a mistyped six-digit value is refused rather than honored.
+    /// </summary>
+    internal static bool TryReadMainValveConfiguration(
+        Func<string, string?> readEnvironment,
+        out ProcessIoMainValveConfiguration configuration,
+        out string refusalCode,
+        out string refusalDetail)
+    {
+        configuration = null!;
+        refusalCode = string.Empty;
+        refusalDetail = string.Empty;
+
+        if (!TryReadRequiredTimeout(readEnvironment, MainValveOpenTimeoutVariable, out TimeSpan openTimeout)
+            || !TryReadRequiredTimeout(readEnvironment, MainValveCloseTimeoutVariable, out TimeSpan closeTimeout)
+            || openTimeout > TimeSpan.FromMilliseconds(ProcessIoMainValve.MaximumTravelTimeoutMilliseconds)
+            || closeTimeout > TimeSpan.FromMilliseconds(ProcessIoMainValve.MaximumTravelTimeoutMilliseconds))
+        {
+            refusalCode = RefusedMainValveConfiguration;
+            refusalDetail =
+                $"The Main Valve travel bounds in {MainValveOpenTimeoutVariable} and "
+                + $"{MainValveCloseTimeoutVariable} are required integers between 1 and "
+                + $"{ProcessIoMainValve.MaximumTravelTimeoutMilliseconds} milliseconds. They are never "
+                + "defaulted: an unbounded wait for a limit switch is not a safety rule.";
+            return false;
+        }
+
+        var candidate = new ProcessIoMainValveConfiguration
+        {
+            Enforcement = ProcessIoMainValveEnforcement.ENFORCED,
+            OpenTimeout = openTimeout,
+            CloseTimeout = closeTimeout,
+        };
+
+        if (!candidate.Valid)
+        {
+            refusalCode = RefusedMainValveConfiguration;
+            refusalDetail = "The composed Main Valve configuration is not valid.";
+            return false;
+        }
+
+        configuration = candidate;
+        return true;
+    }
+
+    /// <summary>
     /// Reads one feedback polarity. Absence means NOT_CONFIGURED, which is not an error: it leaves the
     /// physical Pump command fail-closed. A supplied value that is not a known polarity IS an error.
     /// </summary>
@@ -1440,5 +1706,46 @@ public sealed record CleaningPathDryCleanupReport
     /// True only when both cleanups were independently observed complete. Neither side can mask the
     /// other: a complete valve close never hides a failed motion Stop.
     /// </summary>
-    public bool Complete => Pump.Complete && Motion.Complete && Valves.Complete;
+    public bool Complete => Pump.Complete
+        && (MainValve is null || MainValve.Complete)
+        && Motion.Complete
+        && Valves.Complete;
+}
+
+/// <summary>
+/// What the composition did with the Main Valve on the way out. Reported separately from the Pump cleanup on
+/// purpose: a valve that did not arrive at its closed limit is a fault the Owner must see as its own line, and
+/// it is never merged into a claim that the Pump was stopped.
+/// </summary>
+public sealed record MainValveCleanupRecord
+{
+    /// <summary>True when a close was attempted at all, i.e. when a valve path is composed.</summary>
+    public required bool Attempted { get; init; }
+
+    /// <summary>The position the last read saw.</summary>
+    public required string Position { get; init; }
+
+    /// <summary>True when DI-014 confirmed the closed limit.</summary>
+    public required bool ClosedConfirmed { get; init; }
+
+    /// <summary>True when neither valve coil is believed energised.</summary>
+    public required bool CoilsResting { get; init; }
+
+    /// <summary>True when DI-012 was seen at any point in the run.</summary>
+    public required bool OverTorqueSeen { get; init; }
+
+    /// <summary>The gate's own refusal, or <c>OK</c>.</summary>
+    public required string Code { get; init; }
+
+    /// <summary>The Pump stop confirmation this close was gated on. False means the close was not attempted.</summary>
+    public required bool PumpStopConfirmed { get; init; }
+
+    /// <summary>The number of valve coil writes this run issued.</summary>
+    public required int Writes { get; init; }
+
+    /// <summary>True when this run confirmed the valve OPEN at its start. Reported, never inferred.</summary>
+    public required bool OpenedThisRun { get; init; }
+
+    /// <summary>True when the valve ended at its closed limit with both coils released.</summary>
+    public bool Complete => !Attempted || (ClosedConfirmed && CoilsResting && !OverTorqueSeen);
 }
