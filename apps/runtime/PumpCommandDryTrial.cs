@@ -546,12 +546,18 @@ public static class PumpCommandDryTrial
                 firstAt = outcome.At;
             }
 
-            double gapMs = previousAt is null ? 0d : (outcome.At - previousAt.Value).TotalMilliseconds;
+            // Pattern matching rather than a dereference. Nullable.Value is only proven safe where the test
+            // sits in the same expression, and this repository builds with TreatWarningsAsErrors, so a
+            // guarded-but-not-proven .Value here is a build failure on the field package, not a warning.
+            double gapMs = previousAt is DateTimeOffset previous
+                ? (outcome.At - previous).TotalMilliseconds
+                : 0d;
+            string writtenAddress = outcome.BoundAddress is int boundAddress
+                ? boundAddress.ToString(CultureInfo.InvariantCulture)
+                : "<no bound row>";
             output.WriteLine("  dispatch=" + outcome.Tag
                 + " coil=" + outcome.CoilAddress.ToString(CultureInfo.InvariantCulture)
-                + " written=" + (outcome.BoundAddress is null
-                    ? "<no bound row>"
-                    : outcome.BoundAddress.Value.ToString(CultureInfo.InvariantCulture))
+                + " written=" + writtenAddress
                 + " value=" + outcome.Value.ToString()
                 + " admission=" + (outcome.Admitted ? "ADMITTED" : "REFUSED")
                 + " dispatch=" + (outcome.Dispatched ? "DISPATCHED" : "NOT_DISPATCHED")
@@ -573,12 +579,25 @@ public static class PumpCommandDryTrial
         // and the catalogue row gives the session the address it writes. They are expected to agree, and this
         // line says whether they did in this run - a report that printed only one of the two could not tell a
         // correctly written coil at coil 6 from a write that went somewhere else.
-        List<string> addressChecks = log
-            .Where(o => o.BoundAddress is not null && o.BoundAddress.Value != o.CoilAddress)
-            .Select(o => o.Tag + " contract=" + o.CoilAddress.ToString(CultureInfo.InvariantCulture)
-                + " written=" + o.BoundAddress.Value.ToString(CultureInfo.InvariantCulture))
-            .ToList();
-        int addressCompared = log.Count(o => o.BoundAddress is not null);
+        List<string> addressChecks = new List<string>();
+        int addressCompared = 0;
+        foreach (PumpCommandOutcome outcome in log)
+        {
+            // Same rule as above, and the same list length and the same comparison this replaced: the value is
+            // bound once here instead of being dereferenced twice under a filter the compiler cannot follow.
+            if (outcome.BoundAddress is not int boundAddress)
+            {
+                continue;
+            }
+
+            addressCompared++;
+            if (boundAddress != outcome.CoilAddress)
+            {
+                addressChecks.Add(outcome.Tag + " contract="
+                    + outcome.CoilAddress.ToString(CultureInfo.InvariantCulture)
+                    + " written=" + boundAddress.ToString(CultureInfo.InvariantCulture));
+            }
+        }
         output.WriteLine("  dispatch_address_agreement=" + (addressChecks.Count != 0
             ? "CHECK(" + string.Join(",", addressChecks) + ")"
             : addressCompared == 0
