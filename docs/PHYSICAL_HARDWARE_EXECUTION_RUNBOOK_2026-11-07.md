@@ -407,6 +407,18 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   การปิด gate ต้องอ่าน `main_valve_write` ทั้งก้อน (ลำดับต้องเป็น FALSE ของคอยล์ฝั่งตรงข้ามก่อนเสมอ) พร้อม
   `main_valve_coils_resting=True` และ `main_valve_refusal=NONE`
 
+**บันทึกหลักฐานการรันที่นับเป็น gate (executed field evidence, Owner ran — not simulated):**
+`RESULT D-pump-mv: PASS (exit=0)` เมื่อ 2026-11-11 01:33:22 ที่ `HEAD=16f78bcc` · driver `2026-11-20.1` +
+patch โปรไฟล์ในหน่วยความจำ (ยังไม่อยู่ในไฟล์ตอนนั้น) · exe sha256 `492BCB9DE0CF` · ทั้งสอง timeout ถูก override
+เป็น 45000 ms ผ่าน env ที่ชั้น caller เพราะค่า 30000 ในตัวขับตอนนั้นสั้นกว่าเวลาเดินทางจริง
+(ตัวขับที่ `44820ef` แก้ที่ต้นเหตุแล้ว — รันรอบใหม่ไม่ต้อง override อะไร)
+การรันนี้ **ไม่ได้** ใช้ `WJSS_UPDATE_FIXTURES=1`, `.err.txt` ว่าง, และทุก key ที่ `-Expect` ตั้งไว้ (40 คู่) ตรงตามค่า
+สิ่งที่ gate นี้พิสูจน์จริง: Product เป็นผู้เปิดวาล์วเอง (`PRODUCT_DISPATCH`) → ยืนยันตำแหน่งด้วย FC02 → ค่อย Select Pump
+→ รันบันไดครบ 9 ขั้น → หยุดยืนยันแล้ว → ปิดวาล์วจน `CLOSED` + คอยล์พักทั้งคู่ (`coils_resting=True`)
+สิ่งที่ **ไม่ได้** พิสูจน์ (ห้ามอ้างเกิน): ไม่มีน้ำแรงดันสูงผ่าน nozzle, ไม่มี Cleaning Path/IV sequence, ไม่มีการขยับ axis
+และไม่ใช่ FRR — ตาราง §11 ยังเหลือ `D-sim` กับ `D-dry` ที่รันไม่ได้จนกว่าจะ build ที่ SHA ใหม่ และ `F` (optional) ยังไม่รัน
+ส่วน `E` ปิดเฉพาะเส้นทางอ่าน ยังไม่ทำ per-switch E ตามที่ตกลง
+
 ### ข้อ 6.2 — variant สาม: `D-sim` = วาล์วจริง + Path จริงบนค่าแรงดันที่ Owner ประกาศ
 
 ```powershell
@@ -504,7 +516,7 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 
 ## 11. สรุปว่า stage ไหนปิด gate อะไร (ใช้ตอนผมอัปเดต register)
 
-| Stage | Gate ที่ปิด | สถานะที่ `c4898a0` |
+| Stage | Gate ที่ปิด | สถานะล่าสุด (แถว A/B/C/E อ้าง `c4898a0`, แถว D อ้าง `16f78bc`/`44820ef`) |
 | --- | --- | --- |
 | A1 + A2 | REAL WAGO ENDPOINT CONNECTIVITY · Pump-ready strict-greater ทั้งสองฝั่งบนสัญญาณจริง | **CLOSED** (A1 0.669 bar ⇒ FALSE, exit 2; A2 15.6047 bar ⇒ TRUE, exit 0, `physical_pump_verified=TRUE`) |
 | B | Pump running/fault polarity commissioned (absent ⇒ NOT_CONFIGURED ⇒ D ถูก refuse) | **CLOSED** (DI-004 0→1 ⇒ `ACTIVE_HIGH`; DI-005 ไม่เปลี่ยน ⇒ `ACTIVE_HIGH` ตาม convention เท่านั้น) |
