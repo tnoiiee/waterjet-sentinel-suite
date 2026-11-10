@@ -19,7 +19,7 @@
 # SOURCE-AUTHORED IN ARENA. NOT EXECUTED IN ARENA: the Arena sandbox has no PowerShell interpreter, so the
 # gates here are (a) the load-time parser of PowerShell itself, (b) Test-WjssDriver on the Owner's machine.
 
-$script:WjssDriverVersion = '2026-11-20.1'
+$script:WjssDriverVersion = '2026-11-21.1'
 $ErrorActionPreference = 'Stop'
 # A stage never runs on a driver whose own self-test has not passed in THIS window. Test-WjssDriver is
 # the only thing that proves the parser, the verdict matcher and the expectations still agree with each
@@ -238,8 +238,12 @@ function Invoke-WjssStage {
     # guess: DryIvTrial refuses any profile but TEST_HARDWARE_DRY (apps/runtime/DryIvTrial.cs:278), the
     # dry command composition refuses it too (apps/runtime/RuntimeHostOptions.cs:389), and the read-only
     # Pump-ready trial runs under TEST_HARDWARE. A wrong profile is refused before anything is contacted.
+    # Field defect fixed here: this list was written before D-pump-mv existed, so the new variant inherited
+    # 'TEST_HARDWARE' and was refused with PUMP_COMMAND_TRIAL_REFUSED_PROFILE_NOT_TEST_HARDWARE_DRY (exit=4)
+    # before the endpoint was touched - a safe refusal, but a driver bug. Every name in StageNames that runs a
+    # dry trial must appear below or in its own body; Test-WjssDriver now asserts that for D-pump and D-pump-mv.
     $prof = 'TEST_HARDWARE'
-    if ($Name -eq 'C-iv1' -or $Name -eq 'D-dry' -or $Name -eq 'D-pump' -or $Name -eq 'D-sim') { $prof = 'TEST_HARDWARE_DRY' }
+    if ($Name -eq 'C-iv1' -or $Name -eq 'D-dry' -or $Name -eq 'D-pump' -or $Name -eq 'D-pump-mv' -or $Name -eq 'D-sim') { $prof = 'TEST_HARDWARE_DRY' }
     [Environment]::SetEnvironmentVariable('WJSS_DEVICE_PROFILE', $prof)
     [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_HOST', $script:Ip)
     [Environment]::SetEnvironmentVariable('WJSS_PROCESS_IO_CATALOGUE', $script:Cat)
@@ -700,9 +704,12 @@ $script:Stages = @{
             'WJSS_PUMP_READY_TIMEOUT_MS'     = '30000'
             'WJSS_PUMP_STOPPED_CONFIRM_MS'   = '15000'
             # the two Main Valve bounds. The Product never defaults them: an absent or out of range value is a
-            # refusal before the endpoint is touched, so these two lines are where the 30 s decision is written.
-            'WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS'  = '30000'
-            'WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS' = '30000'
+            # refusal before the endpoint is touched, so these two lines are where the decision is written.
+            # 45 s, not 30 s: the bench measured this valve at 30399 ms to open and 29610 ms to close, so a
+            # 30 s bound sat within 0.4 s of real travel and would abort a perfectly good stroke. 45 s leaves
+            # the same 1.48x margin on the slower direction while staying far below any mechanical risk.
+            'WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS'  = '45000'
+            'WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS' = '45000'
             'WJSS_PUMP_READY_SETPOINT_BAR'   = '15'
             'WJSS_PRESSURE_LOW_BAR'          = '1'
             'WJSS_PRESSURE_HIGH_BAR'         = '15'
@@ -939,6 +946,7 @@ function Test-WjssDriver {
         $self = Join-Path $script:Repo 'tools\hardware-runbook\wjss-field-driver.ps1'
     }
     $haveSelf = Test-Path -LiteralPath $self
+    $own = ''
     if ($haveSelf) {
         $own = [string](Get-Content -LiteralPath $self -Raw)
         if ($own.Contains($needle)) { $bad += 'the driver itself carries a consent literal' }
@@ -946,6 +954,23 @@ function Test-WjssDriver {
         $done += 'driver file is ASCII-only and consent-free'
     }
     else { $done += 'driver file not found (pasted manually) - file-level checks skipped' }
+
+    # Profile coverage for the dry trial variants. A missing entry in the Invoke-WjssStage fallback is exactly
+    # the defect the bench hit on 2026-11-11: D-pump-mv was added to StageNames but not to the shared profile
+    # line, so it inherited TEST_HARDWARE and was refused with
+    # PUMP_COMMAND_TRIAL_REFUSED_PROFILE_NOT_TEST_HARDWARE_DRY (exit=4) before the endpoint was touched.
+    # Safe, but a driver bug, so it is asserted here instead of being remembered by hand. A stage satisfies
+    # the rule either by naming the profile in its own body or through the shared fallback line.
+    $fallback = @(($own -split "`r?`n") | Where-Object { $_.Contains("`$prof = 'TEST_HARDWARE_DRY'") -and $_.TrimStart().StartsWith('if (') })
+    foreach ($n in @('D-pump', 'D-pump-mv')) {
+        $covered = ([string]$script:Stages[$n]).Contains("'WJSS_DRY_COMMAND_MODE'")
+        if (-not $covered -and $fallback.Count -gt 0) {
+            # exact quoted comparison, so D-pump-mv is never satisfied by the shorter D-pump entry
+            $covered = ([string]($fallback -join ' ')).Contains("-eq '" + $n + "'")
+        }
+        if (-not $covered) { $bad += ('profile: stage ' + $n + ' does not select TEST_HARDWARE_DRY (the dry trials refuse any other profile)') }
+    }
+    $done += 'dry trial variants select TEST_HARDWARE_DRY (D-pump, D-pump-mv)'
 
     # parser test on a synthetic report (first key wins, '=' inside a value, junk lines ignored)
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('wjss-selftest-' + (Get-Date -Format 'HHmmss'))
