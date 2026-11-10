@@ -248,6 +248,13 @@ public static class PumpCommandRefusals
     /// <summary>The Pump Outlet Pressure evidence was not accepted as current physical evidence.</summary>
     public const string RefusedPressure = "WJSS_PUMP_READY_REFUSED_PRESSURE";
 
+    /// <summary>
+    /// A feedback record the acceptance rule would not take although the read itself was clean: the session
+    /// generation moved, or the instant judged was not the instant the answer arrived. It gets its own name so
+    /// a refusal of this kind can never be reported as the pressure rule's code and leave the reader to guess.
+    /// </summary>
+    public const string RefusedFeedbackNotAccepted = "WJSS_PUMP_FEEDBACK_NOT_ACCEPTED";
+
     /// <summary>The session did not admit the write, so nothing was dispatched.</summary>
     public const string RefusedNotAdmitted = RefusedNotAdmittedBySession;
 }

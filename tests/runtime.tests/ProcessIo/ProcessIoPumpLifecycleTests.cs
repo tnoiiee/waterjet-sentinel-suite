@@ -978,6 +978,78 @@ public sealed class ProcessIoPumpLifecycleTests
         public required PumpCommandOwnership Ownership { get; init; }
     }
 
+    // ------------------------------------------------- the acceptance instant, the thing that broke the table
+    //
+    // At ee69196 the pump ladder could not leave WAITING_FOR_RUNNING although the rack answered every read
+    // (333 network attempts, no transport error, both feedback inputs usable-looking and yet never Usable). The
+    // cause was neither the device nor the catalogue: the boundary handed the acceptance rule an instant taken
+    // BEFORE the read was issued, while ObservedAt is stamped INSIDE the read, so the rule's own guard
+    // ObservedAt <= now failed on every call. A frozen test clock cannot see that, because there the two
+    // instants are equal - which is exactly why the suite stayed green while the bench could not run.
+
+    [Fact(DisplayName = "44. A ticking clock still accepts the feedback read and the pressure read")]
+    public void Feedback_And_Pressure_Are_Accepted_When_The_Clock_Ticks_Inside_The_Read()
+    {
+        var time = new TickingTime();
+        var transport = new FakeTransport();
+        transport.DiscreteInputs[InputRunning] = true;
+        transport.InputRegisters[RegisterPumpOutlet] = RawAboveSetpoint;
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(time.GetUtcNow());
+
+        var boundary = new ProcessIoPumpCommandBoundary(
+            session, BuildCatalogue(), Authorize(), Commissioned(), time, Freshness);
+
+        PumpFeedbackRead running = boundary.ReadRunning();
+        Assert.True(running.Usable, "a commissioned Running read the device answered is usable evidence");
+        Assert.True(running.Active);
+
+        PumpPressureRead pressure = boundary.ReadPumpOutletPressure();
+        Assert.True(pressure.Accepted, "a current analog sample is accepted, not refused for its timestamps");
+        Assert.NotNull(pressure.Sample);
+    }
+
+    [Fact(DisplayName = "45. A read that answered too late keeps its own reason and its own raw bit")]
+    public void A_Read_That_Answered_Too_Late_Keeps_Its_Own_Reason_And_Its_Own_Bit()
+    {
+        var time = new FakeTime();
+        var transport = new FakeTransport { Clock = time, DiscreteReadDelay = TimeSpan.FromMinutes(1) };
+        transport.DiscreteInputs[InputRunning] = true;
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+        session.Open(time.GetUtcNow());
+
+        var boundary = new ProcessIoPumpCommandBoundary(
+            session, BuildCatalogue(), Authorize(), Commissioned(), time, Freshness);
+
+        PumpFeedbackRead running = boundary.ReadRunning();
+
+        // Too old to be evidence: the interpreted bit stays false and the record is never usable. Nothing is
+        // ever promoted to current just because it would have been convenient.
+        Assert.False(running.Usable);
+        Assert.False(running.Active);
+        Assert.False(running.RawBit);
+
+        // And the report still says what the input physically was, and why the reading was refused, instead of
+        // borrowing the pressure rule's code for a digital input.
+        Assert.True(running.ObservationRawBit);
+        Assert.DoesNotContain("PRESSURE", running.Code, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "46. A feedback read over a closed session reports the session refusal, not a pressure code")]
+    public void A_Feedback_Read_Over_A_Closed_Session_Reports_The_Session_Refusal()
+    {
+        var time = new FakeTime();
+        var transport = new FakeTransport { Clock = time };
+        var session = new ProcessIoSession(ProcessIoDevices.RackT8, transport);
+
+        var boundary = new ProcessIoPumpCommandBoundary(
+            session, BuildCatalogue(), Authorize(), Commissioned(), time, Freshness);
+
+        PumpFeedbackRead running = boundary.ReadRunning();
+        Assert.False(running.Usable);
+        Assert.Equal(ProcessIoRefusals.SessionNotOpen, running.Code);
+    }
+
     private static Rig Create(PumpLifecycleConfiguration configuration)
     {
         var time = new FakeTime();
@@ -1224,5 +1296,22 @@ public sealed class ProcessIoPumpLifecycleTests
         public override DateTimeOffset GetUtcNow() => _now;
 
         public void Advance(TimeSpan delta) => _now = _now.Add(delta);
+    }
+
+    /// <summary>
+    /// A clock that moves on every read, the way SystemClock moves on a machine. This exists because the frozen
+    /// FakeTime above cannot distinguish "before the read" from "after the read": an ordering mistake inside one
+    /// Step is invisible when every call returns the same instant.
+    /// </summary>
+    private sealed class TickingTime : TimeProvider
+    {
+        private DateTimeOffset _now = new(2026, 11, 10, 0, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            DateTimeOffset value = _now;
+            _now = _now.AddMilliseconds(2);
+            return value;
+        }
     }
 }

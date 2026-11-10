@@ -265,6 +265,18 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   บันไดเดินทางเดียวและ PUMP_READY/terminal state ค้างอยู่เมื่อถึงแล้ว จึงไม่มี rung ไหนหลุดเพราะโพลล์ช้าขึ้น
   (ผลพลอยได้: จำนวน request บน coupler ลดลง ~20 เท่าในช่วง supervision 50 s เดิม)
 
+- **กฎ "instant ที่ใช้ตัดสินต้องถูกจับหลังการอ่าน" (ต้นเหตุจริงที่ปิดไปแล้วบนโต๊ะรอบ `ee69196`)**: `ProcessIoPhysicalObservation.ObservedAt`
+  ถูกประทับ *ข้างใน* `ProcessIoSession.ObserveDigitalInput`/`ObserveAnalogInput` (packages/application/ProcessIo/ProcessIoFoundation.cs:525, :560)
+  ส่วน `ProcessIoEvidenceAcceptance.Accepts(...)` → `IsUsableAt` มีเงื่อนไข `ObservedAt <= now` (packages/contracts/ProcessIoContracts.cs:699-703)
+  เดิม `ProcessIoPumpCommandBoundary` จับ `now` ไว้ *ก่อน* เรียกอ่าน (บรรทัด 447/383) ⇒ `ObservedAt > now` เสมอบนนาฬิกาจริง ⇒ ทุกการอ่านถูกทิ้ง
+  = `Usable=false` ตลอด ⇒ `RUNNING_FEEDBACK_TIMEOUT` + `STOPPED_FEEDBACK_TIMEOUT` + `PHYSICAL_ABORT_REQUIRED` พร้อมกันทั้งที่ `transport_errors=0`
+  ตอนนี้ boundary จับ `now` หลังการอ่านเหมือนที่ equipment boundary ทำ (`ProcessIoEquipmentBoundary.cs:449-450`) และมี test กันถอยหลัง
+  ใช้นาฬิกาที่ก้าวจริงทุกการเรียก (`tests/runtime.tests/ProcessIo/ProcessIoPumpLifecycleTests.cs` — `TickingTime`)
+  **บันทึกไว้ให้เห็นว่าทำไม unit test แบบนาฬิกาแช่แข็ง (`FakeTime.GetUtcNow() => _now`) จึงมองไม่เห็นแผลนี้**: สอง call คืนค่าเท่ากันเสมอ
+- **สถานะแถวใน Catalogue ไม่เกี่ยวกับสาเหตุนี้**: เกตการอ่านคือ `row.SourceClassification == "USED"` (`ProcessIoFoundation.cs:147, :279, :583`)
+  และ `ProcessIoCommissioningState` มีแค่ `EXCLUDED`/`READ_ONLY_CANDIDATE` (`packages/contracts/ProcessIoContracts.cs:91-95`) —
+  `READ_ONLY_CANDIDATE` ไม่ได้บล็อกทั้งอ่านและเขียน (บล็อกเฉพาะ `EXCLUDED`: :203, :586) และแถว DI-004/DI-005 เป็น `USED` ใน CSV จริง
+
 ## 6. Stage D — Integrated cleaning-path cycle (มี 3 variant)
 
 ปิด gate: วงจรทั้งรอบ (select pump → enable → run → AO ramp → supervision → cleanup → release) ควบคู่กับการเปิด/ปิดวาล์วและการเดิน Cleaning Path P1-P6
@@ -301,11 +313,22 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   `CleanupState == COMPLETE`, `!OwnsPumpCommand`, `SafeToReportComplete`, เคยเห็น `PUMP_READY` จริง (`run_reached_ready=True`) และไม่เจอ Fault
   ⇒ ผลข้างเคียงที่ตั้งใจ: **รอบที่ปั๊มไม่ขึ้นจะมี exit=2 + RESULT CHECK** ถ้าเคยเห็น exit=0 ทั้งที่ `terminal_state=RUNNING_FEEDBACK_TIMEOUT`
   นั่นคือบั๊กเก่าที่ถูกปิดไปแล้ว
-- **diagnostic ใหม่ที่แนบมากับ send file (Show เท่านั้น ไม่ใช้ตัดสิน pass/fail)** — `dispatch_summary`, `dispatch` รายคำสั่ง
-  (มี `gap_ms`), `dispatch_window_ms`, `command_dispatches`, `command_dispatch_refusals`, `run_reached_ready`,
-  `run_cleared_dispatch`, `enable_released_dispatch`, `stop_accepted`, `stop_code`, `running_commissioned`, `fault_commissioned`,
-  `running_binding`, `fault_binding`, `last_running_usable`/`_raw_bit`/`_active`/`_code`, `last_fault_usable`/`_raw_bit`/`_active`/`_code`,
+- **diagnostic ที่แนบมากับ send file (Show เท่านั้น ไม่ใช้ตัดสิน pass/fail)** — `dispatch_summary`, `dispatch` รายคำสั่ง
+  (มี `gap_ms`), `dispatch_window_ms`, `dispatch_address_agreement`, `command_dispatches`, `command_dispatch_refusals`,
+  `run_reached_ready`, `run_cleared_dispatch`, `enable_released_dispatch`, `stop_accepted`, `stop_code`,
+  `running_commissioned`, `fault_commissioned`, `running_binding`, `fault_binding`,
+  `last_running_usable`/`_raw_bit`/`_active`/`_code`/`_observation_raw`, `last_fault_usable`/`_raw_bit`/`_active`/`_code`/`_observation_raw`,
   `network_attempts`, `transport_errors`, `transport_error_summary`
+- **แยกให้ออกระหว่างสองบรรทัดที่หน้าตาคล้ายกัน**: `last_running_raw_bit` คือบิต *ที่ตีเป็นหลักฐานแล้ว* (`usable && raw!=0` — ถ้าอ่านไม่ถูกยอมรับจะเป็น False เสมอ
+  ไม่ใช่เพราะบิตต่ำ) ส่วน `last_running_observation_raw` คือบิต *ที่อุปกรณ์ตอบมาจริง* (`PumpFeedbackRead.ObservationRawBit`)
+  ⇒ ถ้า `usable=False` แต่ `observation_raw=True` แปลว่า "อินพุต HIGH อยู่ แต่ระบบยังไม่ยอมรับ record นี้" ซึ่งคนละเรื่องกับ "อินพุต LOW"
+- `last_running_code` / `last_fault_code` ตอนนี้เป็นการส่ง `observation.DiagnosticCode` จริงออกมา (`WJSS_SESSION_NOT_OPEN`,
+  `WJSS_OBSERVATION_REFUSED_UNBOUND`, `WJSS_OBSERVATION_REFUSED_NOT_COMMISSIONED`, `WJSS_OBSERVATION_TRANSPORT_FAULT`,
+  `WJSS_OBSERVATION_STALE`) และถ้าการอ่านสะอาดแต่ acceptance ไม่รับ จะได้ `WJSS_PUMP_FEEDBACK_NOT_ACCEPTED`
+  — เดิมทุกกรณีถูกทับเป็น `WJSS_PUMP_READY_REFUSED_PRESSURE` ซึ่งเป็น code ของกฎแรงดัน ไม่เกี่ยวกับอินพุตดิจิทัล
+- **`coil=` กับ `written=` คนละที่มา and ตอนนี้พิมพ์คู่กัน**: `coil=` มาจากตาราง contract (`PumpCommandContract.TryCoilAddress` → `ProcessIoBindings`)
+  ส่วน `written=` คือ `row.Binding.Address` ที่ session ใช้เขียนจริงผ่าน FC05 (`ProcessIoFoundation.cs:221`) —
+  `dispatch_address_agreement=MATCH_OVER_n` แปลว่าตรงทุกบันทึก, `CHECK(tag contract=x written=y)` แปลวาสองตารางไม่ตรงกัน (ต้องหยุดและส่ง log)
 - **อ่าน diagnostic ยังไง (ไม่ต้องเดา):**
   | ที่เห็น | หมายความว่า |
   | --- | --- |
@@ -423,11 +446,11 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 | A1 + A2 | REAL WAGO ENDPOINT CONNECTIVITY · Pump-ready strict-greater ทั้งสองฝั่งบนสัญญาณจริง | **CLOSED** (A1 0.669 bar ⇒ FALSE, exit 2; A2 15.6047 bar ⇒ TRUE, exit 0, `physical_pump_verified=TRUE`) |
 | B | Pump running/fault polarity commissioned (absent ⇒ NOT_CONFIGURED ⇒ D ถูก refuse) | **CLOSED** (DI-004 0→1 ⇒ `ACTIVE_HIGH`; DI-005 ไม่เปลี่ยน ⇒ `ACTIVE_HIGH` ตาม convention เท่านั้น) |
 | C | IV physical actuation + FC01 read-back | **CLOSED** — field-confirmed ทั้งสองทางด้วย limit switches; `fc01=False` ที่ address 22 อธิบายด้วยกติกา RW mirror +512 (อ่านที่ 534) จึงไม่ใช่ defect |
-| D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — สองรอบแรกที่ `6865f58` ไม่ผ่านบันได (รอบ 1 `RUNNING_FEEDBACK_TIMEOUT` โดย DI-004 ต่ำจริงและ `pump_outlet_pressure_bar=0.8301` ใกล้ค่า static ของ Stage A; รอบ 2 `PHYSICAL_ABORT_REQUIRED` + `cleanup_fault=STOPPED_FEEDBACK_TIMEOUT`) — เป็นเหตุฝั่ง feedback/wiring ไม่ใช่ build; ตัว runner ใหม่ตัดสินด้วย state ที่เห็นจริง + dispatch log และพิมพ์หลักฐานครบแล้ว รอรันซ้ำบน SHA ใหม่ (รอบที่ timeout จะออก exit=2 ตามที่ควรเป็นตั้งแต่แรก) |
+| D-pump | บันไดคำสั่งปั๊มอย่างเดียว โดยไม่มีเส้นทางวาล์วใน process เลย | **OPEN** — ที่ `ee69196` บันไดถูกตัดสินถูกต้องแล้ว (exit=2 + CHECK แทน exit=0 ปลอม) และเจอต้นเหตุจริงชั้น boundary: `now` ที่ใช้ acceptance ถูกจับก่อนการอ่าน ⇒ Usable=false เสมอบนของจริง (แก้พร้อมกันทั้ง ReadFeedback/ReadPumpOutletPressure + test นานาฬิกา ticking) — รอรันซ้ำบน SHA ใหม่เพื่อวัด `last_running_usable` และ `analog_ramp_executed` ด้วยตาตัวเอง; ฝั่งโต๊ะ: `dispatch_window_ms`/`written=` ยังต้องดูจาก out.txt |
 | D-sim | Path จริง + วาล์วจริง บนค่าแรงดันที่ประกาศ (ติดป้าย SOFTWARE_SIMULATED) | **OPEN** — ต้อง build ใหม่แล้วรันบนโต๊ะ |
 | D-dry | integrated dry cycle แบบเปียก (ปั๊มจริง + วาล์วจริง) no-load ครบลูปพร้อม cleanup | **OPEN** — ต้องมี `WJSS_DRY_WET_SEQUENCE_ACK` |
 | E | WSB Upper/Lower reclass + DI read path (FC02 vs FC01) | **CLOSED** สำหรับเส้นทางอ่าน (ยังไม่ทำ per-switch E ตามที่ตกลง) |
 | F | (optional) motion stop behaviour | ยังไม่รัน (optional) |
 
 **ส่งผมทุก stage:** ก้อนข้อความใต้ `--- copy everything below ---` (scrub แล้ว) + log ดิบเฉพาะก้อนที่มี `CHECK` — ห้าม commit ไฟล์ log/ผลลัพธ์เข้า repo เด็ดขาด
-**สถานะ:** A/B/C/E ปิดแล้วที่ `c4898a0` · D ยัง OPEN รอคิว `D-pump` (ซ้ำบน SHA ใหม่ แล้วอ่าน `last_running_*`/`transport_errors` ก่อนแตะ Product code) + `D-sim` (โค้ด C# + tests เพิ่มหลังคอมมิธนั้น ต้อง build ใหม่ก่อน) · PRODUCTION NOT AUTHORIZED · MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง
+**สถานะ:** A/B/C/E ปิดแล้วที่ `c4898a0` (ห้ามรันซ้ำ) · D ยัง OPEN: รัน `D-pump` บน SHA ใหม่แล้วอ่าน `last_running_usable` + `analog_ramp_executed` + `dispatch_address_agreement` ก่อนแตะ Product code อีกครั้ง + `D-sim` (โค้ด C# + tests เพิ่มหลังคอมมิธนั้น ต้อง build ใหม่ก่อน) · PRODUCTION NOT AUTHORIZED · MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง

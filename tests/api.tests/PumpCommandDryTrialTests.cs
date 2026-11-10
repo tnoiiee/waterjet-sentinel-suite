@@ -366,6 +366,7 @@ public sealed class PumpCommandDryTrialTests
             "last_fault_usable=", "last_fault_raw_bit=", "last_fault_active=", "last_fault_code=",
             "running_binding=", "fault_binding=", "running_commissioned=", "fault_commissioned=",
             "network_attempts=", "transport_errors=", "transport_error_summary=", "dispatch_summary=",
+            "last_running_observation_raw=", "last_fault_observation_raw=", "dispatch_address_agreement=",
         })
         {
             Assert.Contains("  " + key, text, StringComparison.Ordinal);

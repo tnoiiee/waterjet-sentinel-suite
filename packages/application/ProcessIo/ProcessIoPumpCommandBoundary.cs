@@ -60,6 +60,14 @@ public sealed record PumpCommandOutcome
 
     /// <summary>True only when the command was admitted and the write returned without a fault.</summary>
     public bool Succeeded => Admitted && Dispatched && !TransportFaulted;
+
+    /// <summary>
+    /// The address the session actually wrote, taken from the catalogue row's binding. It is kept apart from
+    /// <see cref="CoilAddress"/>, which is the address the adopted contract table derives for the tag: the two
+    /// are supposed to agree, and where they do not, a report that prints only one of them hides the fact.
+    /// Null when the tag had no bound catalogue row, because then nothing was written anywhere.
+    /// </summary>
+    public int? BoundAddress { get; init; }
 }
 
 /// <summary>
@@ -106,6 +114,13 @@ public sealed record PumpFeedbackRead
 
     /// <summary>True only for an accepted, current, commissioned reading.</summary>
     public required bool Usable { get; init; }
+
+    /// <summary>
+    /// The bit the device answered, reported as it arrived. <see cref="RawBit"/> is the interpreted bit and is
+    /// false whenever the record was not accepted; this one says what the input physically was even then, so
+    /// "the input is low" and "the reading was unusable" stop looking identical in a field report.
+    /// </summary>
+    public bool ObservationRawBit { get; init; }
 
     public required string Code { get; init; }
     public required int SessionGeneration { get; init; }
@@ -398,7 +413,11 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         ProcessIoPhysicalObservation observation =
             _session.ObserveAnalogInput(PumpCommandContract.PumpOutletPressureTag, row, _time, _freshnessBudget);
 
-        if (!ProcessIoEvidenceAcceptance.Accepts(observation, _session.Generation, at, _freshnessBudget))
+        // The same rule as the feedback read below: acceptance is judged at the instant the answer arrived,
+        // not at the instant the request left. Judged any other way the ladder could never confirm readiness,
+        // because ObservedAt is stamped after this instant by construction.
+        if (!ProcessIoEvidenceAcceptance.Accepts(
+                observation, _session.Generation, _time.GetUtcNow(), _freshnessBudget))
         {
             // A stale sample is reported as stale; anything else is unusable. Neither is ever converted
             // into an invented bar value, and the Pump Inlet row is never substituted.
@@ -466,8 +485,14 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         ProcessIoPhysicalObservation observation =
             _session.ObserveDigitalInput(tag, row, _time, _freshnessBudget);
 
+        // The acceptance instant is taken AFTER the read returned, exactly as the equipment boundary does it
+        // (packages/application/CleaningPath/Composition/ProcessIoEquipmentBoundary.cs:449-450). ObservedAt is
+        // stamped inside the session's own read, so a "now" captured before the request can never satisfy
+        // ObservedAt <= now on a clock that runs: every answer was thrown away for no reason but one, and it
+        // looked like the device had said nothing at all.
+        DateTimeOffset acceptedAt = _time.GetUtcNow();
         bool usable = ProcessIoEvidenceAcceptance.Accepts(
-            observation, _session.Generation, at, _freshnessBudget);
+            observation, _session.Generation, acceptedAt, _freshnessBudget);
         bool rawBit = usable && observation.RawValue != 0;
 
         // An uncommissioned polarity is never interpreted: Active stays false and the code says why.
@@ -482,14 +507,26 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
             RawBit = rawBit,
             Active = active,
             Usable = usable && polarityKnown,
-            Code = usabilityCode(code, usable, polarityKnown),
+            ObservationRawBit = observation.RawValue != 0,
+            Code = usabilityCode(code, usable, polarityKnown, observation.DiagnosticCode),
             SessionGeneration = _session.Generation,
             At = at,
         };
 
-        static string usabilityCode(string granted, bool usable, bool polarityKnown)
+        static string usabilityCode(string granted, bool usable, bool polarityKnown, string observedCode)
         {
-            if (!usable) return PumpCommandRefusals.RefusedPressure;
+            if (!usable)
+            {
+                // The record's own machine reason is already precise: a session that was not open, a row that
+                // is not observable, a binding that is missing, a read that never answered, a sample that
+                // arrived too late. Only when the read itself was clean - so the refusal came from acceptance
+                // and from nothing else - does the refusal need a name here, and the name is the one below.
+                // The pressure rule is a different decision and says nothing about a digital input.
+                return observedCode is "OK" or ""
+                    ? PumpCommandRefusals.RefusedFeedbackNotAccepted
+                    : observedCode;
+            }
+
             return polarityKnown ? granted : PumpFeedbackConfiguration.NotCommissionedCode;
         }
     }
@@ -540,6 +577,7 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
             {
                 Tag = tag,
                 CoilAddress = coilAddress,
+                BoundAddress = row.Binding?.Address,
                 Value = value,
                 Admitted = false,
                 Dispatched = false,
@@ -567,6 +605,7 @@ public sealed class ProcessIoPumpCommandBoundary : IPumpCommandBoundary
         {
             Tag = tag,
             CoilAddress = coilAddress,
+            BoundAddress = row.Binding?.Address,
             Value = value,
             Admitted = true,
             Dispatched = dispatched,

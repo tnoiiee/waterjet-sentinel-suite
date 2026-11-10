@@ -19,7 +19,7 @@
 # SOURCE-AUTHORED IN ARENA. NOT EXECUTED IN ARENA: the Arena sandbox has no PowerShell interpreter, so the
 # gates here are (a) the load-time parser of PowerShell itself, (b) Test-WjssDriver on the Owner's machine.
 
-$script:WjssDriverVersion = '2026-11-18.1'
+$script:WjssDriverVersion = '2026-11-19.1'
 $ErrorActionPreference = 'Stop'
 # A stage never runs on a driver whose own self-test has not passed in THIS window. Test-WjssDriver is
 # the only thing that proves the parser, the verdict matcher and the expectations still agree with each
@@ -218,7 +218,11 @@ function Invoke-WjssStage {
         [int]$ExpectExit = 0,
         [switch]$SkipBuildCheck
     )
-    if ($script:SelfTestPassed -ne $true) {
+    # Checked in both scopes on purpose. The driver is dot-sourced at the prompt, so its script scope IS the
+    # session scope and $script: is the right name here; $global: is read as well so the gate means the same
+    # thing under any host that hands this function a different current script. It is not a way to get around
+    # the self-test: both names are unset until Test-WjssDriver passes in this window.
+    if ($script:SelfTestPassed -ne $true -and $global:SelfTestPassed -ne $true) {
         throw ('STOP: Test-WjssDriver has not passed in this window, so no stage runs. Run: Test-WjssDriver')
     }
     Ensure-WjssDevice
@@ -673,7 +677,7 @@ $script:Stages = @{
             'trial_code'                    = 'PUMP_COMMAND_TRIAL_ACCEPTED'
             'session_state'                 = 'CLOSED'
             'transport_released'            = 'True'
-        }) -Show @('pump_selection', 'pump_analog_target_ma', 'pump_ready_setpoint_bar', 'ladder', 'ladder_complete', 'run_reached_ready', 'dispatch_summary', 'command_dispatches', 'command_dispatch_refusals', 'run_cleared_dispatch', 'enable_released_dispatch', 'stop_accepted', 'stop_code', 'running_commissioned', 'fault_commissioned', 'running_binding', 'fault_binding', 'last_running_usable', 'last_running_raw_bit', 'last_running_active', 'last_running_code', 'last_fault_usable', 'last_fault_raw_bit', 'last_fault_active', 'last_fault_code', 'network_attempts', 'transport_errors', 'transport_error_summary', 'pump_outlet_pressure_bar', 'pump_outlet_pressure_raw', 'pump_outlet_pressure_fresh', 'ai003_evidence_verified', 'ai003_pump_ready_rule', 'valve_open_admitted_by_lifecycle', 'terminal_state', 'cleanup_state', 'primary_failure', 'session_state')
+        }) -Show @('pump_selection', 'pump_analog_target_ma', 'pump_ready_setpoint_bar', 'ladder', 'ladder_complete', 'run_reached_ready', 'dispatch_summary', 'dispatch_window_ms', 'dispatch_address_agreement', 'command_dispatches', 'command_dispatch_refusals', 'run_cleared_dispatch', 'enable_released_dispatch', 'stop_accepted', 'stop_code', 'running_commissioned', 'fault_commissioned', 'running_binding', 'fault_binding', 'last_running_usable', 'last_running_raw_bit', 'last_running_active', 'last_running_code', 'last_running_observation_raw', 'last_fault_usable', 'last_fault_raw_bit', 'last_fault_active', 'last_fault_code', 'last_fault_observation_raw', 'network_attempts', 'transport_errors', 'transport_error_summary', 'pump_outlet_pressure_bar', 'pump_outlet_pressure_raw', 'pump_outlet_pressure_fresh', 'ai003_evidence_verified', 'ai003_pump_ready_rule', 'valve_open_admitted_by_lifecycle', 'terminal_state', 'cleanup_state', 'primary_failure', 'session_state')
     }
     'D-sim' = {
         # Stage D, second variant: the Cleaning Path for real, on a DECLARED Pump Outlet Pressure. The

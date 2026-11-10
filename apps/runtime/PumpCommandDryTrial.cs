@@ -549,6 +549,9 @@ public static class PumpCommandDryTrial
             double gapMs = previousAt is null ? 0d : (outcome.At - previousAt.Value).TotalMilliseconds;
             output.WriteLine("  dispatch=" + outcome.Tag
                 + " coil=" + outcome.CoilAddress.ToString(CultureInfo.InvariantCulture)
+                + " written=" + (outcome.BoundAddress is null
+                    ? "<no bound row>"
+                    : outcome.BoundAddress.Value.ToString(CultureInfo.InvariantCulture))
                 + " value=" + outcome.Value.ToString()
                 + " admission=" + (outcome.Admitted ? "ADMITTED" : "REFUSED")
                 + " dispatch=" + (outcome.Dispatched ? "DISPATCHED" : "NOT_DISPATCHED")
@@ -565,6 +568,22 @@ public static class PumpCommandDryTrial
         output.WriteLine("  dispatch_window_ms=" + (log.Count == 0
             ? "0"
             : (log[log.Count - 1].At - firstAt).TotalMilliseconds.ToString("0.#", CultureInfo.InvariantCulture)));
+
+        // Two tables decide where a command lands: the adopted contract table gives the tag its coil number,
+        // and the catalogue row gives the session the address it writes. They are expected to agree, and this
+        // line says whether they did in this run - a report that printed only one of the two could not tell a
+        // correctly written coil at coil 6 from a write that went somewhere else.
+        List<string> addressChecks = log
+            .Where(o => o.BoundAddress is not null && o.BoundAddress.Value != o.CoilAddress)
+            .Select(o => o.Tag + " contract=" + o.CoilAddress.ToString(CultureInfo.InvariantCulture)
+                + " written=" + o.BoundAddress.Value.ToString(CultureInfo.InvariantCulture))
+            .ToList();
+        int addressCompared = log.Count(o => o.BoundAddress is not null);
+        output.WriteLine("  dispatch_address_agreement=" + (addressChecks.Count != 0
+            ? "CHECK(" + string.Join(",", addressChecks) + ")"
+            : addressCompared == 0
+                ? "NOT_COMPARED_NOTHING_REACHED_A_BINDING"
+                : "MATCH_OVER_" + addressCompared.ToString(CultureInfo.InvariantCulture)));
 
         ReportFeedbackDiagnostics(boundary, catalogue, configuration, output);
         ReportTransportDiagnostics(transport, output);
@@ -674,12 +693,14 @@ public static class PumpCommandDryTrial
         output.WriteLine("  last_running_raw_bit=" + (running.RawBit ? "True" : "False"));
         output.WriteLine("  last_running_active=" + (running.Active ? "True" : "False"));
         output.WriteLine("  last_running_code=" + running.Code);
+        output.WriteLine("  last_running_observation_raw=" + (running.ObservationRawBit ? "True" : "False"));
 
         PumpFeedbackRead fault = boundary.ReadFault();
         output.WriteLine("  last_fault_usable=" + (fault.Usable ? "True" : "False"));
         output.WriteLine("  last_fault_raw_bit=" + (fault.RawBit ? "True" : "False"));
         output.WriteLine("  last_fault_active=" + (fault.Active ? "True" : "False"));
         output.WriteLine("  last_fault_code=" + fault.Code);
+        output.WriteLine("  last_fault_observation_raw=" + (fault.ObservationRawBit ? "True" : "False"));
     }
 
     /// <summary>
