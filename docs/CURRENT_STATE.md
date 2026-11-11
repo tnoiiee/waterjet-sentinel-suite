@@ -1,5 +1,30 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Owner topology ruling — logical-row tier split corrected to rows 1–3 UPPER / rows 4–6 LOWER
+> (2026-11-11; software and generated data only; NO HARDWARE EXECUTED; PRODUCTION NOT
+> AUTHORIZED).** The split carried by `WaterJetTopologyCatalog.RegionForLogicalRow`, its TS mirror
+> `packages/contracts/wjss-contracts-ts/validate.mjs::regionForLogicalRow`, the fixture /
+> migrated-example generators and every derived importer, validator, resolver, runtime invariant
+> and simulator now treat rows 1–3 (`G+2xx`, `G+1xx`, `G`) as UPPER and rows 4–6 (`H`, `I`, `J`)
+> as LOWER — 54 Sensors per tier, three logical rows per wall per tier — superseding, for
+> tier-membership and default-assignment-count authority only, the rows 1–2 / rows 3–6 derivation
+> recorded in the 2026-10-25 and 2026-10-21 entries below without deleting any dated record.
+> Canonical default assignments by physical Sensor wall / tier become 12/15/12/15/15/15/12/12 to
+> WJ1..WJ8 (I7 → WJ5/IV5 and I16 → WJ6/IV6 unchanged); the row-3 Sensors G1–G18 are cleaned by
+> WJ3 / WJ4 / WJ1 / WJ2 by target wall. Unchanged: the canonical Equipment table and its Target
+> Coverage, the Legacy WJ identity column, `cannon n → WJn` direct import, WJn ↔ IVn, the
+> `UNRESOLVED` placement of all eight Water Jets, the WSB / axis allocation, 108 Sensors / 216
+> assigned / 240 physical / 24 spare, the Sensor sequence and coordinates, `sensor-map.example.json`,
+> and every Hardware / Production authorization boundary; the fail-closed
+> `TOPO_TARGET_WALL_CONTRADICTION` import rule is not weakened. `snapshot.seed0.json` and
+> `sensor-parameters.migrated.example.json` were regenerated only through their generator owners
+> (deterministic; all four `--legacy-proof` byte-identity proofs still hold). Validation: Node
+> gates executed in the Agent sandbox (contracts-ts 57/57, Ops Preview 191/191, mapping-config
+> 261/261 with 7 skips, process-io 110/110, commissioning 238/239 — the one failure is the
+> pre-existing K3 documentation-drift assertion recorded as failing identically at its approved
+> base); .NET restore / build / test NOT RUN in the Agent environment (no .NET SDK), so the
+> Owner-local exact-head gate remains the validation of record. NO HARDWARE. NO PRODUCTION.
+
 > **H2 CLOSEOUT — Owner-accepted Modbus simulator function/address bench, with H2 Final Readiness Review (2026-10-31; documentation-only closeout; REAL HARDWARE NOT EXECUTED / NOT VERIFIED).**
 > **Owner decision:** the H2 Modbus Simulator Function/Address Bench is **ACCEPTED AS PASS**. The Modbus simulator at the loopback endpoint `127.0.0.1:502` is the accepted current H2 function/address bench reference. The simulator does **not** implement WAGO output process-image mirroring, and that absence is **not** an H2 failure. Real WAGO process-image mirroring at the Owner-local endpoint `<OWNER_LOCAL_WAGO_T8_ENDPOINT>` is **DEFERRED BY OWNER** and may be executed later; real field-device actuation remains **NOT EXECUTED / NOT VERIFIED**. No additional Product Source change is required for current H2 acceptance, and this closeout changes **documentation only**.
 > **Product head of record:** `5ae783cb7177eb3b629a097a48aa40c508868b2c` (direct parent `edbffae5c2be3853915d9d6b3fc0d1ce34a1b744`; approved base `main` `bfd2867af1dda29fcbc1987328be3d131a189d0a`).

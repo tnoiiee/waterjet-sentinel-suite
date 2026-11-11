@@ -427,7 +427,7 @@ public sealed class PumpCommandDryTrialTests
     [Theory]
     [InlineData(PumpCommandDryTrial.ModePumpOnly)]
     [InlineData(PumpCommandDryTrial.ModeMainValveAndPump)]
-    public void Either_Exact_Selector Chooses_This_Evidence_Class(string supplied)
+    public void Either_Exact_Selector_Chooses_This_Evidence_Class(string supplied)
     {
         var values = new Dictionary<string, string?>(StringComparer.Ordinal)
         {

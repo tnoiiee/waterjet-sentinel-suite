@@ -131,11 +131,15 @@ sequence is exactly, in this order and with no holes, replacement identities or 
   ID** — a direct ordinal reference `cannon n → WJn` (WJ1–WJ8), *not* a grid position, *not* an
   installed wall, and *not* a "nearest or same-wall Water Jet". Assignment follows responsibility
   for the **target** wall and region, so a Rear-lower Sensor (I7 included) is assigned WJ5 even
-  though WJ5 is installed on the Front-lower wall. Canonical default assignment by physical
-  Sensor wall / tier: Right/Upper → WJ1/IV1 (8 Sensors), Front/Upper → WJ2/IV2 (10),
-  Left/Upper → WJ3/IV3 (8), Rear/Upper → WJ4/IV4 (10), Rear/Lower → WJ5/IV5 (20),
-  Front/Lower → WJ6/IV6 (20), Right/Lower → WJ7/IV7 (16), Left/Lower → WJ8/IV8 (16) —
-  108 in total, I7 → WJ5/IV5 and I16 → WJ6/IV6 included.
+  though WJ5 is installed on the Front-lower wall. Tier membership of a logical row follows the
+  Owner topology ruling of 2026-11-11: **rows 1–3 (`G+2xx`, `G+1xx`, `G`) are UPPER and rows 4–6
+  (`H`, `I`, `J`) are LOWER** (54 Sensors per tier; the Water Jet table is unchanged, so the
+  row-3 Sensors are cleaned by the same jets as rows 1 and 2). Canonical default assignment by
+  physical Sensor wall / tier: Right/Upper → WJ1/IV1 (12 Sensors), Front/Upper → WJ2/IV2 (15),
+  Left/Upper → WJ3/IV3 (12), Rear/Upper → WJ4/IV4 (15), Rear/Lower → WJ5/IV5 (15),
+  Front/Lower → WJ6/IV6 (15), Right/Lower → WJ7/IV7 (12), Left/Lower → WJ8/IV8 (12) —
+  108 in total, I7 → WJ5/IV5 and I16 → WJ6/IV6 included. Historical: the pre-ruling rows 1–2 /
+  rows 3–6 split gave 8/10/8/10/20/20/16/16.
 - Wall rows are the logical rows; there is no rotation or reversal. The question of row
   alignment across walls of unequal height is resolved by this matrix.
 - The labels are a logical reference. They do **not** define Modbus addresses, register maps,

@@ -532,6 +532,79 @@ public sealed class CleaningPathDryCompositionTests
         Assert.Contains("_boundary.SetMainValveCloseCoil(", gate, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The importer refusal is the operator's only view of why a CSV was refused, so the importer's own
+    /// detail must be carried verbatim instead of being replaced by a generic sentence. The code stays the
+    /// importer's code with the same fallback, and an absent detail never becomes a fabricated reason.
+    /// </summary>
+    [Fact]
+    public void The_Import_Refusal_Carries_The_Importers_Own_Detail()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+
+        Assert.Contains("string importDetail = import.Refusal?.Detail ?? string.Empty;", text, StringComparison.Ordinal);
+        Assert.Contains("" Importer detail: " + importDetail.Trim()", text, StringComparison.Ordinal);
+        Assert.Contains("importDetail.Trim().Length == 0", text, StringComparison.Ordinal);
+        Assert.Contains("refusalCode = import.Refusal?.Code ?? RefusedSensorParameters;", text, StringComparison.Ordinal);
+
+        // Exactly one place quotes an importer detail: the wrapper is not copied into another refusal path.
+        Assert.Equal(1, Count(text, "Importer detail:"));
+
+        // The refusal stays fail-closed: the detail is appended to the same sentence and the composition
+        // still returns false without any fallback import, any partial Sensor set and any warning promotion.
+        int refusal = text.IndexOf("refusalCode = import.Refusal?.Code ?? RefusedSensorParameters;", StringComparison.Ordinal);
+        string block = text.Substring(refusal, text.IndexOf("sensors = import.Result.Sensors;", StringComparison.Ordinal) - refusal);
+        Assert.Contains("return false;", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("import.Result!", block, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The accepted Owner-local profile and the resolved path must name the same WSB cabinet, and the
+    /// comparison must happen while nothing is open: the four axis letters A/B/C/D are shared by every
+    /// cabinet, so they can never detect a profile that belongs to another controller.
+    /// </summary>
+    [Fact]
+    public void The_Profile_Cabinet_Is_Matched_To_The_Resolved_Cabinet_Before_Any_Session_Exists()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+
+        int check = text.IndexOf(
+            "if (!string.Equals(motionRoot.CabinetId, resolved.CabinetId, StringComparison.Ordinal))",
+            StringComparison.Ordinal);
+        Assert.True(check >= 0, "the composition must compare the profile cabinet with the resolved cabinet");
+        Assert.Equal(1, Count(text, "motionRoot.CabinetId, resolved.CabinetId"));
+
+        int transport = text.IndexOf("new ProcessIoPhysicalTransport(endpoints)", StringComparison.Ordinal);
+        int session = text.IndexOf("new ProcessIoSession(ProcessIoDevices.RackT8, transport)", StringComparison.Ordinal);
+        int lifecycle = text.IndexOf("new ProcessIoPumpLifecycle(pumpBoundary", StringComparison.Ordinal);
+        Assert.True(transport > check, "no transport may exist before the cabinet check");
+        Assert.True(session > check, "no session may exist before the cabinet check");
+        Assert.True(lifecycle > check, "no Pump lifecycle may exist before the cabinet check");
+
+        int refusal = text.IndexOf("refusalCode = RefusedMotionCabinetMismatch;", StringComparison.Ordinal);
+        Assert.True(refusal > check, "the refusal must be typed by the check itself");
+        string block = text.Substring(check, refusal - check);
+        Assert.Contains("motionRoot.Shutdown();", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("Dispose()", block, StringComparison.Ordinal);
+
+        Assert.Contains(
+            "public const string RefusedMotionCabinetMismatch = "
+            + ""DRY_COMPOSITION_REFUSED_MOTION_CABINET_MISMATCH";",
+            text,
+            StringComparison.Ordinal);
+
+        // The identity comes from the accepted profile itself: never a restated literal, never the file
+        // name, and never the built-in simulation profile (which the root refuses for Hardware).
+        string root = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "motion-composition", "MotionCompositionRoot.cs"));
+        Assert.Contains("profile.Profile!.ControllerId", root, StringComparison.Ordinal);
+        Assert.Contains("public string CabinetId => _cabinetId;", root, StringComparison.Ordinal);
+        Assert.Equal(1, Count(root, "root = new MotionCompositionRoot("));
+        Assert.DoesNotContain("CabinetId = Path", root, StringComparison.Ordinal);
+    }
+
     private static int Count(string text, string value)
     {
         int count = 0;

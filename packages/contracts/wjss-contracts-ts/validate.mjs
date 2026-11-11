@@ -78,10 +78,18 @@ export function wallForColumn(col) {
   throw new Error(`bad column ${col}`);
 }
 
-/** Vertical region of a logical row: rows 1-2 (G+2xx, G+1xx) are UPPER; rows 3-6 (G, H, I, J) are LOWER. */
+/**
+ * Vertical region of a logical row: rows 1-3 (G+2xx, G+1xx, G) are UPPER and rows 4-6 (H, I, J)
+ * are LOWER (Owner topology ruling of 2026-11-11, which supersedes the earlier rows 1-2 / rows 3-6
+ * split; the tiers then hold 54 Sensors each). The Water Jet target coverage table below is NOT
+ * changed by that ruling - WJ1-WJ4 still clean the UPPER tier and WJ5-WJ8 the LOWER tier, so the
+ * row-3 Sensors (G1-G18) are cleaned by the same jets as rows 1 and 2. Mirror of
+ * WaterJetTopologyCatalog.RegionForLogicalRow in packages/domain/WaterJetTopologyCatalog.cs; the
+ * two must never drift.
+ */
 export function regionForLogicalRow(row) {
-  if (row === 1 || row === 2) return 'UPPER';
-  if (row >= 3 && row <= 6) return 'LOWER';
+  if (row === 1 || row === 2 || row === 3) return 'UPPER';
+  if (row === 4 || row === 5 || row === 6) return 'LOWER';
   throw new Error(`bad row ${row}`);
 }
 

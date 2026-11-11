@@ -70,17 +70,20 @@ public sealed class MotionCompositionRoot
     private readonly ManualMotionControllerOwner _owner;
     private readonly IManualMotionPort _port;
     private readonly ManualMotionSession _session;
+    private readonly string _cabinetId;
 
     private MotionCompositionRoot(
         ManualMotionControllerOwner owner,
         IManualMotionPort port,
         ManualMotionSession session,
-        string profileCode)
+        string profileCode,
+        string cabinetId)
     {
         _owner = owner;
         _port = port;
         _session = session;
         ProfileCode = profileCode;
+        _cabinetId = cabinetId;
     }
 
     /// <summary>The Application session over the hardware-capable port.</summary>
@@ -91,6 +94,15 @@ public sealed class MotionCompositionRoot
 
     /// <summary>The accepted profile code (a code only; never a value from the Owner-local file).</summary>
     public string ProfileCode { get; }
+
+    /// <summary>
+    /// The cabinet identity the accepted Owner-local profile is bound to, read from the profile itself
+    /// (<see cref="ManualMotionProfile.ControllerId"/>) and never from a file name, a path or a caller's
+    /// claim. The WSB1/WSB2/WSB3/WSB4 cabinets all expose the same four axis letters, so the letters prove
+    /// nothing on their own: this is what lets a caller verify the profile belongs to the cabinet its
+    /// Water Jet is wired to, before any session is created.
+    /// </summary>
+    public string CabinetId => _cabinetId;
 
     /// <summary>True only for the hardware-capable port. A simulated port is never reported as this.</summary>
     public bool HardwareCapable => _port.Mode == ManualMotionPortMode.HardwareCapable;
@@ -178,7 +190,7 @@ public sealed class MotionCompositionRoot
         // 3. The existing port over the existing owner, and the existing session over both.
         var port = new MotionLibraryManualMotionPort(owner);
         var session = new ManualMotionSession(port, profile, clock);
-        root = new MotionCompositionRoot(owner, port, session, profile.Code);
+        root = new MotionCompositionRoot(owner, port, session, profile.Code, profile.Profile!.ControllerId);
         refusalCode = CompositionComposed;
         return true;
     }

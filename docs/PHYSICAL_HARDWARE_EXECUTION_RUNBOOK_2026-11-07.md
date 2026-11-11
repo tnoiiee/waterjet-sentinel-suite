@@ -388,6 +388,14 @@ copy ข้อความ error ทั้งก้อน (บรรทัดแ
   คือ "lifecycle อนุญาตให้เปิดวาล์ว IV หรือยัง" ไม่ใช่หลักฐานว่า Main Valve เปิด จึงไม่เอามาแทนกัน
 - exit ที่ยอมรับ: `0` เท่านั้น (2 = ปฏิเสธที่วาล์วหรือล้มกลางบันได, 3 = supervision หมดเวลา, 4 = ปฏิเสธก่อนแตะอุปกรณ์
   รวมถึง `DRY_COMPOSITION_REFUSED_MAIN_VALVE_CONFIGURATION` เมื่อขาด timeout สองตัว)
+- **แยก 2 กับ 4 ให้ออก (ใช้ได้กับทุก variant):** ตัวเลขมาจากคนละชั้น — `4` คือ option/env ที่ trial อ่านเองไม่ผ่าน
+  (`PumpCommandDryTrial.TryReadMode` etc.) ส่วน `2` คือ composition ล้มก่อนที่ trial จะเริ่ม ซึ่งเกิดได้กับ
+  `D-sim` / `D-dry` เท่านั้น เพราะสอง stage นี้ compose ผ่าน `CleaningPathDryComposition` (กลุ่มนี้รวมถึง
+  `DRY_COMPOSITION_REFUSED_SENSOR_PARAMETERS`, code ที่ importer คืนมาเอง เช่น `TOPO_TARGET_WALL_CONTRADICTION`,
+  `_SENSOR_ID`, `_RESOLUTION`, `_CATALOGUE`, `_THRESHOLDS`, `_SUPERVISION_WINDOW`, `_MOTION`,
+  `_MOTION_NOT_HARDWARE_CAPABLE` และ `_MOTION_CABINET_MISMATCH` ที่เพิ่มตาม ruling 2026-11-11)
+  เห็น `exit=2` ให้หาบรรทัด `WJSS dry composition refused [CODE]: detail` ใน out.txt แล้วแก้ที่ input ของโต๊ะ
+  (CSV / store / env) ไม่ใช่แก้ที่โค้ด และห้ามตีความ exit 2 ว่าเป็นความผิดของวาล์ว
 - **เวลาเดินทางจริงของวาล์ว (วัดที่โต๊ะ 2026-11-11, HEAD `16f78bc`):** เปิด CLOSED→OPEN ใช้ `30399.395 ms`,
   ปิด OPEN→CLOSED ใช้ `29609.902 ms` ⇒ ค่า 30000 ที่คิดตอนออกแบบ **แคบกว่าของจริงประมาณ 0.4 วินาที**
   ถ้าค่านี้อยู่กับที่ stage จะ ABORT แบบ fail-closed ทั้งที่วาล์วทำงานปกติ ตัวขับจึงตั้งเป็น **45000** (เผื่อ 1.48 เท่า
@@ -458,6 +466,25 @@ patch โปรไฟล์ในหน่วยความจำ (ยังไ
   ให้รัน `D-pump` (บันไดปั๊มจริง, ไม่ต้องมี store/CSV/motion เลย) + `C-iv1` (วาล์วจริงบนค่า AI-003 ที่ประกาศ) ซึ่งคู่นี้ปิด
   gate คนละครึ่งพอดี และการเดิน P1-P6 ค้างไว้จนกว่าจะต่อ motion ครบ (นี่คือขอบเขตจริงของ Product ไม่ใช่ข้อจำกัดของสคริปต์)
 - refusal ที่เกี่ยวข้อง: `DRY_COMPOSITION_REFUSED_SIMULATED_PUMP_SELECTOR` / `_BAR` / `_ATTESTATION` — แก้ที่ input ไม่ใช่ที่โค้ด
+- **บรรทัด refusal มีเหตุผลของ importer ต่อท้ายแล้ว (เพิ่มตาม ruling 2026-11-11):** ถ้า CSV ถูกปฏิเสธ out.txt จะขึ้นเป็น
+  `WJSS dry composition refused [TOPO_TARGET_WALL_CONTRADICTION]: ... Importer detail: record 'SYN-REC-0xx'`
+  ` (logical G5, REAR UPPER) maps to 'WJ5' whose target is REAR LOWER.` ข้อความหลัง `Importer detail:` คือ text ที่
+  Product เขียนไว้เอง (ไม่ได้เดา ไม่ได้ read-back จากอุปกรณ์) ใช้ชี้แถวที่ผิดใน CSV ได้ทันทีโดยไม่ต้อง debug; ถ้า
+  importer ไม่แนบ detail มาจะไม่มีประโยคนี้ต่อท้าย (ไม่มีการเติมข้อความปลอม) และ code ในวงเล็บเป็น code ของ
+  importer เสมอ ตัวขับยังนับเคสนี้เป็น `exit=2` เหมือนเดิม
+- **การตี tier ของ logical row เปลี่ยนตาม Owner ruling 2026-11-11 (โค้ด + fixture + example ตรงกันแล้ว):**
+  แถว 1-3 (`G+2xx`, `G+1xx`, `G`) = UPPER และแถว 4-6 (`H`, `I`, `J`) = LOWER (เดิม 1-2 / 3-6) ตาราง WJ ไม่เปลี่ยน
+  (WJ1-4 ฉีด UPPER, WJ5-8 ฉีด LOWER, จากฝั่งตรงข้ามของ tier เดิม) ดังนั้น `cannon` ของแถว `G` ใน CSV ต้องเป็น
+  G1-G4 = 3, G5-G9 = 4, G10-G13 = 1, G14-G18 = 2 (IV ตาม WJ: IV3 / IV4 / IV1 / IV2) ส่วนแถว H/I/J คง WJ5-WJ8
+  per-WJ count ตอนนี้คือ 12/15/12/15/15/15/12/12 (รวม 108, I7 ยังเป็น WJ5/IV5 และ I16 เป็น WJ6/IV6) ถ้ายังเจอ
+  `TOPO_TARGET_WALL_CONTRADICTION` บน HEAD ที่มี ruling นี้แล้ว แปลว่าแถว `G` ใน CSV ยังใส่ cannon เก่า —
+  แก้ที่ CSV ห้ามผ่อนปรนตัวตรวจในโค้ด
+- **profile motion ต้องเป็นของ cabinet ที่ path นั้นอยู่จริง (refusal ใหม่ `DRY_COMPOSITION_REFUSED_MOTION_CABINET_MISMATCH`):**
+  ไฟล์ที่ชี้ด้วย `WJSS_MANUAL_MOTION_PROFILE` ต้องเป็นของ WSB1 ซึ่งเป็น cabinet ของ WJ1/WJ2 บนโต๊ะนี้ Product อ่าน
+  cabinet identity จาก profile ที่รับเข้ามาจริง แล้วเทียบกับ cabinet ที่ resolver ได้จาก canonical motion bindings
+  ก่อนสร้าง transport / session / Pump lifecycle เลย ⇒ `exit=2` + `motionRoot.Shutdown()` แล้วจบ (ไม่ map axis ซ้ำ
+  ไม่ยิงคำสั่งไป controller ตัวอื่น ไม่ทิ้ง session ให้ค้าง) และเพราะ A/B/C/D เป็นชื่อเดียวกันทุก cabinet การดูแค่
+  ตัวอักษร axis จึงยืนยันอะไรไม่ได้ นี่คือเหตุผลที่มี gate นี้
 
 ### ข้อ 6.3 — variant สี่: `D-dry` = ปั๊มจริง + วาล์วจริง (โหมดเปียก ต้อง ack แยก)
 
@@ -530,6 +557,8 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 | `PUMP_READY_REFUSED_AT_OR_BELOW_SETPOINT` ที่ A2 | แรงดันจริง ≤ 15 bar | รอปั๊มขึ้นแล้วซ้ำ (ไม่ผิด) |
 | `*_REFUSED_READ_ONLY_CONSENT` / `_CONSENT_MISSING` | phrase ไม่ตรง exact | พิมพ์ใหม่จาก constant (อย่า copy จากแชท/doc) |
 | `IV_TRIAL_REFUSED_*_NOT_FIELD_CONFIRMED` / `CONTRADICTORY` | สั่งงานแล้ว feedback ขัดกัน | หยุด — fail-closed ทำงาน |
+| `exit=2` + `[TOPO_TARGET_WALL_CONTRADICTION]` | แถวใน CSV ระบุ tier/wall ขัดกับ WJ ที่อ้าง (ดู `Importer detail:` ว่าแถวไหน) | แก้ `cannon` ของแถว `G` ให้เป็น 3/4/1/2 ตาม ruling 2026-11-11 แล้วรันบล็อกเดิมซ้ำ — ห้ามแก้โค้ดเพื่อผ่าน |
+| `exit=2` + `[DRY_COMPOSITION_REFUSED_MOTION_CABINET_MISMATCH]` | profile motion ที่โหลดเป็นคนละ cabinet กับที่ path ของ sensor นั้นอยู่ | เปลี่ยน `WJSS_MANUAL_MOTION_PROFILE` ไปไฟล์ของ WSB1 (โต๊ะนี้) แล้วส่ง log กลับ ถ้าคิดว่า binding ผิดให้หยุดส่งผมก่อน |
 | poller `READ FAILED - connect timed out` | IP/ firewall / ไม่ได้เสียบสาย | ตรวจ network แล้วรันบล็อกอ่านบิตซ้ำ เช่น `& "$script:Ev\stage-B-off.ps1"` (อ่านอย่างเดียว ปลอดภัย) |
 
 ## 11. สรุปว่า stage ไหนปิด gate อะไร (ใช้ตอนผมอัปเดต register)

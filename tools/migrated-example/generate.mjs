@@ -14,7 +14,10 @@
 // (2026-10-25): the equipment rows
 // and every Sensor assignment come from the canonical table in
 // tools/fixture-generator/generate.mjs (WJ1-WJ4 clean the UPPER tier, WJ5-WJ8 the LOWER;
-// fine-grained placement UNRESOLVED with no anchors for all eight Water Jets), while
+// fine-grained placement UNRESOLVED with no anchors for all eight Water Jets). The row-to-tier
+// split follows the Owner topology ruling of 2026-11-11 (rows 1-3 UPPER, rows 4-6 LOWER), so the
+// row-3 Sensors G1-G18 are cleaned by WJ3/WJ4/WJ1/WJ2 by target wall, while H/I/J stay with
+// WJ5-WJ8; the superseded split is frozen in the generator for the `--legacy-proof` modes only, while
 // `--legacy-proof` still rebuilds the superseded 106-Sensor form over the frozen
 // historical table and must be byte-identical to the file committed at PR #21 commit
 // 7dc7c691 (port proof). The current form is never hand-edited.
@@ -83,7 +86,7 @@ export function buildMigratedExample(profile) {
     if (isGap) continue;
 
     scanOrder += 1;
-    const region = regionForLogicalRow(logicalRow);
+    const region = regionForLogicalRow(logicalRow, profile.fixtureProfile.serialization === 'legacy106');
     const assigned = jets.filter((w) => w.targetWall === wall && w.targetRegion === region);
     if (assigned.length !== 1) throw new Error(`no single Water Jet targets ${wall}/${region}`);
     const lower = 15 + (scanOrder % 10);

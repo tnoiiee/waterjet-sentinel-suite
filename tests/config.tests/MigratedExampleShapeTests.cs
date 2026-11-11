@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Wjss.Config.Examples.Tests; // ConfigTestPaths — shared repository-root discovery
 using Wjss.Contracts;
+using Wjss.Domain;
 using Xunit;
 
 namespace Wjss.Config.Tests;
@@ -119,7 +120,11 @@ public sealed class MigratedExampleShapeTests
         foreach (var sensor in JsonNodeExtensions.RequireArray(node, "sensors"))
         {
             var logicalRow = JsonNodeExtensions.RequireInt(sensor, "logicalRow");
-            var region = logicalRow <= 2 ? "UPPER" : "LOWER";
+            // The tier is never restated in this test: the row-to-region split has exactly one
+            // implementation, and reading it here is what keeps the example, the importer and the
+            // validator from drifting apart when the Owner ruling changes it (rows 1–3 UPPER /
+            // rows 4–6 LOWER since the Owner topology ruling of 2026-11-11).
+            var region = WaterJetTopologyCatalog.RegionForLogicalRow(logicalRow).ToString();
             var wall = JsonNodeExtensions.RequireString(sensor, "wall");
             // Canonical Target Coverage (Owner-approved canonical Equipment topology
             // adoption, 2026-10-25): WJ1-WJ4 clean the

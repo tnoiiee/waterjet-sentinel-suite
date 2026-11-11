@@ -182,6 +182,14 @@ public sealed class CleaningPathDryComposition : IDisposable
     public const string RefusedSupervision = "DRY_COMPOSITION_REFUSED_SUPERVISION_WINDOW";
     public const string RefusedMotion = "DRY_COMPOSITION_REFUSED_MOTION";
     public const string RefusedMotionNotHardwareCapable = "DRY_COMPOSITION_REFUSED_MOTION_NOT_HARDWARE_CAPABLE";
+
+    /// <summary>
+    /// The accepted Owner-local motion profile is bound to a different WSB cabinet than the one the
+    /// resolved Sensor's Water Jet is wired to. Every cabinet exposes the same four axis letters, so the
+    /// letters alone cannot prove the binding and a wrong profile would otherwise move the wrong
+    /// controller's axes. Refused before any Process-Io transport, session or lifecycle is created.
+    /// </summary>
+    public const string RefusedMotionCabinetMismatch = "DRY_COMPOSITION_REFUSED_MOTION_CABINET_MISMATCH";
     public const string RefusedPumpConfiguration = "DRY_COMPOSITION_REFUSED_PUMP_CONFIGURATION";
 
     /// <summary>
@@ -472,9 +480,18 @@ public sealed class CleaningPathDryComposition : IDisposable
             if (!import.Accepted || import.Result is null)
             {
                 refusalCode = import.Refusal?.Code ?? RefusedSensorParameters;
+                // The importer's own detail is carried verbatim into the reported refusal. It names the
+                // legacy record, the logical Sensor and the wall / region pair that contradicts the
+                // assigned Water Jet — which is exactly what the Owner needs to correct the CSV without a
+                // debugger. Nothing is inferred here: the text is quoted from the outcome, it is only
+                // trimmed so the reported line stays single-spaced, and an absent detail adds nothing.
+                string importDetail = import.Refusal?.Detail ?? string.Empty;
                 refusalDetail =
                     "The Owner-local sensor-parameter CSV was refused, so no Sensor-owned path can be "
-                    + "resolved and no P1 through P6 point can be attributed.";
+                    + "resolved and no P1 through P6 point can be attributed."
+                    + (importDetail.Trim().Length == 0
+                        ? string.Empty
+                        : " Importer detail: " + importDetail.Trim());
                 return false;
             }
 
@@ -619,6 +636,26 @@ public sealed class CleaningPathDryComposition : IDisposable
             refusalDetail =
                 "The composed motion port did not report itself hardware-capable. A simulated port is "
                 + "never accepted as the motion authority of a dry Hardware composition.";
+            return false;
+        }
+
+        // 8b. The profile the operator pointed this run at must be the profile of the cabinet the resolved
+        //     Sensor's Water Jet is wired to. The resolver takes the cabinet from the canonical motion
+        //     bindings; the composition root takes it from the accepted Owner-local profile itself. Neither
+        //     side is inferred or defaulted here, and the four axis letters are deliberately not consulted:
+        //     WSB1, WSB2, WSB3 and WSB4 all use A/B/C/D, so letters alone cannot detect a profile that
+        //     belongs to another cabinet. This runs before the transport, the session, the equipment
+        //     boundary, the Pump lifecycle and the valve gate exist, so the refusal leaves nothing to unwind
+        //     beyond the motion root, which is shut down; no axis is ever remapped onto another controller.
+        if (!string.Equals(motionRoot.CabinetId, resolved.CabinetId, StringComparison.Ordinal))
+        {
+            motionRoot.Shutdown();
+            refusalCode = RefusedMotionCabinetMismatch;
+            refusalDetail =
+                "The loaded Owner-local motion profile is bound to cabinet '" + motionRoot.CabinetId
+                + "' while the resolved path of Sensor '" + resolved.SensorId + "' belongs to cabinet '"
+                + resolved.CabinetId + "'. No session is created, no axis is remapped and no controller is "
+                + "contacted.";
             return false;
         }
 

@@ -235,14 +235,16 @@ public sealed class SensorParameterMigrationTests
     }
 
     [Fact]
-    public void Canonical_Default_Assignment_Counts_Per_WaterJet_Are_8_10_8_10_20_20_16_16()
+    public void Canonical_Default_Assignment_Counts_Per_WaterJet_Are_12_15_12_15_15_15_12_12()
     {
         var result = AcceptedResult(SyntheticSensorParameterCsv.Build());
 
-        // Canonical zone populations by physical Sensor wall / tier: Right/Upper 8,
-        // Front/Upper 10, Left/Upper 8, Rear/Upper 10, Rear/Lower 20, Front/Lower 20,
-        // Right/Lower 16, Left/Lower 16 — assigned to WJ1..WJ8 respectively (IVn paired).
-        var expectedCounts = new[] { 8, 10, 8, 10, 20, 20, 16, 16 };
+        // Canonical zone populations by physical Sensor wall / tier under the Owner topology
+        // ruling of 2026-11-11 (rows 1–3 UPPER / rows 4–6 LOWER, three logical rows per tier):
+        // Right/Upper 12, Front/Upper 15, Left/Upper 12, Rear/Upper 15, Rear/Lower 15,
+        // Front/Lower 15, Right/Lower 12, Left/Lower 12 — assigned to WJ1..WJ8 respectively
+        // (IVn paired). The superseded rows 1–2 / 3–6 split gave 8/10/8/10/20/20/16/16.
+        var expectedCounts = new[] { 12, 15, 12, 15, 15, 15, 12, 12 };
         for (var n = 1; n <= 8; n++)
         {
             Assert.Equal(

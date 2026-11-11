@@ -13,6 +13,51 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-11 — Owner topology ruling: logical-row tier split rows 1–3 UPPER / rows 4–6 LOWER (software/data only; NO HARDWARE EXECUTED, no hardware authorization)
+
+**Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN, MERGE HOLD); .NET RESTORE / BUILD / TEST NOT RUN — no .NET SDK exists in the Agent environment, so the Owner-local gate on the exact head (locked restore, Release build, full test matrix, C# `FixtureParityTests`) remains the validation of record. Node gates EXECUTED in the Agent sandbox: contracts-ts 57/57 PASS, Ops Preview 191/191 PASS, mapping-config (package) 261 PASS / 7 pre-existing skips, apps/mapping-config 82/82 PASS, process-io 110/110 PASS, commissioning 238/239 with the single pre-existing `H: the current-facing records …` K3 documentation-drift failure recorded as failing identically at its approved base. NO HARDWARE. NO PHYSICAL OR MODBUS COMMAND. NO Stage D re-run. PRODUCTION NOT AUTHORIZED.**
+
+- **Owner ruling (2026-11-11).** The tier membership of a logical row is **rows 1–3 (`G+2xx`,
+  `G+1xx`, `G`) UPPER and rows 4–6 (`H`, `I`, `J`) LOWER**, superseding the rows 1–2 / rows 3–6
+  derivation that the code and the generated data carried until now. Each tier therefore holds 54
+  Sensors and three of the six logical rows per wall. The ruling changes ONLY the row-to-tier
+  split: the canonical Equipment table (WJ1–WJ4 UPPER / WJ5–WJ8 LOWER, each targeting the opposite
+  wall in the same tier), the Legacy WJ identity column, `cannon n → WJn` direct import, the
+  WJn ↔ IVn pairing, the `UNRESOLVED` fine-grained placement of all eight Water Jets, the WSB /
+  axis allocation, the 108 / 216 / 240 / 24 baseline, the Sensor sequence and coordinates, and
+  every authorization boundary are unchanged. Canonical Target Coverage remains the default
+  assignment, never a permanent restriction.
+- **Changed:** `packages/domain/WaterJetTopologyCatalog.cs::RegionForLogicalRow`
+  (`1 or 2 or 3 => Region.UPPER`, `4 or 5 or 6 => Region.LOWER`) with its XML doc; the
+  `Region` doc in `packages/contracts/Topology.cs` (now naming the single implementation and
+  forbidding restatements); the TS mirror
+  `packages/contracts/wjss-contracts-ts/validate.mjs::regionForLogicalRow`; the generator split in
+  `tools/fixture-generator/generate.mjs` (profile-aware, with the pre-ruling split frozen for
+  `--legacy-proof` byte-identity only) and its use in `tools/migrated-example/generate.mjs`; the
+  pinned per-Water-Jet counts and test name in
+  `tests/config.tests/SensorParameterMigrationTests.cs::Canonical_Default_Assignment_Counts_Per_WaterJet_Are_12_15_12_15_15_15_12_12`
+  and in `packages/contracts/wjss-contracts-ts/test/validate.test.mjs`; current-authority
+  documentation (`docs/REQUIREMENTS.md` PHY-001, `docs/DOMAIN_MODEL.md` §2.2.1,
+  `config/examples/README.md`, ADR-0017 addendum of 2026-11-11) plus a labelled supersession note
+  on the dated `docs/STAGE_0.3A-3_CHECKPOINT_A.md` derivation. No importer, validator, resolver,
+  runtime-invariant or simulator rule was touched: every one of them derives the region from the
+  single catalogue function.
+- **Regenerated (through the generator owners only, never hand-edited):**
+  `packages/contracts/fixtures/snapshot.seed0.json` and
+  `config/examples/sensor-parameters.migrated.example.json` — 36 lines each, exactly the 18
+  row-3 Sensors re-pointed from WJ5–WJ8 to the UPPER-tier jets by target wall (G1–G4 → WJ3/IV3,
+  G5–G9 → WJ4/IV4, G10–G13 → WJ1/IV1, G14–G18 → WJ2/IV2); per-Water-Jet counts become
+  12/15/12/15/15/15/12/12 (108 total) and `warnings: []` is unchanged. `delta.basic.json`
+  (row-1 Sensors only) and `sensor-map.example.json` (no region field) are byte-identical. All
+  four `--legacy-proof` modes are byte-identical to their pre-change outputs and second runs of
+  every generator are byte-identical (determinism proven in the Agent sandbox).
+- **Bench consequence (Owner-local, recorded not verified here):** with the split corrected, the
+  Owner's `sensorparam.csv` imports when its row-3 `cannon` values are 3 / 4 / 1 / 2 for
+  G1–G4 / G5–G9 / G10–G13 / G14–G18 (LEFT / REAR / RIGHT / FRONT target walls) and rows 4–6 stay
+  on WJ5–WJ8. `TOPO_TARGET_WALL_CONTRADICTION` therefore clears by the ruling, not by weakening
+  the import check: the wall half was already satisfied and the region half now matches the
+  physical layout. The refusal rule itself is untouched and still fail-closed.
+
 ### 2026-10-25 — Owner-approved canonical Equipment topology adoption + H1 synthetic route repair (software/data only; no hardware authorization)
 
 **Status: SOURCE-AUTHORED ON PR #41 (`arena/7968e33e-waterjet-sentinel-suite`); .NET RESTORE/BUILD/TEST NOT RUN (no .NET SDK in

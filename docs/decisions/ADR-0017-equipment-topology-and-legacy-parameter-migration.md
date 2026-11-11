@@ -1,5 +1,23 @@
 # ADR-0017 — Equipment Topology Decision and Legacy Parameter Migration Specification
 
+> **Addendum — Owner topology ruling on the logical-row tier split (Owner decision, 2026-11-11).**
+> This addendum is the current decision record for the tier membership of a logical row. It
+> supersedes the pre-ruling derivation used by the 2026-10-25 addendum below (rows 1–2 UPPER /
+> rows 3–6 LOWER) with **rows 1–3 (`G+2xx`, `G+1xx`, `G`) UPPER and rows 4–6 (`H`, `I`, `J`)
+> LOWER** — three of the six logical rows per tier, 54 Sensors per tier. Nothing else changes:
+> the canonical installed topology, the Target Coverage of every Water Jet (WJ1–WJ4 UPPER,
+> WJ5–WJ8 LOWER, each from the opposite wall in the same tier), the Legacy WJ identity column,
+> `cannon n → WJn` direct import, the WJn ↔ IVn pairing, the `UNRESOLVED` fine-grained placement
+> of all eight Water Jets, the WSB / axis allocation and the dated identity tokens are unchanged;
+> the canonical Sensor sequence, coordinates and wall populations are unchanged. Canonical default
+> assignments by physical Sensor wall / tier become 12/15/12/15/15/15/12/12 to WJ1..WJ8 (I7 →
+> WJ5/IV5 and I16 → WJ6/IV6 unchanged). The single implementation of the split is
+> `WaterJetTopologyCatalog.RegionForLogicalRow`, mirrored by
+> `packages/contracts/wjss-contracts-ts/validate.mjs::regionForLogicalRow` and by the fixture /
+> migrated-example generators; the pre-ruling split survives only as frozen `--legacy-proof`
+> proof data and is never Product authority. The 2026-10-25 count statement
+> (8/10/8/10/20/20/16/16) is retained below as its dated record. NO HARDWARE. NO PRODUCTION.
+
 > **Addendum — Owner-approved canonical Equipment topology adoption (Owner decision, 2026-10-25).**
 > This addendum is the current decision record for equipment topology. Canonical table: WJ1
 > (Legacy identity WJ2) IV1, installed LEFT/UPPER, Target Coverage RIGHT/UPPER, WSB1, axes A/B;
