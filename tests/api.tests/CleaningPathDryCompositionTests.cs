@@ -544,7 +544,9 @@ public sealed class CleaningPathDryCompositionTests
             Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
 
         Assert.Contains("string importDetail = import.Refusal?.Detail ?? string.Empty;", text, StringComparison.Ordinal);
-        Assert.Contains("" Importer detail: " + importDetail.Trim()", text, StringComparison.Ordinal);
+        // The composition source spells the appended clause with a quote on each side of the label, so the
+        // pattern is written here as a verbatim literal: doubled quotes, and no escape character to lose.
+        Assert.Contains(@""" Importer detail: "" + importDetail.Trim()", text, StringComparison.Ordinal);
         Assert.Contains("importDetail.Trim().Length == 0", text, StringComparison.Ordinal);
         Assert.Contains("refusalCode = import.Refusal?.Code ?? RefusedSensorParameters;", text, StringComparison.Ordinal);
 
@@ -590,8 +592,7 @@ public sealed class CleaningPathDryCompositionTests
         Assert.DoesNotContain("Dispose()", block, StringComparison.Ordinal);
 
         Assert.Contains(
-            "public const string RefusedMotionCabinetMismatch = "
-            + ""DRY_COMPOSITION_REFUSED_MOTION_CABINET_MISMATCH";",
+            @"public const string RefusedMotionCabinetMismatch = ""DRY_COMPOSITION_REFUSED_MOTION_CABINET_MISMATCH"";",
             text,
             StringComparison.Ordinal);
 
