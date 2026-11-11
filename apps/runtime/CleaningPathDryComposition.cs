@@ -818,6 +818,16 @@ public sealed class CleaningPathDryComposition : IDisposable
     ///
     /// It is bounded: it gives up with a typed code rather than spinning, and it reports the exact
     /// stage that failed. Nothing is retried, nothing is reconnected and no Stop is skipped.
+    ///
+    /// Every window here is paced by <see cref="PumpDriveIntervalMilliseconds"/> and each step drives at
+    /// most one port call, so a step budget is a real wall-clock window: the bounded Home timeout, the
+    /// brake settle and the observation cadence that a session measures against the injected clock could
+    /// never elapse inside an un-slept spin, and an axis would be refused for a window that never lasted.
+    ///
+    /// The Home of both resolved axes is requested only once the session can observe each axis from a
+    /// fresh status word, because that is the condition under which a Home is accepted rather than
+    /// refused. A refusal is reported with the session's own per-axis outcome codes: nothing about a
+    /// refusal stays silent.
     /// </summary>
     public bool Prepare(int maximumSteps, out string code, out string detail)
     {
@@ -837,6 +847,8 @@ public sealed class CleaningPathDryComposition : IDisposable
             {
                 break;
             }
+
+            Thread.Sleep(PumpDriveIntervalMilliseconds);
         }
 
         if (!_motion.SessionReady)
@@ -846,7 +858,8 @@ public sealed class CleaningPathDryComposition : IDisposable
                 : "DRY_PREPARE_REFUSED_PORT_NOT_READY";
             detail =
                 "The motion port did not reach the ready state within the bounded prepare window. No "
-                + "path is started and no valve is commanded.";
+                + "path is started and no valve is commanded."
+                + PrepareRefusalDiagnostic();
             return false;
         }
 
@@ -867,6 +880,41 @@ public sealed class CleaningPathDryComposition : IDisposable
             return false;
         }
 
+        // A Home is accepted only when the session can prove the axis is standing still from a fresh
+        // status observation, and the step that opened the port published no observation at all: asking
+        // before that first read is refused OBSERVATION_NOT_FRESH by the session itself. So this window
+        // reads both resolved axes first. Nothing is assumed to be visible that was not read: an axis
+        // the session cannot observe stays unhomed, and the refusal carries what the session did see.
+        for (int step = 0; step < maximumSteps; step += 1)
+        {
+            if (_motion.SessionFaulted)
+            {
+                code = "DRY_PREPARE_REFUSED_MOTION_FAULTED";
+                detail = "The motion session faulted while the resolved axes were being observed before Home."
+                    + PrepareRefusalDiagnostic();
+                return false;
+            }
+
+            if (BothResolvedAxesObserved(_motionRoot.Session.Snapshot, horizontalAxis, verticalAxis))
+            {
+                break;
+            }
+
+            _motion.Step();
+            Thread.Sleep(PumpDriveIntervalMilliseconds);
+        }
+
+        if (!BothResolvedAxesObserved(_motionRoot.Session.Snapshot, horizontalAxis, verticalAxis))
+        {
+            code = "DRY_PREPARE_REFUSED_NO_OBSERVATION";
+            detail =
+                "Neither resolved axis produced a fresh status observation within the bounded prepare "
+                + "window, so no axis can be proven stationary and no Home is requested. The path is not "
+                + "started, no point is attributed and no valve is commanded."
+                + PrepareRefusalDiagnostic();
+            return false;
+        }
+
         _motionRoot.Session.RequestHome(horizontalAxis);
         _motionRoot.Session.RequestHome(verticalAxis);
 
@@ -876,7 +924,8 @@ public sealed class CleaningPathDryComposition : IDisposable
             if (_motion.SessionFaulted)
             {
                 code = "DRY_PREPARE_REFUSED_MOTION_FAULTED";
-                detail = "The motion session faulted while homing the resolved axes.";
+                detail = "The motion session faulted while homing the resolved axes."
+                    + PrepareRefusalDiagnostic();
                 return false;
             }
 
@@ -887,13 +936,117 @@ public sealed class CleaningPathDryComposition : IDisposable
                 detail = "The motion session is ready and both resolved axes are move-ready.";
                 return true;
             }
+
+            // The sleep follows the ready check: a successful prepare is reported the moment the session
+            // published move-ready, because the start gate reads the same freshness that was just seen.
+            Thread.Sleep(PumpDriveIntervalMilliseconds);
         }
 
         code = "DRY_PREPARE_REFUSED_NOT_MOVE_READY";
         detail =
             "Both resolved axes did not reach move-ready within the bounded prepare window. The path is "
-            + "not started, no point is attributed and no valve is commanded.";
+            + "not started, no point is attributed and no valve is commanded."
+            + PrepareRefusalDiagnostic();
         return false;
+    }
+
+    /// <summary>
+    /// True when the session can decide the motion state of both resolved axes, that is when each one
+    /// carries a fresh status observation in the published snapshot. This is exactly the condition the
+    /// session itself applies before it accepts a Home, and it is read, never assumed.
+    /// </summary>
+    private static bool BothResolvedAxesObserved(
+        ManualMotionSnapshot snapshot, ManualMotionAxis horizontalAxis, ManualMotionAxis verticalAxis) =>
+        StatusObservedFor(snapshot, horizontalAxis) && StatusObservedFor(snapshot, verticalAxis);
+
+    /// <summary>True when this axis carries a fresh status observation in this snapshot.</summary>
+    private static bool StatusObservedFor(ManualMotionSnapshot snapshot, ManualMotionAxis axis)
+    {
+        foreach (ManualMotionAxisSnapshot entry in snapshot.Axes)
+        {
+            if (entry.Axis == axis)
+            {
+                return entry.StatusWord.Fresh;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The session's own typed facts about this refusal, appended to every prepare refusal detail. Each
+    /// one is a canonical code or identity the session published: the state it is in, what it last
+    /// decided for each resolved axis, and what is still running. No endpoint, no Owner-local path, no
+    /// profile value and no consent phrase can reach it.
+    /// </summary>
+    private string PrepareRefusalDiagnostic()
+    {
+        ManualMotionSnapshot snapshot = _motionRoot.Session.Snapshot;
+        return " Session state=" + snapshot.State
+            + ", active operations=" + snapshot.ActiveOperations.Count.ToString(CultureInfo.InvariantCulture)
+            + ", axis " + DescribeConfiguredAxis(snapshot, _horizontalAxisId)
+            + ", axis " + DescribeConfiguredAxis(snapshot, _verticalAxisId)
+            + ".";
+    }
+
+    /// <summary>Describes one configured axis by the letter it was named with, even when that letter is unresolved.</summary>
+    private static string DescribeConfiguredAxis(ManualMotionSnapshot snapshot, string axisId)
+    {
+        if (!TryAxisFor(axisId, out ManualMotionAxis axis))
+        {
+            return axisId + " snapshot=AXIS_NOT_RESOLVED";
+        }
+
+        return DescribeAxis(snapshot, axis);
+    }
+
+    /// <summary>One axis as the session sees it: home state, motion, freshness, what is running, what it refused.</summary>
+    private static string DescribeAxis(ManualMotionSnapshot snapshot, ManualMotionAxis axis)
+    {
+        ManualMotionAxisSnapshot? entry = null;
+        foreach (ManualMotionAxisSnapshot candidate in snapshot.Axes)
+        {
+            if (candidate.Axis == axis)
+            {
+                entry = candidate;
+                break;
+            }
+        }
+
+        if (entry is null)
+        {
+            return axis + " snapshot=MISSING";
+        }
+
+        string operation = "NONE";
+        string phase = "NONE";
+        foreach (ManualMotionOperationSnapshot active in snapshot.ActiveOperations)
+        {
+            if (active.Axis == axis)
+            {
+                operation = active.Kind.ToString();
+                phase = active.Phase.ToString();
+                break;
+            }
+        }
+
+        string logCode = "NONE";
+        foreach (ManualMotionLogEntry logEntry in snapshot.Log)
+        {
+            if (logEntry.Axis == axis)
+            {
+                logCode = logEntry.Code;
+            }
+        }
+
+        return axis + " home=" + entry.HomeState
+            + " motion=" + entry.Motion
+            + " statusFresh=" + (entry.StatusWord.Fresh ? "True" : "False")
+            + " tpFresh=" + (entry.PositionTp.Fresh ? "True" : "False")
+            + " rpFresh=" + (entry.PositionRp.Fresh ? "True" : "False")
+            + " active=" + operation + "/" + phase
+            + " last=" + (entry.LastOutcomeCode.Length > 0 ? entry.LastOutcomeCode : "NONE")
+            + " log=" + logCode;
     }
 
     /// <summary>

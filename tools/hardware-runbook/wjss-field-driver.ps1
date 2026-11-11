@@ -368,6 +368,9 @@ function Get-WjssMotionVars {
                 $v = Read-WjssField -Label 'Motion controller endpoint, exactly as in your motion commissioning run'
             } elseif ($k -eq 'WJSS_MOTION_LIB_DIR') {
                 $v = Read-WjssOwnerFile -Label 'Directory that holds the motion native library'
+            } elseif ($k -eq 'WJSS_MOTION_LIB_EXPECTED_VERSION') {
+                # a Gate A library version is a version string the probe matches ordinally; only the two SHA-256 names in this set are digests, so asking for 64 hex characters here could never be answered
+                $v = Read-WjssField -Label ('Gate A library version for ' + $k + ' (the version string your motion commissioning window used, for example 2.6.0)') -Pattern '^[0-9][0-9A-Za-z.\-]*$'
             } else {
                 $v = Read-WjssField -Label ('Gate A value for ' + $k + ' (the same value your motion commissioning window used)') -Hash
             }

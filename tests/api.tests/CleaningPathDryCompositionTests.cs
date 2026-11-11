@@ -606,6 +606,94 @@ public sealed class CleaningPathDryCompositionTests
         Assert.DoesNotContain("CabinetId = Path", root, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The bounded prepare window is a poll budget, not a duration: one step drives at most one port
+    /// call, so an un-slept window spends its whole budget in microseconds of wall time while every
+    /// timeout the session enforces (the profile Home bound, the brake settle, the observation cadence)
+    /// is measured against the injected clock. All three prepare windows are therefore paced, and the
+    /// successful path returns without waiting so that the start gate reads the freshness just observed.
+    /// </summary>
+    [Fact]
+    public void The_Prepare_Windows_Are_Paced_And_A_Ready_Window_Waits_For_Nothing()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+        string prepare = PrepareWindow(text);
+
+        // One pacing sleep for each bounded window: the port open, the observation pre-roll, the homing.
+        Assert.Equal(3, Count(prepare, "Thread.Sleep(PumpDriveIntervalMilliseconds);"));
+        Assert.Contains("if (_motion.SessionReady || _motion.SessionFaulted)", prepare, StringComparison.Ordinal);
+
+        // The step budget the trial passes is only a window because it is paced: 24000 steps at the
+        // 5 millisecond drive interval is 120 seconds, which bounds one Home of each axis plus the
+        // stop and settle that follow it. A budget change without a pacing change is a lie.
+        string trial = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryTrial.cs"));
+        Assert.Contains("private const int MaximumPrepareSteps = 24000;", trial, StringComparison.Ordinal);
+        Assert.Contains("dry.Prepare(MaximumPrepareSteps, out code, out detail)", trial, StringComparison.Ordinal);
+
+        int readyCheck = prepare.IndexOf(
+            "if (_motion.AxisMoveReady(CleaningPathExecutionRole.Horizontal)", StringComparison.Ordinal);
+        int readyReturn = prepare.IndexOf("code = \"DRY_PREPARE_READY\";", StringComparison.Ordinal);
+        Assert.True(readyCheck > 0, "move-ready must be read from the session, never assumed");
+        Assert.True(readyReturn > readyCheck, "the session must be asked before the window decides");
+        Assert.Equal(0, Count(prepare.Substring(readyCheck, readyReturn - readyCheck), "Thread.Sleep"));
+    }
+
+    /// <summary>
+    /// The session accepts a Home only once it can prove the axis is standing still from a fresh status
+    /// observation, and the step that opened the port has published no observation at all: a Home asked
+    /// for before that first read is refused OBSERVATION_NOT_FRESH. So the prepare window reads both
+    /// resolved axes first, refuses with its own typed code when the read never arrives, and never
+    /// substitutes a read of its own.
+    /// </summary>
+    [Fact]
+    public void The_Home_Is_Requested_Only_After_The_Session_Can_Observe_Both_Axes()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+        string prepare = PrepareWindow(text);
+
+        int preRoll = prepare.IndexOf(
+            "BothResolvedAxesObserved(_motionRoot.Session.Snapshot, horizontalAxis, verticalAxis)",
+            StringComparison.Ordinal);
+        int refusal = prepare.IndexOf("\"DRY_PREPARE_REFUSED_NO_OBSERVATION\";", StringComparison.Ordinal);
+        int home = prepare.IndexOf("_motionRoot.Session.RequestHome(horizontalAxis)", StringComparison.Ordinal);
+        Assert.True(preRoll > 0, "the prepare window must read the observation state the session published");
+        Assert.True(home > 0, "both resolved axes must be homed before the path may start");
+        Assert.True(preRoll < home, "an axis the session cannot observe must never be homed");
+        Assert.True(refusal < home, "the missing-observation refusal must be typed by the pre-roll itself");
+        Assert.Equal(1, Count(text, "\"DRY_PREPARE_REFUSED_NO_OBSERVATION\";"));
+        Assert.Contains("no Home is requested", prepare, StringComparison.Ordinal);
+
+        // Both axes are asked in one window because the session excludes per axis, not per session.
+        Assert.Equal(1, Count(prepare, "_motionRoot.Session.RequestHome(verticalAxis)"));
+
+        // Nothing about a refusal stays silent: every prepare refusal carries the session's own facts,
+        // and those facts are only ever read from the published snapshot, never from the environment.
+        Assert.Equal(5, Count(prepare, "PrepareRefusalDiagnostic();"));
+        Assert.Contains("ManualMotionSnapshot snapshot = _motionRoot.Session.Snapshot;", prepare, StringComparison.Ordinal);
+        Assert.Contains("LastOutcomeCode", prepare, StringComparison.Ordinal);
+        Assert.DoesNotContain("readEnvironment(", prepare, StringComparison.Ordinal);
+        Assert.DoesNotContain("File.", prepare, StringComparison.Ordinal);
+        Assert.DoesNotContain("Fingerprint", prepare, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The text of the prepare window itself, up to the member that starts the composition. Each prepare
+    /// contract is asserted inside this slice so a sleep or a diagnostic added to an unrelated Pump or
+    /// valve window can never satisfy it by accident.
+    /// </summary>
+    private static string PrepareWindow(string text)
+    {
+        int start = text.IndexOf(
+            "public bool Prepare(int maximumSteps, out string code, out string detail)", StringComparison.Ordinal);
+        int end = text.IndexOf(
+            "public CleaningPathCompositionStartOutcome Start()", StringComparison.Ordinal);
+        Assert.True(start > 0, "the composition must own exactly one bounded prepare window");
+        Assert.True(end > start, "the prepare window must end where the composition start begins");
+        return text.Substring(start, end - start);
+    }
+
     private static int Count(string text, string value)
     {
         int count = 0;
