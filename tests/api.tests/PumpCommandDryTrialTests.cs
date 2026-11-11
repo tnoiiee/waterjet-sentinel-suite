@@ -466,6 +466,8 @@ public sealed class PumpCommandDryTrialTests
     public void The_Valve_Configuration_Is_Refused_Before_The_Trial_Contacts_Anything()
     {
         string text = File.ReadAllText(Path.Combine(RepoRoot(), "apps", "runtime", "PumpCommandDryTrial.cs"));
+        string composition = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
 
         int valveConfiguration = text.IndexOf(
             "CleaningPathDryComposition.TryReadMainValveConfiguration", StringComparison.Ordinal);
@@ -475,9 +477,18 @@ public sealed class PumpCommandDryTrialTests
         Assert.True(transport > 0, "the trial must build its transport");
         Assert.True(valveConfiguration < transport, "an unusable valve configuration must be refused before a transport exists");
 
-        // The bound is required, so the trial never defaults it and never waits on an invented number.
-        Assert.Contains("WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS", text, StringComparison.Ordinal);
-        Assert.Contains("WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS", text, StringComparison.Ordinal);
+        // The bound is required, so it is never defaulted and the trial never waits on an invented number.
+        // The trial does not name the variables itself: it hands the read to the composition, and the
+        // composition is what refuses. So the required bound is pinned where it is enforced.
+        Assert.Contains("CleaningPathDryComposition.TryReadMainValveConfiguration(", text, StringComparison.Ordinal);
+        Assert.Contains("WJSS_MAIN_VALVE_OPEN_TIMEOUT_MS", composition, StringComparison.Ordinal);
+        Assert.Contains("WJSS_MAIN_VALVE_CLOSE_TIMEOUT_MS", composition, StringComparison.Ordinal);
+        Assert.Contains(
+            "TryReadRequiredTimeout(readEnvironment, MainValveOpenTimeoutVariable, out TimeSpan openTimeout)",
+            composition, StringComparison.Ordinal);
+        Assert.Contains(
+            "TryReadRequiredTimeout(readEnvironment, MainValveCloseTimeoutVariable, out TimeSpan closeTimeout)",
+            composition, StringComparison.Ordinal);
     }
 
     [Fact]
