@@ -149,6 +149,14 @@ public sealed class ManualMotionProfileTests
         var axis = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
         Assert.False(axis.AutoResetEncoderOnHome);
         Assert.Equal(1, axis.BrakeOutput);
+
+        // The two optional booleans keep separate readers with deliberately different absent-key rules:
+        // dualZeroPermitted is absent-means-false and is reported as NOT_CONFIGURED, while this key is
+        // absent-means-true and is deliberately not. One value can therefore not answer for the other, and
+        // the encoder rule cannot silently become a new mandatory configuration item.
+        Assert.False(axis.DualZeroPermitted);
+        Assert.Contains("dualZeroPermitted", axis.NotConfiguredItems());
+        Assert.DoesNotContain("autoResetEncoderOnHome", axis.NotConfiguredItems());
     }
 
     [Fact]

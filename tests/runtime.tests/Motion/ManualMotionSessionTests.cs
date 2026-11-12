@@ -1028,24 +1028,59 @@ public sealed class ManualMotionSessionTests
         // The maintenance mode: a Home that never defined the encoder register does not verify it and does
         // not claim it, so the drift stays inspectable instead of failing Home. The register that this Home
         // did define is still verified under the same tolerance and the same freshness barrier.
-        var harness = new Harness(
-            new ManualMotionSimulationOptions { AxisA = new ManualMotionAxisSimulationOptions { RpZeroStart = 30082m } },
+        //
+        // The divergence is produced by the simulation's per-read encoder bias, and it is asserted as an
+        // EXACT RELATION to the verified register rather than as an absolute count. An absolute count would
+        // be a stop residual: the simulated Home never self-terminates, the session stops the axis once it
+        // observes the switch, so wherever the axis happens to rest also rides into RP. That is why this
+        // fact does not build its divergence from two separate zero references (RpZeroStart) - the expected
+        // value would then be a function of the observation schedule, not of the semantics.
+        var divergence = new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { RpBias = 30082m },
+        };
+        var narrowed = new Harness(
+            divergence,
             ProfileWith(
                 ManualMotionProfile.CreateSimulationProfile(),
                 axisA: AxisWithAutoResetEncoder(
                     ManualMotionProfile.CreateSimulationProfile().AxisA!,
                     autoResetEncoderOnHome: false)));
-        harness.OpenAndObserve();
-        harness.HomeAxis(ManualMotionAxis.A);
+        narrowed.OpenAndObserve();
+        narrowed.HomeAxis(ManualMotionAxis.A);
 
-        var axis = harness.Axis(ManualMotionAxis.A);
+        var axis = narrowed.Axis(ManualMotionAxis.A);
         Assert.Equal(ManualMotionHomeState.Homed, axis.HomeState);
         Assert.Equal(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
         Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+
+        // The register this Home was allowed to claim is at zero; the register it was told to leave alone
+        // is displaced by exactly the configured divergence and by nothing else - the Home neither repaired
+        // it nor raised an alarm about it.
         Assert.Equal(0m, axis.PositionTp.Value);
-        Assert.Equal(-30082m, axis.PositionRp.Value);
+        Assert.Equal(axis.PositionTp.Value + 30082m, axis.PositionRp.Value);
+        Assert.True(Math.Abs((axis.PositionRp.Value ?? 0m) - (axis.PositionTp.Value ?? 0m))
+            > narrowed.Profile.AxisA!.PositionTolerance!.Value);
         Assert.DoesNotContain(
-            harness.Port.ExecutedCommands,
+            narrowed.Port.ExecutedCommands,
+            command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+        Assert.NotEqual(0m, axis.PositionRp.Value);
+
+        // The same divergence on a Home that DID define the encoder register still fails: a bias that the
+        // controller keeps applying to its reads is not something the encoder definition can paper over,
+        // so the opt-out above cannot be read as a general relaxation of the zero verification.
+        var kept = new Harness(divergence);
+        kept.OpenAndObserve();
+        kept.Session.RequestHome(ManualMotionAxis.A);
+        kept.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState != ManualMotionHomeState.NotHomed);
+
+        var keptAxis = kept.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, keptAxis.HomeState);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, keptAxis.CoordinateState);
+        Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, keptAxis.LastOutcomeCode);
+        Assert.Contains(
+            kept.Port.ExecutedCommands,
             command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
     }
 

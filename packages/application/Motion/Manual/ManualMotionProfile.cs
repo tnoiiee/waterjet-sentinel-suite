@@ -739,7 +739,13 @@ public static class ManualMotionProfileParser
             return true;
         }
 
-        return property.ValueKind == JsonValueKind.False;
+        if (property.ValueKind == JsonValueKind.False)
+        {
+            value = false;
+            return true;
+        }
+
+        return false;
     }
 
     private static bool TryReadBoolean(JsonElement element, string name, out bool value)
