@@ -828,6 +828,14 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// fresh status word, because that is the condition under which a Home is accepted rather than
     /// refused. A refusal is reported with the session's own per-axis outcome codes: nothing about a
     /// refusal stays silent.
+    ///
+    /// The window also ends when waiting cannot help any more. Once the session has applied each Home
+    /// request, has nothing running on either resolved axis, and one axis finished without reaching
+    /// Homed, move-ready is unreachable for the rest of this session because Home is requested exactly
+    /// once here: the window stops on that evidence instead of spending its remaining budget
+    /// re-observing a finished refusal. An axis still homing, a request not yet applied and an axis that
+    /// is Homed with stale position reads each keep the window open, and no early end dispatches,
+    /// retries or aborts anything — the existing shutdown still owns every stop.
     /// </summary>
     public bool Prepare(int maximumSteps, out string code, out string detail)
     {
@@ -915,6 +923,13 @@ public sealed class CleaningPathDryComposition : IDisposable
             return false;
         }
 
+        // The watermark every Home outcome of THIS window is measured against. The session records at
+        // least one Home-kind entry for every applied Home request, so an entry past this sequence is
+        // proof that the request was applied (accepted or refused) rather than still queued. It is read
+        // from the published log, never assumed, exactly as the H1 commissioning coordinator does.
+        long homeLogWatermark = NewestLogSequence(_motionRoot.Session.Snapshot);
+        bool homeAttemptsFinished = false;
+
         _motionRoot.Session.RequestHome(horizontalAxis);
         _motionRoot.Session.RequestHome(verticalAxis);
 
@@ -939,13 +954,35 @@ public sealed class CleaningPathDryComposition : IDisposable
 
             // The sleep follows the ready check: a successful prepare is reported the moment the session
             // published move-ready, because the start gate reads the same freshness that was just seen.
+            //
+            // A Home is the only route to move-ready in this composition and it is requested exactly
+            // once, so once both attempts are over and one axis is not Homed, every remaining step of
+            // the window can only re-observe the same refusal. The window therefore asks the session
+            // whether anything is left to wait for and stops the moment nothing is: an axis that is
+            // still homing, an axis whose request has not been applied yet, and an axis that is Homed
+            // but whose position reads are momentarily stale are all reasons to keep the window open.
+            ManualMotionSnapshot homeSnapshot = _motionRoot.Session.Snapshot;
+            if (HomeAttemptFinished(homeSnapshot, horizontalAxis, homeLogWatermark)
+                && HomeAttemptFinished(homeSnapshot, verticalAxis, homeLogWatermark))
+            {
+                homeAttemptsFinished = !BothResolvedAxesHomed(
+                    homeSnapshot, horizontalAxis, verticalAxis);
+                if (homeAttemptsFinished)
+                {
+                    break;
+                }
+            }
+
             Thread.Sleep(PumpDriveIntervalMilliseconds);
         }
 
         code = "DRY_PREPARE_REFUSED_NOT_MOVE_READY";
-        detail =
-            "Both resolved axes did not reach move-ready within the bounded prepare window. The path is "
-            + "not started, no point is attributed and no valve is commanded."
+        detail = (homeAttemptsFinished
+                ? "Both resolved axes finished their Home attempt and at least one of them is not "
+                + "move-ready, so no further step could change the outcome. The path is not started, "
+                + "no point is attributed and no valve is commanded."
+                : "Both resolved axes did not reach move-ready within the bounded prepare window. The "
+                + "path is not started, no point is attributed and no valve is commanded.")
             + PrepareRefusalDiagnostic();
         return false;
     }
@@ -974,10 +1011,86 @@ public sealed class CleaningPathDryComposition : IDisposable
     }
 
     /// <summary>
+    /// The newest published session log sequence, or 0 for an empty log. This is the Home-request
+    /// watermark: the outcome of this window is only ever read from entries past it.
+    /// </summary>
+    private static long NewestLogSequence(ManualMotionSnapshot snapshot)
+    {
+        IReadOnlyList<ManualMotionLogEntry> log = snapshot.Log;
+        return log.Count == 0 ? 0 : log[log.Count - 1].Sequence;
+    }
+
+    /// <summary>
+    /// True when the Home attempt of this window is over for one resolved axis: the session applied the
+    /// request (accepted or refused, proven by its own Home-kind log entry past the watermark), no
+    /// operation is running on the axis, and the axis is not mid-Home. Nothing is inferred about what
+    /// the axis did: this says only that the session has stopped working on it.
+    /// </summary>
+    private static bool HomeAttemptFinished(
+        ManualMotionSnapshot snapshot, ManualMotionAxis axis, long watermark)
+    {
+        ManualMotionAxisSnapshot? entry = PublishedAxis(snapshot, axis);
+        if (entry is null || entry.HomeState == ManualMotionHomeState.Homing)
+        {
+            return false;
+        }
+
+        foreach (ManualMotionOperationSnapshot active in snapshot.ActiveOperations)
+        {
+            if (active.Axis == axis)
+            {
+                return false;
+            }
+        }
+
+        foreach (ManualMotionLogEntry logEntry in snapshot.Log)
+        {
+            if (logEntry.Sequence > watermark
+                && logEntry.Axis == axis
+                && logEntry.Operation == ManualMotionOperationKind.Home)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True when both resolved axes reached the session's Homed state. Move-ready is deliberately not
+    /// used here: an axis can be Homed while its position reads are momentarily stale, and that is a
+    /// state this window must keep serving rather than one it gives up on.
+    /// </summary>
+    private static bool BothResolvedAxesHomed(
+        ManualMotionSnapshot snapshot, ManualMotionAxis horizontalAxis, ManualMotionAxis verticalAxis) =>
+        AxisHomed(snapshot, horizontalAxis) && AxisHomed(snapshot, verticalAxis);
+
+    /// <summary>True when this axis is listed in the snapshot and the session calls it Homed.</summary>
+    private static bool AxisHomed(ManualMotionSnapshot snapshot, ManualMotionAxis axis) =>
+        PublishedAxis(snapshot, axis)?.HomeState == ManualMotionHomeState.Homed;
+
+    /// <summary>The published state of one axis, or null when the snapshot does not list it.</summary>
+    private static ManualMotionAxisSnapshot? PublishedAxis(ManualMotionSnapshot snapshot, ManualMotionAxis axis)
+    {
+        foreach (ManualMotionAxisSnapshot candidate in snapshot.Axes)
+        {
+            if (candidate.Axis == axis)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// The session's own typed facts about this refusal, appended to every prepare refusal detail. Each
     /// one is a canonical code or identity the session published: the state it is in, what it last
-    /// decided for each resolved axis, and what is still running. No endpoint, no Owner-local path, no
-    /// profile value and no consent phrase can reach it.
+    /// decided for each resolved axis, and what is still running — plus, under the Owner ruling that
+    /// approved this diagnostic (D2), the raw native position readings and the Home-input
+    /// interpretation the session published for that axis, because whether a zero was reached is
+    /// decided by exactly those numbers and nothing else. Every value is hardware state read from the
+    /// snapshot: no endpoint, no Owner-local path, no profile value and no consent phrase can reach it.
     /// </summary>
     private string PrepareRefusalDiagnostic()
     {
@@ -1003,16 +1116,7 @@ public sealed class CleaningPathDryComposition : IDisposable
     /// <summary>One axis as the session sees it: home state, motion, freshness, what is running, what it refused.</summary>
     private static string DescribeAxis(ManualMotionSnapshot snapshot, ManualMotionAxis axis)
     {
-        ManualMotionAxisSnapshot? entry = null;
-        foreach (ManualMotionAxisSnapshot candidate in snapshot.Axes)
-        {
-            if (candidate.Axis == axis)
-            {
-                entry = candidate;
-                break;
-            }
-        }
-
+        ManualMotionAxisSnapshot? entry = PublishedAxis(snapshot, axis);
         if (entry is null)
         {
             return axis + " snapshot=MISSING";
@@ -1044,10 +1148,24 @@ public sealed class CleaningPathDryComposition : IDisposable
             + " statusFresh=" + (entry.StatusWord.Fresh ? "True" : "False")
             + " tpFresh=" + (entry.PositionTp.Fresh ? "True" : "False")
             + " rpFresh=" + (entry.PositionRp.Fresh ? "True" : "False")
+            + " tp=" + NativeReading(entry.PositionTp)
+            + " rp=" + NativeReading(entry.PositionRp)
+            + " coord=" + entry.CoordinateState
+            + " homeInput=" + entry.HomeInput
             + " active=" + operation + "/" + phase
             + " last=" + (entry.LastOutcomeCode.Length > 0 ? entry.LastOutcomeCode : "NONE")
             + " log=" + logCode;
     }
+
+    /// <summary>
+    /// One raw native reading exactly as the session published it: the value in native units, or
+    /// <c>null</c> when none was ever read, with the freshness the session attached to it. No scaling,
+    /// no unit claim and no interpretation is applied here, because the label of these two registers
+    /// is not vendor-confirmed and inventing one would turn a reading into a conclusion.
+    /// </summary>
+    private static string NativeReading(ManualMotionReadingSnapshot reading) =>
+        (reading.Value?.ToString("0.####", CultureInfo.InvariantCulture) ?? "null")
+        + "(fresh=" + (reading.Fresh ? "True" : "False") + ")";
 
     /// <summary>
     /// Starts the ONE composition in the order the safety position requires: the Pump is admitted,

@@ -694,6 +694,135 @@ public sealed class CleaningPathDryCompositionTests
         return text.Substring(start, end - start);
     }
 
+    /// <summary>
+    /// A Home that ends without move-ready ends the window instead of being re-observed for the rest of
+    /// the budget: Home is the only route to move-ready here and it is requested exactly once, so an
+    /// applied-and-finished attempt with nothing running on either resolved axis has no future. The
+    /// evidence is the session's own log past a watermark captured before the requests, exactly as the
+    /// H1 commissioning coordinator correlates a per-request outcome, and the refusal code is the one
+    /// the prepare window already reported. An axis still homing, a request not yet applied, and an axis
+    /// Homed with stale position reads must all keep the window open, and the early end may not
+    /// dispatch, retry or abort anything.
+    /// </summary>
+    [Fact]
+    public void The_Prepare_Window_Ends_When_The_Home_Attempt_Cannot_Succeed_Any_More()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+        string prepare = PrepareWindow(text);
+
+        // The watermark is captured from the published log before either request, so an outcome is
+        // attributed to this window rather than to earlier history of the same session.
+        int watermark = prepare.IndexOf(
+            "long homeLogWatermark = NewestLogSequence(_motionRoot.Session.Snapshot);", StringComparison.Ordinal);
+        int home = prepare.IndexOf("_motionRoot.Session.RequestHome(horizontalAxis)", StringComparison.Ordinal);
+        Assert.True(watermark > 0, "the window must mark where its own Home outcomes begin");
+        Assert.True(watermark < home, "the watermark must precede the requests it measures");
+
+        // Both resolved axes are judged, and only after the window has already failed to see readiness.
+        int readyReturn = prepare.IndexOf("code = \"DRY_PREPARE_READY\";", StringComparison.Ordinal);
+        int earlyEnd = prepare.IndexOf(
+            "if (HomeAttemptFinished(homeSnapshot, horizontalAxis, homeLogWatermark)", StringComparison.Ordinal);
+        Assert.True(earlyEnd > readyReturn, "move-ready is decided first, never by the early end");
+        Assert.Contains("&& HomeAttemptFinished(homeSnapshot, verticalAxis, homeLogWatermark))", prepare,
+            StringComparison.Ordinal);
+
+        // The early end costs no pacing interval: it breaks out of the window, it does not sleep first.
+        int sleepAfter = prepare.IndexOf("Thread.Sleep(PumpDriveIntervalMilliseconds);", earlyEnd);
+        Assert.True(sleepAfter > earlyEnd, "the paced window must still be paced");
+        Assert.Equal(0, Count(prepare.Substring(earlyEnd, sleepAfter - earlyEnd), "Thread.Sleep"));
+        Assert.Equal(3, Count(prepare, "Thread.Sleep(PumpDriveIntervalMilliseconds);"));
+
+        // Nothing is concluded while the session still has work on either axis, and a Homed axis whose
+        // reads went stale is never treated as a failure: only the session's own state closes the door.
+        Assert.Contains("if (entry is null || entry.HomeState == ManualMotionHomeState.Homing)", prepare,
+            StringComparison.Ordinal);
+        Assert.Contains("homeAttemptsFinished = !BothResolvedAxesHomed(", prepare, StringComparison.Ordinal);
+        Assert.Contains("PublishedAxis(snapshot, axis)?.HomeState == ManualMotionHomeState.Homed;", prepare,
+            StringComparison.Ordinal);
+        Assert.Contains("logEntry.Sequence > watermark", prepare, StringComparison.Ordinal);
+        Assert.Contains("logEntry.Operation == ManualMotionOperationKind.Home", prepare,
+            StringComparison.Ordinal);
+
+        // One shared refusal for both endings: the early end reuses the typed code and the session's own
+        // diagnostic, and each of the two sentences exists exactly once.
+        Assert.Equal(1, Count(prepare, "code = \"DRY_PREPARE_REFUSED_NOT_MOVE_READY\";"));
+        Assert.Equal(1, Count(prepare, "Both resolved axes finished their Home attempt"));
+        Assert.Equal(1, Count(prepare, "Both resolved axes did not reach move-ready within the bounded prepare window"));
+        Assert.Equal(1, Count(prepare, "DRY_PREPARE_REFUSED_NOT_MOVE_READY"));
+
+        // Two requests, ever: the early end invents no third command path and no retry of Home.
+        Assert.Equal(2, Count(prepare, "_motionRoot.Session.Request"));
+        Assert.DoesNotContain("_motionRoot.Session.RequestStop", prepare, StringComparison.Ordinal);
+        Assert.DoesNotContain("RequestDefine", prepare, StringComparison.Ordinal);
+        Assert.DoesNotContain("RequestMove", prepare, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Whether a Home zero was reached is decided by the two native position registers and nothing else,
+    /// so a prepare refusal that prints only their freshness cannot be adjudicated from the transcript.
+    /// The Owner ruling for this scope authorized printing the raw readings, the coordinate state and the
+    /// Home-input interpretation of each resolved axis: hardware state from the published snapshot only,
+    /// with no scaling, no unit claim and no invented register label.
+    /// </summary>
+    [Fact]
+    public void The_Prepare_Diagnostic_Prints_The_Readings_The_Zero_Decision_Depends_On()
+    {
+        string text = File.ReadAllText(
+            Path.Combine(RepoRoot(), "apps", "runtime", "CleaningPathDryComposition.cs"));
+        string diagnostic = DiagnosticWindow(text);
+
+        Assert.Contains("+ \" tp=\" + NativeReading(entry.PositionTp)", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("+ \" rp=\" + NativeReading(entry.PositionRp)", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("+ \" coord=\" + entry.CoordinateState", diagnostic, StringComparison.Ordinal);
+        Assert.Contains("+ \" homeInput=\" + entry.HomeInput", diagnostic, StringComparison.Ordinal);
+
+        // Nothing that was already printed is dropped: the freshness keys the runbook documents are
+        // still there, beside the values they describe.
+        foreach (string key in new[]
+                 {
+                     "\" home=\" + entry.HomeState",
+                     "\" motion=\" + entry.Motion",
+                     "\" statusFresh=\" + (entry.StatusWord.Fresh",
+                     "\" tpFresh=\" + (entry.PositionTp.Fresh",
+                     "\" rpFresh=\" + (entry.PositionRp.Fresh",
+                 })
+        {
+            Assert.Contains(key, diagnostic, StringComparison.Ordinal);
+        }
+
+        // A reading is published as the value and its freshness, or null. No conversion is applied to it,
+        // because the label of these registers is not vendor-confirmed.
+        Assert.Contains(
+            "(reading.Value?.ToString(\"0.####\", CultureInfo.InvariantCulture) ?? \"null\")", diagnostic,
+            StringComparison.Ordinal);
+        Assert.Contains("\"(fresh=\" + (reading.Fresh ? \"True\" : \"False\") + \")\"", diagnostic,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("10000", diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("NativePerMillimetre", diagnostic, StringComparison.Ordinal);
+
+        // Hardware state read from the snapshot: never the environment, never a file, never an endpoint.
+        Assert.DoesNotContain("Environment.", diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("File.", diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("http", diagnostic, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The diagnostic members of the composition, from the axis description to the end of the prepare
+    /// window's helpers, so a value printed by an unrelated member cannot satisfy the contract above.
+    /// </summary>
+    private static string DiagnosticWindow(string text)
+    {
+        int start = text.IndexOf(
+            "private static string DescribeAxis(ManualMotionSnapshot snapshot, ManualMotionAxis axis)",
+            StringComparison.Ordinal);
+        int end = text.IndexOf(
+            "public CleaningPathCompositionStartOutcome Start()", StringComparison.Ordinal);
+        Assert.True(start > 0, "the composition must own one prepare-refusal axis description");
+        Assert.True(end > start, "the axis description must end where the composition start begins");
+        return text.Substring(start, end - start);
+    }
+
     private static int Count(string text, string value)
     {
         int count = 0;
