@@ -1029,12 +1029,15 @@ public sealed class ManualMotionSessionTests
         // not claim it, so the drift stays inspectable instead of failing Home. The register that this Home
         // did define is still verified under the same tolerance and the same freshness barrier.
         //
-        // The divergence is produced by the simulation's per-read encoder bias, and it is asserted as an
-        // EXACT RELATION to the verified register rather than as an absolute count. An absolute count would
-        // be a stop residual: the simulated Home never self-terminates, the session stops the axis once it
-        // observes the switch, so wherever the axis happens to rest also rides into RP. That is why this
-        // fact does not build its divergence from two separate zero references (RpZeroStart) - the expected
-        // value would then be a function of the observation schedule, not of the semantics.
+        // The divergence is the simulation's per-read encoder bias, and it is read from the port at ONE
+        // instant rather than off the session snapshot. The reason is arithmetic, not preference: the
+        // simulated port advances its physics at the start of EVERY call (ManualMotionSimulatedPort.cs:265
+        // and :307), so the two position registers of one snapshot are sampled on different steps, and the
+        // position reference of the first one is re-primed by the Home-carried definition in between. The
+        // snapshot difference therefore carries the travel of those extra steps (the Owner's transcript
+        // measured exactly that: 262 counts at 1500 counts/s for seven 25 ms observation ticks) on top of
+        // the configured bias. Registers read at one instant cannot carry it: with the encoder reference
+        // never re-primed, RP is Physical - Offset + bias while TP is Physical - Offset.
         var divergence = new ManualMotionSimulationOptions
         {
             AxisA = new ManualMotionAxisSimulationOptions { RpBias = 30082m },
@@ -1058,9 +1061,11 @@ public sealed class ManualMotionSessionTests
         // is displaced by exactly the configured divergence and by nothing else - the Home neither repaired
         // it nor raised an alarm about it.
         Assert.Equal(0m, axis.PositionTp.Value);
-        Assert.Equal(axis.PositionTp.Value + 30082m, axis.PositionRp.Value);
-        Assert.True(Math.Abs((axis.PositionRp.Value ?? 0m) - (axis.PositionTp.Value ?? 0m))
-            > narrowed.Profile.AxisA!.PositionTolerance!.Value);
+        var portTp = narrowed.Port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0));
+        var portRp = narrowed.Port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0));
+        Assert.True(portTp.Succeeded && portRp.Succeeded);
+        Assert.Equal(portTp.Value + 30082m, portRp.Value);
+        Assert.True(Math.Abs(portRp.Value - portTp.Value) > narrowed.Profile.AxisA!.PositionTolerance!.Value);
         Assert.DoesNotContain(
             narrowed.Port.ExecutedCommands,
             command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
