@@ -166,7 +166,8 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "autoResetEncoderOnHome": true
     },
     "B": {
       "brakeOutput": 2,
@@ -187,7 +188,8 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "autoResetEncoderOnHome": true
     }
   }
 }
@@ -214,6 +216,17 @@ separate hardware commissioning gate. In particular:
 - `moveMinimumTarget` must be below `moveMaximumTarget` when both are
   configured, and the two status-bit numbers must differ when both are
   configured.
+- `autoResetEncoderOnHome` decides whether the Home lifecycle also defines the encoder register at the
+  switch: `DP{axis}=0` and then `DE{axis}=0`, after the observed stop, with the zero verification reading
+  BOTH registers (Owner ruling recorded with the head after `4a5fdf7`). Omitting the key means ON, so a
+  profile written before this key existed already carries the ruled behaviour, and an explicit `null`
+  means the same as omitting it; any other non-boolean value is a profile shape failure. The value is a
+  permission and a scope, never a relaxation: with it false, Home defines only `DP{axis}=0` and verifies
+  only the register `DP` defines (the other register stays readable as drift evidence and is never
+  claimed), the freshness, sequence-barrier and tolerance conditions are identical either way, a refused
+  `DE` fails Home with `HOME_ENCODER_ZERO_REFUSED`, and the standalone dual-zero action stays behind
+  `dualZeroPermitted` exactly as before. Which physical register each define command writes is NOT
+  established on this branch: it is a field question that the Stage D transcript answers.
 - An axis may be omitted entirely; it is then not allowed by the profile.
 
 Git ignore patterns cover `**/*.wjss-manual-motion-profile.json`, but that is

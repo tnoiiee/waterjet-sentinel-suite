@@ -183,9 +183,12 @@ internal sealed class ManualMotionForm : Form
         controls.Stop.Click += (_, _) => _session.RequestStop(axis);
         controls.Home.Click += (_, _) =>
         {
-            if (Confirm(string.Concat("Start Home on ", controls.Title, "?")))
+            // The box can only narrow the profile permission, never widen it: the session ANDs this intent
+            // with the Owner-local profile value before it dispatches anything.
+            var resetEncoder = controls.AutoResetEncoder.Checked;
+            if (Confirm(HomeQuestion(controls.Title, resetEncoder)))
             {
-                _session.RequestHome(axis);
+                _session.RequestHome(axis, resetEncoder);
             }
         };
         controls.DefineZero.Click += (_, _) =>
@@ -441,6 +444,14 @@ internal sealed class ManualMotionForm : Form
         controls.Home.Enabled = ready && idle && allowed;
         controls.DefineZero.Enabled = ready && idle && allowed;
         controls.DefineDualZero.Enabled = ready && idle && allowed;
+
+        // The encoder definition of Home is a profile permission: the Operator surface may narrow it for
+        // one Home and can never widen it, so a profile that refuses it clears the box and locks it.
+        controls.AutoResetEncoder.Enabled = ready && idle && allowed && axis.AutoResetEncoderOnHome;
+        if (!axis.AutoResetEncoderOnHome)
+        {
+            controls.AutoResetEncoder.Checked = false;
+        }
         controls.Move.Enabled = ready && idle && allowed;
         controls.Target.Enabled = ready && allowed;
 
@@ -451,6 +462,21 @@ internal sealed class ManualMotionForm : Form
         controls.Stop.Enabled = snapshot.State is ManualMotionSessionState.Ready
             or ManualMotionSessionState.Closing
             or ManualMotionSessionState.Faulted;
+    }
+
+    /// <summary>
+    /// The Home confirmation wording. It names the zero definitions this request will carry, so the
+    /// Operator reads the effect of the maintenance box before the request is posted.
+    /// </summary>
+    private static string HomeQuestion(string title, bool resetEncoder)
+    {
+        var definitions = resetEncoder
+            ? "it defines DP=0 and then DE=0 at the switch"
+            : "it defines DP=0 only at the switch";
+        var verification = resetEncoder
+            ? "and verifies BOTH registers before it reports a completed Home."
+            : "and verifies only that register, leaving the other one as drift evidence it never claims.";
+        return string.Concat("Start Home on ", title, "? ", definitions, ", ", verification);
     }
 
     private static ManualMotionOperationSnapshot? OperationFor(ManualMotionSnapshot snapshot, ManualMotionAxis axis)
@@ -602,6 +628,18 @@ internal sealed class ManualMotionForm : Form
             Home = CreateButton("Home");
             DefineZero = CreateButton("Define zero (DP)");
             DefineDualZero = CreateButton("Define dual zero (DE)");
+
+            // Maintenance use only: an Engineer clears this to review the encoder drift without the
+            // Home failing over a register that this Home never defined. It is checked by default, and
+            // the Owner-local profile is what permits the encoder definition at all.
+            AutoResetEncoder = new CheckBox
+            {
+                AutoSize = true,
+                Checked = true,
+                Padding = new Padding(0, 6, 0, 0),
+                Text = "Home defines both registers (DP, then DE)",
+            };
+
             Move = CreateButton("Move absolute (PA)");
             Target = new NumericUpDown
             {
@@ -633,6 +671,7 @@ internal sealed class ManualMotionForm : Form
             commands.Controls.Add(Home);
             commands.Controls.Add(DefineZero);
             commands.Controls.Add(DefineDualZero);
+            commands.Controls.Add(AutoResetEncoder);
 
             var move = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false };
             move.Controls.Add(new Label
@@ -678,6 +717,8 @@ internal sealed class ManualMotionForm : Form
         internal Button DefineZero { get; }
 
         internal Button DefineDualZero { get; }
+
+        internal CheckBox AutoResetEncoder { get; }
 
         internal Button Move { get; }
 

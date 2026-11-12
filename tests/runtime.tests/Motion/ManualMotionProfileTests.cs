@@ -111,6 +111,78 @@ public sealed class ManualMotionProfileTests
     }
 
     [Fact]
+    public void The_Home_Encoder_Definition_Is_On_When_The_Profile_Omits_It()
+    {
+        // An Owner-local profile written before this option existed must keep working unchanged, and it
+        // must describe the behaviour the Owner ruled as the normal one: a Home defines both registers at
+        // the switch. The value is therefore defaulted ON, and it is deliberately not reported as a
+        // NOT_CONFIGURED item, because an absent key is a decision and not a missing commissioning value.
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(CompleteProfile).Profile);
+        var axisA = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
+        Assert.True(axisA.AutoResetEncoderOnHome);
+
+        var axisB = Assert.IsType<ManualMotionAxisProfile>(profile.AxisB);
+        Assert.True(axisB.AutoResetEncoderOnHome);
+        Assert.DoesNotContain("autoResetEncoderOnHome", axisB.NotConfiguredItems());
+    }
+
+    [Fact]
+    public void The_Profile_Can_Refuse_The_Encoder_Definition_On_Home()
+    {
+        const string refused = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "autoResetEncoderOnHome": false
+                }
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(refused);
+        Assert.True(result.Accepted);
+        var profile = Assert.IsType<ManualMotionProfile>(result.Profile);
+        var axis = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
+        Assert.False(axis.AutoResetEncoderOnHome);
+        Assert.Equal(1, axis.BrakeOutput);
+    }
+
+    [Fact]
+    public void A_Null_Home_Encoder_Definition_Is_The_Built_In_Default_And_A_Text_One_Is_Refused()
+    {
+        const string nulled = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "autoResetEncoderOnHome": null
+                }
+              }
+            }
+            """;
+
+        var accepted = ManualMotionProfileParser.Parse(nulled);
+        Assert.True(accepted.Accepted);
+        Assert.True(Assert.IsType<ManualMotionProfile>(accepted.Profile).AxisA!.AutoResetEncoderOnHome);
+
+        var textValue = nulled.Replace(
+            "\"autoResetEncoderOnHome\": null",
+            "\"autoResetEncoderOnHome\": \"yes\"",
+            StringComparison.Ordinal);
+        var refused = ManualMotionProfileParser.Parse(textValue);
+        Assert.False(refused.Accepted);
+        Assert.Null(refused.Profile);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refused.Code);
+    }
+
+    [Fact]
     public void Only_The_Listed_Axes_Are_Allowed()
     {
         // A self-contained one-axis profile (no multi-line excerpt of CompleteProfile, so this test

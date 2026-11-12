@@ -837,3 +837,29 @@ exists:
 
 No controller was contacted, no library was loaded, no export was resolved and no read was issued
 while producing this section. No build and no test execution occurred in the Agent environment.
+
+---
+
+## I. Later record — what this baseline's DP/DE finding became in Product
+
+This section is appended to the record and rewrites nothing above it.
+
+The finding recorded in section B.3 for `DP{axis}=0` and `DE{axis}=0` — "reset does position definition
+then encoder definition; the home branch does stop, fixed delay, then position definition" — is the
+Legacy shape that the Owner ruled into the Product Home lifecycle at the head following `4a5fdf7`
+(trigger: the Stage D-sim Run-1 and Run-2 transcripts at field driver `2026-11-21.1`). At that head a
+Home dispatches `DP<axis>=0` and then `DE<axis>=0` after the observed stop, and the zero verification
+that follows reads both registers.
+
+Two distinctions this baseline can support and two it cannot:
+
+- It supports the ORDER and the OWNERSHIP: the position definition precedes the encoder definition, both
+  belong to the same switch sighting, and no post-verification existed in the Legacy code. The Product
+  therefore adds the verification the Legacy never had, and it does not inherit any Legacy claim about
+  what a zero "means".
+- It does not establish WHICH physical register each define command writes, and it carries no
+  command-to-encoder count ratio. The `map()` function reviewed in `LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md`
+  scales analog registers only (pressure 4 to 20 mA, level, AO write) and contains no position or encoder
+  scaling at all; nothing in this branch states that `TP` and `RP` stand in a 2:1 relation. A ratio claim
+  remains OWNER-STATED until it is measured at the machine, and the Home verification needs no ratio at
+  all because both registers are defined to zero at the same point.

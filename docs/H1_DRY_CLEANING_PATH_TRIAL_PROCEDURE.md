@@ -145,6 +145,29 @@ Centre 125/125 → terminal cleanup and session/run close.
   reset-encoder behavior (position define then encoder define), it is a separate,
   separately-authorized step after the H1 run evidence is complete.
 - No encoder-reset sequence is invented anywhere in this procedure.
+- **Addendum — the encoder definition inside Home (Owner ruling recorded with the head after
+  `4a5fdf7`; the trigger is the Stage D-sim Run-1 / Run-2 transcripts at field driver
+  `2026-11-21.1`).** The Owner ruled that the Home lifecycle itself carries the Legacy reset-encoder
+  order: `DP{axis}=0` and then `DE{axis}=0` at the switch, after the observed stop, and the zero
+  verification then reads BOTH registers. This supersedes, for the **Home-carried** definition only, the
+  statements above that place the encoder definition outside every session of this trial:
+  (1) the bullet beginning "Dual-zero definition (DE=0): OPTIONAL and separately authorized — EXCLUDED"
+  (the exclusion of the **standalone** `RequestDefineDualZero` action, its `UNVERIFIED` effect and its
+  Home-clearing behaviour are all unchanged and still excluded from every session of this trial), and
+  (2) every statement that expects no encoder definition in a Home of this trial: the section 8 line
+  "- DE=0 exists in the plan but is excluded from both runs and every session (section 3).", the two
+  "- Record the DP/DE disposition of section 3 (expected: Home-carried DP verified; DE not dispatched)"
+  steps of sections 10 and 12, and the section 17 scope statement "Both routes exclude: **DE=0**".
+  Those four lines are kept as written and are superseded for the Home-carried definition by this
+  bullet; the standalone action remains excluded.
+  The Product default is on: a profile that omits `autoResetEncoderOnHome` defines both registers, and a
+  profile that sets it to `false` (or an Operator who clears the maintenance box in the commissioning
+  window) narrows one Home back to `DP=0` plus verification of the register that `DP` defines. A refused
+  `DE` is reported as `HOME_ENCODER_ZERO_REFUSED` and fails Home. **What is still not established is which
+  physical register each define command writes**: the branch carries no vendor statement and no measurement
+  of it, so the register mapping remains a field question that this trial's transcript answers and no
+  tolerance may be widened to accommodate. Nothing in this addendum touches the active-home-input refusal
+  of section 3, which remains in force exactly as the Fast H1 Repair recorded it.
 
 ## 4. Representative Move target — Owner decision (both runs)
 

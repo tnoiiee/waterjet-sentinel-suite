@@ -78,6 +78,17 @@ public sealed class ManualMotionAxisProfile
     /// <summary>True only when the Owner-local profile explicitly permits the dual-zero definition on this axis.</summary>
     public bool DualZeroPermitted { get; init; }
 
+    /// <summary>
+    /// True (the default, and the value when the profile omits the key) makes the Home sequence define
+    /// both position registers at the switch: DP{axis}=0 and then DE{axis}=0, after which the zero
+    /// verification reads BOTH registers. When this profile value is false, Home dispatches DP{axis}=0
+    /// only and the verification reads only the register that DP defines, so a divergent second register
+    /// stays inspectable without failing Home. This profile value is the authority: an Operator surface
+    /// cannot enable the encoder definition that the profile refuses, and no profile value ever relaxes
+    /// the freshness, sequence or tolerance conditions of the verification itself.
+    /// </summary>
+    public bool AutoResetEncoderOnHome { get; init; } = true;
+
     /// <summary>The profile property names that are NOT_CONFIGURED for this axis, in schema order.</summary>
     public IReadOnlyList<string> NotConfiguredItems()
     {
@@ -431,6 +442,7 @@ public static class ManualMotionProfileParser
         "homeStatusBit",
         "homeActiveValue",
         "dualZeroPermitted",
+        "autoResetEncoderOnHome",
     };
 
     /// <summary>Reads one Owner-local profile text. Never throws for malformed input.</summary>
@@ -617,7 +629,8 @@ public static class ManualMotionProfileParser
             || !TryReadInt(element, "motionActiveValue", 0, 1, out var motionActive)
             || !TryReadInt(element, "homeStatusBit", 0, 7, out var homeBit)
             || !TryReadInt(element, "homeActiveValue", 0, 1, out var homeActive)
-            || !TryReadBoolean(element, "dualZeroPermitted", out var dualZeroPermitted))
+            || !TryReadBoolean(element, "dualZeroPermitted", out var dualZeroPermitted)
+            || !TryReadBooleanDefaulting(element, "autoResetEncoderOnHome", true, out var autoResetEncoderOnHome))
         {
             return ManualMotionCodes.ProfileValueInvalid;
         }
@@ -658,6 +671,7 @@ public static class ManualMotionProfileParser
             HomeStatusBit = homeBit,
             HomeActiveValue = homeActive,
             DualZeroPermitted = dualZeroPermitted,
+            AutoResetEncoderOnHome = autoResetEncoderOnHome,
         };
 
         return null;
@@ -705,6 +719,27 @@ public static class ManualMotionProfileParser
 
         value = parsed;
         return true;
+    }
+
+    /// <summary>
+    /// Reads an optional boolean whose ABSENT or null form means <paramref name="defaultValue"/>. A key
+    /// present with a non-boolean value is a shape failure: it is never silently coerced to a default.
+    /// </summary>
+    private static bool TryReadBooleanDefaulting(JsonElement element, string name, bool defaultValue, out bool value)
+    {
+        value = defaultValue;
+        if (!element.TryGetProperty(name, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (property.ValueKind == JsonValueKind.True)
+        {
+            value = true;
+            return true;
+        }
+
+        return property.ValueKind == JsonValueKind.False;
     }
 
     private static bool TryReadBoolean(JsonElement element, string name, out bool value)

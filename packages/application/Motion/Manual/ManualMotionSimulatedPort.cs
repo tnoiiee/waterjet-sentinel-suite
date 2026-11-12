@@ -91,6 +91,13 @@ public sealed class ManualMotionAxisSimulationOptions
 
     /// <summary>Synthetic RP divergence added to this axis's RP reads only (TP remains the physical position).</summary>
     public decimal RpBias { get; init; }
+
+    /// <summary>
+    /// When set, the simulated encoder register starts from this physical zero instead of following the
+    /// position reference, so the two registers disagree until a dual-zero (DE) definition re-primitives
+    /// the encoder register. Synthetic test data only, and it models no vendor-confirmed register mapping.
+    /// </summary>
+    public decimal? RpZeroStart { get; init; }
 }
 
 /// <summary>
@@ -99,7 +106,10 @@ public sealed class ManualMotionAxisSimulationOptions
 /// advanced by the injected clock. A simulated result is never hardware evidence.
 ///
 /// Model: each axis has a synthetic physical position and a coordinate offset (the reported position
-/// is physical minus offset). Motion progresses only while the simulated brake output is in the
+/// is physical minus offset). A dual-zero (DE) definition re-primitives the encoder register with a zero
+/// of its own that the position definition does not touch, so the two registers can be made to diverge on
+/// purpose; which real register each define command writes is NOT modelled as a fact here. Motion
+/// progresses only while the simulated brake output is in the
 /// release state the profile names. Begin starts the motion armed by the previous jog-speed,
 /// absolute-target or home command. The simulated home switch sits at a fixed physical position. The
 /// status word is composed from the profile's Owner-attested bit layout (or the synthetic built-in
@@ -453,8 +463,21 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 return true;
 
             case ManualMotionPortCommandKind.DefineDualZero:
+                // The encoder definition re-primitives the encoder register only; the position reference
+                // stays where the position definition put it. Acceptance is exactly as before: a
+                // definition during a non-idle mode is refused and changes nothing.
+                if (axis.Mode != SimulatedMode.Idle)
+                {
+                    return false;
+                }
+
+                if (!_options.ZeroDefinitionIgnored)
+                {
+                    axis.RpZero = axis.Physical;
+                }
+
                 axis.PositionMoveEngaged = false;
-                return axis.Mode == SimulatedMode.Idle;
+                return true;
 
             case ManualMotionPortCommandKind.Acceleration:
             case ManualMotionPortCommandKind.Deceleration:
@@ -600,8 +623,9 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
 
             case ManualMotionReadKind.PositionRp:
                 // The optional per-axis bias makes RP disagree with TP deterministically (a TP/RP
-                // contradiction scenario); with no bias RP equals TP exactly as before.
-                value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero)
+                // contradiction scenario); with no bias RP equals TP exactly as before. An encoder zero
+                // set by a dual-zero definition re-primitives this register alone.
+                value = Math.Round(axis.Physical - (axis.RpZero ?? axis.Offset), 0, MidpointRounding.ToZero)
                     + (axis.Options?.RpBias ?? 0m);
                 return true;
 
@@ -655,6 +679,7 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
             HomeBit = homeBit == MotionBit ? (MotionBit + 1) & 7 : homeBit;
             HomeActiveValue = profile?.HomeActiveValue ?? 1;
             Physical = startPosition;
+            RpZero = options?.RpZeroStart;
         }
 
         public ManualMotionAxisSimulationOptions? Options { get; set; }
@@ -681,6 +706,12 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
         public decimal Physical { get; set; }
 
         public decimal Offset { get; set; }
+
+        /// <summary>
+        /// The physical position the encoder register calls zero. Null until a dual-zero definition sets
+        /// it: while it is null the encoder register follows the position reference, exactly as before.
+        /// </summary>
+        public decimal? RpZero { get; set; }
 
         public SimulatedMode Mode { get; set; }
 

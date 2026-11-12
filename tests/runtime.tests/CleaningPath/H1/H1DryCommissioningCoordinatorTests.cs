@@ -317,7 +317,11 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.Equal(H1DryCommissioningCodes.DualZeroOptionalNotDispatched, result.VerticalCoordinate.DualZeroDispositionCode);
         Assert.Equal(nameof(ManualMotionDualZeroState.NotDispatched), result.HorizontalCoordinate.DualZeroState);
         Assert.Equal(nameof(ManualMotionDualZeroState.NotDispatched), result.VerticalCoordinate.DualZeroState);
-        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero));
+
+        // The Home-carried encoder definition is a different thing from the optional standalone dual-zero
+        // request this record describes, and it does not touch DualZeroState: one definition per axis, at
+        // the switch, inside the Home that the Owner ruling puts both definitions in.
+        Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero).Count);
     }
 
     [Fact]
@@ -373,8 +377,10 @@ public sealed class H1DryCommissioningCoordinatorTests
         Assert.True(harness.StartCommission().Started);
         harness.DriveUntilTerminal();
 
-        // No Move, no zero redefinition and no second Home cycle ever runs after the failed Home.
+        // No Move, no zero redefinition and no second Home cycle ever runs after the failed Home. The
+        // Home never reached its zero definitions, so neither definition was dispatched either.
         Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.PositionAbsolute));
+        Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.DefinePositionZero));
         Assert.Empty(harness.CommandsOf(ManualMotionPortCommandKind.DefineDualZero));
         Assert.Equal(2, harness.CommandsOf(ManualMotionPortCommandKind.Home).Count);
         Assert.Equal(H1DrySafeReturnState.NotPublished, harness.Coordinator.Result!.DrySafeReturn);
@@ -870,6 +876,7 @@ public sealed class H1DryCommissioningCoordinatorTests
                     or ManualMotionPortCommandKind.Home
                     or ManualMotionPortCommandKind.Begin
                     or ManualMotionPortCommandKind.DefinePositionZero
+                    or ManualMotionPortCommandKind.DefineDualZero
                     or ManualMotionPortCommandKind.Acceleration
                     or ManualMotionPortCommandKind.Speed
                     or ManualMotionPortCommandKind.Deceleration

@@ -50,6 +50,13 @@ public sealed class ManualMotionAxisSnapshot
     /// <summary>True when the Owner-local profile lists this axis.</summary>
     public required bool AllowedByProfile { get; init; }
 
+    /// <summary>
+    /// True when the Owner-local profile permits the encoder definition inside Home for this axis, which
+    /// is also the value a profile that omits the key carries. False means Home defines only the position
+    /// register and verifies only that register. This is a profile permission, never a physical fact.
+    /// </summary>
+    public bool AutoResetEncoderOnHome { get; init; }
+
     /// <summary>The brake COMMAND state (never the physical brake).</summary>
     public required ManualMotionBrakeCommandState BrakeCommandState { get; init; }
 

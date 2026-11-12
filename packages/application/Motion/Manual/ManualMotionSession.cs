@@ -149,8 +149,21 @@ public sealed class ManualMotionSession
     /// <summary>Requests the typed Stop of one axis. An active motion operation on that axis is stopped through its lifecycle.</summary>
     public void RequestStop(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.Stop, axis));
 
-    /// <summary>Requests Home on one axis.</summary>
+    /// <summary>
+    /// Requests Home on one axis. Whether the switch also defines the encoder register follows
+    /// <see cref="ManualMotionAxisProfile.AutoResetEncoderOnHome"/>, and that profile value is true when
+    /// the Owner-local profile omits the key.
+    /// </summary>
     public void RequestHome(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.Home, axis));
+
+    /// <summary>
+    /// Requests Home on one axis with the Operator-side intent for the encoder definition. The profile is
+    /// still the authority: false only ever removes the DE{axis}=0 dispatch and the verification of the
+    /// register that DE defines, and no value here relaxes the freshness, sequence or tolerance
+    /// conditions of the zero verification or any other precondition.
+    /// </summary>
+    public void RequestHome(ManualMotionAxis axis, bool resetEncoder) =>
+        Enqueue(new Request(RequestKind.Home, axis) { ResetEncoder = resetEncoder });
 
     /// <summary>Requests define-position-zero on one axis (zero is the only operand).</summary>
     public void RequestDefinePositionZero(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.DefinePositionZero, axis));
@@ -550,6 +563,7 @@ public sealed class ManualMotionSession
 
             case ManualMotionOperationKind.DefinePositionZero:
                 CaptureZeroVerification(op, p);
+                op.VerifiesActualPosition = true;
                 op.Phase = ManualMotionOperationPhase.DefiningZero;
                 break;
 
@@ -570,6 +584,12 @@ public sealed class ManualMotionSession
             case ManualMotionOperationKind.Home:
                 CaptureMotion(op, p);
                 CaptureZeroVerification(op, p);
+
+                // The profile is the authority and the Operator intent can only narrow it. An absent
+                // profile key means true, so an Owner-local profile that predates this option defines
+                // both registers at the switch, exactly as the Legacy Reset-encoder order did.
+                op.ResetEncoderOnHome = p.AutoResetEncoderOnHome && request.ResetEncoder is not false;
+                op.VerifiesActualPosition = op.ResetEncoderOnHome;
                 op.HomeBit = p.HomeStatusBit ?? 0;
                 op.HomeActive = p.HomeActiveValue ?? 0;
                 op.RunTimeout = Milliseconds(p.HomeTimeoutMilliseconds ?? 0);
@@ -971,6 +991,41 @@ public sealed class ManualMotionSession
     private Progress DoDefiningZero(OperationRuntime op, DateTimeOffset now)
     {
         var runtime = Runtime(op.Axis);
+
+        if (op.ZeroStage == ZeroDefineStage.EncoderDue)
+        {
+            // The encoder definition of the Legacy Reset-encoder order: DP{axis}=0 and then DE{axis}=0,
+            // both at the switch and both inside the same Home, on consecutive steps. One port call per
+            // step is what keeps the round-robin fairness of AdvanceActives and the preparation-window
+            // budget intact, so the second definition is never folded into the step of the first one.
+            // This dispatch does not pass through the standalone dual-zero request gate and it never
+            // clears the session Home state that this same Home is about to establish.
+            op.ZeroStage = ZeroDefineStage.Complete;
+            var encoder = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.DefineDualZero, op.Axis, 0, 0));
+            if (Interrupted(encoder, now, op))
+            {
+                return Progress.CalledPort;
+            }
+
+            if (!encoder.Accepted)
+            {
+                // A definition the controller refused is never a successful Home, and nothing already
+                // verified about the other register is claimed: the brake and stop cleanup run as they do
+                // for any refused zero definition.
+                runtime.HomeState = ManualMotionHomeState.HomeFailed;
+                op.EndCode = ManualMotionCodes.HomeEncoderZeroRefused;
+                SetPhase(op, ManualMotionOperationPhase.ApplyingBrake, now);
+                return Progress.CalledPort;
+            }
+
+            // The verification barrier is the LAST accepted zero definition: a read taken before the encoder
+            // definition was accepted can never be the evidence that the encoder register is at zero.
+            op.ZeroSequence = encoder.Sequence;
+            op.ZeroAt = now;
+            SetPhase(op, ManualMotionOperationPhase.VerifyingZero, now);
+            return Progress.CalledPort;
+        }
+
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.DefinePositionZero, op.Axis, 0, 0));
         if (Interrupted(outcome, now, op))
         {
@@ -999,8 +1054,27 @@ public sealed class ManualMotionSession
 
         op.ZeroSequence = outcome.Sequence;
         op.ZeroAt = now;
+        if (op.ResetEncoderOnHome)
+        {
+            op.ZeroStage = ZeroDefineStage.EncoderDue;
+            return Progress.CalledPort;
+        }
+
         SetPhase(op, ManualMotionOperationPhase.VerifyingZero, now);
         return Progress.CalledPort;
+    }
+
+    /// <summary>The zero-definition progress of one DefiningZero phase, one port call per step.</summary>
+    private enum ZeroDefineStage
+    {
+        /// <summary>The position definition (DP) is due.</summary>
+        PositionDue = 0,
+
+        /// <summary>The position definition was accepted and the encoder definition (DE) is due.</summary>
+        EncoderDue = 1,
+
+        /// <summary>Both accepted definitions are dispatched; the verification phase follows.</summary>
+        Complete = 2,
     }
 
     private Progress DoVerifyingZero(OperationRuntime op, DateTimeOffset now)
@@ -1012,6 +1086,19 @@ public sealed class ManualMotionSession
 
         var runtime = Runtime(op.Axis);
         var tp = ZeroReading(runtime.PositionTp, op.ZeroSequence, now, op.Tolerance);
+        if (!op.VerifiesActualPosition)
+        {
+            // The profile keeps the encoder definition off this Home, so only the register that this Home
+            // actually defined is verified. The other register stays readable as drift evidence and is
+            // never claimed: the freshness, sequence-barrier and tolerance conditions below are unchanged.
+            if (tp is bool tpOnly)
+            {
+                return FinishZero(op, now, tpOnly);
+            }
+
+            return now - op.ZeroAt > op.StopTimeout ? FinishZero(op, now, verified: null) : Progress.Waiting;
+        }
+
         var rp = ZeroReading(runtime.PositionRp, op.ZeroSequence, now, op.Tolerance);
         if (tp is bool tpWithin && rp is bool rpWithin)
         {
@@ -1796,6 +1883,7 @@ public sealed class ManualMotionSession
             TargetCoverage = ManualMotionTopology.TargetCoverage(runtime.Axis),
             BrakeOutputNumber = ManualMotionTopology.ConfirmedBrakeOutput(runtime.Axis),
             AllowedByProfile = p is not null,
+            AutoResetEncoderOnHome = p?.AutoResetEncoderOnHome ?? false,
             BrakeCommandState = runtime.BrakeCommandState,
             BrakeOutput = ObservationSnapshot(runtime.BrakeOutput, now),
             StatusWord = ObservationSnapshot(runtime.Status, now),
@@ -1955,6 +2043,9 @@ public sealed class ManualMotionSession
         public ManualMotionJogEndReason Reason { get; init; }
 
         public int Target { get; init; }
+
+        /// <summary>The Operator intent for the encoder definition of a Home request; null means "say nothing".</summary>
+        public bool? ResetEncoder { get; init; }
     }
 
     private sealed class Observation
@@ -2084,6 +2175,15 @@ public sealed class ManualMotionSession
         public long ZeroSequence { get; set; }
 
         public DateTimeOffset ZeroAt { get; set; }
+
+        /// <summary>True when this Home sequence also defines the encoder register (DE{axis}=0).</summary>
+        public bool ResetEncoderOnHome { get; set; }
+
+        /// <summary>The zero-definition progress of this operation; see <see cref="ZeroDefineStage"/>.</summary>
+        public ZeroDefineStage ZeroStage { get; set; }
+
+        /// <summary>True when the zero verification also reads the register the encoder definition defines.</summary>
+        public bool VerifiesActualPosition { get; set; }
 
         public bool HomeDetected { get; set; }
 
