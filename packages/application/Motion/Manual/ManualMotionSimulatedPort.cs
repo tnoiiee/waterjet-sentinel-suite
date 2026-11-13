@@ -93,6 +93,15 @@ public sealed class ManualMotionAxisSimulationOptions
     public decimal RpBias { get; init; }
 
     /// <summary>
+    /// Synthetic TP-to-RP register relation of this axis: the TP read reports the physical position
+    /// multiplied by this value, while RP keeps the commanded unit. 1 (the default) leaves the simulated
+    /// registers 1:1 exactly as before. It models an axis whose position register counts more pulses per
+    /// revolution than the commanded unit, so the raw-TP arrival test of such an axis can be exercised
+    /// without touching the tolerance. Synthetic test data only; it models no vendor-confirmed mapping.
+    /// </summary>
+    public decimal TpMultiplier { get; init; } = 1m;
+
+    /// <summary>
     /// When set, the simulated encoder register starts from this physical zero instead of following the
     /// position reference, so the two registers disagree until a dual-zero (DE) definition re-primitives
     /// the encoder register. Synthetic test data only, and it models no vendor-confirmed register mapping.
@@ -618,7 +627,12 @@ public sealed class ManualMotionSimulatedPort : IManualMotionPort
                 return true;
 
             case ManualMotionReadKind.PositionTp:
-                value = Math.Round(axis.Physical - axis.Offset, 0, MidpointRounding.ToZero);
+                // The optional synthetic register relation scales TP only, so a Move target expressed in
+                // the commanded unit leaves the RP register at that value while TP reports the scaled one.
+                value = Math.Round(
+                    (axis.Physical - axis.Offset) * (axis.Options?.TpMultiplier ?? 1m),
+                    0,
+                    MidpointRounding.ToZero);
                 return true;
 
             case ManualMotionReadKind.PositionRp:

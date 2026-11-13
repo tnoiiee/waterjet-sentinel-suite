@@ -65,6 +65,14 @@ public sealed class ManualMotionAxisSnapshot
     /// </summary>
     public bool AcceptHomeWhenInputActive { get; init; }
 
+    /// <summary>
+    /// The profile TP-to-RP ratio of this axis (1 when the profile omits <c>tpToRpRatio</c>): how many raw
+    /// TP counts represent one position unit. Only the TP comparisons inside the session divide by it. The
+    /// two position readings published beside it stay RAW and unscaled, so a record can always be
+    /// re-audited against a corrected ratio.
+    /// </summary>
+    public decimal TpToRpRatio { get; init; } = 1m;
+
     /// <summary>The brake COMMAND state (never the physical brake).</summary>
     public required ManualMotionBrakeCommandState BrakeCommandState { get; init; }
 

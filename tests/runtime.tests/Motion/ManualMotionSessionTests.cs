@@ -158,6 +158,40 @@ public sealed class ManualMotionSessionTests
         };
     }
 
+    /// <summary>
+    /// A copy of one simulation axis profile with a TP-to-RP register relation of <paramref name="ratio"/>
+    /// and an optionally shortened motion timeout. Every other value is the simulation value it started
+    /// from, so the only difference a test can attribute to this helper is the register relation.
+    /// </summary>
+    private static ManualMotionAxisProfile AxisWithTpToRpRatio(
+        ManualMotionAxisProfile source,
+        decimal ratio,
+        int? motionTimeoutMilliseconds = null) => new()
+    {
+        BrakeOutput = source.BrakeOutput,
+        BrakeReleaseAction = source.BrakeReleaseAction,
+        BrakeSettleMilliseconds = source.BrakeSettleMilliseconds,
+        JogSpeed = source.JogSpeed,
+        HomeSpeed = source.HomeSpeed,
+        HomeTimeoutMilliseconds = source.HomeTimeoutMilliseconds,
+        MoveAcceleration = source.MoveAcceleration,
+        MoveSpeed = source.MoveSpeed,
+        MoveDeceleration = source.MoveDeceleration,
+        MoveMinimumTarget = source.MoveMinimumTarget,
+        MoveMaximumTarget = source.MoveMaximumTarget,
+        PositionTolerance = source.PositionTolerance,
+        MotionTimeoutMilliseconds = motionTimeoutMilliseconds ?? source.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
+        MotionStatusBit = source.MotionStatusBit,
+        MotionActiveValue = source.MotionActiveValue,
+        HomeStatusBit = source.HomeStatusBit,
+        HomeActiveValue = source.HomeActiveValue,
+        DualZeroPermitted = source.DualZeroPermitted,
+        AutoResetEncoderOnHome = source.AutoResetEncoderOnHome,
+        AcceptHomeWhenInputActive = source.AcceptHomeWhenInputActive,
+        TpToRpRatio = ratio,
+    };
+
     private static ManualMotionAxisProfile AxisWithoutJogSpeed(ManualMotionAxisProfile source) => new()
     {
         BrakeOutput = source.BrakeOutput,
@@ -1384,6 +1418,62 @@ public sealed class ManualMotionSessionTests
         var segment = KindsAfter(harness, beforeMove);
         Assert.Contains(ManualMotionPortCommandKind.Stop, segment);
         Assert.Equal(ManualMotionPortCommandKind.BrakeOutputClear, segment[^1]);
+    }
+
+    [Fact]
+    public void A_Move_On_An_Axis_With_A_TP_To_RP_Ratio_Verifies_Through_The_Normalized_TP_Leg()
+    {
+        // The Owner-measured bench relation: the position register counts twice per commanded unit, so the
+        // raw TP reading of an axis standing exactly on its target is twice that target. With the profile
+        // relation configured, the arrival test compares the TP leg in the commanded unit and completes,
+        // while BOTH published readings stay raw and unequal - the ratio rescales no stored value.
+        var source = ManualMotionProfile.CreateSimulationProfile();
+        var harness = new Harness(
+            new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { TpMultiplier = 2m },
+            },
+            ProfileWith(source, axisA: AxisWithTpToRpRatio(source.AxisA!, 2m)));
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, 3000);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(2m, axis.TpToRpRatio);
+        Assert.Equal(6000m, axis.PositionTp.Value);
+        Assert.Equal(3000m, axis.PositionRp.Value);
+        Assert.True(axis.PositionTp.Fresh);
+        Assert.True(axis.PositionRp.Fresh);
+    }
+
+    [Fact]
+    public void A_TP_To_RP_Relation_The_Profile_Does_Not_Know_Still_Times_Out()
+    {
+        // The fail-closed half of the same fact: a profile that says nothing about the relation keeps the
+        // raw comparison, so an axis whose TP register disagrees by a factor of two never verifies. The
+        // encoder register does land on the commanded target, which is what proves the refusal is the TP
+        // leg and not a stalled axis, and nothing is repaired or widened on the way out.
+        var source = ManualMotionProfile.CreateSimulationProfile();
+        var harness = new Harness(
+            new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { TpMultiplier = 2m },
+            },
+            ProfileWith(source, axisA: AxisWithTpToRpRatio(source.AxisA!, 1m, motionTimeoutMilliseconds: 3000)));
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, 3000);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveTimeout);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(1m, axis.TpToRpRatio);
+        Assert.Equal(6000m, axis.PositionTp.Value);
+        Assert.Equal(3000m, axis.PositionRp.Value);
     }
 
     [Fact]

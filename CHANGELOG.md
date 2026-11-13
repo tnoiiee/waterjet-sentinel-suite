@@ -13,6 +13,86 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-13 — R3: the TP-to-RP register relation becomes a per-axis profile value (`tpToRpRatio`)
+
+**Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN,
+MERGE HOLD); .NET RESTORE / BUILD / TEST NOT RUN — no .NET SDK exists in the Agent environment, so the
+Owner-local gate on the exact head (locked restore, Release build with `TreatWarningsAsErrors`, full test
+matrix) remains the validation of record. The last Owner-executed evidence is 0 warnings / 0 errors and
+1874 passed / 0 failed at `64574b7`; the expected total on this head is 1880, that 1874 plus the 6 new
+facts listed below. NO HARDWARE. NO PHYSICAL OR MODBUS COMMAND. `D-sim` REMAINS
+OPEN until re-run on this head. PRODUCTION NOT AUTHORIZED.**
+
+- **The measured reason.** A `stage-D-sim` run at `64574b7` moved both WSB1 axes to P1 and stopped there
+  accurately, then waited out `motionTimeoutMilliseconds`
+  (`steps=1449`, `exit=0`, `terminal_status=FailedAwaitingSafeReturn`, `primary_failure=MOVE_TIMEOUT`).
+  After `CE 6,6,6,6` and a zero definition at the Home switch, a positive jog read `RP=10 / TP=+20` and the
+  stand at P1 read `RP=1 800 000 / 2 000 000` against `TP=+3 600 000 / +4 000 000`: an exact **+2 : 1**
+  register relation (encoder 10 000 pulses per revolution against 5 000 commanded pulses, agreeing within
+  about 3 encoder counts = 1.5 command counts). The timeout was the raw-TP half of the arrival test
+  rejecting `TP = 2 * RP`, not an axis that failed to travel. **MEASURED_ON_BENCH.**
+- **The change (Owner-approved Option 1, atomic scope).** New optional per-axis profile key
+  `TpToRpRatio` / `tpToRpRatio`, a `decimal` meaning "how many raw TP counts are one position unit".
+  Absent or `null` means `1m`, so every existing profile keeps its previous behaviour unchanged, and the
+  key is deliberately NOT a `NotConfiguredItems()` entry — an omitted ratio is a ruling, not a missing
+  commissioning value. A key that IS present must be a JSON number greater than zero and not larger than
+  `1 000 000`; a string, a boolean, an object or array, a number no `decimal` can represent, zero, a
+  negative value or an over-bound value refuses the whole profile as `PROFILE_VALUE_INVALID`. It is never
+  clamped into range and never defaulted on the Owner's behalf.
+- **Where it acts, and where it does not.** The ratio is captured per operation for Home,
+  DefinePositionZero and Move, and it divides ONLY the raw TP reading inside the two verification sites:
+  the Move arrival test (`|TP / ratio - target| <= positionTolerance`) and the TP leg of the zero
+  verification (`|TP / ratio| <= tolerance`). The RP leg is untouched (the encoder register carries the
+  commanded unit), no tolerance is widened, no target is rescaled, and the raw `PositionTp` / `PositionRp`
+  values in the axis runtime, in `ManualMotionAxisSnapshot`, on every commissioning grid, in the
+  cleaning-path execution frames and in the logs stay exactly as read — nothing is overwritten. The
+  snapshot publishes `TpToRpRatio` beside those raw readings so a stored record can be re-audited under a
+  corrected ratio.
+- **Bounds audit (no site needed changing).** The commanded target bounds are unaffected:
+  `moveMinimumTarget` / `moveMaximumTarget` and `CleaningPathUnits.MaximumNative = 2 800 000` are checked
+  against the commanded unit only, so a raw TP of `2 * 2 800 000 = 5 600 000` is expected and nothing caps
+  a position read below it. On the read path the only magnitude fence is `MotionObservationCommandPlan`
+  (16 characters, 10 integer digits, 4 fraction digits, `|value| <= 10 000 000 000`), which admits
+  `2 * 999 990 000 = 1 999 980 000`; `ManualMotionSession.ValueFitsKind` bounds the status word and brake
+  output state only. `ManualMotionCleaningPathBoundary`, `CleaningPathExecutionCoordinator` and
+  `H1DryCommissioningCoordinator` perform no position arithmetic at all — they test freshness and nullity
+  and consume the session's outcome code — so the ratio reaches the H1 and path verdicts through the
+  session alone, which is the only place it had to be applied.
+- **Test hook.** `ManualMotionSimulatedPort` gained a per-axis `TpMultiplier` (default `1m`) so a 2:1 axis
+  can be modelled: the simulated TP read reports the physical position scaled by it while RP keeps the
+  commanded unit. Synthetic test data only, modelling no vendor-confirmed register mapping.
+  New facts: 4 in `ManualMotionProfileTests` (default, decimal reading and independence of the two Home
+  opt-out keys, zero / negative / text / boolean refusals, the admissible-bound pair `1000000` and
+  `1000001`) and 2 in `ManualMotionSessionTests` (a Move on a `tpToRpRatio: 2` axis verifying with the
+  snapshot still holding the raw `TP = 6000` / `RP = 3000`, and the same axis at the default `1m` still
+  timing out). No existing fixture, assertion or tolerance was edited.
+- **Read-only finding on the IV1 valve supervision in `D-sim` (no line of it changed).** The composition
+  requests the paired isolation valve only after P1 is dual-verified and held, so once the ratio lets P1
+  verify, `SuperviseValveOpen` evaluates `AI-004+` for `IV1` with the limit pair and the thresholds
+  (`LowPressureThresholdBar = 1.0`, `HighPressureThresholdBar = 15.0`). With the Pump STOPPED and `AI-004+`
+  about 0 bar GOOD the open leg can never be satisfied: an active upper limit (DI-021) at 0 bar is
+  `VALVE_OPEN_FEEDBACK_CONTRADICTION`, an inactive one becomes `VALVE_FAILED_TO_OPEN` at the end of the
+  supervision window, and both are `BLOCKED`, which sets the primary failure and ends the path without
+  starting P2 — confirmation needs at least the high band in either branch. The close leg is deliberately
+  the other way: 0 bar with the lower limit (DI-029) is `LOWER_LIMIT_CONFIRMED` with `NONE`, and 0 bar
+  without it is `CLOSED_BY_PRESSURE` with `LOWER_LIMIT_SENSOR_FAULT`; `LEAK_SUSPECTED` and
+  `NOT_FULLY_CLOSED` need 1.0 and 15.0 bar. A missing, stale or wrong-identity sample is never a pass
+  either: `SourceChecked` demands `SourceId == "IV1_OUTLET"`, so a Pump-outlet sample cannot substitute,
+  and an unusable sample yields `VALVE_PRESSURE_INPUT_INVALID` — which blocks the open leg and degrades
+  the close/cleanup record to `Partial` instead of failing the valve claim. Expect this wall after the ratio
+  fix in a pump-stopped `D-sim` run; it is the designed behaviour, not a motion defect, and it stays
+  untouched.
+- **Docs (append-only, dated).** `docs/H1_DRY_CLEANING_PATH_TRIAL_PROCEDURE.md` (new section 21),
+  `docs/MANUAL_MOTION_COMMISSIONING_RUNBOOK.md` (new section 7),
+  `docs/PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md` (new Thai section 3 with the exact profile edit
+  and the expected next wall) and `docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md` (what the measured
+  relation does and does not prove: it licenses a configured count-to-count relation, not an engineering-unit
+  or density claim, and not which physical register each define command writes).
+- **Not verified by this entry:** that it compiles, that the suite passes, that any axis reaches any
+  position on hardware, that `D-sim` now completes, or that the vendor interprets the commanded unit as
+  these measurements suggest. The next validation of record is the Owner's Release build and full test
+  matrix on this head, then one re-run of `stage-D-sim` with `"tpToRpRatio": 2` in the bench profile.
+
 ### 2026-11-13 — Owner rulings R1/R2 on the Manual Motion Home lifecycle + the `D-sim` Pump source-identity seam (software only; no hardware authorization)
 
 **Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN, MERGE HOLD); .NET RESTORE / BUILD / TEST NOT RUN — no .NET SDK exists in the Agent environment, so the Owner-local gate on the exact head (locked restore, Release build with `TreatWarningsAsErrors`, full test matrix) remains the validation of record. The last Owner-executed evidence is 0 warnings / 0 errors and 1862 passed / 0 failed at `6b5791e`. NO HARDWARE. NO PHYSICAL OR MODBUS COMMAND. `D-sim` REMAINS OPEN until re-run on this head. PRODUCTION NOT AUTHORIZED.**

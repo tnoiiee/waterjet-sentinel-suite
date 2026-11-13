@@ -732,3 +732,67 @@ addendum and nothing here authorizes a run.
   route) are unchanged. The D-sim evidence continues to print the declared identity and
   `physical_pump_verified=False`. This document records a software repair only: **`D-sim` remains OPEN
   until the Owner re-runs it on the new head and the transcript is reviewed.**
+
+
+## 21. Dated addendum — 2026-11-13 (the TP register relation is a profile value: `tpToRpRatio`)
+
+Validation class of this section: **SOFTWARE_AUTHORED, NOT_COMPILED** (no .NET SDK exists in the Agent
+environment; the Owner-local Release build and full test matrix on the exact head remain the validation of
+record) plus **MEASURED_ON_BENCH** for the register relation it encodes. It adds no step to sections 1..19
+and changes no authorization: gates A/B/C/E stay CLOSED, `D-pump` and `D-pump-mv` stay CLOSED, `D-sim`
+stays OPEN, `D-dry` and `F` stay WAIVED, PRODUCTION NOT AUTHORIZED.
+
+- **The bench fact this section encodes.** At head `64574b7`, a `stage-D-sim` run on the physical bench
+  reached P1, stopped accurately at it, and then waited out `motionTimeoutMilliseconds`
+  (`steps=1449`, `exit=0`, `terminal_status=FailedAwaitingSafeReturn`, `primary_failure=MOVE_TIMEOUT`).
+  After `CE 6,6,6,6` and a zero definition at Home, jogging positive produced `RP=10 / TP=+20`, and the
+  stand at P1 produced `RP=1 800 000 / 2 000 000` against `TP=+3 600 000 / +4 000 000`: one encoder register
+  counting 10 000 pulses per revolution against a drive commanding 5 000, i.e. an exact **+2 : 1** relation
+  (agreement within about 3 encoder counts = 1.5 command counts). The timeout was therefore the raw-TP half
+  of the arrival test rejecting `TP = 2 * RP`, not an axis that failed to travel.
+- **The one new profile key.** `tpToRpRatio` (property `TpToRpRatio`) is an optional per-axis `decimal`:
+  how many raw TP counts represent one position unit. Absent or `null` means `1m`, so every profile written
+  before this key keeps its previous meaning byte-for-byte and the key is deliberately NOT a
+  `NotConfiguredItems()` entry. A key that IS present must be a JSON number greater than zero and not
+  larger than `1 000 000`; a string, a boolean, an object, zero, a negative value or an over-bound value
+  refuses the whole profile as `PROFILE_VALUE_INVALID` — it is never clamped and never defaulted.
+- **Where the ratio is applied, and where it is not.** Exactly two comparison sites change: the TP leg of
+  the Move arrival test and the TP leg of the zero verification. Each divides the raw reading by the ratio
+  before comparing it, so `|TP / ratio - target| <= positionTolerance` and `|TP / ratio| <= tolerance`. The
+  RP leg stays 1:1 because the encoder register is the one carrying the commanded unit. Everything else
+  keeps the RAW value: the axis runtime, `ManualMotionAxisSnapshot.PositionTp`, `PositionRp`, the
+  commissioning grids, the cleaning-path execution frames and every log line. The snapshot now also
+  publishes `TpToRpRatio`, so a stored record can be re-audited under a corrected ratio without re-running
+  the axis. **No tolerance is widened and no reading is overwritten.**
+- **Audit result on the magnitude bounds (nothing needed changing).** The commanded target bounds are
+  untouched by the ratio: `CleaningPathUnits.MaximumNative = 2 800 000` is checked against
+  `point.HorizontalNative` / `point.VerticalNative`, and `moveMinimumTarget` / `moveMaximumTarget` against
+  the requested target. The largest raw TP such an axis can report is therefore `2 * 2 800 000 =
+  5 600 000`, and no code caps a position read below that. The only magnitude fence on the read path is
+  `MotionObservationCommandPlan`: at most 16 characters, at most 10 integer digits, at most 4 fraction
+  digits and `|value| <= 10 000 000 000` — which admits `2 * 999 990 000 = 1 999 980 000` (10 digits,
+  10 characters). `ManualMotionSession.ValueFitsKind` bounds only the status word and the brake output
+  state, never a position. No boundary in `ManualMotionCleaningPathBoundary`,
+  `CleaningPathExecutionCoordinator` or `H1DryCommissioningCoordinator` performs position arithmetic at
+  all: they check freshness and nullity and consume the session's outcome code, so the ratio reaches the
+  H1 and path verdicts through the session alone.
+- **The next wall in `D-sim` is the IV1 open supervision, and that is correct.** Once P1 verifies, the
+  composition requests the paired isolation valve only after P1 is dual-verified and held
+  (`SuperviseValveOpen` reads `AI-004+` for `IV1` and the two limit switches), so with the pump STOPPED and
+  `AI-004+` about 0 bar GOOD: `SequencingPressure.Open` with the upper limit (DI-021) active classifies
+  `VALVE_OPEN_FEEDBACK_CONTRADICTION` (0 bar is below the 1.0 bar low band), and without it the window ends
+  at `VALVE_FAILED_TO_OPEN`; both are `BLOCKED`, which blocks the advance gate and ends the path without
+  starting P2. An open confirmation needs `>= HighPressureThresholdBar` (15.0 bar) in either branch, which
+  a stopped pump cannot produce — and the sample identity must be exactly `IV1_OUTLET` (`SourceChecked`), so
+  a Pump-outlet sample never substitutes. The close leg behaves the other way on purpose: 0 bar with the
+  lower limit (DI-029) active is `LOWER_LIMIT_CONFIRMED` with `NONE`, and 0 bar without it is
+  `CLOSED_BY_PRESSURE` with `LOWER_LIMIT_SENSOR_FAULT`; only a pressure of at least 1.0 bar (leak) or 15.0
+  bar (not fully closed) fails it. A refused or unusable pressure sample is not a pass either: it is
+  `VALVE_PRESSURE_INPUT_INVALID`, which blocks the open leg and degrades the close/cleanup record to
+  `Partial`. This is a read-only finding: no line of that supervision was changed here, and none of it is
+  evidence about a real valve position.
+- **Procedure effect.** Sections 3 and 18 keep their wording: a procedure that must keep the older Home
+  refusal still sets `acceptHomeWhenInputActive: false`, and a procedure run on an axis with a measured 2:1
+  register relation now records `"tpToRpRatio": 2` in that axis's profile instead of reasoning about the
+  doubling by hand. `CE 6,6,6,6` and the zero-at-Home step stay exactly as written, and nothing in this
+  section authorizes a command, a tolerance change or a re-run of any closed stage.

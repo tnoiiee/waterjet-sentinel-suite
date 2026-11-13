@@ -888,3 +888,30 @@ nothing. Trigger: the Owner's R1 and R2 rulings on the Manual Motion Home lifecy
   fact above (read both registers from the port at one instant) is the only form of that evidence this
   branch accepts. `acceptHomeWhenInputActive` changes no tolerance, no ratio and no scaling statement, and
   the deferred `R3` density question is neither supported nor weakened by it.
+
+
+## Dated addendum — 2026-11-13 (the measured TP:RP relation, and what it does and does not prove)
+
+Validation class: **MEASURED_ON_BENCH** for the numbers, **SOFTWARE_AUTHORED, NOT_COMPILED** for the
+software that consumes them.
+
+- What the bench produced at head `64574b7`, after `CE 6,6,6,6` and a zero definition at the Home switch:
+  jogging positive read `RP=10 / TP=+20`, and the stand at P1 read `RP=1 800 000 / 2 000 000` against
+  `TP=+3 600 000 / +4 000 000`. Both axes agree on one relation: two raw TP counts per one RP count,
+  consistent with 10 000 encoder pulses per revolution against 5 000 commanded pulses per revolution, and
+  agreeing within about 3 encoder counts (1.5 command counts). The measurement is of the two registers the
+  port reported at one instant, which is the only form of register evidence this branch accepts (see the
+  2026-11-12 record above).
+- What this baseline can now support: the Product may treat `TP = 2 * RP` as a **configured** relation for
+  these two axes, because the Owner measured it on this bench and the profile key `tpToRpRatio` states it
+  per axis. It remains a measured register relation, not a vendor document: no GCLIB manual, controller
+  dump or drive parameter listing was read to produce it, and the ratio says nothing about which physical
+  register each define command writes — that question stays open exactly as section I left it.
+- What it still cannot support: a density or engineering-unit claim. The ratio is a count-to-count
+  relation; it is not a millimetre calibration, not a steps-per-millimetre figure and not a statement that
+  the controller interprets the commanded unit the same way. The deferred `R3` density question is
+  unaffected: this addendum normalizes one comparison, it does not convert units anywhere.
+- What changed in behaviour: an axis whose profile states the relation verifies a Move and a zero against
+  the normalized TP reading; an axis whose profile omits it keeps the raw comparison and therefore keeps
+  failing closed on such a register. The failure mode is the safety property — nothing was relaxed to make
+  the bench transcript pass, the tolerance stayed at 2, and the raw readings in the record are unchanged.

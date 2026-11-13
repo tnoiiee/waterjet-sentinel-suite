@@ -358,3 +358,30 @@ Nothing in a software or simulated pass proves:
 Related evidence: `docs/evidence/MANUAL_MOTION_LEGACY_CONTINUITY.md`,
 `docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md`, and
 `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`.
+
+
+## 7. Dated addendum — 2026-11-13 (`tpToRpRatio`: the TP register relation of one axis)
+
+Validation class: **SOFTWARE_AUTHORED, NOT_COMPILED**. No hardware was touched by this section and no
+simulated value in it is hardware evidence.
+
+- The Owner-local profile accepts one new optional per-axis key, `tpToRpRatio` (a `decimal`): the number of
+  raw TP register counts per position unit, `1m` when the key is absent or `null`. Like the two other
+  optional Home keys it is listed in the allowed axis properties, it is deliberately NOT a NOT_CONFIGURED
+  item, and a present key that is not a number greater than zero and not larger than `1 000 000` refuses
+  the whole profile rather than being coerced.
+- It rescales nothing. The runtime keeps the raw TP and RP observations, the snapshot publishes them raw and
+  adds `TpToRpRatio` beside them, and the grids and logs print the raw numbers. Only the two TP comparisons
+  inside the session (the Move arrival test and the zero verification) divide the reading by the ratio
+  before applying `positionTolerance`; the RP comparisons are untouched. A profile that omits the key
+  therefore evaluates the arrival test exactly as before this option existed.
+- The simulated port gained a per-axis `TpMultiplier` (default `1m`) so a 2:1 axis can be modelled in
+  tests: the simulated TP read reports the physical position scaled by it while RP keeps the commanded
+  unit, which is how the raw-TP arrival refusal and its repair are both pinned without widening any
+  tolerance. That knob is synthetic test data; it models no vendor-confirmed register mapping.
+- Bounds audit, recorded so a future reader does not have to repeat it: the commanded target bounds
+  (`moveMinimumTarget` / `moveMaximumTarget`, and `CleaningPathUnits.MaximumNative = 2 800 000` for path
+  points) apply to the commanded unit only, so a TP reading of `2 * 2 800 000 = 5 600 000` is expected and
+  is not capped anywhere; the read path's only magnitude fence is
+  `MotionObservationCommandPlan` (16 characters, 10 integer digits, 4 fraction digits,
+  `|value| <= 10 000 000 000`). Nothing in this suite rejects `TP = 2 * RP`.

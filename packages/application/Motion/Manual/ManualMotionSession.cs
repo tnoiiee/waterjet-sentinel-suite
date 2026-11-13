@@ -572,6 +572,7 @@ public sealed class ManualMotionSession
 
             case ManualMotionOperationKind.DefinePositionZero:
                 CaptureZeroVerification(op, p);
+                op.TpToRpRatio = p.TpToRpRatio;
                 op.VerifiesActualPosition = true;
                 op.Phase = ManualMotionOperationPhase.DefiningZero;
                 break;
@@ -593,6 +594,7 @@ public sealed class ManualMotionSession
             case ManualMotionOperationKind.Home:
                 CaptureMotion(op, p);
                 CaptureZeroVerification(op, p);
+                op.TpToRpRatio = p.TpToRpRatio;
 
                 // The profile is the authority and the Operator intent can only narrow it. An absent
                 // profile key means true, so an Owner-local profile that predates this option defines
@@ -629,6 +631,11 @@ public sealed class ManualMotionSession
                 op.Tolerance = p.PositionTolerance ?? 0;
                 op.RunTimeout = Milliseconds(p.MotionTimeoutMilliseconds ?? 0);
                 op.Target = request.Target;
+
+                // The register relation is captured once for the life of the operation, so a profile edit
+                // mid-operation cannot move the yardstick under a running Move. Only the TP leg of the
+                // arrival test divides by it: the commanded target and the RP leg stay 1:1.
+                op.TpToRpRatio = p.TpToRpRatio;
                 op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Acceleration, axis, p.MoveAcceleration ?? 0, 0));
                 op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Speed, axis, p.MoveSpeed ?? 0, 0));
                 op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Deceleration, axis, p.MoveDeceleration ?? 0, 0));
@@ -1131,7 +1138,10 @@ public sealed class ManualMotionSession
         }
 
         var runtime = Runtime(op.Axis);
-        var tp = ZeroReading(runtime.PositionTp, op.ZeroSequence, now, op.Tolerance);
+        // The TP leg of the zero verification is normalized by the same profile relation as the arrival
+        // test (1 by default), while the RP leg below is not: the register that a DE definition zeroed is
+        // read in its own unit. Both readings stay raw in the runtime and in the published snapshot.
+        var tp = ZeroReading(runtime.PositionTp, op.ZeroSequence, now, op.Tolerance, op.TpToRpRatio);
         if (!op.VerifiesActualPosition)
         {
             // The profile keeps the encoder definition off this Home, so only the register that this Home
@@ -1823,28 +1833,44 @@ public sealed class ManualMotionSession
         }
 
         var runtime = Runtime(op.Axis);
-        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, op.Target, op.Tolerance)
+
+        // The TP leg is compared in the commanded unit: the raw reading is divided by the profile register
+        // relation of this axis, which is 1 for every profile that omits the key and therefore leaves this
+        // test exactly as it was. The relation rescales nothing else - runtime.PositionTp and the published
+        // snapshot keep the raw value, and the RP leg stays 1:1 because the encoder register is the one
+        // that carries the commanded unit.
+        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, op.Target, op.Tolerance, op.TpToRpRatio)
             && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, op.Target, op.Tolerance);
     }
 
-    private bool WithinTolerance(Observation observation, long afterSequence, DateTimeOffset now, int target, int tolerance)
+    private bool WithinTolerance(
+        Observation observation,
+        long afterSequence,
+        DateTimeOffset now,
+        int target,
+        int tolerance,
+        decimal scale = 1m)
     {
         if (observation.Sequence <= afterSequence || !IsFresh(observation, now) || observation.Value is not decimal value)
         {
             return false;
         }
 
-        return Math.Abs(value - target) <= tolerance;
+        // The scale is a profile value that was validated on read, so it is always a positive finite
+        // number: no zero or negative divisor can reach this division.
+        var measured = scale == 1m ? value : value / scale;
+        return Math.Abs(measured - target) <= tolerance;
     }
 
-    private bool? ZeroReading(Observation observation, long afterSequence, DateTimeOffset now, int tolerance)
+    private bool? ZeroReading(Observation observation, long afterSequence, DateTimeOffset now, int tolerance, decimal scale = 1m)
     {
         if (observation.Sequence <= afterSequence || !IsFresh(observation, now) || observation.Value is not decimal value)
         {
             return null;
         }
 
-        return Math.Abs(value) <= tolerance;
+        var measured = scale == 1m ? value : value / scale;
+        return Math.Abs(measured) <= tolerance;
     }
 
     // ---------------------------------------------------------------------------- publication
@@ -1931,6 +1957,7 @@ public sealed class ManualMotionSession
             AllowedByProfile = p is not null,
             AutoResetEncoderOnHome = p?.AutoResetEncoderOnHome ?? false,
             AcceptHomeWhenInputActive = p?.AcceptHomeWhenInputActive ?? false,
+            TpToRpRatio = p?.TpToRpRatio ?? 1m,
             BrakeCommandState = runtime.BrakeCommandState,
             BrakeOutput = ObservationSnapshot(runtime.BrakeOutput, now),
             StatusWord = ObservationSnapshot(runtime.Status, now),
@@ -2259,6 +2286,13 @@ public sealed class ManualMotionSession
         public TimeSpan HeartbeatTimeout { get; set; }
 
         public int Tolerance { get; set; }
+
+        /// <summary>
+        /// The profile TP-to-RP relation captured when this operation started (1 when the profile omits
+        /// <c>tpToRpRatio</c>). It is a divisor for the TP comparisons only; it is never applied to a
+        /// commanded target, to the RP comparison, or to any stored or published reading.
+        /// </summary>
+        public decimal TpToRpRatio { get; set; } = 1m;
 
         public bool HasZeroVerification { get; set; }
 

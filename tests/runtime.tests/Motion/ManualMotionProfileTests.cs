@@ -270,6 +270,104 @@ public sealed class ManualMotionProfileTests
     }
 
     [Fact]
+    public void The_Tp_To_Rp_Ratio_Defaults_To_One_When_The_Profile_Omits_It()
+    {
+        // An axis whose position register ticks 1:1 with the commanded unit needs no key, so every
+        // profile written before this option existed keeps its exact previous meaning: one TP count per
+        // position unit. The default is a complete configuration and never a commissioning gap.
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(CompleteProfile).Profile);
+
+        Assert.Equal(1m, Assert.IsType<ManualMotionAxisProfile>(profile.AxisA).TpToRpRatio);
+
+        var axisB = Assert.IsType<ManualMotionAxisProfile>(profile.AxisB);
+        Assert.Equal(1m, axisB.TpToRpRatio);
+
+        // Deliberately not a NOT_CONFIGURED item: an absent ratio is a ruling of 1:1, not a value the
+        // Owner still has to measure, so it can never become a blocker in the not-configured census.
+        Assert.DoesNotContain("tpToRpRatio", axisB.NotConfiguredItems());
+    }
+
+    [Fact]
+    public void The_Tp_To_Rp_Ratio_Is_Read_As_A_Decimal_And_A_Null_Means_One()
+    {
+        const string scaled = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "tpToRpRatio": 2
+                },
+                "B": {
+                  "brakeOutput": 2,
+                  "tpToRpRatio": 1.25
+                },
+                "C": {
+                  "brakeOutput": 3,
+                  "tpToRpRatio": null
+                }
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(scaled);
+        Assert.True(result.Accepted);
+        var profile = Assert.IsType<ManualMotionProfile>(result.Profile);
+
+        // The Owner-measured bench relation of 10 000 encoder pulses per revolution against 5 000
+        // commanded pulses per revolution, kept exactly as written and never rounded to an integer.
+        Assert.Equal(2m, Assert.IsType<ManualMotionAxisProfile>(profile.AxisA).TpToRpRatio);
+        Assert.Equal(1.25m, Assert.IsType<ManualMotionAxisProfile>(profile.AxisB).TpToRpRatio);
+
+        // A null is the same decision as an absent key, and the other optional keys are untouched by it.
+        var axisC = Assert.IsType<ManualMotionAxisProfile>(profile.AxisC);
+        Assert.Equal(1m, axisC.TpToRpRatio);
+        Assert.True(axisC.AcceptHomeWhenInputActive);
+        Assert.True(axisC.AutoResetEncoderOnHome);
+    }
+
+    [Fact]
+    public void A_TP_To_RP_Ratio_That_Is_Zero_Negative_Or_Not_A_Number_Refuses_The_Whole_Profile()
+    {
+        // Zero would make the TP comparison divide by nothing and a negative value would invert the
+        // register: both are refused outright rather than clamped to the default, and a text value is a
+        // malformed profile, never a number to be parsed leniently. A refusal carries no profile at all.
+        foreach (var value in new[] { "0", "-2", "\"2\"", "true" })
+        {
+            var text = ReplaceInProfile(
+                "\"dualZeroPermitted\": true",
+                "\"dualZeroPermitted\": true, \"tpToRpRatio\": " + value);
+            var result = ManualMotionProfileParser.Parse(text);
+
+            Assert.False(result.Accepted);
+            Assert.Null(result.Profile);
+            Assert.Equal(ManualMotionCodes.ProfileValueInvalid, result.Code);
+        }
+    }
+
+    [Fact]
+    public void A_TP_To_RP_Ratio_Outside_The_Admisible_Bound_Refuses_The_Profile()
+    {
+        // The bound is a sanity fence against a mis-typed value (one million TP counts per position unit
+        // is a gearing this suite will not act on), and it is generous enough that any real encoder
+        // relation fits inside it. At the bound the value is still accepted, as the largest admissible one.
+        var atBound = ReplaceInProfile(
+            "\"dualZeroPermitted\": true",
+            "\"dualZeroPermitted\": true, \"tpToRpRatio\": 1000000");
+        Assert.True(ManualMotionProfileParser.Parse(atBound).Accepted);
+
+        var overBound = ReplaceInProfile(
+            "\"dualZeroPermitted\": true",
+            "\"dualZeroPermitted\": true, \"tpToRpRatio\": 1000001");
+        var refused = ManualMotionProfileParser.Parse(overBound);
+        Assert.False(refused.Accepted);
+        Assert.Null(refused.Profile);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refused.Code);
+    }
+
+    [Fact]
     public void Only_The_Listed_Axes_Are_Allowed()
     {
         // A self-contained one-axis profile (no multi-line excerpt of CompleteProfile, so this test
