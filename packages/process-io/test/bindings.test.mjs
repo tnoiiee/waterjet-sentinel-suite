@@ -143,12 +143,54 @@ test('bindings: owner rulings preserved (pressure identities and ordinal rules)'
   assert.equal(OWNER_RULINGS.ivUpperLimitRows.length, 8);
 });
 
+test('bindings: corrected WSB limit mapping (20..27 Upper/open, 28..35 Lower/closed)', () => {
+  // Owner correction ACCELERATED-CLEANING-INTEGRATION-01: the superseded workbook had these
+  // reversed. Upper is the OPEN-position feedback and Lower the CLOSED-position feedback.
+  assert.deepEqual(
+    [...OWNER_RULINGS.ivUpperLimitRows],
+    ['DI-021', 'DI-022', 'DI-023', 'DI-024', 'DI-025', 'DI-026', 'DI-027', 'DI-028'],
+  );
+  assert.deepEqual(
+    [...OWNER_RULINGS.ivLowerLimitRows],
+    ['DI-029', 'DI-030', 'DI-031', 'DI-032', 'DI-033', 'DI-034', 'DI-035', 'DI-036'],
+  );
+  assert.deepEqual([...OWNER_RULINGS.ivOpenFeedbackRows], [...OWNER_RULINGS.ivUpperLimitRows]);
+  assert.deepEqual([...OWNER_RULINGS.ivClosedFeedbackRows], [...OWNER_RULINGS.ivLowerLimitRows]);
+  assert.equal(OWNER_RULINGS.ivLimitOrdinalRule, 'DI-020+k -> IVk Upper/open Limit; DI-028+k -> IVk Lower/closed Limit');
+
+  for (let i = 1; i <= 8; i += 1) {
+    const upper = ROW_BINDINGS[`DI-0${20 + i}`];
+    const lower = ROW_BINDINGS[`DI-0${28 + i}`];
+    assert.equal(upper.address, 19 + i);
+    assert.equal(lower.address, 27 + i);
+    assert.ok(upper.address < lower.address);
+    assert.match(upper.legacyPath, new RegExp(`WSB Upper Limit Switch #${i} \\(NO\\)`));
+    assert.match(lower.legacyPath, new RegExp(`WSB Lower Limit Switch #${i} \\(NO\\)`));
+  }
+});
+
+test('bindings: IV command authority is the maintained coil 21+n', () => {
+  assert.deepEqual(
+    [...OWNER_RULINGS.ivCommandRows],
+    ['DO-023', 'DO-024', 'DO-025', 'DO-026', 'DO-027', 'DO-028', 'DO-029', 'DO-030'],
+  );
+  for (let i = 1; i <= 8; i += 1) {
+    const row = ROW_BINDINGS[`DO-0${22 + i}`];
+    assert.equal(row.address, 21 + i);
+    assert.equal(row.direction, 'WRITE');
+    assert.equal(READ_BACK_SOURCES[`DO-0${22 + i}`].readBackRow, `DI-0${20 + i}`);
+  }
+  assert.equal(OWNER_RULINGS.ivCommandSemantics.open, 'true / energised');
+  assert.equal(OWNER_RULINGS.ivCommandSemantics.close, 'false / de-energised');
+  assert.equal(OWNER_RULINGS.ivCommandSemantics.writeFunctionCode, 'FC05');
+});
+
 test('bindings: command shapes and read-back sources adopted', () => {
   assert.equal(OUTPUT_COMMAND_SHAPE['DO-008'].shape, 'PAIRED_COMPLEMENT');
   assert.equal(OUTPUT_COMMAND_SHAPE['DO-008'].pair, 'DO-009');
   assert.equal(OUTPUT_COMMAND_SHAPE['DO-001'].shape, 'MUTUAL_EXCLUSIVE_MAINTAINED');
   assert.equal(OUTPUT_COMMAND_SHAPE['DO-023'].shape, 'MAINTAINED');
-  assert.equal(READ_BACK_SOURCES['DO-023'].readBackRow, 'DI-029');
+  assert.equal(READ_BACK_SOURCES['DO-023'].readBackRow, 'DI-021');
   assert.equal(READ_BACK_SOURCES['AO-001+'].readBackRow, null);
 });
 

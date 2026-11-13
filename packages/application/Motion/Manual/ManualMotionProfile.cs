@@ -78,6 +78,43 @@ public sealed class ManualMotionAxisProfile
     /// <summary>True only when the Owner-local profile explicitly permits the dual-zero definition on this axis.</summary>
     public bool DualZeroPermitted { get; init; }
 
+    /// <summary>
+    /// True (the default, and the value when the profile omits the key) makes the Home sequence define
+    /// both position registers at the switch: DP{axis}=0 and then DE{axis}=0, after which the zero
+    /// verification reads BOTH registers. When this profile value is false, Home dispatches DP{axis}=0
+    /// only and the verification reads only the register that DP defines, so a divergent second register
+    /// stays inspectable without failing Home. This profile value is the authority: an Operator surface
+    /// cannot enable the encoder definition that the profile refuses, and no profile value ever relaxes
+    /// the freshness, sequence or tolerance conditions of the verification itself.
+    /// </summary>
+    public bool AutoResetEncoderOnHome { get; init; } = true;
+
+    /// <summary>
+    /// True (the default, and the value when the profile omits the key) permits a Home request that
+    /// arrives while the home input is ALREADY active: the axis is standing on the switch, so the
+    /// operation dispatches no home speed and no Begin, defines the zero registers at that position and
+    /// completes exactly as a Home that traveled there would. False keeps the former refusal, so a
+    /// commissioning procedure that requires the axis to be moved off the input first can pin that
+    /// reading in its own profile. Neither value relaxes any other condition: the brake, stationarity,
+    /// freshness, feedback-configuration, tolerance and zero-verification preconditions all still run,
+    /// and no value of this key ever starts travel toward an active switch.
+    /// </summary>
+    public bool AcceptHomeWhenInputActive { get; init; } = true;
+
+    /// <summary>
+    /// The number of raw TP register counts that represent one position unit: 1 (the default, and the
+    /// value when the profile omits the key) means the two registers tick 1:1. A value of 2 says the
+    /// position register counts twice per commanded unit, which is the Owner-measured bench relation of
+    /// 10 000 encoder pulses per revolution against 5 000 commanded pulses per revolution. This value
+    /// NEVER rescales anything: the raw TP and RP reads stay raw and separate in the runtime, in the
+    /// snapshot and on every grid, so a record remains re-auditable under a corrected ratio. It is applied
+    /// only where a TP reading is compared against a commanded target or against a defined zero, and the
+    /// RP comparison is never scaled. The key is optional, so an axis that omits it is never reported as
+    /// NOT_CONFIGURED; a present key must be a number greater than zero and not larger than the admissible
+    /// ratio bound, or the whole profile is refused as ProfileValueInvalid.
+    /// </summary>
+    public decimal TpToRpRatio { get; init; } = 1m;
+
     /// <summary>The profile property names that are NOT_CONFIGURED for this axis, in schema order.</summary>
     public IReadOnlyList<string> NotConfiguredItems()
     {
@@ -387,6 +424,12 @@ public static class ManualMotionProfileParser
     private const string SessionProperty = "session";
     private const string AxesProperty = "axes";
 
+    /// <summary>
+    /// The largest admissible TP-to-RP ratio: more than one million raw TP counts per position unit is a
+    /// mis-typed value, never a gearing this suite will act on.
+    /// </summary>
+    private const decimal MaximumTpToRpRatio = 1_000_000m;
+
     private static readonly JsonDocumentOptions DocumentOptions = new()
     {
         AllowTrailingCommas = false,
@@ -431,6 +474,9 @@ public static class ManualMotionProfileParser
         "homeStatusBit",
         "homeActiveValue",
         "dualZeroPermitted",
+        "autoResetEncoderOnHome",
+        "acceptHomeWhenInputActive",
+        "tpToRpRatio",
     };
 
     /// <summary>Reads one Owner-local profile text. Never throws for malformed input.</summary>
@@ -617,7 +663,10 @@ public static class ManualMotionProfileParser
             || !TryReadInt(element, "motionActiveValue", 0, 1, out var motionActive)
             || !TryReadInt(element, "homeStatusBit", 0, 7, out var homeBit)
             || !TryReadInt(element, "homeActiveValue", 0, 1, out var homeActive)
-            || !TryReadBoolean(element, "dualZeroPermitted", out var dualZeroPermitted))
+            || !TryReadBoolean(element, "dualZeroPermitted", out var dualZeroPermitted)
+            || !TryReadBooleanDefaulting(element, "autoResetEncoderOnHome", true, out var autoResetEncoderOnHome)
+            || !TryReadBooleanDefaulting(element, "acceptHomeWhenInputActive", true, out var acceptHomeWhenInputActive)
+            || !TryReadTpToRpRatio(element, "tpToRpRatio", out var tpToRpRatio))
         {
             return ManualMotionCodes.ProfileValueInvalid;
         }
@@ -658,6 +707,9 @@ public static class ManualMotionProfileParser
             HomeStatusBit = homeBit,
             HomeActiveValue = homeActive,
             DualZeroPermitted = dualZeroPermitted,
+            AutoResetEncoderOnHome = autoResetEncoderOnHome,
+            AcceptHomeWhenInputActive = acceptHomeWhenInputActive,
+            TpToRpRatio = tpToRpRatio,
         };
 
         return null;
@@ -699,6 +751,63 @@ public static class ManualMotionProfileParser
         }
 
         if (parsed < minimum || parsed > maximum)
+        {
+            return false;
+        }
+
+        value = parsed;
+        return true;
+    }
+
+    /// <summary>
+    /// Reads an optional boolean whose ABSENT or null form means <paramref name="defaultValue"/>. A key
+    /// present with a non-boolean value is a shape failure: it is never silently coerced to a default.
+    /// </summary>
+    private static bool TryReadBooleanDefaulting(JsonElement element, string name, bool defaultValue, out bool value)
+    {
+        value = defaultValue;
+        if (!element.TryGetProperty(name, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (property.ValueKind == JsonValueKind.True)
+        {
+            value = true;
+            return true;
+        }
+
+        if (property.ValueKind == JsonValueKind.False)
+        {
+            value = false;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Reads the optional <c>tpToRpRatio</c>. An ABSENT or null key means 1 (the two registers tick 1:1),
+    /// so omitting it is a complete configuration and never a NOT_CONFIGURED item. A key that IS present
+    /// must be a JSON number greater than zero and not larger than <see cref="MaximumTpToRpRatio"/>: a
+    /// string, a boolean, an object or array, a number a decimal cannot represent, zero or a negative
+    /// value is a shape failure that refuses the whole profile. It is never coerced to the default and
+    /// never clamped into range.
+    /// </summary>
+    private static bool TryReadTpToRpRatio(JsonElement element, string name, out decimal value)
+    {
+        value = 1m;
+        if (!element.TryGetProperty(name, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.Number || !property.TryGetDecimal(out var parsed))
+        {
+            return false;
+        }
+
+        if (parsed <= 0m || parsed > MaximumTpToRpRatio)
         {
             return false;
         }

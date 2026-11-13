@@ -243,11 +243,22 @@ public static class ProcessIoRefusals
     public const string SessionNotOpen = "WJSS_SESSION_NOT_OPEN";
     public const string ConfigRefused = "WJSS_CONFIG_REFUSED";
     public const string NoNetworkIoOnRefusal = "WJSS_NO_NETWORK_IO_ON_REFUSAL";
+
+    // Observation refusals (typed values, never exceptions, zero network I/O on refusal).
+    public const string ObservationRefusedUnbound = "WJSS_OBSERVATION_REFUSED_UNBOUND";
+    public const string ObservationRefusedNotCommissioned = "WJSS_OBSERVATION_REFUSED_NOT_COMMISSIONED";
+    public const string ObservationTransportFault = "WJSS_OBSERVATION_TRANSPORT_FAULT";
+    public const string ObservationStale = "WJSS_OBSERVATION_STALE";
+    public const string ObservationOutOfDomain = "WJSS_OBSERVATION_OUT_OF_DOMAIN";
+    public const string ObservationRefusedGeneration = "WJSS_OBSERVATION_REFUSED_GENERATION";
 }
 
 /// <summary>
 /// Exact engineering conversion constants. The formulas are the clamped linear map
-/// chains of the runtime call sites (raw 0..32767 full scale). Mirrored by legacyEvidence.mjs.
+/// chains of the runtime call sites (raw 0..32767 full scale), with the two corrections the commissioned
+/// hardware forced: the Pump Outlet live zero is applied by the channel and not a second time in software,
+/// and the water-level span follows Legacy rev2 (0..240). Both are recorded with their evidence in
+/// docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md. Mirrored by legacyEvidence.mjs.
 /// </summary>
 public static class ProcessIoEngineering
 {
@@ -264,16 +275,31 @@ public static class ProcessIoEngineering
     public static double WcPressureBar(int rawWord)
         => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 40);
 
-    /// <summary>Pump outlet pressure: raw to signal mA 0..20 to bar 0..40 (two stage).</summary>
+    /// <summary>
+    /// Pump outlet pressure: raw 0..32767 to bar 0..40, ONE stage. The 4 mA live zero is already applied
+    /// by the commissioned channel (750-471 slot 13 ch 3, signal type 4-20 mA, user limits 32767/-32768),
+    /// so raw 0 IS 4 mA and raw 32767 IS 20 mA; subtracting the live zero a second time in software was a
+    /// defect inherited from the Legacy call site (rev1 and rev2 both chain raw -&gt; 0..20 mA and then
+    /// 4..20 mA -&gt; 0..40 bar), which under-reported pressure by a factor of 1.54 and silently raised the
+    /// effective Pump-ready threshold from 15 bar to just over 20 bar. Field evidence at 2026-11-07 settled
+    /// it: raw 580 at rest (4.28 mA, ~0.7 bar) and raw 13631 with the pump running against the Owner's
+    /// independent reading of 16.x bar. This is the Owner ruling "4-20 mA, 0-40 bar" implemented exactly, and
+    /// it is now the same conversion as the other pressure transmitters. A below-4 mA loop is reported by
+    /// the channel as a negative word and is refused by the raw-domain check (0..32767) as BAD, never
+    /// clamped into a value, so the fail-closed behaviour is unchanged.
+    /// See docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md.
+    /// </summary>
     public static double PumpOutletPressureBar(int rawWord)
-    {
-        double milliamps = LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 20);
-        return LegacyMap(milliamps, 4, 20, 0, 40);
-    }
+        => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 40);
 
-    /// <summary>Water level: raw to level 0..270.</summary>
+    /// <summary>
+    /// Water level: raw to level 0..240. Legacy rev1 used a 0..270 span; rev2 corrected the same call site to
+    /// 0..240, and the commissioned equipment follows rev2. The percentage output below is unaffected,
+    /// because rev2 derives it as level over the same 0..240 span, which is algebraically raw 0..32767 to
+    /// 0..100. See docs/evidence/LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md.
+    /// </summary>
     public static double WaterTankLevel(int rawWord)
-        => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 270);
+        => LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 240);
 
     /// <summary>Water level percent: raw to 0..100.</summary>
     public static double WaterTankLevelPercent(int rawWord)
@@ -437,4 +463,273 @@ public static class ProcessIoLegacyProvenance
 
     public static string PathFor(string tag) =>
         $"Authoritative T8 fieldbus mapping workbook for {tag} (see packages/process-io/src/legacyEvidence.mjs)";
+}
+
+/// <summary>
+/// Canonical Isolation Valve identity and its exact adopted Process-Io rows
+/// (ACCELERATED-CLEANING-INTEGRATION-01, Owner decisions D1 and D3).
+///
+/// This is NOT a second I/O catalogue: every accessor below resolves through
+/// <see cref="ProcessIoBindings"/> for the address and only supplies the documented ordinal
+/// derivation. The ordinals are fixed by the corrected authoritative workbook and the exact Legacy
+/// command chain:
+///
+///   Legacy cannon n  -> WJn            (canonical Product derivation, unchanged)
+///   WJn              <-> IVn           (one-to-one by ordinal)
+///   IVn command      -> DO-0(22+n)     coil 21+n, FC05, MAINTAINED single coil
+///   IVn OPEN  feedback -> DI-0(20+n)   FC02 address 19+n  (WSB Upper Limit Switch #n)
+///   IVn CLOSED feedback -> DI-0(28+n)  FC02 address 27+n  (WSB Lower Limit Switch #n)
+///   IVn outlet pressure -> AI-(3+n, exactly three digits)+ FC04 input register 2+n
+///                          so n=1 is AI-004+ and n=8 is AI-011+; the tag is never four digits
+///
+/// Command semantics are maintained state, never a pulse: true (energised) = OPEN,
+/// false (de-energised) = CLOSED. Safe cleanup writes false and retains the de-energised state.
+/// FC01 output read-back is process-image evidence only and is never field confirmation.
+///
+/// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the gate).
+/// </summary>
+public static class ProcessIoIsolationValves
+{
+    /// <summary>Exactly eight Water Jets and eight Isolation Valves (never nine, never inferred).</summary>
+    public const int Count = 8;
+
+    /// <summary>Command shapes that carry command authority. Read shapes never write.</summary>
+    public const string MaintainedCommandSemantics = "MAINTAINED_SINGLE_COIL";
+
+    /// <summary>Canonical Product identity, e.g. 1 -> "IV1".</summary>
+    public static string ValveId(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "IV" + ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Strict parse of "IV1".."IV8"; anything else is not an Isolation Valve identity. The supplied
+    /// spelling must be the canonical identity itself, so a zero-padded ordinal or a whitespace-wrapped
+    /// spelling is refused rather than normalized: a physical command identity is never an alias.
+    /// </summary>
+    public static bool TryParseValveId(string? valveId, out int ordinal)
+    {
+        ordinal = 0;
+        if (string.IsNullOrEmpty(valveId)) return false;
+        if (!valveId.StartsWith("IV", StringComparison.Ordinal)) return false;
+        if (!int.TryParse(valveId.AsSpan(2), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out int parsed))
+        {
+            return false;
+        }
+        if (parsed < 1 || parsed > Count) return false;
+
+        // Range validation alone is not strict: "IV01" parses to the in-range ordinal 1. Requiring the
+        // supplied value to be the canonical identity rejects every alias without normalizing it.
+        if (!string.Equals(valveId, ValveId(parsed), StringComparison.Ordinal)) return false;
+
+        ordinal = parsed;
+        return true;
+    }
+
+    /// <summary>The maintained FC05 command coil for IVn (DO-0(22+n)).</summary>
+    public static string CommandTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "DO-0" + (22 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The OPEN-position feedback row for IVn (WSB Upper Limit Switch #n).</summary>
+    public static string OpenFeedbackTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "DI-0" + (20 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>The CLOSED-position feedback row for IVn (WSB Lower Limit Switch #n).</summary>
+    public static string ClosedFeedbackTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "DI-0" + (28 + ordinal).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// The IVn outlet pressure row, AI-004+ .. AI-011+, ordinal by IV identity. The numeric identity is
+    /// exactly three decimal digits, so ordinal 7 is AI-010+ and ordinal 8 is AI-011+. Unpadded
+    /// concatenation would widen to a fourth digit at ordinal 7 and name no adopted row.
+    /// </summary>
+    public static string OutletPressureTag(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        return "AI-"
+            + (3 + ordinal).ToString("D3", System.Globalization.CultureInfo.InvariantCulture)
+            + "+";
+    }
+
+    /// <summary>True for exactly the eight IV outlet pressure tags, AI-004+ .. AI-011+.</summary>
+    public static bool IsOutletPressureTag(string? tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return false;
+        for (int n = 1; n <= Count; n += 1)
+        {
+            if (string.Equals(tag, OutletPressureTag(n), StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>The Pump Outlet Pressure row, the sole Pump-ready pressure authority.</summary>
+    public const string PumpOutletPressureTag = "AI-003+";
+
+    /// <summary>The Pump Inlet Pressure row: diagnostic and trend only, never a Pump-ready source.</summary>
+    public const string PumpInletPressureTag = "AI-002+";
+
+    /// <summary>The adopted command coil address (zero-based coil 21+n).</summary>
+    public static int CommandCoilAddress(int ordinal)
+    {
+        RequireOrdinal(ordinal);
+        if (!ProcessIoBindings.TryGet(CommandTag(ordinal), out ProcessIoPhysicalBinding binding))
+        {
+            throw new InvalidOperationException($"No adopted binding exists for {CommandTag(ordinal)}.");
+        }
+        if (binding.Area != ProcessIoArea.Coil || binding.Direction != "WRITE")
+        {
+            throw new InvalidOperationException(
+                $"{CommandTag(ordinal)} is not an adopted WRITE coil binding; refusing to command it.");
+        }
+        return binding.Address;
+    }
+
+    /// <summary>
+    /// The maintained command state for a typed command kind. OPEN energises (true); CLOSE
+    /// de-energises (false). This is the only place the polarity is expressed.
+    /// </summary>
+    public static bool CoilValueFor(bool open) => open;
+
+    private static void RequireOrdinal(int ordinal)
+    {
+        if (ordinal < 1 || ordinal > Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(ordinal), ordinal, $"Isolation Valve ordinal must be 1..{Count}.");
+        }
+    }
+}
+
+/// <summary>
+/// Truthful quality of one physical Process-Io observation. A synchronous transport read that
+/// returned is evidence that a value was RECEIVED; it is not by itself evidence that the value is
+/// GOOD, current or plausible. The session assigns these from what it actually knows.
+/// </summary>
+public enum ProcessIoObservationQuality
+{
+    /// <summary>The read returned and the value is inside the adopted engineering domain.</summary>
+    GOOD = 0,
+
+    /// <summary>The read returned but the session cannot vouch for the value (unbound, excluded, wrong generation).</summary>
+    UNCERTAIN = 1,
+
+    /// <summary>The read did not return a usable value.</summary>
+    BAD = 2,
+
+    /// <summary>The value is older than the freshness budget, or belongs to a superseded generation.</summary>
+    STALE = 3,
+
+    /// <summary>The channel is not commissioned for observation.</summary>
+    DISABLED = 4,
+}
+
+/// <summary>Where a physical observation came from, as a value a report can carry verbatim.</summary>
+public enum ProcessIoObservationProvenance
+{
+    /// <summary>Read through the adopted catalogue row on the physical-capable transport.</summary>
+    PHYSICAL_READ = 0,
+
+    /// <summary>Read from a deterministic in-memory transport (never physical evidence).</summary>
+    SIMULATED_READ = 1,
+
+    /// <summary>No read was attempted because the session or row refused it.</summary>
+    NOT_OBSERVED = 2,
+}
+
+/// <summary>
+/// One typed physical observation. Every field is something the session actually knows: the raw
+/// word, the engineering value and its unit, the quality it can justify, both timestamps, the
+/// connection generation the value was read under, the freshness verdict and the provenance.
+///
+/// A caller must never synthesise this record from a bare transport call: that would fabricate a
+/// GOOD, current observation. Only <see cref="Wjss.Runtime.Core.ProcessIo.ProcessIoSession"/>
+/// produces it, and only after it has consulted its own generation and state.
+/// </summary>
+public sealed record ProcessIoPhysicalObservation
+{
+    /// <summary>Product tag of the catalogue row, e.g. "AI-003+" or "DI-021".</summary>
+    public required string Tag { get; init; }
+
+    /// <summary>The raw transport value: the word for AI, the bit for DI.</summary>
+    public required int RawValue { get; init; }
+
+    /// <summary>Engineering value when a conversion is adopted for the tag; null for raw-only rows.</summary>
+    public double? EngineeringValue { get; init; }
+
+    /// <summary>Engineering unit for <see cref="EngineeringValue"/>, e.g. "bar".</summary>
+    public string? Unit { get; init; }
+
+    public required ProcessIoObservationQuality Quality { get; init; }
+
+    /// <summary>The instant the value is claimed to describe.</summary>
+    public required DateTimeOffset ObservedAt { get; init; }
+
+    /// <summary>The instant the transport actually returned it. Never earlier than ObservedAt.</summary>
+    public required DateTimeOffset ReceivedAt { get; init; }
+
+    /// <summary>The session connection generation this value was read under.</summary>
+    public required int SourceGeneration { get; init; }
+
+    /// <summary>True only when the quality is GOOD and the sample is inside its freshness budget.</summary>
+    public required bool Fresh { get; init; }
+
+    public required ProcessIoObservationProvenance Provenance { get; init; }
+
+    /// <summary>Typed machine reason, "OK" when nothing was refused.</summary>
+    public required string DiagnosticCode { get; init; }
+
+    /// <summary>True when the record may be used as current process evidence.</summary>
+    public bool IsUsable => Quality == ProcessIoObservationQuality.GOOD && Fresh;
+
+    /// <summary>
+    /// True when the record is current, usable and belongs to the stated live generation. A value
+    /// from a superseded generation is refused rather than reinterpreted.
+    /// </summary>
+    public bool IsUsableAt(DateTimeOffset now, int liveGeneration, TimeSpan freshnessBudget) =>
+        IsUsable
+        && SourceGeneration == liveGeneration
+        && ObservedAt <= now
+        && now - ObservedAt <= freshnessBudget;
+}
+
+/// <summary>
+/// One admitted IV command result. The token belongs to the existing
+/// <see cref="Wjss.Runtime.Core.ProcessIo.ProcessIoSession"/> lifecycle; this record only reports
+/// what happened to it.
+/// </summary>
+public sealed record ProcessIoCommandOutcome
+{
+    public required string ValveId { get; init; }
+
+    public required string Tag { get; init; }
+
+    public required int CoilAddress { get; init; }
+
+    /// <summary>The maintained coil value sent: true = energised = OPEN, false = CLOSED.</summary>
+    public required bool CoilValue { get; init; }
+
+    /// <summary>True only when admission AND dispatch both succeeded.</summary>
+    public required bool Dispatched { get; init; }
+
+    public required string AdmissionCode { get; init; }
+
+    public required string DispatchCode { get; init; }
+
+    public required int SessionGeneration { get; init; }
+
+    public required DateTimeOffset At { get; init; }
+
+    /// <summary>True when the transport threw during dispatch; the exception is captured, never propagated.</summary>
+    public bool TransportFaulted { get; init; }
 }

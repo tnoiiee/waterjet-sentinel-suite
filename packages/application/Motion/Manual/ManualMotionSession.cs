@@ -149,8 +149,27 @@ public sealed class ManualMotionSession
     /// <summary>Requests the typed Stop of one axis. An active motion operation on that axis is stopped through its lifecycle.</summary>
     public void RequestStop(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.Stop, axis));
 
-    /// <summary>Requests Home on one axis.</summary>
+    /// <summary>
+    /// Requests Home on one axis. Whether the switch also defines the encoder register follows
+    /// <see cref="ManualMotionAxisProfile.AutoResetEncoderOnHome"/>, and whether a request that arrives
+    /// while the home input is already active is accepted instead of refused follows
+    /// <see cref="ManualMotionAxisProfile.AcceptHomeWhenInputActive"/>. Both profile values are true when
+    /// the Owner-local profile omits the key.
+    /// </summary>
     public void RequestHome(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.Home, axis));
+
+    /// <summary>
+    /// Requests Home on one axis with the Operator-side intent for the encoder definition. The profile is
+    /// still the authority: false only ever removes the DE{axis}=0 dispatch and the verification of the
+    /// register that DE defines, and no value here relaxes the freshness, sequence or tolerance
+    /// conditions of the zero verification or any other precondition.
+    /// </summary>
+    public void RequestHome(ManualMotionAxis axis, bool resetEncoder, bool acceptHomeWhenInputActive = true) =>
+        Enqueue(new Request(RequestKind.Home, axis)
+        {
+            ResetEncoder = resetEncoder,
+            AcceptHomeWhenInputActive = acceptHomeWhenInputActive,
+        });
 
     /// <summary>Requests define-position-zero on one axis (zero is the only operand).</summary>
     public void RequestDefinePositionZero(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.DefinePositionZero, axis));
@@ -465,7 +484,10 @@ public sealed class ManualMotionSession
                     ?? (p.HomeStatusBit is null || p.HomeActiveValue is null ? ManualMotionCodes.HomeFeedbackNotConfigured : null)
                     ?? (p.PositionTolerance is null ? ManualMotionCodes.PositionToleranceNotConfigured : null)
                     ?? CheckStationary(axis, p, now)
-                    ?? (InterpretHome(axis, now) == ManualMotionInterpretation.Active ? ManualMotionCodes.HomeInputAlreadyActive : null);
+                    ?? (InterpretHome(axis, now) == ManualMotionInterpretation.Active
+                        && !AcceptsActiveHomeInput(p, request)
+                            ? ManualMotionCodes.HomeInputAlreadyActive
+                            : null);
 
             case ManualMotionOperationKind.DefinePositionZero:
                 return CheckStationary(axis, p, now);
@@ -550,6 +572,8 @@ public sealed class ManualMotionSession
 
             case ManualMotionOperationKind.DefinePositionZero:
                 CaptureZeroVerification(op, p);
+                op.TpToRpRatio = p.TpToRpRatio;
+                op.VerifiesActualPosition = true;
                 op.Phase = ManualMotionOperationPhase.DefiningZero;
                 break;
 
@@ -570,11 +594,35 @@ public sealed class ManualMotionSession
             case ManualMotionOperationKind.Home:
                 CaptureMotion(op, p);
                 CaptureZeroVerification(op, p);
+                op.TpToRpRatio = p.TpToRpRatio;
+
+                // The profile is the authority and the Operator intent can only narrow it. An absent
+                // profile key means true, so an Owner-local profile that predates this option defines
+                // both registers at the switch, exactly as the Legacy Reset-encoder order did.
+                op.ResetEncoderOnHome = p.AutoResetEncoderOnHome && request.ResetEncoder is not false;
+                op.VerifiesActualPosition = op.ResetEncoderOnHome;
                 op.HomeBit = p.HomeStatusBit ?? 0;
                 op.HomeActive = p.HomeActiveValue ?? 0;
                 op.RunTimeout = Milliseconds(p.HomeTimeoutMilliseconds ?? 0);
-                op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.HomeSpeed, axis, p.HomeSpeed ?? 0, 0));
-                op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Home, axis, 0, 0));
+
+                // An axis already resting on the home input is accepted only when the profile permits it
+                // (and the Operator surface has not narrowed that permission away). The switch is proven
+                // active by the same fresh status observation the refusal used, so the operation skips the
+                // travel half of Home entirely - no home speed, no Begin, no Stop - and runs the ordinary
+                // zero definition, verification and brake re-apply from here. Every precondition above ran
+                // unchanged, and a permitted request is the ONLY thing this clause can change.
+                op.HomeAtActiveInput = AcceptsActiveHomeInput(p, request)
+                    && InterpretHome(axis, now) == ManualMotionInterpretation.Active;
+                op.HomeDetected = op.HomeAtActiveInput;
+                if (!op.HomeAtActiveInput)
+                {
+                    var homeSpeed = p.HomeSpeed ?? 0;
+                    op.PendingCommands.Enqueue(new ManualMotionPortCommand(
+                        ManualMotionPortCommandKind.HomeSpeed, axis, homeSpeed, 0));
+                    op.PendingCommands.Enqueue(new ManualMotionPortCommand(
+                        ManualMotionPortCommandKind.Home, axis, 0, 0));
+                }
+
                 op.Phase = ManualMotionOperationPhase.ReleasingBrake;
                 break;
 
@@ -583,6 +631,11 @@ public sealed class ManualMotionSession
                 op.Tolerance = p.PositionTolerance ?? 0;
                 op.RunTimeout = Milliseconds(p.MotionTimeoutMilliseconds ?? 0);
                 op.Target = request.Target;
+
+                // The register relation is captured once for the life of the operation, so a profile edit
+                // mid-operation cannot move the yardstick under a running Move. Only the TP leg of the
+                // arrival test divides by it: the commanded target and the RP leg stay 1:1.
+                op.TpToRpRatio = p.TpToRpRatio;
                 op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Acceleration, axis, p.MoveAcceleration ?? 0, 0));
                 op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Speed, axis, p.MoveSpeed ?? 0, 0));
                 op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Deceleration, axis, p.MoveDeceleration ?? 0, 0));
@@ -598,6 +651,15 @@ public sealed class ManualMotionSession
         SetActive(axis, op);
         AppendLog(now, axis, kind, ManualMotionCodes.OperationStarted);
     }
+
+    /// <summary>
+    /// The effective permission to accept a Home request while the home input is already active. The
+    /// profile is the authority and an Operator surface can only narrow it, exactly like the encoder
+    /// definition of Home: an absent request intent follows the profile, and a profile that omits the key
+    /// permits the acceptance. Nothing here judges any other condition of the request.
+    /// </summary>
+    private static bool AcceptsActiveHomeInput(ManualMotionAxisProfile p, Request request) =>
+        p.AcceptHomeWhenInputActive && request.AcceptHomeWhenInputActive is not false;
 
     private static void CaptureMotion(OperationRuntime op, ManualMotionAxisProfile p)
     {
@@ -817,6 +879,17 @@ public sealed class ManualMotionSession
             return Progress.Transitioned;
         }
 
+        if (op.HomeAtActiveInput)
+        {
+            // No Begin call is made and no motion is claimed: the axis is standing on the input, so the
+            // only work left is the zero definition this Home performs at that position. MotionBegun
+            // deliberately stays false, which is what keeps the ordinary Stop dispatch and the protective
+            // Stop of fault cleanup out of this lifecycle, and HomeState is established by the zero
+            // completion below instead of by a Begin, so a completed Home is never reported as Homing.
+            SetPhase(op, ManualMotionOperationPhase.DefiningZero, now);
+            return Progress.Transitioned;
+        }
+
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.Begin, op.Axis, 0, 0));
 
         // A refused, faulted or unclassified begin may still have started motion: the call reached
@@ -971,6 +1044,41 @@ public sealed class ManualMotionSession
     private Progress DoDefiningZero(OperationRuntime op, DateTimeOffset now)
     {
         var runtime = Runtime(op.Axis);
+
+        if (op.ZeroStage == ZeroDefineStage.EncoderDue)
+        {
+            // The encoder definition of the Legacy Reset-encoder order: DP{axis}=0 and then DE{axis}=0,
+            // both at the switch and both inside the same Home, on consecutive steps. One port call per
+            // step is what keeps the round-robin fairness of AdvanceActives and the preparation-window
+            // budget intact, so the second definition is never folded into the step of the first one.
+            // This dispatch does not pass through the standalone dual-zero request gate and it never
+            // clears the session Home state that this same Home is about to establish.
+            op.ZeroStage = ZeroDefineStage.Complete;
+            var encoder = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.DefineDualZero, op.Axis, 0, 0));
+            if (Interrupted(encoder, now, op))
+            {
+                return Progress.CalledPort;
+            }
+
+            if (!encoder.Accepted)
+            {
+                // A definition the controller refused is never a successful Home, and nothing already
+                // verified about the other register is claimed: the brake and stop cleanup run as they do
+                // for any refused zero definition.
+                runtime.HomeState = ManualMotionHomeState.HomeFailed;
+                op.EndCode = ManualMotionCodes.HomeEncoderZeroRefused;
+                SetPhase(op, ManualMotionOperationPhase.ApplyingBrake, now);
+                return Progress.CalledPort;
+            }
+
+            // The verification barrier is the LAST accepted zero definition: a read taken before the encoder
+            // definition was accepted can never be the evidence that the encoder register is at zero.
+            op.ZeroSequence = encoder.Sequence;
+            op.ZeroAt = now;
+            SetPhase(op, ManualMotionOperationPhase.VerifyingZero, now);
+            return Progress.CalledPort;
+        }
+
         var outcome = ExecuteCommand(new ManualMotionPortCommand(ManualMotionPortCommandKind.DefinePositionZero, op.Axis, 0, 0));
         if (Interrupted(outcome, now, op))
         {
@@ -999,8 +1107,27 @@ public sealed class ManualMotionSession
 
         op.ZeroSequence = outcome.Sequence;
         op.ZeroAt = now;
+        if (op.ResetEncoderOnHome)
+        {
+            op.ZeroStage = ZeroDefineStage.EncoderDue;
+            return Progress.CalledPort;
+        }
+
         SetPhase(op, ManualMotionOperationPhase.VerifyingZero, now);
         return Progress.CalledPort;
+    }
+
+    /// <summary>The zero-definition progress of one DefiningZero phase, one port call per step.</summary>
+    private enum ZeroDefineStage
+    {
+        /// <summary>The position definition (DP) is due.</summary>
+        PositionDue = 0,
+
+        /// <summary>The position definition was accepted and the encoder definition (DE) is due.</summary>
+        EncoderDue = 1,
+
+        /// <summary>Both accepted definitions are dispatched; the verification phase follows.</summary>
+        Complete = 2,
     }
 
     private Progress DoVerifyingZero(OperationRuntime op, DateTimeOffset now)
@@ -1011,7 +1138,23 @@ public sealed class ManualMotionSession
         }
 
         var runtime = Runtime(op.Axis);
-        var tp = ZeroReading(runtime.PositionTp, op.ZeroSequence, now, op.Tolerance);
+        // The TP leg of the zero verification is normalized by the same profile relation as the arrival
+        // test (1 by default), while the RP leg below is not: the register that a DE definition zeroed is
+        // read in its own unit. Both readings stay raw in the runtime and in the published snapshot.
+        var tp = ZeroReading(runtime.PositionTp, op.ZeroSequence, now, op.Tolerance, op.TpToRpRatio);
+        if (!op.VerifiesActualPosition)
+        {
+            // The profile keeps the encoder definition off this Home, so only the register that this Home
+            // actually defined is verified. The other register stays readable as drift evidence and is
+            // never claimed: the freshness, sequence-barrier and tolerance conditions below are unchanged.
+            if (tp is bool tpOnly)
+            {
+                return FinishZero(op, now, tpOnly);
+            }
+
+            return now - op.ZeroAt > op.StopTimeout ? FinishZero(op, now, verified: null) : Progress.Waiting;
+        }
+
         var rp = ZeroReading(runtime.PositionRp, op.ZeroSequence, now, op.Tolerance);
         if (tp is bool tpWithin && rp is bool rpWithin)
         {
@@ -1690,28 +1833,44 @@ public sealed class ManualMotionSession
         }
 
         var runtime = Runtime(op.Axis);
-        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, op.Target, op.Tolerance)
+
+        // The TP leg is compared in the commanded unit: the raw reading is divided by the profile register
+        // relation of this axis, which is 1 for every profile that omits the key and therefore leaves this
+        // test exactly as it was. The relation rescales nothing else - runtime.PositionTp and the published
+        // snapshot keep the raw value, and the RP leg stays 1:1 because the encoder register is the one
+        // that carries the commanded unit.
+        return WithinTolerance(runtime.PositionTp, op.BeginSequence, now, op.Target, op.Tolerance, op.TpToRpRatio)
             && WithinTolerance(runtime.PositionRp, op.BeginSequence, now, op.Target, op.Tolerance);
     }
 
-    private bool WithinTolerance(Observation observation, long afterSequence, DateTimeOffset now, int target, int tolerance)
+    private bool WithinTolerance(
+        Observation observation,
+        long afterSequence,
+        DateTimeOffset now,
+        int target,
+        int tolerance,
+        decimal scale = 1m)
     {
         if (observation.Sequence <= afterSequence || !IsFresh(observation, now) || observation.Value is not decimal value)
         {
             return false;
         }
 
-        return Math.Abs(value - target) <= tolerance;
+        // The scale is a profile value that was validated on read, so it is always a positive finite
+        // number: no zero or negative divisor can reach this division.
+        var measured = scale == 1m ? value : value / scale;
+        return Math.Abs(measured - target) <= tolerance;
     }
 
-    private bool? ZeroReading(Observation observation, long afterSequence, DateTimeOffset now, int tolerance)
+    private bool? ZeroReading(Observation observation, long afterSequence, DateTimeOffset now, int tolerance, decimal scale = 1m)
     {
         if (observation.Sequence <= afterSequence || !IsFresh(observation, now) || observation.Value is not decimal value)
         {
             return null;
         }
 
-        return Math.Abs(value) <= tolerance;
+        var measured = scale == 1m ? value : value / scale;
+        return Math.Abs(measured) <= tolerance;
     }
 
     // ---------------------------------------------------------------------------- publication
@@ -1796,6 +1955,9 @@ public sealed class ManualMotionSession
             TargetCoverage = ManualMotionTopology.TargetCoverage(runtime.Axis),
             BrakeOutputNumber = ManualMotionTopology.ConfirmedBrakeOutput(runtime.Axis),
             AllowedByProfile = p is not null,
+            AutoResetEncoderOnHome = p?.AutoResetEncoderOnHome ?? false,
+            AcceptHomeWhenInputActive = p?.AcceptHomeWhenInputActive ?? false,
+            TpToRpRatio = p?.TpToRpRatio ?? 1m,
             BrakeCommandState = runtime.BrakeCommandState,
             BrakeOutput = ObservationSnapshot(runtime.BrakeOutput, now),
             StatusWord = ObservationSnapshot(runtime.Status, now),
@@ -1955,6 +2117,12 @@ public sealed class ManualMotionSession
         public ManualMotionJogEndReason Reason { get; init; }
 
         public int Target { get; init; }
+
+        /// <summary>The Operator intent for the encoder definition of a Home request; null means "say nothing".</summary>
+        public bool? ResetEncoder { get; init; }
+
+        /// <summary>The Operator intent for an already-active home input; null means "say nothing".</summary>
+        public bool? AcceptHomeWhenInputActive { get; init; }
     }
 
     private sealed class Observation
@@ -2085,7 +2253,23 @@ public sealed class ManualMotionSession
 
         public DateTimeOffset ZeroAt { get; set; }
 
+        /// <summary>True when this Home sequence also defines the encoder register (DE{axis}=0).</summary>
+        public bool ResetEncoderOnHome { get; set; }
+
+        /// <summary>The zero-definition progress of this operation; see <see cref="ZeroDefineStage"/>.</summary>
+        public ZeroDefineStage ZeroStage { get; set; }
+
+        /// <summary>True when the zero verification also reads the register the encoder definition defines.</summary>
+        public bool VerifiesActualPosition { get; set; }
+
         public bool HomeDetected { get; set; }
+
+        /// <summary>
+        /// True when this Home was permitted to start with the home input already active. It is the flag
+        /// that removes the travel half of the lifecycle, and it is decided once, at request time, from
+        /// the profile permission and the fresh input reading.
+        /// </summary>
+        public bool HomeAtActiveInput { get; set; }
 
         public long PressId { get; set; }
 
@@ -2102,6 +2286,13 @@ public sealed class ManualMotionSession
         public TimeSpan HeartbeatTimeout { get; set; }
 
         public int Tolerance { get; set; }
+
+        /// <summary>
+        /// The profile TP-to-RP relation captured when this operation started (1 when the profile omits
+        /// <c>tpToRpRatio</c>). It is a divisor for the TP comparisons only; it is never applied to a
+        /// commanded target, to the RP comparison, or to any stored or published reading.
+        /// </summary>
+        public decimal TpToRpRatio { get; set; } = 1m;
 
         public bool HasZeroVerification { get; set; }
 

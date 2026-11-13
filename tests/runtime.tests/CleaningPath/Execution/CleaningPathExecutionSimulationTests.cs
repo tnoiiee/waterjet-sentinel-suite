@@ -675,6 +675,7 @@ public sealed class CleaningPathExecutionSimulationTests
             ManualMotionPortCommandKind.HomeSpeed,
             ManualMotionPortCommandKind.Home,
             ManualMotionPortCommandKind.DefinePositionZero,
+            ManualMotionPortCommandKind.DefineDualZero,
         };
         foreach (var command in harness.Port.ExecutedCommands)
         {

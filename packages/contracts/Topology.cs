@@ -17,7 +17,10 @@ namespace Wjss.Contracts;
 /// SOURCE-AUTHORED IN ARENA; NOT COMPILED IN ARENA (Owner-local build is the gate).
 /// </summary>
 
-/// <summary>Vertical region of the boiler wall. Rows 1–2 (G+2xx, G+1xx) are UPPER; rows 3–6 (G, H, I, J) are LOWER.</summary>
+/// <summary>Vertical region of the boiler wall. Rows 1–3 (G+2xx, G+1xx, G) are UPPER; rows 4–6 (H, I, J) are
+/// LOWER (Owner topology ruling of 2026-11-11, which supersedes the earlier rows 1–2 / rows 3–6 split).
+/// The single implementation of this split is <c>WaterJetTopologyCatalog.RegionForLogicalRow</c>; every
+/// importer, validator, resolver, fixture and example derives from it and none may restate the row ranges.</summary>
 public enum Region { UPPER, LOWER }
 
 /// <summary>

@@ -68,6 +68,24 @@ public sealed class CleaningPathCompositionCoordinator : ICleaningPathPointAdvan
     private bool _abortRequested;
     private bool _closeRequested;
 
+    /// <summary>
+    /// True only for a run whose Pump-ready was admitted from an Owner declaration under a Pump the Owner
+    /// attests STOPPED: the boundary implements <see cref="ICleaningPathDeclaredPumpSource"/> AND the
+    /// admitted sample is that boundary's own declared identity rather than a measured Pump Outlet
+    /// observation. It selects the limit-confirmed paired-IV supervision rules in
+    /// <see cref="SequencingPressure.OpenPumpStopped"/> and <see cref="SequencingPressure.ClosePumpStopped"/>
+    /// and nothing else: it authorizes no command, fabricates no observation, widens no identity rule and
+    /// leaves the physical route (false) exactly as it was.
+    /// </summary>
+    private bool _declaredPumpMode;
+
+    /// <summary>
+    /// The one input <see cref="_declaredPumpMode"/> is allowed to read: set by the Pump-ready evaluation
+    /// itself, so the valve supervision cannot be switched by anything except the identity that actually
+    /// carried this run's readiness. Recomputed on every Start, and false on every refusal.
+    /// </summary>
+    private bool _pumpReadinessAcceptedByDeclaration;
+
     public CleaningPathCompositionCoordinator(
         ICleaningPathMotionBoundary motion,
         ICleaningPathEquipmentBoundary equipment,
@@ -139,6 +157,14 @@ public sealed class CleaningPathCompositionCoordinator : ICleaningPathPointAdvan
             return new CleaningPathCompositionStartOutcome(false, pathStart.Code, pump, null);
         }
 
+        // B2 seam, evaluated once for the life of this composition and from the readiness decision alone:
+        // a run that became ready through the boundary's OWN declaration is the Pump-stopped evidence
+        // class, so its paired-IV supervision is judged with the limit switches as the only physical
+        // proof and 0 bar as the expected state of the line. Nothing is fabricated by this: the same
+        // observations are still read, preserved and refused on any defect - only their meaning under an
+        // attested stop is the one the Owner ruled. Every other boundary keeps the physical rules.
+        _declaredPumpMode = _equipment is ICleaningPathDeclaredPumpSource && _pumpReadinessAcceptedByDeclaration;
+
         _request = request;
         _identity = IdentityFrom(resolution!.Resolution!);
         _pumpReadiness = pump;
@@ -209,16 +235,50 @@ public sealed class CleaningPathCompositionCoordinator : ICleaningPathPointAdvan
 
     private CleaningPathPumpReadinessResult EvaluatePumpReadiness(SequencingPressureThresholds thresholds)
     {
+        // Recomputed from scratch on every call: a refused readiness can never leave a previous run's
+        // valve supervision mode standing.
+        _pumpReadinessAcceptedByDeclaration = false;
         var sample = _equipment.ReadPumpOutletPressure();
-        if (!SequencingPressure.Valid(sample)
-            || !string.Equals(sample!.SourceId, PressureSample.PumpOutletSource, StringComparison.Ordinal))
+
+        // Exactly two identities can carry this decision, and both come from the source of the sample.
+        // The measured one is the shared Pump Outlet constant. The declared one exists for the ONE
+        // evidence class whose sample must never carry a measured identity - the Owner-declared Pump
+        // Outlet value - and it is admitted only because the boundary that served this sample declares
+        // that very identity itself. The declaration is read from the boundary instance and never
+        // inferred from the sample text, so a boundary that declares nothing (every other boundary in
+        // this repository, physical included) keeps the wrong-source refusal unchanged, and a sample
+        // that merely looks like a declared one is still refused.
+        var declared = (_equipment as ICleaningPathDeclaredPumpSource)?.AcceptedPumpReadySourceId;
+        var measuredIdentity = sample is not null
+            && string.Equals(sample.SourceId, PressureSample.PumpOutletSource, StringComparison.Ordinal);
+        var declaredIdentity = sample is not null
+            && !string.IsNullOrEmpty(declared)
+            && string.Equals(sample.SourceId, declared, StringComparison.Ordinal);
+        if (!SequencingPressure.Valid(sample) || !(measuredIdentity || declaredIdentity))
         {
             // Invalid input and wrong-source input are the same fail-closed class: no readiness
-            // rule may be evaluated and the exact sample evidence is preserved.
+            // rule may be evaluated and the exact sample evidence is preserved. The preserved sample
+            // keeps the identity it arrived with, which is what makes a declared value readable as
+            // declared in the evidence, and nothing here rewrites it.
             return new CleaningPathPumpReadinessResult(false, SequencingCodes.PumpPressureInputInvalid, sample);
         }
 
-        return SequencingPressure.PumpReady(sample, thresholds)
+        // The identity test above is the only part of the rule this seam touches. The value rule below
+        // is the same strict greater-than over the same thresholds that SequencingPressure.PumpReady
+        // applies to a measured sample, and that helper is deliberately not called here: it also
+        // re-tests the measured Pump Outlet identity, so routing a declared sample through it would
+        // classify a value the Owner declared as not-ready instead of evaluating it. Quality, staleness,
+        // finiteness, the negative bound, the UTC requirement and the strict setpoint comparison all
+        // still come from SequencingPressure.Valid plus that same comparison, unchanged.
+        var ready = sample!.Bar!.Value > thresholds.PumpReadySetpointBar;
+
+        // The declaration is what made this acceptance possible only when the measured identity did NOT
+        // match: a boundary that happens to declare "PUMP_OUTLET" is served by the physical rule and
+        // stays on the physical supervision route, so the declared mode can never be reached by a
+        // measured sample and can never be entered by a refusal.
+        _pumpReadinessAcceptedByDeclaration = ready && declaredIdentity && !measuredIdentity;
+
+        return ready
             ? new CleaningPathPumpReadinessResult(true, CleaningPathCompositionCodes.PumpReadyAccepted, sample)
             : new CleaningPathPumpReadinessResult(false, SequencingCodes.PumpNotReady, sample);
     }
@@ -291,7 +351,11 @@ public sealed class CleaningPathCompositionCoordinator : ICleaningPathPointAdvan
         var valveId = _identity!.DerivedIsolationValveId;
         var sample = _equipment.ReadValveOutletPressure(valveId);
         var upperDetected = _equipment.ReadUpperLimitDetected(valveId);
-        var assessment = SequencingPressure.Open(SourceChecked(sample, valveId), upperDetected, timedOut, _request.PressureThresholds);
+        // The raw observation and the source check are identical on both routes; only the classifier that
+        // judges 0 bar under an attested stop differs, and the physical route below is the unchanged call.
+        var assessment = _declaredPumpMode
+            ? SequencingPressure.OpenPumpStopped(SourceChecked(sample, valveId), upperDetected, timedOut, _request.PressureThresholds)
+            : SequencingPressure.Open(SourceChecked(sample, valveId), upperDetected, timedOut, _request.PressureThresholds);
         if (assessment.Open is null && assessment.Diagnosis == ValveDiagnosis.NONE)
         {
             // Still pending inside the supervision window: no pressure band is inferred yet.
@@ -336,6 +400,15 @@ public sealed class CleaningPathCompositionCoordinator : ICleaningPathPointAdvan
         // sequence itself is complete and the terminal awaits Safe Return.
         _valveCloseSupervision = result;
         Record(CleaningPathCompositionCodes.KindValveCloseSupervision, CloseCodeFor(result.Assessment), JobPhase.P6);
+        if (_declaredPumpMode && result.Assessment.Close != ValveCloseResolution.LOWER_LIMIT_CONFIRMED)
+        {
+            // The declared mode never reports a completed path-and-valve sequence on a pressure inference:
+            // with the Pump attested stopped there is no line pressure that could prove this valve closed,
+            // so anything but the physical Lower limit is the composition's first primary failure and the
+            // terminal becomes FailedAwaitingSafeReturn instead. The classification itself is unchanged.
+            _primaryFailureCode ??= CloseCodeFor(result.Assessment);
+        }
+
         Terminalize();
     }
 
@@ -373,7 +446,12 @@ public sealed class CleaningPathCompositionCoordinator : ICleaningPathPointAdvan
         var valveId = _identity!.DerivedIsolationValveId;
         var sample = _equipment.ReadValveOutletPressure(valveId);
         var lowerDetected = _equipment.ReadLowerLimitDetected(valveId);
-        var assessment = SequencingPressure.Close(SourceChecked(sample, valveId), lowerDetected, timedOut, _request.PressureThresholds);
+        // Same rule as the open leg: the close of a Pump-stopped run is proven by the Lower limit alone,
+        // and a timeout without it stays a failure instead of inferring closure from an expected 0 bar.
+        var assessment = _declaredPumpMode
+            ? SequencingPressure.ClosePumpStopped(
+                SourceChecked(sample, valveId), lowerDetected, timedOut, _request.PressureThresholds)
+            : SequencingPressure.Close(SourceChecked(sample, valveId), lowerDetected, timedOut, _request.PressureThresholds);
         if (assessment.Close is null)
         {
             return null;

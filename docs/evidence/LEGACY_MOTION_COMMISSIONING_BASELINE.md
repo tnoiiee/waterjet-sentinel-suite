@@ -837,3 +837,81 @@ exists:
 
 No controller was contacted, no library was loaded, no export was resolved and no read was issued
 while producing this section. No build and no test execution occurred in the Agent environment.
+
+---
+
+## I. Later record — what this baseline's DP/DE finding became in Product
+
+This section is appended to the record and rewrites nothing above it.
+
+The finding recorded in section B.3 for `DP{axis}=0` and `DE{axis}=0` — "reset does position definition
+then encoder definition; the home branch does stop, fixed delay, then position definition" — is the
+Legacy shape that the Owner ruled into the Product Home lifecycle at the head following `4a5fdf7`
+(trigger: the Stage D-sim Run-1 and Run-2 transcripts at field driver `2026-11-21.1`). At that head a
+Home dispatches `DP<axis>=0` and then `DE<axis>=0` after the observed stop, and the zero verification
+that follows reads both registers.
+
+Two distinctions this baseline can support and two it cannot:
+
+- It supports the ORDER and the OWNERSHIP: the position definition precedes the encoder definition, both
+  belong to the same switch sighting, and no post-verification existed in the Legacy code. The Product
+  therefore adds the verification the Legacy never had, and it does not inherit any Legacy claim about
+  what a zero "means".
+- It does not establish WHICH physical register each define command writes, and it carries no
+  command-to-encoder count ratio. The `map()` function reviewed in `LEGACY_REV2_SCALING_CORRECTIONS_2026-11-07.md`
+  scales analog registers only (pressure 4 to 20 mA, level, AO write) and contains no position or encoder
+  scaling at all; nothing in this branch states that `TP` and `RP` stand in a 2:1 relation. A ratio claim
+  remains OWNER-STATED until it is measured at the machine, and the Home verification needs no ratio at
+  all because both registers are defined to zero at the same point.
+
+---
+
+## Dated addendum — 2026-11-13 (what the Product now does at an already-active Home input)
+
+**Appended only.** No record above is edited or deleted by this section, and this section authorizes
+nothing. Trigger: the Owner's R1 and R2 rulings on the Manual Motion Home lifecycle (heads `c39bc00`,
+`5c9a129`, `6b5791e`), recorded against the Legacy behaviour described above.
+
+- The Legacy order reviewed above — position define then encoder define at one switch sighting, with **no
+  post-verification** — is what the Product Home sequence now carries by default (`autoResetEncoderOnHome`
+  absent means `true`), plus the verification the Legacy never had.
+- The **second** half of the Legacy shape is the reason R2 exists: in the Legacy application a Home
+  requested while the axis was already resting on the Home switch was a normal way to re-establish zero at
+  the switch, because nothing traveled. The Product refused that request
+  (`HOME_INPUT_ALREADY_ACTIVE`) until the Owner ruled a per-axis profile key
+  `acceptHomeWhenInputActive` (absent or `true` = accept without travel; `false` = the refusal, verbatim).
+  The accepted route dispatches no home-speed, no begin and no stop; the brake, stationarity, freshness,
+  tolerance and verification conditions are untouched, so the Product is stricter than the Legacy in every
+  respect except the refusal itself.
+- What this baseline still cannot support: which physical register each define command writes, and any
+  command-to-encoder count ratio. Both remain OWNER-STATED field questions, and the 2026-11-12 register
+  fact above (read both registers from the port at one instant) is the only form of that evidence this
+  branch accepts. `acceptHomeWhenInputActive` changes no tolerance, no ratio and no scaling statement, and
+  the deferred `R3` density question is neither supported nor weakened by it.
+
+
+## Dated addendum — 2026-11-13 (the measured TP:RP relation, and what it does and does not prove)
+
+Validation class: **MEASURED_ON_BENCH** for the numbers, **SOFTWARE_AUTHORED, NOT_COMPILED** for the
+software that consumes them.
+
+- What the bench produced at head `64574b7`, after `CE 6,6,6,6` and a zero definition at the Home switch:
+  jogging positive read `RP=10 / TP=+20`, and the stand at P1 read `RP=1 800 000 / 2 000 000` against
+  `TP=+3 600 000 / +4 000 000`. Both axes agree on one relation: two raw TP counts per one RP count,
+  consistent with 10 000 encoder pulses per revolution against 5 000 commanded pulses per revolution, and
+  agreeing within about 3 encoder counts (1.5 command counts). The measurement is of the two registers the
+  port reported at one instant, which is the only form of register evidence this branch accepts (see the
+  2026-11-12 record above).
+- What this baseline can now support: the Product may treat `TP = 2 * RP` as a **configured** relation for
+  these two axes, because the Owner measured it on this bench and the profile key `tpToRpRatio` states it
+  per axis. It remains a measured register relation, not a vendor document: no GCLIB manual, controller
+  dump or drive parameter listing was read to produce it, and the ratio says nothing about which physical
+  register each define command writes — that question stays open exactly as section I left it.
+- What it still cannot support: a density or engineering-unit claim. The ratio is a count-to-count
+  relation; it is not a millimetre calibration, not a steps-per-millimetre figure and not a statement that
+  the controller interprets the commanded unit the same way. The deferred `R3` density question is
+  unaffected: this addendum normalizes one comparison, it does not convert units anywhere.
+- What changed in behaviour: an axis whose profile states the relation verifies a Move and a zero against
+  the normalized TP reading; an axis whose profile omits it keeps the raw comparison and therefore keeps
+  failing closed on such a register. The failure mode is the safety property — nothing was relaxed to make
+  the bench transcript pass, the tolerance stayed at 2, and the raw readings in the record are unchanged.

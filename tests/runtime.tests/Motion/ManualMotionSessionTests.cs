@@ -158,6 +158,40 @@ public sealed class ManualMotionSessionTests
         };
     }
 
+    /// <summary>
+    /// A copy of one simulation axis profile with a TP-to-RP register relation of <paramref name="ratio"/>
+    /// and an optionally shortened motion timeout. Every other value is the simulation value it started
+    /// from, so the only difference a test can attribute to this helper is the register relation.
+    /// </summary>
+    private static ManualMotionAxisProfile AxisWithTpToRpRatio(
+        ManualMotionAxisProfile source,
+        decimal ratio,
+        int? motionTimeoutMilliseconds = null) => new()
+    {
+        BrakeOutput = source.BrakeOutput,
+        BrakeReleaseAction = source.BrakeReleaseAction,
+        BrakeSettleMilliseconds = source.BrakeSettleMilliseconds,
+        JogSpeed = source.JogSpeed,
+        HomeSpeed = source.HomeSpeed,
+        HomeTimeoutMilliseconds = source.HomeTimeoutMilliseconds,
+        MoveAcceleration = source.MoveAcceleration,
+        MoveSpeed = source.MoveSpeed,
+        MoveDeceleration = source.MoveDeceleration,
+        MoveMinimumTarget = source.MoveMinimumTarget,
+        MoveMaximumTarget = source.MoveMaximumTarget,
+        PositionTolerance = source.PositionTolerance,
+        MotionTimeoutMilliseconds = motionTimeoutMilliseconds ?? source.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
+        MotionStatusBit = source.MotionStatusBit,
+        MotionActiveValue = source.MotionActiveValue,
+        HomeStatusBit = source.HomeStatusBit,
+        HomeActiveValue = source.HomeActiveValue,
+        DualZeroPermitted = source.DualZeroPermitted,
+        AutoResetEncoderOnHome = source.AutoResetEncoderOnHome,
+        AcceptHomeWhenInputActive = source.AcceptHomeWhenInputActive,
+        TpToRpRatio = ratio,
+    };
+
     private static ManualMotionAxisProfile AxisWithoutJogSpeed(ManualMotionAxisProfile source) => new()
     {
         BrakeOutput = source.BrakeOutput,
@@ -319,6 +353,103 @@ public sealed class ManualMotionSessionTests
         HomeActiveValue = source.HomeActiveValue,
         DualZeroPermitted = source.DualZeroPermitted,
     };
+
+    /// <summary>
+    /// The same axis profile with only the Home encoder-definition value changed. Synthetic test value:
+    /// it exists so a fact can review the maintenance mode of a Home, and it never changes any other
+    /// precondition, tolerance or freshness value of the source profile.
+    /// </summary>
+    private static ManualMotionAxisProfile AxisWithAutoResetEncoder(
+        ManualMotionAxisProfile source,
+        bool autoResetEncoderOnHome) => new()
+    {
+        BrakeOutput = source.BrakeOutput,
+        BrakeReleaseAction = source.BrakeReleaseAction,
+        BrakeSettleMilliseconds = source.BrakeSettleMilliseconds,
+        JogSpeed = source.JogSpeed,
+        HomeSpeed = source.HomeSpeed,
+        HomeTimeoutMilliseconds = source.HomeTimeoutMilliseconds,
+        MoveAcceleration = source.MoveAcceleration,
+        MoveSpeed = source.MoveSpeed,
+        MoveDeceleration = source.MoveDeceleration,
+        MoveMinimumTarget = source.MoveMinimumTarget,
+        MoveMaximumTarget = source.MoveMaximumTarget,
+        PositionTolerance = source.PositionTolerance,
+        MotionTimeoutMilliseconds = source.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
+        MotionStatusBit = source.MotionStatusBit,
+        MotionActiveValue = source.MotionActiveValue,
+        HomeStatusBit = source.HomeStatusBit,
+        HomeActiveValue = source.HomeActiveValue,
+        DualZeroPermitted = source.DualZeroPermitted,
+        AutoResetEncoderOnHome = autoResetEncoderOnHome,
+    };
+
+    /// <summary>
+    /// One axis profile with the Home-on-an-active-input permission set explicitly. Every other value,
+    /// including the encoder definition of Home, is copied from the source: the two Home options are
+    /// independent permissions and a test of one must never move the other.
+    /// </summary>
+    private static ManualMotionAxisProfile AxisWithAcceptHomeWhenInputActive(
+        ManualMotionAxisProfile source,
+        bool acceptHomeWhenInputActive) => new()
+    {
+        BrakeOutput = source.BrakeOutput,
+        BrakeReleaseAction = source.BrakeReleaseAction,
+        BrakeSettleMilliseconds = source.BrakeSettleMilliseconds,
+        JogSpeed = source.JogSpeed,
+        HomeSpeed = source.HomeSpeed,
+        HomeTimeoutMilliseconds = source.HomeTimeoutMilliseconds,
+        MoveAcceleration = source.MoveAcceleration,
+        MoveSpeed = source.MoveSpeed,
+        MoveDeceleration = source.MoveDeceleration,
+        MoveMinimumTarget = source.MoveMinimumTarget,
+        MoveMaximumTarget = source.MoveMaximumTarget,
+        PositionTolerance = source.PositionTolerance,
+        MotionTimeoutMilliseconds = source.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
+        MotionStatusBit = source.MotionStatusBit,
+        MotionActiveValue = source.MotionActiveValue,
+        HomeStatusBit = source.HomeStatusBit,
+        HomeActiveValue = source.HomeActiveValue,
+        DualZeroPermitted = source.DualZeroPermitted,
+        AutoResetEncoderOnHome = source.AutoResetEncoderOnHome,
+        AcceptHomeWhenInputActive = acceptHomeWhenInputActive,
+    };
+
+    /// <summary>
+    /// One FakePort session whose Axis A reports the home input ACTIVE through status bit 3, on the
+    /// profile the caller supplies. Every read is accepted with a fixed sequence and the fake dispatches
+    /// nothing by itself, so "nothing reached the port" is an exact statement about the request.
+    /// </summary>
+    private static (FakePort Port, ManualMotionSession Session, TestClock Clock) ActiveInputSession(
+        ManualMotionProfile profile)
+    {
+        var clock = new TestClock(Instant);
+        var port = new FakePort
+        {
+            ReadHandler = read => new ManualMotionPortReadResult(
+                true,
+                false,
+                read.Kind == ManualMotionReadKind.StatusWord && read.Axis == ManualMotionAxis.A ? 8m : 0m,
+                "FAKE_READ",
+                1),
+        };
+        var session = new ManualMotionSession(
+            port,
+            ManualMotionProfileResult.FromProfile(profile),
+            clock);
+
+        session.Step();
+        for (var index = 0; index < 16; index++)
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(25));
+            session.Step();
+        }
+
+        Assert.Equal(ManualMotionInterpretation.Active, session.Snapshot.Axes[0].HomeInput);
+        return (port, session, clock);
+    }
 
     /// <summary>
     /// A FakePort session that records every read (with its fake-clock time) and models just enough
@@ -903,7 +1034,7 @@ public sealed class ManualMotionSessionTests
     }
 
     [Fact]
-    public void Home_Completes_With_Stop_Then_Dp_Zero_Verified_Then_Brake_Apply()
+    public void Home_Completes_With_Stop_Then_Dp_De_Zero_Verified_Then_Brake_Apply()
     {
         var harness = new Harness();
         harness.OpenAndObserve();
@@ -924,13 +1055,197 @@ public sealed class ManualMotionSessionTests
                 ManualMotionPortCommandKind.Begin,
                 ManualMotionPortCommandKind.Stop,
                 ManualMotionPortCommandKind.DefinePositionZero,
+                ManualMotionPortCommandKind.DefineDualZero,
                 ManualMotionPortCommandKind.BrakeOutputClear,
             },
             harness.Port.ExecutedCommands.Select(command => command.Kind).ToArray());
+
+        // Both zero definitions are issued only after the stop was observed, and in the Legacy order:
+        // the position definition first, the encoder definition second, never the reverse.
+        var kinds = harness.Port.ExecutedCommands.Select(command => command.Kind).ToList();
+        var stopIndex = kinds.IndexOf(ManualMotionPortCommandKind.Stop);
+        Assert.True(stopIndex >= 0);
+        Assert.Equal(ManualMotionPortCommandKind.DefinePositionZero, kinds[stopIndex + 1]);
+        Assert.Equal(ManualMotionPortCommandKind.DefineDualZero, kinds[stopIndex + 2]);
         Assert.True(Math.Abs(axis.PositionTp.Value ?? 999m) <= 2m);
         Assert.True(Math.Abs(axis.PositionRp.Value ?? 999m) <= 2m);
     }
 
+    [Fact]
+    public void Home_Defines_The_Encoder_Register_The_Position_Definition_Left_Verification_Failing()
+    {
+        // The shape the field transcript showed: one register keeps a zero of its own, so the position
+        // definition alone leaves it away from zero and the verification of both registers fails. The
+        // encoder definition of the same Home re-primitives it and the verification then passes. Which
+        // physical register each define command writes stays a field question; this scenario covers the
+        // register the encoder definition owns, and the tolerance is never widened for it.
+        var diverged = new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { RpZeroStart = 30082m },
+        };
+        var harness = new Harness(diverged);
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.Homed, axis.HomeState);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+        Assert.Equal(0m, axis.PositionTp.Value);
+        Assert.Equal(0m, axis.PositionRp.Value);
+        Assert.Contains(
+            harness.Port.ExecutedCommands,
+            command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    [Fact]
+    public void Home_Verification_Still_Refuses_When_Neither_Zero_Definition_Changes_Anything()
+    {
+        // The fail-closed proof of the same scenario: with both definitions acknowledged but ignored and
+        // the switch away from zero, the registers this Home defined are not at zero, so Home fails. The
+        // encoder definition did not make the verification softer and no tolerance is involved.
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            ZeroDefinitionIgnored = true,
+            HomeSwitchPosition = -3000m,
+        });
+        harness.OpenAndObserve();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState != ManualMotionHomeState.NotHomed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, axis.CoordinateState);
+        Assert.Equal(-3000m, axis.PositionTp.Value);
+    }
+
+    [Fact]
+    public void Home_Without_The_Encoder_Definition_Leaves_The_Divergent_Register_Visible_And_Unclaimed()
+    {
+        // The maintenance mode: a Home that never defined the encoder register does not verify it and does
+        // not claim it, so the drift stays inspectable instead of failing Home. The register that this Home
+        // did define is still verified under the same tolerance and the same freshness barrier.
+        //
+        // The divergence is the simulation's per-read encoder bias, and it is read from the port at ONE
+        // instant rather than off the session snapshot. The reason is arithmetic, not preference: the
+        // simulated port advances its physics at the start of EVERY call (ManualMotionSimulatedPort.cs:265
+        // and :307), so the two position registers of one snapshot are sampled on different steps, and the
+        // position reference of the first one is re-primed by the Home-carried definition in between. The
+        // snapshot difference therefore carries the travel of those extra steps (the Owner's transcript
+        // measured exactly that: 262 counts at 1500 counts/s for seven 25 ms observation ticks) on top of
+        // the configured bias. Registers read at one instant cannot carry it: with the encoder reference
+        // never re-primed, RP is Physical - Offset + bias while TP is Physical - Offset.
+        var divergence = new ManualMotionSimulationOptions
+        {
+            AxisA = new ManualMotionAxisSimulationOptions { RpBias = 30082m },
+        };
+        var narrowed = new Harness(
+            divergence,
+            ProfileWith(
+                ManualMotionProfile.CreateSimulationProfile(),
+                axisA: AxisWithAutoResetEncoder(
+                    ManualMotionProfile.CreateSimulationProfile().AxisA!,
+                    autoResetEncoderOnHome: false)));
+        narrowed.OpenAndObserve();
+        narrowed.HomeAxis(ManualMotionAxis.A);
+
+        var axis = narrowed.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.Homed, axis.HomeState);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+
+        // The register this Home was allowed to claim is at zero; the register it was told to leave alone
+        // is displaced by exactly the configured divergence and by nothing else - the Home neither repaired
+        // it nor raised an alarm about it.
+        Assert.Equal(0m, axis.PositionTp.Value);
+        var portTp = narrowed.Port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionTp, ManualMotionAxis.A, 0));
+        var portRp = narrowed.Port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, ManualMotionAxis.A, 0));
+        Assert.True(portTp.Succeeded && portRp.Succeeded);
+        Assert.Equal(portTp.Value + 30082m, portRp.Value);
+        Assert.True(Math.Abs(portRp.Value - portTp.Value) > narrowed.Profile.AxisA!.PositionTolerance!.Value);
+        Assert.DoesNotContain(
+            narrowed.Port.ExecutedCommands,
+            command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+        Assert.NotEqual(0m, axis.PositionRp.Value);
+
+        // The same divergence on a Home that DID define the encoder register still fails: a bias that the
+        // controller keeps applying to its reads is not something the encoder definition can paper over,
+        // so the opt-out above cannot be read as a general relaxation of the zero verification.
+        var kept = new Harness(divergence);
+        kept.OpenAndObserve();
+        kept.Session.RequestHome(ManualMotionAxis.A);
+        kept.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState != ManualMotionHomeState.NotHomed);
+
+        var keptAxis = kept.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, keptAxis.HomeState);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, keptAxis.CoordinateState);
+        Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, keptAxis.LastOutcomeCode);
+        Assert.Contains(
+            kept.Port.ExecutedCommands,
+            command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
+
+    [Fact]
+    public void Refused_Encoder_Definition_Fails_Home_With_Its_Own_Code_And_The_Brake_Path()
+    {
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            RefuseCommand = ManualMotionPortCommandKind.DefineDualZero,
+        });
+        harness.OpenAndObserve();
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState == ManualMotionHomeState.HomeFailed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionCodes.HomeEncoderZeroRefused, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroDispatched, axis.CoordinateState);
+        Assert.Equal(ManualMotionBrakeCommandState.ApplyCommanded, axis.BrakeCommandState);
+
+        // The refused definition is the last command of the motion part of the Home: the zero definitions
+        // run after the observed stop, and the brake apply that follows is the normal cleanup path.
+        var kinds = harness.Port.ExecutedCommands.Select(command => command.Kind).ToList();
+        Assert.Contains(ManualMotionPortCommandKind.DefinePositionZero, kinds);
+        Assert.Contains(ManualMotionPortCommandKind.DefineDualZero, kinds);
+        Assert.Equal(ManualMotionPortCommandKind.DefinePositionZero, kinds[^3]);
+        Assert.Equal(ManualMotionPortCommandKind.DefineDualZero, kinds[^2]);
+    }
+
+    [Fact]
+    public void The_Encoder_Definition_On_Home_Cannot_Be_Forced_Past_A_Refusing_Profile()
+    {
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        Assert.True(simulation.AxisA!.AutoResetEncoderOnHome);
+
+        // An explicit false from the Operator surface removes the dispatch and its verification.
+        var narrowed = new Harness(options: null, profile: simulation);
+        narrowed.OpenAndObserve();
+        narrowed.Session.RequestHome(ManualMotionAxis.A, resetEncoder: false);
+        narrowed.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+        Assert.DoesNotContain(
+            narrowed.Port.ExecutedCommands,
+            command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+
+        // And a profile that refuses it is not overridden by an Operator surface that asks for it.
+        var refusedByProfile = new Harness(
+            options: null,
+            profile: ProfileWith(
+                simulation,
+                axisA: AxisWithAutoResetEncoder(simulation.AxisA!, autoResetEncoderOnHome: false)));
+        refusedByProfile.OpenAndObserve();
+        refusedByProfile.Session.RequestHome(ManualMotionAxis.A, resetEncoder: true);
+        refusedByProfile.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+        Assert.DoesNotContain(
+            refusedByProfile.Port.ExecutedCommands,
+            command => command.Kind == ManualMotionPortCommandKind.DefineDualZero);
+    }
     [Fact]
     public void Stop_During_Home_Aborts_Through_The_Stop_And_Brake_Path()
     {
@@ -948,7 +1263,11 @@ public sealed class ManualMotionSessionTests
         var kinds = harness.Port.ExecutedCommands.Select(command => command.Kind).ToList();
         Assert.Contains(ManualMotionPortCommandKind.Stop, kinds);
         Assert.Equal(ManualMotionPortCommandKind.BrakeOutputClear, kinds[^1]);
+
+        // An abort before the switch was sighted defines nothing at all: neither the position register nor
+        // the encoder register is re-primitives, because the Home never reached its zero definitions.
         Assert.DoesNotContain(ManualMotionPortCommandKind.DefinePositionZero, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.DefineDualZero, kinds);
     }
 
     [Fact]
@@ -1099,6 +1418,62 @@ public sealed class ManualMotionSessionTests
         var segment = KindsAfter(harness, beforeMove);
         Assert.Contains(ManualMotionPortCommandKind.Stop, segment);
         Assert.Equal(ManualMotionPortCommandKind.BrakeOutputClear, segment[^1]);
+    }
+
+    [Fact]
+    public void A_Move_On_An_Axis_With_A_TP_To_RP_Ratio_Verifies_Through_The_Normalized_TP_Leg()
+    {
+        // The Owner-measured bench relation: the position register counts twice per commanded unit, so the
+        // raw TP reading of an axis standing exactly on its target is twice that target. With the profile
+        // relation configured, the arrival test compares the TP leg in the commanded unit and completes,
+        // while BOTH published readings stay raw and unequal - the ratio rescales no stored value.
+        var source = ManualMotionProfile.CreateSimulationProfile();
+        var harness = new Harness(
+            new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { TpMultiplier = 2m },
+            },
+            ProfileWith(source, axisA: AxisWithTpToRpRatio(source.AxisA!, 2m)));
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, 3000);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveCompletedPositionVerified);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(2m, axis.TpToRpRatio);
+        Assert.Equal(6000m, axis.PositionTp.Value);
+        Assert.Equal(3000m, axis.PositionRp.Value);
+        Assert.True(axis.PositionTp.Fresh);
+        Assert.True(axis.PositionRp.Fresh);
+    }
+
+    [Fact]
+    public void A_TP_To_RP_Relation_The_Profile_Does_Not_Know_Still_Times_Out()
+    {
+        // The fail-closed half of the same fact: a profile that says nothing about the relation keeps the
+        // raw comparison, so an axis whose TP register disagrees by a factor of two never verifies. The
+        // encoder register does land on the commanded target, which is what proves the refusal is the TP
+        // leg and not a stalled axis, and nothing is repaired or widened on the way out.
+        var source = ManualMotionProfile.CreateSimulationProfile();
+        var harness = new Harness(
+            new ManualMotionSimulationOptions
+            {
+                AxisA = new ManualMotionAxisSimulationOptions { TpMultiplier = 2m },
+            },
+            ProfileWith(source, axisA: AxisWithTpToRpRatio(source.AxisA!, 1m, motionTimeoutMilliseconds: 3000)));
+        harness.OpenAndObserve();
+        harness.HomeAxis(ManualMotionAxis.A);
+
+        harness.Session.RequestMove(ManualMotionAxis.A, 3000);
+        harness.DriveUntil(snapshot => snapshot.ActiveOperations.Count == 0
+            && snapshot.Axes[0].LastOutcomeCode == ManualMotionCodes.MoveTimeout);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(1m, axis.TpToRpRatio);
+        Assert.Equal(6000m, axis.PositionTp.Value);
+        Assert.Equal(3000m, axis.PositionRp.Value);
     }
 
     [Fact]
@@ -1320,29 +1695,13 @@ public sealed class ManualMotionSessionTests
     [Fact]
     public void Home_Is_Refused_When_The_Home_Input_Is_Already_Active()
     {
-        var clock = new TestClock(Instant);
-        var port = new FakePort
-        {
-            ReadHandler = read => new ManualMotionPortReadResult(
-                true,
-                false,
-                read.Kind == ManualMotionReadKind.StatusWord && read.Axis == ManualMotionAxis.A ? 8m : 0m,
-                "FAKE_READ",
-                1),
-        };
-        var session = new ManualMotionSession(
-            port,
-            ManualMotionProfileResult.FromProfile(ManualMotionProfile.CreateSimulationProfile()),
-            clock);
-
-        session.Step();
-        for (var index = 0; index < 16; index++)
-        {
-            clock.Advance(TimeSpan.FromMilliseconds(25));
-            session.Step();
-        }
-
-        Assert.Equal(ManualMotionInterpretation.Active, session.Snapshot.Axes[0].HomeInput);
+        // The profile opt-out is the older behaviour verbatim: a profile that refuses Home on an active
+        // input stops the request before any command exists, so a commissioning procedure that requires
+        // the axis to be moved off the switch first keeps exactly the guarantee it was written against.
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        var (port, session, clock) = ActiveInputSession(ProfileWith(
+            simulation,
+            axisA: AxisWithAcceptHomeWhenInputActive(simulation.AxisA!, acceptHomeWhenInputActive: false)));
 
         session.RequestHome(ManualMotionAxis.A);
         clock.Advance(TimeSpan.FromMilliseconds(25));
@@ -1350,6 +1709,103 @@ public sealed class ManualMotionSessionTests
 
         Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, session.Snapshot.Axes[0].LastOutcomeCode);
         Assert.Empty(port.Executed);
+    }
+
+    [Fact]
+    public void The_Acceptance_Of_An_Active_Input_Cannot_Be_Widened_By_The_Operator_Surface()
+    {
+        // An Operator box can only narrow the profile permission, never widen it. With the profile
+        // permitting the acceptance, an explicit false is the older refusal; with the profile refusing
+        // it, an explicit true is still the older refusal. Neither half dispatches anything at all.
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        var (narrowedPort, narrowedSession, narrowedClock) = ActiveInputSession(simulation);
+        narrowedSession.RequestHome(ManualMotionAxis.A, resetEncoder: true, acceptHomeWhenInputActive: false);
+        narrowedClock.Advance(TimeSpan.FromMilliseconds(25));
+        narrowedSession.Step();
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, narrowedSession.Snapshot.Axes[0].LastOutcomeCode);
+        Assert.Empty(narrowedPort.Executed);
+
+        var (refusedPort, refusedSession, refusedClock) = ActiveInputSession(ProfileWith(
+            simulation,
+            axisA: AxisWithAcceptHomeWhenInputActive(simulation.AxisA!, acceptHomeWhenInputActive: false)));
+        refusedSession.RequestHome(ManualMotionAxis.A, resetEncoder: true, acceptHomeWhenInputActive: true);
+        refusedClock.Advance(TimeSpan.FromMilliseconds(25));
+        refusedSession.Step();
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, refusedSession.Snapshot.Axes[0].LastOutcomeCode);
+        Assert.Empty(refusedPort.Executed);
+    }
+
+    [Fact]
+    public void Home_On_An_Active_Input_Defines_Zero_Without_Travel()
+    {
+        // The ruled bench behaviour: an axis standing on the Home switch homes without moving. The switch
+        // is proven active by the same fresh status reading that used to refuse the request, and what
+        // follows is the ordinary zero definition, verification and brake re-apply of a completed Home -
+        // with no home speed, no Begin and no Stop, because there is nothing to start and nothing to stop.
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        Assert.True(simulation.AxisA!.AcceptHomeWhenInputActive);
+
+        var harness = new Harness(new ManualMotionSimulationOptions { StartPositionA = 0m });
+        harness.OpenAndObserve();
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Axis(ManualMotionAxis.A).HomeInput);
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.Homed, axis.HomeState);
+        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(ManualMotionBrakeCommandState.ApplyCommanded, axis.BrakeCommandState);
+        Assert.Equal(0m, axis.PositionTp.Value);
+        Assert.Equal(0m, axis.PositionRp.Value);
+
+        var kinds = harness.Port.ExecutedCommands.Select(command => command.Kind).ToList();
+        Assert.DoesNotContain(ManualMotionPortCommandKind.HomeSpeed, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Home, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Begin, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Stop, kinds);
+        Assert.Contains(ManualMotionPortCommandKind.DefinePositionZero, kinds);
+
+        // Both registers are defined, on consecutive steps: one port call per step is the contract that
+        // keeps the driver cadence and the preparation-window budget intact, and the accepted route
+        // inherits it instead of folding the two definitions into one dispatch.
+        var position = kinds.IndexOf(ManualMotionPortCommandKind.DefinePositionZero);
+        var encoder = kinds.IndexOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(position >= 0 && encoder >= 0, "both zero definitions must be dispatched");
+        Assert.Equal(position + 1, encoder);
+    }
+
+    [Fact]
+    public void Accepting_An_Active_Input_Still_Verifies_The_Zero_It_Defines()
+    {
+        // What the acceptance removes is travel, and nothing else. With the position register held away
+        // from zero by an acknowledged-but-ignored definition, the Home that started on an active switch
+        // fails the same verification, sets the same typed Home failure and claims no zero - being on the
+        // switch is never a substitute for a verified coordinate, and no tolerance is involved.
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            StartPositionA = 30m,
+            ZeroDefinitionIgnored = true,
+        });
+        harness.OpenAndObserve();
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Axis(ManualMotionAxis.A).HomeInput);
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState != ManualMotionHomeState.NotHomed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, axis.CoordinateState);
+        Assert.Equal(30m, axis.PositionTp.Value);
+
+        var kinds = harness.Port.ExecutedCommands.Select(command => command.Kind).ToList();
+        Assert.DoesNotContain(ManualMotionPortCommandKind.HomeSpeed, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Home, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Begin, kinds);
     }
 
     [Fact]

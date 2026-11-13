@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  ROW_BINDINGS, TRANSPORT_SHAPE, FUNCTION_CODES, DEVICE_KEYS,
+  ROW_BINDINGS, TRANSPORT_SHAPE, FUNCTION_CODES, DEVICE_KEYS, ANALOG_CONVERSIONS,
 } from '../src/legacyEvidence.mjs';
 
 const CS_PATH = new URL('../../../packages/contracts/ProcessIoContracts.cs', import.meta.url);
@@ -67,10 +67,32 @@ test('parity: catalogue loader constants match the adopted inventory', () => {
   assert.ok(CS_APP.includes('public const int ExpectedRowCount = 111;'));
 });
 
-test('parity: engineering formulas match the Legacy map chains', () => {
+test('parity: engineering formulas mirror the adopted map chains', () => {
   assert.ok(CS.includes('if (v >= inMax) v = inMax;'));
   assert.ok(CS.includes('return (v - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;'));
-  assert.ok(CS.includes('=> LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 40);'));
-  assert.ok(CS.includes('double milliamps = LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, 20);'));
-  assert.ok(CS.includes('return LegacyMap(milliamps, 4, 20, 0, 40);'));
+
+  // Every engineered analog row in the mirror is one clamped stage over raw 0..32767. Rebuild the C# call
+  // the mirror's steps denote and require it to be present: this pins both directions, not one.
+  for (const [tag, conv] of Object.entries(ANALOG_CONVERSIONS)) {
+    for (const out of conv.outputs) {
+      assert.equal(out.steps.length, 1, `${tag}.${out.name} must be a one-stage chain after the 2026-11-07 corrections`);
+      const [step] = out.steps;
+      assert.deepEqual(
+        { inMin: step.inMin, inMax: step.inMax, outMin: step.outMin },
+        { inMin: 0, inMax: 32767, outMin: 0 },
+        `${tag}.${out.name} must span raw 0..32767 from 0`);
+      const call = `=> LegacyMap(rawWord, 0, ProcessIoRepresentation.RawFullScale, 0, ${step.outMax});`;
+      assert.ok(CS.includes(call), `C# is missing the ${tag}.${out.name} chain: ${call}`);
+    }
+  }
+
+  // The Pump Outlet and the WC/IV rows share one conversion (0..40 bar) and the water level follows Legacy
+  // rev2 (0..240). Count the call sites so a second, drifting copy of either formula cannot appear.
+  assert.equal([...CS.matchAll(/=> LegacyMap\(rawWord, 0, ProcessIoRepresentation\.RawFullScale, 0, 40\);/g)].length, 2);
+  assert.equal([...CS.matchAll(/=> LegacyMap\(rawWord, 0, ProcessIoRepresentation\.RawFullScale, 0, 240\);/g)].length, 1);
+
+  // The superseded two-stage pump chain (a second live-zero subtraction) must be gone from the Product.
+  assert.doesNotMatch(CS, /milliamps = LegacyMap\(rawWord, 0, ProcessIoRepresentation\.RawFullScale, 0, 20\);/);
+  assert.doesNotMatch(CS, /LegacyMap\(milliamps, 4, 20, 0, 40\)/);
+  assert.doesNotMatch(CS, /=> LegacyMap\(rawWord, 0, ProcessIoRepresentation\.RawFullScale, 0, 270\);/);
 });

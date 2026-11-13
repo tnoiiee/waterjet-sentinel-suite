@@ -147,6 +147,24 @@ public interface ICleaningPathEquipmentBoundary
     bool ReadLowerLimitDetected(string valveId);
 }
 
+/// <summary>
+/// The ONE capability that can widen the Pump-ready source identity, and it belongs to the source that
+/// has to justify the widening rather than to <see cref="ICleaningPathEquipmentBoundary"/>: the shared
+/// equipment contract keeps its closed member list (no Pump command, and no new member any boundary must
+/// implement), so a boundary that does not declare anything is judged by the measured Pump Outlet
+/// identity alone, exactly as before. A declared source names the only identity its own samples carry,
+/// which is how a value the Owner declared stays distinguishable from an AI-003 measurement forever.
+/// </summary>
+public interface ICleaningPathDeclaredPumpSource
+{
+    /// <summary>
+    /// The single <see cref="PressureSample.SourceId"/> this source is allowed to satisfy Pump-ready
+    /// with. Empty or null admits nothing: it never turns an unrecognised identity into readiness, and
+    /// it never renames, rewrites or upgrades the sample a boundary actually served.
+    /// </summary>
+    string AcceptedPumpReadySourceId { get; }
+}
+
 /// <summary>One entry of the combined composition evidence sequence.</summary>
 public sealed record CleaningPathCompositionEvent(
     long Sequence,

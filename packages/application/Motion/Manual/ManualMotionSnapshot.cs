@@ -50,6 +50,29 @@ public sealed class ManualMotionAxisSnapshot
     /// <summary>True when the Owner-local profile lists this axis.</summary>
     public required bool AllowedByProfile { get; init; }
 
+    /// <summary>
+    /// True when the Owner-local profile permits the encoder definition inside Home for this axis, which
+    /// is also the value a profile that omits the key carries. False means Home defines only the position
+    /// register and verifies only that register. This is a profile permission, never a physical fact.
+    /// </summary>
+    public bool AutoResetEncoderOnHome { get; init; }
+
+    /// <summary>
+    /// True when the Owner-local profile permits Home while the home input is already active, which is
+    /// also the value a profile that omits the key carries. False means such a request is refused and the
+    /// Operator must move the axis off the input first. This is a profile permission about one request,
+    /// never a claim that the input is or is not active: the input state stays the separate reading below.
+    /// </summary>
+    public bool AcceptHomeWhenInputActive { get; init; }
+
+    /// <summary>
+    /// The profile TP-to-RP ratio of this axis (1 when the profile omits <c>tpToRpRatio</c>): how many raw
+    /// TP counts represent one position unit. Only the TP comparisons inside the session divide by it. The
+    /// two position readings published beside it stay RAW and unscaled, so a record can always be
+    /// re-audited against a corrected ratio.
+    /// </summary>
+    public decimal TpToRpRatio { get; init; } = 1m;
+
     /// <summary>The brake COMMAND state (never the physical brake).</summary>
     public required ManualMotionBrakeCommandState BrakeCommandState { get; init; }
 

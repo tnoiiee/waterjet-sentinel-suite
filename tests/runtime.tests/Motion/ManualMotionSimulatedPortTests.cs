@@ -26,6 +26,13 @@ public sealed class ManualMotionSimulatedPortTests
         return result.Value;
     }
 
+    private static decimal ReadRp(ManualMotionSimulatedPort port, ManualMotionAxis axis = ManualMotionAxis.A)
+    {
+        var result = port.Read(new ManualMotionPortRead(ManualMotionReadKind.PositionRp, axis, 0));
+        Assert.True(result.Succeeded);
+        return result.Value;
+    }
+
     private static ManualMotionProfile ClearOutputProfile()
     {
         ManualMotionAxisProfile Axis(int brakeOutput) => new()
@@ -198,6 +205,43 @@ public sealed class ManualMotionSimulatedPortTests
         ignoring.Open();
         ignoring.Execute(Command(ManualMotionPortCommandKind.DefinePositionZero));
         Assert.Equal(12000m, ReadTp(ignoring));
+    }
+
+    [Fact]
+    public void Dual_Zero_Definition_Reprimitives_The_Encoder_Register_Only()
+    {
+        // The model gives the two registers separate zeros: a position definition leaves a displaced
+        // encoder zero exactly where it was, and the dual-zero definition re-primitives the encoder
+        // register without touching the position reference. Which real controller register each define
+        // command writes is a field question and is deliberately NOT modelled as a fact here.
+        var port = new ManualMotionSimulatedPort(
+            new TestClock(Instant),
+            ManualMotionProfile.CreateSimulationProfile(),
+            new ManualMotionSimulationOptions { AxisA = new ManualMotionAxisSimulationOptions { RpZeroStart = 30082m } });
+        port.Open();
+
+        Assert.Equal(12000m, ReadTp(port));
+        Assert.Equal(-18082m, ReadRp(port));
+
+        port.Execute(Command(ManualMotionPortCommandKind.DefinePositionZero));
+        Assert.Equal(0m, ReadTp(port));
+        Assert.Equal(-18082m, ReadRp(port));
+
+        port.Execute(Command(ManualMotionPortCommandKind.DefineDualZero));
+        Assert.Equal(0m, ReadTp(port));
+        Assert.Equal(0m, ReadRp(port));
+
+        var ignoring = new ManualMotionSimulatedPort(
+            new TestClock(Instant),
+            ManualMotionProfile.CreateSimulationProfile(),
+            new ManualMotionSimulationOptions
+            {
+                ZeroDefinitionIgnored = true,
+                AxisA = new ManualMotionAxisSimulationOptions { RpZeroStart = 30082m },
+            });
+        ignoring.Open();
+        ignoring.Execute(Command(ManualMotionPortCommandKind.DefineDualZero));
+        Assert.Equal(-18082m, ReadRp(ignoring));
     }
 
     [Fact]

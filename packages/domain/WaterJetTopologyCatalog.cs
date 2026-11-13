@@ -167,11 +167,19 @@ public static class WaterJetTopologyCatalog
     private static readonly Dictionary<string, WaterJetConfiguration> WaterJetsById =
         WaterJets.ToDictionary(w => w.WaterJetId, StringComparer.Ordinal);
 
-    /// <summary>Vertical region of a logical row: rows 1–2 (G+2xx, G+1xx) are UPPER; rows 3–6 (G, H, I, J) are LOWER.</summary>
+    /// <summary>
+    /// Vertical region of a logical row, per the Owner topology ruling of 2026-11-11 that supersedes the
+    /// pre-ruling split (rows 1–2 UPPER / rows 3–6 LOWER): rows 1–3 (G+2xx, G+1xx, G) are UPPER and rows 4–6
+    /// (H, I, J) are LOWER, so each wall's tier carries three of the six logical rows and the tiers hold 54
+    /// Sensors each (LEFT 12 + REAR 15 + RIGHT 12 + FRONT 15 per tier). The Water Jet table above is NOT
+    /// changed by that ruling: WJ1–WJ4 still spray the UPPER tier and WJ5–WJ8 the LOWER tier, which is why
+    /// row 3 is cleaned by the same jets as rows 1 and 2 (G1–G4 by WJ3, G5–G9 by WJ4, G10–G13 by WJ1,
+    /// G14–G18 by WJ2).
+    /// </summary>
     public static Region RegionForLogicalRow(int logicalRow) => logicalRow switch
     {
-        1 or 2 => Region.UPPER,
-        3 or 4 or 5 or 6 => Region.LOWER,
+        1 or 2 or 3 => Region.UPPER,
+        4 or 5 or 6 => Region.LOWER,
         _ => throw new ArgumentOutOfRangeException(nameof(logicalRow), "logical row must be 1-6"),
     };
 

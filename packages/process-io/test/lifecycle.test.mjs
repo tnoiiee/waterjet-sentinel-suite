@@ -37,20 +37,28 @@ test('engineering: WC/IV pressure single-stage conversion (Legacy exact)', () =>
   assert.equal(obs.engineering.bar.unit, 'bar');
 });
 
-test('engineering: pump outlet two-stage conversion (raw -> mA -> bar, Legacy exact)', () => {
+test('engineering: pump outlet single-stage conversion (corrected live zero, deliberately not Legacy)', () => {
   const conv = ANALOG_CONVERSIONS['AI-003+'];
-  assert.equal(conv.outputs[0].steps.length, 2);
+  assert.equal(conv.outputs[0].steps.length, 1);
   const zero = analogEngineering('AI-003+', 0, T, 1);
   assert.equal(zero.engineering.bar.value, 0);
   const full = analogEngineering('AI-003+', 32767, T, 1);
   assert.equal(full.engineering.bar.value, 40);
   const mid = analogEngineering('AI-003+', 24575, T, 1);
   assert.equal(Math.round(mid.engineering.bar.value), Math.round(applySteps(24575, ANALOG_CONVERSIONS['AI-003+'].outputs[0].steps)));
+  // Field anchors recorded 2026-11-07 on the live device: raw 580 at rest and raw 13631 with the pump
+  // running against the Owner's independent reading of 16.x bar. The corrected chain reproduces both.
+  assert.equal(Math.round(analogEngineering('AI-003+', 13631, T, 1).engineering.bar.value * 100) / 100, 16.64);
+  assert.ok(analogEngineering('AI-003+', 580, T, 1).engineering.bar.value < 1);
+  // Same conversion as the other pressure transmitters; the difference between the rows is role, not scale.
+  assert.equal(
+    analogEngineering('AI-003+', 13631, T, 1).engineering.bar.value,
+    analogEngineering('AI-004+', 13631, T, 1).engineering.bar.value);
 });
 
 test('engineering: water level dual outputs; 0-20 mA rows never get engineering values', () => {
   const level = analogEngineering('AI-001+', 32767, T, 1);
-  assert.equal(level.engineering.level.value, 270);
+  assert.equal(level.engineering.level.value, 240);
   assert.equal(level.engineering.percent.value, 100);
   const rawOnly = analogEngineering('AI-012', 1234, T, 1);
   assert.equal(rawOnly.scaling, 'UNRESOLVED');

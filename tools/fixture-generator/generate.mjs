@@ -29,6 +29,14 @@
 // emitted per Snapshot.cs, whole doubles spell as integers, and the file has no trailing
 // newline); the legacy serialization keeps the exact form of the 7dc7c691 file.
 //
+// Owner topology ruling of 2026-11-11: the logical-row-to-tier split is rows 1-3 UPPER / rows 4-6
+// LOWER (previously rows 1-2 / rows 3-6). Only the split changes - the equipment table, the wall
+// populations and the WJn <-> IVn pairing do not - so the fixture assignments move the row-3 Sensors
+// (G1-G18) from WJ5-WJ8 to the UPPER-tier jets: per-Water-Jet counts become RIGHT/UPPER 12 -> WJ1,
+// FRONT/UPPER 15 -> WJ2, LEFT/UPPER 12 -> WJ3, REAR/UPPER 15 -> WJ4, REAR/LOWER 15 -> WJ5,
+// FRONT/LOWER 15 -> WJ6, RIGHT/LOWER 12 -> WJ7, LEFT/LOWER 12 -> WJ8 (108 total; I7 -> WJ5/IV5 and
+// I16 -> WJ6/IV6 unchanged). The pre-ruling split stays frozen for `--legacy-proof` byte-identity.
+//
 // Every value is a pure function of fixed formulas over ScanOrder (no clock, no random source,
 // no Production value). Running it twice yields identical bytes.
 //
@@ -170,10 +178,20 @@ export function sensorIdFor(row, column) {
   }
 }
 
-export function regionForLogicalRow(row) {
-  if (row === 1 || row === 2) return 'UPPER';
-  if (row >= 3 && row <= 6) return 'LOWER';
-  throw new RangeError('logical row must be 1-6');
+// Row-to-tier split. CURRENT Product authority (Owner topology ruling of 2026-11-11): rows 1-3
+// (G+2xx, G+1xx, G) are UPPER and rows 4-6 (H, I, J) are LOWER - 54 Sensors per tier - while the
+// equipment table keeps WJ1-WJ4 on the UPPER tier and WJ5-WJ8 on the LOWER tier. The superseded
+// pre-ruling split (rows 1-2 UPPER / rows 3-6 LOWER) is frozen here ONLY so the `--legacy-proof`
+// modes keep reproducing previously committed .NET output byte-for-byte; it is never Product
+// authority. Mirror of WaterJetTopologyCatalog.RegionForLogicalRow (C#), which carries the current
+// split alone.
+const CURRENT_REGION_BY_ROW = Object.freeze(['UPPER', 'UPPER', 'UPPER', 'LOWER', 'LOWER', 'LOWER']);
+const LEGACY_PROOF_REGION_BY_ROW = Object.freeze(['UPPER', 'UPPER', 'LOWER', 'LOWER', 'LOWER', 'LOWER']);
+
+export function regionForLogicalRow(row, legacyProof = false) {
+  const region = (legacyProof ? LEGACY_PROOF_REGION_BY_ROW : CURRENT_REGION_BY_ROW)[row - 1];
+  if (region === undefined) throw new RangeError('logical row must be 1-6');
+  return region;
 }
 
 // ---- FixtureGenerator formulas ----
@@ -234,7 +252,7 @@ export function buildSensor(profile, scanOrder, inQueue, isJobTarget) {
   const score = scoreFor(scanOrder);
   const uncertain = scanOrder % 7 === 0;
   const { deviceId, index } = deviceFor(profile.deviceCounts, scanOrder);
-  const region = regionForLogicalRow(row);
+  const region = regionForLogicalRow(row, profile.serialization === 'legacy106');
   const assignedList = waterJets(profile).filter((w) => w.targetWall === wall && w.targetRegion === region);
   if (assignedList.length !== 1) throw new Error(`no single Water Jet targets ${wall}/${region}`);
   const assigned = assignedList[0];

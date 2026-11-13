@@ -84,9 +84,11 @@ test('all eight fine-grained placements are UNRESOLVED with no anchors; canonica
   assert.ok(validateEnvelope(resolved).issues.some((i) => i.includes('placementKind must be UNRESOLVED in the current canonical topology')));
 });
 
-test('canonical default assignments: 8/10/8/10/20/20/16/16 per WJ, I7 to WJ5/IV5 and I16 to WJ6/IV6', () => {
+test('canonical default assignments: 12/15/12/15/15/15/12/12 per WJ, I7 to WJ5/IV5 and I16 to WJ6/IV6', () => {
+  // Tier populations follow the Owner topology ruling of 2026-11-11 (rows 1-3 UPPER / rows 4-6
+  // LOWER): three logical rows per tier, so LEFT/RIGHT walls carry 12 Sensors and REAR/FRONT 15.
   const snapshot = fixture('snapshot.seed0.json');
-  const expected = { WJ1: 8, WJ2: 10, WJ3: 8, WJ4: 10, WJ5: 20, WJ6: 20, WJ7: 16, WJ8: 16 };
+  const expected = { WJ1: 12, WJ2: 15, WJ3: 12, WJ4: 15, WJ5: 15, WJ6: 15, WJ7: 12, WJ8: 12 };
   for (const [id, count] of Object.entries(expected)) {
     const own = snapshot.sensors.filter((s) => s.assignedWaterJetId === id);
     assert.equal(own.length, count, id);

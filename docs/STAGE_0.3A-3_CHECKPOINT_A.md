@@ -55,7 +55,11 @@ Canonical baseline (protected):
 
 Wall mapping (unchanged, `[OWNER CONFIRMED]`): columns 1–4 LEFT, 5–9 REAR, 10–13 RIGHT,
 14–18 FRONT; rows top-to-bottom 1 `G+2xx`, 2 `G+1xx`, 3 `G`, 4 `H`, 5 `I`, 6 `J`.
-Regions derived from the approved topology: **UPPER = rows 1–2, LOWER = rows 3–6.**
+Regions derived from the approved topology at this checkpoint: **UPPER = rows 1–2, LOWER =
+rows 3–6.** *(Labelled supersession note, added 2026-11-11: the Owner topology ruling of
+2026-11-11 sets **rows 1–3 UPPER / rows 4–6 LOWER** — the current authority is
+`WaterJetTopologyCatalog.RegionForLogicalRow` and this dated derivation is retained unchanged
+as the checkpoint record; the wall, column and sequence statements above are unaffected.)*
 
 Per-wall logical/sensor arithmetic: LEFT 4×6=24 (24 sensors); REAR 5×6=30 minus I7 = 29;
 RIGHT 4×6=24 (24); FRONT 5×6=30 minus I16 = 29. Total logical 108; total sensors 106.
@@ -78,6 +82,10 @@ installed on one wall and sprays the **opposite** wall (`FRONT↔REAR`, `LEFT↔
 
 Anchor-consistency proof (each anchor resolves inside the installed wall and region of its
 WJ, against the `[OWNER CONFIRMED]` grid):
+
+*(Same supersession note as above: the "⇒ UPPER/LOWER" verdicts in this table read the pre-ruling
+rows 1–2 / rows 3–6 split and are the dated record of the checkpoint reasoning, not current
+authority.)*
 
 | WJ | Anchor resolution | Installed wall/region check |
 | --- | --- | --- |

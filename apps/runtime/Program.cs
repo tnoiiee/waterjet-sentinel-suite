@@ -39,6 +39,26 @@ if (!TcEndpointConfiguration.TryReadAcquisitionMode(
 
 var physicalReadOnly = acquisitionMode == TcAcquisitionMode.PHYSICAL_READ_ONLY;
 
+// 0b. Explicit dry command-composition selector (ACCELERATED-CLEANING-INTEGRATION-01).
+//     The selector is read BEFORE the profile so that the profile default and the profile gate can
+//     agree with it. An absent selector means the mode was NOT chosen; only the exact literal
+//     selects it. Nothing is inferred from the profile, the endpoint or any other variable.
+if (!ProcessIoEndpointConfiguration.TryReadDryMode(
+    Environment.GetEnvironmentVariable, out var dryCommandMode, out var dryModeCode, out var dryModeDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{dryModeCode}]: {dryModeDetail} Nothing was bound.");
+    return 4;
+}
+
+if (dryCommandMode && physicalReadOnly)
+{
+    Console.Error.WriteLine(
+        $"WJSS startup refused [{ProfileStartPolicy.ModeConflictCode}]: the dry command-composition "
+        + "mode and the physical read-only mode are mutually exclusive and were both requested. "
+        + "No mode is selected on the caller's behalf and nothing was bound.");
+    return 2;
+}
+
 // 1. Device profile (ADR-0012). Default SIMULATOR; the explicit physical read-only mode defaults to
 //    TEST_HARDWARE and nothing else. Unknown labels are a configuration error; any profile the mode
 //    does not authorize is refused by the policy.
@@ -59,7 +79,66 @@ if (!ProfileStartPolicy.TryParseProfile(profileLabel, out var profile))
     return 4;
 }
 
-if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, out var refusalCode, out var refusalReason))
+// 0c. Isolated IV Hardware trial selector (ACCELERATED-CLEANING-INTEGRATION-01 two-stage evidence).
+//
+//     This is a SEPARATE evidence class from the integrated dry command composition below, and the
+//     two are never combined: the trial refuses when the integrated dry selector is also set, and the
+//     integrated dry path is not modified by this branch. The trial is selected by its own exact
+//     literal (see DryIvTrial.Token / DryIvTrial.ModeVariable) plus the published single-DO consent
+//     and the Owner Pump-stopped attestation, and it is validated in full by DryIvTrial itself, so
+//     PRODUCTION, a non-dry profile, a missing endpoint, a missing consent or a missing attestation
+//     all refuse before anything is bound.
+if (!DryIvTrial.TryReadMode(Environment.GetEnvironmentVariable, out var ivTrialSelected, out var ivTrialCode, out var ivTrialDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{ivTrialCode}]: {ivTrialDetail} Nothing was bound.");
+    return 4;
+}
+
+if (ivTrialSelected)
+{
+    return DryIvTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
+}
+
+// 0d. Isolated READ-ONLY physical Pump-ready trial selector (Trial A).
+//
+//     The third evidence class, and the only read-only one. It reads AI-003+ through the existing
+//     Process-Io transport and applies the existing Pump-ready rule; it commands nothing. Like the IV
+//     trial it is selected by its own exact literal and validated in full by its own runner, so
+//     PRODUCTION, a non-authorized profile, a missing endpoint, a missing consent, a missing catalogue
+//     or a missing AI-003+ binding all refuse before a transport is constructed. It also refuses when
+//     either of the other two physical selectors is set, so the three are never combined.
+if (!ProcessIoPumpReadyReadTrial.TryReadMode(
+    Environment.GetEnvironmentVariable, out var pumpReadyReadSelected, out var pumpReadCode, out var pumpReadDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{pumpReadCode}]: {pumpReadDetail} Nothing was bound.");
+    return 4;
+}
+
+if (pumpReadyReadSelected)
+{
+    return ProcessIoPumpReadyReadTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
+}
+
+// 0e. The Pump command ladder alone (runbook Stage D, first variant).
+//
+//     The fourth evidence class. It commands the Pump ladder over the existing dry write authorization and
+//     nothing else: no equipment boundary is composed, so that run holds no Isolation Valve command surface
+//     at all, and no motion composition exists, so no axis moves. Like the other two physical trials it is
+//     selected by its own exact literal and validated in full by its own runner, and it refuses when another
+//     physical evidence class is selected beside it.
+if (!PumpCommandDryTrial.TryReadMode(
+    Environment.GetEnvironmentVariable, out var pumpCommandSelected, out var pumpCommandCode, out var pumpCommandDetail))
+{
+    Console.Error.WriteLine($"WJSS startup refused [{pumpCommandCode}]: {pumpCommandDetail} Nothing was bound.");
+    return 4;
+}
+
+if (pumpCommandSelected)
+{
+    return PumpCommandDryTrial.Run(profile, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
+}
+
+if (!ProfileStartPolicy.TryRequireStartable(profile, physicalReadOnly, dryCommandMode, out var refusalCode, out var refusalReason))
 {
     Console.Error.WriteLine($"WJSS startup refused [{refusalCode}]: {refusalReason}");
     return 2;
@@ -72,6 +151,17 @@ if (!int.TryParse(portLabel ?? DefaultPort.ToString(CultureInfo.InvariantCulture
 {
     Console.Error.WriteLine($"WJSS startup refused: invalid {PortEnv} '{portLabel}' (expected 1-65535). Nothing was bound.");
     return 4;
+}
+
+// 3b. TEST_HARDWARE_DRY: build the ONE dry composition root, here, before any listener exists.
+//
+//     It is deliberately NOT routed through SimulatorRuntime. The mode has exactly one surface: the
+//     bounded, single-use console trial that this branch runs and then exits. No HTTP route, no
+//     command API and no Kiosk control is added, and the read-only SIMULATOR projection is never
+//     served beside a physical composition (that would blur provenance).
+if (dryCommandMode)
+{
+    return CleaningPathDryTrial.Run(profile, port, Environment.GetEnvironmentVariable, Console.Out, Console.Error);
 }
 
 // 3. Synthetic configuration: determinism seed, tick interval and bounded history

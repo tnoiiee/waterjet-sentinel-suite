@@ -145,6 +145,29 @@ Centre 125/125 → terminal cleanup and session/run close.
   reset-encoder behavior (position define then encoder define), it is a separate,
   separately-authorized step after the H1 run evidence is complete.
 - No encoder-reset sequence is invented anywhere in this procedure.
+- **Addendum — the encoder definition inside Home (Owner ruling recorded with the head after
+  `4a5fdf7`; the trigger is the Stage D-sim Run-1 / Run-2 transcripts at field driver
+  `2026-11-21.1`).** The Owner ruled that the Home lifecycle itself carries the Legacy reset-encoder
+  order: `DP{axis}=0` and then `DE{axis}=0` at the switch, after the observed stop, and the zero
+  verification then reads BOTH registers. This supersedes, for the **Home-carried** definition only, the
+  statements above that place the encoder definition outside every session of this trial:
+  (1) the bullet beginning "Dual-zero definition (DE=0): OPTIONAL and separately authorized — EXCLUDED"
+  (the exclusion of the **standalone** `RequestDefineDualZero` action, its `UNVERIFIED` effect and its
+  Home-clearing behaviour are all unchanged and still excluded from every session of this trial), and
+  (2) every statement that expects no encoder definition in a Home of this trial: the section 8 line
+  "- DE=0 exists in the plan but is excluded from both runs and every session (section 3).", the two
+  "- Record the DP/DE disposition of section 3 (expected: Home-carried DP verified; DE not dispatched)"
+  steps of sections 10 and 12, and the section 17 scope statement "Both routes exclude: **DE=0**".
+  Those four lines are kept as written and are superseded for the Home-carried definition by this
+  bullet; the standalone action remains excluded.
+  The Product default is on: a profile that omits `autoResetEncoderOnHome` defines both registers, and a
+  profile that sets it to `false` (or an Operator who clears the maintenance box in the commissioning
+  window) narrows one Home back to `DP=0` plus verification of the register that `DP` defines. A refused
+  `DE` is reported as `HOME_ENCODER_ZERO_REFUSED` and fails Home. **What is still not established is which
+  physical register each define command writes**: the branch carries no vendor statement and no measurement
+  of it, so the register mapping remains a field question that this trial's transcript answers and no
+  tolerance may be widened to accommodate. Nothing in this addendum touches the active-home-input refusal
+  of section 3, which remains in force exactly as the Fast H1 Repair recorded it.
 
 ## 4. Representative Move target — Owner decision (both runs)
 
@@ -652,3 +675,228 @@ That wording authorizes the reviewed two-run procedure as a whole; every one of 
 sessions (four per run) still requires its own explicit Owner start after the prior terminal
 and cleanup review, and Run B still requires the separate explicit Owner start of section 11
 after the Run A terminal review. This document is not that authorization.
+
+## 20. Dated addendum — 2026-11-13 (Home opt-outs are profile-governed; the D-sim Pump seam)
+
+**Appended, not rewritten.** The text of sections 3 and 18 above is kept exactly as written and is not
+edited by this addendum; this section records what changed after it. Trigger: the Owner's R1 and R2
+rulings, recorded with the heads after `4a5fdf7` (`c39bc00`, `5c9a129`, `6b5791e`), plus the Stage
+`D-sim` Run-1 / Run-2 transcripts at field driver `2026-11-21.1`. No hardware is executed by this
+addendum and nothing here authorizes a run.
+
+- **R1 — the encoder definition inside Home (already recorded in section 3).** `DP{axis}=0` then
+  `DE{axis}=0` at the switch, both registers verified; `autoResetEncoderOnHome` (absent means `true`) is
+  the profile authority and an Operator may only narrow it. Closed at the bench: `prepare=DRY_PREPARE_READY`
+  on WSB1 axes A and B.
+- **R2 — the `HOME_INPUT_ALREADY_ACTIVE` refusal is now profile-governed.** The sentence of section 3
+  ("this repair deliberately adds no back-off motion and **no automatic already-at-home acceptance**") and
+  the matching sentence of section 18 described a **fixed** refusal. That is superseded in one direction
+  only: a new per-axis profile key `acceptHomeWhenInputActive` decides what a Home request that arrives
+  while the Home input is already active does.
+  - `acceptHomeWhenInputActive: false` — the refusal of sections 3 and 18, verbatim: `HOME_INPUT_ALREADY_ACTIVE`,
+    no native command of any kind dispatched, and the H1 run reaching `H1_FAILED_HOME` with that typed
+    primary cause. This is the reading this procedure was written against, so the H1 dry-commissioning
+    scenarios that assert it pass `acceptHomeWhenInputActive: false` to their own synthetic profile and
+    keep every assertion unchanged.
+  - `acceptHomeWhenInputActive` **absent or `true`** (the Product default, ruled by the Owner 2026-11-12
+    on the same grounds as `autoResetEncoderOnHome`: an axis parked on its Home switch between runs is a
+    normal bench state, and the Owner must not be forced to jog an axis off the switch to start a run) —
+    the request is **accepted**, and the Home is completed **without any travel**: no `HM` home-speed set,
+    no `BG` begin, no `ST` stop is dispatched, because there is nothing to start and nothing to stop. The
+    operation still runs the ordinary brake release, `DP{axis}=0`, `DE{axis}=0`, the two-register
+    verification and the brake re-apply, and reports `HOME_COMPLETED_ZERO_VERIFIED` / `Homed` + `ZeroVerified`.
+  - **What neither setting changes:** every precondition still runs fail-closed before any of this —
+    brake configured, Home parameters configured, feedback bits configured, position tolerance present,
+    and the axis **stationary** under the freshness rules. A zero verification that does not land at zero
+    still fails the Home (`HOME_ZERO_VERIFICATION_FAILED`) even though the switch was active; being on the
+    switch is never a substitute for a verified coordinate. No tolerance is widened anywhere, and no
+    value of this key ever starts a move **into** an active switch — the accepted route dispatches no
+    motion at all, and **back-off motion remains absent in both settings**.
+  - **Second Commission on axes at rest on the switches (the `491ff`-era scenario of section 3):** with
+    the profile refusing it, the transcript is the typed terminal failure above; with the Product default
+    it is a Home that redefines and re-verifies zero at the switch, and the trial's coordinate-readiness
+    precondition is therefore satisfied without an explicit jog-off step. The recovery instruction "move
+    the affected axis off the Home input … and start Commission/Home again" remains valid for a profile
+    that sets `false`, and is unnecessary (never forbidden, just unnecessary) under the default.
+- **An Operator surface can only narrow the permission.** The commissioning window carries a per-axis
+  box, checked by default and cleared and locked by a profile that refuses the acceptance, exactly like
+  the R1 encoder box; it can never widen a profile refusal.
+- **`D-sim` Pump seam (software fix, same commit).** The `D-sim` failure at the bench
+  (`dry.Start()` → `PUMP_PRESSURE_INPUT_INVALID` with `pump_evidence_kind=SOFTWARE_SIMULATED`) was a
+  source-identity mismatch inside the composition, not a pressure value and not a polling gap: the
+  declared-evidence gate serves its sample with the identity `AI-003+SOFTWARE_SIMULATED`, while the
+  composition accepted only the measured `PUMP_OUTLET` identity. The composition now compares the sample
+  against the identity that the *serving boundary itself* declares, through a new capability interface
+  that the shared equipment contract does not carry; the strict `>` setpoint rule, the `Valid` quality
+  rules and every other refusal (including a boundary that declares nothing, and the physical AI-003
+  route) are unchanged. The D-sim evidence continues to print the declared identity and
+  `physical_pump_verified=False`. This document records a software repair only: **`D-sim` remains OPEN
+  until the Owner re-runs it on the new head and the transcript is reviewed.**
+
+
+## 21. Dated addendum — 2026-11-13 (the TP register relation is a profile value: `tpToRpRatio`)
+
+Validation class of this section: **SOFTWARE_AUTHORED, NOT_COMPILED** (no .NET SDK exists in the Agent
+environment; the Owner-local Release build and full test matrix on the exact head remain the validation of
+record) plus **MEASURED_ON_BENCH** for the register relation it encodes. It adds no step to sections 1..19
+and changes no authorization: gates A/B/C/E stay CLOSED, `D-pump` and `D-pump-mv` stay CLOSED, `D-sim`
+stays OPEN, `D-dry` and `F` stay WAIVED, PRODUCTION NOT AUTHORIZED.
+
+- **The bench fact this section encodes.** At head `64574b7`, a `stage-D-sim` run on the physical bench
+  reached P1, stopped accurately at it, and then waited out `motionTimeoutMilliseconds`
+  (`steps=1449`, `exit=0`, `terminal_status=FailedAwaitingSafeReturn`, `primary_failure=MOVE_TIMEOUT`).
+  After `CE 6,6,6,6` and a zero definition at Home, jogging positive produced `RP=10 / TP=+20`, and the
+  stand at P1 produced `RP=1 800 000 / 2 000 000` against `TP=+3 600 000 / +4 000 000`: one encoder register
+  counting 10 000 pulses per revolution against a drive commanding 5 000, i.e. an exact **+2 : 1** relation
+  (agreement within about 3 encoder counts = 1.5 command counts). The timeout was therefore the raw-TP half
+  of the arrival test rejecting `TP = 2 * RP`, not an axis that failed to travel.
+- **The one new profile key.** `tpToRpRatio` (property `TpToRpRatio`) is an optional per-axis `decimal`:
+  how many raw TP counts represent one position unit. Absent or `null` means `1m`, so every profile written
+  before this key keeps its previous meaning byte-for-byte and the key is deliberately NOT a
+  `NotConfiguredItems()` entry. A key that IS present must be a JSON number greater than zero and not
+  larger than `1 000 000`; a string, a boolean, an object, zero, a negative value or an over-bound value
+  refuses the whole profile as `PROFILE_VALUE_INVALID` — it is never clamped and never defaulted.
+- **Where the ratio is applied, and where it is not.** Exactly two comparison sites change: the TP leg of
+  the Move arrival test and the TP leg of the zero verification. Each divides the raw reading by the ratio
+  before comparing it, so `|TP / ratio - target| <= positionTolerance` and `|TP / ratio| <= tolerance`. The
+  RP leg stays 1:1 because the encoder register is the one carrying the commanded unit. Everything else
+  keeps the RAW value: the axis runtime, `ManualMotionAxisSnapshot.PositionTp`, `PositionRp`, the
+  commissioning grids, the cleaning-path execution frames and every log line. The snapshot now also
+  publishes `TpToRpRatio`, so a stored record can be re-audited under a corrected ratio without re-running
+  the axis. **No tolerance is widened and no reading is overwritten.**
+- **Audit result on the magnitude bounds (nothing needed changing).** The commanded target bounds are
+  untouched by the ratio: `CleaningPathUnits.MaximumNative = 2 800 000` is checked against
+  `point.HorizontalNative` / `point.VerticalNative`, and `moveMinimumTarget` / `moveMaximumTarget` against
+  the requested target. The largest raw TP such an axis can report is therefore `2 * 2 800 000 =
+  5 600 000`, and no code caps a position read below that. The only magnitude fence on the read path is
+  `MotionObservationCommandPlan`: at most 16 characters, at most 10 integer digits, at most 4 fraction
+  digits and `|value| <= 10 000 000 000` — which admits `2 * 999 990 000 = 1 999 980 000` (10 digits,
+  10 characters). `ManualMotionSession.ValueFitsKind` bounds only the status word and the brake output
+  state, never a position. No boundary in `ManualMotionCleaningPathBoundary`,
+  `CleaningPathExecutionCoordinator` or `H1DryCommissioningCoordinator` performs position arithmetic at
+  all: they check freshness and nullity and consume the session's outcome code, so the ratio reaches the
+  H1 and path verdicts through the session alone.
+- **The next wall in `D-sim` is the IV1 open supervision, and that is correct.** Once P1 verifies, the
+  composition requests the paired isolation valve only after P1 is dual-verified and held
+  (`SuperviseValveOpen` reads `AI-004+` for `IV1` and the two limit switches), so with the pump STOPPED and
+  `AI-004+` about 0 bar GOOD: `SequencingPressure.Open` with the upper limit (DI-021) active classifies
+  `VALVE_OPEN_FEEDBACK_CONTRADICTION` (0 bar is below the 1.0 bar low band), and without it the window ends
+  at `VALVE_FAILED_TO_OPEN`; both are `BLOCKED`, which blocks the advance gate and ends the path without
+  starting P2. An open confirmation needs `>= HighPressureThresholdBar` (15.0 bar) in either branch, which
+  a stopped pump cannot produce — and the sample identity must be exactly `IV1_OUTLET` (`SourceChecked`), so
+  a Pump-outlet sample never substitutes. The close leg behaves the other way on purpose: 0 bar with the
+  lower limit (DI-029) active is `LOWER_LIMIT_CONFIRMED` with `NONE`, and 0 bar without it is
+  `CLOSED_BY_PRESSURE` with `LOWER_LIMIT_SENSOR_FAULT`; only a pressure of at least 1.0 bar (leak) or 15.0
+  bar (not fully closed) fails it. A refused or unusable pressure sample is not a pass either: it is
+  `VALVE_PRESSURE_INPUT_INVALID`, which blocks the open leg and degrades the close/cleanup record to
+  `Partial`. This is a read-only finding: no line of that supervision was changed here, and none of it is
+  evidence about a real valve position.
+- **Procedure effect.** Sections 3 and 18 keep their wording: a procedure that must keep the older Home
+  refusal still sets `acceptHomeWhenInputActive: false`, and a procedure run on an axis with a measured 2:1
+  register relation now records `"tpToRpRatio": 2` in that axis's profile instead of reasoning about the
+  doubling by hand. `CE 6,6,6,6` and the zero-at-Home step stay exactly as written, and nothing in this
+  section authorizes a command, a tolerance change or a re-run of any closed stage.
+
+## 22. Dated addendum — 2026-11-14 (a declared-Pump run supervises the paired IV on its limit switches)
+
+**Status: SOURCE-AUTHORED IN ARENA, NOT COMPILED (no .NET SDK in the Agent environment; the Owner-local
+build and test matrix on the exact head is the validation of record). NO HARDWARE EXECUTED, NO COMMAND
+AUTHORIZED, and this addendum does not change the meaning of any earlier section of this procedure.**
+
+- **What was recorded at `dc323ea`.** The `D-sim` run cleared the register-ratio wall and stopped at the
+  paired-IV open leg: `prepare=DRY_PREPARE_READY`, `start=PUMP_READY_ACCEPTED` under
+  `pump_gate=DECLARED_PUMP_PRECONDITION` / `pump_evidence_kind=SOFTWARE_SIMULATED` /
+  `physical_pump_verified=False`, both axes dual-verifying P1 with zero `MOVE_TIMEOUT` (`steps=693`), then
+  `primary_failure=VALVE_OPEN_FEEDBACK_CONTRADICTION` while `AI-004+` genuinely read about 0 bar and the IV1
+  Upper limit was physically tripped. The composition fenced the valve closed and the close confirmed on the
+  Lower limit, so the run ended `cleanup.complete=True`, `session_state=CLOSED`. The read-only finding in
+  section 21 described precisely this outcome; the rule it quoted is the rule that is now scoped.
+- **What changed.** Only the MEANING of a pressure reading inside the one evidence class whose Pump-ready
+  came from an Owner declaration under an attested pump stop. There the Upper limit switch is the open proof
+  and 0 bar on the valve outlet is the expected state of the line, so an active Upper limit at 0 bar is
+  `OPEN_CONFIRMED`, a window that ends with no Upper limit is `VALVE_FAILED_TO_OPEN`, and any valid reading at
+  or above `LowPressureThresholdBar` (1.0 bar) is `VALVE_OPEN_FEEDBACK_CONTRADICTION` immediately — a live
+  pressure where a stopped pump cannot make one is a contradiction to be reported, never a leak to be
+  tolerated. In that class `OPEN_BY_PRESSURE` is unreachable: no declared run can confirm an open from a
+  pressure number. Every other route keeps the physical classifier byte-for-byte.
+- **The asymmetry is now the other way too, on purpose.** In the declared class a CLOSE is confirmed only by
+  the physical Lower limit: the bands that prove a valve is not closed (`>= 1.0` leak, `>= 15.0` not fully
+  closed) are kept and judged first, and a window that ends with no Lower limit is `NOT_FULLY_CLOSED` with
+  `LOWER_LIMIT_SENSOR_FAULT` instead of the physical route's `CLOSED_BY_PRESSURE`. The composition refuses its
+  own success terminal on such a close, so `PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` now means
+  "both limit switches spoke", never "the pressure looked low enough".
+- **What is NOT widened.** The exact `<valve>_OUTLET` source identity (`SourceChecked`), `SequencingPressure.Valid`
+  (quality, staleness, finiteness, non-negativity, UTC), the strict `>` comparison against
+  `PumpReadySetpointBar`, the preserved raw sample inside `PressureEvidence`, and the rule that no physical
+  pump is verified in this evidence class. No pressure value is fabricated anywhere: the observed 0 bar is
+  what the record carries, and the acceptance is attributed to the limit switch and to nothing else.
+- **Procedure effect.** Sections that describe the paired-IV supervision of a declared-Pump `D-sim` run
+  should be read with this rule: the accepted evidence at the open leg is the Upper limit line plus the raw
+  `AI-004+` reading, and at the close leg it is the Lower limit line. A run that reaches
+  `LOWER_LIMIT_SENSOR_FAULT` at the close has NOT failed to close - it has failed to PROVE the close, and the
+  correct action is to record the transcript and check the limit wiring, never to re-run until a code appears
+  elsewhere. On any route whose pump readiness is measured rather than declared, the pre-existing codes
+  (`VALVE_OPEN_FEEDBACK_CONTRADICTION` at 0 bar with the limit active, `VALVE_FAILED_TO_OPEN` at the end of
+  the window, `OPEN_BY_PRESSURE` only from at least 15.0 bar) still apply unchanged, and the prohibition on
+  editing a threshold or a supervision rule to make a stage pass stands exactly as written.
+
+## 23. Dated addendum — 2026-11-14 (`D-sim` CLOSED at `ea6d5fb6`: the paired-IV open and close were confirmed by the limit switches)
+
+**Status: DOCUMENTATION ONLY. No `.cs`, `.csproj`, `.sln`, `.json` or `.ps1` file was changed by this
+addendum, so the Owner-verified state at `ea6d5fb6` (Release build `0 warnings / 0 errors`, `1909 / 1909`,
+driver `2026-11-21.1` `SELFCHECK: PASS (11 groups)`, executable `sha256 8AE7E90F8B7C`) remains the
+validation of record. The Agent has no .NET SDK, no PowerShell and no bench access: the build, test and
+transcript numbers below are OWNER-REPORTED-BENCH, and only the line-by-line agreement with source at that
+head is SOURCE-VERIFIED-IN-ARENA. NO HARDWARE COMMAND IS AUTHORIZED BY THIS ADDENDUM; PRODUCTION IS NOT
+AUTHORIZED; PR #45 STAYS OPEN ON MERGE HOLD.**
+
+- **The closure fact.** A `stage-D-sim` run at `ea6d5fb6` (2026-11-13 16:55:56, `exit=0`, `steps=1410`)
+  reported `prepare=DRY_PREPARE_READY`, `start=PUMP_READY_ACCEPTED`,
+  `pump_gate=DECLARED_PUMP_PRECONDITION`, `pump_evidence_kind=SOFTWARE_SIMULATED`,
+  `physical_pump_verified=False`, `simulated_ai003_bar=20`, `simulated_pump_ready_rule=DECLARED_ABOVE_SETPOINT`,
+  `terminal_status=CompleteAwaitingSafeReturn`,
+  `terminal_code=PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` and `primary_failure=NONE`, with
+  `cleanup.valves.refused=0`, `cleanup.valves.transport_failures=0`, `cleanup.valves.unknown=0`,
+  `cleanup.complete=True` and `session_state=CLOSED`. That is the full expectation set the `D-sim` stage
+  declares in `tools/hardware-runbook/wjss-field-driver.ps1:765`, compared case-sensitively key by key by
+  `Resolve-WjssVerdict` (`:163`). Gate `D-sim` is recorded **CLOSED** on that head; the procedure needs no
+  further run of this stage, and no CLOSED stage above it is re-run to decorate the record.
+- **Why `primary_failure=NONE` now carries the valve proof.** The trial prints that line as
+  `result.Handoff.PrimaryFailureCode ?? "NONE"` (`apps/runtime/CleaningPathDryTrial.cs:122`). Under the
+  Scope B2 rules live at this head - the open leg routed through `SequencingPressure.OpenPumpStopped`
+  (`CleaningPathCompositionCoordinator.cs:357`) and any close that is not `LOWER_LIMIT_CONFIRMED` promoted to
+  the first primary failure (`:403`) - the success terminal cannot be reached by pressure reasoning at all:
+  `OPEN_BY_PRESSURE` is unreachable in that classifier and `CLOSED_BY_PRESSURE` no longer satisfies a close.
+  So `NONE` alongside that terminal code means the Upper limit confirmed the open and the Lower limit
+  confirmed the close, physically, while `pump_stopped` was attested at the panel. The declared 20 bar stays
+  what it always was: Pump-ready input only, still required to be strictly above the setpoint
+  (`apps/runtime/CleaningPathDryComposition.cs:600`), never an input to the valve judgement.
+- **Procedure reading note.** `cleanup.valves.attempted=0` / `closed=0` in that transcript are the trial's own
+  shutdown-pass counters (`CleaningPathDryTrial.cs:140-141`). The valve open and the closing fence belong to the
+  composition's supervision legs, which is why the terminal above was reachable at all. A future runner must
+  read those two counters as "the trial-level pass had nothing left to fence", never as "no valve command was
+  issued" - and the driver's own valve expectations for this stage are exactly
+  `refused=0`, `transport_failures=0`, `unknown=0`, `valves.complete=True`.
+- **Cadence rule learned from the intermediate run.** The first run at the same head (2026-11-13 16:27:26)
+  passed `prepare`, `start`, the P1 dual-axis move and the limit-confirmed open, then stopped at the next
+  point dispatch with `primary_failure=OBSERVATION_NOT_FRESH` at `steps=697`, with the cleanup close returning
+  to the Lower limit. That is a fail-closed observation check working, not a defect: a move is refused when
+  the axis motion-status interpretation is not fresh (`packages/application/Motion/Manual/ManualMotionSession.cs:551`),
+  and the session advances its multi-axis observation scheduler by at most one read per step (`:1548`), so
+  four axes times four reads (Status, TP, RP, brake) need at least 16 steps - 400 ms at this trial's 25 ms
+  step - per full round, which cannot fit inside an `observationFreshnessMilliseconds` of 300. The correct
+  procedure action is the one the Owner took: align the **profile's own** cadence numbers
+  (`observationIntervalMilliseconds=25`, `observationFreshnessMilliseconds=2000`, both read at
+  `ManualMotionProfile.cs:554-555`) and re-run, keeping `tpToRpRatio` and `positionTolerance` at their
+  commissioned values (the tolerance stays inside the profile's admissible integer range,
+  `ManualMotionProfile.cs:659`). Softening the freshness check, widening a tolerance or re-running until a
+  different code appears remain forbidden.
+- **Boundaries this closure does not move.** `SOFTWARE_SIMULATED` with `physical_pump_verified=False` is
+  command/control-path evidence and is kept separate from the Physical Pump and Main Valve evidence of
+  `D-pump` / `D-pump-mv` (`16f78bc`; ruling recorded at `e3a731c`); it is not evidence that a pump ran or that
+  the machine is ready with water. The Centre Safe Return (125 mm / 125 mm, 1 250 000 native per axis) stays a
+  typed handoff that this stage never commands. Only the two axes the resolver bound for the run's Sensor -
+  `G+210` to `WJ1`/`IV1` on WSB1, horizontal A and vertical B - were motion-exercised; axes C and D were not
+  touched by this stage. Gates A/B/C/E stay CLOSED at `c4898a0`, `D-dry` and `F` stay WAIVED by Owner
+  decision, `PRODUCTION: NOT AUTHORIZED` and `SIMULATED_FALLBACK: NOT PERMITTED` stay printed on every such
+  run, and the merge decision on PR #45 remains the Owner's alone.

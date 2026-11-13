@@ -111,6 +111,263 @@ public sealed class ManualMotionProfileTests
     }
 
     [Fact]
+    public void The_Home_Encoder_Definition_Is_On_When_The_Profile_Omits_It()
+    {
+        // An Owner-local profile written before this option existed must keep working unchanged, and it
+        // must describe the behaviour the Owner ruled as the normal one: a Home defines both registers at
+        // the switch. The value is therefore defaulted ON, and it is deliberately not reported as a
+        // NOT_CONFIGURED item, because an absent key is a decision and not a missing commissioning value.
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(CompleteProfile).Profile);
+        var axisA = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
+        Assert.True(axisA.AutoResetEncoderOnHome);
+
+        var axisB = Assert.IsType<ManualMotionAxisProfile>(profile.AxisB);
+        Assert.True(axisB.AutoResetEncoderOnHome);
+        Assert.DoesNotContain("autoResetEncoderOnHome", axisB.NotConfiguredItems());
+    }
+
+    [Fact]
+    public void The_Profile_Can_Refuse_The_Encoder_Definition_On_Home()
+    {
+        const string refused = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "autoResetEncoderOnHome": false
+                }
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(refused);
+        Assert.True(result.Accepted);
+        var profile = Assert.IsType<ManualMotionProfile>(result.Profile);
+        var axis = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
+        Assert.False(axis.AutoResetEncoderOnHome);
+        Assert.Equal(1, axis.BrakeOutput);
+
+        // The two optional booleans keep separate readers with deliberately different absent-key rules:
+        // dualZeroPermitted is absent-means-false and is reported as NOT_CONFIGURED, while this key is
+        // absent-means-true and is deliberately not. One value can therefore not answer for the other, and
+        // the encoder rule cannot silently become a new mandatory configuration item.
+        Assert.False(axis.DualZeroPermitted);
+        Assert.Contains("dualZeroPermitted", axis.NotConfiguredItems());
+        Assert.DoesNotContain("autoResetEncoderOnHome", axis.NotConfiguredItems());
+    }
+
+    [Fact]
+    public void A_Null_Home_Encoder_Definition_Is_The_Built_In_Default_And_A_Text_One_Is_Refused()
+    {
+        const string nulled = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "autoResetEncoderOnHome": null
+                }
+              }
+            }
+            """;
+
+        var accepted = ManualMotionProfileParser.Parse(nulled);
+        Assert.True(accepted.Accepted);
+        Assert.True(Assert.IsType<ManualMotionProfile>(accepted.Profile).AxisA!.AutoResetEncoderOnHome);
+
+        var textValue = nulled.Replace(
+            "\"autoResetEncoderOnHome\": null",
+            "\"autoResetEncoderOnHome\": \"yes\"",
+            StringComparison.Ordinal);
+        var refused = ManualMotionProfileParser.Parse(textValue);
+        Assert.False(refused.Accepted);
+        Assert.Null(refused.Profile);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refused.Code);
+    }
+
+    [Fact]
+    public void Home_Is_Accepted_On_An_Active_Input_When_The_Profile_Omits_The_Key()
+    {
+        // The Owner ruled the bench behaviour: an axis parked on the Home switch between runs is normal,
+        // so a profile written before this key existed must keep working unedited and must describe the
+        // acceptance, exactly like the encoder-definition key beside it. A null value is the same decision
+        // as an absent one, and a text value is a malformed profile rather than a truthy string.
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(CompleteProfile).Profile);
+        Assert.True(Assert.IsType<ManualMotionAxisProfile>(profile.AxisA).AcceptHomeWhenInputActive);
+
+        var axisB = Assert.IsType<ManualMotionAxisProfile>(profile.AxisB);
+        Assert.True(axisB.AcceptHomeWhenInputActive);
+
+        // Deliberately not a NOT_CONFIGURED item: an absent key is a ruling, not a missing commissioning
+        // value, so it can never become a blocker in the not-configured census of an axis.
+        Assert.DoesNotContain("acceptHomeWhenInputActive", axisB.NotConfiguredItems());
+
+        const string nulled = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "acceptHomeWhenInputActive": null
+                }
+              }
+            }
+            """;
+
+        var accepted = ManualMotionProfileParser.Parse(nulled);
+        Assert.True(accepted.Accepted);
+        Assert.True(Assert.IsType<ManualMotionProfile>(accepted.Profile).AxisA!.AcceptHomeWhenInputActive);
+
+        var textValue = nulled.Replace(
+            "\"acceptHomeWhenInputActive\": null",
+            "\"acceptHomeWhenInputActive\": \"yes\"",
+            StringComparison.Ordinal);
+        var refusedByText = ManualMotionProfileParser.Parse(textValue);
+        Assert.False(refusedByText.Accepted);
+        Assert.Null(refusedByText.Profile);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refusedByText.Code);
+    }
+
+    [Fact]
+    public void The_Profile_Can_Refuse_Home_On_An_Active_Input()
+    {
+        // The opt-out is a real one: a commissioning procedure that needs the older refusal - move off the
+        // Home input before Homing - states it in its own profile, and the reader honours it exactly.
+        const string refusedText = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "acceptHomeWhenInputActive": false
+                }
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(refusedText);
+        Assert.True(result.Accepted);
+        var profile = Assert.IsType<ManualMotionProfile>(result.Profile);
+        var axis = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
+        Assert.False(axis.AcceptHomeWhenInputActive);
+        Assert.Equal(1, axis.BrakeOutput);
+
+        // The two optional Home keys stay independent: refusing one never implies the other, and a profile
+        // that says nothing about the encoder definition keeps the ruled default.
+        Assert.True(axis.AutoResetEncoderOnHome);
+        Assert.False(axis.DualZeroPermitted);
+        Assert.Contains("dualZeroPermitted", axis.NotConfiguredItems());
+        Assert.DoesNotContain("acceptHomeWhenInputActive", axis.NotConfiguredItems());
+    }
+
+    [Fact]
+    public void The_Tp_To_Rp_Ratio_Defaults_To_One_When_The_Profile_Omits_It()
+    {
+        // An axis whose position register ticks 1:1 with the commanded unit needs no key, so every
+        // profile written before this option existed keeps its exact previous meaning: one TP count per
+        // position unit. The default is a complete configuration and never a commissioning gap.
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(CompleteProfile).Profile);
+
+        Assert.Equal(1m, Assert.IsType<ManualMotionAxisProfile>(profile.AxisA).TpToRpRatio);
+
+        var axisB = Assert.IsType<ManualMotionAxisProfile>(profile.AxisB);
+        Assert.Equal(1m, axisB.TpToRpRatio);
+
+        // Deliberately not a NOT_CONFIGURED item: an absent ratio is a ruling of 1:1, not a value the
+        // Owner still has to measure, so it can never become a blocker in the not-configured census.
+        Assert.DoesNotContain("tpToRpRatio", axisB.NotConfiguredItems());
+    }
+
+    [Fact]
+    public void The_Tp_To_Rp_Ratio_Is_Read_As_A_Decimal_And_A_Null_Means_One()
+    {
+        const string scaled = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "tpToRpRatio": 2
+                },
+                "B": {
+                  "brakeOutput": 2,
+                  "tpToRpRatio": 1.25
+                },
+                "C": {
+                  "brakeOutput": 3,
+                  "tpToRpRatio": null
+                }
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(scaled);
+        Assert.True(result.Accepted);
+        var profile = Assert.IsType<ManualMotionProfile>(result.Profile);
+
+        // The Owner-measured bench relation of 10 000 encoder pulses per revolution against 5 000
+        // commanded pulses per revolution, kept exactly as written and never rounded to an integer.
+        Assert.Equal(2m, Assert.IsType<ManualMotionAxisProfile>(profile.AxisA).TpToRpRatio);
+        Assert.Equal(1.25m, Assert.IsType<ManualMotionAxisProfile>(profile.AxisB).TpToRpRatio);
+
+        // A null is the same decision as an absent key, and the other optional keys are untouched by it.
+        var axisC = Assert.IsType<ManualMotionAxisProfile>(profile.AxisC);
+        Assert.Equal(1m, axisC.TpToRpRatio);
+        Assert.True(axisC.AcceptHomeWhenInputActive);
+        Assert.True(axisC.AutoResetEncoderOnHome);
+    }
+
+    [Fact]
+    public void A_TP_To_RP_Ratio_That_Is_Zero_Negative_Or_Not_A_Number_Refuses_The_Whole_Profile()
+    {
+        // Zero would make the TP comparison divide by nothing and a negative value would invert the
+        // register: both are refused outright rather than clamped to the default, and a text value is a
+        // malformed profile, never a number to be parsed leniently. A refusal carries no profile at all.
+        foreach (var value in new[] { "0", "-2", "\"2\"", "true" })
+        {
+            var text = ReplaceInProfile(
+                "\"dualZeroPermitted\": true",
+                "\"dualZeroPermitted\": true, \"tpToRpRatio\": " + value);
+            var result = ManualMotionProfileParser.Parse(text);
+
+            Assert.False(result.Accepted);
+            Assert.Null(result.Profile);
+            Assert.Equal(ManualMotionCodes.ProfileValueInvalid, result.Code);
+        }
+    }
+
+    [Fact]
+    public void A_TP_To_RP_Ratio_Outside_The_Admisible_Bound_Refuses_The_Profile()
+    {
+        // The bound is a sanity fence against a mis-typed value (one million TP counts per position unit
+        // is a gearing this suite will not act on), and it is generous enough that any real encoder
+        // relation fits inside it. At the bound the value is still accepted, as the largest admissible one.
+        var atBound = ReplaceInProfile(
+            "\"dualZeroPermitted\": true",
+            "\"dualZeroPermitted\": true, \"tpToRpRatio\": 1000000");
+        Assert.True(ManualMotionProfileParser.Parse(atBound).Accepted);
+
+        var overBound = ReplaceInProfile(
+            "\"dualZeroPermitted\": true",
+            "\"dualZeroPermitted\": true, \"tpToRpRatio\": 1000001");
+        var refused = ManualMotionProfileParser.Parse(overBound);
+        Assert.False(refused.Accepted);
+        Assert.Null(refused.Profile);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refused.Code);
+    }
+
+    [Fact]
     public void Only_The_Listed_Axes_Are_Allowed()
     {
         // A self-contained one-axis profile (no multi-line excerpt of CompleteProfile, so this test

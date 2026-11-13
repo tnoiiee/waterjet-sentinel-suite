@@ -166,7 +166,8 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "autoResetEncoderOnHome": true
     },
     "B": {
       "brakeOutput": 2,
@@ -187,7 +188,8 @@ allocations: A → 1 and B → 2.
       "motionActiveValue": null,
       "homeStatusBit": null,
       "homeActiveValue": null,
-      "dualZeroPermitted": null
+      "dualZeroPermitted": null,
+      "autoResetEncoderOnHome": true
     }
   }
 }
@@ -214,6 +216,17 @@ separate hardware commissioning gate. In particular:
 - `moveMinimumTarget` must be below `moveMaximumTarget` when both are
   configured, and the two status-bit numbers must differ when both are
   configured.
+- `autoResetEncoderOnHome` decides whether the Home lifecycle also defines the encoder register at the
+  switch: `DP{axis}=0` and then `DE{axis}=0`, after the observed stop, with the zero verification reading
+  BOTH registers (Owner ruling recorded with the head after `4a5fdf7`). Omitting the key means ON, so a
+  profile written before this key existed already carries the ruled behaviour, and an explicit `null`
+  means the same as omitting it; any other non-boolean value is a profile shape failure. The value is a
+  permission and a scope, never a relaxation: with it false, Home defines only `DP{axis}=0` and verifies
+  only the register `DP` defines (the other register stays readable as drift evidence and is never
+  claimed), the freshness, sequence-barrier and tolerance conditions are identical either way, a refused
+  `DE` fails Home with `HOME_ENCODER_ZERO_REFUSED`, and the standalone dual-zero action stays behind
+  `dualZeroPermitted` exactly as before. Which physical register each define command writes is NOT
+  established on this branch: it is a field question that the Stage D transcript answers.
 - An axis may be omitted entirely; it is then not allowed by the profile.
 
 Git ignore patterns cover `**/*.wjss-manual-motion-profile.json`, but that is
@@ -345,3 +358,30 @@ Nothing in a software or simulated pass proves:
 Related evidence: `docs/evidence/MANUAL_MOTION_LEGACY_CONTINUITY.md`,
 `docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md`, and
 `docs/evidence/GCLIB_2_6_0_API_USAGE_BASELINE.md`.
+
+
+## 7. Dated addendum — 2026-11-13 (`tpToRpRatio`: the TP register relation of one axis)
+
+Validation class: **SOFTWARE_AUTHORED, NOT_COMPILED**. No hardware was touched by this section and no
+simulated value in it is hardware evidence.
+
+- The Owner-local profile accepts one new optional per-axis key, `tpToRpRatio` (a `decimal`): the number of
+  raw TP register counts per position unit, `1m` when the key is absent or `null`. Like the two other
+  optional Home keys it is listed in the allowed axis properties, it is deliberately NOT a NOT_CONFIGURED
+  item, and a present key that is not a number greater than zero and not larger than `1 000 000` refuses
+  the whole profile rather than being coerced.
+- It rescales nothing. The runtime keeps the raw TP and RP observations, the snapshot publishes them raw and
+  adds `TpToRpRatio` beside them, and the grids and logs print the raw numbers. Only the two TP comparisons
+  inside the session (the Move arrival test and the zero verification) divide the reading by the ratio
+  before applying `positionTolerance`; the RP comparisons are untouched. A profile that omits the key
+  therefore evaluates the arrival test exactly as before this option existed.
+- The simulated port gained a per-axis `TpMultiplier` (default `1m`) so a 2:1 axis can be modelled in
+  tests: the simulated TP read reports the physical position scaled by it while RP keeps the commanded
+  unit, which is how the raw-TP arrival refusal and its repair are both pinned without widening any
+  tolerance. That knob is synthetic test data; it models no vendor-confirmed register mapping.
+- Bounds audit, recorded so a future reader does not have to repeat it: the commanded target bounds
+  (`moveMinimumTarget` / `moveMaximumTarget`, and `CleaningPathUnits.MaximumNative = 2 800 000` for path
+  points) apply to the commanded unit only, so a TP reading of `2 * 2 800 000 = 5 600 000` is expected and
+  is not capped anywhere; the read path's only magnitude fence is
+  `MotionObservationCommandPlan` (16 characters, 10 integer digits, 4 fraction digits,
+  `|value| <= 10 000 000 000`). Nothing in this suite rejects `TP = 2 * RP`.

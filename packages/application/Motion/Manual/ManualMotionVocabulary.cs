@@ -494,6 +494,14 @@ public static class ManualMotionCodes
     /// <summary>The profile does not permit the dual-zero definition for the axis.</summary>
     public const string DualZeroNotPermittedByProfile = "DUAL_ZERO_NOT_PERMITTED_BY_PROFILE";
 
+    /// <summary>
+    /// Home was asked to define the encoder register as well and the controller refused that
+    /// definition: Home is reported as failed. A refused encoder definition is never treated as a
+    /// successful Home, and the brake path plus the protective Stop run exactly as for any other
+    /// refused zero definition.
+    /// </summary>
+    public const string HomeEncoderZeroRefused = "HOME_ENCODER_ZERO_REFUSED";
+
     /// <summary>The request was ignored because it does not match the active hold-to-run press.</summary>
     public const string JogPressNotActive = "JOG_PRESS_NOT_ACTIVE";
 
@@ -622,6 +630,7 @@ public static class ManualMotionCodes
         HomeCompletedZeroVerified => "Home completed and zero was verified by position reads under the Owner-attested profile interpretation. Not hardware evidence.",
         HomeCompletedZeroNotVerified => "Home completed but zero could not be verified.",
         DualZeroDispatchedEffectUnverified => "The dual-zero definition was dispatched. Its effect is UNVERIFIED.",
+        HomeEncoderZeroRefused => "The refused encoder definition made Home fail. No position is claimed by this code.",
         MoveCompletedPositionVerified => "Move completed: not moving and both position reads within the configured tolerance of the target.",
         CoordinateRedefinedHomeCleared => "A manual coordinate definition cleared the session Home state of the axis.",
         _ => "See the code. No command text, reply text or native detail is recorded.",
