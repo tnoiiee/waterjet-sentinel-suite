@@ -80,4 +80,55 @@ public static class SequencingPressure
             ? new(null, ValveCloseResolution.CLOSED_BY_PRESSURE, ValveDiagnosis.LOWER_LIMIT_SENSOR_FAULT)
             : new(null, null, ValveDiagnosis.NONE);
     }
+
+    /// <summary>
+    /// The paired-IV open classifier for the ONE evidence class in which the Pump is Owner-attested
+    /// STOPPED and Pump-ready was admitted from a declared value: no measured line pressure can exist
+    /// while that valve travels, so the limit switch is the open proof and pressure is only ever a
+    /// contradiction. Quality and source validity still come first, an invalid reading is never assigned
+    /// to a pressure band, and a live reading at or above the low band fails closed IMMEDIATELY because it
+    /// contradicts the attested stop. 0 bar never confirms an open by pressure here: without the Upper
+    /// limit the supervision window simply ends as a failed open. This is the only difference from
+    /// <see cref="Open"/>; the physical route above is untouched.
+    /// </summary>
+    public static ValveAssessment OpenPumpStopped(
+        PressureSample? sample,
+        bool upperDetected,
+        bool timedOut,
+        SequencingPressureThresholds thresholds)
+    {
+        if (!Valid(sample)) return new(ValveOpenResolution.BLOCKED, null, ValveDiagnosis.VALVE_PRESSURE_INPUT_INVALID);
+        if (sample!.Bar!.Value >= thresholds.LowPressureThresholdBar)
+            return new(ValveOpenResolution.BLOCKED, null, ValveDiagnosis.VALVE_OPEN_FEEDBACK_CONTRADICTION);
+        if (upperDetected) return new(ValveOpenResolution.OPEN_CONFIRMED, null, ValveDiagnosis.NONE);
+        if (!timedOut) return new(null, null, ValveDiagnosis.NONE);
+        return new(ValveOpenResolution.BLOCKED, null, ValveDiagnosis.VALVE_FAILED_TO_OPEN);
+    }
+
+    /// <summary>
+    /// The paired-IV close classifier for the same Pump-stopped evidence class. The bands that prove a
+    /// valve is NOT closed are kept unchanged, because pressure under a stopped Pump can only ever
+    /// contradict a closed claim, never support one; and a timeout without the Lower limit stays
+    /// NOT_FULLY_CLOSED instead of <see cref="ValveCloseResolution.CLOSED_BY_PRESSURE"/>, because 0 bar
+    /// with the Pump stopped is the expected state of the whole line and proves nothing about this valve.
+    /// The classification is always non-null once the window ends, so the supervision terminates and the
+    /// cleanup record keeps its failure state.
+    /// </summary>
+    public static ValveAssessment ClosePumpStopped(
+        PressureSample? sample,
+        bool lowerDetected,
+        bool timedOut,
+        SequencingPressureThresholds thresholds)
+    {
+        if (!Valid(sample))
+            return new(null, ValveCloseResolution.PRESSURE_INPUT_INVALID, ValveDiagnosis.VALVE_PRESSURE_INPUT_INVALID);
+        if (!lowerDetected && !timedOut) return new(null, null, ValveDiagnosis.NONE);
+        var pressure = sample!.Bar!.Value;
+        if (pressure >= thresholds.HighPressureThresholdBar)
+            return new(null, ValveCloseResolution.NOT_FULLY_CLOSED, ValveDiagnosis.VALVE_NOT_FULLY_CLOSED);
+        if (pressure >= thresholds.LowPressureThresholdBar)
+            return new(null, ValveCloseResolution.LEAK_SUSPECTED, ValveDiagnosis.VALVE_LEAK_SUSPECTED);
+        if (lowerDetected) return new(null, ValveCloseResolution.LOWER_LIMIT_CONFIRMED, ValveDiagnosis.NONE);
+        return new(null, ValveCloseResolution.NOT_FULLY_CLOSED, ValveDiagnosis.LOWER_LIMIT_SENSOR_FAULT);
+    }
 }

@@ -796,3 +796,46 @@ stays OPEN, `D-dry` and `F` stay WAIVED, PRODUCTION NOT AUTHORIZED.
   register relation now records `"tpToRpRatio": 2` in that axis's profile instead of reasoning about the
   doubling by hand. `CE 6,6,6,6` and the zero-at-Home step stay exactly as written, and nothing in this
   section authorizes a command, a tolerance change or a re-run of any closed stage.
+
+## 22. Dated addendum — 2026-11-14 (a declared-Pump run supervises the paired IV on its limit switches)
+
+**Status: SOURCE-AUTHORED IN ARENA, NOT COMPILED (no .NET SDK in the Agent environment; the Owner-local
+build and test matrix on the exact head is the validation of record). NO HARDWARE EXECUTED, NO COMMAND
+AUTHORIZED, and this addendum does not change the meaning of any earlier section of this procedure.**
+
+- **What was recorded at `dc323ea`.** The `D-sim` run cleared the register-ratio wall and stopped at the
+  paired-IV open leg: `prepare=DRY_PREPARE_READY`, `start=PUMP_READY_ACCEPTED` under
+  `pump_gate=DECLARED_PUMP_PRECONDITION` / `pump_evidence_kind=SOFTWARE_SIMULATED` /
+  `physical_pump_verified=False`, both axes dual-verifying P1 with zero `MOVE_TIMEOUT` (`steps=693`), then
+  `primary_failure=VALVE_OPEN_FEEDBACK_CONTRADICTION` while `AI-004+` genuinely read about 0 bar and the IV1
+  Upper limit was physically tripped. The composition fenced the valve closed and the close confirmed on the
+  Lower limit, so the run ended `cleanup.complete=True`, `session_state=CLOSED`. The read-only finding in
+  section 21 described precisely this outcome; the rule it quoted is the rule that is now scoped.
+- **What changed.** Only the MEANING of a pressure reading inside the one evidence class whose Pump-ready
+  came from an Owner declaration under an attested pump stop. There the Upper limit switch is the open proof
+  and 0 bar on the valve outlet is the expected state of the line, so an active Upper limit at 0 bar is
+  `OPEN_CONFIRMED`, a window that ends with no Upper limit is `VALVE_FAILED_TO_OPEN`, and any valid reading at
+  or above `LowPressureThresholdBar` (1.0 bar) is `VALVE_OPEN_FEEDBACK_CONTRADICTION` immediately — a live
+  pressure where a stopped pump cannot make one is a contradiction to be reported, never a leak to be
+  tolerated. In that class `OPEN_BY_PRESSURE` is unreachable: no declared run can confirm an open from a
+  pressure number. Every other route keeps the physical classifier byte-for-byte.
+- **The asymmetry is now the other way too, on purpose.** In the declared class a CLOSE is confirmed only by
+  the physical Lower limit: the bands that prove a valve is not closed (`>= 1.0` leak, `>= 15.0` not fully
+  closed) are kept and judged first, and a window that ends with no Lower limit is `NOT_FULLY_CLOSED` with
+  `LOWER_LIMIT_SENSOR_FAULT` instead of the physical route's `CLOSED_BY_PRESSURE`. The composition refuses its
+  own success terminal on such a close, so `PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` now means
+  "both limit switches spoke", never "the pressure looked low enough".
+- **What is NOT widened.** The exact `<valve>_OUTLET` source identity (`SourceChecked`), `SequencingPressure.Valid`
+  (quality, staleness, finiteness, non-negativity, UTC), the strict `>` comparison against
+  `PumpReadySetpointBar`, the preserved raw sample inside `PressureEvidence`, and the rule that no physical
+  pump is verified in this evidence class. No pressure value is fabricated anywhere: the observed 0 bar is
+  what the record carries, and the acceptance is attributed to the limit switch and to nothing else.
+- **Procedure effect.** Sections that describe the paired-IV supervision of a declared-Pump `D-sim` run
+  should be read with this rule: the accepted evidence at the open leg is the Upper limit line plus the raw
+  `AI-004+` reading, and at the close leg it is the Lower limit line. A run that reaches
+  `LOWER_LIMIT_SENSOR_FAULT` at the close has NOT failed to close - it has failed to PROVE the close, and the
+  correct action is to record the transcript and check the limit wiring, never to re-run until a code appears
+  elsewhere. On any route whose pump readiness is measured rather than declared, the pre-existing codes
+  (`VALVE_OPEN_FEEDBACK_CONTRADICTION` at 0 bar with the limit active, `VALVE_FAILED_TO_OPEN` at the end of
+  the window, `OPEN_BY_PRESSURE` only from at least 15.0 bar) still apply unchanged, and the prohibition on
+  editing a threshold or a supervision rule to make a stage pass stands exactly as written.

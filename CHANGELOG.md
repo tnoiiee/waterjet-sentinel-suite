@@ -13,6 +13,84 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-14 — B2: a declared-Pump run supervises the paired IV on its limit switches (software only; no hardware authorization)
+
+**Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN,
+MERGE HOLD); .NET RESTORE / BUILD / TEST NOT RUN — no .NET SDK exists in the Agent environment, so the
+Owner-local gate on the exact head (locked restore, Release build with `TreatWarningsAsErrors`, full test
+matrix) remains the validation of record. The last Owner-executed evidence is 0 warnings / 0 errors and
+1880 passed / 0 failed at `dc323ea`; the expected total on this head is 1909, that 1880 plus the 29 new
+test cases listed below. NO HARDWARE. NO PHYSICAL OR MODBUS COMMAND. `D-sim` REMAINS OPEN until re-run on
+this head. PRODUCTION NOT AUTHORIZED.**
+
+- **The measured reason.** The `D-sim` run at `dc323ea` cleared the R3 wall and reached the next one exactly
+  where the read-only analysis in the 2026-11-13 R3 entry said it would: `prepare=DRY_PREPARE_READY`,
+  `start=PUMP_READY_ACCEPTED` with `pump_gate=DECLARED_PUMP_PRECONDITION`,
+  `pump_evidence_kind=SOFTWARE_SIMULATED` and `physical_pump_verified=False`; both axes verified P1 with
+  zero `MOVE_TIMEOUT` (`steps=693`); and then `terminal_status=FailedAwaitingSafeReturn` with
+  `primary_failure=VALVE_OPEN_FEEDBACK_CONTRADICTION`, because `AI-004+` really read about 0 bar while DI-021
+  (the IV1 Upper limit) was physically tripped. The composition fenced the valve closed on its own and the
+  close reached `LOWER_LIMIT_CONFIRMED`, and the run still reported `cleanup.complete=True` with
+  `session_state=CLOSED`. **MEASURED_ON_BENCH.**
+- **Why the open leg could not pass and why loosening it was not an option.** `SequencingPressure.Open`
+  judges a valve-open claim against the pressure bands: at 0 bar (below `LowPressureThresholdBar` = 1.0) an
+  active Upper limit is a CONTRADICTION and an inactive one ends the window as `VALVE_FAILED_TO_OPEN`; an
+  open confirmation needs `>= HighPressureThresholdBar` = 15.0 bar, which a pump the Owner attests STOPPED
+  cannot produce. That rule is correct for every run whose pump state is not attested, so it was not changed.
+- **The change (Owner-approved Scope B2, atomic).** Two extra classifiers sit beside the existing ones in
+  `SequencingPressure`: `OpenPumpStopped` and `ClosePumpStopped`. For the one evidence class in which
+  Pump-ready was admitted from an Owner DECLARATION under an attested stop, the Upper/Lower limit switches
+  become the only physical proof: `0 bar` with the Upper limit active is `OPEN_CONFIRMED`; any valid reading
+  at or above `LowPressureThresholdBar` is `VALVE_OPEN_FEEDBACK_CONTRADICTION` immediately, with or without
+  the limit and even at the high band; a window that ends with no limit is `VALVE_FAILED_TO_OPEN`; and
+  `OPEN_BY_PRESSURE` is unreachable in that classifier, so a declared run can never confirm an open from
+  pressure alone. On the close side the bands that prove a valve is NOT closed are kept and judged first
+  (`>= High` `NOT_FULLY_CLOSED` + `VALVE_NOT_FULLY_CLOSED`, `>= Low` `LEAK_SUSPECTED`), `LOWER_LIMIT_CONFIRMED`
+  requires the physical Lower limit, and a timeout without it stays `NOT_FULLY_CLOSED` +
+  `LOWER_LIMIT_SENSOR_FAULT` instead of becoming the physical route's `CLOSED_BY_PRESSURE` inference —
+  because 0 bar with the pump stopped is the expected state of the whole line and proves nothing about one
+  valve. The composition additionally refuses its own success terminal in that mode: a close that is not
+  `LOWER_LIMIT_CONFIRMED` becomes the first primary failure, so
+  `PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` can never report a pressure-inferred closure.
+- **How the mode is selected, and how narrowly.** `CleaningPathCompositionCoordinator` derives
+  `_declaredPumpMode` exactly once per composition, from the readiness decision alone: it is true only when
+  the equipment boundary implements `ICleaningPathDeclaredPumpSource` AND the accepted Pump sample carried
+  that boundary's own declared identity rather than the measured `PUMP_OUTLET` identity. A refusal leaves it
+  false, a boundary that declares nothing leaves it false, and a boundary that declares `PUMP_OUTLET` stays on
+  the physical route, so no run can enter the mode by accident. The raw sample, `SourceChecked` on the exact
+  `<valve>_OUTLET` identity, `SequencingPressure.Valid` quality/staleness/finiteness/non-negativity and the
+  strict `> PumpReadySetpointBar` comparison are all still on the path unchanged, and nothing in this scope
+  fabricates a pressure value or weakens the physical-pump rule.
+- **What is deliberately unchanged.** `SequencingPressure.Open` / `SequencingPressure.Close` bodies are
+  byte-for-byte what they were at `dc323ea`; no `ValveOpenResolution`, `ValveCloseResolution` or
+  `ValveDiagnosis` member was added (every outcome above is expressed with existing values, so the exhaustive
+  switches stay exhaustive); `ICleaningPathEquipmentBoundary`, `CleaningPathSimulatedPumpReadyGate`,
+  `CleaningPathDryComposition`, `CleaningPathDryTrial`, every `ProcessIo*` source, `SequencingKernel` and
+  `tools/hardware-runbook/wjss-field-driver.ps1` were not touched; no `WJSS_*` identifier and no asserted
+  status or failure code literal was removed or renamed. `cleanup.valves.attempted=0` beside a
+  composition-internal close is a statement about which cleanup owner acted, and this scope changed no
+  reporting or driver code, so every key keeps the meaning the Owner already recorded.
+- **New tests (29 cases).** `tests/runtime.tests/Sequencing/SequencingPressureTests.cs` gains 7 `[Fact]`
+  plus 2 theories with 15 `[InlineData]` rows: the full Pump-stopped open and close matrices, the pending
+  window on 0 bar, the unreachable `OPEN_BY_PRESSURE` sweep, the invalid-input sweep on both legs, the
+  never-infers-closure sweep, and a pin that re-reads the PHYSICAL `Open`/`Close` to prove their pressure
+  inference (including `CLOSED_BY_PRESSURE`) is still there for every non-declaring route.
+  `tests/runtime.tests/CleaningPath/Composition/CleaningPathCompositionPumpStoppedValveTests.cs` is new with
+  7 end-to-end facts over the real `CleaningPathSimulatedPumpReadyGate` and one real Manual Motion session on
+  the deterministic simulated port: the declared run completes P1..P6 with the open accepted on the Upper
+  limit at a preserved raw 0 bar; an open that times out fences the valve closed, blocks P2 and reports
+  `VALVE_FAILED_TO_OPEN` with the cleanup close refusing to infer closure; any pressure at or above the low
+  band under the attested stop blocks the open inside the window; a missing Lower limit refuses the success
+  terminal with `LOWER_LIMIT_SENSOR_FAULT`; a valve observation from the wrong source id stays
+  `VALVE_PRESSURE_INPUT_INVALID` at a ready-level value; and both regression guards — a boundary that
+  declares nothing and a declaring boundary served by a measured sample — still produce
+  `VALVE_OPEN_FEEDBACK_CONTRADICTION` on the identical bench state.
+- **Evidence boundary.** These are SOFTWARE and TEST facts about the command/control path. A simulated
+  `OPEN_CONFIRMED` on a limit switch is not evidence that a valve moved and not evidence that the machine is
+  ready with water; `physical_pump_verified` stays `False` for this class and `PUMP_READY_ACCEPTED` remains
+  non-hardware evidence. The Owner must rebuild at this head, run the full matrix (expected 1909) and re-run
+  `D-sim`, then send the transcript for a source-level judgement; no closed stage is re-run and no physical
+  valve, pump or main-valve command is authorized by this entry.
 ### 2026-11-13 — R3: the TP-to-RP register relation becomes a per-axis profile value (`tpToRpRatio`)
 
 **Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN,

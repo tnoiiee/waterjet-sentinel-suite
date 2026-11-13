@@ -684,3 +684,47 @@ controller หรือ transport ด้วยตัวเอง** — ผู้
 - **สถานะหลักฐาน:** ข้อนี้เป็น SOFTWARE_AUTHORED, NOT_COMPILED (Agent ไม่มี .NET SDK — Owner build + test ที่
   head นี้คือด่านตรวจจริง) ส่วนตัวเลข `2:1` เป็น MEASURED_ON_BENCH; `D-sim` ยัง **OPEN** จนกว่า Owner จะรันซ้ำ
   ที่ head ใหม่แล้วส่ง transcript ให้ผมตรวจครบทุกก้อน
+## ภาคผนวกลงวันที่ 2026-11-14 (B2: กติกาการตรวจวาล์วคู่ของ `D-sim` เมื่อปั๊มถูกยืนยันว่าหยุด)
+
+**สถานะ: SOURCE-AUTHORED IN ARENA, NOT COMPILED (Agent ไม่มี .NET SDK — Owner build และ test matrix
+ที่ head นี้คือด่านตรวจจริง) ไม่มีคำสั่งฮาร์ดแวร์หรือ MODBUS ใด ๆ ถูกส่งในขั้นตอนนี้ และ PRODUCTION
+ยังไม่ได้รับอนุญาต**
+
+- **สิ่งที่วัดได้บนโต๊ะที่ `dc323ea`:** การรันผ่านกำแพงของ R3 ได้จริง แล้วไปหยุดที่การตรวจวาล์วตามที่ผมอ่าน
+  ไว้ล่วงหน้าแล้ว — `prepare=DRY_PREPARE_READY`, `start=PUMP_READY_ACCEPTED` (พร้อม
+  `pump_gate=DECLARED_PUMP_PRECONDITION`, `pump_evidence_kind=SOFTWARE_SIMULATED`,
+  `physical_pump_verified=False`), P1 ของทั้งสองแกนยืนยันครบคู่และไม่มี `MOVE_TIMEOUT` (`steps=693`) จากนั้น
+  `terminal_status=FailedAwaitingSafeReturn` + `primary_failure=VALVE_OPEN_FEEDBACK_CONTRADICTION` เพราะ
+  `AI-004+` อ่านได้ประมาณ 0 bar จริง ขณะที่ DI-021 (Upper limit ของ IV1) ถูกกดทางกายภาพ การปิดที่ระบบ
+  สั่งเองยืนยันที่ `LOWER_LIMIT_CONFIRMED` และรอบจบด้วย `cleanup.complete=True`, `session_state=CLOSED`
+  ตัวเลขชุดนี้เป็น MEASURED_ON_BENCH ของเส้นทางคำสั่ง/การควบคุมเท่านั้น ไม่ใช่หลักฐานว่าน้ำพร้อมทำงาน
+- **กติกาที่แก้ (ซอฟต์แวร์ + เทสต์เท่านั้น):** สำหรับรอบที่ Pump-ready มาจากการ declared ของ Owner ภายใต้
+  คำยืนยันว่าปั๊มหยุด (คือ `D-sim`) limit switch เป็นหลักฐานกายภาพเพียงอย่างเดียวของการเปิด — `0 bar` กับ
+  DI-021 ที่ทำงาน ⇒ `OPEN_CONFIRMED`; หมดหน้าต่างแล้วไม่ได้สัญญาณ ⇒ `VALVE_FAILED_TO_OPEN`; และถ้าอ่านแรงดัน
+  ได้ตั้งแต่ `LowPressureThresholdBar` = 1.0 bar ขึ้นไปในขณะที่ปั๊มถูกยืนยันว่าหยุด ⇒
+  `VALVE_OPEN_FEEDBACK_CONTRADICTION` ทันที (ไม่ต้องรอหมดหน้าต่าง) เพราะแรงดันที่มีอยู่ขัดกับคำยืนยันว่าปั๊มหยุด
+  ส่วนการปิดต้องเห็น DI-029 เท่านั้นจึงจะเป็น `LOWER_LIMIT_CONFIRMED` — แถบที่บอกว่า "ยังไม่ปิด"
+  (`>= 1.0` = leak, `>= 15.0` = not fully closed) ยังคงอยู่และถูกตัดสินก่อนเหมือนเดิม
+- **สิ่งที่ไม่ถูกทำให้หย่อนลงเด็ดขาด:** `SequencingPressure.Open` และ `.Close` ของเส้นทางเดิมยังบรรทัดต่อ
+  บรรทัดเหมือน `dc323ea` และเทสต์เดิมที่ pin พฤติกรรมนั้นไว้ยังอยู่ครบโดยไม่ถูกแก้; ไม่เพิ่ม enum ตัวใหม่; ห้ามแก้
+  `SequencingPressureThresholds`, `positionTolerance` หรือ timeout ใดเพื่อให้ขั้นผ่าน; source ของตัวอย่าง
+  แรงดันต้องเป็น `IV1_OUTLET` เท่าเดิม (`SourceChecked`) และค่า 0 bar ดิบยังถูกเก็บไว้ใน `PressureEvidence`
+  ตามที่มันอ่านได้ — ไม่มีการสร้างค่าแรงดันขึ้นมาแทนที่ใด ๆ ทั้งสิ้น `physical_pump_verified` ยังเป็น `False`
+  สำหรับหลักฐานชั้นนี้เสมอ
+- **ผลข้างเคียงที่ตั้งใจใส่ไว้:** ในโหมด declared นี้ ถ้าการปิดไม่ได้อ่านจาก DI-029 ระบบจะไม่รายงาน
+  `PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` อีกต่อไป code ของ limit ที่ขาด (เช่น
+  `LOWER_LIMIT_SENSOR_FAULT`) จะกลายเป็น primary failure แรกและปิดรอบที่ `FailedAwaitingSafeReturn`
+  เจตนาให้เป็นอย่างนั้น: "ลำดับครบ" ต้องแปลว่าสวิตช์ทั้งสองฝั่งพูดแล้ว ไม่ใช่ "แรงดันต่ำพอคงปิดแล้ว"
+- **เกณฑ์รับที่ Owner ต้องส่งพร้อม transcript รอบถัดไป:** `prepare=DRY_PREPARE_READY` →
+  `start=PUMP_READY_ACCEPTED` → P1 `MOVE_COMPLETED_POSITION_VERIFIED` ทั้งสองแกน → `VALVE_OPEN_ACCEPTED`
+  พร้อมบรรทัด `primary_failure` ที่ว่างเปล่า → เดิน P2..P6 จนจบ → การปิดยืนยันที่ DI-029 →
+  `terminal_status=CompleteAwaitingSafeReturn` ถ้าเจอ `LOWER_LIMIT_SENSOR_FAULT` ที่ขั้นปิด แปลว่าระบบ
+  "ยืนยันการปิดไม่ได้" ไม่ใช่ "วาล์วไม่ปิด" — ให้หยุดแล้วส่ง transcript ให้ผมตรวจการเดินสายของ limit switch
+  ถ้าเจอ `VALVE_OPEN_FEEDBACK_CONTRADICTION` ทั้งที่ปั๊มหยุดอยู่ แปลว่ามีแรงดันจริงในระบบ (หรือสายสวิตช์สลับ
+  กัน) ให้บันทึกค่าที่อ่านได้ทั้งสองช่องมาด้วย ห้ามรันซ้ำเพื่อให้ code หายไป
+- **ขอบเขตไฟล์:** งานนี้แตะเฉพาะ `packages/application/Runtime/Sequencing/SequencingPressure.cs`,
+  `packages/application/CleaningPath/Composition/CleaningPathCompositionCoordinator.cs`, ไฟล์เทสต์ใต้
+  `tests/runtime.tests/…` และเอกสารนี้กับ `CHANGELOG.md` เท่านั้น — `ICleaningPathEquipmentBoundary`,
+  `CleaningPathSimulatedPumpReadyGate.cs`, `CleaningPathDryComposition.cs`, `CleaningPathDryTrial.cs`,
+  ไฟล์ `ProcessIo*` ทั้งหลาย, `SequencingKernel.cs` และ `tools/hardware-runbook/wjss-field-driver.ps1`
+  ไม่ถูกแตะเลย ข้อความ `WJSS_*` และ code ที่ driver ใช้ตรวจตัวเองยังอยู่ครบตามเดิม
