@@ -408,6 +408,31 @@
 > RUN in the Agent environment (no .NET SDK) — the Owner-local exact-head gate is the validation of
 > record; no native load, Controller contact or Hardware use occurred for Phase 1A.**
 
+> **Stage 0.4C-K3 evidence disclosure carried into the current-facing head (2026-11-15;
+> documentation only: no source, contract, test, script, profile or hardware change).** The K3
+> checkpoint records its Owner evidence outcome in [STAGE_0.4C-K3_CHECKPOINT.md](STAGE_0.4C-K3_CHECKPOINT.md)
+> and in [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md) section 14, but the
+> current-facing head of this document did not carry that disclosure, so a reader of the head alone
+> could miss the one thing K3 settled: the archive that was reported as found is NOT evidence. This
+> block adds the dated disclosure to the head, verbatim, without deleting or rewording any dated
+> record above or below it, and it changes no status: it is the same record, placed where the current
+> position is read.
+>
+> An Owner evidence archive was reported as located through an unapproved connected-storage metadata query.
+> Archive content was not retrieved or read.
+> The archive is not accepted as evidence for this checkpoint.
+> Owner authorization is required before any future connected-storage access.
+>
+> Consequences, unchanged by this placement and restated for the head reader: the K3 protocol candidate
+> is **WITHDRAWN** and is not a design input; process-image derivation from that archive stays
+> **DERIVATION_BLOCKED**; the arithmetic that K3 did perform over the Owner-supplied record is classified
+> **RECORD_TO_RECORD_CONSISTENCY_ONLY**, which is not verification against a drawing, a manual, a device
+> or a wire; `STAGE_0.4C-1_TC_ACQUISITION` stays **BLOCKED** and `WIRE_BREAK_DECODING` stays **BLOCKED**.
+> No file, byte or content of the archive was fetched, and none of its names, sizes, digests or offsets is
+> repeated here. Future connected-storage access needs an explicit Owner authorization first; nothing in
+> this repository may assume it. Stage 0.4C-K4 (the Operator presentation slice, PR #46) is a read-only
+> surface over existing contracts and retracts, relaxes or reopens none of the above.
+
 > **Canonical Topology Adoption (2026-10-21; superseded as the current equipment-topology\n> position by the Owner-approved canonical Equipment topology adoption of 2026-10-25 recorded\n> above; retained unedited below as the dated record — supersedes
 > every contrary WJ/IV tier, Target Coverage, assignment, WSB/axis-allocation, REV1-current and
 > placement statement below without deleting any dated record. HISTORICAL / SUPERSEDED — DO NOT

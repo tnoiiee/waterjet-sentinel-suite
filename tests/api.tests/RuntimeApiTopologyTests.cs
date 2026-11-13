@@ -195,9 +195,12 @@ public sealed class RuntimeApiTopologyTests
             .ToArray();
 
         var routeCount = constants.Length;
-        // H3-A adds ONE read-only route (the Cleaning Job Workspace document). The registry stays
-        // read-only: the new constant carries no verb and the host maps it with GET only.
-        Assert.Equal(7, routeCount);
+        // H3-A adds ONE read-only route (the Cleaning Job Workspace document) and Stage 0.4C-K4 adds
+        // three more (the Operator document, its allow-listed asset route and the shell's liveness
+        // probe). The registry stays read-only: no constant carries a verb, and the host maps every
+        // one of them with GET only. The order is the declaration order of the registry, so a new
+        // constant that is not pinned here fails this closed set rather than passing unnoticed.
+        Assert.Equal(10, routeCount);
         Assert.Equal(
             [
                 ApiRoutes.HealthLive,
@@ -207,6 +210,9 @@ public sealed class RuntimeApiTopologyTests
                 ApiRoutes.Runtime,
                 ApiRoutes.Deltas,
                 ApiRoutes.Inspector,
+                ApiRoutes.Ui,
+                ApiRoutes.UiAsset,
+                ApiRoutes.KioskHealth,
             ],
             constants);
 

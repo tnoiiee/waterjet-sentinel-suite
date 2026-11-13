@@ -22,7 +22,7 @@ namespace Wjss.Runtime.Core.ProcessIo;
 //   through the session and its freshness, generation and provenance rules by way of the Pump boundary.
 //
 // WHY THE COIL IS RELEASED AND NOT HELD
-//   The actuator is a two-winding motorized ball valve with end-of-travel limit switches, not a solenoid that
+//   The actuator is a two-winding motorized ball valve with a limit switch at each end of travel, not a solenoid that
 //   must be held. Holding a coil at a limit burns the winding, so the confirmed position releases the coil
 //   that reached it, and both coils are released on any abort. Both coils True is never written by any path:
 //   every travel clears the opposite coil first, in the legacy order the Owner supplied.

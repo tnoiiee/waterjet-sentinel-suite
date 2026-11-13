@@ -32,7 +32,7 @@ namespace Wjss.Contracts;
 //   energised at a limit. Never both True, never a coil left hot.
 
 /// <summary>
-/// The observed position of the Main Valve, derived only from the two end-of-travel limit switches.
+/// The observed position of the Main Valve, derived only from the two limit switches at the ends of travel.
 /// <see cref="UNKNOWN"/> is not a position: it means the inputs were not readable, and a caller must fail
 /// closed on it exactly as it fails closed on <see cref="CONFLICT"/>.
 /// </summary>

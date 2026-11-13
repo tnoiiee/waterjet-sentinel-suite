@@ -104,7 +104,7 @@ public sealed class ManualMotionAxisSimulationOptions
     /// <summary>
     /// When set, the simulated encoder register starts from this physical zero instead of following the
     /// position reference, so the two registers disagree until a dual-zero (DE) definition re-primitives
-    /// the encoder register. Synthetic test data only, and it models no vendor-confirmed register mapping.
+    /// the encoder register. Synthetic test data only, and it models no vendor-confirmed address mapping.
     /// </summary>
     public decimal? RpZeroStart { get; init; }
 }

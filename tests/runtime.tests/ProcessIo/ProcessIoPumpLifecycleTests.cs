@@ -1086,7 +1086,7 @@ public sealed class ProcessIoPumpLifecycleTests
         Assert.Equal(14, closeCoil);
 
         // The trap itself, stated as a test: the closed limit INPUT and the open command COIL share the number
-        // 13 in two different Modbus address spaces. Any code that ever conflates them is wrong on the bench in
+        // 13 in two different transport address spaces. Any code that ever conflates them is wrong on the bench in
         // the loudest possible way, so the collision must stay visible here.
         Assert.Equal(closedInput, openCoil);
 

@@ -13,6 +13,82 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-15 — Stage 0.4C-K4 Operator presentation and its hosting slice (PR #46, OPEN with MERGE HOLD; software and documentation only; NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
+
+**Status: one consolidated commit on branch `arena/c52177ef-waterjet-sentinel-suite` from the approved base
+`main` `a07c3aa10a857c4404c8cb84fead7f7e0ce643c4`, opened as PR #46 and kept OPEN with a MERGE HOLD. The
+shape shipped here is the Owner-approved PR #46 blueprint: Part A (hosting), Part B (the presentation) and
+Part C (documentation) as inspected, plus the line-count-neutral S3 comment cleanup of blueprint section 4.
+Decision 1 is carried as ruling 1a, presentation only over the existing contracts; Decision 2 as
+`apps/ui/public/**` with the System Font Stack. Nothing in this entry is a hardware, commissioning or
+Production claim, and no snapshot, delta or acquisition contract was widened to make a screen work.**
+
+- **Part A - the host serves its own screen.** `packages/contracts/ApiRoutes.cs` gains three read-only
+  identities (`/`, `/ui/{file}`, `/api/health`); `apps/runtime/Program.cs` registers each with `app.MapGet`
+  after the existing registrations, and the asset handler matches the route value against a frozen
+  `HashSet<string>(StringComparer.Ordinal)` of the eight shipped module and stylesheet names **before** any
+  path is composed, so a nested or traversed name is the same 404 as an unknown one and no wildcard, no
+  fallback and no static-file middleware exists to serve more than that set. The handler parameter is named
+  `file` to bind the `{file}` token. `apps/runtime/Wjss.Runtime.csproj` copies `..\..\ui\public\**\*.*` to
+  `Ui/` in the output beside the existing `Inspector\index.html` item, so the presentation reaches the
+  browser with no build pipeline, no package manager and no new `PackageReference` - `packages.lock.json`
+  is untouched and a locked restore stays honest. `GET /api/health` answers `KioskHealthPayload` (liveness,
+  the host's own redacted acquisition label, readiness as a fact beside it, the current revision) with 200
+  independently of readiness, because the Kiosk shell reloads the approved route as soon as the host answers
+  and the readiness verdict stays owned by `/health/ready`.
+- **Part B - the presentation.** `apps/ui/` ships ten files: nine under `public/` (the document, one stylesheet, seven
+  ES modules) plus the gate at `test/ui.contract.test.mjs`. `app.mjs` boots and owns the lifecycle, `feed.mjs`
+  is the only network surface, `wallMap.mjs` carries the authoritative 108-cell U-shape and a `buildModel` that
+  refuses anything else, `sensorDetail.mjs` draws a canvas trend in which a `null` sample is a gap and never a
+  line to zero, and `thermal.mjs`, `dispatchPanel.mjs` and `opsPanel.mjs` complete the screen. The gate pins
+  inventory, module-graph reachability, geometry, cadence and the contract field names each panel reads, so a
+  renamed contract field fails a test instead of blanking a panel. Every import is relative, so
+  the same graph resolves from `/ui/…` in the browser and from disk under `node --test`; the document carries
+  one `<script type="module">` and no inline style, `global.css` carries no `url()`, `@import` or `@font-face`,
+  and the inline SVGs carry no `xmlns` - a namespace URL would be an address in the product tree for no
+  benefit, which is also why the fonts are the system stack. Poll cadence is `POLL_INTERVAL_MS = 1000` with
+  `MAX_DELTA_ROWS = 60`, `OFFLINE_AFTER_FAILURES = 3`, `HEALTH_EVERY_TICKS = 10` and `cache: 'no-store'`; a
+  `PreviousRevision` mismatch is a gap, the buffer is discarded and a full Snapshot is refetched, and no
+  merge of a delta into a view happens anywhere - the host publishes metadata-only delta rows.
+- **Decision 1a held visibly.** No decoded Front/Rear temperature exists in any contract the Runtime
+  publishes, so the thermal block states `DFR_NOT_PUBLISHED_BY_RUNTIME` where the pair would be shown and
+  lists the acquisition facts that do exist. Zero `.NET` snapshot, `TcAcquisition` or fixture change was made
+  to keep a screen busy, and the UI does not present an unavailability as a sensor gap or as a zero.
+- **Section 4 of the blueprint: eight comment lines.** `apps/runtime/PumpCommandDryTrial.cs` (three),
+  `packages/application/Motion/Manual/ManualMotionSimulatedPort.cs`, `packages/application/ProcessIo/ProcessIoMainValveGate.cs`,
+  `packages/contracts/ProcessIoMainValve.cs`, `tests/runtime.tests/ProcessIo/ProcessIoPumpLifecycleTests.cs` and
+  one comment line of `tools/hardware-runbook/wjss-field-driver.ps1` were reworded so the S3 transport-vocabulary
+  scan reports the pre-existing findings as clean: vendor and protocol names replaced by the neutral wording the
+  sentence already meant (`real field T8 rack`, `the field-transport round trip`, `the raw`, `address mapping`,
+  `transport address spaces`, `limit switch at each end of travel`). Comment-only, one line each, no line count
+  changed in any of the six files, no `-Expect` key, no self-check string and no `s3Exception.mjs` entry touched
+  or widened; no test asserts any reworded sentence.
+- **Part C - documentation.** This entry, and a dated `Stage 0.4C-K3` blockquote inserted above the first
+  superseded record of `docs/CURRENT_STATE.md` so the current-facing head carries the Owner evidence
+  disclosure (archive reported as located through an unapproved connected-storage metadata query, content not
+  retrieved, not accepted as evidence, Owner authorization required before any future access) together with the
+  WITHDRAWN candidate, the DERIVATION_BLOCKED derivation and the RECORD_TO_RECORD_CONSISTENCY_ONLY
+  classification. Purely additive: 25 lines inserted, 0 deleted, and no dated record below reworded.
+- **Validation actually run in the Arena sandbox.** `node --test` per workspace: `apps/ui` 18/18, `packages/commissioning`
+  **239/239** (the K3 head-slice assertion this entry satisfies is now green for the first time), `apps/kiosk` 22/22,
+  `apps/ops-preview` 191/191, contracts-ts 57/57, process-io 110/110, mapping-config 261 passed with the 7 recorded
+  skips and 0 failed; `node tools/boundary-scan/boundary-scan.mjs .` reports **0 findings (S1-S9 clean)** over the
+  whole repository including the ten new files. `apps/kiosk/**` and `apps/ops-preview/**` show **zero diffs**.
+- **NOT verified here, and why.** There is no .NET SDK, no PowerShell and no `node_modules` in the Agent
+  environment, so `.NET` restore, build and test were NOT run and the eight new
+  `tests/api.tests/OperatorPresentationHostingTests.cs` facts have never executed; the expected Owner-local result
+  is the predecessor count plus those facts (**1909 + 8 = 1917**, `failed: 0`). `tools/launch/Start-WjssOperatorKiosk.ps1`
+  is written to the documented conventions and carries its own `-SelfTest` over the pure helpers, but it was NOT
+  executed: no launcher, driver, host or shell was started in this session. The HTTP answers of the new routes (200
+  on the document and its allow-listed assets, 404 on an unknown or nested name) are pinned from the source shape
+  and the whitelist-parity fact, exactly as this test project already documents for host endpoint behaviour: they are
+  exercised Owner-local against the built host, not here. The screen itself has not been rendered in a browser or on
+  a kiosk display.
+
+**Boundaries unchanged by this entry: SIMULATOR and the physical read-only acquisition mode only; NO device write,
+NO actuation, NO command route, NO TEST_HARDWARE, NO PRODUCTION, NO hardware or field verification, NO commissioning
+claim. `docs/**` history stays append-only and PR #46 is OPEN - DO NOT MERGE.**
+
 ### 2026-11-14 — Owner bench verification of `ea6d5fb6` (paired-IV supervision on limit switches PASSED): Gate `D-sim` CLOSED (documentation only; no code, test, script, profile or hardware command changed)
 
 **Status: DOCUMENTATION-ONLY COMMIT on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 remains

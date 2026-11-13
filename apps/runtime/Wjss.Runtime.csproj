@@ -14,6 +14,8 @@
       GET /api/v1/runtime  -> read-only Runtime status
       GET /api/v1/deltas   -> bounded recent Delta activity
       GET /inspector       -> development-only Runtime Inspector page
+      GET /                -> the Operator presentation document (Stage 0.4C-K4)
+      GET /api/health      -> liveness for the Kiosk shell availability probe
 
     No write, command, dispatch or SSE surface exists. Startup with any device
     profile other than SIMULATOR is refused BEFORE any port is bound.
@@ -36,6 +38,14 @@
       serve it from the build directory without a Node build pipeline.
     -->
     <Content Include="Inspector\index.html" CopyToOutputDirectory="PreserveNewest" />
+
+    <!--
+      The Operator presentation (Stage 0.4C-K4) is authored in apps/ui and copied into this host's
+      output under Ui/, so the host can serve its own UI from the build directory: no Node process,
+      no package manager, no bundler and no static-file middleware is involved at build or run time.
+      LinkBase keeps the copied tree flat and predictable (Ui/index.html, Ui/app.mjs, ...).
+    -->
+    <Content Include="..\..\ui\public\**\*.*" LinkBase="Ui" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
