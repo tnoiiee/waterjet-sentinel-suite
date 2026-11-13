@@ -1,5 +1,33 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Stage 0.4C-K4 presentation-surface correction (2026-11-16; documentation, build file, UI presentation and tests
+> only: no contract member, no fixture, no runtime route, no driver change; NO HARDWARE EXECUTED; NO DEVICE WRITE;
+> PRODUCTION NOT AUTHORIZED).** The K4 slice — the Operator presentation served by the Runtime host itself, on PR #46
+> — reached the Owner's build with a copy path one directory too deep. `apps/runtime/` sits two directories below the
+> repository root, so the presentation item's `..\..\ui\public\**\*.*` glob matched nothing; MSBuild does not treat an
+> empty glob as an error, so the build stayed green while the host output had no `Ui/` to read. The observed answers are
+> exactly what that shape predicts: the liveness route 200, the document 500, every asset 404, and a Kiosk shell
+> reporting `LOCAL HOST: CONNECTED` beside a screen saying `LOCAL VIEW INTERRUPTED - RECONNECTING`. The correction is
+> the one-level glob with an explicit `Link="Ui\%(RecursiveDir)%(Filename)%(Extension)"` and
+> `CopyToPublishDirectory="PreserveNewest"`, plus a `VerifyOperatorUiOutput` target that fails the build when
+> `Ui\index.html` or `Ui\app.mjs` is missing from the output the host actually reads — so a silent miss of this kind is
+> closed for every route, not only for the one that was noticed. Eleven hosting facts now assert the resolved path and
+> byte-for-byte output parity instead of the literal source text; the launcher gained a live probe (`-Probe`) because a
+> test project cannot reach a listener without a test-only package that the pinned dependency set forbids; and the UI
+> gate resolves every property chain the modules read against the property graph of the `.NET` records that publish it,
+> which found one real defect in the new surface: the Active Job panel's Safe Return row read `state` and `Phase`, names
+> that no contract publishes, so it would have printed a fallback forever instead of failing. It now reads the
+> published `step`, `trigger`, `pendingOutcome`, `startedAt`, the `valve` and `axis` legs and the `failure` reason, and
+> says plainly when a leg has not been published rather than calling it idle.
+>
+> **Status of the slice is unchanged by this correction:** presentation, build file, launcher and tests only; the
+> kiosk launcher and `apps/ops-preview/**` byte-identical to the K1 baseline; no `PackageReference` and
+> `packages.lock.json` untouched; Decision 1a and every fence above unchanged; PR #46 held open with a merge hold. Node
+> gates are green here (`apps/ui` 22/22, commissioning 239/239, boundary scan S1-S9 clean). The `.NET` build and test,
+> the launcher and the rendered screen are NOT verified in this environment and stay an Owner-local gate: the operator
+> screen has still been seen by no one, in any browser, on any machine.
+
+
 > **Owner topology ruling — logical-row tier split corrected to rows 1–3 UPPER / rows 4–6 LOWER
 > (2026-11-11; software and generated data only; NO HARDWARE EXECUTED; PRODUCTION NOT
 > AUTHORIZED).** The split carried by `WaterJetTopologyCatalog.RegionForLogicalRow`, its TS mirror

@@ -19,19 +19,41 @@ workspace: what is authored here is what the browser reads, byte for byte.
 | `public/thermal.mjs` | The thermal block and the Front/Rear availability statement. |
 | `public/dispatchPanel.mjs` | Global queue, frozen countdown and frozen decision, 13-stage timeline, live `TimeDelay` preview. |
 | `public/opsPanel.mjs` | Active Job, Pump, Alarms, the Critical Alarm modal and the status chips. |
-| `test/ui.contract.test.mjs` | The gate: 18 tests over inventory, module graph, geometry, cadence, contract field names and the read-only surface. |
+| `test/ui.contract.test.mjs` | The gate: 22 tests over inventory, module graph, geometry, cadence, the read-only surface, the element ids the paint needs and the published contract shape behind every field it reads. |
 
 ## Two roots, one copy
 
 * authored root: `apps/ui/public/` — the files under test;
-* served root: `Ui/` **beside the host binary**, produced by the single
-  `<Content Include="..\..\ui\public\**\*.*" LinkBase="Ui" CopyToOutputDirectory="PreserveNewest" />`
-  item in `apps/runtime/Wjss.Runtime.csproj`.
+* served root: `Ui/` **beside the host binary**, produced by the single item in
+  `apps/runtime/Wjss.Runtime.csproj`:
+
+  ```xml
+  <Content Include="..\ui\public\**\*.*" Link="Ui\%(RecursiveDir)%(Filename)%(Extension)"
+           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  ```
+
+The include is relative to that project file. `apps/runtime/` is two directories below the repository
+root, so the presentation is **one** level up, at `apps/ui/public`; a path that walks up twice points
+at a directory that does not exist, an empty glob is not an MSBuild error, and the build stays green
+while every route 404s. That happened once, which is why the copy is now checked twice rather than
+assumed:
+
+```xml
+<Target Name="VerifyOperatorUiOutput" AfterTargets="CopyFilesToOutputDirectory">
+  <Error Condition="!Exists('$(WjssUiOutputRoot)Ui\index.html') or !Exists('$(WjssUiOutputRoot)Ui\app.mjs')" ... />
+</Target>
+```
+
+The target resolves its root from `$(OutDir)` (with `$(OutputPath)` as the fallback) and normalises
+the trailing separator, so it looks at the directory the host itself reads from and cannot fail a
+correct build. `dotnet test` additionally asserts the resolution of the include path and, when a build
+output exists, that `Ui/` carries all nine files byte-identical to this directory.
 
 That item is the only "build" the presentation has: MSBuild copies the directory into the output.
 It introduces no `PackageReference`, so `packages.lock.json` is untouched and a locked restore stays
-honest. A host build whose output lacks `Ui/index.html` answers 500 with a plain sentence rather than
-serving a stale or partial tree.
+honest. A host build whose output lacks `Ui/index.html` no longer reaches the point of serving: it is
+refused at build time. If a host that was built some other way still lacks the files, the document
+route answers 500 with a plain sentence rather than serving a stale or partial tree.
 
 `packages/contracts/ApiRoutes.cs` carries the route identities: `Ui = "/"`, `UiAsset = "/ui/{file}"`
 and `KioskHealth = "/api/health"`. The asset handler matches the route value against a frozen
@@ -81,13 +103,29 @@ all. `app.mjs` is the single entry; every other module is reachable from it.
 node --test apps/ui/test/*.test.mjs
 ```
 
-18 tests, no dependencies to install. It pins the file inventory, that every import resolves to a
-shipped file, the absence of inline script and of `url()` / `@import` / `@font-face`, the GET-only
-surface, the ASCII-only and `innerHTML`-free source, the geometry and refusal paths, the cadence
-constants, and the contract field names each panel reads (so a renamed contract field fails a test
-instead of silently blanking a panel). `node tools/boundary-scan/boundary-scan.mjs .` is the repo-wide
-check. `index.html` carries no `xmlns` on its inline SVG for the same reason: a namespace URL is an
-address in the product tree.
+22 tests, no dependencies to install. They are grouped into three kinds of promise.
+
+* **Shape** — the file inventory, that every import resolves to a shipped file **by exact case** and
+  stays inside `/ui/`, that no module looks up an element id the document does not carry (a `null`
+  lookup during the first paint is a thrown boot, not a blank panel), the absence of inline script and
+  of `url()` / `@import` / `@font-face`, the ASCII-only and `innerHTML`-free source, the GET-only
+  surface, the geometry and refusal paths and the cadence constants.
+* **Contract** — every property chain a module reads off a Snapshot, a status, a workspace document or
+  the liveness body is resolved against the property graph of the `.NET` records that publish it
+  (`packages/contracts/*.cs`, `apps/runtime/RuntimeApiResponses.cs`). A name the contract does not
+  publish does not throw in a browser: it prints a fallback and looks answered, which is worse on an
+  operator screen, so the graph, not prose, is the check. The Safe Return row is pinned field by field
+  for the same reason.
+* **Boundary** — the read-only surface, the stated `DFR_NOT_PUBLISHED_BY_RUNTIME` absence, the
+  lifecycle on `document.body.dataset.appState`.
+
+`node tools/boundary-scan/boundary-scan.mjs .` is the repo-wide check. `index.html` carries no `xmlns`
+on its inline SVG for the same reason: a namespace URL is an address in the product tree.
+
+The live answers — 200 on the document and on each allow-listed module with its own content type, 404
+on an unknown or traversed name, 200 `ALIVE` on the shell liveness route — are asserted by
+`tools/launch/Start-WjssOperatorKiosk.ps1 -Probe` against a running host, because reaching a listener
+from a test here would need a test-only package.
 
 **Status:** shipped in Stage 0.4C-K4 as a presentation layer over the existing read-only contracts.
 The earlier React/Vitest/Playwright plan is not implemented and is not required by this checkpoint; if

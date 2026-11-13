@@ -13,6 +13,66 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-16 — Stage 0.4C-K4 review correction: the presentation copy path, a build that cannot miss it, and a contract-shape gate (fixup on PR #46; OPEN with MERGE HOLD; documentation, build file and tests only — NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
+
+**Status: one fixup commit on branch `arena/c52177ef-waterjet-sentinel-suite`, PR #46 kept OPEN with a MERGE
+HOLD.** The Owner's Owner-local run at `a05ccfb324aeb5a042129f0dbde4276bab73fa8b` restored, built and tested green
+(`--locked-mode` restore, `-warnaserror` build, `dotnet test`, and `Start-WjssOperatorKiosk.ps1 -SelfTest`), and the
+Kiosk shell connected to the host (`GET /api/health -> HTTP 200`, `LOCAL HOST: CONNECTED`) — while the screen itself
+stayed on `LOCAL VIEW INTERRUPTED - RECONNECTING`. The built output carried `Inspector/` and **no `Ui/` at all**, and
+the live probe answered `GET / -> 500`, `GET /ui/global.css -> 404`, `GET /ui/app.mjs -> 404`. Cause: the Content item
+written in the previous entry used `..\..\ui\public\**\*.*` from a project file that sits in `apps/runtime`, which is
+two directories below the root, so the glob resolved to a non-existent `<root>/ui/public`, matched **zero** items, and
+MSBuild does not treat an empty glob as an error. Every other part of the slice was correct; nothing reached the
+browser to be wrong.
+
+- **The copy is fixed and the failure mode is closed, not papered over.** `apps/runtime/Wjss.Runtime.csproj` now
+  carries `..\ui\public\**\*.*` with explicit `Link="Ui\%(RecursiveDir)%(Filename)%(Extension)"` and both
+  `CopyToOutputDirectory` and `CopyToPublishDirectory` set to `PreserveNewest`, so build and publish produce the same
+  flat `Ui/` tree. A new `VerifyOperatorUiOutput` target, `AfterTargets="CopyFilesToOutputDirectory"`, fails the
+  build when `Ui\index.html` or `Ui\app.mjs` is not in the output. Its root is resolved from `$(OutDir)` with
+  `$(OutputPath)` as the fallback and an explicit trailing-separator normalisation, because the guard must never be
+  able to fail a correct build. `dotnet build -c Release -warnaserror` can no longer be green without the UI.
+- **Two facts replaced one that could not see the defect.** The previous revision pinned the Content item by its exact
+  source text, which faithfully repeated the author's mistake. `tests/api.tests/OperatorPresentationHostingTests.cs`
+  now (a) parses the include, strips the glob, resolves it against `apps/runtime/` and requires `Directory.Exists`
+  plus `File.Exists` for the document and every allow-listed name, refusing a two-level walk explicitly, and (b)
+  asserts that when a host build output exists, its `Ui/` directory carries exactly the nine shipped files,
+  non-empty and byte-identical to `apps/ui/public/` — the file-system fact the Owner had to inspect by hand. A
+  checkout with no build output is not claimed either way; the header of the file says so.
+- **The real HTTP answers have a harness.** Reaching a live listener from a test needs `Microsoft.AspNetCore.
+  Mvc.Testing`, which is not in the centrally pinned set, and adding it would break the `--locked-mode` restore that is
+  the Owner's clean-environment condition — so the answers the Owner probed manually are now asserted by
+  `tools/launch/Start-WjssOperatorKiosk.ps1 -Probe`: 200 with `text/html` and the boot module element for the
+  document; 200 with the right content type and non-empty body for each of the eight allow-listed names; 404 for an
+  unknown name, for a differently-cased name, for a nested name and for two encoded traversals; 200 with
+  `status == "ALIVE"` for the shell liveness route. A normal launch runs the same probe on the host it started, and it
+  refuses to start one whose output has no `Ui\index.html` (the runner's copy of the build-time refusal). The
+  launcher's `-SelfTest` also checks the copy source and the build output, so it stays meaningful without a host.
+- **Pre-flight browser audit found one real defect and fixed it.** Every property chain the modules read was resolved
+  against the property graph of the `.NET` records that publish it (7020 chains, `ContractJson.Options` camelCase):
+  the Active Job panel's Safe Return row read `safeReturn.state` and `safeReturn.Phase`, and `SafeReturnState`
+  publishes neither — so that row would have printed its fallback text forever, silently. It now reads the published
+  `step`, `trigger`, `pendingOutcome`, `startedAt`, `valve` (`valveId`, `command`, `feedback`, `resolution`), `axis`
+  (`command`, `standby`) and `failure` (`reason`, `at`), with an absent leg named as absent rather than as idle. The
+  audit itself is now a gate: `apps/ui/test/ui.contract.test.mjs` grew from 18 to 22 tests, adding exact-case
+  served-name resolution for every import, the element-id existence rule (a null lookup during the first paint is a
+  thrown boot, not a blank panel), the contract property-chain resolution, and the Safe Return field pins. Every one
+  of those four was checked by mutation: breaking the file breaks the gate.
+- **`apps/ui/README.md`** now states the corrected item, why one level up is the only correct depth, what the
+  fail-fast target guarantees, and where the live answers are asserted.
+
+**Validation re-run here: `node tools/boundary-scan/boundary-scan.mjs .` => `0 findings (S1-S9 clean)`; `apps/ui`
+22/22; `packages/commissioning` 239/239; `apps/kiosk` 22/22; `apps/ops-preview` 191/191; contracts-ts 57/57;
+process-io 110/110; mapping-config 261 passed with the 7 recorded skips; `apps/mapping-config` 82/82;
+tools/process-io-evidence 21/21; tools/tc-bench 19/19; boundary-scan's own suite 33/33 — 0 failures repo-wide.
+NOT run here, as before: `.NET` restore/build/test (no SDK in the Agent sandbox), the launcher, and any browser
+render. Expected Owner-local result: the same `0 warnings / 0 errors` build, now additionally gated by
+`VerifyOperatorUiOutput`. `tests/api.tests/OperatorPresentationHostingTests.cs` carries **11** `[Fact]` members where
+the previous revision carried 8 (the exact-text assertion replaced by two, and two further facts added), so the total moves by
+three: **1920** tests, `failed: 0`. That figure is arithmetic on the diff, not a run: the Agent sandbox has no `.NET`
+SDK, and this repository counts theories by their expanded cases, so the number above is a claim to be checked by the
+Owner's `dotnet test -c Release`, not evidence of one.
 ### 2026-11-15 — Stage 0.4C-K4 Operator presentation and its hosting slice (PR #46, OPEN with MERGE HOLD; software and documentation only; NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
 
 **Status: one consolidated commit on branch `arena/c52177ef-waterjet-sentinel-suite` from the approved base

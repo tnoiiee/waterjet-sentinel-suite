@@ -378,3 +378,204 @@ test('the lifecycle is published on the body dataset and a refused topology is n
   assert.match(sources.get('app.mjs'), /HOST UNAVAILABLE - RECONNECTING/);
   assert.match(sources.get('app.mjs'), /FRAME IS NOT CURRENT - RETRYING/);
 });
+
+// ------------------------------------------------------------------ boot safety
+
+test('every import specifier names a served file exactly, case-sensitively', () => {
+  const served = new Set(readdirSync(PUBLIC));
+
+  for (const [name, text] of every) {
+    if (!name.endsWith('.mjs')) continue;
+    // Only a real module specifier counts. A bare "from" inside a string is prose, and a test that
+    // matched it would be matching the file rather than its imports.
+    for (const match of text.matchAll(/^[ \t]*(?:import|export)[ \t]+(?:[^'\n]*?[ \t]from[ \t]+)?'(?<spec>[^']+)'[ \t]*$/gm)) {
+      const spec = match.groups.spec;
+      assert.equal(spec.startsWith('./'), true,
+        `${name} imports '${spec}': a root-absolute specifier breaks resolution under node --test and a `
+        + 'parent path would leave the served directory');
+      const file = spec.slice(2);
+      assert.equal(basename(file), file, `${name} imports '${spec}', which leaves /ui/`);
+      assert.equal(served.has(file), true, `${name} imports '${file}', which the host does not serve`);
+      assert.equal(file.endsWith('.mjs'), true,
+        `${name} imports '${file}': a module the browser must compile is not a browser-native file`);
+    }
+  }
+
+  // The document reaches the same set through its two asset elements.
+  for (const match of html.matchAll(/(?:src|href)="\/ui\/(?<file>[^"]+)"/g)) {
+    assert.equal(served.has(match.groups.file), true, `the document requests ${match.groups.file}, which is not shipped`);
+  }
+  assert.equal(html.includes('src="/ui/app.mjs"'), true, 'the document must boot the entry module the host serves');
+  assert.equal(html.includes('href="/ui/global.css"'), true, 'the document must load the stylesheet the host serves');
+});
+
+test('no module looks up an element the document does not carry, so first paint cannot throw', () => {
+  const htmlIds = new Set([...html.matchAll(/\bid="(?<id>[^"]+)"/g)].map((m) => m.groups.id));
+  assert.equal(htmlIds.size, [...html.matchAll(/\bid="[^"]*"/g)].length,
+    'a duplicated id would make one of the two unreachable by getElementById');
+
+  for (const name of MODULES) {
+    const text = read(name).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\/\/.*$/gm, '');
+    const created = new Set([...text.matchAll(/\.id\s*=\s*['"](?<id>[a-z0-9_-]+)['"]/g)].map((m) => m.groups.id));
+    const looked = new Set();
+    for (const re of [/getElementById\(['"](?<id>[a-z0-9_-]+)['"]\)/g, /querySelector(?:All)?\(['"]#(?<id>[a-z0-9_-]+)['"]\)/g,
+      /\bhost\(['"](?<id>[a-z0-9_-]+)['"]\)/g, /\bset\(['"](?<id>[a-z0-9_-]+)['"]/g]) {
+      for (const m of text.matchAll(re)) looked.add(m.groups.id);
+    }
+    for (const id of looked) {
+      assert.equal(htmlIds.has(id) || created.has(id), true,
+        `${name} looks up '${id}', which no shipped document or module provides: the lookup returns null and the paint throws`);
+    }
+  }
+});
+
+// ------------------------------------------------------- contract wire shape
+
+test('every payload property the modules read is a published contract property', () => {
+  // The serialiser in use is ContractJson.Options: camelCase properties, UPPER_SNAKE enums. A module
+  // that reads a name the contract does not publish does not crash - it quietly prints a fallback,
+  // which is worse on an operator screen. So the property graph, not prose, is the check here.
+  // HERE is a file path, so the first '..' leaves the test directory and the fourth reaches the root.
+  const root = join(HERE, '..', '..', '..', '..');
+  const csFiles = [];
+  for (const dir of [join(root, 'packages', 'contracts'), join(root, 'apps', 'runtime')]) {
+    for (const entry of readdirSync(dir)) if (entry.endsWith('.cs')) csFiles.push(join(dir, entry));
+  }
+  assert.equal(csFiles.length > 20, true, 'the contract tree must be readable for this check to mean anything');
+
+  const types = new Map();
+  for (const file of csFiles) {
+    const text = readFileSync(file, 'utf8');
+    for (const match of text.matchAll(/public sealed (?:record|class)\s+(?<name>\w+)[^{}]*\{/g)) {
+      let index = match.index + match[0].length;
+      let depth = 1;
+      while (index < text.length && depth > 0) {
+        if (text[index] === '{') depth += 1;
+        else if (text[index] === '}') depth -= 1;
+        index += 1;
+      }
+      const body = text.slice(match[0].length + match.index, index - 1);
+      const props = types.get(match.groups.name) || {};
+      for (const prop of body.matchAll(/public\s+(?:required\s+|virtual\s+|override\s+|static\s+|const\s+)?(?<type>[A-Za-z_][\w<>,\[\]?.\s]*?)\s+(?<name>[A-Z]\w*)\s*(?:\{\s*get;|=>)/g)) {
+        if (prop.groups.type.includes('(')) continue;
+        const key = prop.groups.name[0].toLowerCase() + prop.groups.name.slice(1);
+        props[key] = prop.groups.type.trim();
+      }
+      types.set(match.groups.name, props);
+    }
+    for (const enumMatch of text.matchAll(/public enum\s+(?<name>\w+)\s*\{/g)) {
+      if (!types.has(enumMatch.groups.name)) types.set(enumMatch.groups.name, null);
+    }
+  }
+
+  const element = (declared) => {
+    const clean = declared.replace(/\s+/g, ' ').trim();
+    const list = clean.match(/^(?:IReadOnlyList|IReadOnlyCollection|IList|List|IEnumerable)<\s*(?<el>[\w.?]+)\s*>$/);
+    if (list) return { list: true, el: list.groups.el.replace(/\?$/, '') };
+    const nullable = clean.match(/^(?<el>[\w.]+)\?$/);
+    if (nullable) return { list: false, el: nullable.groups.el };
+    return { list: false, el: clean };
+  };
+
+  const ARRAY_METHODS = new Set(['map', 'filter', 'forEach', 'find', 'findIndex', 'some', 'every', 'slice',
+    'join', 'length', 'indexOf', 'includes', 'reduce', 'flatMap', 'at', 'concat', 'sort', 'reverse']);
+  const roots = new Map(Object.entries({
+    snapshot: 'OperationalSnapshot', status: 'RuntimeStatus', health: 'KioskHealthPayload',
+    workspace: 'DispatchWorkspace',
+  }));
+
+  const resolve = (expression, table) => {
+    const parts = expression.split('.').filter(Boolean);
+    let type = table.get(parts[0]);
+    if (!type) return null;
+    let isList = false;
+    for (let index = 1; index < parts.length; index += 1) {
+      if (isList && ARRAY_METHODS.has(parts[index])) return { leaf: true };
+      const outer = element(type);
+      const owner = types.get(outer.list ? outer.el : type);
+      if (!owner) return { leaf: true };
+      if (!(parts[index] in owner)) return { missing: parts[index], type: outer.list ? outer.el : type, path: parts.slice(0, index + 1).join('.') };
+      const next = element(owner[parts[index]]);
+      isList = next.list;
+      type = next.el;
+    }
+    return { type, list: isList, path: parts.join('.') };
+  };
+
+  for (const name of MODULES) {
+    // Comment first, then literals: an apostrophe in prose ("the host's label") would otherwise open a
+    // string that swallows the code that follows it, and the check would quietly see less than it says.
+    const text = read(name)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""');
+    const table = new Map(roots);
+
+    // A panel helper receives a sub-object of the Snapshot, and most field reads live inside it, so a
+    // check limited to top-level roots would cover almost nothing. Each local function's parameters
+    // therefore take the type of the chain at its first call site - nothing more is claimed than what
+    // the caller actually passes.
+    const inferParameters = () => {
+      for (const fn of text.matchAll(/function\s+(?<name>[a-zA-Z_$][\w$]*)\s*\((?<params>[^)]*)\)/g)) {
+        const params = fn.groups.params.split(',').map((part) => part.trim().split(/[\s=]/)[0]).filter(Boolean);
+        if (!params.length) continue;
+        const calls = new RegExp('\\b' + fn.groups.name + '\\((?<args>[^()]*(?:\\([^()]*\\)[^()]*)*)\\)', 'g');
+        for (const call of text.matchAll(calls)) {
+          const args = call.groups.args.split(',');
+          for (let index = 0; index < params.length; index += 1) {
+            if (table.has(params[index])) continue;
+            const chain = (args[index] || '').match(/[a-z_$][\w$]*(?:\.[a-zA-Z_]\w*){0,6}/);
+            if (!chain) continue;
+            const result = resolve(chain[0], table);
+            if (result && result.type && !result.list && types.has(result.type)) table.set(params[index], result.type);
+          }
+          break;
+        }
+      }
+    };
+
+    for (let pass = 0; pass < 4; pass += 1) {
+      inferParameters();
+      for (const match of text.matchAll(/(?:const|let)\s+(?<name>[a-z_$][\w$]*)\s*=\s*(?<init>[^;]+)/g)) {
+        const callIndex = match.groups.init.indexOf('(');
+        const chainIndex = match.groups.init.search(/[a-z_$][\w$]*\.[a-zA-Z_]\w*/);
+        if (callIndex >= 0 && callIndex < chainIndex) continue;
+        const chains = [...match.groups.init.matchAll(/[a-z_$][\w$]*(?:\.[a-zA-Z_]\w*){1,6}/g)].map((c) => c[0]);
+        chains.sort((a, b) => b.split('.').length - a.split('.').length);
+        if (!chains.length) continue;
+        const result = resolve(chains[0], table);
+        if (result && result.missing) {
+          assert.fail(`${name}: ${result.path} reads '${result.missing}', which ${result.type} does not publish`);
+        }
+        if (result && result.type && !result.list && types.has(result.type) && !table.has(match.groups.name)) {
+          table.set(match.groups.name, result.type);
+        }
+      }
+      for (const match of text.matchAll(/[a-z_$][\w$]*(?:\.[a-zA-Z_]\w*){1,6}/g)) {
+        const result = resolve(match[0], table);
+        if (result && result.missing && !ARRAY_METHODS.has(result.missing)) {
+          assert.fail(`${name}: ${result.path} reads '${result.missing}', which ${result.type} does not publish`);
+        }
+      }
+    }
+  }
+});
+
+test('the Safe Return row reads the published leg fields and no other shape', () => {
+  const ops = read('opsPanel.mjs');
+  const fields = ['safeReturn.step', 'safeReturn.trigger', 'safeReturn.pendingOutcome',
+    'safeReturn.startedAt', 'safeReturn.valve', 'safeReturn.axis', 'safeReturn.failure',
+    'valve.valveId', 'valve.command', 'valve.feedback', 'valve.resolution',
+    'axis.command', 'axis.standby', 'failure.reason', 'failure.at'];
+  for (const field of fields) {
+    const pattern = new RegExp(field.replace('.', '\\.') + '\\b(?!\\w)');
+    assert.equal(pattern.test(ops), true, `the Safe Return row no longer reads exactly ${field}`);
+  }
+
+  // SafeReturnState has no step-list alias: reading a name it does not publish would fall through to
+  // the fallback string and the row would look answered while it was not.
+  for (const forbidden of ['safeReturn.state', 'safeReturn.Phase', 'safeReturn.status', 'safeReturn.events[0]']) {
+    assert.equal(ops.includes(forbidden), false, `the Safe Return row reads ${forbidden}, which is not published`);
+  }
+  assert.match(ops, /no Mandatory Safe Return is running for this job/);
+});

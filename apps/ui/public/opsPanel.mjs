@@ -45,6 +45,39 @@ function facts(host, rows) {
   return list;
 }
 
+/**
+ * The Mandatory Safe Return leg in the contract's own words. The host publishes a step, a trigger, a
+ * pending outcome and one leg per device, so this prints exactly those and nothing between them: an
+ * absent leg is named as absent rather than as idle, and no state is invented for a device the
+ * Snapshot did not report on. A published failure is the only case that reads as bad.
+ */
+function safeReturnFacts(safeReturn) {
+  if (!safeReturn || typeof safeReturn !== 'object') {
+    return { tone: 'mute', line: 'NONE - no Mandatory Safe Return is running for this job' };
+  }
+
+  const valve = safeReturn.valve && typeof safeReturn.valve === 'object' ? safeReturn.valve : null;
+  const axis = safeReturn.axis && typeof safeReturn.axis === 'object' ? safeReturn.axis : null;
+  const failure = safeReturn.failure && typeof safeReturn.failure === 'object' ? safeReturn.failure : null;
+  const legs = 'valve ' + (valve
+    ? text(valve.valveId, 'unnamed') + ' command ' + text(valve.command) + ', feedback ' + text(valve.feedback)
+      + ', resolution ' + text(valve.resolution, 'NOT_RESOLVED')
+    : 'no valve leg published')
+    + ' - axis ' + (axis
+      ? 'command ' + text(axis.command) + ', standby ' + text(axis.standby)
+      : 'no axis leg published');
+
+  return {
+    tone: failure ? 'bad' : 'warn',
+    line: text(safeReturn.step, 'STEP_NOT_PUBLISHED')
+      + ' - triggered by ' + text(safeReturn.trigger)
+      + ', pending ' + text(safeReturn.pendingOutcome)
+      + ', started ' + timeOf(safeReturn.startedAt)
+      + ' - ' + legs
+      + (failure ? ' - FAILED ' + text(failure.reason) + ' at ' + timeOf(failure.at) : ''),
+  };
+}
+
 function bar(host, fraction) {
   const value = typeof fraction === 'number' && Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
   const track = document.createElement('div');
@@ -81,6 +114,7 @@ export function renderJob(host, snapshot) {
     return;
   }
 
+  const safeReturnView = safeReturnFacts(job.safeReturn);
   section(host, 'Active job - ' + text(job.phaseLabel) + ' (' + text(job.phase) + ', step '
     + text(job.phaseIndex) + ')', (block) => {
     facts(block, [
@@ -103,9 +137,7 @@ export function renderJob(host, snapshot) {
       ['valve open command', text(job.valveOpenCommand)],
       ['valve resolution', text(job.valveOpenResolution)],
       ['valve diagnosis', text(job.valveDiagnosis)],
-      ['safe return', job.safeReturn && typeof job.safeReturn === 'object'
-        ? text(job.safeReturn.state || job.safeReturn.Phase || 'published')
-        : 'NONE - no Mandatory Safe Return is running for this job', 'mute'],
+      ['safe return', safeReturnView.line, safeReturnView.tone],
     ]);
   });
 }
