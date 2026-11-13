@@ -839,3 +839,64 @@ AUTHORIZED, and this addendum does not change the meaning of any earlier section
   (`VALVE_OPEN_FEEDBACK_CONTRADICTION` at 0 bar with the limit active, `VALVE_FAILED_TO_OPEN` at the end of
   the window, `OPEN_BY_PRESSURE` only from at least 15.0 bar) still apply unchanged, and the prohibition on
   editing a threshold or a supervision rule to make a stage pass stands exactly as written.
+
+## 23. Dated addendum — 2026-11-14 (`D-sim` CLOSED at `ea6d5fb6`: the paired-IV open and close were confirmed by the limit switches)
+
+**Status: DOCUMENTATION ONLY. No `.cs`, `.csproj`, `.sln`, `.json` or `.ps1` file was changed by this
+addendum, so the Owner-verified state at `ea6d5fb6` (Release build `0 warnings / 0 errors`, `1909 / 1909`,
+driver `2026-11-21.1` `SELFCHECK: PASS (11 groups)`, executable `sha256 8AE7E90F8B7C`) remains the
+validation of record. The Agent has no .NET SDK, no PowerShell and no bench access: the build, test and
+transcript numbers below are OWNER-REPORTED-BENCH, and only the line-by-line agreement with source at that
+head is SOURCE-VERIFIED-IN-ARENA. NO HARDWARE COMMAND IS AUTHORIZED BY THIS ADDENDUM; PRODUCTION IS NOT
+AUTHORIZED; PR #45 STAYS OPEN ON MERGE HOLD.**
+
+- **The closure fact.** A `stage-D-sim` run at `ea6d5fb6` (2026-11-13 16:55:56, `exit=0`, `steps=1410`)
+  reported `prepare=DRY_PREPARE_READY`, `start=PUMP_READY_ACCEPTED`,
+  `pump_gate=DECLARED_PUMP_PRECONDITION`, `pump_evidence_kind=SOFTWARE_SIMULATED`,
+  `physical_pump_verified=False`, `simulated_ai003_bar=20`, `simulated_pump_ready_rule=DECLARED_ABOVE_SETPOINT`,
+  `terminal_status=CompleteAwaitingSafeReturn`,
+  `terminal_code=PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` and `primary_failure=NONE`, with
+  `cleanup.valves.refused=0`, `cleanup.valves.transport_failures=0`, `cleanup.valves.unknown=0`,
+  `cleanup.complete=True` and `session_state=CLOSED`. That is the full expectation set the `D-sim` stage
+  declares in `tools/hardware-runbook/wjss-field-driver.ps1:765`, compared case-sensitively key by key by
+  `Resolve-WjssVerdict` (`:163`). Gate `D-sim` is recorded **CLOSED** on that head; the procedure needs no
+  further run of this stage, and no CLOSED stage above it is re-run to decorate the record.
+- **Why `primary_failure=NONE` now carries the valve proof.** The trial prints that line as
+  `result.Handoff.PrimaryFailureCode ?? "NONE"` (`apps/runtime/CleaningPathDryTrial.cs:122`). Under the
+  Scope B2 rules live at this head - the open leg routed through `SequencingPressure.OpenPumpStopped`
+  (`CleaningPathCompositionCoordinator.cs:357`) and any close that is not `LOWER_LIMIT_CONFIRMED` promoted to
+  the first primary failure (`:403`) - the success terminal cannot be reached by pressure reasoning at all:
+  `OPEN_BY_PRESSURE` is unreachable in that classifier and `CLOSED_BY_PRESSURE` no longer satisfies a close.
+  So `NONE` alongside that terminal code means the Upper limit confirmed the open and the Lower limit
+  confirmed the close, physically, while `pump_stopped` was attested at the panel. The declared 20 bar stays
+  what it always was: Pump-ready input only, still required to be strictly above the setpoint
+  (`apps/runtime/CleaningPathDryComposition.cs:600`), never an input to the valve judgement.
+- **Procedure reading note.** `cleanup.valves.attempted=0` / `closed=0` in that transcript are the trial's own
+  shutdown-pass counters (`CleaningPathDryTrial.cs:140-141`). The valve open and the closing fence belong to the
+  composition's supervision legs, which is why the terminal above was reachable at all. A future runner must
+  read those two counters as "the trial-level pass had nothing left to fence", never as "no valve command was
+  issued" - and the driver's own valve expectations for this stage are exactly
+  `refused=0`, `transport_failures=0`, `unknown=0`, `valves.complete=True`.
+- **Cadence rule learned from the intermediate run.** The first run at the same head (2026-11-13 16:27:26)
+  passed `prepare`, `start`, the P1 dual-axis move and the limit-confirmed open, then stopped at the next
+  point dispatch with `primary_failure=OBSERVATION_NOT_FRESH` at `steps=697`, with the cleanup close returning
+  to the Lower limit. That is a fail-closed observation check working, not a defect: a move is refused when
+  the axis motion-status interpretation is not fresh (`packages/application/Motion/Manual/ManualMotionSession.cs:551`),
+  and the session advances its multi-axis observation scheduler by at most one read per step (`:1548`), so
+  four axes times four reads (Status, TP, RP, brake) need at least 16 steps - 400 ms at this trial's 25 ms
+  step - per full round, which cannot fit inside an `observationFreshnessMilliseconds` of 300. The correct
+  procedure action is the one the Owner took: align the **profile's own** cadence numbers
+  (`observationIntervalMilliseconds=25`, `observationFreshnessMilliseconds=2000`, both read at
+  `ManualMotionProfile.cs:554-555`) and re-run, keeping `tpToRpRatio` and `positionTolerance` at their
+  commissioned values (the tolerance stays inside the profile's admissible integer range,
+  `ManualMotionProfile.cs:659`). Softening the freshness check, widening a tolerance or re-running until a
+  different code appears remain forbidden.
+- **Boundaries this closure does not move.** `SOFTWARE_SIMULATED` with `physical_pump_verified=False` is
+  command/control-path evidence and is kept separate from the Physical Pump and Main Valve evidence of
+  `D-pump` / `D-pump-mv` (`16f78bc`; ruling recorded at `e3a731c`); it is not evidence that a pump ran or that
+  the machine is ready with water. The Centre Safe Return (125 mm / 125 mm, 1 250 000 native per axis) stays a
+  typed handoff that this stage never commands. Only the two axes the resolver bound for the run's Sensor -
+  `G+210` to `WJ1`/`IV1` on WSB1, horizontal A and vertical B - were motion-exercised; axes C and D were not
+  touched by this stage. Gates A/B/C/E stay CLOSED at `c4898a0`, `D-dry` and `F` stay WAIVED by Owner
+  decision, `PRODUCTION: NOT AUTHORIZED` and `SIMULATED_FALLBACK: NOT PERMITTED` stay printed on every such
+  run, and the merge decision on PR #45 remains the Owner's alone.

@@ -602,6 +602,16 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 ⇒ เหลือ `D-sim` (ข้อ ข.) เป็นรายการเดียวที่ยังค้ำ gate D · PRODUCTION NOT AUTHORIZED ·
 MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง
 
+**สถานะ (อัปเดต 2026-11-14 ปิด gate `D-sim` ที่ `ea6d5fb6`):** A (`A1-off`, `A2-run`) · B (`B-off`, `B-on`) · C (`C-iv1`) · E (`E-idle`, `E-moved`) **CLOSED** ที่ `c4898a0` (ห้ามรันซ้ำ)
+· `D-pump` + `D-pump-mv` **CLOSED** ที่ `16f78bc` (คำตัดสินของ Owner บันทึกที่ `e3a731c`) · **`D-sim` CLOSED ที่
+`ea6d5fb6`** (รันผ่าน 2026-11-13 16:55:56, `steps=1410`, `exit=0`, tests `1909 / 1909`, build `0 W / 0 E`,
+driver `2026-11-21.1` SELFCHECK PASS, exe sha256 `8AE7E90F8B7C`) · `D-dry` + `F` **WAIVED** ตามข้อ ค.
+⇒ **gate D ไม่มีแถว OPEN เหลือแล้ว** แถว `D-sim` ด้านบนยังคงข้อความเดิมตามกติกาไม่ลบบันทึกเก่า และบล็อกนี้คือ
+สถานะปัจจุบันที่ใช้อ้างอิง · ขอบเขตหลักฐานคงเดิม: `SOFTWARE_SIMULATED` + `physical_pump_verified=False` นับเป็น
+หลักฐานเส้นทางคำสั่ง/การควบคุมเท่านั้น ไม่ใช่หลักฐานว่าปั๊มเดินหรือน้ำพร้อมทำงาน · Safe Return ที่ Centre
+(125, 125) ยังเป็น handoff ที่ stage นี้ไม่สั่ง · แกน C/D ไม่ได้ถูกเคลื่อนใน `D-sim` · **PRODUCTION NOT
+AUTHORIZED** · PR #45 ยัง OPEN + MERGE HOLD จนกว่าคุณจะสั่ง merge เอง
+
 ---
 
 ## ภาคผนวกลงวันที่ 2026-11-13 (R1/R2 ค่า Home ใหม่ + การแก้ seam ของ `D-sim`)
@@ -728,3 +738,39 @@ controller หรือ transport ด้วยตัวเอง** — ผู้
   `CleaningPathSimulatedPumpReadyGate.cs`, `CleaningPathDryComposition.cs`, `CleaningPathDryTrial.cs`,
   ไฟล์ `ProcessIo*` ทั้งหลาย, `SequencingKernel.cs` และ `tools/hardware-runbook/wjss-field-driver.ps1`
   ไม่ถูกแตะเลย ข้อความ `WJSS_*` และ code ที่ driver ใช้ตรวจตัวเองยังอยู่ครบตามเดิม
+
+---
+
+## บันทึกปิด gate `D-sim` (2026-11-14, head `ea6d5fb6`)
+
+- **สิ่งที่ Owner ส่งมา (OWNER-REPORTED-BENCH) กับสิ่งที่ผมตรวจ (SOURCE-VERIFIED-IN-ARENA):** ผมไม่มี .NET SDK,
+  ไม่มี PowerShell และไม่มีสิทธิ์แตะโต๊ะ ⇒ ตัวเลข build/test และ transcript ทุกตัวเป็นรายงานของ Owner ส่วนผมไล่
+  เทียบทีละบรรทัดกับ code ที่ head นั้นจริง แล้วบันทึกผลไว้ที่นี่
+- **บรรทัดที่สำคัญที่สุดคือ `primary_failure=NONE`:** `apps/runtime/CleaningPathDryTrial.cs:122` พิมพ์ค่านี้ออกมา
+  จาก `result.Handoff.PrimaryFailureCode ?? "NONE"` ⇒ ความหมายคือ "ไม่มีความล้มเหลวหลักเลย" และใต้กติกา B2 ที่
+  head นี้ (`CleaningPathCompositionCoordinator.cs:357` ส่งการเปิดวาล์วผ่าน `SequencingPressure.OpenPumpStopped`
+  และ `:403` บังคับให้การปิดที่ไม่ใช่ `LOWER_LIMIT_CONFIRMED` กลายเป็น primary failure แรก) ทางเดียวที่จะได้
+  `CompleteAwaitingSafeReturn` + `PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` + `NONE` พร้อมกันคือ
+  **limit switch ทั้งสองฝั่งพูดจริง** (DI-021 ยืนยันการเปิด และ DI-029 ยืนยันการปิด) เพราะ `OPEN_BY_PRESSURE`
+  ไปไม่ถึงในโหมดนี้ และการปิดเดาจากแรงดันไม่ได้อีกต่อไป
+- **หลักฐานว่านี่คือโหมด declared ไม่ใช่การยืนยันปั๊มจริง:** `pump_gate=DECLARED_PUMP_PRECONDITION` ถูกพิมพ์
+  เฉพาะเมื่อ `PumpGateComposed == False` (`CleaningPathDryComposition.cs:776` ตั้งค่าเป็น `!simulatedPumpReady`)
+  พร้อม `physical_pump_verified=False` และ `simulated_ai003_bar=20` ที่ยังต้องมากกว่า setpoint แบบเข้ม (`:600`)
+  — ค่า 20 bar เป็น input ของประตูปั๊มอย่างเดียว ไม่เคยถูกใช้ตัดสินสถานะวาล์ว
+- **การตรวจ 25 ข้อของตัวขับผ่านครบ:** `wjss-field-driver.ps1:765` กำหนดตาราง `-Expect` ของ `D-sim` และ
+  `Resolve-WjssVerdict` (`:163`) เทียบทุก key แบบตรงตัว case-sensitive รวม exit code ⇒ `RESULT D-sim: PASS`
+  คือ Product ยืนยันตัวเอง ไม่ใช่การตีความของผม (ที่ `err.txt` ว่างเป็นหลักฐานประกอบ เพราะตัวขับไม่ได้ใช้มันตัดสิน)
+- **`cleanup.valves.attempted=0` ไม่ใช่ "ไม่ได้สั่งวาล์ว":** สองบรรทัดนั้นนับรอบ cleanup ของตัว trial เอง
+  (`CleaningPathDryTrial.cs:140-141`) ขณะที่การเปิด/ปิดวาล์วจริงอยู่ใน supervision ของ composition ซึ่งทำงาน
+  เสร็จจนได้ terminal ข้างบน บันทึกไว้เพื่อไม่ให้อ่านผิดในรอบถัดไป และไม่มีไฟล์ driver หรือ trial ถูกแก้
+- **รอบกลาง (run 1) พิสูจน์อะไร:** ที่ `observationIntervalMilliseconds=100` +
+  `observationFreshnessMilliseconds=300` การรันค้างที่ `OBSERVATION_NOT_FRESH` (`steps=697`) ซึ่งเป็น gate
+  fail-closed ที่ทำงานถูกต้องแล้ว (`ManualMotionSession.cs:551`) เพราะ session ขยับตัว scheduling ของ observation
+  ได้ไม่เกินหนึ่งการอ่านต่อ step (`:1548`) ⇒ สี่แกน × (Status, TP, RP, brake) = อย่างน้อย 16 step = 400 ms ต่อรอบ
+  ซึ่งอยู่ในหน้าต่าง 300 ms ไม่ได้เลย การแก้ของ Owner คือปรับจังหวะใน **ไฟล์ profile ของ Owner เอง** เป็น
+  `25 / 2000` โดยคง `positionTolerance=10000` (ยังอยู่ในช่วงที่ profile รับได้
+  `ManualMotionProfile.cs:659`) และ `tpToRpRatio=2` ไว้เท่าเดิม ⇒ **ไม่มีการผ่อนการตรวจ freshness ไม่มีการขยาย
+  tolerance เพื่อให้ผ่าน และไม่มีไฟล์ใน repo ถูกแก้ในข้อนี้** (key ทั้งสองถูกอ่านที่
+  `ManualMotionProfile.cs:554-555`)
+- **ขั้นถัดไป:** หน้าที่ของ `D-sim` จบที่การปิด gate ในเอกสารนี้ ผมจะส่งสรุป "เอกสารพร้อม merge" ของ PR #45 ให้
+  คุณตรวจในรายงานเดียวกัน ส่วน PR ยัง OPEN + MERGE HOLD ตามเดิม ผมไม่ merge และไม่มีใครรัน stage ที่ปิดแล้วซ้ำ

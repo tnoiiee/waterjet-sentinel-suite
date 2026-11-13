@@ -13,6 +13,104 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-14 — Owner bench verification of `ea6d5fb6` (paired-IV supervision on limit switches PASSED): Gate `D-sim` CLOSED (documentation only; no code, test, script, profile or hardware command changed)
+
+**Status: DOCUMENTATION-ONLY COMMIT on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 remains
+OPEN with MERGE HOLD). It edits no `.cs`, `.csproj`, `.sln`, `.json` or `.ps1` file, so the Owner-verified
+compiled state at `ea6d5fb6` — Release build `0 warnings / 0 errors`, `total: 1909, failed: 0, succeeded:
+1909, skipped: 0`, driver `SELFCHECK: PASS (driver 2026-11-21.1, 11 groups)` and executable `sha256
+8AE7E90F8B7C` — stays the validation of record and applies unchanged to the documentation head that
+follows it. The clean-environment condition the Owner used (in-process `TargetPath` and every `WJSS_*`
+variable cleared before restore/build/test) is recorded because it is what makes those numbers attributable
+to this head. NO new hardware command, profile value or threshold was introduced by this entry.**
+
+- **What the Owner ran, and how it was checked.** Two `stage-D-sim` runs at `ea6d5fb6` were transcribed and
+  every printed line was then re-derived from source at that exact head. The evidence classes are kept
+  separate on purpose: `1909 / 1909`, the driver self-check and the two-run transcripts are
+  **OWNER-REPORTED-BENCH**; the line-by-line agreement below is **SOURCE-VERIFIED-IN-ARENA**; nothing here is
+  reproduced by the Agent, which has no .NET SDK, no PowerShell and no bench access.
+- **The decisive line: `primary_failure=NONE`.** `apps/runtime/CleaningPathDryTrial.cs:122` prints
+  `primary_failure=` as `result.Handoff.PrimaryFailureCode ?? "NONE"`, so `NONE` means the composition
+  recorded no primary failure at all. Under the Scope B2 rules that are live at this head
+  (`CleaningPathCompositionCoordinator.cs:357` routes the open through `SequencingPressure.OpenPumpStopped`
+  and `:403` turns any close that is not `LOWER_LIMIT_CONFIRMED` into the first primary failure), `NONE`
+  together with `terminal_status=CompleteAwaitingSafeReturn` and
+  `terminal_code=PATH_AND_VALVE_SEQUENCE_COMPLETE_AWAITING_SAFE_RETURN` can only be reached if **both**
+  physical limit switches actually spoke for `IV1`: the Upper limit to accept the open and the Lower limit to
+  confirm the close. `OPEN_BY_PRESSURE` is unreachable in that classifier (`SequencingPressure.cs:94`), and
+  `CLOSED_BY_PRESSURE` no longer satisfies the close (`:117`), so the success terminal is now an
+  inference-free statement about the switches. The declared `simulated_ai003_bar=20` value never enters that
+  judgement: it is only Pump-ready input, still refused unless strictly above the setpoint
+  (`CleaningPathDryComposition.cs:600`).
+- **Transcript keys verified against the print surface.** Every key in the `out.txt` block is printed by
+  `CleaningPathDryTrial` in the same order the trial prints it: `profile` / `mode` / `surface` at the run
+  head, then `ReportProvenance` (`:158-193`) giving `endpoint=endpoint-sha256-prefix:` + six digest bytes
+  (`ProcessIoEndpointConfiguration.cs:37`, no address in the output), `catalogue_rows=109`
+  (`= catalogue.Count`, `CleaningPathDryComposition.cs:761`), `process_io_device=PROCESS_IO_WAGO_T8`
+  (`ProcessIoDevices.RackT8`), `pump_ready_source=AI-003+` (`ProcessIoContracts.cs:577`),
+  `sensor=G+210` / `water_jet=WJ1` / `isolation_valve=IV1` / `axes=A/B` (the resolver's own derivation:
+  `G+210` is RIGHT/UPPER row 1 → canonical `WJ1`/`IV1`, `WJn` ↔ `IVn`, WSB1 axes A/B),
+  `motion_port=HardwareCapable` (the only admissible value — a non-hardware port is refused
+  `DRY_COMPOSITION_REFUSED_MOTION_NOT_HARDWARE_CAPABLE`), `motion_profile=PROFILE_ACCEPTED`,
+  `write_authority=PROCESS_IO_SESSION`, `coordinators=COMPOSITION+EXECUTION`, `pump_selection=1`,
+  `pump_feedback=COMMISSIONED`, `pump_owner=INTEGRATED_DRY_CYCLE`,
+  **`pump_gate=DECLARED_PUMP_PRECONDITION`** which is printed exactly when `PumpGateComposed` is false
+  (`CleaningPathDryComposition.cs:776`, `PumpGateComposed = !simulatedPumpReady`) i.e. the declared gate is
+  in use and NOT the physical one, `physical_pump_verified=False` and the two declared-mode lines plus the
+  standing statements `PHYSICAL HARDWARE: NOT EXECUTED / NOT VERIFIED`, `PRODUCTION: NOT AUTHORIZED`,
+  `SIMULATED_FALLBACK: NOT PERMITTED`. `prepare=DRY_PREPARE_READY` is printed only after a successful
+  `Prepare` (`:88`); `start=` and `pump_readiness=` are the composition's own codes (`:99-100`);
+  `steps=1410` is inside the trial's `MaximumSteps = 240000` budget at one 25 ms step each, so no bounded
+  timeout was approached; `exit=0` is the trial's "terminal result reached" code.
+- **The 25 driver expectations all matched.** `wjss-field-driver.ps1:765` declares the `D-sim` expectation
+  table and `Resolve-WjssVerdict` (`:163`) compares every key case-sensitively and exactly, with the exit
+  code compared against `-ExpectExit 0`. The transcript matches all 25 (`profile`, `mode`, `prepare`,
+  `terminal_status`, `terminal_code`, `primary_failure`, `pump_gate`, `pump_evidence_kind`,
+  `physical_pump_verified`, `simulated_pump_ready_rule`, the seven `cleanup.pump.*`, `cleanup.motion.complete`,
+  `cleanup.valves.complete`, `cleanup.valves.refused=0`, `cleanup.valves.transport_failures=0`,
+  `cleanup.valves.unknown=0`, `cleanup.complete`, `write_authority`, `coordinators`, `session_state`) →
+  `RESULT D-sim: PASS`. `stage-D-sim.err.txt` being empty is corroborating rather than asserted: the verdict
+  function does not read the error stream, it only surfaces its first lines in the report.
+- **`cleanup.valves.attempted=0` / `closed=0` is not "no valve command".** Those two lines count the trial's
+  own shutdown pass over `Valves.AttemptedValveIds` / `ClosedValveIds` (`CleaningPathDryTrial.cs:140-141`);
+  in this stage the valve open and the closing fence are owned by the composition's supervision legs, which
+  ran and are the reason the terminal is `CompleteAwaitingSafeReturn`. The trial-level counters are `0`
+  because that shutdown pass had nothing left to fence, and the driver's expectations for that path are
+  exactly the four it checks: `refused=0`, `transport_failures=0`, `unknown=0`, `valves.complete=True`.
+  Recorded as a reading note; no driver or trial reporting change was made or is proposed here.
+- **The intermediate run and what it proves.** Run 1 (`2026-11-13 16:27:26`, Owner-local profile
+  `observationIntervalMilliseconds=100`, `observationFreshnessMilliseconds=300`, `tpToRpRatio=2` on A/B)
+  passed `prepare=DRY_PREPARE_READY`, `start=PUMP_READY_ACCEPTED`, the P1 dual-axis move and the paired-IV
+  open through `OpenPumpStopped`, then refused at the next point dispatch with
+  `primary_failure=OBSERVATION_NOT_FRESH` at `steps=697`, with the paired-IV cleanup close returning to the
+  Lower limit. That is the fail-closed observation check working as designed: `ManualMotionSession.cs:551`
+  returns `OBSERVATION_NOT_FRESH` whenever the axis motion-status interpretation is not fresh, and the
+  session advances its multi-axis observation scheduler by **at most one read per step**
+  (`ManualMotionSession.cs:1548` and its doc comment), so four axes × (Status, TP, RP, brake) need at
+  least 16 steps — 400 ms at the trial's 25 ms step — per full round, which cannot fit a 300 ms
+  freshness window. The Owner resolved it by aligning the profile's own cadence numbers to
+  `25 / 2000` (a round ≈ 400 ms stays well inside 2000 ms) while keeping `positionTolerance=10000`
+  (inside the profile's admissible integer range, `ManualMotionProfile.cs:659`) and `tpToRpRatio=2`. **The
+  freshness check itself was not softened, no tolerance was widened for the pass, and no repository file
+  was involved: both keys are Owner-local profile configuration read at `ManualMotionProfile.cs:554-555`.**
+- **Evidence boundaries, restated because this record closes a gate.** `pump_evidence_kind=SOFTWARE_SIMULATED`
+  with `physical_pump_verified=False` keeps this evidence class separate from the Physical Pump and Main
+  Valve evidence of `D-pump` / `D-pump-mv` (`16f78bc`, ruling recorded at `e3a731c`): a `D-sim` pass is proof
+  of the command/control path plus real valve actuation and real limit feedback, never proof that a pump ran
+  or that the machine is ready with water. The Centre Safe Return (125 mm / 125 mm, 1 250 000 native per
+  axis) stays a typed handoff that this stage does not command
+  (`docs/ACCELERATED_CLEANING_DRY_TRIAL_PACKAGE.md` row 12). Only the two axes the path resolved for
+  `G+210` — A horizontal, B vertical — were motion-exercised; C and D were not.
+  `PRODUCTION: NOT AUTHORIZED`, `SIMULATED_FALLBACK: NOT PERMITTED` and the closed-stage re-run prohibition
+  all stand, and PR #45 stays OPEN on MERGE HOLD until the Owner orders the merge.
+- **Gate ledger after this record.** A (`A1-off`, `A2-run`), B (`B-off`, `B-on`), C (`C-iv1`), E (`E-idle`,
+  `E-moved`) CLOSED at `c4898a0`; `D-pump` and `D-pump-mv` CLOSED at `16f78bc`; **`D-sim` CLOSED at
+  `ea6d5fb6` (run 2026-11-13 16:55:56, `1909 / 1909`, `steps=1410`, `exit=0`)**; `D-dry` and `F` WAIVED by
+  Owner decision. Gate D therefore has no open row left, and no stage above is re-run to decorate this
+  record. Recorded in `docs/PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md` (§11 status block + the
+  2026-11-14 closing appendix) and `docs/H1_DRY_CLEANING_PATH_TRIAL_PROCEDURE.md` §23; the older dated
+  rows and addenda that still read `OPEN` are left in place as dated records and are superseded by these
+  appends rather than deleted.
 ### 2026-11-14 — B2: a declared-Pump run supervises the paired IV on its limit switches (software only; no hardware authorization)
 
 **Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN,
