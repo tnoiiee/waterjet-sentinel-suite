@@ -151,7 +151,9 @@ public sealed class ManualMotionSession
 
     /// <summary>
     /// Requests Home on one axis. Whether the switch also defines the encoder register follows
-    /// <see cref="ManualMotionAxisProfile.AutoResetEncoderOnHome"/>, and that profile value is true when
+    /// <see cref="ManualMotionAxisProfile.AutoResetEncoderOnHome"/>, and whether a request that arrives
+    /// while the home input is already active is accepted instead of refused follows
+    /// <see cref="ManualMotionAxisProfile.AcceptHomeWhenInputActive"/>. Both profile values are true when
     /// the Owner-local profile omits the key.
     /// </summary>
     public void RequestHome(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.Home, axis));
@@ -162,8 +164,12 @@ public sealed class ManualMotionSession
     /// register that DE defines, and no value here relaxes the freshness, sequence or tolerance
     /// conditions of the zero verification or any other precondition.
     /// </summary>
-    public void RequestHome(ManualMotionAxis axis, bool resetEncoder) =>
-        Enqueue(new Request(RequestKind.Home, axis) { ResetEncoder = resetEncoder });
+    public void RequestHome(ManualMotionAxis axis, bool resetEncoder, bool acceptHomeWhenInputActive = true) =>
+        Enqueue(new Request(RequestKind.Home, axis)
+        {
+            ResetEncoder = resetEncoder,
+            AcceptHomeWhenInputActive = acceptHomeWhenInputActive,
+        });
 
     /// <summary>Requests define-position-zero on one axis (zero is the only operand).</summary>
     public void RequestDefinePositionZero(ManualMotionAxis axis) => Enqueue(new Request(RequestKind.DefinePositionZero, axis));
@@ -478,7 +484,10 @@ public sealed class ManualMotionSession
                     ?? (p.HomeStatusBit is null || p.HomeActiveValue is null ? ManualMotionCodes.HomeFeedbackNotConfigured : null)
                     ?? (p.PositionTolerance is null ? ManualMotionCodes.PositionToleranceNotConfigured : null)
                     ?? CheckStationary(axis, p, now)
-                    ?? (InterpretHome(axis, now) == ManualMotionInterpretation.Active ? ManualMotionCodes.HomeInputAlreadyActive : null);
+                    ?? (InterpretHome(axis, now) == ManualMotionInterpretation.Active
+                        && !AcceptsActiveHomeInput(p, request)
+                            ? ManualMotionCodes.HomeInputAlreadyActive
+                            : null);
 
             case ManualMotionOperationKind.DefinePositionZero:
                 return CheckStationary(axis, p, now);
@@ -593,8 +602,25 @@ public sealed class ManualMotionSession
                 op.HomeBit = p.HomeStatusBit ?? 0;
                 op.HomeActive = p.HomeActiveValue ?? 0;
                 op.RunTimeout = Milliseconds(p.HomeTimeoutMilliseconds ?? 0);
-                op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.HomeSpeed, axis, p.HomeSpeed ?? 0, 0));
-                op.PendingCommands.Enqueue(new ManualMotionPortCommand(ManualMotionPortCommandKind.Home, axis, 0, 0));
+
+                // An axis already resting on the home input is accepted only when the profile permits it
+                // (and the Operator surface has not narrowed that permission away). The switch is proven
+                // active by the same fresh status observation the refusal used, so the operation skips the
+                // travel half of Home entirely - no home speed, no Begin, no Stop - and runs the ordinary
+                // zero definition, verification and brake re-apply from here. Every precondition above ran
+                // unchanged, and a permitted request is the ONLY thing this clause can change.
+                op.HomeAtActiveInput = AcceptsActiveHomeInput(p, request)
+                    && InterpretHome(axis, now) == ManualMotionInterpretation.Active;
+                op.HomeDetected = op.HomeAtActiveInput;
+                if (!op.HomeAtActiveInput)
+                {
+                    var homeSpeed = p.HomeSpeed ?? 0;
+                    op.PendingCommands.Enqueue(new ManualMotionPortCommand(
+                        ManualMotionPortCommandKind.HomeSpeed, axis, homeSpeed, 0));
+                    op.PendingCommands.Enqueue(new ManualMotionPortCommand(
+                        ManualMotionPortCommandKind.Home, axis, 0, 0));
+                }
+
                 op.Phase = ManualMotionOperationPhase.ReleasingBrake;
                 break;
 
@@ -618,6 +644,15 @@ public sealed class ManualMotionSession
         SetActive(axis, op);
         AppendLog(now, axis, kind, ManualMotionCodes.OperationStarted);
     }
+
+    /// <summary>
+    /// The effective permission to accept a Home request while the home input is already active. The
+    /// profile is the authority and an Operator surface can only narrow it, exactly like the encoder
+    /// definition of Home: an absent request intent follows the profile, and a profile that omits the key
+    /// permits the acceptance. Nothing here judges any other condition of the request.
+    /// </summary>
+    private static bool AcceptsActiveHomeInput(ManualMotionAxisProfile p, Request request) =>
+        p.AcceptHomeWhenInputActive && request.AcceptHomeWhenInputActive is not false;
 
     private static void CaptureMotion(OperationRuntime op, ManualMotionAxisProfile p)
     {
@@ -834,6 +869,17 @@ public sealed class ManualMotionSession
         {
             op.EndCode ??= ManualMotionCodes.AbortedBeforeMotion;
             SetPhase(op, ManualMotionOperationPhase.ApplyingBrake, now);
+            return Progress.Transitioned;
+        }
+
+        if (op.HomeAtActiveInput)
+        {
+            // No Begin call is made and no motion is claimed: the axis is standing on the input, so the
+            // only work left is the zero definition this Home performs at that position. MotionBegun
+            // deliberately stays false, which is what keeps the ordinary Stop dispatch and the protective
+            // Stop of fault cleanup out of this lifecycle, and HomeState is established by the zero
+            // completion below instead of by a Begin, so a completed Home is never reported as Homing.
+            SetPhase(op, ManualMotionOperationPhase.DefiningZero, now);
             return Progress.Transitioned;
         }
 
@@ -1884,6 +1930,7 @@ public sealed class ManualMotionSession
             BrakeOutputNumber = ManualMotionTopology.ConfirmedBrakeOutput(runtime.Axis),
             AllowedByProfile = p is not null,
             AutoResetEncoderOnHome = p?.AutoResetEncoderOnHome ?? false,
+            AcceptHomeWhenInputActive = p?.AcceptHomeWhenInputActive ?? false,
             BrakeCommandState = runtime.BrakeCommandState,
             BrakeOutput = ObservationSnapshot(runtime.BrakeOutput, now),
             StatusWord = ObservationSnapshot(runtime.Status, now),
@@ -2046,6 +2093,9 @@ public sealed class ManualMotionSession
 
         /// <summary>The Operator intent for the encoder definition of a Home request; null means "say nothing".</summary>
         public bool? ResetEncoder { get; init; }
+
+        /// <summary>The Operator intent for an already-active home input; null means "say nothing".</summary>
+        public bool? AcceptHomeWhenInputActive { get; init; }
     }
 
     private sealed class Observation
@@ -2186,6 +2236,13 @@ public sealed class ManualMotionSession
         public bool VerifiesActualPosition { get; set; }
 
         public bool HomeDetected { get; set; }
+
+        /// <summary>
+        /// True when this Home was permitted to start with the home input already active. It is the flag
+        /// that removes the travel half of the lifecycle, and it is decided once, at request time, from
+        /// the profile permission and the fresh input reading.
+        /// </summary>
+        public bool HomeAtActiveInput { get; set; }
 
         public long PressId { get; set; }
 

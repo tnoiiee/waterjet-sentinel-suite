@@ -89,6 +89,18 @@ public sealed class ManualMotionAxisProfile
     /// </summary>
     public bool AutoResetEncoderOnHome { get; init; } = true;
 
+    /// <summary>
+    /// True (the default, and the value when the profile omits the key) permits a Home request that
+    /// arrives while the home input is ALREADY active: the axis is standing on the switch, so the
+    /// operation dispatches no home speed and no Begin, defines the zero registers at that position and
+    /// completes exactly as a Home that traveled there would. False keeps the former refusal, so a
+    /// commissioning procedure that requires the axis to be moved off the input first can pin that
+    /// reading in its own profile. Neither value relaxes any other condition: the brake, stationarity,
+    /// freshness, feedback-configuration, tolerance and zero-verification preconditions all still run,
+    /// and no value of this key ever starts travel toward an active switch.
+    /// </summary>
+    public bool AcceptHomeWhenInputActive { get; init; } = true;
+
     /// <summary>The profile property names that are NOT_CONFIGURED for this axis, in schema order.</summary>
     public IReadOnlyList<string> NotConfiguredItems()
     {
@@ -443,6 +455,7 @@ public static class ManualMotionProfileParser
         "homeActiveValue",
         "dualZeroPermitted",
         "autoResetEncoderOnHome",
+        "acceptHomeWhenInputActive",
     };
 
     /// <summary>Reads one Owner-local profile text. Never throws for malformed input.</summary>
@@ -630,7 +643,8 @@ public static class ManualMotionProfileParser
             || !TryReadInt(element, "homeStatusBit", 0, 7, out var homeBit)
             || !TryReadInt(element, "homeActiveValue", 0, 1, out var homeActive)
             || !TryReadBoolean(element, "dualZeroPermitted", out var dualZeroPermitted)
-            || !TryReadBooleanDefaulting(element, "autoResetEncoderOnHome", true, out var autoResetEncoderOnHome))
+            || !TryReadBooleanDefaulting(element, "autoResetEncoderOnHome", true, out var autoResetEncoderOnHome)
+            || !TryReadBooleanDefaulting(element, "acceptHomeWhenInputActive", true, out var acceptHomeWhenInputActive))
         {
             return ManualMotionCodes.ProfileValueInvalid;
         }
@@ -672,6 +686,7 @@ public static class ManualMotionProfileParser
             HomeActiveValue = homeActive,
             DualZeroPermitted = dualZeroPermitted,
             AutoResetEncoderOnHome = autoResetEncoderOnHome,
+            AcceptHomeWhenInputActive = acceptHomeWhenInputActive,
         };
 
         return null;

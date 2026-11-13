@@ -210,15 +210,38 @@ public sealed class CleaningPathCompositionCoordinator : ICleaningPathPointAdvan
     private CleaningPathPumpReadinessResult EvaluatePumpReadiness(SequencingPressureThresholds thresholds)
     {
         var sample = _equipment.ReadPumpOutletPressure();
-        if (!SequencingPressure.Valid(sample)
-            || !string.Equals(sample!.SourceId, PressureSample.PumpOutletSource, StringComparison.Ordinal))
+
+        // Exactly two identities can carry this decision, and both come from the source of the sample.
+        // The measured one is the shared Pump Outlet constant. The declared one exists for the ONE
+        // evidence class whose sample must never carry a measured identity - the Owner-declared Pump
+        // Outlet value - and it is admitted only because the boundary that served this sample declares
+        // that very identity itself. The declaration is read from the boundary instance and never
+        // inferred from the sample text, so a boundary that declares nothing (every other boundary in
+        // this repository, physical included) keeps the wrong-source refusal unchanged, and a sample
+        // that merely looks like a declared one is still refused.
+        var declared = (_equipment as ICleaningPathDeclaredPumpSource)?.AcceptedPumpReadySourceId;
+        var measuredIdentity = sample is not null
+            && string.Equals(sample.SourceId, PressureSample.PumpOutletSource, StringComparison.Ordinal);
+        var declaredIdentity = sample is not null
+            && !string.IsNullOrEmpty(declared)
+            && string.Equals(sample.SourceId, declared, StringComparison.Ordinal);
+        if (!SequencingPressure.Valid(sample) || !(measuredIdentity || declaredIdentity))
         {
             // Invalid input and wrong-source input are the same fail-closed class: no readiness
-            // rule may be evaluated and the exact sample evidence is preserved.
+            // rule may be evaluated and the exact sample evidence is preserved. The preserved sample
+            // keeps the identity it arrived with, which is what makes a declared value readable as
+            // declared in the evidence, and nothing here rewrites it.
             return new CleaningPathPumpReadinessResult(false, SequencingCodes.PumpPressureInputInvalid, sample);
         }
 
-        return SequencingPressure.PumpReady(sample, thresholds)
+        // The identity test above is the only part of the rule this seam touches. The value rule below
+        // is the same strict greater-than over the same thresholds that SequencingPressure.PumpReady
+        // applies to a measured sample, and that helper is deliberately not called here: it also
+        // re-tests the measured Pump Outlet identity, so routing a declared sample through it would
+        // classify a value the Owner declared as not-ready instead of evaluating it. Quality, staleness,
+        // finiteness, the negative bound, the UTC requirement and the strict setpoint comparison all
+        // still come from SequencingPressure.Valid plus that same comparison, unchanged.
+        return sample!.Bar!.Value > thresholds.PumpReadySetpointBar
             ? new CleaningPathPumpReadinessResult(true, CleaningPathCompositionCodes.PumpReadyAccepted, sample)
             : new CleaningPathPumpReadinessResult(false, SequencingCodes.PumpNotReady, sample);
     }

@@ -36,7 +36,7 @@ namespace Wjss.Runtime.Core.CleaningPath.Composition;
 /// Serves one Owner-declared Pump-ready value as the Pump precondition of an otherwise fully physical
 /// Cleaning Path composition, and labels every sample it produces as declared rather than measured.
 /// </summary>
-public sealed class CleaningPathSimulatedPumpReadyGate : ICleaningPathEquipmentBoundary
+public sealed class CleaningPathSimulatedPumpReadyGate : ICleaningPathEquipmentBoundary, ICleaningPathDeclaredPumpSource
 {
     /// <summary>
     /// The SourceId carried by every sample this gate serves. It is part of the evidence line, not a
@@ -115,6 +115,15 @@ public sealed class CleaningPathSimulatedPumpReadyGate : ICleaningPathEquipmentB
 
     /// <summary>The evidence kind this composition must report, for the same reason.</summary>
     public static string PumpEvidenceKind => EvidenceKind;
+
+    /// <summary>
+    /// The identity this gate stamps on the only sample it serves, stated as the acceptance it needs: the
+    /// composition may compare Pump-ready against THIS value, but never against a measured AI-003
+    /// identity, because this gate's sample deliberately does not carry one. Reading the accepted
+    /// identity from the source that produced the sample is what keeps the widening narrow - a sample
+    /// from any other boundary, or a sample whose text merely looks like this one, is still refused.
+    /// </summary>
+    public string AcceptedPumpReadySourceId => DeclaredPressureSourceId;
 
     /// <summary>True once the composition has begun, which is what admits a paired-IV OPEN.</summary>
     public bool RunBegun => _begun;

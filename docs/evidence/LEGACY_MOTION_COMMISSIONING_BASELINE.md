@@ -863,3 +863,28 @@ Two distinctions this baseline can support and two it cannot:
   scaling at all; nothing in this branch states that `TP` and `RP` stand in a 2:1 relation. A ratio claim
   remains OWNER-STATED until it is measured at the machine, and the Home verification needs no ratio at
   all because both registers are defined to zero at the same point.
+
+---
+
+## Dated addendum — 2026-11-13 (what the Product now does at an already-active Home input)
+
+**Appended only.** No record above is edited or deleted by this section, and this section authorizes
+nothing. Trigger: the Owner's R1 and R2 rulings on the Manual Motion Home lifecycle (heads `c39bc00`,
+`5c9a129`, `6b5791e`), recorded against the Legacy behaviour described above.
+
+- The Legacy order reviewed above — position define then encoder define at one switch sighting, with **no
+  post-verification** — is what the Product Home sequence now carries by default (`autoResetEncoderOnHome`
+  absent means `true`), plus the verification the Legacy never had.
+- The **second** half of the Legacy shape is the reason R2 exists: in the Legacy application a Home
+  requested while the axis was already resting on the Home switch was a normal way to re-establish zero at
+  the switch, because nothing traveled. The Product refused that request
+  (`HOME_INPUT_ALREADY_ACTIVE`) until the Owner ruled a per-axis profile key
+  `acceptHomeWhenInputActive` (absent or `true` = accept without travel; `false` = the refusal, verbatim).
+  The accepted route dispatches no home-speed, no begin and no stop; the brake, stationarity, freshness,
+  tolerance and verification conditions are untouched, so the Product is stricter than the Legacy in every
+  respect except the refusal itself.
+- What this baseline still cannot support: which physical register each define command writes, and any
+  command-to-encoder count ratio. Both remain OWNER-STATED field questions, and the 2026-11-12 register
+  fact above (read both registers from the port at one instant) is the only form of that evidence this
+  branch accepts. `acceptHomeWhenInputActive` changes no tolerance, no ratio and no scaling statement, and
+  the deferred `R3` density question is neither supported nor weakened by it.

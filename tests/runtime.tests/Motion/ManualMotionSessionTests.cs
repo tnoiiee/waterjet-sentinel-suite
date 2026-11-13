@@ -352,6 +352,72 @@ public sealed class ManualMotionSessionTests
     };
 
     /// <summary>
+    /// One axis profile with the Home-on-an-active-input permission set explicitly. Every other value,
+    /// including the encoder definition of Home, is copied from the source: the two Home options are
+    /// independent permissions and a test of one must never move the other.
+    /// </summary>
+    private static ManualMotionAxisProfile AxisWithAcceptHomeWhenInputActive(
+        ManualMotionAxisProfile source,
+        bool acceptHomeWhenInputActive) => new()
+    {
+        BrakeOutput = source.BrakeOutput,
+        BrakeReleaseAction = source.BrakeReleaseAction,
+        BrakeSettleMilliseconds = source.BrakeSettleMilliseconds,
+        JogSpeed = source.JogSpeed,
+        HomeSpeed = source.HomeSpeed,
+        HomeTimeoutMilliseconds = source.HomeTimeoutMilliseconds,
+        MoveAcceleration = source.MoveAcceleration,
+        MoveSpeed = source.MoveSpeed,
+        MoveDeceleration = source.MoveDeceleration,
+        MoveMinimumTarget = source.MoveMinimumTarget,
+        MoveMaximumTarget = source.MoveMaximumTarget,
+        PositionTolerance = source.PositionTolerance,
+        MotionTimeoutMilliseconds = source.MotionTimeoutMilliseconds,
+        StopTimeoutMilliseconds = source.StopTimeoutMilliseconds,
+        MotionStatusBit = source.MotionStatusBit,
+        MotionActiveValue = source.MotionActiveValue,
+        HomeStatusBit = source.HomeStatusBit,
+        HomeActiveValue = source.HomeActiveValue,
+        DualZeroPermitted = source.DualZeroPermitted,
+        AutoResetEncoderOnHome = source.AutoResetEncoderOnHome,
+        AcceptHomeWhenInputActive = acceptHomeWhenInputActive,
+    };
+
+    /// <summary>
+    /// One FakePort session whose Axis A reports the home input ACTIVE through status bit 3, on the
+    /// profile the caller supplies. Every read is accepted with a fixed sequence and the fake dispatches
+    /// nothing by itself, so "nothing reached the port" is an exact statement about the request.
+    /// </summary>
+    private static (FakePort Port, ManualMotionSession Session, TestClock Clock) ActiveInputSession(
+        ManualMotionProfile profile)
+    {
+        var clock = new TestClock(Instant);
+        var port = new FakePort
+        {
+            ReadHandler = read => new ManualMotionPortReadResult(
+                true,
+                false,
+                read.Kind == ManualMotionReadKind.StatusWord && read.Axis == ManualMotionAxis.A ? 8m : 0m,
+                "FAKE_READ",
+                1),
+        };
+        var session = new ManualMotionSession(
+            port,
+            ManualMotionProfileResult.FromProfile(profile),
+            clock);
+
+        session.Step();
+        for (var index = 0; index < 16; index++)
+        {
+            clock.Advance(TimeSpan.FromMilliseconds(25));
+            session.Step();
+        }
+
+        Assert.Equal(ManualMotionInterpretation.Active, session.Snapshot.Axes[0].HomeInput);
+        return (port, session, clock);
+    }
+
+    /// <summary>
     /// A FakePort session that records every read (with its fake-clock time) and models just enough
     /// controller behaviour for the observation-cycle tests: Begin makes the status motion bit of
     /// ITS axis active, Stop makes ITS axis inactive, and each brake-output read follows the brake
@@ -1539,29 +1605,13 @@ public sealed class ManualMotionSessionTests
     [Fact]
     public void Home_Is_Refused_When_The_Home_Input_Is_Already_Active()
     {
-        var clock = new TestClock(Instant);
-        var port = new FakePort
-        {
-            ReadHandler = read => new ManualMotionPortReadResult(
-                true,
-                false,
-                read.Kind == ManualMotionReadKind.StatusWord && read.Axis == ManualMotionAxis.A ? 8m : 0m,
-                "FAKE_READ",
-                1),
-        };
-        var session = new ManualMotionSession(
-            port,
-            ManualMotionProfileResult.FromProfile(ManualMotionProfile.CreateSimulationProfile()),
-            clock);
-
-        session.Step();
-        for (var index = 0; index < 16; index++)
-        {
-            clock.Advance(TimeSpan.FromMilliseconds(25));
-            session.Step();
-        }
-
-        Assert.Equal(ManualMotionInterpretation.Active, session.Snapshot.Axes[0].HomeInput);
+        // The profile opt-out is the older behaviour verbatim: a profile that refuses Home on an active
+        // input stops the request before any command exists, so a commissioning procedure that requires
+        // the axis to be moved off the switch first keeps exactly the guarantee it was written against.
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        var (port, session, clock) = ActiveInputSession(ProfileWith(
+            simulation,
+            axisA: AxisWithAcceptHomeWhenInputActive(simulation.AxisA!, acceptHomeWhenInputActive: false)));
 
         session.RequestHome(ManualMotionAxis.A);
         clock.Advance(TimeSpan.FromMilliseconds(25));
@@ -1569,6 +1619,103 @@ public sealed class ManualMotionSessionTests
 
         Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, session.Snapshot.Axes[0].LastOutcomeCode);
         Assert.Empty(port.Executed);
+    }
+
+    [Fact]
+    public void The_Acceptance_Of_An_Active_Input_Cannot_Be_Widened_By_The_Operator_Surface()
+    {
+        // An Operator box can only narrow the profile permission, never widen it. With the profile
+        // permitting the acceptance, an explicit false is the older refusal; with the profile refusing
+        // it, an explicit true is still the older refusal. Neither half dispatches anything at all.
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        var (narrowedPort, narrowedSession, narrowedClock) = ActiveInputSession(simulation);
+        narrowedSession.RequestHome(ManualMotionAxis.A, resetEncoder: true, acceptHomeWhenInputActive: false);
+        narrowedClock.Advance(TimeSpan.FromMilliseconds(25));
+        narrowedSession.Step();
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, narrowedSession.Snapshot.Axes[0].LastOutcomeCode);
+        Assert.Empty(narrowedPort.Executed);
+
+        var (refusedPort, refusedSession, refusedClock) = ActiveInputSession(ProfileWith(
+            simulation,
+            axisA: AxisWithAcceptHomeWhenInputActive(simulation.AxisA!, acceptHomeWhenInputActive: false)));
+        refusedSession.RequestHome(ManualMotionAxis.A, resetEncoder: true, acceptHomeWhenInputActive: true);
+        refusedClock.Advance(TimeSpan.FromMilliseconds(25));
+        refusedSession.Step();
+        Assert.Equal(ManualMotionCodes.HomeInputAlreadyActive, refusedSession.Snapshot.Axes[0].LastOutcomeCode);
+        Assert.Empty(refusedPort.Executed);
+    }
+
+    [Fact]
+    public void Home_On_An_Active_Input_Defines_Zero_Without_Travel()
+    {
+        // The ruled bench behaviour: an axis standing on the Home switch homes without moving. The switch
+        // is proven active by the same fresh status reading that used to refuse the request, and what
+        // follows is the ordinary zero definition, verification and brake re-apply of a completed Home -
+        // with no home speed, no Begin and no Stop, because there is nothing to start and nothing to stop.
+        var simulation = ManualMotionProfile.CreateSimulationProfile();
+        Assert.True(simulation.AxisA!.AcceptHomeWhenInputActive);
+
+        var harness = new Harness(new ManualMotionSimulationOptions { StartPositionA = 0m });
+        harness.OpenAndObserve();
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Axis(ManualMotionAxis.A).HomeInput);
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState == ManualMotionHomeState.Homed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.Homed, axis.HomeState);
+        Assert.Equal(ManualMotionCodes.HomeCompletedZeroVerified, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerified, axis.CoordinateState);
+        Assert.Equal(ManualMotionBrakeCommandState.ApplyCommanded, axis.BrakeCommandState);
+        Assert.Equal(0m, axis.PositionTp.Value);
+        Assert.Equal(0m, axis.PositionRp.Value);
+
+        var kinds = harness.Port.ExecutedCommands.Select(command => command.Kind).ToList();
+        Assert.DoesNotContain(ManualMotionPortCommandKind.HomeSpeed, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Home, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Begin, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Stop, kinds);
+        Assert.Contains(ManualMotionPortCommandKind.DefinePositionZero, kinds);
+
+        // Both registers are defined, on consecutive steps: one port call per step is the contract that
+        // keeps the driver cadence and the preparation-window budget intact, and the accepted route
+        // inherits it instead of folding the two definitions into one dispatch.
+        var position = kinds.IndexOf(ManualMotionPortCommandKind.DefinePositionZero);
+        var encoder = kinds.IndexOf(ManualMotionPortCommandKind.DefineDualZero);
+        Assert.True(position >= 0 && encoder >= 0, "both zero definitions must be dispatched");
+        Assert.Equal(position + 1, encoder);
+    }
+
+    [Fact]
+    public void Accepting_An_Active_Input_Still_Verifies_The_Zero_It_Defines()
+    {
+        // What the acceptance removes is travel, and nothing else. With the position register held away
+        // from zero by an acknowledged-but-ignored definition, the Home that started on an active switch
+        // fails the same verification, sets the same typed Home failure and claims no zero - being on the
+        // switch is never a substitute for a verified coordinate, and no tolerance is involved.
+        var harness = new Harness(new ManualMotionSimulationOptions
+        {
+            StartPositionA = 30m,
+            ZeroDefinitionIgnored = true,
+        });
+        harness.OpenAndObserve();
+        Assert.Equal(ManualMotionInterpretation.Active, harness.Axis(ManualMotionAxis.A).HomeInput);
+
+        harness.Session.RequestHome(ManualMotionAxis.A);
+        harness.DriveUntil(snapshot => ActiveOf(snapshot, ManualMotionAxis.A) is null
+            && snapshot.Axes[0].HomeState != ManualMotionHomeState.NotHomed);
+
+        var axis = harness.Axis(ManualMotionAxis.A);
+        Assert.Equal(ManualMotionHomeState.HomeFailed, axis.HomeState);
+        Assert.Equal(ManualMotionCodes.HomeZeroVerificationFailed, axis.LastOutcomeCode);
+        Assert.Equal(ManualMotionCoordinateState.ZeroVerificationFailed, axis.CoordinateState);
+        Assert.Equal(30m, axis.PositionTp.Value);
+
+        var kinds = harness.Port.ExecutedCommands.Select(command => command.Kind).ToList();
+        Assert.DoesNotContain(ManualMotionPortCommandKind.HomeSpeed, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Home, kinds);
+        Assert.DoesNotContain(ManualMotionPortCommandKind.Begin, kinds);
     }
 
     [Fact]

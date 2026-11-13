@@ -13,6 +13,63 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-13 — Owner rulings R1/R2 on the Manual Motion Home lifecycle + the `D-sim` Pump source-identity seam (software only; no hardware authorization)
+
+**Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN, MERGE HOLD); .NET RESTORE / BUILD / TEST NOT RUN — no .NET SDK exists in the Agent environment, so the Owner-local gate on the exact head (locked restore, Release build with `TreatWarningsAsErrors`, full test matrix) remains the validation of record. The last Owner-executed evidence is 0 warnings / 0 errors and 1862 passed / 0 failed at `6b5791e`. NO HARDWARE. NO PHYSICAL OR MODBUS COMMAND. `D-sim` REMAINS OPEN until re-run on this head. PRODUCTION NOT AUTHORIZED.**
+
+- **R1 — Home carries the encoder definition (shipped `c39bc00`, corrected `5c9a129` / `6b5791e`).** The
+  Home lifecycle now defines `DP{axis}=0` and then `DE{axis}=0` at the switch and verifies BOTH registers
+  before it reports a completed Home, behind the per-axis profile key `autoResetEncoderOnHome` (absent or
+  null means `true`; a non-boolean value refuses the whole profile; the key is deliberately not a
+  NOT_CONFIGURED item). A refused `DE` is `HOME_ENCODER_ZERO_REFUSED` and fails Home. The drift evidence is
+  read from both registers at one instant on the port, never from snapshot fields of different instants.
+  Bench evidence: `prepare=DRY_PREPARE_READY` on WSB1 axes A and B — R1 is hardware-validated.
+- **R2 — `HOME_INPUT_ALREADY_ACTIVE` is profile-governed (this entry).** New per-axis profile key
+  `AcceptHomeWhenInputActive` / `acceptHomeWhenInputActive`, **default `true`** by explicit Owner ruling
+  (an axis parked on the Home switch between runs is a normal bench state, so the bench profile needs no
+  edit and no jog-off step is forced). Effective `true`: a Home requested while the input is active is
+  accepted and completed **without travel** — no `HomeSpeed`, no `Begin`, no `Stop` — while every existing
+  precondition (brake, Home parameters, feedback configuration, tolerance, stationarity, observation
+  freshness) still runs fail-closed and a zero verification that does not land at zero still fails Home.
+  `false` (or an Operator clearing the new commissioning checkbox, which can only narrow the profile):
+  the previous refusal verbatim, nothing dispatched. No back-off motion is added in either setting and no
+  tolerance is widened.
+  - **Changed:** `ManualMotionProfile` (property + allowlist key + defaulted reader + the one axis
+    construction arm), `ManualMotionAxisSnapshot` + the session snapshot feed, `ManualMotionSession`
+    (`RequestHome` third optional intent parameter, `Request`/`OperationRuntime` members, the Home
+    precondition clause, the Home `StartOperation` arm and a `DoBeginning` short-circuit),
+    `apps/motion-commissioning/ManualMotionForm` (per-axis checkbox, enablement and Home confirmation
+    wording), the three H1 fail-closed Home scenarios and the execution harness profile builder (explicit
+    `acceptHomeWhenInputActive: false`, assertions unchanged).
+  - **Tests:** +2 `ManualMotionProfileTests` facts (absent/null ⇒ `true`, text ⇒ whole-profile refusal;
+    explicit `false` honoured and independent of `autoResetEncoderOnHome`), the existing refusal fact kept
+    as the `false` case, +1 Operator-cannot-widen fact, +1 accepted-without-travel fact (both registers
+    verified, `Homed`, brake re-applied, `DP` and `DE` on consecutive steps), +1 fact proving the accepted
+    route still fails a zero verification that does not land at zero.
+- **`D-sim` Pump source-identity seam (same commit).** `dry.Start()` refused
+  `PUMP_PRESSURE_INPUT_INVALID` at the bench because the composition required the measured
+  `PUMP_OUTLET` identity while the declared-evidence gate serves `AI-003+SOFTWARE_SIMULATED` by design.
+  The composition now also accepts the single identity that the serving boundary itself declares, through a
+  new `ICleaningPathDeclaredPumpSource` capability that is deliberately **not** a member of
+  `ICleaningPathEquipmentBoundary` (its closed five-member contract and its reflection pin are untouched);
+  `SequencingPressure.PumpReady` is not modified, the declared route re-applies the same `Valid` rules and
+  the same strict greater-than setpoint comparison, an empty declaration admits nothing, and a boundary
+  that declares nothing — the physical AI-003 route included — is judged by the measured identity alone.
+  - **Tests:** +5 `CleaningPathCompositionPumpGateTests` facts (declared identity accepted through the real
+    coordinator over the real Motion session; the same identity forged by a non-declaring boundary still
+    refused; a declaration admits its own identity only; an empty declaration admits nothing; a declared
+    value at the setpoint is `PUMP_NOT_READY`) and +2 `api.tests` facts composing the real
+    `CleaningPathSimulatedPumpReadyGate` with the real `CleaningPathCompositionCoordinator`, which is the
+    seam no test covered before (the file had zero coordinator references, and that gap is what shipped
+    the bug).
+- **Docs:** dated addenda appended to `docs/H1_DRY_CLEANING_PATH_TRIAL_PROCEDURE.md` (section 20) and
+  `docs/evidence/LEGACY_MOTION_COMMISSIONING_BASELINE.md` and a 2026-11-13 addendum to
+  `docs/PHYSICAL_HARDWARE_EXECUTION_RUNBOOK_2026-11-07.md`; no existing procedure text was rewritten, and
+  the H1 sections that state the refusal remain in force for a profile that sets `false`.
+- **Not done / open:** `D-sim` re-run on this head (Owner-executed), `D-dry` and `F` (WAIVED), the `R3`
+  encoder-density question (deferred — no ratio may become fact, no tolerance may be widened), and
+  `catalogue_rows=109` vs the 108-row ruling (reported, untouched). PR #45 stays on MERGE HOLD.
+
 ### 2026-11-11 — Owner topology ruling: logical-row tier split rows 1–3 UPPER / rows 4–6 LOWER (software/data only; NO HARDWARE EXECUTED, no hardware authorization)
 
 **Status: SOURCE-AUTHORED IN ARENA on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 OPEN, MERGE HOLD); .NET RESTORE / BUILD / TEST NOT RUN — no .NET SDK exists in the Agent environment, so the Owner-local gate on the exact head (locked restore, Release build, full test matrix, C# `FixtureParityTests`) remains the validation of record. Node gates EXECUTED in the Agent sandbox: contracts-ts 57/57 PASS, Ops Preview 191/191 PASS, mapping-config (package) 261 PASS / 7 pre-existing skips, apps/mapping-config 82/82 PASS, process-io 110/110 PASS, commissioning 238/239 with the single pre-existing `H: the current-facing records …` K3 documentation-drift failure recorded as failing identically at its approved base. NO HARDWARE. NO PHYSICAL OR MODBUS COMMAND. NO Stage D re-run. PRODUCTION NOT AUTHORIZED.**

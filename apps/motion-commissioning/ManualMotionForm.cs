@@ -186,9 +186,10 @@ internal sealed class ManualMotionForm : Form
             // The box can only narrow the profile permission, never widen it: the session ANDs this intent
             // with the Owner-local profile value before it dispatches anything.
             var resetEncoder = controls.AutoResetEncoder.Checked;
-            if (Confirm(HomeQuestion(controls.Title, resetEncoder)))
+            var acceptActiveInput = controls.HomeAtActiveInput.Checked;
+            if (Confirm(HomeQuestion(controls.Title, resetEncoder, acceptActiveInput)))
             {
-                _session.RequestHome(axis, resetEncoder);
+                _session.RequestHome(axis, resetEncoder, acceptActiveInput);
             }
         };
         controls.DefineZero.Click += (_, _) =>
@@ -452,6 +453,15 @@ internal sealed class ManualMotionForm : Form
         {
             controls.AutoResetEncoder.Checked = false;
         }
+
+        // Accepting a Home that arrives on an active input is likewise a profile permission: the box can
+        // narrow it for one request and can never widen it, so a profile that refuses it clears the box
+        // and locks it, and the request then stays exactly the refusal it was before this option existed.
+        controls.HomeAtActiveInput.Enabled = ready && idle && allowed && axis.AcceptHomeWhenInputActive;
+        if (!axis.AcceptHomeWhenInputActive)
+        {
+            controls.HomeAtActiveInput.Checked = false;
+        }
         controls.Move.Enabled = ready && idle && allowed;
         controls.Target.Enabled = ready && allowed;
 
@@ -468,7 +478,7 @@ internal sealed class ManualMotionForm : Form
     /// The Home confirmation wording. It names the zero definitions this request will carry, so the
     /// Operator reads the effect of the maintenance box before the request is posted.
     /// </summary>
-    private static string HomeQuestion(string title, bool resetEncoder)
+    private static string HomeQuestion(string title, bool resetEncoder, bool acceptActiveInput)
     {
         var definitions = resetEncoder
             ? "it defines DP=0 and then DE=0 at the switch"
@@ -476,7 +486,12 @@ internal sealed class ManualMotionForm : Form
         var verification = resetEncoder
             ? "and verifies BOTH registers before it reports a completed Home."
             : "and verifies only that register, leaving the other one as drift evidence it never claims.";
-        return string.Concat("Start Home on ", title, "? ", definitions, ", ", verification);
+        // The Operator reads the already-active-input rule before the request is posted, because that is
+        // the one condition under which this Home dispatches no travel at all.
+        var atSwitch = acceptActiveInput
+            ? " If the home input is already active, it defines zero at that position and travels not at all."
+            : " If the home input is already active, this request is refused until the axis is off the input.";
+        return string.Concat("Start Home on ", title, "? ", definitions, ", ", verification, atSwitch);
     }
 
     private static ManualMotionOperationSnapshot? OperationFor(ManualMotionSnapshot snapshot, ManualMotionAxis axis)
@@ -640,6 +655,18 @@ internal sealed class ManualMotionForm : Form
                 Text = "Home defines both registers (DP, then DE)",
             };
 
+            // Bench use: an axis parked on the Home switch between runs is a normal state, so the
+            // acceptance is on by default and an Operator unchecks it only to reproduce the strict
+            // procedure reading. The Owner-local profile is what permits the acceptance at all, and
+            // neither half of this pair ever commands a move.
+            HomeAtActiveInput = new CheckBox
+            {
+                AutoSize = true,
+                Checked = true,
+                Padding = new Padding(0, 6, 0, 0),
+                Text = "Home while the input is active (defines zero, no travel)",
+            };
+
             Move = CreateButton("Move absolute (PA)");
             Target = new NumericUpDown
             {
@@ -672,6 +699,7 @@ internal sealed class ManualMotionForm : Form
             commands.Controls.Add(DefineZero);
             commands.Controls.Add(DefineDualZero);
             commands.Controls.Add(AutoResetEncoder);
+            commands.Controls.Add(HomeAtActiveInput);
 
             var move = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false };
             move.Controls.Add(new Label
@@ -719,6 +747,8 @@ internal sealed class ManualMotionForm : Form
         internal Button DefineDualZero { get; }
 
         internal CheckBox AutoResetEncoder { get; }
+
+        internal CheckBox HomeAtActiveInput { get; }
 
         internal Button Move { get; }
 

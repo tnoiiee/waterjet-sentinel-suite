@@ -601,3 +601,45 @@ Legacy rev2 อ่าน bit กลุ่มนี้ผ่าน **FC01 (coils)
 ค่า default ให้ขยับ (env หาย = refuse) มีแค่ doc comment ที่เขียนเลขค้างไว้ซึ่งอัปเดตแล้ว · `D-dry` กับ `F` ถูก waive ตามข้อ ค.
 ⇒ เหลือ `D-sim` (ข้อ ข.) เป็นรายการเดียวที่ยังค้ำ gate D · PRODUCTION NOT AUTHORIZED ·
 MERGE HOLD บน PR #45 จนกว่าผมจะสรุปผลครบทุก stage และคุณจะสั่ง merge เอง
+
+---
+
+## ภาคผนวกลงวันที่ 2026-11-13 (R1/R2 ค่า Home ใหม่ + การแก้ seam ของ `D-sim`)
+
+เอกสารนี้ **ต่อท้าย** เท่านั้น — ข้อความด้านบนทุกบรรทัดคงเดิม ไม่แก้ ไม่ลบ. ที่มา: คำตัดสิน R1/R2 ของ Owner
+(head `c39bc00`, `5c9a129`, `6b5791e`) และ transcript ของ stage `D-sim` ที่ field driver `2026-11-21.1`.
+**ไม่มีการรันฮาร์ดแวร์จากเอกสารนี้ และไม่ใช่ใบอนุญาตรันใด ๆ ทั้งสิ้น**
+
+### 1) คีย์ใหม่ในโปรไฟล์ `acceptHomeWhenInputActive` (ค่า default = `true`)
+
+| สถานะของคีย์ | พฤติกรรมของ Home ที่ request ตอนที่ **Home input ค้าง active อยู่** (แกนยืนบนสวิตช์) |
+|---|---|
+| ไม่เขียนคีย์นี้ / `true` (ค่า default ของ Product) | **รับ request แต่ไม่เคลื่อนที่เลย** — ไม่ส่ง `HM`, `BG`, `ST`; ทำ `DP=0` → `DE=0` → ตรวจทั้งสอง register → คืนเบรกตามลำดับปกติ → `HOME_COMPLETED_ZERO_VERIFIED`, `Homed` + `ZeroVerified` |
+| `false` | ปฏิเสธแบบเดิมทุกตัวอักษร: `HOME_INPUT_ALREADY_ACTIVE`, ไม่ส่ง command ใดเลย, และ H1 run จบที่ `H1_FAILED_HOME` |
+
+- Owner สั่งให้ default เป็น `true` ด้วยเหตุผลเดียวกับ `autoResetEncoderOnHome`: การวางแกนบนสวิตช์ Home ระหว่างรอบเป็น
+  สถานะปกติหน้างาน และ **ไม่บังคับ** ให้ jog ออกจากสวิตช์ก่อนเริ่มรอบ ⇒ **ไฟล์โปรไฟล์ที่ bench ใช้อยู่ไม่ต้องแก้**
+- ทุก precondition เดิมยังทำงานครบและยัง fail-closed เหมือนเดิม: เบรก, ค่า Home, บิต feedback,
+  position tolerance, **แกนต้องหยุดนิ่ง** ภายใต้กฎ freshness — ถ้าตรวจ zero แล้วไม่ลงหลักศูนย์ Home ยัง
+  `HOME_ZERO_VERIFICATION_FAILED` อยู่ดี การอยู่บนสวิตช์ไม่ใช่หลักฐานแทน coordinate ที่ตรวจแล้ว
+- **ไม่มีค่าใดของคีย์นี้สั่งเคลื่อนที่เข้าหาสวิตช์ที่ active** และทั้งสองค่า **ไม่เพิ่มการถอยหลังออกจากสวิตช์
+  (back-off motion)** — เช่นเดียวกับที่ H1 procedure เขียนไว้; ค่า tolerance ใด ๆ ไม่ถูกขยาย
+- หน้าต่าง commissioning มี checkbox ต่อแกน (ติ๊กเป็น default) ซึ่ง Operator **ถอดออก (uncheck) ได้ทางเดียว** ไม่มีทางขยายสิทธิ์ที่
+  โปรไฟล์ปฏิเสธ (รูปแบบเดียวกับช่อง R1)
+- ผลข้างเคียงที่คาดหวังได้ที่ `D-dry`/H1: ถ้าแกนค้างบนสวิตช์ Home การ Commission ครั้งถัดไปจะ **สำเร็จ** แทนที่จะ
+  ถูกปฏิเสธ (เมื่อโปรไฟล์ใช้ default) — ผู้รันต้องอ่านว่านี่คือคำสั่งตัดสินของ Owner ไม่ใช่ความผิดปกติของ sensor
+
+### 2) `D-sim` — ต้นเหตุของ `PUMP_PRESSURE_INPUT_INVALID` และการแก้ (ซอฟต์แวร์อย่างเดียว)
+
+- ที่ bench: `prepare=DRY_PREPARE_READY` ผ่านแล้ว แต่ `dry.Start()` ปฏิเสธด้วย `PUMP_PRESSURE_INPUT_INVALID`
+  พร้อม `pump_evidence_kind=SOFTWARE_SIMULATED`, `simulated_ai003_bar=20`, `physical_pump_verified=False`
+- ต้นเหตุคือ **ตัวตนของ source ไม่ตรง** ไม่ใช่ค่าแรงดันและไม่ใช่ช่องว่างการ poll: gate ที่ใช้หลักฐานแบบ
+  declared ส่ง sample ที่ stamp `AI-003+SOFTWARE_SIMULATED` ขณะที่ composition ยอมรับ identity
+  `PUMP_OUTLET` (ค่าที่วัดจริงจาก AI-003) เท่านั้น
+- การแก้: composition เทียบ sample กับ identity ที่ **boundary ผู้ส่ง sample ประกาศเอง** ผ่าน capability
+  interface ใหม่ (`ICleaningPathDeclaredPumpSource`) — ไม่ได้แก้ contract ชุดอุปกรณ์เดิม, ไม่ได้แตะ
+  `SequencingPressure.PumpReady`, กฎ `Valid` และกฎ `>` เชิงเข้มที่ 15 bar คงเดิม, boundary ที่ไม่ประกาศอะไร
+  (รวมถึงเส้นทาง physical AI-003 ทั้งหมด) ยังปฏิเสธ wrong-source เหมือนเดิม และ sample ที่ "หน้าตาเหมือน"
+  ของ declared แต่มาจาก boundary ที่ไม่ประกาศ ก็ยังถูกปฏิเสธ
+- **สถานะ gate:** `D-sim` ยัง **OPEN** จนกว่า Owner จะ build ที่ head ใหม่แล้วรัน `D-sim` ซ้ำและส่ง transcript
+  ให้ผมตรวจ; คำสั่งรันข้างบน (ข้อ 0.1 + ก้อน `D-sim`) ใช้ได้ตามเดิมโดยไม่ต้องแก้ตัวแปร env ใด ๆ

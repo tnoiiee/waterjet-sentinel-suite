@@ -191,6 +191,85 @@ public sealed class ManualMotionProfileTests
     }
 
     [Fact]
+    public void Home_Is_Accepted_On_An_Active_Input_When_The_Profile_Omits_The_Key()
+    {
+        // The Owner ruled the bench behaviour: an axis parked on the Home switch between runs is normal,
+        // so a profile written before this key existed must keep working unedited and must describe the
+        // acceptance, exactly like the encoder-definition key beside it. A null value is the same decision
+        // as an absent one, and a text value is a malformed profile rather than a truthy string.
+        var profile = Assert.IsType<ManualMotionProfile>(ManualMotionProfileParser.Parse(CompleteProfile).Profile);
+        Assert.True(Assert.IsType<ManualMotionAxisProfile>(profile.AxisA).AcceptHomeWhenInputActive);
+
+        var axisB = Assert.IsType<ManualMotionAxisProfile>(profile.AxisB);
+        Assert.True(axisB.AcceptHomeWhenInputActive);
+
+        // Deliberately not a NOT_CONFIGURED item: an absent key is a ruling, not a missing commissioning
+        // value, so it can never become a blocker in the not-configured census of an axis.
+        Assert.DoesNotContain("acceptHomeWhenInputActive", axisB.NotConfiguredItems());
+
+        const string nulled = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "acceptHomeWhenInputActive": null
+                }
+              }
+            }
+            """;
+
+        var accepted = ManualMotionProfileParser.Parse(nulled);
+        Assert.True(accepted.Accepted);
+        Assert.True(Assert.IsType<ManualMotionProfile>(accepted.Profile).AxisA!.AcceptHomeWhenInputActive);
+
+        var textValue = nulled.Replace(
+            "\"acceptHomeWhenInputActive\": null",
+            "\"acceptHomeWhenInputActive\": \"yes\"",
+            StringComparison.Ordinal);
+        var refusedByText = ManualMotionProfileParser.Parse(textValue);
+        Assert.False(refusedByText.Accepted);
+        Assert.Null(refusedByText.Profile);
+        Assert.Equal(ManualMotionCodes.ProfileValueInvalid, refusedByText.Code);
+    }
+
+    [Fact]
+    public void The_Profile_Can_Refuse_Home_On_An_Active_Input()
+    {
+        // The opt-out is a real one: a commissioning procedure that needs the older refusal - move off the
+        // Home input before Homing - states it in its own profile, and the reader honours it exactly.
+        const string refusedText = """
+            {
+              "schema": "wjss.manual-motion-profile/1",
+              "controller": "WSB1",
+              "session": {},
+              "axes": {
+                "A": {
+                  "brakeOutput": 1,
+                  "acceptHomeWhenInputActive": false
+                }
+              }
+            }
+            """;
+
+        var result = ManualMotionProfileParser.Parse(refusedText);
+        Assert.True(result.Accepted);
+        var profile = Assert.IsType<ManualMotionProfile>(result.Profile);
+        var axis = Assert.IsType<ManualMotionAxisProfile>(profile.AxisA);
+        Assert.False(axis.AcceptHomeWhenInputActive);
+        Assert.Equal(1, axis.BrakeOutput);
+
+        // The two optional Home keys stay independent: refusing one never implies the other, and a profile
+        // that says nothing about the encoder definition keeps the ruled default.
+        Assert.True(axis.AutoResetEncoderOnHome);
+        Assert.False(axis.DualZeroPermitted);
+        Assert.Contains("dualZeroPermitted", axis.NotConfiguredItems());
+        Assert.DoesNotContain("acceptHomeWhenInputActive", axis.NotConfiguredItems());
+    }
+
+    [Fact]
     public void Only_The_Listed_Axes_Are_Allowed()
     {
         // A self-contained one-axis profile (no multi-line excerpt of CompleteProfile, so this test

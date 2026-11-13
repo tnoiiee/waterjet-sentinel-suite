@@ -675,3 +675,60 @@ That wording authorizes the reviewed two-run procedure as a whole; every one of 
 sessions (four per run) still requires its own explicit Owner start after the prior terminal
 and cleanup review, and Run B still requires the separate explicit Owner start of section 11
 after the Run A terminal review. This document is not that authorization.
+
+## 20. Dated addendum — 2026-11-13 (Home opt-outs are profile-governed; the D-sim Pump seam)
+
+**Appended, not rewritten.** The text of sections 3 and 18 above is kept exactly as written and is not
+edited by this addendum; this section records what changed after it. Trigger: the Owner's R1 and R2
+rulings, recorded with the heads after `4a5fdf7` (`c39bc00`, `5c9a129`, `6b5791e`), plus the Stage
+`D-sim` Run-1 / Run-2 transcripts at field driver `2026-11-21.1`. No hardware is executed by this
+addendum and nothing here authorizes a run.
+
+- **R1 — the encoder definition inside Home (already recorded in section 3).** `DP{axis}=0` then
+  `DE{axis}=0` at the switch, both registers verified; `autoResetEncoderOnHome` (absent means `true`) is
+  the profile authority and an Operator may only narrow it. Closed at the bench: `prepare=DRY_PREPARE_READY`
+  on WSB1 axes A and B.
+- **R2 — the `HOME_INPUT_ALREADY_ACTIVE` refusal is now profile-governed.** The sentence of section 3
+  ("this repair deliberately adds no back-off motion and **no automatic already-at-home acceptance**") and
+  the matching sentence of section 18 described a **fixed** refusal. That is superseded in one direction
+  only: a new per-axis profile key `acceptHomeWhenInputActive` decides what a Home request that arrives
+  while the Home input is already active does.
+  - `acceptHomeWhenInputActive: false` — the refusal of sections 3 and 18, verbatim: `HOME_INPUT_ALREADY_ACTIVE`,
+    no native command of any kind dispatched, and the H1 run reaching `H1_FAILED_HOME` with that typed
+    primary cause. This is the reading this procedure was written against, so the H1 dry-commissioning
+    scenarios that assert it pass `acceptHomeWhenInputActive: false` to their own synthetic profile and
+    keep every assertion unchanged.
+  - `acceptHomeWhenInputActive` **absent or `true`** (the Product default, ruled by the Owner 2026-11-12
+    on the same grounds as `autoResetEncoderOnHome`: an axis parked on its Home switch between runs is a
+    normal bench state, and the Owner must not be forced to jog an axis off the switch to start a run) —
+    the request is **accepted**, and the Home is completed **without any travel**: no `HM` home-speed set,
+    no `BG` begin, no `ST` stop is dispatched, because there is nothing to start and nothing to stop. The
+    operation still runs the ordinary brake release, `DP{axis}=0`, `DE{axis}=0`, the two-register
+    verification and the brake re-apply, and reports `HOME_COMPLETED_ZERO_VERIFIED` / `Homed` + `ZeroVerified`.
+  - **What neither setting changes:** every precondition still runs fail-closed before any of this —
+    brake configured, Home parameters configured, feedback bits configured, position tolerance present,
+    and the axis **stationary** under the freshness rules. A zero verification that does not land at zero
+    still fails the Home (`HOME_ZERO_VERIFICATION_FAILED`) even though the switch was active; being on the
+    switch is never a substitute for a verified coordinate. No tolerance is widened anywhere, and no
+    value of this key ever starts a move **into** an active switch — the accepted route dispatches no
+    motion at all, and **back-off motion remains absent in both settings**.
+  - **Second Commission on axes at rest on the switches (the `491ff`-era scenario of section 3):** with
+    the profile refusing it, the transcript is the typed terminal failure above; with the Product default
+    it is a Home that redefines and re-verifies zero at the switch, and the trial's coordinate-readiness
+    precondition is therefore satisfied without an explicit jog-off step. The recovery instruction "move
+    the affected axis off the Home input … and start Commission/Home again" remains valid for a profile
+    that sets `false`, and is unnecessary (never forbidden, just unnecessary) under the default.
+- **An Operator surface can only narrow the permission.** The commissioning window carries a per-axis
+  box, checked by default and cleared and locked by a profile that refuses the acceptance, exactly like
+  the R1 encoder box; it can never widen a profile refusal.
+- **`D-sim` Pump seam (software fix, same commit).** The `D-sim` failure at the bench
+  (`dry.Start()` → `PUMP_PRESSURE_INPUT_INVALID` with `pump_evidence_kind=SOFTWARE_SIMULATED`) was a
+  source-identity mismatch inside the composition, not a pressure value and not a polling gap: the
+  declared-evidence gate serves its sample with the identity `AI-003+SOFTWARE_SIMULATED`, while the
+  composition accepted only the measured `PUMP_OUTLET` identity. The composition now compares the sample
+  against the identity that the *serving boundary itself* declares, through a new capability interface
+  that the shared equipment contract does not carry; the strict `>` setpoint rule, the `Valid` quality
+  rules and every other refusal (including a boundary that declares nothing, and the physical AI-003
+  route) are unchanged. The D-sim evidence continues to print the declared identity and
+  `physical_pump_verified=False`. This document records a software repair only: **`D-sim` remains OPEN
+  until the Owner re-runs it on the new head and the transcript is reviewed.**

@@ -40,10 +40,14 @@ internal sealed class H1DryCommissioningHarness
         string assignedIsolationValveId = Wsb1ValveId,
         string? overrideWaterJetId = null,
         int horizontalSpeed = 400000,
-        int verticalSpeed = 200000)
+        int verticalSpeed = 200000,
+        bool acceptHomeWhenInputActive = true)
     {
         Clock = new TestClock(Instant);
-        Profile = CleaningPathExecutionHarness.CreatePathProfile(horizontalSpeed, verticalSpeed);
+        Profile = CleaningPathExecutionHarness.CreatePathProfile(
+            horizontalSpeed,
+            verticalSpeed,
+            acceptHomeWhenInputActive: acceptHomeWhenInputActive);
         Port = new ManualMotionSimulatedPort(Clock, Profile, options);
         Session = new ManualMotionSession(Port, ManualMotionProfileResult.FromProfile(Profile), Clock);
 

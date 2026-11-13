@@ -292,13 +292,36 @@ internal sealed class CleaningPathExecutionHarness
         _ => "D",
     };
 
+    /// <summary>
+    /// The synthetic path profile. <paramref name="acceptHomeWhenInputActive"/> is a per-scenario opt-out
+    /// of the ruled bench default, and it exists so a procedure that pins the fail-closed refusal of a
+    /// Home that arrives on an active switch keeps pinning it: a test that needs that refusal states it
+    /// here, and every other scenario follows the profile default that the Owner ruled.
+    /// </summary>
     internal static ManualMotionProfile CreatePathProfile(
         int horizontalSpeed,
         int verticalSpeed,
         int horizontalMoveTimeoutMilliseconds = 20000,
-        int verticalMoveTimeoutMilliseconds = 20000)
+        int verticalMoveTimeoutMilliseconds = 20000,
+        bool acceptHomeWhenInputActive = true)
     {
         var simulation = ManualMotionProfile.CreateSimulationProfile();
+
+        // The built-in simulation profile is a test dependency, so a missing axis is a harness defect and
+        // is reported as one instead of being tolerated by a null profile.
+        ManualMotionAxisProfile Axis(ManualMotionAxisProfile? axis, string letter) => axis
+            ?? throw new InvalidOperationException(
+                string.Concat("The built-in simulation profile must provide Axis ", letter, "."));
+
+        var axisA = PathAxis(1, horizontalSpeed, horizontalMoveTimeoutMilliseconds, Axis(simulation.AxisA, "A"),
+            acceptHomeWhenInputActive);
+        var axisB = PathAxis(2, verticalSpeed, verticalMoveTimeoutMilliseconds, Axis(simulation.AxisB, "B"),
+            acceptHomeWhenInputActive);
+        var axisC = PathAxis(3, horizontalSpeed, horizontalMoveTimeoutMilliseconds, Axis(simulation.AxisC, "C"),
+            acceptHomeWhenInputActive);
+        var axisD = PathAxis(4, verticalSpeed, verticalMoveTimeoutMilliseconds, Axis(simulation.AxisD, "D"),
+            acceptHomeWhenInputActive);
+
         return new ManualMotionProfile
         {
             Source = simulation.Source,
@@ -307,10 +330,10 @@ internal sealed class CleaningPathExecutionHarness
             ObservationFreshnessMilliseconds = simulation.ObservationFreshnessMilliseconds,
             JogHeartbeatTimeoutMilliseconds = simulation.JogHeartbeatTimeoutMilliseconds,
             JogMaximumHoldMilliseconds = simulation.JogMaximumHoldMilliseconds,
-            AxisA = PathAxis(1, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisA ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis A.")),
-            AxisB = PathAxis(2, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisB ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis B.")),
-            AxisC = PathAxis(3, horizontalSpeed, horizontalMoveTimeoutMilliseconds, simulation.AxisC ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis C.")),
-            AxisD = PathAxis(4, verticalSpeed, verticalMoveTimeoutMilliseconds, simulation.AxisD ?? throw new InvalidOperationException("The built-in simulation profile must provide Axis D.")),
+            AxisA = axisA,
+            AxisB = axisB,
+            AxisC = axisC,
+            AxisD = axisD,
         };
     }
 
@@ -323,7 +346,8 @@ internal sealed class CleaningPathExecutionHarness
         int brakeOutput,
         int moveSpeed,
         int moveTimeoutMilliseconds,
-        ManualMotionAxisProfile simulation) => new()
+        ManualMotionAxisProfile simulation,
+        bool acceptHomeWhenInputActive) => new()
     {
         BrakeOutput = brakeOutput,
         BrakeReleaseAction = simulation.BrakeReleaseAction,
@@ -344,6 +368,8 @@ internal sealed class CleaningPathExecutionHarness
         HomeStatusBit = simulation.HomeStatusBit,
         HomeActiveValue = simulation.HomeActiveValue,
         DualZeroPermitted = simulation.DualZeroPermitted,
+        AutoResetEncoderOnHome = simulation.AutoResetEncoderOnHome,
+        AcceptHomeWhenInputActive = acceptHomeWhenInputActive,
     };
 
     /// <summary>Per-axis simulation overrides for one axis letter (A..D), simulation-only.</summary>

@@ -1,5 +1,6 @@
 using Wjss.Runtime;
 using Wjss.Runtime.Core.CleaningPath.Composition;
+using Wjss.Runtime.Core.CleaningPath.Execution;
 using Wjss.Runtime.Core.Sequencing;
 using Wjss.Time;
 using Xunit;
@@ -202,6 +203,93 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
         Assert.Contains("DECLARED PUMP-READY EVIDENCE", text, StringComparison.Ordinal);
     }
 
+        // --------------------------------------------------- the seam the D-sim run died on
+    //
+    // Everything above is decorator semantics, and that is exactly how the wrong-source refusal shipped:
+    // the gate was proven on its own, the composition was proven with a boundary that serves the measured
+    // identity, and no test ever put the two together. The two facts below compose the real gate with the
+    // real production coordinator, so the accepted identity of a declared source and the refusal of every
+    // other source are pinned at the seam where they are decided. The Motion boundary is a probe that the
+    // Pump-ready stage must never reach: a composition that started asking Motion questions before it had
+    // judged the Pump evidence would throw here instead of passing quietly.
+
+    [Fact]
+    public void The_Real_Composition_Accepts_The_Identity_The_Real_Gate_Declares()
+    {
+        var inner = new FakeBoundary();
+        CleaningPathSimulatedPumpReadyGate gate = Gate(inner);
+
+        var outcome = StartComposition(gate);
+
+        Assert.NotNull(outcome.PumpReadiness);
+        Assert.True(outcome.PumpReadiness!.Ready);
+        Assert.Equal(CleaningPathCompositionCodes.PumpReadyAccepted, outcome.PumpReadiness.Code);
+        Assert.Equal(Declared, outcome.PumpReadiness.Sample!.Bar);
+        Assert.Equal(CleaningPathSimulatedPumpReadyGate.DeclaredPressureSourceId, outcome.PumpReadiness.Sample.SourceId);
+
+        // Acceptance never upgrades the identity: the composition records the declared sample exactly as
+        // the gate served it, so the transcript still reads AI-003 + SOFTWARE_SIMULATED rather than a
+        // measured Pump Outlet observation.
+        Assert.NotEqual(PressureSample.PumpOutletSource, outcome.PumpReadiness.Sample.SourceId);
+        Assert.False(outcome.Started);
+
+        // The refusal that follows is the next stage's own precondition (no accepted Phase 3A snapshot is
+        // supplied to this fact on purpose), which proves the decision really moved past the Pump gate.
+        Assert.Equal(CleaningPathExecutionCodes.StartRefusedSnapshotNotAccepted, outcome.Code);
+
+        // The declared value short-circuits the transport: the inner boundary was never asked for Pump
+        // pressure by this decision, so nothing here can be read as a measurement.
+        Assert.Equal(0, inner.PumpPressureReads);
+        Assert.Empty(inner.ValveRequests);
+    }
+
+    [Fact]
+    public void The_Real_Composition_Keeps_Judging_Any_Other_Boundary_By_The_Measured_Identity()
+    {
+        // Same value, same quality, same thresholds - only the source identity and the absence of a
+        // declaration differ. The physical route therefore stays byte-for-byte as strict as it was before
+        // the declared-source clause existed, and a boundary that declares nothing can never satisfy
+        // Pump-ready with a non-Pump-Outlet identity.
+        var accepted = StartComposition(new PlainPumpBoundary(
+            Sample(Declared, PressureSample.PumpOutletSource)));
+        Assert.True(accepted.PumpReadiness!.Ready);
+        Assert.Equal(CleaningPathCompositionCodes.PumpReadyAccepted, accepted.PumpReadiness.Code);
+
+        var forged = StartComposition(new PlainPumpBoundary(
+            Sample(Declared, CleaningPathSimulatedPumpReadyGate.DeclaredPressureSourceId)));
+        Assert.False(forged.Started);
+        Assert.False(forged.PumpReadiness!.Ready);
+        Assert.Equal(SequencingCodes.PumpPressureInputInvalid, forged.PumpReadiness.Code);
+        Assert.Equal(CleaningPathSimulatedPumpReadyGate.DeclaredPressureSourceId, forged.PumpReadiness.Sample!.SourceId);
+
+        // And the value rule is not relaxed for a boundary that does declare: at the setpoint exactly, a
+        // declared source is PUMP_NOT_READY, never an acceptance.
+        var atSetpoint = StartComposition(new DeclaringPumpBoundary(
+            Sample(Setpoint, CleaningPathSimulatedPumpReadyGate.DeclaredPressureSourceId)));
+        Assert.False(atSetpoint.Started);
+        Assert.Equal(SequencingCodes.PumpNotReady, atSetpoint.PumpReadiness!.Code);
+    }
+
+    /// <summary>
+    /// A GOOD, non-stale, UTC-stamped sample at one bar value under one identity. DateTimeOffset.UtcNow
+    /// carries a zero offset, which is what the shared validity rule demands of every accepted sample.
+    /// </summary>
+    private static PressureSample Sample(double bar, string sourceId) =>
+        new(bar, PressureQuality.GOOD, false, DateTimeOffset.UtcNow, sourceId);
+
+    private static CleaningPathCompositionStartOutcome StartComposition(ICleaningPathEquipmentBoundary equipment)
+    {
+        var composition = new CleaningPathCompositionCoordinator(new CompositionMotionProbe(), equipment, new SystemClock());
+        return composition.Start(
+            null,
+            null,
+            new CleaningPathCompositionRequest
+            {
+                PressureThresholds = new SequencingPressureThresholds(),
+                ValveSupervisionTimeout = TimeSpan.FromMilliseconds(500),
+            });
+    }
+
     private static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -252,5 +340,82 @@ public sealed class CleaningPathSimulatedPumpReadyGateTests
             LowerReads += 1;
             return Lower;
         }
+    }
+
+    /// <summary>Serves one fixed Pump sample and declares nothing.</summary>
+    private sealed class PlainPumpBoundary : ICleaningPathEquipmentBoundary
+    {
+        private readonly PressureSample? _sample;
+
+        internal PlainPumpBoundary(PressureSample? sample) => _sample = sample;
+
+        public PressureSample? ReadPumpOutletPressure() => _sample;
+
+        public void RequestValve(CleaningPathValveCommandRequest request) => throw new NotSupportedException();
+
+        public PressureSample? ReadValveOutletPressure(string valveId) => null;
+
+        public bool ReadUpperLimitDetected(string valveId) => false;
+
+        public bool ReadLowerLimitDetected(string valveId) => false;
+    }
+
+    /// <summary>
+    /// The same served sample plus the capability the real gate publishes: declared identity and declared
+    /// value stay separate knobs so a test can prove the declaration admits its own identity only.
+    /// </summary>
+    private sealed class DeclaringPumpBoundary : ICleaningPathEquipmentBoundary, ICleaningPathDeclaredPumpSource
+    {
+        private readonly PressureSample? _sample;
+
+        internal DeclaringPumpBoundary(PressureSample? sample) => _sample = sample;
+
+        public string AcceptedPumpReadySourceId => CleaningPathSimulatedPumpReadyGate.DeclaredPressureSourceId;
+
+        public PressureSample? ReadPumpOutletPressure() => _sample;
+
+        public void RequestValve(CleaningPathValveCommandRequest request) => throw new NotSupportedException();
+
+        public PressureSample? ReadValveOutletPressure(string valveId) => null;
+
+        public bool ReadUpperLimitDetected(string valveId) => false;
+
+        public bool ReadLowerLimitDetected(string valveId) => false;
+    }
+
+    /// <summary>
+    /// A Motion boundary that fail-closed answers every readiness question with "no" and throws if the
+    /// Pump-ready stage ever drives it. The Pump decision must be taken, and refused, before any Motion
+    /// request exists; a probe that never gets touched is part of what this pair of facts proves.
+    /// </summary>
+    private sealed class CompositionMotionProbe : ICleaningPathMotionBoundary
+    {
+        public bool SessionReady => false;
+
+        public bool SessionFaulted => false;
+
+        public bool AxisAllowed(CleaningPathExecutionRole role) => false;
+
+        public bool AxisMoveReady(CleaningPathExecutionRole role) => false;
+
+        public bool BeginExecutionEvidenceWindow() => false;
+
+        public CleaningPathMotionAxisFrame Frame(CleaningPathExecutionRole role) =>
+            throw new NotSupportedException("the Pump-ready stage may not touch Motion");
+
+        public IReadOnlyList<CleaningPathMotionEvent> DrainEvents() =>
+            throw new NotSupportedException("the Pump-ready stage may not touch Motion");
+
+        public void RequestMove(CleaningPathExecutionRole role, int targetNative) =>
+            throw new NotSupportedException("the Pump-ready stage may not touch Motion");
+
+        public void RequestStop(CleaningPathExecutionRole role) =>
+            throw new NotSupportedException("the Pump-ready stage may not touch Motion");
+
+        public void RequestClose() =>
+            throw new NotSupportedException("the Pump-ready stage may not touch Motion");
+
+        public void Step() =>
+            throw new NotSupportedException("the Pump-ready stage may not touch Motion");
     }
 }

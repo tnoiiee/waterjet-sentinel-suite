@@ -57,6 +57,14 @@ public sealed class ManualMotionAxisSnapshot
     /// </summary>
     public bool AutoResetEncoderOnHome { get; init; }
 
+    /// <summary>
+    /// True when the Owner-local profile permits Home while the home input is already active, which is
+    /// also the value a profile that omits the key carries. False means such a request is refused and the
+    /// Operator must move the axis off the input first. This is a profile permission about one request,
+    /// never a claim that the input is or is not active: the input state stays the separate reading below.
+    /// </summary>
+    public bool AcceptHomeWhenInputActive { get; init; }
+
     /// <summary>The brake COMMAND state (never the physical brake).</summary>
     public required ManualMotionBrakeCommandState BrakeCommandState { get; init; }
 

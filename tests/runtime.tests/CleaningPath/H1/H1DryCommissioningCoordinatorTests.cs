@@ -456,8 +456,12 @@ public sealed class H1DryCommissioningCoordinatorTests
     [Fact]
     public void Home_Input_Already_Active_Reaches_Terminal_Failure()
     {
+        // The profile opts this scenario out of the accepted-at-switch Home, which is what a dry
+        // commissioning procedure needs: the refusal below is the guarantee the procedure states, so it
+        // is pinned on the profile that refuses it rather than on a default a later ruling could change.
         var harness = new H1DryCommissioningHarness(
-            options: new ManualMotionSimulationOptions { StartPositionA = 0m });
+            options: new ManualMotionSimulationOptions { StartPositionA = 0m },
+            acceptHomeWhenInputActive: false);
         harness.OpenAndObserve();
         Assert.Equal(ManualMotionInterpretation.Active, harness.Session.Snapshot.Axes[0].HomeInput);
 
@@ -483,7 +487,8 @@ public sealed class H1DryCommissioningCoordinatorTests
     public void Home_Input_Already_Active_At_Baseline_Reaches_Terminal_Failure()
     {
         var harness = new H1DryCommissioningHarness(
-            options: new ManualMotionSimulationOptions { StartPositionA = 0m });
+            options: new ManualMotionSimulationOptions { StartPositionA = 0m },
+            acceptHomeWhenInputActive: false);
         harness.OpenAndObserve();
 
         // A prior refused Home attempt leaves the typed refusal code as the axis outcome baseline:
@@ -511,11 +516,18 @@ public sealed class H1DryCommissioningCoordinatorTests
     [Fact]
     public void Second_Commission_While_Axes_Rest_On_The_Home_Input_Fails_Closed()
     {
-        var harness = CommissionedHarness();
+        // The profile of this scenario refuses a Home that arrives on an active input, which is the
+        // reading the H1 procedure states: a second Commission on axes that are resting on their Home
+        // switches fails closed, and the bench default of accepting it is what a procedure has to
+        // opt out of explicitly when it needs this guarantee.
+        var harness = CommissionedHarness(acceptHomeWhenInputActive: false);
         var homeCount = harness.CommandsOf(ManualMotionPortCommandKind.Home).Count;
 
-        // After a verified Home both axes rest on their Home switches: a second Commission/Home
-        // is refused fail-closed and the active input is never treated as a completed Home.
+        // After a verified Home both axes rest on their Home switches: with this profile the second
+        // Commission/Home is refused fail-closed and the active input is never treated as a completed
+        // Home. The refusal is profile-governed (acceptHomeWhenInputActive), so a bench profile that
+        // keeps the ruled default accepts the request without traveling, and neither behaviour turns an
+        // active input into a completed Home.
         Assert.True(harness.StartCommission().Started);
         harness.DriveUntilTerminal();
 
@@ -914,9 +926,9 @@ public sealed class H1DryCommissioningCoordinatorTests
     }
 
     /// <summary>One harness whose Commission/Home action completed with verified coordinates.</summary>
-    private static H1DryCommissioningHarness CommissionedHarness()
+    private static H1DryCommissioningHarness CommissionedHarness(bool acceptHomeWhenInputActive = true)
     {
-        var harness = new H1DryCommissioningHarness();
+        var harness = new H1DryCommissioningHarness(acceptHomeWhenInputActive: acceptHomeWhenInputActive);
         harness.OpenAndObserve();
         harness.CommissionOnly();
         return harness;
