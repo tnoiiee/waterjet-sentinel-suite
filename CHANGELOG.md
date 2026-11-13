@@ -68,11 +68,12 @@ process-io 110/110; mapping-config 261 passed with the 7 recorded skips; `apps/m
 tools/process-io-evidence 21/21; tools/tc-bench 19/19; boundary-scan's own suite 33/33 — 0 failures repo-wide.
 NOT run here, as before: `.NET` restore/build/test (no SDK in the Agent sandbox), the launcher, and any browser
 render. Expected Owner-local result: the same `0 warnings / 0 errors` build, now additionally gated by
-`VerifyOperatorUiOutput`. `tests/api.tests/OperatorPresentationHostingTests.cs` carries **11** `[Fact]` members where
-the previous revision carried 8 (the exact-text assertion replaced by two, and two further facts added), so the total moves by
-three: **1920** tests, `failed: 0`. That figure is arithmetic on the diff, not a run: the Agent sandbox has no `.NET`
-SDK, and this repository counts theories by their expanded cases, so the number above is a claim to be checked by the
-Owner's `dotnet test -c Release`, not evidence of one.
+`VerifyOperatorUiOutput`. `tests/api.tests/OperatorPresentationHostingTests.cs` carries **11** `[Fact]` members
+where the previous revision carried 8 (the exact-text assertion replaced by two, and two further facts added), so the
+total moves by three: **1920** tests, `failed: 0`. That figure is arithmetic on the diff, not a run: the Agent sandbox
+has no `.NET` SDK, and this repository counts theories by their expanded cases, so the number above is a claim to be
+checked by the Owner's `dotnet test -c Release`, not evidence of one.
+
 ### 2026-11-15 — Stage 0.4C-K4 Operator presentation and its hosting slice (PR #46, OPEN with MERGE HOLD; software and documentation only; NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
 
 **Status: one consolidated commit on branch `arena/c52177ef-waterjet-sentinel-suite` from the approved base
