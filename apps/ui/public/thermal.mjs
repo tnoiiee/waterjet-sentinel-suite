@@ -56,49 +56,54 @@ export function renderThermal(host, snapshot, sensorId) {
   const sensor = findSensor(snapshot, sensorId);
   const tc = snapshot ? snapshot.tcAcquisition : null;
 
-  if (sensor) {
-    fact(host, 'sensor', text(sensor.sensorId));
-    fact(host, 'front channel', text(sensor.tcFrontChannel));
-    fact(host, 'rear channel', text(sensor.tcRearChannel));
-    fact(host, 'front minus rear', DFR_UNAVAILABLE, 'warn');
-    fact(host, 'dirty score', text(sensor.dirtyScore === null || sensor.dirtyScore === undefined
-      ? 'NOT_PROVIDED' : Number(sensor.dirtyScore).toFixed(1)));
-    fact(host, 'classification', text(sensor.classification));
-    fact(host, 'quality', text(sensor.quality));
+  const block = document.createElement('div');
+  block.className = 'sub';
+  const title = document.createElement('p');
+  title.className = 'sub-title';
+  title.textContent = 'TC Acquisition Evidence' + (sensor ? ' (' + text(sensor.sensorId) + ')' : '');
+  block.appendChild(title);
+
+  const dl = document.createElement('dl');
+  dl.className = 'facts';
+  block.appendChild(dl);
+  host.appendChild(block);
+
+  if (!sensor) {
+    fact(dl, 'selection', 'no Sensor selected - paired view follows the wall-map selection', 'mute');
   } else {
-    fact(host, 'selection', 'no Sensor selected - the paired view follows the wall-map selection', 'mute');
+    fact(dl, 'front minus rear', DFR_UNAVAILABLE, 'warn');
   }
 
   if (!tc) {
-    fact(host, 'tc acquisition', 'no acquisition state published', 'mute');
+    fact(dl, 'tc acquisition', 'no acquisition state published', 'mute');
     return;
   }
 
   const physical = tc.physical === true;
   const quarantine = tc.quarantined === true;
-  fact(host, 'node / cabinet', text(tc.nodeId) + ' / ' + text(tc.cabinetId));
-  fact(host, 'provenance', text(tc.provenance), physical ? 'ok' : 'mute');
-  fact(host, 'physical', physical ? 'YES - read from the physical path' : 'no - deterministic simulated evidence',
+  fact(dl, 'node / cabinet', text(tc.nodeId) + ' / ' + text(tc.cabinetId));
+  fact(dl, 'provenance', text(tc.provenance), physical ? 'ok' : 'mute');
+  fact(dl, 'physical', physical ? 'YES - read from physical path' : 'no - simulated evidence',
     physical ? 'ok' : 'warn');
-  fact(host, 'quarantined', text(tc.quarantined), quarantine ? 'bad' : null);
-  fact(host, 'acquisition state', text(tc.acquisitionState),
+  fact(dl, 'quarantined', text(tc.quarantined), quarantine ? 'bad' : null);
+  fact(dl, 'acquisition state', text(tc.acquisitionState),
     String(tc.acquisitionState) === 'ACQUIRED' ? 'ok' : 'warn');
-  fact(host, 'acquired at', timeOf(tc.acquiredAtUtc));
-  fact(host, 'quality', text(tc.quality), String(tc.quality) === 'GOOD' ? 'ok' : 'warn');
-  fact(host, 'diagnostic state', text(tc.diagnosticState));
-  fact(host, 'mapping status', text(tc.mappingStatus));
-  fact(host, 'decode status', text(tc.decodeStatus),
+  fact(dl, 'acquired at', timeOf(tc.acquiredAtUtc));
+  fact(dl, 'tc quality', text(tc.quality), String(tc.quality) === 'GOOD' ? 'ok' : 'warn');
+  fact(dl, 'diagnostic state', text(tc.diagnosticState));
+  fact(dl, 'mapping status', text(tc.mappingStatus));
+  fact(dl, 'decode status', text(tc.decodeStatus),
     String(tc.decodeStatus).indexOf('NOT_VERIFIED') >= 0 ? 'warn' : null);
-  fact(host, 'words copied', text(tc.copiedWordCount));
+  fact(dl, 'words copied', text(tc.copiedWordCount));
 
   const evidence = tc.physicalEvidence;
   if (evidence && typeof evidence === 'object') {
-    fact(host, 'endpoint identity', text(evidence.endpointIdentity));
-    fact(host, 'read profile', text(evidence.readProfile));
-    fact(host, 'mapping evidence', text(evidence.mappingEvidenceState));
-    fact(host, 'commissioning state', text(evidence.commissioningState));
+    fact(dl, 'endpoint identity', text(evidence.endpointIdentity));
+    fact(dl, 'read profile', text(evidence.readProfile));
+    fact(dl, 'mapping evidence', text(evidence.mappingEvidenceState));
+    fact(dl, 'commissioning state', text(evidence.commissioningState));
   } else {
-    fact(host, 'physical evidence', 'absent from this publication (serialized only for the physical path)', 'mute');
+    fact(dl, 'physical evidence', 'absent (serialized only on physical path)', 'mute');
   }
 
   const notVerified = Array.isArray(tc.notVerified) ? tc.notVerified : [];
@@ -106,7 +111,7 @@ export function renderThermal(host, snapshot, sensorId) {
   list.textContent = 'not verified';
   const items = document.createElement('dd');
   if (notVerified.length === 0) {
-    items.textContent = 'the host declared nothing outstanding';
+    items.textContent = 'none outstanding';
     items.dataset.tone = 'mute';
   } else {
     const box = document.createElement('span');
@@ -118,16 +123,15 @@ export function renderThermal(host, snapshot, sensorId) {
     }
     items.appendChild(box);
   }
-  host.appendChild(list);
-  host.appendChild(items);
+  dl.appendChild(list);
+  dl.appendChild(items);
 
   const note = document.createElement('dt');
   note.textContent = 'reading rule';
   const noteValue = document.createElement('dd');
   noteValue.dataset.tone = 'mute';
   noteValue.textContent = 'Copied words are process-image state, not proof of a field device. A decode '
-    + 'status that says NOT_VERIFIED is shown as it is: the presentation adds no engineering unit '
-    + 'and no temperature of its own.';
-  host.appendChild(note);
-  host.appendChild(noteValue);
+    + 'status of NOT_VERIFIED is shown as published with no added engineering unit or temperature.';
+  dl.appendChild(note);
+  dl.appendChild(noteValue);
 }

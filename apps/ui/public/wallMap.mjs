@@ -50,10 +50,122 @@ export function visualOf(sensor) {
   if (quality === 'STALE' || quality === 'DISABLED') {
     return { key: 'stale', marker: '~', label: quality === 'STALE' ? 'STALE' : 'DISABLED' };
   }
+  if (quality === 'UNCERTAIN') {
+    return { key: 'watch', marker: '?', label: 'UNCERTAIN' };
+  }
+  if (quality === 'BAD') {
+    return { key: 'watch', marker: 'x', label: 'BAD DATA' };
+  }
   if (classification === 'DIRTY') return { key: 'dirty', marker: '!', label: 'DIRTY' };
   if (classification === 'CLEANER') return { key: 'clean', marker: '=', label: 'CLEANER' };
-  if (quality === 'BAD') return { key: 'watch', marker: 'x', label: 'BAD DATA' };
   return { key: 'watch', marker: '-', label: classification === 'NOT_CLASSIFIED' ? 'NOT CLASSIFIED' : 'OBSERVE' };
+}
+
+// Strictly mutually exclusive 3-bucket partition over snapshot.sensors[] matching visualOf(sensor).
+// In .NET runtime contracts, Quality.UNCERTAIN retains its last validated CLEANER/DIRTY classification,
+// so summing walls[].cleaner + walls[].dirty + walls[].uncertain double-counts uncertain sensors (> 108).
+// Partitioning each sensor by its rendered visual state guarantees cleaner + dirty + unc === 108 always,
+// while still surfacing the raw published walls[] counters for tooltips and diagnostics.
+export function partitionSensors(sensors, walls) {
+  const rawList = Array.isArray(walls) ? walls : [];
+  const rawByWall = new Map();
+  let rawCleaner = 0;
+  let rawDirty = 0;
+  let rawUncertain = 0;
+  let rawNotClassified = 0;
+  for (const entry of rawList) {
+    if (!entry) continue;
+    const key = String(entry.wall || '').toUpperCase();
+    rawByWall.set(key, entry);
+    rawCleaner += Number(entry.cleaner) || 0;
+    rawDirty += Number(entry.dirty) || 0;
+    rawUncertain += Number(entry.uncertain) || 0;
+    rawNotClassified += Number(entry.notClassified) || 0;
+  }
+
+  const list = Array.isArray(sensors) ? sensors : [];
+  if (list.length === 0) {
+    return {
+      state: 'no data',
+      pills: [],
+      total: 0,
+      expected: EXPECTED_TOTAL,
+      perWall: [],
+      byWall: new Map(),
+      rawBreakdown: 'uncertain ' + String(rawUncertain) + ' + not classified ' + String(rawNotClassified),
+      note: 'SENSOR SET NOT PUBLISHED IN THIS SNAPSHOT',
+    };
+  }
+
+  const byWall = new Map();
+  for (const wallKey of WALL_ORDER) {
+    const raw = rawByWall.get(wallKey) || null;
+    byWall.set(wallKey, {
+      wall: wallKey,
+      total: 0,
+      cleaner: 0,
+      dirty: 0,
+      uncertain: 0,
+      publishedCleaner: raw ? Number(raw.cleaner) || 0 : 0,
+      publishedDirty: raw ? Number(raw.dirty) || 0 : 0,
+      publishedUncertain: raw ? Number(raw.uncertain) || 0 : 0,
+      publishedNotClassified: raw ? Number(raw.notClassified) || 0 : 0,
+      maxScore: raw && typeof raw.maxScore === 'number' ? raw.maxScore : null,
+    });
+  }
+
+  let cleaner = 0;
+  let dirty = 0;
+  let uncertain = 0;
+  for (const sensor of list) {
+    if (!sensor) continue;
+    const wallKey = String(sensor.wall || '').toUpperCase();
+    const bucket = byWall.get(wallKey);
+    const vis = visualOf(sensor);
+    if (vis.key === 'clean') {
+      cleaner += 1;
+      if (bucket) bucket.cleaner += 1;
+    } else if (vis.key === 'dirty') {
+      dirty += 1;
+      if (bucket) bucket.dirty += 1;
+    } else {
+      uncertain += 1;
+      if (bucket) bucket.uncertain += 1;
+    }
+    if (bucket) {
+      bucket.total += 1;
+      if (bucket.maxScore === null && typeof sensor.dirtyScore === 'number' && Number.isFinite(sensor.dirtyScore)) {
+        bucket.maxScore = sensor.dirtyScore;
+      } else if (bucket.maxScore !== null && typeof sensor.dirtyScore === 'number' && sensor.dirtyScore > bucket.maxScore) {
+        bucket.maxScore = sensor.dirtyScore;
+      }
+    }
+  }
+
+  const total = cleaner + dirty + uncertain;
+  const mismatch = total !== EXPECTED_TOTAL;
+  const rawBreakdown = 'raw walls[]: cleaner ' + String(rawCleaner)
+    + ', dirty ' + String(rawDirty)
+    + ', uncertain ' + String(rawUncertain)
+    + ', not classified ' + String(rawNotClassified);
+
+  return {
+    state: mismatch ? 'mismatch' : 'ok',
+    pills: [
+      { key: 'cleaner', label: 'Cleaner', value: cleaner, tone: 'ok' },
+      { key: 'dirty', label: 'Dirty', value: dirty, tone: 'bad' },
+      { key: 'uncertain', label: 'Uncertain', value: uncertain, tone: 'warn' },
+    ],
+    total,
+    expected: EXPECTED_TOTAL,
+    perWall: WALL_ORDER.map((wallKey) => byWall.get(wallKey)),
+    byWall,
+    rawBreakdown,
+    note: mismatch
+      ? 'TOPOLOGY_COUNT_MISMATCH: mutually exclusive tile tally adds to ' + String(total) + ', not ' + String(EXPECTED_TOTAL)
+      : '108 Sensors (mutually exclusive tile states: ' + String(cleaner) + ' clean + ' + String(dirty)
+        + ' dirty + ' + String(uncertain) + ' unc/stale = 108; ' + rawBreakdown + ')',
+  };
 }
 
 export function alarmOf(sensor) {
@@ -200,14 +312,6 @@ function sideFooterCard(label, statusText) {
   return card;
 }
 
-function wallSummaryOf(snapshot, wall) {
-  const summaries = snapshot && Array.isArray(snapshot.walls) ? snapshot.walls : [];
-  for (const entry of summaries) {
-    if (entry && String(entry.wall || '').toUpperCase() === wall) return entry;
-  }
-  return null;
-}
-
 function deviceNote(wall, snapshot) {
   const jets = Array.isArray(snapshot.waterJets) ? snapshot.waterJets : [];
   const targeted = jets.filter((jet) => String(jet.targetWall || '').toUpperCase() === wall);
@@ -309,15 +413,15 @@ function halfGrid(wall, slots, sensorById, rows, selectedId, queuePosMap, onSele
   return grid;
 }
 
-function cleanlinessBar(summary) {
+function cleanlinessBar(bucket) {
   const wrap = document.createElement('div');
   wrap.className = 'wall-bar-wrap num';
   const bar = document.createElement('div');
   bar.className = 'wall-bar';
 
-  const dirty = summary ? Number(summary.dirty) || 0 : 0;
-  const unc = summary ? (Number(summary.uncertain) || 0) + (Number(summary.notClassified) || 0) : 0;
-  const clean = summary ? Number(summary.cleaner) || 0 : 0;
+  const dirty = bucket ? Number(bucket.dirty) || 0 : 0;
+  const unc = bucket ? Number(bucket.uncertain) || 0 : 0;
+  const clean = bucket ? Number(bucket.cleaner) || 0 : 0;
 
   for (const [cls, count] of [['dirty', dirty], ['unc', unc], ['clean', clean]]) {
     if (count > 0) {
@@ -332,12 +436,12 @@ function cleanlinessBar(summary) {
   const labels = document.createElement('div');
   labels.className = 'wall-bar-labels';
   const left = document.createElement('span');
-  left.textContent = summary
+  left.textContent = bucket
     ? 'D:' + String(dirty) + ' | U:' + String(unc) + ' | C:' + String(clean)
     : 'Wall summary unavailable';
   const right = document.createElement('span');
-  right.textContent = summary && typeof summary.maxScore === 'number'
-    ? 'Max ' + summary.maxScore.toFixed(1)
+  right.textContent = bucket && typeof bucket.maxScore === 'number'
+    ? 'Max ' + bucket.maxScore.toFixed(1)
     : 'Max --';
   labels.appendChild(left);
   labels.appendChild(right);
@@ -345,7 +449,7 @@ function cleanlinessBar(summary) {
   return wrap;
 }
 
-function wallBlock(wall, entry, sensorById, snapshot, selectedId, queuePosMap, onSelect) {
+function wallBlock(wall, entry, sensorById, snapshot, selectedId, queuePosMap, bucket, onSelect) {
   const section = document.createElement('section');
   section.className = 'wall-block';
   section.dataset.wall = wall;
@@ -374,7 +478,7 @@ function wallBlock(wall, entry, sensorById, snapshot, selectedId, queuePosMap, o
 
   gridWrap.appendChild(halfGrid(wall, entry.slots, sensorById, LOWER_ROWS, selectedId, queuePosMap, onSelect));
   section.appendChild(gridWrap);
-  section.appendChild(cleanlinessBar(wallSummaryOf(snapshot, wall)));
+  section.appendChild(cleanlinessBar(bucket));
   return section;
 }
 
@@ -452,26 +556,27 @@ export function renderWallMap(host, model, snapshot, selection, onSelect) {
     if (sensor && typeof sensor.sensorId === 'string') sensorById.set(sensor.sensorId, sensor);
   }
   const queuePosMap = queuePositionsMap(snapshot);
+  const tally = partitionSensors(sensors, snapshot.walls);
 
   // Column 1 (4fr): Left Installed Nozzles + LEFT Wall (4x6) + WSB Topology Footer
   const leftCol = document.createElement('div');
   leftCol.className = 'u-col u-col-side';
   leftCol.appendChild(nozzleStrip('LEFT', snapshot));
-  leftCol.appendChild(wallBlock('LEFT', model.walls.get('LEFT'), sensorById, snapshot, selection, queuePosMap, onSelect));
+  leftCol.appendChild(wallBlock('LEFT', model.walls.get('LEFT'), sensorById, snapshot, selection, queuePosMap, tally.byWall.get('LEFT'), onSelect));
   leftCol.appendChild(sideFooterCard('WSB1 / WSB4 Topology (A/C Horiz, B/D Vert)', 'CANONICAL'));
 
   // Column 2 (5.2fr): REAR Wall (5x6) + U-Center Command Hub + FRONT Wall (5x6)
   const centerCol = document.createElement('div');
   centerCol.className = 'u-col u-col-center';
-  centerCol.appendChild(wallBlock('REAR', model.walls.get('REAR'), sensorById, snapshot, selection, queuePosMap, onSelect));
+  centerCol.appendChild(wallBlock('REAR', model.walls.get('REAR'), sensorById, snapshot, selection, queuePosMap, tally.byWall.get('REAR'), onSelect));
   centerCol.appendChild(centerHub(snapshot));
-  centerCol.appendChild(wallBlock('FRONT', model.walls.get('FRONT'), sensorById, snapshot, selection, queuePosMap, onSelect));
+  centerCol.appendChild(wallBlock('FRONT', model.walls.get('FRONT'), sensorById, snapshot, selection, queuePosMap, tally.byWall.get('FRONT'), onSelect));
 
   // Column 3 (4fr): Right Installed Nozzles + RIGHT Wall (4x6) + WSB Topology Footer
   const rightCol = document.createElement('div');
   rightCol.className = 'u-col u-col-side';
   rightCol.appendChild(nozzleStrip('RIGHT', snapshot));
-  rightCol.appendChild(wallBlock('RIGHT', model.walls.get('RIGHT'), sensorById, snapshot, selection, queuePosMap, onSelect));
+  rightCol.appendChild(wallBlock('RIGHT', model.walls.get('RIGHT'), sensorById, snapshot, selection, queuePosMap, tally.byWall.get('RIGHT'), onSelect));
   rightCol.appendChild(sideFooterCard('WSB2 / WSB3 Topology (108 SDS Normal)', '108 / 108'));
 
   host.appendChild(leftCol);

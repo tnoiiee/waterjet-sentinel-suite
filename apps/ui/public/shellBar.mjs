@@ -10,7 +10,9 @@
 // only. The badge either reports what /api/health and /api/v1/runtime say, or it reports that it
 // has not read them yet.
 
+import { text } from './feed.mjs';
 import { EXPECTED_TOTAL, WATER_JETS, summaryPills } from './topology.mjs';
+import { partitionSensors } from './wallMap.mjs';
 
 export const TABS = Object.freeze([
   { key: 1, id: 'main', label: 'Main Control', panel: 'main' },
@@ -70,15 +72,23 @@ export function modeBadge(health, status) {
   if (!health && !status) {
     return { label: 'HOST NOT READ YET', tone: 'warn', detail: 'no liveness answer and no runtime status yet', allowed: false };
   }
-  const profile = health ? health.deviceProfile : status.profile;
-  const acquisition = health ? health.acquisitionMode : 'NOT_REPORTED';
-  const ready = health ? health.ready : status.ready;
-  const stage = health ? health.stageMarker : status.stageMarker;
+  const profile = (health && health.deviceProfile !== undefined && health.deviceProfile !== null)
+    ? health.deviceProfile : (status && status.profile !== undefined ? status.profile : null);
+  const acquisition = (health && health.acquisitionMode !== undefined && health.acquisitionMode !== null)
+    ? health.acquisitionMode : 'NOT_REPORTED';
+  const ready = (health && health.ready !== undefined && health.ready !== null)
+    ? health.ready : (status && status.ready !== undefined ? status.ready : null);
+  const stage = (health && health.stageMarker !== undefined && health.stageMarker !== null)
+    ? health.stageMarker : (status && status.stageMarker !== undefined ? status.stageMarker : null);
+  const profileLabel = text(profile, 'NOT_REPORTED');
+  const acqLabel = text(acquisition, 'NOT_REPORTED');
+  const readyLabel = text(ready, 'NOT_REPORTED');
+  const stageLabel = text(stage, 'NOT_REPORTED');
   if (SIMULATOR_PROFILES.includes(profile)) {
     return {
       label: 'SIMULATOR MODE - OFFLINE LOOPBACK',
       tone: 'info',
-      detail: 'profile ' + String(profile) + ', acquisition ' + String(acquisition) + ', readiness ' + String(ready) + ', stage ' + String(stage),
+      detail: 'profile ' + profileLabel + ', acquisition ' + acqLabel + ', readiness ' + readyLabel + ', stage ' + stageLabel,
       allowed: true,
     };
   }
@@ -86,14 +96,14 @@ export function modeBadge(health, status) {
     return {
       label: 'PRODUCTION PROFILE - NOT AUTHORIZED IN THIS BUILD',
       tone: 'bad',
-      detail: 'the read-only Operator surface does not run against Production; stage ' + String(stage),
+      detail: 'the read-only Operator surface does not run against Production; stage ' + stageLabel,
       allowed: false,
     };
   }
   return {
     label: 'LIVE TELEMETRY - PRODUCTION NOT AUTHORIZED',
     tone: 'warn',
-    detail: 'profile ' + String(profile) + ', acquisition ' + String(acquisition) + ', readiness ' + String(ready) + ', stage ' + String(stage),
+    detail: 'profile ' + profileLabel + ', acquisition ' + acqLabel + ', readiness ' + readyLabel + ', stage ' + stageLabel,
     allowed: false,
   };
 }
@@ -104,7 +114,10 @@ export function diagnosticsBadge(badge) {
     : 'DIAGNOSTICS - UNAVAILABLE: THE HOST DOES NOT REPORT A SIMULATOR PROFILE';
 }
 
-export function pillCounts(walls) {
+export function pillCounts(walls, sensors) {
+  if (Array.isArray(sensors) && sensors.length > 0) {
+    return partitionSensors(sensors, walls);
+  }
   return summaryPills(walls);
 }
 
@@ -182,8 +195,8 @@ export function renderTabStrip(activeId, alarmCount, note, queue) {
   return TABS.length;
 }
 
-export function renderPills(walls) {
-  const result = summaryPills(walls);
+export function renderPills(walls, sensors) {
+  const result = pillCounts(walls, sensors);
   const strip = host('summary-pills');
   if (strip) {
     clear(strip);
@@ -210,9 +223,10 @@ export function renderPills(walls) {
       }
     }
     strip.dataset.count = String(result.pills.length);
+    const detail = result.rawBreakdown || result.breakdown || '';
     strip.setAttribute('title', result.state === 'mismatch'
       ? result.note
-      : 'sum of the published per-wall subtotals; full breakdown in System and Trends: ' + result.breakdown);
+      : 'Mutually exclusive 108-SDS tile states (sum = ' + String(result.total) + '); ' + detail);
     strip.dataset.note = result.state;
   }
   setText('pills-note', result.note);

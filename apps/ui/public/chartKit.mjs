@@ -24,12 +24,52 @@ export const SERIES_TOKENS = Object.freeze({
   gap: '--series-gap',
 });
 
+// HiDPI canvas sizing: measures the laid-out CSS box when present, resizes the backing store by
+// devicePixelRatio (capped at 3x), applies a matching transform, and returns logical CSS pixel
+// dimensions. Falls back safely to the canvas attribute dimensions in headless / Fake-DOM runs.
+export function prepareCanvas(canvas, fallbackW, fallbackH) {
+  if (!canvas || typeof canvas.getContext !== 'function') return null;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  let cssW = 0;
+  let cssH = 0;
+  if (typeof canvas.getBoundingClientRect === 'function') {
+    const rect = canvas.getBoundingClientRect();
+    if (rect && Number.isFinite(rect.width) && Number.isFinite(rect.height)) {
+      cssW = Math.round(rect.width);
+      cssH = Math.round(rect.height);
+    }
+  }
+  if (cssW < 40 && typeof canvas.clientWidth === 'number' && canvas.clientWidth >= 40) {
+    cssW = Math.round(canvas.clientWidth);
+  }
+  if (cssH < 40 && typeof canvas.clientHeight === 'number' && canvas.clientHeight >= 40) {
+    cssH = Math.round(canvas.clientHeight);
+  }
+  if (cssW < 40) cssW = Math.max(40, Number(fallbackW) || Number(canvas.width) || 320);
+  if (cssH < 40) cssH = Math.max(40, Number(fallbackH) || Number(canvas.height) || 140);
+
+  const rawDpr = typeof window !== 'undefined' && typeof window.devicePixelRatio === 'number'
+    && Number.isFinite(window.devicePixelRatio) && window.devicePixelRatio > 0
+    ? window.devicePixelRatio : 1;
+  const dpr = Math.min(3, Math.max(1, rawDpr));
+
+  const targetW = Math.round(cssW * dpr);
+  const targetH = Math.round(cssH * dpr);
+  if (canvas.width !== targetW) canvas.width = targetW;
+  if (canvas.height !== targetH) canvas.height = targetH;
+
+  if (typeof ctx.setTransform === 'function') {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  return { ctx, width: cssW, height: cssH, dpr };
+}
+
 export function contextOf(canvas) {
   if (!canvas || typeof canvas.getContext !== 'function') return null;
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
-  // A canvas that is only 1 pixel tall or wide means the layout has not settled; drawing into it
-  // would produce a line no one can read, so the caller is told to skip this frame.
   if (canvas.width < 40 || canvas.height < 40) return null;
   return ctx;
 }
@@ -38,6 +78,32 @@ export function token(ctx, name, fallback) {
   if (typeof document === 'undefined' || !document.documentElement) return fallback;
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value === '' ? fallback : value;
+}
+
+// Convert Unix epoch seconds (TrendPoint.T in .NET), epoch ms, numeric string, or ISO-8601 string
+// to finite Unix epoch seconds.
+export function epochSecondsOf(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value > 1e11 ? value / 1000 : value;
+  }
+  if (typeof value === 'string' && value.length > 0) {
+    if (/^\d{9,13}$/.test(value)) {
+      const n = Number(value);
+      return n > 1e11 ? n / 1000 : n;
+    }
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed / 1000;
+  }
+  return null;
+}
+
+// Human-readable UTC HH:MM:SS for chart X-axis labels (never raw epoch integers like 1794665562).
+export function formatAxisTime(value) {
+  const sec = epochSecondsOf(value);
+  if (sec === null) return '--:--:--';
+  const date = new Date(sec * 1000);
+  if (Number.isNaN(date.getTime())) return '--:--:--';
+  return date.toISOString().slice(11, 19);
 }
 
 // A series is { name, unit, values: [ { t, value } | null ], live } - value null is a gap.
@@ -98,9 +164,11 @@ export function timeRangeOf(points, fallbackSpan) {
   let first = null;
   let last = null;
   for (const point of points) {
-    if (!point || !Number.isFinite(point.t)) continue;
-    if (first === null || point.t < first) first = point.t;
-    if (last === null || point.t > last) last = point.t;
+    if (!point) continue;
+    const t = epochSecondsOf(point.t);
+    if (t === null) continue;
+    if (first === null || t < first) first = t;
+    if (last === null || t > last) last = t;
   }
   if (first === null) return null;
   if (last === first) last = first + (Number.isFinite(fallbackSpan) ? fallbackSpan : 60);
@@ -108,62 +176,91 @@ export function timeRangeOf(points, fallbackSpan) {
 }
 
 // The plot frame. Left gutter carries the engineering unit, right gutter carries the second axis when
-// a chart is dual-axis, and the top band carries the series captions. A chart that cannot fit the
-// gutters does not draw: a clipped axis on a wall map is worse than an empty panel and a caption.
-export function frameOf(canvas, options) {
-  const left = options.dualAxis ? 62 : 46;
-  const right = options.dualAxis ? 58 : 12;
-  const top = options.captions === false ? 10 : 26;
+// a chart is dual-axis, and the top band carries the series captions. Accepts optional logical CSS size
+// from prepareCanvas so HiDPI backing stores draw in CSS pixel coordinates.
+export function frameOf(canvas, options, size) {
+  const opts = options || {};
+  const left = opts.dualAxis ? 62 : 50;
+  const right = opts.dualAxis ? 58 : 16;
+  const top = opts.captions === false ? 12 : 24;
   const bottom = 22;
-  const width = canvas.width;
-  const height = canvas.height;
-  if (width < left + right + 60 || height < top + bottom + 40) return null;
-  return { left, right, top, bottom, x0: left, y0: height - bottom, x1: width - right, y1: top, w: width - left - right, h: height - top - bottom };
+  const width = size && Number.isFinite(size.width) ? size.width : canvas.width;
+  const height = size && Number.isFinite(size.height) ? size.height : canvas.height;
+  if (width < left + right + 60 || height < top + bottom + 36) return null;
+  return {
+    left, right, top, bottom,
+    x0: left, y0: height - bottom,
+    x1: width - right, y1: top,
+    w: width - left - right, h: height - top - bottom,
+  };
 }
 
 export function mapperFor(frame, range, timeRange) {
-  const spanX = timeRange.last - timeRange.first;
+  const spanX = Math.max(1e-6, timeRange.last - timeRange.first);
+  const spanY = Math.max(1e-6, range.max - range.min);
   return (point, value) => {
-    if (!Number.isFinite(point.t)) return null;
-    const x = frame.x0 + ((point.t - timeRange.first) / spanX) * frame.w;
-    const fraction = (value - range.min) / (range.max - range.min);
+    const t = epochSecondsOf(point.t);
+    if (t === null) return null;
+    const x = frame.x0 + ((t - timeRange.first) / spanX) * frame.w;
+    const fraction = (value - range.min) / spanY;
     const y = frame.y1 + (1 - fraction) * frame.h;
     return { x, y };
   };
 }
 
 export function axisOf(ctx, frame, range, unit, side) {
-  const ticks = ticksFor(range.min, range.max, 4);
+  const ticks = ticksFor(range.min, range.max, 3);
+  const spanY = Math.max(1e-6, range.max - range.min);
   ctx.save();
   ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
   ctx.textBaseline = 'middle';
   for (const tick of ticks) {
-    const fraction = (tick - range.min) / (range.max - range.min);
-    const y = frame.y1 - fraction * frame.h;
+    const fraction = (tick - range.min) / spanY;
+    const y = frame.y1 + (1 - fraction) * frame.h;
     ctx.strokeStyle = 'rgba(120, 140, 160, 0.22)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(frame.x0, y);
     ctx.lineTo(frame.x1, y);
     ctx.stroke();
-    const text = formatTick(tick) + (side === 'left' ? '' : '');
-    ctx.fillStyle = 'rgba(154, 165, 177, 0.95)';
+    const label = formatTick(tick);
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.95)';
     if (side === 'left') {
       ctx.textAlign = 'right';
-      ctx.fillText(text, frame.x0 - 5, y);
+      ctx.fillText(label, frame.x0 - 6, y);
     } else {
       ctx.textAlign = 'left';
-      ctx.fillText(text, frame.x1 + 5, y);
+      ctx.fillText(label, frame.x1 + 6, y);
     }
   }
   if (unit) {
-    // The unit belongs to the axis it describes, printed once above the ticks: a reader who is
-    // comparing two charts must never have to infer whether this column is bar or per cent.
     ctx.textAlign = side === 'left' ? 'left' : 'right';
-    ctx.fillStyle = 'rgba(154, 165, 177, 0.78)';
-    ctx.fillText(unit, side === 'left' ? 2 : frame.x1 + 5, frame.y1 + 12);
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.78)';
+    ctx.fillText(unit, side === 'left' ? 4 : frame.x1 + 6, frame.y1 + 4);
   }
   ctx.restore();
   return { ticks };
+}
+
+export function drawTimeAxis(ctx, frame, timeRange) {
+  if (!timeRange) return;
+  const spanSec = Math.max(0, Math.round(timeRange.last - timeRange.first));
+  const mid = (timeRange.first + timeRange.last) / 2;
+  const y = frame.y0 + 13;
+  ctx.save();
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.95)';
+  ctx.textBaseline = 'middle';
+
+  ctx.textAlign = 'left';
+  ctx.fillText(formatAxisTime(timeRange.first) + (spanSec > 0 ? ' (-' + String(spanSec) + 's)' : ''), frame.x0, y);
+  if (frame.w > 260) {
+    ctx.textAlign = 'center';
+    ctx.fillText(formatAxisTime(mid), frame.x0 + frame.w / 2, y);
+  }
+  ctx.textAlign = 'right';
+  ctx.fillText('NOW ' + formatAxisTime(timeRange.last), frame.x1, y);
+  ctx.restore();
 }
 
 export function ticksFor(min, max, count) {
@@ -178,7 +275,7 @@ export function ticksFor(min, max, count) {
 export function formatTick(value) {
   if (Math.abs(value) >= 1000) return value.toFixed(0);
   if (Math.abs(value) >= 100) return value.toFixed(1);
-  return value.toFixed(2);
+  return value.toFixed(1);
 }
 
 export function captionFor(seriesList, points, capacity) {
@@ -209,7 +306,7 @@ export function drawBand(ctx, frame, low, high, mapper) {
   const bottom = mapper({ t: 0 }, low);
   if (top === null || bottom === null) return false;
   ctx.save();
-  ctx.fillStyle = 'rgba(121, 192, 255, 0.10)';
+  ctx.fillStyle = 'rgba(46, 160, 109, 0.12)';
   ctx.fillRect(frame.x0, Math.min(top.y, bottom.y), frame.w, Math.abs(bottom.y - top.y));
   ctx.restore();
   return true;
@@ -221,7 +318,7 @@ export function drawSetpoint(ctx, frame, mapper, value) {
   if (placed === null) return false;
   ctx.save();
   ctx.setLineDash([4, 3]);
-  ctx.strokeStyle = 'rgba(227, 179, 65, 0.9)';
+  ctx.strokeStyle = 'rgba(251, 191, 36, 0.9)';
   ctx.beginPath();
   ctx.moveTo(frame.x0, placed.y);
   ctx.lineTo(frame.x1, placed.y);
@@ -248,7 +345,7 @@ export function drawScalarMarker(ctx, frame, y, label, tone) {
   ctx.font = '9.5px ui-monospace, Menlo, Consolas, monospace';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
-  ctx.fillStyle = tone === 'mute' ? 'rgba(154, 165, 177, 0.9)' : 'rgba(230, 237, 243, 0.92)';
+  ctx.fillStyle = tone === 'mute' ? 'rgba(148, 163, 184, 0.9)' : 'rgba(241, 245, 249, 0.92)';
   ctx.fillText(label, frame.x1 - 12, y - 3);
   ctx.restore();
   return true;
@@ -266,10 +363,6 @@ export function normalise(values, range) {
 }
 
 // ---- point placement that cannot overlap labels ------------------------------------------------
-// The 2D workspace panel puts a text label on every published position. Two positions can be a
-// millimetre apart, so labels are placed on a rank basis: the first label claims its exact point, the
-// next label that would collide is pushed along a free direction until it clears. The pushed label
-// keeps a leader line back to its true point, so the correction is visible instead of hidden.
 export function placeLabels(entries, box, minGapX, minGapY) {
   const placed = [];
   for (const entry of entries) {
@@ -277,15 +370,18 @@ export function placeLabels(entries, box, minGapX, minGapY) {
     const anchorY = box.y1 - entry.fy * box.h;
     let x = anchorX;
     let y = anchorY;
+    if (x + entry.width > box.x1 - 2) x = Math.max(box.x0 + 2, box.x1 - entry.width - 2);
+    if (y - entry.height / 2 < box.y0 + 2) y = box.y0 + entry.height / 2 + 2;
+    if (y + entry.height / 2 > box.y1 - 2) y = box.y1 - entry.height / 2 - 2;
     let shifts = 0;
     while (shifts < 24 && collides(placed, x, y, entry.width, entry.height, minGapX, minGapY)) {
       y -= entry.height + minGapY;
       shifts += 1;
-      if (y < box.y0) {
-        y = box.y1 - 6;
+      if (y < box.y0 + 6) {
+        y = box.y1 - 8;
         x += entry.width + minGapX;
       }
-      if (x + entry.width > box.x1) x = box.x0;
+      if (x + entry.width > box.x1 - 2) x = box.x0 + 4;
     }
     placed.push({
       label: entry.label,
@@ -311,9 +407,11 @@ function collides(placed, x, y, width, height, minGapX, minGapY) {
 export function drawGrid(ctx, box, stepFraction, tone) {
   ctx.save();
   ctx.strokeStyle = tone === 'soft' ? 'rgba(120, 140, 160, 0.16)' : 'rgba(120, 140, 160, 0.30)';
-  for (let index = 0; index <= 1; index += stepFraction) {
-    const x = box.x0 + index * box.w;
-    const y = box.y1 - index * box.h;
+  ctx.lineWidth = 1;
+  for (let index = 0; index <= 1.0001; index += stepFraction) {
+    const clamped = Math.min(1, index);
+    const x = box.x0 + clamped * box.w;
+    const y = box.y1 - clamped * box.h;
     ctx.beginPath();
     ctx.moveTo(x, box.y0);
     ctx.lineTo(x, box.y1);

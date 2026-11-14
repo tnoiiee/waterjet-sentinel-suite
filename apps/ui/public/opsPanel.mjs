@@ -150,13 +150,25 @@ export function renderJob(host, snapshot, workspace) {
     kpiTile(strip, 'NEXT DELAY', delayVal, delaySub, countdown && countdown.frozen ? 'warn' : 'info');
     host.appendChild(strip);
 
+    const standbySeq = document.createElement('div');
+    standbySeq.className = 'seq-bar seq-bar-standby num';
+    const standbyLabels = ['Home', 'P1', 'IV Open', 'P2', 'P3', 'P4..P6', 'IV Close', 'Safe Return'];
+    for (let i = 0; i < standbyLabels.length; i += 1) {
+      const step = document.createElement('div');
+      step.className = i === standbyLabels.length - 1 ? 'seq-step standby-park' : 'seq-step standby';
+      step.textContent = standbyLabels[i];
+      standbySeq.appendChild(step);
+    }
+    host.appendChild(standbySeq);
+
+    bar(host, 0);
+
     const idleNote = document.createElement('p');
     idleNote.className = 'cockpit-safe-line';
     idleNote.textContent = outcome
-      ? 'NONE - no active job at rev ' + text(snapshot ? snapshot.revision : null)
-        + ' | Last outcome: ' + text(outcome.jobId) + ' on ' + text(outcome.targetSensorId)
+      ? 'STANDBY - Parked at Safe Return (125, 125) | Last: ' + text(outcome.jobId) + ' on ' + text(outcome.targetSensorId)
         + ' (' + text(outcome.outcome) + ', finalized ' + timeOf(outcome.finalizedAt) + ')'
-      : 'NONE - no cleaning job is active at revision ' + text(snapshot ? snapshot.revision : null);
+      : 'STANDBY - Parked at Safe Return (125, 125) | No cleaning job active at rev ' + text(snapshot ? snapshot.revision : null);
     host.appendChild(idleNote);
     return;
   }

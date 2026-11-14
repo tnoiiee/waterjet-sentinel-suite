@@ -20,7 +20,6 @@ import {
   SAFE_RETURN_CENTRE_NATIVE,
   SCALING_NOTE,
   STAGE_COORDINATE_NOTE,
-  WALL_ORDER,
   WATER_JETS,
   WATER_JETS_BY_ID,
   WORKSPACE_MAX_MM,
@@ -34,18 +33,19 @@ import {
   summaryPills,
   tierOfRow,
 } from './topology.mjs';
+import { partitionSensors } from './wallMap.mjs';
 import {
   axisOf,
   captionFor,
-  contextOf,
   drawGrid,
   drawSeries,
+  drawTimeAxis,
   formatTick,
   formatted,
   frameOf,
   mapperFor,
   normalise,
-  placeLabels,
+  prepareCanvas,
   rangeOf,
   timeRangeOf,
 } from './chartKit.mjs';
@@ -148,7 +148,7 @@ function table(hostNode, headers, body) {
 
 function byId(list, key, value) {
   for (const item of list) {
-    if (item[key] === value) return item;
+    if (item && item[key] === value) return item;
   }
   return null;
 }
@@ -156,12 +156,13 @@ function byId(list, key, value) {
 // ---------------------------------------------------------------- Tab 3: WJ & Pump
 
 function axisWording(letter) {
-  return AXIS_WORDING[AXIS_ROLES[letter]] || ('axis ' + String(letter));
+  return AXIS_WORDING[AXIS_ROLES[letter]] || ('axis ' + text(letter, '?'));
 }
 
-function publishedIv(published, canonical) {
-  if (!published) return canonical + ' (published identity unavailable)';
-  return canonical + ' (published: ' + text(published.dedicatedIsolationValveId, 'none') + ')';
+function publishedIv(published, canonicalIv) {
+  const ivLabel = text(canonicalIv, 'IV?');
+  if (!published) return ivLabel + ' (published identity unavailable)';
+  return ivLabel + ' (published: ' + text(published.dedicatedIsolationValveId, 'none') + ')';
 }
 
 export function renderWsbGrid(root, snapshot) {
@@ -189,14 +190,16 @@ export function renderWsbGrid(root, snapshot) {
     paragraph(card, 'wsb-name', cabinet.wsb + ' - ' + cabinet.controller);
     for (const binding of cabinet.jets) {
       const published = byId(waterJets, 'waterJetId', binding.wj);
+      const canonicalJet = WATER_JETS_BY_ID[binding.wj] || null;
+      const canonicalIv = canonicalJet ? canonicalJet.iv : 'IV?';
       const row = block(card, 'wsb-jet');
       row.dataset.tone = published ? 'ok' : 'bad';
       const horizontal = axisWording(binding.horizontalAxis);
       const vertical = axisWording(binding.verticalAxis);
       const title = document.createElement('p');
       title.className = 'wsb-jet-title';
-      title.textContent = binding.wj + ' / ' + publishedIv(published, binding.iv)
-        + ' | brake ' + String(BRAKE_OUTPUT_ORDER[binding.horizontalAxis]) + '+' + String(BRAKE_OUTPUT_ORDER[binding.verticalAxis]);
+      title.textContent = binding.wj + ' + ' + publishedIv(published, canonicalIv)
+        + ' | Brake ' + String(BRAKE_OUTPUT_ORDER[binding.horizontalAxis]) + '+' + String(BRAKE_OUTPUT_ORDER[binding.verticalAxis]);
       row.appendChild(title);
       const axes = document.createElement('p');
       axes.className = 'wsb-jet-axes';
@@ -313,15 +316,17 @@ export function renderMaintenanceLock(root, snapshot) {
 
 export function renderActiveCockpit(root, snapshot, view, onFocusActive, onToggleOverlay) {
   const active = snapshot ? snapshot.activeJob : null;
+  const hasActive = Boolean(active && active.targetSensorId);
   const row = block(root, 'cockpit-meta-row');
   const actions = block(row, 'cockpit-actions');
 
   const focus = document.createElement('button');
   focus.type = 'button';
   focus.className = 'btn-sm primary cockpit-btn';
-  focus.textContent = active && active.targetSensorId
+  focus.textContent = hasActive
     ? 'Focus Active (' + text(active.targetSensorId) + ')'
-    : 'Focus Active (None)';
+    : 'Focus Active (Standby)';
+  focus.disabled = !hasActive;
   focus.dataset.action = 'focus-active';
   actions.appendChild(focus);
 
@@ -329,8 +334,14 @@ export function renderActiveCockpit(root, snapshot, view, onFocusActive, onToggl
   overlay.type = 'button';
   overlay.className = 'btn-sm cockpit-btn';
   overlay.dataset.action = 'toggle-overlay';
-  overlay.setAttribute('aria-pressed', view.overlay === 'cleaning' ? 'true' : 'false');
-  overlay.textContent = view.overlay === 'cleaning' ? 'Badge: CLEANING NOW' : 'Badge: INSPECTING';
+  if (!hasActive) {
+    overlay.disabled = true;
+    overlay.setAttribute('aria-pressed', 'false');
+    overlay.textContent = 'Mode: STANDBY';
+  } else {
+    overlay.setAttribute('aria-pressed', view.overlay === 'cleaning' ? 'true' : 'false');
+    overlay.textContent = view.overlay === 'cleaning' ? 'View: CLEANING NOW' : 'View: INSPECTING';
+  }
   actions.appendChild(overlay);
 
   const coal = paragraph(row, 'cockpit-missing', 'COAL FLOW: ' + NOT_PUBLISHED);
@@ -339,7 +350,7 @@ export function renderActiveCockpit(root, snapshot, view, onFocusActive, onToggl
   actions.addEventListener('click', (event) => {
     const target = event.target;
     const button = target && target.closest ? target.closest('.cockpit-btn') : null;
-    if (!button || !button.dataset.action) return;
+    if (!button || button.disabled || !button.dataset.action) return;
     if (button.dataset.action === 'focus-active') onFocusActive();
     if (button.dataset.action === 'toggle-overlay') onToggleOverlay();
   });
@@ -360,142 +371,265 @@ function selectedSensorOf(snapshot, selectedId) {
   return sensors.length ? sensors[0] : null;
 }
 
-export function renderDelayBands(canvas, caption, snapshot, workspace, selectedId) {
+function sameWallPeers(snapshot, selected) {
+  const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
+  if (!selected || !selected.wall) return [];
+  const wall = String(selected.wall).toUpperCase();
+  return sensors
+    .filter((entry) => entry && String(entry.wall || '').toUpperCase() === wall
+      && entry.sensorId !== selected.sensorId
+      && typeof entry.dirtyScore === 'number' && Number.isFinite(entry.dirtyScore))
+    .sort((a, b) => b.dirtyScore - a.dirtyScore)
+    .slice(0, 3);
+}
+
+function drawScoreBarPanel(ctx, box, selected, peers, dirtyThresh) {
+  ctx.strokeStyle = '#28303b';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(box.x0, box.y0, box.w, box.h);
+
+  const threshX = box.x0 + 6 + Math.min(1, Math.max(0, dirtyThresh / 100)) * Math.max(20, box.w - 12);
+  ctx.save();
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textBaseline = 'top';
+  ctx.fillText('SDS ' + (selected ? text(selected.sensorId) : '-') + ' vs Wall Peers (0-100)', box.x0 + 6, box.y0 + 5);
+
+  const bars = [
+    { label: selected ? text(selected.sensorId) + ' Cur' : 'Cur', value: selected ? selected.dirtyScore : null, color: '#e05246' },
+    { label: selected ? text(selected.sensorId) + ' Val' : 'Val', value: selected ? selected.lastValidatedScore : null, color: '#38bdf8' },
+  ];
+  for (const peer of peers) {
+    bars.push({
+      label: text(peer.sensorId) + ' Peer',
+      value: peer.dirtyScore,
+      color: peer.dirtyScore >= dirtyThresh ? 'rgba(224, 82, 70, 0.55)' : 'rgba(46, 160, 109, 0.65)',
+    });
+  }
+
+  const topOffset = 22;
+  const bottomPad = 16;
+  const availH = Math.max(28, box.h - topOffset - bottomPad);
+  const rowPitch = Math.max(14, Math.floor(availH / Math.max(2, bars.length)));
+  const barH = Math.max(10, Math.min(16, rowPitch - 4));
+  const barW = Math.max(20, box.w - 12);
+
+  for (let i = 0; i < bars.length; i += 1) {
+    const item = bars[i];
+    const yPos = box.y0 + topOffset + i * rowPitch;
+    if (yPos + barH > box.y0 + box.h - bottomPad + 2) break;
+    ctx.fillStyle = '#15191f';
+    ctx.fillRect(box.x0 + 6, yPos, barW, barH);
+    if (typeof item.value === 'number' && Number.isFinite(item.value)) {
+      const fillW = Math.min(1, Math.max(0, item.value / 100)) * barW;
+      ctx.fillStyle = item.color;
+      ctx.fillRect(box.x0 + 6, yPos, fillW, barH);
+    }
+    ctx.fillStyle = '#f1f5f9';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(item.label + ': ' + (typeof item.value === 'number' ? item.value.toFixed(1) : '--'),
+      box.x0 + 10, yPos + barH / 2);
+  }
+
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(threshX, box.y0 + 18);
+  ctx.lineTo(threshX, box.y0 + box.h - 14);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#fbbf24';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('Dirty Threshold: ' + String(dirtyThresh), box.x0 + 6, box.y0 + box.h - 3);
+  ctx.restore();
+}
+
+export function renderDelayBands(canvas, caption, snapshot, workspace, selectedId, scoreHistory) {
   if (!canvas || !caption) return;
-  const ctx = contextOf(canvas);
-  if (!ctx) {
+  const sized = prepareCanvas(canvas, 560, 165);
+  if (!sized) {
     caption.textContent = 'delay bands: canvas not available in this browser';
     return;
   }
+  const { ctx, width, height } = sized;
   const configuration = workspace ? workspace.configuration : null;
   const ranges = configuration && Array.isArray(configuration.boilerRanges) ? configuration.boilerRanges : [];
-  const frame = frameOf(canvas, { dualAxis: true, captions: true });
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const selected = selectedSensorOf(snapshot, selectedId);
+  const peers = sameWallPeers(snapshot, selected);
+  const dirtyThresh = snapshot && snapshot.config && typeof snapshot.config.dirtyThreshold === 'number'
+    ? snapshot.config.dirtyThreshold : 65;
+
+  ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = '#0d1014';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, width, height);
 
-  if (!frame) {
-    caption.textContent = 'delay bands: canvas has no frame to draw into';
-    return;
-  }
-  if (!ranges.length) {
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '11px "Segoe UI", Roboto, sans-serif';
-    ctx.fillText('Delay bands: ' + NOT_PUBLISHED + ' (waiting for DispatchWorkspace)', 14, 28);
-    caption.textContent = 'delay bands: ' + NOT_PUBLISHED + ' - this workspace carries no Boiler Condition ranges';
-    return;
-  }
-
-  const leftBox = {
-    x0: 14,
-    y0: 14,
-    w: Math.max(120, Math.floor(canvas.width * 0.62) - 24),
-    h: Math.max(60, canvas.height - 32),
-  };
+  const leftW = Math.max(120, Math.floor(width * 0.56) - 18);
+  const leftBox = { x0: 10, y0: 10, w: leftW, h: Math.max(60, height - 20) };
   const rightBox = {
-    x0: leftBox.x0 + leftBox.w + 18,
-    y0: 14,
-    w: Math.max(100, canvas.width - (leftBox.x0 + leftBox.w + 30)),
+    x0: leftBox.x0 + leftBox.w + 12,
+    y0: 10,
+    w: Math.max(100, width - (leftBox.x0 + leftBox.w + 22)),
     h: leftBox.h,
   };
 
-  const low = Math.min.apply(null, ranges.map((range) => range.autoDelayMinSeconds));
-  const high = Math.max.apply(null, ranges.map((range) => range.autoDelayMaxSeconds));
-  const active = configuration ? text(configuration.activeBoilerCondition, NOT_PUBLISHED) : NOT_PUBLISHED;
+  if (ranges.length > 0) {
+    const low = Math.min.apply(null, ranges.map((range) => range.autoDelayMinSeconds));
+    const high = Math.max.apply(null, ranges.map((range) => range.autoDelayMaxSeconds));
+    const active = configuration ? text(configuration.activeBoilerCondition, NOT_PUBLISHED) : NOT_PUBLISHED;
 
-  // Grid backdrop on delay band axis
+    ctx.strokeStyle = '#28303b';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(leftBox.x0, leftBox.y0, leftBox.w, leftBox.h);
+
+    for (let index = 0; index < ranges.length; index += 1) {
+      const range = ranges[index];
+      const lane = leftBox.y0 + (index + 0.16) * (leftBox.h / ranges.length);
+      const laneHeight = (leftBox.h / ranges.length) * 0.68;
+      const from = leftBox.x0 + ((range.autoDelayMinSeconds - low) / Math.max(1, high - low)) * leftBox.w;
+      const to = leftBox.x0 + ((range.autoDelayMaxSeconds - low) / Math.max(1, high - low)) * leftBox.w;
+      const isActive = text(range.condition, '') === active;
+
+      ctx.save();
+      ctx.fillStyle = isActive ? 'rgba(56, 189, 248, 0.28)' : 'rgba(148, 163, 184, 0.14)';
+      ctx.fillRect(from, lane, Math.max(4, to - from), laneHeight);
+      ctx.strokeStyle = isActive ? '#38bdf8' : '#475569';
+      ctx.lineWidth = isActive ? 1.5 : 1;
+      ctx.strokeRect(from, lane, Math.max(4, to - from), laneHeight);
+      ctx.fillStyle = isActive ? '#f1f5f9' : '#94a3b8';
+      ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text(range.condition, '?') + ' ' + String(range.autoDelayMinSeconds) + '-' + String(range.autoDelayMaxSeconds) + 's',
+        leftBox.x0 + 6, lane + laneHeight / 2);
+      ctx.restore();
+    }
+
+    const preview = workspace ? workspace.preview : null;
+    const applied = preview && typeof preview.appliedDelaySeconds === 'number' ? preview.appliedDelaySeconds : null;
+    if (applied !== null) {
+      const x = leftBox.x0 + ((applied - low) / Math.max(1, high - low)) * leftBox.w;
+      ctx.save();
+      ctx.strokeStyle = '#34d399';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, leftBox.y0);
+      ctx.lineTo(x, leftBox.y0 + leftBox.h);
+      ctx.stroke();
+      ctx.fillStyle = '#34d399';
+      ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+      ctx.fillText('Applied ' + String(applied) + 's', Math.min(x + 4, leftBox.x0 + leftBox.w - 72), leftBox.y0 + 12);
+      ctx.restore();
+    }
+
+    drawScoreBarPanel(ctx, rightBox, selected, peers, dirtyThresh);
+
+    caption.textContent = 'Delay ' + String(low) + '-' + String(high) + 's | Condition: ' + active
+      + ' | Applied: ' + (applied === null ? NOT_PUBLISHED : String(applied) + 's')
+      + ' | ' + (selected ? text(selected.sensorId) : '-') + ' dirty '
+      + (selected && typeof selected.dirtyScore === 'number' ? selected.dirtyScore.toFixed(1) : '--')
+      + ', validated ' + (selected && typeof selected.lastValidatedScore === 'number' ? selected.lastValidatedScore.toFixed(1) : '--');
+    return;
+  }
+
+  // Fallback when DispatchWorkspace carries no boilerRanges yet: draw real observed rolling
+  // Dirty Score history for the selected SDS (never invented) + same-wall peer comparison bars.
   ctx.strokeStyle = '#28303b';
   ctx.lineWidth = 1;
   ctx.strokeRect(leftBox.x0, leftBox.y0, leftBox.w, leftBox.h);
 
-  for (let index = 0; index < ranges.length; index += 1) {
-    const range = ranges[index];
-    const lane = leftBox.y0 + (index + 0.16) * (leftBox.h / ranges.length);
-    const laneHeight = (leftBox.h / ranges.length) * 0.68;
-    const from = leftBox.x0 + ((range.autoDelayMinSeconds - low) / Math.max(1, high - low)) * leftBox.w;
-    const to = leftBox.x0 + ((range.autoDelayMaxSeconds - low) / Math.max(1, high - low)) * leftBox.w;
-    const isActive = text(range.condition, '') === active;
+  const hist = Array.isArray(scoreHistory) ? scoreHistory : [];
+  const plot = {
+    x0: leftBox.x0 + 30,
+    y0: leftBox.y0 + 22,
+    w: Math.max(40, leftBox.w - 38),
+    h: Math.max(30, leftBox.h - 38),
+  };
 
-    ctx.save();
-    ctx.fillStyle = isActive ? 'rgba(56, 189, 248, 0.28)' : 'rgba(148, 163, 184, 0.14)';
-    ctx.fillRect(from, lane, Math.max(4, to - from), laneHeight);
-    ctx.strokeStyle = isActive ? '#38bdf8' : '#475569';
-    ctx.lineWidth = isActive ? 1.5 : 1;
-    ctx.strokeRect(from, lane, Math.max(4, to - from), laneHeight);
-    ctx.fillStyle = isActive ? '#f1f5f9' : '#94a3b8';
-    ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text(range.condition, '?') + ' ' + String(range.autoDelayMinSeconds) + '-' + String(range.autoDelayMaxSeconds) + 's',
-      leftBox.x0 + 6, lane + laneHeight / 2);
-    ctx.restore();
-  }
-
-  const preview = workspace ? workspace.preview : null;
-  const applied = preview && typeof preview.appliedDelaySeconds === 'number' ? preview.appliedDelaySeconds : null;
-  if (applied !== null) {
-    const x = leftBox.x0 + ((applied - low) / Math.max(1, high - low)) * leftBox.w;
-    ctx.save();
-    ctx.strokeStyle = '#34d399';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x, leftBox.y0);
-    ctx.lineTo(x, leftBox.y0 + leftBox.h);
-    ctx.stroke();
-    ctx.fillStyle = '#34d399';
-    ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
-    ctx.fillText('Applied ' + String(applied) + 's', Math.min(x + 4, leftBox.x0 + leftBox.w - 72), leftBox.y0 + 10);
-    ctx.restore();
-  }
-
-  // Right-side Selected SDS published Dirty Score vs Last Validated Score (0..100 scale)
-  const selected = selectedSensorOf(snapshot, selectedId);
-  ctx.strokeStyle = '#28303b';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(rightBox.x0, rightBox.y0, rightBox.w, rightBox.h);
-
-  const dirtyThresh = snapshot && snapshot.config && typeof snapshot.config.dirtyThreshold === 'number'
-    ? snapshot.config.dirtyThreshold : 65;
-  const threshX = rightBox.x0 + Math.min(1, Math.max(0, dirtyThresh / 100)) * rightBox.w;
   ctx.save();
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#f1f5f9';
+  ctx.fillText('SDS ' + (selected ? text(selected.sensorId) : '-') + ' Observed Score History', leftBox.x0 + 6, leftBox.y0 + 5);
+  ctx.fillStyle = '#64748b';
+  ctx.textAlign = 'right';
+  ctx.fillText('Delay bands: awaiting workspace', leftBox.x0 + leftBox.w - 6, leftBox.y0 + 5);
+  ctx.textAlign = 'left';
+
+  // Horizontal 0 / 50 / 100 gridlines
+  for (const val of [0, 50, 100]) {
+    const gy = plot.y0 + (1 - val / 100) * plot.h;
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.16)';
+    ctx.beginPath();
+    ctx.moveTo(plot.x0, gy);
+    ctx.lineTo(plot.x0 + plot.w, gy);
+    ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(val), plot.x0 - 4, gy);
+  }
+  ctx.textAlign = 'left';
+
+  // Threshold dashed amber line
+  const threshY = plot.y0 + (1 - Math.min(100, Math.max(0, dirtyThresh)) / 100) * plot.h;
   ctx.strokeStyle = '#fbbf24';
-  ctx.setLineDash([3, 3]);
+  ctx.setLineDash([4, 3]);
   ctx.beginPath();
-  ctx.moveTo(threshX, rightBox.y0);
-  ctx.lineTo(threshX, rightBox.y0 + rightBox.h);
+  ctx.moveTo(plot.x0, threshY);
+  ctx.lineTo(plot.x0 + plot.w, threshY);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
-  ctx.fillText('SDS ' + (selected ? text(selected.sensorId) : '-') + ' Score (0-100)', rightBox.x0 + 6, rightBox.y0 + 14);
-
-  const drawBar = (yPos, label, score, fillColor) => {
-    const barW = rightBox.w - 12;
-    const barH = 16;
-    ctx.fillStyle = '#15191f';
-    ctx.fillRect(rightBox.x0 + 6, yPos, barW, barH);
-    if (typeof score === 'number' && Number.isFinite(score)) {
-      const fillW = Math.min(1, Math.max(0, score / 100)) * barW;
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(rightBox.x0 + 6, yPos, fillW, barH);
+  // Observed rolling frame curve (null breaks the stroke; never interpolated)
+  if (hist.length > 0) {
+    ctx.strokeStyle = selected && String(selected.classification) === 'DIRTY' ? '#e05246' : '#38bdf8';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    let drawn = false;
+    let lastPt = null;
+    for (let i = 0; i < hist.length; i += 1) {
+      const sample = hist[i];
+      const v = sample && typeof sample.score === 'number' && Number.isFinite(sample.score) ? sample.score : null;
+      if (v === null) {
+        drawn = false;
+        continue;
+      }
+      const x = plot.x0 + (hist.length === 1 ? plot.w : (i / (hist.length - 1)) * plot.w);
+      const y = plot.y0 + (1 - Math.min(100, Math.max(0, v)) / 100) * plot.h;
+      if (!drawn) {
+        ctx.moveTo(x, y);
+        drawn = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+      lastPt = { x, y };
     }
-    ctx.fillStyle = '#f1f5f9';
-    ctx.fillText(label + ': ' + (typeof score === 'number' ? score.toFixed(1) : '--'), rightBox.x0 + 10, yPos + 12);
-  };
+    ctx.stroke();
+    if (lastPt) {
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(lastPt.x, lastPt.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = '#94a3b8';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Collecting published Snapshot frames...', plot.x0 + 6, plot.y0 + plot.h / 2);
+  }
 
-  drawBar(rightBox.y0 + 28, 'Dirty', selected ? selected.dirtyScore : null, '#e05246');
-  drawBar(rightBox.y0 + 54, 'Valid', selected ? selected.lastValidatedScore : null, '#38bdf8');
-
-  ctx.fillStyle = '#fbbf24';
-  ctx.fillText('Thresh ' + String(dirtyThresh), rightBox.x0 + 6, rightBox.y0 + rightBox.h - 6);
+  ctx.fillStyle = '#94a3b8';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(String(hist.length) + ' observed frame(s) | Threshold ' + String(dirtyThresh), plot.x0, leftBox.y0 + leftBox.h - 3);
   ctx.restore();
 
-  caption.textContent = 'Delay ' + String(low) + '-' + String(high) + 's | Condition: ' + active
-    + ' | Applied: ' + (applied === null ? NOT_PUBLISHED : String(applied) + 's')
-    + ' | ' + (selected ? text(selected.sensorId) : '-') + ' dirty '
-    + (selected && typeof selected.dirtyScore === 'number' ? selected.dirtyScore.toFixed(1) : 'none')
-    + ', validated ' + (selected && typeof selected.lastValidatedScore === 'number' ? selected.lastValidatedScore.toFixed(1) : 'none')
-    + ' | Coal/Temp: ' + NOT_PUBLISHED;
+  drawScoreBarPanel(ctx, rightBox, selected, peers, dirtyThresh);
+
+  caption.textContent = 'Delay bands: awaiting DispatchWorkspace | '
+    + (selected ? text(selected.sensorId) : '-') + ' dirty '
+    + (selected && typeof selected.dirtyScore === 'number' ? selected.dirtyScore.toFixed(1) : '--')
+    + ', validated ' + (selected && typeof selected.lastValidatedScore === 'number' ? selected.lastValidatedScore.toFixed(1) : '--')
+    + ' (' + String(hist.length) + ' observed frame(s)) | Coal Flow: ' + NOT_PUBLISHED;
 }
 
 // ---------------------------------------------------------------- Tab 4: Sensor & Path
@@ -532,8 +666,11 @@ export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, o
   const filtered = sensors.filter((sensor) => {
     if (!sensor) return false;
     if (filter === 'ALL') return true;
-    if (filter === 'DIRTY') return String(sensor.classification) === 'DIRTY';
-    if (filter === 'UNCERTAIN') return String(sensor.classification) !== 'DIRTY' && String(sensor.classification) !== 'CLEANER';
+    if (filter === 'DIRTY') return String(sensor.classification) === 'DIRTY' && String(sensor.quality) === 'GOOD';
+    if (filter === 'UNCERTAIN') {
+      return String(sensor.quality) !== 'GOOD'
+        || (String(sensor.classification) !== 'DIRTY' && String(sensor.classification) !== 'CLEANER');
+    }
     return String(sensor.wall || '').toUpperCase() === filter;
   });
 
@@ -547,7 +684,7 @@ export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, o
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'sds-row';
-    row.dataset.sensorId = String(sensor.sensorId);
+    row.dataset.sensorId = text(sensor.sensorId, '');
     if (sensor.sensorId === selectedId || sensor.sensorId === activeTargetId) {
       row.setAttribute('aria-current', 'true');
     }
@@ -556,14 +693,15 @@ export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, o
     id.textContent = text(sensor.sensorId, '?');
     const place = document.createElement('span');
     place.className = 'sds-row-place';
-    place.textContent = text(sensor.wall, '?') + ' R' + String(sensor.logicalRow) + 'C' + String(sensor.logicalColumn)
+    place.textContent = text(sensor.wall, '?') + ' R' + text(sensor.logicalRow, '?') + 'C' + text(sensor.logicalColumn, '?')
       + ' ' + tierOfRow(sensor.logicalRow) + ' | ' + (typeof sensor.dirtyScore === 'number' ? sensor.dirtyScore.toFixed(1) : '--');
     const jet = document.createElement('span');
     jet.className = 'sds-row-jet';
     jet.textContent = text(sensor.assignedWaterJetId, '-') + ' / ' + text(sensor.assignedIsolationValveId, '-');
     const stateBadge = document.createElement('span');
     stateBadge.className = 'sds-row-state';
-    stateBadge.textContent = text(sensor.classification, '?');
+    const isUnc = String(sensor.quality || '') !== 'GOOD';
+    stateBadge.textContent = isUnc ? text(sensor.quality, '?') : text(sensor.classification, '?');
 
     row.appendChild(id);
     row.appendChild(place);
@@ -571,7 +709,7 @@ export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, o
     row.appendChild(stateBadge);
     row.title = text(sensor.classification, NOT_PUBLISHED) + ' / ' + text(sensor.queueState, '?')
       + ' / ' + text(sensor.quality, '?');
-    row.dataset.tone = sensor.classification === 'DIRTY' ? 'bad' : sensor.classification === 'CLEANER' ? 'ok' : 'warn';
+    row.dataset.tone = isUnc ? 'warn' : (sensor.classification === 'DIRTY' ? 'bad' : sensor.classification === 'CLEANER' ? 'ok' : 'warn');
     list.appendChild(row);
   }
   list.addEventListener('click', (event) => {
@@ -583,17 +721,25 @@ export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, o
 
 export function renderWorkspace(canvas, caption, snapshot, selectedSensor, activeTarget) {
   if (!canvas || !caption) return;
-  const ctx = contextOf(canvas);
-  if (!ctx) {
+  const sized = prepareCanvas(canvas, 320, 240);
+  if (!sized) {
     caption.textContent = 'workspace: canvas not available in this browser';
     return;
   }
-  const box = { x0: 18, y0: 18, x1: canvas.width - 18, y1: canvas.height - 18 };
-  box.w = box.x1 - box.x0;
-  box.h = box.y1 - box.y0;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const { ctx, width, height } = sized;
+  ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = '#0d1014';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, width, height);
+
+  // Centered 1:1 square inside safe margins so zero labels ever clip at any edge
+  const padL = 34;
+  const padR = 18;
+  const padT = 16;
+  const padB = 26;
+  const side = Math.max(72, Math.min(width - padL - padR, height - padT - padB));
+  const x0 = Math.round(padL + Math.max(0, (width - padL - padR - side) / 2));
+  const y0 = Math.round(padT + Math.max(0, (height - padT - padB - side) / 2));
+  const box = { x0, y0, x1: x0 + side, y1: y0 + side, w: side, h: side };
 
   ctx.save();
   ctx.strokeStyle = '#384250';
@@ -607,6 +753,8 @@ export function renderWorkspace(canvas, caption, snapshot, selectedSensor, activ
   const centreFy = (SAFE_RETURN_CENTRE_MM.vertical - WORKSPACE_MIN_MM) / extent;
   const cx = box.x0 + centreFx * box.w;
   const cy = box.y1 - centreFy * box.h;
+
+  // Crosshair & circle at Safe Return Centre (125, 125)
   ctx.save();
   ctx.strokeStyle = '#22d3ee';
   ctx.lineWidth = 1.5;
@@ -619,40 +767,41 @@ export function renderWorkspace(canvas, caption, snapshot, selectedSensor, activ
   ctx.beginPath();
   ctx.arc(cx, cy, 6, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.restore();
 
-  const markers = [];
-  for (let mm = WORKSPACE_MIN_MM; mm <= WORKSPACE_MAX_MM; mm += 70) {
-    markers.push({ label: String(mm), fx: (mm - WORKSPACE_MIN_MM) / extent, fy: 0, width: 24, height: 11, slot: 'bottom' });
-    markers.push({ label: String(mm), fx: 0, fy: (mm - WORKSPACE_MIN_MM) / extent, width: 24, height: 11, slot: 'left' });
-  }
-  markers.push({
-    label: 'Centre ' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical),
-    fx: centreFx,
-    fy: centreFy,
-    width: 104,
-    height: 12,
-    tone: 'cyan',
-  });
-  const placed = placeLabels(markers, box, 6, 3);
-
-  ctx.save();
+  // Clean axis tick numbers outside the square
   ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
-  ctx.textBaseline = 'middle';
-  for (const label of placed) {
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
-    ctx.beginPath();
-    ctx.moveTo(label.anchorX, label.anchorY);
-    ctx.lineTo(label.x + 2, label.y);
-    ctx.stroke();
-    ctx.fillStyle = label.tone === 'cyan' ? '#22d3ee' : label.tone === 'amber' ? '#fbbf24' : '#e2e8f0';
-    ctx.fillText(label.label, label.x, label.y);
+  ctx.fillStyle = '#94a3b8';
+  for (let mm = WORKSPACE_MIN_MM; mm <= WORKSPACE_MAX_MM; mm += 70) {
+    const frac = (mm - WORKSPACE_MIN_MM) / extent;
+    const tx = box.x0 + frac * box.w;
+    const ty = box.y1 - frac * box.h;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(String(mm), tx, box.y1 + 5);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(mm), box.x0 - 5, ty);
   }
+
+  // Callout inside upper-right quadrant, clamped cleanly inside box bounds
+  const labelText = 'Centre (' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical) + ')';
+  const calloutX = Math.min(cx + 10, box.x1 - 92);
+  const calloutY = Math.max(box.y0 + 12, cy - 16);
+  ctx.strokeStyle = 'rgba(34, 211, 238, 0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx + 4, cy - 4);
+  ctx.lineTo(calloutX, calloutY + 3);
+  ctx.stroke();
+  ctx.fillStyle = '#22d3ee';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(labelText, calloutX + 2, calloutY);
   ctx.restore();
 
-  caption.textContent = 'Workspace ' + String(WORKSPACE_MIN_MM) + '-' + String(WORKSPACE_MAX_MM)
-    + ' mm (1:1) | ' + SCALING_NOTE + ' | Centre (' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', '
-    + String(SAFE_RETURN_CENTRE_MM.vertical) + ') = ' + grouped(SAFE_RETURN_CENTRE_NATIVE.horizontal) + ' native';
+  caption.textContent = '0-' + String(WORKSPACE_MAX_MM) + ' mm (1:1) | ' + SCALING_NOTE
+    + ' | Centre (' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical)
+    + ') = ' + grouped(SAFE_RETURN_CENTRE_NATIVE.horizontal) + ' native';
   return {
     selected: selectedSensor ? 'selected ' + String(selectedSensor) + ' - no published position' : 'nothing selected',
     activeTarget: activeTarget ? 'active target ' + String(activeTarget) + ' - no published position' : 'no active target',
@@ -675,7 +824,7 @@ export function renderPathTable(root, workspace) {
       cells: [
         stage.key,
         stage.stage,
-        step ? String(step.ordinal) : '-',
+        step ? text(step.ordinal, '-') : '-',
         step ? text(step.label, NOT_PUBLISHED) : NOT_PUBLISHED,
         step ? text(step.state, NOT_PUBLISHED) : NOT_PUBLISHED,
         stage.key === 'CENTRE' || stage.key === 'SAFE_RETURN'
@@ -713,20 +862,20 @@ export function renderSystemSummary(root, snapshot, status, health, connection) 
     ['readiness detail', status ? text(status.readinessDetail, NOT_PUBLISHED) : NOT_PUBLISHED, 'mute'],
     ['scenario', status ? text(status.scenario, NOT_PUBLISHED) : NOT_PUBLISHED],
     ['stage', status ? text(status.stageMarker, NOT_PUBLISHED) : (health ? text(health.stageMarker, NOT_PUBLISHED) : NOT_PUBLISHED)],
-    ['revision (snapshot)', snapshot ? String(snapshot.revision) : 'none', 'mute'],
+    ['revision (snapshot)', snapshot ? text(snapshot.revision, 'none') : 'none', 'mute'],
     ['revision (health)', health && health.currentRevision !== null && health.currentRevision !== undefined ? String(health.currentRevision) : NOT_PUBLISHED],
     ['generated at', snapshot ? timeOf(snapshot.generatedAt) : NOT_PUBLISHED],
     ['server time', status ? timeOf(status.serverTimeUtc) : NOT_PUBLISHED],
     ['tick', status ? number(status.tickIntervalMilliseconds, 0, 'ms') : NOT_PUBLISHED],
     ['evolution', status ? (status.evolutionRunning ? 'RUNNING' : 'STOPPED') : NOT_PUBLISHED, status && status.evolutionRunning ? 'ok' : 'warn'],
-    ['accepted ticks', status ? String(status.acceptedTicks) : NOT_PUBLISHED],
-    ['rejected transitions', status ? String(status.rejectedTransitions) : NOT_PUBLISHED, status && status.rejectedTransitions > 0 ? 'warn' : 'mute'],
+    ['accepted ticks', status ? text(status.acceptedTicks, NOT_PUBLISHED) : NOT_PUBLISHED],
+    ['rejected transitions', status ? text(status.rejectedTransitions, NOT_PUBLISHED) : NOT_PUBLISHED, status && status.rejectedTransitions > 0 ? 'warn' : 'mute'],
     ['uptime', runtime ? number(runtime.uptimeSeconds, 0, 's') : NOT_PUBLISHED],
-    ['invariant violations', runtime ? String(runtime.invariantViolations) : NOT_PUBLISHED, runtime && runtime.invariantViolations > 0 ? 'bad' : 'ok'],
-    ['second Jobs accepted', runtime ? String(runtime.acceptedSecondJobs) : NOT_PUBLISHED],
-    ['second Jobs refused', runtime ? String(runtime.refusedSecondJobs) : NOT_PUBLISHED],
-    ['SSE clients', runtime ? String(runtime.sseClients) : NOT_PUBLISHED, 'mute'],
-    ['config revision', config ? String(config.revision) : NOT_PUBLISHED],
+    ['invariant violations', runtime ? text(runtime.invariantViolations, NOT_PUBLISHED) : NOT_PUBLISHED, runtime && runtime.invariantViolations > 0 ? 'bad' : 'ok'],
+    ['second Jobs accepted', runtime ? text(runtime.acceptedSecondJobs, NOT_PUBLISHED) : NOT_PUBLISHED],
+    ['second Jobs refused', runtime ? text(runtime.refusedSecondJobs, NOT_PUBLISHED) : NOT_PUBLISHED],
+    ['SSE clients', runtime ? text(runtime.sseClients, NOT_PUBLISHED) : NOT_PUBLISHED, 'mute'],
+    ['config revision', config ? text(config.revision, NOT_PUBLISHED) : NOT_PUBLISHED],
     ['config label', config ? text(config.label, NOT_PUBLISHED) : NOT_PUBLISHED],
     ['dirty threshold', config ? number(config.dirtyThreshold, 2) : NOT_PUBLISHED],
     ['stale threshold', config ? number(config.staleThresholdMs, 0, 'ms') : NOT_PUBLISHED],
@@ -737,10 +886,10 @@ export function renderSystemSummary(root, snapshot, status, health, connection) 
     heading(root, 'Historian');
     rows(root, [
       ['wired', historian.wired ? 'YES' : 'NO', historian.wired ? 'ok' : 'mute'],
-      ['depth / capacity', String(historian.depth) + ' / ' + String(historian.capacity)],
+      ['depth / capacity', text(historian.depth, '0') + ' / ' + text(historian.capacity, '0')],
       ['near overflow', historian.nearOverflow ? 'YES' : 'NO', historian.nearOverflow ? 'bad' : 'ok'],
-      ['rejected', String(historian.rejected), historian.rejected > 0 ? 'warn' : 'ok'],
-      ['gap markers', String(historian.gapMarkers), historian.gapMarkers > 0 ? 'warn' : 'ok'],
+      ['rejected', text(historian.rejected, '0'), historian.rejected > 0 ? 'warn' : 'ok'],
+      ['gap markers', text(historian.gapMarkers, '0'), historian.gapMarkers > 0 ? 'warn' : 'ok'],
       ['last batch latency', historian.lastBatchLatencyMs === null || historian.lastBatchLatencyMs === undefined ? 'no batch yet' : number(historian.lastBatchLatencyMs, 0, 'ms')],
     ]);
   }
@@ -748,20 +897,21 @@ export function renderSystemSummary(root, snapshot, status, health, connection) 
   if (status) {
     heading(root, 'Runtime Counters');
     const counts = status.sensorCounts;
+    const disabledCount = Array.isArray(status.disabledSensorIds) ? status.disabledSensorIds.length : 0;
     rows(root, [
-      ['logical slots', counts ? text(counts.logicalSlots.label, NOT_PUBLISHED) + ' = ' + String(counts.logicalSlots.count) : NOT_PUBLISHED],
-      ['Sensor locations', counts ? text(counts.sensorLocations.label, NOT_PUBLISHED) + ' = ' + String(counts.sensorLocations.count) : NOT_PUBLISHED],
-      ['TC channels', counts ? text(counts.thermocoupleChannels.label, NOT_PUBLISHED) + ' = ' + String(counts.thermocoupleChannels.count) : NOT_PUBLISHED],
-      ['physical TC', counts ? text(counts.physicalThermocoupleChannels.label, NOT_PUBLISHED) + ' = ' + String(counts.physicalThermocoupleChannels.count) : NOT_PUBLISHED],
-      ['unassigned TC', counts ? text(counts.unassignedThermocoupleChannels.label, NOT_PUBLISHED) + ' = ' + String(counts.unassignedThermocoupleChannels.count) : NOT_PUBLISHED],
-      ['Water Jets', counts ? String(counts.waterJets.count) : NOT_PUBLISHED],
-      ['Isolation Valves', counts ? String(counts.isolationValves.count) : NOT_PUBLISHED],
-      ['queue', status.queueCount + ' queued of ' + status.queueCapacity + ' (' + text(status.queuePlaceholder, 'no placeholder') + ')'],
+      ['logical slots', counts && counts.logicalSlots ? text(counts.logicalSlots.label, NOT_PUBLISHED) + ' = ' + text(counts.logicalSlots.count, '0') : NOT_PUBLISHED],
+      ['Sensor locations', counts && counts.sensorLocations ? text(counts.sensorLocations.label, NOT_PUBLISHED) + ' = ' + text(counts.sensorLocations.count, '0') : NOT_PUBLISHED],
+      ['TC channels', counts && counts.thermocoupleChannels ? text(counts.thermocoupleChannels.label, NOT_PUBLISHED) + ' = ' + text(counts.thermocoupleChannels.count, '0') : NOT_PUBLISHED],
+      ['physical TC', counts && counts.physicalThermocoupleChannels ? text(counts.physicalThermocoupleChannels.label, NOT_PUBLISHED) + ' = ' + text(counts.physicalThermocoupleChannels.count, '0') : NOT_PUBLISHED],
+      ['unassigned TC', counts && counts.unassignedThermocoupleChannels ? text(counts.unassignedThermocoupleChannels.label, NOT_PUBLISHED) + ' = ' + text(counts.unassignedThermocoupleChannels.count, '0') : NOT_PUBLISHED],
+      ['Water Jets', counts && counts.waterJets ? text(counts.waterJets.count, '0') : NOT_PUBLISHED],
+      ['Isolation Valves', counts && counts.isolationValves ? text(counts.isolationValves.count, '0') : NOT_PUBLISHED],
+      ['queue', text(status.queueCount, '0') + ' queued of ' + text(status.queueCapacity, '0') + ' (' + text(status.queuePlaceholder, 'no placeholder') + ')'],
       ['active Job', status.activeJobPresent ? text(status.activeJobId, 'present') : 'none'],
-      ['disabled Sensors', status.disabledSensorIds.length ? String(status.disabledSensorIds.length) : 'none'],
-      ['alarm counts', 'active ' + String(status.activeAlarmCount) + ', cleared-unack ' + String(status.clearedAlarmCount)],
-      ['delta history', String(status.deltaHistoryDepth) + ' / ' + String(status.deltaHistoryCapacity) + ', newest rev ' + (status.newestDeltaRevision === null || status.newestDeltaRevision === undefined ? 'none' : String(status.newestDeltaRevision))],
-      ['state history', String(status.stateHistoryDepth) + ' / ' + String(status.stateHistoryCapacity)],
+      ['disabled Sensors', disabledCount ? String(disabledCount) : 'none'],
+      ['alarm counts', 'active ' + text(status.activeAlarmCount, '0') + ', cleared-unack ' + text(status.clearedAlarmCount, '0')],
+      ['delta history', text(status.deltaHistoryDepth, '0') + ' / ' + text(status.deltaHistoryCapacity, '0') + ', newest rev ' + (status.newestDeltaRevision === null || status.newestDeltaRevision === undefined ? 'none' : String(status.newestDeltaRevision))],
+      ['state history', text(status.stateHistoryDepth, '0') + ' / ' + text(status.stateHistoryCapacity, '0')],
       ['last fault', text(status.lastFaultCode, 'none') + ' - ' + text(status.lastFaultDetail, 'no detail'), status.lastFaultCode ? 'bad' : 'ok'],
       ['startup fault', text(status.startupFaultCode, 'none'), status.startupFaultCode ? 'bad' : 'ok'],
       ['acquisition label', counts && counts.equipmentTopology ? text(counts.equipmentTopology.acquisition, NOT_PUBLISHED) : NOT_PUBLISHED, 'mute'],
@@ -776,11 +926,11 @@ export function renderSystemSummary(root, snapshot, status, health, connection) 
       cells: [
         text(device.deviceId, '?'),
         text(device.state, NOT_PUBLISHED),
-        String(device.consecutiveTimeouts),
+        text(device.consecutiveTimeouts, '0'),
         timeOf(device.lastSuccessAt),
         device.lastLatencyMs === null || device.lastLatencyMs === undefined ? '-' : number(device.lastLatencyMs, 0, 'ms'),
-        String(device.pollsOk),
-        String(device.pollsFailed),
+        text(device.pollsOk, '0'),
+        text(device.pollsFailed, '0'),
       ],
       tone: device.state === 'ONLINE' ? 'ok' : device.state === 'TIMEOUT' ? 'bad' : 'warn',
     })));
@@ -789,30 +939,34 @@ export function renderSystemSummary(root, snapshot, status, health, connection) 
 
 export function renderWallBreakdown(root, snapshot) {
   clear(root);
-  const summary = summaryPills(snapshot ? snapshot.walls : null);
-  if (summary.state === 'no data') {
-    paragraph(root, 'empty-state', summary.note);
+  const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
+  const tally = sensors.length > 0
+    ? partitionSensors(sensors, snapshot ? snapshot.walls : null)
+    : summaryPills(snapshot ? snapshot.walls : null);
+
+  if (tally.state === 'no data') {
+    paragraph(root, 'empty-state', tally.note);
     return;
   }
 
-  // Visual 3-segment cleanliness distribution bars per wall
+  // Visual 3-segment mutually exclusive cleanliness distribution bars per wall (sum === 24 / 30 / 108)
   const barList = block(root, 'dist-bar-list num');
-  for (const wall of summary.perWall) {
+  for (const entry of tally.perWall) {
     const row = block(barList, 'dist-row');
     const head = block(row, 'dist-row-head');
     const left = document.createElement('strong');
-    left.textContent = text(wall.wall, '?') + ' (' + String(wall.total) + ' SDS)';
+    left.textContent = text(entry.wall, '?') + ' (' + String(entry.total) + ' SDS)';
     const right = document.createElement('span');
-    right.textContent = 'Clean ' + String(wall.cleaner) + ' | Dirty ' + String(wall.dirty)
-      + ' | Unc ' + String(wall.uncertain + wall.notClassified);
+    right.textContent = 'Clean ' + String(entry.cleaner) + ' | Dirty ' + String(entry.dirty)
+      + ' | Unc ' + String(entry.uncertain);
     head.appendChild(left);
     head.appendChild(right);
 
     const bar = block(row, 'wall-bar');
     for (const [cls, cnt] of [
-      ['dirty', wall.dirty],
-      ['unc', wall.uncertain + wall.notClassified],
-      ['clean', wall.cleaner],
+      ['dirty', entry.dirty],
+      ['unc', entry.uncertain],
+      ['clean', entry.cleaner],
     ]) {
       if (cnt > 0) {
         const seg = block(bar, 'wall-bar-seg ' + cls);
@@ -821,24 +975,32 @@ export function renderWallBreakdown(root, snapshot) {
     }
   }
 
-  const body = summary.perWall.map((wall) => ({
+  const body = tally.perWall.map((entry) => ({
     cells: [
-      text(wall.wall, '?'),
-      String(wall.total),
-      String(wall.cleaner),
-      String(wall.dirty),
-      String(wall.uncertain),
-      String(wall.notClassified),
-      wall.maxScore === null || wall.maxScore === undefined ? '-' : number(wall.maxScore, 1),
+      text(entry.wall, '?'),
+      String(entry.total),
+      String(entry.cleaner),
+      String(entry.dirty),
+      String(entry.uncertain),
+      String(entry.publishedUncertain !== undefined ? entry.publishedUncertain : (entry.uncertain || 0)),
+      entry.maxScore === null || entry.maxScore === undefined ? '-' : number(entry.maxScore, 1),
     ],
-    tone: wall.total === EXPECTED_PER_WALL[wall.wall] ? 'ok' : 'warn',
+    tone: entry.total === EXPECTED_PER_WALL[entry.wall] ? 'ok' : 'warn',
   }));
   body.push({
-    cells: ['TOTAL', String(summary.total), String(summary.pills[0].value), String(summary.pills[1].value), summary.breakdown, '-', '-'],
-    tone: summary.state === 'mismatch' ? 'bad' : 'ok',
+    cells: [
+      'TOTAL',
+      String(tally.total),
+      String(tally.pills[0].value),
+      String(tally.pills[1].value),
+      String(tally.pills[2].value),
+      '-',
+      '-',
+    ],
+    tone: tally.state === 'mismatch' ? 'bad' : 'ok',
   });
-  table(root, ['Wall', 'Tot', 'Clean', 'Dirty', 'Unc', 'NotCls', 'Max'], body);
-  paragraph(root, 'breakdown-note', summary.note);
+  table(root, ['Wall', 'Tot', 'Clean', 'Dirty', 'Unc', 'RawUnc', 'Max'], body);
+  paragraph(root, 'breakdown-note', tally.note);
 }
 
 export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
@@ -851,11 +1013,12 @@ export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
     note.textContent = NOT_PUBLISHED;
     return;
   }
-  const ctx = contextOf(canvas);
-  if (!ctx) {
+  const sized = prepareCanvas(canvas, 680, 200);
+  if (!sized) {
     caption.textContent = 'trend explorer: canvas not available in this browser';
     return;
   }
+  const { ctx, width, height } = sized;
   const enabled = names.map((name) => view.enabled.indexOf(name) >= 0);
   const series = names.map((name, index) => ({
     name,
@@ -868,17 +1031,24 @@ export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
   const shown = series.filter((entry, index) => enabled[index]);
   const range = rangeOf(shown);
   const timeRange = timeRangeOf(points.filter(Boolean).map((point) => ({ t: point.t, value: 0 })), 60);
-  const frame = frameOf(canvas, { dualAxis: false, captions: false });
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const frame = frameOf(canvas, { dualAxis: false, captions: false }, sized);
+
+  ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = '#0d1014';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, width, height);
 
   if (!frame || !range || !timeRange) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('No finite samples on enabled channels yet (' + String(points.length) + ' points)', 16, 28);
     caption.textContent = 'trend explorer: ' + String(points.length) + ' samples, nothing on an enabled channel to plot';
     note.textContent = 'a channel with every sample missing is a DATA GAP, not a flat line';
     return;
   }
   const mapper = mapperFor(frame, range, timeRange);
+  axisOf(ctx, frame, range, 'bar', 'left');
+  drawTimeAxis(ctx, frame, timeRange);
+
   ctx.save();
   ctx.lineWidth = 1.8;
   for (const entry of shown) {
@@ -888,14 +1058,13 @@ export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
     drawSeries(ctx, entry.values, mapper);
   }
   ctx.restore();
-  axisOf(ctx, frame, range, 'bar', 'left');
 
   const span = { min: 0, max: 100 };
   const normalized = series.map((entry) => normalise(entry.values, range));
   caption.textContent = captionFor(shown.length ? shown : series, points, trend.capacity)
     + ' | vertical: ' + formatTick(range.min) + ' to ' + formatTick(range.max) + ' bar'
     + ' | 0-100% span ' + formatTick(span.min) + ' to ' + formatTick(span.max);
-  note.textContent = 'Bounded window (' + String(trend.capacity)
+  note.textContent = 'Bounded window (' + text(trend.capacity, '0')
     + ' samples) for published channels only; Coal Flow, SDS Temp, and IV History are ' + NOT_PUBLISHED + '.';
   return { series, normalized, enabled };
 }
@@ -965,16 +1134,17 @@ export function renderCameraPanel(root, snapshot, selectedJet, onSelectJet) {
 
   const viewport = block(root, 'cam-viewport');
   const canvas = document.createElement('canvas');
-  canvas.width = 320;
-  canvas.height = 132;
+  canvas.width = 340;
+  canvas.height = 136;
   canvas.setAttribute('role', 'img');
   canvas.setAttribute('aria-label', 'Camera viewport mount container for ' + displayJet);
   viewport.appendChild(canvas);
 
-  const ctx = contextOf(canvas);
-  if (ctx) {
-    const w = canvas.width;
-    const h = canvas.height;
+  const sized = prepareCanvas(canvas, 340, 136);
+  if (sized) {
+    const ctx = sized.ctx;
+    const w = sized.width;
+    const h = sized.height;
     ctx.fillStyle = '#0b0e13';
     ctx.fillRect(0, 0, w, h);
 
@@ -1009,12 +1179,12 @@ export function renderCameraPanel(root, snapshot, selectedJet, onSelectJet) {
     ctx.lineTo(cx, cy + 20);
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(13, 16, 20, 0.82)';
-    ctx.fillRect(10, h - 42, w - 20, 18);
+    ctx.fillStyle = 'rgba(13, 16, 20, 0.86)';
+    ctx.fillRect(8, h - 40, w - 16, 18);
     ctx.fillStyle = '#fbbf24';
     ctx.font = '9px ui-monospace, Menlo, Consolas, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE', w * 0.5, h - 30);
+    ctx.fillText('NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE', w * 0.5, h - 28);
     ctx.textAlign = 'left';
   }
 

@@ -8,12 +8,27 @@
 // never recomputes a delay, never extends a countdown and never reorders a queue entry.
 
 import { text, number, timeOf } from './feed.mjs';
+import { prepareCanvas } from './chartKit.mjs';
 
 const NOT_PUBLISHED = 'NOT_PUBLISHED_BY_RUNTIME';
 
-function section(host, title, build) {
+function fmt(value, empty) {
+  return text(value, empty === undefined ? '--' : empty);
+}
+
+function fmtNum(value, digits, unit) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
+  return number(value, digits, unit);
+}
+
+function fmtTime(value) {
+  if (value === null || value === undefined || value === '') return '--';
+  return timeOf(value);
+}
+
+function section(host, title, build, extraClass) {
   const block = document.createElement('div');
-  block.className = 'sub';
+  block.className = extraClass ? 'sub ' + extraClass : 'sub';
   const head = document.createElement('p');
   head.className = 'sub-title';
   head.textContent = title;
@@ -23,20 +38,48 @@ function section(host, title, build) {
   return block;
 }
 
-function facts(host, rows) {
+function facts(host, rows, compact) {
   const list = document.createElement('dl');
-  list.className = 'facts';
+  list.className = compact ? 'facts facts-grid-2' : 'facts';
   for (const [label, value, tone] of rows) {
+    const item = compact ? document.createElement('div') : null;
+    if (item) item.className = 'fact-pair';
     const term = document.createElement('dt');
     term.textContent = label;
     const entry = document.createElement('dd');
     entry.textContent = value;
     if (tone) entry.dataset.tone = tone;
-    list.appendChild(term);
-    list.appendChild(entry);
+    if (item) {
+      item.appendChild(term);
+      item.appendChild(entry);
+      list.appendChild(item);
+    } else {
+      list.appendChild(term);
+      list.appendChild(entry);
+    }
   }
   host.appendChild(list);
   return list;
+}
+
+function kpiMini(parent, label, value, sub, tone) {
+  const tile = document.createElement('div');
+  tile.className = 'kpi-tile';
+  if (tone) tile.dataset.tone = tone;
+  const l = document.createElement('span');
+  l.className = 'kpi-tile-lbl';
+  l.textContent = label;
+  const v = document.createElement('span');
+  v.className = 'kpi-tile-val num';
+  v.textContent = value;
+  if (tone) v.dataset.tone = tone;
+  const s = document.createElement('span');
+  s.className = 'kpi-tile-sub num';
+  s.textContent = sub;
+  tile.appendChild(l);
+  tile.appendChild(v);
+  tile.appendChild(s);
+  parent.appendChild(tile);
 }
 
 function table(host, columns, rows, emptyText) {
@@ -48,7 +91,7 @@ function table(host, columns, rows, emptyText) {
     return;
   }
   const node = document.createElement('table');
-  node.className = 'grid-table';
+  node.className = 'grid-table num';
   const head = document.createElement('thead');
   const headRow = document.createElement('tr');
   for (const column of columns) {
@@ -91,7 +134,7 @@ export function renderDispatch(host, workspace) {
     const note = document.createElement('p');
     note.className = 'note';
     note.dataset.tone = 'bad';
-    note.textContent = 'WORKSPACE REFUSED: the document discriminator is ' + text(workspace.kind)
+    note.textContent = 'WORKSPACE REFUSED: the document discriminator is ' + fmt(workspace.kind)
       + ', not the Cleaning Job Workspace the contract names.';
     host.appendChild(note);
     return;
@@ -99,145 +142,144 @@ export function renderDispatch(host, workspace) {
 
   const queue = workspace.queue || {};
   const entries = Array.isArray(queue.entries) ? queue.entries : [];
-  section(host, 'Global queue - ' + text(queue.totalQueued) + ' of ' + text(queue.capacity) + ' at revision ' + text(queue.revision), (block) => {
-    facts(block, [
-      ['queue label', text(queue.label)],
-      ['capacity / queued', text(queue.capacity) + ' / ' + text(queue.totalQueued)],
-      ['auto sequence', text(queue.autoSequence)],
-      ['mode', text(workspace.mode)],
-      ['queue revision', text(queue.revision)],
-    ]);
-    table(block, ['pos', 'entry', 'sensor', 'why queued', 'score', 'since last clean'],
-      entries.map((entry, index) => ({
-        selected: index === 0,
-        cells: [
-          text(entry.position),
-          text(entry.entryId),
-          text(entry.sensorId),
-          text(entry.sourceReason),
-          entry.dirtyScore === null || entry.dirtyScore === undefined ? 'NOT_PROVIDED' : Number(entry.dirtyScore).toFixed(1),
-          text(entry.secondsSinceLastClean) + ' s',
-        ],
-      })),
-      'The queue is empty: no entry is waiting for a cleaning cycle.');
-    const last = queue.lastDispatch;
-    if (last && typeof last === 'object') {
-      facts(block, [
-        ['last dispatch', text(last.dispatchId)],
-        ['entry / position', text(last.queueEntryId) + ' from position ' + text(last.positionBefore)],
-        ['sensor / why', text(last.sensorId) + ' - ' + text(last.sourceReason)],
-        ['job', text(last.jobId)],
-        ['origin', text(last.origin)],
-        ['queue revision before / after', text(last.queueRevisionBefore) + ' / ' + text(last.queueRevisionAfter)],
-        ['dispatched at', timeOf(last.dispatchedAt)],
-      ]);
-    }
-  });
-
   const countdown = workspace.countdown || {};
-  const countdownRows = [
-    ['lifecycle', text(countdown.lifecycle), String(countdown.lifecycle) === 'ACTIVE_FROZEN' ? 'warn' : null],
-    ['generation', text(countdown.generation)],
-    ['remaining', text(countdown.remainingSeconds) + ' s'],
-    ['frozen', text(countdown.frozen) + ' - the applied delay cannot change mid-countdown'],
-    ['dispatch admissible', text(countdown.dispatchAdmissible),
-      countdown.dispatchAdmissible === true ? 'ok' : 'mute'],
-    ['decision', text(countdown.decision)],
-    ['refusal code', text(countdown.refusalCode),
-      countdown.refusalCode && countdown.refusalCode !== 'NONE' ? 'bad' : null],
-    ['superseded', text(countdown.supersededReason)],
-    ['last superseded', text(countdown.lastSupersededReason)],
-    ['created / completed / dispatched', timeOf(countdown.createdAt) + ' / ' + timeOf(countdown.completedAt)
-      + ' / ' + timeOf(countdown.dispatchedAt)],
-  ];
-  section(host, 'Next-dispatch countdown', (block) => facts(block, countdownRows));
+  const preview = workspace.preview || {};
+  const decision = countdown.decision && typeof countdown.decision === 'object' ? countdown.decision : null;
+  const manual = String(preview.mode) === 'MANUAL_FIXED';
 
-  const decision = countdown.decision;
-  if (decision && typeof decision === 'object') {
-    section(host, 'Frozen decision - captured once after Mandatory Safe Return', (block) => facts(block, [
-      ['decision', text(decision.decisionId)],
-      ['countdown generation', text(decision.countdownGeneration)],
-      ['queue generation', text(decision.queueGeneration)],
-      ['entry', text(decision.queueEntryId)],
-      ['next sensor', text(decision.nextSensorId) + ' on ' + text(decision.nextWall)
-        + ', order-in-wall ' + text(decision.nextSensorOrderWall)],
-      ['canonical / effective jet', text(decision.canonicalWaterJetId) + ' / ' + text(decision.effectiveWaterJetId)],
-      ['effective jet provenance', text(decision.effectiveWaterJetProvenance)],
-      ['isolation valve', text(decision.isolationValveId)],
-      ['cabinet / controller', text(decision.cabinetId) + ' / ' + text(decision.controllerId)],
-      ['axes', text(decision.horizontalAxisId) + ' / ' + text(decision.verticalAxisId)],
-      ['boiler condition / mode', text(decision.boilerCondition) + ' / ' + text(decision.mode)],
-      ['configuration version', text(decision.configurationVersion)],
-      ['manual delay', number(decision.manualDelaySeconds, 0, 's')],
-      ['frozen RH input', decision.rhInput && typeof decision.rhInput === 'object'
-        ? number(decision.rhInput.rhTemperature, 1, '%') + ' / ' + text(decision.rhInput.quality)
-          + ' at ' + timeOf(decision.rhInput.observedAt) + ', generation ' + text(decision.rhInput.generation)
-        : 'none - ' + (String(decision.mode) === 'MANUAL_FIXED'
-            ? 'Manual mode ignores the RH input by contract'
-            : 'the host published no frozen input')],
-      ['RH range / window', number(decision.rhTempMin, 1) + ' to ' + number(decision.rhTempMax, 1)
-        + ' over ' + text(decision.rhInputWindowSeconds) + ' s'],
-      ['auto delay range', number(decision.autoDelayMinSeconds, 0, 's') + ' to '
-        + number(decision.autoDelayMaxSeconds, 0, 's')],
-      ['base delay / zone / factor', number(decision.baseDelaySeconds, 0, 's') + ' / '
-        + text(decision.zone) + ' / ' + number(decision.zoneFactor, 2)],
-      ['applied delay (frozen)', number(decision.appliedDelaySeconds, 0, 's'), 'ok'],
-      ['decision created', timeOf(decision.createdAt)],
-    ]));
-  } else {
-    section(host, 'Frozen decision', (block) => facts(block, [
-      ['decision', text(countdown.decision === null || countdown.decision === undefined
-        ? 'NONE' : countdown.decision), 'mute'],
-      ['meaning', 'no decision is frozen for this generation: the applied delay is not fixed yet'],
-    ]));
+  // Top 4-tile summary strip for fast scanning
+  const kpi = document.createElement('div');
+  kpi.className = 'kpi-strip-4';
+  kpiMini(kpi, 'COUNTDOWN',
+    typeof countdown.remainingSeconds === 'number' ? String(countdown.remainingSeconds) + ' s' : 'IDLE',
+    fmt(countdown.lifecycle, 'NONE') + (countdown.frozen ? ' (FROZEN)' : ''),
+    String(countdown.lifecycle) === 'ACTIVE_FROZEN' ? 'warn' : 'mute');
+  kpiMini(kpi, 'APPLIED DELAY',
+    fmtNum(preview.appliedDelaySeconds, 0, 's'),
+    fmt(preview.boilerCondition, 'NO CONDITION') + ' | x' + fmtNum(preview.zoneFactor, 2),
+    preview.appliedDelaySeconds === null || preview.appliedDelaySeconds === undefined ? 'mute' : 'ok');
+  kpiMini(kpi, 'DISPATCH MODE',
+    fmt(workspace.mode, fmt(preview.mode)),
+    'AutoSeq: ' + fmt(queue.autoSequence),
+    countdown.dispatchAdmissible === true ? 'ok' : 'info');
+  kpiMini(kpi, 'QUEUE STATUS',
+    fmt(queue.totalQueued, '0') + ' / ' + fmt(queue.capacity, '0'),
+    'Rev ' + fmt(queue.revision) + ' | ' + fmt(queue.label, 'Global'),
+    entries.length > 0 ? 'info' : 'mute');
+  host.appendChild(kpi);
+
+  // Two-column compact cards: Countdown + TimeDelay Preview side by side
+  const cardPair = document.createElement('div');
+  cardPair.className = 'dispatch-cards-2';
+
+  section(cardPair, 'Next-Dispatch Countdown', (block) => {
+    facts(block, [
+      ['Lifecycle', fmt(countdown.lifecycle, 'IDLE'), String(countdown.lifecycle) === 'ACTIVE_FROZEN' ? 'warn' : null],
+      ['Generation', fmt(countdown.generation)],
+      ['Remaining', fmtNum(countdown.remainingSeconds, 0, 's')],
+      ['Frozen', countdown.frozen === true ? 'YES (locked)' : (countdown.frozen === false ? 'NO' : '--')],
+      ['Admissible', countdown.dispatchAdmissible === true ? 'YES' : (countdown.dispatchAdmissible === false ? 'NO' : '--'),
+        countdown.dispatchAdmissible === true ? 'ok' : 'mute'],
+      ['Refusal', fmt(countdown.refusalCode, 'NONE'),
+        countdown.refusalCode && countdown.refusalCode !== 'NONE' ? 'bad' : null],
+      ['Superseded', fmt(countdown.supersededReason, fmt(countdown.lastSupersededReason, 'None'))],
+      ['Timestamps', fmtTime(countdown.createdAt) + ' / ' + fmtTime(countdown.completedAt) + ' / ' + fmtTime(countdown.dispatchedAt)],
+    ]);
+  }, 'dispatch-subcard');
+
+  section(cardPair, 'TimeDelay Preview - ' + fmt(preview.mode) + (manual ? ' (Manual)' : ' (Auto)'), (block) => {
+    facts(block, [
+      ['Available / Exec', fmt(preview.available) + ' / ' + fmt(preview.affectsExecution)],
+      ['Refusal', fmt(preview.refusalCode, 'NONE'),
+        preview.refusalCode && preview.refusalCode !== 'NONE' ? 'bad' : null],
+      ['RH Input', fmtNum(preview.rhTemperature, 1, '%') + ' (' + fmt(preview.rhQuality) + ')', null],
+      ['RH Observed / Gen', fmtTime(preview.rhObservedAt) + ' | gen ' + fmt(preview.rhGeneration)],
+      ['Clamped RH', fmtNum(preview.clampedRhTemperature, 1, '%')],
+      ['Mapped / Base', fmtNum(preview.mappedDelaySeconds, 0, 's') + ' / ' + fmtNum(preview.baseDelaySeconds, 0, 's')],
+      ['Zone / Factor', fmt(preview.zone) + ' / ' + fmtNum(preview.zoneFactor, 2)],
+      ['Applied / Boiler', fmtNum(preview.appliedDelaySeconds, 0, 's') + ' | ' + fmt(preview.boilerCondition),
+        preview.appliedDelaySeconds === null || preview.appliedDelaySeconds === undefined ? 'mute' : 'ok'],
+    ]);
+  }, 'dispatch-subcard');
+
+  host.appendChild(cardPair);
+
+  // Last Dispatch card (compact 2-col)
+  const last = queue.lastDispatch;
+  if (last && typeof last === 'object') {
+    section(host, 'Last Dispatch Record', (block) => {
+      facts(block, [
+        ['Dispatch ID', fmt(last.dispatchId)],
+        ['Entry / Pos', fmt(last.queueEntryId) + ' (from pos ' + fmt(last.positionBefore) + ')'],
+        ['Sensor / Reason', fmt(last.sensorId) + ' - ' + fmt(last.sourceReason)],
+        ['Job / Origin', fmt(last.jobId) + ' (' + fmt(last.origin) + ')'],
+        ['Queue Rev', fmt(last.queueRevisionBefore) + ' -> ' + fmt(last.queueRevisionAfter)],
+        ['Dispatched At', fmtTime(last.dispatchedAt)],
+      ], true);
+    }, 'dispatch-subcard');
   }
 
+  // Frozen Decision card
+  if (decision) {
+    section(host, 'Frozen Decision (Captured Once After Mandatory Safe Return)', (block) => {
+      facts(block, [
+        ['Decision / Gen', fmt(decision.decisionId) + ' | cd #' + fmt(decision.countdownGeneration) + ' / q #' + fmt(decision.queueGeneration)],
+        ['Entry / Target', fmt(decision.queueEntryId) + ' -> ' + fmt(decision.nextSensorId) + ' (' + fmt(decision.nextWall) + ' #' + fmt(decision.nextSensorOrderWall) + ')'],
+        ['Water Jet', fmt(decision.canonicalWaterJetId) + ' -> ' + fmt(decision.effectiveWaterJetId) + ' (' + fmt(decision.effectiveWaterJetProvenance) + ')'],
+        ['Valve / Cabinet', fmt(decision.isolationValveId) + ' | ' + fmt(decision.cabinetId) + ' / ' + fmt(decision.controllerId)],
+        ['Axes', fmt(decision.horizontalAxisId) + ' / ' + fmt(decision.verticalAxisId)],
+        ['Condition / Mode', fmt(decision.boilerCondition) + ' / ' + fmt(decision.mode) + ' (cfg ' + fmt(decision.configurationVersion) + ')'],
+        ['Manual / Auto Range', fmtNum(decision.manualDelaySeconds, 0, 's') + ' | ' + fmtNum(decision.autoDelayMinSeconds, 0, 's') + '-' + fmtNum(decision.autoDelayMaxSeconds, 0, 's')],
+        ['Frozen RH Input', decision.rhInput && typeof decision.rhInput === 'object'
+          ? fmtNum(decision.rhInput.rhTemperature, 1, '%') + ' ' + fmt(decision.rhInput.quality)
+            + ' @ ' + fmtTime(decision.rhInput.observedAt) + ' (gen ' + fmt(decision.rhInput.generation) + ')'
+          : (String(decision.mode) === 'MANUAL_FIXED' ? 'Ignored (Manual)' : 'None published')],
+        ['RH Range / Window', fmtNum(decision.rhTempMin, 1) + '-' + fmtNum(decision.rhTempMax, 1) + ' / ' + fmt(decision.rhInputWindowSeconds) + ' s'],
+        ['Base / Zone / Applied', fmtNum(decision.baseDelaySeconds, 0, 's') + ' | ' + fmt(decision.zone) + ' x' + fmtNum(decision.zoneFactor, 2) + ' -> ' + fmtNum(decision.appliedDelaySeconds, 0, 's'), 'ok'],
+        ['Decision Created', fmtTime(decision.createdAt)],
+      ], true);
+    }, 'dispatch-subcard');
+  } else {
+    section(host, 'Frozen Decision', (block) => {
+      const note = document.createElement('p');
+      note.className = 'note';
+      note.dataset.tone = 'mute';
+      note.textContent = 'Decision: ' + fmt(countdown.decision, 'NONE')
+        + ' - no decision is frozen for this generation; applied delay is not fixed yet.';
+      block.appendChild(note);
+    }, 'dispatch-subcard');
+  }
+
+  // Dispatch-cycle timeline table
   const timeline = workspace.timeline || {};
   const steps = Array.isArray(timeline.steps) ? timeline.steps : [];
-  section(host, 'Dispatch-cycle timeline - ' + String(steps.length) + ' steps, current stage '
-    + text(timeline.stage), (block) => {
-    table(block, ['#', 'stage', 'step', 'state'], steps.map((step) => ({
+  section(host, 'Dispatch-Cycle Timeline - ' + String(steps.length) + ' Steps (Stage: ' + fmt(timeline.stage, 'IDLE') + ')', (block) => {
+    table(block, ['#', 'Stage', 'Step', 'State'], steps.map((step) => ({
       selected: String(step.state) === 'CURRENT',
-      cells: [text(step.ordinal), text(step.stage), text(step.label), text(step.state)],
+      cells: [fmt(step.ordinal), fmt(step.stage), fmt(step.label), fmt(step.state)],
     })), 'The host published no timeline steps.');
-    const note = document.createElement('p');
-    note.className = 'note';
-    note.textContent = 'Every step is listed in contract order and none is hidden: a pending step '
-      + 'reads PENDING, a failed step reads FAILED, and the screen adds no progress of its own.';
-    block.appendChild(note);
-  });
+  }, 'dispatch-subcard');
 
-  const preview = workspace.preview || {};
-  const manual = String(preview.mode) === 'MANUAL_FIXED';
-  section(host, 'TimeDelay preview - ' + text(preview.mode) + (manual ? ' (Manual fixed)' : ' (Auto mapped)'), (block) => {
-    facts(block, [
-      ['available', text(preview.available)],
-      ['affects execution', text(preview.affectsExecution)],
-      ['refusal code', text(preview.refusalCode),
-        preview.refusalCode && preview.refusalCode !== 'NONE' ? 'bad' : null],
-      ['RH input', number(preview.rhTemperature, 1, '%') + ' / ' + text(preview.rhQuality)
-        + ' at ' + timeOf(preview.rhObservedAt)],
-      ['RH generation', text(preview.rhGeneration)],
-      ['clamped RH', number(preview.clampedRhTemperature, 1, '%')],
-      ['mapped delay', number(preview.mappedDelaySeconds, 0, 's')],
-      ['base delay', number(preview.baseDelaySeconds, 0, 's')],
-      ['zone / factor', text(preview.zone) + ' / ' + number(preview.zoneFactor, 2)],
-      ['applied delay', number(preview.appliedDelaySeconds, 0, 's'),
-        preview.appliedDelaySeconds === null || preview.appliedDelaySeconds === undefined ? 'mute' : 'ok'],
-      ['boiler condition', text(preview.boilerCondition)],
-    ]);
-    const note = document.createElement('p');
-    note.className = 'note';
-    note.textContent = 'Preview only. While a countdown is ACTIVE_FROZEN the applied delay shown here '
-      + 'is the frozen value, and a live preview that disagrees with it is reported as a preview, '
-      + 'never as a change to the running countdown.';
-    block.appendChild(note);
-  });
+  // Compact queue entries reference table when entries exist
+  if (entries.length > 0) {
+    section(host, 'Queued Entries Detail (' + String(entries.length) + ')', (block) => {
+      table(block, ['#', 'Entry', 'Sensor', 'Reason', 'Score', 'Age'],
+        entries.map((entry, index) => ({
+          selected: index === 0,
+          cells: [
+            fmt(entry.position),
+            fmt(entry.entryId),
+            fmt(entry.sensorId),
+            fmt(entry.sourceReason),
+            fmtNum(entry.dirtyScore, 1),
+            fmt(entry.secondsSinceLastClean) + ' s',
+          ],
+        })),
+        'Queue empty.');
+    }, 'dispatch-subcard');
+  }
 }
 
-// A view scale of the countdown lane, in per cent of real time. It is a reading aid only: the frozen
-// seconds the host published are the same seconds at 1.0x and at 0.75x, and the axis label says so,
-// because a control that quietly changed a displayed countdown would be a control over the sequence.
 const VIEW_SCALES = Object.freeze([1, 0.75]);
 let viewScale = 1;
 
@@ -251,16 +293,6 @@ export function setViewScale(value) {
   return viewScale;
 }
 
-/**
- * The queue as slots rather than as a table: one box per position up to the published capacity, filled
- * from the published entries, and a muted empty-slot box for every position the host did not fill. A
- * blank box on a wall screen reads like a hidden entry, so the emptiness is written out instead.
- */
-/**
- * One queue, rendered at two sizes. Tab 2 gets the whole board with the countdown lane; Tab 1 gets the
- * same slots beside the selected Sensor, from the Snapshot's own QueueSummary - the same published fields,
- * because two views of a queue that disagree about what is queued would be a worse defect than a scroll.
- */
 export function renderQueueBoard(host, queue, workspace, options) {
   host.textContent = '';
   const withLane = !options || options.lane !== false;
@@ -306,10 +338,10 @@ export function renderQueueBoard(host, queue, workspace, options) {
         tr.addEventListener('click', () => onSelect(entry.sensorId));
       }
       for (const val of [
-        'Q' + text(entry.position),
-        text(entry.sensorId),
-        typeof entry.dirtyScore === 'number' ? entry.dirtyScore.toFixed(1) : '--',
-        text(entry.sourceReason),
+        'Q' + fmt(entry.position),
+        fmt(entry.sensorId),
+        fmtNum(entry.dirtyScore, 1),
+        fmt(entry.sourceReason),
       ]) {
         const td = document.createElement('td');
         td.textContent = val;
@@ -339,12 +371,12 @@ export function renderQueueBoard(host, queue, workspace, options) {
     } else {
       const id = document.createElement('span');
       id.className = 'queue-slot-id';
-      id.textContent = String(position) + '. ' + text(entry.sensorId) + ' / ' + text(entry.entryId);
+      id.textContent = String(position) + '. ' + fmt(entry.sensorId) + ' / ' + fmt(entry.entryId);
       card.appendChild(id);
       const score = document.createElement('span');
       score.className = 'queue-slot-score';
-      score.textContent = number(entry.dirtyScore, 1) + ' - ' + text(entry.sourceReason)
-        + ' - ' + String(entry.secondsSinceLastClean) + ' s since last clean';
+      score.textContent = fmtNum(entry.dirtyScore, 1) + ' | ' + fmt(entry.sourceReason)
+        + ' | ' + fmt(entry.secondsSinceLastClean) + ' s since clean';
       card.appendChild(score);
       if (typeof entry.dirtyScore === 'number') card.dataset.tone = 'info';
     }
@@ -352,20 +384,20 @@ export function renderQueueBoard(host, queue, workspace, options) {
   }
   host.appendChild(grid);
 
+  const totalQueued = Number(queue.totalQueued) || 0;
   const head = document.createElement('p');
   head.className = 'note';
-  head.textContent = 'queue: ' + String(entries.length) + ' of ' + String(capacity) + ' slots filled'
-    + ' - total queued ' + String(queue.totalQueued) + ' at queue revision ' + String(queue.revision)
-    + ' (' + text(queue.label) + ') - auto sequence ' + text(queue.autoSequence)
-    + ' - ' + (entries.length === Number(queue.totalQueued) ? 'entries agree with the total'
-      : 'ENTRIES AND TOTAL DISAGREE: ' + String(entries.length) + ' vs ' + String(queue.totalQueued));
+  head.textContent = 'Queue: ' + String(entries.length) + ' of ' + String(capacity) + ' slots filled'
+    + ' | total ' + String(totalQueued) + ' at rev ' + fmt(queue.revision)
+    + ' (' + fmt(queue.label, 'Global') + ') | AutoSeq ' + fmt(queue.autoSequence)
+    + (entries.length === totalQueued ? '' : ' | ENTRIES/TOTAL MISMATCH: ' + String(entries.length) + ' vs ' + String(totalQueued));
   host.appendChild(head);
 
   if (!withLane) return;
-  section(host, 'Next-dispatch countdown lane (view scale, never a recomputation)', (block) => {
+  section(host, 'Next-Dispatch Countdown Lane (View Scale, Never a Recomputation)', (block) => {
     const canvas = document.createElement('canvas');
     canvas.width = 620;
-    canvas.height = 110;
+    canvas.height = 96;
     canvas.id = 'delay-curve';
     canvas.setAttribute('role', 'img');
     canvas.setAttribute('aria-label', 'Frozen countdown lane of the Cleaning Job Workspace at the selected view scale');
@@ -394,83 +426,89 @@ export function renderQueueBoard(host, queue, workspace, options) {
     block.appendChild(buttons);
     block.appendChild(caption);
     drawCountdownLane(canvas, caption, workspace);
-  });
+  }, 'dispatch-subcard');
 }
 
-/**
- * The countdown lane: the remaining seconds the host froze, drawn against the seconds axis at the
- * selected view scale. Nothing is interpolated forward and no timer runs here - when the host stops
- * publishing a countdown the lane says so instead of walking on its own.
- */
 export function drawCountdownLane(canvas, caption, workspace) {
-  const context = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
-  if (!context) {
+  const sized = prepareCanvas(canvas, 620, 96);
+  if (!sized) {
     caption.textContent = 'countdown lane: canvas not available in this browser';
     return;
   }
+  const { ctx, width, height } = sized;
   const countdown = workspace ? workspace.countdown : null;
-  const width = canvas.width;
-  const height = canvas.height;
-  context.clearRect(0, 0, width, height);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#0d1014';
+  ctx.fillRect(0, 0, width, height);
+
   const seconds = countdown && typeof countdown.remainingSeconds === 'number' ? countdown.remainingSeconds : null;
   const preview = workspace ? workspace.preview : null;
   const applied = preview && typeof preview.appliedDelaySeconds === 'number' ? preview.appliedDelaySeconds : null;
   const span = Math.max(1, applied === null ? 600 : applied);
-  const lane = height - 34;
+  const padX = 18;
+  const trackW = Math.max(60, width - padX * 2);
+  const lane = height - 28;
 
-  context.strokeStyle = 'rgba(120, 140, 160, 0.55)';
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(8, lane);
-  context.lineTo(width - 8, lane);
-  context.stroke();
+  // Baseline axis
+  ctx.strokeStyle = '#384250';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padX, lane);
+  ctx.lineTo(width - padX, lane);
+  ctx.stroke();
+
   const ticks = 5;
-  context.font = '10px ui-monospace, Menlo, Consolas, monospace';
-  context.textAlign = 'center';
-  context.fillStyle = 'rgba(154, 165, 177, 0.85)';
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#94a3b8';
   for (let index = 0; index <= ticks; index += 1) {
-    const x = 8 + (index / ticks) * (width - 16);
+    const x = padX + (index / ticks) * trackW;
     const shown = Math.round((index / ticks) * span / viewScale);
-    context.beginPath();
-    context.moveTo(x, lane - 4);
-    context.lineTo(x, lane + 4);
-    context.stroke();
-    context.fillText(String(shown) + ' s', x, lane + 16);
+    ctx.beginPath();
+    ctx.moveTo(x, lane - 4);
+    ctx.lineTo(x, lane + 4);
+    ctx.stroke();
+    ctx.fillText(String(shown) + ' s', x, lane + 15);
   }
+  ctx.textAlign = 'left';
+
   if (seconds === null) {
-    context.setLineDash([4, 3]);
-    context.strokeStyle = 'rgba(154, 165, 177, 0.5)';
-    context.beginPath();
-    context.moveTo(8, lane - 12);
-    context.lineTo(width - 8, lane - 12);
-    context.stroke();
-    context.setLineDash([]);
-    caption.textContent = 'countdown lane: no remaining seconds published in this workspace - nothing is drawn forward';
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
+    ctx.beginPath();
+    ctx.moveTo(padX, lane - 16);
+    ctx.lineTo(width - padX, lane - 16);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText('No active countdown seconds published', padX + 4, lane - 26);
+    caption.textContent = 'Countdown lane: no remaining seconds published in this workspace - nothing is drawn forward.';
     return;
   }
-  const x = 8 + Math.min(1, Math.max(0, seconds / span)) * (width - 16);
-  context.strokeStyle = 'rgba(227, 179, 65, 0.95)';
-  context.lineWidth = 2;
-  context.beginPath();
-  context.moveTo(8, lane - 12);
-  context.lineTo(x, lane - 12);
-  context.stroke();
-  context.beginPath();
-  context.moveTo(x, lane - 22);
-  context.lineTo(x, lane - 2);
-  context.stroke();
-  caption.textContent = 'countdown lane: ' + String(seconds) + ' s remaining at ' + viewScale.toFixed(2).replace(/0$/, '')
-    + 'x view scale - the axis is compressed for reading only, the published countdown and its '
-    + (countdown && countdown.frozen ? 'frozen' : 'unfrozen') + ' state are unchanged ('
-    + text(countdown ? countdown.lifecycle : null) + ', generation '
-    + text(countdown && countdown.decision ? countdown.decision.countdownGeneration : null) + ')';
+
+  const ratio = Math.min(1, Math.max(0, seconds / span));
+  const x = padX + ratio * trackW;
+  ctx.fillStyle = 'rgba(251, 191, 36, 0.20)';
+  ctx.fillRect(padX, lane - 24, Math.max(3, x - padX), 14);
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padX, lane - 17);
+  ctx.lineTo(x, lane - 17);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x, lane - 28);
+  ctx.lineTo(x, lane - 4);
+  ctx.stroke();
+  ctx.fillStyle = '#f1f5f9';
+  ctx.fillText(String(seconds) + ' s remaining', Math.min(x + 6, width - 110), lane - 30);
+
+  caption.textContent = 'Countdown lane: ' + String(seconds) + ' s remaining at ' + viewScale.toFixed(2).replace(/0$/, '')
+    + 'x view scale (' + (countdown && countdown.frozen ? 'FROZEN' : 'unfrozen') + ', '
+    + fmt(countdown ? countdown.lifecycle : null) + ', gen '
+    + fmt(countdown && countdown.decision ? countdown.decision.countdownGeneration : null) + ')';
 }
 
-/**
- * The single published outcome of the last released Job. The Runtime keeps one record and no archive of
- * completed cycles, so the panel prints that one row and says what it does not carry, rather than laying
- * out a history that would have to be invented.
- */
 export function renderOutcome(host, snapshot) {
   host.textContent = '';
   const sequence = snapshot ? snapshot.sequence : null;
@@ -478,46 +516,47 @@ export function renderOutcome(host, snapshot) {
   if (!outcome) {
     const note = document.createElement('p');
     note.className = 'outcome-absent';
-    note.textContent = 'no completed-cycle record published: NO HISTORICAL CYCLE ARCHIVE - LAST OUTCOME ONLY';
+    note.textContent = 'No completed-cycle record published: NO HISTORICAL CYCLE ARCHIVE - LAST OUTCOME ONLY';
     host.appendChild(note);
     return;
   }
   const line = document.createElement('p');
   line.className = 'outcome-line';
   line.dataset.tone = String(outcome.outcome) === 'COMPLETE' ? 'ok' : 'warn';
-  line.textContent = 'job ' + text(outcome.jobId) + ' on ' + text(outcome.targetSensorId)
-    + ' - outcome ' + text(outcome.outcome) + ' - trigger ' + text(outcome.trigger)
-    + ' at phase ' + text(outcome.phaseAtTrigger)
-    + ' - cleaning phases complete ' + (outcome.cleaningPhasesComplete ? 'YES' : 'NO');
+  line.textContent = 'Job ' + fmt(outcome.jobId) + ' on ' + fmt(outcome.targetSensorId)
+    + ' | ' + fmt(outcome.outcome) + ' | Trigger: ' + fmt(outcome.trigger)
+    + ' @ ' + fmt(outcome.phaseAtTrigger)
+    + ' | Phases Complete: ' + (outcome.cleaningPhasesComplete ? 'YES' : 'NO');
   host.appendChild(line);
+
   facts(host, [
-    ['valve', text(outcome.valveId) + ' - close command seq ' + text(outcome.valveCloseCommandSeq)
-      + ', closed confirmed seq ' + text(outcome.valveClosedConfirmedSeq, 'not observed: closure was pressure-inferred')
-      + ', resolution ' + text(outcome.valveCloseResolution, NOT_PUBLISHED)],
-    ['diagnosis', text(outcome.valveDiagnosis, 'none recorded')],
-    ['qualified', text(outcome.qualifiedCompletion, 'not recorded')
+    ['Valve & Closure', fmt(outcome.valveId) + ' | cmd #' + fmt(outcome.valveCloseCommandSeq)
+      + ' | closed #' + fmt(outcome.valveClosedConfirmedSeq, 'inferred')
+      + ' (' + fmt(outcome.valveCloseResolution, NOT_PUBLISHED) + ')'],
+    ['Diagnosis', fmt(outcome.valveDiagnosis, 'None')],
+    ['Qualification', fmt(outcome.qualifiedCompletion, 'None')
       + (Array.isArray(outcome.qualifiedRemarks) && outcome.qualifiedRemarks.length ? ' - ' + outcome.qualifiedRemarks.join(' / ') : '')],
-    ['queue revision', text(outcome.queueRevisionBefore) + ' -> ' + text(outcome.queueRevisionAfter)
-      + ' (entry ' + text(outcome.queueEntryId) + ', dispatch ' + text(outcome.dispatchId) + ')'],
-    ['axis evidence', 'return command seq ' + text(outcome.axisReturnCommandSeq)
-      + ', standby confirmed seq ' + text(outcome.standbyConfirmedSeq)],
-    ['outcome / release seq', text(outcome.outcomeSeq) + ' / ' + text(outcome.releaseSeq)],
-    ['auto sequence', text(outcome.autoSequenceAtRelease)],
-    ['finalized', timeOf(outcome.finalizedAt)],
-  ]);
+    ['Queue Rev / Entry', fmt(outcome.queueRevisionBefore) + ' -> ' + fmt(outcome.queueRevisionAfter)
+      + ' | ' + fmt(outcome.queueEntryId) + ' / ' + fmt(outcome.dispatchId)],
+    ['Axis Evidence', 'ret #' + fmt(outcome.axisReturnCommandSeq) + ' | standby #' + fmt(outcome.standbyConfirmedSeq)],
+    ['Outcome / Release', '#' + fmt(outcome.outcomeSeq) + ' / #' + fmt(outcome.releaseSeq) + ' | AutoSeq ' + fmt(outcome.autoSequenceAtRelease)],
+    ['Finalized', fmtTime(outcome.finalizedAt)],
+  ], true);
+
   const events = Array.isArray(outcome.events) ? outcome.events : [];
   const list = document.createElement('p');
   list.className = 'note';
-  list.textContent = 'events of that record: ' + String(events.length)
-    + (events.length ? ' - ' + events.map((event) => String(event.seq) + ' ' + String(event.event)).join(', ') : ' - none')
+  list.textContent = 'Events (' + String(events.length) + '): '
+    + (events.length ? events.map((event) => String(event.seq) + ':' + String(event.event)).join(', ') : 'none')
     + ' | NO HISTORICAL CYCLE ARCHIVE - LAST OUTCOME ONLY';
   host.appendChild(list);
+
   const faults = Array.isArray(outcome.equipmentFaults) ? outcome.equipmentFaults : [];
   const tail = document.createElement('p');
   tail.className = 'note';
   tail.dataset.tone = faults.length ? 'bad' : 'mute';
   tail.textContent = faults.length
-    ? faults.map((fault) => text(fault.valveId) + ' ' + text(fault.diagnosis)).join(' | ')
-    : 'no equipment fault recorded on that outcome';
+    ? faults.map((fault) => fmt(fault.valveId) + ' ' + fmt(fault.diagnosis)).join(' | ')
+    : 'No equipment fault recorded on that outcome.';
   host.appendChild(tail);
 }

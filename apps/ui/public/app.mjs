@@ -54,6 +54,7 @@ import {
 
 const DENSITY_KEY = 'wjss.operator.density';
 const densities = ['comfortable', 'compact'];
+const SCORE_HISTORY_CAP = 60;
 
 const view = {
   selectedId: null,
@@ -72,7 +73,35 @@ const view = {
   filter: 'ALL',
   sdsFilter: 'ALL',
   camChoice: 'AUTO',
+  scoreHistory: new Map(),
+  lastHistoryRev: null,
 };
+
+function recordScoreHistory(snapshot) {
+  if (!snapshot || !Array.isArray(snapshot.sensors)) return;
+  const rev = snapshot.revision;
+  if (view.lastHistoryRev !== null && rev <= view.lastHistoryRev) {
+    if (rev < view.lastHistoryRev) {
+      // Revision discontinuity / host reset: never keep history across a reset.
+      view.scoreHistory.clear();
+    } else {
+      return;
+    }
+  }
+  view.lastHistoryRev = rev;
+  for (const sensor of snapshot.sensors) {
+    if (!sensor || typeof sensor.sensorId !== 'string') continue;
+    let list = view.scoreHistory.get(sensor.sensorId);
+    if (!list) {
+      list = [];
+      view.scoreHistory.set(sensor.sensorId, list);
+    }
+    const score = typeof sensor.dirtyScore === 'number' && Number.isFinite(sensor.dirtyScore)
+      ? sensor.dirtyScore : null;
+    list.push({ rev, score });
+    if (list.length > SCORE_HISTORY_CAP) list.shift();
+  }
+}
 
 function host(id) {
   return document.getElementById(id);
@@ -315,7 +344,10 @@ function renderHeader(state) {
     view.tabNote,
     state.snapshot ? state.snapshot.queue : null,
   );
-  renderPills(state.snapshot ? state.snapshot.walls : null);
+  renderPills(
+    state.snapshot ? state.snapshot.walls : null,
+    state.snapshot ? state.snapshot.sensors : null,
+  );
   renderFeedState(connection, state.revision, state.consecutiveFailures, state.health);
   renderDiagnostics(view.diagnosticsOpen, badge, view.frameFacts);
   renderStatusStripAndTicker(state);
@@ -472,6 +504,7 @@ function render(state, force) {
 
   const model = buildModel(snapshot);
   view.model = model;
+  recordScoreHistory(snapshot);
   if (snapshot.trend && Array.isArray(snapshot.trend.seriesNames)
     && view.enabledFrom !== String(snapshot.trend.seriesNames.join(' '))) {
     view.enabled = snapshot.trend.seriesNames.slice();
@@ -512,17 +545,26 @@ function render(state, force) {
   if (bandsBadge) {
     const hasActive = Boolean(snapshot.activeJob && snapshot.activeJob.targetSensorId);
     const showClean = hasActive && view.overlay === 'cleaning';
-    bandsBadge.className = showClean ? 'badge-cleaning-now' : 'badge-inspecting';
+    bandsBadge.className = showClean ? 'badge-cleaning-now' : (hasActive ? 'badge-inspecting' : 'badge-standby');
     bandsBadge.textContent = showClean
       ? 'CLEANING NOW: ' + text(snapshot.activeJob.targetSensorId)
-      : 'INSPECTING: ' + text(view.selectedId, '-');
+      : (hasActive ? 'INSPECTING: ' + text(view.selectedId, '-') : 'STANDBY | ' + text(view.selectedId, '-'));
   }
   const bands = host('delay-bands');
-  if (bands) renderDelayBands(bands, host('delay-bands-caption'), snapshot, state.workspace, view.selectedId);
+  if (bands) {
+    renderDelayBands(
+      bands,
+      host('delay-bands-caption'),
+      snapshot,
+      state.workspace,
+      view.selectedId,
+      view.selectedId ? view.scoreHistory.get(view.selectedId) : null,
+    );
+  }
 
   const miniQueueTitle = host('mini-queue-title');
   if (miniQueueTitle && snapshot.queue) {
-    miniQueueTitle.textContent = 'Cleaning Queue (' + String(snapshot.queue.totalQueued) + ' / ' + String(snapshot.queue.capacity) + ')';
+    miniQueueTitle.textContent = 'Cleaning Queue (' + text(snapshot.queue.totalQueued, '0') + ' / ' + text(snapshot.queue.capacity, '0') + ')';
   }
   const queueCompact = host('queue-compact');
   if (queueCompact) {

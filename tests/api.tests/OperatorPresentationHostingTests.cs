@@ -173,7 +173,7 @@ public sealed class OperatorPresentationHostingTests
         var document = Read("apps/ui/public/index.html");
 
         var scriptTags = System.Text.RegularExpressions.Regex.Matches(document, "<script\\b[^>]*>");
-        Assert.Equal(1, scriptTags.Count);
+        Assert.Single(scriptTags);
         var script = scriptTags[0].Value;
         Assert.Contains("type=\"module\"", script, StringComparison.Ordinal);
         Assert.Contains("src=\"/ui/app.mjs\"", script, StringComparison.Ordinal);
@@ -182,7 +182,7 @@ public sealed class OperatorPresentationHostingTests
         // is not served by the host would make the presentation depend on another process. The single
         // script element above carries a src, so a script without one is by definition an inline one.
         Assert.DoesNotContain("<style", document, StringComparison.Ordinal);
-        Assert.Equal(0, System.Text.RegularExpressions.Regex.Matches(document, "<script\\b(?![^>]*\\bsrc=)").Count);
+        Assert.Equal(0, System.Text.RegularExpressions.Regex.Count(document, "<script\\b(?![^>]*\\bsrc=)"));
         Assert.Contains("href=\"/ui/global.css\"", document, StringComparison.Ordinal);
     }
 
@@ -248,7 +248,7 @@ public sealed class OperatorPresentationHostingTests
             include.Replace('\\', '/').StartsWith("../../", StringComparison.Ordinal),
             "the presentation lives at apps/ui/public: from apps/runtime the include may walk up only one directory");
 
-        var wildcard = include.IndexOf("*", StringComparison.Ordinal);
+        var wildcard = include.IndexOf('*', StringComparison.Ordinal);
         Assert.True(wildcard > 0, "the item is a glob over a directory, not a single file");
         // The item value is written with MSBuild separators; normalising them keeps the resolution
         // honest on a build host where the backslash is not the directory separator.

@@ -969,3 +969,327 @@ test('the Hydrogen U-shape map and canvas panels render cleanly with finite coor
     globalThis.document = prevDoc;
   }
 });
+
+test('Fix 2: mutually exclusive 108 sensor partition stays exact when quality=UNCERTAIN overlaps classification', async () => {
+  const prevDoc = globalThis.document;
+  const makeNode = (tag) => ({
+    tagName: String(tag).toUpperCase(),
+    className: '',
+    id: '',
+    title: '',
+    type: '',
+    disabled: false,
+    hidden: false,
+    dataset: {},
+    style: { setProperty() {} },
+    children: [],
+    attributes: new Map(),
+    get firstChild() { return this.children[0] || null; },
+    set textContent(v) { this._text = String(v); if (v === '') this.children = []; },
+    get textContent() {
+      if (this.children.length === 0) return this._text || '';
+      return this.children.map((c) => c.textContent).join(' ');
+    },
+    appendChild(child) { this.children.push(child); return child; },
+    removeChild(child) {
+      const idx = this.children.indexOf(child);
+      if (idx >= 0) this.children.splice(idx, 1);
+      return child;
+    },
+    setAttribute(k, v) { this.attributes.set(k, String(v)); },
+    getAttribute(k) { return this.attributes.get(k) || null; },
+    addEventListener() {},
+  });
+  globalThis.document = { createElement: makeNode };
+  try {
+    const mapMod = await import(pathToFileURL(join(PUBLIC, 'wallMap.mjs')).href);
+    const barMod = await import(pathToFileURL(join(PUBLIC, 'shellBar.mjs')).href);
+    const tabsMod = await import(pathToFileURL(join(PUBLIC, 'tabs.mjs')).href);
+    const topoMod = await import(pathToFileURL(join(PUBLIC, 'topology.mjs')).href);
+
+    // Replicate real Runtime overlap: UNCERTAIN sensors still carry CLEANER/DIRTY classification,
+    // so raw walls[] counters have cleaner + dirty + uncertain = 122 (> 108).
+    const wallSpec = [['LEFT', 4], ['REAR', 5], ['RIGHT', 4], ['FRONT', 5]];
+    const wallMap = [];
+    const sensors = [];
+    const walls = [];
+    let scan = 1;
+    for (const [wall, cols] of wallSpec) {
+      let rawClean = 0;
+      let rawDirty = 0;
+      let rawUnc = 0;
+      for (let r = 1; r <= 6; r += 1) {
+        for (let c = 1; c <= cols; c += 1) {
+          const sensorId = `${wall}-U-${r}-${c}`;
+          const isDirty = scan % 3 === 0;
+          const isUncertain = scan % 7 === 0;
+          if (isDirty) rawDirty += 1; else rawClean += 1;
+          if (isUncertain) rawUnc += 1;
+          wallMap.push({ slotId: `S-${sensorId}`, positionKind: 'SENSOR', wall, logicalRow: r, logicalColumn: c, sensorId });
+          sensors.push({
+            sensorId, deviceId: 'DEV1', wall, logicalRow: r, logicalColumn: c, scanOrder: scan,
+            dirtyScore: isDirty ? 78.4 : 32.1, lastValidatedScore: 45.0,
+            classification: isDirty ? 'DIRTY' : 'CLEANER', classificationBasis: 'CURRENT',
+            quality: isUncertain ? 'UNCERTAIN' : 'GOOD', queueState: 'NONE', alarmState: 'NONE',
+            isActiveJobTarget: false, assignedWaterJetId: topoMod.WATER_JETS[0].wj,
+            assignedIsolationValveId: topoMod.WATER_JETS[0].iv,
+            tcFrontChannel: `TCF-${scan}`, tcRearChannel: `TCR-${scan}`,
+          });
+          scan += 1;
+        }
+      }
+      walls.push({
+        wall, total: 6 * cols, cleaner: rawClean, dirty: rawDirty,
+        uncertain: rawUnc, notClassified: 0, maxScore: 78.4,
+      });
+    }
+
+    // Confirm raw published counters truly overlap (> 108) before asserting our partition fixes it.
+    const rawOverlapSum = walls.reduce((s, w) => s + w.cleaner + w.dirty + w.uncertain + w.notClassified, 0);
+    assert.ok(rawOverlapSum > 108, `fixture must have overlapping raw counts (>108), got ${rawOverlapSum}`);
+
+    const partitioned = mapMod.partitionSensors(sensors, walls);
+    assert.equal(partitioned.state, 'ok');
+    assert.equal(partitioned.total, 108);
+    const pillSum = partitioned.pills.reduce((s, p) => s + p.value, 0);
+    assert.equal(pillSum, 108, 'mutually exclusive pills must sum strictly to 108');
+    assert.ok(partitioned.pills[2].value > 0, 'uncertain bucket must be non-zero');
+    for (const bucket of partitioned.perWall) {
+      assert.equal(bucket.cleaner + bucket.dirty + bucket.uncertain, bucket.total,
+        `${bucket.wall} buckets must sum strictly to ${bucket.total}`);
+      assert.equal(bucket.publishedUncertain > 0, true, `${bucket.wall} retains raw published uncertain count`);
+    }
+
+    const barCounts = barMod.pillCounts(walls, sensors);
+    assert.equal(barCounts.pills.reduce((s, p) => s + p.value, 0), 108, 'shellBar pills must sum to 108');
+
+    // Verify wall map DOM tile states match partitionSensors 1-to-1.
+    const snapshot = {
+      kind: 'snapshot', revision: 12, generatedAt: '2026-11-14T12:00:00Z',
+      wallMap, sensors, walls,
+      waterJets: topoMod.WATER_JETS.map((j) => ({
+        waterJetId: j.wj, installedWall: j.installedWall, installedRegion: j.installedTier,
+        targetWall: j.targetWall, targetRegion: j.targetTier, dedicatedIsolationValveId: j.iv,
+        placementKind: j.placementKind, placementAnchors: [],
+      })),
+      activeJob: null,
+      pump: { state: 'STOPPED', pressure: 0, setpoint: 15, readyBandLow: 15, readyBandHigh: 25, ready: false },
+      config: { dirtyThreshold: 65 },
+    };
+    const mapHost = makeNode('div');
+    const model = mapMod.buildModel(snapshot);
+    mapMod.renderWallMap(mapHost, model, snapshot, sensors[0].sensorId, () => {});
+    const countsByState = { clean: 0, dirty: 0, watch: 0 };
+    const walk = (n) => {
+      if (n.className && n.className.includes('sds-cell')) {
+        countsByState[n.dataset.state] = (countsByState[n.dataset.state] || 0) + 1;
+      }
+      for (const c of n.children || []) walk(c);
+    };
+    walk(mapHost);
+    assert.equal(countsByState.clean, partitioned.pills[0].value);
+    assert.equal(countsByState.dirty, partitioned.pills[1].value);
+    assert.equal(countsByState.watch, partitioned.pills[2].value);
+    assert.equal(countsByState.clean + countsByState.dirty + countsByState.watch, 108);
+
+    const breakdownHost = makeNode('div');
+    tabsMod.renderWallBreakdown(breakdownHost, snapshot);
+    assert.match(breakdownHost.textContent, /TOTAL\s+108/);
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});
+
+test('Fixes 3-7: zero undefined/NaN across all 6 tabs, HH:MM:SS time axes, honest standby seq-bar, HiDPI canvas, vh clamp', async () => {
+  const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
+  const drawnTexts = [];
+  const transforms = [];
+  const makeNode = (tag) => ({
+    tagName: String(tag).toUpperCase(),
+    className: '',
+    id: '',
+    title: '',
+    type: '',
+    disabled: false,
+    hidden: false,
+    width: 640,
+    height: 180,
+    clientWidth: 640,
+    clientHeight: 180,
+    dataset: {},
+    style: { setProperty() {} },
+    children: [],
+    attributes: new Map(),
+    getBoundingClientRect() { return { width: 640, height: 180 }; },
+    get firstChild() { return this.children[0] || null; },
+    set textContent(v) { this._text = String(v); if (v === '') this.children = []; },
+    get textContent() {
+      if (this.children.length === 0) return this._text || '';
+      return this.children.map((c) => c.textContent).join(' ');
+    },
+    appendChild(child) { this.children.push(child); return child; },
+    removeChild(child) {
+      const idx = this.children.indexOf(child);
+      if (idx >= 0) this.children.splice(idx, 1);
+      return child;
+    },
+    setAttribute(k, v) { this.attributes.set(k, String(v)); },
+    getAttribute(k) { return this.attributes.get(k) || null; },
+    addEventListener() {},
+    getContext() {
+      return {
+        fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textAlign: '', textBaseline: '',
+        save() {}, restore() {}, beginPath() {}, stroke() {}, fill() {}, setLineDash() {},
+        clearRect() {}, fillRect() {}, strokeRect() {}, moveTo() {}, lineTo() {}, arc() {},
+        setTransform(...args) { transforms.push(args); },
+        fillText(str) { drawnTexts.push(String(str)); },
+      };
+    },
+  });
+  globalThis.document = { createElement: makeNode };
+  globalThis.window = { devicePixelRatio: 2 };
+  try {
+    const mapMod = await import(pathToFileURL(join(PUBLIC, 'wallMap.mjs')).href);
+    const tabsMod = await import(pathToFileURL(join(PUBLIC, 'tabs.mjs')).href);
+    const opsMod = await import(pathToFileURL(join(PUBLIC, 'opsPanel.mjs')).href);
+    const dispMod = await import(pathToFileURL(join(PUBLIC, 'dispatchPanel.mjs')).href);
+    const detailMod = await import(pathToFileURL(join(PUBLIC, 'sensorDetail.mjs')).href);
+    const thermMod = await import(pathToFileURL(join(PUBLIC, 'thermal.mjs')).href);
+    const topoMod = await import(pathToFileURL(join(PUBLIC, 'topology.mjs')).href);
+
+    const wallSpec = [['LEFT', 4], ['REAR', 5], ['RIGHT', 4], ['FRONT', 5]];
+    const wallMap = [];
+    const sensors = [];
+    let scan = 1;
+    for (const [wall, cols] of wallSpec) {
+      for (let r = 1; r <= 6; r += 1) {
+        for (let c = 1; c <= cols; c += 1) {
+          const sensorId = `${wall}-Z-${r}-${c}`;
+          wallMap.push({ slotId: `S-${sensorId}`, positionKind: 'SENSOR', wall, logicalRow: r, logicalColumn: c, sensorId });
+          sensors.push({
+            sensorId, deviceId: 'DEV1', wall, logicalRow: r, logicalColumn: c, scanOrder: scan,
+            dirtyScore: scan % 4 === 0 ? 74.0 : 38.5, lastValidatedScore: 44.0,
+            classification: scan % 4 === 0 ? 'DIRTY' : 'CLEANER', classificationBasis: 'CURRENT',
+            quality: 'GOOD', queueState: 'NONE', alarmState: 'NONE',
+            isActiveJobTarget: false, assignedWaterJetId: topoMod.WATER_JETS[0].wj,
+            assignedIsolationValveId: topoMod.WATER_JETS[0].iv,
+            tcFrontChannel: `TCF-${scan}`, tcRearChannel: `TCR-${scan}`,
+          });
+          scan += 1;
+        }
+      }
+    }
+
+    // Standby snapshot with Unix epoch integer trend timestamps (exact live .NET serialization).
+    const standbySnapshot = {
+      kind: 'snapshot', revision: 42, generatedAt: '2026-11-14T12:15:00Z',
+      wallMap, sensors,
+      walls: [
+        { wall: 'LEFT', total: 24, cleaner: 18, dirty: 6, uncertain: 0, notClassified: 0, maxScore: 74 },
+        { wall: 'REAR', total: 30, cleaner: 23, dirty: 7, uncertain: 0, notClassified: 0, maxScore: 74 },
+        { wall: 'RIGHT', total: 24, cleaner: 18, dirty: 6, uncertain: 0, notClassified: 0, maxScore: 74 },
+        { wall: 'FRONT', total: 30, cleaner: 22, dirty: 8, uncertain: 0, notClassified: 0, maxScore: 74 },
+      ],
+      waterJets: topoMod.WATER_JETS.map((j) => ({
+        waterJetId: j.wj, installedWall: j.installedWall, installedRegion: j.installedTier,
+        targetWall: j.targetWall, targetRegion: j.targetTier, dedicatedIsolationValveId: j.iv,
+        placementKind: j.placementKind, placementAnchors: [],
+      })),
+      activeJob: null,
+      queue: { capacity: 10, totalQueued: 0, entries: [], revision: 42, autoSequence: 'PAUSED' },
+      pump: { state: 'RUNNING', pressure: 19.5, setpoint: 20.0, readyBandLow: 15, readyBandHigh: 25, ready: true },
+      config: { dirtyThreshold: 65, revision: 1, label: 'cfg', staleThresholdMs: 5000 },
+      sequence: { mode: 'PAUSED', controls: {}, lastJobOutcome: null },
+      runtime: { uptimeSeconds: 120, stageMarker: 'S5', invariantViolations: 0, sseClients: 1, historian: { wired: true, depth: 5, capacity: 100, nearOverflow: false, rejected: 0, gapMarkers: 0 } },
+      tcAcquisition: { nodeId: 'TC-1', cabinetId: 'CAB-1', provenance: 'SIM', physical: false, quarantined: false, acquisitionState: 'ACQUIRED', quality: 'GOOD', diagnosticState: 'OK', mappingStatus: 'MAPPED', decodeStatus: 'NOT_VERIFIED', copiedWordCount: 16, notVerified: ['SCALE'] },
+      trend: {
+        capacity: 60, seriesNames: ['pressure', 'setpoint'],
+        points: [
+          { t: 1794665229, setpoint: 20.0, series: [19.1, 20.0] },
+          { t: 1794665562, setpoint: 20.0, series: [19.5, 20.0] },
+        ],
+      },
+    };
+    const sparseWorkspace = {
+      kind: 'dispatch-workspace', revision: 42, mode: 'AUTO',
+      queue: { capacity: 10, totalQueued: 0, entries: [], revision: 42, autoSequence: 'PAUSED' },
+      countdown: { lifecycle: 'IDLE', frozen: false },
+      preview: { mode: 'AUTO', available: true },
+      timeline: { stage: 'IDLE', steps: [] },
+    };
+
+    const allTexts = [];
+    const runHost = (fn) => {
+      const el = makeNode('div');
+      fn(el);
+      allTexts.push(el.textContent);
+      return el;
+    };
+
+    // Tab 1 (Standby): 8-step seq-bar MUST be visible, NEVER 'CLEANING NOW', Card 2 draws live without boilerRanges
+    const jobHost = runHost((el) => {
+      opsMod.renderJob(el, standbySnapshot, null);
+      tabsMod.renderActiveCockpit(el, standbySnapshot, { overlay: 'cleaning' }, () => {}, () => {});
+    });
+    const seqSteps = [];
+    const findSteps = (n) => {
+      if (n.className && n.className.includes('seq-step')) seqSteps.push(n);
+      for (const c of n.children || []) findSteps(c);
+    };
+    findSteps(jobHost);
+    assert.equal(seqSteps.length, 8, 'Tab 1 standby must keep all 8 sequence bar steps visible');
+    assert.match(jobHost.textContent, /Safe Return \(125, 125\)/);
+    assert.equal(/CLEANING NOW/.test(jobHost.textContent), false, 'Standby cockpit must never display CLEANING NOW');
+
+    const bandsCanvas = makeNode('canvas');
+    const bandsCaption = makeNode('p');
+    tabsMod.renderDelayBands(bandsCanvas, bandsCaption, standbySnapshot, null, sensors[0].sensorId, [{ rev: 41, score: 36.2 }, { rev: 42, score: 38.5 }]);
+    assert.equal(bandsCanvas.width, 1280, 'HiDPI prepareCanvas must scale backing store by devicePixelRatio (2x)');
+    assert.ok(transforms.some((t) => t[0] === 2 && t[3] === 2), 'HiDPI prepareCanvas must call setTransform(dpr,0,0,dpr,0,0)');
+    allTexts.push(bandsCaption.textContent);
+
+    // Tab 1 Pressure Trend & Tab 6 Trend Explorer: Unix epoch integers -> HH:MM:SS (never 10-digit epoch string!)
+    drawnTexts.length = 0;
+    detailMod.drawTrend(makeNode('canvas'), makeNode('span'), makeNode('span'), standbySnapshot, standbySnapshot.pump);
+    tabsMod.renderTrendExplorer(makeNode('canvas'), makeNode('p'), makeNode('p'), standbySnapshot, { enabled: ['pressure', 'setpoint'] });
+    const axisCombined = drawnTexts.join(' | ');
+    assert.match(axisCombined, /\d{2}:\d{2}:\d{2}/, 'Time axis must format timestamps as HH:MM:SS');
+    assert.equal(/1794665\d{3}/.test(axisCombined), false, 'Time axis must never print raw 10-digit Unix epoch integers');
+
+    // Tab 2, Tab 3 (WSB grid — Fix 3!), Tab 4, Tab 6
+    runHost((el) => dispMod.renderDispatch(el, sparseWorkspace));
+    runHost((el) => dispMod.renderQueueBoard(el, sparseWorkspace.queue, sparseWorkspace));
+    runHost((el) => dispMod.renderOutcome(el, standbySnapshot));
+    const wsbHost = runHost((el) => tabsMod.renderWsbGrid(el, standbySnapshot));
+    for (const jet of topoMod.WATER_JETS) {
+      assert.ok(wsbHost.textContent.includes(`${jet.wj} + ${jet.iv}`), `Tab 3 must display canonical ${jet.wj} + ${jet.iv}`);
+    }
+    runHost((el) => tabsMod.renderPumpCard(el, standbySnapshot));
+    runHost((el) => tabsMod.renderMaintenanceLock(el, standbySnapshot));
+    runHost((el) => tabsMod.renderSensorMaster(el, standbySnapshot, sensors[0].sensorId, null, () => {}, 'ALL'));
+    runHost((el) => detailMod.renderSelectedCard(el, standbySnapshot, sensors[0].sensorId));
+    runHost((el) => detailMod.renderSensorDetail(el, standbySnapshot, sensors[0].sensorId));
+    runHost((el) => thermMod.renderThermal(el, standbySnapshot, sensors[0].sensorId));
+    runHost((el) => tabsMod.renderPathTable(el, sparseWorkspace));
+    runHost((el) => opsMod.renderAlarmFilters(el, standbySnapshot, () => {}));
+    runHost((el) => opsMod.renderAlarms(el, standbySnapshot, sensors[0].sensorId));
+    runHost((el) => opsMod.renderCritical(el, standbySnapshot));
+    runHost((el) => opsMod.renderPump(el, standbySnapshot));
+    runHost((el) => tabsMod.renderSystemSummary(el, standbySnapshot, null, null, { label: 'LIVE', online: true }));
+    runHost((el) => tabsMod.renderWallBreakdown(el, standbySnapshot));
+    runHost((el) => tabsMod.renderCameraPanel(el, standbySnapshot, 'AUTO', () => {}));
+    runHost((el) => mapMod.renderWallMap(el, mapMod.buildModel(standbySnapshot), standbySnapshot, sensors[0].sensorId, () => {}));
+
+    const combinedDom = allTexts.join('\n');
+    assert.equal(/\bundefined\b|\bNaN\b/.test(combinedDom), false,
+      `Rendered DOM across all 6 tabs must contain zero undefined/NaN tokens, found: ${(combinedDom.match(/.{0,30}(?:\bundefined\b|\bNaN\b).{0,30}/) || [])[0]}`);
+
+    // Fix 7: Responsive tile height clamp with vh units on BOTH default :root and compact density.
+    assert.match(css, /:root\s*\{[^}]*--cell-h:\s*clamp\([^)]*vh[^)]*\);/);
+    assert.match(css, /body\[data-density="compact"\]\s*\{[^}]*--cell-h:\s*clamp\([^)]*vh[^)]*\);/);
+  } finally {
+    globalThis.document = prevDoc;
+    globalThis.window = prevWin;
+  }
+});

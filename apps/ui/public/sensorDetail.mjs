@@ -6,6 +6,7 @@
 
 import { text, number, timeOf } from './feed.mjs';
 import { WALL_LABELS, tierOfRow } from './topology.mjs';
+import { prepareCanvas, formatAxisTime, epochSecondsOf } from './chartKit.mjs';
 
 function fact(list, label, value, tone) {
   const dt = document.createElement('dt');
@@ -97,8 +98,10 @@ export function renderSelectedCard(host, snapshot, selectedId) {
 
 export function drawTrend(canvas, caption, note, snapshot, pump) {
   if (!canvas || typeof canvas.getContext !== 'function') return;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  const rawCtx = canvas.getContext('2d');
+  if (!rawCtx) return;
+  const sized = prepareCanvas(canvas, 680, 128);
+  const ctx = sized ? sized.ctx : rawCtx;
 
   const trend = snapshot ? snapshot.trend : null;
   const points = trend && Array.isArray(trend.points) ? trend.points : [];
@@ -106,13 +109,13 @@ export function drawTrend(canvas, caption, note, snapshot, pump) {
   const names = trend && Array.isArray(trend.seriesNames) ? trend.seriesNames : [];
   const active = snapshot ? snapshot.activeJob : null;
 
-  const width = canvas.width;
-  const height = canvas.height;
+  const width = sized ? sized.width : canvas.width;
+  const height = sized ? sized.height : canvas.height;
   ctx.clearRect(0, 0, width, height);
 
-  const pad = { left: 46, right: 16, top: 10, bottom: 20 };
-  const plotW = width - pad.left - pad.right;
-  const plotH = height - pad.top - pad.bottom;
+  const pad = { left: 48, right: 16, top: 10, bottom: 20 };
+  const plotW = Math.max(40, width - pad.left - pad.right);
+  const plotH = Math.max(24, height - pad.top - pad.bottom);
 
   // Dark canvas backdrop
   ctx.fillStyle = '#0d1014';
@@ -259,10 +262,22 @@ export function drawTrend(canvas, caption, note, snapshot, pump) {
   ctx.fillText(((min + max) / 2).toFixed(1) + 'b', pad.left - 5, pad.top + plotH / 2 + 3);
   ctx.fillText(min.toFixed(1) + 'b', pad.left - 5, pad.top + plotH);
 
+  const firstSec = epochSecondsOf(points[0].t);
+  const lastSec = epochSecondsOf(points[points.length - 1].t);
+  const spanSec = firstSec !== null && lastSec !== null ? Math.max(0, Math.round(lastSec - firstSec)) : null;
+
   ctx.textAlign = 'left';
-  ctx.fillText(timeOf(points[0].t), pad.left, height - 5);
+  ctx.fillText(
+    formatAxisTime(points[0].t) + (spanSec !== null && spanSec > 0 ? ' (-' + String(spanSec) + 's)' : ''),
+    pad.left,
+    height - 5,
+  );
+  if (plotW > 280 && firstSec !== null && lastSec !== null) {
+    ctx.textAlign = 'center';
+    ctx.fillText(formatAxisTime((firstSec + lastSec) / 2), pad.left + plotW / 2, height - 5);
+  }
   ctx.textAlign = 'right';
-  ctx.fillText('NOW ' + timeOf(points[points.length - 1].t), width - pad.right, height - 5);
+  ctx.fillText('NOW ' + formatAxisTime(points[points.length - 1].t), width - pad.right, height - 5);
   ctx.textAlign = 'left';
 
   if (caption) {
