@@ -378,7 +378,7 @@ public sealed class OperatorPresentationHostingTests
         // /health/ready carries the readiness verdict.
         var probe = source.IndexOf("app.MapGet(ApiRoutes.KioskHealth", StringComparison.Ordinal);
         Assert.True(probe >= 0, "the shell probe route must be registered");
-        var body = source[probe..(source.IndexOf("));", probe, StringComparison.Ordinal) + 2]);
+        var body = source[probe..(source.IndexOf("));", probe, StringComparison.Ordinal) + 2)];
         Assert.DoesNotContain("statusCode:", body, StringComparison.Ordinal);
         Assert.Contains("Status = \"ALIVE\"", body, StringComparison.Ordinal);
         Assert.Contains("TcEndpointConfiguration.DescribeMode(options.AcquisitionMode)", body, StringComparison.Ordinal);
