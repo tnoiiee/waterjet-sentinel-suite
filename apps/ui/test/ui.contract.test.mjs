@@ -771,3 +771,201 @@ test('the summary pills add up to the protected total, and a wall summary that d
   assert.equal(topology.summaryPills(null).state, 'no data', 'no summary is reported as no summary');
   assert.match(topology.summaryPills([]).note, /WALL SUMMARY NOT PUBLISHED IN THIS SNAPSHOT/);
 });
+
+// ------------------------------------------- Hydrogen 1920x1080 Industrial HMI architecture
+
+test('the Hydrogen 4-band 1920x1080 shell pins exact vertical tracks and a fixed diagnostics popover', () => {
+  // Exact 4-band shell in HTML: topbar (48px) + status-strip (26px) + main-workspace + event-ticker (24px),
+  // plus the out-of-flow fixed diagnostics popover overlay.
+  assert.match(html, /class="app-shell"/);
+  assert.match(html, /class="topbar"/);
+  assert.match(html, /class="status-strip"/);
+  assert.match(html, /class="main-workspace"/);
+  assert.match(html, /class="event-ticker\b/);
+  assert.match(html, /class="diag-popover"\s+id="diag-popover"/);
+
+  // Exact CSS geometry pins for full-bleed 1920x1080 fit (48 + 26 + 16 + 770 + 8 + 188 + 24 = 1080px).
+  assert.match(css, /\.topbar\s*\{[^}]*[;\s]height:\s*48px;/);
+  assert.match(css, /\.status-strip\s*\{[^}]*[;\s]height:\s*26px;/);
+  assert.match(css, /\.event-ticker\s*\{[^}]*[;\s]height:\s*24px;/);
+  assert.match(css, /\.diag-popover\s*\{[^}]*[;\s]position:\s*fixed;/);
+  assert.match(css, /@media\s*\(min-width:\s*1280px\)\s*\{\s*\.app-shell\s*\{[^}]*[;\s]height:\s*100vh;[^}]*[;\s]overflow:\s*hidden;/);
+});
+
+test('Tab 1 pins the 2x2 6fr/4fr architectural grid, 3-column U-shape boiler wall map and vivid fills', () => {
+  assert.match(css, /\.main-control-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*6fr\)\s+minmax\(0,\s*4fr\);/);
+  assert.match(css, /\.main-control-grid\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1fr\)\s+188px;/);
+  assert.match(css, /\.boiler-map-body\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*4fr\)\s+minmax\(0,\s*5\.2fr\)\s+minmax\(0,\s*4fr\);/);
+  assert.match(css, /\.split-card\s*\{[^}]*[;\s]height:\s*178px;/);
+  assert.match(css, /--clean-fill:\s*#1f6a49;/);
+  assert.match(css, /--dirty-fill:\s*#b0382e;/);
+  assert.match(css, /--uncertain-fill:\s*#3e454f;/);
+  assert.match(css, /--bg-canvas:\s*#0d1014;/);
+
+  const mapSource = sources.get('wallMap.mjs');
+  assert.match(mapSource, /u-col-side/);
+  assert.match(mapSource, /u-col-center/);
+  assert.match(mapSource, /u-center-hub/);
+  assert.match(mapSource, /sds-cell/);
+  assert.match(mapSource, /wall-bar/);
+});
+
+test('the Hydrogen U-shape map and canvas panels render cleanly with finite coordinates and authoritative WSB2 C/D', async () => {
+  const prevDoc = globalThis.document;
+  const nonFinite = [];
+  const checkFinite = (fnName, args) => {
+    for (const arg of args) {
+      if (typeof arg === 'number' && !Number.isFinite(arg)) nonFinite.push(`${fnName}(${arg})`);
+    }
+  };
+  const makeNode = (tag) => {
+    const node = {
+      tagName: String(tag).toUpperCase(),
+      className: '',
+      id: '',
+      title: '',
+      type: '',
+      disabled: false,
+      hidden: false,
+      width: 680,
+      height: 190,
+      dataset: {},
+      style: { setProperty() {} },
+      children: [],
+      attributes: new Map(),
+      listeners: [],
+      get firstChild() { return this.children[0] || null; },
+      set textContent(v) { this._text = String(v); if (v === '') this.children = []; },
+      get textContent() {
+        if (this.children.length === 0) return this._text || '';
+        return this.children.map((c) => c.textContent).join(' ');
+      },
+      appendChild(child) { this.children.push(child); return child; },
+      removeChild(child) {
+        const idx = this.children.indexOf(child);
+        if (idx >= 0) this.children.splice(idx, 1);
+        return child;
+      },
+      setAttribute(k, v) { this.attributes.set(k, String(v)); },
+      getAttribute(k) { return this.attributes.get(k) || null; },
+      addEventListener(type, fn) { this.listeners.push({ type, fn }); },
+      getContext() {
+        const ctx = {
+          fillStyle: '', strokeStyle: '', lineWidth: 1, font: '', textAlign: '', textBaseline: '',
+          save() {}, restore() {}, beginPath() {}, stroke() {}, fill() {}, setLineDash() {},
+          clearRect(...a) { checkFinite('clearRect', a); },
+          fillRect(...a) { checkFinite('fillRect', a); },
+          strokeRect(...a) { checkFinite('strokeRect', a); },
+          moveTo(...a) { checkFinite('moveTo', a); },
+          lineTo(...a) { checkFinite('lineTo', a); },
+          arc(...a) { checkFinite('arc', a); },
+          fillText(_t, ...a) { checkFinite('fillText', a); },
+        };
+        return ctx;
+      },
+    };
+    return node;
+  };
+  globalThis.document = { createElement: makeNode };
+  try {
+    const mapMod = await import(pathToFileURL(join(PUBLIC, 'wallMap.mjs')).href);
+    const tabsMod = await import(pathToFileURL(join(PUBLIC, 'tabs.mjs')).href);
+    const detailMod = await import(pathToFileURL(join(PUBLIC, 'sensorDetail.mjs')).href);
+    const topoMod = await import(pathToFileURL(join(PUBLIC, 'topology.mjs')).href);
+
+    const wallSpec = [
+      ['LEFT', 4], ['REAR', 5], ['RIGHT', 4], ['FRONT', 5],
+    ];
+    const wallMap = [];
+    const sensors = [];
+    let scan = 1;
+    for (const [wall, cols] of wallSpec) {
+      for (let r = 1; r <= 6; r += 1) {
+        for (let c = 1; c <= cols; c += 1) {
+          const sensorId = `${wall}-${r}-${c}`;
+          wallMap.push({ slotId: `S-${sensorId}`, positionKind: 'SENSOR', wall, logicalRow: r, logicalColumn: c, sensorId });
+          sensors.push({
+            sensorId, deviceId: 'DEV1', wall, logicalRow: r, logicalColumn: c, scanOrder: scan,
+            dirtyScore: scan % 3 === 0 ? 72.5 : 41.2, lastValidatedScore: 50.0,
+            classification: scan % 3 === 0 ? 'DIRTY' : 'CLEANER', classificationBasis: 'SCORE',
+            quality: 'GOOD', queueState: scan === 1 ? 'ACTIVE' : 'NONE', alarmState: 'NONE',
+            isActiveJobTarget: scan === 1, assignedWaterJetId: topoMod.WATER_JETS[0].wj,
+            assignedIsolationValveId: topoMod.WATER_JETS[0].iv,
+            tcFrontChannel: `TCF-${scan}`, tcRearChannel: `TCR-${scan}`,
+          });
+          scan += 1;
+        }
+      }
+    }
+    const snapshot = {
+      kind: 'snapshot', revision: 7, generatedAt: '2026-11-14T12:00:00Z',
+      wallMap, sensors,
+      walls: [
+        { wall: 'LEFT', total: 24, cleaner: 16, dirty: 8, uncertain: 0, notClassified: 0, maxScore: 72.5 },
+        { wall: 'REAR', total: 30, cleaner: 20, dirty: 10, uncertain: 0, notClassified: 0, maxScore: 72.5 },
+        { wall: 'RIGHT', total: 24, cleaner: 16, dirty: 8, uncertain: 0, notClassified: 0, maxScore: 72.5 },
+        { wall: 'FRONT', total: 30, cleaner: 20, dirty: 10, uncertain: 0, notClassified: 0, maxScore: 72.5 },
+      ],
+      waterJets: topoMod.WATER_JETS.map((j) => ({
+        waterJetId: j.wj, installedWall: j.installedWall, installedRegion: j.installedTier,
+        targetWall: j.targetWall, targetRegion: j.targetTier, dedicatedIsolationValveId: j.iv,
+        placementKind: j.placementKind, placementAnchors: [],
+      })),
+      activeJob: {
+        jobId: 'JOB-1', targetSensorId: sensors[0].sensorId, jetId: topoMod.WATER_JETS[0].wj,
+        valveId: topoMod.WATER_JETS[0].iv, phase: 'P3', phaseLabel: 'P3', phaseIndex: 4,
+        phaseProgress: 0.5, valveOpenCommand: 'OPEN', valveOutletPressureBar: 21.4,
+        pumpOutletPressureBar: 22.1, pumpReadySetpointBar: 15.0,
+        pumpPressureQuality: 'GOOD', pumpPressureSourceId: 'AI-003', pumpPressureInputValid: true,
+        valvePressureQuality: 'GOOD', valvePressureSourceId: 'IV-P', valvePressureInputValid: true,
+      },
+      pump: { state: 'RUNNING', pressure: 22.1, setpoint: 15.0, readyBandLow: 15.0, readyBandHigh: 25.0, ready: true },
+      config: { dirtyThreshold: 65 },
+      trend: {
+        capacity: 60, seriesNames: ['pressure', 'setpoint'],
+        points: [
+          { t: '2026-11-14T11:59:58Z', setpoint: 15.0, series: [22.0, 15.0] },
+          { t: '2026-11-14T11:59:59Z', setpoint: 15.0, series: [null, 15.0] },
+          { t: '2026-11-14T12:00:00Z', setpoint: 15.0, series: [22.1, 15.0] },
+        ],
+      },
+    };
+    const workspace = {
+      kind: 'dispatch-workspace', revision: 7,
+      configuration: {
+        activeBoilerCondition: 'NORMAL',
+        boilerRanges: [
+          { condition: 'LOW', autoDelayMinSeconds: 180, autoDelayMaxSeconds: 300 },
+          { condition: 'NORMAL', autoDelayMinSeconds: 60, autoDelayMaxSeconds: 180 },
+        ],
+      },
+      preview: { appliedDelaySeconds: 90, mode: 'AUTO', zoneFactor: 0.75 },
+    };
+
+    const mapHost = makeNode('div');
+    const model = mapMod.buildModel(snapshot);
+    assert.equal(model.ok, true);
+    mapMod.renderWallMap(mapHost, model, snapshot, sensors[0].sensorId, () => {});
+    assert.equal(mapHost.children.length, 3, 'U-shape wall map must render exactly 3 columns');
+    const allCells = [];
+    const walk = (n) => {
+      if (n.className && n.className.includes('sds-cell')) allCells.push(n);
+      for (const c of n.children || []) walk(c);
+    };
+    walk(mapHost);
+    assert.equal(allCells.length, 108, 'U-shape wall map must render all 108 SDS cells');
+    assert.match(mapHost.textContent, /WJ3 \| IV3 \(WSB2 C\/D\)/, 'Right nozzle strip must obey authoritative WSB2 C/D topology');
+
+    const camHost = makeNode('div');
+    tabsMod.renderCameraPanel(camHost, snapshot, 'AUTO', () => {});
+    assert.match(camHost.textContent, /zero - no image element, no source, no address, no request/);
+
+    const trendCanvas = makeNode('canvas');
+    detailMod.drawTrend(trendCanvas, makeNode('span'), makeNode('span'), snapshot, snapshot.pump);
+    tabsMod.renderDelayBands(makeNode('canvas'), makeNode('p'), snapshot, workspace, sensors[0].sensorId);
+    tabsMod.renderWorkspace(makeNode('canvas'), makeNode('p'), snapshot, sensors[0].sensorId, sensors[0].sensorId);
+    assert.deepEqual(nonFinite, [], 'zero non-finite canvas coordinates allowed');
+  } finally {
+    globalThis.document = prevDoc;
+  }
+});

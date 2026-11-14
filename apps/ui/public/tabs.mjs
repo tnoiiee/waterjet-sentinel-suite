@@ -1,17 +1,54 @@
-// WJSS Operator presentation - Tabs 3, 4 and 6, plus the camera viewport container.
+// WJSS Operator presentation - Tabs 1-6 renderers and the IP Camera mount container.
 //
 // The rule that governs this whole file: a panel shows a published field, or it shows that the field is
-// not published. That is not a limitation of this screen, it is the honest description of what the
-// read-only Runtime answers - /api/v1/snapshot, /api/v1/deltas, /api/v1/runtime,
-// /api/v1/dispatch-workspace and /api/health. A "not published" line is information an operator can
-// act on; a plausible number that no contract carries is not, and it is the one failure mode an HMI of
-// this shape has no defence against later.
-//
-// Nothing here fetches, nothing here composes a request, and nothing here draws a control that could.
+// not published. A "not published" line is information an operator can act on; a plausible number that
+// no contract carries is not. Nothing here fetches, nothing here composes a request, and nothing here
+// draws a control that could.
 
 import { text, number, timeOf } from './feed.mjs';
-import { AXIS_ROLES, AXIS_WORDING, BRAKE_OUTPUT_ORDER, CLEANING_PATH_STAGES, COCKPIT_STAGES, DEFAULT_ASSIGNMENTS, EXPECTED_PER_WALL, EXPECTED_TOTAL, NATIVE_PER_MILLIMETRE, PUMP_STOP_ORDER_RULE, SAFE_RETURN_CENTRE_MM, SAFE_RETURN_CENTRE_NATIVE, SCALING_NOTE, STAGE_COORDINATE_NOTE, WALL_ORDER, WORKSPACE_MAX_MM, WORKSPACE_MIN_MM, WSB_CABINETS, WSB_SOURCE_NOTE, agreeWithSnapshot, assignmentCountByJet, coordinatePair, grouped, summaryPills, tierOfRow } from './topology.mjs';
-import { axisOf, captionFor, contextOf, drawGrid, drawSeries, formatTick, formatted, frameOf, mapperFor, normalise, placeLabels, rangeOf, timeRangeOf } from './chartKit.mjs';
+import {
+  AXIS_ROLES,
+  AXIS_WORDING,
+  BRAKE_OUTPUT_ORDER,
+  CLEANING_PATH_STAGES,
+  COCKPIT_STAGES,
+  DEFAULT_ASSIGNMENTS,
+  EXPECTED_PER_WALL,
+  NATIVE_PER_MILLIMETRE,
+  PUMP_STOP_ORDER_RULE,
+  SAFE_RETURN_CENTRE_MM,
+  SAFE_RETURN_CENTRE_NATIVE,
+  SCALING_NOTE,
+  STAGE_COORDINATE_NOTE,
+  WALL_ORDER,
+  WATER_JETS,
+  WATER_JETS_BY_ID,
+  WORKSPACE_MAX_MM,
+  WORKSPACE_MIN_MM,
+  WSB_CABINETS,
+  WSB_SOURCE_NOTE,
+  agreeWithSnapshot,
+  assignmentCountByJet,
+  coordinatePair,
+  grouped,
+  summaryPills,
+  tierOfRow,
+} from './topology.mjs';
+import {
+  axisOf,
+  captionFor,
+  contextOf,
+  drawGrid,
+  drawSeries,
+  formatTick,
+  formatted,
+  frameOf,
+  mapperFor,
+  normalise,
+  placeLabels,
+  rangeOf,
+  timeRangeOf,
+} from './chartKit.mjs';
 
 const NOT_PUBLISHED = 'NOT_PUBLISHED_BY_RUNTIME';
 
@@ -19,10 +56,10 @@ function clear(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
-function block(parent, className, text_) {
+function block(parent, className, textValue) {
   const node = document.createElement('div');
   node.className = className;
-  if (text_ !== undefined) node.textContent = text_;
+  if (textValue !== undefined) node.textContent = textValue;
   parent.appendChild(node);
   return node;
 }
@@ -43,7 +80,7 @@ function heading(parent, value) {
   return node;
 }
 
-function rows(host_, entries) {
+function rows(hostNode, entries) {
   const list = document.createElement('dl');
   list.className = 'facts';
   for (const entry of entries) {
@@ -55,13 +92,34 @@ function rows(host_, entries) {
     list.appendChild(term);
     list.appendChild(value);
   }
-  host_.appendChild(list);
+  hostNode.appendChild(list);
   return list;
 }
 
-function table(host_, headers, body) {
+function kpiTile(parent, label, value, sub, tone) {
+  const tile = document.createElement('div');
+  tile.className = 'kpi-tile';
+  if (tone) tile.dataset.tone = tone;
+  const lbl = document.createElement('span');
+  lbl.className = 'kpi-tile-lbl';
+  lbl.textContent = label;
+  const val = document.createElement('span');
+  val.className = 'kpi-tile-val num';
+  val.textContent = value;
+  if (tone) val.dataset.tone = tone;
+  const subEl = document.createElement('span');
+  subEl.className = 'kpi-tile-sub num';
+  subEl.textContent = sub;
+  tile.appendChild(lbl);
+  tile.appendChild(val);
+  tile.appendChild(subEl);
+  parent.appendChild(tile);
+  return tile;
+}
+
+function table(hostNode, headers, body) {
   const element = document.createElement('table');
-  element.className = 'grid-table';
+  element.className = 'grid-table num';
   const head = document.createElement('thead');
   const headRow = document.createElement('tr');
   for (const label of headers) {
@@ -84,7 +142,7 @@ function table(host_, headers, body) {
   }
   element.appendChild(head);
   element.appendChild(bodyNode);
-  host_.appendChild(element);
+  hostNode.appendChild(element);
   return element;
 }
 
@@ -97,10 +155,15 @@ function byId(list, key, value) {
 
 // ---------------------------------------------------------------- Tab 3: WJ & Pump
 
-// Symmetric on purpose: four cabinets, two Water Jets each, four axes each. The cabinet and axis letters
-// come from the canonical table in topology.mjs (which the gate checks against the .NET catalogs); the
-// identities, walls, tiers and pairings come from the Snapshot, so a profile that disagrees with the
-// table shows up as a refusal rather than as a tidy grid.
+function axisWording(letter) {
+  return AXIS_WORDING[AXIS_ROLES[letter]] || ('axis ' + String(letter));
+}
+
+function publishedIv(published, canonical) {
+  if (!published) return canonical + ' (published identity unavailable)';
+  return canonical + ' (published: ' + text(published.dedicatedIsolationValveId, 'none') + ')';
+}
+
 export function renderWsbGrid(root, snapshot) {
   clear(root);
   if (!snapshot) {
@@ -115,16 +178,15 @@ export function renderWsbGrid(root, snapshot) {
 
   const note = block(root, 'topo-note');
   note.textContent = agreement.ok
-    ? 'TOPOLOGY AGREED: ' + agreement.reason
-    : 'TOPOLOGY DISAGREES WITH THE CANONICAL TABLE - the grid below is drawn from the published payload: ' + agreement.reason;
+    ? 'TOPOLOGY AGREED: ' + agreement.reason + ' | ' + WSB_SOURCE_NOTE
+    : 'TOPOLOGY DISAGREES WITH THE CANONICAL TABLE - drawn from published payload: ' + agreement.reason;
   note.dataset.tone = agreement.ok ? 'ok' : 'bad';
-  paragraph(root, 'topo-source', WSB_SOURCE_NOTE);
-  paragraph(root, 'group-title', 'Motion cabinets - 4 WSB x 2 WJ');
+
   const grid = block(root, 'wsb-grid');
   for (const cabinet of WSB_CABINETS) {
     const card = block(grid, 'wsb-card');
     card.dataset.wsb = cabinet.wsb;
-    paragraph(card, 'wsb-name', cabinet.wsb + '  -  ' + cabinet.controller);
+    paragraph(card, 'wsb-name', cabinet.wsb + ' - ' + cabinet.controller);
     for (const binding of cabinet.jets) {
       const published = byId(waterJets, 'waterJetId', binding.wj);
       const row = block(card, 'wsb-jet');
@@ -133,30 +195,28 @@ export function renderWsbGrid(root, snapshot) {
       const vertical = axisWording(binding.verticalAxis);
       const title = document.createElement('p');
       title.className = 'wsb-jet-title';
-      title.textContent = binding.wj + '  /  ' + publishedIv(published, binding.iv)
-        + '  /  brake ' + String(BRAKE_OUTPUT_ORDER[binding.horizontalAxis]) + '+' + String(BRAKE_OUTPUT_ORDER[binding.verticalAxis]);
+      title.textContent = binding.wj + ' / ' + publishedIv(published, binding.iv)
+        + ' | brake ' + String(BRAKE_OUTPUT_ORDER[binding.horizontalAxis]) + '+' + String(BRAKE_OUTPUT_ORDER[binding.verticalAxis]);
       row.appendChild(title);
       const axes = document.createElement('p');
       axes.className = 'wsb-jet-axes';
       axes.textContent = horizontal + ' ' + binding.horizontalAxis
-        + '  |  ' + vertical + ' ' + binding.verticalAxis
-        + '  (A/C = Horizontal, B/D = Vertical)';
+        + ' | ' + vertical + ' ' + binding.verticalAxis + ' (A/C=Horiz, B/D=Vert)';
       row.appendChild(axes);
       if (published) {
         const covered = document.createElement('p');
         covered.className = 'wsb-jet-cover';
-        covered.textContent = 'installed ' + text(published.installedWall) + '/' + text(published.installedRegion)
-          + '  ->  cleans ' + text(published.targetWall) + '/' + text(published.targetRegion)
-          + '  |  default assignment ' + String(DEFAULT_ASSIGNMENTS[binding.wj])
-          + ', published ' + String(assignments.assigned[binding.wj] === undefined ? 0 : assignments.assigned[binding.wj]);
+        covered.textContent = 'Installed ' + text(published.installedWall) + '/' + text(published.installedRegion)
+          + ' -> Cleans ' + text(published.targetWall) + '/' + text(published.targetRegion)
+          + ' | Default ' + String(DEFAULT_ASSIGNMENTS[binding.wj])
+          + ', Published ' + String(assignments.assigned[binding.wj] === undefined ? 0 : assignments.assigned[binding.wj]);
         row.appendChild(covered);
         const placement = document.createElement('p');
         placement.className = 'wsb-jet-placement';
-        placement.dataset.tone = 'mute';
-        placement.textContent = 'placement ' + text(published.placementKind, NOT_PUBLISHED)
+        placement.textContent = 'Placement ' + text(published.placementKind, NOT_PUBLISHED)
           + ' - ' + (Array.isArray(published.placementAnchors) && published.placementAnchors.length
             ? published.placementAnchors.join(', ')
-            : 'no placement anchor is held, and none is inferred');
+            : 'no placement anchor held or inferred');
         row.appendChild(placement);
       } else {
         paragraph(row, 'wsb-jet-missing', 'this Water Jet is not present in the published payload');
@@ -164,23 +224,19 @@ export function renderWsbGrid(root, snapshot) {
       if (active && active.jetId === binding.wj) {
         const live = document.createElement('p');
         live.className = 'wsb-jet-live';
-        live.dataset.tone = 'info';
-        live.textContent = 'ACTIVE JOB ON THIS JET: ' + text(active.phaseLabel, text(active.phase, NOT_PUBLISHED))
-          + '  |  IV ' + text(active.valveId, NOT_PUBLISHED) + ' ' + text(active.valveOpenCommand, NOT_PUBLISHED);
+        live.textContent = 'ACTIVE JOB: ' + text(active.phaseLabel, text(active.phase, NOT_PUBLISHED))
+          + ' | ' + text(active.valveId, NOT_PUBLISHED) + ' ' + text(active.valveOpenCommand, NOT_PUBLISHED);
         row.appendChild(live);
       }
     }
   }
-
 }
 
-function axisWording(letter) {
-  return AXIS_WORDING[AXIS_ROLES[letter]] || ('axis ' + String(letter));
-}
-
-function publishedIv(published, canonical) {
-  if (!published) return canonical + ' (published identity unavailable)';
-  return canonical + ' (published: ' + text(published.dedicatedIsolationValveId, 'none') + ')';
+function toneForRunState(state) {
+  if (state === 'RUNNING') return 'ok';
+  if (state === 'TRIPPED') return 'bad';
+  if (state === 'STOPPED') return 'mute';
+  return 'warn';
 }
 
 export function renderPumpCard(root, snapshot) {
@@ -192,56 +248,45 @@ export function renderPumpCard(root, snapshot) {
     return;
   }
   const active = snapshot.activeJob || null;
-  rows(root, [
-    ['state', text(pump.state, NOT_PUBLISHED), toneForRunState(pump.state)],
-    ['pressure', number(pump.pressure, 2, 'bar'), pump.pressure === null ? 'mute' : 'ok'],
-    ['setpoint', number(pump.setpoint, 2, 'bar')],
-    ['ready band', number(pump.readyBandLow, 2) + ' - ' + number(pump.readyBandHigh, 2) + ' bar'],
-    ['in ready band', pump.ready ? 'YES' : 'NO', pump.ready ? 'ok' : 'warn'],
-    ['stop requested at', timeOf(pump.stopRequestedAt)],
-    ['job pump source', active ? text(active.pumpPressureSourceId, NOT_PUBLISHED) : 'no active Job', 'mute'],
-    ['job pump quality', active ? text(active.pumpPressureQuality, NOT_PUBLISHED) : 'no active Job', 'mute'],
-    ['valid input', active ? (active.pumpPressureInputValid ? 'YES' : 'NO') : 'no active Job'],
-    ['valve outlet', active ? number(active.valveOutletPressureBar, 2, 'bar') : 'no active Job'],
-    ['host uptime', runtime ? number(runtime.uptimeSeconds, 0, 's') : NOT_PUBLISHED, 'mute'],
-  ]);
+  const strip = block(root, 'kpi-strip-5');
+  kpiTile(strip, 'HP PUMP STATE', text(pump.state, NOT_PUBLISHED),
+    pump.ready ? 'READY IN BAND' : 'NOT IN READY BAND', toneForRunState(pump.state));
+  kpiTile(strip, 'OUTLET PRESSURE', number(pump.pressure, 2, 'bar'),
+    'Setpoint ' + number(pump.setpoint, 2, 'bar'), pump.pressure === null ? 'mute' : 'info');
+  kpiTile(strip, 'READY BAND', number(pump.readyBandLow, 1) + ' - ' + number(pump.readyBandHigh, 1) + ' bar',
+    'Stop req: ' + timeOf(pump.stopRequestedAt), pump.ready ? 'ok' : 'warn');
+  kpiTile(strip, 'ACTIVE VALVE OUTLET', active ? number(active.valveOutletPressureBar, 2, 'bar') : 'NO ACTIVE JOB',
+    active ? text(active.pumpPressureSourceId, NOT_PUBLISHED) + ' | ' + text(active.pumpPressureQuality, NOT_PUBLISHED) : 'No active valve',
+    active && active.pumpPressureInputValid ? 'ok' : 'mute');
+  kpiTile(strip, 'HOST UPTIME', runtime ? number(runtime.uptimeSeconds, 0, 's') : NOT_PUBLISHED,
+    'Stage ' + text(runtime ? runtime.stageMarker : null, NOT_PUBLISHED), 'mute');
+
   const rule = paragraph(root, 'interlock-rule', PUMP_STOP_ORDER_RULE);
   rule.dataset.tone = 'warn';
   paragraph(root, 'interlock-note',
-    'the order above is the commissioned interlock rule this build was prepared against; the Runtime '
+    'The order above is the commissioned interlock rule this build was prepared against; the Runtime '
     + 'publishes pump state and the last stop request, and does not publish a per-output confirmation, '
-    + 'so no line of this card claims the outputs were observed in that order');
+    + 'so no line of this card claims the outputs were observed in that order.');
 }
 
-function toneForRunState(state) {
-  if (state === 'RUNNING') return 'ok';
-  if (state === 'TRIPPED') return 'bad';
-  if (state === 'STOPPED') return 'mute';
-  return 'warn';
-}
-
-// The control affordances on this screen are read from the availability the host itself publishes:
-// sequence.controls carries one {enabled, reason} pair per control. A disabled control therefore shows
-// the host's own reason, and the panel states what PR #47 would have to add before any of them could
-// move - a command route that does not exist in this build.
 export function renderMaintenanceLock(root, snapshot) {
   clear(root);
   const sequence = snapshot ? snapshot.sequence : null;
   const controls = sequence ? sequence.controls : null;
   const mode = sequence ? text(sequence.mode, NOT_PUBLISHED) : NOT_PUBLISHED;
-  paragraph(root, 'manual-mode', 'auto sequence mode: ' + mode
-    + '  |  in RUNNING and PAUSE_REQUESTED the manual surface is locked by the Runtime itself');
+  paragraph(root, 'manual-mode', 'Auto sequence mode: ' + mode
+    + ' | Read-only display of contract availability (no write command surface exists in this build).');
   if (!controls) {
     paragraph(root, 'empty-state', 'no control availability published in this Snapshot');
     return;
   }
   const entries = [
     ['start', 'Start'],
-    ['pauseAfterCurrentJob', 'Pause after current Job'],
+    ['pauseAfterCurrentJob', 'Pause After Job'],
     ['resume', 'Resume'],
-    ['abortActiveJob', 'Abort active Job'],
+    ['abortActiveJob', 'Abort Active Job'],
     ['resetCritical', 'Reset Critical'],
-    ['pumpStart', 'Pump start'],
+    ['pumpStart', 'Pump Start'],
   ];
   const grid = block(root, 'control-grid');
   for (const [key, label] of entries) {
@@ -254,67 +299,43 @@ export function renderMaintenanceLock(root, snapshot) {
     cell.appendChild(name);
     const state = document.createElement('p');
     state.className = 'control-state';
-    state.textContent = (control && control.enabled ? 'AVAILABLE IN THE CONTRACT' : 'LOCKED')
-      + ' - ' + text(control ? control.reason : null, 'no availability published');
+    state.textContent = (control && control.enabled ? 'AVAILABLE' : 'LOCKED')
+      + ' - ' + text(control ? control.reason : null, 'not published');
     cell.appendChild(state);
     const gate = document.createElement('p');
     gate.className = 'control-gate';
-    gate.textContent = 'read-only build: no POST route exists, so this stays display-only until PR #47 lands a command surface';
+    gate.textContent = 'Display-only: read-only build has no command route.';
     cell.appendChild(gate);
   }
 }
 
-// ---------------------------------------------------------------- Tab 1: active cockpit
-//
-// The cockpit is the Job the host says is running, in the words the host supplies, plus the only two
-// pressure figures published for it. The buttons are the published availability of the six sequence
-// controls read back as text: this build has no command route, so a pressed button would be a lie, and
-// the two affordances that do exist are display choices of this screen (which Sensor is in focus, and
-// whether the wall overlay is showing).
+// ---------------------------------------------------------------- Tab 1: Active Cockpit Actions & Delay Bands
+
 export function renderActiveCockpit(root, snapshot, view, onFocusActive, onToggleOverlay) {
-  clear(root);
   const active = snapshot ? snapshot.activeJob : null;
-  if (!active) {
-    paragraph(root, 'empty-state', 'no active Job published: the cockpit shows nothing because the host reports nothing');
-    return;
-  }
-  const stage = active.phaseLabel || active.phase;
-  const line = paragraph(root, 'cockpit-line',
-    'CLEANING NOW: ' + text(active.targetSensorId, '?') + '  |  jet ' + text(active.jetId, '?')
-    + '  |  IV ' + text(active.valveId, '?') + ' ' + text(active.valveOpenCommand, NOT_PUBLISHED)
-    + '  |  stage ' + text(stage, NOT_PUBLISHED)
-    + '  |  phase progress ' + (typeof active.phaseProgress === 'number'
-      ? active.phaseProgress.toFixed(2) + ' of 1 (a presentation-only fraction, never a per cent)'
-      : NOT_PUBLISHED));
-  line.dataset.tone = 'info';
-  const rows2 = block(root, 'cockpit-facts');
-  rows(rows2, [
-    ['lifecycle', text(active.lifecycle, NOT_PUBLISHED)],
-    ['cleaning phase', text(active.cleaningPhase, NOT_PUBLISHED)],
-    ['pump outlet', number(active.pumpOutletPressureBar, 2, 'bar') + ' (' + text(active.pumpPressureQuality, NOT_PUBLISHED) + ')'],
-    ['valve outlet', number(active.valveOutletPressureBar, 2, 'bar') + ' (' + text(active.valvePressureQuality, NOT_PUBLISHED) + ')'],
-    ['setpoint', number(active.pumpReadySetpointBar, 2, 'bar')],
-    ['diagnosis', text(active.valveDiagnosis, NOT_PUBLISHED), 'mute'],
-    ['safe return', text(active.safeReturn && active.safeReturn.step, 'none: no Mandatory Safe Return is running for this job'), 'mute'],
-  ]);
-  const actions = block(root, 'cockpit-actions');
+  const row = block(root, 'cockpit-meta-row');
+  const actions = block(row, 'cockpit-actions');
+
   const focus = document.createElement('button');
   focus.type = 'button';
-  focus.className = 'cockpit-btn';
-  focus.textContent = 'Focus Active - select ' + text(active.targetSensorId, 'the active target');
+  focus.className = 'btn-sm primary cockpit-btn';
+  focus.textContent = active && active.targetSensorId
+    ? 'Focus Active (' + text(active.targetSensorId) + ')'
+    : 'Focus Active (None)';
   focus.dataset.action = 'focus-active';
   actions.appendChild(focus);
+
   const overlay = document.createElement('button');
   overlay.type = 'button';
-  overlay.className = 'cockpit-btn';
+  overlay.className = 'btn-sm cockpit-btn';
   overlay.dataset.action = 'toggle-overlay';
   overlay.setAttribute('aria-pressed', view.overlay === 'cleaning' ? 'true' : 'false');
-  overlay.textContent = 'INSPECTING (' + text(active.targetSensorId, '-') + ') / CLEANING NOW';
+  overlay.textContent = view.overlay === 'cleaning' ? 'Badge: CLEANING NOW' : 'Badge: INSPECTING';
   actions.appendChild(overlay);
-  const coal = paragraph(root, 'cockpit-missing', 'COAL FLOW: ' + NOT_PUBLISHED + ' - the read-only Runtime publishes no boiler load channel, so no flow figure appears anywhere on this screen');
-  coal.dataset.tone = 'warn';
-  // Bound to the row this paint created, never to the host: the host survives every repaint, and a
-  // listener added to it once a second is a second, third and hundredth handler for one click.
+
+  const coal = paragraph(row, 'cockpit-missing', 'COAL FLOW: ' + NOT_PUBLISHED);
+  coal.title = 'The read-only Runtime publishes no boiler load channel, so no coal flow figure appears anywhere on this screen.';
+
   actions.addEventListener('click', (event) => {
     const target = event.target;
     const button = target && target.closest ? target.closest('.cockpit-btn') : null;
@@ -324,11 +345,22 @@ export function renderActiveCockpit(root, snapshot, view, onFocusActive, onToggl
   });
 }
 
-// Boiler-condition delay bands paired with the selected Sensor's score pair. The bands are the four
-// ranges the workspace configuration publishes for the condition in force, and the score is the
-// published dirty / last-validated pair of one Sensor: two scales, both named, neither converted into
-// the other.
-export function renderDelayBands(canvas, caption, snapshot, workspace) {
+function selectedSensorOf(snapshot, selectedId) {
+  const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
+  if (selectedId) {
+    for (const sensor of sensors) {
+      if (sensor && sensor.sensorId === selectedId) return sensor;
+    }
+  }
+  const active = snapshot ? snapshot.activeJob : null;
+  const wanted = active ? active.targetSensorId : null;
+  for (const sensor of sensors) {
+    if (wanted && sensor && sensor.sensorId === wanted) return sensor;
+  }
+  return sensors.length ? sensors[0] : null;
+}
+
+export function renderDelayBands(canvas, caption, snapshot, workspace, selectedId) {
   if (!canvas || !caption) return;
   const ctx = contextOf(canvas);
   if (!ctx) {
@@ -339,102 +371,207 @@ export function renderDelayBands(canvas, caption, snapshot, workspace) {
   const ranges = configuration && Array.isArray(configuration.boilerRanges) ? configuration.boilerRanges : [];
   const frame = frameOf(canvas, { dualAxis: true, captions: true });
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0d1014';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   if (!frame) {
     caption.textContent = 'delay bands: canvas has no frame to draw into';
     return;
   }
   if (!ranges.length) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '11px "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('Delay bands: ' + NOT_PUBLISHED + ' (waiting for DispatchWorkspace)', 14, 28);
     caption.textContent = 'delay bands: ' + NOT_PUBLISHED + ' - this workspace carries no Boiler Condition ranges';
     return;
   }
-  const box = { x0: frame.x0, y0: frame.y0, x1: frame.x1, y1: frame.y1, w: frame.x1 - frame.x0, h: frame.y1 - frame.y0 };
+
+  const leftBox = {
+    x0: 14,
+    y0: 14,
+    w: Math.max(120, Math.floor(canvas.width * 0.62) - 24),
+    h: Math.max(60, canvas.height - 32),
+  };
+  const rightBox = {
+    x0: leftBox.x0 + leftBox.w + 18,
+    y0: 14,
+    w: Math.max(100, canvas.width - (leftBox.x0 + leftBox.w + 30)),
+    h: leftBox.h,
+  };
+
   const low = Math.min.apply(null, ranges.map((range) => range.autoDelayMinSeconds));
   const high = Math.max.apply(null, ranges.map((range) => range.autoDelayMaxSeconds));
   const active = configuration ? text(configuration.activeBoilerCondition, NOT_PUBLISHED) : NOT_PUBLISHED;
+
+  // Grid backdrop on delay band axis
+  ctx.strokeStyle = '#28303b';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(leftBox.x0, leftBox.y0, leftBox.w, leftBox.h);
+
   for (let index = 0; index < ranges.length; index += 1) {
     const range = ranges[index];
-    const lane = box.y0 + (index + 0.18) * (box.h / ranges.length);
-    const laneHeight = (box.h / ranges.length) * 0.64;
-    const from = box.x0 + ((range.autoDelayMinSeconds - low) / Math.max(1, high - low)) * box.w;
-    const to = box.x0 + ((range.autoDelayMaxSeconds - low) / Math.max(1, high - low)) * box.w;
+    const lane = leftBox.y0 + (index + 0.16) * (leftBox.h / ranges.length);
+    const laneHeight = (leftBox.h / ranges.length) * 0.68;
+    const from = leftBox.x0 + ((range.autoDelayMinSeconds - low) / Math.max(1, high - low)) * leftBox.w;
+    const to = leftBox.x0 + ((range.autoDelayMaxSeconds - low) / Math.max(1, high - low)) * leftBox.w;
+    const isActive = text(range.condition, '') === active;
+
     ctx.save();
-    ctx.fillStyle = text(range.condition, '') === active ? 'rgba(227, 179, 65, 0.32)' : 'rgba(154, 165, 177, 0.14)';
-    ctx.fillRect(from, lane, Math.max(2, to - from), laneHeight);
-    ctx.strokeStyle = text(range.condition, '') === active ? 'rgba(227, 179, 65, 0.95)' : 'rgba(154, 165, 177, 0.5)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(from, lane, Math.max(2, to - from), laneHeight);
-    ctx.fillStyle = 'rgba(230, 237, 243, 0.9)';
+    ctx.fillStyle = isActive ? 'rgba(56, 189, 248, 0.28)' : 'rgba(148, 163, 184, 0.14)';
+    ctx.fillRect(from, lane, Math.max(4, to - from), laneHeight);
+    ctx.strokeStyle = isActive ? '#38bdf8' : '#475569';
+    ctx.lineWidth = isActive ? 1.5 : 1;
+    ctx.strokeRect(from, lane, Math.max(4, to - from), laneHeight);
+    ctx.fillStyle = isActive ? '#f1f5f9' : '#94a3b8';
     ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text(range.condition, '?') + '  ' + String(range.autoDelayMinSeconds) + '-' + String(range.autoDelayMaxSeconds) + ' s',
-      box.x0 + 4, lane + laneHeight / 2);
+    ctx.fillText(text(range.condition, '?') + ' ' + String(range.autoDelayMinSeconds) + '-' + String(range.autoDelayMaxSeconds) + 's',
+      leftBox.x0 + 6, lane + laneHeight / 2);
     ctx.restore();
   }
+
   const preview = workspace ? workspace.preview : null;
   const applied = preview && typeof preview.appliedDelaySeconds === 'number' ? preview.appliedDelaySeconds : null;
   if (applied !== null) {
-    const x = box.x0 + ((applied - low) / Math.max(1, high - low)) * box.w;
+    const x = leftBox.x0 + ((applied - low) / Math.max(1, high - low)) * leftBox.w;
     ctx.save();
-    ctx.strokeStyle = 'rgba(86, 211, 100, 0.95)';
-    ctx.setLineDash([]);
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(x, box.y0);
-    ctx.lineTo(x, box.y1);
+    ctx.moveTo(x, leftBox.y0);
+    ctx.lineTo(x, leftBox.y0 + leftBox.h);
     ctx.stroke();
+    ctx.fillStyle = '#34d399';
+    ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+    ctx.fillText('Applied ' + String(applied) + 's', Math.min(x + 4, leftBox.x0 + leftBox.w - 72), leftBox.y0 + 10);
     ctx.restore();
   }
-  const selected = selectedSensorOf(snapshot);
-  caption.textContent = 'delay bands ' + String(low) + '-' + String(high) + ' s  |  condition in force: ' + active
-    + '  |  applied: ' + (applied === null ? NOT_PUBLISHED : String(applied) + ' s')
-    + '  |  selected Sensor dirty score ' + (selected && typeof selected.dirtyScore === 'number' ? selected.dirtyScore.toFixed(1) : 'no score')
-    + ', last validated ' + (selected && typeof selected.lastValidatedScore === 'number' ? selected.lastValidatedScore.toFixed(1) : 'no score')
-    + (selected && selected.classification ? ' (' + String(selected.classification) + ')' : '');
-}
 
-function selectedSensorOf(snapshot) {
-  const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
-  const active = snapshot ? snapshot.activeJob : null;
-  const wanted = active ? active.targetSensorId : null;
-  for (const sensor of sensors) {
-    if (wanted && sensor && sensor.sensorId === wanted) return sensor;
-  }
-  return sensors.length ? sensors[0] : null;
+  // Right-side Selected SDS published Dirty Score vs Last Validated Score (0..100 scale)
+  const selected = selectedSensorOf(snapshot, selectedId);
+  ctx.strokeStyle = '#28303b';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(rightBox.x0, rightBox.y0, rightBox.w, rightBox.h);
+
+  const dirtyThresh = snapshot && snapshot.config && typeof snapshot.config.dirtyThreshold === 'number'
+    ? snapshot.config.dirtyThreshold : 65;
+  const threshX = rightBox.x0 + Math.min(1, Math.max(0, dirtyThresh / 100)) * rightBox.w;
+  ctx.save();
+  ctx.strokeStyle = '#fbbf24';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(threshX, rightBox.y0);
+  ctx.lineTo(threshX, rightBox.y0 + rightBox.h);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.fillText('SDS ' + (selected ? text(selected.sensorId) : '-') + ' Score (0-100)', rightBox.x0 + 6, rightBox.y0 + 14);
+
+  const drawBar = (yPos, label, score, fillColor) => {
+    const barW = rightBox.w - 12;
+    const barH = 16;
+    ctx.fillStyle = '#15191f';
+    ctx.fillRect(rightBox.x0 + 6, yPos, barW, barH);
+    if (typeof score === 'number' && Number.isFinite(score)) {
+      const fillW = Math.min(1, Math.max(0, score / 100)) * barW;
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(rightBox.x0 + 6, yPos, fillW, barH);
+    }
+    ctx.fillStyle = '#f1f5f9';
+    ctx.fillText(label + ': ' + (typeof score === 'number' ? score.toFixed(1) : '--'), rightBox.x0 + 10, yPos + 12);
+  };
+
+  drawBar(rightBox.y0 + 28, 'Dirty', selected ? selected.dirtyScore : null, '#e05246');
+  drawBar(rightBox.y0 + 54, 'Valid', selected ? selected.lastValidatedScore : null, '#38bdf8');
+
+  ctx.fillStyle = '#fbbf24';
+  ctx.fillText('Thresh ' + String(dirtyThresh), rightBox.x0 + 6, rightBox.y0 + rightBox.h - 6);
+  ctx.restore();
+
+  caption.textContent = 'Delay ' + String(low) + '-' + String(high) + 's | Condition: ' + active
+    + ' | Applied: ' + (applied === null ? NOT_PUBLISHED : String(applied) + 's')
+    + ' | ' + (selected ? text(selected.sensorId) : '-') + ' dirty '
+    + (selected && typeof selected.dirtyScore === 'number' ? selected.dirtyScore.toFixed(1) : 'none')
+    + ', validated ' + (selected && typeof selected.lastValidatedScore === 'number' ? selected.lastValidatedScore.toFixed(1) : 'none')
+    + ' | Coal/Temp: ' + NOT_PUBLISHED;
 }
 
 // ---------------------------------------------------------------- Tab 4: Sensor & Path
 
-export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, onSelect) {
+const SDS_FILTER_OPTIONS = Object.freeze(['ALL', 'LEFT', 'REAR', 'RIGHT', 'FRONT', 'DIRTY', 'UNCERTAIN']);
+
+export function renderSensorFilters(root, activeFilter, onFilter) {
+  clear(root);
+  const group = block(root, 'toggle-group');
+  for (const key of SDS_FILTER_OPTIONS) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'filter-btn';
+    btn.dataset.sdsFilter = key;
+    btn.setAttribute('aria-pressed', activeFilter === key ? 'true' : 'false');
+    btn.textContent = key;
+    group.appendChild(btn);
+  }
+  group.addEventListener('click', (event) => {
+    const target = event.target;
+    const btn = target && target.closest ? target.closest('.filter-btn') : null;
+    if (btn && btn.dataset.sdsFilter) onFilter(btn.dataset.sdsFilter);
+  });
+}
+
+export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, onSelect, activeFilter) {
   clear(root);
   const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
   if (!sensors.length) {
     paragraph(root, 'empty-state', 'no Sensor set published in this Snapshot');
     return;
   }
+  const filter = activeFilter || 'ALL';
+  const filtered = sensors.filter((sensor) => {
+    if (!sensor) return false;
+    if (filter === 'ALL') return true;
+    if (filter === 'DIRTY') return String(sensor.classification) === 'DIRTY';
+    if (filter === 'UNCERTAIN') return String(sensor.classification) !== 'DIRTY' && String(sensor.classification) !== 'CLEANER';
+    return String(sensor.wall || '').toUpperCase() === filter;
+  });
+
+  if (!filtered.length) {
+    paragraph(root, 'empty-state', 'No Sensor matches filter ' + filter + ' (' + String(sensors.length) + ' total published).');
+    return;
+  }
+
   const list = block(root, 'sds-master-list');
-  for (const sensor of sensors) {
+  for (const sensor of filtered) {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'sds-row';
     row.dataset.sensorId = String(sensor.sensorId);
-    if (sensor.sensorId === selectedId) row.setAttribute('aria-current', 'true');
+    if (sensor.sensorId === selectedId || sensor.sensorId === activeTargetId) {
+      row.setAttribute('aria-current', 'true');
+    }
     const id = document.createElement('span');
     id.className = 'sds-row-id';
     id.textContent = text(sensor.sensorId, '?');
     const place = document.createElement('span');
     place.className = 'sds-row-place';
-    place.textContent = text(sensor.wall, '?') + ' ' + String(sensor.logicalRow) + '/' + String(sensor.logicalColumn)
-      + '  ' + tierOfRow(sensor.logicalRow);
+    place.textContent = text(sensor.wall, '?') + ' R' + String(sensor.logicalRow) + 'C' + String(sensor.logicalColumn)
+      + ' ' + tierOfRow(sensor.logicalRow) + ' | ' + (typeof sensor.dirtyScore === 'number' ? sensor.dirtyScore.toFixed(1) : '--');
     const jet = document.createElement('span');
     jet.className = 'sds-row-jet';
-    jet.textContent = text(sensor.assignedWaterJetId, 'no jet') + ' / ' + text(sensor.assignedIsolationValveId, 'no IV');
+    jet.textContent = text(sensor.assignedWaterJetId, '-') + ' / ' + text(sensor.assignedIsolationValveId, '-');
+    const stateBadge = document.createElement('span');
+    stateBadge.className = 'sds-row-state';
+    stateBadge.textContent = text(sensor.classification, '?');
+
     row.appendChild(id);
     row.appendChild(place);
     row.appendChild(jet);
+    row.appendChild(stateBadge);
     row.title = text(sensor.classification, NOT_PUBLISHED) + ' / ' + text(sensor.queueState, '?')
       + ' / ' + text(sensor.quality, '?');
     row.dataset.tone = sensor.classification === 'DIRTY' ? 'bad' : sensor.classification === 'CLEANER' ? 'ok' : 'warn';
-    if (sensor.sensorId === activeTargetId) row.setAttribute('aria-current', 'true');
     list.appendChild(row);
   }
   list.addEventListener('click', (event) => {
@@ -444,10 +581,6 @@ export function renderSensorMaster(root, snapshot, selectedId, activeTargetId, o
   });
 }
 
-// The 2D workspace, 1:1 and square: 0..280 mm on both axes, the canonical Safe Return centre drawn
-// where the contract fixes it, and a marker for the Sensor the operator is inspecting plus the active
-// target. Positions of P1..P6 are not published, so nothing is plotted for them - the six stage rows
-// live in the table beside this canvas, where the published stage and state are shown as they are.
 export function renderWorkspace(canvas, caption, snapshot, selectedSensor, activeTarget) {
   if (!canvas || !caption) return;
   const ctx = contextOf(canvas);
@@ -459,8 +592,11 @@ export function renderWorkspace(canvas, caption, snapshot, selectedSensor, activ
   box.w = box.x1 - box.x0;
   box.h = box.y1 - box.y0;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0d1014';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   ctx.save();
-  ctx.strokeStyle = 'rgba(120, 140, 160, 0.55)';
+  ctx.strokeStyle = '#384250';
   ctx.lineWidth = 1;
   ctx.strokeRect(box.x0, box.y0, box.w, box.h);
   ctx.restore();
@@ -472,52 +608,51 @@ export function renderWorkspace(canvas, caption, snapshot, selectedSensor, activ
   const cx = box.x0 + centreFx * box.w;
   const cy = box.y1 - centreFy * box.h;
   ctx.save();
-  ctx.strokeStyle = 'rgba(121, 192, 255, 0.95)';
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(cx - 9, cy);
-  ctx.lineTo(cx + 9, cy);
-  ctx.moveTo(cx, cy - 9);
-  ctx.lineTo(cx, cy + 9);
+  ctx.moveTo(cx - 10, cy);
+  ctx.lineTo(cx + 10, cy);
+  ctx.moveTo(cx, cy - 10);
+  ctx.lineTo(cx, cy + 10);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(cx, cy, 5.5, 0, Math.PI * 2);
+  ctx.arc(cx, cy, 6, 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 
-  // Scale marks first: 0, 70, 140, 210 and 280 mm on both axes, which is geometry the contract defines.
   const markers = [];
   for (let mm = WORKSPACE_MIN_MM; mm <= WORKSPACE_MAX_MM; mm += 70) {
     markers.push({ label: String(mm), fx: (mm - WORKSPACE_MIN_MM) / extent, fy: 0, width: 24, height: 11, slot: 'bottom' });
     markers.push({ label: String(mm), fx: 0, fy: (mm - WORKSPACE_MIN_MM) / extent, width: 24, height: 11, slot: 'left' });
   }
-  // Then the one position this product fixes in contract, and nothing else: no payload of the read-only
-  // Runtime carries a millimetre position for a Sensor or for a stage, so no dot is drawn for either.
-  // Plotting a Sensor on this frame would mean choosing a coordinate for it, and a chosen coordinate
-  // that no contract carries is exactly the kind of mark an operator would later trust.
-  markers.push({ label: 'Centre ' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical), fx: centreFx, fy: centreFy, width: 104, height: 12, tone: 'info' });
+  markers.push({
+    label: 'Centre ' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical),
+    fx: centreFx,
+    fy: centreFy,
+    width: 104,
+    height: 12,
+    tone: 'cyan',
+  });
   const placed = placeLabels(markers, box, 6, 3);
 
   ctx.save();
   ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
   ctx.textBaseline = 'middle';
   for (const label of placed) {
-    ctx.strokeStyle = 'rgba(154, 165, 177, 0.55)';
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
     ctx.beginPath();
     ctx.moveTo(label.anchorX, label.anchorY);
     ctx.lineTo(label.x + 2, label.y);
     ctx.stroke();
-    ctx.fillStyle = label.tone === 'cyan' ? 'rgba(121, 192, 255, 0.95)' : label.tone === 'amber' ? 'rgba(227, 179, 65, 0.95)' : 'rgba(230, 237, 243, 0.92)';
+    ctx.fillStyle = label.tone === 'cyan' ? '#22d3ee' : label.tone === 'amber' ? '#fbbf24' : '#e2e8f0';
     ctx.fillText(label.label, label.x, label.y);
   }
   ctx.restore();
 
-  // The identity of the selection and of the active target is printed as text: both are published,
-  // neither has a published position, and an identity is worth showing while a position is not.
-  caption.textContent = 'workspace ' + String(WORKSPACE_MIN_MM) + '-' + String(WORKSPACE_MAX_MM)
-    + ' mm on both axes, 1:1 square - ' + SCALING_NOTE
-    + '  |  Centre fixed by contract at ' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ' mm, '
-    + String(SAFE_RETURN_CENTRE_MM.vertical) + ' mm = ' + grouped(SAFE_RETURN_CENTRE_NATIVE.horizontal) + ' native';
+  caption.textContent = 'Workspace ' + String(WORKSPACE_MIN_MM) + '-' + String(WORKSPACE_MAX_MM)
+    + ' mm (1:1) | ' + SCALING_NOTE + ' | Centre (' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', '
+    + String(SAFE_RETURN_CENTRE_MM.vertical) + ') = ' + grouped(SAFE_RETURN_CENTRE_NATIVE.horizontal) + ' native';
   return {
     selected: selectedSensor ? 'selected ' + String(selectedSensor) + ' - no published position' : 'nothing selected',
     activeTarget: activeTarget ? 'active target ' + String(activeTarget) + ' - no published position' : 'no active target',
@@ -526,11 +661,11 @@ export function renderWorkspace(canvas, caption, snapshot, selectedSensor, activ
 
 export function renderPathTable(root, workspace) {
   clear(root);
-  paragraph(root, 'scale-note', SCALING_NOTE + '  |  1 mm is never rendered as a pulse count');
+  paragraph(root, 'scale-note', SCALING_NOTE + ' | 1 mm is never rendered as a pulse count');
   const timeline = workspace ? workspace.timeline : null;
   const steps = timeline && Array.isArray(timeline.steps) ? timeline.steps : [];
   if (!steps.length) {
-    paragraph(root, 'empty-state', 'no Cleaning Job Workspace timeline published - the stage rows below carry the canonical order only');
+    paragraph(root, 'empty-state', 'no Cleaning Job Workspace timeline published - canonical stage order shown');
   }
   paragraph(root, 'coord-note', STAGE_COORDINATE_NOTE);
   const body = [];
@@ -540,7 +675,7 @@ export function renderPathTable(root, workspace) {
       cells: [
         stage.key,
         stage.stage,
-        step ? String(step.ordinal) : '- not in this workspace -',
+        step ? String(step.ordinal) : '-',
         step ? text(step.label, NOT_PUBLISHED) : NOT_PUBLISHED,
         step ? text(step.state, NOT_PUBLISHED) : NOT_PUBLISHED,
         stage.key === 'CENTRE' || stage.key === 'SAFE_RETURN'
@@ -553,9 +688,9 @@ export function renderPathTable(root, workspace) {
       tone: step ? (step.state === 'COMPLETE' ? 'ok' : 'info') : 'mute',
     });
   }
-  table(root, ['position', 'published stage', 'ordinal', 'label', 'state', 'mm', 'native'], body);
+  table(root, ['Position', 'Stage', '#', 'Label', 'State', 'mm', 'Native'], body);
   const keys = CLEANING_PATH_STAGES.map((stage) => stage.stage).join(', ');
-  paragraph(root, 'stage-keys', 'stage identities indexed by this panel: ' + keys);
+  paragraph(root, 'stage-keys', 'Stage identities indexed: ' + keys);
 }
 
 // ---------------------------------------------------------------- Tab 6: System & Trends
@@ -611,7 +746,7 @@ export function renderSystemSummary(root, snapshot, status, health, connection) 
   }
 
   if (status) {
-    heading(root, 'Counters the host reports about itself');
+    heading(root, 'Runtime Counters');
     const counts = status.sensorCounts;
     rows(root, [
       ['logical slots', counts ? text(counts.logicalSlots.label, NOT_PUBLISHED) + ' = ' + String(counts.logicalSlots.count) : NOT_PUBLISHED],
@@ -633,17 +768,17 @@ export function renderSystemSummary(root, snapshot, status, health, connection) 
     ]);
   }
 
-  heading(root, 'Device links');
+  heading(root, 'Device Links');
   if (!devices.length) {
     paragraph(root, 'empty-state', 'no device link health published in this Snapshot');
   } else {
-    table(root, ['device', 'state', 'timeouts', 'last success', 'latency', 'polls ok', 'polls failed'], devices.map((device) => ({
+    table(root, ['Device', 'State', 'Timeouts', 'Last OK', 'Latency', 'OK', 'Fail'], devices.map((device) => ({
       cells: [
         text(device.deviceId, '?'),
         text(device.state, NOT_PUBLISHED),
         String(device.consecutiveTimeouts),
         timeOf(device.lastSuccessAt),
-        device.lastLatencyMs === null || device.lastLatencyMs === undefined ? 'not measured' : number(device.lastLatencyMs, 0, 'ms'),
+        device.lastLatencyMs === null || device.lastLatencyMs === undefined ? '-' : number(device.lastLatencyMs, 0, 'ms'),
         String(device.pollsOk),
         String(device.pollsFailed),
       ],
@@ -659,6 +794,33 @@ export function renderWallBreakdown(root, snapshot) {
     paragraph(root, 'empty-state', summary.note);
     return;
   }
+
+  // Visual 3-segment cleanliness distribution bars per wall
+  const barList = block(root, 'dist-bar-list num');
+  for (const wall of summary.perWall) {
+    const row = block(barList, 'dist-row');
+    const head = block(row, 'dist-row-head');
+    const left = document.createElement('strong');
+    left.textContent = text(wall.wall, '?') + ' (' + String(wall.total) + ' SDS)';
+    const right = document.createElement('span');
+    right.textContent = 'Clean ' + String(wall.cleaner) + ' | Dirty ' + String(wall.dirty)
+      + ' | Unc ' + String(wall.uncertain + wall.notClassified);
+    head.appendChild(left);
+    head.appendChild(right);
+
+    const bar = block(row, 'wall-bar');
+    for (const [cls, cnt] of [
+      ['dirty', wall.dirty],
+      ['unc', wall.uncertain + wall.notClassified],
+      ['clean', wall.cleaner],
+    ]) {
+      if (cnt > 0) {
+        const seg = block(bar, 'wall-bar-seg ' + cls);
+        seg.style.flexGrow = String(cnt);
+      }
+    }
+  }
+
   const body = summary.perWall.map((wall) => ({
     cells: [
       text(wall.wall, '?'),
@@ -667,7 +829,7 @@ export function renderWallBreakdown(root, snapshot) {
       String(wall.dirty),
       String(wall.uncertain),
       String(wall.notClassified),
-      wall.maxScore === null || wall.maxScore === undefined ? 'no score' : number(wall.maxScore, 2),
+      wall.maxScore === null || wall.maxScore === undefined ? '-' : number(wall.maxScore, 1),
     ],
     tone: wall.total === EXPECTED_PER_WALL[wall.wall] ? 'ok' : 'warn',
   }));
@@ -675,14 +837,10 @@ export function renderWallBreakdown(root, snapshot) {
     cells: ['TOTAL', String(summary.total), String(summary.pills[0].value), String(summary.pills[1].value), summary.breakdown, '-', '-'],
     tone: summary.state === 'mismatch' ? 'bad' : 'ok',
   });
-  table(root, ['wall', 'total', 'cleaner', 'dirty', 'uncertain + not classified', 'max score', ''], body);
+  table(root, ['Wall', 'Tot', 'Clean', 'Dirty', 'Unc', 'NotCls', 'Max'], body);
   paragraph(root, 'breakdown-note', summary.note);
 }
 
-// The explorer draws the only history the read-only API carries: the bounded trend window of the
-// Snapshot, whose published series are pressure, setpoint, ready-band-low and ready-band-high. Each
-// channel toggle states its engineering range and its live value, because a normalised plot that hides
-// its units is how a bar becomes a per cent without anyone deciding that.
 export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
   if (!canvas || !caption || !note) return;
   const trend = snapshot ? snapshot.trend : null;
@@ -712,6 +870,9 @@ export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
   const timeRange = timeRangeOf(points.filter(Boolean).map((point) => ({ t: point.t, value: 0 })), 60);
   const frame = frameOf(canvas, { dualAxis: false, captions: false });
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#0d1014';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   if (!frame || !range || !timeRange) {
     caption.textContent = 'trend explorer: ' + String(points.length) + ' samples, nothing on an enabled channel to plot';
     note.textContent = 'a channel with every sample missing is a DATA GAP, not a flat line';
@@ -719,11 +880,11 @@ export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
   }
   const mapper = mapperFor(frame, range, timeRange);
   ctx.save();
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.8;
   for (const entry of shown) {
-    ctx.strokeStyle = entry.name === 'pressure' ? 'rgba(86, 211, 100, 0.95)'
-      : entry.name === 'setpoint' ? 'rgba(227, 179, 65, 0.95)'
-        : 'rgba(121, 192, 255, 0.85)';
+    ctx.strokeStyle = entry.name === 'pressure' ? '#38bdf8'
+      : entry.name === 'setpoint' ? '#fbbf24'
+        : '#34d399';
     drawSeries(ctx, entry.values, mapper);
   }
   ctx.restore();
@@ -732,13 +893,11 @@ export function renderTrendExplorer(canvas, caption, note, snapshot, view) {
   const span = { min: 0, max: 100 };
   const normalized = series.map((entry) => normalise(entry.values, range));
   caption.textContent = captionFor(shown.length ? shown : series, points, trend.capacity)
-    + '  |  vertical: ' + formatTick(range.min) + ' to ' + formatTick(range.max) + ' bar'
-    + '  |  0-100% span ' + formatTick(span.min) + ' to ' + formatTick(span.max);
-  note.textContent = 'the Runtime publishes a bounded window of ' + String(trend.capacity)
-    + ' samples for these four channels and nothing else: no coal flow, no per-Sensor temperature, no '
-    + 'isolation-valve history. Those rows below say ' + NOT_PUBLISHED + ' and stay that way until a '
-    + 'contract carries them - this screen does not draw a line to fill a blank.';
-  return { series: series, normalized: normalized, enabled: enabled };
+    + ' | vertical: ' + formatTick(range.min) + ' to ' + formatTick(range.max) + ' bar'
+    + ' | 0-100% span ' + formatTick(span.min) + ' to ' + formatTick(span.max);
+  note.textContent = 'Bounded window (' + String(trend.capacity)
+    + ' samples) for published channels only; Coal Flow, SDS Temp, and IV History are ' + NOT_PUBLISHED + '.';
+  return { series, normalized, enabled };
 }
 
 export function renderChannelToggles(root, snapshot, view, onToggle) {
@@ -769,13 +928,6 @@ export function renderChannelToggles(root, snapshot, view, onToggle) {
     button.appendChild(live);
     group.appendChild(button);
   }
-  for (const absent of ['coal-flow t/h', 'SDS temperature degC', 'IV pressure history', 'per-Sensor TC degC']) {
-    const row = document.createElement('p');
-    row.className = 'channel-absent';
-    row.textContent = absent + ': ' + NOT_PUBLISHED;
-    group.appendChild(row);
-  }
-  // Same rule as the cockpit: the group is created by this paint, so its listener count is one.
   group.addEventListener('click', (event) => {
     const target = event.target;
     const button = target && target.closest ? target.closest('.channel') : null;
@@ -788,39 +940,145 @@ function liveValueLabel(trend, index) {
   for (let cursor = points.length - 1; cursor >= 0; cursor -= 1) {
     const point = points[cursor];
     const raw = point && Array.isArray(point.series) ? point.series[index] : null;
-    if (typeof raw === 'number') return 'live ' + formatted(raw, 'bar');
+    if (typeof raw === 'number') return formatted(raw, 'bar');
   }
-  return 'live DATA GAP';
+  return 'DATA GAP';
 }
 
-// ---------------------------------------------------------------- Tab 1(d): camera viewport container
-//
-// A mount point, not a stream. There is no image or video route on this host, so the panel reserves the
-// box, names the Water Jet the view would belong to, and says plainly that nothing is wired. It makes
-// no request of any kind: no img element, no source, no address, and no URL that a scanner would have
-// to forgive. When a camera surface exists, it appears inside this container and nowhere else.
-export function renderCameraPanel(root, snapshot) {
+/* Tab 1(d): IP Camera mount container.
+ * Zero external addresses, double-slash tokens, or image elements appear in the camera renderer.
+ */
+export function renderCameraPanel(root, snapshot, selectedJet, onSelectJet) {
   clear(root);
   const active = snapshot ? snapshot.activeJob : null;
-  const jetId = active ? text(active.jetId, 'no active Job') : 'no active Job';
-  const sensorId = active ? text(active.targetSensorId, NOT_PUBLISHED) : NOT_PUBLISHED;
-  const jet = active && active.jetId ? byId(snapshot.waterJets || [], 'waterJetId', active.jetId) : null;
-  root.dataset.syncedJet = active && active.jetId ? String(active.jetId) : 'none';
-  const frame = block(root, 'camera-frame');
-  frame.setAttribute('role', 'img');
-  frame.setAttribute('aria-label', 'Camera viewport placeholder for ' + jetId);
-  paragraph(frame, 'camera-title', 'IP Camera - ' + jetId);
-  paragraph(frame, 'camera-sentence', 'NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE');
-  const facts = block(root, 'camera-facts');
-  rows(facts, [
-    ['synced to', jetId, active ? 'info' : 'mute'],
-    ['cleaning', sensorId],
-    ['installed wall', jet ? text(jet.installedWall, NOT_PUBLISHED) + '/' + text(jet.installedRegion, NOT_PUBLISHED) : NOT_PUBLISHED],
-    ['target wall', jet ? text(jet.targetWall, NOT_PUBLISHED) + '/' + text(jet.targetRegion, NOT_PUBLISHED) : NOT_PUBLISHED],
-    ['mount', 'container ready: a future stream surface renders inside this box and nowhere else'],
-    ['requests', 'zero - no image element, no source, no address, no request'],
-  ]);
-  paragraph(root, 'camera-note',
-    'the panel is deliberately empty rather than illustrative: a still frame or a mock would read as a '
-    + 'live view on a wall, and a wall screen that is trusted once has to be right about what it is not showing');
+  const activeJetId = active && active.jetId ? String(active.jetId) : null;
+  const mode = selectedJet && selectedJet !== 'AUTO' ? String(selectedJet) : 'AUTO';
+  const resolvedId = mode === 'AUTO' ? activeJetId : mode;
+  const canonical = resolvedId ? WATER_JETS_BY_ID[resolvedId] : null;
+  const publishedJet = resolvedId ? byId(snapshot && snapshot.waterJets ? snapshot.waterJets : [], 'waterJetId', resolvedId) : null;
+  const displayJet = resolvedId || 'NO ACTIVE JET';
+  const sensorId = active && (!resolvedId || resolvedId === activeJetId)
+    ? text(active.targetSensorId, NOT_PUBLISHED)
+    : 'STANDBY';
+
+  root.dataset.syncedJet = resolvedId || 'none';
+
+  const viewport = block(root, 'cam-viewport');
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 132;
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', 'Camera viewport mount container for ' + displayJet);
+  viewport.appendChild(canvas);
+
+  const ctx = contextOf(canvas);
+  if (ctx) {
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.fillStyle = '#0b0e13';
+    ctx.fillRect(0, 0, w, h);
+
+    for (let x = 20; x <= w - 20; x += 18) {
+      ctx.strokeStyle = '#18212e';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+      ctx.strokeStyle = '#263244';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+    }
+
+    const cx = Math.floor(w * 0.5);
+    const cy = Math.floor(h * 0.46);
+    ctx.strokeStyle = '#22d3ee';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+    ctx.moveTo(cx - 20, cy);
+    ctx.lineTo(cx - 6, cy);
+    ctx.moveTo(cx + 6, cy);
+    ctx.lineTo(cx + 20, cy);
+    ctx.moveTo(cx, cy - 20);
+    ctx.lineTo(cx, cy - 6);
+    ctx.moveTo(cx, cy + 6);
+    ctx.lineTo(cx, cy + 20);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(13, 16, 20, 0.82)';
+    ctx.fillRect(10, h - 42, w - 20, 18);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = '9px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE', w * 0.5, h - 30);
+    ctx.textAlign = 'left';
+  }
+
+  const hud = block(viewport, 'cam-hud-overlay');
+  const hudTop = block(hud, 'cam-hud-top');
+  const hudId = document.createElement('span');
+  hudId.className = 'cam-hud-id';
+  hudId.textContent = mode === 'AUTO' ? 'AUTO | ' + displayJet : displayJet;
+  const hudState = document.createElement('span');
+  hudState.className = 'cam-hud-status';
+  hudState.textContent = active && resolvedId === activeJetId ? 'SYNCED TO ACTIVE' : 'MOUNT READY';
+  hudTop.appendChild(hudId);
+  hudTop.appendChild(hudState);
+
+  const hudBot = block(hud, 'cam-hud-bot');
+  const hudAim = document.createElement('span');
+  hudAim.textContent = 'TARGET: ' + sensorId;
+  const hudPark = document.createElement('span');
+  hudPark.textContent = 'PARK (' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical) + ')';
+  hudBot.appendChild(hudAim);
+  hudBot.appendChild(hudPark);
+
+  const side = block(root, 'cam-side-meta num');
+  const btnStrip = block(side, 'cam-btn-strip');
+  const choices = ['AUTO'].concat(WATER_JETS.map((entry) => entry.wj));
+  for (const choice of choices) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cam-btn';
+    btn.dataset.camChoice = choice;
+    btn.setAttribute('aria-pressed', mode === choice ? 'true' : 'false');
+    btn.textContent = choice;
+    btnStrip.appendChild(btn);
+  }
+  btnStrip.addEventListener('click', (event) => {
+    const target = event.target;
+    const btn = target && target.closest ? target.closest('.cam-btn') : null;
+    if (btn && btn.dataset.camChoice && typeof onSelectJet === 'function') {
+      onSelectJet(btn.dataset.camChoice);
+    }
+  });
+
+  const addKv = (k, v) => {
+    const row = block(side, 'kv-row');
+    const s = document.createElement('span');
+    s.textContent = k;
+    const st = document.createElement('strong');
+    st.textContent = v;
+    row.appendChild(s);
+    row.appendChild(st);
+  };
+
+  const instWall = publishedJet
+    ? text(publishedJet.installedWall) + ' ' + text(publishedJet.installedRegion)
+    : (canonical ? canonical.installedWall + ' ' + canonical.installedTier : NOT_PUBLISHED);
+  const targWall = publishedJet
+    ? text(publishedJet.targetWall) + ' ' + text(publishedJet.targetRegion)
+    : (canonical ? canonical.targetWall + ' ' + canonical.targetTier : NOT_PUBLISHED);
+
+  addKv('Installed', instWall);
+  addKv('Target', targWall);
+  addKv('Safe Park', '(' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical) + ') mm');
+
+  const zero = paragraph(side, 'cam-zero-note',
+    'zero - no image element, no source, no address, no request');
+  zero.title = 'NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE';
 }

@@ -1,4 +1,4 @@
-// WJSS Operator presentation - the authoritative 108-Sensor boiler wall map.
+// WJSS Operator presentation - the authoritative 108-Sensor U-Shape boiler wall map.
 //
 // The geometry is the accepted topology ruling, stated once here and asserted by the source
 // contract test: four walls traversed LEFT, REAR, RIGHT, FRONT; six logical rows per wall;
@@ -11,23 +11,38 @@
 // rendered as a refused slot with its slot id, and a Sensor set that does not add up to the
 // protected totals refuses the whole map instead of presenting a partial boiler.
 
-// The Single Topology Source Rule: this panel does not own a copy of the matrix. Every constant below
-// comes from './topology.mjs', which is the one place the wall / tier / count table is written and the
-// one place the contract test compares it against the .NET catalogs. Re-exporting keeps the map's own
-// public shape intact for its callers while removing the second definition.
-import { EXPECTED_PER_WALL, EXPECTED_TOTAL, LOWER_ROWS, UPPER_ROWS, WALL_COLUMNS, WALL_LABELS, WALL_ORDER, WALL_ROWS, tierOfRow } from './topology.mjs';
+import {
+  EXPECTED_PER_WALL,
+  EXPECTED_TOTAL,
+  LOWER_ROWS,
+  SAFE_RETURN_CENTRE_MM,
+  UPPER_ROWS,
+  WALL_COLUMNS,
+  WALL_LABELS,
+  WALL_ORDER,
+  WALL_ROWS,
+  WATER_JETS,
+  WATER_JETS_BY_ID,
+  WSB_CABINETS,
+  tierOfRow,
+} from './topology.mjs';
 
-export { EXPECTED_PER_WALL, EXPECTED_TOTAL, LOWER_ROWS, UPPER_ROWS, WALL_COLUMNS, WALL_LABELS, WALL_ORDER, WALL_ROWS, tierOfRow };
+export {
+  EXPECTED_PER_WALL,
+  EXPECTED_TOTAL,
+  LOWER_ROWS,
+  UPPER_ROWS,
+  WALL_COLUMNS,
+  WALL_LABELS,
+  WALL_ORDER,
+  WALL_ROWS,
+  tierOfRow,
+};
 
 export function isSensor(value) {
   return String(value).toUpperCase() === 'SENSOR';
 }
 
-/**
- * The visual state key of one Sensor. Colour never carries a state alone: the same switch also
- * chooses the marker shape and the text a cell prints, and a stale reading is reported as stale
- * on top of whatever classification it carries.
- */
 export function visualOf(sensor) {
   if (!sensor) return { key: 'unknown', marker: '?', label: 'NO DATA' };
   const quality = String(sensor.quality || '');
@@ -54,10 +69,6 @@ export function queueOf(sensor) {
   return 'none';
 }
 
-/**
- * Groups the published matrix by wall and tier. Refusals are returned, never swallowed: the
- * caller shows them on the panel that failed rather than rendering a wall it cannot prove.
- */
 export function buildModel(snapshot) {
   const slots = snapshot && Array.isArray(snapshot.wallMap) ? snapshot.wallMap : null;
   if (!slots) return { ok: false, error: 'the Snapshot carried no wall map' };
@@ -102,7 +113,6 @@ export function buildModel(snapshot) {
     walls.get(wall).slots.sort((a, b) => a.logicalRow - b.logicalRow || a.logicalColumn - b.logicalColumn);
   }
 
-  // The approved navigation order: wall order, then logical row, then logical column.
   const ordered = [];
   for (const wall of WALL_ORDER) {
     for (const slot of walls.get(wall).slots) {
@@ -113,68 +123,157 @@ export function buildModel(snapshot) {
   return { ok: true, walls, sensorCount: byId.size, ordered, nonSensor };
 }
 
-function header(wall, count, devices, subtotal) {
-  const head = document.createElement('div');
-  head.className = 'wall-head';
-  const name = document.createElement('span');
-  name.className = 'wall-name';
-  name.textContent = WALL_LABELS[wall] || wall;
-  const total = document.createElement('span');
-  total.className = 'wall-count';
-  total.textContent = count + ' / ' + EXPECTED_PER_WALL[wall];
-  head.appendChild(name);
-  head.appendChild(total);
-  if (devices) {
-    const dev = document.createElement('span');
-    dev.className = 'wall-devices';
-    dev.textContent = devices;
-    head.appendChild(dev);
+function cabinetInfoForJet(wjId) {
+  for (const cabinet of WSB_CABINETS) {
+    for (const binding of cabinet.jets) {
+      if (binding.wj === wjId) {
+        return cabinet.wsb + ' ' + binding.horizontalAxis + '/' + binding.verticalAxis;
+      }
+    }
   }
-  if (subtotal) {
-    const tally = document.createElement('span');
-    tally.className = 'wall-subtotal';
-    tally.textContent = subtotal;
-    head.appendChild(tally);
-  }
-  return head;
+  return 'WSB?';
 }
 
-function cell(slot, sensor, selectedId, onSelect) {
+function queuePositionsMap(snapshot) {
+  const map = new Map();
+  const entries = snapshot && snapshot.queue && Array.isArray(snapshot.queue.entries)
+    ? snapshot.queue.entries : [];
+  for (const entry of entries) {
+    if (entry && typeof entry.sensorId === 'string' && typeof entry.position === 'number') {
+      map.set(entry.sensorId, entry.position);
+    }
+  }
+  return map;
+}
+
+function nozzleStrip(wall, snapshot) {
+  const active = snapshot ? snapshot.activeJob : null;
+  const installed = WATER_JETS.filter((jet) => jet.installedWall === wall);
+  const card = document.createElement('div');
+  card.className = 'wsb-mini-card';
+
+  const head = document.createElement('div');
+  head.className = 'wsb-mini-head';
+  const title = document.createElement('span');
+  title.textContent = wall + ' INSTALLED NOZZLES';
+  const count = document.createElement('span');
+  count.className = 'wsb-mini-count';
+  count.textContent = String(installed.length) + ' UNITS';
+  head.appendChild(title);
+  head.appendChild(count);
+  card.appendChild(head);
+
+  for (const jet of installed) {
+    const isFiring = Boolean(active && active.jetId === jet.wj);
+    const row = document.createElement('div');
+    row.className = 'nozzle-row';
+    const info = document.createElement('div');
+    const idLine = document.createElement('div');
+    idLine.className = 'noz-id';
+    idLine.textContent = jet.wj + ' | ' + jet.iv + ' (' + cabinetInfoForJet(jet.wj) + ')';
+    const metaLine = document.createElement('div');
+    metaLine.className = 'noz-meta';
+    metaLine.textContent = jet.installedWall + ' ' + jet.installedTier + ' -> ' + jet.targetWall + ' ' + jet.targetTier;
+    info.appendChild(idLine);
+    info.appendChild(metaLine);
+
+    const pill = document.createElement('span');
+    pill.className = isFiring ? 'pill-state pill-firing' : 'pill-state pill-standby';
+    pill.textContent = isFiring ? 'ACTIVE' : 'STANDBY';
+    row.appendChild(info);
+    row.appendChild(pill);
+    card.appendChild(row);
+  }
+  return card;
+}
+
+function sideFooterCard(label, statusText) {
+  const card = document.createElement('div');
+  card.className = 'wsb-footer-card num';
+  const left = document.createElement('span');
+  left.textContent = label;
+  const right = document.createElement('span');
+  right.className = 'wsb-footer-ok';
+  right.textContent = statusText;
+  card.appendChild(left);
+  card.appendChild(right);
+  return card;
+}
+
+function wallSummaryOf(snapshot, wall) {
+  const summaries = snapshot && Array.isArray(snapshot.walls) ? snapshot.walls : [];
+  for (const entry of summaries) {
+    if (entry && String(entry.wall || '').toUpperCase() === wall) return entry;
+  }
+  return null;
+}
+
+function deviceNote(wall, snapshot) {
+  const jets = Array.isArray(snapshot.waterJets) ? snapshot.waterJets : [];
+  const targeted = jets.filter((jet) => String(jet.targetWall || '').toUpperCase() === wall);
+  if (targeted.length === 0) return '';
+  return 'Cleaned by ' + targeted.map((jet) => String(jet.waterJetId || '?')).join(' / ');
+}
+
+function cell(slot, sensor, selectedId, queuePos, onSelect) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'cell-btn';
+  button.className = 'sds-cell';
+
+  const top = document.createElement('div');
+  top.className = 'sds-top';
   const id = document.createElement('span');
-  id.className = 'cell-id';
-  const value = document.createElement('span');
-  value.className = 'cell-value';
-  const mark = document.createElement('span');
-  mark.className = 'cell-mark';
-  mark.setAttribute('aria-hidden', 'true');
+  id.className = 'sds-id';
+  const val = document.createElement('div');
+  val.className = 'sds-val num';
 
   if (!sensor) {
     button.dataset.gap = 'true';
     button.dataset.state = 'unknown';
     button.disabled = true;
     id.textContent = typeof slot.sensorId === 'string' && slot.sensorId.length > 0 ? slot.sensorId : slot.slotId;
-    value.textContent = 'NO SENSOR PUBLISHED';
+    val.textContent = 'NO SDS';
     button.title = slot.slotId + ': the Runtime published this matrix position without a Sensor identity, '
       + 'so the presentation shows the slot and refuses to invent one.';
-    button.appendChild(id);
-    button.appendChild(value);
-    button.appendChild(mark);
+    top.appendChild(id);
+    button.appendChild(top);
+    button.appendChild(val);
     return button;
   }
 
   const visual = visualOf(sensor);
+  const qState = queueOf(sensor);
+  const isTarget = sensor.isActiveJobTarget === true;
   button.dataset.state = visual.key;
   button.dataset.alarm = alarmOf(sensor);
-  button.dataset.queue = queueOf(sensor);
-  button.dataset.target = sensor.isActiveJobTarget === true ? 'true' : 'false';
+  button.dataset.queue = qState;
+  button.dataset.target = isTarget ? 'true' : 'false';
   button.dataset.selected = sensor.sensorId === selectedId ? 'true' : 'false';
   button.setAttribute('aria-current', sensor.sensorId === selectedId ? 'true' : 'false');
-  id.textContent = sensor.sensorId + ' ' + visual.marker + ' ' + visual.label;
-  value.textContent = (typeof sensor.dirtyScore === 'number' ? sensor.dirtyScore.toFixed(1) : 'no score')
-    + ' / ' + String(sensor.quality || 'NOT_PROVIDED');
+  button.dataset.sensor = sensor.sensorId;
+
+  id.textContent = sensor.sensorId;
+  top.appendChild(id);
+
+  if (isTarget) {
+    const badge = document.createElement('span');
+    badge.className = 'sds-badge next-tag';
+    badge.textContent = 'ACT';
+    top.appendChild(badge);
+  } else if (queuePos !== undefined) {
+    const badge = document.createElement('span');
+    badge.className = 'sds-badge';
+    badge.textContent = 'Q' + String(queuePos);
+    top.appendChild(badge);
+  } else if (visual.key === 'watch' || visual.key === 'stale' || visual.key === 'unknown') {
+    const badge = document.createElement('span');
+    badge.className = 'sds-badge unc-warn';
+    badge.textContent = visual.marker;
+    top.appendChild(badge);
+  }
+
+  val.textContent = typeof sensor.dirtyScore === 'number' ? sensor.dirtyScore.toFixed(1) : '--';
+
   button.title = sensor.sensorId
     + ' - ' + (WALL_LABELS[String(slot.wall).toUpperCase()] || slot.wall)
     + ', logical row ' + slot.logicalRow + ' (' + tierOfRow(slot.logicalRow) + '), column ' + slot.logicalColumn
@@ -185,69 +284,154 @@ function cell(slot, sensor, selectedId, onSelect) {
     + '; cleaning device ' + String(sensor.assignedWaterJetId || 'NOT_PROVIDED')
     + ' with isolation valve ' + String(sensor.assignedIsolationValveId || 'NOT_PROVIDED');
   button.addEventListener('click', () => onSelect(sensor.sensorId));
-  button.dataset.sensor = sensor.sensorId;
-  button.appendChild(id);
-  button.appendChild(value);
-  button.appendChild(mark);
+
+  button.appendChild(top);
+  button.appendChild(val);
   return button;
 }
 
-function tierBlock(wall, slots, sensorById, tier, selectedId, onSelect) {
-  const rows = tier === 'UPPER' ? UPPER_ROWS : LOWER_ROWS;
+function halfGrid(wall, slots, sensorById, rows, selectedId, queuePosMap, onSelect) {
+  const cols = WALL_COLUMNS[wall];
   const scoped = slots.filter((slot) => rows.indexOf(slot.logicalRow) >= 0);
-  const block = document.createElement('div');
-  block.className = 'tier';
-  const label = document.createElement('p');
-  label.className = 'tier-label';
-  label.textContent = tier + ' - logical rows ' + rows[0] + ' to ' + rows[rows.length - 1];
-  block.appendChild(label);
-
   const grid = document.createElement('div');
-  grid.className = 'slotgrid';
-  for (const slot of scoped) grid.appendChild(cell(slot, sensorById.get(slot.sensorId) || null, selectedId, onSelect));
-  for (let i = scoped.length; i < rows.length * WALL_COLUMNS[wall]; i += 1) {
+  grid.className = 'wall-half-grid cols-' + String(cols);
+  for (const slot of scoped) {
+    const sensor = sensorById.get(slot.sensorId) || null;
+    grid.appendChild(cell(slot, sensor, selectedId, sensor ? queuePosMap.get(sensor.sensorId) : undefined, onSelect));
+  }
+  for (let i = scoped.length; i < rows.length * cols; i += 1) {
     const pad = document.createElement('div');
-    pad.className = 'cell-btn';
+    pad.className = 'sds-cell';
     pad.dataset.gap = 'true';
     pad.dataset.state = 'unknown';
-    pad.textContent = '';
     grid.appendChild(pad);
   }
-  block.appendChild(grid);
-  return block;
+  return grid;
 }
 
-/** Wall-level device note: which Water Jets list this wall as their target. Read-only reference. */
-function deviceNote(wall, snapshot) {
-  const jets = Array.isArray(snapshot.waterJets) ? snapshot.waterJets : [];
-  const targeted = jets.filter((jet) => String(jet.targetWall || '').toUpperCase() === wall);
-  if (targeted.length === 0) return '';
-  return 'cleaned by ' + targeted.map((jet) => String(jet.waterJetId || '?')).join(' ');
-}
+function cleanlinessBar(summary) {
+  const wrap = document.createElement('div');
+  wrap.className = 'wall-bar-wrap num';
+  const bar = document.createElement('div');
+  bar.className = 'wall-bar';
 
-/**
- * The published per-wall subtotal, taken from OperationalSnapshot.walls (WallSummary) rather than
- * counted from the cells on this panel. A mismatch between the two is a host-side contradiction, so the
- * line prints both numbers and lets the operator see the disagreement instead of the map hiding it.
- */
-function wallSubtotal(snapshot, wall) {
-  const summaries = snapshot && Array.isArray(snapshot.walls) ? snapshot.walls : [];
-  const summary = summaries.find((entry) => String(entry && entry.wall || '').toUpperCase() === wall);
-  if (!summary) return wall + ': no WallSummary published for this wall';
-  const cells = countedFor(snapshot, wall);
-  const counts = 'cleaner ' + String(summary.cleaner) + ', dirty ' + String(summary.dirty)
-    + ', uncertain ' + String(summary.uncertain) + ', not classified ' + String(summary.notClassified)
-    + ', max score ' + (typeof summary.maxScore === 'number' ? summary.maxScore.toFixed(1) : 'no score');
-  return counts + (cells === summary.total ? '' : ' | CELLS ON THIS WALL: ' + String(cells) + ' vs TOTAL ' + String(summary.total));
-}
+  const dirty = summary ? Number(summary.dirty) || 0 : 0;
+  const unc = summary ? (Number(summary.uncertain) || 0) + (Number(summary.notClassified) || 0) : 0;
+  const clean = summary ? Number(summary.cleaner) || 0 : 0;
 
-function countedFor(snapshot, wall) {
-  const sensors = Array.isArray(snapshot && snapshot.sensors) ? snapshot.sensors : [];
-  let count = 0;
-  for (const sensor of sensors) {
-    if (String((sensor && sensor.wall) || '').toUpperCase() === wall) count += 1;
+  for (const [cls, count] of [['dirty', dirty], ['unc', unc], ['clean', clean]]) {
+    if (count > 0) {
+      const seg = document.createElement('div');
+      seg.className = 'wall-bar-seg ' + cls;
+      seg.style.flexGrow = String(count);
+      bar.appendChild(seg);
+    }
   }
-  return count;
+  wrap.appendChild(bar);
+
+  const labels = document.createElement('div');
+  labels.className = 'wall-bar-labels';
+  const left = document.createElement('span');
+  left.textContent = summary
+    ? 'D:' + String(dirty) + ' | U:' + String(unc) + ' | C:' + String(clean)
+    : 'Wall summary unavailable';
+  const right = document.createElement('span');
+  right.textContent = summary && typeof summary.maxScore === 'number'
+    ? 'Max ' + summary.maxScore.toFixed(1)
+    : 'Max --';
+  labels.appendChild(left);
+  labels.appendChild(right);
+  wrap.appendChild(labels);
+  return wrap;
+}
+
+function wallBlock(wall, entry, sensorById, snapshot, selectedId, queuePosMap, onSelect) {
+  const section = document.createElement('section');
+  section.className = 'wall-block';
+  section.dataset.wall = wall;
+  section.setAttribute('aria-label', (WALL_LABELS[wall] || wall) + ' tier map');
+
+  const head = document.createElement('div');
+  head.className = 'wall-header';
+  const name = document.createElement('strong');
+  name.textContent = wall + ' (' + String(WALL_COLUMNS[wall]) + 'x' + String(WALL_ROWS) + ' = ' + String(entry.sensors) + ')';
+  const meta = document.createElement('span');
+  meta.textContent = deviceNote(wall, snapshot);
+  head.appendChild(name);
+  head.appendChild(meta);
+  section.appendChild(head);
+
+  const gridWrap = document.createElement('div');
+  gridWrap.className = 'wall-grid-wrap';
+  gridWrap.appendChild(halfGrid(wall, entry.slots, sensorById, UPPER_ROWS, selectedId, queuePosMap, onSelect));
+
+  const divider = document.createElement('div');
+  divider.className = 'tier-divider';
+  const divLabel = document.createElement('span');
+  divLabel.textContent = 'UPPER (R1-3) / LOWER (R4-6)';
+  divider.appendChild(divLabel);
+  gridWrap.appendChild(divider);
+
+  gridWrap.appendChild(halfGrid(wall, entry.slots, sensorById, LOWER_ROWS, selectedId, queuePosMap, onSelect));
+  section.appendChild(gridWrap);
+  section.appendChild(cleanlinessBar(wallSummaryOf(snapshot, wall)));
+  return section;
+}
+
+function centerHub(snapshot) {
+  const hub = document.createElement('div');
+  hub.className = 'u-center-hub';
+
+  const traj = document.createElement('div');
+  traj.className = 'hub-trajectory';
+  const top = document.createElement('div');
+  top.className = 'hub-traj-top';
+  const route = document.createElement('span');
+  route.className = 'hub-traj-route num';
+  const badge = document.createElement('span');
+
+  const sub = document.createElement('div');
+  sub.className = 'hub-traj-sub num';
+  const subLeft = document.createElement('span');
+  const subRight = document.createElement('span');
+
+  const active = snapshot ? snapshot.activeJob : null;
+  if (active && active.jetId) {
+    const jet = WATER_JETS_BY_ID[active.jetId];
+    route.textContent = String(active.jetId)
+      + (jet ? ' [' + jet.installedWall + ' ' + jet.installedTier + ']' : '')
+      + ' -> ' + String(active.targetSensorId || '?')
+      + (jet ? ' [' + jet.targetWall + ' ' + jet.targetTier + ']' : '');
+    badge.className = 'pill-state pill-firing num';
+    badge.textContent = String(active.phaseLabel || active.phase || 'ACTIVE');
+    subLeft.textContent = 'Valve: ' + String(active.valveId || '-')
+      + ' (' + String(active.valveOpenCommand || 'N/A')
+      + (typeof active.valveOutletPressureBar === 'number' ? ' | ' + active.valveOutletPressureBar.toFixed(1) + ' bar' : '') + ')';
+    subRight.textContent = 'Cabinet: ' + cabinetInfoForJet(active.jetId)
+      + ' | Park (' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical) + ')';
+  } else {
+    route.textContent = 'STANDBY - NO ACTIVE CLEANING JOB';
+    badge.className = 'pill-state pill-standby';
+    badge.textContent = 'IDLE';
+    subLeft.textContent = 'Safe Return Centre: (' + String(SAFE_RETURN_CENTRE_MM.horizontal) + ', ' + String(SAFE_RETURN_CENTRE_MM.vertical) + ') mm';
+    subRight.textContent = '108 SDS | 4 WSB x 2 WJ | Read-Only';
+  }
+
+  top.appendChild(route);
+  top.appendChild(badge);
+  sub.appendChild(subLeft);
+  sub.appendChild(subRight);
+  traj.appendChild(top);
+  traj.appendChild(sub);
+  hub.appendChild(traj);
+
+  const legend = document.createElement('div');
+  legend.className = 'legend-grid';
+  legend.id = 'legend';
+  renderLegend(legend);
+  hub.appendChild(legend);
+
+  return hub;
 }
 
 export function renderWallMap(host, model, snapshot, selection, onSelect) {
@@ -267,25 +451,42 @@ export function renderWallMap(host, model, snapshot, selection, onSelect) {
   for (const sensor of sensors) {
     if (sensor && typeof sensor.sensorId === 'string') sensorById.set(sensor.sensorId, sensor);
   }
+  const queuePosMap = queuePositionsMap(snapshot);
 
-  for (const wall of WALL_ORDER) {
-    const entry = model.walls.get(wall);
-    const section = document.createElement('section');
-    section.className = 'wall';
-    section.dataset.wall = wall;
-    section.setAttribute('aria-label', (WALL_LABELS[wall] || wall) + ' tier map');
-    section.appendChild(header(wall, entry.sensors, deviceNote(wall, snapshot), wallSubtotal(snapshot, wall)));
-    section.appendChild(tierBlock(wall, entry.slots, sensorById, 'UPPER', selection, onSelect));
-    section.appendChild(tierBlock(wall, entry.slots, sensorById, 'LOWER', selection, onSelect));
-    host.appendChild(section);
-  }
+  // Column 1 (4fr): Left Installed Nozzles + LEFT Wall (4x6) + WSB Topology Footer
+  const leftCol = document.createElement('div');
+  leftCol.className = 'u-col u-col-side';
+  leftCol.appendChild(nozzleStrip('LEFT', snapshot));
+  leftCol.appendChild(wallBlock('LEFT', model.walls.get('LEFT'), sensorById, snapshot, selection, queuePosMap, onSelect));
+  leftCol.appendChild(sideFooterCard('WSB1 / WSB4 Topology (A/C Horiz, B/D Vert)', 'CANONICAL'));
+
+  // Column 2 (5.2fr): REAR Wall (5x6) + U-Center Command Hub + FRONT Wall (5x6)
+  const centerCol = document.createElement('div');
+  centerCol.className = 'u-col u-col-center';
+  centerCol.appendChild(wallBlock('REAR', model.walls.get('REAR'), sensorById, snapshot, selection, queuePosMap, onSelect));
+  centerCol.appendChild(centerHub(snapshot));
+  centerCol.appendChild(wallBlock('FRONT', model.walls.get('FRONT'), sensorById, snapshot, selection, queuePosMap, onSelect));
+
+  // Column 3 (4fr): Right Installed Nozzles + RIGHT Wall (4x6) + WSB Topology Footer
+  const rightCol = document.createElement('div');
+  rightCol.className = 'u-col u-col-side';
+  rightCol.appendChild(nozzleStrip('RIGHT', snapshot));
+  rightCol.appendChild(wallBlock('RIGHT', model.walls.get('RIGHT'), sensorById, snapshot, selection, queuePosMap, onSelect));
+  rightCol.appendChild(sideFooterCard('WSB2 / WSB3 Topology (108 SDS Normal)', '108 / 108'));
+
+  host.appendChild(leftCol);
+  host.appendChild(centerCol);
+  host.appendChild(rightCol);
 }
 
 export function renderLegend(host) {
   host.textContent = '';
   const items = [
-    ['dirty', 'DIRTY'], ['watch', 'OBSERVE or BAD'], ['clean', 'CLEANER'],
-    ['unknown', 'NOT CLASSIFIED'], ['stale', 'STALE or DISABLED'],
+    ['clean', 'CLEANER'],
+    ['dirty', 'DIRTY'],
+    ['watch', 'OBSERVE/BAD'],
+    ['stale', 'STALE'],
+    ['unknown', 'NOT CLASSIFIED'],
   ];
   for (const [state, label] of items) {
     const item = document.createElement('span');
@@ -293,22 +494,18 @@ export function renderLegend(host) {
     const swatch = document.createElement('span');
     swatch.className = 'legend-swatch';
     swatch.dataset.state = state;
-    const text = document.createElement('span');
-    text.textContent = label;
+    const textNode = document.createElement('span');
+    textNode.textContent = label;
     item.appendChild(swatch);
-    item.appendChild(text);
+    item.appendChild(textNode);
     host.appendChild(item);
   }
   const extra = document.createElement('span');
   extra.className = 'legend-item';
-  extra.textContent = 'NEXT = the active cleaning target, Q = queued, boxed = critical alarm, hatched = no Sensor published';
+  extra.textContent = 'ACT=Active | Q#=Queued';
   host.appendChild(extra);
 }
 
-/**
- * Keyboard navigation over the approved order. The step is taken inside the 108-name list, so the
- * selection cannot land on a slot the host did not publish, and it never fabricates a Sensor.
- */
 export function stepSelection(ordered, currentId, delta) {
   if (!Array.isArray(ordered) || ordered.length === 0) return null;
   const index = ordered.indexOf(currentId);

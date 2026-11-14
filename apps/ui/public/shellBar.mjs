@@ -1,17 +1,16 @@
-// WJSS Operator presentation - the Unified Command Bar.
+// WJSS Operator presentation - the Unified Command Bar & Diagnostics Popover.
 //
-// One strip at the top of the screen carries everything that is true across every tab: where the
-// operator is (six tabs), how the boiler wall stands right now (three summary pills over all 108
-// Sensors), and what the host actually is (the runtime mode badge). Nothing in this file draws a value
-// the Runtime did not publish, and nothing in it can be reached by a keyboard shortcut that a plant
-// floor would hit by accident.
+// One 48px top bar plus one 26px status strip carry everything that is true across every tab:
+// where the operator is (six tabs), how the boiler wall stands right now (three summary pills over
+// all 108 Sensors), and what the host actually is (the runtime mode badge). Nothing in this file
+// draws a value the Runtime did not publish, and nothing in it can be reached by a keyboard
+// shortcut that a plant floor would hit by accident.
 //
-// The mode badge is assembled from the published liveness body and the published runtime status only.
-// A previous draft of this screen carried a fixed label naming itself a prototype: a label like that is
-// read as a statement about the machine, and it stays true after the machine changes. So the badge
-// either reports what /api/health and /api/v1/runtime say, or it reports that it has not read them yet.
+// The mode badge is assembled from the published liveness body and the published runtime status
+// only. The badge either reports what /api/health and /api/v1/runtime say, or it reports that it
+// has not read them yet.
 
-import { summaryPills } from './topology.mjs';
+import { EXPECTED_TOTAL, WATER_JETS, summaryPills } from './topology.mjs';
 
 export const TABS = Object.freeze([
   { key: 1, id: 'main', label: 'Main Control', panel: 'main' },
@@ -22,8 +21,6 @@ export const TABS = Object.freeze([
   { key: 6, id: 'system', label: 'System & Trends', panel: 'system' },
 ]);
 
-// The panels are addressed by their data attribute, not by an id: a duplicate id in a six-tab document
-// is one careless edit away, and a data attribute cannot collide with itself.
 export const TAB_PANEL_IDS = Object.freeze(TABS.map((tab) => tab.panel));
 
 export function tabKeyOf(id) {
@@ -35,11 +32,6 @@ export function tabKeyOf(id) {
 
 export const DEFAULT_TAB = 'main';
 
-// The helper actions a wall screen may offer a commissioning operator. They are presentation-only by
-// construction: every one of them re-reads, re-selects or reveals something the host already publishes,
-// and none of them composes a request the read-only surface does not answer. They are also gated: they
-// render only when the host reports a simulator profile, because "step the phase" means something
-// different when a pump is attached.
 export const DIAGNOSTICS_ACTIONS = Object.freeze([
   { id: 'repoll', label: 'Re-poll the full Snapshot now' },
   { id: 'focus-active', label: 'Move selection to the active target' },
@@ -65,8 +57,6 @@ export function tabLabel(id) {
   return id;
 }
 
-// The tab the address asks for, read once at boot so a kiosk can be pointed straight at Alarms. An
-// unknown fragment is not an error and not a guess: the screen opens Main Control and says what it saw.
 export function tabFromHash(hash) {
   if (typeof hash !== 'string' || hash.length === 0) return { id: DEFAULT_TAB, note: '' };
   const value = hash.replace(/^#\/?/, '');
@@ -118,9 +108,6 @@ export function pillCounts(walls) {
   return summaryPills(walls);
 }
 
-// The Alarms tab carries a count badge, because an alarm the operator has not seen is the only thing on
-// this screen that is time-critical. The number is the published active-unacknowledged count, and an
-// unavailable count is shown as such rather than as zero.
 export function alarmBadge(alarms) {
   if (!alarms) return { text: 'no data', tone: 'mute', count: null };
   const count = typeof alarms.activeUnack === 'number' ? alarms.activeUnack : null;
@@ -128,10 +115,6 @@ export function alarmBadge(alarms) {
   if (count === 0) return { text: '0', tone: 'ok', count: 0 };
   return { text: String(count), tone: count > 0 ? 'bad' : 'ok', count };
 }
-
-// ---------------------------------------------------------------- render (text and nodes, no markup)
-// Every node below is built with createElement and written with textContent. No markup string is
-// assembled anywhere in the presentation, so there is no path from a published payload to the parser.
 
 function host(id) {
   return document.getElementById(id);
@@ -152,19 +135,11 @@ function clear(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
-/**
- * The six tabs. An alarm count rides on the Alarms tab only, because that is the tab a count should
- * interrupt from; every other tab shows its name and its key, which is what makes the keyboard route
- * discoverable rather than folklore.
- */
-export function renderTabStrip(activeId, alarmCount, note) {
+export function renderTabStrip(activeId, alarmCount, note, queue) {
   const strip = host('tab-nav');
   if (!strip) return 0;
   clear(strip);
-  const hint = document.createElement('span');
-  hint.className = 'tabnav-note';
-  hint.textContent = note ? String(note) : 'tabs: keys 1 to 6';
-  strip.appendChild(hint);
+  strip.title = note ? String(note) : 'Switch tabs with keys 1 to 6';
   for (const tab of TABS) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -179,9 +154,25 @@ export function renderTabStrip(activeId, alarmCount, note) {
     label.textContent = tab.label;
     button.appendChild(key);
     button.appendChild(label);
-    if (tab.id === 'alarms' && alarmCount && alarmCount.count !== null) {
+
+    if (tab.id === 'queue' && queue && typeof queue.totalQueued === 'number') {
+      const qBadge = document.createElement('span');
+      qBadge.className = 'nav-badge num';
+      qBadge.textContent = String(queue.totalQueued) + '/' + String(queue.capacity || 0);
+      button.appendChild(qBadge);
+    } else if (tab.id === 'wj') {
+      const wBadge = document.createElement('span');
+      wBadge.className = 'nav-badge num';
+      wBadge.textContent = String(WATER_JETS.length);
+      button.appendChild(wBadge);
+    } else if (tab.id === 'sensor') {
+      const sBadge = document.createElement('span');
+      sBadge.className = 'nav-badge num';
+      sBadge.textContent = String(EXPECTED_TOTAL);
+      button.appendChild(sBadge);
+    } else if (tab.id === 'alarms' && alarmCount && alarmCount.count !== null) {
       const badge = document.createElement('span');
-      badge.className = 'tab-badge';
+      badge.className = 'tab-badge num';
       badge.dataset.tone = alarmCount.tone;
       badge.textContent = alarmCount.text;
       button.appendChild(badge);
@@ -191,32 +182,32 @@ export function renderTabStrip(activeId, alarmCount, note) {
   return TABS.length;
 }
 
-/**
- * The three summary pills, built from the published per-wall subtotals. Pill three is the published
- * uncertain count plus the published not-classified count, because the Classification enum has no
- * UNCERTAIN member and a third pill that silently dropped a fourth of the wall would not add up to 108.
- * The tooltip and the note under the bar carry the breakdown, and a disagreement with the protected
- * total is printed rather than reconciled.
- */
 export function renderPills(walls) {
   const result = summaryPills(walls);
   const strip = host('summary-pills');
   if (strip) {
     clear(strip);
-    for (const pill of result.pills) {
-      const node = document.createElement('span');
-      node.className = 'pill-count';
-      node.dataset.pill = pill.key;
-      const label = document.createElement('span');
-      label.className = 'pill-label';
-      label.textContent = pill.label;
-      const value = document.createElement('b');
-      value.className = 'pill-value';
-      value.textContent = String(pill.value);
-      node.appendChild(label);
-      node.appendChild(value);
-      node.title = pill.detail;
-      strip.appendChild(node);
+    if (result.pills.length === 0) {
+      const wait = document.createElement('span');
+      wait.className = 'pill-count';
+      wait.dataset.pill = 'uncertain';
+      wait.textContent = '108 SDS: WAITING';
+      strip.appendChild(wait);
+    } else {
+      for (const pill of result.pills) {
+        const node = document.createElement('span');
+        node.className = 'pill-count num';
+        node.dataset.pill = pill.key;
+        const label = document.createElement('span');
+        label.className = 'pill-label';
+        label.textContent = pill.key === 'uncertain' ? 'UNC:' : (pill.label.toUpperCase() + ':');
+        const value = document.createElement('b');
+        value.className = 'pill-value';
+        value.textContent = String(pill.value);
+        node.appendChild(label);
+        node.appendChild(value);
+        strip.appendChild(node);
+      }
     }
     strip.dataset.count = String(result.pills.length);
     strip.setAttribute('title', result.state === 'mismatch'
@@ -235,21 +226,20 @@ export function renderModeBadge(badge) {
   setText('mode-note', badge.detail);
 }
 
-/**
- * The Diagnostics dropdown. The toggle is always present so its absence is never a mystery, and the
- * actions are rendered only when the host reports a simulator profile; otherwise the menu says which
- * profile it saw instead. Every action is presentation-only, and the sentence under the bar says so.
- */
 export function renderDiagnostics(open, badge, frameFacts) {
   const root = host('diag-root');
   if (root) {
     root.dataset.open = open ? 'true' : 'false';
     root.dataset.allowed = badge.allowed ? 'true' : 'false';
   }
+  const popover = host('diag-popover');
+  if (popover) {
+    popover.dataset.open = open ? 'true' : 'false';
+  }
   const toggle = host('diag-badge');
   if (toggle) {
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-    toggle.textContent = (open ? 'diagnostics (open): ' : 'diagnostics: ') + (badge.allowed ? 'simulator helpers' : 'unavailable');
+    toggle.textContent = open ? 'Diagnostics ^' : 'Diagnostics v';
   }
   setText('diag-note', diagnosticsBadge(badge));
   const menu = host('diag-menu');
@@ -282,19 +272,16 @@ export function renderAlarmBadge(alarms) {
   const badge = alarmBadge(alarms);
   setText('alarm-count', badge.text);
   setTone('alarm-count', badge.tone);
+  const jump = host('alarm-jump');
+  if (jump) jump.dataset.tone = badge.tone;
   setText('alarm-text', badge.count === null
     ? 'no active unacknowledged count published'
     : badge.count === 0
-      ? 'no active unacknowledged alarm'
-      : 'active unacknowledged alarm(s) - see the Alarms tab');
+      ? 'ALL ALARMS CLEAR - 0 UNACKNOWLEDGED'
+      : 'UNACK ALARM(S) - CLICK TO INSPECT ALARMS TAB');
   return badge;
 }
 
-/**
- * The feed line: what the screen is doing about its own connection. `phase` is the presentation's
- * state, not a host state, and it is worded that way - a screen that says LIVE while its last frame is
- * forty seconds old is the failure this line exists to prevent.
- */
 export function renderFeedState(connection, revision, failures, health) {
   const phase = connection && connection.phase ? connection.phase : 'booting';
   const label = phase === 'live' ? 'LIVE - polling'
@@ -306,15 +293,12 @@ export function renderFeedState(connection, revision, failures, health) {
   setText('rev-state', 'rev: ' + (revision === null || revision === undefined ? '-' : String(revision))
     + (failures ? ', ' + String(failures) + ' failed attempt(s)' : ''));
   setTone('rev-state', failures ? 'warn' : 'mute');
-  // The host the liveness body names for itself, printed as published: an origin the browser happens to
-  // be sitting on is a fact about the frame, while this is the host's own statement of what it is.
   setText('host-state', 'host: ' + (health && health.host ? String(health.host) : 'NOT_READ')
     + (health && health.status ? ' (' + String(health.status) + ')' : ''));
   setTone('host-state', health ? (health.status === 'ALIVE' ? 'ok' : 'warn') : 'mute');
   return label;
 }
 
-/** The tab the bar is showing, read back from the buttons so a caller can confirm a switch painted. */
 export function activeTabId() {
   const strip = host('tab-nav');
   if (!strip) return null;
@@ -335,6 +319,12 @@ export function wireBarActions(onTab, onDiagnostics, onDiagnosticsAction) {
   }
   const toggle = host('diag-badge');
   if (toggle) toggle.addEventListener('click', () => onDiagnostics());
+  const close = host('diag-close');
+  if (close) close.addEventListener('click', () => onDiagnostics(false));
+  const jump = host('alarm-jump');
+  if (jump) jump.addEventListener('click', () => onTab('alarms'));
+  const gotoQueue = host('btn-goto-queue');
+  if (gotoQueue) gotoQueue.addEventListener('click', () => onTab('queue'));
   const menu = host('diag-menu');
   if (menu) {
     menu.addEventListener('click', (event) => {

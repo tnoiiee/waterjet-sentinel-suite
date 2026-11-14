@@ -81,10 +81,12 @@ public sealed class MainForm : Form
     /// rounding of the last line - it is not the clip guard it was when it was 4.
     /// </summary>
     private const int RowSlackY = 1;
+    private const long StatusBarToggleDebounceMs = 150;
 
     private readonly WebView2 _view = new() { Dock = DockStyle.Fill, Visible = false };
     private readonly Panel _content = new() { Dock = DockStyle.Fill, BackColor = ShellBack };
     private readonly TableLayoutPanel _statusBar = new();
+    private TableLayoutPanel? _outerLayout;
     private readonly TableLayoutPanel _overlay = new();
     private readonly Label _overlayHeadline = new();
     private readonly Label _overlayDetail = new();
@@ -114,6 +116,7 @@ public sealed class MainForm : Form
     private int _blockedPopups;
     private int _cancelledDownloads;
     private int _deniedPermissions;
+    private long _lastStatusBarToggleTick = -StatusBarToggleDebounceMs;
 
     public MainForm()
     {
@@ -125,8 +128,11 @@ public sealed class MainForm : Form
         DoubleBuffered = true;
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(1024, 600);
+        KeyPreview = true;
 
         BuildLayout();
+
+        _view.KeyDown += OnViewKeyDown;
 
         _probeTimer.Interval = KioskShellOptions.ProbeIntervalMs;
         _probeTimer.Tick += OnProbeTick;
@@ -166,6 +172,7 @@ public sealed class MainForm : Form
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         layout.Controls.Add(_statusBar, 0, 0);
         layout.Controls.Add(_content, 0, 1);
+        _outerLayout = layout;
         Controls.Add(layout);
     }
 
@@ -232,6 +239,9 @@ public sealed class MainForm : Form
         _statusBar.SetColumnSpan(_policyState, 2);
 
         LayoutStatusBar();
+        // Full-bleed 1920x1080 default: hide the native shell header until toggled by F10 or F12.
+        // The header buttons stay enabled and wired inside _statusBar; F10/F12 only toggles visibility.
+        _statusBar.Visible = false;
     }
 
     /// <summary>
@@ -403,6 +413,53 @@ public sealed class MainForm : Form
 
         // The toggle label is part of the action zone, so its width is re-measured here.
         LayoutStatusBar();
+    }
+
+    /// <summary>
+    /// Toggles the native shell status bar between hidden (full-bleed 1920x1080 default) and
+    /// visible (showing Stage identity, host state, Stage boundary, policy counters and the
+    /// Windowed / Exit buttons). Debounced with Environment.TickCount64 so one physical F10/F12
+    /// press observed across ProcessCmdKey and WebView2 KeyDown toggles exactly once.
+    /// </summary>
+    private void ToggleStatusBar()
+    {
+        var now = Environment.TickCount64;
+        if (now - _lastStatusBarToggleTick < StatusBarToggleDebounceMs)
+        {
+            return;
+        }
+
+        _lastStatusBarToggleTick = now;
+        _statusBar.Visible = !_statusBar.Visible;
+        if (_statusBar.Visible)
+        {
+            LayoutStatusBar();
+        }
+
+        _outerLayout?.PerformLayout();
+        PerformLayout();
+    }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        var keyCode = keyData & Keys.KeyCode;
+        if (keyCode == Keys.F10 || keyCode == Keys.F12)
+        {
+            ToggleStatusBar();
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    private void OnViewKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.F10 || e.KeyCode == Keys.F12)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            ToggleStatusBar();
+        }
     }
 
     protected override void OnResize(EventArgs e)

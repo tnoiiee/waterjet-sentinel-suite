@@ -1,4 +1,4 @@
-// WJSS Operator presentation - Active Job, Pump, alarms and device links.
+// WJSS Operator presentation - Active Job KPI Cockpit, Pump, Alarms and Device Links.
 //
 // Every value on this panel is a published field of the Snapshot. The panel is read-only in the
 // strongest sense available to it: it renders no button, no field and no gesture that maps to a
@@ -7,6 +7,8 @@
 // instrument did not make.
 
 import { text, number, timeOf } from './feed.mjs';
+
+const NOT_PUBLISHED = 'NOT_PUBLISHED_BY_RUNTIME';
 
 function section(host, title, build) {
   const block = document.createElement('div');
@@ -45,12 +47,28 @@ function facts(host, rows) {
   return list;
 }
 
-/**
- * The Mandatory Safe Return leg in the contract's own words. The host publishes a step, a trigger, a
- * pending outcome and one leg per device, so this prints exactly those and nothing between them: an
- * absent leg is named as absent rather than as idle, and no state is invented for a device the
- * Snapshot did not report on. A published failure is the only case that reads as bad.
- */
+function kpiTile(parent, label, value, sub, tone, titleText) {
+  const tile = document.createElement('div');
+  tile.className = 'kpi-tile';
+  if (tone) tile.dataset.tone = tone;
+  if (titleText) tile.title = titleText;
+  const lbl = document.createElement('span');
+  lbl.className = 'kpi-tile-lbl';
+  lbl.textContent = label;
+  const val = document.createElement('span');
+  val.className = 'kpi-tile-val num';
+  val.textContent = value;
+  if (tone) val.dataset.tone = tone;
+  const subEl = document.createElement('span');
+  subEl.className = 'kpi-tile-sub num';
+  subEl.textContent = sub;
+  tile.appendChild(lbl);
+  tile.appendChild(val);
+  tile.appendChild(subEl);
+  parent.appendChild(tile);
+  return tile;
+}
+
 function safeReturnFacts(safeReturn) {
   if (!safeReturn || typeof safeReturn !== 'object') {
     return { tone: 'mute', line: 'NONE - no Mandatory Safe Return is running for this job' };
@@ -91,61 +109,117 @@ function bar(host, fraction) {
   host.appendChild(track);
 }
 
-export function renderJob(host, snapshot) {
+function activeSeqIndex(job) {
+  if (!job) return -1;
+  const phase = String(job.phase || '').toUpperCase();
+  const cleaning = String(job.cleaningPhase || '').toUpperCase();
+  if (phase.indexOf('SAFE_RETURN') >= 0) return 7;
+  if (phase.indexOf('CLOSE_IV') >= 0) return 6;
+  if (cleaning === 'P4' || cleaning === 'P5' || cleaning === 'P6' || phase === 'P4' || phase === 'P5' || phase === 'P6') return 5;
+  if (cleaning === 'P3' || phase === 'P3') return 4;
+  if (cleaning === 'P2' || phase === 'P2') return 3;
+  if (phase.indexOf('OPEN_IV') >= 0) return 2;
+  if (phase.indexOf('P1') >= 0 || cleaning === 'P1') return 1;
+  return 0;
+}
+
+export function renderJob(host, snapshot, workspace) {
   const job = snapshot ? snapshot.activeJob : null;
+  const pump = snapshot ? snapshot.pump : null;
   const outcome = snapshot && snapshot.sequence ? snapshot.sequence.lastJobOutcome : null;
+  const countdown = workspace ? workspace.countdown : null;
+  const preview = workspace ? workspace.preview : null;
+
+  const strip = document.createElement('div');
+  strip.className = 'kpi-strip-4';
+
+  const delayVal = countdown && typeof countdown.remainingSeconds === 'number'
+    ? String(countdown.remainingSeconds) + ' s'
+    : (preview && typeof preview.appliedDelaySeconds === 'number' ? String(preview.appliedDelaySeconds) + ' s' : '--');
+  const delaySub = countdown && countdown.lifecycle
+    ? text(countdown.lifecycle) + (countdown.frozen ? ' (FROZEN)' : '')
+    : (preview ? text(preview.mode) + ' x' + number(preview.zoneFactor, 2) : 'No countdown');
 
   if (!job) {
-    section(host, 'Active job', (block) => {
-      facts(block, [
-        ['active job', 'NONE - no cleaning job is active at revision ' + text(snapshot ? snapshot.revision : null), 'mute'],
-      ]);
-      if (outcome) {
-        facts(block, [
-          ['last job outcome', text(outcome.jobId) + ' on ' + text(outcome.targetSensorId)],
-          ['outcome', text(outcome.outcome), String(outcome.outcome).indexOf('FAULT') >= 0 ? 'bad' : 'ok'],
-          ['trigger / phase at trigger', text(outcome.trigger) + ' at ' + text(outcome.phaseAtTrigger)],
-          ['cleaning phases complete', text(outcome.cleaningPhasesComplete)],
-          ['valve', text(outcome.valveId) + ' - close resolution ' + text(outcome.valveCloseResolution)],
-          ['finalized at', timeOf(outcome.finalizedAt)],
-        ]);
-      }
-    });
+    kpiTile(strip, 'TARGET', 'STANDBY', outcome ? 'Last: ' + text(outcome.targetSensorId) + ' (' + text(outcome.outcome) + ')' : 'No active job', 'mute');
+    kpiTile(strip, 'PUMP OUTLET', pump ? number(pump.pressure, 1, 'bar') : '--',
+      pump ? (pump.ready ? 'READY' : text(pump.state)) + ' | SP ' + number(pump.setpoint, 1, 'b') : 'No pump state',
+      pump && pump.ready ? 'ok' : 'warn');
+    kpiTile(strip, 'ISOLATION VALVE', 'CLOSED',
+      outcome ? text(outcome.valveId) + ' ' + text(outcome.valveCloseResolution) : 'No active valve', 'mute');
+    kpiTile(strip, 'NEXT DELAY', delayVal, delaySub, countdown && countdown.frozen ? 'warn' : 'info');
+    host.appendChild(strip);
+
+    const idleNote = document.createElement('p');
+    idleNote.className = 'cockpit-safe-line';
+    idleNote.textContent = outcome
+      ? 'NONE - no active job at rev ' + text(snapshot ? snapshot.revision : null)
+        + ' | Last outcome: ' + text(outcome.jobId) + ' on ' + text(outcome.targetSensorId)
+        + ' (' + text(outcome.outcome) + ', finalized ' + timeOf(outcome.finalizedAt) + ')'
+      : 'NONE - no cleaning job is active at revision ' + text(snapshot ? snapshot.revision : null);
+    host.appendChild(idleNote);
     return;
   }
 
   const safeReturnView = safeReturnFacts(job.safeReturn);
-  section(host, 'Active job - ' + text(job.phaseLabel) + ' (' + text(job.phase) + ', step '
-    + text(job.phaseIndex) + ')', (block) => {
-    facts(block, [
-      ['job', text(job.jobId)],
-      ['target sensor', text(job.targetSensorId), 'ok'],
-      ['water jet / isolation valve', text(job.jetId) + ' / ' + text(job.valveId)],
-      ['cleaning phase', text(job.cleaningPhase)],
-      ['lifecycle', text(job.lifecycle)],
-      ['started / phase started', timeOf(job.startedAt) + ' / ' + timeOf(job.phaseStartedAt)],
-    ]);
-    bar(block, job.phaseProgress);
-    facts(block, [
-      ['pump outlet pressure', number(job.pumpOutletPressureBar, 2, 'bar') + ' - '
-        + text(job.pumpPressureQuality) + ' from ' + text(job.pumpPressureSourceId),
-        job.pumpPressureInputValid === true ? 'ok' : 'warn'],
-      ['pump ready setpoint', number(job.pumpReadySetpointBar, 2, 'bar')],
-      ['valve outlet pressure', number(job.valveOutletPressureBar, 2, 'bar') + ' - '
-        + text(job.valvePressureQuality) + ' from ' + text(job.valvePressureSourceId),
-        job.valvePressureInputValid === true ? 'ok' : 'warn'],
-      ['valve open command', text(job.valveOpenCommand)],
-      ['valve resolution', text(job.valveOpenResolution)],
-      ['valve diagnosis', text(job.valveDiagnosis)],
-      ['safe return', safeReturnView.line, safeReturnView.tone],
-    ]);
-  });
+  const pumpTitle = 'Pump outlet ' + number(job.pumpOutletPressureBar, 2, 'bar')
+    + ' (' + text(job.pumpPressureQuality) + ' from ' + text(job.pumpPressureSourceId) + ')'
+    + ' | Ready setpoint ' + number(job.pumpReadySetpointBar, 2, 'bar');
+  const valveTitle = 'Valve ' + text(job.valveId) + ' outlet ' + number(job.valveOutletPressureBar, 2, 'bar')
+    + ' (' + text(job.valvePressureQuality) + ' from ' + text(job.valvePressureSourceId) + ')'
+    + ' | Command ' + text(job.valveOpenCommand) + ' | Resolution ' + text(job.valveOpenResolution)
+    + ' | Diagnosis ' + text(job.valveDiagnosis);
+
+  kpiTile(strip, 'TARGET', text(job.targetSensorId),
+    text(job.jetId) + ' | ' + text(job.valveId) + ' | ' + text(job.phaseLabel, text(job.phase)), 'info',
+    'Job ' + text(job.jobId) + ' | Lifecycle ' + text(job.lifecycle) + ' | Started ' + timeOf(job.startedAt));
+  kpiTile(strip, 'PUMP OUTLET', number(job.pumpOutletPressureBar, 1, 'bar'),
+    text(job.pumpPressureQuality) + ' (' + text(job.pumpPressureSourceId) + ')',
+    job.pumpPressureInputValid === true ? 'ok' : 'warn', pumpTitle);
+  kpiTile(strip, text(job.valveId, 'VALVE') + ' OUTLET', number(job.valveOutletPressureBar, 1, 'bar'),
+    text(job.valveOpenCommand) + ' | ' + text(job.valvePressureQuality),
+    job.valvePressureInputValid === true ? 'ok' : 'warn', valveTitle);
+  kpiTile(strip, 'NEXT DELAY', delayVal, delaySub, 'info');
+  host.appendChild(strip);
+
+  // 8-Step Sequence Bar
+  const seqBar = document.createElement('div');
+  seqBar.className = 'seq-bar num';
+  const stepLabels = [
+    'Home',
+    'P1',
+    text(job.valveId, 'IV') + ' Open',
+    'P2',
+    'P3',
+    'P4..P6',
+    text(job.valveId, 'IV') + ' Close',
+    'Safe Return',
+  ];
+  const currentIdx = activeSeqIndex(job);
+  for (let i = 0; i < stepLabels.length; i += 1) {
+    const step = document.createElement('div');
+    step.className = i < currentIdx ? 'seq-step done' : (i === currentIdx ? 'seq-step active' : 'seq-step');
+    step.textContent = stepLabels[i];
+    seqBar.appendChild(step);
+  }
+  host.appendChild(seqBar);
+
+  bar(host, job.phaseProgress);
+
+  const safeLine = document.createElement('p');
+  safeLine.className = 'cockpit-safe-line';
+  safeLine.dataset.tone = safeReturnView.tone;
+  safeLine.title = safeReturnView.line;
+  safeLine.textContent = 'Job ' + text(job.jobId) + ' (' + text(job.phaseLabel, text(job.phase))
+    + ', step ' + text(job.phaseIndex) + ', started ' + timeOf(job.phaseStartedAt)
+    + ') | Safe Return: ' + safeReturnView.line;
+  host.appendChild(safeLine);
 }
 
 export function renderPump(host, snapshot) {
   const pump = snapshot ? snapshot.pump : null;
   const status = snapshot ? snapshot.runtime : null;
-  section(host, 'Pump', (block) => {
+  section(host, 'Pump summary', (block) => {
     if (!pump) {
       facts(block, [['pump', 'no pump state published', 'bad']]);
       return;
@@ -172,9 +246,6 @@ export function renderPump(host, snapshot) {
   });
 }
 
-// Severity filtering is a reading aid of this screen and nothing more: the state lives in this module,
-// it is never sent anywhere, and the unfiltered count stays printed beside the filtered one so the
-// operator can always see how much of the list a filter is hiding.
 let alarmFilter = 'ALL';
 const ALARM_FILTERS = ['ALL', 'HIGH', 'MEDIUM', 'LOW'];
 
@@ -191,6 +262,8 @@ export function renderAlarmFilters(host, snapshot, onFilter) {
   host.textContent = '';
   const alarms = snapshot ? snapshot.alarms : null;
   const items = alarms && Array.isArray(alarms.items) ? alarms.items : [];
+  const group = document.createElement('div');
+  group.className = 'toggle-group';
   for (const value of ALARM_FILTERS) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -198,23 +271,16 @@ export function renderAlarmFilters(host, snapshot, onFilter) {
     button.dataset.filter = value;
     button.setAttribute('aria-pressed', alarmFilter === value ? 'true' : 'false');
     const matching = value === 'ALL' ? items.length : items.filter((item) => String(item.severity) === value).length;
-    button.textContent = value.toLowerCase() + ' (' + String(matching) + ')';
+    button.textContent = value + ' (' + String(matching) + ')';
     button.addEventListener('click', () => {
       setAlarmFilter(value);
       if (onFilter) onFilter(value);
     });
-    host.appendChild(button);
+    group.appendChild(button);
   }
-  const note = document.createElement('p');
-  note.className = 'filter-note';
-  note.textContent = 'display filter only - the Runtime is never told which rows this screen is showing';
-  host.appendChild(note);
+  host.appendChild(group);
 }
 
-/**
- * The latched critical event, with the host's own resume conditions. Nothing here can clear it: this
- * panel reads the latch and reports what the latch says about how it is cleared elsewhere.
- */
 export function renderCritical(host, snapshot) {
   host.textContent = '';
   const sequence = snapshot ? snapshot.sequence : null;
@@ -263,6 +329,7 @@ export function renderCritical(host, snapshot) {
   const thead = document.createElement('thead');
   thead.appendChild(head);
   table.appendChild(thead);
+  const tbody = document.createElement('tbody');
   for (const fault of faults) {
     const tr = document.createElement('tr');
     for (const value of [
@@ -279,8 +346,9 @@ export function renderCritical(host, snapshot) {
       td.textContent = value;
       tr.appendChild(td);
     }
-    table.appendChild(tr);
+    tbody.appendChild(tr);
   }
+  table.appendChild(tbody);
   const caption = document.createElement('p');
   caption.className = 'note';
   caption.dataset.tone = 'mute';
@@ -288,8 +356,6 @@ export function renderCritical(host, snapshot) {
   host.appendChild(caption);
   host.appendChild(table);
 }
-
-const NOT_PUBLISHED = 'NOT_PUBLISHED_BY_RUNTIME';
 
 export function renderAlarms(host, snapshot, selectedId) {
   const alarms = snapshot ? snapshot.alarms : null;
@@ -301,14 +367,7 @@ export function renderAlarms(host, snapshot, selectedId) {
 
   const active = items.filter((item) => String(item.state).indexOf('ACTIVE') === 0);
   section(host, 'Alarms - ' + String(active.length) + ' active of ' + String(items.length)
-    + ' retained', (block) => {
-    facts(block, [
-      ['active unacknowledged', text(alarms ? alarms.activeUnack : 0),
-        Number(alarms && alarms.activeUnack) > 0 ? 'bad' : null],
-      ['active acknowledged', text(alarms ? alarms.activeAck : 0)],
-      ['cleared unacknowledged', text(alarms ? alarms.clearedUnack : 0)],
-    ]);
-
+    + ' retained (unack ' + text(alarms ? alarms.activeUnack : 0) + ')', (block) => {
     const shown = alarmFilter === 'ALL' ? items : items.filter((item) => String(item.severity) === alarmFilter);
     const ack = document.createElement('p');
     ack.className = 'ack-note';
@@ -328,9 +387,9 @@ export function renderAlarms(host, snapshot, selectedId) {
       block.appendChild(note);
     } else {
       const table = document.createElement('table');
-      table.className = 'grid-table';
+      table.className = 'grid-table num';
       const head = document.createElement('tr');
-      for (const label of ['sev', 'code', 'what', 'sensor / device', 'state', 'raised']) {
+      for (const label of ['Severity', 'Code', 'Description', 'Sensor / Device', 'State', 'Raised']) {
         const th = document.createElement('th');
         th.scope = 'col';
         th.textContent = label;
@@ -393,11 +452,6 @@ export function renderAlarms(host, snapshot, selectedId) {
   });
 }
 
-/**
- * The modal request is the contract's own: an unacknowledged HIGH alarm, or an equipment fault the
- * host marks as demanding a modal. The screen never escalates a state the host did not escalate,
- * and dismissing this dialog acknowledges no device - it only stops covering the wall.
- */
 export function criticalAlert(snapshot) {
   const alarms = snapshot && snapshot.alarms ? snapshot.alarms : null;
   const items = alarms && Array.isArray(alarms.items) ? alarms.items : [];
@@ -426,11 +480,6 @@ export function criticalAlert(snapshot) {
   return null;
 }
 
-/**
- * Header chips: the host facts a standing operator must see without moving. Values are copied out
- * of the published documents; a fact the host has not answered for yet reads NOT_READ and is never
- * shown as if it were current.
- */
 export function renderChips(chips, snapshot, status, health, connection) {
   const set = (id, value, tone) => {
     const host = chips.querySelector('#' + id);
@@ -441,9 +490,6 @@ export function renderChips(chips, snapshot, status, health, connection) {
   };
 
   const profile = status ? status.profile : (snapshot ? snapshot.deviceProfile : null);
-  // The acquisition mode is the host's own word for what it may read: DETERMINISTIC names the
-  // deterministic path and PHYSICAL_READ_ONLY names the physical one. Neither is a write claim, and
-  // the chip says so instead of implying a capability the host does not publish.
   const acquisition = health && health.acquisitionMode ? String(health.acquisitionMode) : null;
   set('chip-profile', text(profile, 'NOT_READ'), null);
   set('chip-acquisition',

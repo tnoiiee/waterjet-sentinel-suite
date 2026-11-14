@@ -420,14 +420,16 @@ function Invoke-WjssSelfTest
     {
         $bad += ('output: the built host at ' + $runtimeDirectory + ' carries no Ui\index.html, so GET / answers 500')
     }
-    $done += 'copy source and build output (nine presentation files, Ui/index.html in the host output)'
+    $done += 'copy source and build output (13 presentation files, Ui/index.html in the host output)'
 
     $lines = @(Get-Content -LiteralPath $PSCommandPath)
+    $writeOutNeedle = 'Write-' + 'Output'
+    $envReadNeedle = 'GetEnvironment' + 'Variable'
     $echo = @($lines | Where-Object {
-        $_.Contains('Write-Output') -and $_.Contains('$endpoint') -and -not $_.Contains('endpointPresent')
+        $_.Contains($writeOutNeedle) -and $_.Contains('$endpoint') -and -not $_.Contains('endpointPresent')
     })
     if ($echo.Count -gt 0) { $bad += 'leak: a line prints an operator-supplied value' }
-    $echo2 = @($lines | Where-Object { $_.Contains('GetEnvironmentVariable') -and $_.Contains('Write-Output') })
+    $echo2 = @($lines | Where-Object { $_.Contains($envReadNeedle) -and $_.Contains($writeOutNeedle) })
     if ($echo2.Count -gt 0) { $bad += 'leak: an environment read is also an output' }
     $done += 'no echo: every environment read is presence-only and never an output'
 

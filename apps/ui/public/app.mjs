@@ -1,26 +1,56 @@
 // WJSS Operator presentation - boot, the tab router and the wiring of every panel.
 //
 // This module owns view state only: which Sensor is selected, which tab is open, which trend channels
-// are enabled, how dense the cells are and whether the critical dialog is open. It owns no queue, no
-// job, no eligibility and no device state, and it holds no authority to change any of them. The lifecycle
-// is published on document.body.dataset.appState as 'booting', then 'ready' once an authoritative
-// Snapshot has been rendered, then 'failed' when the frame can no longer be called current.
+// are enabled, which camera mount slot is shown, how dense the cells are and whether the critical
+// dialog is open. It owns no queue, no job, no eligibility and no device state, and it holds no
+// authority to change any of them. The lifecycle is published on document.body.dataset.appState as
+// 'booting', then 'ready' once an authoritative Snapshot has been rendered, then 'failed' when the
+// frame can no longer be called current.
 //
 // Reconnect policy, stated once: every poll reads the whole Snapshot, so a recovery is always a
 // fresh full Snapshot; nothing is replayed, and a frame that is not current is never shown without
 // the banner that says so.
 //
-// The six tabs share one render pass over one frame. Nothing is fetched per tab and nothing is deferred
-// until a tab is opened: a wall screen must not have a view that is quietly staler than another.
+// The six tabs share one render pass over one frame. Nothing is fetched per tab and nothing is
+// deferred until a tab is opened: a wall screen must not have a view that is quietly staler than
+// another.
 
 import { createFeed, text, clockOf, POLL_INTERVAL_MS, MAX_DELTA_ROWS, OFFLINE_AFTER_FAILURES } from './feed.mjs';
-import { buildModel, renderWallMap, renderLegend, stepSelection } from './wallMap.mjs';
+import { buildModel, renderWallMap, stepSelection } from './wallMap.mjs';
 import { renderSensorDetail, renderSelectedCard, drawTrend } from './sensorDetail.mjs';
 import { renderThermal, renderDfrStatement, dfrStatement } from './thermal.mjs';
 import { renderDispatch, renderQueueBoard, renderOutcome } from './dispatchPanel.mjs';
 import { renderJob, renderPump, renderAlarms, renderAlarmFilters, renderCritical, criticalAlert, renderChips } from './opsPanel.mjs';
-import { DEFAULT_TAB, TABS, isTabId, modeBadge, renderAlarmBadge, renderDiagnostics, renderFeedState, renderModeBadge, renderPills, renderTabStrip, tabFromHash, tabKeyOf, wireBarActions } from './shellBar.mjs';
-import { renderActiveCockpit, renderCameraPanel, renderChannelToggles, renderDelayBands, renderMaintenanceLock, renderPathTable, renderPumpCard, renderSensorMaster, renderSystemSummary, renderTrendExplorer, renderWallBreakdown, renderWorkspace, renderWsbGrid } from './tabs.mjs';
+import {
+  DEFAULT_TAB,
+  isTabId,
+  modeBadge,
+  renderAlarmBadge,
+  renderDiagnostics,
+  renderFeedState,
+  renderModeBadge,
+  renderPills,
+  renderTabStrip,
+  tabFromHash,
+  tabKeyOf,
+  wireBarActions,
+} from './shellBar.mjs';
+import {
+  renderActiveCockpit,
+  renderCameraPanel,
+  renderChannelToggles,
+  renderDelayBands,
+  renderMaintenanceLock,
+  renderPathTable,
+  renderPumpCard,
+  renderSensorFilters,
+  renderSensorMaster,
+  renderSystemSummary,
+  renderTrendExplorer,
+  renderWallBreakdown,
+  renderWorkspace,
+  renderWsbGrid,
+} from './tabs.mjs';
 
 const DENSITY_KEY = 'wjss.operator.density';
 const densities = ['comfortable', 'compact'];
@@ -30,7 +60,6 @@ const view = {
   model: null,
   dismissed: new Set(),
   lastState: null,
-  paintedRegions: new Set(),
   dispatchKey: null,
   opsKey: null,
   tab: DEFAULT_TAB,
@@ -38,12 +67,11 @@ const view = {
   diagnosticsOpen: false,
   frameFacts: '',
   overlay: 'cleaning',
-  // The explorer starts with every channel the host named enabled. The list is taken from the first
-  // accepted frame rather than from a table in this file, so a channel the Runtime stops publishing
-  // cannot stay lit on the screen, and one it adds is drawn the frame it appears.
   enabled: [],
   enabledFrom: null,
   filter: 'ALL',
+  sdsFilter: 'ALL',
+  camChoice: 'AUTO',
 };
 
 function host(id) {
@@ -73,8 +101,7 @@ function applyDensity(name) {
   try {
     window.localStorage.setItem(DENSITY_KEY, value);
   } catch {
-    // A locked-down kiosk profile may refuse storage. Density is presentation only, so a refusal
-    // is not a fault to report: the default simply stands.
+    // A locked-down kiosk profile may refuse storage; density is presentation only.
   }
 }
 
@@ -91,11 +118,6 @@ function wireDensity() {
   applyDensity(stored || document.body.dataset.density || 'comfortable');
 }
 
-/**
- * The tab switch, and the only thing a tab switch does: it marks the document and the bar. Every panel
- * is rendered on every frame regardless of which tab is showing, so no view can be stale and no hidden
- * panel can be quietly out of date when it is opened.
- */
 function applyTab(id) {
   const wanted = isTabId(id) ? id : view.tab;
   view.tab = wanted;
@@ -149,11 +171,11 @@ function dismissCritical() {
   closeCritical();
 }
 
-function openCritical(alert) {
+function openCritical(alert, bypassDismissed) {
   const modal = host('alarm-modal');
   const body = host('alarm-modal-body');
   if (!modal || !body) return;
-  if (view.dismissed.has(alert.message)) return;
+  if (!bypassDismissed && view.dismissed.has(alert.message)) return;
   body.textContent = alert.message;
   modal.hidden = false;
 }
@@ -167,9 +189,18 @@ function wireCritical() {
       if (event.target === modal) dismissCritical();
     });
   }
+  const previewBtn = host('btn-preview-modal');
+  if (previewBtn) {
+    previewBtn.addEventListener('click', () => {
+      const snapshot = view.lastState ? view.lastState.snapshot : null;
+      const alert = criticalAlert(snapshot);
+      openCritical(alert || {
+        message: 'CRITICAL MODAL PREVIEW: no critical alarm is latched in the accepted frame, so this dialog shows a layout preview and no alarm fact.',
+      }, true);
+    });
+  }
 }
 
-/** Keeps the internal scroll of a rebuilt panel, so a steady one-second cadence cannot fight it. */
 function rebuild(node, paint) {
   const top = node.scrollTop;
   node.textContent = '';
@@ -215,6 +246,55 @@ function renderBanners(state) {
   }
 }
 
+function renderStatusStripAndTicker(state) {
+  const snapshot = state.snapshot;
+  const active = snapshot ? snapshot.activeJob : null;
+  const pump = snapshot ? snapshot.pump : null;
+
+  const stripRight = host('status-strip-right');
+  if (stripRight) {
+    if (active) {
+      stripRight.textContent = 'Active: ' + text(active.targetSensorId) + ' | '
+        + text(active.jetId) + ' / ' + text(active.valveId) + ' (' + text(active.phaseLabel, text(active.phase))
+        + ') | Pump ' + (pump && typeof pump.pressure === 'number' ? pump.pressure.toFixed(1) + ' bar' : '--')
+        + ' | Safe Return Centre (125, 125)';
+    } else if (snapshot) {
+      stripRight.textContent = 'Standby (No Active Cleaning Job) | Pump '
+        + (pump ? text(pump.state) + ' ' + (typeof pump.pressure === 'number' ? pump.pressure.toFixed(1) + ' bar' : '--') : '--')
+        + ' | Rev ' + text(snapshot.revision) + ' | Safe Return Centre (125, 125)';
+    } else {
+      stripRight.textContent = 'Waiting for first authoritative Snapshot | Safe Return Centre (125, 125)';
+    }
+  }
+
+  const tickerMsg = host('ticker-msg');
+  if (tickerMsg) {
+    const items = state.feed && Array.isArray(state.feed.items) ? state.feed.items : [];
+    const latest = items.length > 0 ? items[0] : null;
+    if (latest) {
+      const sections = Array.isArray(latest.changedSections) && latest.changedSections.length > 0
+        ? latest.changedSections.join(', ') : 'none';
+      tickerMsg.textContent = clockOf(latest.generatedAt) + ' | Rev ' + text(latest.revision)
+        + ' (prev ' + text(latest.previousRevision) + ') | changed SDS: ' + text(latest.changedSensorCount)
+        + ' | sections: ' + sections
+        + (latest.hasRevisionGap === true ? ' | GAP DETECTED' : ' | chain OK');
+    } else if (snapshot) {
+      tickerMsg.textContent = 'Snapshot Rev ' + text(snapshot.revision) + ' accepted at '
+        + clockOf(snapshot.generatedAt) + ' | ' + String(Array.isArray(snapshot.sensors) ? snapshot.sensors.length : 0)
+        + ' Sensors | poll ' + String(POLL_INTERVAL_MS) + ' ms';
+    } else {
+      tickerMsg.textContent = 'Waiting for first authoritative Snapshot from local read-only Runtime...';
+    }
+  }
+
+  const tickerMeta = host('ticker-meta');
+  if (tickerMeta) {
+    tickerMeta.textContent = 'PHASE: ' + String(state.phase || 'booting').toUpperCase()
+      + ' | REV: ' + text(state.revision, '-')
+      + ' | READ-ONLY | SAFE RETURN (125, 125)';
+  }
+}
+
 function renderHeader(state) {
   const chips = host('chips');
   const connection = {
@@ -229,10 +309,16 @@ function renderHeader(state) {
 
   const badge = modeBadge(state.health, state.status);
   renderModeBadge(badge);
-  renderTabStrip(view.tab, renderAlarmBadge(state.snapshot ? state.snapshot.alarms : null), view.tabNote);
+  renderTabStrip(
+    view.tab,
+    renderAlarmBadge(state.snapshot ? state.snapshot.alarms : null),
+    view.tabNote,
+    state.snapshot ? state.snapshot.queue : null,
+  );
   renderPills(state.snapshot ? state.snapshot.walls : null);
   renderFeedState(connection, state.revision, state.consecutiveFailures, state.health);
   renderDiagnostics(view.diagnosticsOpen, badge, view.frameFacts);
+  renderStatusStripAndTicker(state);
 
   const mode = host('mode-line');
   if (mode) {
@@ -251,19 +337,14 @@ function renderHeader(state) {
   }
 }
 
-/**
- * The Diagnostics menu, and the reason each entry is allowed to exist. Every action here re-reads,
- * re-selects or reveals something already published; none of them composes a request the read-only
- * surface does not answer, and the whole menu renders only when the host reports a simulator profile.
- */
 function wireBar(feed) {
   wireBarActions(
     (id) => {
       applyTab(id);
       repaint(true);
     },
-    () => {
-      view.diagnosticsOpen = !view.diagnosticsOpen;
+    (explicit) => {
+      view.diagnosticsOpen = typeof explicit === 'boolean' ? explicit : !view.diagnosticsOpen;
       repaint(true);
     },
     (action) => {
@@ -288,7 +369,9 @@ function wireBar(feed) {
       }
       if (action === 'modal-preview') {
         const alert = criticalAlert(snapshot);
-        openCritical(alert || { message: 'CRITICAL MODAL PREVIEW: no critical alarm is latched in the accepted frame, so this dialog shows a layout preview and no alarm fact.' });
+        openCritical(alert || {
+          message: 'CRITICAL MODAL PREVIEW: no critical alarm is latched in the accepted frame, so this dialog shows a layout preview and no alarm fact.',
+        }, true);
         return;
       }
       if (action === 'frame-facts') {
@@ -336,6 +419,44 @@ function renderFeedTable(body, feed) {
   }
 }
 
+function renderAlarmKpiStrip(node, snapshot) {
+  const alarms = snapshot ? snapshot.alarms : null;
+  const latch = snapshot && snapshot.sequence ? snapshot.sequence.critical : null;
+  const strip = document.createElement('div');
+  strip.className = 'kpi-strip-4 num';
+  const cards = [
+    ['CRITICAL LATCH', latch ? 'LATCHED' : '0', latch ? text(latch.kind) : 'No Main Pump critical trip', latch ? 'bad' : 'ok'],
+    ['ACTIVE UNACKNOWLEDGED', text(alarms ? alarms.activeUnack : 0), 'Runtime authoritative unack count', Number(alarms && alarms.activeUnack) > 0 ? 'warn' : 'ok'],
+    ['ACTIVE ACKNOWLEDGED', text(alarms ? alarms.activeAck : 0), 'Active monitored conditions', 'info'],
+    ['CLEARED UNACKNOWLEDGED', text(alarms ? alarms.clearedUnack : 0), 'Display filter: ' + String(view.filter), 'mute'],
+  ];
+  for (const [label, value, sub, tone] of cards) {
+    const tile = document.createElement('div');
+    tile.className = 'kpi-tile';
+    tile.dataset.tone = tone;
+    const l = document.createElement('span');
+    l.className = 'kpi-tile-lbl';
+    l.textContent = label;
+    const v = document.createElement('span');
+    v.className = 'kpi-tile-val';
+    v.dataset.tone = tone;
+    v.textContent = value;
+    const s = document.createElement('span');
+    s.className = 'kpi-tile-sub';
+    s.textContent = sub;
+    tile.appendChild(l);
+    tile.appendChild(v);
+    tile.appendChild(s);
+    strip.appendChild(tile);
+  }
+  node.appendChild(strip);
+
+  const line = document.createElement('p');
+  line.className = 'ack-note';
+  line.textContent = 'ACKNOWLEDGE IS NOT OFFERED HERE: the count above is the Runtime active-unacknowledged count; the filter changes only which rows this screen displays.';
+  node.appendChild(line);
+}
+
 function render(state, force) {
   if (!state) return;
   view.lastState = state;
@@ -351,9 +472,6 @@ function render(state, force) {
 
   const model = buildModel(snapshot);
   view.model = model;
-  // The explorer's channel set is seeded from the published series names before anything is painted, so
-  // the first frame already draws: a first paint that waits for a second tick would read as a blank
-  // panel on a wall that is being looked at for the first time.
   if (snapshot.trend && Array.isArray(snapshot.trend.seriesNames)
     && view.enabledFrom !== String(snapshot.trend.seriesNames.join(' '))) {
     view.enabled = snapshot.trend.seriesNames.slice();
@@ -374,17 +492,12 @@ function render(state, force) {
     renderWallMap(mapHost, model, snapshot, view.selectedId, select);
     mapHost.scrollTop = top;
   }
-  const legend = host('legend');
-  if (legend && !view.paintedRegions.has('legend')) {
-    renderLegend(legend);
-    view.paintedRegions.add('legend');
-  }
 
-  // Tab 1: the cockpit, the card and the camera follow the same frame as the map.
+  // Tab 1: Operations Cockpit, Delay Bands, Compact Queue, Inspector, Pressure Trend, Camera Mount
   const cockpit = host('active-cockpit');
   if (cockpit) {
     rebuild(cockpit, (node) => {
-      renderJob(node, snapshot);
+      renderJob(node, snapshot, state.workspace);
       renderActiveCockpit(node, snapshot, view, () => {
         if (snapshot.activeJob && snapshot.activeJob.targetSensorId) view.selectedId = snapshot.activeJob.targetSensorId;
         repaint(true);
@@ -394,16 +507,57 @@ function render(state, force) {
       });
     });
   }
+
+  const bandsBadge = host('delay-bands-badge');
+  if (bandsBadge) {
+    const hasActive = Boolean(snapshot.activeJob && snapshot.activeJob.targetSensorId);
+    const showClean = hasActive && view.overlay === 'cleaning';
+    bandsBadge.className = showClean ? 'badge-cleaning-now' : 'badge-inspecting';
+    bandsBadge.textContent = showClean
+      ? 'CLEANING NOW: ' + text(snapshot.activeJob.targetSensorId)
+      : 'INSPECTING: ' + text(view.selectedId, '-');
+  }
+  const bands = host('delay-bands');
+  if (bands) renderDelayBands(bands, host('delay-bands-caption'), snapshot, state.workspace, view.selectedId);
+
+  const miniQueueTitle = host('mini-queue-title');
+  if (miniQueueTitle && snapshot.queue) {
+    miniQueueTitle.textContent = 'Cleaning Queue (' + String(snapshot.queue.totalQueued) + ' / ' + String(snapshot.queue.capacity) + ')';
+  }
+  const queueCompact = host('queue-compact');
+  if (queueCompact) {
+    rebuild(queueCompact, (node) => renderQueueBoard(node, snapshot.queue, null, {
+      lane: false,
+      compact: true,
+      onSelect: select,
+    }));
+  }
+
+  const inspId = host('insp-id');
+  if (inspId) inspId.textContent = text(view.selectedId, '-');
   const selectedCard = host('selected-card');
   if (selectedCard) rebuild(selectedCard, (node) => renderSelectedCard(node, snapshot, view.selectedId));
-  const queueCompact = host('queue-compact');
-  if (queueCompact) rebuild(queueCompact, (node) => renderQueueBoard(node, snapshot.queue, null, { lane: false }));
-  const camera = host('camera-panel');
-  if (camera) rebuild(camera, (node) => renderCameraPanel(node, snapshot));
+
+  const trendLegend = host('trend-legend');
+  if (trendLegend) {
+    const p = snapshot.pump;
+    const aj = snapshot.activeJob;
+    trendLegend.textContent = 'Pump: ' + (p && typeof p.pressure === 'number' ? p.pressure.toFixed(1) + ' bar' : '--')
+      + ' | SP: ' + (p && typeof p.setpoint === 'number' ? p.setpoint.toFixed(1) + ' bar' : '--')
+      + (aj ? ' | ' + text(aj.valveId) + ': ' + (typeof aj.valveOutletPressureBar === 'number' ? aj.valveOutletPressureBar.toFixed(1) + ' bar' : '--') : '');
+  }
   const canvas = host('trend-canvas');
   if (canvas) drawTrend(canvas, host('trend-caption'), host('trend-note'), snapshot, snapshot.pump);
 
-  // Tab 2: the queue board and the single published outcome, beside the atomic workspace document.
+  const camera = host('camera-panel');
+  if (camera) {
+    rebuild(camera, (node) => renderCameraPanel(node, snapshot, view.camChoice, (choice) => {
+      view.camChoice = choice;
+      repaint(true);
+    }));
+  }
+
+  // Tab 2: Cleaning Queue & Dispatch Workspace
   const board = host('queue-board');
   if (board) rebuild(board, (node) => renderQueueBoard(node, state.workspace ? state.workspace.queue : null, state.workspace));
   const outcome = host('outcome-host');
@@ -415,7 +569,7 @@ function render(state, force) {
     view.dispatchKey = dispatchKey;
   }
 
-  // Tab 3: the canonical cabinet grid, the published Pump state and the control availability.
+  // Tab 3: WJ & Pump
   const grid = host('wsb-grid');
   if (grid) rebuild(grid, (node) => renderWsbGrid(node, snapshot));
   const pumpCard = host('pump-card');
@@ -423,11 +577,24 @@ function render(state, force) {
   const manual = host('manual-lock');
   if (manual) rebuild(manual, (node) => renderMaintenanceLock(node, snapshot));
 
-  // Tab 4: master and detail, the square workspace frame and the published path stages.
+  // Tab 4: Sensor & Path
+  const sdsFilters = host('sds-filters');
+  if (sdsFilters) {
+    rebuild(sdsFilters, (node) => renderSensorFilters(node, view.sdsFilter, (value) => {
+      view.sdsFilter = value;
+      repaint(true);
+    }));
+  }
   const master = host('sds-master');
   if (master) {
-    rebuild(master, (node) => renderSensorMaster(node, snapshot, view.selectedId,
-      snapshot.activeJob ? snapshot.activeJob.targetSensorId : null, select));
+    rebuild(master, (node) => renderSensorMaster(
+      node,
+      snapshot,
+      view.selectedId,
+      snapshot.activeJob ? snapshot.activeJob.targetSensorId : null,
+      select,
+      view.sdsFilter,
+    ));
   }
   const detail = host('sensor-detail');
   if (detail) rebuild(detail, (node) => renderSensorDetail(node, snapshot, view.selectedId));
@@ -443,7 +610,9 @@ function render(state, force) {
   const thermal = host('thermal-facts');
   if (thermal) rebuild(thermal, (node) => renderThermal(node, snapshot, view.selectedId));
 
-  // Tab 5: the alarm list, the filter that only hides rows, and the latched critical event.
+  // Tab 5: Alarms
+  const ack = host('ack-host');
+  if (ack) rebuild(ack, (node) => renderAlarmKpiStrip(node, snapshot));
   const filters = host('alarm-filter');
   if (filters) {
     rebuild(filters, (node) => renderAlarmFilters(node, snapshot, (value) => {
@@ -455,34 +624,8 @@ function render(state, force) {
   if (alarmsRoot) rebuild(alarmsRoot, (node) => renderAlarms(node, snapshot, view.selectedId));
   const criticalHost = host('critical-host');
   if (criticalHost) rebuild(criticalHost, (node) => renderCritical(node, snapshot));
-  const ack = host('ack-host');
-  if (ack) rebuild(ack, (node) => {
-    const line = document.createElement('p');
-    line.className = 'ack-note';
-    line.textContent = 'ACKNOWLEDGE IS NOT OFFERED HERE: the count on this screen is the host\'s own '
-      + 'active-unacknowledged count, and the filter above changes only which rows this screen prints. '
-      + 'A device acknowledgement is a Runtime action and this build publishes no route that would carry it.';
-    node.appendChild(line);
-    const counts = document.createElement('dl');
-    counts.className = 'facts';
-    const values = [
-      ['active unacknowledged', text(snapshot.alarms ? snapshot.alarms.activeUnack : null)],
-      ['active acknowledged', text(snapshot.alarms ? snapshot.alarms.activeAck : null)],
-      ['cleared unacknowledged', text(snapshot.alarms ? snapshot.alarms.clearedUnack : null)],
-      ['display filter', String(view.filter)],
-    ];
-    for (const row of values) {
-      const term = document.createElement('dt');
-      term.textContent = row[0];
-      const value = document.createElement('dd');
-      value.textContent = row[1];
-      counts.appendChild(term);
-      counts.appendChild(value);
-    }
-    node.appendChild(counts);
-  });
 
-  // Tab 6: the host's own evidence, the wall breakdown behind the pills, and the trend explorer.
+  // Tab 6: System & Trends
   const systemHost = host('system-host');
   if (systemHost) rebuild(systemHost, (node) => renderSystemSummary(node, snapshot, state.status, state.health, connection(state)));
   const breakdown = host('wall-breakdown');
@@ -500,8 +643,6 @@ function render(state, force) {
       repaint(true);
     }));
   }
-  const bands = host('delay-bands');
-  if (bands) renderDelayBands(bands, host('delay-bands-caption'), snapshot, state.workspace);
   const opsRoot = host('ops-root');
   const opsKey = String(snapshot.revision) + '/' + String(view.selectedId);
   if (opsRoot && (force || opsKey !== view.opsKey)) {
@@ -513,7 +654,7 @@ function render(state, force) {
   if (feedBody) renderFeedTable(feedBody, state.feed);
 
   const alert = criticalAlert(snapshot);
-  if (alert) openCritical(alert); else closeCritical();
+  if (alert) openCritical(alert, false); else closeCritical();
 
   if (!model.ok) setAppState('failed');
   else setAppState('ready');

@@ -264,6 +264,8 @@ export function setViewScale(value) {
 export function renderQueueBoard(host, queue, workspace, options) {
   host.textContent = '';
   const withLane = !options || options.lane !== false;
+  const compact = Boolean(options && options.compact);
+  const onSelect = options && typeof options.onSelect === 'function' ? options.onSelect : null;
   if (!queue) {
     const note = document.createElement('p');
     note.className = 'note';
@@ -274,6 +276,52 @@ export function renderQueueBoard(host, queue, workspace, options) {
   }
   const capacity = Number(queue.capacity) || 0;
   const entries = Array.isArray(queue.entries) ? queue.entries : [];
+
+  if (compact) {
+    if (entries.length === 0) {
+      const note = document.createElement('p');
+      note.className = 'note';
+      note.dataset.tone = 'mute';
+      note.textContent = 'Queue empty (0 / ' + String(capacity) + ' slots) - waiting for Runtime dispatch entries.';
+      host.appendChild(note);
+      return;
+    }
+    const tbl = document.createElement('table');
+    tbl.className = 'mini-table num';
+    const thead = document.createElement('thead');
+    const hrow = document.createElement('tr');
+    for (const col of ['#', 'SDS', 'Score', 'Reason']) {
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.textContent = col;
+      hrow.appendChild(th);
+    }
+    thead.appendChild(hrow);
+    tbl.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    for (const entry of entries) {
+      if (!entry) continue;
+      const tr = document.createElement('tr');
+      if (onSelect && entry.sensorId) {
+        tr.addEventListener('click', () => onSelect(entry.sensorId));
+      }
+      for (const val of [
+        'Q' + text(entry.position),
+        text(entry.sensorId),
+        typeof entry.dirtyScore === 'number' ? entry.dirtyScore.toFixed(1) : '--',
+        text(entry.sourceReason),
+      ]) {
+        const td = document.createElement('td');
+        td.textContent = val;
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    }
+    tbl.appendChild(tbody);
+    host.appendChild(tbl);
+    return;
+  }
+
   const grid = document.createElement('div');
   grid.className = 'queue-board';
   for (let position = 1; position <= capacity; position += 1) {
@@ -286,7 +334,7 @@ export function renderQueueBoard(host, queue, workspace, options) {
     if (!entry) {
       const empty = document.createElement('span');
       empty.className = 'queue-slot-id';
-      empty.textContent = 'EMPTY SLOT - Available';
+      empty.textContent = 'Slot ' + String(position) + ' - EMPTY';
       card.appendChild(empty);
     } else {
       const id = document.createElement('span');
@@ -298,8 +346,6 @@ export function renderQueueBoard(host, queue, workspace, options) {
       score.textContent = number(entry.dirtyScore, 1) + ' - ' + text(entry.sourceReason)
         + ' - ' + String(entry.secondsSinceLastClean) + ' s since last clean';
       card.appendChild(score);
-      // The threshold that put an entry in the queue is a Snapshot configuration fact, not a queue fact:
-      // the slot is therefore toned from the published score alone and the number is printed, never judged.
       if (typeof entry.dirtyScore === 'number') card.dataset.tone = 'info';
     }
     grid.appendChild(card);
@@ -324,6 +370,9 @@ export function renderQueueBoard(host, queue, workspace, options) {
     canvas.setAttribute('role', 'img');
     canvas.setAttribute('aria-label', 'Frozen countdown lane of the Cleaning Job Workspace at the selected view scale');
     block.appendChild(canvas);
+    const caption = document.createElement('p');
+    caption.className = 'note';
+    caption.id = 'curve-caption';
     const buttons = document.createElement('div');
     buttons.className = 'speed';
     for (const scale of VIEW_SCALES) {
@@ -333,13 +382,16 @@ export function renderQueueBoard(host, queue, workspace, options) {
       button.dataset.scale = String(scale);
       button.setAttribute('aria-pressed', viewScale === scale ? 'true' : 'false');
       button.textContent = scale.toFixed(2).replace(/0$/, '') + 'x';
-      button.addEventListener('click', () => setViewScale(scale));
+      button.addEventListener('click', () => {
+        setViewScale(scale);
+        for (const sibling of Array.prototype.slice.call(buttons.children)) {
+          sibling.setAttribute('aria-pressed', sibling.dataset.scale === String(scale) ? 'true' : 'false');
+        }
+        drawCountdownLane(canvas, caption, workspace);
+      });
       buttons.appendChild(button);
     }
     block.appendChild(buttons);
-    const caption = document.createElement('p');
-    caption.className = 'note';
-    caption.id = 'curve-caption';
     block.appendChild(caption);
     drawCountdownLane(canvas, caption, workspace);
   });

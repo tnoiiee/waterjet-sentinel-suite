@@ -300,6 +300,23 @@ no restore, build or .NET test of this project has been executed there. Until th
 committed, a restore running in locked mode will report the lock file as stale — that is expected
 for this Stage and is recorded in the Stage checkpoint.
 
+## Full-bleed 1920x1080 default and F10/F12 shell status bar toggle (Stage 0.4C-K4 continuation)
+
+The native four-row shell status bar (`_statusBar`, containing the Stage identity, connection state,
+Stage boundary text, policy counters, **Windowed / full screen** and **Exit Kiosk Preview**) is
+hidden by default (`_statusBar.Visible = false`) so the embedded presentation owns the entire
+`1920x1080` fullscreen client area with zero vertical chrome offset.
+
+- Press **`F10`** or **`F12`** at any time to toggle the native shell status bar visible or hidden.
+- Both `ProcessCmdKey` (`keyData & Keys.KeyCode`) and `_view.KeyDown` route through a single
+  `ToggleStatusBar()` method guarded by a monotonic `Environment.TickCount64` debounce (150 ms) so
+  one physical keypress cannot fire twice across WinForms and the embedded view.
+- Toggling visible re-measures the four header rows (`LayoutStatusBar()`) and refreshes the outer
+  layout (`PerformLayout()`).
+- Neither `F10` nor `F12` exits the window: the intentional, confirmed exit path (**Exit Kiosk
+  Preview** or normal window close plus confirmation dialog) and every navigation/popup/download/DPI
+  invariant (`ApplicationHighDpiMode=PerMonitorV2`, `app.manifest`, `Program.cs`) remain unchanged.
+
 ## Validation status
 
 - **Verified in Arena:** the Stage boundary scanner (S1–S9, `node tools/boundary-scan/boundary-scan.mjs .`)

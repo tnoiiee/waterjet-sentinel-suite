@@ -1,269 +1,280 @@
-// WJSS Operator presentation - the selected Sensor and its bounded trend.
+// WJSS Operator presentation - Selected Sensor detail and bounded Pressure Trend.
 //
-// The facts are the published Sensor projection and nothing else: identity, placement, assigned
-// cleaning devices, TC channel identities, score and quality with its reason, queue and alarm
-// state. A value the host did not publish reads NOT_PROVIDED; the presentation never computes a
-// substitute, never carries a value forward from a previous revision and never presents a stale
-// reading as current.
-//
-// The trend is the Snapshot-delivered bounded window. The canvas is used instead of an inline
-// vector element so this file contains no namespace literal of any kind, and a null series value
-// is drawn as a break in the line: a missing sample never becomes an interpolated segment.
+// Everything printed here is read straight from the Snapshot's published Sensor record and bounded
+// trend window. No temperature is invented from a channel name, no gap in the pressure series is
+// smoothed over, and no trend history is kept across a host reset.
 
 import { text, number, timeOf } from './feed.mjs';
-import { tierOfRow } from './topology.mjs';
+import { WALL_LABELS, tierOfRow } from './topology.mjs';
 
-const SERIES_COLORS = ['#4bb4ff', '#2fbf71', '#f2b53c', '#ff5d5d'];
+function fact(list, label, value, tone) {
+  const dt = document.createElement('dt');
+  dt.textContent = label;
+  const dd = document.createElement('dd');
+  dd.textContent = value;
+  if (tone) dd.dataset.tone = tone;
+  list.appendChild(dt);
+  list.appendChild(dd);
+}
 
-export function renderSensorDetail(host, snapshot, sensorId) {
-  host.textContent = '';
+function kvRow(parent, label, value, tone) {
+  const row = document.createElement('div');
+  row.className = 'kv-row';
+  const left = document.createElement('span');
+  left.textContent = label;
+  const right = document.createElement('strong');
+  right.textContent = value;
+  if (tone) right.dataset.tone = tone;
+  row.appendChild(left);
+  row.appendChild(right);
+  parent.appendChild(row);
+}
+
+function findSensor(snapshot, selectedId) {
   const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
-  const sensor = sensors.find((entry) => entry && entry.sensorId === sensorId);
+  if (!selectedId) return null;
+  for (const sensor of sensors) {
+    if (sensor && sensor.sensorId === selectedId) return sensor;
+  }
+  return null;
+}
 
+export function renderSensorDetail(host, snapshot, selectedId) {
+  host.textContent = '';
+  const sensor = findSensor(snapshot, selectedId);
   if (!sensor) {
-    const row = document.createElement('dt');
-    row.textContent = 'selection';
-    const value = document.createElement('dd');
-    value.dataset.tone = 'mute';
-    value.textContent = sensorId ? 'no Sensor published under ' + String(sensorId) : 'no Sensor selected';
-    host.appendChild(row);
-    host.appendChild(value);
-    const note = document.createElement('dt');
-    note.textContent = 'how to select';
-    const noteValue = document.createElement('dd');
-    noteValue.dataset.tone = 'mute';
-    noteValue.textContent = 'click a wall-map cell, or use the arrow keys to walk the approved order';
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = 'Select a Sensor on the Boiler Wall Map or press an arrow key to inspect its published record.';
     host.appendChild(note);
-    host.appendChild(noteValue);
-    return null;
+    return;
   }
 
-  const slot = (Array.isArray(snapshot.wallMap) ? snapshot.wallMap : [])
-    .find((entry) => entry && entry.sensorId === sensor.sensorId);
-
-  const rows = [
-    ['sensor', text(sensor.sensorId), null],
-    ['device', text(sensor.deviceId), null],
-    ['wall', text(sensor.wall), null],
-    ['logical row', text(sensor.logicalRow) + ' - ' + (slot ? tierOfText(slot.logicalRow) : 'tier not published'), null],
-    ['logical column', text(sensor.logicalColumn), null],
-    ['wall column / row', text(sensor.wallColumn) + ' / ' + text(sensor.wallRow), null],
-    ['scan order', text(sensor.scanOrder), null],
-    ['position kind', text(sensor.positionKind), null],
-    ['cleaning device', text(sensor.assignedWaterJetId), null],
-    ['isolation valve', text(sensor.assignedIsolationValveId), null],
-    ['TC front channel', text(sensor.tcFrontChannel), null],
-    ['TC rear channel', text(sensor.tcRearChannel), null],
-    ['classification', text(sensor.classification), 'pill ' + text(sensor.classification, 'NONE')],
-    ['basis', text(sensor.classificationBasis), null],
-    ['dirty score', number(sensor.dirtyScore, 1), null],
-    ['last validated score', number(sensor.lastValidatedScore, 1), null],
-    ['last validated at', timeOf(sensor.lastValidatedAt), null],
-    ['quality', text(sensor.quality), 'pill ' + text(sensor.quality, 'NONE')],
-    ['quality reason', text(sensor.qualityReason), null],
-    ['source timestamp', timeOf(sensor.sourceTimestamp), null],
-    ['queue state', text(sensor.queueState), null],
-    ['active job target', sensor.isActiveJobTarget === true ? 'YES - this Sensor is being cleaned' : 'no', null],
-    ['alarm state', text(sensor.alarmState), null],
-    ['alarm severity', text(sensor.alarmSeverity), null],
-  ];
-
-  for (const [label, value, className] of rows) {
-    const term = document.createElement('dt');
-    term.textContent = label;
-    const entry = document.createElement('dd');
-    if (className) {
-      const pill = document.createElement('span');
-      pill.className = className;
-      pill.textContent = value;
-      entry.appendChild(pill);
-    } else {
-      entry.textContent = value;
-    }
-    if (label === 'quality' && (String(sensor.quality) === 'STALE' || String(sensor.quality) === 'BAD')) {
-      entry.dataset.tone = 'bad';
-    }
-    host.appendChild(term);
-    host.appendChild(entry);
-  }
-  return sensor;
+  const list = document.createElement('dl');
+  list.className = 'facts';
+  const wall = String(sensor.wall || '').toUpperCase();
+  fact(list, 'sensor', text(sensor.sensorId) + ' (device ' + text(sensor.deviceId) + ')');
+  fact(list, 'location', (WALL_LABELS[wall] || text(sensor.wall)) + ' - row '
+    + text(sensor.logicalRow) + ' (' + tierOfRow(sensor.logicalRow) + '), col '
+    + text(sensor.logicalColumn) + ', scan order ' + text(sensor.scanOrder));
+  fact(list, 'cleaning path', text(sensor.assignedWaterJetId) + ' / ' + text(sensor.assignedIsolationValveId));
+  fact(list, 'thermocouple channels', text(sensor.tcFrontChannel) + ' (front) / '
+    + text(sensor.tcRearChannel) + ' (rear)');
+  fact(list, 'dirty score', number(sensor.dirtyScore, 1) + ' (last validated '
+    + number(sensor.lastValidatedScore, 1) + ')',
+    String(sensor.classification) === 'DIRTY' ? 'bad'
+      : String(sensor.classification) === 'CLEANER' ? 'ok' : null);
+  fact(list, 'classification', text(sensor.classification) + ' on basis ' + text(sensor.classificationBasis));
+  fact(list, 'quality', text(sensor.quality) + (sensor.qualityReason ? ' - ' + sensor.qualityReason : ''),
+    String(sensor.quality) === 'GOOD' ? 'ok' : 'warn');
+  fact(list, 'source timestamp', timeOf(sensor.sourceTimestamp));
+  fact(list, 'queue state', text(sensor.queueState) + (sensor.isActiveJobTarget === true ? ' (ACTIVE JOB TARGET)' : ''));
+  fact(list, 'alarm', text(sensor.alarmState) + (sensor.alarmSeverity ? ' / ' + sensor.alarmSeverity : ''),
+    String(sensor.alarmState).indexOf('ACTIVE') === 0 ? 'bad' : null);
+  fact(list, 'active job target', sensor.isActiveJobTarget === true ? 'YES' : 'no');
+  host.appendChild(list);
 }
 
-// The tier ruling is not this panel's to restate: it comes from the one topology module, so a cell on
-// the map and a line in this detail can never disagree about which tier a logical row belongs to.
-function tierOfText(row) {
-  const tier = tierOfRow(row);
-  return tier === 'UPPER' ? 'UPPER tier' : tier === 'LOWER' ? 'LOWER tier' : 'unplaced row';
-}
-
-/**
- * The compact card the wall-map tab keeps beside the map: the same published facts, fewer of them, and
- * worded the same way as the full detail so a glance and a read cannot disagree.
- */
-export function renderSelectedCard(host, snapshot, sensorId) {
+export function renderSelectedCard(host, snapshot, selectedId) {
   host.textContent = '';
-  const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
-  const sensor = sensors.find((entry) => entry && entry.sensorId === sensorId);
-  const rows = [
-    ['sensor', sensor ? text(sensor.sensorId) : 'nothing selected'],
-    ['position', sensor ? text(sensor.wall) + ' row ' + text(sensor.logicalRow) + ' (' + tierOfText(sensor.logicalRow) + ') column ' + text(sensor.logicalColumn) : '-'],
-    ['device', sensor ? text(sensor.deviceId) + ' / jet ' + text(sensor.assignedWaterJetId) + ' / IV ' + text(sensor.assignedIsolationValveId) : '-'],
-    ['classification', sensor ? text(sensor.classification) + ' on basis ' + text(sensor.classificationBasis) : '-'],
-    ['score', sensor ? number(sensor.dirtyScore, 1) + ' (last validated ' + number(sensor.lastValidatedScore, 1) + ')' : '-'],
-    ['quality', sensor ? text(sensor.quality) + (sensor.qualityReason ? ' - ' + String(sensor.qualityReason) : '') : '-'],
-    ['queue', sensor ? text(sensor.queueState) + (sensor.isActiveJobTarget === true ? ' - ACTIVE TARGET' : '') : '-'],
-  ];
-  for (const row of rows) {
-    const term = document.createElement('dt');
-    term.textContent = row[0];
-    const value = document.createElement('dd');
-    value.textContent = row[1];
-    if (row[2]) value.dataset.tone = row[2];
-    host.appendChild(term);
-    host.appendChild(value);
+  const sensor = findSensor(snapshot, selectedId);
+  if (!sensor) {
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.textContent = 'Click any SDS cell on the Boiler Wall Map to inspect.';
+    host.appendChild(note);
+    return;
   }
+  const wall = String(sensor.wall || '').toUpperCase();
+  kvRow(host, 'Wall / Tier', wall + ' ' + tierOfRow(sensor.logicalRow) + ' (R' + text(sensor.logicalRow) + ' C' + text(sensor.logicalColumn) + ')');
+  kvRow(host, 'Dirty Score', number(sensor.dirtyScore, 1) + ' (val ' + number(sensor.lastValidatedScore, 1) + ')',
+    String(sensor.classification) === 'DIRTY' ? 'bad' : String(sensor.classification) === 'CLEANER' ? 'ok' : 'warn');
+  kvRow(host, 'State / Qual', text(sensor.classification) + ' | ' + text(sensor.quality));
+  kvRow(host, 'Assigned WJ', text(sensor.assignedWaterJetId) + ' / ' + text(sensor.assignedIsolationValveId));
+  kvRow(host, 'Queue / Alarm', text(sensor.queueState) + ' | ' + text(sensor.alarmState));
+  kvRow(host, 'TC Pair', text(sensor.tcFrontChannel) + ' / ' + text(sensor.tcRearChannel));
 }
 
-/**
- * Draws the bounded trend window. The window is what the Snapshot carried: the presentation does
- * not grow it, does not stitch an older window onto it and does not draw a point the host omitted.
- */
 export function drawTrend(canvas, caption, note, snapshot, pump) {
-  const context = typeof canvas.getContext === 'function' ? canvas.getContext('2d') : null;
-  const trend = snapshot && snapshot.trend ? snapshot.trend : null;
+  if (!canvas || typeof canvas.getContext !== 'function') return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const trend = snapshot ? snapshot.trend : null;
   const points = trend && Array.isArray(trend.points) ? trend.points : [];
-  const names = trend && Array.isArray(trend.seriesNames) ? trend.seriesNames : [];
   const capacity = trend && typeof trend.capacity === 'number' ? trend.capacity : 0;
+  const names = trend && Array.isArray(trend.seriesNames) ? trend.seriesNames : [];
+  const active = snapshot ? snapshot.activeJob : null;
 
   const width = canvas.width;
   const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
 
-  if (!context) {
-    if (caption) caption.textContent = 'trend: this browser offered no drawing surface';
-    return;
-  }
+  const pad = { left: 46, right: 16, top: 10, bottom: 20 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
 
-  context.fillStyle = '#0c141b';
-  context.fillRect(0, 0, width, height);
-
-  const pad = { left: 44, right: 10, top: 10, bottom: 18 };
-  const plotW = Math.max(10, width - pad.left - pad.right);
-  const plotH = Math.max(10, height - pad.top - pad.bottom);
+  // Dark canvas backdrop
+  ctx.fillStyle = '#0d1014';
+  ctx.fillRect(0, 0, width, height);
 
   if (points.length === 0) {
-    context.strokeStyle = '#27384a';
-    context.strokeRect(pad.left, pad.top, plotW, plotH);
-    context.fillStyle = '#6f8496';
-    context.font = '11px monospace';
-    context.fillText('the window is empty: the Runtime has published no trend point yet', pad.left + 8, pad.top + 22);
-    if (caption) caption.textContent = 'trend: 0 of ' + String(capacity) + ' points, capacity ' + String(capacity);
-    if (note) note.textContent = 'An empty window is a fact about the host, not a rendering failure.';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '12px "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('No trend samples published in this frame.', pad.left + 8, pad.top + 28);
+    if (caption) caption.textContent = '0 of ' + String(capacity) + ' samples - waiting for published history.';
+    if (note) note.textContent = 'DATA GAP: no published pressure sample yet.';
     return;
   }
 
-  let low = Infinity;
-  let high = -Infinity;
-  let gaps = 0;
-  for (const point of points) {
-    if (!point) continue;
-    if (typeof point.setpoint === 'number' && Number.isFinite(point.setpoint)) {
-      low = Math.min(low, point.setpoint);
-      high = Math.max(high, point.setpoint);
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  const consider = (v) => {
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      if (v < min) min = v;
+      if (v > max) max = v;
     }
-    const series = Array.isArray(point.series) ? point.series : [];
-    for (const value of series) {
-      if (value === null || value === undefined) { gaps += 1; continue; }
-      if (typeof value !== 'number' || !Number.isFinite(value)) continue;
-      low = Math.min(low, value);
-      high = Math.max(high, value);
+  };
+  for (const point of points) {
+    consider(point.setpoint);
+    if (Array.isArray(point.series)) {
+      for (const v of point.series) consider(v);
     }
   }
   if (pump) {
-    if (typeof pump.readyBandLow === 'number') low = Math.min(low, pump.readyBandLow);
-    if (typeof pump.readyBandHigh === 'number') high = Math.max(high, pump.readyBandHigh);
+    consider(pump.readyBandLow);
+    consider(pump.readyBandHigh);
+    consider(pump.setpoint);
+    consider(pump.pressure);
   }
-  if (!Number.isFinite(low) || !Number.isFinite(high)) { low = 0; high = 1; }
-  if (high - low < 1e-6) { high = low + 1; }
-  const margin = (high - low) * 0.08;
-  low -= margin;
-  high += margin;
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    min = 0;
+    max = 28;
+  }
+  if (min > 0) min = Math.max(0, min - 2);
+  if (max === min) {
+    min -= 1;
+    max += 1;
+  } else {
+    const margin = (max - min) * 0.12;
+    min = Math.max(0, min - margin);
+    max += margin;
+  }
 
-  const xAt = (index) => pad.left + (points.length === 1 ? plotW / 2 : (index / (points.length - 1)) * plotW);
-  const yAt = (value) => pad.top + plotH - ((value - low) / (high - low)) * plotH;
+  const xOf = (index) => pad.left + (points.length === 1 ? plotW / 2 : (index / (points.length - 1)) * plotW);
+  const yOf = (value) => pad.top + plotH - ((value - min) / (max - min)) * plotH;
 
-  // Frame, then the ready band, then the job and alarm columns: the background facts are drawn
-  // first so a series line is never hidden behind a shaded region.
-  context.strokeStyle = '#27384a';
-  context.strokeRect(pad.left, pad.top, plotW, plotH);
-  context.fillStyle = '#10221a';
-  for (let i = 0; i < points.length; i += 1) {
-    if (points[i] && points[i].jobActive === true) {
-      context.fillRect(xAt(i) - 1.5, pad.top, 3, plotH);
-    }
-  }
-  context.fillStyle = '#2b1315';
-  for (let i = 0; i < points.length; i += 1) {
-    if (points[i] && points[i].alarmActive === true) {
-      context.fillRect(xAt(i) - 1.5, pad.top, 3, plotH);
-    }
-  }
+  // Shaded green Ready Band
   if (pump && typeof pump.readyBandLow === 'number' && typeof pump.readyBandHigh === 'number') {
-    const yTop = yAt(pump.readyBandHigh);
-    const yBottom = yAt(pump.readyBandLow);
-    context.fillStyle = 'rgba(47,191,113,0.16)';
-    context.fillRect(pad.left, Math.min(yTop, yBottom), plotW, Math.abs(yBottom - yTop));
+    const topY = yOf(pump.readyBandHigh);
+    const botY = yOf(pump.readyBandLow);
+    ctx.fillStyle = 'rgba(46, 160, 109, 0.12)';
+    ctx.fillRect(pad.left, topY, plotW, Math.max(2, botY - topY));
   }
 
-  context.font = '10px monospace';
-  context.fillStyle = '#6f8496';
-  context.fillText(number(high, 1), 3, pad.top + 8);
-  context.fillText(number(low, 1), 3, pad.top + plotH);
-  context.fillText(String(points.length) + ' of ' + String(capacity) + ' points', pad.left, height - 5);
+  // Horizontal grid lines
+  ctx.strokeStyle = '#28303b';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 2; i += 1) {
+    const gy = pad.top + (i / 2) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, gy);
+    ctx.lineTo(width - pad.right, gy);
+    ctx.stroke();
+  }
 
-  // Setpoint as a stepped line: it is a property of each published point, so it is drawn per point
-  // rather than as one constant invented by the view.
-  context.strokeStyle = '#9db0c0';
-  context.setLineDash([4, 3]);
-  context.beginPath();
-  let started = false;
+  // Highlight explicit DATA GAP columns where primary series is null
+  let gapCount = 0;
   for (let i = 0; i < points.length; i += 1) {
-    const point = points[i];
-    if (!point || typeof point.setpoint !== 'number' || !Number.isFinite(point.setpoint)) { started = false; continue; }
-    const x = xAt(i);
-    const y = yAt(point.setpoint);
-    if (!started) { context.moveTo(x, y); started = true; } else { context.lineTo(x, y); }
-  }
-  context.stroke();
-  context.setLineDash([]);
-
-  for (let series = 0; series < Math.max(names.length, 1); series += 1) {
-    context.strokeStyle = SERIES_COLORS[series % SERIES_COLORS.length];
-    context.lineWidth = 1.2;
-    context.beginPath();
-    let drawn = false;
-    for (let i = 0; i < points.length; i += 1) {
-      const point = points[i];
-      const value = point && Array.isArray(point.series) ? point.series[series] : null;
-      if (value === null || value === undefined || typeof value !== 'number' || !Number.isFinite(value)) {
-        drawn = false;
-        continue;
-      }
-      const x = xAt(i);
-      const y = yAt(value);
-      if (!drawn) { context.moveTo(x, y); drawn = true; } else { context.lineTo(x, y); }
+    const v = Array.isArray(points[i].series) ? points[i].series[0] : null;
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      gapCount += 1;
+      const gx = xOf(i);
+      ctx.fillStyle = 'rgba(148, 163, 184, 0.10)';
+      ctx.fillRect(gx - 2, pad.top, 4, plotH);
     }
-    context.stroke();
   }
-  context.lineWidth = 1;
+
+  // Dashed amber setpoint series
+  ctx.strokeStyle = '#fbbf24';
+  ctx.setLineDash([4, 3]);
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  let drawn = false;
+  for (let i = 0; i < points.length; i += 1) {
+    const v = points[i].setpoint;
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      const x = xOf(i);
+      const y = yOf(v);
+      if (!drawn) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      drawn = true;
+    } else {
+      drawn = false;
+    }
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Solid cyan/emerald primary series (nulls break the line, never interpolated)
+  const colours = ['#38bdf8', '#34d399', '#a78bfa'];
+  const count = names.length > 0 ? names.length : 1;
+  for (let s = 0; s < count; s += 1) {
+    ctx.strokeStyle = colours[s % colours.length];
+    ctx.lineWidth = s === 0 ? 2 : 1.3;
+    ctx.beginPath();
+    drawn = false;
+    for (let i = 0; i < points.length; i += 1) {
+      const series = points[i].series;
+      const v = Array.isArray(series) ? series[s] : null;
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        const x = xOf(i);
+        const y = yOf(v);
+        if (!drawn) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        drawn = true;
+      } else {
+        drawn = false;
+      }
+    }
+    ctx.stroke();
+  }
+
+  // Latest active point marker
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    const series = points[i].series;
+    const v = Array.isArray(series) ? series[0] : null;
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(xOf(i), yOf(v), 3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+  }
+
+  // Y-axis ticks & X-axis time markers
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(max.toFixed(1) + 'b', pad.left - 5, pad.top + 8);
+  ctx.fillText(((min + max) / 2).toFixed(1) + 'b', pad.left - 5, pad.top + plotH / 2 + 3);
+  ctx.fillText(min.toFixed(1) + 'b', pad.left - 5, pad.top + plotH);
+
+  ctx.textAlign = 'left';
+  ctx.fillText(timeOf(points[0].t), pad.left, height - 5);
+  ctx.textAlign = 'right';
+  ctx.fillText('NOW ' + timeOf(points[points.length - 1].t), width - pad.right, height - 5);
+  ctx.textAlign = 'left';
 
   if (caption) {
-    caption.textContent = 'trend: ' + names.map((name, index) => name + ' = ' + SERIES_COLORS[index % SERIES_COLORS.length]).join(', ')
-      + ' - window ' + String(points.length) + ' of capacity ' + String(capacity);
+    caption.textContent = String(points.length) + ' of ' + String(capacity) + ' samples'
+      + ' | series: ' + (names.length > 0 ? names.join(', ') : 'unnamed')
+      + (gapCount > 0 ? ' | ' + String(gapCount) + ' DATA GAP sample(s)' : '')
+      + ' | null values break the line and are never interpolated';
   }
   if (note) {
-    note.textContent = gaps > 0
-      ? String(gaps) + ' null series value' + (gaps === 1 ? '' : 's') + ' in this window: drawn as '
-        + (gaps === 1 ? 'a gap' : 'gaps') + ', never interpolated.'
-      : 'No gap in this window: every published point carried a value.';
+    note.textContent = active && typeof active.valveOutletPressureBar === 'number'
+      ? 'Active ' + text(active.valveId) + ' live: ' + active.valveOutletPressureBar.toFixed(1)
+        + ' bar (no IV history channel published)'
+      : 'No IV history channel published by read-only Runtime';
   }
 }

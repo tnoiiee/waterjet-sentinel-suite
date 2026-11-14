@@ -11,8 +11,8 @@ workspace: what is authored here is what the browser reads, byte for byte.
 
 | Path | Role |
 | --- | --- |
-| `public/index.html` | The document: semantic structure, mount points, one `<script type="module">`. No inline script, no inline style. |
-| `public/global.css` | The only design-token location. Dark, high-contrast, 1920×1080 first, `overflow-x: hidden`, one narrow-width reflow breakpoint, a density switch. |
+| `public/index.html` | The document: 4-band full-bleed `1920x1080` Hydrogen shell (`48px` topbar, `26px` status strip, `1fr` workspace with 6 tabs, `24px` event ticker, plus out-of-flow fixed `#diag-popover` overlay), one `<script type="module">`. No inline script, no inline style. |
+| `public/global.css` | The only design-token location. Hydrogen Industrial HMI dark slate palette (`#0d1014` / `#15191f` / `#1c222a`), vivid cell status fills (`#1f6a49` / `#b0382e` / `#3e454f`), exact `1920x1080` full-bleed viewport lock, `2x2` Tab 1 grid (`6fr/4fr`, `1fr/188px`), 3-column U-shape wall map, and density switch (`39px`/`34px` cells). |
 | `public/app.mjs` | Boot, the tab router, repaint cadence, selection and keyboard (keys 1-6 switch tabs), density toggle, offline banners, `document.body.dataset.appState` lifecycle (`booting` / `ready` / `failed`). |
 | `public/topology.mjs` | **The one canonical topology table**: walls, tiers, the 24/30/24/30 counts, WJ1-WJ8 with their dedicated valves, the four WSB cabinets and their axis roles, the millimetre/native scaling (`1 mm = 10,000 native`), the published stage order and the pill arithmetic. Every other module imports it; none restates it. |
 | `public/chartKit.mjs` | The shared canvas kit: a gap-safe series that ends the drawn segment at a missing sample, the frame and axis helpers, the dashed setpoint and ready band, the single scalar marker the isolation-valve pressure uses, and the label placer the square workspace frame needs. |
@@ -24,7 +24,7 @@ workspace: what is authored here is what the browser reads, byte for byte.
 | `public/thermal.mjs` | The thermal block and the Front/Rear availability statement. |
 | `public/dispatchPanel.mjs` | Global queue, frozen countdown and frozen decision, 13-stage timeline, live `TimeDelay` preview. |
 | `public/opsPanel.mjs` | Active Job, Pump, Alarms, the Critical Alarm modal and the status chips. |
-| `test/ui.contract.test.mjs` | The gate: 27 tests over inventory, module graph, geometry, cadence, the read-only surface, the element ids the paint needs, the published contract shape behind every field it reads, and the parity of `topology.mjs` with the two .NET catalogs and the millimetre contract it mirrors. |
+| `test/ui.contract.test.mjs` | The gate: 30 tests over inventory, module graph, geometry, cadence, the read-only surface, the element ids the paint needs, the published contract shape behind every field it reads, the parity of `topology.mjs` with the two .NET catalogs, the Hydrogen 4-band/U-shape layout pins, and fake-DOM rendering with finite canvas coordinates. |
 
 ## Two roots, one copy
 
@@ -136,7 +136,7 @@ the layout was built to, and what it deliberately does not show:
 node --test apps/ui/test/*.test.mjs
 ```
 
-27 tests, no dependencies to install. They are grouped into three kinds of promise.
+30 tests, no dependencies to install. They are grouped into three kinds of promise.
 
 * **Shape** — the file inventory, that every import resolves to a shipped file **by exact case** and
   stays inside `/ui/`, that no module looks up an element id the document does not carry (a `null`
