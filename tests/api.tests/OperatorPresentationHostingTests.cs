@@ -58,6 +58,12 @@ public sealed class OperatorPresentationHostingTests
         ApiRoutes.KioskHealth,
     ];
 
+    /// <summary>Standard object and compiler-synthesized C# record methods allowed on a read-only payload.</summary>
+    private static readonly string[] AllowedRecordMethods =
+    [
+        "Equals", "GetHashCode", "ToString", "<Clone>$", "Deconstruct", "GetType", "op_Equality", "op_Inequality",
+    ];
+
     private static string RepoRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -192,7 +198,7 @@ public sealed class OperatorPresentationHostingTests
         var feed = Read("apps/ui/public/feed.mjs");
         var matches = System.Text.RegularExpressions.Regex.Matches(
             feed,
-            "^export const [A-Z_]+ = '(?<path>/[a-z0-9/._-]+)';$",
+            "^export const [A-Z_]+ = '(?<path>/[a-z0-9/._-]+)';\\r?$",
             System.Text.RegularExpressions.RegexOptions.Multiline);
         var requested = new string[matches.Count];
         for (var index = 0; index < matches.Count; index++)
@@ -351,15 +357,18 @@ public sealed class OperatorPresentationHostingTests
         Assert.Equal(typeof(int?), typeof(KioskHealthPayload).GetProperty("CurrentRevision")!.PropertyType);
 
         // A public field would be a handle rather than a report, and a public method other than an
-        // accessor or the record's own equality members would be a surface to call.
+        // accessor or a standard object / compiler-synthesized record member would be a surface to call.
         Assert.Empty(typeof(KioskHealthPayload).GetFields(BindingFlags.Public | BindingFlags.Instance));
         foreach (var method in typeof(KioskHealthPayload)
                  .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
         {
-            var allowed = method.Name.StartsWith("get_", StringComparison.Ordinal)
-                || method.Name.StartsWith("set_", StringComparison.Ordinal)
-                || method.Name.StartsWith("Equals", StringComparison.Ordinal);
-            Assert.True(allowed, method.Name + " is not an accessor or the record equality member");
+            if (method.Name.StartsWith("get_", StringComparison.Ordinal)
+                || method.Name.StartsWith("set_", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            Assert.Contains(method.Name, AllowedRecordMethods, StringComparer.Ordinal);
         }
 
         foreach (var property in typeof(KioskHealthPayload).GetProperties())
