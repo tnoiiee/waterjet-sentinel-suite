@@ -238,8 +238,8 @@ var uiDirectory = Path.Combine(AppContext.BaseDirectory, "Ui");
 var uiIndexPath = Path.Combine(uiDirectory, "index.html");
 var uiAssets = new HashSet<string>(StringComparer.Ordinal)
 {
-    "global.css", "app.mjs", "feed.mjs", "wallMap.mjs", "sensorDetail.mjs", "thermal.mjs",
-    "dispatchPanel.mjs", "opsPanel.mjs",
+    "global.css", "app.mjs", "feed.mjs", "topology.mjs", "chartKit.mjs", "shellBar.mjs", "tabs.mjs",
+    "wallMap.mjs", "sensorDetail.mjs", "thermal.mjs", "dispatchPanel.mjs", "opsPanel.mjs",
 };
 var uiContentTypes = new Dictionary<string, string>(StringComparer.Ordinal)
 {

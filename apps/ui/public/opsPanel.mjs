@@ -172,6 +172,125 @@ export function renderPump(host, snapshot) {
   });
 }
 
+// Severity filtering is a reading aid of this screen and nothing more: the state lives in this module,
+// it is never sent anywhere, and the unfiltered count stays printed beside the filtered one so the
+// operator can always see how much of the list a filter is hiding.
+let alarmFilter = 'ALL';
+const ALARM_FILTERS = ['ALL', 'HIGH', 'MEDIUM', 'LOW'];
+
+export function alarmFilterValue() {
+  return alarmFilter;
+}
+
+export function setAlarmFilter(value) {
+  alarmFilter = ALARM_FILTERS.indexOf(value) >= 0 ? value : 'ALL';
+  return alarmFilter;
+}
+
+export function renderAlarmFilters(host, snapshot, onFilter) {
+  host.textContent = '';
+  const alarms = snapshot ? snapshot.alarms : null;
+  const items = alarms && Array.isArray(alarms.items) ? alarms.items : [];
+  for (const value of ALARM_FILTERS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'filter-btn';
+    button.dataset.filter = value;
+    button.setAttribute('aria-pressed', alarmFilter === value ? 'true' : 'false');
+    const matching = value === 'ALL' ? items.length : items.filter((item) => String(item.severity) === value).length;
+    button.textContent = value.toLowerCase() + ' (' + String(matching) + ')';
+    button.addEventListener('click', () => {
+      setAlarmFilter(value);
+      if (onFilter) onFilter(value);
+    });
+    host.appendChild(button);
+  }
+  const note = document.createElement('p');
+  note.className = 'filter-note';
+  note.textContent = 'display filter only - the Runtime is never told which rows this screen is showing';
+  host.appendChild(note);
+}
+
+/**
+ * The latched critical event, with the host's own resume conditions. Nothing here can clear it: this
+ * panel reads the latch and reports what the latch says about how it is cleared elsewhere.
+ */
+export function renderCritical(host, snapshot) {
+  host.textContent = '';
+  const sequence = snapshot ? snapshot.sequence : null;
+  const latch = sequence ? sequence.critical : null;
+  if (!latch) {
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.dataset.tone = 'ok';
+    note.textContent = 'no latched Main Pump critical event in this Snapshot';
+    host.appendChild(note);
+  } else {
+    facts(host, [
+      ['event', text(latch.eventId) + ' / alarm ' + text(latch.alarmId), 'bad'],
+      ['kind', text(latch.kind) + ' at severity ' + text(latch.severity)],
+      ['latched at', timeOf(latch.raisedAt) + ' (evidence seq ' + text(latch.evidenceSeq) + ')'],
+      ['condition', latch.conditionActive ? 'STILL ACTIVE' : 'CLEARED' + (latch.clearedAt ? ' at ' + timeOf(latch.clearedAt) : ''),
+        latch.conditionActive ? 'bad' : 'ok'],
+      ['acknowledged', latch.acknowledged ? 'YES at ' + timeOf(latch.acknowledgedAt) : 'NO'],
+      ['job at event', text(latch.jobId, 'no Job') + ' / target ' + text(latch.targetSensorId, 'none')
+        + ' / phase ' + text(latch.phaseAtEvent, NOT_PUBLISHED)],
+      ['safe return required', latch.safeReturnRequired ? 'YES' : 'NO'],
+      ['safe return complete', latch.safeReturnComplete ? 'YES' : 'NO'],
+      ['safe return failed', latch.safeReturnFailed ? 'YES - the latch stays' : 'NO', latch.safeReturnFailed ? 'bad' : null],
+      ['modal', latch.modalOpen ? 'OPEN - the latch projects a modal' : 'closed'
+        + (latch.modalClosedAt ? ' at ' + timeOf(latch.modalClosedAt) : ''), latch.modalOpen ? 'warn' : null],
+    ]);
+  }
+  const faults = sequence && Array.isArray(sequence.equipmentFaults) ? sequence.equipmentFaults : null;
+  if (!faults || faults.length === 0) {
+    const note = document.createElement('p');
+    note.className = 'note';
+    note.dataset.tone = 'mute';
+    note.textContent = 'no SIMULATOR equipment fault latched in this Snapshot';
+    host.appendChild(note);
+    return;
+  }
+  const table = document.createElement('table');
+  table.className = 'grid-table';
+  const head = document.createElement('tr');
+  for (const label of ['valve', 'diagnosis', 'raised', 'pressure', 'next dispatch', 'modal', 'upper limit', 'lower limit']) {
+    const th = document.createElement('th');
+    th.scope = 'col';
+    th.textContent = label;
+    head.appendChild(th);
+  }
+  const thead = document.createElement('thead');
+  thead.appendChild(head);
+  table.appendChild(thead);
+  for (const fault of faults) {
+    const tr = document.createElement('tr');
+    for (const value of [
+      text(fault.valveId),
+      text(fault.diagnosis),
+      timeOf(fault.raisedAt),
+      number(fault.pressureBar, 2, 'bar') + ' (' + text(fault.pressureQuality, NOT_PUBLISHED) + ')',
+      fault.nextDispatchBlocked ? 'BLOCKED' : 'not blocked',
+      fault.modalOpen ? 'open' : 'closed',
+      fault.upperLimitDetected === true ? 'detected' : fault.upperLimitDetected === false ? 'not detected' : 'not observed',
+      fault.lowerLimitDetected === true ? 'detected' : fault.lowerLimitDetected === false ? 'not detected' : 'not observed',
+    ]) {
+      const td = document.createElement('td');
+      td.textContent = value;
+      tr.appendChild(td);
+    }
+    table.appendChild(tr);
+  }
+  const caption = document.createElement('p');
+  caption.className = 'note';
+  caption.dataset.tone = 'mute';
+  caption.textContent = 'latched SIMULATOR equipment fault: observation only, and this screen holds no clear authority';
+  host.appendChild(caption);
+  host.appendChild(table);
+}
+
+const NOT_PUBLISHED = 'NOT_PUBLISHED_BY_RUNTIME';
+
 export function renderAlarms(host, snapshot, selectedId) {
   const alarms = snapshot ? snapshot.alarms : null;
   const items = alarms && Array.isArray(alarms.items) ? alarms.items : [];
@@ -190,11 +309,22 @@ export function renderAlarms(host, snapshot, selectedId) {
       ['cleared unacknowledged', text(alarms ? alarms.clearedUnack : 0)],
     ]);
 
-    if (items.length === 0) {
+    const shown = alarmFilter === 'ALL' ? items : items.filter((item) => String(item.severity) === alarmFilter);
+    const ack = document.createElement('p');
+    ack.className = 'ack-note';
+    ack.textContent = 'UI-ONLY ACKNOWLEDGE - NOT SENT TO RUNTIME: this build exposes no acknowledge '
+      + 'affordance at all, because a button that only changes a screen would read as a device action on '
+      + 'a wall. Acknowledgement belongs to the Runtime, and until a command route exists the count above '
+      + 'is the only acknowledgement state this screen can honestly show.';
+    block.appendChild(ack);
+
+    if (shown.length === 0) {
       const note = document.createElement('p');
       note.className = 'note';
-      note.dataset.tone = 'ok';
-      note.textContent = 'The Runtime retained no alarm for this revision.';
+      note.dataset.tone = items.length === 0 ? 'ok' : 'mute';
+      note.textContent = items.length === 0
+        ? 'The Runtime retained no alarm for this revision.'
+        : 'no alarm of severity ' + alarmFilter + ' in the retained set - ' + String(items.length) + ' row(s) hidden by this display filter';
       block.appendChild(note);
     } else {
       const table = document.createElement('table');
@@ -210,7 +340,7 @@ export function renderAlarms(host, snapshot, selectedId) {
       thead.appendChild(head);
       table.appendChild(thead);
       const body = document.createElement('tbody');
-      for (const item of items) {
+      for (const item of shown) {
         const tr = document.createElement('tr');
         if (String(item.severity) === 'HIGH') tr.dataset.alarm = 'critical';
         if (selectedId && item.sensorId === selectedId) tr.dataset.selected = 'true';

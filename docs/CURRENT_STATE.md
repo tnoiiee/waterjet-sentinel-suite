@@ -1,5 +1,24 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Stage 0.4C-K4 fixup series (2026-11-16; the Operator presentation, the Kiosk header metrics and the launcher's
+> parse only: no contract member, no route, no fixture, no driver change; NO HARDWARE EXECUTED; NO DEVICE WRITE;
+> PRODUCTION NOT AUTHORIZED).** Three approved workstreams landed as one atomic pass. The launcher no longer aborts
+> before its first check: two concatenations whose continuation lines led with `+` were PowerShell 7 syntax in a file
+> that declares `#requires -Version 5.1`, which is why `-SelfTest` and `-Probe` died at parse time on the Owner's
+> machine; they are hoisted into locals and the file parses statically clean. The Kiosk header was compacted by
+> metrics alone - padding, gaps and four font sizes - from about 103 px to about 64 px at 1920x1080, with the 55 px
+> target recorded as unreachable without hiding a row or going below 8 pt, so nothing was deleted to make a number.
+> The presentation became one Unified Command Bar over six tabs (Main Control, Cleaning Queue, WJ and Pump, Sensor and
+> Path, Alarms, System and Trends) with the summary pills, the mode badge, the alarm count and a simulator-gated
+> Diagnostics dropdown in the bar and no outer scrollbar. One canonical module now owns the topology, the cabinet and
+> valve table, the stage order and the millimetre scaling, and the UI gate parses the two `.NET` catalogs and
+> `CleaningPathContracts.cs` to prove it: 22 tests became 27, each new one mutation-proved. What the read-only host
+> does not publish stays unpublished on the screen - the camera viewport is a container with a sentence and zero
+> requests, the valve outlet pressure is one marker with `NO IV HISTORY CHANNEL PUBLISHED`, coal flow and a
+> completed-cycle archive are named absent, and no `tpToRpRatio` is printed anywhere. Node gates and a fake-DOM paint
+> run are green here; no `.NET` compile, no PowerShell execution and no browser layout is verified in this sandbox,
+> so those three remain Owner-local.
+>
 > **Stage 0.4C-K4 presentation-surface correction (2026-11-16; documentation, build file, UI presentation and tests
 > only: no contract member, no fixture, no runtime route, no driver change; NO HARDWARE EXECUTED; NO DEVICE WRITE;
 > PRODUCTION NOT AUTHORIZED).** The K4 slice — the Operator presentation served by the Runtime host itself, on PR #46

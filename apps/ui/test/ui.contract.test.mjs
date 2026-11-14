@@ -17,8 +17,12 @@ const HERE = fileURLToPath(import.meta.url);
 const UI = join(HERE, '..', '..');
 const PUBLIC = join(UI, 'public');
 
-const MODULES = ['app.mjs', 'feed.mjs', 'wallMap.mjs', 'sensorDetail.mjs', 'thermal.mjs',
-  'dispatchPanel.mjs', 'opsPanel.mjs'];
+// The modules the contract rules run over. Four of them are new in the 1920x1080 overhaul: the one
+// topology table, the shared canvas kit, the command bar and the tab panel set. Anything that must not
+// appear anywhere in the presentation is checked against this list, so a new module is covered the
+// moment it is shipped - which is also why the inventory test below keeps it honest.
+const MODULES = ['app.mjs', 'feed.mjs', 'topology.mjs', 'chartKit.mjs', 'shellBar.mjs', 'tabs.mjs',
+  'wallMap.mjs', 'sensorDetail.mjs', 'thermal.mjs', 'dispatchPanel.mjs', 'opsPanel.mjs'];
 
 function read(name) {
   return readFileSync(join(PUBLIC, name), 'utf8');
@@ -45,8 +49,9 @@ test('the workspace ships browser-native modules only: no manifest, no lockfile,
   }
 
   const shipped = readdirSync(PUBLIC).sort();
-  assert.deepEqual(shipped, ['app.mjs', 'dispatchPanel.mjs', 'feed.mjs', 'global.css', 'index.html',
-    'opsPanel.mjs', 'sensorDetail.mjs', 'thermal.mjs', 'wallMap.mjs']
+  assert.deepEqual(shipped, ['app.mjs', 'chartKit.mjs', 'dispatchPanel.mjs', 'feed.mjs', 'global.css',
+    'index.html', 'opsPanel.mjs', 'sensorDetail.mjs', 'shellBar.mjs', 'tabs.mjs', 'thermal.mjs',
+    'topology.mjs', 'wallMap.mjs']
     .sort(), 'the shipped file set is exactly the files the Runtime serves');
 
   for (const name of shipped) {
@@ -578,4 +583,191 @@ test('the Safe Return row reads the published leg fields and no other shape', ()
     assert.equal(ops.includes(forbidden), false, `the Safe Return row reads ${forbidden}, which is not published`);
   }
   assert.match(ops, /no Mandatory Safe Return is running for this job/);
+});
+
+// ------------------------------------------- the 1920x1080 overhaul: one table, six tabs, no invention
+
+const ROOT = join(HERE, '..', '..', '..', '..');
+const csharp = (relative) => readFileSync(join(ROOT, relative), 'utf8');
+
+test('the single canonical topology module agrees with the two .NET catalogs it mirrors', async () => {
+  const catalog = csharp('packages/domain/WaterJetTopologyCatalog.cs');
+  const motion = csharp('packages/application/Motion/MotionTopologyCatalog.cs');
+  const topology = await import(pathToFileURL(join(PUBLIC, 'topology.mjs')).href);
+
+  // The eight Water Jet rows, read out of the catalog's own object initializers rather than out of prose.
+  const pattern = /WaterJetId = "(?<wj>WJ\d)",\s*InstalledWall = Wall\.(?<installedWall>\w+),\s*InstalledRegion = Region\.(?<installedRegion>\w+),\s*PlacementKind = WaterJetPlacementKind\.(?<placementKind>\w+),\s*PlacementAnchors = \[(?<anchors>[^\]]*)\],\s*TargetWall = Wall\.(?<targetWall>\w+),\s*TargetRegion = Region\.(?<targetRegion>\w+),\s*DedicatedIsolationValveId = "(?<iv>IV\d)"/g;
+  const rows = [...catalog.matchAll(pattern)].map((match) => match.groups);
+  assert.equal(rows.length, 8, 'eight Water Jet rows are read from the catalog, so this check cannot pass vacuously');
+
+  for (const row of rows) {
+    const mine = topology.WATER_JETS.find((jet) => jet.wj === row.wj);
+    assert.ok(mine, `${row.wj} is missing from the presentation table`);
+    assert.equal(mine.installedWall, row.installedWall, `${row.wj} installed wall`);
+    assert.equal(mine.installedTier, row.installedRegion, `${row.wj} installed region`);
+    assert.equal(mine.targetWall, row.targetWall, `${row.wj} target wall`);
+    assert.equal(mine.targetTier, row.targetRegion, `${row.wj} target region`);
+    assert.equal(mine.iv, row.iv, `${row.wj} dedicated valve`);
+    assert.equal(mine.placementKind, row.placementKind, `${row.wj} placement kind`);
+    assert.deepEqual(mine.placementAnchors, row.anchors.trim() === '' ? [] : row.anchors.split(','),
+      `${row.wj} carries an anchor the catalog does not`);
+  }
+  assert.equal(catalog.includes(topology.UNRESOLVED_PLACEMENT_WORDING), true,
+    'the placement wording on screen is the catalog sentence, not a paraphrase of it');
+
+  // Tier split, read from the catalog's own RegionForLogicalRow rather than restated: if the ruling
+  // moves in C#, the map and this check both stop agreeing and the failure names the row.
+  assert.match(catalog, /1 or 2 or 3 => Region\.UPPER,\s*\n\s*4 or 5 or 6 => Region\.LOWER/,
+    'the catalog no longer states the 1-3 UPPER / 4-6 LOWER ruling the map depends on');
+  assert.match(catalog, /logical row must be 1-6/,
+    'a row outside 1-6 is a refusal in the catalog, and the map reports it as UNPLACED rather than guessing');
+  assert.deepEqual([...topology.UPPER_ROWS], [1, 2, 3]);
+  assert.deepEqual([...topology.LOWER_ROWS], [4, 5, 6]);
+
+  // Motion: axis roles and brake allocation, read from the Axis(...) lines of the motion catalog.
+  const axes = [...motion.matchAll(/Axis\("(?<controller>MC-WSB\d)", MotionVocabulary\.Axis(?<letter>[A-D]), MotionVocabulary\.AxisRole(?<role>\w+),[^,]*,\s*MotionVocabulary\.BrakeOutput(?<brake>\d)\)/g)]
+    .map((match) => match.groups);
+  assert.equal(axes.length, 16, 'four cabinets by four axes are read from the motion catalog');
+  for (const axis of axes) {
+    assert.equal(topology.AXIS_ROLES[axis.letter], axis.role, `axis ${axis.letter} role`);
+    assert.equal(topology.BRAKE_OUTPUT_ORDER[axis.letter], Number(axis.brake), `brake output of axis ${axis.letter}`);
+  }
+  const bindings = [...motion.matchAll(/Binding\("(?<wj>WJ\d)", "(?<wsb>WSB\d)", "(?<controller>MC-WSB\d)", MotionVocabulary\.Axis(?<first>[A-D]), MotionVocabulary\.Axis(?<second>[A-D])/g)]
+    .map((match) => match.groups);
+  assert.equal(bindings.length, 8, 'one binding per Water Jet, read from the motion catalog');
+  for (const binding of bindings) {
+    const cabinet = topology.WSB_CABINETS.find((entry) => entry.wsb === binding.wsb);
+    assert.ok(cabinet, `${binding.wsb} is missing from the presentation table`);
+    assert.equal(cabinet.controller, binding.controller, `${binding.wsb} controller identity`);
+    const jet = cabinet.jets.find((entry) => entry.wj === binding.wj);
+    assert.ok(jet, `${binding.wj} is not shown on ${binding.wsb}`);
+    assert.equal(jet.horizontalAxis, binding.first, `${binding.wj} horizontal axis`);
+    assert.equal(jet.verticalAxis, binding.second, `${binding.wj} vertical axis`);
+  }
+  // The counts the tabs print are derived from the table, never from a second copy of it.
+  let assignedTotal = 0;
+  for (const wall of topology.WALL_ORDER) {
+    const perWall = topology.WATER_JETS
+      .filter((jet) => jet.targetWall === wall)
+      .reduce((sum, jet) => sum + topology.DEFAULT_ASSIGNMENTS[jet.wj], 0);
+    assert.equal(perWall, topology.EXPECTED_PER_WALL[wall],
+      `the default assignments aimed at ${wall} no longer account for that wall's Sensors`);
+    assignedTotal += perWall;
+  }
+  assert.equal(assignedTotal, topology.EXPECTED_TOTAL);
+});
+
+test('the millimetre and native scaling on screen is the contract constant, and no ratio is invented', async () => {
+  const contracts = csharp('packages/domain/CleaningPathContracts.cs');
+  const topology = await import(pathToFileURL(join(PUBLIC, 'topology.mjs')).href);
+  assert.equal(Number(/NativePerMillimetre = (\d+)/.exec(contracts)[1]), topology.NATIVE_PER_MILLIMETRE,
+    'the screen and the contract must agree on how many native units a millimetre is');
+  assert.equal(Number(/MinimumMillimetres = (\d+)/.exec(contracts)[1]), topology.WORKSPACE_MIN_MM);
+  assert.equal(Number(/MaximumMillimetres = (\d+)/.exec(contracts)[1]), topology.WORKSPACE_MAX_MM);
+  assert.equal(Number(/MaximumNative = (\d+)/.exec(contracts)[1]), topology.MAX_NATIVE);
+  assert.equal(Number(/SafeReturnCentreHorizontalMillimetres = (\d+)/.exec(contracts)[1]),
+    topology.SAFE_RETURN_CENTRE_MM.horizontal);
+  assert.equal(Number(/SafeReturnCentreVerticalMillimetres = (\d+)/.exec(contracts)[1]),
+    topology.SAFE_RETURN_CENTRE_MM.vertical);
+  assert.equal(topology.nativeToMm(topology.SAFE_RETURN_CENTRE_NATIVE.horizontal), 125);
+  assert.equal(topology.coordinatePair(281).ok, false, 'a coordinate outside the contract range is refused');
+  assert.equal(topology.coordinatePair(0).ok, true);
+
+  // The conversion factor is stated in words on the panel that shows millimetres, so a reader of the
+  // screen and a reader of the contract are given the same sentence.
+  assert.match(sources.get('tabs.mjs'), /1 mm is never rendered as a pulse count/);
+
+  // A tpToRpRatio belongs to a manual motion profile, not to this product: the Runtime publishes none in
+  // any payload the screen reads, so the screen must not print one - and must not print a 2:1 either.
+  // Comments are stripped first: the file that explains why no ratio is printed has to name the ratio to
+  // explain it, and a check that punished that would end up deleting the explanation instead of the bug.
+  for (const [name, source] of every) {
+    const text = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    assert.equal(/tpToRpRatio/.test(text), false, `${name} reads a profile ratio the payload never publishes`);
+    assert.equal(/\b2:1\b|TP:RP/.test(text), false, `${name} states a ratio nobody published`);
+  }
+});
+
+test('six tabs, one panel each, and the topology table is written in exactly one file', () => {
+  const shell = sources.get('shellBar.mjs');
+  const tabs = [...shell.matchAll(/\{ key: (?<key>\d), id: '(?<id>\w+)', label: '(?<label>[^']+)'/g)]
+    .map((match) => match.groups);
+  assert.deepEqual(tabs.map((tab) => tab.label),
+    ['Main Control', 'Cleaning Queue', 'WJ & Pump', 'Sensor & Path', 'Alarms', 'System & Trends']);
+  assert.deepEqual(tabs.map((tab) => tab.key), ['1', '2', '3', '4', '5', '6']);
+
+  const panels = [...html.matchAll(/data-tab-panel="(?<id>[a-z]+)"/g)].map((match) => match.groups.id);
+  assert.deepEqual(panels, tabs.map((tab) => tab.id), 'a tab without a panel is a button that does nothing');
+  assert.equal(new Set(panels).size, panels.length, 'a panel named twice is a panel that never clears');
+
+  // Single Topology Source Rule: only topology.mjs may write the table. A panel that restates a row is a
+  // row that can drift, and drift on a wall screen looks like data.
+  for (const [name, text] of every) {
+    if (name === 'topology.mjs') continue;
+    assert.equal(/\bWJ1\b/.test(text), false,
+      `${name} names WJ1 directly: the identity table belongs in topology.mjs and is imported from there`);
+  }
+  // A module that uses the table takes it from the canonical module; the router, which reads none, is
+  // checked by what it does import instead. That is the rule as it can actually be enforced.
+  for (const [name, source] of every) {
+    if (name === 'topology.mjs' || !name.endsWith('.mjs')) continue;
+    if (/\bWALL_ORDER\b|\btierOfRow\b|\bEXPECTED_TOTAL\b|\bEXPECTED_PER_WALL\b|\bWATER_JETS\b|\bSB_CABINETS\b/.test(source)) {
+      assert.equal(source.includes("from './topology.mjs'"), true,
+        `${name} uses the topology table without importing the canonical module`);
+    }
+  }
+  for (const name of ['app.mjs', 'wallMap.mjs', 'tabs.mjs', 'shellBar.mjs']) {
+    assert.equal(sources.get(name).includes("from './topology.mjs'")
+      || sources.get(name).includes("from './tabs.mjs'")
+      || sources.get(name).includes("from './shellBar.mjs'")
+      || sources.get(name).includes("from './wallMap.mjs'")
+      || sources.get(name).includes("from './topology.mjs'"), true,
+      `${name} is not wired into the module graph the document boots`);
+  }
+});
+
+test('the camera viewport is a container: it carries the refusal and makes no request', () => {
+  assert.equal(/<img|poster=|srcset=/.test(html), false, 'the document carries no image element to load');
+  assert.match(html, /id="camera-panel"/);
+  assert.match(sources.get('tabs.mjs'), /NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE/);
+  // The sentence is the whole of the viewport's claim about itself; anything warmer would be a mock.
+  const camera = sources.get('tabs.mjs').split('export function renderCameraPanel')[1] || '';
+  assert.equal(/http|\/\/|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(camera), false,
+    'the camera panel names an address: the read-only host has no image route to name');
+  assert.match(camera, /zero - no image element, no source, no address, no request/);
+});
+
+test('the summary pills add up to the protected total, and a wall summary that does not is reported', async () => {
+  const topology = await import(pathToFileURL(join(PUBLIC, 'topology.mjs')).href);
+  const walls = [
+    { wall: 'LEFT', total: 24, dirty: 6, cleaner: 12, notClassified: 3, uncertain: 3, maxScore: 91.5 },
+    { wall: 'REAR', total: 30, dirty: 8, cleaner: 15, notClassified: 4, uncertain: 3, maxScore: 95 },
+    { wall: 'RIGHT', total: 24, dirty: 5, cleaner: 13, notClassified: 3, uncertain: 3, maxScore: 88 },
+    { wall: 'FRONT', total: 30, dirty: 9, cleaner: 14, notClassified: 4, uncertain: 3, maxScore: 99 },
+  ];
+  // The fixture is the arithmetic the pill claims: every wall's parts add to its own total, the four
+  // walls add to 108, and 12 + 14 of them are classified neither dirty nor cleaner. A function that
+  // quietly dropped one of the two components could not reproduce these numbers.
+  for (const wall of walls) {
+    assert.equal(wall.cleaner + wall.dirty + wall.uncertain + wall.notClassified, wall.total,
+      `the fixture for ${wall.wall} is not self-consistent`);
+  }
+  assert.equal(walls.reduce((sum, wall) => sum + wall.total, 0), 108);
+  const result = topology.summaryPills(walls);
+  assert.equal(result.state, 'ok', JSON.stringify(result.note));
+  assert.equal(result.total, 108);
+  assert.equal(result.pills.length, 3);
+  assert.deepEqual(result.pills.map((pill) => pill.key), ['cleaner', 'dirty', 'uncertain']);
+  assert.equal(result.pills[0].value, 54);
+  assert.equal(result.pills[1].value, 28);
+  assert.equal(result.pills[2].value, 26,
+    'pill three is the published uncertain count plus the published not-classified count');
+  assert.match(result.breakdown, /uncertain 12 \+ not classified 14/);
+  assert.equal(result.perWall.length, 4, 'the breakdown the bar points at has one row per wall');
+
+  const short = topology.summaryPills([walls[0], walls[1]]);
+  assert.equal(short.state, 'mismatch');
+  assert.match(short.note, /TOPOLOGY_COUNT_MISMATCH/);
+  assert.equal(topology.summaryPills(null).state, 'no data', 'no summary is reported as no summary');
+  assert.match(topology.summaryPills([]).note, /WALL SUMMARY NOT PUBLISHED IN THIS SNAPSHOT/);
 });

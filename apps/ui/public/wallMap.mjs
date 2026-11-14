@@ -11,31 +11,13 @@
 // rendered as a refused slot with its slot id, and a Sensor set that does not add up to the
 // protected totals refuses the whole map instead of presenting a partial boiler.
 
-export const WALL_ORDER = Object.freeze(['LEFT', 'REAR', 'RIGHT', 'FRONT']);
+// The Single Topology Source Rule: this panel does not own a copy of the matrix. Every constant below
+// comes from './topology.mjs', which is the one place the wall / tier / count table is written and the
+// one place the contract test compares it against the .NET catalogs. Re-exporting keeps the map's own
+// public shape intact for its callers while removing the second definition.
+import { EXPECTED_PER_WALL, EXPECTED_TOTAL, LOWER_ROWS, UPPER_ROWS, WALL_COLUMNS, WALL_LABELS, WALL_ORDER, WALL_ROWS, tierOfRow } from './topology.mjs';
 
-export const WALL_LABELS = Object.freeze({
-  LEFT: 'LEFT wall', REAR: 'REAR wall', RIGHT: 'RIGHT wall', FRONT: 'FRONT wall',
-});
-
-/** Columns per wall in the approved matrix (LEFT and RIGHT are 4 wide, REAR and FRONT are 5). */
-export const WALL_COLUMNS = Object.freeze({ LEFT: 4, REAR: 5, RIGHT: 4, FRONT: 5 });
-
-export const WALL_ROWS = 6;
-export const UPPER_ROWS = Object.freeze([1, 2, 3]);
-export const LOWER_ROWS = Object.freeze([4, 5, 6]);
-
-export const EXPECTED_TOTAL = 108;
-export const EXPECTED_PER_WALL = Object.freeze({ LEFT: 24, REAR: 30, RIGHT: 24, FRONT: 30 });
-
-/**
- * Tier of one logical row. The ruling is authoritative and this function is its only product
- * presentation source: row 3 belongs to UPPER, row 4 to LOWER. A row outside 1 to 6 has no tier.
- */
-export function tierOfRow(row) {
-  if (UPPER_ROWS.indexOf(row) >= 0) return 'UPPER';
-  if (LOWER_ROWS.indexOf(row) >= 0) return 'LOWER';
-  return 'UNPLACED';
-}
+export { EXPECTED_PER_WALL, EXPECTED_TOTAL, LOWER_ROWS, UPPER_ROWS, WALL_COLUMNS, WALL_LABELS, WALL_ORDER, WALL_ROWS, tierOfRow };
 
 export function isSensor(value) {
   return String(value).toUpperCase() === 'SENSOR';
@@ -131,7 +113,7 @@ export function buildModel(snapshot) {
   return { ok: true, walls, sensorCount: byId.size, ordered, nonSensor };
 }
 
-function header(wall, count, devices) {
+function header(wall, count, devices, subtotal) {
   const head = document.createElement('div');
   head.className = 'wall-head';
   const name = document.createElement('span');
@@ -147,6 +129,12 @@ function header(wall, count, devices) {
     dev.className = 'wall-devices';
     dev.textContent = devices;
     head.appendChild(dev);
+  }
+  if (subtotal) {
+    const tally = document.createElement('span');
+    tally.className = 'wall-subtotal';
+    tally.textContent = subtotal;
+    head.appendChild(tally);
   }
   return head;
 }
@@ -182,6 +170,7 @@ function cell(slot, sensor, selectedId, onSelect) {
   button.dataset.alarm = alarmOf(sensor);
   button.dataset.queue = queueOf(sensor);
   button.dataset.target = sensor.isActiveJobTarget === true ? 'true' : 'false';
+  button.dataset.selected = sensor.sensorId === selectedId ? 'true' : 'false';
   button.setAttribute('aria-current', sensor.sensorId === selectedId ? 'true' : 'false');
   id.textContent = sensor.sensorId + ' ' + visual.marker + ' ' + visual.label;
   value.textContent = (typeof sensor.dirtyScore === 'number' ? sensor.dirtyScore.toFixed(1) : 'no score')
@@ -236,6 +225,31 @@ function deviceNote(wall, snapshot) {
   return 'cleaned by ' + targeted.map((jet) => String(jet.waterJetId || '?')).join(' ');
 }
 
+/**
+ * The published per-wall subtotal, taken from OperationalSnapshot.walls (WallSummary) rather than
+ * counted from the cells on this panel. A mismatch between the two is a host-side contradiction, so the
+ * line prints both numbers and lets the operator see the disagreement instead of the map hiding it.
+ */
+function wallSubtotal(snapshot, wall) {
+  const summaries = snapshot && Array.isArray(snapshot.walls) ? snapshot.walls : [];
+  const summary = summaries.find((entry) => String(entry && entry.wall || '').toUpperCase() === wall);
+  if (!summary) return wall + ': no WallSummary published for this wall';
+  const cells = countedFor(snapshot, wall);
+  const counts = 'cleaner ' + String(summary.cleaner) + ', dirty ' + String(summary.dirty)
+    + ', uncertain ' + String(summary.uncertain) + ', not classified ' + String(summary.notClassified)
+    + ', max score ' + (typeof summary.maxScore === 'number' ? summary.maxScore.toFixed(1) : 'no score');
+  return counts + (cells === summary.total ? '' : ' | CELLS ON THIS WALL: ' + String(cells) + ' vs TOTAL ' + String(summary.total));
+}
+
+function countedFor(snapshot, wall) {
+  const sensors = Array.isArray(snapshot && snapshot.sensors) ? snapshot.sensors : [];
+  let count = 0;
+  for (const sensor of sensors) {
+    if (String((sensor && sensor.wall) || '').toUpperCase() === wall) count += 1;
+  }
+  return count;
+}
+
 export function renderWallMap(host, model, snapshot, selection, onSelect) {
   host.textContent = '';
   if (!model || !model.ok) {
@@ -260,7 +274,7 @@ export function renderWallMap(host, model, snapshot, selection, onSelect) {
     section.className = 'wall';
     section.dataset.wall = wall;
     section.setAttribute('aria-label', (WALL_LABELS[wall] || wall) + ' tier map');
-    section.appendChild(header(wall, entry.sensors, deviceNote(wall, snapshot)));
+    section.appendChild(header(wall, entry.sensors, deviceNote(wall, snapshot), wallSubtotal(snapshot, wall)));
     section.appendChild(tierBlock(wall, entry.slots, sensorById, 'UPPER', selection, onSelect));
     section.appendChild(tierBlock(wall, entry.slots, sensorById, 'LOWER', selection, onSelect));
     host.appendChild(section);

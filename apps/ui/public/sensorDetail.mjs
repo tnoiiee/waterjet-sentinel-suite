@@ -11,6 +11,7 @@
 // is drawn as a break in the line: a missing sample never becomes an interpolated segment.
 
 import { text, number, timeOf } from './feed.mjs';
+import { tierOfRow } from './topology.mjs';
 
 const SERIES_COLORS = ['#4bb4ff', '#2fbf71', '#f2b53c', '#ff5d5d'];
 
@@ -88,10 +89,39 @@ export function renderSensorDetail(host, snapshot, sensorId) {
   return sensor;
 }
 
+// The tier ruling is not this panel's to restate: it comes from the one topology module, so a cell on
+// the map and a line in this detail can never disagree about which tier a logical row belongs to.
 function tierOfText(row) {
-  if (row === 1 || row === 2 || row === 3) return 'UPPER tier';
-  if (row === 4 || row === 5 || row === 6) return 'LOWER tier';
-  return 'unplaced row';
+  const tier = tierOfRow(row);
+  return tier === 'UPPER' ? 'UPPER tier' : tier === 'LOWER' ? 'LOWER tier' : 'unplaced row';
+}
+
+/**
+ * The compact card the wall-map tab keeps beside the map: the same published facts, fewer of them, and
+ * worded the same way as the full detail so a glance and a read cannot disagree.
+ */
+export function renderSelectedCard(host, snapshot, sensorId) {
+  host.textContent = '';
+  const sensors = snapshot && Array.isArray(snapshot.sensors) ? snapshot.sensors : [];
+  const sensor = sensors.find((entry) => entry && entry.sensorId === sensorId);
+  const rows = [
+    ['sensor', sensor ? text(sensor.sensorId) : 'nothing selected'],
+    ['position', sensor ? text(sensor.wall) + ' row ' + text(sensor.logicalRow) + ' (' + tierOfText(sensor.logicalRow) + ') column ' + text(sensor.logicalColumn) : '-'],
+    ['device', sensor ? text(sensor.deviceId) + ' / jet ' + text(sensor.assignedWaterJetId) + ' / IV ' + text(sensor.assignedIsolationValveId) : '-'],
+    ['classification', sensor ? text(sensor.classification) + ' on basis ' + text(sensor.classificationBasis) : '-'],
+    ['score', sensor ? number(sensor.dirtyScore, 1) + ' (last validated ' + number(sensor.lastValidatedScore, 1) + ')' : '-'],
+    ['quality', sensor ? text(sensor.quality) + (sensor.qualityReason ? ' - ' + String(sensor.qualityReason) : '') : '-'],
+    ['queue', sensor ? text(sensor.queueState) + (sensor.isActiveJobTarget === true ? ' - ACTIVE TARGET' : '') : '-'],
+  ];
+  for (const row of rows) {
+    const term = document.createElement('dt');
+    term.textContent = row[0];
+    const value = document.createElement('dd');
+    value.textContent = row[1];
+    if (row[2]) value.dataset.tone = row[2];
+    host.appendChild(term);
+    host.appendChild(value);
+  }
 }
 
 /**

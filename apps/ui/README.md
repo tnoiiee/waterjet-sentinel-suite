@@ -1,25 +1,30 @@
 # apps/ui — Operator presentation (Stage 0.4C-K4)
 
-The fullscreen Operator screen for a WJSS cell: the 108-Sensor wall map, the selected Sensor,
-the thermal block, the Dispatch Workspace and the operational blocks. It is **browser-native**
-(one document, one stylesheet, seven ES modules) and it is **served by `Wjss.Runtime` itself**.
+The fullscreen Operator screen for a WJSS cell: a Unified Command Bar over six tabs - the 108-Sensor
+wall map with the active cockpit, the cleaning queue, the Water Jet and Pump surfaces, the Sensor and
+Path detail, the alarms, and the host evidence with the trends. It is **browser-native**
+(one document, one stylesheet, eleven ES modules) and it is **served by `Wjss.Runtime` itself**.
 There is no build step, no package manager, no bundler and no transpiler anywhere in this
 workspace: what is authored here is what the browser reads, byte for byte.
 
-## The shipped set (10 files)
+## The shipped set (13 files)
 
 | Path | Role |
 | --- | --- |
 | `public/index.html` | The document: semantic structure, mount points, one `<script type="module">`. No inline script, no inline style. |
 | `public/global.css` | The only design-token location. Dark, high-contrast, 1920×1080 first, `overflow-x: hidden`, one narrow-width reflow breakpoint, a density switch. |
-| `public/app.mjs` | Boot, repaint cadence, selection and keyboard, density toggle, offline banners, `document.body.dataset.appState` lifecycle (`booting` / `ready` / `failed`). |
+| `public/app.mjs` | Boot, the tab router, repaint cadence, selection and keyboard (keys 1-6 switch tabs), density toggle, offline banners, `document.body.dataset.appState` lifecycle (`booting` / `ready` / `failed`). |
+| `public/topology.mjs` | **The one canonical topology table**: walls, tiers, the 24/30/24/30 counts, WJ1-WJ8 with their dedicated valves, the four WSB cabinets and their axis roles, the millimetre/native scaling (`1 mm = 10,000 native`), the published stage order and the pill arithmetic. Every other module imports it; none restates it. |
+| `public/chartKit.mjs` | The shared canvas kit: a gap-safe series that ends the drawn segment at a missing sample, the frame and axis helpers, the dashed setpoint and ready band, the single scalar marker the isolation-valve pressure uses, and the label placer the square workspace frame needs. |
+| `public/shellBar.mjs` | The command bar: the six tabs, the three summary pills with their tooltip and note, the mode badge built only from published `health` / `status`, the alarm count, the feed line and the simulator-gated Diagnostics dropdown. |
+| `public/tabs.mjs` | Tabs 3, 4 and 6 plus the active cockpit and the camera viewport container: the cabinet grid, the pump card, the control availability, the master-detail Sensor list, the square 0-280 mm frame, the path stage table, the host summary, the wall breakdown and the normalised trend explorer. |
 | `public/feed.mjs` | The whole network surface: fetch loop, revision-gap detection, reconnect, bounded delta row list. Nothing else in the UI may call `fetch`. |
 | `public/wallMap.mjs` | The authoritative U-shape geometry and `buildModel` (it refuses a Snapshot that is not 108 cells). |
 | `public/sensorDetail.mjs` | Selected-Sensor facts and the trend canvas (a `null` sample is drawn as a gap, never as a line to zero). |
 | `public/thermal.mjs` | The thermal block and the Front/Rear availability statement. |
 | `public/dispatchPanel.mjs` | Global queue, frozen countdown and frozen decision, 13-stage timeline, live `TimeDelay` preview. |
 | `public/opsPanel.mjs` | Active Job, Pump, Alarms, the Critical Alarm modal and the status chips. |
-| `test/ui.contract.test.mjs` | The gate: 22 tests over inventory, module graph, geometry, cadence, the read-only surface, the element ids the paint needs and the published contract shape behind every field it reads. |
+| `test/ui.contract.test.mjs` | The gate: 27 tests over inventory, module graph, geometry, cadence, the read-only surface, the element ids the paint needs, the published contract shape behind every field it reads, and the parity of `topology.mjs` with the two .NET catalogs and the millimetre contract it mirrors. |
 
 ## Two roots, one copy
 
@@ -47,7 +52,7 @@ assumed:
 The target resolves its root from `$(OutDir)` (with `$(OutputPath)` as the fallback) and normalises
 the trailing separator, so it looks at the directory the host itself reads from and cannot fail a
 correct build. `dotnet test` additionally asserts the resolution of the include path and, when a build
-output exists, that `Ui/` carries all nine files byte-identical to this directory.
+output exists, that `Ui/` carries all thirteen files byte-identical to this directory.
 
 That item is the only "build" the presentation has: MSBuild copies the directory into the output.
 It introduces no `PackageReference`, so `packages.lock.json` is untouched and a locked restore stays
@@ -97,13 +102,41 @@ all. `app.mjs` is the single entry; every other module is reachable from it.
   URL in it is: an offline kiosk must not depend on a font fetch, and a copied URL would be an
   address in the product tree for no benefit.
 
+## The 1920x1080 overhaul (Stage 0.4C-K4 fixup series)
+
+The bar replaced the two-column frame: one row of plant state, six tabs, no outer scrollbar. The rules
+the layout was built to, and what it deliberately does not show:
+
+* **One topology source.** `topology.mjs` is the only file that writes the wall / tier / count / WJ / IV /
+  WSB / scaling table. A module that uses the table imports it; the contract test fails a module that
+  names `WJ1` itself. The table's content is checked against the C# catalogs on every run.
+* **A tab that is not open is still current.** Every panel is painted from the same accepted frame on
+  every tick, so switching tabs cannot land on a view that is quietly forty seconds old.
+* **Pill three is `uncertain + notClassified`,** because `Classification` has no `UNCERTAIN` member; the
+  tooltip and the note under the bar carry the breakdown, the full four-wall table lives in
+  System and Trends, and a set that does not add to 108 is marked `TOPOLOGY_COUNT_MISMATCH` instead of
+  being reconciled on screen.
+* **The mode badge reads the host.** It is assembled from `KioskHealthPayload` and `RuntimeStatus` only —
+  profile, acquisition mode, readiness, stage — and never from a label baked into the presentation.
+  Presentation helpers (re-poll, move the selection, reveal the frame identity, preview the modal) are
+  inside a Diagnostics dropdown that renders only when the host reports a simulator profile.
+* **What is not published stays unpublished.** The IP Camera viewport is a container with a sentence, not
+  a frame: `NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE`, zero requests, no address.
+  The isolation-valve outlet pressure is one scalar on the active Job, so it is drawn as a marker with
+  `NO IV HISTORY CHANNEL PUBLISHED` and never as a history line. Coal flow, a completed-cycle archive
+  and a `tpToRpRatio` are the same kind of absence, and each says so on the panel it belongs to.
+* **The workspace frame is honest geometry.** `0..280 mm` square, `1 mm = 10,000 native`, integer
+  millimetres only, the Safe Return Centre at `125, 125 mm = 1,250,000 / 1,250,000 native`. No stage or
+  Sensor coordinate is published, so none is plotted: a position invented for a dot is exactly what an
+  operator would later trust.
+
 ## Gate
 
 ```
 node --test apps/ui/test/*.test.mjs
 ```
 
-22 tests, no dependencies to install. They are grouped into three kinds of promise.
+27 tests, no dependencies to install. They are grouped into three kinds of promise.
 
 * **Shape** — the file inventory, that every import resolves to a shipped file **by exact case** and
   stays inside `/ui/`, that no module looks up an element id the document does not carry (a `null`
@@ -117,10 +150,16 @@ node --test apps/ui/test/*.test.mjs
   operator screen, so the graph, not prose, is the check. The Safe Return row is pinned field by field
   for the same reason.
 * **Boundary** — the read-only surface, the stated `DFR_NOT_PUBLISHED_BY_RUNTIME` absence, the
-  lifecycle on `document.body.dataset.appState`.
+  lifecycle on `document.body.dataset.appState`, the camera container that makes no request, and the
+  parity of `topology.mjs` with `WaterJetTopologyCatalog`, `MotionTopologyCatalog` and
+  `CleaningPathContracts` (the eight Water Jet rows, the 1-3 / 4-6 tier ruling, the sixteen axis lines,
+  the eight cabinet bindings and `NativePerMillimetre`) — which is what makes "one canonical table" a
+  checked fact rather than a claim a reviewer has to trust.
 
-`node tools/boundary-scan/boundary-scan.mjs .` is the repo-wide check. `index.html` carries no `xmlns`
-on its inline SVG for the same reason: a namespace URL is an address in the product tree.
+`node tools/boundary-scan/boundary-scan.mjs .` is the repo-wide check. There is no SVG element anywhere
+in the presentation and therefore no `xmlns` namespace URL either: the trend, the delay bands and the
+workspace frame are drawn on a `<canvas>` with `getContext('2d')`, which keeps every asset a plain text
+file the host can serve from its own output directory.
 
 The live answers — 200 on the document and on each allow-listed module with its own content type, 404
 on an unknown or traversed name, 200 `ALIVE` on the shell liveness route — are asserted by

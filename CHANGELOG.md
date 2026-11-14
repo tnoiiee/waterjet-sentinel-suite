@@ -13,6 +13,67 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-16 — Stage 0.4C-K4 fixup series: the Operator HMI becomes a command bar over six tabs, the Kiosk header is compacted by metrics only, and the launcher parses under PowerShell 5.1 again (Owner-approved atomic pass; NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
+
+**Status: one commit on branch `arena/c52177ef-waterjet-sentinel-suite`, PR #46 kept OPEN with a MERGE HOLD.** Three
+workstreams were approved as one slice and executed together, because the third of them changes the asset list the host
+serves and the fourth place that list is written is a launcher a shell cannot even parse.
+
+- **Workstream C — the launcher is parseable again.** `tools/launch/Start-WjssOperatorKiosk.ps1` declares
+  `#requires -Version 5.1` and carried two multi-line concatenations whose continuation lines began with a leading `+`,
+  which is a backline form PowerShell 7 accepts and 5.1 does not: `Parser::ParseFile` reported errors, so `-SelfTest`
+  and `-Probe` aborted before their first check — exactly the symptom reported from the Owner's machine. The two
+  expressions are now hoisted into locals (`$refused`, `$stopLine`) with the concatenation operators trailing the
+  lines. The file is 528 lines, LF-only, ASCII, and statically clean under a 5.1 rule set (no leading binary
+  operators, no PS7-only syntax, balanced).
+- **Workstream B — the Kiosk header fits by metrics, not by hiding rows.** `apps/kiosk/MainForm.cs` compaction is
+  padding, gap and font-size only: `BarPadY 8 -> 2`, `RowSlackY 4 -> 1`, `BarGapX 20 -> 12`, the four row fonts
+  `10/9/9.5/9 -> 9/8.5/8.5/8`, buttons `8.5F` with `Padding(10,1,10,1)` and `Margin(8,0,0,0)`, and `Padding.Empty` on
+  the text rows. Measured at 1920x1080 the header budget falls from about 103 px to about 64 px. The 55 px the review
+  note asked for is **not** reachable without hiding a row or dropping below 8 pt, so the deviation is stated in the
+  source comment and in `apps/kiosk/README.md` rather than closed by deleting information. DPI awareness and
+  `app.manifest` were not touched, `shell.contract.test.mjs` still passes 22 of 22 with **zero** relaxations, and the
+  boundary scan still reports `0 findings (S1-S9 clean)`.
+- **Workstream A — the presentation is a Unified Command Bar over six tabs.** `apps/ui/public/` gained
+  `topology.mjs` (the one canonical topology, scaling and stage table), `chartKit.mjs` (gap-safe series drawing, the
+  frame and axis helpers, the dashed setpoint and ready band, the single scalar marker, the label placer),
+  `shellBar.mjs` (tabs, the three summary pills, the mode badge, the alarm count, the feed line, the simulator-gated
+  Diagnostics dropdown) and `tabs.mjs` (cabinet grid, pump card, control availability, master-detail, the square
+  0-280 mm frame, the path-stage table, the host summary, the wall breakdown, the normalised explorer, the active
+  cockpit and the camera container). `index.html`, `global.css` and `app.mjs` were rewritten around them.
+  The pills add to exactly 108 because pill three is the published `uncertain` count **plus** the published
+  `notClassified` count - `Classification` has no `UNCERTAIN` member - and a set that does not add up is marked
+  `TOPOLOGY_COUNT_MISMATCH` instead of being reconciled. The mode badge is assembled only from `KioskHealthPayload` and
+  `RuntimeStatus`; the word `PROTOTYPE` appears nowhere in the shipped set. The camera viewport is a container with a
+  sentence and zero requests. The isolation-valve outlet pressure is drawn as one marker with
+  `NO IV HISTORY CHANNEL PUBLISHED`, because no history channel exists to draw.
+- **The Single Topology Source Rule is now a checked fact.** `ui.contract.test.mjs` parses
+  `packages/domain/WaterJetTopologyCatalog.cs`, `packages/application/Motion/MotionTopologyCatalog.cs` and
+  `packages/domain/CleaningPathContracts.cs` and compares them with `topology.mjs`: the eight Water Jet rows with
+  their valves and empty anchor lists, the `1 or 2 or 3 => UPPER` ruling, the sixteen `Axis(...)` lines behind the
+  roles and brake allocation, the eight cabinet bindings, `NativePerMillimetre`, `Minimum/MaximumMillimetres`,
+  `MaximumNative` and the Safe Return centre. It also fails any module that names `WJ1` itself instead of importing the
+  table, and any file that states a `tpToRpRatio`. The gate grew from 22 to **27 tests**; all five new tests were
+  mutation-proved (changing a wall, a scaling constant, a tab label, the camera sentence and the pill arithmetic each
+  fails exactly one test).
+- **The five places the served-asset list is written are in lockstep:** `apps/runtime/Program.cs` (12 names),
+  `tests/api.tests/OperatorPresentationHostingTests.cs` (12 and 13), `apps/ui/test/ui.contract.test.mjs` (inventory and
+  `MODULES`), `tools/launch/Start-WjssOperatorKiosk.ps1` (`Get-WjssServedAssets`, and the `-SelfTest` surface check now
+  expects 12), and the `apps/ui/README.md` table. A python cross-check of all five lists is equal; the two `.cs` files
+  differ from their parent only in those array literals.
+- **Verification and its limits.** Run here: `node --test apps/ui/test/*.test.mjs` 27/27; kiosk 22/22; commissioning
+  239/239; ops-preview 191; contracts-ts 57/57; process-io 110/110; mapping-config 261 + 7 skipped;
+  `apps/mapping-config` 82/82; boundary-scan 33/33; process-io-evidence 21/21; tc-bench 19/19;
+  `node tools/boundary-scan/boundary-scan.mjs .` -> `0 findings (S1-S9 clean)`; `node --check` on every `.mjs`; plus a
+  throwaway fake-DOM harness that booted `app.mjs` against a contract-shaped frame and painted all six tabs in three
+  payload modes (full, sparse, host-down) with no exception, no missing host element and no non-finite value handed to
+  a canvas - a run that found and fixed two real defects (a per-repaint listener accumulation on two persistent hosts,
+  and a 0..1 phase fraction printed as a per cent). **Not verified here:** any `.NET` compile or test run, any
+  PowerShell execution, and every pixel, font and overlap of the layout - the sandbox has no SDK, no shell and no
+  browser. Owner-local: `dotnet build --locked-mode -warnaserror`, `dotnet test`,
+  `pwsh -NoProfile -File tools/launch/Start-WjssOperatorKiosk.ps1 -SelfTest` and then `-Probe` against a running host,
+  and a screen at 1920x1080.
+
 ### 2026-11-16 — Stage 0.4C-K4 review correction: the presentation copy path, a build that cannot miss it, and a contract-shape gate (fixup on PR #46; OPEN with MERGE HOLD; documentation, build file and tests only — NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
 
 **Status: one fixup commit on branch `arena/c52177ef-waterjet-sentinel-suite`, PR #46 kept OPEN with a MERGE

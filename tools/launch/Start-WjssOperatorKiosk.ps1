@@ -184,6 +184,10 @@ function Get-WjssServedAssets
         @{ Path = 'global.css'; Status = 200; ContentType = 'text/css' },
         @{ Path = 'app.mjs'; Status = 200; ContentType = 'text/javascript' },
         @{ Path = 'feed.mjs'; Status = 200; ContentType = 'text/javascript' },
+        @{ Path = 'topology.mjs'; Status = 200; ContentType = 'text/javascript' },
+        @{ Path = 'chartKit.mjs'; Status = 200; ContentType = 'text/javascript' },
+        @{ Path = 'shellBar.mjs'; Status = 200; ContentType = 'text/javascript' },
+        @{ Path = 'tabs.mjs'; Status = 200; ContentType = 'text/javascript' },
         @{ Path = 'wallMap.mjs'; Status = 200; ContentType = 'text/javascript' },
         @{ Path = 'sensorDetail.mjs'; Status = 200; ContentType = 'text/javascript' },
         @{ Path = 'thermal.mjs'; Status = 200; ContentType = 'text/javascript' },
@@ -301,8 +305,9 @@ function Invoke-WjssUiProbe
     }
 
     $served = 1 + (Get-WjssServedAssets).Count
-    Write-Output ('ok   ' + $Label + ': ' + [string]$served + ' routes served, '
-        + [string](Get-WjssRefusedAssetPaths).Count + ' refused, liveness ALIVE')
+    $refused = (Get-WjssRefusedAssetPaths).Count
+    Write-Output ('ok   ' + $Label + ': ' + [string]$served + ' routes served, ' +
+        [string]$refused + ' refused, liveness ALIVE')
 }
 
 function Get-WjssModeSelection
@@ -381,7 +386,7 @@ function Invoke-WjssSelfTest
     $done += 'cleanup: no process, no error, nothing left holding the port'
 
     $served = Get-WjssServedAssets
-    if ($served.Count -ne 8) { $bad += ('probe surface: ' + [string]$served.Count + ' assets, expected the 8 the host whitelists') }
+    if ($served.Count -ne 12) { $bad += ('probe surface: ' + [string]$served.Count + ' assets, expected the 12 the host whitelists') }
     foreach ($asset in $served)
     {
         if ($asset.Status -ne 200) { $bad += ('probe surface: ' + $asset.Path + ' is not expected to answer 200') }
@@ -394,7 +399,7 @@ function Invoke-WjssSelfTest
     {
         $bad += 'probe surface: the document is not in the refused set, so the asset route could serve it twice'
     }
-    $done += 'probe surface (8 served assets, 6 refused names, one answer each)'
+    $done += 'probe surface (12 served assets, 6 refused names, one answer each)'
 
     $uiSource = Join-Path $root 'apps\ui\public'
     if (-not (Test-Path -LiteralPath (Join-Path $uiSource 'index.html')))
@@ -495,8 +500,8 @@ try
     $uiOutputDirectory = Join-Path (Split-Path -Parent $runtimeExecutable) 'Ui'
     if (-not (Test-Path -LiteralPath (Join-Path $uiOutputDirectory 'index.html')))
     {
-        throw ('STOP: the host output has no Ui\index.html, so GET / would answer 500 and every /ui/ asset 404. '
-            + 'Rebuild the solution: the build now fails fast when that copy matches no file.')
+        $stopLine = 'STOP: the host output has no Ui\index.html, so GET / would answer 500 and every /ui/ asset 404. '
+        throw ($stopLine + 'Rebuild the solution: the build now fails fast when that copy matches no file.')
     }
 
     $runtime = Start-Process -FilePath $runtimeExecutable -WorkingDirectory $repositoryRoot `

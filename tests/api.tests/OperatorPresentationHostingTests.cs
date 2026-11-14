@@ -35,14 +35,15 @@ public sealed class OperatorPresentationHostingTests
     /// </summary>
     private static readonly string[] ExpectedUiAssets =
     [
-        "app.mjs", "dispatchPanel.mjs", "feed.mjs", "global.css", "opsPanel.mjs",
-        "sensorDetail.mjs", "thermal.mjs", "wallMap.mjs",
+        "app.mjs", "chartKit.mjs", "dispatchPanel.mjs", "feed.mjs", "global.css", "opsPanel.mjs",
+        "sensorDetail.mjs", "shellBar.mjs", "tabs.mjs", "thermal.mjs", "topology.mjs", "wallMap.mjs",
     ];
 
     /// <summary>The allow-listed assets plus the document: everything the presentation ships.</summary>
     private static readonly string[] ShippedPresentationFileNames =
-        ["app.mjs", "dispatchPanel.mjs", "feed.mjs", "global.css", "index.html", "opsPanel.mjs",
-            "sensorDetail.mjs", "thermal.mjs", "wallMap.mjs"];
+        ["app.mjs", "chartKit.mjs", "dispatchPanel.mjs", "feed.mjs", "global.css", "index.html",
+            "opsPanel.mjs", "sensorDetail.mjs", "shellBar.mjs", "tabs.mjs", "thermal.mjs",
+            "topology.mjs", "wallMap.mjs"];
 
     /// <summary>Every property of the shell liveness body, and nothing else.</summary>
     private static readonly string[] ExpectedHealthFields =
