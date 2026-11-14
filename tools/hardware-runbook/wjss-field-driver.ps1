@@ -655,7 +655,7 @@ $script:Stages = @{
             'WJSS_PUMP_READY_SETPOINT_BAR'  = '15'
             'WJSS_PRESSURE_LOW_BAR'         = '1'
             'WJSS_PRESSURE_HIGH_BAR'        = '15'
-            # nothing else: this trial composes no store, no sensor parameters and no motion, so the WAGO
+            # nothing else: this trial composes no store, no sensor parameters and no motion, so the rack
             # T8 alone is the whole device surface it touches
         } -Expect ([ordered]@{
             'trial_identity'                = 'PHYSICAL_PUMP_COMMAND_ONLY_NO_VALVES'

@@ -1,0 +1,475 @@
+<!doctype html>
+<!--
+  WJSS Operator presentation - Stage 0.4C-K4 fixup series (fullscreen 1920x1080, read-only).
+  Served by Wjss.Runtime itself from GET / with its assets under /ui/. No Node process,
+  no bundler and no package manager is involved: every file below the /ui/ route is a
+  committed browser-native ES module.
+
+  The frame is one Unified Command Bar over six tabs, so an operator reads plant state in a
+  single row and changes what they are looking at without changing what they are watching:
+  the wall map, the queue, the WJ and Pump surfaces, the Sensor and Path detail, the alarms and
+  the system evidence with the trends.
+
+  This document contains no inline script and no inline style block: the presentation
+  boots from exactly one module element, so a restrictive content policy of the shape
+  "script-src 'self'; style-src 'self'" is satisfiable without editing this file.
+  Every value the screen shows is written by the modules with textContent only.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>WaterJet Sentinel Suite - Operator</title>
+<link rel="stylesheet" href="/ui/global.css">
+</head>
+<body data-density="comfortable" data-app-state="booting" data-tab="main">
+
+<header class="cmdbar" role="banner">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">WaterJet Sentinel Suite</span>
+    <span class="brand-stage">Operator - Stage 0.4C-K4</span>
+  </div>
+
+  <nav class="tabnav" id="tab-nav" data-tab-nav aria-label="Operator views">
+    <span class="tabnav-note">tabs: keys 1 to 6</span>
+  </nav>
+
+  <div class="pills" id="summary-pills" data-count="0" title="no Snapshot read yet">
+    <span class="pill" id="pill-cleaner" data-pill="cleaner"><span class="pill-label">Cleaner</span></span>
+    <span class="pill" id="pill-dirty" data-pill="dirty"><span class="pill-label">Dirty</span></span>
+    <span class="pill" id="pill-watch" data-pill="watch"><span class="pill-label">Uncertain</span></span>
+  </div>
+  <p class="pills-note" id="pills-note">summary: waiting for the first accepted Snapshot</p>
+
+  <div class="mode" id="mode-root">
+    <span class="mode-badge" id="mode-badge">mode: not yet read from the host</span>
+    <p class="mode-note" id="mode-note">the badge is derived from published host state only</p>
+  </div>
+
+  <div class="diagnostics" id="diag-root" data-allowed="false">
+    <span class="diag-badge" id="diag-badge">diagnostics: not read</span>
+    <div class="diag-menu" id="diag-menu" role="group" aria-label="Diagnostics actions"></div>
+    <p class="diag-note" id="diag-note">no presentation helper is offered until the host reports its profile</p>
+  </div>
+
+  <div class="alarms" id="alarm-root">
+    <p class="alarm-count" id="alarm-count">0</p>
+    <p class="alarm-text" id="alarm-text">no active unacknowledged alarm read</p>
+  </div>
+
+  <div class="states">
+    <p class="feed-state" id="live-state">connecting</p>
+    <p class="feed-state" id="rev-state">rev: -</p>
+    <p class="feed-state" id="host-state">host: not read</p>
+  </div>
+
+  <div id="chips" class="chips" role="group" aria-label="Host and acquisition state" aria-live="polite">
+    <span class="chip" id="chip-profile">profile: <b>...</b></span>
+    <span class="chip" id="chip-acquisition">acquisition: <b>...</b></span>
+    <span class="chip" id="chip-readiness">readiness: <b>...</b></span>
+    <span class="chip" id="chip-revision">revision: <b>...</b></span>
+    <span class="chip" id="chip-connection">connection: <b>booting</b></span>
+  </div>
+
+  <div class="topbar-actions">
+    <div class="density" role="group" aria-label="Cell density (presentation only)">
+      <button type="button" class="density-btn" data-density-set="comfortable" aria-pressed="true">comfortable</button>
+      <button type="button" class="density-btn" data-density-set="compact" aria-pressed="false">compact</button>
+    </div>
+    <span class="clock" id="server-clock" title="Runtime server time of the last accepted poll">--:--:--</span>
+  </div>
+</header>
+
+<div id="banner-stale" class="banner banner-warn" role="status" aria-live="polite" hidden></div>
+<div id="banner-fault" class="banner banner-fault" role="alert" hidden></div>
+
+<main class="stage">
+
+  <section class="tab" data-tab-panel="main" aria-labelledby="h-map">
+    <div class="split split-60-40">
+      <div class="col col-main">
+        <section class="panel panel-map">
+          <div class="panel-head">
+            <h2 id="h-map">Boiler wall map - 108 Sensors</h2>
+            <p class="panel-note" id="map-note">
+              U traversal LEFT, REAR, RIGHT, FRONT; logical row 1 to 6 then logical column 1 to 18;
+              rows 1-3 UPPER and rows 4-6 LOWER; I7 and I16 are normal Product Sensors.
+            </p>
+          </div>
+          <div class="panel-body">
+            <div id="wallmap" class="wallmap"></div>
+            <div id="legend" class="legend" role="group" aria-label="Cell legend"></div>
+          </div>
+        </section>
+
+        <section class="panel panel-trend">
+          <div class="panel-head">
+            <h2>Pressure trend and the valve outlet pressure</h2>
+            <p class="panel-note">
+              The trend window is the Snapshot-delivered bounded window of the pump and its ready band.
+              The isolation-valve outlet pressure is published as one scalar for the active Job, so it is
+              drawn as a marker against that scale and never as a history line.
+            </p>
+          </div>
+          <div class="panel-body body-split">
+            <figure class="trend" id="trend-figure">
+              <figcaption id="trend-caption">trend: no Snapshot yet</figcaption>
+              <canvas id="trend-canvas" width="880" height="150" role="img"
+                      aria-label="Bounded trend of the published series with the setpoint and the ready band"></canvas>
+              <p class="note" id="trend-note">Gaps stay gaps: a missing sample is never drawn as a line.</p>
+            </figure>
+          </div>
+        </section>
+
+        <section class="panel panel-card panel-bands">
+          <div class="panel-head">
+            <h2>Auto TimeDelay bands and the selected score</h2>
+            <p class="panel-note">
+              The four configured delay ranges and the one in force, read from the Cleaning Job Workspace,
+              printed against the published dirty and last-validated score of the Sensor in focus. Two scales
+              are shown because converting one into the other would be an invention: no contract relates
+              seconds to a score.
+            </p>
+          </div>
+          <div class="panel-body">
+            <figure class="explorer">
+              <canvas id="delay-bands" width="880" height="120" role="img"
+                      aria-label="Configured Boiler Condition delay bands with the applied delay marked"></canvas>
+              <p class="note" id="delay-bands-caption">delay bands: no workspace read yet</p>
+            </figure>
+          </div>
+        </section>
+
+        <section class="panel panel-cockpit">
+          <div class="panel-head">
+            <h2>Active job cockpit</h2>
+            <p class="panel-note">Read-only observation: no control affordance exists on this screen.</p>
+          </div>
+          <div class="panel-body body-split">
+            <div id="active-cockpit" class="cockpit"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="col col-side">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Selected Sensor</h2>
+            <p class="panel-note">The card follows the selection; the full 22-field detail is in Sensor and Path.</p>
+          </div>
+          <div class="panel-body">
+            <dl id="selected-card" class="facts" aria-live="polite"></dl>
+          </div>
+        </section>
+
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Queue beside the selection</h2>
+            <p class="panel-note">GlobalQueue head at the same Runtime revision as the Snapshot.</p>
+          </div>
+          <div class="panel-body">
+            <div id="queue-compact" class="queue-compact"></div>
+          </div>
+        </section>
+
+        <section class="panel panel-camera">
+          <div class="panel-head">
+            <h2>IP Camera</h2>
+            <p class="panel-note">Reserved viewport, synchronised to the active Water Jet identity.</p>
+          </div>
+          <div class="panel-body">
+            <div id="camera-panel" class="camera"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" data-tab-panel="queue" aria-labelledby="h-queue">
+    <div class="split split-40-60">
+      <div class="col">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2 id="h-queue">Cleaning queue slots</h2>
+            <p class="panel-note">
+              One slot per queue position, up to the published capacity. A position the host did not fill is
+              shown as an empty slot, because a blank box on a wall screen reads like a hidden entry.
+            </p>
+          </div>
+          <div class="panel-body">
+            <div id="queue-board" class="queue-board"></div>
+          </div>
+        </section>
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Last job outcome</h2>
+            <p class="panel-note">
+              The Runtime publishes one frozen outcome record of the last released Job and no archive, so the
+              row is single, and history of completed cycles is stated as unavailable rather than implied.
+            </p>
+          </div>
+          <div class="panel-body">
+            <div id="outcome-host" class="outcome"></div>
+          </div>
+        </section>
+      </div>
+      <div class="col">
+        <section class="panel panel-dispatch">
+          <div class="panel-head">
+            <h2>Countdown, TimeDelay and dispatch timeline</h2>
+            <p class="panel-note">One atomic Cleaning Job Workspace document at the current Runtime revision.</p>
+          </div>
+          <div class="panel-body">
+            <div id="dispatch-root" class="dispatch-root"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" data-tab-panel="wj" aria-labelledby="h-wj">
+    <div class="split split-60-40">
+      <div class="col">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2 id="h-wj">Motion cabinets and Water Jets - 4 WSB by 2 WJ</h2>
+            <p class="panel-note">
+              Cabinet and axis letters come from the canonical motion table; identities, walls, tiers and
+              pairings come from the Snapshot. A disagreement is printed on the panel, never smoothed over.
+            </p>
+          </div>
+          <div class="panel-body">
+            <div id="wsb-grid" class="wsb-grid-host"></div>
+          </div>
+        </section>
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Manual maintenance surface</h2>
+            <p class="panel-note">
+              Availability is read from the published control state; this build publishes no command route,
+              so every cell stays a statement and becomes a button only when a command surface exists.
+            </p>
+          </div>
+          <div class="panel-body">
+            <div id="manual-lock" class="manual-lock"></div>
+          </div>
+        </section>
+      </div>
+      <div class="col">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Main Pump</h2>
+            <p class="panel-note">State, pressure, setpoint and the ready band exactly as published.</p>
+          </div>
+          <div class="panel-body">
+            <div id="pump-card" class="pump-card"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" data-tab-panel="sensor" aria-labelledby="h-sensor">
+    <div class="split split-master-detail">
+      <div class="col col-master">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2 id="h-sensor">Sensors</h2>
+            <p class="panel-note">The published set, in the approved wall, row and column order.</p>
+          </div>
+          <div class="panel-body">
+            <div id="sds-master" class="sds-master"></div>
+          </div>
+        </section>
+      </div>
+      <div class="col col-detail">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Selected Sensor detail</h2>
+            <p class="panel-note">Every field of the published presentation state, nothing beside it.</p>
+          </div>
+          <div class="panel-body">
+            <dl id="sensor-detail" class="facts" aria-live="polite"></dl>
+          </div>
+        </section>
+        <section class="panel panel-card panel-workspace">
+          <div class="panel-head">
+            <h2>Cleaning path workspace - 0 to 280 mm, square</h2>
+            <p class="panel-note">
+              1 mm is 10,000 native units and coordinates are integer millimetres; the pair is never shown as
+              a pulse count alone, and a position the Runtime does not publish is not plotted.
+            </p>
+          </div>
+          <div class="panel-body body-split">
+            <div class="ws-square">
+              <canvas id="ws-canvas" width="460" height="460" role="img"
+                      aria-label="Square workspace frame of 0 to 280 millimetres on both axes with the contract Safe Return centre"></canvas>
+              <p class="ws-caption" id="ws-caption">workspace: no frame drawn yet</p>
+            </div>
+            <div id="path-table" class="path-table"></div>
+          </div>
+        </section>
+        <section class="panel panel-card panel-thermal">
+          <div class="panel-head">
+            <h2>Paired thermal diagnostics</h2>
+            <p class="panel-note">
+              Front and Rear measurement identities and the TC acquisition evidence, exactly as the
+              Runtime publishes them. The paired difference is not a Runtime contract field and is
+              therefore reported as unavailable rather than computed here.
+            </p>
+          </div>
+          <div class="panel-body">
+            <p class="dfr-statement" id="dfr-statement">DFR_NOT_PUBLISHED_BY_RUNTIME</p>
+            <dl id="thermal-facts" class="facts" aria-live="polite"></dl>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" data-tab-panel="alarms" aria-labelledby="h-alarms">
+    <div class="split split-40-60">
+      <div class="col">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2 id="h-alarms">Alarms</h2>
+            <p class="panel-note">Filtering is a display choice of this screen; it changes nothing on the host.</p>
+          </div>
+          <div class="panel-body">
+            <div id="alarm-filter" class="alarm-filter"></div>
+            <div id="alarms-root" class="alarms-root"></div>
+          </div>
+        </section>
+      </div>
+      <div class="col">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Critical latch and equipment faults</h2>
+            <p class="panel-note">Latched state as published, with the host's own resume conditions.</p>
+          </div>
+          <div class="panel-body">
+            <div id="critical-host" class="critical"></div>
+          </div>
+        </section>
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Acknowledgement</h2>
+            <p class="panel-note">There is nothing to press in this build, and the screen says so on every row.</p>
+          </div>
+          <div class="panel-body">
+            <div id="ack-host" class="ack-host"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="tab" data-tab-panel="system" aria-labelledby="h-system">
+    <div class="split split-60-40">
+      <div class="col">
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2 id="h-system">Host, health and counters</h2>
+            <p class="panel-note">Only fields the read-only endpoints answer; anything else names itself absent.</p>
+          </div>
+          <div class="panel-body">
+            <div id="system-host" class="system-host"></div>
+          </div>
+        </section>
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Wall breakdown</h2>
+            <p class="panel-note">
+              The full per-wall breakdown behind the command-bar pills, so a one-number summary can always be
+              opened down to the four walls it was added from.
+            </p>
+          </div>
+          <div class="panel-body">
+            <div id="wall-breakdown" class="wall-breakdown"></div>
+          </div>
+        </section>
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Recent revision activity</h2>
+            <p class="panel-note">Bounded Delta feed metadata; a provable revision gap is shown, never closed.</p>
+          </div>
+          <div class="panel-body">
+            <table class="grid-table" id="feed-table">
+              <thead>
+                <tr><th scope="col">rev</th><th scope="col">prev</th><th scope="col">time</th>
+                    <th scope="col">sensors</th><th scope="col">sections</th><th scope="col">chain</th></tr>
+              </thead>
+              <tbody id="feed-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <div class="col">
+        <section class="panel panel-card panel-explorer">
+          <div class="panel-head">
+            <h2>Trend explorer</h2>
+            <p class="panel-note">
+              Channels normalised to 0-100 per cent to compare shapes. The engineering range and the live value
+              stay printed beside each toggle, so a normalised view never hides its units.
+            </p>
+          </div>
+          <div class="panel-body">
+            <canvas id="explorer-canvas" width="620" height="240" role="img"
+                    aria-label="Normalised view of the enabled published trend channels"></canvas>
+            <p class="note" id="explorer-caption">explorer: no Snapshot yet</p>
+            <div id="channel-list" class="channel-list" role="group" aria-label="Trend channels"></div>
+            <p class="note" id="explorer-note">a channel with every sample missing is a DATA GAP, not a flat line</p>
+          </div>
+        </section>
+        <section class="panel panel-card">
+          <div class="panel-head">
+            <h2>Active job evidence</h2>
+            <p class="panel-note">The same Job record the cockpit shows, with the Safe Return leg detail.</p>
+          </div>
+          <div class="panel-body">
+            <div id="ops-root" class="ops-root"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="statusbar" role="contentinfo">
+  <span id="boundary-line">READ-ONLY OBSERVATION - NO DEVICE WRITE - NO COMMAND SURFACE - FIELD VERIFICATION PENDING</span>
+  <span id="mode-line">mode: not yet read from the host</span>
+  <span id="state-line">app state: booting</span>
+  <span id="host-line">host: same origin</span>
+</footer>
+
+<div id="boot-error" class="boot-error" role="alert" hidden>
+  <strong>The Operator presentation did not start.</strong>
+  <span id="boot-error-detail"></span>
+  <span class="boot-error-hint">Start Wjss.Runtime and open the same address it reports. The presentation
+    re-snapshots by itself as soon as the host answers again.</span>
+</div>
+
+<noscript>
+  <div class="boot-error" role="alert">
+    <strong>Scripts are required.</strong>
+    <span>This presentation renders the Runtime Snapshot in the browser; with scripting disabled nothing
+      can be shown. Enable scripting for the local origin only.</span>
+  </div>
+</noscript>
+
+<div id="alarm-modal" class="modal" hidden>
+  <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="alarm-modal-title" aria-describedby="alarm-modal-body">
+    <h2 id="alarm-modal-title">Critical alarm</h2>
+    <p id="alarm-modal-body" role="alert" aria-live="assertive"></p>
+    <p class="modal-note">The alarm stays on the wall map and in the alarm panel after acknowledgement of
+      this dialog: acknowledging a screen is not acknowledging a device.</p>
+    <button type="button" class="modal-close" id="alarm-modal-close">Dismiss</button>
+  </div>
+</div>
+
+<script type="module" src="/ui/app.mjs"></script>
+</body>
+</html>

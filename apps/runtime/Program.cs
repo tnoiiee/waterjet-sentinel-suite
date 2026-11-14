@@ -228,6 +228,25 @@ var app = builder.Build();
 var startedUtc = DateTimeOffset.UtcNow;
 var inspectorPagePath = Path.Combine(AppContext.BaseDirectory, "Inspector", "index.html");
 
+// The Operator presentation (Stage 0.4C-K4) ships inside this host's output the same way the
+// Inspector page does: one document plus a fixed set of browser-native modules, read from the build
+// directory with no Node build pipeline, no package manager and no static-file middleware. The asset
+// names below are a frozen whitelist, so a request never contributes a path segment: an unmatched
+// name is answered with 404 before the file system is consulted, which makes a nested or traversed
+// path impossible by construction instead of by filtering.
+var uiDirectory = Path.Combine(AppContext.BaseDirectory, "Ui");
+var uiIndexPath = Path.Combine(uiDirectory, "index.html");
+var uiAssets = new HashSet<string>(StringComparer.Ordinal)
+{
+    "global.css", "app.mjs", "feed.mjs", "topology.mjs", "chartKit.mjs", "shellBar.mjs", "tabs.mjs",
+    "wallMap.mjs", "sensorDetail.mjs", "thermal.mjs", "dispatchPanel.mjs", "opsPanel.mjs",
+};
+var uiContentTypes = new Dictionary<string, string>(StringComparer.Ordinal)
+{
+    [".css"] = "text/css; charset=utf-8",
+    [".mjs"] = "text/javascript; charset=utf-8",
+};
+
 // 5. Start only an initialized Runtime. A faulted composition has no writer or
 //    Snapshot: keep the host's read-only 503 diagnostics available without claiming
 //    that an evolution loop or a Delta feed exists.
@@ -273,6 +292,38 @@ IResult InspectorEndpoint() => File.Exists(inspectorPagePath)
         Encoding.UTF8,
         StatusCodes.Status500InternalServerError);
 
+// The Operator document is a file read, not a computed projection: a build that does not carry the
+// presentation says so with a 500 and a plain sentence, exactly as the Inspector route does. It
+// never falls back to a stale copy and never serves a partially updated tree.
+IResult UiEndpoint() => File.Exists(uiIndexPath)
+    ? Results.File(uiIndexPath, "text/html; charset=utf-8")
+    : Results.Text(
+        "The Operator presentation is not present in this build output.",
+        "text/plain",
+        Encoding.UTF8,
+        StatusCodes.Status500InternalServerError);
+
+// The route value is matched against the frozen set before anything is composed from it, and the
+// content type comes from the extension of an allow-listed name rather than from the request. An
+// unknown name, a nested name and an unknown extension are all the same answer: 404.
+IResult UiAssetEndpoint(string file)
+{
+    if (!uiAssets.Contains(file))
+    {
+        return Results.NotFound();
+    }
+
+    var assetPath = Path.Combine(uiDirectory, file);
+    if (!File.Exists(assetPath))
+    {
+        return Results.NotFound();
+    }
+
+    return uiContentTypes.TryGetValue(Path.GetExtension(file), out var contentType)
+        ? Results.File(assetPath, contentType)
+        : Results.NotFound();
+}
+
 // 7. Health: live = host alive (never a readiness claim); ready = the full
 //    readiness contract, 200 only when every condition holds, else 503 with a
 //    structured machine code and no silent fallback.
@@ -303,6 +354,24 @@ app.MapGet(ApiRoutes.HealthReady, () =>
         : Results.Json(payload, ContractJson.Options, statusCode: StatusCodes.Status503ServiceUnavailable);
 });
 
+// 7b. The liveness route of the Kiosk shell. The shell reloads the approved route as soon as this
+//     answers, so the route must exist on the same origin and port as the presentation - that is the
+//     whole reason it is here. It answers 200 whenever the host is up, independent of readiness, and
+//     reports the acquisition mode as the host's own redacted label: it states what the host may
+//     READ and never implies a write, a command or a device action.
+app.MapGet(ApiRoutes.KioskHealth, () => Results.Json(
+    new KioskHealthPayload
+    {
+        Status = "ALIVE",
+        Host = "Wjss.Runtime",
+        DeviceProfile = options.Profile,
+        AcquisitionMode = TcEndpointConfiguration.DescribeMode(options.AcquisitionMode),
+        Ready = runtime.Readiness().Ready,
+        CurrentRevision = runtime.IsInitialized ? (int?)runtime.Publication.Current.Revision : null,
+        StageMarker = RuntimeStage.Marker,
+    },
+    ContractJson.Options));
+
 app.MapGet(ApiRoutes.Snapshot, SnapshotEndpoint);
 app.MapGet(ApiRoutes.DispatchWorkspace, DispatchWorkspaceEndpoint);
 app.MapGet(ApiRoutes.Runtime, RuntimeEndpoint);
@@ -311,6 +380,11 @@ app.MapGet(ApiRoutes.Deltas, DeltasEndpoint);
 // trailing slash, so a second "/inspector/" endpoint is a second candidate for
 // the same request and makes the match ambiguous (AmbiguousMatchException).
 app.MapGet(ApiRoutes.Inspector, InspectorEndpoint);
+// ONE registration each, for the same reason: the presentation document and its modules are read-only
+// files of this host, and they carry no verb, no parameter beyond the allow-listed name and no
+// request body. Serving them changes nothing the Runtime observes and authorizes nothing.
+app.MapGet(ApiRoutes.Ui, UiEndpoint);
+app.MapGet(ApiRoutes.UiAsset, UiAssetEndpoint);
 
 RuntimeStatus BuildStatus()
 {

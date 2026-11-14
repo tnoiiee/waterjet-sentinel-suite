@@ -10,7 +10,7 @@ namespace Wjss.Runtime;
 
 // PUMP PLATFORM, PHASE 0.5E: the fourth physical evidence class, the Pump command rung alone.
 //
-//     What this run is. The complete Pump command ladder is executed against the real WAGO T8 rack over
+//     What this run is. The complete Pump command ladder is executed against the real field T8 rack over
 //     the ONE authorized dry write authorization: the Pump selection pair, the inverter enable, the Run
 //     command, the ramp of the analog speed reference, the commissioned Running input, the Fault input,
 //     the Pump Outlet Pressure rule, and then the Stop order in reverse with the safe-zero analog sentinel.
@@ -640,7 +640,7 @@ public static class PumpCommandDryTrial
         // The dwell between the enable and the Run command is a physical question the Owner answers with the
         // inverter manual, not a guess this runner may fill in: Start() dispatches the whole sequence without
         // an artificial delay (packages/application/ProcessIo/ProcessIoPumpLifecycle.cs:288-321), so the only
-        // spacing is the Modbus round trip. These two numbers say what that spacing actually was.
+        // spacing is the field-transport round trip. These two numbers say what that spacing was.
         output.WriteLine("  dispatch_window_ms=" + (log.Count == 0
             ? "0"
             : (log[log.Count - 1].At - firstAt).TotalMilliseconds.ToString("0.#", CultureInfo.InvariantCulture)));
@@ -934,7 +934,7 @@ public static class PumpCommandDryTrial
     }
 
     /// <summary>
-    /// What the catalogue binds one tag to, in the transport's own terms. The panel number is the Modbus
+    /// What the catalogue binds one tag to, in the transport's own terms. The panel number is the raw
     /// address plus one, so this line can be compared with the mapping workbook without opening the CSV.
     /// </summary>
     private static string DescribeBinding(

@@ -14,6 +14,8 @@
       GET /api/v1/runtime  -> read-only Runtime status
       GET /api/v1/deltas   -> bounded recent Delta activity
       GET /inspector       -> development-only Runtime Inspector page
+      GET /                -> the Operator presentation document (Stage 0.4C-K4)
+      GET /api/health      -> liveness for the Kiosk shell availability probe
 
     No write, command, dispatch or SSE surface exists. Startup with any device
     profile other than SIMULATOR is refused BEFORE any port is bound.
@@ -36,7 +38,42 @@
       serve it from the build directory without a Node build pipeline.
     -->
     <Content Include="Inspector\index.html" CopyToOutputDirectory="PreserveNewest" />
+
+    <!--
+      The Operator presentation (Stage 0.4C-K4) is authored in apps/ui and copied into this host's
+      output under Ui/, so the host can serve its own UI from the build directory: no Node process,
+      no package manager, no bundler and no static-file middleware is involved at build or run time.
+
+      The Include path is relative to THIS project file, which sits in apps/runtime: one level up is
+      apps, so the presentation is ..\ui\public. (An earlier revision of this item walked up two
+      levels, matched nothing, and an empty Content glob is not an MSBuild error, so the build stayed
+      green while the routes had no files to serve. The verification target below is what keeps that
+      failure mode loud instead of silent.) Link metadata is written explicitly rather than
+      through LinkBase so the copied tree is identical for build and for publish (Ui\index.html,
+      Ui\app.mjs, ...), and it is a real path template for every file the glob matches.
+    -->
+    <Content Include="..\ui\public\**\*.*" Link="Ui\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <Target Name="VerifyOperatorUiOutput" AfterTargets="CopyFilesToOutputDirectory">
+    <!--
+      Fail the build when the presentation did not reach the output. The routes GET / and GET /ui/{file}
+      answer from these copied files, so a build that carries the host without them is not a build of
+      this Stage: it would serve 500 and 404 while reporting success. The two names checked here are the
+      document and its only entry module, which together prove the glob matched and the copy ran.
+
+      The root is resolved rather than hardcoded: CopyFilesToOutputDirectory copies to $(OutDir), and
+      $(OutputPath) is the fallback for a build that sets it directly, so the check looks at the
+      directory the host itself reads from instead of at a convention. Trailing-slash normalisation is
+      explicit because Exists() on a concatenation without the separator would fail a good build.
+    -->
+    <PropertyGroup>
+      <WjssUiOutputRoot Condition="'$(OutDir)' != ''">$(OutDir)</WjssUiOutputRoot>
+      <WjssUiOutputRoot Condition="'$(WjssUiOutputRoot)' == ''">$(OutputPath)</WjssUiOutputRoot>
+      <WjssUiOutputRoot>$([MSBuild]::EnsureTrailingSlash('$(WjssUiOutputRoot)'))</WjssUiOutputRoot>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(WjssUiOutputRoot)Ui\index.html') or !Exists('$(WjssUiOutputRoot)Ui\app.mjs')" Text="WJSS Operator presentation is missing from the host output (looked for Ui\index.html and Ui\app.mjs under $(WjssUiOutputRoot)). The apps/ui/public content item matched no file, so GET / would answer 500 and GET /ui/{file} would answer 404. The Include path is relative to apps/runtime, so it must resolve to apps/ui/public." />
+  </Target>
 
   <ItemGroup>
     <ProjectReference Include="../../adapters/simulator/Wjss.Adapters.Simulator.csproj" />
