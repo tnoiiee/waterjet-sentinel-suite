@@ -142,6 +142,14 @@ public sealed class RuntimeStartGateSourceTests
         Assert.Contains("app.MapGet(ApiRoutes.Deltas", src, StringComparison.Ordinal);
         Assert.Contains("app.MapGet(ApiRoutes.Inspector", src, StringComparison.Ordinal);
 
+        // Stage 0.4C-K4 adds the read-only presentation surface: the Operator document at the origin
+        // root, one allow-listed asset name, and the liveness answer of the shell probe. Each is a GET
+        // of a shipped file or a small factual body, registered exactly once, and none of them carries
+        // a parameter other than the allow-listed asset name.
+        Assert.Contains("app.MapGet(ApiRoutes.Ui, UiEndpoint)", src, StringComparison.Ordinal);
+        Assert.Contains("app.MapGet(ApiRoutes.UiAsset, UiAssetEndpoint)", src, StringComparison.Ordinal);
+        Assert.Contains("app.MapGet(ApiRoutes.KioskHealth", src, StringComparison.Ordinal);
+
         // No write/command route exists anywhere in the host.
         foreach (var writeVerb in new[] { "MapPost", "MapPut", "MapPatch", "MapDelete", "MapMethods" })
         {

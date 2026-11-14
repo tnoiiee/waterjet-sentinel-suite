@@ -311,6 +311,14 @@ public sealed class RuntimeHostCompositionTests
         Assert.Equal("/api/v1/runtime", ApiRoutes.Runtime);
         Assert.Equal("/api/v1/deltas", ApiRoutes.Deltas);
         Assert.Equal("/inspector", ApiRoutes.Inspector);
+
+        // Stage 0.4C-K4 adds the presentation surface: the document at the origin root (the Kiosk
+        // shell navigates to the approved origin itself), one allow-listed asset name, and the
+        // liveness route the shell probes. All three are reads of this host, and none of them is a
+        // readiness claim: /health/ready above stays the only readiness identity.
+        Assert.Equal("/", ApiRoutes.Ui);
+        Assert.Equal("/ui/{file}", ApiRoutes.UiAsset);
+        Assert.Equal("/api/health", ApiRoutes.KioskHealth);
     }
 
     // A long timer prevents a real background tick while these tests invoke the very same

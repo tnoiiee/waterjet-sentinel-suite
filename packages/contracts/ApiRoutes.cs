@@ -3,10 +3,12 @@ namespace Wjss.Contracts;
 /// <summary>
 /// Route identities of the Local Application API surface that EXISTS. Stage
 /// 0.3A-1 registered the health routes only; Stage 0.3A-2C adds the READ-ONLY
-/// Runtime observation routes and the development Inspector page. No write,
-/// command or dispatch route exists, and no constant is declared for one, so no
-/// half-wired command surface can be mistaken for implementation. SSE streaming
-/// remains deliberately absent (the Inspector polls instead).
+/// Runtime observation routes and the development Inspector page; Stage 0.4C-K4 adds
+/// the Operator presentation (the document and its browser-native modules) and the
+/// liveness route the Kiosk shell probes. No write, command or dispatch route exists,
+/// and no constant is declared for one, so no half-wired command surface can be
+/// mistaken for implementation. SSE streaming remains deliberately absent (both
+/// presentations poll instead).
 /// </summary>
 public static class ApiRoutes
 {
@@ -34,4 +36,24 @@ public static class ApiRoutes
 
     /// <summary>Development-only Runtime Inspector page (read-only, SIMULATOR profile).</summary>
     public const string Inspector = "/inspector";
+
+    /// <summary>
+    /// The Operator presentation document. The host serves it at the origin root because the Kiosk
+    /// shell navigates to the approved origin itself, so the presentation and the API it reads stay
+    /// same-origin. It is a read of a file shipped in the host output, never a control surface.
+    /// </summary>
+    public const string Ui = "/";
+
+    /// <summary>
+    /// One whitelisted module or stylesheet of the Operator presentation. The route value is matched
+    /// against a frozen set of names before any path is composed, so nothing here accepts a path.
+    /// </summary>
+    public const string UiAsset = "/ui/{file}";
+
+    /// <summary>
+    /// Liveness of the local host for the Kiosk shell's availability probe. Like
+    /// <see cref="HealthLive"/> it is never a readiness claim: 200 means the host answers, and
+    /// <see cref="HealthReady"/> stays the only readiness contract.
+    /// </summary>
+    public const string KioskHealth = "/api/health";
 }

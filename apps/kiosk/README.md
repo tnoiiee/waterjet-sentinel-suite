@@ -105,6 +105,38 @@ Density control is fully visible; the Overview table scrolls only inside its own
 horizontal scrollbar exists; windowed mode stays usable; reconnect stays fail-safe; and every automated
 gate stays green. The 1920×1080 claim stays an **acceptance target** until the Owner confirms it.
 
+## Header vertical budget: the 2026-11-16 metrics-only compaction (Stage 0.4C-K4 fixup series)
+
+The Operator presentation is a 1920x1080 screen with no page scroll, and the shell header takes its
+height away from the embedded page: `BuildLayout` gives the header row `SizeType.AutoSize`, so whatever
+`LayoutStatusBar` measures is exactly what the WebView2 viewport loses. The header was therefore
+compacted **in metrics only**:
+
+* `BarPadY` 8 -> 2, `RowSlackY` 4 -> 1, `BarGapX` 20 -> 12;
+* the four text rows go from 10F / 9F / 9.5F / 9F to 9F / 8.5F / 8.5F / 8F;
+* `ConfigureTextRow` now sets `Padding.Empty` instead of a 2px bottom margin, because a measured row
+  adds its control margin to its height and four rows would carry eight pixels of pure spacing;
+* `ConfigureButton` goes to 8.5F with `Padding(10, 1, 10, 1)` and a zero vertical margin, because row 0
+  is `max(text row, actions height)` - the buttons set a floor the text alone cannot reach.
+
+Estimated result at 1920x1080: approximately **103 px -> approximately 64 px** of header, so about 39 px
+return to the presentation. The number is an estimate on purpose: the row heights come from
+`TextRenderer.MeasureText` on the real display at the real DPI, which the Agent sandbox cannot run, so the
+measured figure is an Owner-local observation (see **Validation status**). The 55 px originally asked for is
+reachable only by hiding one of the four rows or by dropping text below 8 pt: the first would remove a
+Stage boundary statement that is required to stay displayed, the second stops being legible at an
+operator's standing distance, so neither was done.
+
+**Deliberately unchanged**, because each of these is a protection and not a preference: all four header
+rows still exist (`RowCount = 4`) with the Stage identity, the connection state, the Stage boundary and the
+policy counters, each still a measured `AutoSize = false` row with `Dock = DockStyle.Fill` and each long
+text still spanning both columns; the two actions are still visible, enabled and inside one bounded
+`_actionZone`; `WrapContents = false` still keeps them on one line; the text is still measured with `WordBreak |
+NoPadding | NoPrefix` and re-measured on resize, on the `DpiChanged` event and whenever a header text
+changes; `MinimumSize` is still 1024x600 so no larger display is required; no `AutoScroll` was introduced;
+`app.manifest`, `Program.cs` and `Wjss.Kiosk.csproj` carry zero diff, so the DPI posture this file documents
+elsewhere is untouched. `test/shell.contract.test.mjs` pins every one of those facts and was **not edited** -
+it passes 22/22 against this compaction as it did before it.
 ## Out of scope in this Stage (deliberately, per the Stage brief)
 
 No Runtime process supervision (the Operator starts the host), no Windows auto-login, no OS shell
@@ -267,6 +299,23 @@ could not be regenerated in Arena: the Arena sandbox has no .NET SDK and no reac
 no restore, build or .NET test of this project has been executed there. Until the refresh is
 committed, a restore running in locked mode will report the lock file as stale — that is expected
 for this Stage and is recorded in the Stage checkpoint.
+
+## Full-bleed 1920x1080 default and F10/F12 shell status bar toggle (Stage 0.4C-K4 continuation)
+
+The native four-row shell status bar (`_statusBar`, containing the Stage identity, connection state,
+Stage boundary text, policy counters, **Windowed / full screen** and **Exit Kiosk Preview**) is
+hidden by default (`_statusBar.Visible = false`) so the embedded presentation owns the entire
+`1920x1080` fullscreen client area with zero vertical chrome offset.
+
+- Press **`F10`** or **`F12`** at any time to toggle the native shell status bar visible or hidden.
+- Both `ProcessCmdKey` (`keyData & Keys.KeyCode`) and `_view.KeyDown` route through a single
+  `ToggleStatusBar()` method guarded by a monotonic `Environment.TickCount64` debounce (150 ms) so
+  one physical keypress cannot fire twice across WinForms and the embedded view.
+- Toggling visible re-measures the four header rows (`LayoutStatusBar()`) and refreshes the outer
+  layout (`PerformLayout()`).
+- Neither `F10` nor `F12` exits the window: the intentional, confirmed exit path (**Exit Kiosk
+  Preview** or normal window close plus confirmation dialog) and every navigation/popup/download/DPI
+  invariant (`ApplicationHighDpiMode=PerMonitorV2`, `app.manifest`, `Program.cs`) remain unchanged.
 
 ## Validation status
 

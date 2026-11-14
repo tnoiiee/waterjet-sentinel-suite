@@ -103,9 +103,29 @@ test('the exit is intentional, confirmed and reversible', () => {
   assert.match(source.main, /MessageBoxButtons\.YesNo/);
   assert.match(source.main, /CloseReason\.UserClosing && !_confirmedExit/);
   assert.match(source.main, /_confirmedExit = true;/);
+  // Full-bleed default: the native status bar starts hidden and F10/F12 toggles ONLY its
+  // visibility (debounced with Environment.TickCount64 across ProcessCmdKey and _view.KeyDown).
   // No hidden keystroke-only exit, and no irreversible lockdown.
-  assert.equal(/KeyDown/.test(source.main), false);
-  assert.equal(/Keys\./.test(source.main), false);
+  assert.match(source.main, /_statusBar\.Visible = false;/);
+  assert.match(source.main, /KeyPreview = true;/);
+  assert.match(source.main, /_view\.KeyDown \+= OnViewKeyDown;/);
+  assert.match(source.main, /Environment\.TickCount64/);
+  assert.match(source.main, /Keys\.F10/);
+  assert.match(source.main, /Keys\.F12/);
+  const keyHandlersStart = source.main.indexOf('private void ToggleStatusBar()');
+  const keyHandlersEnd = source.main.indexOf('protected override void OnResize', keyHandlersStart);
+  assert.ok(keyHandlersStart > 0 && keyHandlersEnd > keyHandlersStart, 'ToggleStatusBar and key handlers must be defined');
+  const keyHandlers = source.main.slice(keyHandlersStart, keyHandlersEnd);
+  assert.match(keyHandlers, /_statusBar\.Visible = !_statusBar\.Visible;/);
+  assert.match(keyHandlers, /LayoutStatusBar\(\);/);
+  assert.match(keyHandlers, /PerformLayout\(\);/);
+  assert.match(keyHandlers, /ProcessCmdKey\(ref Message msg, Keys keyData\)/);
+  assert.match(keyHandlers, /keyData & Keys\.KeyCode/);
+  assert.match(keyHandlers, /OnViewKeyDown\(object\? sender, KeyEventArgs e\)/);
+  assert.match(keyHandlers, /e\.Handled = true;/);
+  assert.match(keyHandlers, /e\.SuppressKeyPress = true;/);
+  assert.equal(/RequestConfirmedExit|Close\(|Application\.Exit|Environment\.Exit|_confirmedExit/.test(keyHandlers), false, 'key handlers must never exit the shell');
+  assert.equal(/Keys\.(Escape|F4|Q|X)\b/.test(source.main), false, 'no exit-hotkey literal may appear in MainForm.cs');
   assert.match(source.main, /FormBorderStyle\.None/);
   assert.match(source.main, /ToggleWindowMode/);
 });

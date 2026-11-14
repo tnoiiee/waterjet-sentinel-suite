@@ -52,17 +52,41 @@ public sealed class MainForm : Form
         "KioskPreview",
         "ViewData");
 
-    /// <summary>Padding and gaps of the shell header. Kept small so the header stays compact.</summary>
+    /// <summary>
+    /// Padding and gaps of the shell header. These four numbers, plus the four font sizes in
+    /// BuildStatusBar, ARE the header: its height is measured from real text (see LayoutStatusBar) and
+    /// the outer layout gives the header row SizeType.AutoSize, so every pixel removed here is a pixel
+    /// the Operator presentation gets back. Nothing else about the header is guesswork and nothing
+    /// here trades information for space: all four rows stay, all three full-width spans stay, the two
+    /// actions stay visible, and no scrollbar is introduced.
+    ///
+    /// The vertical budget at 1920x1080, per row: the measured line height of the font in use plus
+    /// RowSlackY, and 2 x BarPadY for the container. Before this compaction the header measured
+    /// approximately 4 x (15..17 + 4 + 2) + 16 = roughly 103 px, about a tenth of the screen; with the
+    /// metrics below it measures approximately 4 x (13..15 + 1) + 4 = roughly 64 px, so about 39 px
+    /// return to the embedded page. The exact figure stays an Owner-local measurement (TextRenderer on
+    /// the real display, at the real DPI): the Agent environment that authored this has no WinForms.
+    /// Reaching the 55 px that was asked for would need either a hidden row or text below 8 pt; the
+    /// first would remove information the Stage boundary requires displayed, the second is not legible
+    /// from an operator's standing distance, so neither is done.
+    /// </summary>
     private const int BarPadX = 16;
-    private const int BarPadY = 8;
-    private const int BarGapX = 20;
+    private const int BarPadY = 2;
+    private const int BarGapX = 12;
 
-    /// <summary>Vertical slack added to every measured text row, so a wrapped line never clips.</summary>
-    private const int RowSlackY = 4;
+    /// <summary>
+    /// Vertical slack added to every measured text row, so a wrapped line never clips. One pixel, not
+    /// four: TextRenderer.MeasureText is already called with TextFormatFlags.NoPadding, and a wrapped
+    /// row grows by the full measured height of the second line, so this only has to absorb the
+    /// rounding of the last line - it is not the clip guard it was when it was 4.
+    /// </summary>
+    private const int RowSlackY = 1;
+    private const long StatusBarToggleDebounceMs = 150;
 
     private readonly WebView2 _view = new() { Dock = DockStyle.Fill, Visible = false };
     private readonly Panel _content = new() { Dock = DockStyle.Fill, BackColor = ShellBack };
     private readonly TableLayoutPanel _statusBar = new();
+    private TableLayoutPanel? _outerLayout;
     private readonly TableLayoutPanel _overlay = new();
     private readonly Label _overlayHeadline = new();
     private readonly Label _overlayDetail = new();
@@ -92,6 +116,7 @@ public sealed class MainForm : Form
     private int _blockedPopups;
     private int _cancelledDownloads;
     private int _deniedPermissions;
+    private long _lastStatusBarToggleTick = -StatusBarToggleDebounceMs;
 
     public MainForm()
     {
@@ -103,8 +128,11 @@ public sealed class MainForm : Form
         DoubleBuffered = true;
         AutoScaleMode = AutoScaleMode.Dpi;
         MinimumSize = new Size(1024, 600);
+        KeyPreview = true;
 
         BuildLayout();
+
+        _view.KeyDown += OnViewKeyDown;
 
         _probeTimer.Interval = KioskShellOptions.ProbeIntervalMs;
         _probeTimer.Tick += OnProbeTick;
@@ -144,6 +172,7 @@ public sealed class MainForm : Form
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         layout.Controls.Add(_statusBar, 0, 0);
         layout.Controls.Add(_content, 0, 1);
+        _outerLayout = layout;
         Controls.Add(layout);
     }
 
@@ -181,10 +210,10 @@ public sealed class MainForm : Form
 
         _stageLabel.Text = "Kiosk Preview  -  Stage " + KioskShellOptions.StageId;
         _boundaryLabel.Text = KioskShellOptions.BoundaryText;
-        ConfigureTextRow(_stageLabel, Ink, 10F, FontStyle.Bold);
-        ConfigureTextRow(_connectionState, Ink, 9F, FontStyle.Regular);
-        ConfigureTextRow(_boundaryLabel, Warn, 9.5F, FontStyle.Bold);
-        ConfigureTextRow(_policyState, Muted, 9F, FontStyle.Regular);
+        ConfigureTextRow(_stageLabel, Ink, 9F, FontStyle.Bold);
+        ConfigureTextRow(_connectionState, Ink, 8.5F, FontStyle.Regular);
+        ConfigureTextRow(_boundaryLabel, Warn, 8.5F, FontStyle.Bold);
+        ConfigureTextRow(_policyState, Muted, 8F, FontStyle.Regular);
 
         ConfigureButton(_windowModeButton, "Windowed / full screen", Info);
         ConfigureButton(_exitButton, "Exit Kiosk Preview", Err);
@@ -210,6 +239,9 @@ public sealed class MainForm : Form
         _statusBar.SetColumnSpan(_policyState, 2);
 
         LayoutStatusBar();
+        // Full-bleed 1920x1080 default: hide the native shell header until toggled by F10 or F12.
+        // The header buttons stay enabled and wired inside _statusBar; F10/F12 only toggles visibility.
+        _statusBar.Visible = false;
     }
 
     /// <summary>
@@ -337,7 +369,9 @@ public sealed class MainForm : Form
         label.TextAlign = ContentAlignment.MiddleLeft;
         label.ForeColor = colour;
         label.Font = new Font("Segoe UI", size, style, GraphicsUnit.Point);
-        label.Margin = new Padding(0, 0, 0, 2);
+        // Zero margin, not 2: in a measured row the margin is added to the row height, so four rows
+        // would carry eight pixels of pure spacing. The gap between rows is RowSlackY's job.
+        label.Margin = Padding.Empty;
     }
 
     private static void ConfigureButton(Button button, string text, Color colour)
@@ -349,9 +383,12 @@ public sealed class MainForm : Form
         button.FlatAppearance.BorderColor = colour;
         button.ForeColor = colour;
         button.BackColor = ShellBar;
-        button.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold, GraphicsUnit.Point);
-        button.Margin = new Padding(8, 2, 0, 2);
-        button.Padding = new Padding(10, 2, 10, 2);
+        // The actions set the floor of row 0 (LayoutStatusBar takes max of the text row and the
+        // actions height), so the button metrics are part of the header budget too: 8.5F keeps the
+        // label legible, and the vertical margin is zero so the row is not grown by spacing.
+        button.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold, GraphicsUnit.Point);
+        button.Margin = new Padding(8, 0, 0, 0);
+        button.Padding = new Padding(10, 1, 10, 1);
         button.TabStop = true;
     }
 
@@ -376,6 +413,53 @@ public sealed class MainForm : Form
 
         // The toggle label is part of the action zone, so its width is re-measured here.
         LayoutStatusBar();
+    }
+
+    /// <summary>
+    /// Toggles the native shell status bar between hidden (full-bleed 1920x1080 default) and
+    /// visible (showing Stage identity, host state, Stage boundary, policy counters and the
+    /// Windowed / Exit buttons). Debounced with Environment.TickCount64 so one physical F10/F12
+    /// press observed across ProcessCmdKey and WebView2 KeyDown toggles exactly once.
+    /// </summary>
+    private void ToggleStatusBar()
+    {
+        var now = Environment.TickCount64;
+        if (now - _lastStatusBarToggleTick < StatusBarToggleDebounceMs)
+        {
+            return;
+        }
+
+        _lastStatusBarToggleTick = now;
+        _statusBar.Visible = !_statusBar.Visible;
+        if (_statusBar.Visible)
+        {
+            LayoutStatusBar();
+        }
+
+        _outerLayout?.PerformLayout();
+        PerformLayout();
+    }
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        var keyCode = keyData & Keys.KeyCode;
+        if (keyCode == Keys.F10 || keyCode == Keys.F12)
+        {
+            ToggleStatusBar();
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    private void OnViewKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyCode == Keys.F10 || e.KeyCode == Keys.F12)
+        {
+            e.Handled = true;
+            e.SuppressKeyPress = true;
+            ToggleStatusBar();
+        }
     }
 
     protected override void OnResize(EventArgs e)

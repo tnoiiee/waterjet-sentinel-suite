@@ -13,6 +13,213 @@
 
 ## 2. Current Stage / Unreleased
 
+### 2026-11-14 — Stage 0.4C-K4 continuation: Hydrogen Industrial HMI visual polish, full-bleed WinForms Kiosk shell with F10/F12 toggle, and PowerShell 5.1 launcher `-SelfTest` parity (Owner-approved atomic pass; NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
+
+**Status: continuation commit on branch `arena/2e167a8e-waterjet-sentinel-suite` fast-forwarded from PR #46 (`006955867117775c0f4474cb209da49a8b10c306`), continuation PR kept OPEN with a MERGE HOLD.** All three Owner-approved workstreams landed atomically while preserving the exact 13-file `apps/ui/public/` asset manifest, zero-build browser-native architecture, C# contracts, hosting whitelist, and DPI configuration untouched:
+
+- **Workstream C — Launcher `-SelfTest` parity (`tools/launch/Start-WjssOperatorKiosk.ps1`).** Fixed two `-SelfTest` failures discovered on the Owner's Windows PowerShell 5.1 host: updated the presentation file-count diagnostic from `nine` to `13 presentation files` (matching `apps/ui/public/` and `apps/runtime/Program.cs`), and split the `-SelfTest` self-scan needles (`$writeOutNeedle`, `$envReadNeedle`) via concatenation so `$echo` and `$echo2` evaluate to `0` instead of self-matching the scanner's own assertion lines. File remains LF-only, ASCII-only, and statically clean under Windows PowerShell 5.1 (`530 lines`).
+- **Workstream B — Full-bleed WinForms Kiosk shell (`apps/kiosk/MainForm.cs`, `apps/kiosk/test/shell.contract.test.mjs`, `apps/kiosk/README.md`).** Hid `_statusBar` by default (`Visible = false`) so WebView2 occupies the full `1920x1080` viewport edge-to-edge while keeping all four operator status rows, DPI/per-monitor scaling, `app.manifest`, and `KioskDpiConfigurationTests.cs` intact. Wired `F10` and `F12` (toggle-only, with 150ms `Environment.TickCount64` debounce across both WinForms `ProcessCmdKey` and WebView2 `AcceleratorKeyPressed`, leaving `Escape` owned by the web page) to reveal or hide `_statusBar` and the host controls (`Reload`, `Toggle Fullscreen`, `Exit`) on demand. `shell.contract.test.mjs` remains 22/22 PASS with updated visibility/toggle assertions and zero relaxations.
+- **Workstream A — Hydrogen Industrial HMI 1920x1080 polish (`apps/ui/public/`, `apps/ui/test/ui.contract.test.mjs`, `apps/ui/README.md`).** Re-styled all 6 tabs into the dark-slate Hydrogen Industrial HMI palette (`#0d1014` / `#15191f` / `#1c222a`, vivid `#1f6a49` / `#b0382e` / `#3e454f` SDS cells) over a strict 4-band full-bleed `1080px` shell (`48px` topbar + `26px` status strip + `1fr` workspace + `24px` live event ticker) with an out-of-flow fixed `#diag-popover` overlay. Rebuilt Tab 1 into the `2x2` `6fr/4fr` (`1fr/188px`) cockpit featuring a 3-column U-shape Boiler Wall Map (`LEFT` / `REAR + active trajectory hub + FRONT` / `RIGHT` with dynamically derived WJ/IV/WSB2 nozzle strips and per-wall 3-segment cleanliness bars), KPI + 8-step sequence Active Job card, dark-slate Delay Bands + SDS Score `<canvas>`, compact `178px` split Queue/Inspector row, dark-slate Pressure Trend `<canvas>` with ready-band shading and explicit null gap rendering, and a `<canvas>` reticle IP Camera mount container (`NO CAMERA SOURCE - THE READ-ONLY RUNTIME HAS NO IMAGE ROUTE`, zero `<img>`/URLs/requests). Preserved all contract-truth corrections (`WJ3 = WSB2 C/D`, `WJ4 = WSB2 A/B`, `PUMP_STOP_ORDER_RULE`, `DFR_NOT_PUBLISHED_BY_RUNTIME`, zero `tpToRpRatio`, zero mock copy). `apps/ui/test/ui.contract.test.mjs` expanded from 27 to 30 PASS tests (adding Hydrogen shell/grid/fake-DOM assertions).
+- **Verification boundaries:** Node test suites (`apps/ui` 30/30, `apps/kiosk` 22/22, commissioning, `ops-preview`), fake-DOM 6-tab paint harness (`full`, `sparse`, `host-down`), strict LIFO C# delimiter check, PS 5.1 static validation, and `boundary-scan.mjs` S1-S9 (`0 findings`) are green here; `.NET` build/test, Windows PowerShell execution, and live `1920x1080` WebView2 visual verification remain Owner-local gates.
+
+### 2026-11-16 — Stage 0.4C-K4 fixup series: the Operator HMI becomes a command bar over six tabs, the Kiosk header is compacted by metrics only, and the launcher parses under PowerShell 5.1 again (Owner-approved atomic pass; NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
+
+**Status: one commit on branch `arena/c52177ef-waterjet-sentinel-suite`, PR #46 kept OPEN with a MERGE HOLD.** Three
+workstreams were approved as one slice and executed together, because the third of them changes the asset list the host
+serves and the fourth place that list is written is a launcher a shell cannot even parse.
+
+- **Workstream C — the launcher is parseable again.** `tools/launch/Start-WjssOperatorKiosk.ps1` declares
+  `#requires -Version 5.1` and carried two multi-line concatenations whose continuation lines began with a leading `+`,
+  which is a backline form PowerShell 7 accepts and 5.1 does not: `Parser::ParseFile` reported errors, so `-SelfTest`
+  and `-Probe` aborted before their first check — exactly the symptom reported from the Owner's machine. The two
+  expressions are now hoisted into locals (`$refused`, `$stopLine`) with the concatenation operators trailing the
+  lines. The file is 528 lines, LF-only, ASCII, and statically clean under a 5.1 rule set (no leading binary
+  operators, no PS7-only syntax, balanced).
+- **Workstream B — the Kiosk header fits by metrics, not by hiding rows.** `apps/kiosk/MainForm.cs` compaction is
+  padding, gap and font-size only: `BarPadY 8 -> 2`, `RowSlackY 4 -> 1`, `BarGapX 20 -> 12`, the four row fonts
+  `10/9/9.5/9 -> 9/8.5/8.5/8`, buttons `8.5F` with `Padding(10,1,10,1)` and `Margin(8,0,0,0)`, and `Padding.Empty` on
+  the text rows. Measured at 1920x1080 the header budget falls from about 103 px to about 64 px. The 55 px the review
+  note asked for is **not** reachable without hiding a row or dropping below 8 pt, so the deviation is stated in the
+  source comment and in `apps/kiosk/README.md` rather than closed by deleting information. DPI awareness and
+  `app.manifest` were not touched, `shell.contract.test.mjs` still passes 22 of 22 with **zero** relaxations, and the
+  boundary scan still reports `0 findings (S1-S9 clean)`.
+- **Workstream A — the presentation is a Unified Command Bar over six tabs.** `apps/ui/public/` gained
+  `topology.mjs` (the one canonical topology, scaling and stage table), `chartKit.mjs` (gap-safe series drawing, the
+  frame and axis helpers, the dashed setpoint and ready band, the single scalar marker, the label placer),
+  `shellBar.mjs` (tabs, the three summary pills, the mode badge, the alarm count, the feed line, the simulator-gated
+  Diagnostics dropdown) and `tabs.mjs` (cabinet grid, pump card, control availability, master-detail, the square
+  0-280 mm frame, the path-stage table, the host summary, the wall breakdown, the normalised explorer, the active
+  cockpit and the camera container). `index.html`, `global.css` and `app.mjs` were rewritten around them.
+  The pills add to exactly 108 because pill three is the published `uncertain` count **plus** the published
+  `notClassified` count - `Classification` has no `UNCERTAIN` member - and a set that does not add up is marked
+  `TOPOLOGY_COUNT_MISMATCH` instead of being reconciled. The mode badge is assembled only from `KioskHealthPayload` and
+  `RuntimeStatus`; the word `PROTOTYPE` appears nowhere in the shipped set. The camera viewport is a container with a
+  sentence and zero requests. The isolation-valve outlet pressure is drawn as one marker with
+  `NO IV HISTORY CHANNEL PUBLISHED`, because no history channel exists to draw.
+- **The Single Topology Source Rule is now a checked fact.** `ui.contract.test.mjs` parses
+  `packages/domain/WaterJetTopologyCatalog.cs`, `packages/application/Motion/MotionTopologyCatalog.cs` and
+  `packages/domain/CleaningPathContracts.cs` and compares them with `topology.mjs`: the eight Water Jet rows with
+  their valves and empty anchor lists, the `1 or 2 or 3 => UPPER` ruling, the sixteen `Axis(...)` lines behind the
+  roles and brake allocation, the eight cabinet bindings, `NativePerMillimetre`, `Minimum/MaximumMillimetres`,
+  `MaximumNative` and the Safe Return centre. It also fails any module that names `WJ1` itself instead of importing the
+  table, and any file that states a `tpToRpRatio`. The gate grew from 22 to **27 tests**; all five new tests were
+  mutation-proved (changing a wall, a scaling constant, a tab label, the camera sentence and the pill arithmetic each
+  fails exactly one test).
+- **The five places the served-asset list is written are in lockstep:** `apps/runtime/Program.cs` (12 names),
+  `tests/api.tests/OperatorPresentationHostingTests.cs` (12 and 13), `apps/ui/test/ui.contract.test.mjs` (inventory and
+  `MODULES`), `tools/launch/Start-WjssOperatorKiosk.ps1` (`Get-WjssServedAssets`, and the `-SelfTest` surface check now
+  expects 12), and the `apps/ui/README.md` table. A python cross-check of all five lists is equal; the two `.cs` files
+  differ from their parent only in those array literals.
+- **Verification and its limits.** Run here: `node --test apps/ui/test/*.test.mjs` 27/27; kiosk 22/22; commissioning
+  239/239; ops-preview 191; contracts-ts 57/57; process-io 110/110; mapping-config 261 + 7 skipped;
+  `apps/mapping-config` 82/82; boundary-scan 33/33; process-io-evidence 21/21; tc-bench 19/19;
+  `node tools/boundary-scan/boundary-scan.mjs .` -> `0 findings (S1-S9 clean)`; `node --check` on every `.mjs`; plus a
+  throwaway fake-DOM harness that booted `app.mjs` against a contract-shaped frame and painted all six tabs in three
+  payload modes (full, sparse, host-down) with no exception, no missing host element and no non-finite value handed to
+  a canvas - a run that found and fixed two real defects (a per-repaint listener accumulation on two persistent hosts,
+  and a 0..1 phase fraction printed as a per cent). **Not verified here:** any `.NET` compile or test run, any
+  PowerShell execution, and every pixel, font and overlap of the layout - the sandbox has no SDK, no shell and no
+  browser. Owner-local: `dotnet build --locked-mode -warnaserror`, `dotnet test`,
+  `pwsh -NoProfile -File tools/launch/Start-WjssOperatorKiosk.ps1 -SelfTest` and then `-Probe` against a running host,
+  and a screen at 1920x1080.
+
+### 2026-11-16 — Stage 0.4C-K4 review correction: the presentation copy path, a build that cannot miss it, and a contract-shape gate (fixup on PR #46; OPEN with MERGE HOLD; documentation, build file and tests only — NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
+
+**Status: one fixup commit on branch `arena/c52177ef-waterjet-sentinel-suite`, PR #46 kept OPEN with a MERGE
+HOLD.** The Owner's Owner-local run at `a05ccfb324aeb5a042129f0dbde4276bab73fa8b` restored, built and tested green
+(`--locked-mode` restore, `-warnaserror` build, `dotnet test`, and `Start-WjssOperatorKiosk.ps1 -SelfTest`), and the
+Kiosk shell connected to the host (`GET /api/health -> HTTP 200`, `LOCAL HOST: CONNECTED`) — while the screen itself
+stayed on `LOCAL VIEW INTERRUPTED - RECONNECTING`. The built output carried `Inspector/` and **no `Ui/` at all**, and
+the live probe answered `GET / -> 500`, `GET /ui/global.css -> 404`, `GET /ui/app.mjs -> 404`. Cause: the Content item
+written in the previous entry used `..\..\ui\public\**\*.*` from a project file that sits in `apps/runtime`, which is
+two directories below the root, so the glob resolved to a non-existent `<root>/ui/public`, matched **zero** items, and
+MSBuild does not treat an empty glob as an error. Every other part of the slice was correct; nothing reached the
+browser to be wrong.
+
+- **The copy is fixed and the failure mode is closed, not papered over.** `apps/runtime/Wjss.Runtime.csproj` now
+  carries `..\ui\public\**\*.*` with explicit `Link="Ui\%(RecursiveDir)%(Filename)%(Extension)"` and both
+  `CopyToOutputDirectory` and `CopyToPublishDirectory` set to `PreserveNewest`, so build and publish produce the same
+  flat `Ui/` tree. A new `VerifyOperatorUiOutput` target, `AfterTargets="CopyFilesToOutputDirectory"`, fails the
+  build when `Ui\index.html` or `Ui\app.mjs` is not in the output. Its root is resolved from `$(OutDir)` with
+  `$(OutputPath)` as the fallback and an explicit trailing-separator normalisation, because the guard must never be
+  able to fail a correct build. `dotnet build -c Release -warnaserror` can no longer be green without the UI.
+- **Two facts replaced one that could not see the defect.** The previous revision pinned the Content item by its exact
+  source text, which faithfully repeated the author's mistake. `tests/api.tests/OperatorPresentationHostingTests.cs`
+  now (a) parses the include, strips the glob, resolves it against `apps/runtime/` and requires `Directory.Exists`
+  plus `File.Exists` for the document and every allow-listed name, refusing a two-level walk explicitly, and (b)
+  asserts that when a host build output exists, its `Ui/` directory carries exactly the nine shipped files,
+  non-empty and byte-identical to `apps/ui/public/` — the file-system fact the Owner had to inspect by hand. A
+  checkout with no build output is not claimed either way; the header of the file says so.
+- **The real HTTP answers have a harness.** Reaching a live listener from a test needs `Microsoft.AspNetCore.
+  Mvc.Testing`, which is not in the centrally pinned set, and adding it would break the `--locked-mode` restore that is
+  the Owner's clean-environment condition — so the answers the Owner probed manually are now asserted by
+  `tools/launch/Start-WjssOperatorKiosk.ps1 -Probe`: 200 with `text/html` and the boot module element for the
+  document; 200 with the right content type and non-empty body for each of the eight allow-listed names; 404 for an
+  unknown name, for a differently-cased name, for a nested name and for two encoded traversals; 200 with
+  `status == "ALIVE"` for the shell liveness route. A normal launch runs the same probe on the host it started, and it
+  refuses to start one whose output has no `Ui\index.html` (the runner's copy of the build-time refusal). The
+  launcher's `-SelfTest` also checks the copy source and the build output, so it stays meaningful without a host.
+- **Pre-flight browser audit found one real defect and fixed it.** Every property chain the modules read was resolved
+  against the property graph of the `.NET` records that publish it (7020 chains, `ContractJson.Options` camelCase):
+  the Active Job panel's Safe Return row read `safeReturn.state` and `safeReturn.Phase`, and `SafeReturnState`
+  publishes neither — so that row would have printed its fallback text forever, silently. It now reads the published
+  `step`, `trigger`, `pendingOutcome`, `startedAt`, `valve` (`valveId`, `command`, `feedback`, `resolution`), `axis`
+  (`command`, `standby`) and `failure` (`reason`, `at`), with an absent leg named as absent rather than as idle. The
+  audit itself is now a gate: `apps/ui/test/ui.contract.test.mjs` grew from 18 to 22 tests, adding exact-case
+  served-name resolution for every import, the element-id existence rule (a null lookup during the first paint is a
+  thrown boot, not a blank panel), the contract property-chain resolution, and the Safe Return field pins. Every one
+  of those four was checked by mutation: breaking the file breaks the gate.
+- **`apps/ui/README.md`** now states the corrected item, why one level up is the only correct depth, what the
+  fail-fast target guarantees, and where the live answers are asserted.
+
+**Validation re-run here: `node tools/boundary-scan/boundary-scan.mjs .` => `0 findings (S1-S9 clean)`; `apps/ui`
+22/22; `packages/commissioning` 239/239; `apps/kiosk` 22/22; `apps/ops-preview` 191/191; contracts-ts 57/57;
+process-io 110/110; mapping-config 261 passed with the 7 recorded skips; `apps/mapping-config` 82/82;
+tools/process-io-evidence 21/21; tools/tc-bench 19/19; boundary-scan's own suite 33/33 — 0 failures repo-wide.
+NOT run here, as before: `.NET` restore/build/test (no SDK in the Agent sandbox), the launcher, and any browser
+render. Expected Owner-local result: the same `0 warnings / 0 errors` build, now additionally gated by
+`VerifyOperatorUiOutput`. `tests/api.tests/OperatorPresentationHostingTests.cs` carries **11** `[Fact]` members
+where the previous revision carried 8 (the exact-text assertion replaced by two, and two further facts added), so the
+total moves by three: **1920** tests, `failed: 0`. That figure is arithmetic on the diff, not a run: the Agent sandbox
+has no `.NET` SDK, and this repository counts theories by their expanded cases, so the number above is a claim to be
+checked by the Owner's `dotnet test -c Release`, not evidence of one.
+
+### 2026-11-15 — Stage 0.4C-K4 Operator presentation and its hosting slice (PR #46, OPEN with MERGE HOLD; software and documentation only; NO HARDWARE, NO DEVICE WRITE, PRODUCTION NOT AUTHORIZED)
+
+**Status: one consolidated commit on branch `arena/c52177ef-waterjet-sentinel-suite` from the approved base
+`main` `a07c3aa10a857c4404c8cb84fead7f7e0ce643c4`, opened as PR #46 and kept OPEN with a MERGE HOLD. The
+shape shipped here is the Owner-approved PR #46 blueprint: Part A (hosting), Part B (the presentation) and
+Part C (documentation) as inspected, plus the line-count-neutral S3 comment cleanup of blueprint section 4.
+Decision 1 is carried as ruling 1a, presentation only over the existing contracts; Decision 2 as
+`apps/ui/public/**` with the System Font Stack. Nothing in this entry is a hardware, commissioning or
+Production claim, and no snapshot, delta or acquisition contract was widened to make a screen work.**
+
+- **Part A - the host serves its own screen.** `packages/contracts/ApiRoutes.cs` gains three read-only
+  identities (`/`, `/ui/{file}`, `/api/health`); `apps/runtime/Program.cs` registers each with `app.MapGet`
+  after the existing registrations, and the asset handler matches the route value against a frozen
+  `HashSet<string>(StringComparer.Ordinal)` of the eight shipped module and stylesheet names **before** any
+  path is composed, so a nested or traversed name is the same 404 as an unknown one and no wildcard, no
+  fallback and no static-file middleware exists to serve more than that set. The handler parameter is named
+  `file` to bind the `{file}` token. `apps/runtime/Wjss.Runtime.csproj` copies `..\..\ui\public\**\*.*` to
+  `Ui/` in the output beside the existing `Inspector\index.html` item, so the presentation reaches the
+  browser with no build pipeline, no package manager and no new `PackageReference` - `packages.lock.json`
+  is untouched and a locked restore stays honest. `GET /api/health` answers `KioskHealthPayload` (liveness,
+  the host's own redacted acquisition label, readiness as a fact beside it, the current revision) with 200
+  independently of readiness, because the Kiosk shell reloads the approved route as soon as the host answers
+  and the readiness verdict stays owned by `/health/ready`.
+- **Part B - the presentation.** `apps/ui/` ships ten files: nine under `public/` (the document, one stylesheet, seven
+  ES modules) plus the gate at `test/ui.contract.test.mjs`. `app.mjs` boots and owns the lifecycle, `feed.mjs`
+  is the only network surface, `wallMap.mjs` carries the authoritative 108-cell U-shape and a `buildModel` that
+  refuses anything else, `sensorDetail.mjs` draws a canvas trend in which a `null` sample is a gap and never a
+  line to zero, and `thermal.mjs`, `dispatchPanel.mjs` and `opsPanel.mjs` complete the screen. The gate pins
+  inventory, module-graph reachability, geometry, cadence and the contract field names each panel reads, so a
+  renamed contract field fails a test instead of blanking a panel. Every import is relative, so
+  the same graph resolves from `/ui/…` in the browser and from disk under `node --test`; the document carries
+  one `<script type="module">` and no inline style, `global.css` carries no `url()`, `@import` or `@font-face`,
+  and the inline SVGs carry no `xmlns` - a namespace URL would be an address in the product tree for no
+  benefit, which is also why the fonts are the system stack. Poll cadence is `POLL_INTERVAL_MS = 1000` with
+  `MAX_DELTA_ROWS = 60`, `OFFLINE_AFTER_FAILURES = 3`, `HEALTH_EVERY_TICKS = 10` and `cache: 'no-store'`; a
+  `PreviousRevision` mismatch is a gap, the buffer is discarded and a full Snapshot is refetched, and no
+  merge of a delta into a view happens anywhere - the host publishes metadata-only delta rows.
+- **Decision 1a held visibly.** No decoded Front/Rear temperature exists in any contract the Runtime
+  publishes, so the thermal block states `DFR_NOT_PUBLISHED_BY_RUNTIME` where the pair would be shown and
+  lists the acquisition facts that do exist. Zero `.NET` snapshot, `TcAcquisition` or fixture change was made
+  to keep a screen busy, and the UI does not present an unavailability as a sensor gap or as a zero.
+- **Section 4 of the blueprint: eight comment lines.** `apps/runtime/PumpCommandDryTrial.cs` (three),
+  `packages/application/Motion/Manual/ManualMotionSimulatedPort.cs`, `packages/application/ProcessIo/ProcessIoMainValveGate.cs`,
+  `packages/contracts/ProcessIoMainValve.cs`, `tests/runtime.tests/ProcessIo/ProcessIoPumpLifecycleTests.cs` and
+  one comment line of `tools/hardware-runbook/wjss-field-driver.ps1` were reworded so the S3 transport-vocabulary
+  scan reports the pre-existing findings as clean: vendor and protocol names replaced by the neutral wording the
+  sentence already meant (`real field T8 rack`, `the field-transport round trip`, `the raw`, `address mapping`,
+  `transport address spaces`, `limit switch at each end of travel`). Comment-only, one line each, no line count
+  changed in any of the six files, no `-Expect` key, no self-check string and no `s3Exception.mjs` entry touched
+  or widened; no test asserts any reworded sentence.
+- **Part C - documentation.** This entry, and a dated `Stage 0.4C-K3` blockquote inserted above the first
+  superseded record of `docs/CURRENT_STATE.md` so the current-facing head carries the Owner evidence
+  disclosure (archive reported as located through an unapproved connected-storage metadata query, content not
+  retrieved, not accepted as evidence, Owner authorization required before any future access) together with the
+  WITHDRAWN candidate, the DERIVATION_BLOCKED derivation and the RECORD_TO_RECORD_CONSISTENCY_ONLY
+  classification. Purely additive: 25 lines inserted, 0 deleted, and no dated record below reworded.
+- **Validation actually run in the Arena sandbox.** `node --test` per workspace: `apps/ui` 18/18, `packages/commissioning`
+  **239/239** (the K3 head-slice assertion this entry satisfies is now green for the first time), `apps/kiosk` 22/22,
+  `apps/ops-preview` 191/191, contracts-ts 57/57, process-io 110/110, mapping-config 261 passed with the 7 recorded
+  skips and 0 failed; `node tools/boundary-scan/boundary-scan.mjs .` reports **0 findings (S1-S9 clean)** over the
+  whole repository including the ten new files. `apps/kiosk/**` and `apps/ops-preview/**` show **zero diffs**.
+- **NOT verified here, and why.** There is no .NET SDK, no PowerShell and no `node_modules` in the Agent
+  environment, so `.NET` restore, build and test were NOT run and the eight new
+  `tests/api.tests/OperatorPresentationHostingTests.cs` facts have never executed; the expected Owner-local result
+  is the predecessor count plus those facts (**1909 + 8 = 1917**, `failed: 0`). `tools/launch/Start-WjssOperatorKiosk.ps1`
+  is written to the documented conventions and carries its own `-SelfTest` over the pure helpers, but it was NOT
+  executed: no launcher, driver, host or shell was started in this session. The HTTP answers of the new routes (200
+  on the document and its allow-listed assets, 404 on an unknown or nested name) are pinned from the source shape
+  and the whitelist-parity fact, exactly as this test project already documents for host endpoint behaviour: they are
+  exercised Owner-local against the built host, not here. The screen itself has not been rendered in a browser or on
+  a kiosk display.
+
+**Boundaries unchanged by this entry: SIMULATOR and the physical read-only acquisition mode only; NO device write,
+NO actuation, NO command route, NO TEST_HARDWARE, NO PRODUCTION, NO hardware or field verification, NO commissioning
+claim. `docs/**` history stays append-only and PR #46 is OPEN - DO NOT MERGE.**
+
 ### 2026-11-14 — Owner bench verification of `ea6d5fb6` (paired-IV supervision on limit switches PASSED): Gate `D-sim` CLOSED (documentation only; no code, test, script, profile or hardware command changed)
 
 **Status: DOCUMENTATION-ONLY COMMIT on branch `arena/b179a92e-waterjet-sentinel-suite` (PR #45 remains

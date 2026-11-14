@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WaterJet Sentinel Suite - Operator Console</title>
+  <link rel="stylesheet" href="/ui/global.css">
+</head>
+<body data-app-state="booting" data-density="comfortable" data-tab="main">
+  <noscript>
+    <div class="banner banner-fault">
+      JavaScript is required to poll the local read-only Runtime endpoints. Nothing is rendered
+      without it, because a static page would present stale values as live.
+    </div>
+  </noscript>
+
+  <div class="app-shell">
+    <!-- 1. TOP UNIFIED COMMAND & NAVIGATION BAR (48px) -->
+    <header class="topbar" aria-label="Unified command bar">
+      <div class="brand-group">
+        <div class="brand-mark">
+          <div class="brand-icon" aria-hidden="true">WJ</div>
+          <div class="brand-title">
+            <h1>WaterJet Sentinel Suite</h1>
+            <span>READ-ONLY OPERATOR CONSOLE</span>
+          </div>
+        </div>
+        <div class="tally-group" id="summary-pills" aria-label="Boiler wall cleanliness summary">
+          <span class="tally-pill clean num">CLEANER: -</span>
+          <span class="tally-pill dirty num">DIRTY: -</span>
+          <span class="tally-pill unc num">UNC: -</span>
+        </div>
+      </div>
+
+      <nav class="nav-tabs" id="tab-nav" role="tablist" aria-label="Operator tabs"></nav>
+
+      <div class="right-controls">
+        <span class="proto-pill" id="mode-badge" data-tone="warn">HOST NOT READ YET</span>
+        <div class="clock-box num" id="server-clock">--:--:-- UTC</div>
+        <div class="diag-anchor" id="diag-root" data-open="false" data-allowed="false">
+          <button type="button" class="diag-btn" id="diag-badge" aria-expanded="false" aria-controls="diag-popover">
+            Diagnostics v
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- FIXED DIAGNOSTICS POPOVER OVERLAY (zero vertical layout footprint) -->
+    <aside class="diag-popover" id="diag-popover" aria-label="Diagnostics and host boundary">
+      <div class="diag-pop-head">
+        <h4>Diagnostics &amp; Runtime Boundary</h4>
+        <button type="button" class="btn-sm" id="diag-close" aria-label="Close diagnostics">X</button>
+      </div>
+      <p class="diag-boundary">READ-ONLY OBSERVATION - NO DEVICE WRITE - NO COMMAND SURFACE</p>
+      <p class="diag-sub">No command route exists on this host, and no control affordance exists on this screen.</p>
+
+      <div class="diag-chips" id="chips" aria-label="Host facts">
+        <div class="diag-item" id="chip-profile"><span>Profile</span><b>NOT_READ</b></div>
+        <div class="diag-item" id="chip-acquisition"><span>Acquisition</span><b>NOT_READ</b></div>
+        <div class="diag-item" id="chip-readiness"><span>Readiness</span><b>NOT_READ</b></div>
+        <div class="diag-item" id="chip-revision"><span>Revision</span><b>NOT_READ</b></div>
+        <div class="diag-item diag-item-wide" id="chip-connection"><span>Connection</span><b>BOOTING</b></div>
+      </div>
+
+      <div class="diag-density-row">
+        <span class="diag-row-label">Wall Map Density</span>
+        <div class="toggle-group" role="group" aria-label="Cell density">
+          <button type="button" class="toggle-btn" data-density-set="comfortable" aria-pressed="true">Comfortable</button>
+          <button type="button" class="toggle-btn" data-density-set="compact" aria-pressed="false">Compact</button>
+        </div>
+      </div>
+
+      <div class="diag-telemetry">
+        <span id="live-state" data-tone="warn">BOOTING - first frame</span>
+        <span id="rev-state" data-tone="mute">rev: -</span>
+        <span id="host-state" data-tone="mute">host: NOT_READ</span>
+        <span id="mode-note" data-tone="mute"></span>
+        <span id="pills-note" data-tone="mute"></span>
+        <span id="state-line">app state: booting</span>
+        <span id="mode-line">tab: main</span>
+        <span id="host-line">host: same origin</span>
+      </div>
+
+      <div class="diag-helpers-section">
+        <p class="diag-note" id="diag-note">DIAGNOSTICS - waiting for host profile</p>
+        <div class="diag-menu" id="diag-menu" role="region" aria-label="Presentation diagnostics"></div>
+      </div>
+    </aside>
+
+    <!-- 2. SLIM ACTIVE STATUS & ALARM STRIP (26px) -->
+    <div class="status-strip" aria-label="Active status and alarm strip">
+      <div class="status-strip-left">
+        <button type="button" class="alarm-banner-btn" id="alarm-jump" data-tone="mute">
+          <span class="alarm-pill-count num" id="alarm-count" data-tone="mute">0</span>
+          <span id="alarm-text">waiting for Runtime alarm summary</span>
+        </button>
+      </div>
+      <div class="status-summary num" id="status-strip-right">
+        Waiting for first authoritative Snapshot | Safe Return Centre (125, 125)
+      </div>
+    </div>
+
+    <!-- FAULT / STALE BANNERS (zero footprint when hidden) -->
+    <div class="banner banner-stale" id="banner-stale" role="status" hidden></div>
+    <div class="banner banner-fault" id="banner-fault" role="alert" hidden></div>
+    <div class="banner banner-fault" id="boot-error" role="alert" hidden>
+      <strong>Presentation initialization failed:</strong>
+      <span id="boot-error-detail"></span>
+    </div>
+
+    <!-- 3. MAIN WORKSPACE (100% viewport fit across all 6 tabs) -->
+    <main class="main-workspace" id="main">
+      <!-- ==================== TAB 1: MAIN CONTROL ==================== -->
+      <section class="tab-panel" data-tab-panel="main" data-active="true" aria-label="Main Control">
+        <div class="main-control-grid">
+          <!-- TOP-LEFT (60%): U-SHAPE BOILER WALL MAP -->
+          <div class="panel-card wallmap-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>U-Shape Boiler Wall Map - 108 SDS &amp; 8 Water Jets</div>
+              <div class="card-head-hint">Click any SDS cell to inspect | Cyan Ring = Selected | White Border = Active Target</div>
+            </div>
+            <div class="boiler-map-body" id="wallmap"></div>
+          </div>
+
+          <!-- TOP-RIGHT (40%): COMPACT HIGH-DENSITY OPERATIONS COCKPIT -->
+          <div class="cockpit-stack">
+            <!-- Card 1: Active Cleaning Job & Process Readouts -->
+            <div class="panel-card cockpit-job-card">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Active Cleaning Job &amp; Process Readouts</div>
+                <span class="badge-read-only">READ-ONLY</span>
+              </div>
+              <div class="job-card-body" id="active-cockpit"></div>
+            </div>
+
+            <!-- Card 2: Boiler Condition Delay Bands & Selected SDS Score -->
+            <div class="panel-card trend-card">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Boiler Condition Delay Bands &amp; SDS Score</div>
+                <span class="badge-inspecting" id="delay-bands-badge">WAITING</span>
+              </div>
+              <div class="chart-container">
+                <canvas id="delay-bands" width="680" height="190" role="img" aria-label="Boiler condition delay bands and selected SDS score"></canvas>
+              </div>
+              <p class="chart-caption num" id="delay-bands-caption"></p>
+            </div>
+
+            <!-- Card 3: Compact Split Queue & Selected SDS Inspector (178px) -->
+            <div class="split-card">
+              <div class="split-pane">
+                <div class="card-header">
+                  <div class="card-title" id="mini-queue-title">Cleaning Queue</div>
+                  <button type="button" class="btn-sm" id="btn-goto-queue">Manage</button>
+                </div>
+                <div class="mini-table-wrap" id="queue-compact"></div>
+              </div>
+              <div class="split-pane">
+                <div class="card-header">
+                  <div class="card-title">Selected: <span class="accent-cyan" id="insp-id">-</span></div>
+                  <span class="card-head-meta">Inspector</span>
+                </div>
+                <div class="inspector-body num" id="selected-card"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM-LEFT (60%, 188px): PUMP OUTLET & ACTIVE VALVE PRESSURE TREND -->
+          <div class="panel-card pressure-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>Pump Outlet Pressure &amp; Active Valve Window</div>
+              <div class="trend-legend num" id="trend-legend">Waiting for pressure window</div>
+            </div>
+            <div class="chart-container">
+              <canvas id="trend-canvas" width="960" height="122" role="img" aria-label="Pump outlet pressure and setpoint trend window"></canvas>
+            </div>
+            <div class="chart-footer num">
+              <span id="trend-caption"></span>
+              <span id="trend-note"></span>
+            </div>
+          </div>
+
+          <!-- BOTTOM-RIGHT (40%, 188px): IP CAMERA MOUNT CONTAINER -->
+          <div class="panel-card camera-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>IP Camera - Nozzle Mount Container</div>
+              <span class="cam-sim-tag">NO IMAGE ROUTE</span>
+            </div>
+            <div class="cam-body" id="camera-panel"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: CLEANING QUEUE ==================== -->
+      <section class="tab-panel" data-tab-panel="queue" data-active="false" aria-label="Cleaning Queue">
+        <div class="subtab-grid-2 subtab-queue">
+          <div class="panel-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>Global Cleaning Queue &amp; Frozen Countdown Lane</div>
+              <span class="card-head-meta">Read-Only Runtime Projection</span>
+            </div>
+            <div class="scroll-body" id="queue-board"></div>
+          </div>
+          <div class="subcol-stack">
+            <div class="panel-card flex-main">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Dispatch Workspace, Timeline &amp; TimeDelay Preview</div>
+                <span class="card-head-meta">Atomic Revision Document</span>
+              </div>
+              <div class="scroll-body" id="dispatch-root"></div>
+            </div>
+            <div class="panel-card flex-sub">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Last Completed Cleaning Cycle Outcome</div>
+                <span class="card-head-meta">Verified Safe Return (125, 125)</span>
+              </div>
+              <div class="scroll-body" id="outcome-host"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: WJ & PUMP ==================== -->
+      <section class="tab-panel" data-tab-panel="wj" data-active="false" aria-label="WJ and Pump">
+        <div class="subtab-stack">
+          <div class="panel-card shrink-0">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>High-Pressure WaterJet Pump Station &amp; Main Header Interlock</div>
+              <span class="interlock-pill">INTERLOCK: DO-007 (Run) OFF before DO-003 (Enable) OFF</span>
+            </div>
+            <div class="pump-strip-body" id="pump-card"></div>
+          </div>
+
+          <div class="wsb-panel-wrap" id="wsb-grid"></div>
+
+          <div class="panel-card shrink-0">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>Sequence Control Availability &amp; Commissioning Lock</div>
+              <span class="card-head-meta">Display-Only Contract Readout</span>
+            </div>
+            <div class="maint-strip-body" id="manual-lock"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 4: SENSOR & PATH ==================== -->
+      <section class="tab-panel" data-tab-panel="sensor" data-active="false" aria-label="Sensor and Path">
+        <div class="subtab-grid-2 subtab-sensor">
+          <div class="panel-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>108-SDS Matrix Directory &amp; Thermal State</div>
+              <div class="filter-strip" id="sds-filters"></div>
+            </div>
+            <div class="scroll-body" id="sds-master"></div>
+          </div>
+
+          <div class="subcol-stack">
+            <div class="subtab-grid-2 subtab-sensor-top flex-main">
+              <div class="panel-card">
+                <div class="card-header">
+                  <div class="card-title"><span class="dot"></span>Selected SDS Detail &amp; Thermal Evidence</div>
+                  <span class="card-head-meta">216 Assigned TC</span>
+                </div>
+                <div class="scroll-body">
+                  <div id="sensor-detail"></div>
+                  <div class="dfr-box" id="dfr-statement"></div>
+                  <div id="thermal-facts"></div>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="card-header">
+                  <div class="card-title"><span class="dot"></span>2D Workspace Frame (0..280 mm, 1:1)</div>
+                  <span class="card-head-meta">Centre (125, 125)</span>
+                </div>
+                <div class="ws-canvas-wrap">
+                  <canvas id="ws-canvas" width="260" height="240" role="img" aria-label="Square 280 by 280 millimetre workspace with Safe Return Centre"></canvas>
+                  <p class="chart-caption num" id="ws-caption"></p>
+                </div>
+              </div>
+            </div>
+            <div class="panel-card flex-sub">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Cleaning Path P1..P6 Stages &amp; Contract Scaling</div>
+                <span class="card-head-meta">1 mm = 10,000 native</span>
+              </div>
+              <div class="scroll-body" id="path-table"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 5: ALARMS ==================== -->
+      <section class="tab-panel" data-tab-panel="alarms" data-active="false" aria-label="Alarms">
+        <div class="subtab-stack">
+          <div class="alarm-kpi-strip" id="ack-host"></div>
+
+          <div class="panel-card flex-1">
+            <div class="card-header">
+              <div class="card-title-group">
+                <div class="card-title"><span class="dot"></span>Plant Alarm &amp; Interlock Event Log</div>
+                <div class="filter-strip" id="alarm-filter"></div>
+              </div>
+              <button type="button" class="btn-sm danger" id="btn-preview-modal">Preview Critical Modal</button>
+            </div>
+            <div class="scroll-body" id="alarms-root"></div>
+          </div>
+
+          <div class="panel-card critical-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>Latched Critical Event &amp; Equipment Faults</div>
+              <span class="card-head-meta">Runtime Latch State</span>
+            </div>
+            <div class="scroll-body" id="critical-host"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 6: SYSTEM & TRENDS ==================== -->
+      <section class="tab-panel" data-tab-panel="system" data-active="false" aria-label="System and Trends">
+        <div class="subtab-stack">
+          <div class="panel-card trend-explorer-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot"></span>Multi-Channel Historical Trend Explorer</div>
+              <div class="channel-bar" id="channel-list"></div>
+            </div>
+            <div class="chart-container">
+              <canvas id="explorer-canvas" width="1280" height="220" role="img" aria-label="Multi-channel published trend window"></canvas>
+            </div>
+            <div class="chart-footer num">
+              <span id="explorer-caption"></span>
+              <span id="explorer-note"></span>
+            </div>
+          </div>
+
+          <div class="system-bottom-grid">
+            <div class="panel-card">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Field Acquisition &amp; Controller Health</div>
+                <span class="card-head-meta">Runtime Self-Report</span>
+              </div>
+              <div class="scroll-body" id="system-host"></div>
+            </div>
+
+            <div class="panel-card">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Wall Cleanliness Distribution (108 SDS)</div>
+                <span class="card-head-meta">Exact Sum Check</span>
+              </div>
+              <div class="scroll-body">
+                <div id="wall-breakdown"></div>
+                <div id="ops-root"></div>
+              </div>
+            </div>
+
+            <div class="panel-card">
+              <div class="card-header">
+                <div class="card-title"><span class="dot"></span>Bounded Delta Feed (Max 60 Rows)</div>
+                <span class="card-head-meta">Gap-Safe Revision Chain</span>
+              </div>
+              <div class="scroll-body">
+                <table class="data-table num">
+                  <thead>
+                    <tr>
+                      <th scope="col">Rev</th>
+                      <th scope="col">Prev</th>
+                      <th scope="col">Time</th>
+                      <th scope="col">SDS</th>
+                      <th scope="col">Sections</th>
+                      <th scope="col">Chain</th>
+                    </tr>
+                  </thead>
+                  <tbody id="feed-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 4. BOTTOM LIVE OPERATION EVENT TICKER (24px) -->
+    <footer class="event-ticker num" aria-label="Live operation event ticker">
+      <div class="ticker-left">
+        <span class="ticker-tag">LIVE EVENT</span>
+        <span class="ticker-msg" id="ticker-msg">Waiting for first authoritative Snapshot from local read-only Runtime...</span>
+      </div>
+      <div class="ticker-right" id="ticker-meta">READ-ONLY | 108 SDS | SAFE RETURN (125, 125)</div>
+    </footer>
+  </div>
+
+  <!-- CRITICAL ALARM / MAIN PUMP TRIP MODAL -->
+  <div class="modal-backdrop" id="alarm-modal" role="alertdialog" aria-modal="true" aria-labelledby="alarm-modal-title" aria-live="assertive" hidden>
+    <div class="trip-modal">
+      <h3 id="alarm-modal-title">CRITICAL ALARM / INTERLOCK EVENT</h3>
+      <p id="alarm-modal-body"></p>
+      <p class="trip-modal-note">
+        Dismissing this dialog hides the overlay on this screen only. It acknowledges no device and
+        clears no Runtime latch.
+      </p>
+      <div class="trip-modal-actions">
+        <button type="button" class="btn-sm danger" id="alarm-modal-close">Dismiss Screen Overlay</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/ui/app.mjs"></script>
+</body>
+</html>

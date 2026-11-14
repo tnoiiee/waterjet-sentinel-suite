@@ -1,5 +1,58 @@
 # Current State — WaterJet Sentinel Suite (WJSS)
 
+> **Stage 0.4C-K4 continuation — Hydrogen Industrial HMI visual polish, full-bleed Kiosk toggle & launcher `-SelfTest` fix (2026-11-14; continuation of PR #46 `00695586` on branch `arena/2e167a8e-waterjet-sentinel-suite`; no contract member, no route, no fixture, no driver, no DPI file changed; NO HARDWARE EXECUTED; NO DEVICE WRITE; PRODUCTION NOT AUTHORIZED).** Executed all three Owner-approved workstreams atomically:
+> (1) **Workstream C (`tools/launch/Start-WjssOperatorKiosk.ps1`)**: updated the presentation count diagnostic (`nine` -> `13 presentation files`) and split the `-SelfTest` self-scan needles (`$writeOutNeedle`, `$envReadNeedle`) so `$echo=0` and `$echo2=0` pass cleanly on Windows PowerShell 5.1;
+> (2) **Workstream B (`apps/kiosk/MainForm.cs`, `shell.contract.test.mjs`, `apps/kiosk/README.md`)**: defaulted `_statusBar.Visible = false` for a full-bleed `1920x1080` WebView2 canvas while wiring debounced `F10`/`F12` toggle-only access across both WinForms `ProcessCmdKey` and WebView2 `AcceleratorKeyPressed` (22/22 shell contract tests PASS; `Escape` stays with the web page; DPI files untouched);
+> (3) **Workstream A (`apps/ui/public/`, `ui.contract.test.mjs`, `apps/ui/README.md`)**: delivered the Hydrogen Industrial HMI dark-slate theme over the exact 13-file zero-build manifest — 4-band full-bleed `1080px` shell (`48px` topbar / `26px` status strip / `1fr` workspace / `24px` live event ticker) with fixed `#diag-popover`, Tab 1 `2x2` `6fr/4fr` (`1fr/188px`) cockpit with 3-column U-shape Boiler Wall Map (`LEFT` / `REAR+Hub+FRONT` / `RIGHT`), dynamically derived WJ/IV/WSB2 strips (`WJ3 = WSB2 C/D`, `WJ4 = WSB2 A/B`), KPI+8-step Active Job card, dark-slate Delay Bands + Pressure Trend + IP Camera Reticle `<canvas>` surfaces, and honest `NOT_PUBLISHED_BY_RUNTIME` / `NO CAMERA SOURCE` disclosures (30/30 UI contract tests PASS).
+> Node test suites, fake-DOM 6-tab paint harness, strict LIFO C# delimiter check, PS 5.1 static scan, and `boundary-scan.mjs` S1-S9 (`0 findings`) are green in this sandbox; `.NET` build/test, Windows PowerShell execution, and live `1920x1080` WebView2 inspection remain Owner-local gates.
+
+> **Stage 0.4C-K4 fixup series (2026-11-16; the Operator presentation, the Kiosk header metrics and the launcher's
+> parse only: no contract member, no route, no fixture, no driver change; NO HARDWARE EXECUTED; NO DEVICE WRITE;
+> PRODUCTION NOT AUTHORIZED).** Three approved workstreams landed as one atomic pass. The launcher no longer aborts
+> before its first check: two concatenations whose continuation lines led with `+` were PowerShell 7 syntax in a file
+> that declares `#requires -Version 5.1`, which is why `-SelfTest` and `-Probe` died at parse time on the Owner's
+> machine; they are hoisted into locals and the file parses statically clean. The Kiosk header was compacted by
+> metrics alone - padding, gaps and four font sizes - from about 103 px to about 64 px at 1920x1080, with the 55 px
+> target recorded as unreachable without hiding a row or going below 8 pt, so nothing was deleted to make a number.
+> The presentation became one Unified Command Bar over six tabs (Main Control, Cleaning Queue, WJ and Pump, Sensor and
+> Path, Alarms, System and Trends) with the summary pills, the mode badge, the alarm count and a simulator-gated
+> Diagnostics dropdown in the bar and no outer scrollbar. One canonical module now owns the topology, the cabinet and
+> valve table, the stage order and the millimetre scaling, and the UI gate parses the two `.NET` catalogs and
+> `CleaningPathContracts.cs` to prove it: 22 tests became 27, each new one mutation-proved. What the read-only host
+> does not publish stays unpublished on the screen - the camera viewport is a container with a sentence and zero
+> requests, the valve outlet pressure is one marker with `NO IV HISTORY CHANNEL PUBLISHED`, coal flow and a
+> completed-cycle archive are named absent, and no `tpToRpRatio` is printed anywhere. Node gates and a fake-DOM paint
+> run are green here; no `.NET` compile, no PowerShell execution and no browser layout is verified in this sandbox,
+> so those three remain Owner-local.
+>
+> **Stage 0.4C-K4 presentation-surface correction (2026-11-16; documentation, build file, UI presentation and tests
+> only: no contract member, no fixture, no runtime route, no driver change; NO HARDWARE EXECUTED; NO DEVICE WRITE;
+> PRODUCTION NOT AUTHORIZED).** The K4 slice — the Operator presentation served by the Runtime host itself, on PR #46
+> — reached the Owner's build with a copy path one directory too deep. `apps/runtime/` sits two directories below the
+> repository root, so the presentation item's `..\..\ui\public\**\*.*` glob matched nothing; MSBuild does not treat an
+> empty glob as an error, so the build stayed green while the host output had no `Ui/` to read. The observed answers are
+> exactly what that shape predicts: the liveness route 200, the document 500, every asset 404, and a Kiosk shell
+> reporting `LOCAL HOST: CONNECTED` beside a screen saying `LOCAL VIEW INTERRUPTED - RECONNECTING`. The correction is
+> the one-level glob with an explicit `Link="Ui\%(RecursiveDir)%(Filename)%(Extension)"` and
+> `CopyToPublishDirectory="PreserveNewest"`, plus a `VerifyOperatorUiOutput` target that fails the build when
+> `Ui\index.html` or `Ui\app.mjs` is missing from the output the host actually reads — so a silent miss of this kind is
+> closed for every route, not only for the one that was noticed. Eleven hosting facts now assert the resolved path and
+> byte-for-byte output parity instead of the literal source text; the launcher gained a live probe (`-Probe`) because a
+> test project cannot reach a listener without a test-only package that the pinned dependency set forbids; and the UI
+> gate resolves every property chain the modules read against the property graph of the `.NET` records that publish it,
+> which found one real defect in the new surface: the Active Job panel's Safe Return row read `state` and `Phase`, names
+> that no contract publishes, so it would have printed a fallback forever instead of failing. It now reads the
+> published `step`, `trigger`, `pendingOutcome`, `startedAt`, the `valve` and `axis` legs and the `failure` reason, and
+> says plainly when a leg has not been published rather than calling it idle.
+>
+> **Status of the slice is unchanged by this correction:** presentation, build file, launcher and tests only; the
+> kiosk launcher and `apps/ops-preview/**` byte-identical to the K1 baseline; no `PackageReference` and
+> `packages.lock.json` untouched; Decision 1a and every fence above unchanged; PR #46 held open with a merge hold. Node
+> gates are green here (`apps/ui` 22/22, commissioning 239/239, boundary scan S1-S9 clean). The `.NET` build and test,
+> the launcher and the rendered screen are NOT verified in this environment and stay an Owner-local gate: the operator
+> screen has still been seen by no one, in any browser, on any machine.
+
+
 > **Owner topology ruling — logical-row tier split corrected to rows 1–3 UPPER / rows 4–6 LOWER
 > (2026-11-11; software and generated data only; NO HARDWARE EXECUTED; PRODUCTION NOT
 > AUTHORIZED).** The split carried by `WaterJetTopologyCatalog.RegionForLogicalRow`, its TS mirror
@@ -407,6 +460,31 @@
 > position, without deleting that dated record. **Validation position: .NET restore/build/test NOT
 > RUN in the Agent environment (no .NET SDK) — the Owner-local exact-head gate is the validation of
 > record; no native load, Controller contact or Hardware use occurred for Phase 1A.**
+
+> **Stage 0.4C-K3 evidence disclosure carried into the current-facing head (2026-11-15;
+> documentation only: no source, contract, test, script, profile or hardware change).** The K3
+> checkpoint records its Owner evidence outcome in [STAGE_0.4C-K3_CHECKPOINT.md](STAGE_0.4C-K3_CHECKPOINT.md)
+> and in [TC_EVIDENCE_SOURCE_REGISTER.md](TC_EVIDENCE_SOURCE_REGISTER.md) section 14, but the
+> current-facing head of this document did not carry that disclosure, so a reader of the head alone
+> could miss the one thing K3 settled: the archive that was reported as found is NOT evidence. This
+> block adds the dated disclosure to the head, verbatim, without deleting or rewording any dated
+> record above or below it, and it changes no status: it is the same record, placed where the current
+> position is read.
+>
+> An Owner evidence archive was reported as located through an unapproved connected-storage metadata query.
+> Archive content was not retrieved or read.
+> The archive is not accepted as evidence for this checkpoint.
+> Owner authorization is required before any future connected-storage access.
+>
+> Consequences, unchanged by this placement and restated for the head reader: the K3 protocol candidate
+> is **WITHDRAWN** and is not a design input; process-image derivation from that archive stays
+> **DERIVATION_BLOCKED**; the arithmetic that K3 did perform over the Owner-supplied record is classified
+> **RECORD_TO_RECORD_CONSISTENCY_ONLY**, which is not verification against a drawing, a manual, a device
+> or a wire; `STAGE_0.4C-1_TC_ACQUISITION` stays **BLOCKED** and `WIRE_BREAK_DECODING` stays **BLOCKED**.
+> No file, byte or content of the archive was fetched, and none of its names, sizes, digests or offsets is
+> repeated here. Future connected-storage access needs an explicit Owner authorization first; nothing in
+> this repository may assume it. Stage 0.4C-K4 (the Operator presentation slice, PR #46) is a read-only
+> surface over existing contracts and retracts, relaxes or reopens none of the above.
 
 > **Canonical Topology Adoption (2026-10-21; superseded as the current equipment-topology\n> position by the Owner-approved canonical Equipment topology adoption of 2026-10-25 recorded\n> above; retained unedited below as the dated record — supersedes
 > every contrary WJ/IV tier, Target Coverage, assignment, WSB/axis-allocation, REV1-current and
